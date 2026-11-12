@@ -38,7 +38,7 @@ const { db, connectionString } = createPostgresDatabaseConnection(process.env.DA
 const nightlyReport = defineCron({
     schedule: "0 3 * * *",
     async handler(ctx) {
-        const { data } = await ctx.rebase.dataAsAdmin.collection("orders").find({ limit: 100 });
+        const { data } = await ctx.rebase.dataAsAdmin.table("orders").find({ limit: 100 });
         return { orders: data.length };
     }
 });
@@ -116,14 +116,14 @@ const job: CronJobDefinition = {
 
         // ✅ Use ctx.rebase.dataAsAdmin to interact with your data
         const { data: oldSessions } = await ctx.rebase.dataAsAdmin
-            .collection<{ id: string; createdAt: string }>("sessions")
+            .table("sessions")
             .find({
                 where: { createdAt: ["<", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()] },
                 limit: 500,
             });
 
         for (const session of oldSessions) {
-            await ctx.rebase.dataAsAdmin.collection<Record<string, unknown>>("sessions").delete(session.id);
+            await ctx.rebase.dataAsAdmin.table("sessions").delete(String(session.id));
         }
 
         ctx.log(`Cleaned up ${oldSessions.length} expired sessions`);
@@ -158,22 +158,22 @@ const job: CronJobDefinition = {
 
         ctx.log("Fetched rates for", Object.keys(data.rates).length, "currencies");
 
-        // Upsert into your collection using ctx.rebase.dataAsAdmin
+        // Upsert into your table using ctx.rebase.dataAsAdmin
         for (const [currency, rate] of Object.entries(data.rates)) {
             const existing = await ctx.rebase.dataAsAdmin
-                .collection<{ id: string; currency: string; rate: number }>("exchange_rates")
+                .table("exchange_rates")
                 .find({
                     where: { currency: ["==", currency] },
                     limit: 1,
                 });
 
             if (existing.data.length > 0) {
-                await ctx.rebase.dataAsAdmin.collection<Record<string, unknown>>("exchange_rates").update(existing.data[0].id, {
+                await ctx.rebase.dataAsAdmin.table("exchange_rates").update(String(existing.data[0].id), {
                     rate: rate as number,
                     updatedAt: new Date().toISOString(),
                 });
             } else {
-                await ctx.rebase.dataAsAdmin.collection<Record<string, unknown>>("exchange_rates").create({
+                await ctx.rebase.dataAsAdmin.table("exchange_rates").create({
                     currency,
                     rate: rate as number,
                 });
@@ -201,7 +201,7 @@ const job: CronJobDefinition = {
 
     async handler(ctx) {
         const { data: users } = await ctx.rebase.dataAsAdmin
-            .collection<{ id: string; email: string; digestEnabled: boolean }>("users")
+            .table("users")
             .find({
                 where: { digestEnabled: ["==", true] },
             });
@@ -209,7 +209,7 @@ const job: CronJobDefinition = {
         let sent = 0;
         for (const user of users) {
             const { data: notifications } = await ctx.rebase.dataAsAdmin
-                .collection<Record<string, unknown>>("notifications")
+                .table("notifications")
                 .find({
                     where: { userId: ["==", user.id], read: ["==", false] },
                 });
@@ -286,9 +286,9 @@ interface CronJobContext {
 | `signal` | `AbortSignal` | Aborted when the run exceeds `timeoutSeconds`. The timeout stops the scheduler waiting; only this stops the work. Pass it to `fetch`. |
 | `rebase` | `RebaseServerClient` | The server singleton. `rebase.dataAsAdmin` for CRUD, `rebase.email`, `rebase.storage`, `rebase.sql`. |
 
-> **IMPORTANT FOR AGENTS:** `ctx.rebase.dataAsAdmin` is scoped as the **service identity** (`uid: "service"`, `roles: ["admin"]`). Callbacks live in the driver, not in the route layer, so global and collection callbacks still run on this path even though the HTTP loop is skipped. This means:
-> - Collection Callbacks will see `context.user.uid === "service"` and `context.user.roles` containing `"admin"`
-> - If your callbacks implement PII masking or role-based filtering, they should check for admin/service roles and skip masking for server-internal reads
+> **IMPORTANT FOR AGENTS:** `ctx.rebase.dataAsAdmin` is scoped as the **service identity** (`uid: "service"`, `roles: ["admin"]`). Hooks live in the driver, not in the route layer, so global and table hooks still run on this path even though the HTTP loop is skipped. This means:
+> - Table hooks will see `context.user.uid === "service"` and `context.user.roles` containing `"admin"`
+> - If your hooks implement PII masking or role-based filtering, they should check for admin/service roles and skip masking for server-internal reads
 > - The service identity does **not** bypass RLS policies. The driver is scoped with `withAuth({ uid: "service", roles: ["admin"] })`, so statements run as the restricted `rebase_user` role and your policies are evaluated against that identity — it clears the default policies through their `rolesOverlap(['admin'])` arm, and `policy.serverContext()` (`rebase.uid() IS NULL`) is **false** for it. `rebase.sql()` is the real bypass: owner connection, no policies.
 
 ### Using `ctx.rebase`
@@ -297,15 +297,15 @@ interface CronJobContext {
 
 ```typescript
 async handler(ctx) {
-    // Collection CRUD
-    const { data } = await ctx.rebase.dataAsAdmin.collection("orders").find({ limit: 100 });
-    await ctx.rebase.dataAsAdmin.collection("orders").update(id, { status: "archived" });
-    await ctx.rebase.dataAsAdmin.collection("orders").delete(id);
-    await ctx.rebase.dataAsAdmin.collection("metrics").create({ key: "daily_total", value: 42 });
+    // Table CRUD
+    const { data } = await ctx.rebase.dataAsAdmin.table("orders").find({ limit: 100 });
+    await ctx.rebase.dataAsAdmin.table("orders").update(id, { status: "archived" });
+    await ctx.rebase.dataAsAdmin.table("orders").delete(id);
+    await ctx.rebase.dataAsAdmin.table("metrics").create({ key: "daily_total", value: 42 });
 
     // Filtering and sorting — `where` takes [operator, value] tuples, and the key is
     // `orderBy`, not `sort`.
-    const { data: stale } = await ctx.rebase.dataAsAdmin.collection("tokens").find({
+    const { data: stale } = await ctx.rebase.dataAsAdmin.table("tokens").find({
         where: { expiresAt: ["<", new Date().toISOString()] },
         orderBy: ["createdAt", "desc"],
         limit: 500,
@@ -446,7 +446,7 @@ On startup, the scheduler seeds `totalRuns`, `totalFailures`, and `lastRunAt` co
 <!-- docs-verify: ignore -->
 All routes are mounted at `/api/admin/cron`. `GET` routes need the **`cron:read`** scope; `POST /:id/trigger` and `PUT /:id` need **`cron:write`**. `/api/cron` is kept alive as a legacy alias and answers with a `Deprecation` header; write the `/api/admin` path.
 
-> **IMPORTANT FOR AGENTS**: The caller needs the scope, whoever it is: an admin (holds every scope), a person whose role declares `cron:read`/`cron:write` under `auth.roles` on the users collection, the service key, or an API key minted with them — the right credential for an external scheduler: `rebase api-keys create --name "Scheduler" --scopes cron:read,cron:write`. Unauthenticated requests get 401; a caller without the scope gets `403 SCOPE_MISSING` with `details.requiredScope`.
+> **IMPORTANT FOR AGENTS**: The caller needs the scope, whoever it is: an admin (holds every scope), a person whose role declares `cron:read`/`cron:write` under `auth.roles` on the users table, the service key, or an API key minted with them — the right credential for an external scheduler: `rebase api-keys create --name "Scheduler" --scopes cron:read,cron:write`. Unauthenticated requests get 401; a caller without the scope gets `403 SCOPE_MISSING` with `details.requiredScope`.
 
 ### List All Jobs
 

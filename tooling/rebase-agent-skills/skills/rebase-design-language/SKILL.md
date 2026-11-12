@@ -36,7 +36,7 @@ Its header says the markup and classes are copied from the source files they nam
 import type { AppView } from "@rebasepro/cms-types";
 import { UIReferenceView } from "@rebasepro/app/debug";
 
-// <RebaseCMS collections={collections} views={[uiReference]} />
+// <RebaseCMS tableCustomizations={tableCustomizations} views={[uiReference]} />
 export const uiReference: AppView = {
     slug: "debug/ui",
     name: "UI reference",

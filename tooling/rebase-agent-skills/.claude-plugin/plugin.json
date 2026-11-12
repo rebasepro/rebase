@@ -3,7 +3,7 @@
   "name": "rebase",
   "displayName": "Rebase",
   "version": "0.30.1",
-  "description": "Skills for building on Rebase, the open-source Postgres backend and admin panel: collections, auth and row-level security, the REST API and SDK, realtime, storage, email, webhooks, cron jobs, custom functions and deployment.",
+  "description": "Skills for building on Rebase, the open-source Postgres backend and admin panel: tables and schema-as-code, auth and row-level security, the REST API and SDK, realtime, storage, email, webhooks, cron jobs, custom functions and deployment.",
   "author": {
     "name": "Rebase",
     "url": "https://rebase.pro"

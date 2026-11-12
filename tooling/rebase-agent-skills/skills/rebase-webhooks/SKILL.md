@@ -5,7 +5,7 @@ description: Guide for sending outbound HTTP webhooks on entity changes in a Reb
 
 # Rebase Webhooks
 
-> **IMPORTANT FOR AGENTS**: The `WebhookDispatcher` is a **standalone service class** exported from `@rebasepro/server`. It is **not** auto-wired into the backend init pipeline — you must instantiate it yourself and call `onEntityChange()` from your application code (e.g. collection callbacks, custom functions, or cron jobs). Do NOT look for a `webhooks` key in `RebaseBackendConfig`.
+> **IMPORTANT FOR AGENTS**: The `WebhookDispatcher` is a **standalone service class** exported from `@rebasepro/server`. It is **not** auto-wired into the backend init pipeline — you must instantiate it yourself and call `onEntityChange()` (or `enqueueEntityChange()`) from your application code (e.g. table hooks, custom functions, or cron jobs). Do NOT look for a `webhooks` key in `RebaseBackendConfig`.
 
 > **IMPORTANT FOR AGENTS**: Webhooks are **outbound** HTTP POST requests sent by your Rebase backend to external URLs. They are NOT inbound endpoints. To receive webhooks FROM external services, use Rebase custom functions instead (see `rebase-custom-functions` skill).
 
@@ -19,7 +19,7 @@ Rebase provides a `WebhookDispatcher` class for sending HTTP webhook notificatio
 - **Custom headers** — Attach authorization tokens or other headers to outbound requests
 - **10-second deadline** — Covers the response body as well as the headers; the body is capped at 64 KB
 - **Destination validation** — Loopback, link-local, private and non-`http(s)` destinations are refused, and redirects are not followed
-- **Queued delivery** — `enqueueEntityChange()` returns immediately, so a collection callback never holds its transaction open on HTTP
+- **Queued delivery** — `enqueueEntityChange()` returns immediately, so a table hook never holds its transaction open on HTTP
 - **Multiple webhooks** — Multiple webhooks can match the same entity change
 
 ## Setup
@@ -405,18 +405,20 @@ A refused destination comes back as `success: false` with the reason in `respons
 
 ## Integration Patterns
 
-### With Collection Callbacks
+### With Table Hooks
 
-The most common pattern is to wire the dispatcher into Rebase collection callbacks so webhooks fire automatically on CRUD operations. Use `enqueueEntityChange()` here, never `await onEntityChange()`:
+The most common pattern is to wire the dispatcher into a table's hooks so webhooks fire automatically on CRUD operations. Use `enqueueEntityChange()` here, never `await onEntityChange()`:
 
-> **IMPORTANT FOR AGENTS**: `afterSave` and `afterDelete` are awaited **inside the write's Postgres transaction**. Awaiting a delivery there holds a pooled connection and the row's locks until the receiver answers — up to ~36 seconds across three attempts for the slowest matching webhook — and a throw from the callback rolls the customer's write back. `enqueueEntityChange()` returns `void` immediately and queues the deliveries once the write commits — never for a write that rolls back — which is why it is the pattern for callbacks.
+> **IMPORTANT FOR AGENTS**: `afterSave` and `afterDelete` are awaited **inside the write's Postgres transaction**. Awaiting a delivery there holds a pooled connection and the row's locks until the receiver answers — up to ~36 seconds across three attempts for the slowest matching webhook — and a throw from the hook rolls the customer's write back. `enqueueEntityChange()` returns `void` immediately and queues the deliveries once the write commits — never for a write that rolls back — which is why it is the pattern for hooks.
 
-> **IMPORTANT FOR AGENTS**: keep the dispatcher **out of the collection file**. A collection file is also bundled into the admin, in the browser: the build strips its callbacks, but a dispatcher built at the top of the file — and its `@rebasepro/server` import — would ship to every visitor and fail the admin build. Wire it in server code with `backend.setCollectionCallbacks`.
+> **IMPORTANT FOR AGENTS**: keep the dispatcher **out of `backend/schema/`**. Schema files import `@rebasepro/server/schema`, which loads no server code, because the CLI evaluates them for `rebase verify`, `schema generate` and `db push` and the frontend imports their types; a dispatcher built at the top of one — and its `@rebasepro/server` import — would run there too. Wire it in server code with `backend.setTableHooks`.
 
 ```typescript
 // Server-only: call once with what `initializeRebaseBackend` returned.
-import type { CollectionCallbacks } from "@rebasepro/types";
+import type { TableHooks } from "@rebasepro/server/schema";
+import { composeTableHooks } from "@rebasepro/common";
 import { WebhookDispatcher, type RebaseBackendInstance } from "@rebasepro/server";
+import { orders } from "../schema/orders";
 
 export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
     const dispatcher = new WebhookDispatcher({
@@ -435,20 +437,20 @@ export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
         },
     ]);
 
-    const callbacks: CollectionCallbacks = {
-        afterSave: async ({ id, values, previousValues, status, collection }) => {
+    const webhooks: TableHooks = {
+        afterSave: async ({ id, values, previousValues, status, table }) => {
             const event = status === "new" ? "INSERT" : "UPDATE";
             dispatcher.enqueueEntityChange(
-                collection.slug,
+                table.slug,
                 event,
                 String(id),
                 values,
                 status === "new" ? undefined : previousValues
             );
         },
-        afterDelete: async ({ id, collection }) => {
+        afterDelete: async ({ id, table }) => {
             dispatcher.enqueueEntityChange(
-                collection.slug,
+                table.slug,
                 "DELETE",
                 String(id),
                 null
@@ -456,9 +458,8 @@ export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
         },
     };
 
-    // Replaces the callbacks the collection declares — compose them with
-    // `composeCallbacks(declared, callbacks)` if it has some.
-    backend.setCollectionCallbacks("orders", callbacks);
+    // setTableHooks replaces the hooks the table declares — compose them.
+    backend.setTableHooks("orders", composeTableHooks(orders.config.hooks, webhooks));
 }
 ```
 
@@ -497,7 +498,7 @@ export default defineFunction((app, { rebase }) => {
 
         // Create the payment record
         const payment = await rebase.dataAsAdmin
-            .collection<{ id: string; orderId: string; amount: number; status: string }>("payments")
+            .table("payments")
             .create({
             orderId,
             amount,
@@ -508,7 +509,7 @@ export default defineFunction((app, { rebase }) => {
         const results = await dispatcher.onEntityChange(
             "payments",
             "INSERT",
-            payment.id,
+            String(payment.id),
             payment
         );
 
@@ -523,7 +524,7 @@ export default defineFunction((app, { rebase }) => {
 
 ### Shared Dispatcher Instance
 
-For applications with many collections, create a single shared dispatcher:
+For applications with many tables, create a single shared dispatcher:
 
 ```typescript
 // backend/lib/webhooks.ts
@@ -570,17 +571,20 @@ dispatcher.setWebhooks(webhooks);
 export { dispatcher };
 ```
 
-Then import it from any callback or function:
+Then import it from any server-side hook or function:
 
 ```typescript
+import type { TableHooks } from "@rebasepro/server/schema";
 import { dispatcher } from "../lib/webhooks";
 
-// In a collection callback:
-afterSave: async ({ id, values, status, collection }) => {
-    if (status === "new") {
-        dispatcher.enqueueEntityChange(collection.slug, "INSERT", String(id), values);
+// Table hooks, wired with backend.setTableHooks:
+const orderHooks: TableHooks = {
+    afterSave: async ({ id, values, status, table }) => {
+        if (status === "new") {
+            dispatcher.enqueueEntityChange(table.slug, "INSERT", String(id), values);
+        }
     }
-},
+};
 ```
 
 ## WebhookDispatcher API Reference
@@ -607,11 +611,11 @@ Checks all registered webhooks for matching `table` + `event`, and dispatches to
 
 **Returns:** `Promise<WebhookDeliveryResult[]>` — One result per matching webhook. Empty array if no webhooks match.
 
-**Do not await this in a collection callback** — see the warning under *Integration Patterns*. It is for a custom function, a job, or anywhere else the caller genuinely wants to know the outcome before continuing.
+**Do not await this in a table hook** — see the warning under *Integration Patterns*. It is for a custom function, a job, or anywhere else the caller genuinely wants to know the outcome before continuing.
 
 ### `enqueueEntityChange(table, event, id, entity, previousEntity?): void`
 
-Same matching and same payload, queued instead of awaited. Returns `void` immediately. Called inside a write (from a callback), the deliveries are held until that write commits and dropped if it rolls back; then they run on an in-process drain loop — one per webhook, so a receiver that is down delays only its own deliveries — so a collection callback does not hold its transaction open on HTTP and a receiver's outage cannot roll a write back. Results are reported through the `onDelivery` option.
+Same matching and same payload, queued instead of awaited. Returns `void` immediately. Called inside a write (from a hook), the deliveries are held until that write commits and dropped if it rolls back; then they run on an in-process drain loop — one per webhook, so a receiver that is down delays only its own deliveries — so a collection callback does not hold its transaction open on HTTP and a receiver's outage cannot roll a write back. Results are reported through the `onDelivery` option.
 
 By default the queue is **in memory**: a crash or a deploy between the commit and the delivery drops the event. Each webhook's in-memory queue holds at most **10,000** deliveries waiting; past that a new delivery is refused and reported to `onDelivery` as `success: false`, `statusCode: 0`, `attemptNumber: 0`, `responseBody: "queue full"`. **Prefer the job queue below for anything that matters** — it is the recipe's primary example.
 
@@ -680,13 +684,18 @@ for (const result of results) {
 
 ### Non-Blocking Pattern
 
-If you don't want webhook delivery to block your API response — and inside a collection callback you never do — use `enqueueEntityChange` and read the outcome from `onDelivery`:
+If you don't want webhook delivery to block your API response — and inside a table hook you never do — use `enqueueEntityChange` and read the outcome from `onDelivery`:
 
 ```typescript
-afterSave: async ({ id, values, collection }) => {
-    // Returns void. Delivery is queued once this write commits.
-    dispatcher.enqueueEntityChange(collection.slug, "INSERT", String(id), values);
-},
+import type { TableHooks } from "@rebasepro/server/schema";
+import { dispatcher } from "../lib/webhooks";
+
+const webhookHooks: TableHooks = {
+    afterSave: async ({ id, values, table }) => {
+        // Returns void. Delivery is queued once this write commits.
+        dispatcher.enqueueEntityChange(table.slug, "INSERT", String(id), values);
+    }
+};
 ```
 
 > **WARNING FOR AGENTS**: the old form of this pattern — calling `onEntityChange` without awaiting and attaching `.catch()` — reports nothing. `onEntityChange` converts every failure into a result and never rejects, so that `.catch` can only fire on a bug in the dispatcher itself. Use `enqueueEntityChange` plus `onDelivery`.

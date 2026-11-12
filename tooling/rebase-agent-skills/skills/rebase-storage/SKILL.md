@@ -11,10 +11,10 @@ Rebase provides built-in file storage with support for local filesystem, S3-comp
 
 ## Declaring buckets (scaffolded projects)
 
-Since 0.17.0 a bucket is a **declared resource**, not a backend option. A scaffolded project never calls `initializeRebaseBackend` — declare the bucket in `config/resources.ts` and bind it from the environment:
+Since 0.17.0 a bucket is a **declared resource**, not a backend option. A scaffolded project never calls `initializeRebaseBackend` — declare the bucket in `backend/resources.ts` and bind it from the environment:
 
 ```ts
-// config/resources.ts
+// backend/resources.ts
 import { bucket } from "@rebasepro/types";
 
 export const files = bucket({ engine: "s3" });           // the default bucket: S3_BUCKET, S3_REGION, …
@@ -23,10 +23,10 @@ export const media = bucket("media", { engine: "s3" });  // a named one: S3_BUCK
 
 - **Env suffix `<BASE>__<KEY>`.** The default bucket reads the plain names in [Environment Variables](#environment-variables). A named bucket reads each of them with its key appended, uppercased, non-alphanumerics collapsed to `_`: `bucket("media-cdn")` reads `S3_BUCKET__MEDIA_CDN`.
 - **Shared credentials.** `bucket("media", { engine: "s3", account: "minio" })` keeps its own `S3_BUCKET__MEDIA` but falls back to `S3_ACCESS_KEY_ID__MINIO`, `S3_SECRET_ACCESS_KEY__MINIO`, `S3_ENDPOINT__MINIO` (and region, path style) when no per-bucket value is set.
-- **One default.** Uploads whose property names no `storageSource` go to the default-keyed `bucket()`, or to a named bucket marked `default: true`. Mark one; do not rely on declaration order.
+- **One default.** Uploads whose column names no `source` go to the default-keyed `bucket()`, or to a named bucket marked `default: true`. Mark one; do not rely on declaration order.
 - **Engines** are `local`, `s3` and `gcs` on the server. `transport: "direct"` declares a bucket the client talks to itself, with the backend out of the path.
 - **Unbound is not an error.** In development an unbound bucket stands in as a local directory; in production it stays off — requests naming it answer `501 STORAGE_SOURCE_NOT_CONFIGURED`, and an unbound default answers requests that name no source with `501 STORAGE_NOT_CONFIGURED`. `rebase status` names the variable it is waiting on. A project that declares no bucket at all still gets one default bucket, typed by `STORAGE_TYPE`.
-- **Point a property at a bucket by handle:** `storage: { storageSource: media }` (the key string works too).
+- **Point a column at a bucket by handle:** `col.storage({ path: "media/", source: media })` (the key string works too).
 
 The `storage` option below is the **ejected / custom-server** form — what you pass when you call `initializeRebaseBackend` yourself. Passing the removed `storageSources` config key is refused at boot.
 
@@ -95,16 +95,16 @@ These options are set internally when mounting routes but are derived from the b
 
 > **REQUIRED FOR MULTI-TENANT APPS.** `requireAuth` and `publicRead` are *global* switches: they decide whether a caller must be signed in, not what that caller may touch. Without an `authorize` hook, **any authenticated user can read any key they can name** — the only thing separating two tenants' files is key unguessability, which is not an access-control model. Worse, they can `GET /storage/list?prefix=` first, so the keys need not even be guessed.
 
-> **STORAGE REFUSES TO BOOT IN PRODUCTION WITHOUT ONE.** Collections are protected by row-level security; storage is not, and there is no per-object equivalent in the bucket — so this hook *is* the model. When storage is configured and `NODE_ENV=production`, `initializeRebaseBackend` **throws at startup** unless one of these is set:
+> **STORAGE REFUSES TO BOOT IN PRODUCTION WITHOUT ONE.** Tables are protected by row-level security; storage is not, and there is no per-object equivalent in the bucket — so this hook *is* the model. When storage is configured and `NODE_ENV=production`, `initializeRebaseBackend` **throws at startup** unless one of these is set:
 >
 > - `storageAuthorize` — a hook, per object. Recommended.
 > - `storagePolicies` — declarative path patterns (`{ path: "users/:uid/**", allow: ({ params, user }) => user?.uid === params.uid }`). A key no policy matches is refused unless a `storageAuthorize` hook allows it. Ejected-only.
 > - `storagePublicRead: true` — the bucket genuinely is a public read-only CDN.
 > - `storageInsecureAllowAnyAuthenticated: true` — a single-tenant app where every signed-in user is trusted with every file. Named to be read twice.
 >
-> In development it logs a warning instead, so a project can be wrong about this and work fine locally right up until it is deployed. The environment spellings are `STORAGE_PUBLIC_READ` and `STORAGE_ALLOW_ANY_AUTHENTICATED`. A scaffolded project ships a hook in `config/storage.ts` already — read it before replacing it, and note that it models a CMS's *shared content library*, which is not the shape of per-user files.
+> In development it logs a warning instead, so a project can be wrong about this and work fine locally right up until it is deployed. The environment spellings are `STORAGE_PUBLIC_READ` and `STORAGE_ALLOW_ANY_AUTHENTICATED`. A scaffolded project ships a hook in `backend/storage.ts` already (`export const storageAuthorize`, which the runtime reads) — read it before replacing it, and note that it models a CMS's *shared content library*, which is not the shape of per-user files.
 
-Set `storageAuthorize` on `initializeRebaseBackend`. It is the storage analogue of a collection's security rules, and runs after authentication on every storage route:
+Export `storageAuthorize` from `backend/storage.ts` (or set it on `initializeRebaseBackend` when ejected). It is the storage analogue of a table's `rls`, and runs after authentication on every storage route:
 
 ```typescript no-verify
 await initializeRebaseBackend({
@@ -125,7 +125,7 @@ await initializeRebaseBackend({
 | `operation` | `"read" \| "write" \| "delete" \| "list"` | What the request is attempting |
 | `user` | `{ uid, email?, roles? } \| null` | Resolved caller; `null` when the route allows anonymous access |
 | `storageId` | `string \| undefined` | Named backend, when the request targeted one |
-| `data` | `StorageAuthorizeData \| undefined` | Trusted, **RLS-bypassing** read access — `data.collection(slug).find(query)` / `.findById(id)`. Ownership lives in a row, not in a key prefix, so the hook needs a reader to answer "who owns this object?". It bypasses RLS deliberately: this hook *is* the authorization decision, and making it through a reader already narrowed by the caller's own permissions would be circular. Read-only by design |
+| `data` | `StorageAuthorizeData \| undefined` | Trusted, **RLS-bypassing** read access — `data.table(slug).find(query)` / `.findById(id)`. Ownership lives in a row, not in a key prefix, so the hook needs a reader to answer "who owns this object?". It bypasses RLS deliberately: this hook *is* the authorization decision, and making it through a reader already narrowed by the caller's own permissions would be circular. Read-only by design |
 
 Return `false` to deny with a **403**. Throwing also denies — an ownership lookup that fails does not fall open.
 
@@ -241,7 +241,7 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-> **IMPORTANT FOR AGENTS:** Include a `"(default)"` key. Nothing is promoted to default any more — a map without one has no default backend, so an upload whose property names no `storageSource` has nowhere to go. The REST API routes use the default controller unless a `?storageId=<key>` query parameter is provided (see [REST API Endpoints](#rest-api-endpoints)). Use `storageRegistry.get("media")` or `storageRegistry.getOrDefault("media")` to access named backends programmatically.
+> **IMPORTANT FOR AGENTS:** Include a `"(default)"` key. Nothing is promoted to default any more — a map without one has no default backend, so an upload whose column names no `source` has nowhere to go. The REST API routes use the default controller unless a `?storageId=<key>` query parameter is provided (see [REST API Endpoints](#rest-api-endpoints)). Use `storageRegistry.get("media")` or `storageRegistry.getOrDefault("media")` to access named backends programmatically.
 
 ### StorageRegistry API
 
@@ -327,7 +327,7 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 ## Server-Side Storage (custom functions, hooks, jobs)
 
 > **🚨 CRITICAL FOR AGENTS — do NOT hand-roll a cloud SDK.** Inside a custom
-> function, collection hook, or cron job, use the configured storage controller
+> function, table hook, or cron job, use the configured storage controller
 > at **`rebase.storage`**. **Never** `import "@aws-sdk/client-s3"` or
 > `import "@google-cloud/storage"` (or `new S3Client`, `new Storage()`) directly.
 > Doing so hardcodes one backend, bypasses the `storage` config, duplicates the
@@ -437,7 +437,7 @@ Upload a file via `multipart/form-data`.
 | `key` | `string` | No | Storage key/path. Falls back to original filename, then `"unnamed"` |
 | `bucket` | `string` | No | Target bucket name |
 | `storageId` | `string` | No | Route to a named backend (alternative to `?storageId` query param) |
-| `collection`, `property` | `string` | No | The property the file is for — holds it to that property's `storage.maxSize` and `acceptedFiles` |
+| `collection`, `property` | `string` | No | The table slug and the storage column the file is for (wire names) — holds it to that column's `maxBytes` and `accept` |
 | `metadata_*` | `string` | No | Custom metadata keys prefixed with `metadata_` |
 
 **Response** (201):
@@ -628,7 +628,7 @@ Create a new resumable upload.
 | `key` | Explicit storage key/path |
 | `bucket` | Target bucket |
 | `storageId` | Named backend (wins over the `storageId` in the query string) |
-| `collection`, `property` | The property the file is for — its `maxSize` / `acceptedFiles` are checked at creation |
+| `collection`, `property` | The table slug and the storage column the file is for (wire names) — its `maxBytes` / `accept` are checked at creation |
 | `contentType` | File MIME type |
 | `filetype` | Alternative MIME type key (fallback) |
 | `metadata_<name>` | Custom metadata, as the multipart route's `metadata_*` fields |
@@ -822,7 +822,7 @@ if (config.fileNotFound) {
 **URL model — never contains the access token:**
 
 - **Private files** → `{baseUrl}/api/storage/file/{path}?token={scopedDownloadToken}`. The token is a **short-lived, path-scoped** download token (default 5 min), signed by the server and valid only for that object — never the caller's full access JWT. Because it expires, **do not persist a private URL**: store the file **path** and call `getSignedUrl()` again at render time.
-- **Public files** → `{baseUrl}/api/storage/file/{path}` with **no token**. A file is public when it lives under the `public/` prefix — set `storage: { public: true }` on the property, or pass `public: true` to `putObject`. Public URLs are **stable, permanent, and CDN-cacheable**, so they are safe to store in a database and hotlink. For public paths, `getSignedUrl()` returns the URL immediately with no server round-trip.
+- **Public files** → `{baseUrl}/api/storage/file/{path}` with **no token**. A file is public when it lives under the `public/` prefix — set `public: true` in the column's `col.storage({ … })`, or pass `public: true` to `putObject`. Public URLs are **stable, permanent, and CDN-cacheable**, so they are safe to store in a database and hotlink. For public paths, `getSignedUrl()` returns the URL immediately with no server round-trip.
 
 Protocol prefixes (`local://`, `s3://`) are automatically stripped from the key.
 
@@ -875,56 +875,56 @@ console.log(result.prefixes);    // folders: StorageReference[]
 console.log(result.nextPageToken); // for next page, or undefined
 ```
 
-## Collection File Upload Properties
+## File columns in a table
 
-Define file upload fields in your collections using the `storage` option on string properties:
+A file is a `col.storage()` column in the table's `defineTable`
+(`backend/schema/`). It holds the file's path; `.multiple()` holds several:
 
 ```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+// backend/schema/products.ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
-const productsCollection = defineCollection({
-    name: "Products",
-    slug: "products",
-    table: "products",
-    properties: {
-        image: {
-            name: "Product Image",
-            type: "string",
-            storage: {
-                storageSource: "external-source",
-                storagePath: "products/{id}",
-                acceptedFiles: ["image/*"],
-                maxSize: 5 * 1024 * 1024, // 5MB
-            }
-        },
-        documents: {
-            name: "Documents",
-            type: "array",
-            of: {
-                name: "Document",
-                type: "string",
-                storage: {
-                    storageSource: "media",              // routes to the "media" backend
-                    storagePath: "products/documents",
-                    acceptedFiles: ["application/pdf", "application/msword"],
-                }
-            }
-        }
-    }
+export const products = defineTable("products", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        image: col.storage({
+            path: "products/{id}/",
+            source: "external-source",
+            accept: ["image/*"],
+            maxBytes: "5MB"
+        }),
+        documents: col.storage({
+            path: "products/documents/",
+            source: "media",                        // routes to the "media" bucket
+            accept: ["application/pdf", "application/msword"]
+        }).multiple()
+    },
+    rls: "admin-only"
 });
 ```
 
-The `storageSource` field maps to a named backend registered in the `StorageRegistry` (server-side) or in the `storageSources` prop (client-side). When omitted, the `(default)` backend is used.
+`source` names a bucket declared in `backend/resources.ts` — a `bucket()`
+handle or its key — registered in the `StorageRegistry` server-side, or in the
+`storageSources` prop client-side. When omitted, the `(default)` bucket is used.
+A file inside a JSON document is `json.storage({ … })` with the same options.
 
-### StorageConfig Properties
+### `col.storage()` options
 
-| Property | Type | Description |
+| Option | Type | Description |
 |----------|------|-------------|
-| `storageSource` | `string` or a `bucket()` handle | Named backend to route uploads to (optional, defaults to `(default)`) |
-| `storagePath` | `string \| (context) => string` | **Required.** Path template for uploaded files. Placeholders: `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{id}` (the record's id; `{entityId}` is read the same), `{propertyKey}`, `{path}`. Resolved by the admin panel's uploader — nothing on the server confines an upload to this prefix; that is what `storageAuthorize` / `storagePolicies` are for |
-| `acceptedFiles` | `string[]` | Accepted MIME types or globs (e.g., `["image/*"]`) |
-| `maxSize` | `number` | Maximum file size in bytes |
+| `path` | `string` | **Required.** Path template for uploaded files: `"posts/hero/"`, `"users/{id}/"`. Resolved by the admin panel's uploader — nothing on the server confines an upload to this prefix; that is what `storageAuthorize` / `storagePolicies` are for |
+| `source` | `string` or a `bucket()` handle | The bucket to route uploads to (optional, defaults to `(default)`) |
+| `accept` | `string[]` | Accepted MIME types or globs (e.g., `["image/*"]`); enforced by the upload route |
+| `maxBytes` | `number \| string` | Maximum file size: bytes, or `"10MB"`, `"512 kb"`; enforced by the upload route |
+| `imageResize` | `{ maxWidth?, maxHeight?, mode?, format?, quality? }` | Resize images before storing them |
 | `public` | `boolean` | Store files under the `public/` prefix and serve them via stable, token-less, permanent, CDN-cacheable URLs (safe to persist/hotlink). Defaults to `false` (private, short-lived signed URLs). |
+| `fileName` | `string` | The stored file name, as a template |
+| `storeUrl` / `includeBucketUrl` | `boolean` | Store the download URL, or the bucket URL in front of the path |
+
+Browser-side upload functions (a computed path, `processFile`, `postProcess`)
+are presentation: `fields.<key>.storage` in the table's `customizeTable`
+(see `rebase-collections`). The orphan sweep (`rebase storage orphans`) counts a
+file as referenced while a row holds its path.
 
 ## Frontend Storage Sources
 

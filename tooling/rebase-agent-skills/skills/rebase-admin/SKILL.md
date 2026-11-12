@@ -25,7 +25,7 @@ The `@rebasepro/cms` package provides the admin-panel layer for Rebase. It handl
 | One record, read-only, in your own page | `<RecordDetail>` | `@rebasepro/cms` |
 | One value of a row, drawn as the admin draws it | `<FieldValue>` | `@rebasepro/cms` |
 | Add custom top-level views | `<RebaseCMS views={[...]}>` | `@rebasepro/cms` |
-| Replace how one property is edited or shown | `admin: { Field, Preview }` | see §12 |
+| Replace how one field is edited or shown | `fields: { <key>: { Field, Preview } }` in `customizeTable` | see §12 |
 | Open an entity selection dialog | `useSelectionDialog()` | `@rebasepro/cms` |
 | Open a custom side dialog | `useSideDialogsController()` | `@rebasepro/cms` |
 | Set breadcrumbs | `useBreadcrumbsController()` | `@rebasepro/cms` |
@@ -290,7 +290,7 @@ const registry = useCollectionRegistryController();
 const products = registry.getCollection("products");
 if (products) {
     console.log("Collection name:", products.name);
-    console.log("Properties:", Object.keys(products.properties));
+    console.log("Fields:", Object.keys(products.properties));
 }
 
 // List all collections
@@ -351,9 +351,9 @@ type CollectionPanelProps = {
     /** The ids of the rows drawn as selected; `[]` for none. Default: the row last opened */
     highlightedIds?: (string | number)[];
 
-    /** Only these properties, in this order: the table's columns, and what list rows,
-     *  cards and kanban cards are filled from. Wins over propertiesOrder, the saved
-     *  order and listProperties for this panel */
+    /** Only these fields, in this order: the table's columns, and what list rows,
+     *  cards and kanban cards are filled from. Wins over the customization's
+     *  fieldOrder, the saved order and listFields for this panel */
     fields?: string[];
 
     /** The toolbar: "full" (default), "compact" (search, view switch, New),
@@ -461,7 +461,7 @@ import { CollectionPanel, RecordForm } from "@rebasepro/cms";
   (0.29+) draws one value as the server sends it (`useRows`, `client.data`)
   through `PropertyPreview`. A belongsTo's foreign key
   (`field="customer" value={order.customerId}`) is shown as the target's title. It needs the collection
-  registered above it (`<RebaseCMS>` or `CollectionsProvider`); an unknown
+  registered above it (`<RebaseCMS>` or `CollectionsProvider` — every table the server serves is); an unknown
   collection or field throws.
 
 - No CMS route serves the page, so a record clicked in the table opens in a
@@ -475,7 +475,7 @@ import { CollectionPanel, RecordForm } from "@rebasepro/cms";
 ```tsx
 import { CollectionPanel, CollectionsProvider } from "@rebasepro/cms";
 
-<CollectionsProvider collections={[postsCollection, authorsCollection]}>
+<CollectionsProvider tableCustomizations={[postsCms, authorsCms]}>
     <CollectionPanel collection="posts"/>
     <CollectionPanel collection="authors"/>
 </CollectionsProvider>
@@ -798,7 +798,7 @@ interface AppView {
 
 ```tsx
 <RebaseCMS
-    collections={collections}
+    tableCustomizations={tableCustomizations}
     views={[
         { slug: "dashboard", name: "Dashboard", icon: "LayoutDashboard", view: <Dashboard /> },
         { slug: "reports",   name: "Reports",   icon: "FileText",        view: <Reports />, group: "Analytics" },
@@ -813,7 +813,7 @@ Pass a function instead of an array to dynamically resolve views based on the cu
 
 ```tsx
 <RebaseCMS
-    collections={collections}
+    tableCustomizations={tableCustomizations}
     views={({ user, authController, data }) => [
         { slug: "dashboard", name: "Dashboard", icon: "LayoutDashboard", view: <Dashboard /> },
         ...(user?.roles?.includes("analyst")
@@ -839,7 +839,7 @@ const myPlugin: RebasePlugin = {
 
 // `plugins` is a prop of <Rebase>, NOT of <RebaseCMS>.
 <Rebase plugins={[myPlugin]} client={client} authController={authController}>
-    {() => <RebaseCMS collections={collections} />}
+    {() => <RebaseCMS tableCustomizations={tableCustomizations} />}
 </Rebase>
 ```
 
@@ -858,7 +858,7 @@ All views (admin, builder, plugin) are merged in order: **admin views → Studio
   `hooks.modifyCollection` is synchronous over data it already has — a plugin's
   `loading: true` does not hold back `<Rebase>`'s plain children, and
   `modifyCollection` is not re-applied when data arrives later. To react to
-  changes, subscribe with `context.data.collection(slug).listen(...)` from
+  changes, subscribe with `context.data.table(slug).listen(...)` from
   `lifecycle.onMount`, unsubscribing in `onUnmount`. (The `onCollectionChange`
   an entity action's `onClick` receives is a different, working API.)
 
@@ -885,7 +885,7 @@ Views participate in the same navigation group system as collections. Use the `g
 
 ```tsx
 <RebaseCMS
-    collections={collections}
+    tableCustomizations={tableCustomizations}
     views={[
         { slug: "dashboard", name: "Dashboard", view: <Dashboard />, group: "Analytics" },
         { slug: "reports",   name: "Reports",   view: <Reports />,   group: "Analytics" },
@@ -930,7 +930,7 @@ no `basename`, is to tell the CMS about the prefix instead:
 
 ```tsx
 // frontend/src/AdminApp.tsx — tell the admin about the prefix
-<RebaseCMS collections={collections} basePath="/admin" />
+<RebaseCMS tableCustomizations={tableCustomizations} basePath="/admin" />
 ```
 
 > **IMPORTANT FOR AGENTS:** Choose **either** a router `basename="/admin"` **or** `<RebaseCMS basePath="/admin">` — never both, or the prefix is applied twice. Without either, collection views hang on a spinner because URL⇄collection resolution never matches. `<RebaseCMS>` works under any React Router router (0.25+; in 0.24 and earlier it required a **data router**, `createBrowserRouter`, because of `useBlocker`). Prefer a data router anyway: under it, unsaved-changes guards also block in-app navigation, where under `<BrowserRouter>` they can only prompt when leaving the app.
@@ -939,28 +939,30 @@ no `basename`, is to tell the CMS about the prefix instead:
 
 ## 12. Custom Field and Preview Components
 
-To replace how a single property is edited or displayed, point at your component from the property's `admin` block. `Field` is the form editor; `Preview` is the read-only rendering used in table cells and reference previews.
+To replace how a single field is edited or displayed, give the column a component under `fields` in the table's `customizeTable` (in `frontend/src/cms/`). `Field` is the form editor; `Preview` is the read-only rendering in tables, cards and references. Both are imported **by value** — the customization is frontend code, so there is no string path and no lazy thunk (`customizeTable` throws on either):
 
-```ts no-verify
-// config/collections/exercises.ts — a collection file, which the backend also loads
-body_parts: {
-    name: "Affected body parts",
-    type: "array",
-    of: { type: "string", name: "Part", enum: [/* … */] },
-    admin: {
-        Field: () => import("../../frontend/src/BodyPartsField"),
-        Preview: () => import("../../frontend/src/BodyPartsPreview")
+```tsx
+// frontend/src/cms/exercises.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { exercises } from "../../../backend/schema/exercises";
+import BodyPartsField from "../BodyPartsField";
+import BodyPartsPreview from "../BodyPartsPreview";
+
+export const exercisesCms = customizeTable<typeof exercises>("exercises", {
+    fields: {
+        body_parts: { name: "Affected body parts", Field: BodyPartsField, Preview: BodyPartsPreview }
     }
-}
+});
 ```
 
-The value is a **lazy import thunk**, and that is deliberate: a collection file is read by the server as well, so it must not import React. The thunk is type-checked at the call site and never called by the backend. The admin resolves it with `React.lazy` on first render. A direct component reference (`Field: MyField`) also works in a file the backend never loads.
+The table in `backend/schema/exercises.ts` declares the column
+(`body_parts: col.array(col.text().oneOf([...]))`); the frontend imports it as
+a type only, so no server code reaches the browser.
 
 The component itself is ordinary React, in `frontend/`:
 
 ```tsx
-// frontend/src/BodyPartsField.tsx — default-exported, because the thunk resolves
-// to the module's `default`.
+// frontend/src/BodyPartsField.tsx
 import type { FieldProps } from "@rebasepro/cms";
 import type { ArrayProperty } from "@rebasepro/types";
 
@@ -971,17 +973,15 @@ export default function BodyPartsField({ value, setValue, property, error, disab
 
 ```tsx
 // frontend/src/BodyPartsPreview.tsx
-import type { PropertyPreviewProps } from "@rebasepro/cms";
-import type { ArrayProperty } from "@rebasepro/types";
+import type { FieldPreviewProps } from "@rebasepro/cms-types";
 
-export default function BodyPartsPreview({ value, property, size }: PropertyPreviewProps<ArrayProperty>) {
+export default function BodyPartsPreview({ value, property, size }: FieldPreviewProps) {
     return null; // …your read-only rendering
 }
 ```
 
-Read the enum, labels and limits off the `property` argument rather than restating them, so the component cannot drift from the collection.
+Read the enum values, labels and limits off the `property` argument rather than restating them, so the component cannot drift from the table.
 
-> **IMPORTANT FOR AGENTS:** the module must have a **default export** — the resolver takes `default` from what the thunk resolves to, and a named-only export renders nothing. A component whose name begins with a capital and takes no props is treated as a component, not a loader, so `Preview: () => null` is a (useless) component while `Preview: () => import("…")` is a loader; the distinction is made on the dynamic import in the body, not the name.
 
 ---
 
@@ -991,7 +991,7 @@ The admin package exports the following components (from `@rebasepro/cms`):
 
 | Component | Description |
 |-----------|-------------|
-| `RebaseCMS` | Declarative admin config (collections, views, editor) — renders nothing |
+| `RebaseCMS` | Declarative admin config (`tableCustomizations`, `externalCollections`, views, editor) — renders nothing |
 | `RebaseShell` | App shell (drawer, nav, routes, layout) — renders the actual UI |
 | `CollectionPanel` | Embed a collection view inside custom pages — `collection` by name or as a value; `where`, `orderBy`, `fields`, `toolbar`, `rowActions`, `onRowClick` (0.29+) |
 | `RecordForm` | One record's form in a page of your own app (0.25+); `fields`, `FormField` children, `compact`, `collectionOverrides` (0.29+) |

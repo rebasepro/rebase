@@ -1,15 +1,15 @@
 ---
 name: rebase-custom-views
-description: Build a custom back-office screen inside the Rebase admin instead of a separate app — dashboards, review queues, dispatch boards, record summaries, custom field editors. Covers `rebase generate view`, top-level screens (AppView), record tabs (admin.entityViews), field widgets (admin.Field / admin.Preview), and the design tokens that make a view look native. Use it whenever a screen is not a plain table, form or board. For KPIs and charts, read `rebase-dashboards`.
+description: Build a custom back-office screen inside the Rebase admin instead of a separate app — dashboards, review queues, dispatch boards, record summaries, custom field editors. Covers `rebase generate view`, top-level screens (AppView), record tabs (`entityViews` in `customizeTable`), field widgets (`fields.<key>.Field` / `Preview`), and the design tokens that make a view look native. Use it whenever a screen is not a plain table, form or board. For KPIs and charts, read `rebase-dashboards`.
 ---
 
 # Custom views in the Rebase admin
 
 Most back-office screens are a table, a form or a board, and the admin draws
-those from the collection. For the rest, **write a React component inside the
+those from the table. For the rest, **write a React component inside the
 admin, not a separate app.** Inside the admin the component already has the
 signed-in user, the security rules (every read and write goes through the
-server, so RLS and collection callbacks apply), the sidebar, the router, the UI
+server, so RLS and the table's hooks apply), the sidebar, the router, the UI
 kit and the data layer. A standalone Next.js app has to rebuild every one of
 those and keep them in step.
 
@@ -18,8 +18,8 @@ A custom view is about a hundred lines. There are three places to put one:
 | You want | Put a component in | It receives | It renders |
 |---|---|---|---|
 | A screen in the sidebar | `<RebaseCMS views={AppView[]}>` | nothing — read with hooks | full page at `/<slug>`, inside the shell |
-| A tab on every record of a collection | the collection's `admin.entityViews` | `EntityCustomViewParams` | a tab in the record's tab strip, in the side panel and the full-page record |
-| A different editor for one field | the property's `admin.Field` (and `admin.Preview`) | `FieldProps` / `PropertyPreviewProps` | in the form, and in table cells and cards |
+| A tab on every record of a table | `entityViews` in the table's `customizeTable` | `EntityCustomViewParams` | a tab in the record's tab strip, in the side panel and the full-page record |
+| A different editor for one field | `fields.<key>.Field` (and `Preview`) in the table's `customizeTable` | `FieldProps` / `FieldPreviewProps` | in the form, and in table cells and cards |
 
 Other places (toolbar buttons, view modes, slots, replacing built-in parts) are
 in the `rebase-customize-admin` skill.
@@ -34,8 +34,10 @@ rebase generate view audit-trail --collection orders
 The first writes `frontend/src/views/OrdersBoardView.tsx`, lists it in
 `frontend/src/views/index.ts` (an `AppView[]`), and on its first run wires
 `App.tsx` to pass that list as `<RebaseCMS views={views}>`. The second writes
-`frontend/src/views/AuditTrailView.tsx` and adds an entry to the `orders`
-collection's `admin.entityViews` that points at the file by path. `--name`
+`frontend/src/views/AuditTrailView.tsx` and adds it, imported by value, to the
+`entityViews` of `customizeTable("orders", …)` under `frontend/src/cms/` —
+creating `frontend/src/cms/orders.tsx` (and listing it in `cms/index.ts`) when
+the table has no customization yet. `--name`
 sets the label, `--icon` a Lucide icon for the sidebar, `--dry-run` lists the
 changes without making them, `--force` replaces an existing view file.
 
@@ -129,61 +131,45 @@ it is then only built when someone opens the screen.
 
 ```tsx
 import { RebaseCMS } from "@rebasepro/cms";
-import { collections } from "virtual:rebase-collections";
+import { tableCustomizations } from "./cms";
 import { views } from "./views";
 
-export const Admin = () => <RebaseCMS collections={collections} views={views}/>;
+export const Admin = () => <RebaseCMS tableCustomizations={tableCustomizations} views={views}/>;
 ```
 
-## A record tab (`admin.entityViews`)
+## A record tab (`entityViews`)
 
-The collection file is shared with the backend, so reference the component **by
-path**, relative to the collection file. The backend never evaluates the string;
-the admin's Vite plugin turns it into a lazy `import()` and renders the file's
-**default export**.
+Record tabs belong to the table's CMS customization in `frontend/src/cms/`,
+which is frontend code: import the component **by value**. (`customizeTable`
+throws on a string path or a lazy `() => import(…)`.)
 
-```ts
-// config/collections/orders.ts
-import { defineCollection } from "@rebasepro/cms-types";
+```tsx
+// frontend/src/cms/orders.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { orders } from "../../../backend/schema/orders";
+import { AuditTrailView } from "../views/AuditTrailView";
 
-export default defineCollection({
-    name: "Orders",
+export const ordersCms = customizeTable<typeof orders>("orders", {
     singularName: "Order",
-    slug: "orders",
-    table: "orders",
-    admin: {
-        entityViews: [
-            {
-                key: "audit-trail",
-                name: "Audit trail",
-                Builder: "../../frontend/src/views/AuditTrailView"
-            }
-        ]
-    },
-    properties: {
-        id: { name: "ID", type: "number", isId: "increment" },
-        status: {
-            name: "Status",
-            type: "string",
-            enum: [
-                { id: "pending", label: "Pending" },
-                { id: "shipped", label: "Shipped" }
-            ]
-        },
-        note: { name: "Note", type: "string" }
-    }
+    entityViews: [
+        {
+            key: "audit-trail",
+            name: "Audit trail",
+            Builder: AuditTrailView
+        }
+    ]
 });
 ```
 
 Entry fields: `key` (unique on the record), `name` (tab label), `Builder`,
 `icon`, and `position` — `"end"` (default, after the form) or `"start"` (before
 it: a read-only cover of the record, with the form one tab to the right).
-Never import the component into the collection file: the backend loads that
-file too, and the import pulls React into it.
+The table itself (`backend/schema/orders.ts`) is untouched: it declares the
+columns, and the frontend imports it as a type only.
 
 The component receives `EntityCustomViewParams`:
 
-- `collection` — the resolved collection (`name`, `singularName`, `properties`, …);
+- `collection` — the collection the CMS derived for the table, with the customization applied (`name`, `singularName`, `slug`, …);
 - `row` — the saved record as the server sends the row (ISO dates, a belongsTo
   as its foreign-key column, `id` only where the table has that column), **absent while it is being created**;
 - `id` — the saved record's id beside `row`, a string (a composite key's parts
@@ -235,43 +221,36 @@ export function AuditTrailView({ collection, row, id, modifiedValues, formContex
 export default AuditTrailView;
 ```
 
-An entity view used by several collections can instead be registered once on
+An entity view used by several tables can instead be registered once on
 `<RebaseCMS entityViews={[{ key, name, Builder }]}>` and named by key from each
-collection: `admin: { entityViews: ["audit-trail"] }`.
+table's customization: `entityViews: ["audit-trail"]`.
 
-## A field widget (`admin.Field`, `admin.Preview`)
+## A field widget (`Field`, `Preview`)
 
-To change how one property is edited, point its `admin.Field` at a component,
-by path as above. `admin.Preview` changes how it shows when not being edited
-(table cells, cards, references); override one, the other, or both.
-`customProps` is passed through untouched. (`admin.widget` is something else:
-it only picks `"select"` or `"dialog"` for a relation.)
+To change how one column is edited, give it a `Field` component under
+`fields.<key>` of the table's `customizeTable`, imported by value. `Preview`
+changes how it shows when not being edited (table cells, cards, references);
+override one, the other, or both. `customProps` is passed through untouched.
+(`widget` is something else: it only picks `"select"` or `"dialog"` for a
+relation.)
 
-```ts
-import { defineCollection } from "@rebasepro/cms-types";
+```tsx
+// frontend/src/cms/products.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { products } from "../../../backend/schema/products";
+import RatingField from "../fields/RatingField";
+import RatingPreview from "../fields/RatingPreview";
 
-export default defineCollection({
-    name: "Products",
-    slug: "products",
-    table: "products",
-    properties: {
-        id: { name: "ID", type: "number", isId: "increment" },
-        rating: {
-            name: "Rating",
-            type: "number",
-            admin: {
-                Field: "../../frontend/src/fields/RatingField",
-                Preview: "../../frontend/src/fields/RatingPreview",
-                customProps: { max: 5 }
-            }
-        }
+export const productsCms = customizeTable<typeof products>("products", {
+    fields: {
+        rating: { Field: RatingField, Preview: RatingPreview }
     }
 });
 ```
 
 The component replaces the whole field: it draws the input, the label and the
 error line (`error`, when `showError`) itself, as the built-in fields do;
-validation stays with the form, which computes `error` from the property's
+validation stays with the form, which computes `error` from the column's
 rules. `FieldProps` carries `value`, `setValue(value)`, `property`,
 `propertyKey`, `disabled`, `error`, `showError`, `customProps`, and `context`
 (the whole form: `values`, `setFieldValue`, `id`, and `row`, the saved record
@@ -279,17 +258,18 @@ as the server sends it, …).
 
 ```tsx
 // frontend/src/fields/RatingField.tsx
-import type { FieldProps } from "@rebasepro/cms-types";
+import type { FieldProps } from "@rebasepro/cms";
 import type { NumberProperty } from "@rebasepro/types";
 import { Button, Typography } from "@rebasepro/ui";
 
-export default function RatingField({ value, setValue, property, disabled, customProps }: FieldProps<NumberProperty, { max: number }>) {
-    const max = customProps?.max ?? 5;
+const MAX = 5;
+
+export default function RatingField({ value, setValue, property, disabled }: FieldProps<NumberProperty>) {
     return (
         <div className="flex flex-col gap-1">
             <Typography variant="caption" color="secondary">{property.name}</Typography>
             <div className="flex gap-1">
-                {Array.from({ length: max }, (_, i) => i + 1).map(star => (
+                {Array.from({ length: MAX }, (_, i) => i + 1).map(star => (
                     <Button key={star} size="small" disabled={disabled}
                         color={value !== null && star <= value ? "primary" : "neutral"}
                         variant={value !== null && star <= value ? "filled" : "outlined"}
@@ -305,24 +285,23 @@ export default function RatingField({ value, setValue, property, disabled, custo
 
 ```tsx
 // frontend/src/fields/RatingPreview.tsx
-import type { PropertyPreviewProps } from "@rebasepro/cms";
-import type { NumberProperty } from "@rebasepro/types";
+import type { FieldPreviewProps } from "@rebasepro/cms-types";
 import { Typography } from "@rebasepro/ui";
 
-export default function RatingPreview({ value, customProps }: PropertyPreviewProps<NumberProperty, { max: number }>) {
+export default function RatingPreview({ value }: FieldPreviewProps) {
     const rating = typeof value === "number" ? value : 0;
-    return <Typography variant="body2">{"★".repeat(rating)}{"☆".repeat((customProps?.max ?? 5) - rating)}</Typography>;
+    return <Typography variant="body2">{"★".repeat(rating)}{"☆".repeat(5 - rating)}</Typography>;
 }
 ```
 
 ## Data, from inside a view
 
-- **`useRows(collection, { where, orderBy, limit, searchString })`**,
-  **`useRow(collection, id)`**, **`useRowCount`**, **`useAggregate`** and
+- **`useRows(table, { where, orderBy, limit, searchString })`**,
+  **`useRow(table, id)`**, **`useRowCount`**, **`useAggregate`** and
   **`useRowWrites()`** (`create`, `update`, `remove`) (`@rebasepro/app`): live
-  rows, refreshed after every write. Saves go through the server: callbacks and
-  security rules apply. Outside React state (an action's `onClick`, a callback),
-  `useRebaseContext().data.collection("orders")` has `find`, `findById`,
+  rows, refreshed after every write. Saves go through the server: hooks and
+  row-level security apply. Outside React state (an action's `onClick`, a callback),
+  `useRebaseContext().data.table("orders")` has `find`, `findById`,
   `create`, `update`, `delete` over the same rows. Do not `fetch` the REST API
   from admin code.
 - **Rows are the server's rows**: flat, `row.title`, exactly the table's
@@ -335,7 +314,7 @@ export default function RatingPreview({ value, customProps }: PropertyPreviewPro
   (`tableController.ids[i]` is the id of `tableController.rows[i]`;
   `highlightedIds`, `selection.ids`; `selectionController.isSelected(id)`
   takes either spelling). Key, highlight, open and write by that id, not by
-  `String(row.id)`, which a collection keyed by another column does not have.
+  `String(row.id)`, which a table keyed by another column does not have.
 - **`useAuthController()`**: `user` (`uid`, `displayName`, `email`, roles),
   sign-in and sign-out. **`useSnackbarController()`**: `open({ type, message })`.
 - **`useSidePanel()`** (`@rebasepro/cms`): `open({ path, id })` opens a
@@ -390,6 +369,6 @@ export function StatTile({ label, value }: { label: string; value: number }) {
 - The frontend typechecks (`tsc` in the frontend workspace) — every example
   above compiles as written.
 - `rebase dev`, then open `/<slug>` for a screen, or a record of the
-  collection for a tab, signed in as a user with and without the role.
-- A view that only reads is safe; one that writes relies on the collection's
-  security rules, so check those cover the write (`rebase-security`).
+  table for a tab, signed in as a user with and without the role.
+- A view that only reads is safe; one that writes relies on the table's
+  `rls`, so check it covers the write (`rebase-security`).

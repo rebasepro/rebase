@@ -20,7 +20,6 @@ const backend = await initializeRebaseBackend({
     server, app,
     database: postgresAdapter,
     auth: {
-        collection: usersCollection,
         jwtSecret: env.JWT_SECRET,
         email: {
             from: "MyApp <noreply@myapp.com>",
@@ -498,12 +497,12 @@ export default defineCron({
 
         // Fetch subscribers
         const { data: subscribers } = await ctx.rebase.dataAsAdmin
-            .collection<{ email: string; active: boolean }>("subscribers")
+            .table("subscribers")
             .find({ where: { active: ["==", true] } });
 
         for (const sub of subscribers) {
             await ctx.rebase.email.send({
-                to: sub.email,
+                to: String(sub.email),
                 subject: "Your Weekly Digest",
                 html: "<h1>This Week's Updates</h1>...",
             });
@@ -637,7 +636,6 @@ import { getRequestListener } from "@hono/node-server";
 import { createServer } from "http";
 import { initializeRebaseBackend, loadEnv } from "@rebasepro/server";
 import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
-import { defaultUsersCollection } from "@rebasepro/common";
 import { z } from "zod";
 
 // 1. Load and validate environment
@@ -670,7 +668,6 @@ await initializeRebaseBackend({
     server, app,
     database: postgresAdapter,
     auth: {
-        collection: defaultUsersCollection,
         jwtSecret: env.JWT_SECRET,
         serviceKey: env.REBASE_SERVICE_KEY,
         allowRegistration: env.ALLOW_REGISTRATION,

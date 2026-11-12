@@ -192,7 +192,7 @@ import { initializeRebaseBackend, loadEnv } from "@rebasepro/server";
 import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
 import dotenv from "dotenv";
 // backend/schema/index.ts: every table (users is a defineAuthTable) and defaultRls.
-import * as schema from "../schema/index.js";
+import { users, posts, tags, defaultRls } from "../schema/index.js";
 
 // `rebase dev` and `rebase start` name the project's .env in DOTENV_CONFIG_PATH.
 dotenv.config({ path: process.env.DOTENV_CONFIG_PATH, quiet: true });
@@ -203,7 +203,6 @@ const { db, connectionString } = createPostgresDatabaseConnection(env.DATABASE_U
 
 const app = new Hono<HonoEnv>();
 const server = createServer(getRequestListener(app.fetch));
-const { defaultRls, ...tables } = schema;
 
 // Each `type` carries its own required fields — `local` needs `basePath`,
 // `s3`/`gcs` need `bucket` and credentials — so branch on the env var rather
@@ -224,7 +223,7 @@ await initializeRebaseBackend({
     app,
     server,
     database: createPostgresAdapter({ connection: db, connectionString }),
-    tables: Object.values(tables),
+    tables: [users, posts, tags],   // every table backend/schema/index.ts exports
     defaultRls,
     schemaDir: "./schema",         // backend/schema: what the schema editor rewrites
     functionsDir: "./functions",   // backend/functions, as `rebase eject` lays it out
@@ -267,7 +266,7 @@ import {
 } from "@rebasepro/server";
 import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
 import dotenv from "dotenv";
-import * as schema from "../schema/index.js";
+import { users, posts, tags, defaultRls } from "../schema/index.js";
 
 dotenv.config({ path: process.env.DOTENV_CONFIG_PATH, quiet: true });
 const env = loadEnv();                       // validates, and generates JWT_SECRET in development
@@ -276,12 +275,11 @@ installUnhandledRejectionHandler();          // log a stray rejection instead of
 const { db, pool, connectionString } = createPostgresDatabaseConnection(env.DATABASE_URL);
 const app = new Hono<HonoEnv>();
 const server = createServer(getRequestListener(app.fetch));
-const { defaultRls, ...tables } = schema;
 
 // Builds everything; mounts, starts and listens to nothing.
 const backend = await createRebaseBackend({
     database: createPostgresAdapter({ connection: db, connectionString }),
-    tables: Object.values(tables),
+    tables: [users, posts, tags],   // every table backend/schema/index.ts exports
     defaultRls,
     auth: { jwtSecret: env.JWT_SECRET },
     functions: await loadFunctions("./functions"),       // { name: app }

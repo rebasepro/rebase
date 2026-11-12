@@ -33,13 +33,12 @@ Rebase ships a complete, built-in authentication system with JWT sessions, OAuth
 
 Authentication is configured via the `auth` property of `initializeRebaseBackend()` — or of `createRebaseBackend()`, which takes the same options (0.25+). It accepts **either** a `RebaseAuthConfig` object (built-in auth) or an `AuthAdapter` (external auth).
 
-> **Auth & multiple data sources.** The built-in auth system (users, sessions, API keys) is bootstrapped on the **default** data source — the auth collection must live there (the backend warns at boot otherwise). **RLS protects every server collection**: Postgres is the only server engine, and each database a project declares carries its own policies. **Direct data sources (e.g. Firestore) bypass Rebase auth entirely** — they're governed by the external backend's own rules/token; use an `AuthAdapter` to unify identity. See the **rebase-collections** skill for the data-source model.
+> **Auth & multiple data sources.** The built-in auth system (users, sessions, API keys) is bootstrapped on the **default** data source — the users table (`defineAuthTable`) must live there (the backend warns at boot otherwise). **RLS protects every table**: Postgres is the only server engine, and each database a project declares carries its own policies. **Direct data sources (e.g. Firestore) bypass Rebase auth entirely** — they're governed by the external backend's own rules/token; use an `AuthAdapter` to unify identity. See the **rebase-collections** skill for the data-source model.
 
 ### RebaseAuthConfig
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `collection` | `CollectionConfig` | Built-in users collection | The collection used for auth user storage. Import `defaultUsersCollection` from `@rebasepro/common` or pass a custom collection with required auth fields. |
 | `jwtSecret` | `string` | — | **Required.** Secret for signing JWT access tokens. |
 | `accessExpiresIn` | `string` | `"1h"` | Access token lifetime (e.g. `"15m"`, `"2h"`). |
 | `refreshExpiresIn` | `string` | `"30d"` | Refresh token lifetime. |
@@ -103,51 +102,55 @@ await initializeRebaseBackend({
 });
 ```
 
-### Collection-Level Auth Configuration
+### The users table: `defineAuthTable`
 
-Instead of relying solely on the default database auth rules, you can mark any Postgres collection (such as `users.ts` or a custom `members.ts` collection) as the authentication collection. This is configured via the `auth` property on the collection itself:
+Users are stored in the one table declared with `defineAuthTable` in
+`backend/schema/` (nothing in the `auth` options names it). It is a
+`defineTable` that adds the auth columns you did not declare (email, password
+hash, `roles`, verification state…), always adds a self-read policy and an
+admin-only write gate on the privilege columns, and takes an `auth` block for
+the access model and the admin hooks. A project has at most one.
 
 ```typescript
-import { PostgresCollectionConfig } from "@rebasepro/types";
+// backend/schema/members.ts
+import { defineAuthTable, col } from "@rebasepro/server/schema";
 
-const membersCollection: PostgresCollectionConfig = {
-  name: "Members",
-  slug: "members",
-  table: "members",
-  auth: {
-    enabled: true,
-    
-    // Customize what happens when an admin creates a user via the REST API
-    onCreateUser: async (values, ctx) => {
-      const hash = await ctx.hashPassword("welcome123");
-      return {
-        values: { ...values, passwordHash: hash, emailVerified: true },
-        temporaryPassword: "welcome123"
-      };
+export const members = defineAuthTable("members", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        email: col.text().notNull().unique(),
+        displayName: col.text(),
+        roles: col.array(col.text().oneOf(["admin", "support", "editor"])),
+        createdAt: col.timestamptz().onCreateNow()
     },
-
-    // Customize what happens when an admin resets a user's password in the admin panel
-    onResetPassword: async (userId, ctx) => {
-      const tempPassword = "reset_" + Math.random().toString(36).substring(2, 8);
-      return {
-        temporaryPassword: tempPassword,
-        invitationSent: false
-      };
-    },
-
-    // Inject/override auth-specific actions (e.g. show/hide the reset password button)
-    actions: {
-      resetPassword: true // Or false to disable, or a custom EntityAction
-    },
-
-    // The access model — see "Roles & Scopes" below
-    roles: { support: { name: "Support", scopes: ["users:read", "users:write"] } },
-    scopes: { "project:deploy": { label: "Deploy projects", target: "project" } },
-    personalKeys: true
-  },
-  properties: { ... }
-};
+    // Editors may list members; everyone reads their own row through the injected policy.
+    rls: [{ operation: "select", roles: ["editor"] }],
+    auth: {
+        // Customize what happens when an admin creates a user via the REST API
+        onCreateUser: async (values, ctx) => {
+            const hash = await ctx.hashPassword("welcome123");
+            return {
+                values: { ...values, passwordHash: hash, emailVerified: true },
+                temporaryPassword: "welcome123"
+            };
+        },
+        // Customize what happens when an admin resets a user's password in the admin panel
+        onResetPassword: async (userId, ctx) => {
+            const tempPassword = "reset_" + Math.random().toString(36).substring(2, 8);
+            return { temporaryPassword: tempPassword, invitationSent: false };
+        },
+        // The access model — see "Roles & Scopes" below
+        roles: { support: { name: "Support", scopes: ["users:read", "users:write"] } },
+        scopes: { "project:deploy": { label: "Deploy projects", target: "project" } },
+        personalKeys: true
+    }
+});
 ```
+
+The password hash and the verification token are private whatever the
+declaration says. Declaring `roles` as `col.array(col.text().oneOf([...]))`
+closes it to the roles you name. The scaffold's `backend/schema/users.ts` and
+`app/backend/schema/users.ts` are worked examples.
 
 When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive an `AuthCollectionContext` facade containing:
 - `hashPassword(password: string): Promise<string>` — Hash password using the configured hashing algorithm (e.g. scrypt).
@@ -164,7 +167,7 @@ When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive a
 
 ### Inviting teammates by email
 
-Invite flows must turn an email into a user id, but the `users` collection is
+Invite flows must turn an email into a user id, but the users table is
 RLS-protected from the client. **Do not** hand-roll an admin server function for
 this — enable `allowUserLookup` and use the built-in primitive:
 
@@ -526,13 +529,13 @@ API keys are long-lived bearer credentials (`rk_live_…`) for agents, MCP clien
 | Kind | Acts as | Holds | Managed at | Who manages |
 |---|---|---|---|---|
 | `service` | `api-key:<id>`, RLS roles `["service", ...key.roles]` | exactly `key.scopes` | `/api/admin/api-keys` | holders of `keys:read` / `keys:write` |
-| `personal` | its owner (uid), with the owner's roles read **live** on every request | `key.scopes` ∩ what the owner holds now | `/api/auth/keys` | the owning account, when the users collection sets `auth.personalKeys: true` |
+| `personal` | its owner (uid), with the owner's roles read **live** on every request | `key.scopes` ∩ what the owner holds now | `/api/auth/keys` | the owning account, when the users table sets `auth.personalKeys: true` |
 
 > **There is no `admin: true` and no `permissions` list any more.** A key that should run as the `admin` RLS role gets `roles: ["admin"]`; what it may *do* is its `scopes`. A body that sends `permissions`/`admin` instead of `scopes` is refused with `400 INVALID_INPUT`.
 
 ### Scopes a key can hold
 
-- **Data plane** — `data:read`, `data:write`, `data:delete` (target: collection slug), `storage:read`, `storage:write`, `storage:delete` (target: storage source id; the default source is `(default)`), `functions:invoke` (target: function name). `data:read:posts` = read `posts` only. The plain scope covers every target.
+- **Data plane** — `data:read`, `data:write`, `data:delete` (target: table slug), `storage:read`, `storage:write`, `storage:delete` (target: storage source id; the default source is `(default)`), `functions:invoke` (target: function name). `data:read:posts` = read `posts` only. The plain scope covers every target.
 - **Admin plane** — `users:read|write`, `schema:read|write`, `database:read|write`, `backups:read`, `cron:read|write`, `logs:read`. A key holding one reaches that admin surface (e.g. a scheduler key with `cron:write`).
 - **App scopes** — whatever the app declares under `auth.scopes` (e.g. `project:deploy:p1`).
 - **Never** `keys:read` / `keys:write` — `400 KEY_MANAGEMENT_SCOPE`. A key that could manage keys could mint its own successor.
@@ -542,7 +545,7 @@ API keys are long-lived bearer credentials (`rk_live_…`) for agents, MCP clien
 | Refusal | When |
 |---|---|
 | `400 INVALID_SCOPES` | malformed / unknown scope, or a target on a scope that takes none (`details.validScopes` lists the scopes a key may hold, never `keys:*`, since 0.25) |
-| `400 UNKNOWN_SCOPE_TARGET` | the target names a collection, storage source or function this backend does not serve |
+| `400 UNKNOWN_SCOPE_TARGET` | the target names a table, storage source or function this backend does not serve |
 | `400 KEY_MANAGEMENT_SCOPE` | `keys:*` requested |
 | `403 SCOPE_EXCEEDS_CREATOR` | a scope the creator does not hold — a key never holds more than its minter |
 | `403 ROLE_EXCEEDS_CREATOR` | a service-key role the creator does not hold (admins may give any role) |
@@ -648,13 +651,13 @@ The same key works on REST data, storage, functions, the admin surfaces its scop
 
 1. The token is SHA-256 hashed and looked up in `rebase.api_keys`; expiry and revocation are checked.
 2. A service key becomes `{ uid: "api-key:<id>", roles: ["service", ...key.roles] }`; a personal key becomes its owner, with the owner's roles read from the database now.
-3. The key's scopes go on the request (`c.get("scopes")`) and are checked by every route: data by HTTP method (`GET` → `read`, `POST`/`PUT`/`PATCH` → `write`, `DELETE` → `delete`; `POST /bulk/delete` is a delete, `POST /query` and `POST /count` are reads); on a nested path the target collection needs the operation and each parent `data:read`.
+3. The key's scopes go on the request (`c.get("scopes")`) and are checked by every route: data by HTTP method (`GET` → `read`, `POST`/`PUT`/`PATCH` → `write`, `DELETE` → `delete`; `POST /bulk/delete` is a delete, `POST /query` and `POST /count` are reads); on a nested path the target table needs the operation and each parent `data:read`.
 4. The DataDriver is scoped with `withAuth()` to that identity. This does **not** bypass RLS — statements run as `rebase_user` with `app.uid` set, and your policies are evaluated.
 5. Per-key rate limiting applies (`rate_limit`, else the server's API-key default).
 
 > **WARNING FOR AGENTS:** a key is a long-lived credential. Server-side only — never in client code.
 >
-> Scopes and RLS are **two independent gates**. A service key with `data:read` and no `admin` role can read **nothing** on a collection whose policies do not grant `service` — the default policies admit only the server context and `admin`. That is RLS working. Grant `service` in the collection's `securityRules`, or give the key `roles: ["admin"]`. Owner-style rules (`owner_id = rebase.uid()`) never match a service key; they do match a personal key, which runs as its owner.
+> Scopes and RLS are **two independent gates**. A service key with `data:read` and no `admin` role can read **nothing** on a table whose policies do not grant `service` — the default policies admit only the server context and `admin`. That is RLS working. Grant `service` in the table's `rls`, or give the key `roles: ["admin"]`. Owner-style rules (`owner_id = rebase.uid()`) never match a service key; they do match a personal key, which runs as its owner.
 >
 > For an agent, mint the narrowest key that works and leave out `data:delete` and `functions:invoke` unless it needs them — a function is code and can write.
 
@@ -1161,20 +1164,22 @@ Every "may this caller do X?" is answered by a **scope**, `resource:action[:targ
 
 ### Two planes
 
-- **Data plane** — `data:read|write|delete` (target: collection), `storage:read|write|delete` (target: storage source id, `(default)` for the default one), `functions:invoke` (target: function name). **Every signed-in person holds all of it.** What a person may do with rows is the collection's `securityRules` (RLS) and storage policies — never a scope. On a key or token these scopes *narrow*.
+- **Data plane** — `data:read|write|delete` (target: table), `storage:read|write|delete` (target: storage source id, `(default)` for the default one), `functions:invoke` (target: function name). **Every signed-in person holds all of it.** What a person may do with rows is the table's `rls` (RLS) and storage policies — never a scope. On a key or token these scopes *narrow*.
 - **Admin plane** — `users:read|write`, `schema:read|write`, `database:read|write`, `backups:read`, `cron:read|write`, `logs:read`, `keys:read|write`. **Nobody holds them implicitly.** The built-in `admin` role holds all of them; other roles hold what the app declares.
 
-### Declaring roles and app scopes (users collection)
+### Declaring roles and app scopes (the users table)
 
 ```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+// backend/schema/users.ts
+import { defineAuthTable, col } from "@rebasepro/server/schema";
 
-export const usersCollection = defineCollection({
-    slug: "users",
-    name: "Users",
-    table: "users",
+export const users = defineAuthTable("users", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        email: col.text().notNull().unique()
+    },
+    rls: "admin-only",
     auth: {
-        enabled: true,
         roles: {
             support: { name: "Support", scopes: ["users:read", "users:write", "logs:read"] },
             developer: { name: "Developer", scopes: ["schema:read", "database:read", "logs:read", "cron:read"] }
@@ -1183,16 +1188,13 @@ export const usersCollection = defineCollection({
             "project:deploy": { label: "Deploy projects", target: "project" }
         },
         personalKeys: true
-    },
-    properties: {
-        email: { name: "Email", type: "string" }
     }
 });
 ```
 
 Boot refuses:
 - declaring `admin` (built in, holds everything);
-- a role listing a **data-plane** scope (`data:write` on a role would grant nothing — use `securityRules`);
+- a role listing a **data-plane** scope (`data:write` on a role would grant nothing — use the table's `rls`);
 - an unknown scope; an app scope reusing a built-in resource (`data`, `storage`, `functions`, `users`, `schema`, `database`, `backups`, `cron`, `logs`, `keys`) or missing a `label`;
 - a `defaultRole` that is `admin` or holds any admin-plane scope.
 
@@ -1203,7 +1205,7 @@ A role nobody declares (e.g. `editor`) holds no admin-plane scope but still mean
 ### What `admin` means
 
 - Holds every admin-plane scope, `keys:*` included.
-- Is the RLS role the default policies admit — an admin reads every row of a collection that keeps them.
+- Is the RLS role the default policies admit — an admin reads every row of a table that keeps them.
 - Only an admin grants `admin`. A role listing every admin-plane scope is still not `admin`.
 - `requireAdmin` checks the role; prefer `requireScope` for anything a narrower role or a key should do.
 
@@ -1219,7 +1221,7 @@ A role nobody declares (e.g. `editor`) holds no admin-plane scope but still mean
 | Person's session (JWT) | the user | data plane + app scopes + their roles' scopes (admin → all) |
 | Service key `rk_live_…` | `api-key:<id>`, roles `["service", ...key.roles]` | exactly `key.scopes` |
 | Personal key `rk_live_…` | its owner, roles read live | `key.scopes` ∩ owner's current scopes |
-| MCP OAuth token | the user | `data:read|write|delete`, optionally per collection |
+| MCP OAuth token | the user | `data:read|write|delete`, optionally per table |
 | `REBASE_SERVICE_KEY` | `service`, role `admin` | everything |
 
 ### Admin routes
@@ -1244,19 +1246,18 @@ A role nobody declares (e.g. `editor`) holds no admin-plane scope but still mean
 ## Auth hooks (`auth.hooks`)
 
 <!-- docs-verify: ignore -->
-> **IMPORTANT FOR AGENTS: there is no `hooks` key on `RebaseBackendConfig`, and
-> no `BackendHooks`, `UserHooks`, `DataHooks` or `BackendHookContext` type.**
-> A config object shaped like that type-errors, and in plain JavaScript it is
-> silently ignored. There are exactly two extension points, and they sit in
-> different places:
+<!-- docs-verify: ignore -->
+> **IMPORTANT FOR AGENTS: there is no `BackendHooks`, `UserHooks`, `DataHooks`
+> or `BackendHookContext` type.** There are exactly two extension points, and
+> they sit in different places:
 >
 > | Want to… | Use | Where |
 > |---|---|---|
 > | React to sign-up / login / logout / password reset, or replace hashing | `auth.hooks` (`AuthHooks`) | inside the `auth` block |
-> | Transform or gate **collection data** across every collection | `callbacks` (`CollectionCallbacks`) | top level of the backend config |
+> | Transform or gate **table data** across every table | global table hooks (`TableHooks`) | `export const hooks` from `backend/hooks.ts`; the top-level `hooks` option when ejected |
 >
-> Auth writes bypass the collection save pipeline (see the warning above), which
-> is exactly why `auth.hooks` exists: a `beforeSave` on the users collection does
+> Auth writes bypass the table save pipeline (see the warning above), which
+> is exactly why `auth.hooks` exists: a `beforeSave` on the users table does
 > not fire for registration, OAuth or admin user management.
 
 ### `AuthHooks`
@@ -1288,7 +1289,6 @@ A role nobody declares (e.g. `editor`) holds no admin-plane scope but still mean
 await initializeRebaseBackend({
     // ...
     auth: {
-        collection: usersCollection,
         jwtSecret: process.env.JWT_SECRET,
         hooks: {
             async afterUserCreate(user) {
@@ -1304,22 +1304,22 @@ await initializeRebaseBackend({
 
 ### Masking data instead
 
-PII masking is **not** an auth hook — it belongs in the global `callbacks`
-block, which fires on every data path (REST, realtime, and server-side
+PII masking is **not** an auth hook — it belongs in the global table hooks,
+which fire on every data path (REST, realtime, MCP and server-side
 `rebase.dataAsAdmin`):
 
-```typescript no-verify
-await initializeRebaseBackend({
-    // ...
-    callbacks: {
-        afterRead({ row, context }) {
-            if (!context.user?.roles?.includes("admin") && row.email) {
-                return { ...row, email: "***" };
-            }
-            return row;
+```typescript
+// backend/hooks.ts
+import type { TableHooks } from "@rebasepro/server/schema";
+
+export const hooks: TableHooks = {
+    afterRead({ values, context }) {
+        if (!context.user?.roles?.includes("admin") && values.email) {
+            return { ...values, email: "***" };
         }
+        return values;
     }
-});
+};
 ```
 
 ## Email Configuration
@@ -1421,7 +1421,7 @@ When a request includes `Authorization: Bearer <serviceKey>`:
 - Comparison is done with constant-time comparison to prevent timing attacks.
 - Must be ≥ 32 characters (validated at startup).
 
-> **TIP:** In global and collection callbacks, server-side `rebase.dataAsAdmin` calls appear as `uid: "service"`, `roles: ["admin"]`. Use this to skip masking, bypass rate limits, or grant elevated access in your callback logic.
+> **TIP:** In global and table hooks, server-side `rebase.dataAsAdmin` calls appear as `uid: "service"`, `roles: ["admin"]`. Use this to skip masking, bypass rate limits, or grant elevated access in your hook logic.
 
 ### Token Rotation
 

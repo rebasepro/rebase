@@ -263,14 +263,14 @@ for `psql`:
 // backend/scripts/x.ts: the backend workspace is the one that can import the driver.
 import { openRebase } from "@rebasepro/server-postgres";
 import { lowerTables } from "@rebasepro/common";
-import * as schema from "../schema";
+import { users, posts, defaultRls } from "../schema";
 
 // `openRebase` still takes the tables in the server's internal form; a later
 // release takes the defineTable results directly. `rebase console` needs none of this.
-const collections = lowerTables([schema.users, schema.posts], { defaultRls: schema.defaultRls });
+const collections = lowerTables([users, posts], { defaultRls });
 
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
-const { data: posts } = await rebase.dataAsAdmin.posts.find({ limit: 10 });
+const { data: latest } = await rebase.dataAsAdmin.posts.find({ limit: 10 });
 
 // The same data as one user sees it, under row-level security.
 const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });

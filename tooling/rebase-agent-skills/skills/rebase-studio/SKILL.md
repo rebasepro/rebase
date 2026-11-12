@@ -159,7 +159,7 @@ import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 import { RebaseStudio } from "@rebasepro/studio";
 import React from "react";
 import { createRebaseClient } from "@rebasepro/client";
-import { collections } from "virtual:rebase-collections";
+import { tableCustomizations } from "./cms";
 
 // `rebase dev` injects VITE_API_URL with the port it bound (derived from the
 // project path, not a fixed 3001); a deployed build serves the API same-origin.
@@ -175,7 +175,7 @@ export function App() {
     return (
         <Rebase client={rebaseClient} authController={authController} plugins={[dataEnhancementPlugin]}>
             <RebaseAuth/>
-            <RebaseCMS collections={collections} collectionEditor={true}/>
+            <RebaseCMS tableCustomizations={tableCustomizations} collectionEditor={true}/>
             <RebaseStudio tools={undefined} homePage={undefined} />
             <RebaseShell title="My App"/>
         </Rebase>
@@ -288,12 +288,15 @@ These components can be overridden globally on `<Rebase>` (applied to every coll
 `<RebaseCMS>` accepts the full `RebaseCMSConfig`:
 
 ```typescript
-interface RebaseCMSConfig<EC extends AdminCollection = AdminCollection> {
-    collections?: EC[] | CollectionConfigsBuilder<EC>;
+interface RebaseCMSConfig {
+    tableCustomizations?: readonly TableCustomization[]; // the customizations from frontend/src/cms, one per table
+    externalCollections?: readonly AdminCollection[];    // Firestore collections and other non-Rebase sources
+    tables?: readonly TableDescriptor[];                 // embedding and tests: render these instead of the served tables
+    uiConfig?: { tables?: { [slug: string]: object } };
     views?: AppView[] | AppViewsBuilder;
     homePage?: ReactNode;
     entityViews?: EntityCustomView[];
-    collectionViews?: CollectionCustomView[];  // view modes, opted into by admin.customViews
+    collectionViews?: CollectionCustomView[];  // view modes, opted into by customizeTable's customViews
     entityActions?: EntityAction[];
     navigationGroupMappings?: NavigationGroupMapping[];
     collectionEditor?: boolean | CollectionEditorOptions;
@@ -333,7 +336,7 @@ interface NavigationGroupMapping {
 
 // Usage
 <RebaseCMS
-    collections={collections}
+    tableCustomizations={tableCustomizations}
     navigationGroupMappings={[
         { name: "Content", entries: ["posts", "pages", "media"] },
         { name: "Commerce", entries: ["products", "orders"], collapsedByDefault: { drawer: true } },
@@ -437,7 +440,7 @@ Use `<RebaseAuth>` with the `loginView` prop to replace the default login UI:
 ```tsx
 <Rebase client={rebaseClient} authController={authController}>
     <RebaseAuth loginView={<MyCustomLoginPage />} />
-    <RebaseCMS collections={collections} />
+    <RebaseCMS tableCustomizations={tableCustomizations} />
     <RebaseStudio />
     <RebaseShell title="My App" />
 </Rebase>
@@ -469,7 +472,7 @@ A view passed to `<RebaseStudio devViews={[…]}>` is a Studio tool, shown in St
 ```tsx
 // Static array
 <RebaseCMS
-    collections={collections}
+    tableCustomizations={tableCustomizations}
     views={[
         { slug: "dashboard", name: "Dashboard", icon: "LayoutDashboard", view: <Dashboard /> },
         { slug: "audit-log", name: "Audit Log", icon: "ScrollText", view: <AuditLog />, roles: ["admin"] },
@@ -478,7 +481,7 @@ A view passed to `<RebaseStudio devViews={[…]}>` is a Studio tool, shown in St
 
 // Builder function (role-aware, async-capable)
 <RebaseCMS
-    collections={collections}
+    tableCustomizations={tableCustomizations}
     views={({ user, authController, data }) => [
         { slug: "dashboard", name: "Dashboard", icon: "LayoutDashboard", view: <Dashboard /> },
         ...(user?.roles?.includes("analyst")
@@ -637,7 +640,7 @@ These hooks are exported from `@rebasepro/app` and available inside any `<Rebase
 | `useModeController()` | `ModeController` | Read/set color theme (`light` / `dark`) |
 | `useSnackbarController()` | `SnackbarController` | Show toast notifications |
 | `useStorageSource()` | `StorageSource` | Access file storage |
-| `useRows()` / `useRow()` / `useRowWrites()` | rows / row / writes | Rows as the server sends them, live; writes run callbacks and rules |
+| `useRows()` / `useRow()` / `useRowWrites()` | rows / row / writes | Rows as the server sends them, live; writes run hooks and row-level security |
 | `useDialogsController()` | `DialogsController` | Programmatic dialog management |
 | `useCustomizationController()` | `CustomizationController` | Access plugins, slots, property configs |
 | `usePermissions()` | `{ canCreate, canEdit, canDelete, canRead }` | Role-aware permission checks |
@@ -761,40 +764,50 @@ Internally it composes:
 
 ## Visual Collection Editor
 
-The Studio's collection editor allows non-developers to:
-- Add, remove, and reorder fields
-- Configure field types and validation
+The collection editor allows non-developers to:
+- Add, remove, rename and reorder columns
+- Configure column types and validation
 - Set up enum values and relations
-- Preview the form layout
+- Edit a table's row-level security rules
 
-Under the hood, it uses **AST manipulation** (via `ts-morph`) to modify the TypeScript collection files — preserving all custom callbacks and code.
+Under the hood every edit is a typed change (`TablePatch`, in
+`packages/types/src/schema/table_patch.ts`) sent to `/api/admin/schema-editor`,
+which rewrites the `defineTable` files in `backend/schema/` with AST
+manipulation (via `ts-morph`) — preserving hooks and hand-written code — and
+then compiles the result. Presentation (labels, icons, enum colours, view modes)
+is not a schema edit: it lives in `frontend/src/cms/` and in UI preferences.
+The server refuses, and the editor shows as read-only "edited in code", what it
+cannot rewrite safely: a config built with a spread, a column built by a helper,
+rules held in a variable, renaming a table's slug or SQL name (a migration), or
+an edit that does not compile.
 
 ### Enabling the Collection Editor
 
 ```tsx
 // Simple — uses authController.getAuthToken automatically
-<RebaseCMS collections={collections} collectionEditor={true} />
+<RebaseCMS tableCustomizations={tableCustomizations} collectionEditor={true} />
 
 // With options
 <RebaseCMS
-    collections={collections}
+    tableCustomizations={tableCustomizations}
     collectionEditor={{
         getAuthToken: authController.getAuthToken,
-        readOnly: false,
-        pathSuggestions: ["config/collections/"]
+        readOnly: false
     }}
 />
 ```
 
-## Virtual Collection Import
+The backend side is on when it knows where the tables live: `schemaDir`
+(`backend/schema`) outside production — which is what `rebase dev` provides.
 
-Collections are auto-loaded via a Vite plugin:
+## Where the panel's collections come from
 
-```typescript
-import { collections } from "virtual:rebase-collections";
-```
-
-This reads all collection files from the configured collections directory (e.g., `config/collections/`) and makes them available without manual barrel exports.
+There is no collections import in the frontend. `<RebaseCMS>` reads the
+tables the backend serves from `GET /api/schema/tables` and derives a
+collection for each, then layers the `tableCustomizations` over them
+(`customizeTable` results from `frontend/src/cms/`) and adds any
+`externalCollections` (Firestore, via `defineFirestoreCollection`). See
+`rebase-collections`.
 
 ## Running the Studio
 

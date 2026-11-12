@@ -76,8 +76,8 @@ meet:
 - **Remove the collections Vite plugin** and **drop the virtual collections
   module declaration** (`declare module "virtual:rebase-collections"` in a
   `.d.ts`): nothing provides them any more.
-- **Move the global collection callbacks** — a `callbacks` export of
-  `config/index.ts` becomes `export const hooks` in `backend/hooks.ts`; hook
+- **Move the global collection callbacks** — the `callbacks` the old config
+  package's index exported become `export const hooks` in `backend/hooks.ts`; hook
   props say `table` instead of `collection`, and `afterRead` / `beforeDelete` /
   `afterDelete` receive the row as `values` instead of `row`.
 - **Update the importers of …** / **Repoint the imports of …** — code that

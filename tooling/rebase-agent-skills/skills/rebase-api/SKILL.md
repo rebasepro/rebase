@@ -7,7 +7,7 @@ description: Guide for working with Rebase's auto-generated REST API. Use this s
 
 > **WARNING FOR AGENTS**: If you are writing a script or data task, **default to using the Rebase SDK** (`@rebasepro/client` or `@rebasepro/server`) instead of making raw REST API calls (`fetch` / `curl`). For custom backend functions, use `client.functions.invoke('function-name', payload)` — **NEVER** manually construct `/api/functions/` URLs or extract tokens from localStorage. Only use raw API calls if specifically instructed to do so or if you are demonstrating HTTP usage to the user.
 
-Every collection defined in Rebase automatically gets full REST CRUD endpoints. No manual route creation needed.
+Every table declared in `backend/schema` automatically gets full REST CRUD endpoints. No manual route creation needed.
 
 ## REST API
 
@@ -17,10 +17,10 @@ All data routes are mounted under `/api/data/`. Other route categories:
 
 | Base Path | Purpose |
 |-----------|---------|
-| `/api/data/{slug}` | Collection CRUD (auto-generated) |
+| `/api/data/{slug}` | Table CRUD (auto-generated from `backend/schema`) |
 | `/api/data/{slug}/count` | Count matching entities |
 | `/api/data/{slug}/aggregate` | count/sum/avg/min/max, optionally grouped |
-| `/api/data/{parent}/{parentId}/{child}` | Subcollection routes |
+| `/api/data/{parent}/{parentId}/{relation}` | Nested relation routes |
 | `/api/auth/*` | Authentication (login, register, refresh, OAuth) |
 | `/api/admin/*` | Admin surfaces (users, roles, keys, cron, backups, logs, schema), each behind its own admin-plane scope |
 | `/api/admin/api-keys` | Service API key management (`keys:read` / `keys:write`) |
@@ -32,7 +32,8 @@ All data routes are mounted under `/api/data/`. Other route categories:
 | `/api/docs` | OpenAPI 3.0.3 JSON spec (needs `schema:read` when `enableSwagger` is false — the bundle runtime's production default) |
 | `/api/swagger` | Swagger UI (dev only) |
 | `/api/health` | Health check |
-| `/api/meta/contract` | Collection contract, for remote SDK generation (needs `schema:read`) |
+| `/api/schema/tables` | The tables this backend serves, as `TableDescriptor[]` redacted for the caller (`/api/schema/tables/{slug}` for one) — what the CMS, Studio and MCP read |
+| `/api/meta/contract` | Schema contract, for remote SDK generation (needs `schema:read`) |
 | `/api/meta/schema-version` | The schema hash this backend was built from (unauthenticated) |
 
 ### CRUD Operations
@@ -53,11 +54,11 @@ All data routes are mounted under `/api/data/`. Other route categories:
 | `POST` | `/api/data/{slug}/bulk` | Create many in one transaction | `200` |
 | `PATCH` | `/api/data/{slug}/bulk` | Update many in one transaction | `200` |
 | `POST` | `/api/data/{slug}/bulk/delete` | Delete many in one transaction | `200` |
-| `POST` | `/api/data/_batch` | Write across collections in one transaction | `200` |
+| `POST` | `/api/data/_batch` | Write across tables in one transaction | `200` |
 
-### Subcollection Routes
+### Nested Relation Routes
 
-For collections with relations, Rebase generates nested routes automatically. The URL pattern is `/{parent}/{parentId}/{child}`, and it supports arbitrarily deep nesting (parent/id/child/id/grandchild):
+For tables with relations, Rebase generates nested routes automatically. The URL pattern is `/{parent}/{parentId}/{child}`, and it supports arbitrarily deep nesting (parent/id/child/id/grandchild):
 
 | Method | Endpoint | Description | Status |
 |--------|----------|-------------|--------|
@@ -114,7 +115,7 @@ What an agent has to know before constructing one:
   for every query parameter. Use the JSON array.
 - **The whole shape is validated.** A bare object (`?orderBy={"field":"name"}`),
   a bare `["name"]`, a number, or a direction that is not `asc`/`desc` is a
-  **400**, not a 200 with unsorted rows. So is a field the collection does not
+  **400**, not a 200 with unsorted rows. So is a field the table does not
   have (`UNKNOWN_ORDER_BY_FIELD`), and a to-many relation, which has no single
   value per row to order by (`ORDER_BY_FIELD_NOT_SORTABLE`).
 - **Every sort ends on the row id descending**, whether asked for or not. That
@@ -126,7 +127,7 @@ What an agent has to know before constructing one:
 
 > **IMPORTANT FOR AGENTS:** Filters use PostgREST-style syntax: `?field=op.value`. This is NOT bracket syntax. For example: `?status=eq.active`, NOT `?filter[status][eq]=active`.
 
-Every field in the collection can be used as a query parameter with an operator prefix:
+Every column of the table can be used as a query parameter with an operator prefix:
 
 ```
 ?{field}={operator}.{value}
@@ -182,16 +183,16 @@ Nested logical conditions are also supported:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `searchString` | string | Text search. Substring by default; ranked full-text if the collection declares a `search` block |
+| `searchString` | string | Text search. Substring by default; ranked full-text if the table declares a `search` block |
 
 ```
 ?searchString=widget
 ```
 
-By default this is `ILIKE '%widget%'` OR-ed across the collection's top-level
-string properties (not enum or uuid ones); with several words, each word must
-match some property. It does **not** reach inside `map`/JSONB or array
-properties, and does not rank. A collection that declares a `search` block gets
+By default this is `ILIKE '%widget%'` OR-ed across the table's top-level
+text columns (not enum or uuid ones); with several words, each word must
+match some column. It does **not** reach inside JSONB or array
+columns, and does not rank. A table that declares a `search` block gets
 ranked full-text matching over the fields it names, and rows carry a `_score`
 that `orderBy` accepts:
 
@@ -199,7 +200,7 @@ that `orderBy` accepts:
 ?searchString=auditor%20iso%2014001&orderBy=_score:desc
 ```
 
-`orderBy=_score` returns 400 on a collection without the block, or without a
+`orderBy=_score` returns 400 on a table without the block, or without a
 `searchString`.
 
 ### Vector Search
@@ -247,7 +248,7 @@ These parameter names are reserved and will NOT be interpreted as filter fields:
 
 ## Response Format
 
-### List Response (GET collection)
+### List Response (GET table)
 
 ```json
 {
@@ -405,7 +406,7 @@ API keys start with the `rk_` prefix and are validated against the database. Wha
 Authorization: Bearer rk_live_abc123...
 ```
 
-- `data:read`, `data:write`, `data:delete` — plain for every collection, or narrowed: `data:read:orders`. The operation comes from the HTTP method (`GET` → read, `POST`/`PUT`/`PATCH` → write, `DELETE` → delete; `POST /bulk/delete` is a delete, `POST /query` and `POST /count` are reads). On a nested path the target collection needs the operation and each parent `data:read`.
+- `data:read`, `data:write`, `data:delete` — plain for every table, or narrowed: `data:read:orders`. The operation comes from the HTTP method (`GET` → read, `POST`/`PUT`/`PATCH` → write, `DELETE` → delete; `POST /bulk/delete` is a delete, `POST /query` and `POST /count` are reads). On a nested path the target collection needs the operation and each parent `data:read`.
 - `storage:read`, `storage:write`, `storage:delete` — target is a storage source id; the default source is `(default)`.
 - `functions:invoke` — or `functions:invoke:<name>` for one function.
 - Admin-plane scopes (`users:read`, `cron:write`, `logs:read`, `schema:read`, …) reach that admin surface. `keys:read`/`keys:write` can never go on a key.
@@ -430,54 +431,59 @@ POST /api/admin/api-keys
 - **Public access:** Set `requireAuth: false` to allow anonymous access. Access control is then fully delegated to Postgres Row-Level Security (RLS) policies.
 - **Fail-closed:** The raw unscoped driver is never placed in the request context. Every request is either RLS-scoped or rejected.
 
-## Global callbacks
+## Table hooks
 
 <!-- docs-verify: ignore -->
 
-There is no `hooks.data` block and no `BackendHooks` type. Cross-cutting logic
-that applies to **every** collection is configured with the top-level
-`callbacks` key, whose shape is exactly a collection's own `CollectionCallbacks`
-— one concept, one signature, applied at two scopes.
+There is no `hooks.data` block and no `BackendHooks` type. Server-side logic on
+a table's rows is a **table hook**: the `hooks` of a `defineTable`, or, for
+**every** table, `export const hooks` from `backend/hooks.ts` (the top-level
+`hooks` option of an ejected `initializeRebaseBackend`). Both are the same
+`TableHooks` type — one concept, one signature, applied at two scopes.
 
-```typescript no-verify
-await initializeRebaseBackend({
-    // ...
-    callbacks: {
-        afterRead({ row, context }) {
-            if (!context.user?.roles?.includes("admin") && row.email) {
-                return { ...row, email: "***" };
-            }
-            return row;
-        },
-        beforeSave({ values, context }) {
-            return { ...values, updatedBy: context.user?.uid };
+```typescript
+// backend/hooks.ts
+import type { TableHooks } from "@rebasepro/server/schema";
+
+export const hooks: TableHooks = {
+    afterRead({ values, context }) {
+        if (!context.user?.roles?.includes("admin") && values.email) {
+            return { ...values, email: "***" };
         }
+        return values;
+    },
+    beforeSave({ values, context }) {
+        return { ...values, updatedBy: context.user?.uid };
     }
-});
+};
 ```
 
-| Callback | Trigger | Can modify? | Can abort? |
+| Hook | Trigger | Can modify? | Can abort? |
 |----------|---------|-------------|------------|
-| `afterRead({ row, context, … })` | Every read | Return the transformed row | No |
+| `beforeQuery({ operation, query, context, … })` | Before every read | Return a narrowing to AND in | No (it narrows) |
+| `afterRead({ values, context, … })` | Every row leaving the server | Return the transformed row | No |
 | `beforeSave({ values, status, context, … })` | Before every write | Return modified values | Throw → `400 CALLBACK_REJECTED` |
 | `afterSave({ id, values, context, … })` | After the write, before the commit | No | Throw → write rolled back, `400 CALLBACK_REJECTED` |
-| `afterSaveError({ values, context, … })` | After a failed write | No | No |
-| `beforeDelete({ row, id, context, … })` | Before every delete | No | Return `false` or throw |
-| `afterDelete({ row, id, context, … })` | After the delete, before the commit | No | Throw → delete rolled back, `400 CALLBACK_REJECTED` |
+| `afterSaveError({ values, error, context, … })` | After a failed write | No | No |
+| `beforeDelete({ values, id, context, … })` | Before every delete | No | Return `false` or throw |
+| `afterDelete({ values, id, context, … })` | After the delete, before the commit | No | Throw → delete rolled back, `400 CALLBACK_REJECTED` |
 
-Every callback takes **one props object**, not positional arguments. Common
-fields: `collection`, `path`, `row`, `id`, `values`, `previousValues`, `status`
-(`"new" | "existing"`) and `context`. `context.user` carries `uid` and `roles`;
-an unauthenticated request arrives as `{ uid: "anonymous", roles: ["anon"] }`,
-not as `undefined` — test it with `isAnonymousUid` from `@rebasepro/types`.
+Every hook takes **one props object**, not positional arguments. Common
+fields: `table` (the descriptor), `path`, `values`, `id`, `previousValues`,
+`status` (`"new" | "existing" | "copy"`) and `context`. `context.user` carries
+`uid` and `roles`; an unauthenticated request arrives as
+`{ uid: "anonymous", roles: ["anon"] }`, not as `undefined` — test it with
+`isAnonymousUid` from `@rebasepro/types`.
 
 > **IMPORTANT FOR AGENTS:** these are not an API-boundary interceptor. They live
-> in the driver, so they fire on *every* data path — REST, WebSocket/realtime and
-> server-side `rebase.dataAsAdmin` — which is what makes `afterRead` safe to rely
-> on for redaction. The global callback runs first, then the collection's own.
+> in the driver, so they fire on *every* data path — REST, WebSocket/realtime,
+> MCP and server-side `rebase.dataAsAdmin` — which is what makes `afterRead` safe
+> to rely on for redaction. Global hooks run first, then the table's own, then
+> its columns' `.transform()`.
 
-See the **rebase-security** skill for using them as the authorization layer, and
-`packages/types/src/types/entity_callbacks.ts` for the types.
+See the **rebase-security** skill for where they sit beside row-level security,
+the **rebase-collections** skill for writing them, and
+`packages/types/src/schema/hooks.ts` for the types.
 
 ## REST API Examples
 
@@ -563,7 +569,7 @@ curl -H "Authorization: Bearer $TOKEN" \
   "https://example.com/api/data/products?or=(status.eq.active,status.eq.pending)"
 ```
 
-### Subcollection listing
+### Nested relation listing
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" \
@@ -577,10 +583,10 @@ curl -H "Authorization: Bearer $TOKEN" \
 Available at `GET /api/docs`. Returns a JSON OpenAPI specification of the data API. It does not cover the auth, storage, functions or admin routes. With `enableSwagger: false` — which the bundle runtime sets in production unless `REBASE_ENABLE_SWAGGER=true` — it is served only to a caller holding `schema:read`.
 
 The spec includes:
-- All collection CRUD, bulk and `_batch` routes with parameters and schemas
+- All table CRUD, bulk and `_batch` routes with parameters and schemas
 - PostgREST-style filter parameters per field
-- Subcollection routes for relations
-- Component schemas for each collection (output and input)
+- Nested routes for relations
+- Component schemas for each table (output and input)
 - `PaginationMeta` and `ErrorResponse` component schemas
 - The `bearerAuth` security scheme when auth is enabled (no query-token scheme)
 - Proper `201` for POST and `204` for DELETE
@@ -611,9 +617,18 @@ Both paths are registered by the bundle boot path (`packages/server/src/boot/boo
 
 `GET /livez` answers `{ "status": "ok" }` without touching the database. Use `/livez` for liveness and `/health` for readiness: a database blip should not make an orchestrator kill an otherwise healthy process.
 
-### Collection Contract
+### Table descriptors and the contract
 
-There is no `GET /api/collections`. The equivalent is the contract endpoint, which is what a remotely generated SDK is built from:
+There is no `GET /api/collections`. What the backend serves is described by two endpoints:
+
+```
+GET /api/schema/tables
+GET /api/schema/tables/{slug}
+```
+
+A JSON array of `TableDescriptor` (one for `/{slug}`): columns with their types, nullability and validation, relations resolved to slugs, and the `rls` posture — redacted to what this caller may know. Signed-in callers and credentials holding `schema:read` or a `data:*` scope; `404 TABLE_NOT_FOUND` for a slug this caller is not served, `404 SCHEMA_UNAVAILABLE` when no authentication is configured. It carries an `ETag`, so `If-None-Match` gets a `304`. This is what the CMS, the Studio and the MCP tools render from.
+
+The contract endpoint is what a remotely generated SDK is built from:
 
 ```
 GET /api/meta/contract
@@ -625,9 +640,7 @@ Gated — needs `schema:read`: an admin, the service key, or an API key holding 
 {
   "schemaVersion": "a1b2c3…",
   "runtime": { "version": "0.30.1", "contract": 1 },
-  "collections": [ "…serialized collections, client-safe fields only…" ],
-  "collectionSlugs": ["orders", "products", "users"],
-  "generatedAt": "2026-08-21T10:30:00.000Z"
+  "tables": [ "…TableDescriptor[], as GET /api/schema/tables serves an administrator…" ]
 }
 ```
 
@@ -644,7 +657,7 @@ The backend is configured by the object passed to `initializeRebaseBackend(confi
 
 `createRebaseBackend(options)` (new in 0.25) takes `RebaseBackendOptions` itself, with a required `provision`, and mounts nothing: the routes this skill describes are then `backend.mount(app, { basePath })` — the same layout — or one group at a time, at any path, with `app.route("/v2/data", backend.routes.data())` (`routes.auth()`, `data()`, `storage()`, `functions()`, `admin()`, `cron()`, `meta()`). Every path below assumes the default `/api` base path.
 
-> A scaffolded project does not build this object itself. `rebase dev` and the published runtime boot from the bundle: collections and `storageAuthorize` come from `config/index.ts`, and everything else from environment variables. Pass this object directly only when embedding Rebase in a server you own.
+> A scaffolded project does not build this object itself. `rebase dev` and the published runtime boot from the bundle: the tables come from `backend/schema/index.ts`, `storageAuthorize` from `backend/storage.ts`, global hooks from `backend/hooks.ts`, and everything else from environment variables. Pass this object directly only when embedding Rebase in a server you own.
 
 Every option, with its default and what the runtime fills it from, is in the **`rebase-basics`** skill: `../rebase-basics/references/backend-configuration.md`. The points that matter for the API:
 
@@ -679,4 +692,5 @@ A `?limit` above the maximum is a **400, not a clamp** — the request is reject
 - **Bundle boot (health, CORS, static apps):** `packages/server/src/boot/boot.ts`
 - **API Types:** `packages/server/src/api/types.ts`
 - **Auth Middleware:** `packages/server/src/auth/middleware.ts`
-- **Callback Types:** `packages/types/src/types/entity_callbacks.ts`
+- **Hook Types:** `packages/types/src/schema/hooks.ts`
+- **Table descriptors:** `packages/types/src/schema/descriptor.ts`, served by `packages/server/src/api/schema-tables-routes.ts`

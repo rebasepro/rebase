@@ -20,7 +20,7 @@ There are three things to know:
    `TimeSeriesChart` for figures, and `Button`, `Card`, `Typography`,
    `TextField`, `Select`, `Chip`, `Container`, …).
    `CollectionPanel` takes data and components, not flags: `fields` (the
-   properties it shows, in order), `toolbar` (`null`, or a `CollectionToolbar`
+   fields it shows, in order), `toolbar` (`null`, or a `CollectionToolbar`
    composed of `CollectionSearchBar`, `CollectionFiltersButton`,
    `CollectionViewModeToggle`, `CollectionAddButton`), `onRowClick` (the
    row, as `useRows` reads it, instead of opening it), `viewMode`, `highlightedIds`,
@@ -31,9 +31,11 @@ There are three things to know:
    `usePermissions` (`@rebasepro/app`); `useSidePanel`, `useUrlController`,
    `useCollectionRegistryController`, `resolveSelection` (`@rebasepro/cms`).
 3. **Places**: a page (`<RebaseCMS views>`), a collection view mode
-   (`collectionViews` + `admin.customViews`), a toolbar button
-   (`admin.Actions`), a record button (`admin.entityActions`), a record tab
-   (`admin.entityViews`), a field (`admin.Field` / `admin.Preview`), something
+   (`collectionViews` + `customViews` in the table's `customizeTable`), a
+   toolbar button (`Actions`), a record button (`entityActions`), a record tab
+   (`entityViews`), a field (`fields.<key>.Field` / `Preview`) — all options of
+   `customizeTable<typeof table>("slug", { … })` in `frontend/src/cms/`,
+   components imported by value — something
    beside a built-in part (`<Rebase slots>`), or a replacement for a built-in
    part (`<Rebase components>`, `wrap: true` to keep the original inside).
 
@@ -59,10 +61,10 @@ import only package entry points, so they compile as copied.
 
 ## Rules
 
-- **A singleton is a normal collection + a page with `RecordForm` at a
+- **A singleton is a normal table + a page with `RecordForm` at a
   fixed `id`.** The form creates the record under that id on first save;
-  nothing needs seeding. Hide the collection from navigation with
-  `admin.hideFromNavigation: true`.
+  nothing needs seeding. Hide its collection from navigation with
+  `hideFromNavigation: true` in the table's `customizeTable`.
 - **A form showing some fields, or laid out your way, is `RecordForm`
   with `fields` or `FormField` children** (0.29+) — not a form of your own.
   `fields={["name", "status"]}` shows those, in that order.
@@ -96,9 +98,9 @@ import only package entry points, so they compile as copied.
   beside its row, as a string: `id` beside a `row`, `ids` beside `rows` at the
   same positions (`tableController.ids[i]`; `resolveSelection` returns
   `{ rows, ids }`). Write and open with it, never `String(row.id)` — a
-  collection keyed by another column has no `row.id`. A write is the record
-  form's save: `browserCallbacks`, then the server's callbacks and security
-  rules, and every view of the collection reads it again; a write through
+  table keyed by another column has no `row.id`. A write is the record
+  form's save: `browserCallbacks`, then the server's table hooks and row-level
+  security, and every view of the collection reads it again; a write through
   `context.data` is the same. An `Entity` (`{ id, path, values }`) is only what
   a copy of one of the admin's own parts is handed. Don't call `fetch` on the
   REST API from admin code.
@@ -106,7 +108,7 @@ import only package entry points, so they compile as copied.
   `rowActions={(row, id) => <Button size="small" onClick={…}>Ship</Button>}`
   — the table's last column, beside the actions on a list row, a card and a
   kanban card. An action every view of the collection offers is an
-  `admin.entityActions` entry with `collapsed: false`. Not a column of your own.
+  `entityActions` entry with `collapsed: false` in the table's `customizeTable`. Not a column of your own.
 - **A list beside the picked record is `SplitView`** with a `CollectionPanel`
   (`onRowClick`, `highlightedIds`) as `master` and an `RecordForm` or
   `RecordDetail` as `detail`. It lays out by its container's width, so it
@@ -127,8 +129,9 @@ import only package entry points, so they compile as copied.
   "Copying a built-in part" below. The props your component receives are the
   original's.
 - **Server-side behaviour (validation that must hold, derived fields, side
-  effects) belongs in collection `callbacks`**, not only in a component — see
-  the `rebase-collections` skill.
+  effects) belongs in the table's `hooks` (or a column's `.transform()`) in
+  `backend/schema/`**, not only in a component — see the `rebase-collections`
+  skill.
 
 ## Copying a built-in part
 
@@ -170,7 +173,7 @@ To copy one: put the file in the project's frontend, rewrite each relative
 import (`../hooks/…`, `./drawer_expansion`, …) to `@rebasepro/cms` or
 `@rebasepro/app` — everything the file imports is exported from one of them —
 change what you came to change, and register the copy under its name in
-`<Rebase components>` (or a collection's `admin.components` for the
+`<Rebase components>` (or `components` in a table's `customizeTable` for the
 collection-scoped names: `Collection.*`, `Entity.*`, `EditView.FormActions`,
 `DetailView` and `EntityPreview`). Keep the copy small: change the part, not its neighbours.
 
@@ -184,8 +187,8 @@ reimplement those internals; customize around them:
   `Collection.EmptyState`, all copyable), add a view mode with
   `collectionViews`, or `wrap: true`.
 - **`DetailView`** — the record view: identity bar, tabs, inspector, split-list
-  buttons, around tab ids that are URL values. Use `admin.entityViews`,
-  `admin.entityActions`, the `form.*` slots, or the copyable `Entity.Form` and
+  buttons, around tab ids that are URL values. Use `entityViews`,
+  `entityActions`, the `form.*` slots, or the copyable `Entity.Form` and
   `EditView.FormActions`.
 - **`HomePage`** — copyable except its drag-and-drop reordering. A home page of
   your own composes `NavigationGroup`, `NavigationCardBinding` and

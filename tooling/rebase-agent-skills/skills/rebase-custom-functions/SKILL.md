@@ -357,7 +357,7 @@ seconds.
 ```typescript
 import { rebase } from "@rebasepro/server/functions";
 
-await rebase.dataAsAdmin.collection<Record<string, unknown>>("orders").find({ where: { status: ["==", "paid"] } });
+await rebase.dataAsAdmin.table("orders").find({ where: { status: ["==", "paid"] } });
 // `storage` is undefined when the deployment configured none — check it
 // before you rely on it.
 await rebase.storage?.putObject({ key, file });  // → storageUrl (gs://|s3://|local://)

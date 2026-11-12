@@ -27,12 +27,12 @@ no `app/` directory:
 
 ```
 <project-root>/
-├── frontend/             # React admin panel (Vite)
+├── frontend/             # React admin panel (Vite); src/cms/ customizes how tables look
 ├── backend/
-│   └── functions/        # Custom backend functions, one file per function
-│                         # (add crons/ for scheduled jobs, one file per job)
-├── config/               # Collections and storageAuthorize, shared by both
-│   └── collections/
+│   ├── schema/           # The tables: defineTable files, exported from index.ts
+│   ├── functions/        # Custom backend functions, one file per function
+│   │                     # (add crons/ for scheduled jobs, one file per job)
+│   └── storage.ts        # storageAuthorize: who may read/write which files
 ├── scripts/              # Standalone SDK scripts
 ├── .rebase/              # Dev-server state and the managed database's data
 ├── rebase.json           # Which apps this project deploys, and how

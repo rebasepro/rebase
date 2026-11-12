@@ -30,8 +30,8 @@ Requests with the `serviceKey` are scoped as `uid: "service"`, `roles: ["admin"]
 That is admin-scoped, **not** RLS-bypassing: the statements still run as
 `rebase_user` with policies evaluated against that identity — the admin role
 simply satisfies the built-in default policies. `policy.serverContext()`
-(`rebase.uid() IS NULL`) is **false** for it, so a collection with
-`disableDefaultPolicies: true` whose only rule is `serverContext()` denies these
+(`rebase.uid() IS NULL`) is **false** for it, so a table with
+`defaultPolicies: false` whose only rule is `serverContext()` denies these
 writes and returns zero rows for these reads. `rebase.sql()` is the real bypass:
 owner connection, no policies.
 
@@ -41,7 +41,7 @@ A **service key** uses its own identity for RLS scoping: `uid: "api-key:{id}"`, 
 
 ### Reserved System Identities
 
-The auth middleware assigns these reserved identities automatically. They are visible in `context.user` (global and collection callbacks) and `c.get("user")` (custom functions):
+The auth middleware assigns these reserved identities automatically. They are visible in `context.user` (global and table hooks) and `c.get("user")` (custom functions):
 
 | Auth Method | `uid` | `roles` | When It Occurs |
 |---|---|---|---|
@@ -53,6 +53,6 @@ The auth middleware assigns these reserved identities automatically. They are vi
 | Anonymous | `"anonymous"` | `["anon"]` | Unauthenticated when `requireAuth: false` (in `context.user`; `c.get("user")` stays unset) |
 | No token + `requireAuth: true` | — | — | **Rejected (401)** |
 
-> **IMPORTANT FOR AGENTS:** the server singleton's data plane is `rebase.dataAsAdmin` (used in cron jobs, custom functions and webhooks). It is backed by the **native DataDriver** — no JSON round trip through the REST API — and is scoped once, at boot, as `{ uid: "service", roles: ["admin"] }`. Callbacks live in the driver rather than the route layer, so global and collection callbacks still fire, seeing `uid: "service"` and `roles: ["admin"]`. That is how a callback distinguishes a server-internal read from an end-user one. `rebase.data` does not exist — not on the type and not at runtime — so the privileged plane has exactly one name.
+> **IMPORTANT FOR AGENTS:** the server singleton's data plane is `rebase.dataAsAdmin` (used in cron jobs, custom functions and webhooks). It is backed by the **native DataDriver** — no JSON round trip through the REST API — and is scoped once, at boot, as `{ uid: "service", roles: ["admin"] }`. Hooks live in the driver rather than the route layer, so global and table hooks still fire, seeing `uid: "service"` and `roles: ["admin"]`. That is how a hook distinguishes a server-internal read from an end-user one. `rebase.data` does not exist — not on the type and not at runtime — so the privileged plane has exactly one name.
 
 ---

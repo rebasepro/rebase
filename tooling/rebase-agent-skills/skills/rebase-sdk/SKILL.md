@@ -8,21 +8,21 @@ description: Guide for using the Rebase generated TypeScript SDK and client libr
 The Rebase SDK consists of two packages that work together to provide end-to-end type-safe access to a Rebase backend:
 
 - **`@rebasepro/client`** — The runtime client with CRUD, auth, realtime, storage, and more
-- **SDK Generator** — Generates TypeScript types from your collection definitions (via CLI or MCP tool)
+- **SDK Generator** — Generates TypeScript types from the tables in `backend/schema` (via CLI or MCP tool)
 
 The generated types are passed as a generic parameter to the client, providing full type safety across all operations.
 
-> **IMPORTANT FOR AGENTS:** Make sure the SDK types are current before writing client code. While `rebase dev` is running they are: it regenerates them on start and on every save under `config/collections/`. Otherwise use the `rebase_generate_sdk` MCP tool or `npx @rebasepro/cli generate-sdk` CLI command. The generated types live at `./generated/sdk/database.types.ts` relative to the project root.
+> **IMPORTANT FOR AGENTS:** Make sure the SDK types are current before writing client code. While `rebase dev` is running they are: it regenerates them on start and on every save under `backend/schema/`. Otherwise use the `rebase_generate_sdk` MCP tool or `npx @rebasepro/cli generate-sdk` CLI command. The generated types live at `./generated/sdk/database.types.ts` relative to the project root.
 
 ## SDK Generation
 
 ### How to Generate
 
-**Under `rebase dev`:** nothing to run. It regenerates `./generated/sdk/` on start and on every save under `config/collections/`. Generate it yourself in CI, in a frontend repository with no collections (`generate-sdk --from link` or `--from <url>`), or when `rebase dev` is not running.
+**Under `rebase dev`:** nothing to run. It regenerates `./generated/sdk/` on start and on every save under `backend/schema/`. Generate it yourself in CI, in a frontend repository with no `backend/schema` (`generate-sdk --from link` or `--from <url>`), or when `rebase dev` is not running.
 
 **Via MCP tool (preferred):**
 
-Use the `rebase_generate_sdk` MCP tool — no parameters required. It reads collections from `./config/collections` and writes the output to `./generated/sdk/`.
+Use the `rebase_generate_sdk` MCP tool — no parameters required. It compiles the tables `backend/schema/index.ts` exports and writes the output to `./generated/sdk/`.
 
 **Via CLI:**
 
@@ -36,10 +36,10 @@ A `database.types.ts` file (written beside `schema.meta.ts`, which exports the `
 
 | Export | Description |
 |--------|-------------|
-| `Database` | Interface with a key per collection *accessor*, each containing `Row`, `Insert`, and `Update` sub-types |
-| `CollectionName` | Union of the accessor names (`keyof Database`) — not the slugs |
-| `collectionsDictionary` | Runtime constant mapping each accessor to the slug the wire uses |
-| `CollectionsDictionary` | The type of that constant |
+| `Database` | Interface with a key per table *accessor*, each containing `Row`, `Insert`, and `Update` sub-types |
+| `TableName` | Union of the accessor names (`keyof Database`) — not the slugs |
+| `tablesDictionary` | Runtime constant mapping each accessor to the slug the wire uses |
+| `TablesDictionary` | The type of that constant |
 
 **Sub-type semantics:**
 
@@ -49,34 +49,40 @@ A `database.types.ts` file (written beside `schema.meta.ts`, which exports the `
 | `Insert` | Create type — for new records | Optional when the server assigns it | Required fields stay required |
 | `Update` | Partial update type | Not settable | All optional |
 
-A property marked `excludeFromApi` is absent from all three — the API surface
+A column marked `.private()` is absent from all three — the API surface
 does not mention it, in either direction. A write naming one is refused for
 every caller, with `VALIDATION_EXCLUDED_FIELDS`; server code sets it through
-`context.data` in a callback or `rebase.dataAsAdmin`.
+`context.data` in a hook or `rebase.dataAsAdmin`. A `.readOnly()` or stamped
+column is in `Row` but not in `Insert` / `Update`.
 
-**A field's wire name is its property key, and the API is camelCase throughout.**
-A `createdAt` property stored in a `created_at` column is `row.createdAt`; a
+**A field's wire name is its column key, and the API is camelCase throughout.**
+A `createdAt` column key stored in a `created_at` column is `row.createdAt`; a
 relation's foreign key is `authorId` while the column stays `author_id`. The
-collection accessor is turned into a property name the same way (`my-notes` →
-`data.myNotes`). A property key *you* wrote is your key, whatever its shape —
+table accessor is turned into a property name the same way (`my-notes` →
+`data.myNotes`). A column key *you* wrote is your key, whatever its shape —
 only the two derived keys, a relation's foreign key and an introspected column,
 are camel-cased. `where` and `orderBy` are keyed off `Row`, so the generated name
 is the one the backend answers to.
 
-### Property Type Mapping
+### Column Type Mapping
 
-| Rebase Type | TypeScript Type |
-|-------------|-----------------|
-| `string` | `string` (or string literal union if `enum` defined) |
-| `number` | `number` (or number literal union if `enum` defined) |
-| `boolean` | `boolean` |
-| `date` | `string` (ISO 8601) |
-| `geopoint` | `{ latitude: number; longitude: number }` |
-| `reference` | `string \| number` |
-| `map` | Nested `{ ... }` or `Record<string, unknown>` |
-| `array` | `Array<T>` or `Array<unknown>` |
-| `vector` | `number[]` |
-| `binary` | `string` |
+| Column | TypeScript Type |
+|--------|-----------------|
+| `col.text()`, `col.varchar()`, `col.uuid()` | `string` |
+| `col.enum([...])`, `.oneOf([...])` | the union of the values |
+| `col.integer()`, `col.bigint()`, `col.numeric()`, … | `number` |
+| `col.boolean()` | `boolean` |
+| `col.timestamptz()`, `col.date()`, `col.time()` | `string` (ISO 8601) |
+| `col.geopoint()` | `{ latitude: number; longitude: number }` |
+| `col.jsonb(shape)` / `col.jsonb<T>()` | the shape's type / `T` |
+| `col.array(inner)` | `Array<inner>` |
+| `col.vector(n)` | `number[]` |
+| `col.bytea()` | `string` (base64) |
+| `col.storage()` | `string` (`string[]` with `.multiple()`) |
+
+A column without `.notNull()` is `T | null` on `Row`. The same types are
+available from the table itself with `InferRow<typeof posts>` (see
+`rebase-collections`).
 
 A relation is typed as the **target's own `Row`, inlined** — that is what
 `include` serves. It is optional on every read, because it is only loaded when
@@ -91,13 +97,13 @@ and `Update`.
 
 ```typescript
 import { createRebaseClient } from '@rebasepro/client';
-import { collectionsDictionary, type Database } from './generated/sdk/database.types';
+import { tablesDictionary, type Database } from './generated/sdk/database.types';
 
 const rebase = createRebaseClient<Database>({
     baseUrl: 'http://localhost:3001',
     // Maps each accessor back to its slug. Without it, a slug that is not a
     // valid property name cannot be resolved and the request 404s.
-    collections: collectionsDictionary,
+    tables: tablesDictionary,
 });
 ```
 
@@ -105,7 +111,7 @@ const rebase = createRebaseClient<Database>({
 
 The `createRebaseClient<DB>()` factory returns a reconciled client type of `CreateRebaseClientResult<DB>` (which extends the base `RebaseClient` from `@rebasepro/types`). 
 
-Passing your generated `Database` type maps camelCase collection names (e.g. `posts`) to their database schemas (`Row`, `Insert`, and `Update` types), providing autocomplete and type safety across the entire `data` layer.
+Passing your generated `Database` type maps camelCase table names (e.g. `posts`) to their database schemas (`Row`, `Insert`, and `Update` types), providing autocomplete and type safety across the entire `data` layer.
 
 ### Configuration Options
 
@@ -118,7 +124,7 @@ Passing your generated `Database` type maps camelCase collection names (e.g. `po
 | `fetch` | `typeof fetch` | Global `fetch` | Custom fetch implementation |
 | `onUnauthorized` | `() => Promise<boolean>` | The client's own session refresh | Handler called on 401 responses and socket auth errors; resolve `true` to retry with the token resolved again |
 | `realtime` | `boolean` | `true` | Open the WebSocket. Set `false` in one-shot scripts, or the process will not exit |
-| `collections` | `Record<string, string>` | — | Maps accessor names to collection slugs. **Required for a typed client**: pass the generated `collectionsDictionary` |
+| `tables` | `Record<string, string>` | — | Maps accessor names to table slugs. **Required for a typed client**: pass the generated `tablesDictionary` |
 | `offline` | `boolean \| OfflineConfig` | `false` | Local-first sync — see **Offline & Local-First Sync** below |
 
 ### Server-Side Usage
@@ -128,23 +134,23 @@ For server-side scripts or service-to-service calls, pass a service key as the `
 ```typescript
 const rebase = createRebaseClient<Database>({
     baseUrl: 'https://api.myapp.com',
-    collections: collectionsDictionary,
+    tables: tablesDictionary,
     token: process.env.REBASE_SERVICE_KEY,
 });
 ```
 
 ## CRUD Operations
 
-> **IMPORTANT FOR AGENTS:** There are two access patterns for collections. Both are fully typed when using the `Database` generic. Prefer the property-style access for better readability.
+> **IMPORTANT FOR AGENTS:** There are two access patterns for tables. Both are fully typed when using the `Database` generic. Prefer the property-style access for better readability.
 
 ### Access Patterns
 
 ```typescript
-// 1. Property-style access (the `collections` dictionary resolves each accessor to its slug)
+// 1. Property-style access (the `tables` dictionary resolves each accessor to its slug)
 const { data: posts } = await rebase.data.posts.find();
 
-// 2. Collection method (explicit slug)
-const { data: posts } = await rebase.data.collection('posts').find();
+// 2. Table method (explicit slug — for a slug held in a variable)
+const { data: posts } = await rebase.data.table('posts').find();
 ```
 
 ### Available Operations
@@ -164,7 +170,7 @@ const { data: posts } = await rebase.data.collection('posts').find();
 | `iterate` | `iterate(params?)` | `AsyncIterable<Entity>` | Stream matching rows page by page |
 | `upsert` | `upsert(data, { onConflict? })` | `Entity` | Insert, or update the row matching on the primary key (or `onConflict` columns) |
 | `aggregate` | `aggregate({ select, groupBy?, where?, … })` | rows (+ `meta`) | `count`/`sum`/`avg`/`min`/`max`/`countDistinct`/`mode`/`percentile`/`distinct`/`fingerprint` — see **Aggregates** |
-| `refresh` | `refresh({ concurrently? })` | `void` | Recompute a materialized-view collection (`view: { materialized: true }`) |
+| `refresh` | `refresh({ concurrently? })` | `void` | Recompute a materialized view (`defineView(…, { materialized: true })`) |
 
 ### Bulk writes
 
@@ -180,7 +186,7 @@ await rebase.data.orders.updateMany([
 await rebase.data.sessions.deleteMany(['s-1', 's-2']);
 ```
 
-On a collection with no `beforeSave`/`afterSave`/`afterSaveError` hook, no
+On a table with no `beforeSave`/`afterSave`/`afterSaveError` hook, no
 `history` and no `tenant`, `createMany` (upsert too) and `updateMany` are a few
 multi-row statements, not one per row — 1,000 rows is one `INSERT … RETURNING`.
 Prefer them, and `updateMany` with a value per row, over a loop of single
@@ -359,7 +365,7 @@ Rules an agent needs before writing one:
   cursor throws `RebasePaginationError` with code `cursor-missing`.
 - `orderBy('_score')` cannot key a cursor either, for the same reason: relevance
   is computed per query rather than stored.
-- A field the collection does not have is a 400, not a silently unsorted 200.
+- A field the table does not have is a 400, not a silently unsorted 200.
 
 ### Filtering and sorting by a related row
 
@@ -411,7 +417,7 @@ Rules an agent needs before writing one:
 ### Aggregates
 
 `count`, `sum`, `avg`, `min` and `max` over the rows a filter selects, without
-fetching them. From the SDK, `aggregate()` on a collection — never a `findAll()`
+fetching them. From the SDK, `aggregate()` on a table — never a `findAll()`
 and a reduce, which is wrong under a `limit` and unaffordable without one:
 
 ```typescript
@@ -479,8 +485,8 @@ const result = await rebase.data.posts
 | `.orderBy(field, direction?)` | Sort results (`'asc'` or `'desc'`, default `'asc'`). Calling it again **adds a tie-breaker** — it does not replace the first key |
 | `.limit(n)` | Limit number of results |
 | `.offset(n)` | Skip first `n` results |
-| `.search(term)` | Text search — substring by default, ranked full-text if the collection opted in |
-| `.vectorSearch(prop, vector, opts?)` | Nearest-neighbour search over a `vector` property |
+| `.search(term)` | Text search — substring by default, ranked full-text if the table opted in |
+| `.vectorSearch(column, vector, opts?)` | Nearest-neighbour search over a `col.vector()` column |
 | `.include(...relations)` | Include related entities |
 | `.find()` | Execute the query |
 | `.listen(callback, errorCallback?)` | Subscribe to realtime updates |
@@ -490,13 +496,13 @@ const result = await rebase.data.posts
 `.search(term)` behaves in one of two ways, and an agent must know which before
 promising anything:
 
-**Default (no `search` block on the collection).** A case-insensitive substring
-match, OR-ed across the collection's *top-level* `string` properties. It cannot
-see inside `map` (JSONB) or `array` properties, does not rank, and cannot use an
+**Default (no `search` block on the table).** A case-insensitive substring
+match, OR-ed across the table's *top-level* text columns. It cannot
+see inside `jsonb` or array columns, does not rank, and cannot use an
 index. If a user reports that search "finds nothing" for content they can see on
-the record, this is almost always why — the content is in a `map`.
+the record, this is almost always why — the content is in a JSON column.
 
-**Opted in (collection declares `search`).** Ranked full-text matching over
+**Opted in (the table declares `search`).** Ranked full-text matching over
 exactly the fields named in the block, including paths into JSONB. Rows come
 back with `_score`, which is sortable:
 
@@ -507,7 +513,7 @@ const { data } = await client.data.talents
     .find();
 ```
 
-`orderBy("_score")` is a 400 on a collection that has not opted in, or on a
+`orderBy("_score")` is a 400 on a table that has not opted in, or on a
 query with no search string. Do not add it speculatively.
 
 **Explaining a result.** `search(term, { explain: true })` adds `_matches` to
@@ -517,13 +523,13 @@ for bulk reads, since it costs a `ts_headline` per field per row. The snippet
 carries markup and user-typed text: split on `<mark>` and render the parts
 rather than injecting it as HTML.
 
-To make a collection searchable, edit its config — see the `rebase-collections`
+To make a table searchable, add `search` to its `defineTable` — see the `rebase-collections`
 skill. `where` + `like` is not the workaround it looks like: the operator does
 exist, but a pattern beginning with `%` cannot use an index and scans the table.
 
 ### Vector search
 
-For a collection with a `vector` property:
+For a table with a `col.vector()` column:
 
 ```typescript
 const { data } = await client.data.docs
@@ -636,10 +642,10 @@ unsubscribe();
 
 ## Realtime Subscriptions
 
-### Listen to Collection Changes
+### Listen to Table Changes
 
 ```typescript
-// Via CollectionClient
+// Via the table client
 const unsubscribe = rebase.data.posts.listen(
     { where: { status: ['==', 'published'] }, limit: 50 },
     (response) => {
@@ -739,7 +745,7 @@ Opt in with one option. It is **off by default**, so nothing below applies unles
 ```typescript
 const rebase = createRebaseClient<Database>({
     baseUrl: API_URL,
-    collections: collectionsDictionary,
+    tables: tablesDictionary,
     offline: true,
 });
 ```
@@ -807,7 +813,7 @@ try {
 ### Limits agents must not paper over
 
 - **The client is not a replica.** Only rows the app has read or written are local, so a query answered from the cache may be missing rows. Live results flag this as `partial` — surface it rather than presenting it as complete.
-- **`searchString` is approximated** locally as a case-insensitive substring scan. On the server it is *also* a substring scan unless the collection declares a `search` block — do not tell a user they have full-text search until you have checked the collection.
+- **`searchString` is approximated** locally as a case-insensitive substring scan. On the server it is *also* a substring scan unless the table declares a `search` block — do not tell a user they have full-text search until you have checked the collection.
 - **A vector query is never answered from the cache.** The client holds no vectors, and the nearest of what happens to be cached looks exactly like the nearest that exist.
 - **`include`d relations cannot be evaluated locally** — such a query is always `partial` when answered from the cache.
 - **Replay is at-least-once.** Prefer idempotent writes (`createMany` with `upsert`) where a duplicate would matter.
@@ -847,7 +853,7 @@ const { items, nextPageToken } = await rebase.storage.listObjects('prefix/', {
 
 ### Multi-Backend Storage
 
-`rebase.storage` accesses the **default** storage source. For multi-backend setups (e.g. S3 + GCS/Firebase), collection properties can specify `storage.storageSource` in their schema to route uploads to a named backend.
+`rebase.storage` accesses the **default** storage source. For multi-backend setups (e.g. S3 + GCS/Firebase), a `col.storage({ source: "<key>" })` column routes its uploads to a bucket declared in `backend/resources.ts`.
 
 On the frontend, register direct storage sources via the `storageSources` prop on `<Rebase>`:
 
@@ -868,7 +874,7 @@ const firebaseStorageSource = useFirebaseStorageSource({ firebaseApp });
 </Rebase>
 ```
 
-The system resolves the correct source per-property via `StorageSourcesContext` (mirroring `DataSourcesContext`). Properties bound to a `direct` storage source bypass the Rebase backend and upload/download directly to the provider (e.g. Firebase Storage), while `server` sources route through the Rebase API with a `?storageId` query parameter for backend routing.
+The system resolves the correct source per-field via `StorageSourcesContext` (mirroring `DataSourcesContext`). Fields bound to a `direct` storage source bypass the Rebase backend and upload/download directly to the provider (e.g. Firebase Storage), while `server` sources route through the Rebase API with a `?storageId` query parameter for backend routing.
 
 ## Custom Functions
 
@@ -960,19 +966,19 @@ A common pattern for using the SDK in a React application:
 ```typescript
 // src/client.ts
 import { createRebaseClient } from '@rebasepro/client';
-import { collectionsDictionary, type Database } from './generated/sdk/database.types';
+import { tablesDictionary, type Database } from './generated/sdk/database.types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-export const rebase = createRebaseClient<Database>({ baseUrl: API_URL, collections: collectionsDictionary });
+export const rebase = createRebaseClient<Database>({ baseUrl: API_URL, tables: tablesDictionary });
 ```
 
 ```typescript
-// src/hooks/useCollection.ts
+// src/hooks/useTable.ts
 import { useState, useEffect } from 'react';
 import type { FindParams } from '@rebasepro/client';
 import { rebase } from '../client';
 
-export function useCollection<T extends keyof Database>(
+export function useTable<T extends keyof Database>(
     slug: T,
     // Tuples (`{ status: ['==', 'published'] }`), never bare strings
     options?: { limit?: number; where?: FindParams['where'] }
@@ -981,7 +987,7 @@ export function useCollection<T extends keyof Database>(
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = rebase.data.collection(slug).listen(
+        const unsubscribe = rebase.data.table(slug).listen(
             { limit: options?.limit, where: options?.where },
             (response) => {
                 setData(response.data);

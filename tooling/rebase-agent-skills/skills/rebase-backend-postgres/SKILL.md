@@ -12,22 +12,22 @@ Rebase uses PostgreSQL as its primary database, with Drizzle ORM for type-safe s
 ## Architecture
 
 ```
-Collections (TypeScript) → Drizzle Schema (generated) → PostgreSQL (database)
+Tables (backend/schema, TypeScript) → Drizzle Schema (generated) → PostgreSQL (database)
 ```
 
 The backend uses a **two-step process**:
-1. **`rebase schema generate`** reads your Rebase collection definitions and generates a Drizzle ORM schema file (`schema.generated.ts`)
+1. **`rebase schema generate`** compiles the tables in `backend/schema/` (`defineTable`, see `rebase-collections`) and generates a Drizzle ORM schema file (`schema.generated.ts`)
 2. **`rebase db push`** or **`rebase db generate` + `rebase db migrate`** applies the schema to the database
 
 The backend also applies the additive part at every boot, on any database: missing
-tables, columns and enum types, and the collections' RLS policies
+tables, columns and enum types, and the tables' RLS policies
 (`REBASE_MIGRATE_ON_BOOT=ensure`, the default; `none` opts out). It never drops,
 renames or narrows — that is what step 2 is for.
 
-On the way, `db push` and `db generate` render the collections to SQL in `.rebase/sql/`
+On the way, `db push` and `db generate` render the tables to SQL in `.rebase/sql/`
 beside the backend (`backend/.rebase/sql/` in a scaffolded project): `schema.sql` is
 Atlas's desired state, and `policies.sql`, `search.sql`, `vector.sql` and `triggers.sql`
-are applied by Rebase itself. Both commands rewrite all five from the collections on
+are applied by Rebase itself. Both commands rewrite all five from the tables on
 every run, and the directory ignores itself — never edit or commit them. Migrations
 are what you commit, in `drizzle/migrations/`.
 
@@ -45,7 +45,7 @@ are what you commit, in `drizzle/migrations/`.
 ```bash
 # From the project root directory:
 
-# 1. Generate Drizzle schema from collections
+# 1. Generate Drizzle schema from the tables in backend/schema
 rebase schema generate
 
 # 2. Push changes directly to database (no migration files)
@@ -71,8 +71,8 @@ rebase db migrate
 
 | Command | Description | When to Use |
 |---------|-------------|-------------|
-| `rebase schema generate` | Collections → Drizzle schema | Always first step |
-| `rebase schema introspect` | DB → Rebase collections | Legacy DB import (Preferred) |
+| `rebase schema generate` | `backend/schema` → Drizzle schema | Always first step |
+| `rebase schema introspect` | DB → `defineTable` files in `backend/schema` | Adopting an existing database (Preferred) |
 | `rebase db push` | Apply schema directly to DB | Development |
 | `rebase db generate` | Generate schema + create SQL migration files | Production prep |
 | `rebase db migrate` | Run pending migrations | Production deploy |
@@ -105,7 +105,8 @@ rebase db migrate
 |---------|---------|
 | `@rebasepro/server` | Hono server coordinator, API generation, auth, storage, env validation |
 | `@rebasepro/server-postgres` | PostgreSQL bootstrapper, data driver, connection helpers, realtime (LISTEN/NOTIFY) |
-| `@rebasepro/types` | Shared TypeScript type definitions (`PostgresCollectionConfig`, etc.) |
+| `@rebasepro/types` | Shared TypeScript type definitions (`TableDef`, `TableDescriptor`, `SecurityRule`, etc.) |
+| `@rebasepro/server/schema` | Table authoring: `defineTable`, `defineAuthTable`, `defineView`, `col`, `rel`, `json` — loads no server code |
 
 ## Connection Functions
 
@@ -263,6 +264,8 @@ import path from "path";
 import { initializeRebaseBackend } from "@rebasepro/server";
 import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgres";
 import { tables, enums, relations } from "./schema.generated.js";
+// backend/schema/index.ts: every table, and the defaultRls of its "inherit" tables.
+import { users, posts, tags, defaultRls } from "../schema/index.js";
 
 const app = new Hono<HonoEnv>();
 const server = createServer(getRequestListener(app.fetch));
@@ -274,7 +277,9 @@ const { db, pool, connectionString } = createPostgresDatabaseConnection(
 );
 
 const backend = await initializeRebaseBackend({
-    collectionsDir: path.resolve(__dirname, "../../config/collections"),
+    tables: [users, posts, tags],
+    defaultRls,
+    schemaDir: path.resolve(__dirname, "../schema"),
     functionsDir: path.resolve(__dirname, "../functions"),
     cronsDir: path.resolve(__dirname, "../crons"),
     server,
@@ -337,7 +342,7 @@ The config object passed to both `createPostgresAdapter()` and `createPostgresBo
 |----------|------|----------|-------------|
 | `connection` | `NodePgDatabase` | ✅ | Drizzle database connection from `createPostgresDatabaseConnection()` |
 | `schema` | `{ tables, enums, relations }` | No | The generated Drizzle schema — for diagnostics only: the driver reads the tables it serves from the database, and this only lets it warn when `schema.generated.ts` no longer describes the database |
-| `introspectionSchema` | `string` | No | The Postgres schema read when collections are derived from the database. Default `public` |
+| `introspectionSchema` | `string` | No | The Postgres schema read when the tables are read from the database (no `backend/schema`). Default `public` |
 | `unknownFilterFields` | `"error" \| "warn"` | No | A filter field that resolves to no column. Default `"error"`; `"warn"` drops it |
 | `connectionString` | `string` | No | Primary connection URL — enables LISTEN/NOTIFY realtime |
 | `adminConnectionString` | `string` | No | Admin-level connection — enables `DatabasePoolManager`, SQL editor, branching |
@@ -379,7 +384,12 @@ import {
     openRebase,
     postgresDriverConfigFromEnv
 } from "@rebasepro/server-postgres";
-import { collections } from "../../config/collections";
+import { lowerTables } from "@rebasepro/common";
+import { users, posts, defaultRls } from "../schema";
+
+// `openRebase` and `openPostgresDriver` still take the tables in the server's
+// internal form; a later release takes the defineTable results directly.
+const collections = lowerTables([users, posts], { defaultRls });
 
 // The shortcut: dataAsAdmin, sql, withAuth(user), close(). No DDL, no env reads.
 // Typed by the Database `rebase generate-sdk --register` registers, or openRebase<Database>(…).
@@ -408,7 +418,6 @@ The full `RebaseBackendConfig` table — every option, its default, and what the
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `collection` | `CollectionConfig` | `defaultUsersCollection` (table `rebase.users`) | Auth users collection |
 | `jwtSecret` | `string` | — (`loadEnv()` generates `JWT_SECRET` in dev) | JWT signing secret (≥32 chars) |
 | `accessExpiresIn` | `string` | `"1h"` | Access token TTL |
 | `refreshExpiresIn` | `string` | `"30d"` | Refresh token TTL |
@@ -529,15 +538,15 @@ In non-production mode, `loadEnv()` **auto-generates** `JWT_SECRET` and `REBASE_
 
 A project has no `drizzle.config.ts` and runs no `drizzle-kit`: do not create one.
 `db push`, `db generate` and `db migrate` drive [Atlas](https://atlasgo.io)
-(`@ariga/atlas`, a dependency of `backend/package.json`) from the collections:
+(`@ariga/atlas`, a dependency of `backend/package.json`) from the tables:
 
-- The desired state is `.rebase/sql/schema.sql`, rendered from the collections on
+- The desired state is `.rebase/sql/schema.sql`, rendered from the tables on
   every run (see above). Migrations go to `backend/drizzle/migrations/`, with
   Atlas's `atlas.sum` beside them.
 - Atlas plans against a second, empty database: `<db>_dev_diff` on a real server,
   a throwaway in-memory PGlite on the managed one, or the one
   `REBASE_ATLAS_DEV_URL` names.
-- **Only tables that back a collection (or its many-to-many junctions) are in
+- **Only tables declared in `backend/schema` (and their many-to-many junctions) are in
   scope.** Every other table is excluded from the diff, so Atlas never drops it;
   the `rebase` schema (auth tables, RLS helpers, Atlas's revision table) is never
   touched. If the database cannot be read to build that list, the command fails
@@ -562,7 +571,7 @@ const backend = await initializeRebaseBackend({
 
 When enabled:
 - The bootstrapper auto-creates a `rebase.entity_history` table
-- Every `INSERT`, `UPDATE`, `DELETE` on a collection that declares `history: true` is recorded with before/after entities
+- Every `INSERT`, `UPDATE`, `DELETE` on a table that declares `history: true` is recorded with before/after entities
 - History is queryable via the `GET /api/data/:slug/:id/history` REST endpoint
 
 ## Health Check
@@ -649,16 +658,16 @@ The `shutdown(timeoutMs?: number, options?: { server })` method (default timeout
 
 ## Important Notes
 
-- **To import a legacy database**, use `rebase schema introspect` to generate Rebase Collections.
-  Since 0.25 it writes each table's RLS policies into the collection's `securityRules`, so the
-  `db push` after it recreates them as they were; on 0.24 a push could drop a hand-written
-  policy named like a generated one (`<table>_<op>_<hash>`).
+- **To import a legacy database**, use `rebase schema introspect`: it writes one `defineTable`
+  module per table into `backend/schema/` and an export for each in `index.ts`, with
+  `rls: "admin-only"` on every table — write the real rules before anyone but an admin needs
+  the rows.
 - **Never use `schema introspect` then `db migrate`** — introspected databases already have the tables
 - **Always backup before production migrations** — `ALTER COLUMN` or `DROP COLUMN` can cause data loss
 - **Tables not in schema are ignored** — custom tables and internal Rebase tables are safe
-- **CHECK and EXCLUDE constraints are kept (0.25+)** — a collection cannot declare either, so
-  `db push` leaves every one on a collection's table alone: hand-written, or carried by a database
-  `schema introspect` adopted (a readable CHECK also becomes the property's `validation`). On 0.24
+- **CHECK and EXCLUDE constraints are kept (0.25+)** — a table cannot declare either, so
+  `db push` leaves every one on a declared table alone: hand-written, or carried by a database
+  `schema introspect` adopted (a readable CHECK also becomes the column's `.validate()`). On 0.24
   the first push after an introspection dropped them all without a prompt. To remove one, drop it
   by hand. Triggers and functions a user wrote are never touched (Atlas does not inspect them).
   `db generate` is different: it diffs the migration files, so a CHECK a hand-written migration
@@ -668,7 +677,7 @@ The `shutdown(timeoutMs?: number, options?: { server })` method (default timeout
 - **Odd names are safe (0.25+)** — every exclude matches the name exactly, a `.`, `[`, `]` or `*`
   in it included. On 0.24 a hand-written index named like `orders_idx[v1]` was dropped without a
   prompt, and a `.` in a table's or an index's name failed every push (`too many parts in pattern`)
-- **Indexes are declared too** — a collection's `indexes` array is emitted into `schema.sql` by
+- **Indexes are declared too** — a table's `indexes` array is emitted into `schema.sql` by
   `db push`/`db generate` *and* created at boot with `CREATE INDEX CONCURRENTLY IF NOT EXISTS`,
   so a deployment that never runs `db push` still gets them. See the `rebase-collections` skill.
 - **A hand-written index on a managed table used to be dropped by `db push`.** Push is
@@ -678,13 +687,13 @@ The `shutdown(timeoutMs?: number, options?: { server })` method (default timeout
   is excluded from the diff and never touched. Deleting a declaration still drops that index, on
   purpose. Never rename a hand-written index to look generated.
 - **Review generated SQL** — always inspect the new migration in `./drizzle/migrations/` before applying
-- **Collections directory** — Collection definitions are defined in the `config/collections/` directory.
+- **Schema directory** — Tables are defined in `backend/schema/` (or `rebase.json`'s `apps.<backend>.tables`; `--schema-dir <dir>` on every command).
 
 ## Troubleshooting
 
 ### 1. SQL Editor Permission Denied (`permission denied for table <name>`)
-- **Symptoms:** You can view data in the collection/CMS spreadsheet view, but running custom SQL queries (like `SELECT * FROM table;`) in the Rebase Studio SQL Editor throws `cause: error: permission denied for table <table_name>`.
-- **Cause:** Rebase tries to switch database roles to match the active user's role (e.g., `SET LOCAL ROLE "admin"`). If you are using custom auth (roles that exist only in Rebase, in the users' `roles` column, rather than as actual PostgreSQL roles), or if the database-level role doesn't have `SELECT` privileges, the query fails. The collection views do not switch to a role named after yours: they go through the data API, which runs every request as `rebase_user` under the collections' RLS policies, so they keep working.
+- **Symptoms:** You can view data in the CMS spreadsheet view, but running custom SQL queries (like `SELECT * FROM table;`) in the Rebase Studio SQL Editor throws `cause: error: permission denied for table <table_name>`.
+- **Cause:** Rebase tries to switch database roles to match the active user's role (e.g., `SET LOCAL ROLE "admin"`). If you are using custom auth (roles that exist only in Rebase, in the users' `roles` column, rather than as actual PostgreSQL roles), or if the database-level role doesn't have `SELECT` privileges, the query fails. The CMS views do not switch to a role named after yours: they go through the data API, which runs every request as `rebase_user` under the tables' RLS policies, so they keep working.
 - **Solution:** Add `DISABLE_DB_ROLE_SWITCHING=true` to your backend `.env` configuration. This skips role switching, executing queries under the connection owner user.
 
 ### 2. SQL Editor/Studio Schema Fetch Failed (`Cross-database execution requires adminConnectionString`)

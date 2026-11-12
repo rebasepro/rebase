@@ -21,12 +21,12 @@ Rebase includes a built-in WebSocket-based realtime engine that broadcasts datab
 The realtime pipeline has three stages:
 
 1. **Database mutation** — A record is created/updated/deleted (via REST API, SDK, or Studio).
-2. **Server fan-out** — The `RealtimeService` detects the change and fans out to every active WebSocket subscription matching the affected collection or entity.
+2. **Server fan-out** — The `RealtimeService` detects the change and fans out to every active WebSocket subscription matching the affected table or entity.
 3. **Client callback** — The client SDK fires the registered `onUpdate` callback with fresh data.
 
 For multi-instance deployments, PostgreSQL `LISTEN/NOTIFY` broadcasts **row changes** across server instances: on the `rebase_cdc` channel when database-level change capture is active (the default wherever the database role can create triggers), otherwise via the `rebase_entity_changes` channel.
 
-> **IMPORTANT FOR AGENTS:** That covers collection/entity subscriptions only. **Broadcast channels and presence are per-instance unless a channel bus is configured** — see [Multi-instance channels](#multi-instance-channels-and-presence). This is the single most likely cause of "collaboration works locally but not in production": behind a load balancer, two clients on different replicas see an empty room and nothing errors.
+> **IMPORTANT FOR AGENTS:** That covers table/row subscriptions only. **Broadcast channels and presence are per-instance unless a channel bus is configured** — see [Multi-instance channels](#multi-instance-channels-and-presence). This is the single most likely cause of "collaboration works locally but not in production": behind a load balancer, two clients on different replicas see an empty room and nothing errors.
 
 ### Zero Configuration
 
@@ -36,7 +36,7 @@ Realtime is enabled out of the box. There is no flag to flip or service to start
 
 The `@rebasepro/client` SDK provides high-level methods with automatic authentication, reconnection, subscription deduplication, and typed responses.
 
-### Subscribing to a Collection — `listen()`
+### Subscribing to a Table — `listen()`
 
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
@@ -200,7 +200,7 @@ listen(
 ): () => void
 ```
 
-> **IMPORTANT FOR AGENTS:** `.listen()` (on the query builder and on the collection) needs a socket. Realtime is on by default and `websocketUrl` defaults to one derived from `baseUrl`, so this only bites a client created with `realtime: false`, or one whose `baseUrl` is relative outside a browser. There, calling `.listen()` throws a `RebaseClientError` with code `REALTIME_DISABLED`: `"Listen is only available when RebaseClient is configured with a websocketUrl, and not when it was created with realtime: false."`
+> **IMPORTANT FOR AGENTS:** `.listen()` (on the query builder and on the table client) needs a socket. Realtime is on by default and `websocketUrl` defaults to one derived from `baseUrl`, so this only bites a client created with `realtime: false`, or one whose `baseUrl` is relative outside a browser. There, calling `.listen()` throws a `RebaseClientError` with code `REALTIME_DISABLED`: `"Listen is only available when RebaseClient is configured with a websocketUrl, and not when it was created with realtime: false."`
 
 ## Update Delivery: Instant Patch + Correctness Refetch
 
@@ -212,7 +212,7 @@ There used to be an instant row patch (`collection_patch`) ahead of the refetch.
 
 The client SDK automatically deduplicates subscriptions:
 
-- If multiple components subscribe to the same collection with identical parameters (path, filter, orderBy, limit, etc.), only **one** WebSocket subscription is created on the server.
+- If multiple components subscribe to the same table with identical parameters (path, filter, orderBy, limit, etc.), only **one** WebSocket subscription is created on the server.
 - Additional callbacks are registered locally and receive the same data.
 - New subscribers immediately receive the cached latest data if available (`isInitialDataReceived`).
 - The server subscription is only unsubscribed when the **last** callback for that key is removed.
@@ -266,7 +266,7 @@ Auth error codes:
 | `INVALID_TOKEN` | Token is invalid or expired |
 | `SESSION_REVOKED` / `ACCOUNT_DISABLED` | Built-in auth: the session was signed out or revoked (or its account deleted), or the account is disabled |
 
-### Subscribe to a Collection
+### Subscribe to a Table (wire name `subscribe_collection`)
 
 ```typescript
 ws.send(JSON.stringify({

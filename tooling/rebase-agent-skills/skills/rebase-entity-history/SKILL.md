@@ -7,15 +7,18 @@ description: Guide for tracking and reverting entity changes with Rebase's built
 
 Rebase includes a built-in entity history system that records entities of every create, update, and delete operation. History entries are stored in a dedicated PostgreSQL table and exposed via REST API endpoints. The admin panel shows the revisions in the record inspector, with one-click revert.
 
-> **IMPORTANT FOR AGENTS:** Entity history requires **two** things to be enabled: (1) the global `history` flag in the backend config, AND (2) `history: true` on each individual collection. If either is missing, no history is recorded for that collection — the driver's guard is literally `historyService && collection.history`.
+> **IMPORTANT FOR AGENTS:** Entity history requires **two** things to be enabled: (1) the global `history` flag in the backend config, AND (2) `history: true` on each individual table. If either is missing, no history is recorded for that table.
 >
-> Under the **runtime** (`rebase dev`, `rebase start`, the published image — the default) the global flag comes from `REBASE_HISTORY`, which **defaults to `true`**. So in a scaffolded project the global half is already on and the per-collection `history: true` is the one you have to write. A hand-written `initializeRebaseBackend` call has to pass `history` itself.
+> Under the **runtime** (`rebase dev`, `rebase start`, the published image — the default) the global flag comes from `REBASE_HISTORY`, which **defaults to `true`**. So in a scaffolded project the global half is already on and the per-table `history: true` (in its `defineTable`) is the one you have to write. A hand-written `initializeRebaseBackend` call has to pass `history` itself.
 
 ## Enabling History
 
 ### Step 1 — Enable History Globally (Backend Config)
 
-Add `history: true` (or a configuration object) to `initializeRebaseBackend()`:
+In a scaffolded project this is the `REBASE_HISTORY` environment variable,
+which the runtime passes as the backend's `history` option and which defaults
+to `true`. An ejected server adds `history: true` (or a configuration object)
+to `initializeRebaseBackend()`:
 
 ```typescript
 import { initializeRebaseBackend } from "@rebasepro/server";
@@ -26,7 +29,7 @@ await initializeRebaseBackend({
     // `db` from `createPostgresDatabaseConnection(env.DATABASE_URL)`: the adapter
     // needs the connection; a connection string alone opens no pool.
     database: createPostgresAdapter({ connection: db, connectionString: env.DATABASE_URL }),
-    collections: [...collections],
+    tables: [products, logs, users],
 
     // ── Enable entity history globally ──
     history: true,
@@ -48,30 +51,29 @@ The `history` property accepts either:
 history: { retention: 30 },
 ```
 
-### Step 2 — Enable History Per-Collection
+### Step 2 — Enable History Per Table
 
-On each collection that should be tracked, set `history: true`:
+On each table that should be tracked, set `history: true` in its `defineTable`:
 
 ```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+// backend/schema/products.ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
-const productsCollection = defineCollection({
-    slug: "products",
-    name: "Products",
-    table: "products",
-
-    // ── Enable history for this collection ──
-    history: true,
-
-    properties: {
-        name: { type: "string", name: "Name" },
-        price: { type: "number", name: "Price" },
-        status: { type: "string", name: "Status" },
+export const products = defineTable("products", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        name: col.text().notNull(),
+        price: col.numeric(10, 2),
+        status: col.enum(["draft", "active"]).notNull().default("draft")
     },
+    rls: "admin-only",
+
+    // ── Enable history for this table ──
+    history: true
 });
 ```
 
-> **WARNING FOR AGENTS:** Setting `history: true` on a collection has **no effect** if the global `history` flag is not also set in the backend config. Both must be enabled.
+> **WARNING FOR AGENTS:** Setting `history: true` on a table has **no effect** if the backend's `history` is off (`REBASE_HISTORY=false`, or an ejected server that leaves the option out). Both must be enabled.
 
 ## How History Recording Works
 
@@ -100,7 +102,7 @@ Each history entry has the following structure:
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | `string` | UUID primary key of the history entry |
-| `table_name` | `string` | The collection slug / table path |
+| `table_name` | `string` | The table slug / table path |
 | `entity_id` | `string` | The ID of the entity this entry belongs to |
 | `action` | `"create" \| "update" \| "delete"` | What operation was performed |
 | `changed_fields` | `string[] \| null` | Array of field names that changed (only for updates) |
@@ -180,9 +182,9 @@ GET /api/data/:slug/:entityId/history
 
 | Status | Condition |
 |--------|-----------|
-| `404` | Collection slug not found, or the entity does not exist / the caller may not read it (RLS — a 404, not a 403, so its existence is not confirmed) |
-| `400` | History not enabled for this collection, or `limit` above 100 (`INVALID_LIMIT`) |
-| `403` | `SCOPE_MISSING` — an API key without `data:read` on the collection |
+| `404` | Table slug not found, or the entity does not exist / the caller may not read it (RLS — a 404, not a 403, so its existence is not confirmed) |
+| `400` | History not enabled for this table, or `limit` above 100 (`INVALID_LIMIT`) |
+| `403` | `SCOPE_MISSING` — an API key without `data:read` on the table |
 
 Access is the row's: the route reads the entity through the caller's RLS-scoped driver first (a row in the trash included), and only then the history table.
 
@@ -211,20 +213,20 @@ No request body is needed. The server fetches the stored `values` from the histo
 
 | Status | Condition |
 |--------|-----------|
-| `404` | Collection, entity (or one the caller may not read) or history entry not found |
-| `403` | `SCOPE_MISSING` — an API key without `data:write` on the collection |
-| `400` | History not enabled for the collection |
+| `404` | Table, entity (or one the caller may not read) or history entry not found |
+| `403` | `SCOPE_MISSING` — an API key without `data:write` on the table |
+| `400` | History not enabled for the table |
 | `400` | History entry belongs to a different entity (cross-entity revert blocked) |
 | `400` | History entry has no stored values |
 
-> **IMPORTANT FOR AGENTS:** Reverting goes through the **normal save path**, which means: (1) it triggers all `beforeSave` / `afterSave` callbacks, (2) it creates a **new history entry** for the revert operation itself, providing a complete audit trail, and (3) it notifies real-time subscribers of the change.
+> **IMPORTANT FOR AGENTS:** Reverting goes through the **normal save path**, which means: (1) it triggers all `beforeSave` / `afterSave` hooks, (2) it creates a **new history entry** for the revert operation itself, providing a complete audit trail, and (3) it notifies real-time subscribers of the change.
 
 ### Example: Fetch and Revert via cURL
 
 `$TOKEN` is an access token — the `accessToken` a sign-in returns, or an API key.
 
 ```bash
-# List history for entity 42 in the "products" collection
+# List history for entity 42 in the "products" table
 curl -H "Authorization: Bearer $TOKEN" \
      "http://localhost:3001/api/data/products/42/history?limit=10&offset=0"
 
@@ -324,7 +326,7 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_history_updated_at
 ### Storage Characteristics
 
 - **Values are stored as JSONB** — `values` is the full entity, not a diff, so a revert simply writes it back. An update's `previous_values` holds only the fields it changed (`format: 2`); entries recorded before 0.25 hold the whole previous entity (`format: 1`).
-- **All collections share one table** — the `table_name` column distinguishes between collections.
+- **All tables share one history table** — the `table_name` column distinguishes between them.
 - **Entity IDs are stored as text** — regardless of the original column type.
 - **Indexes**: `(table_name, entity_id, updated_at DESC)` for per-entity lookups, and `(updated_at)` for the retention sweep. A database from before 0.25 also had `(table_name, entity_id)`; boot drops it, as the first index covers it.
 
@@ -366,7 +368,7 @@ There is nothing to schedule: the hourly sweep above is the global, TTL-based cl
 
 ## Admin Panel Integration
 
-When history is enabled for a collection, the admin panel offers **History** in
+When history is enabled for a table, the admin panel offers **History** in
 the record's overflow (`⋮`) menu, beside **Inspect record**. Both open the record
 inspector — a panel beside the form, not a tab in front of it — so the record
 you are inspecting stays on screen while you read its revisions. The panel:
@@ -382,7 +384,7 @@ are left out of each entry's diff: they change on every write, and the entry
 already states when it happened and which record it belongs to.
 
 No additional configuration is needed — the menu entry appears for any
-collection with `history: true`.
+table with `history: true`.
 
 ## Client SDK Usage
 
@@ -405,8 +407,7 @@ import { getRequestListener } from "@hono/node-server";
 import { createServer } from "http";
 import { initializeRebaseBackend, loadEnv } from "@rebasepro/server";
 import { createPostgresAdapter } from "@rebasepro/server-postgres";
-import { defineCollection } from "@rebasepro/cms-types";
-import { defaultUsersCollection } from "@rebasepro/common";
+import { defineTable, defineAuthTable, col } from "@rebasepro/server/schema";
 import dotenv from "dotenv";
 
 dotenv.config({ path: "../../.env" });
@@ -415,29 +416,32 @@ const env = loadEnv();
 const app = new Hono<HonoEnv>();
 const server = createServer(getRequestListener(app.fetch));
 
-// Collection with history enabled
-const productsCollection = defineCollection({
-    slug: "products",
-    name: "Products",
-    table: "products",
-    history: true,  // ← Per-collection opt-in
-    properties: {
-        name: { type: "string", name: "Name" },
-        price: { type: "number", name: "Price" },
-        description: { type: "string", name: "Description" },
+// Table with history enabled (normally in backend/schema/products.ts)
+const products = defineTable("products", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        name: col.text().notNull(),
+        price: col.numeric(10, 2),
+        description: col.text()
     },
+    rls: "admin-only",
+    history: true  // ← Per-table opt-in
 });
 
-// Collection WITHOUT history
-const logsCollection = defineCollection({
-    slug: "logs",
-    name: "Logs",
-    table: "logs",
-    // history: false (default) — high-volume tables shouldn't track history
-    properties: {
-        message: { type: "string", name: "Message" },
-        level: { type: "string", name: "Level" },
+// Table WITHOUT history — high-volume tables shouldn't track history
+const logs = defineTable("logs", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        message: col.text().notNull(),
+        level: col.enum(["info", "warn", "error"]).notNull()
     },
+    rls: "admin-only"
+});
+
+// The users table auth stores accounts in.
+const users = defineAuthTable("users", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), email: col.text().notNull().unique() },
+    rls: "admin-only"
 });
 
 await initializeRebaseBackend({
@@ -447,13 +451,12 @@ await initializeRebaseBackend({
         connection: db, // from createPostgresDatabaseConnection(env.DATABASE_URL)
         connectionString: env.DATABASE_URL,
     }),
-    collections: [productsCollection, logsCollection, defaultUsersCollection],
+    tables: [products, logs, users],
 
     // ── Enable history globally with 60-day retention ──
     history: { retention: 60 },
 
     auth: {
-        collection: defaultUsersCollection,
         jwtSecret: env.JWT_SECRET,
         serviceKey: env.REBASE_SERVICE_KEY,
     },
@@ -474,7 +477,7 @@ console.log(`Server running at http://localhost:${env.PORT}`);
 
 - Each history entry stores the **full JSONB entity** in `values`; an update's `previous_values` adds only the changed fields (`format: 2`, since 0.25 — older entries hold the whole previous entity too). For entities with large text fields or complex nested structures, this can grow quickly.
 - Default retention limits: **200 entries per entity** and **90 days TTL**. Adjust these based on your use case.
-- All collections share the single `rebase.entity_history` table — monitor its size with:
+- All tables share the single `rebase.entity_history` table — monitor its size with:
 
 ```sql
 SELECT pg_size_pretty(pg_total_relation_size('rebase.entity_history'));
@@ -484,8 +487,8 @@ SELECT pg_size_pretty(pg_total_relation_size('rebase.entity_history'));
 
 | Scenario | Recommendation |
 |----------|---------------|
-| High-write collections (logs, analytics, events) | Do NOT enable `history: true` — the volume will overwhelm storage |
-| Content/CMS collections (articles, products, pages) | Enable history — great for audit trails and undo |
+| High-write tables (logs, analytics, events) | Do NOT enable `history: true` — the volume will overwhelm storage |
+| Content tables (articles, products, pages) | Enable history — great for audit trails and undo |
 | User-facing data (orders, profiles) | Enable history — useful for compliance and support |
 | Large text fields (markdown, HTML, JSON blobs) | Consider shorter retention (`history: { retention: 14 }`) to limit storage |
 
