@@ -1,7 +1,7 @@
 # Rebase reference application
 
-The example this monorepo develops against: a backend, an admin panel, and the
-collections both read. It is what `pnpm run dev` at the repository root starts,
+The example this monorepo develops against: a backend that owns the tables, and
+an admin panel layered over them. It is what `pnpm run dev` at the repository root starts,
 and what the end-to-end suites drive.
 
 Setting it up is part of the repository's setup — see
@@ -14,12 +14,17 @@ the database and the first run. This file describes the app itself.
 |---|---|
 | `frontend/` | The React admin panel, built with Vite |
 | `backend/` | The Node server: Postgres via Drizzle, plus WebSocket realtime |
-| `config/` | The collections, display config and locales both sides read |
+| `backend/schema/` | The tables (`defineTable`, `defineAuthTable`), their RLS, hooks, search and indexes |
+| `backend/lib/` | What the tables share: PII masking, the product locales |
+| `frontend/src/cms/` | How the admin panel shows each table (`customizeTable`): labels, actions, kanban, forms, custom fields |
 | `rebase.json` | What the CLI reads: the two apps, and where each one's code lives |
 
-`config/collections/` is the single definition. Adding a property there changes
-the database schema, the admin panel and the generated SDK types together —
-which is the point of the example.
+`backend/schema/` is the single definition of the data. Adding a column there
+changes the database schema, the API, the admin panel and the generated SDK
+types together — which is the point of the example. The panel shows every
+table the backend serves with no frontend file at all; `frontend/src/cms/`
+only states what this demo changes about how they look, and imports the
+tables as types only, so nothing of the backend reaches the browser.
 
 ## Running it
 
@@ -29,7 +34,7 @@ pnpm dev
 ```
 
 `pnpm dev` is `rebase dev`. It starts the backend and the frontend together, and
-applies the collections to the development database at boot, additively.
+applies the tables to the development database at boot, additively.
 
 **It picks a free port per project rather than fixed ones**, and prints the
 admin-panel and API URLs it settled on — read them from its output, they differ
@@ -43,13 +48,13 @@ Run from this directory.
 | Command | What it does |
 |---|---|
 | `pnpm dev` | Backend and frontend, watching (`rebase dev`) |
-| `pnpm build` | Builds `frontend`, `backend` and `config` |
+| `pnpm build` | Builds `frontend` and `backend` |
 | `pnpm start` | The production server, which also serves the built frontend |
-| `pnpm run schema:generate` | Regenerate `backend/src/schema.generated.ts` from the collections |
-| `pnpm run db:push` | Apply the collections to the development database (Atlas) |
+| `pnpm run schema:generate` | Regenerate `backend/src/schema.generated.ts` from `backend/schema` |
+| `pnpm run db:push` | Apply the tables to the development database (Atlas) |
 | `pnpm run db:generate` | Write a SQL migration instead of pushing — the production path |
 | `pnpm run db:migrate` | Run pending migrations |
-| `pnpm run schema:introspect` | Read an existing database back into collection definitions |
+| `pnpm run schema:introspect` | Read an existing database back into table definitions |
 | `pnpm run generate:sdk` | Regenerate the typed client SDK |
 | `pnpm run deploy` | Deploy the demo (maintainers) |
 

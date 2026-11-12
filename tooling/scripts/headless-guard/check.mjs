@@ -41,7 +41,7 @@ register(pathToFileURL(path.join(here, "forbid-ui-hook.mjs")));
  * reason it always was — it is the shape the docs point at.
  */
 const COLLECTION_DIRS = [
-    path.join(repoRoot, "app", "config", "collections"),
+    path.join(repoRoot, "app", "backend", "schema"),
     path.join(repoRoot, "packages", "cli", "templates", "template", "config", "collections")
 ];
 
@@ -140,7 +140,7 @@ console.log("Checking the reference app imports only what the runtime image ship
     const block = /const RUNTIME_PROVIDED = new Set\(\[([\s\S]*?)\]\)/.exec(src);
     if (!block) throw new Error("could not find RUNTIME_PROVIDED in packages/cli/src/bundle.ts");
     const provided = new Set([...block[1].matchAll(/"([^"]+)"/g)].map(m => m[1]));
-    const appConfig = path.join(repoRoot, "app", "config");
+    const appConfig = path.join(repoRoot, "app", "backend", "schema");
     const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) return entry.name === "node_modules" || entry.name === "dist" ? [] : walk(full);
