@@ -8,7 +8,7 @@ import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import { relationMisconfigured } from "./collection-helpers";
 import { explainZeroRowWrite } from "./write-denial";
 import { currentFieldViewer } from "./field-viewer";
-import { parseColumnFromServer, serializeColumnToServer } from "../data-transformer";
+import { serializeColumnToServer } from "../data-transformer";
 import { toRestScalar } from "./row-pipeline";
 
 /**
@@ -485,23 +485,21 @@ async function removeLinks(
  *
  * Only the `pivot` columns: the two foreign keys are the link's identity, and
  * the caller already has both. A column the caller may not read
- * (`access.read`, `private`) is left out, as it is on any row; each value goes
- * through its column's codec, in the style the target row is rendered in.
+ * (`access.read`, `private`) is left out, as it is on any row; each value is
+ * served as REST serves it (`toRestScalar`).
  *
  * @param junctionRow The junction row, keyed as its catalogue table keys it.
  */
 export function readPivotColumns(
     junctionRow: Record<string, unknown>,
-    pivot: readonly ColumnDescriptor[],
-    /** `"rest"`: as REST serves a value (`toRestScalar`); `"admin"`: the view model (`parseColumnFromServer`). */
-    style: "rest" | "admin"
+    pivot: readonly ColumnDescriptor[]
 ): Record<string, unknown> {
     const viewer = currentFieldViewer();
     const values: Record<string, unknown> = {};
     for (const column of pivot) {
         if (!(column.key in junctionRow) || !canReadColumn(column, viewer)) continue;
         const value = junctionRow[column.key];
-        values[column.key] = style === "rest" ? toRestScalar(value, column) : parseColumnFromServer(value, column);
+        values[column.key] = toRestScalar(value, column);
     }
     return values;
 }

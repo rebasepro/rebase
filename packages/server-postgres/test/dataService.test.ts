@@ -207,12 +207,8 @@ describe("DataService", () => {
             };
             db.limit.mockResolvedValue([mockPost]);
             const entity = await dataService.fetchOne("posts", 2);
-            // The service correctly converts relation IDs to strings.
-            expect(entity?.author).toEqual({
-                id: "1",
-                path: "authors",
-                __type: "relation"
-            });
+            // The stored value, as stored: no relation ref minted over it.
+            expect(entity?.author).toBe(1);
         });
 
         it("should parse a composite ID and use both parts in the WHERE clause", async () => {
@@ -225,8 +221,9 @@ describe("DataService", () => {
 
             const entity = await dataService.fetchOne("project_users", "proj1:::user1");
 
-            // Check that we fetched the actual mocked user
-            expect(entity?.id).toBe("proj1:::user1");
+            // The row's own columns: its address is the consumer's to derive.
+            expect(entity?.id).toBe("user1");
+            expect(entity?.project_id).toBe("proj1");
             expect(entity?.email).toBe("test@test.com");
 
             expect(db.select).toHaveBeenCalled();
@@ -704,7 +701,7 @@ name: "Test User" };
 
             const entity = await dataService.fetchOne("users", 123);
 
-            expect(entity?.id).toBe("123");
+            expect(entity?.id).toBe(123);
             expect(entity?.email).toBe("test@example.com");
         });
 
@@ -781,7 +778,7 @@ assigneeId: null };
             }
 
             // The main test is that the entity was successfully fetched despite null relations
-            expect(entity?.id).toBe("1");
+            expect(entity?.id).toBe(1);
             expect(entity?.title).toBe("Task 1");
         });
     });
@@ -1101,11 +1098,8 @@ status: "active" }
 
             const entity = await dataService.fetchOne("users", 1);
 
-            // The actual implementation converts dates to objects with __type and value
-            expect(entity?.created_at).toEqual({
-                __type: "date",
-                value: "2023-01-01T00:00:00.000Z"
-            });
+            // RFC 3339, as REST serves a timestamp.
+            expect(entity?.created_at).toBe("2023-01-01T00:00:00.000Z");
         });
 
         it("should handle numeric fields correctly", async () => {

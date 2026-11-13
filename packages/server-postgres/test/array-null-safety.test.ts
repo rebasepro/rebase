@@ -2,7 +2,6 @@ import { describe, it, expect } from "@jest/globals";
 import {
     serializeColumnToServer,
     serializeRelationValue,
-    parseColumnFromServer,
     serializeDataToServer
 } from "../src/data-transformer";
 import { liftedColumnOf, runtimeTableOf } from "./helpers/codec-columns";
@@ -188,58 +187,6 @@ describe("serializeColumnToServer — array null safety", () => {
         const nested = [["a", "b"], ["c"]];
         // Without `of` or `oneOf`, the array case falls through to `return value`
         expect(serializeColumnToServer(nested, liftedColumnOf(bareArrayProp))).toEqual([["a", "b"], ["c"]]);
-    });
-});
-
-// ─────────────────────────────────────────────────────────────
-// 2. parseColumnFromServer — array null safety
-// ─────────────────────────────────────────────────────────────
-describe("parseColumnFromServer — array null safety", () => {
-    // ── Null / undefined early return ──
-    it("returns null when value is null with array property", () => {
-        expect(parseColumnFromServer(null, liftedColumnOf(arrayOfStringsProp))).toBeNull();
-    });
-
-    it("returns undefined when value is undefined with array property", () => {
-        expect(parseColumnFromServer(undefined, liftedColumnOf(arrayOfStringsProp))).toBeUndefined();
-    });
-
-    // ── Empty array ──
-    it("returns [] when value is an empty array with array-of-strings", () => {
-        expect(parseColumnFromServer([], liftedColumnOf(arrayOfStringsProp))).toEqual([]);
-    });
-
-    // ── Non-array values (coerced to array) ──
-    it("coerces a non-array string to single-element array for array property", () => {
-        expect(parseColumnFromServer("not-an-array", liftedColumnOf(arrayOfStringsProp))).toEqual(["not-an-array"]);
-    });
-
-    it("coerces a non-array number to empty array for array property", () => {
-        expect(parseColumnFromServer(99, liftedColumnOf(arrayOfStringsProp))).toEqual([]);
-    });
-
-    // ── Null with oneOf ──
-    it("returns null when value is null with array oneOf property", () => {
-        expect(parseColumnFromServer(null, liftedColumnOf(arrayOneOfProp))).toBeNull();
-    });
-
-    // ── Array with null elements ──
-    it("handles array with null elements for parsing gracefully", () => {
-        const result = parseColumnFromServer([null, "a", null], liftedColumnOf(arrayOfStringsProp));
-        expect(result).toEqual([null, "a", null]);
-    });
-
-    // ── Falsy non-null values (coerced to array) ──
-    it("coerces falsy number 0 to empty array for array property", () => {
-        expect(parseColumnFromServer(0, liftedColumnOf(arrayOfStringsProp))).toEqual([]);
-    });
-
-    it("coerces false to empty array for array property", () => {
-        expect(parseColumnFromServer(false, liftedColumnOf(arrayOfStringsProp))).toEqual([]);
-    });
-
-    it("coerces empty string to single-element array for array property", () => {
-        expect(parseColumnFromServer("", liftedColumnOf(arrayOfStringsProp))).toEqual([""]);
     });
 });
 

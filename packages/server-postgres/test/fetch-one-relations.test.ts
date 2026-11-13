@@ -1,6 +1,7 @@
 /**
- * The relations the driver's single get fills in are the target's rows as the
- * caller may see them — its `beforeQuery` scope and its soft delete applied.
+ * The relations the driver's single get fills in (those its `include` names)
+ * are the target's rows as the caller may see them — its `beforeQuery` scope
+ * and its soft delete applied.
  *
  * `fetchOne` is what the socket's `FETCH_ONE` and the MCP `get_document` tool
  * serve, and it populated every relation through drizzle's relational `with`,
@@ -117,45 +118,50 @@ afterEach(async () => {
     await db.close();
 });
 
-type Ref = { __type?: string; id?: string; path?: string; data?: { values?: Record<string, unknown> } };
-const refIds = (value: unknown) => (value as Ref[]).map(ref => ref.id);
+const ids = (value: unknown) => (value as Record<string, unknown>[]).map(row => row.id);
+const INCLUDE = ["docs", "viaDocs"];
 
 describe("driver.fetchOne (WS FETCH_ONE, MCP get_document)", () => {
-    it("scopes a to-many relation to what the REST include serves", async () => {
+    it("serves what the REST include serves", async () => {
         const driver = driverOver(db, TENANT_USER);
         const rest = await driver.restFetchService.fetchOneForRest("owners", 1, ["docs"]);
         expect((rest?.docs as Record<string, unknown>[]).map(d => d.title)).toEqual(["alpha"]);
 
-        const row = await driver.fetchOne({ path: "owners", id: 1 });
-        expect(refIds(row?.docs)).toEqual(["1"]);
+        const row = await driver.fetchOne({ path: "owners", id: 1, include: ["docs"] });
+        expect(row).toEqual(rest);
+    });
+
+    it("loads no relation it was not asked for", async () => {
+        const row = await driverOver(db, TENANT_USER).fetchOne({ path: "owners", id: 1 });
+        expect(row).toEqual({ id: 1, name: "Ada" });
     });
 
     it("hides a soft-deleted target on a join-path relation too", async () => {
-        const row = await driverOver(db, TENANT_USER).fetchOne({ path: "owners", id: 1 });
-        expect(refIds(row?.viaDocs)).toEqual(["1"]);
+        const row = await driverOver(db, TENANT_USER).fetchOne({ path: "owners", id: 1, include: INCLUDE });
+        expect(ids(row?.viaDocs)).toEqual([1]);
     });
 
     it("hides it with no beforeQuery scope at all", async () => {
-        const row = await driverOver(db).fetchOne({ path: "owners", id: 1 });
-        expect(refIds(row?.docs).sort()).toEqual(["1", "3"]);
-        expect(refIds(row?.viaDocs).sort()).toEqual(["1", "3"]);
+        const row = await driverOver(db).fetchOne({ path: "owners", id: 1, include: INCLUDE });
+        expect(ids(row?.docs)).toEqual([1, 3]);
+        expect(ids(row?.viaDocs)).toEqual([1, 3]);
     });
 
-    it("scopes them on the path a fetch without the relational query API takes", async () => {
-        const row = await driverOver(db, TENANT_USER, { withSchema: false }).fetchOne({ path: "owners", id: 1 });
-        expect(refIds(row?.docs)).toEqual(["1"]);
-        expect(refIds(row?.viaDocs)).toEqual(["1"]);
+    it("scopes them on a driver built without the relational query API", async () => {
+        const row = await driverOver(db, TENANT_USER, { withSchema: false }).fetchOne({ path: "owners", id: 1, include: INCLUDE });
+        expect(ids(row?.docs)).toEqual([1]);
+        expect(ids(row?.viaDocs)).toEqual([1]);
     });
 
-    it("still renders each target as a ref carrying its values", async () => {
-        const owner = await driverOver(db, TENANT_USER).fetchOne({ path: "owners", id: 1 });
-        const [doc] = owner?.docs as Ref[];
-        expect(doc).toMatchObject({ __type: "relation", id: "1", path: "docs" });
-        expect(doc.data?.values?.title).toBe("alpha");
+    it("renders each target as its own row — never a ref", async () => {
+        const owner = await driverOver(db, TENANT_USER).fetchOne({ path: "owners", id: 1, include: ["docs"] });
+        const [doc] = owner?.docs as Record<string, unknown>[];
+        expect(doc).toMatchObject({ id: 1, title: "alpha" });
+        expect(doc).not.toHaveProperty("__type");
 
-        const alpha = await driverOver(db, TENANT_USER).fetchOne({ path: "docs", id: 1 });
-        expect(alpha?.owner).toMatchObject({ __type: "relation", id: "1", path: "owners" });
-        expect((alpha?.owner as Ref).data?.values?.name).toBe("Ada");
+        const alpha = await driverOver(db, TENANT_USER).fetchOne({ path: "docs", id: 1, include: ["owner"] });
+        expect(alpha?.owner).toEqual({ id: 1, name: "Ada" });
+        expect(alpha?.ownerId).toBe(1);
     });
 });
 

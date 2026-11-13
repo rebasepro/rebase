@@ -1605,7 +1605,13 @@ roles: verifiedUser.roles }
                     case "FETCH_ONE": {
                         wsDebug("📄 [WebSocket Server] Processing FETCH_ENTITY request");
                         const request: FetchOneProps = payload;
+                        // An `include` names relations, and a relation the
+                        // caller may not read is refused here as it is on
+                        // `FETCH_COLLECTION` and REST's `GET /:id`.
+                        assertReadRequest(request.path, { include: request.include });
                         const delegate = await getScopedDelegate();
+                        // The row REST serves (`GET /:id?include=…`): the
+                        // admin panel builds its view model in the browser.
                         const row = await delegate.fetchOne(request);
                         wsDebug("📄 [WebSocket Server] FETCH_ENTITY result:", row);
                         const response = {

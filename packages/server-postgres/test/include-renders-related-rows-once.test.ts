@@ -4,7 +4,6 @@ import { RelationService } from "../src/services/RelationService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { relationOfTable } from "./helpers/relation-descriptors";
-import * as transformer from "../src/data-transformer";
 import { arrayRowsFor, recordingDb } from "./helpers/spg-b-recording-db";
 
 /**
@@ -15,8 +14,7 @@ import { arrayRowsFor, recordingDb } from "./helpers/spg-b-recording-db";
  * the target's own to-one relations), then again for REST. The second pass did
  * not undo the first's ref, so `post.comments[0].post` came back as an
  * envelope the REST contract says a developer never sees — and every related
- * row cost 2.5× a parent row. Counted, not timed: the admin rendering must not
- * run at all on the REST path, and must still run on the admin's.
+ * row cost 2.5× a parent row. There is one rendering now (`toRestRow`).
  */
 describe("the include loader renders a related row once", () => {
     const registry = new FixtureTableRegistry();
@@ -65,28 +63,17 @@ describe("the include loader renders a related row once", () => {
     // Read off the table the way the loader reads it.
     const relation = () => relationOfTable(registry, "posts", "comments");
 
-    it("does not build the admin view model for a REST include", async () => {
-        const parse = jest.spyOn(transformer, "parseDataFromServer");
+    it("renders each related row as the target's own REST row", async () => {
         const service = new RelationService(db(), registry);
 
         const related = await service.batchFetchRelatedEntitiesMany(
-            "posts", [1, 2], "comments", relation(), undefined, undefined, { style: "rest" }
+            "posts", [1, 2], "comments", relation()
         );
 
-        expect(parse).not.toHaveBeenCalled();
         const rows = [...related.values()].flat();
         expect(rows).toHaveLength(COMMENTS);
         // The target's own row: its foreign key as the column, no ref minted
         // for its `post` relation.
         expect(rows[0].values).toEqual({ id: 1, body: "c0", postId: 1 });
-    });
-
-    it("still builds it, once a row, for the admin", async () => {
-        const parse = jest.spyOn(transformer, "parseDataFromServer");
-        const service = new RelationService(db(), registry);
-
-        await service.batchFetchRelatedEntitiesMany("posts", [1, 2], "comments", relation());
-
-        expect(parse).toHaveBeenCalledTimes(COMMENTS);
     });
 });

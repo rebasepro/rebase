@@ -27,7 +27,8 @@ import { diffPlanAgainstCatalogue } from "../src/schema/plan/diff-plan";
 import { readSchemaMetadata } from "../src/schema/introspect-db-queries";
 import { generateSchemaModules } from "../src/schema/introspect-db-logic";
 import { readCatalogueSchema } from "../src/schema/catalogue-schema";
-import { parseColumnFromServer, serializeColumnToServer } from "../src/data-transformer";
+import { serializeColumnToServer } from "../src/data-transformer";
+import { toRestScalar } from "../src/services/row-pipeline";
 import { columnAt, runtimeTableOfDef } from "./helpers/codec-columns";
 import { customTypesAgree, normalizeFormatType } from "../src/schema/column-type-drift";
 import { evaluateSchemaModules } from "./helpers/introspect-generation";
@@ -172,7 +173,7 @@ describe("col.custom(): generated from a database, pushed, booted and served", (
         for (const [key, value] of Object.entries(written)) values[key] = serializeColumnToServer(value, columnAt(runtime, key), key);
         const [row] = await orm.insert(catalogue.tables.sessions).values(values).returning();
         const read: Record<string, unknown> = {};
-        for (const key of Object.keys(written)) read[key] = parseColumnFromServer(row[key], columnAt(runtime, key));
+        for (const key of Object.keys(written)) read[key] = toRestScalar(row[key], columnAt(runtime, key));
         expect(read).toEqual(written);
     });
 });

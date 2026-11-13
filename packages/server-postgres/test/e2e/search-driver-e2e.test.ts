@@ -134,17 +134,17 @@ describe("search through the driver", () => {
     }, 30_000);
 
     it("finds a candidate by a certification buried in JSONB", async () => {
-        const rows = await fetchService.fetchCollection("talents", { searchString: "ISO 14001" });
+        const rows = await fetchService.fetchCollectionForRest("talents", { searchString: "ISO 14001" });
         expect(rows.map(r => r.full_name)).toEqual(["Ana Gutiérrez"]);
     });
 
     it("matches an accentless query against accented content", async () => {
-        const rows = await fetchService.fetchCollection("talents", { searchString: "iberica" });
+        const rows = await fetchService.fetchCollectionForRest("talents", { searchString: "iberica" });
         expect(rows.map(r => r.full_name)).toEqual(["Consultora ISO Ibérica"]);
     });
 
     it("never returns the generated column", async () => {
-        const rows = await fetchService.fetchCollection("talents", {});
+        const rows = await fetchService.fetchCollectionForRest("talents", {});
         expect(rows.length).toBe(3);
         for (const row of rows) {
             expect(row).not.toHaveProperty(spec.column);
@@ -152,14 +152,14 @@ describe("search through the driver", () => {
     });
 
     it("keeps the generated column out of a single-row read too", async () => {
-        const [first] = await fetchService.fetchCollection("talents", {});
-        const one = await fetchService.fetchOne("talents", String(first.id));
+        const [first] = await fetchService.fetchCollectionForRest("talents", {});
+        const one = await fetchService.fetchOneForRest("talents", String(first.id));
         expect(one).toBeDefined();
         expect(one).not.toHaveProperty(spec.column);
     });
 
     it("returns a relevance score with each searched row", async () => {
-        const rows = await fetchService.fetchCollection("talents", { searchString: "ISO" });
+        const rows = await fetchService.fetchCollectionForRest("talents", { searchString: "ISO" });
         expect(rows.length).toBeGreaterThan(0);
         for (const row of rows) {
             expect(typeof row._score).toBe("number");
@@ -168,7 +168,7 @@ describe("search through the driver", () => {
     });
 
     it("attaches no score when the request carried no search string", async () => {
-        const rows = await fetchService.fetchCollection("talents", {});
+        const rows = await fetchService.fetchCollectionForRest("talents", {});
         expect(rows.every(r => r._score === undefined)).toBe(true);
     });
 
@@ -176,7 +176,7 @@ describe("search through the driver", () => {
         // "ISO" appears in one row's name (weight A) and another's
         // certifications (weight B). Weighting is the whole reason to declare
         // one, so this is the assertion that would catch it being dropped.
-        const rows = await fetchService.fetchCollection("talents", {
+        const rows = await fetchService.fetchCollectionForRest("talents", {
             searchString: "ISO",
             orderBy: "_score",
             order: "desc"
@@ -188,13 +188,13 @@ describe("search through the driver", () => {
 
     it("refuses `_score` on a collection that did not opt in", async () => {
         await expect(
-            fetchService.fetchCollection("notes", { searchString: "plain", orderBy: "_score", order: "desc" })
+            fetchService.fetchCollectionForRest("notes", { searchString: "plain", orderBy: "_score", order: "desc" })
         ).rejects.toThrow(/Unknown orderBy field/);
     });
 
     it("refuses cursor pagination by relevance rather than paging wrongly", async () => {
         await expect(
-            fetchService.fetchCollection("talents", {
+            fetchService.fetchCollectionForRest("talents", {
                 searchString: "ISO",
                 orderBy: "_score",
                 order: "desc",
@@ -207,7 +207,7 @@ describe("search through the driver", () => {
         // A typo matches nothing on the exact path, so every row it finds has
         // ts_rank 0. Without the trigram term in the score the best match comes
         // back in arbitrary order — which is what `fuzzy` is supposed to fix.
-        const rows = await fuzzyService.fetchCollection("fuzzies", {
+        const rows = await fuzzyService.fetchCollectionForRest("fuzzies", {
             searchString: "iso14000",
             orderBy: "_score",
             order: "desc"
@@ -218,7 +218,7 @@ describe("search through the driver", () => {
     });
 
     it("still puts an exact match above a merely-similar one", async () => {
-        const rows = await fuzzyService.fetchCollection("fuzzies", {
+        const rows = await fuzzyService.fetchCollectionForRest("fuzzies", {
             searchString: "auditor",
             orderBy: "_score",
             order: "desc"
@@ -228,7 +228,7 @@ describe("search through the driver", () => {
 
     describe("explaining why a row matched", () => {
         it("names the field the hit came from, with the text around it", async () => {
-            const rows = await fetchService.fetchCollection("talents", {
+            const rows = await fetchService.fetchCollectionForRest("talents", {
                 searchString: "ISO 14001",
                 searchExplain: true
             });
@@ -243,7 +243,7 @@ describe("search through the driver", () => {
         it("distinguishes a name hit from a certification hit for the same term", async () => {
             // "ISO" is in one row's name and another's certifications. A score
             // cannot tell those apart; this is the whole point of the feature.
-            const rows = await fetchService.fetchCollection("talents", {
+            const rows = await fetchService.fetchCollectionForRest("talents", {
                 searchString: "ISO",
                 searchExplain: true,
                 orderBy: "_score",
@@ -256,7 +256,7 @@ describe("search through the driver", () => {
         });
 
         it("returns fields in the order the collection declared them", async () => {
-            const rows = await fetchService.fetchCollection("talents", {
+            const rows = await fetchService.fetchCollectionForRest("talents", {
                 searchString: "Ana OR 14001",
                 searchExplain: true
             });
@@ -265,12 +265,12 @@ describe("search through the driver", () => {
         });
 
         it("attaches nothing unless the caller asked", async () => {
-            const rows = await fetchService.fetchCollection("talents", { searchString: "ISO 14001" });
+            const rows = await fetchService.fetchCollectionForRest("talents", { searchString: "ISO 14001" });
             expect(rows[0]._matches).toBeUndefined();
         });
 
         it("is ignored on a collection that never opted in", async () => {
-            const rows = await fetchService.fetchCollection("notes", {
+            const rows = await fetchService.fetchCollectionForRest("notes", {
                 searchString: "plain",
                 searchExplain: true
             });
@@ -282,7 +282,7 @@ describe("search through the driver", () => {
     it("leaves a collection without the block on the old ILIKE behaviour", async () => {
         // Substring, mid-word — something `websearch_to_tsquery` would not match
         // and ILIKE does. Its presence proves the fallback still runs.
-        const rows = await fetchService.fetchCollection("notes", { searchString: "lain not" });
+        const rows = await fetchService.fetchCollectionForRest("notes", { searchString: "lain not" });
         expect(rows.map(r => r.body)).toEqual(["a plain note"]);
     });
 });

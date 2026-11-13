@@ -201,13 +201,15 @@ describe("reads", () => {
         });
     });
 
-    it("the admin's view model envelopes a time column and a date nested in jsonb", async () => {
+    it("the driver's own read serves the REST row: no envelope, a time as its text", async () => {
         const id = await createShelf();
         const entity = await driver.fetchOne({ path: "shelves", id: String(id) });
+        const rest = await driver.restFetchService.fetchOneForRest("shelves", String(id));
+        expect(entity).toEqual(rest);
         expect(entity).toMatchObject({
-            opensAt: { __type: "date", value: "1970-01-01T09:30:00.000Z" },
+            opensAt: "09:30:00",
             place: { latitude: 41.38, longitude: 2.17 },
-            log: { seenAt: { __type: "date", value: "2024-01-01T00:00:00.000Z" }, scores: [1, null] }
+            log: { seenAt: "2024-01-01T00:00:00.000Z", scores: [1, null] }
         });
     });
 });

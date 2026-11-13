@@ -6,7 +6,7 @@ import { FixtureTableRegistry } from "./tables";
 
 /**
  * Columns and runtime tables for the codec tests (`serializeColumnToServer`,
- * `parseColumnFromServer`, `serializeDataToServer`, `normalizeDbValues`): the
+ * `serializeDataToServer`, `toRestScalar`): the
  * codecs read a column's descriptor, so a test hands them one.
  */
 

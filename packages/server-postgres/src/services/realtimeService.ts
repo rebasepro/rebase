@@ -2384,11 +2384,8 @@ roles: ["anon"] };
                         tx, this.registry,
                         () => (hookContext ??= callbackContextWithin(this.driver, tx, activeAuth))
                     );
-                    // The REST pipeline, for the same reason the collection refetch
-                    // uses it: `listenById()` and `findById()` are the same read,
-                    // and `fetchOne` renders the admin's view model — every relation
-                    // eagerly loaded, each under a `{ __type: "relation" }`
-                    // envelope. A subscriber got one shape and a fetch the other.
+                    // The one read walk, as the collection refetch reads:
+                    // `listenById()` and `findById()` are the same read.
                     let processedEntity = await txEntityService.fetchOneForRest(
                         notifyPath, id, include
                     ) ?? undefined;

@@ -854,13 +854,10 @@ export class PersistService {
         }
 
         // Fetch the saved row back through the same walk `GET /:id` serves, so a
-        // write's answer is the read that follows it. This used to be `fetchOne`
-        // — the admin view-model walk — whose `__type: "relation"` refs then
-        // leaked into REST responses, afterSave callbacks, history records and
-        // app-level realtime payloads, none of which see that shape from any
-        // read path. The admin does not need them here either: its rows arrive
-        // over the realtime subscription refetch, which still serves the
-        // view-model walk.
+        // write's answer is the read that follows it. This used to be the
+        // admin view-model walk, whose `__type: "relation"` refs then leaked
+        // into REST responses, afterSave callbacks, history records and
+        // app-level realtime payloads. There is one read walk now.
         //
         // `withDeleted` on the read-back, which is not the same question the
         // caller's own read asks. A soft delete IS a save — it stamps

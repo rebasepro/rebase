@@ -15,7 +15,7 @@
  * thirteenth. These tests establish it the way the driver does.
  */
 import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
-import { toFlatRow, toRestRow, stripUnreadable, canReadRelation } from "../src/services/row-pipeline";
+import { toRestRow, stripUnreadable, canReadRelation } from "../src/services/row-pipeline";
 import { withFieldViewer, currentFieldViewer } from "../src/services/field-viewer";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -102,14 +102,6 @@ describe("the REST row", () => {
     });
 });
 
-describe("the admin row", () => {
-    it("applies the same rule as REST", () => {
-        const served = withFieldViewer({ roles: ["staff"] }, () => toFlatRow(row(), registry.requireTable(staff.slug), registry));
-        expect(served).not.toHaveProperty("salary");
-        expect(served.name).toBe("Ada");
-    });
-});
-
 describe("a relation target", () => {
     const post = () => ({ id: 7, title: "Hello", author: row() });
 
@@ -120,22 +112,16 @@ describe("a relation target", () => {
         expect(author).not.toHaveProperty("salary");
     });
 
-    type Ref = { data?: { values?: Record<string, unknown> } };
-
-    it("is stripped inside the ref the admin and every realtime frame carry", () => {
-        const served = withFieldViewer({ roles: ["staff"] }, () => toFlatRow(post(), registry.requireTable(posts.slug), registry));
-        const ref = served.author as Ref;
-        expect(ref.data?.values?.name).toBe("Ada");
-        expect(ref.data?.values).not.toHaveProperty("salary");
-        expect(ref.data?.values).not.toHaveProperty("passwordHash");
-        expect(ref.data?.values).not.toHaveProperty("password_hash");
+    it("withholds the target's secret under both its spellings", () => {
+        const served = withFieldViewer({ roles: ["staff"] }, () => toRestRow(post(), registry.requireTable(posts.slug), registry));
+        const author = served.author as Record<string, unknown>;
+        expect(author).not.toHaveProperty("passwordHash");
+        expect(author).not.toHaveProperty("password_hash");
     });
 
-    it("carries the field for a caller who may read it, in both renderings", () => {
+    it("carries the field for a caller who may read it", () => {
         const inlined = withFieldViewer({ roles: ["hr"] }, () => toRestRow(post(), registry.requireTable(posts.slug), registry));
         expect((inlined.author as Record<string, unknown>).salary).toBe(90_000);
-        const ref = withFieldViewer({ roles: ["hr"] }, () => toFlatRow(post(), registry.requireTable(posts.slug), registry));
-        expect((ref.author as Ref).data?.values?.salary).toBe(90_000);
     });
 });
 

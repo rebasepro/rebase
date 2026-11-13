@@ -26,7 +26,6 @@ import {
     type PointsBackRelation
 } from "./relation-tables";
 import type { RuntimeTable } from "../model/runtime-table";
-import { parseDataFromServer } from "../data-transformer";
 import { stripUnreadable, toRestRow } from "./row-pipeline";
 import { hiddenColumnsOption } from "./hidden-columns";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
@@ -144,19 +143,6 @@ export interface RelatedRowWindow {
      */
     totals?: Map<string, number>;
 }
-
-/**
- * How the batch loaders render a target row.
- *
- * - `"admin"` — the view model the admin panel reads: declared types parsed
- *   (`parseDataFromServer`), the target's own to-one relations as
- *   `{ __type: "relation" }` refs, undeclared columns dropped.
- * - `"rest"` — the row the target's own route serves (`toRestRow`): what an
- *   `include` embeds. The REST contract is that a developer never sees a ref,
- *   and an included row is rendered exactly as the same row is at the top
- *   level.
- */
-export type RelatedRowStyle = "admin" | "rest";
 
 /** The alias of the subquery a limited relation read joins back to. */
 const RANKED = "__ranked";
@@ -399,49 +385,28 @@ export class RelationService {
     }
 
     /**
-     * One target row, as the {@link RelatedRow} everything here returns.
-     *
-     * `resolveNested` is the one thing the call sites do not agree on, and on
-     * purpose: the single-parent fetches pass `db` and `registry` to
-     * `parseDataFromServer`, so the target's *own* relations get resolved too,
-     * while the batch paths deliberately do not — a query per target row is
-     * the N+1 the batching exists to avoid.
+     * One target row, as the {@link RelatedRow} everything here returns: its
+     * values rendered by `render` (see {@link restRendering}) — the row the
+     * target's own REST route serves, its field access applied.
      */
-    private async toRelatedRow<M extends Record<string, unknown>>(
+    private toRelatedRow<M extends Record<string, unknown>>(
         targetRow: Record<string, unknown>,
         target: RuntimeTable,
         targetPks: PrimaryKeyInfo[],
-        options?: {
-            resolveNested?: boolean;
-            /** The REST rendering, when the caller asked for it — see {@link restRendering}. */
-            rest?: (row: Record<string, unknown>) => Record<string, unknown>;
-        }
-    ): Promise<RelatedRow<M>> {
-        let values: Record<string, unknown>;
-        if (options?.rest) {
-            values = options.rest(targetRow);
-        } else {
-            values = options?.resolveNested
-                ? await parseDataFromServer(targetRow, target, this.db, this.registry)
-                : await parseDataFromServer(targetRow, target, undefined, this.registry);
-
-            // The target's OWN exclusions, applied to the target's own columns.
-            // WebSocket fetches and every realtime frame come through here, so
-            // a leak here is invisible from the REST surface people test.
-            stripUnreadable(values, target.descriptor);
-        }
-
+        render: (row: Record<string, unknown>) => Record<string, unknown>
+    ): RelatedRow<M> {
         return {
             // The whole key: a composite target addressed by its first column
             // names every row that shares it.
             id: buildCompositeId(targetRow, targetPks),
             path: target.slug,
-            values: values as M
+            values: render(targetRow) as M
         };
     }
 
     /**
-     * A target row as its own REST route serves it, for the `"rest"` style.
+     * A target row as its own REST route serves it — what an `include` embeds,
+     * rendered exactly as the same row is at the top level.
      *
      * The loaders read the target with `SELECT *`, so the columns a REST read
      * never selects — a generated search vector — are dropped first; then
@@ -659,6 +624,7 @@ export class RelationService {
     ): Promise<RelatedRow<M>[]> {
         const { target, targetTable, targetPks, targetIdField, parentTable, parentPks, parentIdCol } = this.ends(parent, relation);
         const parsedParentId = parseIdValues(parentId, parentPks)[parentPks[0].fieldName];
+        const render = this.restRendering(target, targetTable);
 
         // The target table's `beforeQuery`, resolved before either branch
         // builds a WHERE, so a scope applied in one branch is applied in both.
@@ -700,7 +666,7 @@ export class RelationService {
 
             const rows: RelatedRow<M>[] = [];
             for (const row of results as Array<Record<string, unknown>>) {
-                rows.push(await this.toRelatedRow<M>(rowOf(row, targetTableName), target, targetPks, { resolveNested: true }));
+                rows.push(this.toRelatedRow<M>(rowOf(row, targetTableName), target, targetPks, render));
             }
 
             return rows;
@@ -781,7 +747,7 @@ export class RelationService {
 
         const rows: RelatedRow<M>[] = [];
         for (const row of results as Array<Record<string, unknown>>) {
-            rows.push(await this.toRelatedRow<M>(rowOf(row, target.descriptor.table), target, targetPks, { resolveNested: true }));
+            rows.push(this.toRelatedRow<M>(rowOf(row, target.descriptor.table), target, targetPks, render));
         }
 
         return rows;
@@ -916,8 +882,6 @@ export class RelationService {
         relation: RelationDescriptor,
         narrow?: SQL,
         options?: {
-            /** How each target row is rendered; see {@link RelatedRowStyle}. */
-            style?: RelatedRowStyle;
             /**
              * The parent rows themselves, in `parentIds` order, when the caller
              * holds them. A `belongsTo` reads each one's foreign key off its
@@ -930,7 +894,7 @@ export class RelationService {
 
         const parent = this.tableAt(parentCollectionPath);
         const { target, targetTable, targetPks, targetIdField, parentTable, parentPks, parentIdCol } = this.ends(parent, relation);
-        const render = { rest: options?.style === "rest" ? this.restRendering(target, targetTable) : undefined };
+        const render = this.restRendering(target, targetTable);
         const targetIdInfo = targetPks[0];
 
         const parsedParentIds = parentIds.map(id => parseIdValues(id, parentPks)[parentPks[0].fieldName]);
@@ -974,7 +938,7 @@ export class RelationService {
             for (const row of results as Array<Record<string, unknown>>) {
                 resultMap.set(
                     buildCompositeId(rowOf(row, parent.descriptor.table), parentPks),
-                    await this.toRelatedRow(rowOf(row, targetTableName), target, targetPks, render)
+                    this.toRelatedRow(rowOf(row, targetTableName), target, targetPks, render)
                 );
             }
 
@@ -1051,7 +1015,7 @@ export class RelationService {
             for (const [parentIdStr, fkValue] of parentToFk) {
                 const targetRow = targetById.get(String(fkValue));
                 if (targetRow) {
-                    resultMap.set(parentIdStr, await this.toRelatedRow(targetRow, target, targetPks, render));
+                    resultMap.set(parentIdStr, this.toRelatedRow(targetRow, target, targetPks, render));
                 }
             }
 
@@ -1111,7 +1075,7 @@ export class RelationService {
 
             const parentId = parentIdByKey.get(String(foreignKeyValue));
             if (parentId !== undefined) {
-                resultMap.set(String(parentId), await this.toRelatedRow(targetRow, target, targetPks, render));
+                resultMap.set(String(parentId), this.toRelatedRow(targetRow, target, targetPks, render));
             }
         }
 
@@ -1138,15 +1102,13 @@ export class RelationService {
         relation: RelationDescriptor,
         /** An extra condition on the target — see {@link batchFetchRelatedEntities}. */
         narrow?: SQL,
-        window?: RelatedRowWindow,
-        /** `style` — how each target row is rendered; see {@link RelatedRowStyle}. */
-        options?: { style?: RelatedRowStyle }
+        window?: RelatedRowWindow
     ): Promise<Map<string, RelatedRow<Record<string, unknown>>[]>> {
         if (parentIds.length === 0) return new Map();
 
         const parent = this.tableAt(parentCollectionPath);
         const { target, targetTable, targetPks, targetIdField, parentTable, parentPks, parentIdCol } = this.ends(parent, relation);
-        const render = { rest: options?.style === "rest" ? this.restRendering(target, targetTable) : undefined };
+        const render = this.restRendering(target, targetTable);
 
         const parsedParentIds = parentIds.map(id => parseIdValues(id, parentPks)[parentPks[0].fieldName]);
 
@@ -1203,7 +1165,7 @@ export class RelationService {
                 const parentId = buildCompositeId(rowOf(row, parent.descriptor.table), parentPks);
                 recordTotal(window, parentId, row);
                 const arr = resultMap.get(parentId) || [];
-                arr.push(await this.toRelatedRow(rowOf(row, targetTableName), target, targetPks, render));
+                arr.push(this.toRelatedRow(rowOf(row, targetTableName), target, targetPks, render));
                 resultMap.set(parentId, arr);
             }
 
@@ -1266,8 +1228,8 @@ export class RelationService {
                 const parentId = String(junctionData[parentKey]);
                 recordTotal(window, parentId, row);
                 const arr = resultMap.get(parentId) || [];
-                const related = await this.toRelatedRow(targetData, target, targetPks, render);
-                if (pivot.length > 0) related.pivot = readPivotColumns(junctionData, pivot, render.rest ? "rest" : "admin");
+                const related = this.toRelatedRow(targetData, target, targetPks, render);
+                if (pivot.length > 0) related.pivot = readPivotColumns(junctionData, pivot);
                 arr.push(related);
                 resultMap.set(parentId, arr);
             }
@@ -1329,7 +1291,7 @@ export class RelationService {
                 const key = String(parentId);
                 recordTotal(window, key, row);
                 const arr = resultMap.get(key) || [];
-                arr.push(await this.toRelatedRow(targetRow, target, targetPks, render));
+                arr.push(this.toRelatedRow(targetRow, target, targetPks, render));
                 resultMap.set(key, arr);
             }
         }

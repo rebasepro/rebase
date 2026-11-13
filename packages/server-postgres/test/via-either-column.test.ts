@@ -109,8 +109,8 @@ afterEach(async () => {
     await db.close();
 });
 
-type Ref = { id?: string };
-const refIds = (value: unknown) => (value as Ref[]).map(ref => String(ref.id)).sort();
+type Related = { id?: unknown };
+const refIds = (value: unknown) => (value as Related[]).map(row => String(row.id)).sort();
 
 describe("a via step with alternatives", () => {
     it("loads one parent's rows from either column", async () => {
@@ -119,7 +119,7 @@ describe("a via step with alternatives", () => {
     });
 
     it("fills the relation on a single get", async () => {
-        const row = await driverOver(db).fetchOne({ path: "people", id: 2 });
+        const row = await driverOver(db).fetchOne({ path: "people", id: 2, include: ["friends"] });
         expect(refIds(row?.friends)).toEqual(["10", "11"]);
     });
 

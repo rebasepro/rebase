@@ -4,7 +4,8 @@ import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { planColumnFor, planColumnTypeFor } from "./helpers/plan-column";
-import { serializeColumnToServer, parseColumnFromServer } from "../src/data-transformer";
+import { serializeColumnToServer } from "../src/data-transformer";
+import { toRestScalar } from "../src/services/row-pipeline";
 import { columnOf, runtimeTableOf } from "./helpers/codec-columns";
 import { compileSet, planCollections } from "./helpers/plan-tables";
 
@@ -53,7 +54,7 @@ name: "Location" }
 longitude: 2.17 }, location, "location");
         expect(stored).toEqual({ latitude: 41.38,
 longitude: 2.17 });
-        expect(parseColumnFromServer(stored, location)).toEqual({ latitude: 41.38,
+        expect(toRestScalar(stored, location)).toEqual({ latitude: 41.38,
 longitude: 2.17 });
     });
 

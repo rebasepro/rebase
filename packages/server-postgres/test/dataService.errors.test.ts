@@ -128,7 +128,7 @@ name: "Test" };
             db.limit.mockResolvedValue([mockEntity]);
 
             const entity = await dataService.fetchOne("test", "123");
-            expect(entity?.id).toBe("123");
+            expect(entity?.id).toBe(123);
         });
 
         it("reports an id no row could have as no row, not as an error", async () => {
@@ -185,7 +185,7 @@ name: "Test" };
             db.limit.mockResolvedValue([mockEntity]);
 
             const entity = await dataService.fetchOne("test", 0);
-            expect(entity?.id).toBe("0");
+            expect(entity?.id).toBe(0);
         });
 
         it("should handle negative numbers as valid ID", async () => {
@@ -194,7 +194,7 @@ name: "Test" };
             db.limit.mockResolvedValue([mockEntity]);
 
             const entity = await dataService.fetchOne("test", -1);
-            expect(entity?.id).toBe("-1");
+            expect(entity?.id).toBe(-1);
         });
     });
 
@@ -295,7 +295,7 @@ name: "Test" };
 
             expect(results).toHaveLength(10);
             results.forEach(result => {
-                expect(result?.id).toBe("1");
+                expect(result?.id).toBe(1);
             });
         });
 

@@ -12,7 +12,7 @@
  * relation targets, since a secret only has to leak through one overlooked path.
  */
 import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
-import { toFlatRow, toRestRow } from "../src/services/row-pipeline";
+import { toRestRow } from "../src/services/row-pipeline";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 
@@ -55,21 +55,6 @@ describe("excludeFromApi", () => {
         };
 
         const served = toRestRow(row, registry.requireTable(usersCollection.slug), registry);
-
-        expect(served.email).toBe("a@b.c");
-        expect(served).not.toHaveProperty("passwordHash");
-        expect(served).not.toHaveProperty("emailVerificationToken");
-    });
-
-    it("strips excluded columns from the admin (CMS) row", () => {
-        const row = {
-            id: 1,
-            email: "a@b.c",
-            passwordHash: "salt:hash",
-            emailVerificationToken: "tok_123"
-        };
-
-        const served = toFlatRow(row, registry.requireTable(usersCollection.slug), registry);
 
         expect(served.email).toBe("a@b.c");
         expect(served).not.toHaveProperty("passwordHash");
@@ -142,20 +127,6 @@ describe("excludeFromApi", () => {
             expect(inlined).not.toHaveProperty("email_verification_token");
         });
 
-        it("strips them from a relation REFERENCE too (admin, WebSocket, realtime)", () => {
-            const served = toFlatRow({ id: 1, title: "hi", author }, registry.requireTable(postsCollection.slug), registry);
-
-            const ref = served.author as { data?: { values?: Record<string, unknown> } };
-            expect(ref.data?.values?.email).toBe("author@example.com");
-            // Both spellings: `normalizeDbValues` renames the column to its
-            // property key on the way through, so asserting only on the
-            // snake_case name would pass on a ref that still carries the secret.
-            expect(ref.data?.values).not.toHaveProperty("passwordHash");
-            expect(ref.data?.values).not.toHaveProperty("password_hash");
-            expect(ref.data?.values).not.toHaveProperty("emailVerificationToken");
-            expect(ref.data?.values).not.toHaveProperty("email_verification_token");
-        });
-
         it("strips them from every element of a to-many relation", () => {
             const authorsCollection: LegacyCollectionConfig = {
                 name: "Articles",
@@ -171,12 +142,13 @@ describe("excludeFromApi", () => {
             };
 
             registry.registerMultiple([authorsCollection]);
-            const served = toFlatRow({ id: 1, editors: [author, { ...author, id: 8 }] }, registry.requireTable(authorsCollection.slug), registry);
+            const served = toRestRow({ id: 1, editors: [author, { ...author, id: 8 }] }, registry.requireTable(authorsCollection.slug), registry);
 
-            for (const ref of served.editors as Array<{ data?: { values?: Record<string, unknown> } }>) {
-                expect(ref.data?.values?.email).toBe("author@example.com");
-                expect(ref.data?.values).not.toHaveProperty("passwordHash");
-                expect(ref.data?.values).not.toHaveProperty("emailVerificationToken");
+            for (const editor of served.editors as Array<Record<string, unknown>>) {
+                expect(editor.email).toBe("author@example.com");
+                expect(editor).not.toHaveProperty("passwordHash");
+                expect(editor).not.toHaveProperty("password_hash");
+                expect(editor).not.toHaveProperty("emailVerificationToken");
             }
         });
     });

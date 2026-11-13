@@ -221,10 +221,11 @@ describe("Duplicating a record (every relation kind)", () => {
     });
 
     it("leaves every existing row as it was, and the copy keeps what it can share", async () => {
-        const loaded = await driver.fetchOne({ path: "authors", id: "a-1", collection: authorsCollection });
+        const loaded = await driver.fetchOne({ path: "authors", id: "a-1", include: Object.keys(RELATION_PROPERTIES) });
         if (!loaded) throw new Error("the original did not read back");
-        // The admin reads the children with the record — this is what the
-        // form opens with, and what a copy used to send back.
+        // The admin reads the children with the record (it names them in
+        // `include`) — this is what the form opens with, and what a copy used
+        // to send back.
         expect(loaded.posts).toBeTruthy();
 
         const before = await snapshot(admin);

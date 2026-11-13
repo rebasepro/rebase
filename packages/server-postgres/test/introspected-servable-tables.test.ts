@@ -17,7 +17,8 @@ import { drizzle } from "drizzle-orm/pglite";
 import { introspectTables } from "../src/schema/introspect-tables";
 import { compileIntrospectedTables } from "../src/schema/introspect-runtime";
 import { readCatalogueSchema } from "../src/schema/catalogue-schema";
-import { parseColumnFromServer, serializeColumnToServer } from "../src/data-transformer";
+import { serializeColumnToServer } from "../src/data-transformer";
+import { toRestScalar } from "../src/services/row-pipeline";
 import { columnAt, runtimeTableOfDef } from "./helpers/codec-columns";
 
 const DDL = `
@@ -80,7 +81,7 @@ describe("introspected tables the runtime serves, with the lowering gone", () =>
         const [row] = await orm.insert(catalogue.tables.notes)
             .values({ blocks: serializeColumnToServer(written, blocks, "blocks") })
             .returning();
-        expect(parseColumnFromServer(row.blocks, blocks)).toEqual(written);
+        expect(toRestScalar(row.blocks, blocks)).toEqual(written);
         const { rows } = await db.query<{ second: unknown }>("SELECT blocks[2] AS second FROM public.notes");
         expect(rows[0].second).toEqual({ type: "list", value: [1, 2] });
     });

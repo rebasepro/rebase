@@ -64,16 +64,14 @@ isId: "increment" },
         const { db } = recordingDb((statement) => shapedRows(statement, dbRows));
 
         const fetchService = new FetchService(db, registry);
-        const rows = await fetchService.fetchCollection("posts/1/comments", {});
+        const rows = await fetchService.fetchCollectionForRest("posts/1/comments", {});
 
         // Not `id: "5"` — the integer column, unrestringified and unoverwritten.
-        // `post_id` is absent because the collection does not declare it; the
-        // point here is the columns it *does* declare, and their types.
+        // The row REST serves: every column the table holds, the foreign key
+        // the collection does not declare included.
         expect(rows).toEqual([
-            { id: 5,
-body: "First!" },
-            { id: 6,
-body: "Second." }
+            { id: 5, body: "First!", postId: 1 },
+            { id: 6, body: "Second.", postId: 1 }
         ]);
     });
 });

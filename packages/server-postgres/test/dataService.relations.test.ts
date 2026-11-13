@@ -320,11 +320,9 @@ __type: "relation" }
 
             const entity = await dataService.fetchOne("orders", 1);
 
-            expect(entity?.customer).toEqual({
-                id: "5",
-                path: "customers",
-                __type: "relation"
-            });
+            // The foreign key, as the key; no relation ref minted over it.
+            expect(entity?.customerId).toBe(5);
+            expect(entity).not.toHaveProperty("customer");
         });
     });
 

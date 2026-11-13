@@ -81,8 +81,8 @@ function buildDriver(
     if (globalHooks) registry.setGlobalHooks(globalHooks);
     const driver = new PostgresBackendDriver(mockDb, new RealtimeService(mockDb, registry), registry);
     const dataService = dataServiceOf(driver);
-    jest.spyOn(dataService, "fetchCollection").mockResolvedValue(rows);
-    jest.spyOn(dataService, "fetchOne").mockResolvedValue(rows[0]);
+    jest.spyOn(dataService, "fetchCollectionForRest").mockResolvedValue(rows);
+    jest.spyOn(dataService, "fetchOneForRest").mockResolvedValue(rows[0]);
     return driver;
 }
 

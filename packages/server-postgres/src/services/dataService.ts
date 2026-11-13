@@ -13,7 +13,7 @@ import { rowsOfResult } from "../utils/result-rows";
 import { positionalStatement } from "../utils/positional-params";
 
 // Re-export data transformer functions for external use
-export { sanitizeAndConvertDates, serializeDataToServer, parseDataFromServer } from "../data-transformer";
+export { sanitizeAndConvertDates, serializeDataToServer } from "../data-transformer";
 
 // Re-export service classes for direct use
 export { FetchService } from "./FetchService";
@@ -58,7 +58,8 @@ export class DataService implements DataRepository {
     // =============================================================
 
     /**
-     * Fetch a single row by ID
+     * One row, as REST's `GET /:id` serves it — {@link fetchOneForRest} with no
+     * `include`. The `DataRepository` door; there is one read walk.
      */
     async fetchOne<M extends Record<string, unknown>>(
         collectionPath: string,
@@ -67,31 +68,27 @@ export class DataService implements DataRepository {
         /** See `FetchCollectionProps.withDeleted`. */
         withDeleted?: WithDeleted
     ): Promise<Record<string, unknown> | undefined> {
-        return this.fetchService.fetchOne<M>(collectionPath, id, databaseId, withDeleted);
+        return (await this.fetchService.fetchOneForRest<M>(collectionPath, id, undefined, databaseId, { withDeleted })) ?? undefined;
     }
 
     /**
-     * Fetch a collection of rows with optional filtering, ordering, and pagination
+     * Rows of a table, as REST serves them — {@link fetchCollectionForRest},
+     * with the relations `options.include` names. The `DataRepository` door.
      */
     async fetchCollection<M extends Record<string, unknown>>(
         collectionPath: string,
-        // The service's own options, rather than a second list of them: this
-        // facade re-listed eleven fields and the driver re-listed ten of those,
-        // so every option added to the fetch had two places to be dropped.
-        options: Parameters<FetchService["fetchCollection"]>[1] = {}
+        { include, ...options }: Parameters<FetchService["fetchCollectionForRest"]>[1] & { include?: IncludeSpec } = {}
     ): Promise<Record<string, unknown>[]> {
-        return this.fetchService.fetchCollection<M>(collectionPath, options);
+        return this.fetchService.fetchCollectionForRest<M>(collectionPath, options, include);
     }
 
     /**
      * The REST read pipeline: flat rows, with exactly the relations `include`
      * names — see {@link FetchService.fetchCollectionForRest}.
      *
-     * Exposed on the facade because it is what *every* consumer should be
-     * reading through. The realtime refetch used to go via `fetchCollection`
-     * above, which nests a relation under a `{ __type: "relation" }` envelope
-     * and loaded every relation regardless, so a subscription and a REST list
-     * answered the same query with two different row shapes.
+     * The one read walk: every read on this facade, the realtime refetch
+     * included, comes out of it, so a subscription and a REST list answer
+     * the same query with the same row.
      */
     async fetchCollectionForRest<M extends Record<string, unknown>>(
         collectionPath: string,
@@ -126,7 +123,8 @@ export class DataService implements DataRepository {
     }
 
     /**
-     * Search rows by text
+     * Rows matching a text search — {@link fetchCollectionForRest} with
+     * `searchString`. The `DataRepository` door.
      */
     async searchRows<M extends Record<string, unknown>>(
         collectionPath: string,
@@ -142,7 +140,7 @@ export class DataService implements DataRepository {
             searchExplain?: boolean;
         } = {}
     ): Promise<Record<string, unknown>[]> {
-        return this.fetchService.searchRows<M>(collectionPath, searchString, options);
+        return this.fetchService.fetchCollectionForRest<M>(collectionPath, { ...options, searchString });
     }
 
     /**

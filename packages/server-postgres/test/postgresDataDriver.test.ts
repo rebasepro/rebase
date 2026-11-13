@@ -718,7 +718,7 @@ table_name: "users" }])
             registry.setTableHooks("test_coll", { afterRead: afterReadSpy });
             const mockCollectionWithCallback = collection("test_coll");
 
-            jest.spyOn(delegate.dataService, "fetchCollection").mockResolvedValueOnce([
+            jest.spyOn(delegate.dataService, "fetchCollectionForRest").mockResolvedValueOnce([
                 { id: "e1", path: "test_coll", values: {} }
             ]);
 
@@ -738,7 +738,7 @@ table_name: "users" }])
             registry.setTableHooks("test_coll", { afterRead: afterReadSpy });
             const mockCollectionWithCallback = collection("test_coll");
 
-            jest.spyOn(delegate.dataService, "fetchOne").mockResolvedValueOnce(
+            jest.spyOn(delegate.dataService, "fetchOneForRest").mockResolvedValueOnce(
                 { id: "e1", path: "test_coll", values: {} }
             );
 
@@ -759,7 +759,7 @@ table_name: "users" }])
             registry.setTableHooks("test_coll", { beforeSave: beforeSaveSpy, afterSave: afterSaveSpy });
             const mockCollectionWithCallback = collection("test_coll");
 
-            jest.spyOn(delegate.dataService, "fetchOne").mockResolvedValue(undefined);
+            jest.spyOn(delegate.dataService, "fetchOneForRest").mockResolvedValue(undefined);
             jest.spyOn(delegate.dataService, "save").mockResolvedValueOnce(
                 { id: "e1", path: "test_coll", values: { name: "test" } }
             );

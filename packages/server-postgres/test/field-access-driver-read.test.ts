@@ -261,8 +261,8 @@ describe("a withheld relation, on the driver's reads", () => {
     });
 
     it("is served to a caller holding the role", async () => {
-        const one = await (await peopleDriver().withAuth(HR_USER)).fetchOne({ path: "people", id: 1 });
+        const one = await (await peopleDriver().withAuth(HR_USER)).fetchOne({ path: "people", id: 1, include: ["band"] });
         expect(one?.bandId).toBe(7);
-        expect(one?.band).toMatchObject({ __type: "relation", id: "7", path: "bands" });
+        expect(one?.band).toEqual({ id: 7, label: "director" });
     });
 });

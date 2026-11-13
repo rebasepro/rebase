@@ -1012,12 +1012,10 @@ export class RestApiGenerator {
      *
      * The read routes and the write routes both take their tag from here, so a
      * tag a `GET` handed out and the tag a write compares it against are
-     * hashes of one rendering of the row. The write routes' own existence read
-     * is not that rendering, not even for its version column: `driver.fetchOne`
-     * returns the admin view model, where a date is a `{ __type: "date" }`
-     * envelope rather than the ISO string the REST row carries. Hashing it
-     * matched no tag any read ever handed out, so every conditional write to a
-     * collection with an `on_update` date was a 412.
+     * hashes of one rendering of the row. (A driver's `fetchOne` once returned
+     * the admin view model, a date as a `{ __type: "date" }` envelope; hashing
+     * that matched no tag any read handed out, so every conditional write to a
+     * table with an `on_update` date was a 412.)
      *
      * A driver without a REST read serves `GET /:id` from `fetchOne` too, so
      * there the row already read is the rendering to hash.

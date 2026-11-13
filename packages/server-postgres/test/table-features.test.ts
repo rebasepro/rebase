@@ -27,7 +27,8 @@ import { withPinnedPlannerWorld } from "../src/schema/render-outputs";
 import { assertWritableColumns } from "../src/services/collection-helpers";
 import { readCatalogueSchema } from "../src/schema/catalogue-schema";
 import { tableIndexStatement } from "../src/schema/table-index";
-import { parseColumnFromServer, serializeColumnToServer } from "../src/data-transformer";
+import { serializeColumnToServer } from "../src/data-transformer";
+import { toRestScalar } from "../src/services/row-pipeline";
 import { columnAt, runtimeTableOfDef } from "./helpers/codec-columns";
 import { drizzle } from "drizzle-orm/pglite";
 import {
@@ -357,15 +358,16 @@ describe("table features: `<item>.array()` of every scalar element type", () => 
             const [row] = await orm.insert(table).values(values).returning();
             const read: Record<string, unknown> = {};
             for (const key of Object.keys(written)) {
-                read[key] = parseColumnFromServer(row[key], columnAt(runtime, key));
+                read[key] = toRestScalar(row[key], columnAt(runtime, key));
             }
-            // Each item comes back as a scalar column of its type does.
-            const date = (iso: string) => ({ __type: "date", value: iso });
+            // As REST serves a native array: the items as the driver returns
+            // them. NOTE: unlike the scalar column of the same type, a
+            // `numeric[]` item stays text and a `timestamptz[]` item the
+            // Postgres literal — `toRestScalar` renders no array element.
             expect(read).toEqual({
                 ...written,
-                days: [date("2026-01-02T00:00:00.000Z")],
-                instants: [date("2026-01-02T10:00:00.000Z")],
-                times: [date("1970-01-01T09:30:00.000Z")]
+                amounts: ["1.50", "2.25"],
+                instants: [expect.stringMatching(/^2026-01-02 \d{2}:00:00\+\d{2}$/)]
             });
         } finally {
             await db.close();

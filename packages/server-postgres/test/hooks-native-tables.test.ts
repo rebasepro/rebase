@@ -316,11 +316,12 @@ describe("PII through an include", () => {
         expect(one?.author).toMatchObject({ email: "s***@acme.com" });
     });
 
-    it("is masked inside a relation ref's row (`data.values`), on the driver's own read", async () => {
-        // The admin's rendering: `{ __type: "relation", data: { id, path, values } }`.
-        // The target's hook used to be handed the envelope, and `values.email` went out raw.
-        const row = await driver.fetchOne({ path: "posts", id: "1" });
-        expect(row?.author).toMatchObject({ __type: "relation", data: { values: { name: "Sam", email: "s***@acme.com" } } });
+    it("is masked inside an included row on the driver's own read (`fetchOne`)", async () => {
+        // The driver's SPI serves the REST row: the target's own row under the
+        // relation's name, masked by the target's hook.
+        const row = await driver.fetchOne({ path: "posts", id: "1", include: ["author"] });
+        expect(row?.author).toMatchObject({ name: "Sam", email: "s***@acme.com" });
+        expect(row?.author).not.toHaveProperty("__type");
     });
 
     it("is masked in a realtime frame, the first and every refetch", async () => {

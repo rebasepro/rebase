@@ -88,12 +88,10 @@ describe("read-shape parity across the entry points", () => {
         // The relation service is private: read by name and narrowed.
         const relations: unknown = Reflect.get(fetchService, "relationService");
         if (!(relations instanceof RelationService)) throw new Error("FetchService holds no RelationService");
-        // The loader renders the target; the include path asks it for the
-        // target's own REST rendering, which is `toRestRow` — the parent's.
-        jest.spyOn(relations, "batchFetchRelatedEntities").mockImplementation((...args: unknown[]) => {
-            const options = args[5];
-            const style = typeof options === "object" && options !== null && "style" in options ? options.style : undefined;
-            const values = style === "rest" ? toRestRow({ ...AUTHOR }, registry.requireTable(authorsCollection.slug), registry) : AUTHOR;
+        // The loader renders the target as its own REST row — `toRestRow`,
+        // the parent's rendering.
+        jest.spyOn(relations, "batchFetchRelatedEntities").mockImplementation(() => {
+            const values = toRestRow({ ...AUTHOR }, registry.requireTable(authorsCollection.slug), registry);
             return Promise.resolve(new Map([["1", { id: 7, path: "authors", values }]]));
         });
         jest.spyOn(relations, "batchFetchRelatedEntitiesMany").mockResolvedValue(new Map());

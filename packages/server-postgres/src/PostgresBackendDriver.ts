@@ -908,19 +908,31 @@ export class PostgresBackendDriver implements DataDriver {
         );
     }
 
+    /**
+     * Rows of a table, as REST serves them: the one read walk
+     * (`fetchCollectionForRest`) — columns under their own names, a foreign
+     * key as a key, dates as RFC 3339, relations only when `include` names
+     * them, each as the target's own row — then the one `afterRead` chain.
+     *
+     * It used to be the admin panel's view-model walk: every date wrapped as
+     * `{ __type: "date" }`, every belongsTo turned into a relation ref, so the
+     * socket's one-shot read, MCP, plugins and a function's `requireDriver(c)`
+     * were handed a second row shape that no write door accepts back. The panel
+     * builds its view model in the browser, from this row and the descriptor.
+     */
     async fetchCollection<M extends Record<string, unknown>>(
         // Forwarded whole rather than re-listed, as `listenCollection` does:
         // the list named ten of the query's fields, so `logical`, `include`,
         // `fields`, `distinct`, `withDeleted` and `searchExplain` were accepted
         // and dropped — an `or(...)` read returned every row while `count`
         // with the same group answered 1.
-        { path, startAfter, ...query }: FetchCollectionProps<M>
+        { path, startAfter, include, ...query }: FetchCollectionProps<M>
     ): Promise<Record<string, unknown>[]> {
 
-        const rows = await this.dataService.fetchCollection<M>(path, {
+        const rows = await this.dataService.fetchCollectionForRest<M>(path, {
             ...withoutViewCollection(query),
             startAfter: startAfter as Record<string, unknown> | undefined
-        });
+        }, include);
 
         // The one chain: every tier, embedded relations included. A hook that
         // mutates the row and returns nothing leaves the row it mutated.
@@ -989,19 +1001,20 @@ export class PostgresBackendDriver implements DataDriver {
         return () => this.realtimeService.unsubscribe(subscriptionId);
     }
 
+    /**
+     * One row, as REST's `GET /:id` serves it (`fetchOneForRest`, then
+     * `afterRead`): the relations `include` names and no others. It used to
+     * load every relation the table declares, eagerly, as relation refs.
+     */
     async fetchOne<M extends Record<string, unknown>>({
                                                              path,
                                                              id,
                                                              databaseId,
-                                                             withDeleted
+                                                             withDeleted,
+                                                             include
                                                          }: FetchOneProps<M>): Promise<Record<string, unknown> | undefined> {
-        const row = await this.dataService.fetchOne<M>(
-            path,
-            id,
-            databaseId,
-            withDeleted
-        );
-        if (!row) return row;
+        const row = await this.dataService.fetchOneForRest<M>(path, id, include, databaseId, { withDeleted });
+        if (!row) return undefined;
         const [served] = await this.applyAfterRead([row], path);
         return served;
     }
@@ -1132,17 +1145,18 @@ export class PostgresBackendDriver implements DataDriver {
             // rules describe what they may receive: applied here, a tenant
             // column members may not read would leave every member in no
             // tenant at all.
-            const rows = await withFieldViewer(undefined, () => this.dataService.fetchCollection(slug, {
+            const rows = await withFieldViewer(undefined, () => this.dataService.fetchCollectionForRest(slug, {
                 filter: { [userField]: ["==", uid] },
                 limit: cap + 1
             }));
+            // `tenantField` names a column or a belongsTo; a row carries a
+            // belongsTo as its foreign key, under the key of that column.
+            const link = this.registry.getTable(slug)?.relations.get(tenantField);
+            const tenantKey = link?.kind === "belongsTo" ? link.localField : tenantField;
             const tenants = Array.from(new Set(
                 rows.slice(0, cap)
-                    .map(row => (row as Record<string, unknown>)[tenantField])
+                    .map(row => row[tenantKey])
                     .filter(value => value !== null && value !== undefined)
-                    .map(value => (typeof value === "object"
-                        ? (value as { id?: unknown }).id ?? value
-                        : value))
             ));
             return { tenants, complete: rows.length <= cap };
         } catch (err) {

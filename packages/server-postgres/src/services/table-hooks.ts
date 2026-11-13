@@ -288,8 +288,8 @@ export function afterReadApplies(registry: PostgresTableRegistry | undefined, se
  * `afterRead` on rows leaving the server — THE read chain, for every path.
  *
  * Runs {@link afterReadOnRow} on each row, then masks each embedded relation
- * (an `include`d row or list, a `{ __type: "relation", data }` payload) one
- * level deep with the target table's `afterRead`. `context` is asked for only
+ * (an `include`d row or list — the target's own row) one level deep with the
+ * target table's `afterRead`. `context` is asked for only
  * when a hook will run, so a table without hooks costs a map lookup.
  *
  * `onHookRun` is called once, before the first hook runs: the driver notes
@@ -314,21 +314,6 @@ export async function afterReadOnRows(
         if (Array.isArray(value)) return Promise.all(value.map(item => maskEmbedded(item, target)));
         if (!isRecord(value)) return value;
         const targetPath = target.table?.slug ?? path;
-        // A relation ref (the admin's rendering, and every realtime frame's)
-        // nests the row under `.data` — as `{ id, path, values }`, so the
-        // row the target's hooks mask is `data.values`. Handed the envelope,
-        // a hook masking `email` masked a key the envelope does not have,
-        // and `data.values.email` went out as stored.
-        if (value.__type === "relation") {
-            const data = value.data;
-            if (!isRecord(data)) return value;
-            if (isRecord(data.values)) {
-                return { ...value, data: { ...data, values: await afterReadOnRow(target, data.values, targetPath, ctx) } };
-            }
-            return { ...value, data: await afterReadOnRow(target, data, targetPath, ctx) };
-        }
-        // A bare reference carries no row to mask.
-        if (value.__type === "reference") return value;
         return afterReadOnRow(target, value, targetPath, ctx);
     };
 

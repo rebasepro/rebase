@@ -16,7 +16,9 @@
  *
  * And the driver's own read SPI (`fetchCollection` / `fetchOne`), which every
  * other in-process caller uses (the socket's one-shot frames, MCP, the RLS
- * simulator, plugins, user functions): the same rows, through the same walk.
+ * simulator, plugins, user functions): the same rows, through the same walk —
+ * it served the admin's view model (`{ __type: "date" }`, relation refs, every
+ * relation eagerly) until the "one read shape" slice.
  *
  * PGlite carries no pgvector, so a vector column is pinned at the codec level
  * (`row-pipeline` `toRestScalar` serves it as the driver returns it).
@@ -34,6 +36,7 @@ import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { toRestScalar } from "../src/services/row-pipeline";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
+import { testUser } from "./helpers/spg-b-fixtures";
 
 const samples = defineTable("samples", {
     columns: {
@@ -235,5 +238,29 @@ describe("in-process SDK values (buildSdkData)", () => {
     it("an author with nothing related: an empty list, a null hasOne", async () => {
         const included = await sdk().table("authors").findById(2, { include: ["posts", "profile", "postTags"] });
         expect(included).toEqual({ id: 2, name: "Bo", joinedAt: null, posts: [], profile: null, postTags: [] });
+    });
+});
+
+describe("the driver's own read SPI serves the same rows (fetchCollection / fetchOne)", () => {
+    it("fetchCollection: the rows `find` serves, with and without include", async () => {
+        const plain = await driver.fetchCollection({ path: "samples", orderBy: [["id", "asc"]] });
+        expect(plain).toEqual([SAMPLE, EMPTY]);
+        const included = await driver.fetchCollection({ path: "posts", orderBy: [["id", "asc"]], include: ["tags", "author"] });
+        expect(included).toEqual(await driver.restFetchService.fetchCollectionForRest("posts", { orderBy: [["id", "asc"]] }, ["tags", "author"]));
+        expect(included[0]).not.toHaveProperty("author.__type");
+    });
+
+    it("fetchOne: the row `findById` serves, with only the relations it names", async () => {
+        expect(await driver.fetchOne({ path: "samples", id: 1 })).toEqual(SAMPLE);
+        expect(await driver.fetchOne({ path: "authors", id: 1 })).toEqual({ id: 1, name: "Ada", joinedAt: "2020-01-02T03:04:05.000Z" });
+        expect(await driver.fetchOne({ path: "authors", id: 1, include: ["posts"] }))
+            .toEqual(await driver.restFetchService.fetchOneForRest("authors", 1, ["posts"]));
+        expect(await driver.fetchOne({ path: "samples", id: 999 })).toBeUndefined();
+    });
+
+    it("the same through a caller's driver (an RLS-scoped transaction)", async () => {
+        const scoped = await driver.withAuth(testUser({ uid: "u-wire", roles: ["admin"] }));
+        expect(await scoped.fetchOne({ path: "samples", id: 1 })).toEqual(SAMPLE);
+        expect(await scoped.fetchCollection({ path: "samples", orderBy: [["id", "asc"]] })).toEqual([SAMPLE, EMPTY]);
     });
 });

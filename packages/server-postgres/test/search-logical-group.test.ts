@@ -146,16 +146,9 @@ describe("the `or`/`and` group survives a search", () => {
         expect(queries()[0].params).not.toContain("published");
     });
 
-    it("reaches the search path through `searchRows` too", async () => {
-        // The realtime refetch searches through `DataService.searchRows`, whose
-        // options type had no `logical` at all — so a live *filtered* search
-        // could not pass one on however carefully the subscription stored it.
-        const { service, queries } = setup();
-
-        await service.searchRows("docs", "auditor", { logical: group });
-
-        expect(queries()[0].params).toContain("published");
-    });
+    // `FetchService.searchRows` is gone: every search — `DataService.searchRows`
+    // included — is `fetchCollectionForRest` with a `searchString`, the read
+    // the cases above pin.
 });
 
 describe("the same group survives a live search subscription", () => {

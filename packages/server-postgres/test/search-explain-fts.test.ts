@@ -68,7 +68,7 @@ afterAll(async () => {
 
 describe("explaining a full-text search", () => {
     it("names the fields that matched, with no accent-folding function in the database", async () => {
-        const rows = await service.fetchCollection("posts", { searchString: "panels", searchExplain: true, limit: 10 });
+        const rows = await service.fetchCollectionForRest("posts", { searchString: "panels", searchExplain: true, limit: 10 });
         const byTitle = Object.fromEntries(rows.map(row => [String(row.title), (row._matches as { field: string }[]).map(m => m.field)]));
         expect(byTitle).toEqual({
             "Admin panels for Postgres": ["title"],

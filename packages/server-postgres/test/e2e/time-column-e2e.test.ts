@@ -63,7 +63,7 @@ describe("a time column", () => {
 
     it("reads a stored time as that time of day", async () => {
         const row = await driver.fetchOne({ path: "shops", id: "s1", collection: shops });
-        expect(row?.opens).toEqual({ __type: "date", value: "1970-01-01T09:30:00.000Z" });
+        expect(row?.opens).toBe("09:30:00");
     });
 
     it("writes a time of day back as itself", async () => {
@@ -74,7 +74,7 @@ describe("a time column", () => {
         const { rows } = await admin.query("SELECT opens::text AS opens FROM shops WHERE id = 's1'");
         expect(rows[0].opens).toBe("18:45:30");
         const row = await driver.fetchOne({ path: "shops", id: "s1", collection: shops });
-        expect(row?.opens).toEqual({ __type: "date", value: "1970-01-01T18:45:30.000Z" });
+        expect(row?.opens).toBe("18:45:30");
     });
 
     it("takes a time written as text", async () => {

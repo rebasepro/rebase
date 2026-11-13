@@ -97,7 +97,7 @@ const services: Record<string, FetchService> = {};
 
 /** First names of the rows a search returns, sorted so order is not asserted. */
 async function found(slug: string, searchString: string): Promise<string[]> {
-    const rows = await services[slug].fetchCollection(slug, { searchString, limit: 50 });
+    const rows = await services[slug].fetchCollectionForRest(slug, { searchString, limit: 50 });
     return rows.map(r => String(r.name).split(" ")[0]).sort();
 }
 
@@ -240,15 +240,15 @@ describe("`hybrid` is both halves, with no threshold to tune", () => {
         // `sebastian` is a lexeme of two rows and a substring of the same two,
         // while `seb` is only ever a substring. So the first query's scores are
         // real `ts_rank` values and the second's are the substring floor.
-        const lexeme = await services.hybrid.fetchCollection("hybrid", { searchString: "sebastian" });
-        const prefix = await services.hybrid.fetchCollection("hybrid", { searchString: "seb" });
+        const lexeme = await services.hybrid.fetchCollectionForRest("hybrid", { searchString: "sebastian" });
+        const prefix = await services.hybrid.fetchCollectionForRest("hybrid", { searchString: "seb" });
         const min = (rows: Record<string, unknown>[]) => Math.min(...rows.map(r => Number(r._score)));
         expect(min(lexeme)).toBeGreaterThan(min(prefix));
         expect(min(prefix)).toBeGreaterThan(0);
     });
 
     it("names the field a substring-only hit came from, when asked to explain", async () => {
-        const [row] = await services.hybrid.fetchCollection("hybrid", {
+        const [row] = await services.hybrid.fetchCollectionForRest("hybrid", {
             searchString: "audit", searchExplain: true
         });
         const matches = row._matches as { field: string; snippet: string }[];

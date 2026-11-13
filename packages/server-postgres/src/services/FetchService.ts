@@ -1,11 +1,11 @@
-import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, is, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
+import { and, asc, count, desc, eq, getTableColumns, gt, is, isNotNull, isNull, lt, or, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable, PgTimestamp, PgTimestampString } from "drizzle-orm/pg-core";
 import { FilterValues, INCLUDE_COUNT_KEY, isPercentileFraction, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, type RelationDescriptor, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
 import { isTimeZoneName } from "@rebasepro/types";
 import type { ColumnDescriptor } from "@rebasepro/types";
 import { isJsNumberType } from "@rebasepro/common";
 import type { DriverAggregate, DriverAggregateGroup, IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
-import { apiHiddenKeys, includableRelations, queryableColumnKeys, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
+import { apiHiddenKeys, includableRelations, queryableColumnKeys, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, listedColumnKeys, type FilterCompilationOptions } from "../utils/drizzle-conditions";
 import { currentFieldViewer, namesHiddenFromCaller } from "./field-viewer";
@@ -27,13 +27,11 @@ import {
     COMPOSITE_ID_SEPARATOR,
     type PrimaryKeyInfo
 } from "./collection-helpers";
-import { parseDataFromServer } from "../data-transformer";
 import { RelationService } from "./RelationService";
-import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query";
 import { DrizzleClient } from "../interfaces";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
-import { toFlatRow, toRestRow, stripUnreadable, canReadRelation } from "./row-pipeline";
-import { visibleColumnProjection, hiddenColumnsOption } from "./hidden-columns";
+import { toRestRow, canReadRelation } from "./row-pipeline";
+import { visibleColumnProjection } from "./hidden-columns";
 import type { RuntimeTable } from "../model/runtime-table";
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
 import { relatedRowsOrder } from "./relation-tables";
@@ -43,8 +41,6 @@ import { beforeQueryCondition, beforeQueryConditions, hasBeforeQuery, type ReadC
 import { ApiError, logger } from "@rebasepro/server";
 import { reachedDatabase } from "../utils/pg-error-utils";
 
-/** Type-safe accessor for Drizzle's relational query API via dynamic table name */
-type DbQueryAccessor = Record<string, RelationalQueryBuilder<any, any>> | undefined;
 
 /**
  * One sort key, with the column or expression it was resolved to.
@@ -210,15 +206,6 @@ export class FetchService {
         private callContext?: ReadCallContextProvider
     ) {
         this.relationService = new RelationService(db, registry, callContext);
-    }
-
-    /**
-     * Get the relational query builder for a given table name.
-     * Safely narrows the DrizzleClient union type to access db.query[tableName].
-     */
-    private getQueryBuilder(tableName: string): RelationalQueryBuilder<TablesRelationalConfig, TableRelationalConfig> | undefined {
-        const query = (this.db as { query?: DbQueryAccessor }).query;
-        return query?.[tableName] as RelationalQueryBuilder<TablesRelationalConfig, TableRelationalConfig> | undefined;
     }
 
     /**
@@ -930,15 +917,10 @@ target });
             try {
                 if (relation.cardinality === "one") {
                     // Rendered by the loader exactly as the target's own route
-                    // renders it (`style: "rest"`): a target left in the walk's
-                    // own types is how a date came back as a string at the top
-                    // level and a `{ __type: "date" }` envelope one level down,
-                    // in one response — and how the target's own to-one
-                    // relations arrived as `{ __type: "relation" }` refs.
-                    // The rows go along so a `belongsTo` takes each foreign
+                    // renders it (`toRestRow`). The rows go along so a `belongsTo` takes each foreign
                     // key from the row rather than selecting it again.
                     const results = await this.relationService.batchFetchRelatedEntities(
-                        collectionPath, rowIds, key, relation, narrow, { style: "rest", parentRows: addressable }
+                        collectionPath, rowIds, key, relation, narrow, { parentRows: addressable }
                     );
                     for (const row of addressable) {
                         const related = results.get(String(addressOf(row)));
@@ -959,7 +941,7 @@ target });
                         ? { limit: node.limit, orderBy: node.orderBy, totals }
                         : undefined;
                     const results = await this.relationService.batchFetchRelatedEntitiesMany(
-                        collectionPath, rowIds, key, relation, narrow, window, { style: "rest" }
+                        collectionPath, rowIds, key, relation, narrow, window
                     );
                     for (const row of addressable) {
                         const address = String(addressOf(row));
@@ -1128,58 +1110,6 @@ target });
             // A path with no registered collection — a nested or derived one.
             // No cursor is the honest answer; the listing pages by offset.
             return undefined;
-        }
-    }
-
-    /**
-     * Every relation of one row, as the refs the admin renders, attached in
-     * place.
-     *
-     * Loaded by the batched loaders an `include` takes, so a target reached from
-     * this row is read as the caller may see it: its `beforeQuery` scope and its
-     * soft delete applied, its unreadable fields stripped. Populated through
-     * drizzle's relational `with`, the single get knew neither, and a
-     * tenant-scoped user fetching an owner was handed another tenant's docs —
-     * and the trashed ones — under a relation `?include=` answered correctly.
-     *
-     * A to-many relation that reaches nothing is `[]`; a to-one is left off. A
-     * relation that fails for a reason other than the database is logged and
-     * left off, as on the include path, rather than failing the whole row.
-     */
-    private async loadRelationRefs(
-        row: Record<string, unknown>,
-        address: string,
-        runtime: RuntimeTable,
-        collectionPath: string,
-        /** The row as read, so a `belongsTo` takes its foreign key from it. */
-        sourceRow: Record<string, unknown>
-    ): Promise<void> {
-        if (!address) return;
-        const toRef = (related: { id: string | number; path: string; values: Record<string, unknown> }) =>
-            createRelationRefWithData(related.id, related.path, {
-                id: related.id,
-                path: related.path,
-                values: related.values
-            });
-
-        for (const [key, relation] of runtime.relations) {
-            try {
-                if (relation.cardinality === "one") {
-                    const related = (await this.relationService.batchFetchRelatedEntities(
-                        collectionPath, [address], key, relation, undefined, { parentRows: [sourceRow] }
-                    )).get(address);
-                    if (related) row[key] = toRef(related);
-                } else {
-                    const related = (await this.relationService.batchFetchRelatedEntitiesMany(
-                        collectionPath, [address], key, relation
-                    )).get(address) ?? [];
-                    row[key] = related.map(toRef);
-                }
-            } catch (e) {
-                if (e instanceof ApiError) throw e;
-                if (reachedDatabase(e)) throw e;
-                logger.warn(`[FetchService] Could not load relation '${key}' on ${collectionPath}`, { error: e });
-            }
         }
     }
 
@@ -1538,230 +1468,6 @@ target });
     }
 
     /**
-     * Fetch a single row by ID
-     */
-    async fetchOne<M extends Record<string, unknown>>(
-        collectionPath: string,
-        id: string | number,
-        databaseId?: string,
-        withDeleted?: WithDeleted
-    ): Promise<Record<string, unknown> | undefined> {
-        if (!await this.isAddressableUnder(collectionPath, id)) return undefined;
-
-        const runtime = requireTableAt(collectionPath, this.registry);
-        const table = pgTableOf(runtime, this.registry);
-        const idInfoArray = requirePrimaryKeys(runtime, this.registry);
-
-        // An address the key columns cannot hold names no row — the same answer
-        // as a well-formed id nobody has. Asking Postgres instead raises 22P02
-        // and aborts the transaction around this read.
-        if (!idCanAddressTable(id, table, idInfoArray)) return undefined;
-
-        const addressed = rowIdentityCondition(table, idInfoArray, id, collectionPath);
-
-        // Part of the identity, so a row the hook excludes is absent here
-        // exactly as it is from the listing.
-        const narrowing = await this.narrowReadCondition(
-            collectionPath, runtime, table, "get", {}
-        );
-        const identity = narrowing
-            ? and(addressed, narrowing) as SQL
-            : addressed;
-
-        // Primary path: db.query.findFirst for the row, then its relations
-        const tableName = getTableName(table);
-
-        const qb = this.getQueryBuilder(tableName);
-        if (qb) {
-            // `null` until the query answers: `undefined` is its answer for a
-            // row that is not there.
-            let row: Record<string, unknown> | undefined | null = null;
-            try {
-                const hidden = hiddenColumnsOption(getTableColumns(table), runtime.descriptor);
-
-                row = await qb.findFirst({
-                    // Soft delete: a stamped row answers 404 like any other
-                    // absent one, so `findById` and `find` agree about which
-                    // rows exist.
-                    where: andSoftDelete(identity, runtime, table, withDeleted),
-                    ...(hidden ? { columns: hidden } : {})
-                } as Parameters<NonNullable<typeof qb>["findFirst"]>[0]);
-            } catch (e) {
-                if (reachedDatabase(e)) throw e;
-                logger.warn(`[FetchService] db.query.findFirst failed for ${collectionPath}, falling back to db.select`, { error: e });
-            }
-
-            if (row === undefined) return undefined;
-            if (row !== null) {
-                const flatRow = toFlatRow(row, runtime, this.registry);
-                await this.loadRelationRefs(flatRow, buildCompositeId(row, idInfoArray), runtime, collectionPath, row);
-
-                // Again, now the relations are on the row: a relation property
-                // the caller may not read is withheld like any other field.
-                return stripUnreadable(flatRow, runtime.descriptor);
-            }
-        }
-
-        // Fallback: db.select, then the same relation loader
-        // `select()` and `select(getTableColumns(table))` differ only once a
-        // join is added, and this read has none: the same SQL, the same rows.
-        const visibleOne = visibleColumnProjection<AnyPgColumn>(getTableColumns(table), runtime.descriptor) ?? getTableColumns(table);
-        const result = await this.db
-            .select(visibleOne)
-            .from(table)
-            .where(andSoftDelete(identity, runtime, table, withDeleted))
-            .limit(1);
-
-        if (result.length === 0) return undefined;
-
-        const raw = result[0] as M;
-        // Without `db`: the parse only types the columns and turns an owned
-        // foreign key into a ref (the registry names its target). Given `db`,
-        // it queried each inverse relation itself, with neither the target's
-        // scope nor its soft delete.
-        const values = await parseDataFromServer(raw, runtime, undefined, this.registry) as Record<string, unknown>;
-        await this.loadRelationRefs(values, buildCompositeId(raw, idInfoArray), runtime, collectionPath, raw);
-
-        // The primary path strips inside `toFlatRow`; this one parses the row
-        // itself, so it strips itself. Without it a fetch that fell back served
-        // every declared column, `excludeFromApi` ones included.
-        stripUnreadable(values, runtime.descriptor);
-
-        return {
-            ...values,
-            id: id.toString()
-        };
-    }
-
-    /**
-     * Unified method to fetch rows with optional search functionality
-     */
-    async fetchRowsWithConditions<M extends Record<string, unknown>>(
-        collectionPath: string,
-        options: {
-            filter?: FilterValues<Extract<keyof M, string>>;
-            orderBy?: string | OrderByTuple[];
-            order?: "desc" | "asc";
-            limit?: number;
-            offset?: number;
-            startAfter?: Record<string, unknown>;
-            searchString?: string;
-            searchExplain?: boolean;
-            databaseId?: string;
-            vectorSearch?: VectorSearchParams;
-            logical?: LogicalCondition;
-            /** Narrow to the rows reachable from a parent through a relation. */
-            relatedTo?: NestedPathHop;
-            /** See `FetchCollectionProps.withDeleted`. */
-            withDeleted?: WithDeleted;
-            /**
-             * Relations to load. **Absent means none** — the same as it means
-             * over REST.
-             *
-             * It used to mean *all of them*, unconditionally, and this is the
-             * method the realtime refetch goes through. So a subscription was
-             * pushed rows carrying every relation the collection declares while
-             * the identical `find()` returned rows carrying none, and a client
-             * that rendered both saw the row change shape when a write landed.
-             */
-            include?: IncludeSpec;
-            /** Columns to read — a projection pushed into the SELECT. */
-            fields?: string[];
-            /** `SELECT DISTINCT` over the projection. */
-            distinct?: boolean;
-        } = {}
-    ): Promise<Record<string, unknown>[]> {
-        const runtime = requireTableAt(collectionPath, this.registry);
-        this.assertCallerMayRead(runtime.slug, options);
-        const table = pgTableOf(runtime, this.registry);
-        const idInfoArray = requirePrimaryKeys(runtime, this.registry);
-        const idInfo = idInfoArray[0];
-        const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
-
-        if (!idField) {
-            throw new Error(`ID field '${idInfo.fieldName}' not found in table '${collectionPath}'`);
-        }
-
-        // ONE read, then relations.
-        //
-        // This method used to hold a `db.query.findMany` branch and a full
-        // second copy of the `db.select` builder below it — the same
-        // conditions, ordering, vector and rank handling as
-        // `fetchRowsWithConditionsRaw`, written out twice. Two copies of a
-        // query builder is two answers to every question asked of it, and they
-        // had already drifted: only one of them read `startAfter`, so cursor
-        // paging worked on one path and silently did nothing on the other.
-        const results = await this.fetchRowsWithConditionsRaw<M>(collectionPath, options);
-
-        return this.processRowResults<M>(
-            results, runtime, collectionPath, idInfo, options.databaseId,
-            normalizeInclude(options.include), idInfoArray
-        );
-    }
-
-    /**
-     * Fallback path used when db.query is unavailable.
-     *
-     * The primary path runs the results through `toFlatRow`, which maps
-     * relations from what drizzle already nested — no query per row. This one
-     * has no nesting to read, so it resolves relations itself, in batches.
-     *
-     * Process raw database results into flat rows with relations.
-     */
-    private async processRowResults<M extends Record<string, unknown>>(
-        results: Record<string, unknown>[],
-        runtime: RuntimeTable,
-        collectionPath: string,
-        idInfo: { fieldName: string; type: "string" | "number" },
-        _databaseId?: string,
-        /**
-         * The relations to load. **Absent means none.**
-         *
-         * It was a `skipRelations` boolean defaulting to *load everything*, and
-         * that default is what made the realtime refetch return rows of a
-         * different shape from the REST list serving the identical query. The
-         * parameter now says which relations rather than whether, so the two
-         * callers state the same thing and neither can quietly mean "all".
-         */
-        include?: NormalizedInclude,
-        _idInfoArray?: { fieldName: string; type: "string" | "number" }[]
-    ): Promise<Record<string, unknown>[]> {
-        if (results.length === 0) {
-            // An unknown relation is a 400 whether or not a row matched.
-            if (include) this.assertIncludeResolvable(runtime, include);
-            return [];
-        }
-
-        // First pass: parse all rows WITHOUT per-row relation queries.
-        // We deliberately omit db/registry so parseDataFromServer only does type
-        // coercion (dates, numbers, FK→relation stubs for owning relations) and
-        // does NOT issue individual SQL queries for inverse relations. The
-        // include pass below batch-loads what the caller asked for, one query
-        // per relation per level, avoiding the N+1 that plagued the old path.
-        void idInfo;
-        const values = await Promise.all(results.map(async (rawRow: Record<string, unknown>) =>
-            await parseDataFromServer(rawRow as M, runtime, undefined, this.registry) as Record<string, unknown>));
-
-        // Second pass: the relations the caller named, through the same batched
-        // loader every other read uses — so a row from here and a row from the
-        // REST list carry the same relations, loaded the same way.
-        if (include) {
-            await this.loadIncludes(values, runtime, collectionPath, include);
-        }
-
-        // Last, once the includes have read the key columns they group by: the
-        // fields this caller may not read. The REST list strips in `toRestRow`
-        // and the single get in `toFlatRow`; this parse is the third exit from
-        // the pipeline and it is what the socket's `FETCH_COLLECTION`, a text
-        // search and the MCP tools are served from. Without it every one of
-        // them handed a plain user each row's password hash.
-        for (const row of values) stripUnreadable(row, runtime.descriptor);
-
-        // Columns only — the address is the consumer's to derive.
-        return values;
-    }
-
-    /**
      * Every row of a collection's table, as stored, a page at a time, in key
      * order — the driver's `scanStoredRows`.
      *
@@ -1801,87 +1507,6 @@ target });
             const last = rows[rows.length - 1];
             after = keyNames.map(name => last[name]);
         }
-    }
-
-    /**
-     * Fetch a collection of rows
-     */
-    async fetchCollection<M extends Record<string, unknown>>(
-        collectionPath: string,
-        options: {
-            filter?: FilterValues<Extract<keyof M, string>>;
-            /**
-             * An `or(...)`/`and(...)` group, applied alongside `filter`.
-             *
-             * `fetchRowsWithConditions` below has always applied this; it was
-             * simply absent from this signature, so the only callers that could
-             * pass one were the ones that went around this method. Realtime
-             * came through here, which is why a subscription filtered by a
-             * logical group was pushed every row in the table.
-             */
-            logical?: LogicalCondition;
-            orderBy?: string | OrderByTuple[];
-            order?: "desc" | "asc";
-            limit?: number;
-            offset?: number;
-            startAfter?: Record<string, unknown>;
-            searchString?: string;
-            searchExplain?: boolean;
-            databaseId?: string;
-            vectorSearch?: VectorSearchParams;
-            /** Relations to load. Absent means none — see `fetchRowsWithConditions`. */
-            include?: IncludeSpec;
-            /** Columns to read — a projection pushed into the SELECT. */
-            fields?: string[];
-            /** `SELECT DISTINCT` over the projection. */
-            distinct?: boolean;
-            /** See `FetchCollectionProps.withDeleted`. */
-            withDeleted?: WithDeleted;
-        } = {}
-    ): Promise<Record<string, unknown>[]> {
-        // A nested path is the target collection narrowed by a relation — the
-        // same query, one condition heavier. It used to be a separate builder
-        // that honoured `limit` and nothing else.
-        //
-        // `relatedTo` is always set, to `undefined` for a root path: these
-        // options arrive from a socket frame spread whole, and the scope is
-        // this method's to derive from the path, never the caller's to send.
-        const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
-        return this.fetchRowsWithConditions<M>(
-            hop ? hop.target.slug : collectionPath,
-            { ...options, orderBy: FetchService.nestedOrder(hop, options.orderBy), relatedTo: hop }
-        );
-    }
-
-    /**
-     * Search rows by text
-     */
-    async searchRows<M extends Record<string, unknown>>(
-        collectionPath: string,
-        searchString: string,
-        options: {
-            filter?: FilterValues<Extract<keyof M, string>>;
-            /**
-             * An `or(...)`/`and(...)` group, applied alongside `filter`.
-             *
-             * `fetchRowsWithConditions` has always applied one; it was missing
-             * from this signature, so a realtime search subscription carrying a
-             * group could not pass it on and served every row matching the text
-             * that RLS allowed.
-             */
-            logical?: LogicalCondition;
-            orderBy?: string | OrderByTuple[];
-            order?: "desc" | "asc";
-            limit?: number;
-            databaseId?: string;
-            /** Ask each row which declared search field matched. */
-            searchExplain?: boolean;
-        } = {}
-    ): Promise<Record<string, unknown>[]> {
-        return this.fetchRowsWithConditions<M>(collectionPath, {
-            ...options,
-            searchString
-        });
     }
 
     /**
@@ -2452,8 +2077,6 @@ target });
             searchString?: string;
             databaseId?: string;
             vectorSearch?: VectorSearchParams;
-            /** Narrow to the rows reachable from a parent through a relation. */
-            relatedTo?: NestedPathHop;
             /**
              * See `FetchCollectionProps.withDeleted`. Applied by
              * `fetchRowsWithConditionsRaw` — the one place this pipeline builds
@@ -2472,33 +2095,34 @@ target });
     ): Promise<Record<string, unknown>[]> {
         // Resolve a nested path here rather than at the route, so `include`,
         // `offset` and the rest reach a child listing by the same route they
-        // reach a root one.
-        if (isNestedPath(collectionPath)) {
-            const hop = resolveNestedPath(collectionPath, this.registry);
-            if (hop) {
-                return this.fetchCollectionForRest<M>(
-                    hop.target.slug, { ...options,
-orderBy: FetchService.nestedOrder(hop, options.orderBy),
-relatedTo: hop }, include
-                );
-            }
-        }
+        // reach a root one: the target table, narrowed by the relation.
+        //
+        // The scope (`relatedTo`) is always this method's to derive from the
+        // path, never a caller's to send: these options arrive from a socket
+        // frame spread whole, and a smuggled `relatedTo` is dropped.
+        const requested = { ...options };
+        Reflect.deleteProperty(requested, "relatedTo");
+        const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
+        const path = hop ? hop.target.slug : collectionPath;
+        const read = hop
+            ? { ...requested, orderBy: FetchService.nestedOrder(hop, requested.orderBy), relatedTo: hop }
+            : { ...requested, relatedTo: undefined };
+
         // `relatedTo` is applied by `fetchRowsWithConditionsRaw`, which builds
-        // the scope condition itself — this used to build a second one here and
-        // hand it to a `db.query` branch that no longer exists.
-        const runtime = requireTableAt(collectionPath, this.registry);
-        this.assertCallerMayRead(runtime.slug, { ...options, include });
+        // the scope condition itself.
+        const runtime = requireTableAt(path, this.registry);
+        this.assertCallerMayRead(runtime.slug, { ...read, include });
 
         const normalizedInclude = normalizeInclude(include);
 
         // Base rows first, relations after. One SELECT, then one query per
         // relation per level of the include tree — never one per row, and never
         // the lateral join the relational query API compiles a to-many into.
-        const rows = (await this.fetchRowsWithConditionsRaw<M>(collectionPath, options))
+        const rows = (await this.fetchRowsWithConditionsRaw<M>(path, read))
             .map(row => toRestRow(row, runtime, this.registry));
 
         if (normalizedInclude) {
-            await this.loadIncludes(rows, runtime, collectionPath, normalizedInclude);
+            await this.loadIncludes(rows, runtime, path, normalizedInclude);
         }
 
         return rows;

@@ -1,33 +1,26 @@
 import { INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, type ColumnDescriptor } from "@rebasepro/types";
-import { canReadColumn, hasColumnAccessRules, restrictedKeys, createRelationRefWithData, restCodecOf } from "@rebasepro/common";
+import { canReadColumn, hasColumnAccessRules, restrictedKeys, restCodecOf } from "@rebasepro/common";
 import type { RelationDescriptor, TableDescriptor } from "@rebasepro/types";
 import { currentFieldViewer } from "./field-viewer";
-import { normalizeDbValues } from "../data-transformer";
-import { deriveRowAddress } from "./collection-helpers";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import type { RuntimeTable } from "../model/runtime-table";
 
 /**
- * Turning a drizzle result into a row we serve.
+ * Turning a drizzle result into the row we serve — the ONE read shape.
  *
- * There are two shapes, and they are the same walk. Both take a row whose
- * relation fields hold nested objects, both unwrap junction rows to reach the
- * target behind them, and both leave every other column alone. They differ only
- * in what they put where the relation was:
+ * REST, every socket frame, the in-process SDK and the driver's own read SPI
+ * serve this row: columns under their own names, a foreign key as a key,
+ * temporal columns as RFC 3339, numeric ones as numbers, and a relation only
+ * when an `include` names it, as the target's own row. The admin panel's view
+ * model (dates as `Date`, relations as `EntityRelation`) is built in the
+ * browser from this row and the table descriptor; nothing here produces a
+ * `{ __type: … }` envelope.
  *
- * - `"ref"` — a `{ id, path, __type: "relation" }` reference carrying the
- *   target's values. This is what the admin renders.
- * - `"inline"` — the target's own columns, flat. This is what REST serves, and
- *   — since the in-process SDK reads through the same pipeline — what
- *   `rebase.dataAsAdmin` / `context.data` serve too. A developer never sees a ref.
- *
- * They used to be two functions that happened to agree, and the agreement was
- * not enforced by anything: the row-identity bug had to be fixed five times
- * across differently-shaped copies of this walk, and one of the copies was
- * dead code nobody had noticed. Whatever the next cross-cutting change is, it
- * is one edit here.
+ * There used to be a second rendering here — a `{ __type: "relation" }` ref
+ * carrying the target's values, for the admin — and the two had to be kept in
+ * agreement by hand: the row-identity bug was fixed five times across copies of
+ * this walk. One rendering cannot disagree with itself.
  */
-export type RelationStyle = "ref" | "inline";
 
 /**
  * Whether a many-relation reaches its target through a junction table.
@@ -107,10 +100,6 @@ function coerceDeclaredNumber(value: unknown): unknown {
  */
 function toRestDate(value: unknown): unknown {
     if (value instanceof Date) return isNaN(value.getTime()) ? null : value.toISOString();
-    // An upstream walk may already have tagged it for the admin's view model.
-    if (value && typeof value === "object" && (value as { __type?: unknown }).__type === "date") {
-        return (value as { value?: unknown }).value ?? null;
-    }
     if (typeof value !== "string" && typeof value !== "number") return value;
     if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
     const date = new Date(value);
@@ -179,10 +168,9 @@ export function toRestScalar(value: unknown, column: ColumnDescriptor | undefine
  * Apply {@link toRestScalar} across a row, leaving undeclared columns alone.
  *
  * A target rendered differently from its parent is the shape bug this whole
- * file exists to prevent — a date was a string at the top level and a
- * `{ __type: "date" }` envelope one level down, in the same response. The
- * include loader renders its targets with {@link toRestRow}, through
- * `RelationService`'s `"rest"` style, for the same reason.
+ * file exists to prevent — a date was once a string at the top level and an
+ * envelope one level down, in the same response. The include loader renders
+ * its targets with {@link toRestRow} for the same reason.
  */
 function toRestValues(
     row: Record<string, unknown>,
@@ -284,91 +272,14 @@ export function canReadRelation(relation: RelationDescriptor): boolean {
     return canReadColumn(relation, currentFieldViewer());
 }
 
-function renderTarget(
-    targetRow: Record<string, unknown>,
-    target: RuntimeTable,
-    style: RelationStyle,
-    registry: PostgresTableRegistry
-): unknown {
-    if (style === "inline") {
-        // The target's columns, and only those: its address is the consumer's
-        // to derive, and merging one in overwrites a real `id` column.
-        return stripUnreadable(toRestValues({ ...targetRow }, target), target.descriptor);
-    }
-
-    const address = relationTargetAddress(targetRow, target, registry);
-    const path = target.slug;
-    return createRelationRefWithData(address, path, {
-        id: address,
-        path,
-        // Stripped here as well as in the inline branch above. The two branches
-        // are the same data in two renderings — REST inlines the target's
-        // columns, the admin and every realtime frame carry a ref with those
-        // columns attached — and only the first one was filtered. So a password
-        // hash that REST correctly withheld rode out on every `.listen()` frame
-        // and every WebSocket fetch of anything with a relation to users.
-        values: stripUnreadable(
-            normalizeDbValues(targetRow, target) as Record<string, unknown>,
-            target.descriptor
-        )
-    });
-}
-
 /**
- * The address a relation ref points at.
- *
- * The whole key, not its first column: a composite-keyed target addressed by
- * `tenant_id` alone points at every row that shares it. A target whose key
- * cannot be resolved at all used to throw here — reading `[0]` of an empty
- * array — taking down the parent's fetch over a relation it may not even have
- * asked for. The first column is a guess, but a ref that resolves to nothing
- * beats no rows at all.
+ * A related row as an `include` embeds it: the target's columns, and only
+ * those — its address is the consumer's to derive, and merging one in
+ * overwrites a real `id` column — rendered and stripped by the target's own
+ * descriptor, exactly as its own route serves it.
  */
-export function relationTargetAddress(
-    targetRow: Record<string, unknown>,
-    target: RuntimeTable,
-    registry: PostgresTableRegistry
-): string {
-    const address = deriveRowAddress(targetRow, target, registry);
-    if (address) return address;
-    return String(targetRow[Object.keys(targetRow)[0]] ?? "");
-}
-
-/**
- * The row the admin renders: every column, with relations as references.
- *
- * Values are normalized (dates, numbers, NaN) because the admin's view-model
- * expects real types. The row's own address is *not* among the columns — it is
- * derived by the consumer from the table's primary keys.
- */
-export function toFlatRow(
-    row: Record<string, unknown>,
-    table: RuntimeTable,
-    registry: PostgresTableRegistry
-): Record<string, unknown> {
-    const normalized = normalizeDbValues(row, table) as Record<string, unknown>;
-
-    // Keyed by relation: a relation the read nested (`with`) sits on the raw
-    // row under its name.
-    for (const [key, relation] of table.relations) {
-        const relData = row[key];
-        if (relData === undefined || relData === null) continue;
-
-        if (relation.cardinality === "many" && Array.isArray(relData)) {
-            const target = registry.requireTable(relation.target);
-            normalized[key] = relData.map((item: Record<string, unknown>) =>
-                renderTarget(
-                    isJunctionRelation(relation) ? unwrapJunctionRow(item, relation) : item,
-                    target,
-                    "ref",
-                    registry
-                ));
-        } else if (relation.cardinality === "one" && typeof relData === "object" && !Array.isArray(relData)) {
-            normalized[key] = renderTarget(relData as Record<string, unknown>, registry.requireTable(relation.target), "ref", registry);
-        }
-    }
-
-    return stripUnreadable(normalized, table.descriptor);
+function renderTarget(targetRow: Record<string, unknown>, target: RuntimeTable): Record<string, unknown> {
+    return stripUnreadable(toRestValues({ ...targetRow }, target), target.descriptor);
 }
 
 /**
@@ -410,12 +321,10 @@ export function toRestRow(
             flat[key] = value.map((item: Record<string, unknown>) =>
                 renderTarget(
                     isJunctionRelation(relation) ? unwrapJunctionRow(item, relation) : item,
-                    registry.requireTable(relation.target),
-                    "inline",
-                    registry
+                    registry.requireTable(relation.target)
                 ));
         } else if (typeof value === "object" && value !== null) {
-            flat[key] = renderTarget(value as Record<string, unknown>, registry.requireTable(step.relation.target), "inline", registry);
+            flat[key] = renderTarget(value as Record<string, unknown>, registry.requireTable(step.relation.target));
         } else {
             // A relation's key holding a scalar: its foreign key, as a scalar.
             flat[key] = toRestScalar(value, table.columnsByKey.get(key));

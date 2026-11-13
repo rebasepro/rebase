@@ -113,10 +113,8 @@ name: `Customer ${100 + i}` }));
 
         const rows = await dataService.fetchCollection("user_profiles", {});
 
-        // The foreign key's own stub — `{ __type, id, path }`, which
-        // `parseDataFromServer` derives from the column without querying — and
-        // no related row embedded over it.
-        expect(rows[0].user).toEqual({ __type: "relation", id: "100", path: "customers" });
+        // The foreign key, as a key, and no related row embedded over it.
+        expect(rows[0]).not.toHaveProperty("user");
         // One select: the base rows. No relation was loaded, so none was read.
         expect(selectCount()).toBe(1);
     });
