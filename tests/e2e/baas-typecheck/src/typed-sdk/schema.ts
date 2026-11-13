@@ -19,12 +19,12 @@ import { col, defineTable, rel } from "@rebasepro/types";
 
 export const authors = defineTable("authors", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         name: col.text().notNull(),
         passwordHash: col.text().private(),
         salary: col.integer().access({ read: ["hr"], write: ["hr"] }),
         computed: col.text().readOnly(),
-        createdAt: col.timestamptz().onCreateNow()
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow()
     },
     relations: {
         posts: rel.hasMany(() => posts, { foreignKey: "author_id" }),
@@ -37,7 +37,7 @@ export const authors = defineTable("authors", {
 
 export const profiles = defineTable("profiles", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         bio: col.text()
     },
     rls: "admin-only"
@@ -58,9 +58,9 @@ export const posts = defineTable("posts", {
         subtitle: col.text(),
         status: col.enum(["draft", "published"]),
         views: col.integer(),
-        tagsList: col.array(col.text()),
-        embedding: col.vector(3),
-        publishedAt: col.timestamptz()
+        tagsList: col.text().array(),
+        embedding: col.vector({ dimensions: 3 }),
+        publishedAt: col.timestamp({ withTimezone: true })
     },
     relations: {
         author: rel.belongsTo(() => authors, { localKey: "author_id" }),
@@ -79,7 +79,7 @@ export const posts = defineTable("posts", {
 
 export const orderItems = defineTable("order_items", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         sku: col.text().notNull(),
         quantity: col.integer()
     },
@@ -103,10 +103,10 @@ export const myNotes = defineTable("my_notes", {
  */
 export const comments = defineTable("comments", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         body: col.text().notNull(),
-        moderatorId: col.integer().column("moderator_id").private(),
-        reviewerId: col.integer().column("reviewer_id").readOnly()
+        moderatorId: col.integer("moderator_id").private(),
+        reviewerId: col.integer("reviewer_id").readOnly()
     },
     relations: {
         post: rel.belongsTo(() => posts, { localKey: "post_id", notNull: true }),

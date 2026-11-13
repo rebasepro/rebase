@@ -31,11 +31,11 @@ export const posts = defineTable("posts", {
         slug: col.text().unique(),
         status: col.enum(["draft", "published"]).default("draft"),
         views: col.integer().validate({ min: 0, integer: true }),
-        published_at: col.timestamptz().onUpdateNow(),
+        published_at: col.timestamp({ withTimezone: true }).onUpdateNow(),
         // A server-side guarantee, not a UI hint — must be core.
         password_hash: col.text().private(),
-        tags: col.array(col.text()),
-        embedding: col.vector(1536),
+        tags: col.text().array(),
+        embedding: col.vector({ dimensions: 1536 }),
         author_id: col.uuid()
     },
     relations: {
