@@ -4,7 +4,10 @@
  * Each project is copied to a temporary directory and migrated there — the
  * demo app (`app/`), every `rebase init` preset as `applyPreset` lays it out,
  * the cloud control plane (`saas/`, a private repository checked out beside
- * this one, skipped when absent) — and the SQL check must pass: the tables it
+ * this one, skipped when absent). The projects themselves are on the table
+ * model now, so each copy gets its frozen 0.30 `config/` (the plan-golden
+ * suites' `plan-corpus-legacy` copies) in place of its tables, and the run
+ * starts from that. The SQL check must pass: the tables it
  * writes render byte-identical DDL, policies, search, vector, triggers, views
  * and Drizzle schema. Nothing is ever written into the real trees; another
  * step applies the migration for real.
@@ -58,41 +61,91 @@ function tempCopy(label: string, from: string): string {
     return dir;
 }
 
-/** A scaffold of one preset, laid out the way `applyPreset` leaves it. */
-function templateProject(preset: "blog" | "ecommerce" | "blank"): string {
-    const dir = tempCopy(`template-${preset}`, path.join(REPO, "packages", "cli", "templates", "template"));
-    const collections = path.join(dir, "config", "collections");
-    const presets = path.join(collections, "presets");
-    if (preset !== "blog") {
-        for (const file of ["posts.ts", "authors.ts", "tags.ts", "index.ts"]) fs.rmSync(path.join(collections, file), { force: true });
-        for (const file of fs.readdirSync(path.join(presets, preset)).filter(name => name.endsWith(".ts"))) {
-            fs.copyFileSync(path.join(presets, preset, file), path.join(collections, file));
+/**
+ * The frozen legacy inputs: verbatim copies of `app/config` and of each CLI
+ * preset's `config/collections` as they stood at 7081747fad (0.30.1), kept by
+ * the plan-golden suite (see `legacy-model.ts` there for the two edits made to
+ * them). The live projects are on the table model now, so these are the only
+ * place the full codemod still has a real 0.30 project to migrate.
+ */
+const LEGACY = path.join(REPO, "packages", "server-postgres", "test", "fixtures", "plan-corpus-legacy");
+
+/**
+ * Copy a frozen `config/` into `<dir>/config`, with its imports of the frozen
+ * model (`../../legacy-model`, `../../../legacy-model`: they were written for
+ * their place in the fixture tree) repointed at `<dir>/legacy-model.ts`.
+ */
+function placeLegacyConfig(dir: string, from: string, legacyModel = path.join(LEGACY, "legacy-model.ts")): void {
+    fs.copyFileSync(legacyModel, path.join(dir, "legacy-model.ts"));
+    const config = path.join(dir, "config");
+    const walk = (source: string, target: string): void => {
+        fs.mkdirSync(target, { recursive: true });
+        for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+            const sourcePath = path.join(source, entry.name);
+            const targetPath = path.join(target, entry.name);
+            if (entry.isDirectory()) { walk(sourcePath, targetPath); continue; }
+            let relative = path.relative(path.dirname(targetPath), path.join(dir, "legacy-model"));
+            if (!relative.startsWith(".")) relative = `./${relative}`;
+            const text = fs.readFileSync(sourcePath, "utf8").replace(/(["'])(?:\.\.\/)+legacy-model\1/g, `$1${relative}$1`);
+            fs.writeFileSync(targetPath, text);
         }
-    }
-    fs.rmSync(presets, { recursive: true, force: true });
-    // The template is being moved onto the new layout in place, its blog
-    // outputs beside config/ until that is deleted: drop them, so every preset
-    // is migrated from its legacy files alone.
+    };
+    walk(from, config);
+}
+
+/** The layout's outputs, which a 0.30 project did not have: dropped so the run writes them. */
+function dropTableLayout(dir: string): void {
     for (const output of ["backend/schema", "backend/lib", "frontend/src/cms"]) fs.rmSync(path.join(dir, output), { recursive: true, force: true });
-    for (const moved of ["resources.ts", "storage.ts"]) {
-        if (fs.existsSync(path.join(dir, "config", moved))) fs.rmSync(path.join(dir, "backend", moved), { force: true });
-    }
+}
+
+/** The demo app at 0.30.1: today's project around it, its `config/` the frozen copy. */
+function legacyApp(): string {
+    const dir = tempCopy("app", path.join(REPO, "app"));
+    dropTableLayout(dir);
+    placeLegacyConfig(dir, path.join(LEGACY, "app"));
     return dir;
 }
 
-const TEMPLATE_IS_LEGACY = fs.existsSync(path.join(REPO, "packages", "cli", "templates", "template", "config", "collections"));
+/** A scaffold of one preset at 0.30.1: today's template around it, its `config/collections` the frozen preset. */
+function legacyTemplate(preset: "blog" | "ecommerce" | "blank"): string {
+    const dir = tempCopy(`template-${preset}`, path.join(REPO, "packages", "cli", "templates", "template"));
+    dropTableLayout(dir);
+    placeLegacyConfig(dir, path.join(LEGACY, "cli-template", preset));
+    return dir;
+}
 
-const PROJECTS: { name: string; dir: () => string; present: boolean }[] = [
-    { name: "app", dir: () => tempCopy("app", path.join(REPO, "app")), present: fs.existsSync(path.join(REPO, "app", "config", "collections")) },
-    { name: "template blog", dir: () => templateProject("blog"), present: TEMPLATE_IS_LEGACY },
-    { name: "template ecommerce", dir: () => templateProject("ecommerce"), present: TEMPLATE_IS_LEGACY },
-    { name: "template blank", dir: () => templateProject("blank"), present: TEMPLATE_IS_LEGACY },
-    { name: "saas", dir: () => tempCopy("saas", path.join(REPO, "saas")), present: fs.existsSync(path.join(REPO, "saas", "config", "collections")) }
+/**
+ * The control plane at its last 0.30 layout: today's `saas/` around it, its
+ * `config/collections` the frozen copy its own plan-golden suite keeps.
+ */
+const SAAS = path.join(REPO, "saas");
+const SAAS_LEGACY = path.join(SAAS, "test", "plan-corpus-legacy");
+function legacySaas(): string {
+    const dir = tempCopy("saas", SAAS);
+    dropTableLayout(dir);
+    placeLegacyConfig(dir, path.join(SAAS_LEGACY, "saas"), path.join(SAAS_LEGACY, "legacy-model.ts"));
+    return dir;
+}
+
+/**
+ * Every input but `saas` is in this repository, so a missing one is a failure,
+ * not a skip: a renamed fixture must not turn the only full run of the codemod
+ * on a real project into a silent no-op. `saas` is a private repository checked
+ * out beside this one; it is skipped only when the checkout is absent, and a
+ * checkout without its frozen copy fails, for the same reason.
+ */
+const PROJECTS: { name: string; input: string; dir: () => string; optional?: boolean }[] = [
+    { name: "app", input: path.join(LEGACY, "app", "collections"), dir: legacyApp },
+    { name: "template blog", input: path.join(LEGACY, "cli-template", "blog", "collections"), dir: () => legacyTemplate("blog") },
+    { name: "template ecommerce", input: path.join(LEGACY, "cli-template", "ecommerce", "collections"), dir: () => legacyTemplate("ecommerce") },
+    { name: "template blank", input: path.join(LEGACY, "cli-template", "blank", "collections"), dir: () => legacyTemplate("blank") },
+    { name: "saas", input: path.join(SAAS_LEGACY, "saas", "collections"), dir: legacySaas, optional: true }
 ];
 
 describe("the repository's projects migrate with byte-identical SQL", () => {
     for (const project of PROJECTS) {
-        it.skipIf(!project.present)(project.name, async () => {
+        it.skipIf(project.optional === true && !fs.existsSync(SAAS))(project.name, async () => {
+            expect(fs.existsSync(project.input), `${project.name}: its legacy input ${path.relative(REPO, project.input)} is missing`).toBe(true);
             const dir = project.dir();
             const report = await migrateCollectionsToTables({ projectRoot: dir, force: true, moduleAliases: ALIASES });
             const summary = {
