@@ -55,13 +55,13 @@ const posts = defineTable("posts", {
         seo: col.jsonb(json.object({ title: json.string(), canonical: json.string(), level: json.string().oneOf(["low", "high"]) })),
         status: col.enum(["draft", "needs_review", "published", "archived"]).notNull().default("draft"),
         priority: col.integer().oneOf([1, 2, 3]),
-        labels: col.array(col.text().oneOf(["hot", "cold"])),
+        labels: col.text({ enum: ["hot", "cold"] }).array(),
         views: col.integer(),
         featured: col.boolean(),
-        publishDate: col.timestamptz(),
+        publishDate: col.timestamp({ withTimezone: true }),
         orgId: col.uuid(),
         firestoreDocId: col.text(),
-        createdAt: col.timestamptz().notNull().onCreateNow(),
+        createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
         __order: col.text()
     },
     relations: {
@@ -314,8 +314,8 @@ const orderLines = defineTable("order_lines", {
 const orders = defineTable("orders", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
-        total: col.numeric(10, 2),
-        placedAt: col.timestamptz()
+        total: col.numeric({ precision: 10, scale: 2 }),
+        placedAt: col.timestamp({ withTimezone: true })
     },
     relations: {
         customer: rel.belongsTo(() => customers),
