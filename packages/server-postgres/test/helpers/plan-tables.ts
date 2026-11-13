@@ -8,7 +8,6 @@
  */
 import {
     compileSchema,
-    lowerTables,
     relationalCollections
 } from "@rebasepro/common";
 import {
@@ -166,12 +165,6 @@ function relationsOf(collection: LegacyCollectionConfig): { target: () => Legacy
  */
 export function planCollections(collections: readonly LegacyCollectionConfig[], options?: PlanOptions): SchemaPlan {
     return planSchema(compileSet(collections), options);
-}
-
-/** A legacy set lifted and lowered back: the collections the legacy planner input was. */
-export function lowerSet(collections: readonly LegacyCollectionConfig[]): PostgresCollectionConfig[] {
-    const { defs, defaultRls } = liftSet(collections);
-    return lowerTables(defs, defaultRls ? { defaultRls } : {});
 }
 
 /**

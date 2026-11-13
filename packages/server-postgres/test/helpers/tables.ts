@@ -2,7 +2,6 @@ import {
     SchemaDefinitionError,
     compileTable,
     compiledTable,
-    lowerTables,
     resolveCollectionRelations,
     type SchemaDefinitionProblem
 } from "@rebasepro/common";
@@ -15,7 +14,6 @@ import type {
     AnyViewDef,
     CompiledTable,
     DefaultRls,
-    PostgresCollectionConfig,
     SecurityRule,
     TableDescriptor,
     TableHooks
@@ -67,13 +65,11 @@ export interface FixtureTables {
     tables: CompiledTable[];
     /** Their descriptors, in the same order. */
     descriptors: TableDescriptor[];
-    /** The definitions lowered back into collections. Removed with the lowering (slice K8). */
-    collections: PostgresCollectionConfig[];
 }
 
 /**
- * Lift legacy fixture collections, compile them, and lower them again: the
- * `tables` a driver (or `openRebase`) takes beside its `collections`.
+ * Lift legacy fixture collections and compile them: the `tables` a driver (or
+ * `openRebase`) takes.
  *
  * A collection the lift refuses throws with the lift's reason; rewrite that
  * fixture as `defineTable`.
@@ -82,18 +78,11 @@ export function tablesFromCollections(
     collections: readonly (LegacyCollectionConfig | LegacyAnyCollectionConfig)[],
     options: { defaultSecurityRules?: readonly SecurityRule[] } = {}
 ): FixtureTables {
-    const { defs, defaultRls, tables } = compileFixtures(collections, options);
-    const descriptors = tables.map(table => table.descriptor);
-    const descriptorBySlug = new Map(descriptors.map(descriptor => [descriptor.slug, descriptor]));
-    const collectionsOut = lowerTables(defs, { ...(defaultRls ? { defaultRls } : {}), describe: slug => descriptorBySlug.get(slug) });
-    return { tables, descriptors, collections: collectionsOut };
+    const { tables } = compileFixtures(collections, options);
+    return { tables, descriptors: tables.map(table => table.descriptor) };
 }
 
-/**
- * Lift and compile fixture collections, without lowering them again: what a
- * registry needs. (Lowering follows every relation target it meets; a fixture
- * whose targets are factories building a new object per call would never end.)
- */
+/** Lift and compile fixture collections: what a registry needs. */
 function compileFixtures(
     collections: readonly (LegacyCollectionConfig | LegacyAnyCollectionConfig)[],
     options: { defaultSecurityRules?: readonly SecurityRule[] }

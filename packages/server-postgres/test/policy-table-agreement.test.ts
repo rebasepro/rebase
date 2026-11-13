@@ -21,6 +21,7 @@ import {
     getJunctionSecurityRules,
     getTableName,
     junctionPolicyTable,
+    lowerTables,
     policyTableFromDescriptor,
     policyTableResolver,
     resolveJunctionSpecs,
@@ -29,11 +30,17 @@ import {
     tableJunctionRules,
     type CompiledRulePolicy
 } from "@rebasepro/common";
-import type { SecurityRule } from "@rebasepro/types";
+import type { PostgresCollectionConfig, SecurityRule } from "@rebasepro/types";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { loadPlanCorpus, withPinnedPlannerWorld, type PlanCorpus } from "./helpers/plan-corpus";
-import { INPUT_ADJUSTMENTS, compileSet, lowerSet } from "./helpers/plan-tables";
+import { INPUT_ADJUSTMENTS, compileSet, liftSet } from "./helpers/plan-tables";
+
+/** A legacy set lifted and lowered back: the collections the legacy policy entry points read. */
+function lowerSet(collections: readonly LegacyCollectionConfig[]): PostgresCollectionConfig[] {
+    const { defs, defaultRls } = liftSet(collections);
+    return lowerTables(defs, defaultRls ? { defaultRls } : {});
+}
 
 const SWITCHES = { adminRole: true, adminRequestRole: true } as const;
 
