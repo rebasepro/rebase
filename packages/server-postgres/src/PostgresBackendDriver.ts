@@ -3476,7 +3476,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
             // key, a `_pivot` field). The service identity — what
             // `dataAsAdmin` and a hook nested in one run as — is the server
             // speaking, and is not held to them.
-            ...(user.uid === SERVICE_UID ? {} : { checkWrite: this.columnWriteCheck() })
+            ...(user?.uid === SERVICE_UID ? {} : { checkWrite: this.columnWriteCheck() })
         });
 
         // Delegate admin ops to the base driver (no RLS wrapping for admin)
