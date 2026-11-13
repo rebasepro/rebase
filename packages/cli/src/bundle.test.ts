@@ -877,7 +877,7 @@ file: "package.json" });
         write("backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
         write("backend/schema/index.ts", "export {};");
 
-        await expect(buildBundle({ projectRoot: scratch, appName: "backend", app: { type: "backend" }, runtimeRange: "^1" }))
+        await expect(buildBundle({ projectRoot: scratch, appName: "backend", app: { type: "backend", runtime: "managed" }, runtimeRange: "^1" }))
             .rejects.toThrow(/dotenv\n.*\^16\.0\.0 {2}\(package\.json\)\n.*\^17\.4\.2 {2}\(backend\/package\.json\)/);
         expect(fs.existsSync(path.join(scratch, "dist-bundle"))).toBe(false);
     });

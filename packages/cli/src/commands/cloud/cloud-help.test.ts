@@ -19,7 +19,7 @@
  * reached at all". A regression here does not look like wrong text; it looks
  * like a CI job hanging on a prompt.
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 
 // Every group module is mocked, so *any* call into one is a test failure rather
 // than a network request or a prompt. This is the assertion — the expectations
@@ -86,8 +86,7 @@ function allHandlers() {
         ...Object.values(link), ...Object.values(deploy), ...Object.values(projects),
         ...Object.values(resources), env.envCommand, databases.dbCommand, tokens.tokensCommand,
         context.requireProjectRef
-    ].filter((f): f is ReturnType<typeof vi.fn> =>
-        typeof f === "function" && "mock" in f && !PRINTERS.includes(f));
+    ].filter(f => vi.isMockFunction(f) && !PRINTERS.includes(f));
 }
 
 function argv(...tokens: string[]): string[] {
@@ -95,7 +94,7 @@ function argv(...tokens: string[]): string[] {
     return ["node", "rebase", "cloud", ...tokens];
 }
 
-let logSpy: ReturnType<typeof vi.spyOn>;
+let logSpy: MockInstance<typeof console.log>;
 
 beforeEach(() => {
     vi.clearAllMocks();

@@ -96,7 +96,7 @@ export default note;
 describe("summarisePortability", () => {
     it("says nothing when there is nothing to say", () => {
         expect(summarisePortability([
-            { name: "a", file: "f/a.ts", issues: [], portable: true }
+            { name: "a", file: "f/a.ts", issues: [], portable: true, resourceImports: [] }
         ])).toEqual([]);
         expect(summarisePortability([])).toEqual([]);
     });
@@ -106,15 +106,16 @@ describe("summarisePortability", () => {
             name: "a",
             file: "backend/functions/a.ts",
             issues: [{ kind: "module-scope-env", line: 3, message: "reads process.env at module scope.", actionable: true }],
-            portable: true
+            portable: true,
+            resourceImports: []
         }]);
         expect(lines.join("\n")).toContain("backend/functions/a.ts:3");
     });
 
     it("collapses Node-only functions to a count and their names", () => {
         const lines = summarisePortability([
-            { name: "reports", file: "f/reports.ts", issues: [{ kind: "node-builtin", line: 1, message: "x", actionable: false }], portable: false },
-            { name: "hello", file: "f/hello.ts", issues: [], portable: true }
+            { name: "reports", file: "f/reports.ts", issues: [{ kind: "node-builtin", line: 1, message: "x", actionable: false }], portable: false, resourceImports: [] },
+            { name: "hello", file: "f/hello.ts", issues: [], portable: true, resourceImports: [] }
         ]);
         expect(lines.join("\n")).toContain("1 of 2 function(s) depend on Node: reports");
     });

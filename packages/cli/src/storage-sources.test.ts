@@ -65,7 +65,8 @@ describe("rebase.json storage block", () => {
     it("omitting it is still the ordinary case", () => {
         const { manifest, issues } = validateManifest(base);
         expect(issues).toEqual([]);
-        expect(manifest?.storage).toBeUndefined();
+        expect(manifest).toBeDefined();
+        expect(manifest && "storage" in manifest).toBe(false);
     });
 });
 

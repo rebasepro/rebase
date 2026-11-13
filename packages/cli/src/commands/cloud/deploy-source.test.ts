@@ -460,7 +460,7 @@ describe("a deploy that builds its own bundle", () => {
             vi.mocked(buildBundle).mockImplementationOnce(async () => ({
                 outDir: bundleDir,
                 manifest: JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8")),
-                collectionCount: 0,
+                tableCount: 0,
                 vendor,
                 release: () => {}
             }));
@@ -544,7 +544,7 @@ describe("the build flags a deploy's remedies name", () => {
         vi.mocked(buildBundle).mockImplementationOnce(async () => ({
             outDir: bundleDir,
             manifest: JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8")),
-            collectionCount: 0,
+            tableCount: 0,
             vendor: { vendored: false, skipped: "the bundle declares no dependencies" },
             release: () => {}
         }));
@@ -1194,7 +1194,7 @@ describe("the syntax check before a static deploy", () => {
         vi.mocked(buildBundle).mockImplementationOnce(async () => ({
             outDir: bundleDir,
             manifest: JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8")),
-            collectionCount: 0,
+            tableCount: 0,
             vendor: { vendored: false, skipped: "the bundle declares no dependencies" },
             release: () => {}
         }));

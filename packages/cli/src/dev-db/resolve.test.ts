@@ -215,7 +215,7 @@ describe("describeDevDatabase", () => {
         expect(describeDevDatabase({ kind: "external", url: URL_A, source: "flag" })).toContain("--database-url");
         expect(describeDevDatabase({ kind: "external", url: URL_A, source: "environment" })).toContain("environment");
         expect(describeDevDatabase({ kind: "external", url: URL_A, source: "env-file" })).toContain(".env");
-        expect(describeDevDatabase({ kind: "docker", source: "docker" })).toContain("Docker");
+        expect(describeDevDatabase({ kind: "docker", source: "docker", url: null })).toContain("Docker");
         expect(describeDevDatabase({ kind: "managed", source: "managed" })).toContain("PGlite");
     });
 

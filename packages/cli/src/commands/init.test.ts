@@ -1462,10 +1462,11 @@ pm: "pnpm"
         // A boolean, not a named pair: "cms" was a product category rather than
         // a thing this tool builds, and "baas" was the manifest value that is
         // now derived from whether backend/schema declares tables.
-        expect((q as { choices: { value: boolean }[] }).choices.map((c) => c.value).sort())
+        if (q?.type !== "select") throw new Error(`"headless" should be a select, got ${q?.type}`);
+        expect(q.choices.map((c) => c.value).sort())
             .toEqual([false, true]);
         // Backend + admin is the safer thing to land on for someone unsure.
-        expect((q as { default: boolean }).default).toBe(false);
+        expect(q.default).toBe(false);
     });
 
     it("does not ask when --headless is given", () => {
