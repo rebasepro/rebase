@@ -1197,6 +1197,9 @@ importers:
 
   packages/inference:
     dependencies:
+      '@rebasepro/cms-types':
+        specifier: workspace:*
+        version: link:../cms-types
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../types
