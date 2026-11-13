@@ -41,9 +41,11 @@ interface BackendOptions {
     /** An answer to the source-only `/apply`. */
     apply?: () => Response;
     tablesSummary?: unknown;
+    /** `GET /unmapped-tables` and `GET /unmapped-tables/public/<table>`, by table. */
+    unmapped?: { list: unknown; described: Record<string, unknown> };
 }
 
-function backend({ live = false, apply, tablesSummary, sourceEditor = true, frontendApply }: BackendOptions = {}) {
+function backend({ live = false, apply, tablesSummary, sourceEditor = true, frontendApply, unmapped }: BackendOptions = {}) {
     const posted: Posted[] = [];
     global.fetch = fakeFetch(async (url, init) => {
         if (init?.method === "POST") posted.push({ url, body: JSON.parse(String(init.body)) });
@@ -71,6 +73,9 @@ function backend({ live = false, apply, tablesSummary, sourceEditor = true, fron
         }
         if (url.endsWith("/api/admin/schema-editor/frontend/apply")) return frontendApply ? frontendApply() : jsonResponse({ success: true, files: [] });
         if (url.endsWith("/api/admin/schema-editor/tables")) return jsonResponse(tablesSummary ?? { tables: [] });
+        if (unmapped && url.endsWith("/api/admin/schema-editor/unmapped-tables")) return jsonResponse(unmapped.list);
+        const describedTable = /\/api\/admin\/schema-editor\/unmapped-tables\/public\/(\w+)$/.exec(url)?.[1];
+        if (unmapped && describedTable) return jsonResponse({ table: unmapped.described[describedTable] });
         if (url.endsWith("/api/admin/schema-editor/apply")) return apply ? apply() : jsonResponse({ success: true, files: [], tables: [] });
         return jsonResponse({}, { status: 404 });
     });
@@ -405,14 +410,14 @@ describe("a Firestore collection, defined in the frontend", () => {
     it("a refusal of the source editor reaches the editor with its code", async () => {
         backend({
             frontendApply: () => jsonResponse({
-                error: { code: "SCHEMA_EDIT_REFUSED", message: "frontend/src/cms/events.ts changed since the edit was prepared.", details: { problems: [] } }
-            }, { status: 400 })
+                error: { code: "SCHEMA_EDIT_STALE_FILE", message: "frontend/src/cms/events.ts changed since the edit was prepared.", details: { problems: [] } }
+            }, { status: 409 })
         });
         harness([events()]);
         await waitFor(() => expect(controller.frontendCollectionsEditable).toBe(true));
         const error = await run(() => controller.updateCollection({ id: "fs_events", collectionData: { name: "Live events" } }));
         expect(error).toBeInstanceOf(SchemaEditRefused);
-        expect(String(error)).toMatch(/changed since the edit was prepared/);
+        expect(error).toMatchObject({ code: "SCHEMA_EDIT_STALE_FILE" });
     });
 
     it("is read-only in production: no source editor writes the frontend", async () => {
@@ -434,5 +439,66 @@ describe("a Firestore collection, defined in the frontend", () => {
         expect(error).toMatchObject({ code: "EXTERNAL_COLLECTION" });
         expect(String(error)).toMatch(/externalCollections/);
         expect(frontendPosts(posted)).toEqual([]);
+    });
+});
+
+describe("importing an existing table", () => {
+    /** As `GET …/unmapped-tables/public/comments` describes it: RLS off, so raised to "admin-only". */
+    const comments = table("comments", {
+        columns: [
+            uuidId(),
+            column("body", { kind: "text" }, { nullable: false }),
+            column("score", { kind: "numeric", precision: 10, scale: 2 }),
+            column("authorId", { kind: "uuid" }, { column: "author_id", foreignKeyOf: "author" })
+        ],
+        relations: [{ name: "author", kind: "belongsTo", target: "users", cardinality: "one", localKey: "author_id", localField: "authorId", index: true, constraint: true }],
+        rls: { posture: "admin-only", rules: [], defaultPolicies: true }
+    });
+    const rlsRaised = "Row-level security is off on \"comments\", so today every request reaches every row. It is imported as \"admin-only\".";
+    const unmapped = {
+        list: { tables: [{ schema: "public", table: "comments", rlsEnabled: false, policies: 0 }] },
+        described: { comments: { schema: "public", table: "comments", rlsEnabled: false, policies: 0, descriptor: comments, rlsRaised, notes: [] } }
+    };
+
+    it("lists the tables the schema editor offers, and opens one projected as a served table", async () => {
+        backend({ unmapped });
+        harness([project(posts)]);
+        let listed: unknown;
+        await run(async () => { listed = await controller.listUnmappedTables?.(); });
+        expect(listed).toEqual([{ schema: "public", table: "comments", rlsEnabled: false, policies: 0, notes: [] }]);
+
+        let imported: Awaited<ReturnType<NonNullable<CollectionsConfigController["describeUnmappedTable"]>>> | undefined;
+        await run(async () => { imported = await controller.describeUnmappedTable?.("public", "comments"); });
+        expect(imported?.table.rlsRaised).toBe(rlsRaised);
+        expect(imported?.descriptor).toEqual(comments);
+        // The same projection a served table gets: its foreign key a relation to the served `users`.
+        const asData = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
+        expect(asData(imported?.collection)).toEqual(asData(collectionFromTable(comments, { tables: [...all, comments] })));
+        expect(imported?.collection.properties.author).toMatchObject({ type: "relation" });
+    });
+
+    it("saves an adoption of its description, then the person's edits, as one edit", async () => {
+        const posted = backend({ unmapped });
+        const { saved, presentation } = writer();
+        harness([project(posts)], { presentation });
+        const projected = collectionFromTable(comments, { tables: [...all, comments] });
+        const after = { ...projected, name: "Reader comments", description: "What readers wrote." };
+        await run(() => controller.saveCollection({ id: "comments", collectionData: after, adopting: comments }));
+
+        const apply = posted.find(p => p.url.endsWith("/api/admin/schema-editor/apply"));
+        expect(apply?.body).toEqual({
+            patches: [
+                { op: "adoptTable", table: comments },
+                { op: "setOption", table: "comments", option: "description", value: "What readers wrote." }
+            ]
+        });
+        expect(saved).toEqual([{ slug: "comments", delta: { name: "Reader comments" } }]);
+    });
+
+    it("adopts it unchanged when the person changed nothing", async () => {
+        const posted = backend({ unmapped });
+        harness([project(posts)]);
+        await run(() => controller.saveCollection({ id: "comments", collectionData: collectionFromTable(comments, { tables: [...all, comments] }), adopting: comments }));
+        expect(posted.find(p => p.url.endsWith("/api/admin/schema-editor/apply"))?.body).toEqual({ patches: [{ op: "adoptTable", table: comments }] });
     });
 });

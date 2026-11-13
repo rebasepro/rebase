@@ -9,7 +9,7 @@ import {
     UpdateKanbanColumnsOrderParams,
     TableSourceInfo
 } from "./types/config_controller";
-import type { TableDescriptor, TablePatch, UiTablePreferences } from "@rebasepro/types";
+import type { TableDescriptor, TablePatch, UiTablePreferences, UnmappedTable } from "@rebasepro/types";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { AdminCollection, AdminPostgresCollection } from "@rebasepro/cms-types";
@@ -74,6 +74,34 @@ interface TableSourceSummary {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** A table description as the wire carries it: checked for the fields the projector and the adoption read. */
+function isTableDescriptor(value: unknown): value is TableDescriptor {
+    return isRecord(value)
+        && typeof value.name === "string"
+        && typeof value.slug === "string"
+        && typeof value.table === "string"
+        && typeof value.schema === "string"
+        && Array.isArray(value.columns)
+        && Array.isArray(value.relations)
+        && Array.isArray(value.primaryKey)
+        && isRecord(value.rls);
+}
+
+/** One table of `GET …/unmapped-tables`, or of `…/unmapped-tables/:schema/:table` with its description. */
+function readUnmappedTable(value: unknown): UnmappedTable | undefined {
+    if (!isRecord(value) || typeof value.schema !== "string" || typeof value.table !== "string") return undefined;
+    return {
+        schema: value.schema,
+        table: value.table,
+        rlsEnabled: value.rlsEnabled === true,
+        policies: typeof value.policies === "number" ? value.policies : 0,
+        ...(isTableDescriptor(value.descriptor) ? { descriptor: value.descriptor } : {}),
+        ...(typeof value.rlsRaised === "string" ? { rlsRaised: value.rlsRaised } : {}),
+        ...(typeof value.unimportable === "string" ? { unimportable: value.unimportable } : {}),
+        notes: Array.isArray(value.notes) ? value.notes.filter((note): note is string => typeof note === "string") : []
+    };
+}
 
 function readSummaries(body: unknown): TableSourceSummary[] {
     if (!isRecord(body) || !Array.isArray(body.tables)) return [];
@@ -400,6 +428,13 @@ export function useLocalCollectionsConfigController(
         await refreshFrontendCalls();
     };
 
+    /** A table being imported, projected as the served tables are, its relations resolved among them. */
+    const projectedImport = async (descriptor: TableDescriptor): Promise<AdminCollection> => {
+        const { collectionFromTable } = await import("../tables/project_table");
+        const served = (optionsRef.current?.tables ?? []).filter(table => table.slug !== descriptor.slug);
+        return collectionFromTable(descriptor, { tables: [...served, descriptor] });
+    };
+
     /** Write one split edit: the schema first, then — once the schema took — the presentation. */
     const commit = async (edit: SplitEdit): Promise<void> => {
         if (edit.detachesInheritedRules) await detach.confirm(edit.table);
@@ -407,15 +442,22 @@ export function useLocalCollectionsConfigController(
         await writePresentation(edit.table, edit.presentation);
     };
 
-    const save = async (slug: string, after: AdminCollection, before?: AdminCollection): Promise<void> => {
+    const save = async (slug: string, after: AdminCollection, before?: AdminCollection, adopting?: TableDescriptor): Promise<void> => {
+        // Loaded with the first save: the boot path of every admin session
+        // builds this controller, and most sessions never save a table.
+        if (adopting) {
+            // The person's edits are what changed from the table's projection.
+            const { splitEdit } = await import("./split_edit");
+            const projected = before ?? await projectedImport(adopting);
+            await commit(splitEdit({ before: projected, after, table: adopting, adopt: true }));
+            return;
+        }
         const loaded = before ?? findCollection(slug);
         if ((loaded ?? after).engine === "firestore") {
             await saveFirestore(slug, after, loaded);
             return;
         }
         assertTable(loaded, slug);
-        // Loaded with the first save: the boot path of every admin session
-        // builds this controller, and most sessions never save a table.
         const { splitEdit } = await import("./split_edit");
         await commit(splitEdit({ before: loaded, after, table: tablesBySlug.get(slug) }));
     };
@@ -493,8 +535,8 @@ export function useLocalCollectionsConfigController(
         ),
         getCollection: (id: string) => currentOf(id),
 
-        saveCollection: async ({ id, collectionData, baseline }: SaveCollectionParams) => {
-            await save(id, collectionData, baseline);
+        saveCollection: async ({ id, collectionData, baseline, adopting }: SaveCollectionParams) => {
+            await save(id, collectionData, baseline, adopting);
         },
         // `collectionData` is a partial: the keys it names, set over the
         // collection as it is.
@@ -529,6 +571,20 @@ export function useLocalCollectionsConfigController(
         },
         applyTablePatches: async (table: string, patches: TablePatch[]) => {
             await writeSchema(table, patches);
+        },
+
+        listUnmappedTables: async () => {
+            const body = await request("GET", "/unmapped-tables");
+            const listed = isRecord(body) && Array.isArray(body.tables) ? body.tables : [];
+            return listed.flatMap(table => readUnmappedTable(table) ?? []);
+        },
+
+        describeUnmappedTable: async (schema: string, table: string) => {
+            const body = await request("GET", `/unmapped-tables/${encodeURIComponent(schema)}/${encodeURIComponent(table)}`);
+            const found = isRecord(body) ? readUnmappedTable(body.table) : undefined;
+            const descriptor = found?.descriptor;
+            if (!found || !descriptor) throw new Error(`The schema editor did not describe "${schema}"."${table}".`);
+            return { table: found, descriptor, collection: await projectedImport(descriptor) };
         },
 
         saveProperty: async ({ path, propertyKey, property, newPropertiesOrder }: SavePropertyParams) => {

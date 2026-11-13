@@ -1,12 +1,11 @@
 import { useUrlController } from "./_cms_internals";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Entity, Property, TableMetadata, User } from "@rebasepro/types";
+import { Entity, Property, UnmappedTable, User } from "@rebasepro/types";
 import { deepEqual as equal } from "fast-equals";
 
-import { CollectionsConfigController } from "./types/config_controller";
-import { useCustomizationController, useRebaseContext, useAuthController, useSnackbarController, useBridgeRegistration } from "@rebasepro/app";
+import { CollectionsConfigController, ImportedTable } from "./types/config_controller";
+import { useCustomizationController, useAuthController, useSnackbarController, useBridgeRegistration } from "@rebasepro/app";
 import type { StudioSchemaEditing } from "@rebasepro/app";
-import { getTableName } from "@rebasepro/common";
 import { useNavigate } from "react-router";
 import { CollectionEditorController } from "./types/collection_editor_controller";
 import { CollectionInference } from "./types/collection_inference";
@@ -64,10 +63,10 @@ export const ConfigControllerProvider = React.memo(
         generateCollection
     }: ConfigControllerProviderProps & { children?: React.ReactNode }) {
 
-        // Internal: fetch unmapped tables and table columns from the data source
-        const { databaseAdmin } = useRebaseContext();
         const authController = useAuthController();
-        const [unmappedTables, setUnmappedTables] = useState<string[]>([]);
+        /** The database's tables no declared table maps, as the schema editor lists them. */
+        const [unmapped, setUnmapped] = useState<UnmappedTable[]>([]);
+        const unmappedTables = useMemo(() => unmapped.filter(table => !table.unimportable).map(table => table.table), [unmapped]);
 
         /**
          * Studio's writers, routed through the same plan/apply dialog the
@@ -92,9 +91,13 @@ export const ConfigControllerProvider = React.memo(
         }, [collectionConfigController]);
         useBridgeRegistration("schemaEditing", schemaEditing);
 
-        const onFetchTableMetadata = useCallback(async (tableName: string): Promise<TableMetadata | undefined> => {
-            return databaseAdmin?.fetchTableMetadata?.(tableName) as Promise<TableMetadata | undefined>;
-        }, [databaseAdmin]);
+        /** One unmapped table as introspection describes it: what "Import an existing table" adopts. */
+        const onDescribeUnmappedTable = useCallback(async (tableName: string): Promise<ImportedTable | undefined> => {
+            const describe = collectionConfigController.describeUnmappedTable;
+            const listed = unmapped.find(table => table.table === tableName);
+            if (!describe || !listed) return undefined;
+            return describe(listed.schema, listed.table);
+        }, [collectionConfigController, unmapped]);
 
         const urlController = useUrlController();
         const navigate = useNavigate();
@@ -128,14 +131,14 @@ export const ConfigControllerProvider = React.memo(
          * tables, for a list most sessions never see.
          */
         const newCollectionDialogOpen = Boolean(currentDialog?.isNewCollection);
+        const listUnmappedTables = collectionConfigController.listUnmappedTables;
         useEffect(() => {
             if (!newCollectionDialogOpen) return;
-            if (!databaseAdmin?.fetchUnmappedTables || authController.initialLoading || !authController.user) return;
-            const existingPaths = (collectionConfigController.collections ?? []).map(c => getTableName(c) ?? "").filter(Boolean);
-            databaseAdmin.fetchUnmappedTables(existingPaths)
-                .then((tables: string[]) => setUnmappedTables(tables))
+            if (!listUnmappedTables || authController.initialLoading || !authController.user) return;
+            listUnmappedTables()
+                .then(tables => setUnmapped(tables))
                 .catch((e: unknown) => console.warn("Could not fetch unmapped tables:", e));
-        }, [newCollectionDialogOpen, databaseAdmin, authController.initialLoading, authController.user, collectionConfigController.collections]);
+        }, [newCollectionDialogOpen, listUnmappedTables, authController.initialLoading, authController.user]);
 
         const [currentPropertyDialog, setCurrentPropertyDialog] = React.useState<{
             propertyKey?: string,
@@ -294,7 +297,7 @@ parentEntityIds,
                 generateCollection,
                 onAnalyticsEvent,
                 unmappedTables,
-                onFetchTableMetadata,
+                onDescribeUnmappedTable,
                 handleClose: (collection?: AdminCollection) => {
                     if (currentDialog?.redirect) {
                         if (collection && currentDialog?.isNewCollection && !currentDialog.parentCollectionSlugs.length) {
@@ -308,7 +311,7 @@ parentEntityIds,
         }, [
             currentDialog, collectionConfigController, collectionInference,
             getData, extraView, getUser, generateCollection,
-            onAnalyticsEvent, unmappedTables, onFetchTableMetadata,
+            onAnalyticsEvent, unmappedTables, onDescribeUnmappedTable,
             urlController, navigate
         ]);
 

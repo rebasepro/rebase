@@ -65,7 +65,7 @@ export {
 } from "./validateCollectionJson";
 
 export type {
-    CollectionsConfigController, DeleteCollectionParams, SaveCollectionParams, UpdateCollectionParams, CollectionsSetupInfo, UpdatePropertiesOrderParams, UpdateKanbanColumnsOrderParams
+    CollectionsConfigController, DeleteCollectionParams, SaveCollectionParams, UpdateCollectionParams, CollectionsSetupInfo, UpdatePropertiesOrderParams, UpdateKanbanColumnsOrderParams, ImportedTable
 } from "./types/config_controller";
 export type {
     CollectionEditorController

@@ -94,6 +94,13 @@ export interface SplitEditInput {
     after: AdminCollection;
     /** The table as the server serves it: the facts the view model cannot carry are kept from it. */
     table?: TableDescriptor;
+    /**
+     * `table` is not in `backend/schema` yet: it is the database's table as
+     * introspection described it ("Import an existing table"), and `before`
+     * its projection. The edit adopts it first (`adoptTable`), then makes the
+     * person's changes to it.
+     */
+    adopt?: true;
 }
 
 // ── Small helpers ───────────────────────────────────────────────────────────
@@ -542,12 +549,21 @@ function createTableWith(after: AdminCollection, columns: Record<string, WireCol
  * - Everything else the edit changed that is a preference key is the
  *   presentation delta. A new table's presentation is everything it states.
  *
+ * - Adopting a table the database has (`adopt`) is `adoptTable` with its
+ *   description, then the edit made to its projection.
+ *
  * @throws {@link SplitEditError} for a slug, table or database change, a
  *   property with no column equivalent, redacted rules, or a new table without
  *   a primary key.
  */
-export function splitEdit({ before, after, table }: SplitEditInput): SplitEdit {
+export function splitEdit({ before, after, table, adopt }: SplitEditInput): SplitEdit {
     const slug = before?.slug ?? after.slug;
+
+    if (adopt) {
+        if (!before || !table) throw new Error("Adopting a table needs its description and its projection.");
+        const edit = splitEdit({ before, after, table });
+        return { ...edit, schema: [{ op: "adoptTable", table }, ...edit.schema] };
+    }
 
     if (!before) {
         const presentation = tablePresentationOf(after);

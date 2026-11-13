@@ -65,13 +65,9 @@ function ProblemList({ problems }: { problems: readonly SchemaEditProblem[] }) {
     );
 }
 
-/**
- * The server refuses an apply whose file changed since the preview read it.
- * It says so in its message, under the general refusal code: matched by that
- * sentence until the server gives it a code of its own.
- */
+/** The server refuses an apply whose file changed on disk since the preview read it, with a code of its own. */
 function isStaleFile(error: SchemaEditRefused): boolean {
-    return error.code === "SCHEMA_EDIT_REFUSED" && /changed since the edit was prepared/.test(error.message);
+    return error.code === "SCHEMA_EDIT_STALE_FILE";
 }
 
 /** The problems a refusal names for one field, for drawing beside that field. */

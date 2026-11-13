@@ -1,5 +1,5 @@
 import type React from "react";
-import type { Property, TablePatch } from "@rebasepro/types";
+import type { Property, TableDescriptor, TablePatch, UnmappedTable } from "@rebasepro/types";
 import { NavigationGroupMapping, AdminCollection } from "@rebasepro/cms-types";
 
 export interface CollectionsSetupInfo {
@@ -70,6 +70,19 @@ export interface CollectionsConfigController {
     applyTablePatches?: (table: string, patches: TablePatch[]) => Promise<void>;
 
     /**
+     * The database's tables no declared table maps — what "Import an existing
+     * table" offers — as the schema editor lists them. Absent on a controller
+     * that does not write `backend/schema`.
+     */
+    listUnmappedTables?: () => Promise<UnmappedTable[]>;
+
+    /**
+     * One of those tables as introspection describes it, and projected as a
+     * served table is: what the editor opens to import it.
+     */
+    describeUnmappedTable?: (schema: string, table: string) => Promise<ImportedTable>;
+
+    /**
      * Update the properties order of a collection (used for column reordering).
      */
     updatePropertiesOrder: (params: UpdatePropertiesOrderParams) => Promise<void>;
@@ -92,6 +105,18 @@ export interface CollectionsConfigController {
      * controllers write without asking anybody.
      */
     dialog?: React.ReactNode;
+}
+
+/**
+ * A table the database has, read for "Import an existing table".
+ */
+export interface ImportedTable {
+    /** What introspection found, the description included (`rlsRaised` when its posture was raised to `"admin-only"`). */
+    table: UnmappedTable;
+    /** The table as introspection described it: what the save adopts (`SaveCollectionParams.adopting`). */
+    descriptor: TableDescriptor;
+    /** Its projection, as a served table's: what the editor opens, and the baseline the person's edits are made against. */
+    collection: AdminCollection;
 }
 
 /**
@@ -129,6 +154,14 @@ export type SaveCollectionParams<M extends Record<string, unknown> = Record<stri
      * Absent, the controller's own copy of the collection stands in for it.
      */
     baseline?: AdminCollection<M>,
+    /**
+     * The table this new collection adopts ("Import an existing table"), as
+     * introspection described it. The save writes the table's source from it
+     * (`adoptTable`) — so planning it changes nothing in the database — and
+     * then the changes the person made to its projection (`baseline`, or the
+     * projection itself when absent).
+     */
+    adopting?: TableDescriptor,
     previousId?: string,
     parentCollectionSlugs?: string[], parentEntityIds?: string[]
 }

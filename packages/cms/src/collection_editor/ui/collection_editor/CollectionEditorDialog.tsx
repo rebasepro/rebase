@@ -20,6 +20,7 @@ import { useSafeSnackbarController } from "../../useSafeSnackbarController";
 import { SchemaEditRefusalView } from "./SchemaEditRefusalView";
 import { ConfigControllerContext } from "../../ConfigControllerProvider";
 import {
+    Alert,
     ArrowLeftIcon,
     Button,
     CheckIcon,
@@ -36,7 +37,7 @@ import {
     Tooltip,
     Typography
 } from "@rebasepro/ui";
-import { EngineProperties, Entity, getDataSourceCapabilities, MapProperty, Properties, Property, TableMetadata, User } from "@rebasepro/types";
+import { EngineProperties, Entity, getDataSourceCapabilities, MapProperty, Properties, Property, User } from "@rebasepro/types";
 import { PropertyConfig, AdminCollection, isPropertyBuilder } from "@rebasepro/cms-types";
 import { removeInitialAndTrailingSlashes } from "@rebasepro/app";
 import { isSchemaChangeCancelled } from "../../liveSchemaClient";
@@ -44,7 +45,7 @@ import { CollectionEditorSchema } from "./CollectionYupValidation";
 import { GeneralSettingsForm } from "./GeneralSettingsForm";
 import { DisplaySettingsForm } from "./DisplaySettingsForm";
 import { CollectionPropertiesEditorForm } from "./CollectionPropertiesEditorForm";
-import { CollectionsConfigController } from "../../types/config_controller";
+import { CollectionsConfigController, ImportedTable } from "../../types/config_controller";
 import { CollectionEditorWelcomeView } from "./CollectionEditorWelcomeView";
 import { CollectionInference } from "../../types/collection_inference";
 import { buildEntityPropertiesFromData } from "@rebasepro/inference";
@@ -57,7 +58,7 @@ import { AICollectionGeneratorPopover } from "./AICollectionGeneratorPopover";
 import { AIModifiedPathsProvider, useAIModifiedPaths } from "./AIModifiedPathsContext";
 import { CollectionGenerationCallback, CollectionOperation } from "../../api/generateCollectionApi";
 import { CollectionRLSTab } from "./CollectionRLSTab";
-import { buildCollectionFromTableMetadata, getSubcollections, getTableName } from "@rebasepro/common";
+import { getSubcollections, getTableName } from "@rebasepro/common";
 import { mergeDeep, randomString, removeUndefined } from "@rebasepro/utils";
 import type { CollectionEditorExtensionProps, CollectionEditorTab } from "../../extensibility_types";
 
@@ -116,9 +117,10 @@ export interface CollectionEditorDialogProps extends CollectionEditorExtensionPr
      */
     unmappedTables?: string[];
     /**
-     * Callback to fetch column metadata for a table.
+     * One unmapped table as introspection describes it, projected: what
+     * "Import an existing table" opens, and adopts on save.
      */
-    onFetchTableMetadata?: (tableName: string) => Promise<TableMetadata | undefined>;
+    onDescribeUnmappedTable?: (tableName: string) => Promise<ImportedTable | undefined>;
 }
 
 export function CollectionEditorDialog(props: CollectionEditorDialogProps) {
@@ -374,7 +376,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     onAnalyticsEvent,
     fullScreen,
     unmappedTables,
-    onFetchTableMetadata,
+    onDescribeUnmappedTable,
     propertyTypePresets,
     hiddenPropertyTypes,
     renderExtraPropertyFields,
@@ -444,6 +446,8 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     }, [visibleTabs, currentView]);
 
     const [error, setError] = React.useState<Error | undefined>();
+    /** The database table this new collection imports, when it is one: saved as an adoption of its description. */
+    const [adopting, setAdopting] = React.useState<ImportedTable | undefined>();
 
     /**
      * `baseline` is what the form was loaded with: the controller saves the
@@ -457,6 +461,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
             id,
             collectionData: updatedCollection,
             baseline: isNewCollection ? undefined : baseline,
+            ...(isNewCollection && adopting ? { adopting: adopting.descriptor } : {}),
             previousId: editedCollectionId,
             parentCollectionSlugs
         })
@@ -845,6 +850,11 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                         {currentView === "loading" &&
                             <CircularProgressCenter/>}
 
+                        {adopting?.table.rlsRaised && currentView !== "welcome" &&
+                            <div className="px-4 pt-4 sm:px-6">
+                                <Alert color="warning" size="small">{adopting.table.rlsRaised}</Alert>
+                            </div>}
+
                         {currentView === "extra_view" &&
                             usedPath &&
                             extraView?.View &&
@@ -859,14 +869,14 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                 generateCollection={generateCollection}
                                 onAnalyticsEvent={onAnalyticsEvent}
                                 unmappedTables={unmappedTables}
-                                onImportFromTable={onFetchTableMetadata ? async (tableName: string) => {
+                                onImportFromTable={onDescribeUnmappedTable ? async (tableName: string) => {
                                     try {
-                                        const columns = await onFetchTableMetadata!(tableName);
-                                        if (!columns) return;
-                                        const collectionData = buildCollectionFromTableMetadata(tableName, columns);
+                                        const imported = await onDescribeUnmappedTable(tableName);
+                                        if (!imported) return;
+                                        setAdopting(imported);
                                         formController.setValues({
                                             ...formController.values,
-                                            ...collectionData
+                                            ...imported.collection
                                         } as AdminCollection<M>);
                                         onWelcomeScreenContinue();
                                     } catch (e: unknown) {
