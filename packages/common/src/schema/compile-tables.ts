@@ -539,6 +539,13 @@ function compileOne(
                         refuse(`the pivot column "${key}" is not a \`col.*\` builder.`, relationName);
                         continue;
                     }
+                    if (builder.def.primaryKey) {
+                        refuse(
+                            `the pivot column "${key}" is marked \`.primaryKey()\`. The junction's key is its two link ` +
+                            "columns, which Rebase declares; a pivot column is payload the link carries. Drop `.primaryKey()`.",
+                            relationName
+                        );
+                    }
                     const column = deriveColumnName(key, builder.def);
                     // A payload column on a key column is not planned today; it
                     // is not described either.

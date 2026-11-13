@@ -579,6 +579,126 @@ describe("compileTables — refusals", () => {
         });
     });
 
+    // What the lowering (`lowerTables`, deleted) refused and the compiler
+    // accepted until it was moved here: each would compile and boot.
+    describe("refusals moved from the lowering", () => {
+        it("refuses a JSON document, a geopoint, a vector, binary data or a list as a key; a custom scalar may key", () => {
+            const t = table("t", {
+                doc: rawColumn({ type: { kind: "jsonb" }, primaryKey: true, notNull: true }),
+                point: rawColumn({ type: { kind: "jsonb" }, semantic: "geopoint", primaryKey: true, notNull: true }),
+                embedding: rawColumn({ type: { kind: "vector", dimensions: 3 }, primaryKey: true, notNull: true }),
+                bytes: rawColumn({ type: { kind: "bytea" }, primaryKey: true, notNull: true }),
+                tags: rawColumn({ type: { kind: "array", of: { kind: "text" } }, primaryKey: true, notNull: true }),
+                nets: rawColumn({ type: { kind: "other", sqlType: "inet[]" }, primaryKey: true, notNull: true })
+            });
+            const problems = problemsOf([t]);
+            expect(problems.map(p => p.key)).toEqual(["doc", "point", "embedding", "bytes", "tags", "nets"]);
+            expect(problems[0]).toEqual({ table: "t", key: "doc", message: expect.stringContaining("a `jsonb` column cannot be part of the key") });
+            expect(problems[1].message).toContain("a geopoint column cannot be part of the key");
+            for (const problem of problems) expect(problem.message).toContain("Key the table on such a column");
+            expect(problemsOf([table("c", { email: col.custom({ dataType: "citext" }).primaryKey() })])).toEqual([]);
+        });
+
+        it("refuses an array of documents, vectors, bytes, points or a custom type, naming what to write", () => {
+            const t = table("t", {
+                id: id(),
+                docs: rawColumn({ type: { kind: "array", of: { kind: "jsonb" } } }),
+                embeddings: rawColumn({ type: { kind: "array", of: { kind: "vector", dimensions: 3 } } }),
+                blobs: rawColumn({ type: { kind: "array", of: { kind: "bytea" } } }),
+                points: rawColumn({
+                    type: { kind: "array", of: { kind: "jsonb" } },
+                    element: { type: { kind: "jsonb" }, semantic: "geopoint", notNull: false, primaryKey: false, unique: false, readOnly: false, private: false }
+                }),
+                nets: rawColumn({ type: { kind: "array", of: { kind: "other", sqlType: "inet" } } })
+            });
+            const problems = problemsOf([t]);
+            expect(problems).toEqual([
+                { table: "t", key: "docs", message: expect.stringContaining("an array (`.array()`) of `jsonb` values") },
+                { table: "t", key: "embeddings", message: expect.stringContaining("of `vector(3)` values") },
+                { table: "t", key: "blobs", message: expect.stringContaining("of `bytea` values") },
+                { table: "t", key: "points", message: expect.stringContaining("of geopoints") },
+                { table: "t", key: "nets", message: expect.stringContaining("`col.custom({ dataType: \"inet[]\" })`") }
+            ]);
+            expect(problems[0].message).toContain("`col.jsonb(json.array(…))`");
+            expect(problemsOf([table("ok", { id: id(), tags: col.text().array(), nets: col.custom({ dataType: "inet[]" }) })])).toEqual([]);
+        });
+
+        it("refuses a validation rule the column's kind does not check — on the column, its items and its JSON shape", () => {
+            const t = table("t", {
+                id: id(),
+                flag: rawColumn({ type: { kind: "boolean" }, validate: { min: 1 } }),
+                count: rawColumn({ type: { kind: "integer" }, validate: { email: true } }),
+                day: rawColumn({ type: { kind: "date" }, validate: { positive: true } }),
+                tags: rawColumn({
+                    type: { kind: "array", of: { kind: "integer" } },
+                    validate: { matches: "x" },
+                    element: { type: { kind: "integer" }, validate: { url: true }, notNull: false, primaryKey: false, unique: false, readOnly: false, private: false }
+                }),
+                doc: rawColumn({
+                    type: { kind: "jsonb" },
+                    validate: { max: 3 },
+                    json: { kind: "object", fields: { n: { kind: "number", validate: { trim: true } } } }
+                })
+            });
+            expect(problemsOf([t])).toEqual([
+                { table: "t", key: "flag", message: expect.stringContaining("the column declares the validation rule `min`") },
+                { table: "t", key: "count", message: expect.stringContaining("the validation rule `email`, which a number does not check") },
+                { table: "t", key: "day", message: expect.stringContaining("the validation rule `positive`, which a date/time value does not check") },
+                { table: "t", key: "tags", message: expect.stringContaining("the column declares the validation rule `matches`, which a list does not check") },
+                { table: "t", key: "tags", message: expect.stringContaining("the array's items declare the validation rule `url`, which a number does not check") },
+                { table: "t", key: "doc", message: expect.stringContaining("the column declares the validation rule `max`") },
+                { table: "t", key: "doc", message: expect.stringContaining("\"n\" declares the validation rule `trim`, which a number does not check") }
+            ]);
+            const fine = table("fine", {
+                id: id(),
+                name: col.text().validate({ min: 1, email: true }),
+                list: col.jsonb(json.array(json.string().validate({ max: 3 })).validate({ minItems: 1 })),
+                ids: col.integer().validate({ min: 1 }).array().validate({ maxItems: 3 })
+            });
+            expect(problemsOf([fine])).toEqual([]);
+        });
+
+        it("refuses a column both private and access-ruled", () => {
+            const t = table("t", { id: id(), secret: rawColumn({ type: { kind: "text" }, private: true, access: { read: ["admin"] } }) });
+            expect(problemsOf([t])).toEqual([{
+                table: "t", key: "secret", message: expect.stringContaining("`.private()` and `.access()` contradict each other")
+            }]);
+        });
+
+        it("refuses a transform on a column and another on its JSON shape", () => {
+            const t = table("t", {
+                id: id(),
+                doc: rawColumn({
+                    type: { kind: "jsonb" },
+                    transform: { afterRead: value => value },
+                    json: { kind: "object", fields: {}, transform: { beforeSave: value => value } }
+                })
+            });
+            expect(problemsOf([t])).toEqual([{
+                table: "t", key: "doc", message: expect.stringContaining("a `.transform()` on the column and another on its JSON shape")
+            }]);
+        });
+
+        it("refuses a pivot column marked primaryKey", () => {
+            const tags = table("tags");
+            const posts = rawTable("posts", {
+                columns: { id: id() },
+                relations: { tags: rel.manyToMany(() => tags, { pivot: { rank: col.integer().primaryKey() } }) },
+                rls: "admin-only"
+            });
+            expect(problemsOf([tags, posts])).toEqual([{
+                table: "posts", key: "tags", message: expect.stringContaining("the pivot column \"rank\" is marked `.primaryKey()`")
+            }]);
+        });
+
+        it("refuses a col.custom() type that is not a type name, as the planner does", () => {
+            const t = table("t", { id: id(), bad: rawColumn({ type: { kind: "other", sqlType: "inet DEFAULT now" } }) });
+            expect(problemsOf([t])).toEqual([{
+                table: "t", key: "bad", message: expect.stringContaining("holds `default`, which starts a column clause")
+            }]);
+        });
+    });
+
     describe("views", () => {
         it("refuses a view with no query, roles on a plain view, indexes on a plain view, no key, and table-only options", () => {
             const v = rawView("v", {

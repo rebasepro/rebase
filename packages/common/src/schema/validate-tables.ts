@@ -1,6 +1,8 @@
 import type {
     ColumnDef,
     ColumnType,
+    ColumnValidation,
+    JsonShapeDef,
     PolicyExpression,
     PolicyOperand,
     SecurityRule
@@ -8,6 +10,7 @@ import type {
 import { columnTypeLabel } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 
+import { customSqlTypeProblem } from "./custom-sql-type";
 import type { SchemaDefinitionProblem } from "./errors";
 import { deriveEnumTypeName } from "./derive-names";
 
@@ -101,6 +104,25 @@ export function checkColumnDef(
             "timestamp beside it."
         );
     }
+    const keyProblem = def.primaryKey ? keyTypeProblem(def.type, def.semantic) : undefined;
+    if (keyProblem !== undefined) refuse(keyProblem);
+    if (def.private && def.access !== undefined) {
+        refuse(
+            "`.private()` and `.access()` contradict each other: a private column is never served to or written " +
+            "by a client, so access rules say nothing. Drop one of the two."
+        );
+    }
+    if (def.transform !== undefined && def.json?.transform !== undefined) {
+        refuse(
+            "declares a `.transform()` on the column and another on its JSON shape. They are the same hook on the " +
+            "same value, and only one would run: keep one of the two."
+        );
+    }
+    if (kind === "array") {
+        const elementProblem = arrayElementProblem(def.type.of, def.element?.semantic);
+        if (elementProblem !== undefined) refuse(elementProblem);
+    }
+    for (const problem of unsupportedRules(def)) refuse(problem);
     if (def.oneOf !== undefined && !ONE_OF_KINDS.has(kind)) {
         refuse(`\`.oneOf()\` takes a text or numeric column, and this one is \`${columnTypeLabel(def.type)}\`. Use \`col.enum([...])\` for a Postgres enum.`);
     }
@@ -153,6 +175,177 @@ function elementColumnModifiers(element: ColumnDef): string[] {
     return out;
 }
 
+/**
+ * The column types a key may have: the scalars a row is addressed by — in
+ * every URL, filter, cursor and foreign key. (`timestamptz` and `time` are
+ * scalars too, refused as keys with their own message.)
+ */
+const KEY_KINDS: ReadonlySet<ColumnType["kind"]> = new Set([
+    "text", "varchar", "char", "uuid", "enum",
+    "smallint", "integer", "bigint", "smallserial", "serial", "bigserial", "real", "doublePrecision", "numeric",
+    "boolean", "timestamptz", "date", "time"
+]);
+
+/** Whether a `col.custom()` type is an array type (`inet[]`, `text[3]`). */
+const isCustomArrayType = (sqlType: string): boolean => /\]\s*$/.test(sqlType);
+
+/**
+ * Why a column of this type cannot be (part of) a primary key, or `undefined`
+ * when it can.
+ *
+ * A row is addressed by its key as text, so a key is a scalar. A JSON
+ * document, a geopoint, a vector, binary data and a list are not; a
+ * `col.custom()` scalar (`citext`, `inet`) is served as the text the driver
+ * returns and may key a table, a custom list type may not.
+ *
+ * @param semantic The column's `semantic` (`"geopoint"` marks a point stored as `jsonb`).
+ *
+ * @group Schema
+ */
+export function keyTypeProblem(type: ColumnType, semantic?: ColumnDef["semantic"]): string | undefined {
+    const passThrough = type.kind === "other" && !isCustomArrayType(type.sqlType);
+    if (semantic !== "geopoint" && (KEY_KINDS.has(type.kind) || passThrough)) return undefined;
+    const label = semantic === "geopoint" ? "geopoint" : `\`${columnTypeLabel(type)}\``;
+    return (
+        `a ${label} column cannot be part of the key. A row is addressed by its key — in every URL, filter, ` +
+        "cursor and foreign key — so a key is a scalar: text, varchar, char, uuid, an enum, a number, a boolean " +
+        "or a date. Key the table on such a column (several make a composite key) and keep this one as an " +
+        "ordinary column."
+    );
+}
+
+/**
+ * Element types a Postgres array column does not take here: a JSON document
+ * or a vector is a list already, a `bytea` item would need a binary codec per
+ * element, and a `col.custom()` list is spelled as its own type. The planner
+ * refuses the same set.
+ */
+const NON_ELEMENT_KINDS: ReadonlySet<ColumnType["kind"]> = new Set(["json", "jsonb", "vector", "bytea", "other"]);
+
+/**
+ * Why an array column cannot hold items of this type, or `undefined` when it
+ * can. (An array of arrays is refused by the type check.)
+ *
+ * @param elementSemantic The item's `semantic` (`"geopoint"` for `col.geopoint().array()`).
+ *
+ * @group Schema
+ */
+export function arrayElementProblem(of: ColumnType, elementSemantic?: ColumnDef["semantic"]): string | undefined {
+    if (elementSemantic !== "geopoint" && !NON_ELEMENT_KINDS.has(of.kind)) return undefined;
+    if (of.kind === "other") {
+        return (
+            `\`.array()\` of \`col.custom({ dataType: ${JSON.stringify(of.sqlType)} })\` is not an array column Rebase plans. ` +
+            `Name the list type itself: \`col.custom({ dataType: ${JSON.stringify(`${of.sqlType}[]`)} })\`.`
+        );
+    }
+    const items = elementSemantic === "geopoint" ? "geopoints" : `\`${columnTypeLabel(of)}\` values`;
+    return (
+        `an array (\`.array()\`) of ${items} is not a Postgres array column Rebase reads and writes. An array ` +
+        "column holds scalars — text, uuid, numbers, booleans, dates, enums; a list of documents, points or " +
+        "vectors is `col.jsonb(json.array(…))`."
+    );
+}
+
+// ── Validation rules a column kind checks ───────────────────────────────────
+
+const STRING_RULES: ReadonlySet<string> = new Set(["requiredMessage", "min", "max", "length", "matches", "matchesFlags", "matchesMessage", "email", "url", "trim", "lowercase", "uppercase"]);
+const NUMBER_RULES: ReadonlySet<string> = new Set(["requiredMessage", "min", "max", "lessThan", "moreThan", "positive", "negative", "integer"]);
+const DATE_RULES: ReadonlySet<string> = new Set(["requiredMessage", "min", "max"]);
+const LIST_RULES: ReadonlySet<string> = new Set(["requiredMessage", "minItems", "maxItems", "uniqueItems"]);
+const BASE_RULES: ReadonlySet<string> = new Set(["requiredMessage"]);
+
+/** The `.validate()` rules a value of this Postgres type is checked by (besides `uniqueBy`, which `checkUniqueBy` owns). */
+function rulesOfType(type: ColumnType): ReadonlySet<string> {
+    switch (type.kind) {
+        case "text":
+        case "varchar":
+        case "char":
+        case "uuid":
+        case "enum":
+            return STRING_RULES;
+        case "smallint":
+        case "integer":
+        case "bigint":
+        case "smallserial":
+        case "serial":
+        case "bigserial":
+        case "real":
+        case "doublePrecision":
+        case "numeric":
+            return NUMBER_RULES;
+        case "timestamptz":
+        case "date":
+        case "time":
+            return DATE_RULES;
+        case "array":
+            return LIST_RULES;
+        default:
+            return BASE_RULES;
+    }
+}
+
+/** The rules a JSON shape node is checked by. */
+function rulesOfShape(node: JsonShapeDef): ReadonlySet<string> {
+    switch (node.kind) {
+        case "string": return STRING_RULES;
+        case "number": return NUMBER_RULES;
+        case "date": return DATE_RULES;
+        case "array": return LIST_RULES;
+        default: return BASE_RULES;
+    }
+}
+
+/**
+ * The `.validate()` rules declared where nothing checks them: on the column
+ * (by its kind — a JSON array column takes the list rules), on an array's
+ * items, and on every node of a JSON shape. `.validate()` is typed per kind,
+ * so such a rule is a definition built by hand or through a cast; served, it
+ * would read as a constraint the API never enforces.
+ */
+function unsupportedRules(def: ColumnDef): string[] {
+    const out: string[] = [];
+    const check = (rules: ColumnValidation | undefined, allowed: ReadonlySet<string>, where: string, verb = "declares"): void => {
+        for (const [rule, value] of Object.entries(rules ?? {})) {
+            if (value === undefined || rule === "uniqueBy" || allowed.has(rule)) continue;
+            out.push(
+                `${where} ${verb} the validation rule \`${rule}\`, which a ${describeRuleSet(allowed)} does not check. ` +
+                `Drop it, or move it to a column whose kind checks it.`
+            );
+        }
+    };
+    const columnRules = def.semantic === "geopoint"
+        ? BASE_RULES
+        : def.json?.kind === "array" ? LIST_RULES : rulesOfType(def.type);
+    check(def.validate, columnRules, "the column");
+    if (def.type.kind === "array" && def.element) check(def.element.validate, rulesOfType(def.type.of), "the array's items", "declare");
+    const visit = (node: JsonShapeDef, path: string): void => {
+        if ("validate" in node) check(node.validate, rulesOfShape(node), path === "" ? "the document" : `"${path}"`);
+        switch (node.kind) {
+            case "object":
+                for (const [field, child] of Object.entries(node.fields)) visit(child, path === "" ? field : `${path}.${field}`);
+                return;
+            case "array":
+                visit(node.of, path === "" ? "[]" : `${path}[]`);
+                return;
+            case "oneOf":
+                for (const [variant, child] of Object.entries(node.variants)) visit(child, path === "" ? variant : `${path}.${variant}`);
+                return;
+            default:
+                return;
+        }
+    };
+    if (def.json) visit(def.json, "");
+    return out;
+}
+
+const describeRuleSet = (rules: ReadonlySet<string>): string => {
+    if (rules === STRING_RULES) return "text value";
+    if (rules === NUMBER_RULES) return "number";
+    if (rules === DATE_RULES) return "date/time value";
+    if (rules === LIST_RULES) return "list";
+    return "value of this kind (it takes only `requiredMessage`)";
+};
+
 /** Problems in a column type itself: an enum with no or repeated values, a non-positive size. */
 function checkColumnType(table: string, key: string, type: ColumnType): SchemaDefinitionProblem[] {
     const problems: SchemaDefinitionProblem[] = [];
@@ -197,6 +390,17 @@ function checkColumnType(table: string, key: string, type: ColumnType): SchemaDe
                 refuse("`col.numeric(precision, scale)`: a scale needs a precision — `NUMERIC(p, s)` has no form without `p`.");
             }
             break;
+        case "other": {
+            const problem = customSqlTypeProblem(type.sqlType);
+            if (problem !== undefined) {
+                refuse(
+                    `\`col.custom({ dataType: ${JSON.stringify(type.sqlType)} })\`: that type name ${problem}. It is written into ` +
+                    "DDL verbatim, so it must be a Postgres type as `format_type` prints it — `inet`, `timestamp(3) without " +
+                    "time zone`, `geometry(Point, 4326)`, `inet[]` — and nothing after it."
+                );
+            }
+            break;
+        }
         case "array":
             if (type.of.kind === "array") {
                 refuse("an array of arrays is not supported. Use `col.jsonb()` for nested lists.");

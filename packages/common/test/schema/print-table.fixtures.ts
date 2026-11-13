@@ -171,7 +171,8 @@ export const kitchen = defineTable("kitchen_sink", {
         legacy: col.text("LegacyCol").dbDefault(),
         phone: col.text().validate({ matches: /^\+?[0-9 ]+$/, matchesMessage: "digits only", requiredMessage: "needed" }),
         caseless: col.text().validate({ matches: "^[a-z]+$", matchesFlags: "i", length: 8, uppercase: true }),
-        secret: col.text().private().access({ read: [], write: ["admin"] }),
+        secret: col.text().private(),
+        adminWritable: col.text().access({ read: [], write: ["admin"] }),
         visible: col.text().access({ read: ["admin", "editor"] }).readOnly(),
         doc: col.storage({
             source: "media",

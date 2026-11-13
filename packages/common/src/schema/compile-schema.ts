@@ -26,6 +26,8 @@ import type {
 import { isAuthTableDef, isColumnBuilder } from "@rebasepro/types";
 
 import { compileTables } from "./compile-tables";
+import { SchemaDefinitionError, type SchemaDefinitionProblem } from "./errors";
+import { keyTypeProblem } from "./validate-tables";
 import { tableDefsFromDescriptors, type TableDefsFromDescriptorsOptions } from "./descriptor-to-def";
 
 /**
@@ -75,6 +77,10 @@ export function compileSchema(
  * definition beside it is the one {@link tableDefsFromDescriptors} states for
  * it, so a reader of `def` sees the same table. Such a table declares no hooks.
  *
+ * A table keyed on a column no row can be addressed by — a JSON document,
+ * binary data, a vector, a list — is refused (a {@link SchemaDefinitionError}
+ * naming it), as a declared one is; introspection drops it with that reason.
+ *
  * @param options Passed to {@link tableDefsFromDescriptors}: introspection
  *   replaces each `rls` with `"admin-only"`, because Rebase generates no policy
  *   for a table it did not declare.
@@ -85,6 +91,15 @@ export function compileDescribedTables(
     descriptors: readonly TableDescriptor[],
     options: TableDefsFromDescriptorsOptions = {}
 ): CompiledTable[] {
+    const problems: SchemaDefinitionProblem[] = [];
+    for (const descriptor of descriptors) {
+        for (const column of descriptor.columns) {
+            if (!descriptor.primaryKey.includes(column.key)) continue;
+            const problem = keyTypeProblem(column.type, column.semantic);
+            if (problem !== undefined) problems.push({ table: descriptor.name, key: column.key, message: problem });
+        }
+    }
+    if (problems.length > 0) throw new SchemaDefinitionError(problems);
     const defs = tableDefsFromDescriptors(descriptors, options);
     return descriptors.map((descriptor, index) => ({ descriptor, def: defs[index] }));
 }
