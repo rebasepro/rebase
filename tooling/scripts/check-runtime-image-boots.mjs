@@ -94,13 +94,28 @@ if (!KEEP) cleanup.push(() => fs.rmSync(scratch, { recursive: true, force: true 
 
 const bundleDir = path.join(scratch, "dist-bundle");
 fs.mkdirSync(bundleDir, { recursive: true });
+// Bundle format 3, runtime contract 2: the schema is `backend/schema`, one
+// table. A format-2 manifest (`entry.server`) is refused at manifest read by a
+// 0.31 runtime, which is the corpus's assertion, not this gate's.
 fs.writeFileSync(path.join(bundleDir, "manifest.json"), JSON.stringify({
-    bundleFormat: 2,
+    bundleFormat: 3,
+    runtime: { range: "^1", contract: 2 },
     kind: "backend",
     app: "backend",
-    entry: { server: "index.js" },
+    entry: { tables: "backend/schema" },
+    tables: ["boot_check"],
     schemaVersion: "boot-check"
 }, null, 2));
+fs.mkdirSync(path.join(bundleDir, "backend", "schema"), { recursive: true });
+fs.writeFileSync(path.join(bundleDir, "backend", "schema", "index.js"), [
+    "import { defineTable, col } from \"@rebasepro/server/schema\";",
+    "console.log('[bundle] schema evaluated');",
+    "export const bootCheck = defineTable(\"boot_check\", {",
+    "    columns: { id: col.uuid().primaryKey().defaultRandom() },",
+    "    rls: \"admin-only\"",
+    "});",
+    ""
+].join("\n"));
 // A bundle with no dependencies: the install path is covered by
 // fetch-bundle.test.ts against real npm, and pulling from the registry here
 // would make this gate fail when npm is slow rather than when the image is
@@ -108,8 +123,6 @@ fs.writeFileSync(path.join(bundleDir, "manifest.json"), JSON.stringify({
 fs.writeFileSync(path.join(bundleDir, "package.json"), JSON.stringify({
     name: "boot-check-bundle", private: true, type: "module"
 }, null, 2));
-fs.writeFileSync(path.join(bundleDir, "index.js"),
-    "export default {};\nconsole.log('[bundle] entry evaluated');\n");
 
 const tarball = path.join(scratch, "bundle.tar.gz");
 execFileSync("tar", ["-czf", tarball, "-C", bundleDir, "."]);
