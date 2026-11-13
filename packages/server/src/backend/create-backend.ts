@@ -77,7 +77,7 @@ import { RestApiGenerator } from "../api/rest/api-generator";
 import { createAuthMiddleware } from "../auth/middleware";
 import { refuseUnhonouredImpersonation } from "../auth/impersonation";
 import { reportSimulatedContext } from "../auth/simulation";
-import { createAdapterAuthMiddleware } from "../auth/adapter-middleware";
+import { createAdapterAuthMiddleware, createAdapterCallerResolution } from "../auth/adapter-middleware";
 import { scopeDataDriver, SERVICE_IDENTITY } from "../auth/rls-scope";
 import { createBuiltinAuthAdapter } from "../auth/builtin-auth-adapter";
 import { withBackendServiceKey } from "../auth/adapter-service-key";
@@ -1952,6 +1952,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
      * private docs) takes the same list.
      */
     type SurfaceScopes = AdminScope | { read: AdminScope; write: AdminScope };
+    // Who is calling, asked of the auth adapter the data routes ask — one
+    // resolution for every surface that reads the caller (the admin gate,
+    // `/schema/tables`, the OpenAPI document), so a backend with its own
+    // adapter is not answered by a check of the framework's JWT it never
+    // configured. The built-in adapter makes the judgement the gate made
+    // before: the service key, then the token, revocation and live roles.
+    const callerResolution = authAdapter ? createAdapterCallerResolution(authAdapter) : undefined;
     /** `undefined` scopes: any signed-in caller, each route checking what it needs (UI preferences). */
     const adminGate = (scopes: SurfaceScopes | undefined): MiddlewareHandler<HonoEnv>[] => [
         // This backend's keys and roles judge the caller, wherever the gate is
@@ -1959,7 +1966,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         provideServices,
         ...(apiKeyPreAuth ? [apiKeyPreAuth] : []),
         platformTokenPreAuth,
-        createRequireAuth({ serviceKey: internalServiceKey, ...adminGateIdentity }),
+        callerResolution?.require ?? createRequireAuth({ serviceKey: internalServiceKey, ...adminGateIdentity }),
         ...(scopes === undefined ? [] : [typeof scopes === "string" ? requireScope(scopes) : requireScopeByMethod(scopes)])
     ];
     const applyAdminGate = (router: Hono<HonoEnv>, surface: string, scopes: SurfaceScopes | undefined, mountedWith: MountGroup = "admin"): void => {
@@ -3916,16 +3923,6 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // auth configured there is no caller to redact for, so it answers 404
         // SCHEMA_UNAVAILABLE (which the client and the CMS read as "no tables
         // served"). `auth.requireAuth: false` does not open it.
-        const verifyIfPresented: MiddlewareHandler<HonoEnv> = (() => {
-            const verify = createRequireAuth({ serviceKey: internalServiceKey, ...adminGateIdentity });
-            return async (c, next) => {
-                // A credential the pre-auths already resolved, or none at all:
-                // nothing to verify. Anything else is verified, and refused
-                // when it is not valid — a bad token is never read as anonymous.
-                if (c.get("user") || c.req.header("authorization") === undefined) return next();
-                return verify(c, next);
-            };
-        })();
         const publicTables = config.schemaTables?.public === true;
         if (publicTables && adminSurfacesGated) {
             logger.info(
@@ -3937,7 +3934,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             provideServices,
             ...(apiKeyPreAuth ? [apiKeyPreAuth] : []),
             platformTokenPreAuth,
-            verifyIfPresented
+            // A credential the pre-auths already resolved, or none at all, is
+            // let through; anything else is the adapter's to recognise, and a
+            // credential it does not is refused — never read as anonymous.
+            ...(callerResolution ? [callerResolution.identify] : [])
         ];
         schemaTablesSurface = createSchemaTablesRoutes({
             service: schemaTables,

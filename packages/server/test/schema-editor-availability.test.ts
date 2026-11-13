@@ -32,6 +32,9 @@ import { writeSchemaFixture } from "./helpers/schema-source-fixture";
  * stays mounted to say why it will not write.
  */
 
+/** The roles each account a test mints a token for holds in the account store. */
+const TEST_ACCOUNT_ROLES: Record<string, string[]> = { "admin-1": ["admin"], "editor-1": ["editor"] };
+
 const JWT_SECRET = "schema-editor-availability-test-secret-1234567890";
 
 function collection(slug: string): LegacyCollectionConfig {
@@ -52,7 +55,10 @@ function reportingBootstrapper(reports: LegacyCollectionConfig[] | undefined): B
         // Enough for the built-in auth adapter to be constructed. Nothing here
         // logs in — the JWTs are minted directly.
         async initializeAuth() {
-            return { userService: {}, authRepository: {} };
+            // The live roles the built-in adapter reads per request, as the
+            // data routes do: each test account holds the role its token names.
+            const authRepository = { getUserRoleIds: async (uid: string) => TEST_ACCOUNT_ROLES[uid] ?? [] };
+            return { userService: authRepository, authRepository };
         }
     });
 }

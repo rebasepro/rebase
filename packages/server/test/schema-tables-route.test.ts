@@ -163,8 +163,11 @@ function bootstrapper(introspected?: Introspected): BackendBootstrapper {
         async initializeDriver(): Promise<InitializedDriver> {
             return { driver: stubDriver(), tables: introspected?.tables ?? [], internals: {} };
         },
+        // The account store the built-in adapter reads a token's live roles
+        // from: each person holds the roles their token was minted with.
         async initializeAuth() {
-            return { userService: {}, authRepository: {} };
+            const authRepository = { getUserRoleIds: async (uid: string) => PERSON_ROLES.get(uid) ?? [] };
+            return { userService: authRepository, authRepository };
         }
     };
 }
@@ -189,7 +192,12 @@ async function boot(options: {
 }
 
 const bearer = (token: string, extra: Record<string, string> = {}) => ({ headers: { authorization: `Bearer ${token}`, ...extra } });
-const person = (roles: string[], uid = `u-${roles.join("-") || "member"}`) => generateAccessToken(uid, roles);
+/** The roles each minted person holds in the account store. */
+const PERSON_ROLES = new Map<string, string[]>();
+const person = (roles: string[], uid = `u-${roles.join("-") || "member"}`) => {
+    PERSON_ROLES.set(uid, roles);
+    return generateAccessToken(uid, roles);
+};
 
 async function tablesFor(app: Hono<HonoEnv>, init?: RequestInit): Promise<TableDescriptor[]> {
     const response = await app.request("/api/schema/tables", init);

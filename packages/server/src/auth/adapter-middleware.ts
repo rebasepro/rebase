@@ -20,7 +20,7 @@
  */
 
 import type { MiddlewareHandler, Context } from "hono";
-import type { DataDriver, AuthAdapter } from "@rebasepro/types";
+import type { DataDriver, AuthAdapter, AuthenticatedUser } from "@rebasepro/types";
 import { ANONYMOUS_USER_ID } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import type { ApiKeyStore } from "./api-keys/api-key-store";
@@ -66,6 +66,70 @@ export function adapterRefusal(error: unknown): ApiError {
     return error instanceof ApiError && error.statusCode >= 400 ? error : ApiError.unauthenticated("Unauthorized");
 }
 
+/** What {@link verifyWithAdapter} decided: who the caller is (`null`: nobody), or why they are refused. */
+export type AdapterVerdict = { user: AuthenticatedUser | null } | { refused: ApiError };
+
+/**
+ * Ask the backend's auth adapter who sent a request — the one place every door
+ * that reads "who is calling" asks it: the data and functions routers here, and
+ * the admin gate and the caller-described documents (`/schema/tables`, OpenAPI)
+ * through {@link createAdapterCallerResolution}. A throw is the adapter's
+ * refusal ({@link adapterRefusal}), never a 500.
+ */
+export async function verifyWithAdapter(adapter: AuthAdapter, c: Context<HonoEnv>): Promise<AdapterVerdict> {
+    try {
+        return { user: await adapter.verifyRequest(c.req.raw) };
+    } catch (error) {
+        // adapter.verifyRequest() threw — reject the request (fail closed).
+        return { refused: adapterRefusal(error) };
+    }
+}
+
+/** The request's `user` for an account the adapter recognised. */
+function requestUserOf(user: AuthenticatedUser): NonNullable<HonoEnv["Variables"]["user"]> {
+    return {
+        uid: user.uid,
+        email: user.email,
+        roles: user.roles,
+        isAnonymous: user.isAnonymous === true
+    };
+}
+
+/**
+ * The caller resolution of the surfaces outside the data plane, through the
+ * same adapter the data routes ask ({@link verifyWithAdapter}), so a backend
+ * with its own adapter is answered there as it is on `/data`.
+ *
+ * - `identify` sets `user` when the adapter recognises the request and lets a
+ *   request with no credential through as nobody; a credential that is
+ *   presented and not recognised is a 401, never read as anonymous.
+ * - `require` does the same and refuses nobody with a 401.
+ *
+ * A caller an earlier middleware already resolved (an `rk_` key, an `rpt_`
+ * platform token) is kept. Neither scopes the data driver, simulates or
+ * impersonates: these surfaces judge the caller's scopes, not rows.
+ */
+export function createAdapterCallerResolution(adapter: AuthAdapter): {
+    identify: MiddlewareHandler<HonoEnv>;
+    require: MiddlewareHandler<HonoEnv>;
+} {
+    const resolve = (required: boolean): MiddlewareHandler<HonoEnv> => async (c, next) => {
+        if (c.get("user")) return next();
+        const verdict = await verifyWithAdapter(adapter, c);
+        if ("refused" in verdict) return refuse(c, verdict.refused);
+        if (verdict.user) {
+            c.set("user", requestUserOf(verdict.user));
+            return next();
+        }
+        if (c.req.header("authorization") !== undefined) {
+            return refuse(c, ApiError.unauthenticated("Invalid or expired token"));
+        }
+        if (required) return refuse(c, ApiError.unauthenticated("Authorization header missing or invalid"));
+        return next();
+    };
+    return { identify: resolve(false), require: resolve(true) };
+}
+
 /**
  * Create a Hono middleware that uses an `AuthAdapter` for request verification.
  */
@@ -94,23 +158,13 @@ driver });
             }
         }
 
-        let authenticatedUser = null;
-
-        try {
-            authenticatedUser = await adapter.verifyRequest(c.req.raw);
-        } catch (error) {
-            // adapter.verifyRequest() threw — reject the request (fail closed).
-            return refuse(c, adapterRefusal(error));
-        }
+        const verdict = await verifyWithAdapter(adapter, c);
+        if ("refused" in verdict) return refuse(c, verdict.refused);
+        const authenticatedUser = verdict.user;
 
         if (authenticatedUser) {
             // Authenticated — set user context and scope driver
-            c.set("user", {
-                uid: authenticatedUser.uid,
-                email: authenticatedUser.email,
-                roles: authenticatedUser.roles,
-                isAnonymous: authenticatedUser.isAnonymous === true
-            });
+            c.set("user", requestUserOf(authenticatedUser));
             try {
                 c.set("driver", await scopeDataDriver(driver, {
                     uid: authenticatedUser.uid,
