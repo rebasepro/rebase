@@ -112,6 +112,18 @@ async function migrateWithShims(options: MigrateOptions, shimDir: ShimDir): Prom
     const configDir = path.resolve(root, manifest.configDir);
     const writes = !options.dryRun && !options.check;
 
+    // After the printed `git rm`: nothing left to read, and the tables are there.
+    // That is the end state, not an error — whichever mode asks.
+    const collectionsDir = path.join(configDir, "collections");
+    if (!fs.existsSync(collectionsDir) && fs.existsSync(path.join(root, SCHEMA_DIR))) {
+        report.status = "already-migrated";
+        report.notes.push({
+            file: toPosix(path.relative(root, collectionsDir)),
+            message: `is gone and ${toPosix(SCHEMA_DIR)} exists: the project is already migrated. There is nothing left to compare backend/schema with (--check reads config/collections; run it before the git rm line), and nothing to remove.`
+        });
+        return report;
+    }
+
     if (writes && !options.force) {
         const state = gitState(root);
         if (!state.clean) {

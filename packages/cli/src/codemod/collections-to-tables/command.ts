@@ -43,6 +43,8 @@ ${chalk.bold("Options")}
   --dry-run   Print the plan (files, refusals, manual steps) and write nothing. Start here.
   --check     On a project already migrated, before deleting config/: prove backend/schema still
               renders the same SQL as config/collections. Writes nothing; exits 1 with the diff if not.
+              After the git rm line (config/collections gone, backend/schema there) it reports
+              "already migrated" and exits 0.
   --json      One JSON document on stdout: files, refusals, notes, manual steps, the SQL check
   --force     Run on a dirty git tree, and replace output files that hold something else
               (an earlier run's output you edited). Without it, both are refused and nothing is written.
@@ -141,7 +143,9 @@ function printReport(report: MigrationReport): void {
             console.log(chalk.green("  Migrated. Review the diff, do the manual steps, then remove the legacy files:"));
             break;
         case "already-migrated":
-            console.log(chalk.green("  Already migrated: every file holds what the codemod would write, and the SQL matches. Remove the legacy files:"));
+            console.log(chalk.green(report.verification
+                ? "  Already migrated: every file holds what the codemod would write, and the SQL matches. Remove the legacy files:"
+                : "  Already migrated: config/collections is gone and backend/schema is in place. Nothing to check or remove."));
             break;
         case "checked":
             console.log(chalk.green("  The migrated schema matches config/collections. Remove the legacy files:"));

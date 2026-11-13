@@ -443,6 +443,26 @@ describe("modes", () => {
         expect(report.verification?.differences.find(difference => difference.output === "schema.sql")?.diff).toContain("NOT NULL");
     }, 180_000);
 
+    it("--check after the printed git rm says the project is already migrated, and exits 0", async () => {
+        const dir = materialize("typed");
+        const migrated = await run(dir);
+        expect(migrated.status).toBe("migrated");
+        const removed = (migrated.removeCommand ?? "").replace(/^git rm -r /, "").split(" ");
+        for (const target of removed) fs.rmSync(path.join(dir, target), { recursive: true, force: true });
+        const previous = process.exitCode;
+        const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+        try {
+            const report = await runCollectionsToTables({ check: true }, dir, ALIASES);
+            expect(report.refusals).toEqual([]);
+            expect(report.status).toBe("already-migrated");
+            expect(report.notes.map(entry => entry.message).join(" ")).toMatch(/already migrated/);
+            expect(process.exitCode ?? 0).toBe(0);
+        } finally {
+            process.exitCode = previous;
+            log.mockRestore();
+        }
+    }, 180_000);
+
     it("refuses a dirty git tree, and a directory that is not in git, unless --force", async () => {
         const dir = materialize("blog");
         const notGit = await run(dir, { force: false });
