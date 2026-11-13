@@ -43,7 +43,7 @@ const posts = defineTable("posts", {
         title: col.text().transform(trim).notNull(),
         secret: col.text().transform(mask),
         plain: col.text(),
-        tags: col.array(col.text().transform(tag)),
+        tags: col.text().transform(tag).array(),
         content: col.jsonb(json.object({
             seo: json.object({ title: json.string().transform(nestedTrim), untouched: json.string() }),
             blocks: json.array(json.oneOf({

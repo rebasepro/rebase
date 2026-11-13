@@ -17,7 +17,7 @@ const tasks = defineTable("tasks", {
     columns: {
         id: id(),
         assignee: col.uuid().userId(),
-        watchers: col.array(col.text().userId()),
+        watchers: col.text().userId().array(),
         meta: col.jsonb(json.object({ reviewer: json.string().userId(), note: json.string() })),
         title: col.text()
     },

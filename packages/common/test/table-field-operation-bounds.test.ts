@@ -15,9 +15,9 @@ const items = defineTable("items", {
         stock: col.integer().validate({ min: 0, max: 10, integer: true }),
         rating: col.doublePrecision().validate({ moreThan: 0, lessThan: 5, positive: true }),
         plain: col.integer(),
-        tags: col.array(col.text()).validate({ minItems: 1, maxItems: 3, uniqueItems: true }),
+        tags: col.text().array().validate({ minItems: 1, maxItems: 3, uniqueItems: true }),
         blocks: col.jsonb(json.array(json.string()).validate({ maxItems: 2 })),
-        unique: col.array(col.text()).validate({ uniqueItems: true }),
+        unique: col.text().array().validate({ uniqueItems: true }),
         title: col.text().validate({ min: 1, max: 80 }),
         meta: col.jsonb(json.object({ a: json.string() }))
     },

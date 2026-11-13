@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { col, defineTable, json } from "@rebasepro/types";
+import { col, defineTable, json, sql } from "@rebasepro/types";
 
 import { compileTables } from "../src/schema/compile-tables";
 import {
@@ -22,7 +22,7 @@ const accounts = defineTable("accounts", {
         active: col.boolean().default(true),
         currency: col.text().default("EUR"),
         region: col.text().dbDefault(),
-        slugged: col.text().defaultSql("lower('X')"),
+        slugged: col.text().default(sql`lower('X')`),
         note: col.text(),
         prefs: col.jsonb(json.object({
             notify: json.boolean().default(true),
@@ -33,8 +33,8 @@ const accounts = defineTable("accounts", {
             nested: json.object({ level: json.number().default(1), label: json.string() })
         })),
         plain: col.jsonb(json.object({ a: json.string(), b: json.number() })),
-        createdAt: col.timestamptz().onCreateNow(),
-        updatedAt: col.timestamptz().onUpdateNow(),
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow(),
+        updatedAt: col.timestamp({ withTimezone: true }).onUpdateNow(),
         createdBy: col.text().onCreateUser(),
         updatedBy: col.text().onUpdateUser(),
         audit: col.jsonb(json.object({

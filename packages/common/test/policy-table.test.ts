@@ -27,10 +27,10 @@ const tags = defineTable("tags", {
 const posts = defineTable("posts", {
     schema: "content",
     columns: {
-        id: col.integer().primaryKey().identity(),
-        title: col.text().column("headline"),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
+        title: col.text("headline"),
         score: col.numeric(),
-        views: col.bigint()
+        views: col.bigint({ mode: "number" })
     },
     relations: {
         org: rel.belongsTo(() => orgs),

@@ -11,7 +11,9 @@ import {
     type PostgresCollectionConfig,
     type RebaseCallContext,
     type SecurityRule,
-    type TableDescriptor
+    type TableDescriptor,
+    pgEnum,
+    sql
 } from "@rebasepro/types";
 
 import {
@@ -69,19 +71,23 @@ function refusal(run: () => unknown): string[] {
 }
 
 describe("lowerTables — columns", () => {
+    const sharedKindEnum = pgEnum("shared_kind", ["a"]);
+
+    const tCEnum = pgEnum("t_c", ["a"]);
+
     it.each<[string, Parameters<typeof lowerColumn>[0], unknown]>([
         ["text", col.text(), { type: "string" }],
         ["text notNull unique", col.text().notNull().unique(), { type: "string", validation: { required: true, unique: true } }],
-        ["varchar(n) carries n as `validation.max`", col.varchar(100), { type: "string", columnType: "varchar", validation: { max: 100 } }],
-        ["varchar() is 255, which the planner derives", col.varchar(), { type: "string", columnType: "varchar" }],
-        ["varchar(255) with an explicit max", col.varchar(255).validate({ max: 255 }), { type: "string", columnType: "varchar", validation: { max: 255 } }],
-        ["char(n)", col.char(3), { type: "string", columnType: "char", validation: { max: 3 } }],
-        ["varchar(n) keeps its own `max` as the API's rule", col.varchar(40).validate({ max: 20 }), { type: "string", columnType: "varchar", validation: { max: 20 } }],
+        ["varchar(n) carries n as `validation.max`", col.varchar({ length: 100 }), { type: "string", columnType: "varchar", validation: { max: 100 } }],
+        ["varchar() is 255, which the planner derives", col.varchar({ length: 255 }), { type: "string", columnType: "varchar" }],
+        ["varchar(255) with an explicit max", col.varchar({ length: 255 }).validate({ max: 255 }), { type: "string", columnType: "varchar", validation: { max: 255 } }],
+        ["char(n)", col.char({ length: 3 }), { type: "string", columnType: "char", validation: { max: 3 } }],
+        ["varchar(n) keeps its own `max` as the API's rule", col.varchar({ length: 40 }).validate({ max: 20 }), { type: "string", columnType: "varchar", validation: { max: 20 } }],
         ["uuid", col.uuid(), { type: "string", columnType: "uuid" }],
         ["uuid defaultRandom outside the key", col.uuid().defaultRandom(), { type: "string", columnType: "uuid", databaseDefault: "sql`gen_random_uuid()`" }],
         ["enum", col.enum(["a", "b"]).default("a"), { type: "string", enum: [{ id: "a", label: "a" }, { id: "b", label: "b" }], defaultValue: "a" }],
-        ["enum named <table>_<column>", col.enum(["a"], { name: "t_c" }), { type: "string", enum: [{ id: "a", label: "a" }] }],
-        ["enum naming a shared type", col.enum(["a"], { name: "shared_kind" }), { type: "string", enum: [{ id: "a", label: "a" }] }],
+        ["enum named <table>_<column>", tCEnum(), { type: "string", enum: [{ id: "a", label: "a" }] }],
+        ["enum naming a shared type", sharedKindEnum(), { type: "string", enum: [{ id: "a", label: "a" }] }],
         ["string rules", col.text().validate({ min: 1, max: 9, length: 4, matches: /^a/i, matchesMessage: "m", trim: true, lowercase: true, uppercase: false, requiredMessage: "r" }),
             { type: "string", validation: { min: 1, max: 9, length: 4, matches: /^a/i, matchesMessage: "m", trim: true, lowercase: true, uppercase: false, requiredMessage: "r" } }],
         ["string pattern without flags stays a string", col.text().validate({ matches: "^a" }), { type: "string", validation: { matches: "^a" } }],
@@ -90,10 +96,10 @@ describe("lowerTables — columns", () => {
         ["onUpdateUser", col.text().onUpdateUser(), { type: "string", autoValue: "user_on_update" }],
         ["userId is userSelect", col.text().userId(), { type: "string", userSelect: true }],
         ["userId on a uuid beside a stamp", col.uuid().onCreateUser().userId(), { type: "string", columnType: "uuid", autoValue: "user_on_create", userSelect: true }],
-        ["userId on each item of text[]", col.array(col.text().userId()), { type: "array", columnType: "text[]", of: { type: "string", userSelect: true } }],
-        ["defaultSql", col.text().defaultSql("gen_short_id()"), { type: "string", databaseDefault: "sql`gen_short_id()`" }],
+        ["userId on each item of text[]", col.text().userId().array(), { type: "array", columnType: "text[]", of: { type: "string", userSelect: true } }],
+        ["defaultSql", col.text().default(sql`gen_short_id()`), { type: "string", databaseDefault: "sql`gen_short_id()`" }],
         ["dbDefault", col.text().dbDefault(), { type: "string", databaseDefault: true }],
-        ["generatedAs is closed to writes and filled by the database", col.text().notNull().generatedAs("upper(x)"),
+        ["generatedAs is closed to writes and filled by the database", col.text().notNull().generatedAlwaysAs(sql`upper(x)`),
             { type: "string", access: { write: [] }, databaseDefault: true, validation: { required: true } }],
         ["private", col.text().private(), { type: "string", excludeFromApi: true }],
         ["private wins over readOnly", col.text().readOnly().private(), { type: "string", excludeFromApi: true }],
@@ -101,36 +107,36 @@ describe("lowerTables — columns", () => {
         ["readOnly merged with access", col.text().access({ read: ["hr"], write: ["hr"] }).readOnly(), { type: "string", access: { read: ["hr"], write: [] } }],
         ["access", col.text().access({ read: ["hr"] }), { type: "string", access: { read: ["hr"] } }],
         ["describe", col.text().describe("What it is"), { type: "string", description: "What it is" }],
-        [".column() renames", col.text().column("legacy_name"), { type: "string", columnName: "legacy_name" }],
-        [".column() equal to the derived name is left out", col.text().column("c"), { type: "string" }],
+        [".column() renames", col.text("legacy_name"), { type: "string", columnName: "legacy_name" }],
+        [".column() equal to the derived name is left out", col.text("c"), { type: "string" }],
         ["storage", col.storage({ path: "p/", accept: ["image/*"], maxBytes: "1KB", source: "media", public: true, fileName: "{f}", metadata: { a: 1 }, includeBucketUrl: true, storeUrl: false, imageResize: { maxWidth: 5 } }),
             { type: "string", storage: { storagePath: "p/", acceptedFiles: ["image/*"], maxSize: 1024, storageSource: "media", public: true, fileName: "{f}", metadata: { a: 1 }, includeBucketUrl: true, storeUrl: false, imageResize: { maxWidth: 5 } } }],
         ["storage multiple", col.storage({ path: "p/" }).multiple(), { type: "array", columnType: "text[]", of: { type: "string", storage: { storagePath: "p/" } } }],
         ["integer", col.integer(), { type: "number", columnType: "integer" }],
         ["integer with the integer rule infers its type", col.integer().validate({ integer: true }), { type: "number", validation: { integer: true } }],
         ["smallint", col.smallint(), { type: "number", columnType: "smallint" }],
-        ["bigint", col.bigint(), { type: "number", columnType: "bigint" }],
+        ["bigint", col.bigint({ mode: "number" }), { type: "number", columnType: "bigint" }],
         ["smallserial", col.smallserial(), { type: "number", columnType: "smallserial" }],
         ["serial", col.serial(), { type: "number", columnType: "serial" }],
-        ["bigserial", col.bigserial(), { type: "number", columnType: "bigserial" }],
+        ["bigserial", col.bigserial({ mode: "number" }), { type: "number", columnType: "bigserial" }],
         ["real", col.real(), { type: "number", columnType: "real" }],
         ["doublePrecision", col.doublePrecision(), { type: "number", columnType: "double precision" }],
         ["numeric is inferred", col.numeric(), { type: "number" }],
-        ["numeric(p, s)", col.numeric(10, 2), { type: "number", precision: 10, scale: 2 }],
+        ["numeric(p, s)", col.numeric({ precision: 10, scale: 2 }), { type: "number", precision: 10, scale: 2 }],
         ["numeric with the integer rule names its type", col.numeric().validate({ integer: true }), { type: "number", columnType: "numeric", validation: { integer: true } }],
         ["number oneOf is an enum without a type", col.integer().oneOf([1, 2]), { type: "number", columnType: "integer", enum: [{ id: 1, label: "1" }, { id: 2, label: "2" }] }],
         ["number rules and default", col.integer().validate({ min: 0, max: 9, lessThan: 10, moreThan: -1, positive: true, negative: false }).default(3),
             { type: "number", columnType: "integer", validation: { min: 0, max: 9, lessThan: 10, moreThan: -1, positive: true, negative: false }, defaultValue: 3 }],
         ["boolean default", col.boolean().notNull().default(false), { type: "boolean", validation: { required: true }, defaultValue: false }],
-        ["timestamptz", col.timestamptz(), { type: "date" }],
+        ["timestamptz", col.timestamp({ withTimezone: true }), { type: "date" }],
         ["date default kept as written", col.date().default("2024-12-25"), { type: "date", columnType: "date", defaultValue: "2024-12-25" }],
         ["time", col.time().default("09:00"), { type: "date", columnType: "time", defaultValue: "09:00" }],
-        ["onCreateNow", col.timestamptz().onCreateNow(), { type: "date", autoValue: "on_create" }],
-        ["onUpdateNow", col.timestamptz().notNull().onUpdateNow(), { type: "date", autoValue: "on_update", validation: { required: true } }],
-        ["date bounds", col.timestamptz().validate({ min: "2020-01-01T00:00:00.000Z" }), { type: "date", validation: { min: new Date("2020-01-01T00:00:00.000Z") } }],
+        ["onCreateNow", col.timestamp({ withTimezone: true }).onCreateNow(), { type: "date", autoValue: "on_create" }],
+        ["onUpdateNow", col.timestamp({ withTimezone: true }).notNull().onUpdateNow(), { type: "date", autoValue: "on_update", validation: { required: true } }],
+        ["date bounds", col.timestamp({ withTimezone: true }).validate({ min: "2020-01-01T00:00:00.000Z" }), { type: "date", validation: { min: new Date("2020-01-01T00:00:00.000Z") } }],
         ["jsonb", col.jsonb(), { type: "map" }],
         ["json", col.json(), { type: "map", columnType: "json" }],
-        ["jsonb default", col.jsonb<{ a: number }>().default({ a: 1 }), { type: "map", defaultValue: { a: 1 } }],
+        ["jsonb default", col.jsonb().$type<{ a: number }>().default({ a: 1 }), { type: "map", defaultValue: { a: 1 } }],
         ["json.object", col.jsonb(json.object({ a: json.string().required().validate({ max: 3 }), n: json.number().oneOf([1]) })),
             { type: "map", properties: { a: { type: "string", validation: { required: true, max: 3 } }, n: { type: "number", enum: [{ id: 1, label: "1" }] } } }],
         ["json.object additional", col.jsonb(json.object({}, { additional: true })), { type: "map", keyValue: true }],
@@ -163,29 +169,29 @@ describe("lowerTables — columns", () => {
         ["json.array of anything", col.jsonb(json.array(json.unknown())).validate({}), { type: "array", columnType: "jsonb" }],
         ["json.array of oneOf", col.jsonb(json.array(json.oneOf({ text: json.string() }, { typeField: "kind" }))),
             { type: "array", columnType: "jsonb", oneOf: { properties: { text: { type: "string" } }, typeField: "kind" } }],
-        ["col.array(text)", col.array(col.text().oneOf(["x"])).validate({ minItems: 1, maxItems: 2 }),
+        ["col.array(text)", col.text({ enum: ["x"] }).array().validate({ minItems: 1, maxItems: 2 }),
             { type: "array", columnType: "text[]", of: { type: "string", enum: [{ id: "x", label: "x" }] }, validation: { min: 1, max: 2 } }],
-        ["col.array(integer)", col.array(col.integer().validate({ min: 0 })), { type: "array", columnType: "integer[]", of: { type: "number", validation: { min: 0 } } }],
-        ["col.array(boolean)", col.array(col.boolean()), { type: "array", columnType: "boolean[]", of: { type: "boolean" } }],
-        ["col.array(numeric)", col.array(col.numeric()).default([1]), { type: "array", columnType: "numeric[]", of: { type: "number" }, defaultValue: [1] }],
-        ["col.array(uuid) has no legacy column type; its items say what they are", col.array(col.uuid()), { type: "array", of: { type: "string", columnType: "uuid" } }],
-        ["col.array(enum)", col.array(col.enum(["red", "green"])), { type: "array", of: { type: "string", enum: [{ id: "red", label: "red" }, { id: "green", label: "green" }] } }],
-        ["col.array(varchar(n))", col.array(col.varchar(5).validate({ min: 1 })), { type: "array", of: { type: "string", columnType: "varchar", validation: { min: 1 } } }],
-        ["col.array(bigint)", col.array(col.bigint()), { type: "array", of: { type: "number" } }],
-        ["col.array(numeric(p, s))", col.array(col.numeric(8, 2)), { type: "array", of: { type: "number" } }],
-        ["col.array(date)", col.array(col.date()), { type: "array", of: { type: "date", columnType: "date" } }],
-        ["col.array(timestamptz)", col.array(col.timestamptz()), { type: "array", of: { type: "date" } }],
-        ["col.array(time)", col.array(col.time()), { type: "array", of: { type: "date", columnType: "time" } }],
+        ["col.array(integer)", col.integer().validate({ min: 0 }).array(), { type: "array", columnType: "integer[]", of: { type: "number", validation: { min: 0 } } }],
+        ["col.array(boolean)", col.boolean().array(), { type: "array", columnType: "boolean[]", of: { type: "boolean" } }],
+        ["col.array(numeric)", col.numeric().array().default([1]), { type: "array", columnType: "numeric[]", of: { type: "number" }, defaultValue: [1] }],
+        ["col.array(uuid) has no legacy column type; its items say what they are", col.uuid().array(), { type: "array", of: { type: "string", columnType: "uuid" } }],
+        ["col.array(enum)", col.enum(["red", "green"]).array(), { type: "array", of: { type: "string", enum: [{ id: "red", label: "red" }, { id: "green", label: "green" }] } }],
+        ["col.array(varchar(n))", col.varchar({ length: 5 }).validate({ min: 1 }).array(), { type: "array", of: { type: "string", columnType: "varchar", validation: { min: 1 } } }],
+        ["col.array(bigint)", col.bigint({ mode: "number" }).array(), { type: "array", of: { type: "number" } }],
+        ["col.array(numeric(p, s))", col.numeric({ precision: 8, scale: 2 }).array(), { type: "array", of: { type: "number" } }],
+        ["col.array(date)", col.date().array(), { type: "array", of: { type: "date", columnType: "date" } }],
+        ["col.array(timestamptz)", col.timestamp({ withTimezone: true }).array(), { type: "array", of: { type: "date" } }],
+        ["col.array(time)", col.time().array(), { type: "array", of: { type: "date", columnType: "time" } }],
         ["geopoint", col.geopoint().default({ latitude: 1, longitude: 2 }), { type: "geopoint", defaultValue: { latitude: 1, longitude: 2 } }],
-        ["vector", col.vector(3), { type: "vector", dimensions: 3 }],
-        ["vector index, `ip` is `inner_product`", col.vector(3, { index: { method: "hnsw", metric: ["cosine", "ip"], m: 8, efConstruction: 32 } }),
+        ["vector", col.vector({ dimensions: 3 }), { type: "vector", dimensions: 3 }],
+        ["vector index, `ip` is `inner_product`", col.vector({ dimensions: 3, index: { method: "hnsw", metric: ["cosine", "ip"], m: 8, efConstruction: 32 } }),
             { type: "vector", dimensions: 3, index: { method: "hnsw", distance: ["cosine", "inner_product"], m: 8, efConstruction: 32 } }],
-        ["vector single metric", col.vector(3, { index: { method: "ivfflat", metric: "l2", lists: 4 } }), { type: "vector", dimensions: 3, index: { method: "ivfflat", distance: "l2", lists: 4 } }],
-        ["vector index false", col.vector(3, { index: false }), { type: "vector", dimensions: 3, index: false }],
+        ["vector single metric", col.vector({ dimensions: 3, index: { method: "ivfflat", metric: "l2", lists: 4 } }), { type: "vector", dimensions: 3, index: { method: "ivfflat", distance: "l2", lists: 4 } }],
+        ["vector index false", col.vector({ dimensions: 3, index: false }), { type: "vector", dimensions: 3, index: false }],
         ["bytea", col.bytea().unique(), { type: "binary", validation: { unique: true } }],
-        ["identity outside the key is filled by the database", col.integer().notNull().identity(),
+        ["identity outside the key is filled by the database", col.integer().notNull().generatedByDefaultAsIdentity(),
             { type: "number", columnType: "integer", databaseDefault: true, validation: { required: true } }],
-        ["identity at another width", col.bigint().identity(), { type: "number", columnType: "bigint", databaseDefault: true }]
+        ["identity at another width", col.bigint({ mode: "number" }).generatedByDefaultAsIdentity(), { type: "number", columnType: "bigint", databaseDefault: true }]
     ])("%s", (_name, column, expected) => {
         expect(lowerColumn(column)).toEqual(expected);
     });
@@ -193,12 +199,12 @@ describe("lowerTables — columns", () => {
     it("lowers the key strategies onto `isId`", () => {
         const all = lowerTables([
             defineTable("a", { columns: { id: col.uuid().primaryKey().defaultRandom() }, rls: "admin-only" }),
-            defineTable("b", { columns: { id: col.integer().primaryKey().identity() }, rls: "admin-only" }),
+            defineTable("b", { columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity() }, rls: "admin-only" }),
             defineTable("c", { columns: { code: col.text().primaryKey() }, rls: "admin-only" }),
-            defineTable("d", { columns: { id: col.text().primaryKey().defaultSql("gen_id()") }, rls: "admin-only" }),
+            defineTable("d", { columns: { id: col.text().primaryKey().default(sql`gen_id()`) }, rls: "admin-only" }),
             defineTable("e", { columns: { n: col.integer().primaryKey(), u: col.uuid().primaryKey() }, rls: "admin-only" }),
             defineTable("f", { columns: { day: col.date().primaryKey(), n: col.numeric().primaryKey() }, rls: "admin-only" }),
-            defineTable("g", { columns: { id: col.bigint().primaryKey().identity() }, rls: "admin-only" })
+            defineTable("g", { columns: { id: col.bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity() }, rls: "admin-only" })
         ]);
         expect(all.map(collection => collection.properties)).toEqual([
             { id: { type: "string", isId: "uuid" } },
@@ -212,7 +218,7 @@ describe("lowerTables — columns", () => {
     });
 
     it("leaves out the planner's implicit key, when it is declared first", () => {
-        const implicit = col.text().primaryKey().defaultSql("gen_random_uuid()::text");
+        const implicit = col.text().primaryKey().default(sql`gen_random_uuid()::text`);
         const [first, later] = lowerTables([
             defineTable("a", { columns: { id: implicit, body: col.text() }, rls: "admin-only" }),
             defineTable("b", { columns: { body: col.text(), id: implicit }, rls: "admin-only" })
@@ -249,7 +255,7 @@ describe("lowerTables — columns", () => {
 
 describe("lowerTables — relations", () => {
     const users = defineTable("users", { columns: { id }, rls: "admin-only" });
-    const counters = defineTable("counters", { columns: { id: col.integer().primaryKey().identity() }, rls: "admin-only" });
+    const counters = defineTable("counters", { columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity() }, rls: "admin-only" });
 
     it("plans a bound plain foreign key where its column was declared", () => {
         const posts = defineTable("posts", {
@@ -267,7 +273,7 @@ describe("lowerTables — relations", () => {
 
     it("keeps a bound column that is more than a foreign key, the relation carrying the constraint", () => {
         const posts = defineTable("posts", {
-            columns: { id, authorRef: col.uuid().column("author_id").describe("who"), body: col.text() },
+            columns: { id, authorRef: col.uuid("author_id").describe("who"), body: col.text() },
             relations: { author: rel.belongsTo(() => users, { localKey: "author_id", index: false }) },
             rls: "admin-only"
         });
@@ -280,7 +286,7 @@ describe("lowerTables — relations", () => {
 
     it("keeps a bound column whose type is not the target's key type", () => {
         const posts = defineTable("posts", {
-            columns: { id, counterId: col.bigint() },
+            columns: { id, counterId: col.bigint({ mode: "number" }) },
             relations: { counter: rel.belongsTo(() => counters) },
             rls: "admin-only"
         });
@@ -374,7 +380,7 @@ describe("lowerTables — relations", () => {
     it("lowers a relation's field rules onto its relation property, in every form", () => {
         const tags = defineTable("tags", { columns: { id }, rls: "admin-only" });
         const posts = defineTable("posts", {
-            columns: { id, authorId: col.uuid(), editorRef: col.uuid().column("editor_id").describe("who edits") },
+            columns: { id, authorId: col.uuid(), editorRef: col.uuid("editor_id").describe("who edits") },
             relations: {
                 // Absorbs its plain column.
                 author: rel.belongsTo(() => users, { access: { read: ["admin", "editor"], write: ["admin"] } }),
@@ -419,7 +425,7 @@ describe("lowerTables — relations", () => {
 
     it("names an absorbed column by its relation in indexes, which the planner resolves to the same column", () => {
         const posts = defineTable("posts", {
-            columns: { id, authorId: col.uuid(), at: col.timestamptz() },
+            columns: { id, authorId: col.uuid(), at: col.timestamp({ withTimezone: true }) },
             relations: { author: rel.belongsTo(() => users) },
             indexes: [{ columns: ["authorId", { column: "at", direction: "desc" }], include: ["authorId"], where: { column: "authorId", op: "is not null" }, reason: "feed" }],
             rls: "admin-only"
@@ -474,7 +480,7 @@ describe("lowerTables — table keys", () => {
             database: "analytics",
             description: "Shared",
             metadata: { owner: "x" },
-            columns: { id, orgId: col.text().notNull(), deletedAt: col.timestamptz(), title: col.text() },
+            columns: { id, orgId: col.text().notNull(), deletedAt: col.timestamp({ withTimezone: true }), title: col.text() },
             rls: rules,
             tenant: { field: "orgId", from: { claim: "org_id" }, bypassRoles: ["support"] },
             softDelete: { field: "deletedAt" },
@@ -502,7 +508,7 @@ describe("lowerTables — table keys", () => {
             strictWrites: false,
             indexes: [{ using: "gin", on: ["title"], reason: "search" }]
         });
-        expect(only([defineTable("s", { columns: { id, deletedAt: col.timestamptz() }, rls: "admin-only", softDelete: true })]).softDelete).toBe(true);
+        expect(only([defineTable("s", { columns: { id, deletedAt: col.timestamp({ withTimezone: true }) }, rls: "admin-only", softDelete: true })]).softDelete).toBe(true);
     });
 
     it("lowers defineAuthTable to an enabled auth block", () => {
@@ -638,23 +644,23 @@ describe("lowerTables — an introspected database (`introspected: true`)", () =
         const [t] = lowerTables([defineTable("t", {
             columns: {
                 id,
-                ip: col.custom("inet").notNull(),
-                cidrs: col.custom("cidr[]"),
-                span: col.custom("interval").describe("how long")
+                ip: col.custom({ dataType: "inet" }).notNull(),
+                cidrs: col.custom({ dataType: "cidr[]" }),
+                span: col.custom({ dataType: "interval" }).describe("how long")
             },
             rls: "admin-only"
         })], { introspected: true });
         expect(t.properties.ip).toMatchObject({ type: "string", validation: { required: true } });
         expect(t.properties.cidrs).toMatchObject({ type: "array" });
         expect(t.properties.span).toMatchObject({ type: "string", description: "how long" });
-        const [carried] = lowerWithDefinitions([defineTable("t", { columns: { id, ip: col.custom("inet") }, rls: "admin-only" })], { introspected: true });
+        const [carried] = lowerWithDefinitions([defineTable("t", { columns: { id, ip: col.custom({ dataType: "inet" }) }, rls: "admin-only" })], { introspected: true });
         expect(carried.properties.ip.tableColumn?.type).toEqual({ kind: "other", sqlType: "inet" });
     });
 
     it("lets such a column be the key (a citext key), not a list type", () => {
-        const [t] = lowerTables([defineTable("t", { columns: { code: col.custom("citext").primaryKey() }, rls: "admin-only" })], { introspected: true });
+        const [t] = lowerTables([defineTable("t", { columns: { code: col.custom({ dataType: "citext" }).primaryKey() }, rls: "admin-only" })], { introspected: true });
         expect(t.properties.code).toMatchObject({ type: "string", isId: true });
-        expect(refusal(() => lowerTables([defineTable("t", { columns: { codes: col.custom("citext[]").primaryKey() }, rls: "admin-only" })], { introspected: true })))
+        expect(refusal(() => lowerTables([defineTable("t", { columns: { codes: col.custom({ dataType: "citext[]" }).primaryKey() }, rls: "admin-only" })], { introspected: true })))
             .toEqual([expect.stringMatching(/^t\.codes: is `\.primaryKey\(\)` on a `citext\[\]` column/)]);
     });
 
@@ -669,7 +675,7 @@ describe("lowerTables — an introspected database (`introspected: true`)", () =
 describe("lowerTables — `col.custom()` in a planned project", () => {
     it("lowers it as introspection does — the planner plans the type from the definition", () => {
         const [t] = lowerWithDefinitions([defineTable("t", {
-            columns: { code: col.custom("citext").primaryKey(), ip: col.custom("inet").notNull(), nets: col.custom("cidr[]") },
+            columns: { code: col.custom({ dataType: "citext" }).primaryKey(), ip: col.custom({ dataType: "inet" }).notNull(), nets: col.custom({ dataType: "cidr[]" }) },
             rls: "admin-only"
         })]);
         expect(t.properties.code).toMatchObject({ type: "string", isId: true, tableColumn: { type: { kind: "other", sqlType: "citext" } } });
@@ -682,7 +688,7 @@ describe("lowerTables — `col.custom()` in a planned project", () => {
         "public.citext", "\"geo\".\"point 3\"", "geometry(Point, 4326)", "geometry(Point,4326)", "inet[]", "int4range[][]", "text[3]",
         "interval day to second(3)"
     ])("accepts the type name %s", sqlType => {
-        expect(() => lowerTables([defineTable("t", { columns: { id, c: col.custom(sqlType) }, rls: "admin-only" })])).not.toThrow();
+        expect(() => lowerTables([defineTable("t", { columns: { id, c: col.custom({ dataType: sqlType }) }, rls: "admin-only" })])).not.toThrow();
     });
 
     it.each<[string, RegExp]>([
@@ -695,7 +701,7 @@ describe("lowerTables — `col.custom()` in a planned project", () => {
         ["geometry(Point, 'x')", /cannot be read as a type name/],
         ["\"open", /cannot be read as a type name/]
     ])("refuses the type name %s, naming the column", (sqlType, reason) => {
-        const problems = refusal(() => lowerTables([defineTable("t", { columns: { id, c: col.custom(sqlType) }, rls: "admin-only" })]));
+        const problems = refusal(() => lowerTables([defineTable("t", { columns: { id, c: col.custom({ dataType: sqlType }) }, rls: "admin-only" })]));
         expect(problems).toEqual([expect.stringMatching(/^t\.c: is `col\.custom\(/)]);
         expect(problems[0]).toMatch(reason);
     });
@@ -743,8 +749,8 @@ describe("lowerTables — refusals", () => {
         const [table] = lowerTables([defineTable("t", {
             columns: {
                 id,
-                s: col.text().oneOf(["a", "b"]),
-                a: col.array(col.text()).validate({ uniqueItems: true }),
+                s: col.text({ enum: ["a", "b"] }),
+                a: col.text().array().validate({ uniqueItems: true }),
                 scalar: col.jsonb(json.string()),
                 blocks: col.jsonb(json.oneOf({ x: json.string() })),
                 doc: col.jsonb(json.object({ b: json.oneOf({ x: json.string() }), u: json.unknown(), n: json.number() })),
@@ -784,9 +790,9 @@ describe("lowerTables — refusals", () => {
         const problems = refusal(() => lowerTables([
             keyed(col.jsonb().primaryKey()),
             keyed(col.geopoint().primaryKey()),
-            keyed(col.vector(3).primaryKey()),
+            keyed(col.vector({ dimensions: 3 }).primaryKey()),
             keyed(col.bytea().primaryKey()),
-            keyed(col.array(col.text()).primaryKey())
+            keyed(col.text().array().primaryKey())
         ]));
         expect(problems).toEqual([
             expect.stringMatching(/^t\.k: is `\.primaryKey\(\)` on a `jsonb` column\. A row is addressed by its key/),
@@ -801,10 +807,10 @@ describe("lowerTables — refusals", () => {
         const holding = (items: Parameters<typeof lowerColumn>[0]): AnyTableDef =>
             defineTable("t", { columns: { id, a: items }, rls: "admin-only" });
         const problems = refusal(() => lowerTables([
-            holding(col.array(col.jsonb())),
-            holding(col.array(col.geopoint())),
-            holding(col.array(col.vector(3))),
-            holding(col.array(col.bytea()))
+            holding(col.jsonb().array()),
+            holding(col.geopoint().array()),
+            holding(col.vector({ dimensions: 3 }).array()),
+            holding(col.bytea().array())
         ]));
         expect(problems).toEqual([
             expect.stringMatching(/^t\.a: is `col\.array\(\)` of `jsonb`, which is not an element type/),

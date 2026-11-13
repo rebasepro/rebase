@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { col, defineAuthTable, defineTable, defineView, json, rel } from "@rebasepro/types";
+import { col, defineAuthTable, defineTable, defineView, json, rel, sql } from "@rebasepro/types";
 import type { TableDescriptor } from "@rebasepro/types";
 
 import { compileTable, compileTables, describeColumn } from "../../src/schema/compile-tables";
@@ -17,8 +17,8 @@ const users = defineAuthTable("users", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         email: col.text().notNull().unique(),
-        passwordHash: col.text().column("password_hash"),
-        roles: col.array(col.text()).notNull().default([])
+        passwordHash: col.text("password_hash"),
+        roles: col.text().array().notNull().default([])
     },
     rls: "admin-only",
     auth: { personalKeys: true, roles: { editor: { scopes: ["data:read"] } } }
@@ -48,16 +48,16 @@ const posts = defineTable("posts", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         title: col.text().notNull().validate({ min: 3, max: 200 }),
-        slug: col.varchar(160).notNull().unique(),
+        slug: col.varchar({ length: 160 }).notNull().unique(),
         status: col.enum(["draft", "needs_review", "published", "archived"]).notNull().default("draft"),
         heroImage: col.storage({ path: "posts/heroes/", accept: ["image/*"], maxBytes: "10MB" }),
-        embedding: col.vector(1536, { index: { method: "hnsw", metric: "cosine" } }),
-        metadata: col.jsonb<{ seoTitle?: string; canonicalUrl?: string }>(),
-        publishDate: col.timestamptz(),
+        embedding: col.vector({ dimensions: 1536, index: { method: "hnsw", metric: "cosine" } }),
+        metadata: col.jsonb().$type<{ seoTitle?: string; canonicalUrl?: string }>(),
+        publishDate: col.timestamp({ withTimezone: true }),
         orgId: col.uuid().notNull(),
-        createdAt: col.timestamptz().notNull().onCreateNow(),
-        updatedAt: col.timestamptz().notNull().onUpdateNow(),
-        deletedAt: col.timestamptz(),
+        createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
+        updatedAt: col.timestamp({ withTimezone: true }).notNull().onUpdateNow(),
+        deletedAt: col.timestamp({ withTimezone: true }),
         __order: col.text()
     },
     relations: {
@@ -183,19 +183,19 @@ describe("compileTables — columns", () => {
     it("carries every column flag the builders can set", () => {
         const table = defineTable("everything", {
             columns: {
-                id: col.integer().primaryKey().identity(),
-                computed: col.integer().generatedAs("id * 2"),
+                id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
+                computed: col.integer().generatedAlwaysAs(sql`id * 2`),
                 locked: col.text().readOnly(),
                 secret: col.text().private(),
                 guarded: col.text().access({ read: ["admin"], write: [] }),
                 author: col.uuid().onCreateUser(),
                 owner: col.text().userId(),
-                watchers: col.array(col.text().userId()),
+                watchers: col.text().userId().array(),
                 note: col.text().describe("Free text").validate({ matches: /^a/i }),
                 priority: col.integer().oneOf([1, 2, 3]),
                 where: col.geopoint(),
                 gallery: col.storage({ path: "g/", maxBytes: 1024 }).multiple(),
-                labels: col.array(col.text().oneOf(["a", "b"]).validate({ max: 3 })).validate({ maxItems: 2 }),
+                labels: col.text({ enum: ["a", "b"] }).validate({ max: 3 }).array().validate({ maxItems: 2 }),
                 shaped: col.jsonb(json.object({
                     title: json.string().required().transform({ beforeSave: ({ value }) => value }),
                     at: json.date().onCreateNow(),
@@ -203,8 +203,8 @@ describe("compileTables — columns", () => {
                 })),
                 trimmed: col.text().transform({ beforeSave: ({ value }) => value?.trim() ?? null }),
                 legacy: col.text().dbDefault(),
-                code: col.text().defaultSql("gen_short_id()"),
-                noIndex: col.vector(3, { index: false })
+                code: col.text().default(sql`gen_short_id()`),
+                noIndex: col.vector({ dimensions: 3, index: false })
             },
             rls: "admin-only"
         });
@@ -533,13 +533,13 @@ describe("compileTables — table options", () => {
 
     it("normalizes `softDelete: true` to the legacy default field", () => {
         const trash = defineTable("trash", {
-            columns: { id: col.uuid().primaryKey(), deletedAt: col.timestamptz() },
+            columns: { id: col.uuid().primaryKey(), deletedAt: col.timestamp({ withTimezone: true }) },
             rls: "admin-only",
             softDelete: true
         });
         expect(compileTables([trash])[0].softDelete).toEqual({ field: "deletedAt" });
         const trashObject = defineTable("trash_object", {
-            columns: { id: col.uuid().primaryKey(), deletedAt: col.timestamptz() },
+            columns: { id: col.uuid().primaryKey(), deletedAt: col.timestamp({ withTimezone: true }) },
             rls: "admin-only",
             softDelete: {}
         });
@@ -591,7 +591,7 @@ describe("compileTables — table options", () => {
 
     it("makes a secret private by its SQL column too, and only on the auth table", () => {
         const store = defineAuthTable("accounts", {
-            columns: { id: col.uuid().primaryKey(), token: col.text().column("email_verification_token") },
+            columns: { id: col.uuid().primaryKey(), token: col.text("email_verification_token") },
             rls: "admin-only"
         });
         expect(compileTables([store])[0].columns.find(c => c.key === "token")?.private).toBe(true);

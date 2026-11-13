@@ -10,13 +10,15 @@
  *
  * - transforms: a function cannot be printed from its value — the printer
  *   takes its source from the caller, which the example suite covers;
- * - `.column()` equal to the key's snake_case: the printer leaves it out by
- *   design, so the comparison resolves the SQL name on both sides.
+ * - a leading SQL name equal to the key's snake_case: the printer leaves it out
+ *   by design, so the comparison resolves the SQL name on both sides;
+ * - stamps on an array's items: a stamp describes the column, and nothing that
+ *   describes the column can come before `.array()`.
  */
 import { describe, expect, it } from "@jest/globals";
 import fc from "fast-check";
-import { col, json } from "@rebasepro/types";
-import type { AnyColumn, AnyJsonField, ColumnBuilder, ColumnFlags, NumericColumnKind, TextColumnKind } from "@rebasepro/types";
+import { col, json, pgEnum, sql } from "@rebasepro/types";
+import type { AnyColumn, AnyJsonField, ColumnBuilder, ColumnFlags, NumericColumnKind, SqlTemplate, TextColumnKind, VectorConfig } from "@rebasepro/types";
 
 import { printColumn } from "../../src/schema/print-table";
 import { comparableColumn, evaluateColumn } from "../schema/print-eval";
@@ -64,19 +66,27 @@ const universal: fc.Arbitrary<Universal> = fc.record({
     generatedAs: fc.option(fc.constantFrom("1 + 1", "lower(\"name\")"), { nil: undefined })
 });
 
-/** Apply the modifiers every builder has, in a fixed order the result does not depend on. */
-function applyUniversal<D, K extends TextColumnKind | NumericColumnKind | "uuid" | "boolean" | "timestamptz" | "date" | "time" | "jsonb" | "json" | "bytea" | "array" | "storage" | "geopoint" | "vector" | "enum">(
-    start: ColumnBuilder<D, K, ColumnFlags>,
-    mods: Universal
-): ColumnBuilder<D, K, ColumnFlags> {
-    let builder = start;
-    if (mods.column !== undefined) builder = builder.column(mods.column);
+/** A generated SQL expression as a `sql` template: what `` sql`…` `` builds from the same text. */
+function sqlText(text: string): SqlTemplate {
+    return sql(Object.assign([text], { raw: [text] }));
+}
+
+/** A builder, given the SQL column name the generator picked (or none). */
+type Start<D, K extends BuilderKindUsed> = (name: string | undefined) => ColumnBuilder<D, K, ColumnFlags>;
+type BuilderKindUsed = TextColumnKind | NumericColumnKind | "uuid" | "boolean" | "timestamptz" | "date" | "time" | "jsonb" | "json" | "bytea" | "array" | "storage" | "geopoint" | "vector" | "enum";
+
+/**
+ * Build the column with its SQL name, then apply the modifiers every builder
+ * has, in a fixed order the result does not depend on.
+ */
+function applyUniversal<D, K extends BuilderKindUsed>(start: Start<D, K>, mods: Universal): ColumnBuilder<D, K, ColumnFlags> {
+    let builder = start(mods.column);
     if (mods.notNull) builder = builder.notNull();
     if (mods.primaryKey) builder = builder.primaryKey();
     if (mods.unique) builder = builder.unique();
-    if (mods.defaultSql !== undefined) builder = builder.defaultSql(mods.defaultSql);
+    if (mods.defaultSql !== undefined) builder = builder.default(sqlText(mods.defaultSql));
     else if (mods.dbDefault) builder = builder.dbDefault();
-    if (mods.generatedAs !== undefined) builder = builder.generatedAs(mods.generatedAs);
+    if (mods.generatedAs !== undefined) builder = builder.generatedAlwaysAs(sqlText(mods.generatedAs));
     if (mods.readOnly) builder = builder.readOnly();
     if (mods.private) builder = builder.private();
     if (mods.access !== undefined) builder = builder.access(mods.access);
@@ -85,7 +95,12 @@ function applyUniversal<D, K extends TextColumnKind | NumericColumnKind | "uuid"
 }
 
 const textColumn: fc.Arbitrary<AnyColumn> = fc.record({
-    base: fc.constantFrom(() => col.text(), () => col.varchar(), () => col.varchar(40), () => col.char(3)),
+    base: fc.constantFrom<Start<string, TextColumnKind>>(
+        name => col.text(name),
+        name => name === undefined ? col.varchar({ length: 255 }) : col.varchar(name, { length: 255 }),
+        name => name === undefined ? col.varchar({ length: 40 }) : col.varchar(name, { length: 40 }),
+        name => name === undefined ? col.char({ length: 3 }) : col.char(name, { length: 3 })
+    ),
     mods: universal,
     literal: fc.option(anyString, { nil: undefined }),
     oneOf: fc.option(fc.array(anyString, { minLength: 1, maxLength: 4 }), { nil: undefined }),
@@ -103,7 +118,7 @@ const textColumn: fc.Arbitrary<AnyColumn> = fc.record({
     pattern: fc.option(patterns, { nil: undefined }),
     stamp: fc.constantFrom(undefined, "create", "update")
 }).map(({ base, mods, literal, oneOf, validate, pattern, stamp }) => {
-    let builder: ColumnBuilder<string, TextColumnKind, ColumnFlags> = applyUniversal(base(), mods);
+    let builder: ColumnBuilder<string, TextColumnKind, ColumnFlags> = applyUniversal(base, mods);
     if (literal !== undefined) builder = builder.default(literal);
     if (stamp === "create") builder = builder.onCreateUser();
     if (stamp === "update") builder = builder.onUpdateUser();
@@ -120,9 +135,13 @@ const textColumn: fc.Arbitrary<AnyColumn> = fc.record({
 });
 
 const numberColumn: fc.Arbitrary<AnyColumn> = fc.record({
-    base: fc.constantFrom(
-        () => col.smallint(), () => col.integer(), () => col.bigint(), () => col.real(), () => col.doublePrecision(),
-        () => col.numeric(), () => col.numeric(12), () => col.numeric(12, 4), () => col.serial(), () => col.smallserial(), () => col.bigserial()
+    base: fc.constantFrom<Start<number, NumericColumnKind>>(
+        name => col.smallint(name), name => col.integer(name),
+        name => name === undefined ? col.bigint({ mode: "number" }) : col.bigint(name, { mode: "number" }),
+        name => col.real(name), name => col.doublePrecision(name),
+        name => col.numeric(name), name => col.numeric(name, { precision: 12 }), name => col.numeric(name, { precision: 12, scale: 4 }),
+        name => col.serial(name), name => col.smallserial(name),
+        name => name === undefined ? col.bigserial({ mode: "number" }) : col.bigserial(name, { mode: "number" })
     ),
     mods: universal,
     literal: fc.option(fc.oneof(fc.integer(), fc.double()), { nil: undefined }),
@@ -132,7 +151,7 @@ const numberColumn: fc.Arbitrary<AnyColumn> = fc.record({
         positive: fc.boolean(), negative: fc.boolean(), integer: fc.boolean()
     }, { requiredKeys: [] }), { nil: undefined })
 }).map(({ base, mods, literal, oneOf, validate }) => {
-    let builder: ColumnBuilder<number, NumericColumnKind, ColumnFlags> = applyUniversal(base(), mods);
+    let builder: ColumnBuilder<number, NumericColumnKind, ColumnFlags> = applyUniversal(base, mods);
     if (literal !== undefined) builder = builder.default(literal);
     if (oneOf !== undefined) builder = builder.oneOf(oneOf);
     if (validate !== undefined) builder = builder.validate(validate);
@@ -140,30 +159,37 @@ const numberColumn: fc.Arbitrary<AnyColumn> = fc.record({
 });
 
 const identityColumn: fc.Arbitrary<AnyColumn> = fc.record({
-    base: fc.constantFrom(() => col.smallint(), () => col.integer(), () => col.bigint()),
+    base: fc.constantFrom<Start<number, "smallint" | "integer" | "bigint">>(
+        name => col.smallint(name), name => col.integer(name),
+        name => name === undefined ? col.bigint({ mode: "number" }) : col.bigint(name, { mode: "number" })
+    ),
     mods: universal
-}).map(({ base, mods }) => applyUniversal(base().identity(), { ...mods, defaultSql: undefined, dbDefault: false }));
+}).map(({ base, mods }) => applyUniversal(name => base(name).generatedByDefaultAsIdentity(), { ...mods, defaultSql: undefined, dbDefault: false }));
 
 const uuidColumn: fc.Arbitrary<AnyColumn> = fc.record({
     mods: universal,
     random: fc.boolean(),
     stamp: fc.constantFrom(undefined, "create", "update")
-}).map(({ mods, random, stamp }) => {
-    let builder: ColumnBuilder<string, "uuid", ColumnFlags> = col.uuid();
+}).map(({ mods, random, stamp }) => applyUniversal(name => {
+    let builder: ColumnBuilder<string, "uuid", ColumnFlags> = col.uuid(name);
     if (random) builder = builder.defaultRandom();
     if (stamp === "create") builder = builder.onCreateUser();
     if (stamp === "update") builder = builder.onUpdateUser();
-    return applyUniversal(builder, random ? { ...mods, defaultSql: undefined, dbDefault: false } : mods);
-});
+    return builder;
+}, random ? { ...mods, defaultSql: undefined, dbDefault: false } : mods));
 
 const temporalColumn: fc.Arbitrary<AnyColumn> = fc.record({
-    base: fc.constantFrom(() => col.timestamptz(), () => col.date(), () => col.time()),
+    base: fc.constantFrom<Start<string, "timestamptz" | "date" | "time">>(
+        name => name === undefined ? col.timestamp({ withTimezone: true }) : col.timestamp(name, { withTimezone: true }),
+        name => col.date(name),
+        name => col.time(name)
+    ),
     mods: universal,
     stamp: fc.constantFrom(undefined, "create", "update"),
     literal: fc.option(fc.date({ min: new Date("1970-01-01T00:00:00.000Z"), max: new Date("2100-01-01T00:00:00.000Z"), noInvalidDate: true }), { nil: undefined }),
     bounds: fc.option(fc.record({ min: fc.constant("2020-01-01"), max: fc.date({ min: new Date("2000-01-01T00:00:00.000Z"), max: new Date("2100-01-01T00:00:00.000Z"), noInvalidDate: true }) }, { requiredKeys: [] }), { nil: undefined })
 }).map(({ base, mods, stamp, literal, bounds }) => {
-    let builder: ColumnBuilder<string, "timestamptz" | "date" | "time", ColumnFlags> = applyUniversal(base(), mods);
+    let builder: ColumnBuilder<string, "timestamptz" | "date" | "time", ColumnFlags> = applyUniversal(base, mods);
     if (literal !== undefined) builder = builder.default(literal);
     if (stamp === "create") builder = builder.onCreateNow();
     if (stamp === "update") builder = builder.onUpdateNow();
@@ -178,7 +204,11 @@ const enumColumn: fc.Arbitrary<AnyColumn> = fc.record({
     pickDefault: fc.boolean()
 }).map(({ values, name, mods, pickDefault }) => {
     const [first, ...rest] = values;
-    let builder: ColumnBuilder<string, "enum", ColumnFlags> = applyUniversal(col.enum([first, ...rest], name === undefined ? {} : { name }), mods);
+    const labels: [string, ...string[]] = [first, ...rest];
+    let builder: ColumnBuilder<string, "enum", ColumnFlags> = applyUniversal(column => {
+        if (name !== undefined) return pgEnum(name, labels)(column);
+        return column === undefined ? col.enum(labels) : col.enum(column, labels);
+    }, mods);
     if (pickDefault) builder = builder.default(first);
     return builder;
 });
@@ -217,8 +247,11 @@ const jsonColumn: fc.Arbitrary<AnyColumn> = fc.record({
     shape: fc.option(shape, { nil: undefined }),
     mods: universal
 }).map(({ binary, shape: field, mods }) => {
-    if (field === undefined) return applyUniversal(binary ? col.jsonb() : col.json(), mods);
-    return applyUniversal(binary ? col.jsonb(field) : col.json(field), mods);
+    if (field === undefined) return applyUniversal(name => binary ? col.jsonb(name) : col.json(name), mods);
+    return applyUniversal(name => {
+        if (name === undefined) return binary ? col.jsonb(field) : col.json(field);
+        return binary ? col.jsonb(name, field) : col.json(name, field);
+    }, mods);
 });
 
 const storageOptions = fc.record({
@@ -237,30 +270,71 @@ const storageColumn: fc.Arbitrary<AnyColumn> = fc.record({
     items: fc.option(fc.record({ maxItems: fc.nat(10) }), { nil: undefined }),
     mods: universal
 }).map(({ options, multiple, perFile, items, mods }) => {
-    const single = col.storage(options);
-    const validated = perFile !== undefined ? single.validate(perFile) : single;
+    const validated = (name: string | undefined): ColumnBuilder<string, "storage"> => {
+        const single = name === undefined ? col.storage(options) : col.storage(name, options);
+        return perFile !== undefined ? single.validate(perFile) : single;
+    };
     if (!multiple) return applyUniversal(validated, mods);
-    const many: ColumnBuilder<string[], "array", ColumnFlags> = applyUniversal(validated.multiple(), mods);
+    const many: ColumnBuilder<string[], "array", ColumnFlags> = applyUniversal(name => validated(name).multiple(), mods);
     return items !== undefined ? many.validate(items) : many;
 });
 
+/** The item types an array is generated over, each with the rules that describe one item. */
+type ItemKind = "text" | "textEnum" | "varchar" | "userId" | "integer" | "numeric" | "uuid" | "enum" | "date" | "timestamp" | "time";
+
+/**
+ * An array column: the item builder (named with the column's SQL name, as
+ * Drizzle names an array), the item's own rules, then `.array()`.
+ */
+function arrayOf(kind: ItemKind, name: string | undefined, labels: [string, ...string[]], ruled: boolean, text: string | undefined): ColumnBuilder<unknown[], "array", ColumnFlags> {
+    switch (kind) {
+        case "text": {
+            let item = col.text(name);
+            if (ruled) item = item.validate({ max: 20, trim: true });
+            return (text === undefined ? item : item.describe(text)).array();
+        }
+        case "textEnum": {
+            const item = name === undefined ? col.text({ enum: labels }) : col.text(name, { enum: labels });
+            return (text === undefined ? item : item.describe(text)).array();
+        }
+        case "varchar": {
+            const item = name === undefined ? col.varchar({ length: 40 }) : col.varchar(name, { length: 40 });
+            return (ruled ? item.validate({ min: 1 }) : item).array();
+        }
+        case "userId": return col.text(name).userId().array();
+        case "integer": {
+            const item = col.integer(name);
+            return (ruled ? item.validate({ min: 0, integer: true }) : item).array();
+        }
+        case "numeric": return col.numeric(name, { precision: 12, scale: 4 }).array();
+        case "uuid": return col.uuid(name).array();
+        case "enum": return (name === undefined ? col.enum(labels) : col.enum(name, labels)).array();
+        case "date": {
+            const item = col.date(name);
+            return (ruled ? item.validate({ min: "2020-01-01" }) : item).array();
+        }
+        case "timestamp": return (name === undefined ? col.timestamp({ withTimezone: true }) : col.timestamp(name, { withTimezone: true })).array();
+        case "time": return col.time(name).array();
+    }
+}
+
 const arrayColumn: fc.Arbitrary<AnyColumn> = fc.record({
-    inner: fc.oneof(textColumn, numberColumn, uuidColumn, enumColumn, temporalColumn),
+    kind: fc.constantFrom<ItemKind>("text", "textEnum", "varchar", "userId", "integer", "numeric", "uuid", "enum", "date", "timestamp", "time"),
+    labels: fc.uniqueArray(word, { minLength: 1, maxLength: 4 }),
+    ruled: fc.boolean(),
+    text: fc.option(anyString, { nil: undefined }),
     mods: universal,
     items: fc.option(fc.record({ minItems: fc.nat(3), maxItems: fc.nat(30), uniqueItems: fc.boolean() }, { requiredKeys: [] }), { nil: undefined })
-}).filter(({ inner }) => inner.def.type.kind !== "array")
-    // Items that carry a column's modifiers (`.notNull()`, a default, a key,
-    // `.readOnly()`, `.private()`) or a SQL name are refused by the compiler
-    // (validate-tables' `elementColumnModifiers`) and have no Drizzle spelling:
-    // anything chained before `.array()` describes each item.
-    .filter(({ inner }) => {
-        const def = inner.def;
-        return !def.notNull && !def.primaryKey && def.default === undefined && !def.readOnly && !def.private && def.column === undefined;
-    })
-    .map(({ inner, mods, items }) => {
-        const builder: ColumnBuilder<unknown[], "array", ColumnFlags> = applyUniversal(col.array(inner), mods);
-        return items !== undefined ? builder.validate(items) : builder;
-    });
+}).map(({ kind, labels, ruled, text, mods, items }) => {
+    const [first, ...rest] = labels;
+    const builder = applyUniversal(name => arrayOf(kind, name, [first, ...rest], ruled, text), mods);
+    return items !== undefined ? builder.validate(items) : builder;
+});
+
+/** `col.vector(config)`, with the SQL name first when there is one. */
+function vector(name: string | undefined, config: VectorConfig): ColumnBuilder<number[], "vector"> {
+    return name === undefined ? col.vector(config) : col.vector(name, config);
+}
 
 const otherColumn: fc.Arbitrary<AnyColumn> = fc.record({
     which: fc.constantFrom("boolean", "bytea", "geopoint", "vector", "vectorNoIndex", "vectorIndexed"),
@@ -268,12 +342,12 @@ const otherColumn: fc.Arbitrary<AnyColumn> = fc.record({
     flag: fc.boolean()
 }).map(({ which, mods, flag }) => {
     switch (which) {
-        case "boolean": return applyUniversal(col.boolean().default(flag), mods);
-        case "bytea": return applyUniversal(col.bytea(), mods);
-        case "geopoint": return applyUniversal(col.geopoint(), mods);
-        case "vector": return applyUniversal(col.vector(4), mods);
-        case "vectorNoIndex": return applyUniversal(col.vector(4, { index: false }), mods);
-        default: return applyUniversal(col.vector(8, { index: { method: flag ? "hnsw" : "ivfflat", metric: ["l2", "ip"], lists: 10 } }), mods);
+        case "boolean": return applyUniversal(name => col.boolean(name).default(flag), mods);
+        case "bytea": return applyUniversal(name => col.bytea(name), mods);
+        case "geopoint": return applyUniversal(name => col.geopoint(name), mods);
+        case "vector": return applyUniversal(name => vector(name, { dimensions: 4 }), mods);
+        case "vectorNoIndex": return applyUniversal(name => vector(name, { dimensions: 4, index: false }), mods);
+        default: return applyUniversal(name => vector(name, { dimensions: 8, index: { method: flag ? "hnsw" : "ivfflat", metric: ["l2", "ip"], lists: 10 } }), mods);
     }
 });
 

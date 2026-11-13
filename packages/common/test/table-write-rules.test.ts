@@ -23,32 +23,32 @@ const tags = defineTable("tags", {
 const posts = defineTable("posts", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
-        title: col.varchar(80),
+        title: col.varchar({ length: 80 }),
         body: col.text().validate({ max: 2000 }),
-        code: col.varchar().validate({ matches: /^[A-Z]{2}$/gi }),
+        code: col.varchar({ length: 255 }).validate({ matches: /^[A-Z]{2}$/gi }),
         loose: col.text().validate({ matches: "/^x+$/i" }),
         plain: col.text().validate({ matches: "^y+$" }),
         views: col.integer(),
-        price: col.numeric(10, 2),
-        names: col.array(col.text()),
-        ips: col.custom("inet[]"),
-        ip: col.custom("inet"),
+        price: col.numeric({ precision: 10, scale: 2 }),
+        names: col.text().array(),
+        ips: col.custom({ dataType: "inet[]" }),
+        ip: col.custom({ dataType: "inet" }),
         meta: col.jsonb(json.object({ seo: json.string() })),
         free: col.jsonb(),
         blocks: col.jsonb(json.array(json.oneOf({ text: json.string() }))),
         headline: col.jsonb(json.string()),
         place: col.geopoint(),
         published: col.boolean(),
-        embedding: col.vector(3),
+        embedding: col.vector({ dimensions: 3 }),
         secret: col.text().private(),
-        hidden: col.vector(3).private(),
+        hidden: col.vector({ dimensions: 3 }).private(),
         authorId: col.uuid()
     },
     relations: {
         author: rel.belongsTo(() => tags, { localKey: "author_id" }),
         tagged: rel.manyToMany(() => tags, {
             through: "posts_tags",
-            pivot: { role: col.text().notNull().oneOf(["owner", "viewer"]) }
+            pivot: { role: col.text({ enum: ["owner", "viewer"] }).notNull() }
         }),
         secretTags: rel.manyToMany(() => tags, { through: "posts_secret_tags", private: true })
     },

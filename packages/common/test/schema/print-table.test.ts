@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 
 import { describe, expect, it } from "@jest/globals";
-import { col, defineAuthTable, defineTable, defineView, json, rel } from "@rebasepro/types";
+import { col, defineAuthTable, defineTable, defineView, json, rel, pgEnum, sql } from "@rebasepro/types";
 import type { AnyTableDef, AnyViewDef, ColumnDef, TableDescriptor } from "@rebasepro/types";
 
 import { compileTables } from "../../src/schema/compile-tables";
@@ -57,39 +57,41 @@ const optionsFor = (name: string): PrintTableOptions => ({
 const chain = (builder: { def: ColumnDef }, key?: string): string => printColumn(builder.def, { key });
 
 describe("printColumn — golden chains", () => {
+    const abTypeEnum = pgEnum("ab_type", ["a", "b"]);
+
     it.each([
         [col.uuid().primaryKey().defaultRandom(), "col.uuid().primaryKey().defaultRandom()"],
         [col.text(), "col.text()"],
-        [col.varchar(160).notNull().unique(), "col.varchar({ length: 160 }).notNull().unique()"],
-        [col.varchar(), "col.varchar({ length: 255 })"],
-        [col.varchar(255), "col.varchar({ length: 255 })"],
-        [col.char(2), "col.char({ length: 2 })"],
+        [col.varchar({ length: 160 }).notNull().unique(), "col.varchar({ length: 160 }).notNull().unique()"],
+        [col.varchar({ length: 255 }), "col.varchar({ length: 255 })"],
+        [col.varchar({ length: 255 }), "col.varchar({ length: 255 })"],
+        [col.char({ length: 2 }), "col.char({ length: 2 })"],
         [col.enum(["draft", "published"]).notNull().default("draft"), "col.enum([\"draft\", \"published\"]).notNull().default(\"draft\")"],
-        [col.enum(["a", "b"], { name: "ab_type" }), "pgEnum(\"ab_type\", [\"a\", \"b\"])()"],
+        [abTypeEnum(), "pgEnum(\"ab_type\", [\"a\", \"b\"])()"],
         [col.smallint(), "col.smallint()"],
-        [col.integer().primaryKey().identity(), "col.integer().primaryKey().generatedByDefaultAsIdentity()"],
-        [col.bigint().default(10), "col.bigint({ mode: \"number\" }).default(10)"],
+        [col.integer().primaryKey().generatedByDefaultAsIdentity(), "col.integer().primaryKey().generatedByDefaultAsIdentity()"],
+        [col.bigint({ mode: "number" }).default(10), "col.bigint({ mode: \"number\" }).default(10)"],
         [col.smallserial(), "col.smallserial()"],
         [col.serial().primaryKey(), "col.serial().primaryKey()"],
-        [col.bigserial(), "col.bigserial({ mode: \"number\" })"],
+        [col.bigserial({ mode: "number" }), "col.bigserial({ mode: \"number\" })"],
         [col.real(), "col.real()"],
         [col.doublePrecision().validate({ min: 0 }), "col.doublePrecision().validate({ min: 0 })"],
         [col.numeric(), "col.numeric()"],
-        [col.numeric(10), "col.numeric({ precision: 10 })"],
-        [col.numeric(10, 2).default(0), "col.numeric({ precision: 10, scale: 2 }).default(0)"],
+        [col.numeric({ precision: 10 }), "col.numeric({ precision: 10 })"],
+        [col.numeric({ precision: 10, scale: 2 }).default(0), "col.numeric({ precision: 10, scale: 2 }).default(0)"],
         [col.boolean().default(false), "col.boolean().default(false)"],
-        [col.timestamptz().notNull().onCreateNow(), "col.timestamp({ withTimezone: true }).notNull().onCreateNow()"],
-        [col.timestamptz().notNull().onUpdateNow(), "col.timestamp({ withTimezone: true }).notNull().onUpdateNow()"],
+        [col.timestamp({ withTimezone: true }).notNull().onCreateNow(), "col.timestamp({ withTimezone: true }).notNull().onCreateNow()"],
+        [col.timestamp({ withTimezone: true }).notNull().onUpdateNow(), "col.timestamp({ withTimezone: true }).notNull().onUpdateNow()"],
         [col.date().validate({ min: new Date("2020-01-01T00:00:00.000Z") }), "col.date().validate({ min: \"2020-01-01T00:00:00.000Z\" })"],
         [col.time(), "col.time()"],
         [col.jsonb(), "col.jsonb()"],
         [col.json(), "col.json()"],
         [col.jsonb(json.object({ seoTitle: json.string() })), "col.jsonb(json.object({ seoTitle: json.string() }))"],
-        [col.array(col.text().oneOf(["a", "b"])), "col.text({ enum: [\"a\", \"b\"] }).array()"],
-        [col.array(col.uuid()).notNull().default([]), "col.uuid().array().notNull().default([])"],
-        [col.vector(1536), "col.vector({ dimensions: 1536 })"],
-        [col.vector(1536, { index: { method: "hnsw", metric: "cosine" } }), "col.vector({ dimensions: 1536, index: { method: \"hnsw\", metric: \"cosine\" } })"],
-        [col.vector(3, { index: false }), "col.vector({ dimensions: 3, index: false })"],
+        [col.text({ enum: ["a", "b"] }).array(), "col.text({ enum: [\"a\", \"b\"] }).array()"],
+        [col.uuid().array().notNull().default([]), "col.uuid().array().notNull().default([])"],
+        [col.vector({ dimensions: 1536 }), "col.vector({ dimensions: 1536 })"],
+        [col.vector({ dimensions: 1536, index: { method: "hnsw", metric: "cosine" } }), "col.vector({ dimensions: 1536, index: { method: \"hnsw\", metric: \"cosine\" } })"],
+        [col.vector({ dimensions: 3, index: false }), "col.vector({ dimensions: 3, index: false })"],
         [col.bytea(), "col.bytea()"],
         [col.geopoint().notNull(), "col.geopoint().notNull()"],
         [
@@ -101,15 +103,15 @@ describe("printColumn — golden chains", () => {
             col.storage({ path: "g/" }).validate({ max: 80 }).multiple().notNull().validate({ maxItems: 3 }),
             "col.storage({ path: \"g/\" }).validate({ max: 80 }).multiple().notNull().validate({ maxItems: 3 })"
         ],
-        [col.array(col.storage({ path: "g/" })), "col.storage({ path: \"g/\" }).multiple()"],
+        [col.storage({ path: "g/" }).array(), "col.storage({ path: \"g/\" }).multiple()"],
         [col.uuid().onCreateUser(), "col.uuid().onCreateUser()"],
         [col.uuid().onUpdateUser(), "col.uuid().onUpdateUser()"],
         [col.uuid().userId(), "col.uuid().userId()"],
-        [col.varchar(36).notNull().userId(), "col.varchar({ length: 36 }).notNull().userId()"],
-        [col.array(col.text().userId()), "col.text().userId().array()"],
-        [col.text().defaultSql("gen_short_id()"), "col.text().default(sql`gen_short_id()`)"],
+        [col.varchar({ length: 36 }).notNull().userId(), "col.varchar({ length: 36 }).notNull().userId()"],
+        [col.text().userId().array(), "col.text().userId().array()"],
+        [col.text().default(sql`gen_short_id()`), "col.text().default(sql`gen_short_id()`)"],
         [col.text().dbDefault(), "col.text().dbDefault()"],
-        [col.integer().generatedAs("length(title)"), "col.integer().generatedAlwaysAs(sql`length(title)`)"],
+        [col.integer().generatedAlwaysAs(sql`length(title)`), "col.integer().generatedAlwaysAs(sql`length(title)`)"],
         [col.integer().oneOf([1, 2, 3]), "col.integer().oneOf([1, 2, 3])"],
         [col.text().readOnly(), "col.text().readOnly()"],
         [col.text().private(), "col.text().private()"],
@@ -125,18 +127,16 @@ describe("printColumn — golden chains", () => {
     });
 
     it("prints every modifier in the canonical order", () => {
-        const builder = col.text()
+        const builder = col.text("legacy_name", { enum: ["x"] })
             .describe("d")
             .access({ read: ["a"] })
             .private()
             .validate({ min: 1 })
-            .oneOf(["x"])
             .userId()
             .onCreateUser()
-            .defaultSql("x()")
+            .default(sql`x()`)
             .unique()
-            .notNull()
-            .column("legacy_name");
+            .notNull();
         expect(printColumn(builder.def, { key: "name", transform: TRANSFORM_SOURCE })).toBe(
             "col.text(\"legacy_name\").notNull().unique().default(sql`x()`).onCreateUser().userId().oneOf([\"x\"])" +
             `.validate({ min: 1 }).transform(${TRANSFORM_SOURCE}).private().access({ read: ["a"] }).describe("d")`
@@ -148,14 +148,14 @@ describe("printColumn — golden chains", () => {
     });
 
     it("leaves the SQL name out when it is the snake_case of the key, and writes it as the builder's first argument otherwise", () => {
-        expect(chain(col.text().column("display_name"), "displayName")).toBe("col.text()");
-        expect(chain(col.text().column("display_name"))).toBe("col.text(\"display_name\")");
-        expect(chain(col.text().column("DisplayName"), "displayName")).toBe("col.text(\"DisplayName\")");
+        expect(chain(col.text("display_name"), "displayName")).toBe("col.text()");
+        expect(chain(col.text("display_name"))).toBe("col.text(\"display_name\")");
+        expect(chain(col.text("DisplayName"), "displayName")).toBe("col.text(\"DisplayName\")");
     });
 
     it("leaves out what a modifier implies: NOT NULL under a primary key, read-only under generatedAs", () => {
         expect(chain(col.uuid().notNull().primaryKey())).toBe("col.uuid().primaryKey()");
-        expect(chain(col.integer().generatedAs("1").readOnly())).toBe("col.integer().generatedAlwaysAs(sql`1`)");
+        expect(chain(col.integer().generatedAlwaysAs(sql`1`).readOnly())).toBe("col.integer().generatedAlwaysAs(sql`1`)");
     });
 
     it("prints sizes human-readable only when exact", () => {
@@ -215,7 +215,7 @@ describe("printColumn — golden chains", () => {
         const nested = col.jsonb(json.object({ a: json.string().transform({ afterRead: ({ value }) => value }) }));
         expect(() => printColumn(nested.def, { key: "doc" })).toThrow(/transforms\["a"\]/);
         expect(printColumn(nested.def, { transforms: { a: "{}" } })).toBe("col.jsonb(json.object({ a: json.string().transform({}) }))");
-        const element = col.array(col.text().transform({ afterRead: ({ value }) => value }));
+        const element = col.text().transform({ afterRead: ({ value }) => value }).array();
         expect(() => printColumn(element.def)).toThrow(/transforms\["\[\]"\]/);
         expect(printColumn(element.def, { transforms: { "[]": "{}" } })).toBe("col.text().transform({}).array()");
     });
@@ -234,7 +234,7 @@ describe("printColumn — golden chains", () => {
         const printed = printColumn({ type: { kind: "other", sqlType: "geometry(Point, 4326)" }, ...flags, notNull: true });
         expect(printed).toBe("col.custom({ dataType: \"geometry(Point, 4326)\" }).notNull()");
         expect(evaluateColumn(printed)).toEqual({ type: { kind: "other", sqlType: "geometry(Point, 4326)" }, ...flags, notNull: true });
-        expect(printColumn(col.custom("inet[]").def)).toBe("col.custom({ dataType: \"inet[]\" })");
+        expect(printColumn(col.custom({ dataType: "inet[]" }).def)).toBe("col.custom({ dataType: \"inet[]\" })");
     });
 });
 
@@ -335,16 +335,16 @@ describe("printTableSource / printTableModule", () => {
             columns: {
                 id: col.uuid().primaryKey().defaultRandom(),
                 title: col.text().notNull().validate({ min: 3, max: 200 }),
-                slug: col.varchar(160).notNull().unique(),
+                slug: col.varchar({ length: 160 }).notNull().unique(),
                 status: col.enum(["draft", "needs_review", "published", "archived"]).notNull().default("draft"),
                 heroImage: col.storage({ path: "posts/heroes/", accept: ["image/*"], maxBytes: "10MB" }),
-                embedding: col.vector(1536, { index: { method: "hnsw", metric: "cosine" } }),
-                metadata: col.jsonb<{ seoTitle?: string; canonicalUrl?: string }>(),
-                publishDate: col.timestamptz(),
+                embedding: col.vector({ dimensions: 1536, index: { method: "hnsw", metric: "cosine" } }),
+                metadata: col.jsonb().$type<{ seoTitle?: string; canonicalUrl?: string }>(),
+                publishDate: col.timestamp({ withTimezone: true }),
                 orgId: col.uuid().notNull(),
-                createdAt: col.timestamptz().notNull().onCreateNow(),
-                updatedAt: col.timestamptz().notNull().onUpdateNow(),
-                deletedAt: col.timestamptz(),
+                createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
+                updatedAt: col.timestamp({ withTimezone: true }).notNull().onUpdateNow(),
+                deletedAt: col.timestamp({ withTimezone: true }),
                 __order: col.text()
             },
             relations: {

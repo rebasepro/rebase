@@ -8,7 +8,7 @@
  * The set compiles (`compileTables(PRINT_FIXTURES, { defaultRls: DEFAULT_RLS })`),
  * so the descriptor round trip runs over it too.
  */
-import { col, defineAuthTable, defineTable, defineView, json, rel } from "@rebasepro/types";
+import { col, defineAuthTable, defineTable, defineView, json, rel, pgEnum, sql } from "@rebasepro/types";
 import type { DefaultRls } from "@rebasepro/types";
 
 export const DEFAULT_RLS: DefaultRls = [{ operation: "select", access: "public" }];
@@ -29,9 +29,9 @@ export const users = defineAuthTable("users", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         email: col.text().notNull().unique().validate({ email: true, lowercase: true, trim: true }),
-        roles: col.array(col.text().oneOf(["admin", "editor"])).notNull().default([]),
-        passwordHash: col.text().column("password_hash").private(),
-        displayName: col.varchar(120).describe("What the user is called in the panel")
+        roles: col.text({ enum: ["admin", "editor"] }).array().notNull().default([]),
+        passwordHash: col.text("password_hash").private(),
+        displayName: col.varchar({ length: 120 }).describe("What the user is called in the panel")
     },
     rls: "admin-only",
     auth: {
@@ -42,7 +42,7 @@ export const users = defineAuthTable("users", {
 });
 
 export const tags = defineTable("tags", {
-    columns: { id: col.integer().primaryKey().identity(), name: col.text().notNull().unique() },
+    columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), name: col.text().notNull().unique() },
     rls: "inherit"
 });
 
@@ -51,7 +51,7 @@ export const comments = defineTable("comments", {
         id: col.uuid().primaryKey().defaultRandom(),
         body: col.text().notNull().transform({ beforeSave: ({ value }) => value.trim() }),
         postId: col.uuid().notNull(),
-        createdAt: col.timestamptz().notNull().onCreateNow()
+        createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow()
     },
     relations: {
         post: rel.belongsTo(() => posts, { localKey: "post_id", onDelete: "cascade" }),
@@ -77,12 +77,12 @@ export const posts = defineTable("posts", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         title: col.text().notNull().validate({ min: 3, max: 200 }),
-        slug: col.varchar(160).notNull().unique(),
+        slug: col.varchar({ length: 160 }).notNull().unique(),
         status: col.enum(["draft", "needs_review", "published", "archived"]).notNull().default("draft"),
         heroImage: col.storage({ path: "posts/heroes/", accept: ["image/*"], maxBytes: "10MB" }),
         gallery: col.storage({ path: "posts/gallery/", maxBytes: 1500 }).validate({ max: 300 }).multiple().notNull().validate({ maxItems: 12 }),
-        embedding: col.vector(1536, { index: { method: "hnsw", metric: "cosine" } }),
-        metadata: col.jsonb<{ seoTitle?: string; canonicalUrl?: string }>(),
+        embedding: col.vector({ dimensions: 1536, index: { method: "hnsw", metric: "cosine" } }),
+        metadata: col.jsonb().$type<{ seoTitle?: string; canonicalUrl?: string }>(),
         content: col.jsonb(json.array(json.oneOf({
             text: json.string(),
             image: json.storage({ path: "posts/content/" })
@@ -99,14 +99,14 @@ export const posts = defineTable("posts", {
         }, { additional: true })),
         blocks: col.json(json.oneOf({ quote: json.object({ by: json.string() }) }, { typeField: "kind", valueField: "data" })),
         priority: col.integer().oneOf([1, 2, 3]),
-        publishDate: col.timestamptz(),
+        publishDate: col.timestamp({ withTimezone: true }),
         orgId: col.uuid().notNull(),
         createdBy: col.uuid().onCreateUser(),
         updatedBy: col.uuid().onUpdateUser().readOnly(),
-        createdAt: col.timestamptz().notNull().onCreateNow(),
-        updatedAt: col.timestamptz().notNull().onUpdateNow(),
-        deletedAt: col.timestamptz(),
-        wordCount: col.integer().generatedAs("length(title)"),
+        createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
+        updatedAt: col.timestamp({ withTimezone: true }).notNull().onUpdateNow(),
+        deletedAt: col.timestamp({ withTimezone: true }),
+        wordCount: col.integer().generatedAlwaysAs(sql`length(title)`),
         __order: col.text()
     },
     relations: {
@@ -134,6 +134,8 @@ export const posts = defineTable("posts", {
     }
 });
 
+const moodTypeEnum = pgEnum("mood_type", ["happy", "sad"]);
+
 /** Every remaining column builder and modifier, on one table. */
 export const kitchen = defineTable("kitchen_sink", {
     table: "kitchen",
@@ -143,30 +145,30 @@ export const kitchen = defineTable("kitchen_sink", {
     description: "Every column kind",
     columns: {
         tenantId: col.text().notNull(),
-        code: col.char(2).primaryKey(),
-        plain: col.varchar(),
+        code: col.char({ length: 2 }).primaryKey(),
+        plain: col.varchar({ length: 255 }),
         small: col.smallint().validate({ min: -5, max: 5, integer: true }),
-        big: col.bigint().default(9007199254740991),
+        big: col.bigint({ mode: "number" }).default(9007199254740991),
         tiny: col.smallserial(),
         counter: col.serial(),
-        huge: col.bigserial(),
+        huge: col.bigserial({ mode: "number" }),
         ratio: col.real().validate({ moreThan: 0, lessThan: 1 }),
         precise: col.doublePrecision().validate({ positive: true }),
-        money: col.numeric(10, 2).default(0),
-        whole: col.numeric(5),
+        money: col.numeric({ precision: 10, scale: 2 }).default(0),
+        whole: col.numeric({ precision: 5 }),
         anyNumber: col.numeric(),
         flag: col.boolean().default(true),
         day: col.date().validate({ min: new Date("2020-01-01T00:00:00.000Z"), max: "2030-12-31" }),
         at: col.time(),
         blob: col.bytea(),
         raw: col.json(),
-        noIndex: col.vector(3, { index: false }),
-        multi: col.vector(8, { index: { method: "hnsw", metric: ["cosine", "l2", "ip"], m: 16, efConstruction: 64 } }),
-        flat: col.vector(8, { index: { method: "ivfflat", lists: 100 } }),
+        noIndex: col.vector({ dimensions: 3, index: false }),
+        multi: col.vector({ dimensions: 8, index: { method: "hnsw", metric: ["cosine", "l2", "ip"], m: 16, efConstruction: 64 } }),
+        flat: col.vector({ dimensions: 8, index: { method: "ivfflat", lists: 100 } }),
         place: col.geopoint(),
-        mood: col.enum(["happy", "sad"], { name: "mood_type" }).default("happy"),
-        shortId: col.text().defaultSql("gen_short_id()").unique(),
-        legacy: col.text().dbDefault().column("LegacyCol"),
+        mood: moodTypeEnum().default("happy"),
+        shortId: col.text().default(sql`gen_short_id()`).unique(),
+        legacy: col.text("LegacyCol").dbDefault(),
         phone: col.text().validate({ matches: /^\+?[0-9 ]+$/, matchesMessage: "digits only", requiredMessage: "needed" }),
         caseless: col.text().validate({ matches: "^[a-z]+$", matchesFlags: "i", length: 8, uppercase: true }),
         secret: col.text().private().access({ read: [], write: ["admin"] }),
@@ -183,11 +185,11 @@ export const kitchen = defineTable("kitchen_sink", {
             includeBucketUrl: false,
             storeUrl: true
         }),
-        ids: col.array(col.uuid()).validate({ minItems: 1, uniqueItems: true }),
-        moods: col.array(col.enum(["happy", "sad"], { name: "mood_type" })),
-        scores: col.array(col.integer().oneOf([1, 2])),
-        labels: col.array(col.text().transform({ afterRead: ({ value }) => value })),
-        sorted: col.text().notNull().default("a").oneOf(["a", "b"]).validate({ min: 1 }).describe("A sort key")
+        ids: col.uuid().array().validate({ minItems: 1, uniqueItems: true }),
+        moods: moodTypeEnum().array(),
+        scores: col.integer().oneOf([1, 2]).array(),
+        labels: col.text().transform({ afterRead: ({ value }) => value }).array(),
+        sorted: col.text({ enum: ["a", "b"] }).notNull().default("a").validate({ min: 1 }).describe("A sort key")
     },
     rls: [
         { name: "owner", operation: "all", ownerField: "tenant_id" },
@@ -219,7 +221,7 @@ export const kitchen = defineTable("kitchen_sink", {
 export const accounts = defineTable("accounts", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
-        deletedAt: col.timestamptz()
+        deletedAt: col.timestamp({ withTimezone: true })
     },
     relations: {
         profile: rel.hasOne(() => profiles, { foreignKey: "account_id" }),
@@ -235,7 +237,7 @@ export const accounts = defineTable("accounts", {
 export const profiles = defineTable("profiles", {
     columns: {
         accountId: col.uuid().primaryKey(),
-        locale: col.char(5).primaryKey(),
+        locale: col.char({ length: 5 }).primaryKey(),
         bio: col.text()
     },
     relations: {
@@ -259,7 +261,7 @@ export const postStats = defineView("post_stats", {
     query: "select\n    status,\n    count(*) as total\nfrom posts\ngroup by status",
     materialized: true,
     roles: ["admin", "analyst"],
-    columns: { status: col.text().primaryKey(), total: col.bigint().notNull() },
+    columns: { status: col.text().primaryKey(), total: col.bigint({ mode: "number" }).notNull() },
     indexes: [{ columns: ["total"] }],
     metadata: { refresh: "hourly" }
 });

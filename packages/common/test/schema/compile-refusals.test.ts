@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { ColumnBuilder, TABLE_BRAND, VIEW_BRAND, col, defineAuthTable, defineTable, defineView, json, policy, rel } from "@rebasepro/types";
+import { ColumnBuilder, TABLE_BRAND, VIEW_BRAND, col, defineAuthTable, defineTable, defineView, json, policy, rel, pgEnum } from "@rebasepro/types";
 import type { AnyTableDef, AnyViewDef, ColumnDef, DefaultRls } from "@rebasepro/types";
 
 import { compileTables, type AnySchemaDef } from "../../src/schema/compile-tables";
@@ -123,8 +123,8 @@ describe("compileTables — refusals", () => {
 
             const cols = table("cols", {
                 id: id(),
-                first: col.text().column(`${long}_first`),
-                second: col.text().column(`${long}_second`)
+                first: col.text(`${long}_first`),
+                second: col.text(`${long}_second`)
             });
             expect(problemsOf([cols])).toEqual([{
                 table: "cols", key: "second", message: expect.stringContaining("once Postgres keeps the first 63 bytes. Give one a shorter `.column()`")
@@ -141,9 +141,13 @@ describe("compileTables — refusals", () => {
         });
 
         it("refuses one named enum type with two lists of values", () => {
-            const a = table("a", { id: id(), s: col.enum(["x", "y"], { name: "shared_status" }) });
-            const b = table("b", { id: id(), s: col.enum(["x", "z"], { name: "shared_status" }) });
-            const same = table("c", { id: id(), s: col.enum(["x", "y"], { name: "shared_status" }) });
+            const sharedStatusEnum = pgEnum("shared_status", ["x", "y"]);
+
+            const a = table("a", { id: id(), s: sharedStatusEnum() });
+            const sharedStatusEnum2 = pgEnum("shared_status", ["x", "z"]);
+
+            const b = table("b", { id: id(), s: sharedStatusEnum2() });
+            const same = table("c", { id: id(), s: sharedStatusEnum() });
             expect(problemsOf([a, b, same])).toEqual([{
                 table: "b", key: "s",
                 message: expect.stringContaining("the enum type \"public\".\"shared_status\" is given the values (x, z) here and (x, y)")
@@ -271,7 +275,7 @@ describe("compileTables — refusals", () => {
             expect(problemsOf([t({ id: id(), removed: col.boolean() }, { field: "removed" })])).toEqual([{
                 table: "t", message: expect.stringContaining("that column is `boolean`. Make it `col.timestamptz()`")
             }]);
-            expect(problemsOf([t({ id: id(), deletedAt: col.timestamptz() }, JSON.parse("\"yes\""))])).toEqual([{
+            expect(problemsOf([t({ id: id(), deletedAt: col.timestamp({ withTimezone: true }) }, JSON.parse("\"yes\""))])).toEqual([{
                 table: "t", message: "`softDelete` must be `true` or `{ field }`."
             }]);
         });
@@ -386,7 +390,9 @@ describe("compileTables — refusals", () => {
         it("refuses a bound enum column that is not the key's enum type", () => {
             const codes = table("codes", { code: col.enum(["a", "b"]).primaryKey() });
             const own = table("own", { id: id(), codeId: col.enum(["a", "b"]) });
-            const shared = table("shared", { id: id(), codeId: col.enum(["a", "b"], { name: "codes_code" }) });
+            const codesCodeEnum = pgEnum("codes_code", ["a", "b"]);
+
+            const shared = table("shared", { id: id(), codeId: codesCodeEnum() });
             const ownDef = rawTable("own", { ...own.config, relations: { code: rel.belongsTo(() => codes) } });
             const sharedDef = rawTable("shared", { ...shared.config, relations: { code: rel.belongsTo(() => codes) } });
             expect(problemsOf([codes, ownDef, sharedDef])).toEqual([{
@@ -410,7 +416,7 @@ describe("compileTables — refusals", () => {
         it("refuses a derived foreign key whose key is taken, or derived twice", () => {
             const users = table("users");
             const taken = rawTable("taken", {
-                columns: { id: id(), authorId: col.text().column("writer") },
+                columns: { id: id(), authorId: col.text("writer") },
                 relations: { author: rel.belongsTo(() => users) },
                 rls: "admin-only"
             });
@@ -511,7 +517,7 @@ describe("compileTables — refusals", () => {
             const t = table("t", {
                 id: id(),
                 items: col.array(col.text().notNull().default("x").access({ read: ["a"] })),
-                fine: col.array(col.text().validate({ max: 3 }).oneOf(["a", "b"]).describe("an item"))
+                fine: col.text({ enum: ["a", "b"] }).validate({ max: 3 }).describe("an item").array()
             });
             expect(problemsOf([t])).toEqual([{
                 table: "t",
@@ -523,7 +529,7 @@ describe("compileTables — refusals", () => {
         it("refuses a private primary key and an instant as a key", () => {
             const t = table("t", { id: rawColumn({ type: { kind: "uuid" }, primaryKey: true, notNull: true, private: true }) });
             expect(problemsOf([t])).toEqual([{ table: "t", key: "id", message: expect.stringContaining("a primary-key column cannot be `.private()`") }]);
-            const at = table("at", { at: col.timestamptz().primaryKey() });
+            const at = table("at", { at: col.timestamp({ withTimezone: true }).primaryKey() });
             expect(problemsOf([at])).toEqual([{ table: "at", key: "at", message: expect.stringContaining("a `timestamptz` column cannot be part of the key") }]);
             expect(problemsOf([table("day", { day: col.date().primaryKey() })])).toEqual([]);
         });
@@ -609,7 +615,7 @@ describe("compileTables — uniqueBy", () => {
             missing: col.jsonb(json.array(json.object({ sku: json.string() })).validate({ uniqueBy: ["ean"] })),
             scalars: col.jsonb(json.array(json.string()).validate({ uniqueBy: ["x"] })),
             empty: col.jsonb(json.array(json.object({ sku: json.string() })).validate({ uniqueBy: [] })),
-            pgArray: col.array(col.text()).validate({ uniqueBy: ["x"] }),
+            pgArray: col.text().array().validate({ uniqueBy: ["x"] }),
             nested: col.jsonb(json.object({ inner: json.array(json.object({ a: json.string() })).validate({ uniqueBy: ["b"] }) }))
         })]);
         expect(problems.map(problem => [problem.key, problem.message])).toEqual([

@@ -1,11 +1,13 @@
 import { describe, expect, it } from "@jest/globals";
-import { col, defineTable, defineView, rel, type TableDescriptor } from "@rebasepro/types";
+import { col, defineTable, defineView, rel, type TableDescriptor, pgEnum, sql } from "@rebasepro/types";
 
 import { compileTables } from "../../src/schema/compile-tables";
 import { columnDefOfDescriptor, tableDefsFromDescriptors } from "../../src/schema/descriptor-to-def";
 import { lowerTables } from "../../src/schema/lower-tables";
 import { isSchemaDefinitionError } from "../../src/schema/errors";
 import { DEFAULT_RLS } from "./print-table.fixtures";
+
+const userStatusEnum = pgEnum("user_status", ["active", "gone"]);
 
 /**
  * A descriptor nobody authored (what introspection reports) reaches the
@@ -16,25 +18,25 @@ import { DEFAULT_RLS } from "./print-table.fixtures";
 const users = defineTable("users", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
-        email: col.varchar(320).notNull().unique(),
-        ip: col.custom("inet"),
-        roles: col.array(col.text().oneOf(["a", "b"])),
-        status: col.enum(["active", "gone"], { name: "user_status" }).notNull().default("active")
+        email: col.varchar({ length: 320 }).notNull().unique(),
+        ip: col.custom({ dataType: "inet" }),
+        roles: col.text({ enum: ["a", "b"] }).array(),
+        status: userStatusEnum().notNull().default("active")
     },
     rls: [{ operation: "select", access: "authenticated" }]
 });
-const tags = defineTable("tags", { columns: { id: col.integer().primaryKey().identity(), name: col.text() }, rls: "admin-only" });
+const tags = defineTable("tags", { columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), name: col.text() }, rls: "admin-only" });
 const posts = defineTable("blog_posts", {
     slug: "posts",
     description: "Posts.",
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         title: col.text().notNull().validate({ max: 200 }),
         authorId: col.uuid().notNull(),
         body: col.jsonb(),
-        createdAt: col.timestamptz().notNull().onCreateNow(),
-        words: col.integer().generatedAs("0"),
-        deletedAt: col.timestamptz()
+        createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
+        words: col.integer().generatedAlwaysAs(sql`0`),
+        deletedAt: col.timestamp({ withTimezone: true })
     },
     relations: {
         author: rel.belongsTo(() => users, { onDelete: "cascade" }),
@@ -48,7 +50,7 @@ const posts = defineTable("blog_posts", {
     indexes: [{ columns: ["title"], reason: "by title" }]
 });
 const comments = defineTable("comments", {
-    columns: { id: col.integer().primaryKey().identity(), postId: col.integer() },
+    columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), postId: col.integer() },
     relations: { post: rel.belongsTo(() => posts, { localKey: "post_id" }) },
     rls: "admin-only"
 });

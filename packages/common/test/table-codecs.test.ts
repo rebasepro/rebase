@@ -11,7 +11,7 @@ import { restCodecOf, valueCodecOf, valueCodecOfType } from "../src/table/codecs
  */
 
 const authors = defineTable("authors", {
-    columns: { id: col.bigint().primaryKey() },
+    columns: { id: col.bigint({ mode: "number" }).primaryKey() },
     rls: "admin-only"
 });
 
@@ -19,23 +19,23 @@ const posts = defineTable("posts", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         title: col.text(),
-        code: col.varchar(12),
+        code: col.varchar({ length: 12 }),
         status: col.enum(["draft", "published"]),
         views: col.integer(),
-        hits: col.bigint(),
-        price: col.numeric(10, 2),
+        hits: col.bigint({ mode: "number" }),
+        price: col.numeric({ precision: 10, scale: 2 }),
         ratio: col.doublePrecision(),
         published: col.boolean(),
-        createdAt: col.timestamptz(),
+        createdAt: col.timestamp({ withTimezone: true }),
         day: col.date(),
         opensAt: col.time(),
         meta: col.jsonb(json.object({ seo: json.string() })),
         raw: col.json(),
         place: col.geopoint(),
-        embedding: col.vector(3),
+        embedding: col.vector({ dimensions: 3 }),
         file: col.bytea(),
-        tags: col.array(col.text()),
-        ip: col.custom("inet")
+        tags: col.text().array(),
+        ip: col.custom({ dataType: "inet" })
     },
     relations: { author: rel.belongsTo(() => authors) },
     rls: "admin-only"

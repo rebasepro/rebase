@@ -16,7 +16,7 @@ const posts = defineTable("posts", {
         title: col.text(),
         cover: col.storage({ path: "posts/covers", accept: ["image/*"], maxBytes: "1MB", source: "media" }),
         gallery: col.storage({ path: "posts/gallery", public: true }).multiple(),
-        attachments: col.array(col.storage({ path: "posts/attachments", maxBytes: 10 })),
+        attachments: col.storage({ path: "posts/attachments", maxBytes: 10 }).array(),
         content: col.jsonb(json.object({
             seo: json.object({ image: json.storage({ path: "posts/seo" }), title: json.string() }),
             blocks: json.array(json.oneOf({
