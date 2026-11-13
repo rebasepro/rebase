@@ -10,15 +10,62 @@
  * re-exports the package as installed and adds `defineCollection` as 0.30
  * defined it: `resolveResourceRefs(collection)` from `@rebasepro/types` (the
  * legacy loader resolves resource handles the same way afterwards, so a
- * project still on 0.30 packages loads the same values). The shims live in
- * the system's temporary directory, named by their content, never in the
- * project.
+ * project still on 0.30 packages loads the same values). The shims live in a
+ * directory of this run's own ({@link createShimDir}), never in the project.
  */
-import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
+
+/**
+ * The directory one run writes its shims into, and what it wrote there.
+ *
+ * Fresh per run — `mkdtemp` under the system's temporary directory, which
+ * creates it with a random name and mode 0700 — because the shims are code the
+ * run then evaluates: a directory any other user could have written to first
+ * (the fixed, content-named path this used to be, on a shared `/tmp`) would
+ * run whatever they planted there, `--dry-run` included. Every file is
+ * created exclusively (`wx`), so a file the run did not write is never used.
+ * {@link removeShimDir} deletes it when the run is over, failed or not.
+ */
+export interface ShimDir {
+    /** The directory, absolute. */
+    path: string;
+    /** The files this run created in it, by name. */
+    written: Map<string, string>;
+}
+
+/** A private directory for one run's shims. */
+export function createShimDir(): ShimDir {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-legacy-shims-"));
+    // `mkdtemp` already creates it 0700 on POSIX; said again for an umask or
+    // platform that does not.
+    fs.chmodSync(dir, 0o700);
+    return { path: dir, written: new Map() };
+}
+
+/** Delete a run's shim directory and everything in it. */
+export function removeShimDir(dir: ShimDir): void {
+    fs.rmSync(dir.path, { recursive: true, force: true });
+}
+
+/**
+ * Write one shim into the run's directory and answer its path. A name this
+ * run already wrote with the same text is answered again; anything else on
+ * disk under that name is refused (`wx`), never read.
+ */
+function writeShim(dir: ShimDir, name: string, text: string): string {
+    const file = path.join(dir.path, name);
+    const previous = dir.written.get(name);
+    if (previous === text) return file;
+    if (previous !== undefined) {
+        throw new Error(`Two different shims were asked for under one name (${name}); this is a bug in the migration.`);
+    }
+    fs.writeFileSync(file, text, { flag: "wx", mode: 0o600 });
+    dir.written.set(name, text);
+    return file;
+}
 
 /** The packages whose 0.30 `defineCollection` the shim restores. */
 const SHIMMED = ["@rebasepro/cms-types", "@rebasepro/common"] as const;
@@ -65,9 +112,10 @@ function subpathAliases(configDir: string, aliases: Readonly<Record<string, stri
  * plus a shim for each package that lost `defineCollection`.
  *
  * @param configDir the project's `config/`, absolute
+ * @param shimDir the run's private shim directory ({@link createShimDir})
  * @param aliases the run's module aliases (in-repo runs map `@rebasepro/*` to source)
  */
-export function legacyLoadAliases(configDir: string, aliases: Readonly<Record<string, string>> = {}): Record<string, string> {
+export function legacyLoadAliases(configDir: string, shimDir: ShimDir, aliases: Readonly<Record<string, string>> = {}): Record<string, string> {
     const out: Record<string, string> = { ...aliases };
     const types = resolveFrom(configDir, aliases, TYPES);
     if (!types) return out;
@@ -82,12 +130,7 @@ export function legacyLoadAliases(configDir: string, aliases: Readonly<Record<st
         "};",
         ""
     ].join("\n");
-    const typesDir = path.join(os.tmpdir(), "rebase-legacy-shims", createHash("sha256").update(typesShim).digest("hex").slice(0, 16));
-    const typesFile = path.join(typesDir, "_rebasepro_types.ts");
-    if (!fs.existsSync(typesFile)) {
-        fs.mkdirSync(typesDir, { recursive: true });
-        fs.writeFileSync(typesFile, typesShim);
-    }
+    const typesFile = writeShim(shimDir, "_rebasepro_types.ts", typesShim);
     Object.assign(out, subpathAliases(configDir, aliases, TYPES));
     out[TYPES] = typesFile;
     for (const name of SHIMMED) {
@@ -99,12 +142,7 @@ export function legacyLoadAliases(configDir: string, aliases: Readonly<Record<st
             `export { resolveResourceRefs as defineCollection } from ${JSON.stringify(types)};`,
             ""
         ].join("\n");
-        const dir = path.join(os.tmpdir(), "rebase-legacy-shims", createHash("sha256").update(text).digest("hex").slice(0, 16));
-        const shim = path.join(dir, `${name.replace(/[@/]/g, "_")}.ts`);
-        if (!fs.existsSync(shim)) {
-            fs.mkdirSync(dir, { recursive: true });
-            fs.writeFileSync(shim, text);
-        }
+        const shim = writeShim(shimDir, `${name.replace(/[@/]/g, "_")}.ts`, text);
         Object.assign(out, subpathAliases(configDir, aliases, name));
         out[name] = shim;
     }
@@ -122,12 +160,14 @@ type Importer = (file: string) => Promise<Record<string, unknown>>;
  * as installed no longer exports it and the new one does: a project still on
  * 0.30 packages loads exactly as before.
  *
+ * @param shimDir the run's private shim directory ({@link createShimDir})
  * @param aliases the aliases the load uses so far ({@link legacyLoadAliases})
  * @param importModule an importer built with those aliases
  * @param moves the moved-symbol table
  */
 export async function movedNameAliases(
     configDir: string,
+    shimDir: ShimDir,
     aliases: Readonly<Record<string, string>>,
     importModule: Importer,
     moves: readonly { symbol: string; from: string; to: string | null; as?: string }[]
@@ -166,12 +206,7 @@ export async function movedNameAliases(
         lines.push(`export * from ${JSON.stringify(current)};`);
         for (const [destination, names] of byDestination) lines.push(`export { ${names.join(", ")} } from ${JSON.stringify(destination)};`);
         const text = `${lines.join("\n")}\n`;
-        const dir = path.join(os.tmpdir(), "rebase-legacy-shims", createHash("sha256").update(text).digest("hex").slice(0, 16));
-        const shim = path.join(dir, `${name.replace(/[@/]/g, "_")}-moved.ts`);
-        if (!fs.existsSync(shim)) {
-            fs.mkdirSync(dir, { recursive: true });
-            fs.writeFileSync(shim, text);
-        }
+        const shim = writeShim(shimDir, `${name.replace(/[@/]/g, "_")}-moved.ts`, text);
         if (!Object.prototype.hasOwnProperty.call(out, name)) Object.assign(out, subpathAliases(configDir, aliases, name));
         out[name] = shim;
     }
