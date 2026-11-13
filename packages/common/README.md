@@ -18,9 +18,9 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 - **The schema compiler** — `compileTables` / `compileSchema` turn `defineTable` results into the descriptors the backend serves
 - **Table helpers** — column codecs, write defaults and stamps, storage and user-column positions, field-operation bounds, read over a `TableDescriptor`
-- **Data driver adapter** — `buildRebaseData()` bridges any `DataDriver` implementation into a `RebaseData` proxy with typed collection accessors
-- **Query builder** — fluent `QueryBuilder` class plus `or()`, `and()`, `cond()` helpers for composing complex queries
-- **Entity/property utilities** — entity resolution, enum helpers, permission checks, reference/relation helpers, storage path utils, callback utilities
+- **SDK data over a driver** — `buildSdkData()` turns any `DataDriver` into the SDK's data surface (`data.products.find()`, `data.table(slug)`), serving rows as the REST API does; `buildRoutedSdkData()` routes it across data sources
+- **Query helpers** — `or()`, `and()`, `not()`, `cond()` for composing complex filters
+- **Policy, tenant, storage and identity helpers** over table descriptors
 
 This package has no React dependency — it's pure TypeScript and can be used in both client and server contexts.
 
@@ -30,8 +30,9 @@ This package has no React dependency — it's pure TypeScript and can be used in
 
 | Export | Description |
 |---|---|
-| `buildRebaseData(driver)` | Wraps a `DataDriver` in a `Proxy`-based `RebaseData` object. Property access like `data.products` returns a `TableAccessor` for that table's slug (camelCase → snake_case); `data.table(slug)` names one explicitly. |
-| `QueryBuilder<M>` | Fluent query builder with `.where()`, `.orderBy()`, `.limit()`, `.offset()`, `.search()`, `.include()`, `.find()`, and `.listen()` |
+| `buildSdkData(driver, options?)` | The SDK's data surface over a `DataDriver` — what `rebase.data` and a hook's `context.data` are. Property access like `data.products` returns an `SDKTableClient` for that table's slug (camelCase → snake_case); `data.table(slug)` names one explicitly. Rows are served as the REST API serves them. |
+| `buildRoutedSdkData(params)` | The same surface over several data sources, each table routed to its driver |
+| `createDriverTableRows(driver, slug)` | Every read, write, count, aggregate, trash and listen of one table over a driver, rows as served — what `buildSdkData` is built on |
 | `or(...conditions)` | Create an OR logical condition |
 | `and(...conditions)` | Create an AND logical condition |
 | `cond(column, op, value)` | Create a single filter condition |
@@ -97,14 +98,14 @@ in 0.31. Backend code composes a table's hooks with `composeTableHooks`.
 ## Quick Start
 
 ```ts
-import { buildRebaseData, QueryBuilder, or, cond } from "@rebasepro/common";
+import { buildSdkData, or, cond } from "@rebasepro/common";
 
-// Wrap a DataDriver into a proxy-based data accessor
-const data = buildRebaseData(myDriver);
+// The SDK's data surface over a DataDriver
+const data = buildSdkData(myDriver);
 
-// Access collections by name (camelCase auto-converts to snake_case)
+// Access tables by name (camelCase auto-converts to snake_case)
 const { data: products } = await data.products.find({ limit: 10 });
-const entity = await data.products.findById("abc-123");
+const product = await data.products.findById("abc-123");
 
 // Fluent query builder
 const { data: results } = await data.products
@@ -124,7 +125,8 @@ const { data: filtered } = await data.products
 
 ## Related Packages
 
-- [`@rebasepro/types`](../types) — `DataDriver`, `RebaseData`, `TableAccessor`, `Entity`, `FindResponse`, etc.
+- [`@rebasepro/types`](../types) — `DataDriver`, `SDKTableClient`, `FindResult`, etc.
+- [`@rebasepro/cms-types`](../cms-types) — the admin panel's accessor and view model: `buildRebaseData`, `QueryBuilder`, `Entity`, `TableAccessor`, `RebaseData` (moved here in 0.31)
 - [`@rebasepro/utils`](../utils) — Low-level utilities (`toSnakeCase`, etc.)
 - [`@rebasepro/app`](../app) — Runtime layer that consumes `@rebasepro/common`
-- [`@rebasepro/client`](../client) — HTTP client that re-exports and extends the `QueryBuilder`
+- [`@rebasepro/client`](../client) — the HTTP client: the same SDK surface over REST

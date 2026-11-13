@@ -658,7 +658,8 @@ rule that silently drops a clause.
   envelopes are served as plain values). The admin panel never read the
   envelope from the socket: it reads REST through `client.data` and builds its
   view model in the browser (`toViewModelValues`, `collectionEntityDataOptions`
-  in `@rebasepro/cms-types`). The view-model builders of the driver
+  in `@rebasepro/cms-types`). The kernel (`@rebasepro/types`,
+  `@rebasepro/common`, `@rebasepro/server`) exports no view-model type. The view-model builders of the driver
   (`parseDataFromServer`, `normalizeDbValues`, `toFlatRow`) are deleted.
   Writes take the same shape: REST, the socket, MCP and the in-process SDK
   accept the values the REST API documents (a to-one relation as its key or
@@ -819,10 +820,20 @@ One line each: what, and why. Grouped by area.
   collection union names it, and `@rebasepro/firebase` depends on the CMS, so
   moving it there would make the CMS depend on Firebase. Firestore's
   authoring types (`defineFirestoreCollection`) do live in `@rebasepro/firebase`.
-- **Pending, not decided: `Entity` and the SDK accessor still live in the
-  kernel.** `buildSdkData` is built on the `Entity` accessor layer
-  (`buildRebaseData`, `createDriverAccessor`, `PolicyEvalContext`); moving
-  `Entity` out means rewriting the SDK onto rows, which is its own slice.
+- **The SDK is built on rows; `Entity` left the kernel.** `buildSdkData`
+  (`rebase.data`, `context.data`, `rebase.dataAsAdmin`) wraps
+  `createDriverTableRows` directly, and `buildRoutedSdkData` routes it by data
+  source; the admin's accessor (`buildRebaseData`, `wrapAsEntityData`,
+  `QueryBuilder`, `EntityDataOptions`) and its types (`Entity`, `TableAccessor`,
+  `RebaseData`, …) moved to `@rebasepro/cms-types`; `wrapAsSdkData` is gone;
+  `PolicyEvalContext` takes a `row`. Why: the SDK went through the admin's
+  view model to serve rows it already had. No SDK behaviour changed — pinned by
+  characterisation tests written before the move.
+- **`registerDataSourceCapabilities` stays in the kernel.** Why: it is the
+  write half of the capability registry `resolveDataSource` reads, and spec §1
+  invariant 4 puts that router in `@rebasepro/common`.
+- **`EntityStatus` stays in the kernel.** Why: it is the save status in the
+  `DataDriver` interface, not a view-model type.
 - **A to-one relation written as an object (`{ id }`) is a 400 naming the
   relation**, not silently unwrapped. Why: it was never documented or typed —
   it is the admin's `EntityRelation` JSON — and unwrapping it was the last

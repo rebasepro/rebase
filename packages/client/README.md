@@ -189,7 +189,7 @@ const unsubscribe = client.data.products.listen(
 
 ## Related Packages
 
-- [`@rebasepro/common`](../common) — `QueryBuilder`, `buildRebaseData`, shared utilities
-- [`@rebasepro/types`](../types) — `Entity`, `FindResult`, `TableAccessor`, etc.
+- [`@rebasepro/common`](../common) — `buildSdkData`, query helpers (`or`, `and`, `cond`), shared utilities
+- [`@rebasepro/types`](../types) — `FindResult`, `SDKTableClient`, etc.
 - [`@rebasepro/utils`](../utils) — `toSnakeCase` and other helpers
 - [`@rebasepro/app`](../app) — React hook adapter that wraps `client.auth` for CMS integration

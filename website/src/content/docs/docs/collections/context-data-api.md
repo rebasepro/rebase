@@ -47,6 +47,19 @@ Each table accessor (`context.data.<slug>`) provides these methods:
 | `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Listen to a single row |
 | `.trash` | `trash.find()`, `.count()`, `.restore(id)`, `.restoreMany(ids)`, `.purge(id)`, `.purgeMany(ids)` | The rows a [soft delete](/docs/collections/soft-delete#from-the-sdk) stamped |
 
+### Known limits in process
+
+The same surface over HTTP (`@rebasepro/client`) does a few things the
+in-process one (`context.data`, `rebase.data`, `rebase.dataAsAdmin`) does not.
+None of this is new in 0.31:
+
+- An in-process row carries no search `_matches` and no version: `etagOf(row)`
+  is `undefined`, so pass `ifMatch` from a row you read over HTTP.
+- `listenCount()` is not available in process: it throws "Realtime is not
+  available".
+- The table shortcut `.search(text)` takes no `{ explain }` (the query
+  builder's `.search` does, but in process there are no `_matches` to return).
+
 ## Querying with `.find()`
 
 The `find()` method filters with `[operator, value]` tuples — the typed form of

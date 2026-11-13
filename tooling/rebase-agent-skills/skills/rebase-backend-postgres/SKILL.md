@@ -363,7 +363,7 @@ that calls it gets exactly the config it passed.
 
 | Step | Method | Purpose |
 |------|--------|---------|
-| 1 | `initializeDriver(config)` | Creates the `PostgresBackendDriver`, registry, realtime service, read replica, pool manager. `config.provision: false` opens it with no DDL of any kind (no role, branch table, channel-history tables or capture triggers); `config.realtime: false` takes no part in realtime. `config.collectionRegistry` is optional — no bundled driver reads it (0.25+) |
+| 1 | `initializeDriver(config)` | Creates the `PostgresBackendDriver`, registry, realtime service, read replica, pool manager. `config.provision: false` opens it with no DDL of any kind (no role, branch table, channel-history tables or capture triggers); `config.realtime: false` takes no part in realtime. it returns `{ driver, tableRegistry, … }` (`tableRegistry` was `collectionRegistry` before 0.31) |
 | 2 | `initializeAuth(config, driverResult)` | Creates auth tables, `UserService`, `PostgresAuthRepository`. After a `provision: false` open it creates nothing and only checks the existing tables are compatible |
 | 3 | `initializeHistory(config, driverResult)` | Creates the `rebase.entity_history` table and `HistoryService`. After a `provision: false` open it creates nothing and attaches to what an earlier boot left |
 | 4 | `initializeRealtime(config, driverResult)` | Returns the `RealtimeService` for WebSocket subscriptions |

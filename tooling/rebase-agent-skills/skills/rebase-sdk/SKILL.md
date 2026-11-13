@@ -1034,6 +1034,6 @@ export function useAuth() {
 - **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)
 - **Client package source:** `packages/client/src/`
 - **SDK generator source:** `packages/codegen/src/`
-- **QueryBuilder source:** `packages/common/src/data/query_builder.ts`
+- **Query builder source:** the in-process one in `packages/common/src/data/sdk-data.ts` (`SdkQueryBuilder`); `or` / `and` / `cond` in `packages/common/src/data/query_builder.ts`
 - **Offline sync engine source:** `packages/client/src/offline.ts` (and `offline-query.ts`, `offline-store.ts`)
 - **SDK demo example:** `examples/sdk-demo/`
