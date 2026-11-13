@@ -80,7 +80,9 @@ async function servedHistoryEntries(
             // those. Served as references, like new entries.
             if (readable(key)) kept[key] = withRelationReferencesOnly(value);
         }
-        return kept;
+        // And its dates as the values they are: the wire carries no
+        // `{ __type: "date" }` envelope, from an old entry either.
+        return withoutDateEnvelopes(kept);
     };
 
     // One call for every snapshot of the page: rows[] in entry order, each
