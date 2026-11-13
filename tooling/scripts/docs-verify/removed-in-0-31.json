@@ -12,48 +12,311 @@
         "exports": {
             "@rebasepro/client": [
                 "CollectionClient",
+                "FindResponse",
                 "SDKCollectionClient"
             ],
             "@rebasepro/common": [
-                "toCollectionAccessor"
+                "AuthContext",
+                "COLLECTION_PATH_SEPARATOR",
+                "CheckOperationOptions",
+                "CollectionRegistry",
+                "DEFAULT_ONE_OF_TYPE",
+                "DEFAULT_ONE_OF_VALUE",
+                "DEFAULT_STRING_COLUMN_LENGTH",
+                "EntityCallbackContext",
+                "EntityDataOptions",
+                "IntrospectedCollection",
+                "IntrospectedRelation",
+                "JunctionDeclaringSide",
+                "JunctionEndpoint",
+                "JunctionSpec",
+                "PolicyClauses",
+                "QueryBuilder",
+                "RelationRef",
+                "RelationRefWithData",
+                "ResolvePropertyProps",
+                "RoutableData",
+                "RoutedRebaseDataParams",
+                "UnknownResolution",
+                "apiHiddenFieldNames",
+                "applyDefaultValuesOnCreate",
+                "assertBeforeQueryIsPostgresOnly",
+                "buildCollectionFromTableMetadata",
+                "buildConditionContext",
+                "buildPropertyCallbacks",
+                "buildRebaseData",
+                "buildRoutedRebaseData",
+                "buildTenantSecurityRule",
+                "canCreateEntity",
+                "canDeleteEntity",
+                "canEditEntity",
+                "canReadCollection",
+                "canReadField",
+                "canWriteField",
+                "checkOperation",
+                "compileRulePolicies",
+                "composeCallbacks",
+                "copyCarriesRelation",
+                "createRelationRef",
+                "createRelationRefWithData",
+                "defaultPoliciesDisabled",
+                "defaultUsersCollection",
+                "defineCollection",
+                "effectiveAccess",
+                "enumToObjectEntries",
+                "evaluateCondition",
+                "fieldKeyForColumn",
+                "findRelation",
+                "fullPathToCollectionSegments",
+                "getArrayResolvedProperties",
+                "getChildViewDeclaringProperties",
+                "getChildViewRelationPropertyKeys",
+                "getCopyValues",
+                "getDeclaredPrimaryKeys",
+                "getDefaultValueFor",
+                "getDefaultValueFortype",
+                "getDefaultValuesFor",
+                "getEffectiveSecurityRules",
+                "getEntityChildViews",
+                "getGeneratedPolicyNames",
+                "getInjectedSecurityRules",
+                "getJunctionCollectionConfig",
+                "getJunctionConfigForRelation",
+                "getJunctionSecurityRules",
+                "getLabelOrConfigFrom",
+                "getPrimaryKeys",
+                "getReferenceFrom",
+                "getRelationFrom",
+                "getRelationTargetPath",
+                "getSubcollections",
+                "getTableName",
+                "getTenantConfig",
+                "hasEntityId",
+                "hasFieldAccessRules",
+                "includableRelationNames",
+                "isJunctionBackedRelation",
+                "isPropertyBuilder",
+                "isRelationRequired",
+                "normalizeToEntityRelation",
+                "policyToPostgres",
+                "queryableFieldNames",
+                "registerConditionOperations",
+                "relationDeclaringProperty",
+                "requireCallbackCollection",
+                "resolveArrayProperties",
+                "resolveCollectionRelations",
+                "resolveEnumValues",
+                "resolveJunctionSpecs",
+                "resolvePrimaryKeys",
+                "resolveProperties",
+                "resolveProperty",
+                "resolvePropertyEnum",
+                "resolveRelation",
+                "resolveRelationProperty",
+                "resolveStorageFilenameString",
+                "resolveStoragePathString",
+                "resolveStorageSource",
+                "resolveStringColumnLength",
+                "restoresSoftDeletedRow",
+                "restrictedFieldNames",
+                "rowToViewModel",
+                "sanitizeData",
+                "segmentsToStrippedPath",
+                "softDeleteFieldOf",
+                "sortProperties",
+                "stripCollectionPath",
+                "toCollectionAccessor",
+                "traverseValueProperty",
+                "traverseValuesProperties",
+                "unavailableStorageSource",
+                "updateDateAutoValues",
+                "updateUserAutoValues",
+                "vectorPropertyNames",
+                "withDeprecatedAlias",
+                "withRelationReferencesOnly",
+                "wrapAsEntityData",
+                "wrapAsSdkData"
             ],
             "@rebasepro/server": [
                 "BundleConfigExports",
                 "CollectionConfigError",
                 "CollectionDefaults",
+                "CollectionRegistryInterface",
                 "ConfigProblem",
+                "DataTransformer",
+                "ListenCollectionRequest",
+                "ListenEntityRequest",
+                "UPLOAD_COLLECTION_FIELD",
+                "UPLOAD_PROPERTY_FIELD",
                 "UnknownKeyPolicy",
                 "ValidateCollectionConfigOptions",
                 "accessModelFromCollections",
                 "applyCollectionDefaults",
                 "assertCollectionConfigs",
+                "assertUploadWithinPropertyLimits",
+                "composeCallbacks",
+                "createUserThroughAuthCollection",
                 "findCollectionConfigProblems",
                 "loadBundleConfigExports",
                 "loadCollectionsFromDirectory",
                 "loadUsersCollection",
-                "unknownKeyPolicyFromEnv"
+                "readUploadPropertyContext",
+                "unknownKeyPolicyFromEnv",
+                "versionProperty"
             ],
             "@rebasepro/types": [
+                "ADMIN_COLLECTION_KEYS",
+                "ADMIN_PROPERTY_KEYS",
+                "AdminCollectionKey",
+                "AdminPropertyKey",
+                "AfterDeleteProps",
+                "AfterReadProps",
+                "AfterSaveErrorProps",
+                "AfterSaveProps",
+                "AnyCollectionConfig",
+                "ArrayProperty",
+                "ArrayPropertyValidationSchema",
+                "AuthCollectionConfig",
+                "AuthState",
+                "BaseCollectionConfig",
+                "BaseProperty",
+                "BeforeDeleteProps",
+                "BeforeQueryProps",
+                "BeforeSaveProps",
+                "BelongsToRelation",
+                "BinaryProperty",
+                "BooleanProperty",
+                "BrinIndex",
+                "BtreeIndex",
+                "ChildViewSource",
                 "CollectionAccessor",
+                "CollectionCallbacks",
+                "CollectionConfig",
+                "CollectionIndex",
                 "CollectionPatch",
                 "CollectionPatchOp",
+                "CollectionRegistryController",
+                "CollectionRegistryInterface",
                 "CollectionTrashAccessor",
+                "CollectionView",
+                "ColorHue",
+                "ColorKey",
+                "ColorScheme",
+                "ColorTone",
+                "ComponentLike",
+                "ComponentRef",
+                "ConditionContext",
+                "ConditionRule",
+                "DataTransformer",
+                "DataType",
+                "DateProperty",
+                "DatePropertyValidationSchema",
                 "DocumentAdmin",
+                "EffectiveRoleController",
+                "EngineProperties",
+                "Entity",
+                "EntityChildView",
+                "EntityReference",
+                "EntityReferenceProps",
+                "EntityRelation",
+                "EntityValues",
+                "EnumValueConditions",
+                "EnumValueConfig",
+                "EnumValues",
+                "FieldAccess",
+                "FileType",
+                "FilterPreset",
+                "FindResponse",
+                "FirebaseCollectionConfig",
+                "FirebaseProperties",
+                "FirebaseProperty",
+                "GeoPoint",
+                "GeopointProperty",
+                "GinIndex",
+                "HasManyRelation",
+                "HasOneRelation",
+                "ImageResize",
+                "IndexKey",
+                "IndexPredicate",
+                "InferCollectionConfigType",
+                "InferEntityType",
+                "InferPropertyType",
+                "JsonLogicRule",
+                "LazyComponentRef",
+                "ListenOneTarget",
                 "MONGODB_CAPABILITIES",
+                "ManyToManyRelation",
+                "MapProperty",
+                "McpAppModuleExport",
                 "MongoDBCollectionConfig",
                 "MongoProperties",
                 "MongoProperty",
+                "NoSuchKey",
+                "NumberProperty",
+                "NumberPropertyValidationSchema",
+                "PostgresCollectionConfig",
+                "PostgresProperties",
+                "PostgresProperty",
+                "Properties",
+                "Property",
+                "PropertyBuilderProps",
+                "PropertyCallbacks",
+                "PropertyConditions",
+                "PropertyTypeNotOnThisEngine",
+                "PropertyValidationSchema",
+                "QueryBuilderInterface",
                 "RUNTIME_ONLY_COLLECTION_KEYS",
+                "RebaseData",
+                "ReferenceProperty",
+                "Relation",
+                "RelationBase",
+                "RelationProperty",
+                "ResolvedBelongsTo",
+                "ResolvedForeignKeyOnTarget",
+                "ResolvedHasMany",
+                "ResolvedHasOne",
+                "ResolvedManyToMany",
+                "ResolvedRelation",
+                "ResolvedRelationBase",
+                "ResolvedVia",
                 "SDKCollectionClient",
+                "SerializedCollectionRef",
+                "SqlExpression",
+                "StorageConfig",
+                "StrictProperties",
+                "StringProperty",
+                "StringPropertyValidationSchema",
+                "UnorderedIndexKey",
+                "UploadedFileContext",
+                "Vector",
+                "VectorDistance",
+                "VectorIndexConfig",
+                "VectorProperty",
+                "ViaRelation",
                 "applyCollectionPatch",
                 "collectionPatchProblems",
+                "deserializeCollections",
                 "diffCollections",
                 "diffJsonValues",
+                "getCollectionDataPath",
+                "getDeclaredSubcollections",
+                "hasForeignKeyOnTarget",
                 "isCollectionPatch",
                 "isDocumentAdmin",
+                "isFirebaseCollectionConfig",
+                "isLazyComponentRef",
+                "isManyToMany",
                 "isMongoDBCollectionConfig",
+                "isPostgresCollectionConfig",
+                "isRelationalCollectionConfig",
+                "isSerializedCollectionRef",
+                "isToMany",
+                "nestAdminCollectionKeys",
+                "nestAdminKeysOf",
+                "nestAdminPropertyKeys",
                 "nestCollectionPatchPaths",
                 "runtimeOnlyKeyIn",
+                "serializeCollections",
                 "toCollectionJson"
             ]
         },
@@ -67,18 +330,52 @@
                     "maxCachedRowsPerCollection"
                 ]
             },
+            "@rebasepro/common": {
+                "PolicyCompileOptions": [
+                    "resolveCollection"
+                ],
+                "PolicyEvalContext": [
+                    "entity"
+                ],
+                "RulePolicyCompileOptions": [
+                    "resolveCollection"
+                ]
+            },
             "@rebasepro/server": {
+                "BackendInstance": [
+                    "collectionRegistry"
+                ],
+                "BackendServices": [
+                    "collections"
+                ],
+                "BuiltinAuthAdapterConfig": [
+                    "collectionAuthConfig"
+                ],
                 "ContractRoutesConfig": [
                     "collectionRegistry",
                     "schemaVersion"
                 ],
+                "FetchCollectionOptions": [
+                    "collection"
+                ],
                 "LoadedBundle": [
                     "collectionsDir"
+                ],
+                "McpToolContext": [
+                    "collections"
+                ],
+                "NestedWriteHop": [
+                    "parentCollection",
+                    "targetCollection"
+                ],
+                "ProvisionOptions": [
+                    "collections"
                 ],
                 "RebaseAuthConfig": [
                     "collection"
                 ],
                 "RebaseBackend": [
+                    "collectionRegistry",
                     "setCollectionCallbacks"
                 ],
                 "RebaseBackendConfig": [
@@ -91,19 +388,75 @@
                     "collections",
                     "collectionsDir"
                 ],
+                "SearchOptions": [
+                    "collection"
+                ],
                 "StorageAuthorizeData": [
                     "collection"
                 ]
             },
             "@rebasepro/types": {
+                "BackendBootstrapper": [
+                    "ensureCollectionPolicies",
+                    "ensureCollectionSchema",
+                    "readCollectionsSchemaVersion",
+                    "stampCollectionsSchemaVersion"
+                ],
+                "BackendInstance": [
+                    "collectionRegistry"
+                ],
+                "BatchWriteOperation": [
+                    "collection"
+                ],
+                "DatabaseAdapter": [
+                    "ensureCollectionPolicies",
+                    "ensureCollectionSchema",
+                    "readCollectionsSchemaVersion",
+                    "stampCollectionsSchemaVersion"
+                ],
+                "DatabaseAdapterInitConfig": [
+                    "collectionRegistry",
+                    "collections"
+                ],
+                "DataDriver": [
+                    "initTextSearch"
+                ],
                 "DataSourceCapabilities": [
                     "supportsDocumentAdmin"
                 ],
                 "DEFAULT_CAPABILITIES": [
                     "supportsDocumentAdmin"
                 ],
+                "DeleteManyProps": [
+                    "collection"
+                ],
+                "DeleteProps": [
+                    "collection"
+                ],
+                "DeleteWhereProps": [
+                    "collection"
+                ],
+                "ExistsInPolicyExpression": [
+                    "collection"
+                ],
+                "FetchCollectionOptions": [
+                    "collection"
+                ],
+                "FetchCollectionProps": [
+                    "collection"
+                ],
+                "FetchOneProps": [
+                    "collection"
+                ],
+                "FilterCombinationValidProps": [
+                    "collection"
+                ],
                 "FIREBASE_CAPABILITIES": [
                     "supportsDocumentAdmin"
+                ],
+                "InitializedDriver": [
+                    "collectionRegistry",
+                    "collections"
                 ],
                 "POSTGRES_CAPABILITIES": [
                     "supportsDocumentAdmin"
@@ -125,7 +478,25 @@
                     "collections",
                     "generatedAt"
                 ],
+                "SaveManyProps": [
+                    "collection"
+                ],
+                "SaveProps": [
+                    "collection"
+                ],
+                "SearchOptions": [
+                    "collection"
+                ],
                 "StorageAuthorizeData": [
+                    "collection"
+                ],
+                "UpdateManyProps": [
+                    "collection"
+                ],
+                "UpdateWhereProps": [
+                    "collection"
+                ],
+                "WriteFilterProps": [
                     "collection"
                 ]
             }
