@@ -314,7 +314,7 @@ implementation beside the OAuth store.
   `show_record` or `show_app`, under the platform token: the tenant holds the
   tables, checks the arguments as its read and write tools would (and
   compiles show_app's code), and returns what the model reads plus `view` —
-  the block to draw (payload version 2), and the tables' descriptors redacted
+  the block to draw (payload version 3), and the tables' descriptors redacted
   for the caller, with per-table `grants` (no column they never receive,
   read-only where they may not write, a restrictive rule closing what the
   token does not grant). The connector forwards the arguments without
