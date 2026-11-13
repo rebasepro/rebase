@@ -54,6 +54,9 @@ async function boot(): Promise<Hono<HonoEnv>> {
         server: idleServer(),
         ...tablesFrom([collection("jobs"), collection("orders", { dataSource: "firestore" })]),
         cronPersistence: false,
+        // What the document holds, not who may read it (`docs-audience` pins
+        // that): published, so an anonymous request reads all of it.
+        enableSwagger: true,
         bootstrappers: [bootstrapper],
         auth: { requireAuth: false, jwtSecret: "openapi-documented-collections-secret-123456" }
     });
