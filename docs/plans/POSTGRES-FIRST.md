@@ -647,11 +647,22 @@ rule that silently drops a clause.
      only, in `@rebasepro/common/migrate`.
 - The schema-version hash is computed over descriptors, so every project
   restamps once and every generated SDK is reported stale once.
-- **Planned, not done:** the server stops emitting the admin's view-model
-  envelope (`{ __type: "date" }`, relation refs); the CMS builds it from the
-  wire row and the descriptor. Today the Postgres driver still builds it
-  (`parseDataFromServer`, `toFlatRow`) for the socket refetch and relation
-  reads.
+- **One read shape — the read side is done.** REST, the SDK, the socket's
+  one-shot frames and subscriptions, MCP, the RLS simulator and the Postgres
+  driver's own `fetchCollection` / `fetchOne` return the same row: columns
+  under their keys, a foreign key as a key, RFC 3339 timestamps, numeric as
+  numbers, a native array's items decoded like their scalar type, and a
+  relation only when `include` names it (as the target's own row). No
+  response carries a `{ __type }` envelope; the client parses responses as
+  plain JSON and revives no class; history entries are wire rows (older
+  envelopes are served as plain values). The admin panel never read the
+  envelope from the socket: it reads REST through `client.data` and builds its
+  view model in the browser (`toViewModelValues`, `collectionEntityDataOptions`
+  in `@rebasepro/cms-types`). The view-model builders of the driver
+  (`parseDataFromServer`, `normalizeDbValues`, `toFlatRow`) are deleted.
+- **One write shape — in progress.** The admin sends wire values rather than
+  its view model, and the server's writes and filters accept wire values only;
+  the remaining write-direction work is tracked by the B-VM-W slice.
 
 ## E. Things to review first (unsure)
 
@@ -708,9 +719,30 @@ One line each: what, and why. Grouped by area.
   keyless introspected table. A `date` key sets `isDay`.
 - **Hooks run where the table is served.** Hooks attached to a collection
   object passed at a call site no longer run (use `setTableHooks`); the
-  driver's own reads mask embedded relations one level deep with the target's
-  `afterRead`; column transforms skip keys the row does not carry; the built-in
-  auth adapter uses only its configured `authTableHooks`.
+  driver's own reads mask embedded relations with the target's `afterRead` at
+  every include depth; column transforms skip keys the row does not carry; the
+  built-in auth adapter uses only its configured `authTableHooks`.
+- **The lowering bridge is deleted, and the compiler refuses what only the
+  lowering refused**: a `jsonb` / geopoint / `vector` / `bytea` / array /
+  custom-list primary key; an array of `jsonb` / `json` / `vector` / `bytea` /
+  geopoint / `col.custom`; a `.validate()` rule the kind does not check;
+  `.private()` + `.access()`; `.transform()` on a column and its JSON shape; a
+  pivot column marked `.primaryKey()` or declaring `.transform()`; an invalid
+  `col.custom` type name. Why: with `lowerTables` gone these compiled and
+  booted, so the compiler is the one place left to say no.
+- **`TableDef.defaultPolicies` is a boolean**: `true` keeps the admin baseline
+  under a database-level `rls.defaultPolicies: false`. Why: a 0.30
+  `disableDefaultPolicies: false` overrode the database on 0.30, and the
+  migration needs a way to carry it (the lift writes `defaultPolicies: true`).
+- **A native array's items are decoded like their scalar type** on every read
+  (REST codec per item, null items stay null). Why: `timestamptz[]` served the
+  Postgres literal and a null item read as `0` or `"NULL"` — the driver parsed
+  the array, REST did not, and one read shape inherited the worse of the two.
+- **A self-referencing `manyToMany` whose junction columns collide is a
+  compile error naming `targetKey`**, and a `manyToMany` into a view resolves
+  its junction. Why: the first produced a `CREATE TABLE` with a duplicate
+  column at `db push`; the second was lost when the planner started filtering
+  views.
 
 ### Access rules
 
@@ -749,6 +781,12 @@ One line each: what, and why. Grouped by area.
 
 ### Migration
 
+- **`policy-table-agreement.test.ts` is retired**: plan goldens pin the policy
+  SQL for every corpus set, which is what the agreement test checked through
+  the lowering.
+- **Tests of the retired envelope rendering are deleted** with the code that
+  rendered it (`parseDataFromServer`, `toFlatRow`, the client reviver); the
+  read shape is pinned by the door-parity and table-features suites instead.
 - **The lift survives as migration tooling only**, in
   `@rebasepro/common/migrate`, with a frozen copy of the 0.30 model and
   `defineLegacyCollection`; no runtime path imports it, and `@rebasepro/types`
@@ -768,6 +806,20 @@ One line each: what, and why. Grouped by area.
   engine.
 - **A restore into another cluster re-stamps the default-admin policies once**
   on the first push or boot: the stamp hashes role OIDs. Same names, same SQL.
+
+- **`FirebaseCollectionConfig` stays in `@rebasepro/cms-types`**, not
+  `@rebasepro/firebase` as §8 Phase 1 worded it. Why: the panel's
+  collection union names it, and `@rebasepro/firebase` depends on the CMS, so
+  moving it there would make the CMS depend on Firebase. Firestore's
+  authoring types (`defineFirestoreCollection`) do live in `@rebasepro/firebase`.
+- **Pending, not decided: `Entity` and the SDK accessor still live in the
+  kernel.** `buildSdkData` is built on the `Entity` accessor layer
+  (`buildRebaseData`, `createDriverAccessor`, `PolicyEvalContext`); moving
+  `Entity` out means rewriting the SDK onto rows, which is its own slice.
+- **Two leaks found here are older than this branch** and were fixed on it:
+  the history endpoint served stored rows unmasked (released 0.30.x), and
+  `afterRead` masked an include's rows one level deep only, so a nested
+  include served masked columns in clear (released 0.30.x).
 
 ### CMS defaults
 
@@ -800,8 +852,11 @@ One line each: what, and why. Grouped by area.
   `SCHEMA_EDIT_STALE_FILE`, so the editor offers Reload instead of matching on
   a message.
 - **Hooks edited in source run after a live apply** (the apply carries the
-  compiled tables). Open: a table a live apply adds is served by the Postgres
-  driver only after a restart.
+  compiled tables), and **a live apply is served without a restart**: the
+  Postgres driver re-reads the changed tables from the catalogue and swaps
+  them in (`refreshTables`); the apply answers `serving: { status }`, and an
+  introspected project or a driver without the capability says
+  `after-restart`.
 
 ### MCP
 
