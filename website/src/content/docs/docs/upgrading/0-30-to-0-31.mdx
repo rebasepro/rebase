@@ -410,7 +410,7 @@ A driver serves history through `DataDriver.serveStoredRows(path, rows)`, inside
 | `SchemaEditingAdmin.planSchemaChange(collections, …)` | `planSchemaChange(tables, …)` with `CompiledTable[]`; `EditedSchema.tables` |
 | `buildCollectionFromTableMetadata`, `IntrospectedCollection`, `IntrospectedRelation` | removed: an introspected table is a `TableDescriptor` |
 | `createUserThroughAuthCollection`; `NestedWriteHop.parentCollection` / `.targetCollection`; `ContractRoutesConfig.collectionRegistry` | `createUserThroughAuthTable`; `.parent` / `.target` (descriptors); removed |
-| the collection loader: `CollectionConfigError`, `ConfigProblem`, `applyCollectionDefaults`, `CollectionDefaults`, `ValidateCollectionConfigOptions`, `accessModelFromCollections`, `loadBundleConfigExports`, `BundleConfigExports`, `unknownKeyPolicyFromEnv`, `UnknownKeyPolicy` | removed: `compileSchema` / `loadBackendSchema` load and check `backend/schema`, and a `SchemaDefinitionError` names every problem |
+| the collection loader: `CollectionConfigError`, `ConfigProblem`, `applyCollectionDefaults`, `CollectionDefaults` and the validator's options type, `accessModelFromCollections`, `loadBundleConfigExports`, `BundleConfigExports`, `unknownKeyPolicyFromEnv`, `UnknownKeyPolicy` | removed: `compileSchema` / `loadBackendSchema` load and check `backend/schema`, and a `SchemaDefinitionError` names every problem |
 
 **What to do:** rename. `rebase migrate sdk-calls` renames `assertUploadWithinPropertyLimits` and the upload field constants (`UPLOAD_COLLECTION_FIELD` / `UPLOAD_PROPERTY_FIELD` → `UPLOAD_TABLE_FIELD` / `UPLOAD_COLUMN_FIELD`, same values), and lists every other import or option in this table as a numbered manual step.
 
