@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import type { Entity, EntityRelation } from "@rebasepro/types";
+import type { Entity } from "@rebasepro/types";
 import type { PropertyConfig, AdminCollection, EntityDisplayRole } from "@rebasepro/cms-types";
 import { getEntityImagePreviewPropertyKey } from "@rebasepro/app";
 import { getDisplayPropertyKey } from "@rebasepro/app";
@@ -8,7 +8,7 @@ import { getEntityFromCache } from "@rebasepro/app";
 import { getEntityPreviewKeys } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
 import { formatCollectionDate, type FormatCollectionDateOptions } from "../../util/format_collection_date";
-import type { AuthController, Property, RelationProperty } from "@rebasepro/cms-types";
+import type { AuthController, Property, RelationProperty, EntityRelation } from "@rebasepro/cms-types";
 import { ChipColorScheme, CHIP_COLORS, CHIP_SEED_KEYS, useUiLabels } from "@rebasepro/ui";
 import { useEntityDisplay } from "../../hooks/useEntityDisplay";
 

@@ -398,6 +398,11 @@
       "to": "@rebasepro/common/migrate"
     },
     {
+      "symbol": "normalizeToEntityRelation",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "PolicyClauses",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
@@ -586,6 +591,12 @@
       "symbol": "withDeprecatedAlias",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "withRelationReferencesOnly",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "History entries hold the stored (wire) row, which embeds no related row; the history routes serve an older entry's relation refs as keys. Nothing replaces it."
     },
     {
       "symbol": "composeCallbacks",
@@ -805,6 +816,21 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "EntityReference",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "EntityReferenceProps",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "EntityRelation",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "EnumValueConditions",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
@@ -846,6 +872,11 @@
     },
     {
       "symbol": "FirebaseProperty",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "GeoPoint",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
     },
@@ -1160,6 +1191,11 @@
     },
     {
       "symbol": "UploadedFileContext",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "Vector",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
     },

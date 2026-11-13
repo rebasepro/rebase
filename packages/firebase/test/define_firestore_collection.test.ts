@@ -1,11 +1,11 @@
 import { describe, expect, it } from "@jest/globals";
 import {
-    EntityReference,
     getDataSourceCapabilities
 } from "@rebasepro/types";
 import {
     isFirebaseCollectionConfig,
-    type FirebaseProperties
+    type FirebaseProperties,
+    EntityReference
 } from "@rebasepro/cms-types";
 import { resolveDataSource } from "@rebasepro/common";
 import { defineFirestoreCollection, type FirestoreDocumentOf } from "../src/collections";

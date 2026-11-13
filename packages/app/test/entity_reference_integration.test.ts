@@ -5,8 +5,7 @@
  * flow through various utility functions during entity save operations.
  */
 import { describe, expect, it } from "@jest/globals";
-import { EntityReference, GeoPoint } from "@rebasepro/types";
-import { updateDateAutoValues } from "@rebasepro/cms-types";
+import { updateDateAutoValues, EntityReference, GeoPoint } from "@rebasepro/cms-types";
 import { mergeDeep } from "@rebasepro/utils";
 
 // Real EntityReference class for testing

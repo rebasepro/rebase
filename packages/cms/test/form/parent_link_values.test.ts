@@ -7,7 +7,7 @@
  * just come from — although the server stamps that link on the create anyway.
  */
 import type { CollectionConfig, StringProperty } from "@rebasepro/cms-types";
-import { EntityRelation } from "@rebasepro/types";
+import { EntityRelation } from "@rebasepro/cms-types";
 import { getParentLinkValues } from "../../src/form/form_utils";
 
 const id: StringProperty = {

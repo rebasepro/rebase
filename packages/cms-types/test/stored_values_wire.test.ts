@@ -1,5 +1,4 @@
-import { EntityReference, EntityRelation, GeoPoint, Vector } from "@rebasepro/types";
-import { type CollectionConfig } from "@rebasepro/cms-types";
+import { type CollectionConfig, EntityReference, EntityRelation, GeoPoint, Vector } from "@rebasepro/cms-types";
 import { wrapAsEntityData } from "@rebasepro/common";
 import type { FindParams } from "@rebasepro/types";
 import { collectionEntityDataOptions } from "../src/data/collection_view_model";

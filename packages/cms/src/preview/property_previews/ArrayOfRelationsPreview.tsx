@@ -1,7 +1,7 @@
 import type { ArrayProperty, RelationProperty } from "@rebasepro/cms-types";
-import { EntityRelation } from "@rebasepro/types";
+import { EntityRelation } from "@rebasepro/cms-types";
 import type { PropertyPreviewProps } from "../../types/components/PropertyPreviewProps";
-import { normalizeToEntityRelation } from "@rebasepro/common";
+import { normalizeToEntityRelation } from "@rebasepro/cms-types";
 import { getRelationTargetPath } from "../../util/relations";
 import { RelationPreview } from "../components/RelationPreview";
 import { useIsNestedEntityPreview } from "../../components/EntityPreviewNesting";

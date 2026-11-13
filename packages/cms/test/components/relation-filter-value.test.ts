@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { EntityRelation } from "@rebasepro/types";
+import { EntityRelation } from "@rebasepro/cms-types";
 import { toRelationFilterValue } from "../../src/components/SelectableTable/filters/FilterFieldBinding";
 
 /**

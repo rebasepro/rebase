@@ -1,8 +1,8 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { EntityRelation, col, defineTable, json, rel } from "@rebasepro/types";
+import { col, defineTable, json, rel } from "@rebasepro/types";
 import { compileTables } from "@rebasepro/common";
-import { getDefaultValuesFor, type ArrayProperty, type MapProperty, type Property } from "@rebasepro/cms-types";
+import { getDefaultValuesFor, type ArrayProperty, type MapProperty, type Property, EntityRelation } from "@rebasepro/cms-types";
 import type { AdminPostgresCollection, FieldProps } from "@rebasepro/cms-types";
 import { applyTableCustomization, applyTableCustomizations, customizeTable, updateRecord } from "@rebasepro/cms";
 // The projector (slice C1) is not on the package entry yet; read it from its module.

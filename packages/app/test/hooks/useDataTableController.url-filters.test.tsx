@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { renderHook } from "@testing-library/react";
-import { EntityReference } from "@rebasepro/types";
+import { EntityReference } from "@rebasepro/cms-types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**

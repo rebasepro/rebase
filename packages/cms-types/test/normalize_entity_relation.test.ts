@@ -1,7 +1,5 @@
-import {
-    normalizeToEntityRelation
-} from "../src/util/entities";
-import { EntityRelation } from "@rebasepro/types";
+import { normalizeToEntityRelation } from "../src/util/normalize_entity_relation";
+import { EntityRelation } from "../src/types/entity_values";
 
 // ─────────────────────────────────────────────────────────────
 // normalizeToEntityRelation

@@ -15,7 +15,6 @@ import {
     isEmptyObject,
     removePropsIfExisting
 } from "../src/objects";
-import { GeoPoint } from "@rebasepro/types";
 
 describe("objects utils", () => {
     describe("getIn", () => {

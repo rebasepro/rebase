@@ -2,10 +2,39 @@
  * The pre-0.31 property model, frozen at 0.30 — part of the migration's input
  * format (see `./index.ts`). Nothing at runtime may import it.
  */
-import type { EntityReference, EntityRelation, GeoPoint, ResourceRef, User, Vector } from "@rebasepro/types";
+import type { ResourceRef, User } from "@rebasepro/types";
 
 import type { LegacyAfterReadProps, LegacyBeforeSaveProps } from "./callbacks";
 import type { LegacyRelation, LegacyResolvedRelation } from "./relations";
+
+/**
+ * The 0.30 value classes a `defaultValue` held, by their shape — the classes
+ * themselves are the admin's now (`@rebasepro/cms-types`), and an instance of
+ * each satisfies these.
+ *
+ * @group Migration
+ */
+export interface LegacyVectorValue {
+    readonly value: number[];
+}
+
+/** @group Migration */
+export interface LegacyGeoPointValue {
+    readonly latitude: number;
+    readonly longitude: number;
+}
+
+/** @group Migration */
+export interface LegacyEntityReferenceValue {
+    readonly id: string;
+    readonly path: string;
+}
+
+/** @group Migration */
+export interface LegacyEntityRelationValue {
+    readonly id: string | number;
+    readonly path: string;
+}
 
 /**
  * A raw SQL expression, written as the template-literal-shaped string
@@ -227,7 +256,7 @@ export interface LegacyVectorIndexConfig {
  */
 export interface LegacyVectorProperty extends LegacyBaseProperty {
     type: "vector";
-    defaultValue?: Vector;
+    defaultValue?: LegacyVectorValue;
     dimensions: number;
     index?: LegacyVectorIndexConfig | false;
     validation?: LegacyPropertyValidationSchema;
@@ -269,7 +298,7 @@ export interface LegacyDateProperty extends LegacyBaseProperty {
  */
 export interface LegacyGeopointProperty extends LegacyBaseProperty {
     type: "geopoint";
-    defaultValue?: GeoPoint;
+    defaultValue?: LegacyGeoPointValue;
     validation?: LegacyPropertyValidationSchema;
 }
 
@@ -280,7 +309,7 @@ export interface LegacyGeopointProperty extends LegacyBaseProperty {
  */
 export interface LegacyReferenceProperty extends LegacyBaseProperty {
     type: "reference";
-    defaultValue?: EntityReference;
+    defaultValue?: LegacyEntityReferenceValue;
     isId?: boolean;
     /** The target collection's slug (or table). */
     path?: string;
@@ -293,7 +322,7 @@ export interface LegacyReferenceProperty extends LegacyBaseProperty {
  */
 export interface LegacyRelationProperty extends LegacyBaseProperty {
     type: "relation";
-    defaultValue?: EntityRelation | EntityRelation[];
+    defaultValue?: LegacyEntityRelationValue | LegacyEntityRelationValue[];
     isId?: boolean;
     relation?: LegacyRelation;
     /** Stamped by normalization. */

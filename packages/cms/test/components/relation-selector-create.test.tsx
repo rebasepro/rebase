@@ -4,8 +4,7 @@
 import React from "react";
 import { beforeAll, describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { EntityRelation } from "@rebasepro/types";
-import { type Relation, type CollectionConfig, type PostgresProperty } from "@rebasepro/cms-types";
+import { type Relation, type CollectionConfig, type PostgresProperty, EntityRelation } from "@rebasepro/cms-types";
 
 /**
  * Pointing a relation at a row that does not exist yet.

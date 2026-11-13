@@ -8,7 +8,8 @@
  *
  * @module
  */
-import { EntityReference, EntityRelation, GeoPoint, JUNCTION_PIVOT_KEY, Vector } from "@rebasepro/types";
+import { JUNCTION_PIVOT_KEY } from "@rebasepro/types";
+import { EntityReference, EntityRelation, GeoPoint, Vector } from "../types/entity_values";
 import { type CollectionConfig } from "../types/collections";
 import { toWireKey } from "@rebasepro/utils";
 import {

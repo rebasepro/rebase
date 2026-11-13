@@ -14,9 +14,9 @@
  * (`collectionsFromTables`), as `CollectionsProvider` projects the served ones.
  */
 import { describe, expect, it } from "@jest/globals";
-import { col, defineTable, EntityRelation, json, rel } from "@rebasepro/types";
+import { col, defineTable, json, rel } from "@rebasepro/types";
 import { compileSchema } from "@rebasepro/common";
-import { rowToViewModel } from "@rebasepro/cms-types";
+import { rowToViewModel, EntityRelation } from "@rebasepro/cms-types";
 import { collectionsFromTables } from "../../src/tables";
 
 const samples = defineTable("samples", {

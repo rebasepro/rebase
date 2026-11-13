@@ -1,4 +1,4 @@
-import { EntityReference, EntityRelation, GeoPoint, Vector } from "@rebasepro/types";
+import { EntityReference, EntityRelation, GeoPoint, Vector } from "@rebasepro/cms-types";
 import { isObject, isPlainObject } from "@rebasepro/utils";
 
 // Define a unique prefix for entity keys in sessionStorage to avoid key collisions

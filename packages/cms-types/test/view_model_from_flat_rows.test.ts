@@ -1,4 +1,4 @@
-import { EntityRelation } from "@rebasepro/types";
+import { EntityRelation } from "@rebasepro/cms-types";
 import type { TableAccessor, DataDriver, RebaseData } from "@rebasepro/types";
 import type { CollectionConfig } from "@rebasepro/cms-types";
 import { buildRebaseData } from "@rebasepro/common";

@@ -4,7 +4,7 @@
 import React from "react";
 import { describe, expect, it, beforeEach } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
-import { EntityReference } from "@rebasepro/types";
+import { EntityReference } from "@rebasepro/cms-types";
 
 /**
  * A reference previewed from where it is stored.

@@ -1,10 +1,12 @@
 import {
     Entity,
-    EntityReference,
-    EntityRelation,
     EntityStatus,
     EntityValues
 } from "@rebasepro/types";
+import {
+    EntityReference,
+    EntityRelation
+} from "../types/entity_values";
 import {
     DataType,
     Properties,

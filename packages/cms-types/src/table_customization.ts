@@ -44,7 +44,6 @@
 import type React from "react";
 import type {
     BuilderKind,
-    EntityRelation,
     ColumnsShape,
     FilterValues,
     InferRow,
@@ -58,6 +57,9 @@ import type {
     User,
     WhereFilterOp
 } from "@rebasepro/types";
+import type {
+    EntityRelation
+} from "./types/entity_values";
 import type {
     ColorKey,
     ColorScheme

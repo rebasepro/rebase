@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "@jest/globals";
 import type { CollectionConfig } from "@rebasepro/cms-types";
-import { EntityRelation } from "@rebasepro/types";
+import { EntityRelation } from "@rebasepro/cms-types";
 import { copyRow, fromWireRow, toWireRow } from "../src/util/wire_row";
 
 const people = {

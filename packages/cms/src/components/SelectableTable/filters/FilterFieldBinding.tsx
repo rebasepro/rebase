@@ -1,6 +1,5 @@
 import React, { Suspense } from "react";
 import {
-    EntityRelation,
     WhereFilterOp
 } from "@rebasepro/types";
 import {
@@ -9,9 +8,10 @@ import {
     ArrayProperty,
     Property,
     ReferenceProperty,
-    RelationProperty
+    RelationProperty,
+    EntityRelation,
+    normalizeToEntityRelation
 } from "@rebasepro/cms-types";
-import { normalizeToEntityRelation } from "@rebasepro/common";
 import { resolveFilterOperators } from "@rebasepro/app";
 import { useCollectionScope, useComponentOverride } from "@rebasepro/app";
 import { StringNumberFilterField } from "./StringNumberFilterField";

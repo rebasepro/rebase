@@ -2,8 +2,7 @@
  * @jest-environment jsdom
  */
 import { mapPropertyToZod } from "../../src/form/validation";
-import { EntityRelation } from "@rebasepro/types";
-import { type Property } from "@rebasepro/cms-types";
+import { type Property, EntityRelation } from "@rebasepro/cms-types";
 
 /** Small form-validation mismatches (CMS-FORMS-27). */
 async function messages(property: Property, value: unknown): Promise<string[]> {

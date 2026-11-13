@@ -5,8 +5,8 @@ import {
     getEntityCSVExportableData,
     getEntityJsonExportableData
 } from "../../src/data_export/export/export";
-import { Entity, EntityReference, EntityRelation, GeoPoint } from "@rebasepro/types";
-import { Properties } from "@rebasepro/cms-types";
+import { Entity } from "@rebasepro/types";
+import { Properties, EntityReference, EntityRelation, GeoPoint } from "@rebasepro/cms-types";
 
 describe("Export Utility Functions", () => {
     const mockProperties: Properties = {

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
-import { EntityRelation, FilterValues } from "@rebasepro/types";
-import { Relation } from "@rebasepro/cms-types";
+import { FilterValues } from "@rebasepro/types";
+import { Relation, EntityRelation } from "@rebasepro/cms-types";
 import { RelationSelector } from "../../RelationSelector";
 
 interface RelationSelectorFieldProps {

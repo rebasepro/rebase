@@ -1,4 +1,4 @@
-import { EntityReference } from "@rebasepro/types";
+import { EntityReference } from "../types/entity_values";
 import { resolveDataSource } from "@rebasepro/common";
 
 /**

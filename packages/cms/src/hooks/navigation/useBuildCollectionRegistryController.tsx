@@ -1,8 +1,7 @@
 import type { DataSourceDefinition } from "@rebasepro/types";
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { getParentReferencesFromPath as commonGetParentReferencesFromPath, removeInitialAndTrailingSlashes } from "@rebasepro/app";
-import { EntityReference } from "@rebasepro/types";
-import { UserConfigurationPersistence, resolveAdminCollection, AdminCollection, CollectionRegistryController, CollectionRegistry, getSubcollections } from "@rebasepro/cms-types";
+import { UserConfigurationPersistence, resolveAdminCollection, AdminCollection, CollectionRegistryController, CollectionRegistry, getSubcollections, EntityReference } from "@rebasepro/cms-types";
 import { mergeDeep } from "@rebasepro/utils";
 import { userPreferencesOverlay } from "./user_preferences_overlay";
 

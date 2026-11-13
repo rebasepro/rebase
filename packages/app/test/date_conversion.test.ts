@@ -8,8 +8,7 @@
  * This test simulates the save flow to identify where the conversion happens.
  */
 import { describe, expect, it } from "@jest/globals";
-import { updateDateAutoValues, traverseValuesProperties, Properties, DateProperty } from "@rebasepro/cms-types";
-import { EntityReference, GeoPoint } from "@rebasepro/types";
+import { updateDateAutoValues, traverseValuesProperties, Properties, DateProperty, EntityReference, GeoPoint } from "@rebasepro/cms-types";
 import { mergeDeep, removeFunctions, removeUndefined } from "@rebasepro/utils";
 import { getEntityFromCache, saveEntityToCache } from "../src/util/entity_cache";
 

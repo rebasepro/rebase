@@ -3,8 +3,7 @@
  */
 import React from "react";
 import { act, renderHook } from "@testing-library/react";
-import { EntityReference } from "@rebasepro/types";
-import { type CollectionConfig } from "@rebasepro/cms-types";
+import { type CollectionConfig, EntityReference } from "@rebasepro/cms-types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { CollectionScopeProvider } from "@rebasepro/app";
 import { useBuildCollectionRegistryController } from "../../src/hooks/navigation/useBuildCollectionRegistryController";

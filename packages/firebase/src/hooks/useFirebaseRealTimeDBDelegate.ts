@@ -21,7 +21,8 @@ import {
     update
 } from "firebase/database";
 import { useCallback } from "react";
-import { DataDriver, DeleteProps, EntityReference, FetchCollectionProps, FetchOneProps, FilterValues, ListenCollectionProps, ListenOneProps, SaveProps, WhereFilterOp } from "@rebasepro/types";
+import { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, FilterValues, ListenCollectionProps, ListenOneProps, SaveProps, WhereFilterOp } from "@rebasepro/types";
+import { EntityReference } from "@rebasepro/cms-types";
 
 /** The values the Realtime Database can order or bound a query by. */
 type RTDBFilterValue = string | number | boolean | null;

@@ -3,7 +3,8 @@ import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { deleteApp, FirebaseApp, initializeApp } from "firebase/app";
 import { getDatabase, goOffline, ref, set } from "firebase/database";
-import { DataDriver, EntityReference } from "@rebasepro/types";
+import { DataDriver } from "@rebasepro/types";
+import { EntityReference } from "@rebasepro/cms-types";
 import { useFirebaseRTDBDelegate } from "../src/hooks/useFirebaseRealTimeDBDelegate";
 
 /*

@@ -3,10 +3,8 @@ import React, { createElement, Suspense } from "react";
 import { deepEqual as equal } from "fast-equals"
 
 import { resourceKeyOf } from "@rebasepro/types";
-import { EntityReference, EntityRelation } from "@rebasepro/types";
 import type { PropertyPreviewProps } from "../types/components/PropertyPreviewProps";
-import { normalizeToEntityRelation } from "@rebasepro/common";
-import { resolveProperty } from "@rebasepro/cms-types";
+import { resolveProperty, EntityReference, EntityRelation, normalizeToEntityRelation } from "@rebasepro/cms-types";
 import { getRelationTargetPath } from "../util/relations";
 import { useAuthController, useCustomizationController } from "@rebasepro/app";
 import { EmptyValue } from "./components/EmptyValue";

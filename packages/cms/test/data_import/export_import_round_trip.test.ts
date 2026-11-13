@@ -3,16 +3,16 @@
  */
 import { afterEach, beforeEach, describe, expect, jest, test } from "@jest/globals";
 import {
-    Entity,
-    EntityReference,
-    EntityRelation,
-    GeoPoint,
-    Vector
+    Entity
 } from "@rebasepro/types";
 import {
     DataType,
     Properties,
-    Property
+    Property,
+    EntityReference,
+    EntityRelation,
+    GeoPoint,
+    Vector
 } from "@rebasepro/cms-types";
 import { downloadEntitiesExport, entryToCSVRow, getEntityCSVExportableData } from "../../src/data_export/export/export";
 import { parseCsvToObjects } from "../../src/data_import/utils/csv";

@@ -13,7 +13,7 @@ import {
     type TableFormValues,
     type TableRow
 } from "../src/table_customization";
-import type { EntityRelation } from "@rebasepro/types";
+import type { EntityRelation } from "@rebasepro/cms-types";
 import type { FieldProps } from "../src/types/plugins";
 
 /**

@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it } from "@jest/globals";
 import { deleteApp, initializeApp } from "firebase/app";
 import { doc, DocumentReference, getFirestore, refEqual, terminate } from "firebase/firestore";
-import { EntityReference } from "@rebasepro/types";
+import { EntityReference } from "@rebasepro/cms-types";
 import { firestoreToRebaseModel, rebaseToFirestoreModel } from "../src/hooks/useFirestoreDriver";
 
 /**

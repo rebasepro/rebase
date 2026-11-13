@@ -3,11 +3,10 @@ import { useEntitySelectionDialog } from "../../../hooks/useSelectionDialog";
 import React, { useCallback, useEffect } from "react";
 import { deepEqual as equal } from "fast-equals";
 
-import { normalizeToEntityRelation } from "@rebasepro/common";
 
 import { RelationPreview } from "../../../preview";
-import { Entity, EntityRelation, FilterValues } from "@rebasepro/types";
-import { AdminCollection, getRelationFrom, getCollectionDataPath, Relation } from "@rebasepro/cms-types";
+import { Entity, FilterValues } from "@rebasepro/types";
+import { AdminCollection, getRelationFrom, getCollectionDataPath, Relation, normalizeToEntityRelation, EntityRelation } from "@rebasepro/cms-types";
 import { } from "@rebasepro/app";
 import { ErrorView } from "@rebasepro/app";
 import { CompactEntityCellField } from "./CompactEntityCellField";

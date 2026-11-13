@@ -10,6 +10,7 @@ export * from "./component_overrides";
 export * from "./entity_actions";
 export * from "./entity_link_builder";
 export * from "./entity_display";
+export * from "./entity_values";
 export * from "./entity_views";
 export * from "./export_import";
 export * from "./filter_preset";

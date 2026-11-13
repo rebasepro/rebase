@@ -36,8 +36,7 @@ jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () =>
 }));
 
 import { RebaseI18nProvider } from "@rebasepro/app";
-import type { EntityReference } from "@rebasepro/types";
-import type { AdminCollection, ArrayProperty, CollectionConfig, Property, ReferenceProperty, RelationProperty } from "@rebasepro/cms-types";
+import type { AdminCollection, ArrayProperty, CollectionConfig, Property, ReferenceProperty, RelationProperty, EntityReference } from "@rebasepro/cms-types";
 import type { FieldProps } from "../../src/types/fields";
 import { fakeFieldProps, fakeFormContext } from "../helpers/fakes";
 import { RelationFieldBinding } from "../../src/form/field_bindings/RelationFieldBinding";

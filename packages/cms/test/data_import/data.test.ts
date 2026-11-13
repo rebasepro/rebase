@@ -1,7 +1,6 @@
 import { describe, expect, test, jest } from "@jest/globals";
 import { ImportCollectionLookup, convertDataToEntity, flattenEntry, processValueMapping } from "../../src/data_import/utils/data";
-import { EntityReference, Vector } from "@rebasepro/types";
-import { AuthController, CollectionRegistryController, Property, Properties, CollectionConfig } from "@rebasepro/cms-types";
+import { AuthController, CollectionRegistryController, Property, Properties, CollectionConfig, EntityReference, Vector } from "@rebasepro/cms-types";
 import { fakeAuthController, fakeCollection } from "../helpers/fakes";
 
 describe("Data Import Utility Functions", () => {

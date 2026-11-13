@@ -1,5 +1,5 @@
-import { DataDriver, EntityReference } from "@rebasepro/types";
-import { CollectionRegistry, collectionEntityDataOptions, CollectionConfig } from "@rebasepro/cms-types";
+import { DataDriver } from "@rebasepro/types";
+import { CollectionRegistry, collectionEntityDataOptions, CollectionConfig, EntityReference } from "@rebasepro/cms-types";
 import { buildRebaseData } from "@rebasepro/common";
 import { buildRoutedRebaseData } from "@rebasepro/common";
 import { resolveDataSource, createDataSourceRegistry } from "@rebasepro/common";

@@ -16,6 +16,7 @@ export * from "./collections";
 export * from "./conditions";
 export * from "./deprecation";
 export * from "./entities";
+export * from "./normalize_entity_relation";
 export * from "./enums";
 export * from "./one_of";
 export * from "./paths";

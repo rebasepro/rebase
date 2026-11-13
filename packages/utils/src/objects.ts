@@ -1,5 +1,4 @@
 import hash from "object-hash";
-import { GeoPoint } from "@rebasepro/types";
 
 /** @private is the value an empty array? */
 export const isEmptyArray = (value?: unknown) =>
@@ -352,6 +351,12 @@ export function removeFunctions(o: unknown): unknown {
     return o;
 }
 
+/** A point — the admin's `GeoPoint` or the wire's `{ latitude, longitude }` — by its shape. */
+function isGeoPointLike(value: object): value is { latitude: number; longitude: number } {
+    return "latitude" in value && "longitude" in value
+        && typeof value.latitude === "number" && typeof value.longitude === "number";
+}
+
 export function getHashValue<T>(v: T): string | null {
     if (!v) return null;
     if (typeof v === "object" && v !== null) {
@@ -359,8 +364,8 @@ export function getHashValue<T>(v: T): string | null {
             return String((v as Record<string, unknown>).id);
         else if (v instanceof Date)
             return v.toLocaleString();
-        else if (v instanceof GeoPoint)
-            return hash(v as Record<string, unknown>);
+        else if (isGeoPointLike(v))
+            return hash({ latitude: v.latitude, longitude: v.longitude });
     }
     return hash(v as object, { ignoreUnknown: true });
 }

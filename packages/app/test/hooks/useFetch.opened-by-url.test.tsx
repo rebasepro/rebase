@@ -2,8 +2,8 @@
  * @jest-environment jsdom
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { EntityRelation, type ByIdReadOptions, type Entity } from "@rebasepro/types";
-import { type CollectionConfig } from "@rebasepro/cms-types";
+import { type ByIdReadOptions, type Entity } from "@rebasepro/types";
+import { type CollectionConfig, EntityRelation } from "@rebasepro/cms-types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**

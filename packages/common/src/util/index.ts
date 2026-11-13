@@ -1,5 +1,4 @@
 export * from "./collections";
-export * from "./entities";
 export * from "./identity";
 export * from "./email";
 export * from "./policy";

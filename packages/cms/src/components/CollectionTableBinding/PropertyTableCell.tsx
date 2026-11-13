@@ -3,7 +3,8 @@ import type { ArrayProperty, NumberProperty, Property, ReferenceProperty, String
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deepEqual as equal, shallowEqual } from "fast-equals"
 
-import { Entity, EntityReference, EntityRelation } from "@rebasepro/types";
+import { Entity } from "@rebasepro/types";
+import { EntityReference, EntityRelation } from "@rebasepro/cms-types";
 
 import { getTableBindingForProperty } from "./table_bindings";
 

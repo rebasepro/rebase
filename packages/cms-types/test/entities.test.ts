@@ -9,11 +9,11 @@ import {
     traverseValuesProperties,
     traverseValueProperty,
     Property,
-    Properties
+    Properties,
+    EntityReference
 } from "@rebasepro/cms-types";
 import {
-    type Entity,
-    EntityReference
+    type Entity
 } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────

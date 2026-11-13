@@ -8,7 +8,7 @@
  * its own: a diff that walked into it found nothing to report, and the edit
  * was dropped from the save without a word.
  */
-import { EntityRelation } from "@rebasepro/types";
+import { EntityRelation } from "@rebasepro/cms-types";
 import { getChangedProperties, getChanges, getEditHandoffValues } from "../../src/form/form_utils";
 
 const january = new Date("2026-01-01T10:00:00Z");

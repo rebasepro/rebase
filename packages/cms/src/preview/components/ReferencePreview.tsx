@@ -2,7 +2,7 @@
 import * as React from "react";
 import { DefaultMissingReference } from "../../components/DefaultMissingReference";
 
-import { EntityReference } from "@rebasepro/types";
+import { EntityReference } from "@rebasepro/cms-types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { useCustomizationController, useBatchedFetch, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 import { Skeleton } from "@rebasepro/ui";

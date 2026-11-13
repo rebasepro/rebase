@@ -1,11 +1,11 @@
 import type { ResourceRef } from "@rebasepro/types";
 
-import type { EntityReference, EntityRelation, EntityValues, GeoPoint, Vector } from "@rebasepro/types";
+import type { EntityReference, EntityRelation, GeoPoint, Vector } from "./entity_values";
 import type { Relation, ResolvedRelation } from "./relation_kinds";
 import type { ColorKey, ColorScheme } from "./chips";
 import type { AuthState } from "@rebasepro/types";
 import type { AfterReadProps, BeforeSaveProps } from "./entity_callbacks";
-import type { User } from "@rebasepro/types";
+import type { User, EntityValues } from "@rebasepro/types";
 
 /**
  * A SQL expression, written in template form: ``"sql`gen_random_uuid()`"``.

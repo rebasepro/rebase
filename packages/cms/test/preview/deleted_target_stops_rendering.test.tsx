@@ -4,7 +4,7 @@
 import React from "react";
 import { describe, expect, it, beforeEach } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
-import { EntityReference, EntityRelation } from "@rebasepro/types";
+import { EntityReference, EntityRelation } from "@rebasepro/cms-types";
 
 /**
  * What a preview shows once its target row is gone.

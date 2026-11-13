@@ -2,7 +2,8 @@
  * @jest-environment jsdom
  */
 import { act, renderHook } from "@testing-library/react";
-import { EntityRelation, type Entity } from "@rebasepro/types";
+import { type Entity } from "@rebasepro/types";
+import { EntityRelation } from "@rebasepro/cms-types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**

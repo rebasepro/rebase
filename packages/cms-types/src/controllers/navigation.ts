@@ -1,5 +1,5 @@
 import React from "react";
-import type { EntityReference } from "@rebasepro/types";
+import type { EntityReference } from "../types/entity_values";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
