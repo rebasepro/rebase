@@ -165,7 +165,8 @@ export default defineFunction((app) => {
     // 401 for anonymous callers.
     app.get("/mine", requireAuth, async (c) => {
         // The request-scoped driver runs as the CALLER: RLS applies to them.
-        // fetchCollection takes ONE object; the collection goes in `path`.
+        // fetchCollection takes ONE object; the table goes in `path`. It returns
+        // the rows GET /api/data/products returns: a relation only via `include`.
         const rows = await requireDriver(c).fetchCollection({
             path: "products",
             limit: 1000

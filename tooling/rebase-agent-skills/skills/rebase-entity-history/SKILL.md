@@ -106,7 +106,7 @@ Each history entry has the following structure:
 | `entity_id` | `string` | The ID of the entity this entry belongs to |
 | `action` | `"create" \| "update" \| "delete"` | What operation was performed |
 | `changed_fields` | `string[] \| null` | Array of field names that changed (only for updates) |
-| `values` | `Record<string, unknown> \| null` | Full entity values at the time of the change (for a delete, the deleted entity) — the row as the REST API serves it. A relation is kept as a reference (`{ "__type": "relation", "id", "path" }`), never the related row's values |
+| `values` | `Record<string, unknown> \| null` | Full entity values at the time of the change (for a delete, the deleted entity) — the row as the REST API serves it: a `belongsTo` as its foreign key, never the related row's values. An entry an older version recorded with `{ "__type": "date" }` envelopes or `{ "__type": "relation" }` refs is served (and reverted) as plain values: the date, the foreign key, the related row's key |
 | `previous_values` | `Record<string, unknown> \| null` | On an update, what the changed fields held before it (`null` for creates and deletes) — see `format` |
 | `updated_by` | `string \| null` | UID of the user who made the change |
 | `updated_at` | `string` (ISO 8601) | Timestamp of when the change was recorded |

@@ -177,7 +177,7 @@ TypeScript that the frontend can `import type` from.
 | `schema` | The Postgres schema. `public` when omitted. |
 | `database` | A non-default Postgres database declared in `backend/resources.ts`. |
 | `description` | What the table holds; shown in OpenAPI and the MCP tool descriptions. |
-| `defaultPolicies` | `false` generates only your rules, without the admin baseline policies. Refused with `"admin-only"`. |
+| `defaultPolicies` | `false` generates only your rules, without the admin baseline policies. Refused with `"admin-only"`. `true` keeps the baseline when the database sets `rls: { defaultPolicies: false }`; left out, the database decides. |
 | `tenant` | `{ field, from: { claim } \| { membership: { table, userField, tenantField } }, bypassRoles? }`: every row scoped to a tenant. |
 | `softDelete` | `true` or `{ field }`: a delete stamps a timestamp column (`deletedAt` by default) instead of removing the row; stamped rows are hidden from reads. |
 | `history` | `true` records every write in the history table (see `rebase-entity-history`). |
@@ -460,7 +460,13 @@ table names sorted and joined by `_` (`posts_tags`), with columns
 `rel.via(() => orders, { steps: [{ table: "order_items", on: { from: "id", to: "product_id" } }, { table: "orders", on: { from: "order_id", to: "id" } }] })`
 (from `app/backend/schema/products.ts`). It is read-only, except a one-step
 to-one chain (written like `hasOne`) and a two-step to-many chain through one
-table (written like `manyToMany`).
+table (written like `manyToMany`). A chain may pass through a table the read
+already holds (a `via` from a table to itself): each step is aliased.
+
+**A `manyToMany` to the table itself** (tracks similar to tracks) needs
+`targetKey`: both junction columns would derive `track_id`, which is refused —
+`rel.manyToMany(() => tracks, { through: "tracks_similar", targetKey: "similar_track_id" })`.
+A `manyToMany` may target a view.
 
 **Reading and writing:** relations are not included unless asked:
 `client.data.posts.include("author", "tags").find()`. A row always carries the
@@ -472,7 +478,17 @@ CMS, every to-many relation becomes a tab under the record.
 Refused when the schema compiles: a target that is not a table or view of the
 schema, a relation and a column with the same key, a bound column of the wrong
 type, two relations on one column, a `belongsTo` to a composite key, two
-`manyToMany` resolving to one junction with different columns.
+`manyToMany` resolving to one junction with different columns, a self-link
+whose two junction columns share a name, a pivot column marked `.primaryKey()`
+or declaring `.transform()`.
+
+Refused for a column: a primary key on `jsonb`, `json`, geopoint, `vector`,
+`bytea`, an array or a custom list (a key is a scalar); an `.array()` of
+`jsonb`, `json`, `vector`, `bytea`, geopoints or `col.custom()` (a list of
+documents is `col.jsonb(json.array(…))`); a `.validate()` rule the column kind
+does not check; `.private()` together with `.access()`; a `.transform()` on a
+column and on its JSON shape. Each message names the table, the column and
+what to write.
 
 ## Row-level security (`rls`)
 

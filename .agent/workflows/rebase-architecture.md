@@ -14,7 +14,8 @@ When working on the Rebase project, adhere to the following architectural guidel
 - **Package entry points for that split:**
   - `@rebasepro/server/schema` — `defineTable`, `defineAuthTable`, `defineView`, `col`, `rel`, `json`, `InferRow` and the hook types. Loads no server code, so the frontend can `import type` a table from `backend/schema`. The types live in `packages/types/src/schema/`.
   - `@rebasepro/server` — the server entrypoint (`initializeRebaseBackend`, `rebase`); `@rebasepro/server/functions` — what route handlers import.
-  - `@rebasepro/cms` — `customizeTable`, `<RebaseCMS>`, `<RebaseShell>`; `@rebasepro/cms-types` — the CMS-only types.
+  - `@rebasepro/cms` — `customizeTable`, `<RebaseCMS>`, `<RebaseShell>`; `@rebasepro/cms-types` — the CMS-only types and helpers, including the collection and property view model (`CollectionConfig`, `StringProperty` and every `…Property`, `CollectionCallbacks`, `EntityReference`, `GeoPoint`) and the panel's policy, relation, field-access and condition helpers. The kernel (`@rebasepro/types`, `@rebasepro/common`, `@rebasepro/server`) exports none of them: import them from `@rebasepro/cms-types` (`tooling/scripts/headless-guard/moved-symbols.json` lists every name that moved).
+- **One read shape.** REST, the SDK, the socket's frames and a driver's `fetchCollection` / `fetchOne` all return the row `GET /api/data/<table>` returns: dates as RFC 3339 strings, a `belongsTo` as its foreign key, a relation only when `include` names it. No response carries a `{ __type }` envelope; the admin panel builds its view model in the browser.
   - `@rebasepro/firebase` — `defineFirestoreCollection` and the Firestore data source, passed to `<RebaseCMS externalCollections>`.
   - `@rebasepro/client` — the SDK: `client.data.table("posts")` or `client.data.posts`.
 

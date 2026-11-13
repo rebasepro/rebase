@@ -964,7 +964,7 @@ The component itself is ordinary React, in `frontend/`:
 ```tsx
 // frontend/src/BodyPartsField.tsx
 import type { FieldProps } from "@rebasepro/cms";
-import type { ArrayProperty } from "@rebasepro/types";
+import type { ArrayProperty } from "@rebasepro/cms-types";
 
 export default function BodyPartsField({ value, setValue, property, error, disabled }: FieldProps<ArrayProperty>) {
     return null; // …your editor

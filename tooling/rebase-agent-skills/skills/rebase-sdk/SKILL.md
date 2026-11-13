@@ -86,8 +86,9 @@ available from the table itself with `InferRow<typeof posts>` (see
 
 A relation is typed as the **target's own `Row`, inlined** — that is what
 `include` serves. It is optional on every read, because it is only loaded when
-the query names it in `include`. The `{ __type: "relation" }` envelope is the
-admin panel's view-model and never reaches `find()`.
+the query names it in `include`. No read returns a `{ __type }` envelope —
+not REST, the SDK, the socket or a driver's `fetchOne` — and the client does
+not turn one into a class: a value is the JSON the server sent.
 
 On writes, a `belongsTo` target can be named either way: `{ author: 5 }` (the
 relation) or `{ authorId: 5 }` (its foreign key). Both are in `Insert`

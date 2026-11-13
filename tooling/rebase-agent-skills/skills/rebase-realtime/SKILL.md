@@ -358,11 +358,11 @@ ws.onmessage = (event) => {
 | `presence_state` | `{ channel }` | Request full presence entity |
 | `channel_history` | `{ channel, sinceSeq?, limit? }` | Request retained messages after `sinceSeq` (retained channels only) |
 | `FETCH_COLLECTION` | `{ path, filter?, orderBy?, limit?, offset?, … }` | One-shot collection fetch (request/response) |
-| `FETCH_ONE` | `{ path, id }` | One-shot row fetch |
+| `FETCH_ONE` | `{ path, id, include? }` | One-shot row fetch |
 | `SAVE` | `{ path, id?, values, status }` | Create or update a row |
 | `DELETE` | `{ row: { id, path }, hard? }` | Delete a row |
 | `COUNT` | `{ path, filter?, … }` | Count rows matching criteria |
-| `CHECK_UNIQUE_FIELD` | `{ path, name, value, id?, collection? }` | Check field uniqueness |
+| `CHECK_UNIQUE_FIELD` | `{ path, name, value, id? }` | Check field uniqueness |
 
 > **IMPORTANT FOR AGENTS:** the one-shot operations are named `FETCH_ONE`,
 > `SAVE`, `DELETE` and `COUNT` — **not** `FETCH_ENTITY`, `SAVE_ENTITY`,
@@ -394,6 +394,10 @@ ws.onmessage = (event) => {
 | `ERROR` | `{ requestId?, payload: { error: { message, code } } }` | General error |
 | `FETCH_COLLECTION_SUCCESS` | `{ requestId, payload: { rows } }` | Response to FETCH_COLLECTION |
 | `FETCH_ONE_SUCCESS` | `{ requestId, payload: { row } }` | Response to `FETCH_ONE` (`row` is `null` when not found) |
+
+`rows` and `row` are the rows `GET /api/data/<table>` serves: dates as RFC 3339
+strings, a `belongsTo` as its foreign key, a relation only when `include` names
+it — never a `{ __type }` envelope.
 | `SAVE_SUCCESS` | `{ requestId, payload: { row } }` | Response to `SAVE` |
 | `DELETE_SUCCESS` | `{ requestId, payload: { success: true } }` | Response to `DELETE` |
 | `COUNT_SUCCESS` | `{ requestId, payload: { count } }` | Response to `COUNT` |

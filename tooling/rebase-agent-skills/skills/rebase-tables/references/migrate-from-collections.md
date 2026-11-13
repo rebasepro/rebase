@@ -15,6 +15,14 @@ Signs a project needs this: a `config/` directory with `collections/`,
 
 ## The steps
 
+First bump every `@rebasepro` package in every workspace package to the
+release being migrated to (`pnpm -r up "@rebasepro/*@0.31.0"`, then
+`pnpm install`), so the types the codemod reads are the new ones. A project on a
+release before 0.30 applies the code changes of the intermediate upgrade
+guides first: the codemod loads its `config/` and the SQL check passes, but that
+check compares the new compiler with itself — only `rebase db push --dry-run`
+against the database proves the DDL.
+
 Run every command from the project root (where `rebase.json` is), on a clean
 git tree: a run refuses a dirty tree unless `--force` is given, so the diff it
 leaves is exactly the migration.
@@ -143,6 +151,9 @@ meet:
   (`--force` for edited files), when the project holds installed skills.
 - **Files of config/ nothing moved** — move whatever is still used before
   deleting `config/`.
+- **An import of a removed name** — the step says what to write instead
+  (`defineCollection` → `defineTable` + `customizeTable`, `InferCollectionConfigType`
+  → `InferRow`, …).
 
 ## SDK calls in your own code: `rebase migrate sdk-calls`
 
@@ -167,9 +178,29 @@ It rewrites, in the project's own code (never in generated files):
 | `maxCachedQueriesPerCollection` / `maxCachedRowsPerCollection` | `…PerTable` |
 | `backend.setCollectionCallbacks(slug, cb)` | `backend.setTableHooks(slug, hooks)` (props adapted) |
 | `storageAuthorize` data `.collection` | `.table` |
+| an import of a name that moved to another package (`StringProperty` from `@rebasepro/types`, `resolveCollectionRelations` from `@rebasepro/common`, the lift from `@rebasepro/common`, …) | the same import from `@rebasepro/cms-types`, `@rebasepro/cms` or `@rebasepro/common/migrate`, merged into an import of it the file has |
+| `reviewSecurityRules`, `assertUploadWithinPropertyLimits`, `UPLOAD_COLLECTION_FIELD`, `UPLOAD_PROPERTY_FIELD` | `reviewRls`, `assertUploadWithinColumnLimits`, `UPLOAD_TABLE_FIELD`, `UPLOAD_COLUMN_FIELD` (every reference in the file) |
 
-A `.collection(` call whose receiver is not the SDK is left as written and
-listed under **Left unchanged** — check each one.
+The full list of moved and removed names is the upgrade guide's "Imports that
+moved" (generated from `tooling/scripts/headless-guard/moved-symbols.json`). A
+package an import now names is added to that workspace package's
+`dependencies`, printed under **Dependencies added**: run `pnpm install`. An
+import of a removed name, a namespace import, `export *`, a dynamic `import()`
+or `require()` of a moved name is a numbered manual step.
+
+Then read the two lists in its output:
+
+- **Rewritten by name — review**: `.collection(` calls on a receiver with no
+  type (`any`), rewritten because the receiver is named `dataAsAdmin` or is
+  `.data` with a literal table name. Confirm each is the SDK.
+- **Left unchanged — check each**: calls it did not prove to be the SDK, such
+  as one through a type the project declares itself. One that *is* the SDK
+  fails at runtime: rename it to `.table(` by hand.
+
+Code that tests whether `collection` exists (`typeof data.collection ===
+"function"`, `"collection" in data`) is a manual step: it takes the other
+branch on the new release. A bundled or minified `.js` file is never edited:
+it is listed, so rebuild it (or replace a vendored client with the new build).
 
 ## The vocabulary, old → new
 

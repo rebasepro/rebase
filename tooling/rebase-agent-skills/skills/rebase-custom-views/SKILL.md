@@ -259,7 +259,7 @@ as the server sends it, …).
 ```tsx
 // frontend/src/fields/RatingField.tsx
 import type { FieldProps } from "@rebasepro/cms";
-import type { NumberProperty } from "@rebasepro/types";
+import type { NumberProperty } from "@rebasepro/cms-types";
 import { Button, Typography } from "@rebasepro/ui";
 
 const MAX = 5;
