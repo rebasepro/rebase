@@ -231,30 +231,6 @@ export function getJunctionCollectionConfig(spec: JunctionSpec): CollectionConfi
     });
 }
 
-/**
- * The same synthetic collection, reached from a resolved relation rather than
- * from a spec.
- *
- * The spec is built by walking every collection, which the schema planner does
- * once at boot and no request path can afford. A read or a write already holds
- * the relation, and a relation's `through` carries the table, both key columns
- * and the payload — everything the config is made of. One builder underneath
- * both, so the shape the planner emitted columns from is the shape the write
- * path validates a `_pivot` against and the read path strips it with.
- */
-export function getJunctionConfigForRelation(
-    through: { table: string; sourceColumn: string; targetColumn: string; properties: Properties }
-): CollectionConfig {
-    return buildJunctionCollectionConfig({
-        // Junctions live in `public`; the CREATE TABLE path strips any schema
-        // prefix from the name, so mirror that here rather than carrying it.
-        table: through.table.includes(".") ? through.table.split(".").pop()! : through.table,
-        schema: "public",
-        keyColumns: [through.sourceColumn, through.targetColumn],
-        properties: through.properties
-    });
-}
-
 function buildJunctionCollectionConfig(args: {
     table: string;
     schema: string;

@@ -125,11 +125,6 @@ export function tableDefaultPoliciesDisabled(table: PolicyTable): boolean {
     return !declaredRlsPolicyShape(table.database ?? DEFAULT_DATA_SOURCE_KEY).defaultPolicies;
 }
 
-/** {@link tableDefaultPoliciesDisabled} for a legacy collection (the CMS's). */
-export function defaultPoliciesDisabled(collection: CollectionConfig): boolean {
-    return tableDefaultPoliciesDisabled(policyTableFromCollection(collection));
-}
-
 export function tableEffectiveRules(table: PolicyTable): SecurityRule[] {
     const explicit = [...table.rules];
 

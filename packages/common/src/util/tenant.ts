@@ -24,7 +24,6 @@ import {
     type SecurityRule,
     type TenantDescriptor
 } from "@rebasepro/types";
-import { getTableName } from "./relations";
 
 /**
  * The collection's tenancy declaration, or nothing.
@@ -125,10 +124,4 @@ export function tenantSecurityRule(tableName: string, tenant: TenantDescriptor):
         condition: expression,
         check: expression
     };
-}
-
-/** {@link tenantSecurityRule} for a legacy collection, or `undefined` when it is not tenant-scoped. */
-export function buildTenantSecurityRule(collection: CollectionConfig): SecurityRule | undefined {
-    const tenant = getTenantConfig(collection);
-    return tenant ? tenantSecurityRule(getTableName(collection), tenant) : undefined;
 }
