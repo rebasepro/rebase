@@ -1,7 +1,6 @@
 {
   "app": 20,
-  "client": 47,
+  "client": 31,
   "cms": 43,
-  "server": 66,
-  "server-postgres": 2
+  "server": 66
 }
