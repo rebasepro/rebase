@@ -26,7 +26,6 @@ import { pgTable, varchar, integer } from "drizzle-orm/pg-core";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
 import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 
@@ -51,7 +50,7 @@ describe("bulk update/delete (E2E)", () => {
     let admin: pg.Client;
     let pool: pg.Pool;
     let driver: PostgresBackendDriver;
-    let registry: PostgresTableRegistry;
+    let registry: FixtureTableRegistry;
 
     async function rows(): Promise<{ id: string; name: string; qty: number }[]> {
         const r = await admin.query("SELECT id, name, qty FROM public.items ORDER BY id");
@@ -130,7 +129,6 @@ describe("bulk update/delete (E2E)", () => {
             await driver.updateMany({
                 path: "items",
                 updates: [{ id: "b", values: { name: "BRAVO" } }],
-                collection: itemsCollection
             });
             // qty survives: a merge, not a replace.
             expect((await rows()).find(r => r.id === "b")).toEqual({ id: "b", name: "BRAVO", qty: 2 });
@@ -173,7 +171,6 @@ describe("bulk update/delete (E2E)", () => {
                     { id: "a", values: { name: "ok" } },
                     { id: "nope", values: { name: "ghost" } }
                 ],
-                collection: itemsCollection
             })).rejects.toMatchObject({ statusCode: 404 });
 
             expect((await rows()).find(r => r.id === "a")!.name).toBe("alpha");
@@ -192,7 +189,6 @@ describe("bulk update/delete (E2E)", () => {
             await driver.updateMany({
                 path: "items",
                 updates: [{ id: "a", values: { name: "x" } }, { id: "b", values: { name: "y" } }],
-                collection: itemsCollection
             });
 
             expect(seen).toEqual(["x", "y"]);
@@ -204,7 +200,7 @@ describe("bulk update/delete (E2E)", () => {
 
     describe("deleteMany", () => {
         it("deletes every id", async () => {
-            await driver.deleteMany({ path: "items", ids: ["a", "c"], collection: itemsCollection });
+            await driver.deleteMany({ path: "items", ids: ["a", "c"] });
             expect((await rows()).map(r => r.id)).toEqual(["b"]);
         });
 
@@ -212,7 +208,6 @@ describe("bulk update/delete (E2E)", () => {
             await expect(driver.deleteMany({
                 path: "items",
                 ids: ["a", "nope"],
-                collection: itemsCollection
             })).rejects.toMatchObject({ statusCode: 404 });
 
             // 'a' is still here: all-or-nothing, so a typo in a list of a
@@ -229,7 +224,7 @@ describe("bulk update/delete (E2E)", () => {
             };
             registry.registerMultiple([itemsCollection]);
 
-            await driver.deleteMany({ path: "items", ids: ["a", "b"], collection: itemsCollection });
+            await driver.deleteMany({ path: "items", ids: ["a", "b"] });
 
             // The property that a single `DELETE ... WHERE id = ANY(...)` would
             // have quietly broken.
@@ -249,7 +244,6 @@ describe("bulk update/delete (E2E)", () => {
             await expect(driver.deleteMany({
                 path: "items",
                 ids: ["a", "b"],
-                collection: itemsCollection
             })).rejects.toThrow(/vetoed/);
 
             expect((await rows()).map(r => r.id)).toEqual(["a", "b", "c"]);

@@ -20,7 +20,6 @@
  */
 import { RelationService } from "../src/services/RelationService";
 import { RelationWriteService } from "../src/services/RelationWriteService";
-import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { relationOfTable } from "./helpers/relation-descriptors";
 import { LegacyCollectionConfig, LegacyRelation, LegacyRelationProperty, resolveLegacyCollectionRelations, resolveLegacyRelation } from "@rebasepro/common/migrate";
@@ -166,7 +165,7 @@ function createMockDb(resolveResults: () => unknown[]) {
 // ═══════════════════════════════════════════════════════════════════════
 
 describe("batchFetchRelatedEntities: ID type coercion (single cardinality)", () => {
-    let registry: PostgresTableRegistry;
+    let registry: FixtureTableRegistry;
 
     beforeEach(() => {
         registry = new FixtureTableRegistry();
@@ -295,7 +294,7 @@ authorId: "999" }
 // ═══════════════════════════════════════════════════════════════════════
 
 describe("updateRelationsUsingJoins: M2M through junction writes", () => {
-    let registry: PostgresTableRegistry;
+    let registry: FixtureTableRegistry;
 
     beforeEach(() => {
         registry = new FixtureTableRegistry();
@@ -589,7 +588,7 @@ to: "id" } }
 // ═══════════════════════════════════════════════════════════════════════
 
 describe("batchFetchRelatedEntities: owning direction (FK-based)", () => {
-    let registry: PostgresTableRegistry;
+    let registry: FixtureTableRegistry;
 
     // Mock collections simulating tasks → clients owning relation
     const mockClientsTable = pgTable("clients", { id: text("id"), name: text("name"), email: text("email") });

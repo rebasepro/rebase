@@ -182,7 +182,7 @@ describe("storage orphans over a collection with read hooks", () => {
     it("reads every row of a composite-keyed table, page by page", async () => {
         const pages: number[] = [];
         const icons: unknown[] = [];
-        for await (const rows of driver.scanStoredRows({ path: "tags", collection: tags, pageSize: 4 })) {
+        for await (const rows of driver.scanStoredRows({ path: "tags", pageSize: 4 })) {
             pages.push(rows.length);
             icons.push(...rows.map(row => row.icon));
         }

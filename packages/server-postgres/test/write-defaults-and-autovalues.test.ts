@@ -91,7 +91,7 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
         it("stores the declared default for a key the caller did not send", async () => {
             // The bug in one line: `active: { defaultValue: true }` produced
             // `true` through the panel and nothing at all through the API.
-            await setup().save({ path: "posts", values: { title: "Hello" }, collection: posts, status: "new" });
+            await setup().save({ path: "posts", values: { title: "Hello" }, status: "new" });
             expect(written().active).toBe(true);
             expect(written().currency).toBe("EUR");
         });
@@ -100,7 +100,6 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
             await setup().save({
                 path: "posts",
                 values: { title: "Hello", active: false, currency: "USD" },
-                collection: posts,
                 status: "new"
             });
             expect(written().active).toBe(false);
@@ -114,7 +113,6 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
             await setup().save({
                 path: "posts",
                 values: { title: "Hello", currency: null },
-                collection: posts,
                 status: "new"
             });
             expect(written().currency).toBeNull();
@@ -124,7 +122,7 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
             // `getDefaultValuesFor` hands a form `null` for every unset string
             // so it has something to render. Writing that here would override
             // the column's own DEFAULT.
-            await setup().save({ path: "posts", values: { title: "Hello" }, collection: posts, status: "new" });
+            await setup().save({ path: "posts", values: { title: "Hello" }, status: "new" });
             expect("subtitle" in written()).toBe(false);
         });
 
@@ -132,7 +130,6 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
             await setup().save({
                 path: "posts",
                 values: { title: "Changed" },
-                collection: posts,
                 id: "1",
                 status: "existing"
             });
@@ -144,7 +141,6 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
             await setup().save({
                 path: "settings",
                 values: { prefs: { notify: false } },
-                collection: settings,
                 status: "new"
             });
             expect(written().prefs).toEqual({ notify: false, theme: "dark" });
@@ -161,7 +157,7 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
                 }
             });
             try {
-                await setup().save({ path: "posts", values: { title: "Hi" }, collection: posts, status: "new" });
+                await setup().save({ path: "posts", values: { title: "Hi" }, status: "new" });
             } finally {
                 registry.setTableHooks("posts", {});
             }
@@ -173,7 +169,7 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
         const user = { uid: "user-9" } as User;
 
         it("stamps both columns on a create", async () => {
-            await setup(user).save({ path: "posts", values: { title: "Hi" }, collection: posts, status: "new" });
+            await setup(user).save({ path: "posts", values: { title: "Hi" }, status: "new" });
             expect(written().createdBy).toBe("user-9");
             expect(written().updatedBy).toBe("user-9");
         });
@@ -182,7 +178,6 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
             await setup(user).save({
                 path: "posts",
                 values: { title: "Hi" },
-                collection: posts,
                 id: "1",
                 status: "existing"
             });
@@ -194,7 +189,6 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
             await setup(user).save({
                 path: "posts",
                 values: { title: "Hi", createdBy: "admin-1", updatedBy: "admin-1" },
-                collection: posts,
                 status: "new"
             });
             expect(written().createdBy).toBe("user-9");
@@ -202,7 +196,7 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
         });
 
         it("writes null when nobody is acting and the column allows it", async () => {
-            await setup().save({ path: "posts", values: { title: "Hi" }, collection: posts, status: "new" });
+            await setup().save({ path: "posts", values: { title: "Hi" }, status: "new" });
             expect(written().createdBy).toBeNull();
             expect(written().updatedBy).toBeNull();
         });
@@ -212,7 +206,7 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
             // that cannot accept an anonymous write — as a 400 naming the
             // field, rather than a 23502 naming the column after the hooks ran.
             await expect(
-                setup().save({ path: "audited", values: { note: "x" }, collection: audited, status: "new" })
+                setup().save({ path: "audited", values: { note: "x" }, status: "new" })
             ).rejects.toMatchObject({ statusCode: 400, code: "VALIDATION_CONSTRAINT" });
             expect(saveSpy).not.toHaveBeenCalled();
         });
@@ -223,7 +217,6 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
             await setup().save({
                 path: "audited",
                 values: { note: "x" },
-                collection: audited,
                 id: "1",
                 status: "existing"
             });

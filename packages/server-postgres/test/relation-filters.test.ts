@@ -423,7 +423,7 @@ describe("filtering by a relation with no column on this row", () => {
                 { tags: ["==", 4] },
                 postsTable,
                 "posts",
-                { collection: postsCollection, sourceIdColumn: postsTable.id }
+                { sourceIdColumn: postsTable.id }
             )).toThrow(/Unknown filter field 'tags'/);
         });
 

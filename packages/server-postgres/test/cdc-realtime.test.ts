@@ -1,6 +1,5 @@
 import { RealtimeService } from "../src/services/realtimeService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { parseCdcPayload, type CdcChangeEvent } from "../src/services/cdc/CdcListener";
@@ -51,7 +50,7 @@ function emitCdc(service: RealtimeService, event: CdcChangeEvent): Promise<void>
 
 describe("RealtimeService — database-level CDC", () => {
     let service: RealtimeService;
-    let registry: PostgresTableRegistry;
+    let registry: FixtureTableRegistry;
     let db: NodePgDatabase;
 
     beforeEach(() => {

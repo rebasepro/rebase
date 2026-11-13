@@ -1,5 +1,5 @@
 import { DataService } from "../src/services/dataService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { drizzleChainMock, type DrizzleChainMock } from "./helpers/drizzle-chain-mock";
 import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -62,7 +62,7 @@ const collectionRegistry = new FixtureTableRegistry();
 
 describe("DataService - Relation Types Tests", () => {
     let dataService: DataService;
-    let db: jest.Mocked<NodePgDatabase<any>>;
+    let db: DrizzleChainMock;
 
     // Mock tables for different relation scenarios
     const mockOrdersTable = {
@@ -224,29 +224,8 @@ relationName: "user" }
             then: jest.fn((resolve) => resolve(Object.assign([], { rowCount: 1 })))
         };
 
-        db = {
-            select: jest.fn().mockReturnThis(),
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            $dynamic: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockReturnThis(),
-            orderBy: jest.fn().mockReturnValue(mockQuery),
-            innerJoin: jest.fn().mockReturnThis(),
-            insert: jest.fn().mockReturnThis(),
-            values: jest.fn().mockReturnThis(),
-            // The junction writer diffs and inserts what arrived with
-            // ON CONFLICT DO NOTHING — see junction-diff-write.
-            onConflictDoNothing: jest.fn().mockReturnThis(),
-            returning: jest.fn().mockResolvedValue([]),
-            update: jest.fn().mockReturnThis(),
-            set: jest.fn().mockReturnThis(),
-            delete: jest.fn().mockReturnThis(),
-            // UPDATE and DELETE report how many rows they matched; the driver rejects a
-            // write that matched none, so the chainable mock has to carry a row count.
-            rowCount: 1,
-            transaction: jest.fn((callback) => callback(db)),
-            then: jest.fn((resolve) => resolve(Object.assign([], { rowCount: 1 })))
-        } as any;
+        db = drizzleChainMock();
+        db.orderBy.mockReturnValue(mockQuery);
 
         dataService = new DataService(db, collectionRegistry);
     });

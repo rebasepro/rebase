@@ -146,8 +146,8 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
     let queryable: Queryable;
 
     const asUser = (uid: string) => driver.withAuth(testUser(uid, []));
-    const countAs = async (uid: string, path: string, collection: LegacyCollectionConfig) =>
-        (await asUser(uid)).count({ path, collection });
+    const countAs = async (uid: string, path: string) =>
+        (await asUser(uid)).count({ path });
     const rawCount = async (table: string, where = ""): Promise<number> => {
         const r = await admin.query(`SELECT count(*)::int AS c FROM public.${table} ${where}`);
         return (r.rows[0] as { c: number }).c;
@@ -303,44 +303,41 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
         // The symptom that started this: a public collection answered 401
         // because RLS was on with no policy. With the policy applied at boot, a
         // user-context read returns the rows.
-        expect(await countAs("anyone", "tiers", tiersCollection)).toBe(2);
+        expect(await countAs("anyone", "tiers")).toBe(2);
         // Even an anonymous principal (empty uid → coerced, never null) reads it.
-        expect(await countAs("", "tiers", tiersCollection)).toBe(2);
+        expect(await countAs("", "tiers")).toBe(2);
     });
 
     it("accepts an authorized write and reads it back", async () => {
         await (await asUser("u1")).save({
             status: "new",
             path: "customers",
-            collection: customersCollection,
             values: { id: "c1", name: "Acme", owner_id: "u1" }
         });
 
         expect(await rawCount("customers", "WHERE id = 'c1'")).toBe(1);
-        expect(await countAs("u1", "customers", customersCollection)).toBe(1);
+        expect(await countAs("u1", "customers")).toBe(1);
     });
 
     it("denies a write that forges another owner (WITH CHECK)", async () => {
         await expect((await asUser("u1")).save({
             status: "new",
             path: "customers",
-            collection: customersCollection,
             values: { id: "c-forged", name: "spoof", owner_id: "u2" }
         })).rejects.toBeTruthy();
         expect(await rawCount("customers", "WHERE id = 'c-forged'")).toBe(0);
     });
 
     it("isolates per-owner reads across tenants (USING)", async () => {
-        expect(await countAs("u1", "customers", customersCollection)).toBe(1);
-        expect(await countAs("u2", "customers", customersCollection)).toBe(0);
+        expect(await countAs("u1", "customers")).toBe(1);
+        expect(await countAs("u2", "customers")).toBe(0);
     });
 
     it("keeps a collection with no rules locked to plain users (secure by default)", async () => {
-        expect(await countAs("u1", "secrets", secretsCollection)).toBe(0);
+        expect(await countAs("u1", "secrets")).toBe(0);
         await expect((await asUser("u1")).save({
             status: "new",
             path: "secrets",
-            collection: secretsCollection,
             values: { id: "s2", value: "x" }
         })).rejects.toBeTruthy();
         expect(await rawCount("secrets")).toBe(1);
@@ -350,12 +347,11 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
         await (await asUser("u1")).save({
             status: "new",
             path: "orders",
-            collection: ordersCollection,
             values: { id: "o1", reference: "ORD-1", customer_id: "c1" }
         });
 
         expect(await rawCount("orders", "WHERE id = 'o1' AND customer_id = 'c1'")).toBe(1);
-        expect(await countAs("anyone", "orders", ordersCollection)).toBe(1);
+        expect(await countAs("anyone", "orders")).toBe(1);
     });
 
     it("is idempotent: a second boot changes nothing and still serves", async () => {
@@ -369,8 +365,8 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
         expect(again.failures).toEqual([]);
         expect(again.tablesSecured).toBe(5);
         // Data still reads exactly the same after a second application.
-        expect(await countAs("anyone", "tiers", tiersCollection)).toBe(2);
-        expect(await countAs("u1", "customers", customersCollection)).toBe(1);
-        expect(await countAs("anyone", "orders", ordersCollection)).toBe(1);
+        expect(await countAs("anyone", "tiers")).toBe(2);
+        expect(await countAs("u1", "customers")).toBe(1);
+        expect(await countAs("anyone", "orders")).toBe(1);
     });
 });

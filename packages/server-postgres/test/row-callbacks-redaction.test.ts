@@ -242,7 +242,6 @@ describe("an afterRead that returns nothing", () => {
             path: "customers",
             id: "c1",
             values: { first_name: "Jane" },
-            collection: plain,
             status: "new"
         });
 

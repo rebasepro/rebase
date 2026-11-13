@@ -42,9 +42,8 @@ const articles = (callbacks: LegacyPostgresCollectionConfig["callbacks"]): Legac
     callbacks
 });
 
-const deleteProps = (collection: LegacyCollectionConfig) => ({
-    row: { id: "a1", path: "articles" },
-    collection
+const deleteProps = () => ({
+    row: { id: "a1", path: "articles" }
 });
 
 /** The row as stored — what the driver reads, and what the callbacks judge. */
@@ -64,7 +63,7 @@ describe("beforeDelete returning false", () => {
         const collection = articles({ beforeDelete: () => false });
         const driver = buildDriver(collection);
 
-        await expect(driver.delete(deleteProps(collection))).rejects.toBeDefined();
+        await expect(driver.delete(deleteProps())).rejects.toBeDefined();
 
         expect(deleteSpy).not.toHaveBeenCalled();
     });
@@ -73,7 +72,7 @@ describe("beforeDelete returning false", () => {
         const collection = articles({ beforeDelete: () => false });
         const driver = buildDriver(collection);
 
-        const error = await driver.delete(deleteProps(collection))
+        const error = await driver.delete(deleteProps())
             .then(() => undefined, (e: CallbackError) => e);
 
         expect(error).toBeDefined();
@@ -93,7 +92,7 @@ describe("beforeDelete returning false", () => {
         });
         const driver = buildDriver(collection);
 
-        await expect(driver.delete(deleteProps(collection))).rejects.toBeDefined();
+        await expect(driver.delete(deleteProps())).rejects.toBeDefined();
 
         expect(ran).toEqual([]);
     });
@@ -104,7 +103,7 @@ describe("beforeDelete returning false", () => {
         const collection = articles({ beforeDelete: () => undefined });
         const driver = buildDriver(collection);
 
-        await driver.delete(deleteProps(collection));
+        await driver.delete(deleteProps());
 
         expect(deleteSpy).toHaveBeenCalled();
     });
@@ -113,7 +112,7 @@ describe("beforeDelete returning false", () => {
         const collection = articles({ beforeDelete: () => true });
         const driver = buildDriver(collection);
 
-        await driver.delete(deleteProps(collection));
+        await driver.delete(deleteProps());
 
         expect(deleteSpy).toHaveBeenCalled();
     });
@@ -128,7 +127,7 @@ describe("beforeDelete returning false", () => {
 
         // `values` is not part of the delete props: an untyped caller can still send it.
         const row = { id: "a1", path: "articles", values: { title: "Ada", status: "draft" } };
-        const error = await driver.delete({ row, collection }).then(() => undefined, (e: CallbackError) => e);
+        const error = await driver.delete({ row }).then(() => undefined, (e: CallbackError) => e);
 
         expect(error?.code).toBe("CALLBACK_REJECTED");
         expect(beforeDelete).toHaveBeenCalledWith(expect.objectContaining({ row: STORED }));
@@ -141,7 +140,7 @@ describe("beforeDelete returning false", () => {
         const collection = articles({ beforeDelete });
         const driver = buildDriver(collection);
 
-        const error = await driver.delete(deleteProps(collection))
+        const error = await driver.delete(deleteProps())
             .then(() => undefined, (e: CallbackError) => e);
 
         expect(error?.status ?? error?.statusCode).toBe(404);
@@ -158,7 +157,7 @@ describe("beforeDelete returning false", () => {
         });
         const driver = buildDriver(collection);
 
-        const error = await driver.delete(deleteProps(collection))
+        const error = await driver.delete(deleteProps())
             .then(() => undefined, (e: CallbackError) => e);
 
         expect(error!.status ?? error!.statusCode).toBe(409);

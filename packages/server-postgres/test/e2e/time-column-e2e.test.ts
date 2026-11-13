@@ -62,23 +62,23 @@ describe("a time column", () => {
     });
 
     it("reads a stored time as that time of day", async () => {
-        const row = await driver.fetchOne({ path: "shops", id: "s1", collection: shops });
+        const row = await driver.fetchOne({ path: "shops", id: "s1" });
         expect(row?.opens).toBe("09:30:00");
     });
 
     it("writes a time of day back as itself", async () => {
         await driver.save({
-            path: "shops", collection: shops, id: "s1", status: "existing",
+            path: "shops", id: "s1", status: "existing",
             values: { opens: new Date("1970-01-01T18:45:30.000Z") }
         });
         const { rows } = await admin.query("SELECT opens::text AS opens FROM shops WHERE id = 's1'");
         expect(rows[0].opens).toBe("18:45:30");
-        const row = await driver.fetchOne({ path: "shops", id: "s1", collection: shops });
+        const row = await driver.fetchOne({ path: "shops", id: "s1" });
         expect(row?.opens).toBe("18:45:30");
     });
 
     it("takes a time written as text", async () => {
-        await driver.save({ path: "shops", collection: shops, id: "s1", status: "existing", values: { opens: "07:05" } });
+        await driver.save({ path: "shops", id: "s1", status: "existing", values: { opens: "07:05" } });
         const { rows } = await admin.query("SELECT opens::text AS opens FROM shops WHERE id = 's1'");
         expect(rows[0].opens).toBe("07:05:00");
     });

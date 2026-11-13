@@ -108,7 +108,6 @@ describe("a many-to-many set saved through the parent, without change capture (E
             path: "posts",
             id: "p-1",
             values: { tags: [{ id: "t-2", path: "tags", __type: "relation" }] },
-            collection: postsCollection,
             status: "existing"
         });
 

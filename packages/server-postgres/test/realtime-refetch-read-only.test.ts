@@ -90,7 +90,7 @@ afterEach(async () => {
 describe("a subscription frame", () => {
     it("refuses an afterRead's write on a collection refetch, as a request read does", async () => {
         const frames: unknown[] = [];
-        const unsubscribe = user.listenCollection!({ path: "widgets", collection: widgets, onUpdate: (rows) => frames.push(rows) });
+        const unsubscribe = user.listenCollection!({ path: "widgets", onUpdate: (rows) => frames.push(rows) });
         await wait(100);
         hookRuns = 0;
         refusals = [];
@@ -106,7 +106,7 @@ describe("a subscription frame", () => {
     });
 
     it("refuses it on a single-row refetch too", async () => {
-        const unsubscribe = user.listenOne!({ path: "widgets", id: "w1", collection: widgets, onUpdate: () => undefined });
+        const unsubscribe = user.listenOne!({ path: "widgets", id: "w1", onUpdate: () => undefined });
         await wait(100);
         hookRuns = 0;
         refusals = [];

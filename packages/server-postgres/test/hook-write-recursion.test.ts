@@ -92,7 +92,7 @@ const count = async (table: string) =>
 
 describe("a hook that writes its own collection", () => {
     it("is refused at a bounded depth, naming the collection and the hook, and nothing is stored", async () => {
-        const error = await user.save({ path: "orders", values: { title: "loop" }, collection: orders, status: "new" })
+        const error = await user.save({ path: "orders", values: { title: "loop" }, status: "new" })
             .then(() => undefined, (e: unknown) => e as { code?: string; statusCode?: number; message: string });
 
         expect(error).toMatchObject({ code: "CALLBACK_RECURSION", statusCode: 500 });
@@ -103,14 +103,14 @@ describe("a hook that writes its own collection", () => {
     });
 
     it("leaves a chain that ends alone", async () => {
-        await expect(user.save({ path: "steps", values: { n: 1 }, collection: steps, status: "new" }))
+        await expect(user.save({ path: "steps", values: { n: 1 }, status: "new" }))
             .resolves.toMatchObject({ n: 1 });
         expect(await count("steps")).toBe(5);
     });
 
     it("counts siblings separately: a bulk write is not a nesting", async () => {
         const rows = Array.from({ length: MAX_WRITE_DEPTH + 4 }, () => ({ n: 5 }));
-        await expect(user.saveMany!({ path: "steps", rows, collection: steps }))
+        await expect(user.saveMany!({ path: "steps", rows }))
             .resolves.toHaveLength(rows.length);
     });
 });

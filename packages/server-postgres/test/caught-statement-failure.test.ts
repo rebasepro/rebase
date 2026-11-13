@@ -153,7 +153,7 @@ const stored = async (id: string) =>
     (await db.query<{ c: number }>("SELECT count(*)::int AS c FROM orders WHERE id = $1", [id])).rows[0].c;
 
 const create = (id: string) =>
-    user.save({ path: "orders", values: { id, customer: "ACME Ltd" }, collection: orders, status: "new" });
+    user.save({ path: "orders", values: { id, customer: "ACME Ltd" }, status: "new" });
 
 const refusedAsAborted = expect.objectContaining({ statusCode: 500, code: "TRANSACTION_ABORTED" });
 
@@ -183,7 +183,7 @@ describe("a failed statement a callback caught", () => {
         await db.query("INSERT INTO orders VALUES ('o3', 'ACME Ltd')");
         attempt = (data) => data.customers.find({ where: { orders: ["==", "ACME Ltd"] } });
 
-        await expect(user.delete({ row: { id: "o3", path: "orders" }, collection: orders }))
+        await expect(user.delete({ row: { id: "o3", path: "orders" } }))
             .rejects.toEqual(refusedAsAborted);
 
         expect(caught).toBeDefined();
@@ -220,7 +220,7 @@ describe("a failed statement the framework used to swallow", () => {
         // The link is written as an UPDATE on the target, which the trigger
         // refuses. Swallowed, the next statement on the transaction failed with
         // "current transaction is aborted" and the real cause was one warn line.
-        const error = await user.save({ path: "owners", values: { name: "Ada", mainDoc: 1 }, collection: owners, status: "new" })
+        const error = await user.save({ path: "owners", values: { name: "Ada", mainDoc: 1 }, status: "new" })
             .then(() => undefined, (e: unknown) => e);
 
         expect(error).toBeDefined();

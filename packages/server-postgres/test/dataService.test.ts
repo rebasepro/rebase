@@ -1,5 +1,5 @@
 import { DataService } from "../src/services/dataService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { drizzleChainMock, type DrizzleChainMock } from "./helpers/drizzle-chain-mock";
 import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -147,7 +147,7 @@ authorsCollection = {
 
 describe("DataService", () => {
     let dataService: DataService;
-    let db: jest.Mocked<NodePgDatabase>;
+    let db: DrizzleChainMock;
 
     beforeEach(() => {
         jest.spyOn(collectionRegistry, "getCollectionByPath").mockImplementation(path => {
@@ -167,29 +167,10 @@ describe("DataService", () => {
         });
         jest.spyOn(collectionRegistry, "getCollections").mockReturnValue([authorsCollection, postsCollection, tagsCollection, projectUsersCollection]);
 
-        db = {
-            select: jest.fn().mockReturnThis(),
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            $dynamic: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue([]),
-            orderBy: jest.fn().mockResolvedValue([]), // This is now a terminal operation by default
-            innerJoin: jest.fn().mockReturnThis(),
-            insert: jest.fn().mockReturnThis(),
-            values: jest.fn().mockReturnThis(),
-            // Junction inserts land with ON CONFLICT DO NOTHING so that two
-            // editors adding the same link concurrently is a no-op rather than
-            // a unique violation.
-            onConflictDoNothing: jest.fn().mockReturnThis(),
-            returning: jest.fn().mockResolvedValue([]),
-            update: jest.fn().mockReturnThis(),
-            set: jest.fn().mockReturnThis(),
-            delete: jest.fn().mockReturnThis(),
-            // UPDATE and DELETE report how many rows they matched; the driver rejects a
-            // write that matched none, so the chainable mock has to carry a row count.
-            rowCount: 1,
-            transaction: jest.fn((callback) => callback(db))
-        } as unknown as jest.Mocked<NodePgDatabase>;
+        db = drizzleChainMock({ awaitable: false });
+        // Reads end on `limit` / `orderBy` here: answer them with no rows by default.
+        db.limit.mockResolvedValue([]);
+        db.orderBy.mockResolvedValue([]);
 
         dataService = new DataService(db, collectionRegistry);
     });
@@ -403,7 +384,7 @@ authorId: 1 }
 
 describe("DataService - Comprehensive Tests", () => {
     let dataService: DataService;
-    let db: jest.Mocked<NodePgDatabase<any>>;
+    let db: DrizzleChainMock;
 
     // Extended mock tables for more complex scenarios
     const mockUsersTable = {
@@ -658,32 +639,7 @@ relationName: "children" }
             return undefined;
         });
 
-        db = {
-            select: jest.fn().mockReturnThis(),
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            $dynamic: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockReturnThis(),
-            orderBy: jest.fn().mockReturnThis(),
-            innerJoin: jest.fn().mockReturnThis(),
-            insert: jest.fn().mockReturnThis(),
-            values: jest.fn().mockReturnThis(),
-            // Junction inserts land with ON CONFLICT DO NOTHING so that two
-            // editors adding the same link concurrently is a no-op rather than
-            // a unique violation.
-            onConflictDoNothing: jest.fn().mockReturnThis(),
-            returning: jest.fn().mockResolvedValue([]),
-            update: jest.fn().mockReturnThis(),
-            set: jest.fn().mockReturnThis(),
-            delete: jest.fn().mockReturnThis(),
-            // UPDATE and DELETE report how many rows they matched; the driver rejects a
-            // write that matched none, so the chainable mock has to carry a row count.
-            rowCount: 1,
-            transaction: jest.fn((callback) => callback(db))
-        } as unknown as jest.Mocked<NodePgDatabase>;
-
-        // Add a then method to make the db object awaitable when the query chain ends
-        (db as unknown as Record<string, jest.Mock>).then = jest.fn((resolve) => resolve(Object.assign([], { rowCount: 1 })));
+        db = drizzleChainMock();
 
         dataService = new DataService(db, collectionRegistry);
     });

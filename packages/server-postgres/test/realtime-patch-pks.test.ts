@@ -1,7 +1,6 @@
 import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { pgTable, text } from "drizzle-orm/pg-core";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { fakeDataDriver, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 import { recordingDb, shapedRows } from "./helpers/spg-c-db";
@@ -42,7 +41,7 @@ isId: true },
     };
 
     let realtimeService: RealtimeService;
-    let registry: PostgresTableRegistry;
+    let registry: FixtureTableRegistry;
     let ws: MockWebSocket;
     /** What the mocked database reads, for every query. */
     let rowsRead: Record<string, unknown>[] = [];

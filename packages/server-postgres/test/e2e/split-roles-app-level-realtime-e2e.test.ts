@@ -119,7 +119,6 @@ describe("split roles without change capture (E2E)", () => {
             path: "orders",
             id: 1,
             values: { status: "shipped" },
-            collection: ordersCollection,
             status: "existing"
         });
 

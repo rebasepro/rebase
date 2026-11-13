@@ -13,7 +13,6 @@
  */
 import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { toRestRow } from "../src/services/row-pipeline";
-import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 
 const usersCollection: LegacyCollectionConfig = {
@@ -37,7 +36,7 @@ const usersCollection: LegacyCollectionConfig = {
     }
 };
 
-function makeRegistry(): PostgresTableRegistry {
+function makeRegistry(): FixtureTableRegistry {
     const registry = new FixtureTableRegistry();
     registry.registerMultiple([usersCollection]);
     return registry;

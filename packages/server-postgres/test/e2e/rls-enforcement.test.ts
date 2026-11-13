@@ -156,7 +156,7 @@ describe("Unified RLS enforcement (E2E)", () => {
         }
     }
     async function countAs(uid: string): Promise<number> {
-        return (await userDriver(uid)).count({ path: "tasks", collection: tasksCollection });
+        return (await userDriver(uid)).count({ path: "tasks" });
     }
     async function realtimeFetchAs(uid: string): Promise<unknown[]> {
         // The service's private refetch, by name: the path a subscription's frames take.
@@ -280,7 +280,7 @@ describe("Unified RLS enforcement (E2E)", () => {
         const a = await userDriver("user-a");
         await a.save({
             status: "new",
-            path: "tasks", collection: tasksCollection,
+            path: "tasks",
             values: { id: "t-a2", title: "A second", owner_id: "user-a" }
         });
 
@@ -300,7 +300,7 @@ describe("Unified RLS enforcement (E2E)", () => {
         // accepts any error cannot tell a denial from a fault.
         await expect(a.save({
             status: "new",
-            path: "tasks", collection: tasksCollection,
+            path: "tasks",
             values: { id: "t-forged", title: "spoof", owner_id: "user-b" }
         })).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
 
@@ -315,7 +315,7 @@ describe("Unified RLS enforcement (E2E)", () => {
         const a = await userDriver("user-a");
         const err = await a.save({
             status: "new",
-            path: "tasks", collection: tasksCollection,
+            path: "tasks",
             values: { id: "t-forged-2", title: "spoof", owner_id: "user-b" }
         }).catch((e: unknown) => e as Error);
 
@@ -333,7 +333,7 @@ describe("Unified RLS enforcement (E2E)", () => {
         // so 404: a 403 here would confirm the row exists to someone who cannot
         // read it.
         await expect(a.save({
-            path: "tasks", collection: tasksCollection, id: "t-b", status: "existing",
+            path: "tasks", id: "t-b", status: "existing",
             values: { title: "hijacked" }
         })).rejects.toMatchObject({ statusCode: 404 });
         const bTitle = await adminClient.query("SELECT title FROM public.tasks WHERE id = 't-b'");
@@ -342,7 +342,7 @@ describe("Unified RLS enforcement (E2E)", () => {
 
     it("DENIES a user from deleting another tenant's row (USING)", async () => {
         const a = await userDriver("user-a");
-        await expect(a.delete({ row: { id: "t-b", path: "tasks" }, collection: tasksCollection }))
+        await expect(a.delete({ row: { id: "t-b", path: "tasks" } }))
             .rejects.toMatchObject({ statusCode: 404 });
         expect(await rawCount("tasks", "WHERE id = 't-b'")).toBe(1);
     });
@@ -352,7 +352,7 @@ describe("Unified RLS enforcement (E2E)", () => {
     // when they can. Neither is ever a success, which is what both used to be.
     it("reports a DELETE the policy refused as denied, not as done", async () => {
         const a = await userDriver("user-a");
-        await expect(a.delete({ row: { id: "n-1", path: "notices" }, collection: noticesCollection }))
+        await expect(a.delete({ row: { id: "n-1", path: "notices" } }))
             .rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
         expect(await rawCount("notices", "WHERE id = 'n-1'")).toBe(1);
     });
@@ -360,7 +360,7 @@ describe("Unified RLS enforcement (E2E)", () => {
     it("reports an UPDATE the policy refused as denied, not as done", async () => {
         const a = await userDriver("user-a");
         await expect(a.save({
-            path: "notices", collection: noticesCollection, id: "n-1", status: "existing",
+            path: "notices", id: "n-1", status: "existing",
             values: { body: "rewritten" }
         })).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
         const body = await adminClient.query("SELECT body FROM public.notices WHERE id = 'n-1'");
@@ -374,7 +374,6 @@ describe("Unified RLS enforcement (E2E)", () => {
         const a = await userDriver("user-a");
         await expect(a.delete({
             row: { id: "tp-1", path: "notices/n-1/topics" },
-            collection: topicsCollection
         })).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
         expect(await rawCount("notice_topics", "WHERE notice_id = 'n-1'")).toBe(1);
     });
@@ -385,7 +384,7 @@ describe("Unified RLS enforcement (E2E)", () => {
     it("reports a membership write the junction refused as denied, not as done", async () => {
         const a = await userDriver("user-a");
         await expect(a.save({
-            path: "notices", collection: noticesCollection, id: "n-1", status: "existing",
+            path: "notices", id: "n-1", status: "existing",
             values: { topics: [] }
         })).rejects.toMatchObject({
             statusCode: 403,
@@ -398,11 +397,11 @@ describe("Unified RLS enforcement (E2E)", () => {
     it("locks a policy-less collection to users (no read, no write)", async () => {
         const a = await userDriver("user-a");
         // Read: user sees nothing.
-        expect(await a.count({ path: "secrets", collection: secretsCollection })).toBe(0);
+        expect(await a.count({ path: "secrets" })).toBe(0);
         // Write: denied by default-deny (no permissive policy).
         await expect(a.save({
             status: "new",
-            path: "secrets", collection: secretsCollection, values: { id: "s2", value: "x" }
+            path: "secrets", values: { id: "s2", value: "x" }
         })).rejects.toBeTruthy();
         expect(await rawCount("secrets")).toBe(1);
     });
@@ -414,7 +413,7 @@ describe("Unified RLS enforcement (E2E)", () => {
         // the base driver wrapped in `withAuth(SERVICE_IDENTITY)`.
         await driver.save({
             status: "new",
-            path: "secrets", collection: secretsCollection, values: { id: "s-server", value: "ok" }
+            path: "secrets", values: { id: "s-server", value: "ok" }
         });
         expect(await rawCount("secrets", "WHERE id = 's-server'")).toBe(1);
     });
@@ -463,7 +462,7 @@ describe("Unified RLS enforcement (E2E)", () => {
             const a = await userDriver("user-a");
             await a.save({
                 status: "new",
-                path: "tasks", collection: tasksCollection,
+                path: "tasks",
                 values: { id: "t-a-cb", title: "cb", owner_id: "user-a" }
             });
 
@@ -476,7 +475,7 @@ describe("Unified RLS enforcement (E2E)", () => {
             seen.length = 0;
             await driver.save({
                 status: "new",
-                path: "tasks", collection: tasksCollection,
+                path: "tasks",
                 values: { id: "t-server-cb", title: "cb", owner_id: "user-b" }
             });
         });

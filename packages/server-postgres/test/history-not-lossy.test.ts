@@ -149,7 +149,7 @@ describe("history is not lossy", () => {
         it("fails the save when the entry cannot be recorded, rather than committing without it", async () => {
             const recordHistory = jest.fn().mockRejectedValue(new Error("history insert failed"));
             await expect(
-                stand(recordHistory).save({ path: "posts", values: { title: "Hi" }, collection: posts, status: "new" })
+                stand(recordHistory).save({ path: "posts", values: { title: "Hi" }, status: "new" })
             ).rejects.toThrow(/history insert failed/);
             expect(recordHistory).toHaveBeenCalledTimes(1);
         });
@@ -163,7 +163,7 @@ describe("history is not lossy", () => {
                 await new Promise(resolve => setTimeout(resolve, 5));
                 settled = true;
             });
-            await stand(recordHistory).save({ path: "posts", values: { title: "Hi" }, collection: posts, status: "new" });
+            await stand(recordHistory).save({ path: "posts", values: { title: "Hi" }, status: "new" });
             expect(settled).toBe(true);
         });
 
@@ -174,14 +174,13 @@ describe("history is not lossy", () => {
             await expect(
                 stand(recordHistory).delete({
                     row: { id: "1", path: "posts" },
-                    collection: posts
                 })
             ).rejects.toThrow(/history insert failed/);
         });
 
         it("records the row it read as the deleted row", async () => {
             const recordHistory = jest.fn().mockResolvedValue(undefined);
-            await stand(recordHistory).delete({ row: { id: "1", path: "posts" }, collection: posts });
+            await stand(recordHistory).delete({ row: { id: "1", path: "posts" } });
             expect(recordHistory).toHaveBeenCalledWith(expect.objectContaining({
                 action: "delete",
                 values: { id: 1, title: "Hi" }

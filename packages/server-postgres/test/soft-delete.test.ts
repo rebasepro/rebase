@@ -203,7 +203,6 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
     it("stamps the field instead of issuing a DELETE", async () => {
         await stand().delete({
             row: { id: "7", path: "posts" },
-            collection: posts
         });
         expect(deleteSpy).not.toHaveBeenCalled();
         expect(saveSpy).toHaveBeenCalledTimes(1);
@@ -218,7 +217,6 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
         // records that is the flag's business, not the subscriber's.
         await stand().delete({
             row: { id: "7", path: "posts" },
-            collection: posts
         });
         expect(notifyUpdate).toHaveBeenCalledWith("posts", "7", null, undefined);
     });
@@ -228,7 +226,6 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
         registry.setTableHooks("posts", { beforeDelete });
         await expect(stand().delete({
             row: { id: "7", path: "posts" },
-            collection: posts
         })).rejects.toThrow();
         expect(beforeDelete).toHaveBeenCalled();
         expect(saveSpy).not.toHaveBeenCalled();
@@ -239,7 +236,6 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
         registry.setTableHooks("posts", { afterDelete });
         await stand().delete({
             row: { id: "7", path: "posts" },
-            collection: posts
         });
         expect(afterDelete).toHaveBeenCalled();
     });
@@ -247,7 +243,6 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
     it("issues a real DELETE when asked for a hard one", async () => {
         await stand().delete({
             row: { id: "7", path: "posts" },
-            collection: posts,
             hard: true
         });
         expect(deleteSpy).toHaveBeenCalledTimes(1);
@@ -258,19 +253,18 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
         // A hard delete of a row that is already stamped is how the trash is
         // emptied. With nothing to judge it reads nothing: the DELETE reaches
         // a stamped row, where a read hiding stamped rows would answer 404.
-        await stand().delete({ row: { id: "7", path: "posts" }, collection: posts, hard: true });
+        await stand().delete({ row: { id: "7", path: "posts" }, hard: true });
         expect(fetchOneSpy).not.toHaveBeenCalled();
         expect(deleteSpy).toHaveBeenCalledTimes(1);
 
         // A soft delete of a stamped row is a delete of nothing.
-        await stand().delete({ row: { id: "7", path: "posts" }, collection: posts });
+        await stand().delete({ row: { id: "7", path: "posts" } });
         expect(fetchOneSpy).toHaveBeenCalledWith("posts", "7", undefined, undefined, { withDeleted: undefined });
     });
 
     it("is a real DELETE on a collection that does not soft-delete", async () => {
         await stand().delete({
             row: { id: "7", path: "notes" },
-            collection: plain
         });
         expect(deleteSpy).toHaveBeenCalledTimes(1);
     });

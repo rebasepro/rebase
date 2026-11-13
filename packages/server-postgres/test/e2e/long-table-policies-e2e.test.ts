@@ -90,10 +90,10 @@ async function policyNames(observer: pg.Client): Promise<{ name: string; cmd: st
 
 async function adminWrites(booted: Booted): Promise<void> {
     const admin: DataDriver = await booted.driver.withAuth(testUser("admin-1", ["admin"]));
-    const created = await admin.save({ path: TABLE, values: { title: "inserted" }, collection, status: "new" });
+    const created = await admin.save({ path: TABLE, values: { title: "inserted" }, status: "new" });
     expect(created).toMatchObject({ title: "inserted" });
     const updated = await admin.save({
-        path: TABLE, id: String(created.id), values: { title: "updated" }, collection, status: "existing"
+        path: TABLE, id: String(created.id), values: { title: "updated" }, status: "existing"
     });
     expect(updated).toMatchObject({ title: "updated" });
 }

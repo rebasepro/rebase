@@ -24,7 +24,6 @@
  */
 import { Table } from "drizzle-orm";
 import { RelationService } from "../src/services/RelationService";
-import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import type { RelationDescriptor } from "@rebasepro/types";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
@@ -226,7 +225,7 @@ function resolved(collection: LegacyCollectionConfig, relationName: string): Rel
 }
 
 describe("batchFetchRelatedEntitiesMany: M2M through junction table regression", () => {
-    let registry: PostgresTableRegistry;
+    let registry: FixtureTableRegistry;
 
     function createMockDb(resolveResults: () => unknown[]) {
         let queryRecorder = {

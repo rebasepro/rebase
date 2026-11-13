@@ -73,17 +73,17 @@ describe("databaseDefault on create", () => {
         (await admin.query("SELECT code FROM tickets WHERE id = $1", [id])).rows[0]?.code as string | undefined;
 
     it("fills a column the create leaves out", async () => {
-        await driver.save({ path: "tickets", id: "t-1", values: { title: "Left out" }, status: "new", collection: tickets });
+        await driver.save({ path: "tickets", id: "t-1", values: { title: "Left out" }, status: "new" });
         expect(await stored("t-1")).toMatch(/^T-[0-9a-f]{32}$/);
     });
 
     it("fills a column the create sends as null, as the admin form does", async () => {
-        await driver.save({ path: "tickets", id: "t-2", values: { title: "Sent null", code: null }, status: "new", collection: tickets });
+        await driver.save({ path: "tickets", id: "t-2", values: { title: "Sent null", code: null }, status: "new" });
         expect(await stored("t-2")).toMatch(/^T-[0-9a-f]{32}$/);
     });
 
     it("keeps a value the create does send", async () => {
-        await driver.save({ path: "tickets", id: "t-3", values: { title: "Sent", code: "MINE" }, status: "new", collection: tickets });
+        await driver.save({ path: "tickets", id: "t-3", values: { title: "Sent", code: "MINE" }, status: "new" });
         expect(await stored("t-3")).toBe("MINE");
     });
 });

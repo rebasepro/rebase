@@ -1,5 +1,4 @@
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
 import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
@@ -43,7 +42,7 @@ const mockPostsCollection: LegacyCollectionConfig = {
 describe("RealtimeService", () => {
     let realtimeService: RealtimeService;
     let statements: RecordedStatement[];
-    let registry: PostgresTableRegistry;
+    let registry: FixtureTableRegistry;
 
     beforeEach(() => {
         jest.useFakeTimers();

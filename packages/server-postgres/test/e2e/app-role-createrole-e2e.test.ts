@@ -114,7 +114,7 @@ describe.each([
 
     it("serves a signed-in read, as rebase_user, with the policy applied", async () => {
         const asU1 = await driver.withAuth(testUser("u1", []));
-        const entities = await asU1.fetchCollection({ path: "notes", collection: notesCollection });
+        const entities = await asU1.fetchCollection({ path: "notes" });
         // The owner would see both; the request role sees its own.
         expect(entities.map(e => String(e.id))).toEqual(["n1"]);
     });

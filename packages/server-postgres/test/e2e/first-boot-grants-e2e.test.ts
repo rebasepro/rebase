@@ -132,7 +132,6 @@ describe("first boot on an empty database (E2E)", () => {
         const saved = await scoped.save({
             path: "orders",
             values: { title: "first order" },
-            collection: ordersCollection,
             status: "new"
         });
         expect(saved).toMatchObject({ title: "first order" });

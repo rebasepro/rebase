@@ -98,7 +98,6 @@ describe("afterSave throws", () => {
             path: "articles",
             id: "a1",
             values: { title: "Ada" },
-            collection,
             status: "new"
         })).rejects.toBeDefined();
 
@@ -121,7 +120,6 @@ describe("afterSave throws", () => {
             path: "articles",
             id: "a1",
             values: { title: "Ada" },
-            collection,
             status: "new"
         }).then(() => undefined, (e: CallbackError) => e);
 
@@ -149,7 +147,6 @@ describe("afterSave throws", () => {
             path: "articles",
             id: "a1",
             values: { title: "Ada" },
-            collection,
             status: "new"
         })).rejects.toBeDefined();
 
@@ -171,7 +168,6 @@ describe("afterSave throws", () => {
             path: "articles",
             id: "a1",
             values: { title: "Ada" },
-            collection,
             status: "new"
         }).then(() => undefined, (e: CallbackError) => e);
 
@@ -198,7 +194,6 @@ describe("afterSave throws", () => {
             path: "articles",
             id: "a1",
             values: { title: "Ada" },
-            collection,
             status: "new"
         })).rejects.toBeDefined();
 
@@ -221,7 +216,6 @@ describe("afterSave throws", () => {
             path: "articles",
             id: "a1",
             values: { title: "Ada" },
-            collection,
             status: "new"
         });
 
@@ -249,7 +243,6 @@ describe("afterDelete throws", () => {
 
         const error = await authed.delete({
             row: { id: "a1", path: "articles" },
-            collection
         }).then(() => undefined, (e: CallbackError) => e);
 
         expect(error!.status ?? error!.statusCode).toBe(400);

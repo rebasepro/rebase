@@ -246,7 +246,6 @@ describe("Duplicating a record (every relation kind)", () => {
         expect(copy).not.toHaveProperty("id");
         await driver.save({
             path: "authors",
-            collection: authorsCollection,
             values: { ...copy, id: "a-2", name: "Ada (copy)" },
             status: "new"
         });

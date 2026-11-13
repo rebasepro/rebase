@@ -118,17 +118,16 @@ describe("DataDriver.delete contract (Postgres, E2E)", () => {
                     // a 404 from the very guard this file is here to check.
                     await driver.save({
                         status: "new",
-                        path: "notes", collection: notesCollection,
+                        path: "notes",
                         values: { id, body: "contract" }
                     });
                     return id;
                 },
                 delete: (id) => driver.delete({
                     row: { id, path: "notes" },
-                    collection: notesCollection
                 }),
                 exists: async (id) =>
-                    (await driver.fetchOne({ path: "notes", id, collection: notesCollection })) != null,
+                    (await driver.fetchOne({ path: "notes", id })) != null,
                 // Any string the key column accepts and no row holds.
                 missingId: () => "n-does-not-exist"
             },
@@ -152,7 +151,7 @@ describe("DataDriver.delete contract (Postgres, E2E)", () => {
         const make = async (id: string) => {
             await driver.save({
                 status: "new",
-                path: "trash_notes", collection: trashCollection,
+                path: "trash_notes",
                 values: { id, body: "trash me" }
             });
             return id;
@@ -185,7 +184,6 @@ describe("DataDriver.delete contract (Postgres, E2E)", () => {
 
             await expect(driver.delete({
                 row: { id, path: "trash_notes" },
-                collection: trashCollection
             })).resolves.toBeUndefined();
 
             expect(await state(id)).toBe("stamped");
@@ -200,13 +198,11 @@ describe("DataDriver.delete contract (Postgres, E2E)", () => {
             const id = await make("t-2");
             await driver.delete({
                 row: { id, path: "trash_notes" },
-                collection: trashCollection
             });
             expect(await state(id)).toBe("stamped");
 
             await driver.delete({
-                row: { id, path: "trash_notes" },
-                collection: trashCollection, hard: true
+                row: { id, path: "trash_notes" }, hard: true
             });
 
             expect(await state(id)).toBe("gone");
@@ -220,12 +216,11 @@ describe("DataDriver.delete contract (Postgres, E2E)", () => {
             const id = await make("t-4");
             await driver.delete({
                 row: { id, path: "trash_notes" },
-                collection: trashCollection
             });
             expect(await state(id)).toBe("stamped");
 
             await driver.deleteMany({
-                path: "trash_notes", ids: [id], collection: trashCollection, hard: true
+                path: "trash_notes", ids: [id], hard: true
             });
 
             expect(await state(id)).toBe("gone");
@@ -234,8 +229,7 @@ describe("DataDriver.delete contract (Postgres, E2E)", () => {
         it("purges a live row directly", async () => {
             const id = await make("t-3");
             await driver.delete({
-                row: { id, path: "trash_notes" },
-                collection: trashCollection, hard: true
+                row: { id, path: "trash_notes" }, hard: true
             });
             expect(await state(id)).toBe("gone");
         });

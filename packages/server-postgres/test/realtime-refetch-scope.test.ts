@@ -85,7 +85,7 @@ afterEach(async () => {
 describe("a refetch scheduled from outside any backend's scope", () => {
     it("runs its hooks with the owning backend as rebase", async () => {
         realtime.setScopeRunner((fn) => runInBackendScope({ rebase: backendB }, fn));
-        const unsubscribe = user.listenCollection!({ path: "widgets", collection: widgets, onUpdate: () => undefined });
+        const unsubscribe = user.listenCollection!({ path: "widgets", onUpdate: () => undefined });
         await wait(100);
         seen = [];
 
@@ -98,7 +98,7 @@ describe("a refetch scheduled from outside any backend's scope", () => {
 
     it("and a single-row subscription's too", async () => {
         realtime.setScopeRunner((fn) => runInBackendScope({ rebase: backendB }, fn));
-        const unsubscribe = user.listenOne!({ path: "widgets", id: "w1", collection: widgets, onUpdate: () => undefined });
+        const unsubscribe = user.listenOne!({ path: "widgets", id: "w1", onUpdate: () => undefined });
         await wait(100);
         seen = [];
 

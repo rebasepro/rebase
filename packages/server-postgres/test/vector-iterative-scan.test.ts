@@ -21,7 +21,6 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, serial, text, vector } from "drizzle-orm/pg-core";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
-import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { FetchService } from "../src/services/FetchService";
 import { hasIterativeIndexScans } from "../src/services/vector-iterative-scan";
@@ -66,7 +65,7 @@ const clustered = (sign: 1 | -1): number[] =>
 
 let db: PGlite;
 let service: FetchService;
-let registry: PostgresTableRegistry;
+let registry: FixtureTableRegistry;
 const query = clustered(1);
 const literal = `'[${query.join(",")}]'::vector`;
 

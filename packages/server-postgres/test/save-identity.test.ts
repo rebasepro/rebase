@@ -104,7 +104,6 @@ label: "Widget" });
         const saved = await driver.save({
             path: "sku_items",
             values: { label: "Widget" },
-            collection: skuItemsCollection,
             status: "new"
         });
 
@@ -124,7 +123,6 @@ role: "admin" });
         await driver.save({
             path: "memberships",
             values: { role: "admin" },
-            collection: membershipsCollection,
             status: "new"
         });
 
@@ -142,7 +140,6 @@ label: "Widget" });
         await driver.save({
             path: "sku_items",
             values: { label: "Widget" },
-            collection: skuItemsCollection,
             status: "new"
         });
 
@@ -166,7 +163,6 @@ name: "Camera" });
         await driver.save({
             path: "products",
             values: { name: "Camera" },
-            collection: productsCollection,
             status: "new"
         });
 
@@ -205,7 +201,6 @@ label: "Widget" });
         await driver.save({
             path: "sku_items",
             values: { label: "Widget" },
-            collection: skuItemsCollection,
             status: "new"
         });
 
@@ -227,7 +222,6 @@ label: "Widget" });
         registry.setTableHooks("sku_items", { beforeDelete });
         await driver.delete({
             row: { id: "ABC-1", path: "sku_items" },
-            collection: skuItemsCollection
         });
 
         expect(beforeDelete).toHaveBeenCalledWith(expect.objectContaining({

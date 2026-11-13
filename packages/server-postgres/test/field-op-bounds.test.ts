@@ -108,7 +108,7 @@ async function stored(id: number): Promise<Row> {
 }
 
 const update = (id: number | string, values: Record<string, unknown>) =>
-    driver.save({ path: "products", id: String(id), values, collection: products, status: "existing" });
+    driver.save({ path: "products", id: String(id), values, status: "existing" });
 
 /** The refusal a plain value breaking the same rule gets: a 400 naming the field and the rule. */
 const refusedBy = (field: string, code: string) => expect.objectContaining({

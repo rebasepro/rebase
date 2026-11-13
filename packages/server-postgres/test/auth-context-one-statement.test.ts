@@ -204,16 +204,16 @@ describe("an authenticated read on the driver", () => {
     it("sets identity and role in one statement, and the row filter still holds", async () => {
         const authed = await driver.withAuth(testUser("user-1", []));
 
-        const own = await authed.fetchOne({ path: "notes", id: mine, collection: notes });
+        const own = await authed.fetchOne({ path: "notes", id: mine });
         expect(own?.title).toBe("mine");
         expect(ceremony()).toHaveLength(1);
 
         statements = [];
-        expect(await authed.fetchOne({ path: "notes", id: theirs, collection: notes })).toBeUndefined();
+        expect(await authed.fetchOne({ path: "notes", id: theirs })).toBeUndefined();
         expect(ceremony()).toHaveLength(1);
 
         statements = [];
-        const listed = await authed.fetchCollection({ path: "notes", collection: notes });
+        const listed = await authed.fetchCollection({ path: "notes" });
         expect(listed.map(row => row.title)).toEqual(["mine"]);
         expect(ceremony()).toHaveLength(1);
     });

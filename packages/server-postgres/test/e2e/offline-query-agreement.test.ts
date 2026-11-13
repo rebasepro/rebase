@@ -128,11 +128,11 @@ const isStringOrdering = (q: { filter: FilterValues<string> }): boolean =>
 const idsOf = (rows: Record<string, unknown>[]): string[] => rows.map(r => String(r.id)).sort();
 
 async function serverIds(props: Record<string, unknown>): Promise<string[]> {
-    return idsOf(await driver.fetchCollection({ path: "items", collection: itemsCollection, limit: 1000, ...props }));
+    return idsOf(await driver.fetchCollection({ path: "items", limit: 1000, ...props }));
 }
 
 async function serverOrder(props: Record<string, unknown>): Promise<string[]> {
-    const rows = await driver.fetchCollection({ path: "items", collection: itemsCollection, limit: 1000, ...props });
+    const rows = await driver.fetchCollection({ path: "items", limit: 1000, ...props });
     return rows.map(r => String(r.id));
 }
 
@@ -164,7 +164,7 @@ beforeAll(async () => {
     realtime.setDataDriver(driver);
 
     // The cache the SDK would be holding: the unfiltered server result.
-    allRows = await driver.fetchCollection({ path: "items", collection: itemsCollection, limit: 1000 });
+    allRows = await driver.fetchCollection({ path: "items", limit: 1000 });
     expect(allRows).toHaveLength(ROWS.length);
 }, 180_000);
 

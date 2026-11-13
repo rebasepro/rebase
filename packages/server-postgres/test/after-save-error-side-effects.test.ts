@@ -70,7 +70,7 @@ afterEach(async () => {
 
 /** A create that hits the unique `name`, so the write fails in the database. */
 const failingCreate = () =>
-    user.save({ path: "widgets", values: { id: "w2", name: "taken" }, collection: widgets, status: "new" });
+    user.save({ path: "widgets", values: { id: "w2", name: "taken" }, status: "new" });
 
 const alertJobs = async () =>
     (await db.query<{ c: number }>("SELECT count(*)::int AS c FROM rebase.jobs WHERE task = 'alert-ops'")).rows[0].c;

@@ -109,7 +109,6 @@ describe("a beforeSave's result", () => {
         await driverOver(db, collection).save({
             path: "orders",
             status: "new",
-            collection,
             values: { customer: "ada", lineItems: lines(), meta: { channel: "web", draftNote: "tbd" } }
         });
 
@@ -123,7 +122,6 @@ describe("a beforeSave's result", () => {
         await driverOver(db, collection).save({
             path: "orders",
             status: "new",
-            collection,
             values: { customer: "ada", lineItems: lines(), meta: { channel: "web" } }
         });
 
@@ -135,7 +133,6 @@ describe("a beforeSave's result", () => {
         await driverOver(db, collection).save({
             path: "orders",
             status: "new",
-            collection,
             values: { customer: "ada", lineItems: lines(), meta: { channel: "web" } }
         });
 

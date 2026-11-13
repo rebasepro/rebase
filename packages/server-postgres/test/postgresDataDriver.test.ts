@@ -122,7 +122,7 @@ describe("PostgresBackendDriver", () => {
 
             jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: "test_collection", collection: collection("test") });
+            await authDelegate.fetchCollection({ path: "test_collection" });
 
             expect(rec.db.transaction).toHaveBeenCalled();
         });
@@ -132,7 +132,7 @@ describe("PostgresBackendDriver", () => {
 
             jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: "test", collection: collection("test") });
+            await authDelegate.fetchCollection({ path: "test" });
 
             expect(rec.db.transaction).toHaveBeenCalled();
             const statement = authStatement(rec.statements());
@@ -145,7 +145,7 @@ describe("PostgresBackendDriver", () => {
 
             jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: "test", collection: collection("test") });
+            await authDelegate.fetchCollection({ path: "test" });
 
             expect(rec.statements()).toHaveLength(1);
             const statement = authStatement(rec.statements());
@@ -160,7 +160,7 @@ describe("PostgresBackendDriver", () => {
 
             jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: "test", collection: collection("test") });
+            await authDelegate.fetchCollection({ path: "test" });
 
             expect(rec.statements()).toHaveLength(1);
             const statement = authStatement(rec.statements());
@@ -174,7 +174,7 @@ describe("PostgresBackendDriver", () => {
 
             jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: "test", collection: collection("test") });
+            await authDelegate.fetchCollection({ path: "test" });
 
             expect(rec.db.transaction).toHaveBeenCalledTimes(1);
             const statement = authStatement(rec.statements());
@@ -188,7 +188,7 @@ describe("PostgresBackendDriver", () => {
 
             jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: "test", collection: collection("test") });
+            await authDelegate.fetchCollection({ path: "test" });
 
             const statement = authStatement(rec.statements());
             expect(statement.text).toContain("set_config");
@@ -214,7 +214,7 @@ describe("PostgresBackendDriver", () => {
                 return {};
             });
 
-            await authDelegate.save({ path: "test", id: "123", values: {}, collection: collection("test"), status: "new" });
+            await authDelegate.save({ path: "test", id: "123", values: {}, status: "new" });
 
             // Ensure transaction was called
             expect(rec.db.transaction).toHaveBeenCalled();
@@ -233,7 +233,7 @@ describe("PostgresBackendDriver", () => {
                 throw new Error("Transaction failed");
             });
 
-            await expect(authDelegate.save({ path: "test", id: "123", values: {}, collection: collection("test"), status: "new" }))
+            await expect(authDelegate.save({ path: "test", id: "123", values: {}, status: "new" }))
                 .rejects.toThrow("Transaction failed");
 
             // Ensure notification was NOT flushed
@@ -254,7 +254,7 @@ describe("PostgresBackendDriver", () => {
             const notifySpy = jest.spyOn(realtime, "notifyUpdate").mockRejectedValueOnce(new Error("Network Failure on Notification"));
 
             // Should still return the entity successfully despite the error
-            const result = await authDelegate.save({ path: "test", id: "buggy-123", values: {}, collection: collection("test"), status: "new" });
+            const result = await authDelegate.save({ path: "test", id: "buggy-123", values: {}, status: "new" });
 
             expect(result).toEqual({ id: "success" });
             expect(notifySpy).toHaveBeenCalledWith("test", "buggy-123", {}, undefined);
@@ -276,8 +276,8 @@ describe("PostgresBackendDriver", () => {
 
             // Fire simultaneously
             await Promise.all([
-                authDelegate.save({ path: "scope-1", id: "1", values: {}, collection: collection("test"), status: "new" }),
-                authDelegate.save({ path: "scope-2", id: "2", values: {}, collection: collection("test"), status: "new" })
+                authDelegate.save({ path: "scope-1", id: "1", values: {}, status: "new" }),
+                authDelegate.save({ path: "scope-2", id: "2", values: {}, status: "new" })
             ]);
 
             // Ensure our notify was called with both exact combinations, but NOT cross-pollinated
@@ -423,7 +423,6 @@ describe("PostgresBackendDriver", () => {
                 const logical = { type: "or" as const, conditions: [{ column: "title", operator: "==" as const, value: "a" }] };
                 delegate.listenCollection({
                     path: "test",
-                    collection: collection("test", { databaseId: "db-2" }),
                     filter: { done: ["==", false] },
                     logical,
                     orderBy: "title",
@@ -518,7 +517,7 @@ describe("PostgresBackendDriver", () => {
 
             jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: "x", collection: collection("x") });
+            await authDelegate.fetchCollection({ path: "x" });
 
             // The text and the parameters pg was handed, apart. A fully
             // interpolated sql.raw() statement ALSO contains both "set_config"
@@ -542,7 +541,7 @@ describe("PostgresBackendDriver", () => {
 
             jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: "x", collection: collection("x") });
+            await authDelegate.fetchCollection({ path: "x" });
 
             const { values } = authStatement(rec.statements());
             const claims = values.find((p): p is string => typeof p === "string" && p.startsWith("{"));
@@ -559,7 +558,7 @@ describe("PostgresBackendDriver", () => {
 
             jest.spyOn(PostgresBackendDriver.prototype, "fetchCollection").mockResolvedValueOnce([]);
 
-            await authDelegate.fetchCollection({ path: "x", collection: collection("x") });
+            await authDelegate.fetchCollection({ path: "x" });
 
             const { values: params } = authStatement(rec.statements());
 
@@ -610,7 +609,7 @@ describe("PostgresBackendDriver", () => {
             jest.spyOn(PostgresBackendDriver.prototype, "count").mockResolvedValueOnce(42);
 
             const authDelegate = await authed(testUser({ uid: "counter", email: "c@test.com" }));
-            const result = await authDelegate.count({ path: "items", collection: collection("items") });
+            const result = await authDelegate.count({ path: "items" });
 
             expect(rec.db.transaction).toHaveBeenCalled();
             expect(result).toBe(42);
@@ -645,8 +644,8 @@ describe("PostgresBackendDriver", () => {
                     return {};
                 });
 
-            await authDelegate.save({ path: "call-1", id: "1", values: {}, collection: collection("test"), status: "new" });
-            await authDelegate.save({ path: "call-2", id: "2", values: {}, collection: collection("test"), status: "new" });
+            await authDelegate.save({ path: "call-1", id: "1", values: {}, status: "new" });
+            await authDelegate.save({ path: "call-2", id: "2", values: {}, status: "new" });
 
             // Each call should have flushed exactly 1 notification, not accumulated
             expect(realtime.notifyUpdate).toHaveBeenCalledTimes(2);
@@ -716,7 +715,6 @@ table_name: "users" }])
         it("should inject storageSource: client.storage into contextForCallback in fetchCollection", async () => {
             const afterReadSpy = jest.fn().mockImplementation(async ({ values }) => values);
             registry.setTableHooks("test_coll", { afterRead: afterReadSpy });
-            const mockCollectionWithCallback = collection("test_coll");
 
             jest.spyOn(delegate.dataService, "fetchCollectionForRest").mockResolvedValueOnce([
                 { id: "e1", path: "test_coll", values: {} }
@@ -724,7 +722,6 @@ table_name: "users" }])
 
             await delegate.fetchCollection({
                 path: "test_coll",
-                collection: mockCollectionWithCallback
             });
 
             expect(afterReadSpy).toHaveBeenCalled();
@@ -736,7 +733,6 @@ table_name: "users" }])
         it("should inject storageSource in fetchOne", async () => {
             const afterReadSpy = jest.fn().mockImplementation(async ({ values }) => values);
             registry.setTableHooks("test_coll", { afterRead: afterReadSpy });
-            const mockCollectionWithCallback = collection("test_coll");
 
             jest.spyOn(delegate.dataService, "fetchOneForRest").mockResolvedValueOnce(
                 { id: "e1", path: "test_coll", values: {} }
@@ -745,7 +741,6 @@ table_name: "users" }])
             await delegate.fetchOne({
                 path: "test_coll",
                 id: "e1",
-                collection: mockCollectionWithCallback
             });
 
             expect(afterReadSpy).toHaveBeenCalled();
@@ -757,7 +752,6 @@ table_name: "users" }])
             const beforeSaveSpy = jest.fn().mockImplementation(async ({ values }) => values);
             const afterSaveSpy = jest.fn();
             registry.setTableHooks("test_coll", { beforeSave: beforeSaveSpy, afterSave: afterSaveSpy });
-            const mockCollectionWithCallback = collection("test_coll");
 
             jest.spyOn(delegate.dataService, "fetchOneForRest").mockResolvedValue(undefined);
             jest.spyOn(delegate.dataService, "save").mockResolvedValueOnce(
@@ -768,7 +762,6 @@ table_name: "users" }])
                 path: "test_coll",
                 id: "e1",
                 values: { name: "test" },
-                collection: mockCollectionWithCallback,
                 status: "existing"
             });
 
@@ -782,14 +775,12 @@ table_name: "users" }])
             const beforeDeleteSpy = jest.fn().mockImplementation(async () => true);
             const afterDeleteSpy = jest.fn();
             registry.setTableHooks("test_coll", { beforeDelete: beforeDeleteSpy, afterDelete: afterDeleteSpy });
-            const mockCollectionWithCallback = collection("test_coll");
 
             jest.spyOn(delegate.dataService, "fetchOneForRest").mockResolvedValueOnce({ id: "e1" });
             jest.spyOn(delegate.dataService, "delete").mockResolvedValueOnce();
 
             await delegate.delete({
                 row: { id: "e1", path: "test_coll" },
-                collection: mockCollectionWithCallback
             });
 
             expect(beforeDeleteSpy).toHaveBeenCalled();

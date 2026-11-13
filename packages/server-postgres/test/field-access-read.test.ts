@@ -17,7 +17,6 @@
 import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { toRestRow, stripUnreadable, canReadRelation } from "../src/services/row-pipeline";
 import { withFieldViewer, currentFieldViewer } from "../src/services/field-viewer";
-import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { belongsTo, manyToMany } from "./helpers/relation-descriptors";
 
@@ -52,7 +51,7 @@ const posts: LegacyCollectionConfig = {
     ]
 };
 
-function makeRegistry(): PostgresTableRegistry {
+function makeRegistry(): FixtureTableRegistry {
     const registry = new FixtureTableRegistry();
     registry.registerMultiple([staff, posts]);
     return registry;

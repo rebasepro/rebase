@@ -74,38 +74,38 @@ afterEach(async () => {
 describe("a map value with `$` keys", () => {
     it("is stored as sent on a create", async () => {
         const schema = { $schema: "https://json-schema.org/draft/2020-12/schema", $id: "doc", type: "object" };
-        await driver().save({ path: "docs", status: "new", collection: docs, values: { views: 0, schema } });
+        await driver().save({ path: "docs", status: "new", values: { views: 0, schema } });
         expect(await storedSchema()).toEqual(schema);
     });
 
     it("is stored as sent on an update, a single `$` key included", async () => {
-        const created = await driver().save({ path: "docs", status: "new", collection: docs, values: { views: 0 } });
+        const created = await driver().save({ path: "docs", status: "new", values: { views: 0 } });
         await driver().save({
-            path: "docs", id: idOf(created), status: "existing", collection: docs,
+            path: "docs", id: idOf(created), status: "existing",
             values: { schema: { $ref: "#/defs/a" } }
         });
         expect(await storedSchema()).toEqual({ $ref: "#/defs/a" });
 
         await driver().save({
-            path: "docs", id: idOf(created), status: "existing", collection: docs,
+            path: "docs", id: idOf(created), status: "existing",
             values: { schema: { $comment: "only key" } }
         });
         expect(await storedSchema()).toEqual({ $comment: "only key" });
     });
 
     it("is still an operation when it is one real operator", async () => {
-        const created = await driver().save({ path: "docs", status: "new", collection: docs, values: { schema: { a: 1 } } });
+        const created = await driver().save({ path: "docs", status: "new", values: { schema: { a: 1 } } });
         await driver().save({
-            path: "docs", id: idOf(created), status: "existing", collection: docs,
+            path: "docs", id: idOf(created), status: "existing",
             values: { schema: { $merge: { b: 2 } } }
         });
         expect(await storedSchema()).toEqual({ a: 1, b: 2 });
     });
 
     it("leaves a misspelled operator on a number refused", async () => {
-        const created = await driver().save({ path: "docs", status: "new", collection: docs, values: { views: 1 } });
+        const created = await driver().save({ path: "docs", status: "new", values: { views: 1 } });
         await expect(driver().save({
-            path: "docs", id: idOf(created), status: "existing", collection: docs,
+            path: "docs", id: idOf(created), status: "existing",
             values: { views: { $incr: 1 } }
         })).rejects.toMatchObject({ code: "INVALID_FIELD_OPERATION" });
     });

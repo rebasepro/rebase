@@ -1,7 +1,6 @@
 import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { pgTable, text } from "drizzle-orm/pg-core";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { fakeDataDriver, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 import { recordingDb } from "./helpers/spg-c-db";
@@ -59,7 +58,7 @@ isId: true },
     };
 
     let service: RealtimeService;
-    let registry: PostgresTableRegistry;
+    let registry: FixtureTableRegistry;
     let ws: MockWebSocket;
     /** One deferred per `fetchCollectionWithAuth` call, in call order. */
     let collectionFetches: Deferred<Record<string, unknown>[]>[];

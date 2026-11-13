@@ -49,8 +49,8 @@ describe("hooks and history see the stored row, not afterRead's view of it", () 
         }
     } as LegacyCollectionConfig;
 
-    const stand = () => {
-        const { driver, recordHistory, notifyUpdate } = driverStand(registryOf(customers));
+    const stand = (served: LegacyCollectionConfig = customers) => {
+        const { driver, recordHistory, notifyUpdate } = driverStand(registryOf(served));
         jest.spyOn(driver.dataService, "save").mockResolvedValue({ ...STORED });
         jest.spyOn(driver.dataService.getFetchService(), "fetchOneForRest").mockResolvedValue({ ...PREVIOUS });
         jest.spyOn(driver.dataService, "fetchOneForRest").mockResolvedValue({ ...STORED });
@@ -65,13 +65,13 @@ describe("hooks and history see the stored row, not afterRead's view of it", () 
 
     it("the caller's response is the afterRead view", async () => {
         const { driver } = stand();
-        const response = await driver.save({ path: "customers", id: "1", values: { title: "new" }, collection: customers, status: "existing" });
+        const response = await driver.save({ path: "customers", id: "1", values: { title: "new" }, status: "existing" });
         expect(response).toEqual({ id: 1, email: "********", title: "new", displayName: "new!" });
     });
 
     it("afterSave gets the stored row, comparable with previousValues", async () => {
         const { driver } = stand();
-        await driver.save({ path: "customers", id: "1", values: { title: "new" }, collection: customers, status: "existing" });
+        await driver.save({ path: "customers", id: "1", values: { title: "new" }, status: "existing" });
         const afterSave = seen.find(s => s.stage === "afterSave");
         expect(afterSave?.values).toEqual(STORED);
         // The one field the write changed is the one that differs.
@@ -82,13 +82,12 @@ describe("hooks and history see the stored row, not afterRead's view of it", () 
 
     it("history records the stored row, so a revert writes stored values back", async () => {
         const { driver, recordHistory } = stand();
-        await driver.save({ path: "customers", id: "1", values: { title: "new" }, collection: customers, status: "existing" });
+        await driver.save({ path: "customers", id: "1", values: { title: "new" }, status: "existing" });
         expect(recordHistory).toHaveBeenCalledTimes(1);
         expect(recordHistory.mock.calls[0][0].values).toEqual(STORED);
     });
 
     it("an afterRead that edits its row in place edits only the caller's view", async () => {
-        const { driver, recordHistory } = stand();
         const inPlace = {
             ...customers,
             callbacks: {
@@ -98,14 +97,17 @@ describe("hooks and history see the stored row, not afterRead's view of it", () 
                 }
             }
         } as LegacyCollectionConfig;
-        const response = await driver.save({ path: "customers", id: "1", values: { title: "new" }, collection: inPlace, status: "existing" });
+        // The table served carries the in-place hook: the driver reads hooks
+        // from its registry, not from anything the caller passes.
+        const { driver, recordHistory } = stand(inPlace);
+        const response = await driver.save({ path: "customers", id: "1", values: { title: "new" }, status: "existing" });
         expect(response.email).toBe("********");
         expect(recordHistory.mock.calls[0][0].values).toEqual(STORED);
     });
 
     it("the delete hooks and the delete's history entry get the stored row", async () => {
         const { driver, recordHistory } = stand();
-        await driver.delete({ row: { id: "1", path: "customers" }, collection: customers });
+        await driver.delete({ row: { id: "1", path: "customers" } });
         expect(seen.filter(s => s.stage !== "afterSave")).toEqual([
             { stage: "beforeDelete", row: STORED },
             { stage: "afterDelete", row: STORED }

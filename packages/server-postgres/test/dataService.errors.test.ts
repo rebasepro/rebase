@@ -1,5 +1,5 @@
 import { DataService } from "../src/services/dataService";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { drizzleChainMock, type DrizzleChainMock } from "./helpers/drizzle-chain-mock";
 import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -44,7 +44,7 @@ function boundValuesOf(node: unknown): unknown[] {
 
 describe("DataService - Error Handling & Edge Cases", () => {
     let dataService: DataService;
-    let db: jest.Mocked<NodePgDatabase<any>>;
+    let db: DrizzleChainMock;
 
     const mockTable = {
         id: { name: "id",
@@ -77,28 +77,7 @@ dataType: "number" },
             return undefined;
         });
 
-        db = {
-            select: jest.fn().mockReturnThis(),
-            from: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            $dynamic: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockReturnThis(),
-            orderBy: jest.fn().mockReturnThis(),
-            innerJoin: jest.fn().mockReturnThis(),
-            insert: jest.fn().mockReturnThis(),
-            values: jest.fn().mockReturnThis(),
-            returning: jest.fn().mockResolvedValue([]),
-            update: jest.fn().mockReturnThis(),
-            set: jest.fn().mockReturnThis(),
-            delete: jest.fn().mockReturnThis(),
-            // UPDATE and DELETE report how many rows they matched; the driver rejects a
-            // write that matched none, so the chainable mock has to carry a row count.
-            rowCount: 1,
-            transaction: jest.fn((callback) => callback(db))
-        } as any;
-
-        // Add a then method to make the db object awaitable when the query chain ends
-        (db as any).then = jest.fn((resolve) => resolve(Object.assign([], { rowCount: 1 })));
+        db = drizzleChainMock();
 
         dataService = new DataService(db, collectionRegistry);
     });

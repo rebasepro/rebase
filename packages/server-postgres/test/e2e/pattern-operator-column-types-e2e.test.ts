@@ -136,7 +136,7 @@ describe("pattern operators on columns that are not plain text", () => {
     });
 
     async function ids(driver: PostgresBackendDriver, filter: FilterValues<string>): Promise<string[]> {
-        const rows = await driver.fetchCollection({ path: "posts", collection: posts, filter });
+        const rows = await driver.fetchCollection({ path: "posts", filter });
         return rows.map(row => String(row.id)).sort();
     }
 
