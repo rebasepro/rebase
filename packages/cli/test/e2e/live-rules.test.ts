@@ -20,9 +20,10 @@
  *
  * A signed-in person is described the tables some rule could grant their roles
  * something on (`schemaTables.persons: "granted"`), not the whole schema. The
- * blog scaffold's `users` table is admin-only, so a reader with no roles must
- * not see it, and — once the live edit removes the only rule that granted them
- * `posts` — must stop seeing `posts` too.
+ * blog scaffold's `users` table reaches a reader only through the auth table's
+ * own-row rule, so they are described it with that rule alone; and once the
+ * live edit removes the only rule that granted them `posts`, they stop seeing
+ * `posts`.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import fs from "fs";
@@ -67,7 +68,7 @@ interface ServedTable { slug: string; rls?: unknown }
 async function servedTables(token: string): Promise<ServedTable[]> {
     const res = await fetch(`${backend!.baseUrl}/api/schema/tables`, { headers: { Authorization: `Bearer ${token}` } });
     expect(res.status, await res.clone().text()).toBe(200);
-    const body = await res.json() as { tables?: ServedTable[] } | ServedTable[];
+    const body: { tables?: ServedTable[] } | ServedTable[] = await res.json();
     return Array.isArray(body) ? body : body.tables ?? [];
 }
 
@@ -94,15 +95,19 @@ beforeAll(async () => {
     linkLocalPackages(projectDir);
     await execa("pnpm", ["install"], { cwd: projectDir, env });
 
+    // A live apply commits into the repository the server finds at boot, and
+    // refuses a dirty tree: the project is a repository before `rebase dev`
+    // starts, and whatever the first boot writes is committed after it.
+    await execa("git", ["init", "-q"], { cwd: projectDir, env: gitEnv });
+    await execa("git", ["add", "-A"], { cwd: projectDir, env: gitEnv });
+    await execa("git", ["commit", "-q", "-m", "scaffold"], { cwd: projectDir, env: gitEnv });
+
     backend = await startBackend(projectDir, env);
     admin = await claimFirstAdmin(backend.baseUrl);
     reader = await registerAndLogin(backend.baseUrl, "reader@example.test", "StrongPass3!reader");
 
-    // A live apply commits, and refuses a dirty tree: the project is a
-    // repository with everything the first boot wrote already committed.
-    await execa("git", ["init", "-q"], { cwd: projectDir, env: gitEnv });
     await execa("git", ["add", "-A"], { cwd: projectDir, env: gitEnv });
-    await execa("git", ["commit", "-q", "-m", "scaffold"], { cwd: projectDir, env: gitEnv });
+    await execa("git", ["commit", "-q", "--allow-empty", "-m", "first boot"], { cwd: projectDir, env: gitEnv });
 }, 900_000);
 
 afterAll(async () => {
@@ -117,10 +122,19 @@ describe("GET /api/schema/tables for a person without schema:read", () => {
         const forReader = (await servedTables(reader.accessToken)).map(table => table.slug);
         const forAdmin = (await servedTables(admin.accessToken)).map(table => table.slug);
 
-        // The admin is described everything; `users` is admin-only.
+        // The admin is described everything. `users` is admin-only in its
+        // own rules, but an auth table is always described (a user reads their
+        // own row) — to the reader without the admin-only rules.
         expect(forAdmin).toEqual(expect.arrayContaining(["posts", "authors", "tags", "users"]));
-        expect(forReader).toEqual(expect.arrayContaining(["posts", "authors", "tags"]));
-        expect(forReader).not.toContain("users");
+        expect(forReader).toEqual(expect.arrayContaining(["posts", "authors", "tags", "users"]));
+        const rulesOf = (tables: ServedTable[]) => {
+            const rls = tables.find(table => table.slug === "users")?.rls;
+            return rls !== null && typeof rls === "object" && "rules" in rls && Array.isArray(rls.rules) ? rls.rules.length : -1;
+        };
+        const readerUsers = rulesOf(await servedTables(reader.accessToken));
+        const adminUsers = rulesOf(await servedTables(admin.accessToken));
+        expect(readerUsers).toBeGreaterThanOrEqual(0);
+        expect(readerUsers).toBeLessThan(adminUsers);
     });
 });
 
@@ -141,7 +155,7 @@ describe("a live rule edit (S-4)", () => {
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${admin.accessToken}` },
             body: JSON.stringify({ patches: [{ op: "removeRule", table: "posts", index: 0 }] })
         });
-        const applied = await apply.json() as { policies?: { status?: string; tables?: string[] } };
+        const applied: { policies?: { status?: string; tables?: string[] } } = await apply.json();
         expect(apply.status, JSON.stringify(applied)).toBe(200);
         // The discriminating half: the apply itself wrote the policies. Without
         // the fix this field is absent and the next boot is what enforces it.

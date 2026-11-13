@@ -72,11 +72,11 @@ describe.each<TemplatePreset>(["blog", "ecommerce", "blank"])("a fresh %s scaffo
         server = socketServer;
         url = `postgresql://postgres:postgres@127.0.0.1:${port}/postgres?sslmode=disable`;
 
-        // The tables as the backend boots them: loaded and compiled, lowered
-        // into what the provisioning reads, `defaultRls` applied.
+        // The tables as the backend boots them: loaded and compiled, with
+        // `defaultRls` applied — what the provisioning reads.
         const { compiled } = await loadProjectSchema(project, path.join(project, "backend", "schema"), ALIASES);
-        const collections = compiled.collections;
-        expect(collections.length).toBeGreaterThan(0);
+        const tables = compiled.tables;
+        expect(tables.length).toBeGreaterThan(0);
 
         // The boot order of server-postgres's managed-boot acceptance test:
         // the helper functions the policies call (what `db push` bootstraps
@@ -86,9 +86,9 @@ describe.each<TemplatePreset>(["blog", "ecommerce", "blank"])("a fresh %s scaffo
         try {
             const queryable = { query: <T>(text: string) => client.query(text).then(result => ({ rows: result.rows as T[] })) };
             await client.query(RLS_BOOTSTRAP_SQL);
-            await ensureTables(queryable, collections);
+            await ensureTables(queryable, tables);
             await ensureAppRole(async (text) => (await client.query<Record<string, unknown>>(text)).rows, ["public", "rebase", "auth"]);
-            const applied = await ensureTablePolicies(queryable, collections);
+            const applied = await ensureTablePolicies(queryable, tables);
             expect(applied.failures).toEqual([]);
         } finally {
             await client.end();

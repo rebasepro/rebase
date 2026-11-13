@@ -36,7 +36,8 @@ interface UiConfigAnswer {
 async function workspacePreferences(): Promise<UiConfigAnswer> {
     const res = await fetch(`${getApiBaseUrl()}/api/admin/ui-config`, { headers: await getAuthHeaders() });
     expect(res.status).toBe(200);
-    return await res.json() as UiConfigAnswer;
+    const body: UiConfigAnswer = await res.json();
+    return body;
 }
 
 test.describe("Studio: a presentation change is a UI preference", () => {

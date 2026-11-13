@@ -94,7 +94,7 @@ function onTheLegacyLayout(): void {
     }, null, 2));
 
     const rootManifest = path.join(projectDir, "package.json");
-    const manifest = JSON.parse(fs.readFileSync(rootManifest, "utf8")) as { workspaces?: string[] };
+    const manifest: { workspaces?: string[] } = JSON.parse(fs.readFileSync(rootManifest, "utf8"));
     manifest.workspaces = [...(manifest.workspaces ?? []), "config"];
     fs.writeFileSync(rootManifest, JSON.stringify(manifest, null, 2));
     const workspace = path.join(projectDir, "pnpm-workspace.yaml");
@@ -144,8 +144,26 @@ describe("rebase migrate collections-to-tables, then build, boot and read", () =
     });
 
     it("builds a bundle from backend/schema", async () => {
-        const build = await execa("node", [cliBin, "build", "--no-static", "--skip-type-check"], { cwd: projectDir, env, reject: false });
-        expect(build.exitCode, `${build.stdout}\n${build.stderr}`).toBe(0);
+        // The suite links the working tree's packages, and `rebase build`
+        // rightly refuses a `link:` a deployed runtime could never install.
+        // For the build, the backend declares them by version, as a published
+        // project does, and the bundle installs nothing (`--no-vendor`).
+        const manifestFile = path.join(projectDir, "backend", "package.json");
+        const linked = fs.readFileSync(manifestFile, "utf8");
+        const manifest: { dependencies?: Record<string, string> } = JSON.parse(linked);
+        const dependencies = manifest.dependencies ?? {};
+        for (const [name, spec] of Object.entries(dependencies)) {
+            if (!spec.startsWith("link:")) continue;
+            const target: { version: string } = JSON.parse(fs.readFileSync(path.join(spec.slice("link:".length), "package.json"), "utf8"));
+            dependencies[name] = target.version;
+        }
+        fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2));
+        try {
+            const build = await execa("node", [cliBin, "build", "--no-static", "--skip-type-check", "--no-vendor"], { cwd: projectDir, env, reject: false });
+            expect(build.exitCode, `${build.stdout}\n${build.stderr}`).toBe(0);
+        } finally {
+            fs.writeFileSync(manifestFile, linked);
+        }
         expect(fs.existsSync(path.join(projectDir, "dist-bundle"))).toBe(true);
     }, 300_000);
 
