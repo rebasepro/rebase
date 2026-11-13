@@ -213,8 +213,15 @@ function printable(plan: PlanContext, builder: Builder, value: unknown, segments
                 builder.codeNodes.push(spread.spread);
                 return new RawSource(spread.text);
             }
-            refuse(plan, builder.entry, `${label} is code, and its source could not be found: ${located.reason}. Write it inline (or as a \`const\` in the same file, or import it) and run the codemod again.`, { key: segments.join(".") });
-            builder.failed = true;
+            // Presentation code whose source cannot be attributed (a wrapper's output,
+            // a member before a spread): the evaluated data around it is printed, the
+            // function is left out, and a step says where it was — a form rule, not a
+            // reason to block the migration.
+            plan.manualSteps.push({
+                title: `Add ${label} of ${builder.name.table} by hand`,
+                detail: `${label} is a function the collection computed (${located.reason}), so its source cannot be carried; the rest of the customization is printed from the evaluated collection. Write it in the table's customization (${relativeToRoot(plan, builder.file)} — \`customizeTable\`, created by hand if the run wrote none) under the same key, from the code that produced it.`,
+                file: relativeToRoot(plan, builder.file)
+            });
             return undefined;
         }
         const member = located.member;
@@ -460,7 +467,7 @@ function applyFieldNote(plan: PlanContext, builder: Builder, item: LiftNote, fie
     }
     if (destination !== undefined) {
         target[destination] = printable(plan, builder, item.value, [...literal, item.field], `${label}.${item.field}`);
-        if (item.field === "dynamicProps") {
+        if (item.field === "dynamicProps" && target[destination] !== undefined) {
             plan.manualSteps.push({
                 title: `Check fields.${key}.dynamicProps of ${builder.name.table}`,
                 detail: "`dynamicProps` returns a field customization now (flat keys: `hidden`, `fieldOrder`, …), not a partial property with an `admin` block. Check what it returns.",
@@ -551,7 +558,7 @@ function prune(value: unknown): unknown {
     const out: Record<string, unknown> = {};
     for (const [key, entry] of Object.entries(value)) {
         const pruned = prune(entry);
-        if (isPlainObject(pruned) && Object.keys(pruned).length === 0) continue;
+        if (pruned === undefined || (isPlainObject(pruned) && Object.keys(pruned).length === 0)) continue;
         out[key] = pruned;
     }
     return out;

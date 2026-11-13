@@ -1,11 +1,14 @@
 import { defineTable, col, json } from "@rebasepro/server/schema";
 
+// From config/collections/events.ts:
+/** A wrapper around the whole properties object: read-only once created, decided by a form rule it adds. */
+
 /** Analytics events, in their own database. */
 export const events = defineTable("events", {
     database: "analytics",
     columns: {
         id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
-        kind: col.text().notNull(),
+        kind: col.text().notNull().describe("What happened"),
         payload: col.jsonb(json.object({}, { additional: true }))
     },
     rls: "admin-only"

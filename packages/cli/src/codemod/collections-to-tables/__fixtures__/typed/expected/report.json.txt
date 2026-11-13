@@ -70,6 +70,11 @@
       "file": "backend/schema/tickets.ts"
     },
     {
+      "title": "Add properties.kind.dynamicProps of events by hand",
+      "detail": "properties.kind.dynamicProps is a function the collection computed (properties: it is the result of calling `lockedOnceCreated(...)`, which the codemod cannot read through), so its source cannot be carried; the rest of the customization is printed from the evaluated collection. Write it in the table's customization (frontend/src/cms/events.tsx — `customizeTable`, created by hand if the run wrote none) under the same key, from the code that produced it.",
+      "file": "frontend/src/cms/events.tsx"
+    },
+    {
       "title": "Child collections of tickets",
       "detail": "`childCollections` has no `customizeTable` equivalent. A table's `rel.hasMany` / `rel.manyToMany` relations are shown as tabs on its records: declare the relation on the table instead.",
       "file": "config/collections/tickets.ts"

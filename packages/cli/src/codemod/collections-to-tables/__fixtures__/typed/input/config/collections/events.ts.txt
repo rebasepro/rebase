@@ -1,16 +1,27 @@
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 
+type Properties = PostgresCollectionConfig["properties"];
+
+/** A wrapper around the whole properties object: read-only once created, decided by a form rule it adds. */
+function lockedOnceCreated(properties: Properties): Properties {
+    const locked: Properties = {};
+    for (const [key, property] of Object.entries(properties)) {
+        locked[key] = key === "kind" ? { ...property, dynamicProps: ({ id }: { id?: unknown }) => (id === undefined ? {} : { readOnly: true }) } : property;
+    }
+    return locked;
+}
+
 /** Analytics events, in their own database. */
 const eventsCollection: PostgresCollectionConfig = {
     name: "Events",
     singularName: "Event",
     slug: "events",
     dataSource: "analytics",
-    properties: {
+    properties: lockedOnceCreated({
         id: { name: "ID", type: "number", isId: "increment" },
-        kind: { name: "Kind", type: "string", validation: { required: true } },
+        kind: { name: "Kind", type: "string", validation: { required: true }, description: "What happened" },
         payload: { name: "Payload", type: "map", keyValue: true }
-    }
+    })
 };
 
 export default eventsCollection;
