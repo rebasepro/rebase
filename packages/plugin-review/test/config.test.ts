@@ -65,7 +65,7 @@ pendingValue: "anything" } } }, [plain])).toEqual([]);
 
     it("checks the values against a `.oneOf([...])` text column too", () => {
         const [closed] = compileTables([defineTable("posts", {
-            columns: { id: col.uuid().primaryKey().defaultRandom(), status: col.text().oneOf(["draft", "published"]) },
+            columns: { id: col.uuid().primaryKey().defaultRandom(), status: col.text({ enum: ["draft", "published"] }) },
             rls: "admin-only"
         })]);
         expect(findReviewConfigProblems({ collections: { posts: { ...stateField, rejectedValue: undefined } } }, [closed])).toEqual([]);
