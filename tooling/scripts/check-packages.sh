@@ -61,8 +61,18 @@ for pkg_dir in "$PACKAGES_DIR"/*/; do
     # Collect unique @rebasepro/* imports from source (not from test files).
     # -E: in a basic regex `+` is a literal character, so this matched nothing
     # and the section passed over any tree at all.
-    imports=$(grep -rhE --exclude="*.test.*" --exclude="*.spec.*" 'from "@rebasepro/[a-zA-Z0-9_-]+"' "$src_dir" 2>/dev/null \
-        | grep -vE '^\s*(\*|//|/\*)' \
+    #
+    # Only statements count: a line that starts an `import`/`export … from`, or
+    # closes a multi-line one (`} from "…"`), in a source module. Code a
+    # package WRITES is not code it imports — the CLI's codemod emits
+    # `import { customizeTable } from "@rebasepro/cms";` into a user's project
+    # as a string, and its `__fixtures__/` hold whole projects as `.txt` — and
+    # matching those reported four "missing" dependencies the CLI never loads.
+    imports=$(grep -rhE --include="*.ts" --include="*.tsx" --include="*.mts" --include="*.cts" \
+            --include="*.js" --include="*.mjs" --include="*.cjs" \
+            --exclude="*.test.*" --exclude="*.spec.*" --exclude-dir="__fixtures__" \
+            '^[[:space:]]*((import|export)[[:space:]].*|\}[[:space:]]*)from "@rebasepro/[a-zA-Z0-9_-]+"' "$src_dir" 2>/dev/null \
+        | grep -oE 'from "@rebasepro/[a-zA-Z0-9_-]+"' \
         | grep -oE '@rebasepro/[a-zA-Z0-9_-]+' \
         | sort -u || true)
 
@@ -142,8 +152,11 @@ for pkg in "${SERVER_PKGS[@]}"; do
         [ -f "$js_file" ] || continue
         fname="$(basename "$js_file")"
 
-        if grep -qE '\b__filename\b|\b__dirname\b' "$js_file" 2>/dev/null; then
-            err "$pkg/$fname contains __filename/__dirname (CJS globals crash in ESM)"
+        # Parsed, not grepped: the words inside a string (the CommonJS wrapper
+        # the schema editor evaluates a file in is built as text) are not a
+        # reference — see esm-cjs-globals.mjs.
+        if ! refs=$(node "$PACKAGES_DIR/../tooling/scripts/esm-cjs-globals.mjs" "$js_file" 2>&1); then
+            err "$pkg/$fname references ${refs##*: } (CJS globals crash in ESM)"
         fi
     done
 done

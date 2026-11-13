@@ -67,3 +67,39 @@ test("declared imports and self-imports pass", () => {
     assert.equal(run.status, 0, run.stdout + run.stderr);
     assert.match(run.stdout, /All @rebasepro\/\* imports have matching package.json entries/);
 });
+
+test("code a package writes is not code it imports: emitted strings and __fixtures__ are not read", () => {
+    const run = runSection2(fixture({
+        "cli/package.json": JSON.stringify({ name: "@rebasepro/cli", dependencies: { "@rebasepro/types": "workspace:*" } }),
+        "cli/src/codemod.ts":
+            "import { EntityCollection } from \"@rebasepro/types\";\n" +
+            "const header = `import { customizeTable } from \"@rebasepro/cms\";`;\n" +
+            "edits.push({ text: `import { defineFirestoreCollection } from \"@rebasepro/firebase\";\\n` });\n",
+        "cli/src/__fixtures__/blog/App.tsx.txt": "import { Rebase } from \"@rebasepro/app\";\n",
+        "cli/src/__fixtures__/blog/App.tsx": "import { Rebase } from \"@rebasepro/app\";\n"
+    }));
+    assert.equal(run.status, 0, run.stdout + run.stderr);
+    assert.match(run.stdout, /All @rebasepro\/\* imports have matching package.json entries/);
+});
+
+test("a multi-line import and an export-from are statements, and are read", () => {
+    const run = runSection2(fixture({
+        "widget/package.json": JSON.stringify({ name: "@rebasepro/widget", dependencies: {} }),
+        "widget/src/index.ts":
+            "import {\n    a,\n    b\n} from \"@rebasepro/common\";\n" +
+            "export type { C } from \"@rebasepro/cms-types\";\n"
+    }));
+    assert.equal(run.status, 2, run.stdout + run.stderr);
+    assert.match(run.stdout, /widget imports @rebasepro\/common but it's NOT in package.json/);
+    assert.match(run.stdout, /widget imports @rebasepro\/cms-types but it's NOT in package.json/);
+});
+
+test("section 5 reads identifiers, not words: a CJS global in a string is not a reference", async () => {
+    const { cjsGlobalReferences } = await import("../esm-cjs-globals.mjs");
+    assert.deepEqual(cjsGlobalReferences("a.js",
+        "const w = vm.runInThisContext(`(function (exports, require, module, __filename, __dirname) {x})`);\n" +
+        "const s = \"__dirname\"; const o = { __filename: 1 }; o.__dirname; // __dirname\n" +
+        "const r = /__dirname/;\n"
+    ), []);
+    assert.deepEqual(cjsGlobalReferences("b.js", "const p = path.join(__dirname, \"x\"); const f = { __filename };\n"), ["__dirname", "__filename"]);
+});
