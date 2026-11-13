@@ -2,6 +2,7 @@
  * The pre-0.31 relation model, frozen at 0.30 — part of the migration's input
  * format (see `./index.ts`). Nothing at runtime may import it.
  */
+import type { LegacyWithAdminCollectionConfig } from "./admin";
 import type { LegacyAnyCollectionConfig } from "./collections";
 import type { LegacyProperties } from "./properties";
 
@@ -30,8 +31,8 @@ export interface LegacyRelationBase {
     target: () => LegacyAnyCollectionConfig;
     onUpdate?: LegacyOnAction;
     onDelete?: LegacyOnAction;
-    /** How the panel presents the relation's tab. */
-    overrides?: Partial<LegacyAnyCollectionConfig>;
+    /** How the panel presents the relation's tab: collection fields, `admin` included. */
+    overrides?: Partial<LegacyWithAdminCollectionConfig>;
 }
 
 /**
@@ -137,7 +138,7 @@ export interface LegacyResolvedRelationBase {
     targetSlug: string;
     onUpdate?: LegacyOnAction;
     onDelete?: LegacyOnAction;
-    overrides?: Partial<LegacyAnyCollectionConfig>;
+    overrides?: Partial<LegacyWithAdminCollectionConfig>;
     cardinality: "one" | "many";
     writable: boolean;
     shared: boolean;

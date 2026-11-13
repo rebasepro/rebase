@@ -4,7 +4,6 @@
  */
 import type { EntityReference, EntityRelation, GeoPoint, ResourceRef, User, Vector } from "@rebasepro/types";
 
-import type { LegacyAdminPropertyOptions } from "./admin";
 import type { LegacyAfterReadProps, LegacyBeforeSaveProps } from "./callbacks";
 import type { LegacyRelation, LegacyResolvedRelation } from "./relations";
 
@@ -150,8 +149,6 @@ export interface LegacyBaseProperty {
     callbacks?: LegacyPropertyCallbacks;
     /** Per-property data for external consumers. */
     metadata?: Record<string, unknown>;
-    /** The admin panel's options for this field (`@rebasepro/cms-types` declared it). */
-    admin?: LegacyAdminPropertyOptions;
 }
 
 /**

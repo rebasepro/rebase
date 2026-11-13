@@ -14,7 +14,6 @@ import type {
     User
 } from "@rebasepro/types";
 
-import type { LegacyAdminCollectionOptions } from "./admin";
 import type { LegacyCollectionCallbacks } from "./callbacks";
 import type { LegacyCollectionIndex } from "./indexes";
 import type { LegacyFirebaseProperties, LegacyPostgresProperties, LegacyProperties } from "./properties";
@@ -48,8 +47,6 @@ export interface LegacyBaseCollectionConfig<M extends Record<string, unknown> = 
     metadata?: Record<string, unknown>;
     history?: boolean;
     strictWrites?: boolean;
-    /** The admin panel's options (`@rebasepro/cms-types` declared it at 0.30). */
-    admin?: LegacyAdminCollectionOptions;
 }
 
 /**

@@ -13,9 +13,13 @@
  *
  * Two edits were made to each copy, neither semantic:
  *
- *   - `// @ts-nocheck` on the first line. The files are evaluated, not
- *     compiled against today's types — the types they were written against are
- *     leaving the packages, and a frozen input must not turn red when they do.
+ *   - `// @ts-nocheck` on the first line, so an editor or a program that holds
+ *     them never turns red while the kernel types they were written against
+ *     leave the packages. They are still type-checked, against the frozen
+ *     model: `packages/common/test/migrate/legacy-model-corpus.test.ts`
+ *     compiles every file here (and the codemod's legacy fixtures) with that
+ *     line stripped, which is the proof that `@rebasepro/common/migrate`'s
+ *     frozen model says everything a 0.30 project said.
  *   - Imports of `@rebasepro/types`, `@rebasepro/common` and
  *     `@rebasepro/cms-types` point here instead. All of them were type-only
  *     except `defineCollection`, which at 7081747fad was
@@ -24,19 +28,37 @@
  *
  * The docs sample additionally gained `export default`, so the directory reader
  * finds it (the docs gate evaluated it with an identity `defineCollection` too).
+ *
+ * This module names the frozen model's types under the names the inputs
+ * import (type-only: nothing of `@rebasepro/common/migrate` is loaded when a
+ * corpus directory is evaluated).
  */
+import type {
+    DefinedLegacyCollection,
+    LegacyAnyCollectionConfig,
+    LegacyEnumValueConfig,
+    LegacyWithAdminCollectionConfig,
+    LegacyWithAdminPostgresCollectionConfig
+} from "@rebasepro/common/migrate";
+import type { RebaseCallContext, SecurityRule as KernelSecurityRule } from "@rebasepro/types";
 
-/** A legacy collection, as data: these inputs are evaluated, not type-checked. */
-export type LegacyRecord = Record<string, unknown>;
+/** A Postgres collection as the inputs wrote it: `admin` blocks included (cms-types was installed). */
+export type PostgresCollectionConfig = LegacyWithAdminPostgresCollectionConfig;
+/** What a relation's `target` returns. */
+export type AnyCollectionConfig = LegacyAnyCollectionConfig;
+export type SecurityRule = KernelSecurityRule;
+export type EnumValueConfig = LegacyEnumValueConfig;
+/** The context a 0.30 collection callback received. */
+export type EntityCallbackContext = RebaseCallContext;
+/**
+ * The admin panel's context, as `app/actions.ts` (a frontend helper the demo
+ * app's collections imported, not a collection) received it. The migration
+ * never reads it; it is opaque here.
+ */
+export type RebaseContext = Record<string, unknown>;
 
-export type PostgresCollectionConfig = LegacyRecord;
-export type AnyCollectionConfig = LegacyRecord;
-export type SecurityRule = LegacyRecord;
-export type EnumValueConfig = LegacyRecord;
-export type EntityCallbackContext = LegacyRecord;
-export type RebaseContext = LegacyRecord;
-
-/** `defineCollection` as it behaved for these inputs: it returned its argument. */
-export function defineCollection<T>(collection: T): T {
+/** `defineCollection` as it behaved for these inputs: it returned its argument, typed as its engine's collection. */
+export function defineCollection<C extends LegacyWithAdminCollectionConfig>(collection: C): DefinedLegacyCollection<C>;
+export function defineCollection(collection: LegacyWithAdminCollectionConfig): LegacyWithAdminCollectionConfig {
     return collection;
 }

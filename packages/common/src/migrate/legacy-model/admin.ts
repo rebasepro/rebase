@@ -10,7 +10,20 @@
  * read (`ADMIN_COLLECTION_KEYS` / `ADMIN_PROPERTY_KEYS` at 0.30) and each value
  * is `unknown` — a misspelled key is still an error, and no CMS type is pulled
  * into the migration module.
+ *
+ * As at 0.30, the block is not part of the core model: `LegacyCollectionConfig`
+ * and the `Legacy…Property` interfaces declare no `admin`, exactly as
+ * `@rebasepro/types` did without `@rebasepro/cms-types` installed. The
+ * `LegacyWithAdmin…` types below are what the augmentation added: a
+ * collection, and every property in it, may carry its block. A
+ * `LegacyWithAdmin…` value is a `Legacy…` value (the block is one more
+ * field), so it goes into the lift unchanged — and a fixture without a block
+ * stays assignable to the kernel's own (augmented) types while those exist.
  */
+import type { User } from "@rebasepro/types";
+
+import type { LegacyFirebaseCollectionConfig, LegacyPostgresCollectionConfig } from "./collections";
+import type { LegacyArrayProperty, LegacyFirebaseProperty, LegacyMapProperty, LegacyPostgresProperty, LegacyProperty } from "./properties";
 
 /**
  * Every key of a collection's `admin` block at 0.30.
@@ -125,3 +138,58 @@ export type LegacyAdminCollectionOptions = { [K in LegacyAdminCollectionKey]?: u
  * @group Migration
  */
 export type LegacyAdminPropertyOptions = { [K in LegacyAdminPropertyKey]?: unknown };
+
+/**
+ * A property as `@rebasepro/cms-types` let it be written at 0.30: with an
+ * `admin` block, and with blocks on the properties nested in it.
+ *
+ * @group Migration
+ */
+export type LegacyWithAdminProperty<P extends LegacyProperty = LegacyProperty> =
+    P extends LegacyMapProperty
+        ? Omit<P, "properties"> & { properties?: LegacyWithAdminProperties; admin?: LegacyAdminPropertyOptions }
+        : P extends LegacyArrayProperty
+            ? Omit<P, "of" | "oneOf"> & {
+                of?: LegacyWithAdminProperty | LegacyWithAdminProperty[];
+                oneOf?: Omit<NonNullable<LegacyArrayProperty["oneOf"]>, "properties"> & { properties: LegacyWithAdminProperties };
+                admin?: LegacyAdminPropertyOptions;
+            }
+            : P & { admin?: LegacyAdminPropertyOptions };
+
+/**
+ * A property map whose properties may carry `admin` blocks.
+ *
+ * @group Migration
+ */
+export type LegacyWithAdminProperties = { [key: string]: LegacyWithAdminProperty };
+
+/**
+ * A Postgres collection as `@rebasepro/cms-types` let it be written at 0.30.
+ *
+ * @group Migration
+ */
+export type LegacyWithAdminPostgresCollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> =
+    Omit<LegacyPostgresCollectionConfig<M, USER>, "properties"> & {
+        properties: { [key: string]: LegacyWithAdminProperty<LegacyPostgresProperty> };
+        admin?: LegacyAdminCollectionOptions;
+    };
+
+/**
+ * A Firestore collection as `@rebasepro/cms-types` let it be written at 0.30.
+ *
+ * @group Migration
+ */
+export type LegacyWithAdminFirebaseCollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> =
+    Omit<LegacyFirebaseCollectionConfig<M, USER>, "properties"> & {
+        properties: { [key: string]: LegacyWithAdminProperty<LegacyFirebaseProperty> };
+        admin?: LegacyAdminCollectionOptions;
+    };
+
+/**
+ * A legacy collection of either engine, `admin` blocks allowed.
+ *
+ * @group Migration
+ */
+export type LegacyWithAdminCollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> =
+    | LegacyWithAdminPostgresCollectionConfig<M, USER>
+    | LegacyWithAdminFirebaseCollectionConfig<M, USER>;
