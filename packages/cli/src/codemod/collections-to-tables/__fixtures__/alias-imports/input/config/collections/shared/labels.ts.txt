@@ -1,0 +1,4 @@
+/** A label for a customer, shared by the panel's views. */
+export function labelOf(name: string): string {
+    return name.trim() || "(unnamed)";
+}

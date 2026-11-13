@@ -110,6 +110,14 @@ export function repointConfigImports(plan: PlanContext, ctx: RepointContext, imp
     const { Node: N, SyntaxKind } = plan.ast.tsm;
     const bindings: TableBinding[] = [];
     const files = [...new Set(importers.map(importer => importer.file))].sort();
+    /** Aliased specifiers (`@config/collections/posts`) → the relative one each stands for, per file. */
+    const aliased = new Map<string, Map<string, string>>();
+    for (const importer of importers) {
+        if (importer.specifier === importer.relativeSpecifier) continue;
+        const map = aliased.get(importer.file) ?? new Map<string, string>();
+        map.set(importer.specifier, importer.relativeSpecifier);
+        aliased.set(importer.file, map);
+    }
     for (const file of files) {
         const side: Side = plan.frontendDir && isUnder(plan.frontendDir, file) ? "frontend" : "backend";
         const text = plan.files.get(file)?.content ?? fs.readFileSync(file, "utf8");
@@ -127,8 +135,10 @@ export function repointConfigImports(plan: PlanContext, ctx: RepointContext, imp
             ];
             for (const literal of literals) {
                 if (!N.isStringLiteral(literal)) continue;
-                const specifier = literal.getLiteralValue();
-                if (!specifier.startsWith(".")) continue;
+                const written = literal.getLiteralValue();
+                // An aliased import is resolved as the relative import it stands for; the rewrite writes it relative.
+                const specifier = written.startsWith(".") ? written : aliased.get(file)?.get(written);
+                if (specifier === undefined) continue;
                 const { target, style } = resolveRelative(file, specifier);
                 if (!isUnder(ctx.configDir, target) && target !== ctx.configDir) continue;
                 const line = literal.getStartLineNumber();
@@ -141,15 +151,15 @@ export function repointConfigImports(plan: PlanContext, ctx: RepointContext, imp
                     continue;
                 }
                 if (isIndex(target, ctx.configDir) || target === ctx.configDir) {
-                    if (ctx.indexRemoved) left.push(`line ${line}: "${specifier}" — config/index.ts re-exported only what Rebase read (\`collections\`, \`storageAuthorize\`) and is removed: import the table from backend/schema, storageAuthorize from backend/storage`);
+                    if (ctx.indexRemoved) left.push(`line ${line}: "${written}" — config/index.ts re-exported only what Rebase read (\`collections\`, \`storageAuthorize\`) and is removed: import the table from backend/schema, storageAuthorize from backend/storage`);
                     continue;
                 }
                 if (!isUnder(ctx.collectionsDir, target)) continue; // the project's own module: it stays
                 if (isIndex(target, ctx.collectionsDir) && side === "backend" && onlyBootCollections(plan, sf, literal.getParent())) continue; // the boot-options rewrite handles it
                 if (isIndex(target, ctx.collectionsDir)) {
                     left.push(side === "backend"
-                        ? `line ${line}: "${specifier}" — the collections index: the backend boots from backend/schema (\`schemaDir\`, or \`tables\` from its index)`
-                        : `line ${line}: "${specifier}" — the collections index: the panel projects the tables from the backend; customizations are in frontend/src/cms`);
+                        ? `line ${line}: "${written}" — the collections index: the backend boots from backend/schema (\`schemaDir\`, or \`tables\` from its index)`
+                        : `line ${line}: "${written}" — the collections index: the panel projects the tables from the backend; customizations are in frontend/src/cms`);
                     continue;
                 }
                 const table = ctx.tables.get(target);
@@ -158,7 +168,7 @@ export function repointConfigImports(plan: PlanContext, ctx: RepointContext, imp
                     try {
                         replaceSpecifier(plan.relocator.relocate(specifier, file, file, side));
                     } catch (error) {
-                        left.push(`line ${line}: "${specifier}" — ${error instanceof Error ? error.message : String(error)}`);
+                        left.push(`line ${line}: "${written}" — ${error instanceof Error ? error.message : String(error)}`);
                     }
                     continue;
                 }
@@ -166,7 +176,7 @@ export function repointConfigImports(plan: PlanContext, ctx: RepointContext, imp
                 const defaultImport = declaration && N.isImportDeclaration(declaration) ? declaration.getDefaultImport() : undefined;
                 const onlyDefault = declaration && N.isImportDeclaration(declaration) && defaultImport && declaration.getNamedImports().length === 0 && !declaration.getNamespaceImport();
                 if (!declaration || !N.isImportDeclaration(declaration) || !defaultImport || !onlyDefault) {
-                    left.push(`line ${line}: "${specifier}" — the collection is the table \`${table.identifier}\` now: import it from ${relativeToRoot(plan, table.file)}${side === "frontend" ? " as a type (`import type`)" : ""}`);
+                    left.push(`line ${line}: "${written}" — the collection is the table \`${table.identifier}\` now: import it from ${relativeToRoot(plan, table.file)}${side === "frontend" ? " as a type (`import type`)" : ""}`);
                     continue;
                 }
                 const local = defaultImport.getText();
@@ -177,7 +187,7 @@ export function repointConfigImports(plan: PlanContext, ctx: RepointContext, imp
                         edits.push({ start: declaration.getStart(), end: declaration.getEnd(), text: `import type { ${binding} } from ${JSON.stringify(tableSpecifier)};` });
                     } else {
                         const cms = table.cms ? `the customization \`${table.cms.identifier}\` (${relativeToRoot(plan, table.cms.file)}) for what the panel shows, ` : "";
-                        left.push(`line ${line}: "${specifier}" — \`${local}\` is read as a value in the frontend; a collection object is gone and the frontend may import backend/ as types only: use ${cms}or the table descriptor the server serves (\`GET /api/schema/tables\`) for its columns and enum values`);
+                        left.push(`line ${line}: "${written}" — \`${local}\` is read as a value in the frontend; a collection object is gone and the frontend may import backend/ as types only: use ${cms}or the table descriptor the server serves (\`GET /api/schema/tables\`) for its columns and enum values`);
                     }
                     continue;
                 }

@@ -1,0 +1,3 @@
+import customers from "./customers";
+
+export const collections = [customers];

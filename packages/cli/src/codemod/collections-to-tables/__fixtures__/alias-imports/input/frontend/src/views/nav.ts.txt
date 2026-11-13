@@ -1,0 +1,3 @@
+import { collections } from "@config/collections";
+
+export const slugs = collections.map(collection => collection.slug);

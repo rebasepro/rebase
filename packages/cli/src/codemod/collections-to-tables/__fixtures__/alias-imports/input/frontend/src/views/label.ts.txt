@@ -1,0 +1,3 @@
+import { labelOf } from "@cfg/collections/shared/labels";
+
+export const unnamed = labelOf("");

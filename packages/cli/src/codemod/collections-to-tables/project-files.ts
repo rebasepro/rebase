@@ -13,6 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { AstContext } from "./ast";
+import { aliasToRelative, type PathAlias } from "./path-aliases";
 import type { PlanContext } from "./plan-context";
 import { note, planFile, relativeToRoot } from "./plan-context";
 import { BACKEND_GUARD_EXPORT, BACKEND_GUARD_SNIPPET } from "../../utils/backend-guard";
@@ -513,22 +514,27 @@ export function unmovedConfigFiles(plan: PlanContext, configDir: string, handled
 export interface ConfigImporter {
     file: string;
     line: number;
+    /** As written: relative, or through a path alias (`@config/collections/posts`). */
     specifier: string;
+    /** The same import written relative to the file (equal to `specifier` when it was). */
+    relativeSpecifier: string;
     target: string;
 }
 
 const SOURCE_FILE = /\.(ts|tsx|mts|js|jsx|mjs)$/;
-const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*)["'](\.{1,2}\/[^"']*)["']/g;
+const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*)["']([^"'\s]+)["']/g;
 
 /**
  * Every module outside `config/` that imports something inside it — a custom
  * backend entry importing `config/collections/users`, a test importing a
- * collection. After the migration those imports point at nothing.
+ * collection — relative, or through a path alias the project's tsconfig
+ * `paths` or Vite `resolve.alias` declares. After the migration those imports
+ * point at nothing.
  *
  * @param skip files the run rewrites itself
  */
-export function findConfigImporters(root: string, configDir: string, skip: ReadonlySet<string>): ConfigImporter[] {
-    return scanSources(root, configDir, skip).importers;
+export function findConfigImporters(root: string, configDir: string, skip: ReadonlySet<string>, aliases: readonly PathAlias[] = []): ConfigImporter[] {
+    return scanSources(root, configDir, skip, aliases).importers;
 }
 
 /** A use of a server API the table model renamed. */
@@ -595,7 +601,7 @@ function blankComments(text: string): string {
     return out.join("");
 }
 
-function scanSources(root: string, configDir: string, skip: ReadonlySet<string>): { importers: ConfigImporter[]; apis: LegacyApiUse[] } {
+function scanSources(root: string, configDir: string, skip: ReadonlySet<string>, aliases: readonly PathAlias[] = []): { importers: ConfigImporter[]; apis: LegacyApiUse[] } {
     const out: ConfigImporter[] = [];
     const apis: LegacyApiUse[] = [];
     const ignored = new Set(["node_modules", "dist", "build", ".git", "coverage", ".turbo", ".next"]);
@@ -618,13 +624,15 @@ function scanSources(root: string, configDir: string, skip: ReadonlySet<string>)
                     apis.push({ file: full, line: text.slice(0, match.index).split("\n").length, api: legacy.api, replacement: legacy.replacement });
                 }
             }
-            if (!text.includes("config")) continue;
+            if (!text.includes("config") && !aliases.some(alias => text.includes(alias.prefix))) continue;
             for (const match of text.matchAll(SPECIFIER)) {
                 const specifier = match[1];
-                const target = path.resolve(path.dirname(full), specifier);
+                const relativeSpecifier = /^\.{1,2}\//.test(specifier) ? specifier : aliasToRelative(aliases, full, specifier);
+                if (relativeSpecifier === undefined) continue;
+                const target = path.resolve(path.dirname(full), relativeSpecifier);
                 if (!inConfig(target)) continue;
                 const line = text.slice(0, match.index).split("\n").length;
-                out.push({ file: full, line, specifier, target });
+                out.push({ file: full, line, specifier, relativeSpecifier, target });
             }
         }
     };

@@ -1,0 +1,11 @@
+{
+  // The panel reaches config/ through an alias.
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@config/*": ["../config/*"],
+    }
+  },
+  "include": ["./src"]
+}

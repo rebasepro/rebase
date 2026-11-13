@@ -1,0 +1,3 @@
+import type customersCollection from "@config/collections/customers";
+
+export type CustomersCollection = typeof customersCollection;

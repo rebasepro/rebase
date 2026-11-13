@@ -570,6 +570,27 @@ describe("Firestore collections built by a function", () => {
     }, 180_000);
 });
 
+/**
+ * Imports of config/ through a path alias — tsconfig `paths` (`@config/*`) or a
+ * Vite `resolve.alias` — are imports of config/ like relative ones: rewritten
+ * where they can be, a step where they cannot, never skipped.
+ */
+describe("imports through a path alias", () => {
+    it("are rewritten or listed like relative imports", async () => {
+        const dir = materialize("alias-imports");
+        const report = await run(dir);
+        expect(report.refusals).toEqual([]);
+        expect(report.status).toBe("migrated");
+        expect(fs.readFileSync(path.join(dir, "frontend/src/views/types.ts"), "utf8"))
+            .toContain('import type { customers as customersCollection } from "../../../backend/schema/customers";');
+        expect(fs.readFileSync(path.join(dir, "frontend/src/views/label.ts"), "utf8"))
+            .toContain('import { labelOf } from "../cms/lib/collections/shared/labels";');
+        expect(fs.existsSync(path.join(dir, "frontend/src/cms/lib/collections/shared/labels.ts"))).toBe(true);
+        const nav = report.manualSteps.find(step => step.file === "frontend/src/views/nav.ts");
+        expect(nav?.detail).toContain('"@config/collections" — the collections index');
+    }, 180_000);
+});
+
 describe("pieces", () => {
     it("keeps only the enum labels and colours that are not derived", () => {
         expect(enumLabelsOf([{ id: "draft", label: "Draft" }, { id: "needs_review", label: "Needs Review" }])).toBeUndefined();

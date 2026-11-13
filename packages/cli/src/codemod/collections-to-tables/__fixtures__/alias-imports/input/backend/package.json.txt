@@ -1,0 +1,8 @@
+{
+    "name": "firestore-backend",
+    "type": "module",
+    "dependencies": {
+        "firestore-config": "*",
+        "@rebasepro/server": "workspace:*"
+    }
+}

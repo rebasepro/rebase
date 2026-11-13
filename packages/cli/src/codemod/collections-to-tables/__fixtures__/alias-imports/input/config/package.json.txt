@@ -1,0 +1,5 @@
+{
+  "name": "firestore-config",
+  "private": true,
+  "type": "module"
+}

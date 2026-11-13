@@ -53,6 +53,7 @@ import {
 } from "./project-files";
 import type { CollectionOutcome, MigrateOptions, MigrationReport, PlannedFile } from "./types";
 import { deriveStoragePaths } from "./storage-paths";
+import { readPathAliases } from "./path-aliases";
 import { repointConfigImports, tableUseSteps, type TableHome } from "./repoint";
 import { verifyMigration } from "./verify";
 
@@ -485,7 +486,7 @@ async function migrateWithShims(options: MigrateOptions, shimDir: ShimDir): Prom
         tables: tableHomes,
         movedWiring: wiringHomes,
         indexRemoved: !configStays || removed.includes(indexFile)
-    }, findConfigImporters(root, configDir, new Set(plan.files.keys())));
+    }, findConfigImporters(root, configDir, new Set(plan.files.keys()), readPathAliases(root)));
     // Helpers beside the collections the project's own code imports, copied out by the repointing.
     for (const copy of relocator.helpers.values()) {
         if (plan.files.has(copy.to)) continue;
