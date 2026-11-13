@@ -7,7 +7,9 @@ import {
     boundKeyColumn,
     canReadRelation,
     canWriteRelation,
+    hasJoinAccessRules,
     isPrivateRelation,
+    relationJoinColumns,
     restrictedKeys
 } from "../src/table/access";
 
@@ -104,5 +106,67 @@ describe("a link follows its key column", () => {
         for (const name of ["handler", "handlerId", "handler_id", "approver", "informant"]) expect(refused.has(name)).toBe(true);
         expect(refused.has("reviewer")).toBe(false);
         expect(restrictedKeys(docsT, { roles: ["hr"] }, "read").refused.has("handler")).toBe(false);
+    });
+});
+
+/**
+ * SEC-FIX-4 R-1: one step further — a relation reads every column its join
+ * condition reads, on every table it passes through, so a hidden key is hidden
+ * from the `hasMany` / `hasOne` that point back through it and from a `via`
+ * joined on it too.
+ */
+describe("a relation follows every column its join reads", () => {
+    const staffT = defineTable("staff", {
+        columns: { id: col.integer().primaryKey(), name: col.text() },
+        relations: {
+            handledCases: rel.hasMany(() => casesT, { foreignKey: "handler_id" }),
+            informedCases: rel.hasMany(() => casesT, { foreignKey: "informant_id" }),
+            notes: rel.hasMany(() => casesT, { foreignKey: "author_id" })
+        },
+        rls: "admin-only"
+    });
+    const casesT = defineTable("cases", {
+        columns: {
+            id: col.integer().primaryKey(),
+            handlerId: col.integer().access({ read: ["hr"] }),
+            informantId: col.integer().private(),
+            authorId: col.integer()
+        },
+        relations: {
+            handlerVia: rel.via(() => staffT, { cardinality: "one", steps: [{ table: "staff", on: { from: "handler_id", to: "id" } }] })
+        },
+        rls: "admin-only"
+    });
+    const [staffD, casesD] = compileTables([staffT, casesT]);
+    const related = (name: string) => [staffD, casesD].find(table => table.slug === name || table.table === name);
+    const relationOn = (table: typeof staffD, name: string) => {
+        const found = table.relations.find(candidate => candidate.name === name);
+        if (!found) throw new Error(name);
+        return found;
+    };
+
+    it("names the join's columns on both sides, and on each via step", () => {
+        expect(relationJoinColumns(staffD, relationOn(staffD, "handledCases"), related).map(c => `${c.column}`)).toEqual(["id", "handler_id"]);
+        expect(relationJoinColumns(casesD, relationOn(casesD, "handlerVia"), related).map(c => c.column)).toEqual(["handler_id", "id"]);
+        // Without the other tables, only this table's side is known.
+        expect(relationJoinColumns(staffD, relationOn(staffD, "handledCases")).map(c => c.column)).toEqual(["id"]);
+    });
+
+    it("withholds the inverse and the via of a hidden key, and leaves an open join alone", () => {
+        expect(canReadRelation(staffD, relationOn(staffD, "handledCases"), editor, related)).toBe(false);
+        expect(canReadRelation(staffD, relationOn(staffD, "handledCases"), { roles: ["hr"] }, related)).toBe(true);
+        expect(canReadRelation(staffD, relationOn(staffD, "notes"), editor, related)).toBe(true);
+        expect(canReadRelation(casesD, relationOn(casesD, "handlerVia"), editor, related)).toBe(false);
+        expect(restrictedKeys(staffD, editor, "read", related).refused.has("handledCases")).toBe(true);
+        expect(restrictedKeys(staffD, editor, "read", related).refused.has("notes")).toBe(false);
+        // A write sets no column through the inverse here: it is not closed by the read rule.
+        expect(restrictedKeys(staffD, editor, "write", related).refused.has("handledCases")).toBe(false);
+    });
+
+    it("treats one joined on a private column as absent", () => {
+        expect(isPrivateRelation(staffD, relationOn(staffD, "informedCases"), related)).toBe(true);
+        expect(apiHiddenKeys(staffD, related).has("informedCases")).toBe(true);
+        expect(apiHiddenKeys(staffD, related).has("handledCases")).toBe(false);
+        expect(hasJoinAccessRules(staffD, related)).toBe(true);
     });
 });

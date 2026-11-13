@@ -224,3 +224,45 @@ describe("a link and its key column are described together", () => {
         expect(inputKeys).not.toContain("informant");
     });
 });
+
+/**
+ * SEC-FIX-4 R-1: an inverse relation (`hasMany` / `hasOne`) or a `via` whose
+ * join reads a column the caller cannot read is not described to them.
+ */
+describe("a relation is described only if the caller may read every column its join reads", () => {
+    const staff = defineTable("staff", {
+        columns: { id: col.serial().primaryKey(), name: col.text() },
+        relations: {
+            handledCases: rel.hasMany(() => cases, { foreignKey: "handler_id" }),
+            informedCases: rel.hasMany(() => cases, { foreignKey: "informant_id" }),
+            notes: rel.hasMany(() => cases, { foreignKey: "author_id" })
+        },
+        rls: [{ operation: "select", access: "authenticated" }]
+    });
+    const cases = defineTable("cases", {
+        columns: {
+            id: col.serial().primaryKey(),
+            handlerId: col.integer().access({ read: ["hr"] }),
+            informantId: col.integer().private(),
+            authorId: col.integer()
+        },
+        relations: {
+            handlerVia: rel.via(() => staff, { cardinality: "one", steps: [{ table: "staff", on: { from: "handler_id", to: "id" } }] })
+        },
+        rls: [{ operation: "select", access: "authenticated" }]
+    });
+    const describedFor = (roles: string[], slug: string) => {
+        const view = schemaViewFor({ kind: "person", roles, scopes: [] });
+        if ("refused" in view) throw new Error("refused");
+        const found = serializeTables(compileSchemaDefs([staff, cases]).descriptors, view).find(table => table.slug === slug);
+        if (!found) throw new Error(slug);
+        return found.relations.map(relation => relation.name).sort();
+    };
+
+    it("drops the inverse and the via of a hidden key for the caller it is hidden from, and keeps an open join", () => {
+        expect(describedFor(["editor"], "staff")).toEqual(["notes"]);
+        expect(describedFor(["editor"], "cases")).toEqual([]);
+        expect(describedFor(["hr"], "staff")).toEqual(["handledCases", "notes"]);
+        expect(describedFor(["hr"], "cases")).toEqual(["handlerVia"]);
+    });
+});

@@ -13,6 +13,7 @@ import {
     type TableDescriptor
 } from "@rebasepro/types";
 import {
+    canReadColumn,
     type FieldViewer,
     type RelationOfKind,
     fieldOperationKind,
@@ -243,7 +244,35 @@ function assertRelationTargetsWritable(
                 viewer
             );
         }
+        assertCopiedColumnsReadable(relation, table, where, viewer);
     }
+}
+
+/**
+ * Refuse a relation write that copies a value of this table the caller may not
+ * read onto rows they may: a to-one `via` writes the parent's join column into
+ * the target's (`PATCH /cases/1 { handlerVia: 4 }` puts `cases.handlerId` on
+ * staff row 4). The relation is named, never the column — a private one has
+ * no name on the API.
+ */
+function assertCopiedColumnsReadable(
+    relation: TableDescriptor["relations"][number],
+    table: TableDescriptor,
+    where: string,
+    viewer: FieldViewer | undefined
+): void {
+    if (relation.kind !== "via" || relation.cardinality !== "one" || relation.steps.length === 0) return;
+    const name = soleStepColumn(relation.steps[0], "from");
+    const copied = name === undefined ? undefined : table.columns.find(column => column.column === name || column.key === name);
+    if (!copied || canReadColumn(copied, viewer)) return;
+    const message = `'${relation.name}' on table '${table.slug}' copies a value of this row you may not read onto the related row, ` +
+        "so it cannot be written with your roles.";
+    throw ApiError.badRequest(`${where}${message}`, "FIELD_NOT_READABLE", {
+        collection: table.slug,
+        fields: [relation.name],
+        violations: [{ field: relation.name, code: "access", message }],
+        messages: [message]
+    });
 }
 
 /**

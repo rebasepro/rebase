@@ -61,6 +61,11 @@ const publicAll: RlsPosture = [{ operation: "all", access: "public" }];
 /** Who a person's links point at: names that must never reach a caller who cannot read the key. */
 const staff = defineTable("staff", {
     columns: { id: col.serial().primaryKey(), name: col.text() },
+    // The same hidden keys, read from the other side (SEC-FIX-4 R-1).
+    relations: {
+        managed: rel.hasMany(() => people, { foreignKey: "manager_id" }),
+        handled: rel.hasMany(() => people, { foreignKey: "handler_id" })
+    },
     rls: publicRead
 });
 
@@ -85,7 +90,8 @@ const people = defineTable("people", {
     },
     relations: {
         manager: rel.belongsTo(() => staff, { localKey: "manager_id" }),
-        handler: rel.belongsTo(() => staff, { localKey: "handler_id" })
+        handler: rel.belongsTo(() => staff, { localKey: "handler_id" }),
+        managerVia: rel.via(() => staff, { cardinality: "one", steps: [{ table: "staff", on: { from: "manager_id", to: "id" } }] })
     },
     hooks: {
         afterRead: ({ values }) => ({ ...values, email: values.email == null ? values.email : "MASKED" })
@@ -491,4 +497,71 @@ describe("read protections at include depth 1, 2 and 3, on every door (E2E)", ()
             });
         });
     }
+
+    /**
+     * SEC-FIX-4 R-1: the same hidden keys read from the other side — a
+     * `hasMany` whose foreign key is `managerId` / `handlerId`, a `via` joined
+     * on `manager_id` — answer as the `belongsTo` does, on every door, and the
+     * schema does not describe them to a caller who cannot read the key.
+     */
+    describe("a relation joined on a hidden key, from the other side", () => {
+        const codeOf = (text: string): string | undefined => text.match(/"code":"([A-Z_]+)"/)?.[1];
+        const sdkAs = async (who: typeof caller) => {
+            const driver = backend.driver;
+            if (!(driver instanceof PostgresBackendDriver)) throw new Error("not postgres");
+            return (await driver.withAuth(testUser(who.uid, who.roles, { claims: who.claims }))).data;
+        };
+
+        it("REST and POST …/query: the inverse is omitted from an include and refused in a filter; the private one is unknown", async () => {
+            const listed = await call("/staff?include=managed");
+            expect(JSON.stringify(listed)).not.toContain("Ada");
+            for (const row of asRows(listed.data)) expect(row).not.toHaveProperty("managed");
+            const queried = await call("/staff/query", { method: "POST", body: { include: { managed: { count: true } } } });
+            expect(JSON.stringify(queried)).not.toContain("Ada");
+            expect(JSON.stringify(queried)).not.toContain("\"managed\"");
+            const filtered = await answer("/staff?managed.name=eq.Ada");
+            expect(filtered.status, filtered.text).toBe(400);
+            expect(codeOf(filtered.text)).toBe("FIELD_NOT_READABLE");
+            const hidden = await answer("/staff?include=handled");
+            expect(hidden.status, hidden.text).toBe(400);
+            expect(codeOf(hidden.text)).toBe("UNKNOWN_RELATION");
+            const viaInclude = await call("/people?include=managerVia");
+            expect(JSON.stringify(viaInclude)).not.toContain("Max-manager");
+        });
+
+        it("a caller the key admits is served the inverse", async () => {
+            const served = await answer("/staff?include=managed", { as: hr });
+            expect(served.text).toContain("Ada");
+            const filtered = await answer("/staff?managed.name=eq.Ada", { as: hr });
+            expect(filtered.status, filtered.text).toBe(200);
+            expect(filtered.text).toContain("Max-manager");
+        });
+
+        it("socket FETCH_COLLECTION, the first subscription frame and the SDK omit or refuse it", async () => {
+            const send = await openSocket();
+            const [list] = await send("FETCH_COLLECTION", { path: "staff", include: ["managed"] }).answers;
+            expect(JSON.stringify(list)).not.toContain("Ada");
+            const [first] = await send("subscribe_collection", { path: "staff", include: ["managed"] }).answers;
+            expect(JSON.stringify(first)).not.toContain("Ada");
+            const [filtered] = await send("FETCH_COLLECTION", { path: "staff", filter: { "managed.name": ["==", "Ada"] } }).answers;
+            expect(filtered.type).toBe("ERROR");
+            expect(JSON.stringify(filtered)).toContain("FIELD_NOT_READABLE");
+            const data = await sdkAs(caller);
+            expect(JSON.stringify((await data.table("staff").find({ include: ["managed"] })).data)).not.toContain("Ada");
+            await expect(data.table("staff").find({ where: { "managed.name": ["==", "Ada"] } })).rejects.toMatchObject({ code: "FIELD_NOT_READABLE" });
+        });
+
+        it("GET /schema/tables does not describe it to the caller who cannot read the key", async () => {
+            const described = async (who: typeof caller) => {
+                const response = await app.request("/api/schema/tables/staff", { headers: { Authorization: `Bearer ${who.token}` } });
+                const text = await response.text();
+                expect(response.status, text).toBe(200);
+                return text;
+            };
+            const forEditor = await described(caller);
+            expect(forEditor).not.toContain("\"managed\"");
+            expect(forEditor).not.toContain("\"handled\"");
+            expect(await described(hr)).toContain("\"managed\"");
+        });
+    });
 });

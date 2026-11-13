@@ -101,7 +101,20 @@ const loose = defineTable("loose", {
     rls: [{ operation: "all", access: "authenticated" }]
 });
 
-const DESCRIPTORS = compileSchemaDefs([readOnlyKeyThreads, replies, boards, cards, covers, notes, tags, people, docs, badges, owners, labels, loose]).descriptors;
+// SEC-FIX-4: a to-one `via` write copies the parent's join column onto the target.
+const vaults = defineTable("vaults", {
+    columns: { id: col.serial().primaryKey(), secretCode: col.integer().access({ read: ["hr"] }) },
+    relations: {
+        locker: rel.via(() => lockers, { steps: [{ table: "lockers", on: { from: "secret_code", to: "code" } }], cardinality: "one" })
+    },
+    rls: [{ operation: "all", access: "authenticated" }]
+});
+const lockers = defineTable("lockers", {
+    columns: { id: col.serial().primaryKey(), code: col.integer() },
+    rls: [{ operation: "all", access: "authenticated" }]
+});
+
+const DESCRIPTORS = compileSchemaDefs([vaults, lockers, readOnlyKeyThreads, replies, boards, cards, covers, notes, tags, people, docs, badges, owners, labels, loose]).descriptors;
 const tableOf = (slug: string): TableDescriptor => {
     const table = DESCRIPTORS.find(candidate => candidate.slug === slug);
     if (!table) throw new Error(slug);
@@ -223,5 +236,15 @@ describe("every spelling of a column is held to the column's write rules", () =>
         expect(refusal(() => assertKnownWriteFields({ sealed: "x" }, looseT, { viewer: editor, relatedTables }))?.code)
             .toBe("VALIDATION_EXCLUDED_FIELDS");
         expect(refusal(() => assertKnownWriteFields({ undeclared: "x" }, looseT, { viewer: editor, relatedTables }))).toBeUndefined();
+    });
+});
+
+describe("a to-one `via` write cannot copy a value the caller may not read (SEC-FIX-4)", () => {
+    it("refuses a caller who cannot read the parent's join column, naming the relation only", () => {
+        const answer = refusal(() => assertKnownWriteFields({ locker: 1 }, tableOf("vaults"), { viewer: editor, relatedTables }));
+        expect(answer?.code).toBe("FIELD_NOT_READABLE");
+        expect(answer?.message).toContain("'locker'");
+        expect(answer?.message).not.toContain("secret");
+        expect(refusal(() => assertKnownWriteFields({ locker: 1 }, tableOf("vaults"), { viewer: { roles: ["hr"] }, relatedTables }))).toBeUndefined();
     });
 });

@@ -1,4 +1,5 @@
 import { RebaseApiError, type CompiledTable, type TableHooks, type TableRegistryInterface } from "@rebasepro/types";
+import type { RelatedTables } from "@rebasepro/common";
 import { PgEnum, PgTable } from "drizzle-orm/pg-core";
 import { Relations } from "drizzle-orm";
 import { buildRuntimeTable, withCatalogueTable, type RuntimeTable } from "./runtime-table";
@@ -109,6 +110,15 @@ export class PostgresTableRegistry implements TableRegistryInterface {
             if (table.descriptor.table === name) return table;
         }
         return undefined;
+    }
+
+    /**
+     * Every served table's descriptor, by slug or by SQL name: what a
+     * relation's join passes through, for the read gates that judge every
+     * column it reads (`relationJoinColumns` in `@rebasepro/common`).
+     */
+    relatedTables(): RelatedTables {
+        return name => (this.getTable(name) ?? this.getTableBySqlName(name))?.descriptor;
     }
 
     /**

@@ -742,7 +742,7 @@ export class RestApiGenerator {
             const current = chain[chain.length - 1].table;
             // A private relation is one the API does not have: a segment
             // naming it names nothing, in the same words as a typo.
-            relation = apiHiddenKeys(current).has(segments[i]) ? undefined : relationOf(current, segments[i]);
+            relation = apiHiddenKeys(current, this.lookup).has(segments[i]) ? undefined : relationOf(current, segments[i]);
             if (!relation) {
                 throw new ApiError(
                     404,

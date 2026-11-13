@@ -27,7 +27,8 @@ import {
     tableJunctionRules,
     type CompiledRulePolicy,
     type FieldViewer,
-    type PolicyTable
+    type PolicyTable,
+    type RelatedTables
 } from "@rebasepro/common";
 import { logger } from "../utils/logger";
 
@@ -434,12 +435,18 @@ function columnServed(column: ColumnDescriptor, viewer: FieldViewer): boolean {
 
 /**
  * A relation as this view describes it, or `undefined` when it is withheld:
- * private, closed to the viewer, a `belongsTo` whose key column is (a link is
- * exactly as readable as its key), or pointing at a table the view does not
- * serve.
+ * private, closed to the viewer, joined on a column the viewer may not read
+ * on any table it passes through (a relation is exactly as readable as what
+ * it is joined on), or pointing at a table the view does not serve.
  */
-function servedRelation(table: TableDescriptor, relation: RelationDescriptor, view: SchemaView, served: ReadonlySet<string>): RelationDescriptor | undefined {
-    if (!canReadRelation(table, relation, view.viewer)) return undefined;
+function servedRelation(
+    table: TableDescriptor,
+    relation: RelationDescriptor,
+    view: SchemaView,
+    served: ReadonlySet<string>,
+    related: RelatedTables
+): RelationDescriptor | undefined {
+    if (!canReadRelation(table, relation, view.viewer, related)) return undefined;
     if (!served.has(relation.target)) return undefined;
     if (relation.kind !== "manyToMany") return relation;
     return {
@@ -462,17 +469,18 @@ function serializeTable(
     table: TableDescriptor,
     view: SchemaView,
     served: ReadonlySet<string>,
-    policies: TablePolicies | undefined
+    policies: TablePolicies | undefined,
+    related: RelatedTables
 ): TableDescriptor {
     const relations = table.relations
-        .map(relation => servedRelation(table, relation, view, served))
+        .map(relation => servedRelation(table, relation, view, served, related))
         .filter((relation): relation is RelationDescriptor => relation !== undefined);
     const relationNames = new Set(relations.map(relation => relation.name));
     // A link and its key column are one fact under two names: a key column
     // whose relation is withheld is withheld with it (as the REST read strips
     // it), derived or declared.
     const withheldKeys = new Set(table.relations
-        .filter(relation => relation.kind === "belongsTo" && !canReadRelation(table, relation, view.viewer))
+        .filter(relation => relation.kind === "belongsTo" && !canReadRelation(table, relation, view.viewer, related))
         .map(relation => relation.kind === "belongsTo" ? relation.localField : ""));
     const hookFlags = !withholdsHookFlags(view);
     const columns = table.columns
@@ -552,5 +560,8 @@ export function serializeTables(
 ): TableDescriptor[] {
     const shown = tables.filter(table => tableServed(table, view));
     const served = new Set(shown.map(table => table.slug));
-    return shown.map(table => serializeTable(table, view, served, view.privileged ? policies?.get(table.slug) : undefined));
+    // Every declared table, served or not: a join reads the columns it reads
+    // whether or not this caller is described the table they are on.
+    const related: RelatedTables = name => tables.find(table => table.slug === name || table.table === name);
+    return shown.map(table => serializeTable(table, view, served, view.privileged ? policies?.get(table.slug) : undefined, related));
 }

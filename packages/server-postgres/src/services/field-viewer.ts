@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { apiHiddenKeys, type FieldViewer } from "@rebasepro/common";
+import { apiHiddenKeys, type FieldViewer, type RelatedTables } from "@rebasepro/common";
 import type { TableDescriptor } from "@rebasepro/types";
 
 /**
@@ -67,7 +67,8 @@ export function currentFieldViewer(): FieldViewer | undefined {
 /**
  * The names an API caller's query may not see on `table`: its private columns
  * and relations (`.private()`, `{ private: true }`) and the foreign key of a
- * private `belongsTo`, in every spelling (`apiHiddenKeys`). Empty on the
+ * private `belongsTo`, and (with `related`) every relation whose join reads a
+ * private column, in every spelling (`apiHiddenKeys`). Empty on the
  * trusted server plane (no viewer), which may filter and sort on those
  * columns — the auth adapter looks rows up by them — and empty with no table
  * in hand.
@@ -76,9 +77,9 @@ export function currentFieldViewer(): FieldViewer | undefined {
  * the table does not have: a "not readable" would confirm a column OpenAPI,
  * `GET /api/schema/tables` and `describe_table` hide.
  */
-export function namesHiddenFromCaller(table: TableDescriptor | undefined): ReadonlySet<string> {
+export function namesHiddenFromCaller(table: TableDescriptor | undefined, related?: RelatedTables): ReadonlySet<string> {
     if (!table || currentFieldViewer() === undefined) return NO_NAMES;
-    return apiHiddenKeys(table);
+    return apiHiddenKeys(table, related);
 }
 
 const NO_NAMES: ReadonlySet<string> = new Set();

@@ -1,5 +1,5 @@
 import type { FetchCollectionProps } from "@rebasepro/types";
-import { hasColumnAccessRules, type FieldViewer } from "@rebasepro/common";
+import { hasColumnAccessRules, hasJoinAccessRules, type FieldViewer } from "@rebasepro/common";
 import { assertQueryFieldsReadable } from "@rebasepro/server";
 import type { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 
@@ -34,15 +34,19 @@ export function assertReadRequestReadable(
     read: { slug: string },
     viewer: FieldViewer,
     /** Where the table's descriptor — and its relations' targets' — are read from. */
-    registry: Pick<PostgresTableRegistry, "getTable" | "requireTable">
+    registry: Pick<PostgresTableRegistry, "getTable" | "getTableBySqlName" | "requireTable">
 ): void {
     // Fail closed: a table this registry does not serve is refused by
     // `requireTable`, never read unchecked.
     const table = registry.requireTable(read.slug).descriptor;
+    // By slug or SQL name: a `via` step names a table by its SQL name.
+    const related = (name: string) => (registry.getTable(name) ?? registry.getTableBySqlName(name))?.descriptor;
     // Nothing on the table restricts a name and nothing reaches another
     // table: there is nothing to refuse. Every read on a caller's behalf
     // passes here, so the common case costs one walk of the columns.
-    if (request.include == null && !hasColumnAccessRules(table)) return;
+    // A relation path reads the join's columns, which may be another
+    // table's (`staff?handledCases.title=…` reads `cases.handlerId`).
+    if (request.include == null && !hasColumnAccessRules(table) && !hasJoinAccessRules(table, related)) return;
     // Every input the REST check takes. An `include` reads its target's
     // columns — `{ staff: { where: { salary: [">", 100000] } } }` answers which
     // departments employ someone over the line — and a vector search measures
@@ -58,7 +62,7 @@ export function assertReadRequestReadable(
         fields: Array.isArray(request.fields) ? request.fields : undefined,
         include: request.include ?? undefined,
         vectorSearch: typeof vectorProperty === "string" ? { property: vectorProperty } : undefined
-    }, table, viewer, slug => registry.getTable(slug)?.descriptor);
+    }, table, viewer, related);
 }
 
 /** The fields an `orderBy` sorts on, in either of its two spellings. */

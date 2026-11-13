@@ -5,7 +5,7 @@ import { isTimeZoneName } from "@rebasepro/types";
 import type { ColumnDescriptor } from "@rebasepro/types";
 import { isJsNumberType } from "@rebasepro/common";
 import type { DriverAggregate, DriverAggregateGroup, IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
-import { apiHiddenKeys, includableRelations, queryableColumnKeys, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
+import { apiHiddenKeys, includableRelations, type RelatedTables, queryableColumnKeys, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, listedColumnKeys, type FilterCompilationOptions } from "../utils/drizzle-conditions";
 import { currentFieldViewer, namesHiddenFromCaller } from "./field-viewer";
@@ -124,9 +124,11 @@ function assertRelationReadable(
     runtime: RuntimeTable,
     key: string,
     relation: RelationDescriptor,
-    use: string
+    use: string,
+    /** The other tables the relation's join passes through. */
+    related: RelatedTables
 ): void {
-    if (canReadRelation(runtime.descriptor, relation)) return;
+    if (canReadRelation(runtime.descriptor, relation, related)) return;
     throw ApiError.badRequest(
         `'${key}' is not readable on table '${runtime.slug}' with your roles, so it cannot be used in ${use}.`,
         "FIELD_NOT_READABLE",
@@ -444,10 +446,10 @@ export class FetchService {
         // builder below, which refuses it naming the ones there are.
         // A relation the API does not have is the builder's to refuse too, as
         // the unknown relation it is for this caller.
-        const sorted = namesHiddenFromCaller(runtime.descriptor).has(spec.relation)
+        const sorted = namesHiddenFromCaller(runtime.descriptor, this.registry.relatedTables()).has(spec.relation)
             ? undefined
             : runtime.relations.get(spec.relation);
-        if (sorted) assertRelationReadable(runtime, spec.relation, sorted, "`orderBy`");
+        if (sorted) assertRelationReadable(runtime, spec.relation, sorted, "`orderBy`", this.registry.relatedTables());
         const primaryKeys = getPrimaryKeys(runtime, this.registry);
         const idColumn = primaryKeys.length === 1
             ? table[primaryKeys[0].fieldName as keyof typeof table] as AnyPgColumn
@@ -897,7 +899,7 @@ target });
         // door reaches (REST, `POST …/query`, the in-process SDK, socket fetches
         // and subscriptions), and at every level of a nested include. The REST
         // rows were stripped before this runs, so the strip cannot catch it.
-        const levels = requested.filter(({ relation }) => canReadRelation(runtime.descriptor, relation));
+        const levels = requested.filter(({ relation }) => canReadRelation(runtime.descriptor, relation, this.registry.relatedTables()));
 
         for (const { key, node, relation } of levels) {
             // The target's lowered collection, looked up by the relation's
@@ -1413,7 +1415,7 @@ target });
 
     private buildRelationScope(hop: NestedPathHop): SQL {
         // The rows of this relation, reached by URL rather than by `include`.
-        assertRelationReadable(hop.parent, hop.relationKey, hop.relation, "a nested path");
+        assertRelationReadable(hop.parent, hop.relationKey, hop.relation, "a nested path", this.registry.relatedTables());
         const parentPks = requirePrimaryKeys(hop.parent, this.registry);
         const parsedParent = parseIdValues(hop.parentId, parentPks);
         // What a single-column link compares against. A link from a composite
@@ -1463,7 +1465,7 @@ target });
         if (!hop) return true;
         // "Is row 7 one of this parent's members" is the relation's value one
         // row at a time — the same reading the listing below is refused.
-        assertRelationReadable(hop.parent, hop.relationKey, hop.relation, "a nested path");
+        assertRelationReadable(hop.parent, hop.relationKey, hop.relation, "a nested path", this.registry.relatedTables());
         return this.relationService.isRelated(hop, id);
     }
 

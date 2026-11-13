@@ -1,5 +1,5 @@
 import { INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, type ColumnDescriptor } from "@rebasepro/types";
-import { arrayElementType, canReadRelation as canReadRelationFor, hasColumnAccessRules, restrictedKeys, restCodecOf, type RestCodec } from "@rebasepro/common";
+import { arrayElementType, canReadRelation as canReadRelationFor, hasColumnAccessRules, restrictedKeys, restCodecOf, type RelatedTables, type RestCodec } from "@rebasepro/common";
 import type { RelationDescriptor, TableDescriptor } from "@rebasepro/types";
 import { currentFieldViewer } from "./field-viewer";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
@@ -293,15 +293,16 @@ export function stripUnreadable(
  * May the current caller be handed the rows of this relation?
  *
  * A relation's value *is* its related rows, so a relation the caller may not
- * read (`rel.*(…, { access: { read } })`, `{ private: true }`, or a
- * `belongsTo` whose key column it may not read) is withheld whole: an
- * `include` neither loads it nor counts it. {@link stripUnreadable}
+ * read (`rel.*(…, { access: { read } })`, `{ private: true }`, or one whose
+ * join reads a column it may not read — on this table or, through `related`,
+ * on the others) is withheld whole: an `include` neither loads it nor counts
+ * it. {@link stripUnreadable}
  * cannot be the only guard here, because the REST rows are stripped before the
  * include loader runs (`toRestRow`, then `loadIncludes`) — the loader wrote the
  * rows back onto the key the strip had just deleted, and `_count` beside them.
  */
-export function canReadRelation(table: TableDescriptor, relation: RelationDescriptor): boolean {
-    return canReadRelationFor(table, relation, currentFieldViewer());
+export function canReadRelation(table: TableDescriptor, relation: RelationDescriptor, related?: RelatedTables): boolean {
+    return canReadRelationFor(table, relation, currentFieldViewer(), related);
 }
 
 /**

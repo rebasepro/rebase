@@ -57,8 +57,12 @@ export type TableLookup = (slug: string) => TableDescriptor | undefined;
  */
 export function servedTables(input: RestTables): { served: ServedTable[]; lookup: TableLookup } {
     const bySlug = new Map(input.descriptors.map(table => [table.slug, table]));
+    // By slug, then by SQL name: a `via` step names the tables it joins by
+    // their SQL names, and a read gate judges the columns on each.
+    const byTable = new Map(input.descriptors.map(table => [table.table, table]));
+    const lookup: TableLookup = name => bySlug.get(name) ?? byTable.get(name);
     if (input.served === undefined) {
-        return { served: input.descriptors.map(table => ({ table })), lookup: slug => bySlug.get(slug) };
+        return { served: input.descriptors.map(table => ({ table })), lookup };
     }
     const served: ServedTable[] = [];
     const undescribed: string[] = [];
@@ -76,5 +80,5 @@ export function servedTables(input: RestTables): { served: ServedTable[]; lookup
             `${undescribed.join(", ")}. Every served table is described by the same compile (or introspection) that names it.`
         );
     }
-    return { served, lookup: slug => bySlug.get(slug) };
+    return { served, lookup };
 }

@@ -21,7 +21,10 @@ export {
     canWriteRelation,
     columnAccess,
     hasColumnAccessRules,
-    restrictedKeys
+    hasJoinAccessRules,
+    relationJoinColumns,
+    restrictedKeys,
+    type RelatedTables
 } from "./access";
 export * from "./relations";
 export * from "./table-options";

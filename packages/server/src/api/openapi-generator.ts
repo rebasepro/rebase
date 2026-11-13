@@ -13,7 +13,7 @@ import {
     type RelationDescriptor,
     type TableDescriptor
 } from "@rebasepro/types";
-import { boundKeyColumn, columnAccess, tenantOf, textMaxLength, validationPattern } from "@rebasepro/common";
+import { boundKeyColumn, columnAccess, relationJoinColumns, tenantOf, textMaxLength, validationPattern } from "@rebasepro/common";
 import { labelFromIdentifier, singularLabel } from "@rebasepro/utils";
 import { DELETED_QUERY_PARAM, HARD_DELETE_QUERY_PARAM } from "./rest/soft-delete-params";
 import type { TableLookup } from "./rest/served-table";
@@ -85,7 +85,7 @@ export function generateOpenApiSpec(
     tables: readonly TableDescriptor[],
     options: OpenApiGeneratorOptions = {}
 ): Record<string, unknown> {
-    const lookup: TableLookup = slug => tables.find(table => table.slug === slug);
+    const lookup: TableLookup = name => tables.find(table => table.slug === name) ?? tables.find(table => table.table === name);
     const collections: DocumentedTable[] = tables.map(table => ({
         table,
         ...documentedNames(table.slug),
@@ -1384,7 +1384,7 @@ function accessDescription(access: ColumnAccess | undefined): string | undefined
  * column back on the surface under its other name. Same pair, same reason, as
  * `excludedApiKeys` in the SDK generator.
  */
-function excludedApiKeys(table: TableDescriptor, direction: "read" | "write" = "read"): Set<string> {
+function excludedApiKeys(table: TableDescriptor, direction: "read" | "write" = "read", lookup?: TableLookup): Set<string> {
     const excluded = new Set<string>();
     for (const column of table.columns) {
         if (isDocumented(column, direction)) continue;
@@ -1392,10 +1392,15 @@ function excludedApiKeys(table: TableDescriptor, direction: "read" | "write" = "
         excluded.add(column.column);
     }
     for (const relation of table.relations) {
-        // A link is documented exactly when its key column is: `{ reviewer }`
-        // writes the `.readOnly()` `reviewerId`, and reads its value.
+        // A link is documented exactly when its key column is (`{ reviewer }`
+        // writes the `.readOnly()` `reviewerId`); a relation is read only if
+        // every column its join reads is (`staff.handledCases` reads the
+        // private `cases.informantId`).
         const bound = boundKeyColumn(table, relation);
-        if (!isDocumented(relation, direction) || (bound !== undefined && !isDocumented(bound, direction))) {
+        const joined = direction === "read" ? relationJoinColumns(table, relation, lookup) : [];
+        if (!isDocumented(relation, direction)
+            || (bound !== undefined && !isDocumented(bound, direction))
+            || joined.some(column => !isDocumented(column, "read"))) {
             excluded.add(relation.name);
         }
     }
@@ -1543,7 +1548,7 @@ export function buildTableSchema(
         [idKey]: { ...idSchemaFor(table), description: "Unique identifier" }
     };
     const required: string[] = [idKey];
-    const excluded = excludedApiKeys(table);
+    const excluded = excludedApiKeys(table, "read", lookup);
     const emitted = new Set<string>(excluded);
     emitted.add(idKey);
 

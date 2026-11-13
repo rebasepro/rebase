@@ -122,14 +122,16 @@ export function assertReadableFields(
     names: readonly (string | undefined)[],
     table: TableDescriptor,
     viewer: FieldViewer | undefined,
-    where: Where
+    where: Where,
+    /** The other tables, so a relation is judged by every column its join reads. */
+    lookup?: TableLookup
 ): void {
     if (names.length === 0) return;
-    const { refused } = restrictedKeys(table, viewer, "read");
+    const { refused } = restrictedKeys(table, viewer, "read", lookup);
     if (refused.size === 0) return;
     // A private name is answered as an unknown one, by `assertNoHiddenNames`
     // or `assertNoHiddenAggregateNames`, never here.
-    const hidden = apiHiddenKeys(table);
+    const hidden = apiHiddenKeys(table, lookup);
 
     const named = [...new Set(names.filter((n): n is string =>
         n !== undefined && refused.has(n) && !hidden.has(n)))];
@@ -221,16 +223,16 @@ function assertRestrictedFieldsUnused(
     const filtered: string[] = [];
     if (options.where) filtered.push(...Object.keys(options.where));
     logicalColumns(options.logical, filtered);
-    assertReadableFields(filtered.map(filterHead), table, viewer, "filter");
+    assertReadableFields(filtered.map(filterHead), table, viewer, "filter", lookup);
     assertRelationPathsReadable(filtered, table, viewer, lookup);
 
     assertReadableFields(
         (options.orderBy ?? []).map(entry => orderByColumn(entry.field)),
-        table, viewer, "orderBy"
+        table, viewer, "orderBy", lookup
     );
     assertAggregateSortsReadable(options.orderBy ?? [], table, viewer, lookup);
 
-    assertReadableFields(options.fields ?? [], table, viewer, "fields");
+    assertReadableFields(options.fields ?? [], table, viewer, "fields", lookup);
 
     // A similarity search reads the vector it ranks by: `_distance` from a
     // point the caller chose is a measurement of it, enough of them locate it,
@@ -285,7 +287,7 @@ function assertAggregateSortsReadable(
         if (!spec?.field) continue;
         const target = relationTarget(table, spec.relation, lookup);
         if (!target) continue;
-        assertReadableFields([spec.field], target, viewer, "orderBy");
+        assertReadableFields([spec.field], target, viewer, "orderBy", lookup);
     }
 }
 
@@ -306,7 +308,12 @@ function assertRelationPathsReadable(
         if (dot <= 0 || name.indexOf("->") >= 0) continue;
         const target = relationTarget(table, name.slice(0, dot), lookup);
         if (!target) continue;
-        assertReadableFields([name.slice(dot + 1)], target, viewer, "filter");
+        // Each hop is judged on the table it starts from, as the first was
+        // above: a readable relation reached through one the caller may not
+        // read is not reachable (`?author.handledCases.title=…`).
+        const rest = name.slice(dot + 1);
+        assertReadableFields([filterHead(rest)], target, viewer, "filter", lookup);
+        assertRelationPathsReadable([rest], target, viewer, lookup);
     }
 }
 
@@ -334,7 +341,7 @@ function assertNoHiddenNames(
     table: TableDescriptor,
     lookup: TableLookup
 ): void {
-    const hidden = apiHiddenKeys(table);
+    const hidden = apiHiddenKeys(table, lookup);
     if (hidden.size > 0) {
         const asked: { kind: "fields" | "filter" | "orderBy"; name: string }[] = [
             ...(options.fields ?? []).map(name => ({ kind: "fields" as const, name })),
@@ -414,9 +421,9 @@ function nameShape(name: string, table: TableDescriptor, hidden: ReadonlySet<str
         if (hidden.has(relationKey)) return { hidden: true, known: false };
         const target = relationTarget(table, relationKey, lookup);
         if (!target) return { hidden: false, known: false };
-        const targetHidden = apiHiddenKeys(target);
+        const targetHidden = apiHiddenKeys(target, lookup);
         const path = { relationKey, fieldKey, target };
-        if (targetHidden.has(fieldKey)) return { hidden: true, known: false, path };
+        if (targetHidden.has(fieldKey) || targetHidden.has(fieldKey.split(".")[0])) return { hidden: true, known: false, path };
         const known = queryableColumnKeys(target).includes(fieldKey) || relationOf(target, fieldKey) !== undefined;
         return { hidden: false, known, path };
     }

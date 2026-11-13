@@ -1666,7 +1666,7 @@ export class DrizzleConditionBuilder {
     ): SQL {
         // A relation the API does not have is not a relation there, for this
         // caller — the same answer, byte for byte, as one never declared.
-        const relation = namesHiddenFromCaller(ownerTable.descriptor).has(spec.relation)
+        const relation = namesHiddenFromCaller(ownerTable.descriptor, registry.relatedTables()).has(spec.relation)
             ? undefined
             : ownerTable.relations.get(spec.relation);
         if (!relation) {
