@@ -89,8 +89,9 @@ test.describe("Studio: a presentation change is a UI preference", () => {
         expect(after.workspaceTarget).toBe("file");
         expect(fs.readFileSync(UI_CONFIG, "utf8")).toContain(RENAMED);
 
-        // And the panel draws the table under its new name.
-        await page.goto("/");
-        await expect(page.getByRole("link").filter({ hasText: RENAMED }).first()).toBeVisible({ timeout: 15000 });
+        // And the panel draws the table under its new name (tags are
+        // `hideFromNavigation`, so on the table's own page, not in the nav).
+        await page.goto(`/c/${SLUG}`);
+        await expect(page.getByRole("main").getByText(RENAMED).first()).toBeVisible({ timeout: 15000 });
     });
 });

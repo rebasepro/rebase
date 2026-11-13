@@ -28,10 +28,16 @@ test.describe("custom collection view", () => {
         const map = page.getByRole("img", { name: /^\d+ products plotted by price and rating$/ });
         await expect(map).toBeVisible({ timeout: 15_000 });
         // Every rated product is a point: the map reads the rows the table does.
-        const plotted = Number((await map.getAttribute("aria-label"))?.match(/^(\d+)/)?.[1]);
-        expect(plotted).toBeGreaterThan(50);
-        await expect(map.locator("circle")).toHaveCount(plotted);
-        await expect(page.getByRole("main").getByText(`${plotted} plotted`)).toBeVisible();
+        // The rows arrive in pages, so the three counts — the label, the
+        // points and the caption — are read together until they agree.
+        const caption = page.getByRole("main").getByText(/^\d+ plotted$/);
+        const agreed = async (): Promise<number> => {
+            const labelled = Number((await map.getAttribute("aria-label"))?.match(/^(\d+)/)?.[1]);
+            const captioned = Number((await caption.textContent())?.match(/^(\d+)/)?.[1]);
+            const points = await map.locator("circle").count();
+            return labelled === captioned && labelled === points ? labelled : -1;
+        };
+        await expect.poll(agreed, { timeout: 15_000 }).toBeGreaterThan(50);
 
         // The search box above drives it: one product found, one point.
         await searchBox(page).fill(name);
