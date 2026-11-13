@@ -185,7 +185,6 @@ const UNSERVED_JOIN_COLUMN: ColumnDescriptor = {
     readOnly: true,
     access: PRIVATE_ACCESS
 };
-Object.freeze(UNSERVED_JOIN_COLUMN);
 
 /**
  * The declared columns a relation's join condition reads, on every table it
