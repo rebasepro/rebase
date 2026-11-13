@@ -342,7 +342,7 @@ function makeAllocator(ctx: FileContext, pending: Map<string, EnumRequest>): Enu
             if (!visibleAt(ctx, freeIdentifiers(valuesNode), target)) {
                 return `the labels of pgEnum "${name}" read a name not visible where the declaration would go`;
             }
-            const key = `${name}\u0000${normalizeValues(values)}`;
+            const key = `${name}\u0000${normalizeValues(values)}\u0000${target.pos}:${target.end}`;
             const already = pending.get(key);
             if (already) return already;
             let ident = `${camel(name)}Enum`;
@@ -464,6 +464,8 @@ function transformChain(ctx: FileContext, chain: Chain, allocator: EnumAllocator
     let typeArgs = rootCall.typeArguments ? text.slice(rootCall.typeArguments.pos, rootCall.typeArguments.end) : undefined;
     let rootChanged = false;
     let rootOverride: string | undefined;
+    /** The root became a pgEnum: its only argument is the SQL name. */
+    let pgEnumCallee = false;
     const afterRoot: string[] = [];
     const A0 = argNodes[0];
     const A1 = argNodes[1];
@@ -567,6 +569,7 @@ function transformChain(ctx: FileContext, chain: Chain, allocator: EnumAllocator
                     enums.push(result);
                 }
                 args = [];
+                pgEnumCallee = true;
                 rootChanged = true;
             }
             break;
@@ -632,7 +635,7 @@ function transformChain(ctx: FileContext, chain: Chain, allocator: EnumAllocator
         if (alreadyNamed) {
             return problem(rootCall, "`.column()` on a builder that already has a leading SQL name");
         }
-        if (callee !== `col.${builder}` || builder === "enum" && args.length === 0) {
+        if (pgEnumCallee) {
             // A pgEnum: `xEnum(name)`.
             args = [leadingName];
         } else {
@@ -753,7 +756,8 @@ export function transformSource(input: string, fileName = "file.ts"): TransformR
             needSql ||= result.needSql;
             for (const request of result.enums) {
                 needPgEnum = true;
-                const position = declarationPosition(ctx, request.statement);
+                // Above this chain's own statement: the request is shared by every chain of the name in the scope.
+                const position = declarationPosition(ctx, statementOf(chain.top) ?? request.statement);
                 const known = committed.get(request.ident);
                 if (!known || position < known.position) committed.set(request.ident, { request, position });
             }
@@ -871,6 +875,14 @@ async function loadCommon(): Promise<CommonModule | undefined> {
     }
 }
 
+/** `Date`, with `new Date()` frozen, so `.default(new Date())` evaluates the same twice. */
+class FixedDate extends Date {
+    constructor(...args: ConstructorParameters<typeof Date>) {
+        if (args.length === 0) super(0);
+        else super(...args);
+    }
+}
+
 /** Evaluate a builder chain's text with `col`, `sql`, `pgEnum`, `json` (and the file's pgEnums) in scope. */
 function evaluateChain(schema: SchemaModule, enums: ChainRewrite["enums"], expression: string): { def?: string; error?: string } {
     const declarations = enums.map(entry => `let ${entry.ident}; try { ${entry.ident} = pgEnum(${JSON.stringify(entry.name)}, ${entry.values}); } catch {}`);
@@ -879,8 +891,8 @@ function evaluateChain(schema: SchemaModule, enums: ChainRewrite["enums"], expre
         compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None }
     }).outputText;
     try {
-        const factory = new Function("col", "sql", "pgEnum", "json", `${js}\nreturn __sweep__();`);
-        const built: unknown = factory(schema.col, schema.sql, schema.pgEnum, schema.json);
+        const factory = new Function("col", "sql", "pgEnum", "json", "Date", `${js}\nreturn __sweep__();`);
+        const built: unknown = factory(schema.col, schema.sql, schema.pgEnum, schema.json, FixedDate);
         if (typeof built !== "object" || built === null || !("def" in built)) return { error: "not a column builder" };
         return { def: stableRender(built.def) };
     } catch (error) {
@@ -1069,10 +1081,11 @@ function isDirty(file: string): boolean {
     }
 }
 
-/** Files the sweep never rewrites: the builders themselves and the old/new pair test. */
+/** Files the sweep never rewrites: the builders themselves and the tests that pair each old spelling with its new one. */
 const ALWAYS_EXCLUDED = [
     "packages/types/src/schema/columns.ts",
     "packages/common/test/schema/drizzle-alignment.test.ts",
+    "packages/types/test/schema/drizzle-spelling.test.ts",
     "tooling/scripts/drizzle-sweep.mts"
 ];
 

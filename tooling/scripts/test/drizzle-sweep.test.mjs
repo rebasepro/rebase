@@ -29,6 +29,8 @@ function column(expression) {
 
 const CASES = [
     [".column(name)", "col.text().column(\"legacy_title\")", "col.text(\"legacy_title\")"],
+    [".column(name) on a timestamptz", "col.timestamptz().column(\"created_at\")", "col.timestamp(\"created_at\", { withTimezone: true })"],
+    [".column(name) on a named enum", "col.enum([\"a\"], { name: \"k\" }).column(\"kind\")", "kEnum(\"kind\")"],
     [".column(name) on an array", "col.array(col.text()).column(\"tag_list\")", "col.text(\"tag_list\").array()"],
     ["col.varchar(n)", "col.varchar(160)", "col.varchar({ length: 160 })"],
     ["col.varchar()", "col.varchar()", "col.varchar({ length: 255 })"],
@@ -118,6 +120,17 @@ export const posts = defineTable("posts", {
     assert.match(text, /status: postStatusEnum\(\)\.notNull\(\)\.default\("draft"\)/);
     assert.match(text, /previous: postStatusEnum\(\),/);
     assert.match(text, /history: postStatusEnum\(\)\.array\(\)/);
+});
+
+test("a pgEnum shared by two tables is declared above the first", () => {
+    const source = `${HEADER}const P = ["a", "b"] as const;
+export const one = defineTable("one", { columns: { p: col.enum(P, { name: "p" }) }, rls: "admin-only" });
+export const two = defineTable("two", { columns: { q: col.enum(P, { name: "p" }), r: col.array(col.enum(P, { name: "p" })) }, rls: "admin-only" });
+`;
+    const { text, problems } = transformSource(source, "t.ts");
+    assert.deepEqual(problems, []);
+    assert.ok(text.indexOf("const pEnum = pgEnum") < text.indexOf("export const one"), text);
+    assert.equal(text.match(/pgEnum\("p"/g)?.length, 1);
 });
 
 test("an existing pgEnum declaration of the same name is reused, other labels are reported", () => {
