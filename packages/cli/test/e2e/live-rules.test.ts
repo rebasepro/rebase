@@ -180,10 +180,24 @@ describe("a live rule edit (S-4)", () => {
             }
         }, 60_000);
         expect((await postsPolicyQuals()).some(qual => qual.includes("published"))).toBe(false);
-        const after = await readRows(backend!.baseUrl, reader.accessToken, "posts");
-        expect(after.rows.map(row => row.title)).not.toContain("Visible until the edit");
 
+        // The reads below wait out a restart in progress the same way: a
+        // refused connection is the watcher, not an answer.
+        let afterTitles: unknown[] | undefined;
+        let readerTables: string[] | undefined;
+        await waitFor(async () => {
+            try {
+                const after = await readRows(backend!.baseUrl, reader.accessToken, "posts");
+                if (after.status !== 200) return false;
+                afterTitles = after.rows.map(row => row.title);
+                readerTables = (await servedTables(reader.accessToken)).map(table => table.slug);
+                return true;
+            } catch {
+                return false;
+            }
+        }, 60_000);
+        expect(afterTitles).not.toContain("Visible until the edit");
         // And the reader is no longer described a table no rule grants them.
-        expect((await servedTables(reader.accessToken)).map(table => table.slug)).not.toContain("posts");
+        expect(readerTables).not.toContain("posts");
     }, 180_000);
 });
