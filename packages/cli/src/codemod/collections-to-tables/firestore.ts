@@ -13,7 +13,7 @@
 import path from "node:path";
 import type { Node, ObjectLiteralExpression, SourceFile } from "ts-morph";
 
-import { findCollectionSite, memberOf, resolveObject } from "./ast";
+import { findCollectionSite, memberOf, resolveArray, resolveObject } from "./ast";
 import { COMPONENT_KEYS } from "./customization";
 import type { CollectionEntry, PlanContext } from "./plan-context";
 import { planFile, refuse, relativeToRoot } from "./plan-context";
@@ -86,6 +86,39 @@ function visitEvaluated(field: unknown, key: string, out: Map<string, string>): 
     if (isRecord(field.oneOf)) evaluatedReferences(field.oneOf.properties, `${key}.oneOf.`, out);
 }
 
+/** Marks the edits of {@link brandAdditionalFieldEntries}, so the module imports the type. */
+const BRANDED = " as AdditionalFieldKey";
+
+/**
+ * `propertiesOrder` / `listProperties` entries naming one of the collection's
+ * `additionalFields`: written `"key" as AdditionalFieldKey`, the spelling
+ * `ColumnKey` requires of a key that is not a property (a bare string does not
+ * type-check under `defineFirestoreCollection`).
+ */
+function brandAdditionalFieldEntries(plan: PlanContext, entry: CollectionEntry, literal: ObjectLiteralExpression, edits: Edit[]): void {
+    const { Node: N } = plan.ast.tsm;
+    const collection: unknown = entry.collection;
+    const admin: unknown = isRecord(collection) ? collection.admin : undefined;
+    const fields: unknown = (isRecord(collection) ? collection.additionalFields : undefined) ?? (isRecord(admin) ? admin.additionalFields : undefined);
+    const keys = new Set((Array.isArray(fields) ? fields : []).flatMap((field: unknown) => (isRecord(field) && typeof field.key === "string" ? [field.key] : [])));
+    if (keys.size === 0) return;
+    const holders: ObjectLiteralExpression[] = [literal];
+    const adminValue = memberOf(plan.ast, literal, "admin").node?.value;
+    const adminObject = adminValue ? resolveObject(plan.ast, adminValue).node : undefined;
+    if (adminObject && adminObject.getSourceFile() === literal.getSourceFile()) holders.push(adminObject);
+    for (const holder of holders) {
+        for (const name of ["propertiesOrder", "listProperties"]) {
+            const value = memberOf(plan.ast, holder, name).node?.value;
+            const array = value ? resolveArray(plan.ast, value).node : undefined;
+            if (!array || array.getSourceFile() !== literal.getSourceFile()) continue;
+            for (const element of array.getElements()) {
+                if (!N.isStringLiteral(element) || !keys.has(element.getLiteralValue())) continue;
+                edits.push({ start: element.getEnd(), end: element.getEnd(), text: BRANDED });
+            }
+        }
+    }
+}
+
 /** The edits that turn the collection literal into `defineFirestoreCollection`'s argument and wrap it. */
 function literalEdits(plan: PlanContext, sf: SourceFile, entry: CollectionEntry, destination: string): Edit[] | undefined {
     const { Node: N } = plan.ast.tsm;
@@ -139,6 +172,8 @@ function literalEdits(plan: PlanContext, sf: SourceFile, entry: CollectionEntry,
             file: relativeToRoot(plan, destination)
         });
     }
+
+    brandAdditionalFieldEntries(plan, entry, literal, edits);
 
     // The wrapper.
     let parent: Node | undefined = literal.getParent();
@@ -216,7 +251,8 @@ export function planFirestoreCollection(plan: PlanContext, entry: CollectionEntr
         const imports = sf.getImportDeclarations();
         const insertAt = imports.length > 0 ? imports[0].getStart() : 0;
         const componentLines = [...componentImports].map(([specifier, local]) => `import ${local} from ${JSON.stringify(specifier)};\n`).join("");
-        edits.push({ start: insertAt, end: insertAt, text: `import { defineFirestoreCollection } from "@rebasepro/firebase";\n${componentLines}` });
+        const brandImport = edits.some(edit => edit.text === BRANDED) ? `import type { AdditionalFieldKey } from "@rebasepro/cms-types";\n` : "";
+        edits.push({ start: insertAt, end: insertAt, text: `import { defineFirestoreCollection } from "@rebasepro/firebase";\n${brandImport}${componentLines}` });
         let out = text;
         for (const edit of edits.sort((a, b) => b.start - a.start || b.end - a.end)) out = out.slice(0, edit.start) + edit.text + out.slice(edit.end);
         out = plan.relocator.moveSpecifiersInText(out, entry.file, destination, "frontend");

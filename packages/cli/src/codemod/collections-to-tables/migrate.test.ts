@@ -575,6 +575,37 @@ describe("a component path written in a shared module", () => {
     }, 120_000);
 });
 
+describe("an additional field named in a column list", () => {
+    it("is written `\"key\" as AdditionalFieldKey`, the spelling the column types require, in a customization", async () => {
+        const dir = materialize("blog");
+        const posts = path.join(dir, "config", "collections", "posts.ts");
+        fs.writeFileSync(posts, fs.readFileSync(posts, "utf8")
+            .replace("propertiesOrder: [\"title\", \"slug\", \"status\", \"body\", \"cover\", \"author\", \"tags\"],",
+                "propertiesOrder: [\"title\", \"wordCount\", \"slug\", \"status\", \"body\", \"cover\", \"author\", \"tags\"],\n" +
+                "        additionalFields: [{ key: \"wordCount\", name: \"Words\", value: ({ entity }) => String(entity.values.body ?? \"\").split(\" \").length }],"));
+        const report = await run(dir, { dryRun: true });
+        expect(report.refusals).toEqual([]);
+        const cms = report.files.find(file => file.path === "frontend/src/cms/posts.tsx")?.content ?? "";
+        expect(cms).toContain("\"wordCount\" as AdditionalFieldKey");
+        expect(cms).toContain("import type { AdditionalFieldKey } from \"@rebasepro/cms-types\";");
+        expect(cms).not.toContain("\"title\" as AdditionalFieldKey");
+        const manifest = report.files.find(file => file.path === "frontend/package.json")?.content ?? "{}";
+        expect(Object.keys((JSON.parse(manifest) as { dependencies?: Record<string, string> }).dependencies ?? {})).toContain("@rebasepro/cms-types");
+    }, 120_000);
+
+    it("and in a converted Firestore collection", async () => {
+        const dir = materialize("firestore");
+        const visits = path.join(dir, "config", "collections", "visits.ts");
+        fs.writeFileSync(visits, fs.readFileSync(visits, "utf8")
+            .replace("    subcollections:", "    propertiesOrder: [\"when\", \"age\", \"store\"],\n    additionalFields: [{ key: \"age\", name: \"Age\", value: () => \"new\" }],\n    subcollections:"));
+        const report = await run(dir, { dryRun: true });
+        expect(report.refusals).toEqual([]);
+        const converted = report.files.find(file => file.path === "frontend/src/cms/visits.ts")?.content ?? "";
+        expect(converted).toContain("propertiesOrder: [\"when\", \"age\" as AdditionalFieldKey, \"store\"]");
+        expect(converted).toContain("import type { AdditionalFieldKey } from \"@rebasepro/cms-types\";");
+    }, 120_000);
+});
+
 describe("tests that read what config/ loses", () => {
     it("are listed with file and line: the removed collections export, and config/collections read as text", async () => {
         const dir = materialize("blog");

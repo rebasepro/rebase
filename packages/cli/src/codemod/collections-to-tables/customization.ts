@@ -851,6 +851,9 @@ function printModule(plan: PlanContext, builder: Builder, options: Record<string
         ...[...builder.libImports].map(([specifier, imported]) => `import { ${[...imported].join(", ")} } from ${JSON.stringify(specifier)};`),
         ...carriedImports
     ];
+    // A column list naming an additional field: the key is branded, as the type asks
+    // (`"score" as AdditionalFieldKey` — a bare string is not a column id).
+    if (brandAdditionalFieldKeys(options)) imports.push(`import type { AdditionalFieldKey } from "@rebasepro/cms-types";`);
     let body: string;
     try {
         body = printValue(options, "", "options");
@@ -860,6 +863,31 @@ function printModule(plan: PlanContext, builder: Builder, options: Record<string
     }
     const call = `export const ${identifier} = customizeTable<typeof ${name.identifier}>(${JSON.stringify(entry.collection.slug)}, ${body});`;
     return `${[imports.join("\n"), ...statements, call].join("\n\n")}\n`;
+}
+
+/**
+ * Brand the entries of `fieldOrder` / `listFields` that name one of the
+ * customization's `additionalFields`: `TableColumnId` accepts a field path, a
+ * relation tab, or an `AdditionalFieldKey`, and the key's documented spelling is
+ * `"key" as AdditionalFieldKey` (the brand is required, so a typo does not pass).
+ *
+ * @returns whether any entry was branded (the module then imports the type)
+ */
+export function brandAdditionalFieldKeys(options: Record<string, unknown>): boolean {
+    const fields = options.additionalFields;
+    const keys = new Set((Array.isArray(fields) ? fields : []).flatMap(field => (isPlainObject(field) && typeof field.key === "string" ? [field.key] : [])));
+    if (keys.size === 0) return false;
+    let branded = false;
+    for (const list of ["fieldOrder", "listFields"]) {
+        const value = options[list];
+        if (!Array.isArray(value)) continue;
+        options[list] = value.map(item => {
+            if (typeof item !== "string" || !keys.has(item)) return item;
+            branded = true;
+            return new RawSource(`${JSON.stringify(item)} as AdditionalFieldKey`);
+        });
+    }
+    return branded;
 }
 
 /** `frontend/src/cms/index.ts`: the customizations in navigation order, and the external collections. */

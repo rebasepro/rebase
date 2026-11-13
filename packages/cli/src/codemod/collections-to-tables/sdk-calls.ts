@@ -570,13 +570,14 @@ export async function rewriteSdkCalls(root: string, options: RewriteSdkOptions =
     }
     // Packages only config/ declared, imported by what the run writes (carried code moved out of config/).
     const configDeclared = options.configManifest ? declaredDependencies(read(options.configManifest)) : new Map<string, string>();
-    if (configDeclared.size > 0) {
+    {
         for (const [file, written] of options.overrides ?? []) {
             if (!SOURCE.test(file)) continue;
             const text = out.get(file) ?? written;
             for (const match of text.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*)["']([^"'.\s][^"'\s]*)["']/g)) {
                 const name = packageOf(match[1]);
-                if (!configDeclared.has(name)) continue;
+                // `@rebasepro/cms-types`, which a customization imports for a branded additional-field key, at the range of the others.
+                if (!configDeclared.has(name) && name !== "@rebasepro/cms-types") continue;
                 const packages = needed.get(file) ?? new Set<string>();
                 packages.add(name);
                 needed.set(file, packages);
