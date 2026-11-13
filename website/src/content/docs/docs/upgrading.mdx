@@ -76,10 +76,13 @@ Then, whichever hop you made:
 [ ] if you implement EmailService yourself, `send` must return a result
 
 --- 0.30 → 0.31 ---
+[ ] bump every @rebasepro package to 0.31 first, then pnpm install
 [ ] rebase migrate collections-to-tables on a clean tree; read the manual steps
 [ ] move config/index.ts `callbacks` to backend/hooks.ts by hand, if you had them
 [ ] rebase generate-sdk; rebase db push --dry-run plans no change
-[ ] git rm -r config (the line the codemod printed)
+[ ] run the git rm line the codemod printed (your own config/ modules may stay)
+[ ] send a to-one relation as its key, not { id } — that is a 400 now
+[ ] call /api/docs signed in, or set REBASE_ENABLE_SWAGGER=true to publish it
 [ ] rename the MCP tools in prompts and allow-lists (list_tables, query_table, …)
 [ ] rebuild the bundle and deploy — a format-2 bundle is refused
 ```
