@@ -29,7 +29,8 @@ const SLUG = "tags";
 const RENAMED = "Labels E2E";
 
 interface UiConfigAnswer {
-    workspace?: Record<string, { name?: string } | undefined>;
+    /** The workspace layer: `ui-config.json`'s shape, preferences by table slug. */
+    workspace?: { tables?: Record<string, { name?: string } | undefined> };
     workspaceTarget?: string;
 }
 
@@ -60,7 +61,7 @@ test.describe("Studio: a presentation change is a UI preference", () => {
     test("renaming a table writes the workspace preferences and the panel draws it", async ({ page }) => {
         failOnPageErrors(page);
         const before = await workspacePreferences();
-        expect(before.workspace?.[SLUG]?.name).toBeUndefined();
+        expect(before.workspace?.tables?.[SLUG]?.name).toBeUndefined();
 
         // The schema editor lists the tables; picking one opens its editor.
         await page.goto("/schema");
@@ -83,7 +84,7 @@ test.describe("Studio: a presentation change is a UI preference", () => {
         await expect(page.getByText("Review schema change")).toHaveCount(0);
 
         const after = await workspacePreferences();
-        expect(after.workspace?.[SLUG]?.name).toBe(RENAMED);
+        expect(after.workspace?.tables?.[SLUG]?.name).toBe(RENAMED);
         // `rebase dev` keeps workspace preferences in the project's source.
         expect(after.workspaceTarget).toBe("file");
         expect(fs.readFileSync(UI_CONFIG, "utf8")).toContain(RENAMED);
