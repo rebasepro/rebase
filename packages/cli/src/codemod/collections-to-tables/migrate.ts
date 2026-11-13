@@ -315,6 +315,7 @@ async function migrateWithShims(options: MigrateOptions, shimDir: ShimDir): Prom
         if (!moved || trial.refusals.length > 0) continue;
         for (const [file, planned] of trial.files) plan.files.set(file, planned);
         plan.notes.push(...trial.notes);
+        plan.manualSteps.push(...trial.manualSteps);
         external.push(moved);
         builtHomes.set(slug, moved.file);
         const outcome = outcomes.get(slug);

@@ -16,7 +16,7 @@ import type { Node, ObjectLiteralExpression, SourceFile } from "ts-morph";
 import { findCollectionSite, memberOf, resolveObject } from "./ast";
 import { COMPONENT_KEYS } from "./customization";
 import type { CollectionEntry, PlanContext } from "./plan-context";
-import { planFile, refuse } from "./plan-context";
+import { planFile, refuse, relativeToRoot } from "./plan-context";
 
 interface Edit {
     start: number;
@@ -24,18 +24,21 @@ interface Edit {
     text: string;
 }
 
-/** Rename `path` → `target` on every reference field of a literal fields map, recursively. */
-function referenceEdits(plan: PlanContext, fields: ObjectLiteralExpression, edits: Edit[]): void {
+/**
+ * Rename `path` → `target` on every reference field of a literal fields map, recursively.
+ * `renamed` collects the key path of each reference renamed (`store`, `lines.of.product`).
+ */
+function referenceEdits(plan: PlanContext, fields: ObjectLiteralExpression, edits: Edit[], renamed: Set<string>, prefix = ""): void {
     const { Node: N } = plan.ast.tsm;
     for (const member of fields.getProperties()) {
         if (!N.isPropertyAssignment(member)) continue;
         const field = resolveObject(plan.ast, member.getInitializer()).node;
         if (!field || field.getSourceFile() !== fields.getSourceFile()) continue;
-        visitField(plan, field, edits);
+        visitField(plan, field, edits, renamed, `${prefix}${member.getName().replace(/^["']|["']$/g, "")}`);
     }
 }
 
-function visitField(plan: PlanContext, field: ObjectLiteralExpression, edits: Edit[]): void {
+function visitField(plan: PlanContext, field: ObjectLiteralExpression, edits: Edit[], renamed: Set<string>, key: string): void {
     const { Node: N } = plan.ast.tsm;
     const type = memberOf(plan.ast, field, "type").node?.value;
     const typeText = type && N.isStringLiteral(type) ? type.getLiteralValue() : undefined;
@@ -44,24 +47,47 @@ function visitField(plan: PlanContext, field: ObjectLiteralExpression, edits: Ed
         if (pathMember && N.isPropertyAssignment(pathMember.node)) {
             const nameNode = pathMember.node.getNameNode();
             edits.push({ start: nameNode.getStart(), end: nameNode.getEnd(), text: "target" });
+            renamed.add(key);
         }
     }
     for (const nested of ["properties", "of"] as const) {
         const value = memberOf(plan.ast, field, nested).node?.value;
         const object = value ? resolveObject(plan.ast, value).node : undefined;
         if (!object || object.getSourceFile() !== field.getSourceFile()) continue;
-        if (nested === "properties") referenceEdits(plan, object, edits);
-        else visitField(plan, object, edits);
+        if (nested === "properties") referenceEdits(plan, object, edits, renamed, `${key}.`);
+        else visitField(plan, object, edits, renamed, `${key}.of`);
     }
     const oneOf = memberOf(plan.ast, field, "oneOf").node?.value;
     const oneOfObject = oneOf ? resolveObject(plan.ast, oneOf).node : undefined;
     const variants = oneOfObject ? memberOf(plan.ast, oneOfObject, "properties").node?.value : undefined;
     const variantsObject = variants ? resolveObject(plan.ast, variants).node : undefined;
-    if (variantsObject) referenceEdits(plan, variantsObject, edits);
+    if (variantsObject) referenceEdits(plan, variantsObject, edits, renamed, `${key}.oneOf.`);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Every reference field of the EVALUATED collection that still sets `path`,
+ * by key path (the same paths {@link referenceEdits} records), with the path.
+ */
+function evaluatedReferences(properties: unknown, prefix = "", out = new Map<string, string>()): Map<string, string> {
+    if (!isRecord(properties)) return out;
+    for (const [name, field] of Object.entries(properties)) visitEvaluated(field, `${prefix}${name}`, out);
+    return out;
+}
+
+function visitEvaluated(field: unknown, key: string, out: Map<string, string>): void {
+    if (!isRecord(field)) return;
+    if (field.type === "reference" && "path" in field) out.set(key, String(field.path));
+    evaluatedReferences(field.properties, `${key}.`, out);
+    visitEvaluated(field.of, `${key}.of`, out);
+    if (isRecord(field.oneOf)) evaluatedReferences(field.oneOf.properties, `${key}.oneOf.`, out);
 }
 
 /** The edits that turn the collection literal into `defineFirestoreCollection`'s argument and wrap it. */
-function literalEdits(plan: PlanContext, sf: SourceFile, entry: CollectionEntry): Edit[] | undefined {
+function literalEdits(plan: PlanContext, sf: SourceFile, entry: CollectionEntry, destination: string): Edit[] | undefined {
     const { Node: N } = plan.ast.tsm;
     const site = findCollectionSite(plan.ast, sf);
     if (!site.node) {
@@ -97,7 +123,22 @@ function literalEdits(plan: PlanContext, sf: SourceFile, entry: CollectionEntry)
         edits.push({ start: properties.node.getStart(), end: properties.node.getEnd(), text: `fields: ${properties.node.getText()}` });
     }
     const fields = resolveObject(plan.ast, properties.value).node;
-    if (fields && fields.getSourceFile() === sf) referenceEdits(plan, fields, edits);
+    const renamed = new Set<string>();
+    if (fields && fields.getSourceFile() === sf) referenceEdits(plan, fields, edits, renamed);
+    // A reference written outside the literal (a shared module, a helper's return
+    // value, a spread of another collection's properties) is not renamed here, and
+    // `defineFirestoreCollection` throws at import on its `path`: name each one.
+    const outside = [...evaluatedReferences(entry.collection.properties)].filter(([key]) => !renamed.has(key));
+    if (outside.length > 0) {
+        plan.manualSteps.push({
+            title: `Rename path → target in the references of ${entry.collection.slug} written outside its literal`,
+            detail: `\`defineFirestoreCollection\` throws at import on a reference field that sets \`path\` ("sets \`path\`… write target instead"). ` +
+                `These reference fields of ${entry.collection.slug} come from outside the collection's literal — a shared module, a helper's return value, or a spread of another collection's \`properties\` — so the codemod did not rename them: ` +
+                outside.map(([key, target]) => `fields.${key} (path "${target}")`).join(", ") +
+                ". Rename `path` → `target` where each is written. A value read from another converted collection's `properties` is the run-time shape, which carries `path`: spread that collection's `fields` (export them) instead.",
+            file: relativeToRoot(plan, destination)
+        });
+    }
 
     // The wrapper.
     let parent: Node | undefined = literal.getParent();
@@ -132,7 +173,7 @@ export function planFirestoreCollection(plan: PlanContext, entry: CollectionEntr
     const text = entry.sourceFile.getFullText();
     const sf = plan.ast.project.createSourceFile(`/__rebase_migrate__/firestore-${path.basename(entry.file)}`, text, { overwrite: true });
     try {
-        const edits = literalEdits(plan, sf, entry);
+        const edits = literalEdits(plan, sf, entry, destination);
         if (!edits) return undefined;
         const { Node: N } = plan.ast.tsm;
         // Drop `defineCollection` from its import, and import the new wrapper.
