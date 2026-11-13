@@ -273,6 +273,18 @@ export function templateText(value: string): string {
     return value.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
 }
 
+/** A number literal or arithmetic on one: `3`, `MAX + 1`, `-1`. */
+function isNumberish(node: ts.Node): boolean {
+    if (ts.isNumericLiteral(node)) return true;
+    if (ts.isParenthesizedExpression(node)) return isNumberish(node.expression);
+    if (ts.isPrefixUnaryExpression(node)) return isNumberish(node.operand) || ts.isIdentifier(node.operand);
+    if (ts.isBinaryExpression(node)) {
+        const arithmetic = [ts.SyntaxKind.PlusToken, ts.SyntaxKind.MinusToken, ts.SyntaxKind.AsteriskToken, ts.SyntaxKind.SlashToken];
+        return arithmetic.includes(node.operatorToken.kind) && (isNumberish(node.left) || isNumberish(node.right));
+    }
+    return false;
+}
+
 function isStringish(node: ts.Node): boolean {
     return ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateExpression(node);
 }
@@ -491,8 +503,10 @@ function transformChain(ctx: FileContext, chain: Chain, allocator: EnumAllocator
                 args = [`{ length: ${args[0]}${enumConfig !== undefined ? `, enum: ${enumConfig}` : ""} }`];
                 enumConfig = undefined;
                 rootChanged = true;
-            } else if (!isStringish(A0) && !ts.isObjectLiteralExpression(A0)) {
-                return problem(rootCall, `\`col.${builder}(${args[0]})\`: cannot tell whether the argument is a length`);
+            } else if (!isStringish(A0) && !ts.isObjectLiteralExpression(A0) && !(A1 && ts.isObjectLiteralExpression(A1))) {
+                // `col.varchar(size)` or `col.varchar(name)`: a variable says nothing. A leftover old
+                // spelling fails to compile once the old overloads are gone.
+                break;
             }
             break;
         }
@@ -513,7 +527,8 @@ function transformChain(ctx: FileContext, chain: Chain, allocator: EnumAllocator
             break;
         }
         case "vector": {
-            if (A0 && !isStringish(A0) && !ts.isObjectLiteralExpression(A0)) {
+            if (A0 && isNumberish(A0) && (A1 === undefined || !ts.isObjectLiteralExpression(A1) ||
+                !A1.properties.some(property => property.name !== undefined && ts.isIdentifier(property.name) && property.name.text === "dimensions"))) {
                 const props = objectProps(A1);
                 const rest = A1 === undefined ? "" : props !== undefined ? props.map(prop => `, ${prop}`).join("") : `, ...(${args[1]})`;
                 args = [`{ dimensions: ${args[0]}${rest} }`];
@@ -543,8 +558,8 @@ function transformChain(ctx: FileContext, chain: Chain, allocator: EnumAllocator
             break;
         }
         case "enum": {
-            if (argNodes.length === 2 && !isStringish(A0)) {
-                if (!ts.isObjectLiteralExpression(A1)) return problem(rootCall, "`col.enum(values, <expression>)`: write the options inline or convert by hand");
+            // `col.enum(values, { name })`. `col.enum(name, values)` is the new spelling; two variables say nothing.
+            if (argNodes.length === 2 && !isStringish(A0) && ts.isObjectLiteralExpression(A1)) {
                 if (A1.properties.length === 0) {
                     args = [args[0]];
                     rootChanged = true;

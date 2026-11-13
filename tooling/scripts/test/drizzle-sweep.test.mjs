@@ -194,6 +194,16 @@ test("converting twice is converting once", () => {
     assert.equal(transformSource(once, "t.ts").changed, false);
 });
 
+test("variables that could be either spelling are left alone", () => {
+    const source = `${HEADER}export function cols(name: string | undefined, config: { dimensions: number }, labels: [string, ...string[]]) {
+    return [col.vector(name, config), col.vector(config), col.varchar(name, { length: 3 }), col.enum(name, labels), col.vector(MAX + 1)];
+}
+`;
+    const result = transformSource(source, "t.ts");
+    assert.deepEqual(result.problems, []);
+    assert.match(result.text, /col\.vector\(name, config\), col\.vector\(config\), col\.varchar\(name, \{ length: 3 \}\), col\.enum\(name, labels\), col\.vector\(\{ dimensions: MAX \+ 1 \}\)/);
+});
+
 test("a dynamic .defaultSql() argument is reported, not guessed", () => {
     const source = `${HEADER}const expr = "x()";\nexport const t = defineTable("t", { columns: { c: col.text().defaultSql(expr) }, rls: "admin-only" });\n`;
     const result = transformSource(source, "t.ts");
