@@ -655,7 +655,7 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
      * The enum type a column is typed by, appended once.
      *
      * A column's own type (`<table>_<column>`) is claimed by that column alone,
-     * as above. A type the definition names (`col.enum(values, { name })`) is
+     * as above. A type the definition names (`pgEnum(name, values)`) is
      * shared: every column naming it is typed by the one `CREATE TYPE`, and
      * they must agree on its values — `compileTables` refuses a disagreement
      * first, and so does this, for a plan reached any other way.

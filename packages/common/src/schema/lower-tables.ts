@@ -1200,7 +1200,7 @@ function lowerArrayColumn(def: ColumnDef, of: ColumnType, base: BaseFields, ctx:
     if (NON_ELEMENT_KINDS.has(of.kind) || element?.semantic === "geopoint") {
         return refuse(
             at,
-            `is \`col.array()\` of ${element?.semantic === "geopoint" ? "geopoints" : `\`${columnTypeLabel(of)}\``}, which is not an ` +
+            `is an array (\`.array()\`) of ${element?.semantic === "geopoint" ? "geopoints" : `\`${columnTypeLabel(of)}\``}, which is not an ` +
             "element type of a Postgres array column here. An array column holds scalars — text, uuid, numbers, " +
             "booleans, dates, enums; a list of documents, points or vectors is `col.jsonb(json.array(…))`."
         );

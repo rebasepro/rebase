@@ -709,11 +709,11 @@ function compileOne(
             if (!column) {
                 refuse(
                     `\`softDelete\` records the deletion in "${field}", and the table has no such column. Declare it — ` +
-                    `\`${field}: col.timestamptz()\` — or name an existing timestamp column with \`softDelete: { field: "…" }\`. ` +
+                    `\`${field}: col.timestamp({ withTimezone: true })\` — or name an existing timestamp column with \`softDelete: { field: "…" }\`. ` +
                     "The flag says what a column means; it does not add one."
                 );
             } else if (!TEMPORAL_KINDS.has(column.type.kind)) {
-                refuse(`\`softDelete\` stamps "${field}" with the time of the deletion, and that column is \`${columnTypeLabel(column.type)}\`. Make it \`col.timestamptz()\`.`);
+                refuse(`\`softDelete\` stamps "${field}" with the time of the deletion, and that column is \`${columnTypeLabel(column.type)}\`. Make it \`col.timestamp({ withTimezone: true })\`.`);
             } else {
                 descriptor.softDelete = { field };
             }

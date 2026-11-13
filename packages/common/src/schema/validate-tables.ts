@@ -56,24 +56,24 @@ export function checkColumnDef(
     if (def.generatedAs !== undefined) {
         if (def.default !== undefined) {
             refuse(
-                "`.generatedAs()` and a default contradict each other: Postgres computes a generated column " +
+                "`.generatedAlwaysAs()` and a default contradict each other: Postgres computes a generated column " +
                 "on every write and refuses any default for it. Keep one of the two."
             );
         }
         if (def.stamp !== undefined) {
             refuse(
-                "`.generatedAs()` and a stamp (`.onCreateNow()`, `.onUpdateUser()`, …) contradict each other: " +
+                "`.generatedAlwaysAs()` and a stamp (`.onCreateNow()`, `.onUpdateUser()`, …) contradict each other: " +
                 "nobody, not even the server, writes a generated column. Keep one of the two."
             );
         }
     }
     if (def.default?.kind === "identity" && !INTEGER_KINDS.has(kind)) {
-        refuse(`\`.identity()\` needs a \`smallint\`, \`integer\` or \`bigint\` column, and this one is \`${columnTypeLabel(def.type)}\`.`);
+        refuse(`\`.generatedByDefaultAsIdentity()\` needs a \`smallint\`, \`integer\` or \`bigint\` column, and this one is \`${columnTypeLabel(def.type)}\`.`);
     }
     if (def.default?.kind === "random-uuid" && kind !== "uuid") {
         refuse(
             `\`.defaultRandom()\` writes \`gen_random_uuid()\`, which needs a \`uuid\` column, and this one is ` +
-            `\`${columnTypeLabel(def.type)}\`. Use \`col.uuid()\`, or \`.defaultSql("gen_random_uuid()::text")\`.`
+            `\`${columnTypeLabel(def.type)}\`. Use \`col.uuid()\`, or \`.default(sql\`gen_random_uuid()::text\`)\`.`
         );
     }
     if (def.stamp?.value === "now" && !TEMPORAL_KINDS.has(kind)) {
@@ -143,7 +143,7 @@ function elementColumnModifiers(element: ColumnDef): string[] {
     if (element.unique) out.push("`.unique()`");
     if (element.primaryKey) out.push("`.primaryKey()`");
     if (element.default !== undefined) out.push("a default");
-    if (element.generatedAs !== undefined) out.push("`.generatedAs()`");
+    if (element.generatedAs !== undefined) out.push("`.generatedAlwaysAs()`");
     if (element.readOnly) out.push("`.readOnly()`");
     if (element.private) out.push("`.private()`");
     if (element.access !== undefined) out.push("`.access()`");

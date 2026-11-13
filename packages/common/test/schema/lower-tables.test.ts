@@ -813,10 +813,10 @@ describe("lowerTables — refusals", () => {
             holding(col.bytea().array())
         ]));
         expect(problems).toEqual([
-            expect.stringMatching(/^t\.a: is `col\.array\(\)` of `jsonb`, which is not an element type/),
-            expect.stringMatching(/^t\.a: is `col\.array\(\)` of geopoints/),
-            expect.stringMatching(/^t\.a: is `col\.array\(\)` of `vector\(3\)`/),
-            expect.stringMatching(/^t\.a: is `col\.array\(\)` of `bytea`/)
+            expect.stringMatching(/^t\.a: is an array \(`\.array\(\)`\) of `jsonb`, which is not an element type/),
+            expect.stringMatching(/^t\.a: is an array \(`\.array\(\)`\) of geopoints/),
+            expect.stringMatching(/^t\.a: is an array \(`\.array\(\)`\) of `vector\(3\)`/),
+            expect.stringMatching(/^t\.a: is an array \(`\.array\(\)`\) of `bytea`/)
         ]);
     });
 

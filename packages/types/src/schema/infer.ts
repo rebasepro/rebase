@@ -312,8 +312,8 @@ type TableEntryOf<T> = T extends SchemaTableLike ? {
  * table; the rest (`defaultRls`, helpers) is ignored.
  *
  * Exact: every declared column — nullability, `.private()`, `.readOnly()`,
- * `.generatedAs()`, defaults and stamps (optional on create), enums and
- * `.oneOf()` unions, `col.jsonb<T>()` documents, temporal columns writable as
+ * `.generatedAlwaysAs()`, defaults and stamps (optional on create), enums and
+ * `.oneOf()` unions, `col.jsonb().$type<T>()` documents, temporal columns writable as
  * a `Date` — the slug, the view's missing writes, the relation names and their
  * cardinality, a junction's `_pivot`, a link hidden or read-only with its key
  * column, and a required derived link written by either name.

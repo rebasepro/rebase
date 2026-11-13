@@ -140,7 +140,7 @@ export interface ColumnElementDescriptor {
     validate?: ColumnValidation;
     oneOf?: readonly (string | number)[];
     storage?: ColumnStorage;
-    /** `"user"`: each item is a user's id (`col.array(col.text().userId())`). */
+    /** `"user"`: each item is a user's id (`col.text().userId().array()`). */
     semantic?: "user";
 }
 

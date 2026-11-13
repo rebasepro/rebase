@@ -39,7 +39,7 @@ export interface StoragePosition {
  *
  * - a storage column (`col.storage({...})`): `path: []`;
  * - an array column whose items are stored files (`col.storage().multiple()`,
- *   or `col.array(...)` with an element carrying storage): `path: [{ items: true }]`.
+ *   or `<item>.array()` with an element carrying storage): `path: [{ items: true }]`.
  *   An element's own storage wins over the column's, as the compiler lowers it;
  * - a `json.storage()` field anywhere inside a JSON column's shape: its path
  *   inside the document.

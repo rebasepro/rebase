@@ -104,7 +104,7 @@ message: `"${slug}" has no column "${review.field}". Declare it as a text column
     }
     if (!holdsText(column)) {
         problems.push({ path: `${at}.field`,
-message: `"${review.field}" is a ${column.type.kind} column; a review state is compared with text, so it has to hold text (col.text(), col.varchar() or col.enum()).` });
+message: `"${review.field}" is a ${column.type.kind} column; a review state is compared with text, so it has to hold text (col.text(), col.varchar({ length }) or col.enum()).` });
         return;
     }
     const allowed = closedValues(column);

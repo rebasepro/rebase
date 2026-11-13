@@ -255,7 +255,7 @@ const shapesOf = (fields: Record<string, AnyJsonField>): Record<string, JsonShap
  * }))),
  * ```
  *
- * `col.jsonb<T>()` on its own types the document statically; a shape also
+ * `col.jsonb().$type<T>()` on its own types the document statically; a shape also
  * tells the server what is inside it.
  *
  * @group Schema

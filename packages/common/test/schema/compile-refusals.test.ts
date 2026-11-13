@@ -273,7 +273,7 @@ describe("compileTables — refusals", () => {
                 table: "t", message: expect.stringContaining("`softDelete` records the deletion in \"deletedAt\", and the table has no such column")
             }]);
             expect(problemsOf([t({ id: id(), removed: col.boolean() }, { field: "removed" })])).toEqual([{
-                table: "t", message: expect.stringContaining("that column is `boolean`. Make it `col.timestamptz()`")
+                table: "t", message: expect.stringContaining("that column is `boolean`. Make it `col.timestamp({ withTimezone: true })`")
             }]);
             expect(problemsOf([t({ id: id(), deletedAt: col.timestamp({ withTimezone: true }) }, JSON.parse("\"yes\""))])).toEqual([{
                 table: "t", message: "`softDelete` must be `true` or `{ field }`."
@@ -501,9 +501,9 @@ describe("compileTables — refusals", () => {
                 elementEmpty: rawColumn({ type: { kind: "array", of: { kind: "text" } }, element: { ...col.text().def, oneOf: [] } })
             });
             expect(problemsOf([t])).toEqual([
-                { table: "t", key: "generatedDefault", message: expect.stringContaining("`.generatedAs()` and a default contradict each other") },
-                { table: "t", key: "generatedStamp", message: expect.stringContaining("`.generatedAs()` and a stamp") },
-                { table: "t", key: "identityText", message: expect.stringContaining("`.identity()` needs a `smallint`, `integer` or `bigint` column, and this one is `text`") },
+                { table: "t", key: "generatedDefault", message: expect.stringContaining("`.generatedAlwaysAs()` and a default contradict each other") },
+                { table: "t", key: "generatedStamp", message: expect.stringContaining("`.generatedAlwaysAs()` and a stamp") },
+                { table: "t", key: "identityText", message: expect.stringContaining("`.generatedByDefaultAsIdentity()` needs a `smallint`, `integer` or `bigint` column, and this one is `text`") },
                 { table: "t", key: "randomText", message: expect.stringContaining("`.defaultRandom()` writes `gen_random_uuid()`, which needs a `uuid` column") },
                 { table: "t", key: "nowText", message: expect.stringContaining("`.onUpdateNow()` stamps the current time") },
                 { table: "t", key: "userNumber", message: expect.stringContaining("`.onCreateUser()` stores the caller's id, which needs a text or `uuid` column, and this one is `integer`") },
@@ -514,9 +514,11 @@ describe("compileTables — refusals", () => {
         });
 
         it("refuses an array item's column-only modifiers, and keeps the item rules", () => {
+            // `.array()` refuses them before it builds the column; a definition
+            // that reaches the compiler another way is refused here.
             const t = table("t", {
                 id: id(),
-                items: col.array(col.text().notNull().default("x").access({ read: ["a"] })),
+                items: rawColumn({ type: { kind: "array", of: { kind: "text" } }, element: col.text().notNull().default("x").access({ read: ["a"] }).def }),
                 fine: col.text({ enum: ["a", "b"] }).validate({ max: 3 }).describe("an item").array()
             });
             expect(problemsOf([t])).toEqual([{
@@ -572,7 +574,7 @@ describe("compileTables — refusals", () => {
                 rls: "admin-only"
             });
             expect(problemsOf([tags, posts])).toEqual([{
-                table: "posts", key: "tags.pivot.rank", message: expect.stringContaining("`.identity()` needs")
+                table: "posts", key: "tags.pivot.rank", message: expect.stringContaining("`.generatedByDefaultAsIdentity()` needs")
             }]);
         });
     });

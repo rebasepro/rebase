@@ -563,7 +563,7 @@ type JsonKeyOf<D> =
 
 /**
  * The customizations of the keys of a JSON document: typed by its keys when
- * the column says what the document is (`col.jsonb<T>()`, `json.object({ … })`).
+ * the column says what the document is (`col.jsonb().$type<T>()`, `json.object({ … })`).
  *
  * @group Table customization
  */
