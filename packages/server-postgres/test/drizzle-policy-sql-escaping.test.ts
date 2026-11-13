@@ -58,7 +58,8 @@ describe("drizzle policy clauses survive the TypeScript file", () => {
         const collection = collectionWith(using);
 
         const schema = await generateSchema(compileSet([collection]));
-        const ddl = generatePolicyStatements(collection, collection.securityRules![0], () => undefined)
+        const [table] = compileSet([collection]);
+        const ddl = generatePolicyStatements(table.descriptor, table.descriptor.rls.rules[0])
             .find(s => /^CREATE POLICY/i.test(s))!;
 
         const drizzleClause = emittedClauses(schema).find(c => c.includes("email ~"))!;

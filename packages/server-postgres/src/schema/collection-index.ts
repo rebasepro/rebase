@@ -50,8 +50,9 @@ import { sha1Hex, truncateToBytes } from "@rebasepro/utils";
  * TRANSITIONAL (Postgres-first Stage B): whether an index entry of a lowered
  * collection was lowered from a table's `indexes` (`tableIndex`), where
  * `reason` is optional — a legacy entry must state one. Read only by
- * {@link buildCollectionIndexSpecs}, the collection door the CLI helpers still
- * use; deleted with `lowerTables`.
+ * {@link buildCollectionIndexSpecs}, the collection door only tests still use
+ * (`collection-index.test`, `foreign-key-indexes.test` state their fixtures
+ * as collections); deleted with it.
  */
 const isTableIndex = (index: CollectionIndex): boolean =>
     "tableIndex" in index && typeof index.tableIndex === "object" && index.tableIndex !== null
@@ -371,9 +372,10 @@ const legacyPredicate = (predicate: IndexPredicate): IndexPredicateSource => {
  * Every index one collection declares, resolved and named.
  *
  * TRANSITIONAL (Postgres-first Stage B): the planner builds a table's indexes
- * from its descriptor ({@link buildTableIndexSpecs}). This door stays for the
- * readers outside the planner that still hold a collection, and builds
- * through the same function, so the two cannot disagree.
+ * from its descriptor ({@link buildTableIndexSpecs}), and so does every
+ * production reader. This door stays only for the tests that state their
+ * fixtures as collections, and builds through the same function, so the two
+ * cannot disagree.
  *
  * Throws {@link CollectionIndexConfigError} rather than dropping a bad entry:
  * an index that silently does not exist is the failure mode this whole feature
@@ -593,20 +595,6 @@ const indexSpecsFrom = (source: IndexTableSource): CollectionIndexSpec[] => {
 
     return specs;
 };
-
-/**
- * Every declared index across a set of collections, in a stable order.
- *
- * Sorted because the result reaches `schema.sql`, which `doctor` string-
- * compares against a regenerated copy — `generatePostgresDdl` does not sort its
- * collections, so leaving this in declaration order would make the artifact
- * depend on the order files happened to load in.
- */
-export const buildCollectionIndexPlan = (
-    collections: readonly CollectionConfig[],
-    resolveColumnName: ResolveColumnName
-): CollectionIndexSpec[] =>
-    sortIndexSpecs(collections.flatMap(collection => buildCollectionIndexSpecs(collection, resolveColumnName)));
 
 /**
  * The stable order every consumer of a set of index specs uses.

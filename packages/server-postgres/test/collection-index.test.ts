@@ -18,14 +18,14 @@ import { compileSchema, lowerTables } from "@rebasepro/common";
 import {
     buildCollectionIndexSpecs,
     buildTableIndexSpecs,
-    buildCollectionIndexPlan,
     collectionIndexStatement,
     deriveIndexName,
     isRebaseIndexName,
     indexFingerprint,
     renderPredicate,
     CollectionIndexConfigError,
-    MAX_INDEX_KEYS
+    MAX_INDEX_KEYS,
+    sortIndexSpecs
 } from "../src/schema/collection-index";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
@@ -272,8 +272,8 @@ describe("the plan and the generated DDL", () => {
     it("sorts by schema, table and name so the artifact does not depend on load order", () => {
         const a = posts([{ on: ["views"], reason: "r" }]);
         const b = { ...posts([{ on: ["status"], reason: "r" }]), slug: "articles", table: "articles" } as CollectionConfig;
-        const forward = buildCollectionIndexPlan([a, b], resolveColumnName).map(s => s.table);
-        const backward = buildCollectionIndexPlan([b, a], resolveColumnName).map(s => s.table);
+        const forward = sortIndexSpecs([...specs(a), ...specs(b)]).map(s => s.table);
+        const backward = sortIndexSpecs([...specs(b), ...specs(a)]).map(s => s.table);
         expect(forward).toEqual(backward);
         expect(forward[0]).toBe("articles");
     });

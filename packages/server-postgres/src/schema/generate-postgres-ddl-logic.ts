@@ -12,10 +12,9 @@
  * reading of relations, junctions, enums and search — one of three such
  * readings. See `schema/plan/types.ts` for what that cost.
  */
-import { CollectionConfig, REBASE_ADMIN_REQUEST_ROLE, SecurityRule, isPostgresCollectionConfig, type CompiledTable } from "@rebasepro/types";
-import { getTableName } from "@rebasepro/common";
-import { planSchema, quoteSqlLiteral, defaultBelongsToOnDelete } from "./plan/plan-schema";
-import { compileSecurityRule } from "./legacy-column-type";
+import { REBASE_ADMIN_REQUEST_ROLE, type CompiledTable, type SecurityRule, type TableDescriptor } from "@rebasepro/types";
+import { policyTableFromDescriptor, policyTableResolver, type ResolvePolicyTable } from "@rebasepro/common";
+import { compileTableSecurityRule, planSchema, quoteSqlLiteral, defaultBelongsToOnDelete } from "./plan/plan-schema";
 import {
     renderDenyingPolicyStatements,
     renderPgType,
@@ -37,8 +36,6 @@ import type { GeneratedColumnDependency } from "./generated-column-conflicts";
 export { quoteSqlLiteral, defaultBelongsToOnDelete };
 export type { ForeignKeyPlan };
 
-type ResolveCollection = (slug: string) => CollectionConfig | undefined;
-
 /**
  * The individual SQL statements a single security rule compiles to: a
  * `DROP POLICY IF EXISTS` / `CREATE POLICY` pair per operation, each a complete
@@ -47,19 +44,17 @@ type ResolveCollection = (slug: string) => CollectionConfig | undefined;
  * This is the primitive the boot-time RLS applier runs one statement at a time
  * (the runtime's DB handle speaks the extended query protocol, which forbids
  * multiple commands in one execute), while `db push` writes the joined string.
+ *
+ * `resolveTable` answers the tables a rule's `existsIn` reaches; by default
+ * only the table itself.
  */
 export const generatePolicyStatements = (
-    collection: CollectionConfig,
+    table: TableDescriptor,
     rule: SecurityRule,
-    resolveCollection: ResolveCollection
-): string[] => {
-    const table = {
-        schema: isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public",
-        table: getTableName(collection)
-    };
-    return compileSecurityRule(collection, rule, resolveCollection, false)
-        .flatMap(policy => renderPolicyStatements(table, policy));
-};
+    resolveTable: ResolvePolicyTable = policyTableResolver([table])
+): string[] =>
+    compileTableSecurityRule(policyTableFromDescriptor(table), rule, resolveTable, false)
+        .flatMap(policy => renderPolicyStatements({ schema: table.schema, table: table.table }, policy));
 
 /**
  * `.rebase/sql/schema.sql` — the desired state Atlas diffs the database against.

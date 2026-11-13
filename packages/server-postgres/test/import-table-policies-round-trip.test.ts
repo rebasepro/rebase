@@ -29,7 +29,7 @@ import type { PostgresCollectionConfig } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
-import { FixtureTableRegistry } from "./helpers/tables";
+import { FixtureTableRegistry, tablesFromCollections } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 import { generatePolicyStatements } from "../src/schema/generate-postgres-ddl-logic";
@@ -120,8 +120,8 @@ describe("importing a table's policies and compiling them back", () => {
             properties: imported.properties,
             securityRules: imported.securityRules
         };
-        const statements = (collection.securityRules ?? [])
-            .flatMap(rule => generatePolicyStatements(collection, rule, () => undefined));
+        const [table] = tablesFromCollections([collection]).descriptors;
+        const statements = table.rls.rules.flatMap(rule => generatePolicyStatements(table, rule));
 
         const target = await database(TABLE);
         for (const statement of statements) await target.exec(statement);
