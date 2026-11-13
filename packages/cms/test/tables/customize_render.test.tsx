@@ -46,7 +46,7 @@ const posts = defineTable("posts", {
         title: col.text().notNull(),
         content: col.text(),
         status: col.enum(["draft", "published"]).notNull().default("draft"),
-        publishDate: col.timestamptz()
+        publishDate: col.timestamp({ withTimezone: true })
     },
     rls: "admin-only"
 });

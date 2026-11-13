@@ -89,13 +89,13 @@ const posts = defineTable("posts", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         title: col.text().notNull().validate({ min: 3, max: 200 }),
-        slug: col.varchar(160).notNull().unique(),
+        slug: col.varchar({ length: 160 }).notNull().unique(),
         // The column §6.2's customization gives a custom editor.
         content: col.text(),
         status: col.enum(["draft", "needs_review", "published", "archived"]).notNull().default("draft"),
-        publishDate: col.timestamptz(),
-        createdAt: col.timestamptz().notNull().onCreateNow(),
-        updatedAt: col.timestamptz().notNull().onUpdateNow(),
+        publishDate: col.timestamp({ withTimezone: true }),
+        createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
+        updatedAt: col.timestamp({ withTimezone: true }).notNull().onUpdateNow(),
         __order: col.text()
     },
     relations: {

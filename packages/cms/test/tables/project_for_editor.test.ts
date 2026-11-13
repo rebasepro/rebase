@@ -23,7 +23,7 @@ const users = defineAuthTable("users", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         email: col.text().notNull().unique(),
-        roles: col.array(col.text()).notNull().default([])
+        roles: col.text().array().notNull().default([])
     },
     rls: "admin-only"
 });
@@ -35,8 +35,8 @@ const articles = defineTable("articles", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         title: col.text(),
-        budgetId: col.uuid().column("budget_id"),
-        authorId: col.uuid().column("author_id")
+        budgetId: col.uuid("budget_id"),
+        authorId: col.uuid("author_id")
     },
     relations: {
         budget: rel.belongsTo(() => budgets, { localKey: "budget_id" }),

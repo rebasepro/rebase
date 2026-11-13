@@ -24,7 +24,7 @@ const posts = defineTable("posts", {
         heroImage: col.storage({ path: "posts/hero/" }),
         content: col.text(),
         status: col.enum(["draft", "needs_review", "published", "archived"]).notNull().default("draft"),
-        publishDate: col.timestamptz(),
+        publishDate: col.timestamp({ withTimezone: true }),
         orgId: col.uuid(),
         __order: col.text()
     },

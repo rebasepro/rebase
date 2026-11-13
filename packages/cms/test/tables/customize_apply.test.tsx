@@ -456,7 +456,7 @@ describe("end to end: defineTable → descriptor → projection → customizatio
             content: col.text(),
             seo: col.jsonb(json.object({ title: json.string() })),
             status: col.enum(["draft", "needs_review", "published", "archived"]).notNull().default("draft"),
-            publishDate: col.timestamptz(),
+            publishDate: col.timestamp({ withTimezone: true }),
             orgId: col.uuid(),
             __order: col.text()
         },
