@@ -2034,14 +2034,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         if (schemaEditorEnabled) return undefined;
         if (introspectCollections) return {
             code: "SCHEMA_EDITOR_BAAS_MODE",
-            message: "Collections are introspected from the database on this server, so there are no " +
-                "collection source files to edit. Change the schema with a migration instead."
+            message: "Tables are introspected from the database on this server, so there are no " +
+                "schema source files to edit. Change the schema with a migration instead."
         };
         if (process.env.NODE_ENV === "production") return {
             code: "SCHEMA_EDITOR_PRODUCTION",
-            message: "The schema editor is off under NODE_ENV=production: it edits collection source " +
+            message: "The schema editor is off under NODE_ENV=production: it edits schema source " +
                 "files, and a deployed server's files are rebuilt from your repository on every " +
-                "deploy, so an edit here would be discarded. Edit collections in development and deploy. " +
+                "deploy, so an edit here would be discarded. Edit the schema in development and deploy. " +
                 LIVE_SCHEMA_REPOSITORY_HINT
         };
         return {

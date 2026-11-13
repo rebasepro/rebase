@@ -61,7 +61,7 @@ export function resolveNestedPath(
 
     const segments = splitPathSegments(path);
     if (segments.length < 3 || segments.length % 2 === 0) {
-        throw new Error(`Invalid relation path: ${path}. Expected format: collection/id/relation`);
+        throw new Error(`Invalid relation path: ${path}. Expected format: table/id/relation`);
     }
 
     let parent = requireTableAt(segments[0], registry);

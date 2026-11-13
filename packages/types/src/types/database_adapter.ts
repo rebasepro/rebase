@@ -180,7 +180,7 @@ export interface DatabaseAdapter {
     finalizeSecurityPosture?(driverResult: InitializedDriver): Promise<void>;
 
     /**
-     * Read the collections schema version this database was last provisioned
+     * Read the schema version this database was last provisioned
      * from, or `null` when nothing has ever stamped it.
      *
      * `null` is not an error and MUST NOT be treated as one — every database
@@ -196,7 +196,7 @@ export interface DatabaseAdapter {
     ): Promise<string | null>;
 
     /**
-     * Record the collections schema version this process just applied.
+     * Record the schema version this process just applied.
      *
      * Called only by the process that provisions, and only after the tables AND
      * the policies are in place — a stamp written earlier would claim a schema

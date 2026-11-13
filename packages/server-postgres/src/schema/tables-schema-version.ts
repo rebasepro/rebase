@@ -1,5 +1,5 @@
 /**
- * The collections schema version, stamped into the database.
+ * The schema version, stamped into the database.
  *
  * Deliberately the same table shape, the same key/value convention and the same
  * "unstamped is null, and null is not an error" rule as `auth/schema-version.ts`.

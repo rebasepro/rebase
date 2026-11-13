@@ -247,7 +247,7 @@ export async function enforceSchemaStamp(options: EnforceSchemaStampOptions): Pr
     try {
         databaseVersion = await read();
     } catch (error) {
-        logger.warn("⚠️ [schema] Could not read the collections schema version from the database.", { error });
+        logger.warn("⚠️ [schema] Could not read the schema version from the database.", { error });
         return { status: "skipped", reason: "the stamp could not be read" };
     }
 

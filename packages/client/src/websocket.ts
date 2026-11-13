@@ -1618,7 +1618,7 @@ export class RebaseWebSocketClient {
                         try {
                             callback.onUpdate(rows, collectionSub.latestMeta);
                         } catch (error) {
-                            console.error("Error in collection subscription callback:", error);
+                            console.error("Error in table subscription callback:", error);
                             if (callback.onError) {
                                 callback.onError(error instanceof Error ? error : new Error(String(error)));
                             }
@@ -2405,7 +2405,7 @@ onError });
                 try {
                     onUpdate(existingSubscription.latestData, existingSubscription.latestMeta);
                 } catch (error) {
-                    console.error("Error in collection subscription callback:", error);
+                    console.error("Error in table subscription callback:", error);
                     if (onError) {
                         onError(error instanceof Error ? error : new Error(String(error)));
                     }
@@ -2679,7 +2679,7 @@ onError });
                 try {
                     callback.onError(error);
                 } catch (callbackError) {
-                    console.error("Error in collection subscription error callback:", callbackError);
+                    console.error("Error in table subscription error callback:", callbackError);
                 }
             }
         });

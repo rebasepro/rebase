@@ -1623,7 +1623,7 @@ export interface BackendBootstrapper {
     finalizeSecurityPosture?(driverResult: InitializedDriver): Promise<void>;
 
     /**
-     * Read the collections schema version this database was last provisioned
+     * Read the schema version this database was last provisioned
      * from, or `null` when nothing has ever stamped it.
      *
      * The companion to {@link stampTablesSchemaVersion}: one process writes
@@ -1643,7 +1643,7 @@ export interface BackendBootstrapper {
     ): Promise<string | null>;
 
     /**
-     * Record the collections schema version this process just applied.
+     * Record the schema version this process just applied.
      *
      * Called only by the process that provisions, and only after both
      * {@link ensureTableSchema} and {@link ensureTablePolicies} have

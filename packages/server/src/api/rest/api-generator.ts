@@ -1742,7 +1742,7 @@ export class RestApiGenerator {
                 assertWriteValuesValid(data, table, {});
                 assertFieldOpsValid(data, table, {});
                 if (!driver.updateWhere) {
-                    throw ApiError.badRequest("This collection's data source does not support filtered updates.", "BULK_UNSUPPORTED");
+                    throw ApiError.badRequest("This table's data source does not support filtered updates.", "BULK_UNSUPPORTED");
                 }
                 return this.runIdempotent(c, body, async () => {
                     const written = await driver.updateWhere!({ path, filter, logical, values: data });
@@ -1826,7 +1826,7 @@ export class RestApiGenerator {
                 this.assertNoFilteredUserWrite(table);
                 const { filter, logical } = parseWriteFilter(body, { table, lookup: this.lookup, viewer: requestViewer(c) });
                 if (!driver.deleteWhere) {
-                    throw ApiError.badRequest("This collection's data source does not support filtered deletes.", "BULK_UNSUPPORTED");
+                    throw ApiError.badRequest("This table's data source does not support filtered deletes.", "BULK_UNSUPPORTED");
                 }
                 return this.runIdempotent(c, body, async () => {
                     const deleted = await driver.deleteWhere!({

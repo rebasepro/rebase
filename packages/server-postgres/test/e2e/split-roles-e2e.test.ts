@@ -209,7 +209,7 @@ async function cdcTriggers(): Promise<string[]> {
     return rows.map(r => r.tgrelid).sort();
 }
 
-/** The collections schema version this database currently carries. */
+/** The schema version this database currently carries. */
 async function stampedSchemaVersion(): Promise<string | null> {
     const rows = await query<{ value: string }>(
         `SELECT value FROM rebase.schema_meta WHERE key = 'collections_schema_version'`
