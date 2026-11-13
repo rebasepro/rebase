@@ -15,6 +15,7 @@
  * real deltas, and a collection whose presentation is entirely default gets no
  * file at all.
  */
+import fs from "node:fs";
 import path from "node:path";
 import type { Node, Statement } from "ts-morph";
 import type { LegacyEnumValues, LiftNote } from "@rebasepro/common/migrate";
@@ -32,7 +33,7 @@ import {
     PROPERTY_ADMIN_DESTINATIONS,
     PROPERTY_FIELD_DESTINATIONS
 } from "./vocabulary";
-import { importLines } from "./modules";
+import { importLines, resolveRelative } from "./modules";
 import type { CollectionEntry, PlanContext } from "./plan-context";
 import { note, planFile, refuse, relativeToRoot } from "./plan-context";
 import { printValue, RawSource } from "./print-js";
@@ -157,8 +158,8 @@ function componentName(specifier: string, taken: ReadonlySet<string>): string {
 }
 
 /** Turn a component path written in the collection file into an import in the customization module. */
-function importComponent(plan: PlanContext, builder: Builder, specifier: string, imported: string): RawSource {
-    const moved = plan.relocator.relocate(specifier, builder.entry.file, builder.file, "frontend");
+function importComponent(plan: PlanContext, builder: Builder, specifier: string, imported: string, writtenIn = builder.entry.file): RawSource {
+    const moved = plan.relocator.relocate(specifier, writtenIn, builder.file, "frontend");
     for (const [local, existing] of builder.componentImports) {
         if (existing.specifier === moved && existing.imported === imported) return new RawSource(local);
     }
@@ -166,6 +167,35 @@ function importComponent(plan: PlanContext, builder: Builder, specifier: string,
     const local = componentName(imported === "default" ? moved : imported, taken);
     builder.componentImports.set(local, { specifier: moved, imported });
     return new RawSource(local);
+}
+
+/**
+ * The module that wrote the component path `value`: the collection file when it
+ * spells it, else the first module of the collection's relative imports (followed
+ * a few levels: a shared helper's own imports) whose source holds it as a string
+ * literal. A relative path is relative to the module that wrote it — a shared
+ * module one directory away names the same component with another path.
+ */
+function componentWriter(entry: CollectionEntry, value: string): string {
+    const spells = (text: string): boolean => text.includes(`"${value}"`) || text.includes(`'${value}'`) || text.includes(`\`${value}\``);
+    if (spells(entry.sourceFile.getFullText())) return entry.file;
+    const seen = new Set<string>([entry.file]);
+    let frontier = [entry.file];
+    for (let depth = 0; depth < 4 && frontier.length > 0; depth++) {
+        const next: string[] = [];
+        for (const file of frontier) {
+            const text = file === entry.file ? entry.sourceFile.getFullText() : fs.readFileSync(file, "utf8");
+            for (const match of text.matchAll(/(?:from|import)\s*\(?\s*["'](\.{1,2}\/[^"']+)["']/g)) {
+                const target = resolveRelative(file, match[1]).target;
+                if (seen.has(target) || !fs.existsSync(target) || !fs.statSync(target).isFile()) continue;
+                seen.add(target);
+                if (spells(fs.readFileSync(target, "utf8"))) return target;
+                next.push(target);
+            }
+        }
+        frontier = next;
+    }
+    return entry.file;
 }
 
 /** A lazy component thunk — `() => import("…")`, optionally `.then(m => m.X)` — as the import it stands for. */
@@ -243,7 +273,7 @@ function printable(plan: PlanContext, builder: Builder, value: unknown, segments
     }
     if (typeof value === "string" && COMPONENT_KEYS.has(String(segments[segments.length - 1])) && (value.startsWith("./") || value.startsWith("../"))) {
         try {
-            return importComponent(plan, builder, value, "default");
+            return importComponent(plan, builder, value, "default", componentWriter(builder.entry, value));
         } catch (error) {
             refuse(plan, builder.entry, error instanceof Error ? error.message : String(error), { key: segments.join(".") });
             builder.failed = true;

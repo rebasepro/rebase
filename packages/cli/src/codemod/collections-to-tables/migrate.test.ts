@@ -559,6 +559,22 @@ describe("modes", () => {
  * the run must convert the ones that have a literal of their own and name the
  * rest, never report "0 Firestore" and copy the tree as 0.30 modules silently.
  */
+describe("a component path written in a shared module", () => {
+    it("is resolved against that module, not the collection file", async () => {
+        const dir = materialize("blog");
+        fs.mkdirSync(path.join(dir, "config", "collections", "shared"), { recursive: true });
+        fs.writeFileSync(path.join(dir, "config", "collections", "shared", "cover.ts"), "export const coverAdmin = { Preview: \"../../../frontend/src/CoverPreview\" };\n");
+        const posts = path.join(dir, "config", "collections", "posts.ts");
+        fs.writeFileSync(posts, fs.readFileSync(posts, "utf8")
+            .replace("import { squash } from \"./_text\";", "import { squash } from \"./_text\";\nimport { coverAdmin } from \"./shared/cover\";")
+            .replace("admin: { Preview: \"../../frontend/src/CoverPreview\" }", "admin: coverAdmin"));
+        const report = await run(dir, { dryRun: true });
+        expect(report.refusals).toEqual([]);
+        const cms = report.files.find(file => file.path === "frontend/src/cms/posts.tsx")?.content ?? "";
+        expect(cms).toContain("import CoverPreview from \"../CoverPreview\";");
+    }, 120_000);
+});
+
 describe("a Firestore reference written outside the converted literal", () => {
     it("is named in a step for that collection, since defineFirestoreCollection throws on its path", async () => {
         const dir = materialize("firestore");
