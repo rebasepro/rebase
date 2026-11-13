@@ -1,7 +1,8 @@
 import type { EntityStatus, RebaseSdkData, SDKTableClient, WriteOptions } from "@rebasepro/types";
 import { RebaseApiError } from "@rebasepro/types";
 import type { AdminCollection, RebaseContext } from "@rebasepro/cms-types";
-import { buildCompositeId, resolvePrimaryKeys } from "@rebasepro/common";
+import { buildCompositeId } from "@rebasepro/common";
+import { resolvePrimaryKeys } from "@rebasepro/cms-types";
 import { toSnakeCase } from "@rebasepro/utils";
 import type { SdkDataLayer } from "./sdkData";
 import { signalWrite } from "./dataChanges";

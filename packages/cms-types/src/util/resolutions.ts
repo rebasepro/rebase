@@ -20,7 +20,7 @@ import {
 import {
     ResolvedRelation
 } from "../types/relation_kinds";
-import { withDeprecatedAlias } from "@rebasepro/common";
+import { withDeprecatedAlias } from "./deprecation";
 import { isJunctionBackedRelation, resolveCollectionRelations } from "./collection_relations";
 import { resolveRelation } from "./resolve_relation";
 import { enumToObjectEntries } from "./enums";

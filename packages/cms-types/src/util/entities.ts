@@ -12,6 +12,7 @@ import {
 } from "../types/properties";
 import { DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "./one_of";
 import { mergeDeep } from "@rebasepro/utils";
+import type { RelationRef } from "@rebasepro/common";
 
 export function isPropertyBuilder(property?: Property) {
     return typeof property?.dynamicProps === "function";
@@ -377,4 +378,23 @@ export function traverseValueProperty(inputValue: unknown,
     }
 
     return value;
+}
+
+/**
+ * Relation reference types used throughout the server layer.
+ * These replace the 50+ manual `{ id, path, __type: "relation" }` constructions.
+ */
+export interface RelationRefWithData extends RelationRef {
+    readonly data: Entity;
+}
+
+/**
+ * Create a hydrated relation reference that includes the full entity data.
+ * Used when entity data has been pre-fetched (e.g., via batch loading or JOINs).
+ */
+export function createRelationRefWithData(id: string | number, path: string, data: Entity): RelationRefWithData {
+    return { id,
+path,
+__type: "relation",
+data };
 }

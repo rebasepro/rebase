@@ -44,8 +44,6 @@
 import type React from "react";
 import type {
     BuilderKind,
-    ColorKey,
-    ColorScheme,
     EntityRelation,
     ColumnsShape,
     FilterValues,
@@ -60,6 +58,10 @@ import type {
     User,
     WhereFilterOp
 } from "@rebasepro/types";
+import type {
+    ColorKey,
+    ColorScheme
+} from "./types/chips";
 import type {
     CollectionCallbacks
 } from "./types/entity_callbacks";

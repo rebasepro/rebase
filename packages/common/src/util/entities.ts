@@ -1,8 +1,4 @@
-import {
-    Entity,
-    EntityRelation
-} from "@rebasepro/types";
-import type { RelationRef } from "../runtime/relation-ref";
+import { EntityRelation } from "@rebasepro/types";
 
 /**
  * Normalize a value into a proper EntityRelation instance.
@@ -50,13 +46,6 @@ export function normalizeToEntityRelation(value: unknown, propertyType?: string,
     );
 }
 
-/**
- * Relation reference types used throughout the server layer.
- * These replace the 50+ manual `{ id, path, __type: "relation" }` constructions.
- */
-export interface RelationRefWithData extends RelationRef {
-    readonly data: Entity;
-}
 
 /**
  * A row snapshot with every relation in it reduced to its reference — target
@@ -86,13 +75,3 @@ export function withRelationReferencesOnly<T>(value: T): T {
     ) as T;
 }
 
-/**
- * Create a hydrated relation reference that includes the full entity data.
- * Used when entity data has been pre-fetched (e.g., via batch loading or JOINs).
- */
-export function createRelationRefWithData(id: string | number, path: string, data: Entity): RelationRefWithData {
-    return { id,
-path,
-__type: "relation",
-data };
-}

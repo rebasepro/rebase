@@ -10,7 +10,7 @@ import type { RoleDefinition, ScopeDefinition } from "@rebasepro/types";
 import { getDataSourceCapabilities } from "@rebasepro/types";
 import type { WhereFilterOp, FilterValues } from "@rebasepro/types";
 import type { SearchConfig } from "@rebasepro/types";
-import type { CollectionIndex } from "@rebasepro/types";
+import type { CollectionIndex } from "./indexes";
 import type { CollectionTenantConfig } from "@rebasepro/types";
 
 /**

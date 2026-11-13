@@ -5,6 +5,7 @@
  * is why they live here and not in `@rebasepro/common`.
  */
 export * from "./child_views";
+export * from "./collection_keys";
 export * from "./collection_policies";
 export * from "./collection_relations";
 export * from "./collection_registry";
@@ -13,6 +14,7 @@ export * from "./copy";
 export * from "./field_access";
 export * from "./collections";
 export * from "./conditions";
+export * from "./deprecation";
 export * from "./entities";
 export * from "./enums";
 export * from "./one_of";

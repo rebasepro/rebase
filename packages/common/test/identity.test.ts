@@ -7,7 +7,6 @@ import { describe, expect, it } from "@jest/globals";
 import {
     buildCompositeId,
     parseIdValues,
-    getDeclaredPrimaryKeys,
     COMPOSITE_ID_SEPARATOR,
     PrimaryKeyInfo
 } from "../src/util/identity";
@@ -47,11 +46,10 @@ user_id: 2 }, composite)).toBe("1:::2");
     });
 
     it("writes a day key as YYYY-MM-DD, from the wire's string or the admin's Date", () => {
-        const dayKey = getDeclaredPrimaryKeys({ properties: {
-            day: { type: "date", columnType: "date", isId: "manual" },
-            sid: { type: "string", isId: "manual" }
-        } });
-        expect(dayKey[0]).toMatchObject({ fieldName: "day", type: "string", isDay: true });
+        const dayKey: PrimaryKeyInfo[] = [
+            { fieldName: "day", type: "string", isUUID: false, isDay: true },
+            { fieldName: "sid", type: "string", isUUID: false }
+        ];
         expect(buildCompositeId({ day: "2026-11-09", sid: "a" }, dayKey)).toBe("2026-11-09:::a");
         expect(buildCompositeId({ day: new Date("2026-11-09"), sid: "a" }, dayKey)).toBe("2026-11-09:::a");
         expect(parseIdValues("2026-11-09:::a", dayKey)).toEqual({ day: "2026-11-09", sid: "a" });
@@ -149,47 +147,5 @@ b: "z" }, twoStrings);
         const value = `x${COMPOSITE_ID_SEPARATOR}y`;
         expect(parseIdValues(buildCompositeId({ sku: value }, stringSku), stringSku))
             .toEqual({ sku: value });
-    });
-});
-
-describe("getDeclaredPrimaryKeys", () => {
-
-    it("reads keys declared with isId", () => {
-        expect(getDeclaredPrimaryKeys({
-            properties: {
-                id: { type: "number",
-isId: true },
-                name: { type: "string" }
-            }
-        })).toEqual([{ fieldName: "id",
-type: "number",
-isUUID: false }]);
-    });
-
-    it("marks a uuid key as a string", () => {
-        expect(getDeclaredPrimaryKeys({
-            properties: { id: { type: "string",
-isId: "uuid" } }
-        })).toEqual([{ fieldName: "id",
-type: "string",
-isUUID: true }]);
-    });
-
-    it("reads composite keys in declaration order", () => {
-        expect(getDeclaredPrimaryKeys({
-            properties: {
-                tenant_id: { type: "number",
-isId: true },
-                user_id: { type: "number",
-isId: true }
-            }
-        }).map(k => k.fieldName)).toEqual(["tenant_id", "user_id"]);
-    });
-
-    it("returns none rather than guessing `id` when nothing is declared", () => {
-        // A wrong guess produces confidently wrong addresses; callers must
-        // treat an empty result as "not addressable".
-        expect(getDeclaredPrimaryKeys({ properties: { name: { type: "string" } } })).toEqual([]);
-        expect(getDeclaredPrimaryKeys({})).toEqual([]);
     });
 });

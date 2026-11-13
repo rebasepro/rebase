@@ -1,13 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import { col, defineTable } from "@rebasepro/types";
-import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { compileTables } from "../src/schema/compile-tables";
-import { collectionsToTableDefs } from "../src/migrate";
-import { getDeclaredPrimaryKeys } from "../src/util/identity";
 import { keyAddressInfo, keyColumns } from "../src/table/keys";
 import { columnByKey, columnBySqlName, columnMaps, columnNameOf, keyForColumn } from "../src/table/columns";
-import { ALL } from "./schema/fixtures/legacy-capabilities";
 
 /**
  * Keys and column lookup: one answer, read from the descriptor. The legacy
@@ -88,33 +84,6 @@ describe("keyAddressInfo", () => {
             { fieldName: "code", type: "string", isUUID: false }
         ]);
     });
-});
-
-describe("keys agree with the declared `isId` tier on every lifted fixture", () => {
-    const fixtures: LegacyCollectionConfig[] = ALL;
-    const { tables, defaultRls } = collectionsToTableDefs(fixtures);
-    const descriptors = compileTables(tables, defaultRls ? { defaultRls } : {});
-
-    it.each(fixtures.map((collection, index) => [collection.slug, collection, index] as const))(
-        "%s",
-        (_slug, collection, index) => {
-            const descriptor = descriptors[index];
-            const declared = getDeclaredPrimaryKeys(collection);
-            const fromDescriptor = keyAddressInfo(descriptor);
-            if (declared.length > 0) {
-                expect(fromDescriptor.map(k => k.fieldName)).toEqual(declared.map(k => k.fieldName));
-                expect(fromDescriptor.map(k => k.type)).toEqual(declared.map(k => k.type));
-                // `isId: "uuid"` is a claim about a uuid column; the descriptor says uuid
-                // whenever the column is one — the claim implies it, never the reverse.
-                declared.forEach((key, i) => {
-                    if (key.isUUID) expect(fromDescriptor[i].isUUID).toBe(true);
-                });
-            } else {
-                // No `isId`: the implicit `id` column is the key, on both sides.
-                expect(fromDescriptor.map(k => k.fieldName)).toEqual(["id"]);
-            }
-        }
-    );
 });
 
 describe("column lookup", () => {

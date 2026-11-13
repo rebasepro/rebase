@@ -14,8 +14,8 @@
  *   beside what the code declares, not instead of it: code can hold objects a
  *   preference cannot, and a preference must not delete them.
  */
-import type { AnyFieldCustomization, EnumLabel, TableCustomizationOptions, UserConfigurationPersistence, EnumValueConditions, PropertyConditions } from "@rebasepro/cms-types";
-import type { ColorKey, UiFieldPreferences, UiPreferences, UiTablePreferences } from "@rebasepro/types";
+import type { AnyFieldCustomization, EnumLabel, TableCustomizationOptions, UserConfigurationPersistence, EnumValueConditions, PropertyConditions, ColorKey } from "@rebasepro/cms-types";
+import type { UiFieldPreferences, UiPreferences, UiTablePreferences } from "@rebasepro/types";
 import { isUiTablePreferences, mergeUiTablePreferences } from "@rebasepro/types";
 import { stripCollectionPath } from "@rebasepro/cms-types";
 

@@ -1,9 +1,7 @@
 export * from "./entities";
 export * from "./filter-operators";
-export * from "./chips";
 
 export * from "./search";
-export * from "./indexes";
 export * from "./relations";
 export * from "./read_query";
 export * from "./auth_hooks";

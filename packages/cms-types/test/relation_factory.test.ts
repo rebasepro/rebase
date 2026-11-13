@@ -1,4 +1,4 @@
-import { createRelationRefWithData } from "@rebasepro/common";
+import { createRelationRefWithData } from "@rebasepro/cms-types";
 import type { Entity } from "@rebasepro/types";
 import { resolveCollectionRelations } from "../src/util/collection_relations";
 import type { CollectionConfig } from "../src/types/collections";

@@ -1,5 +1,6 @@
 export * from "./breadcrumbs";
 export * from "./builders";
+export * from "./chips";
 export * from "./collections";
 export * from "./entity_callbacks";
 export * from "./properties";
@@ -14,6 +15,7 @@ export * from "./export_import";
 export * from "./filter_preset";
 export * from "./form_layout";
 export * from "./formex";
+export * from "./indexes";
 export * from "./locales";
 export * from "./mcp_app_modules";
 export * from "./modify_collections";

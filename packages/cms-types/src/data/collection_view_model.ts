@@ -13,10 +13,12 @@ import { type CollectionConfig } from "../types/collections";
 import { toWireKey } from "@rebasepro/utils";
 import {
     buildCompositeId,
-    resolvePrimaryKeys,
     type EntityDataOptions,
     type PrimaryKeyInfo
 } from "@rebasepro/common";
+import {
+    resolvePrimaryKeys
+} from "../util/collection_keys";
 import {
     fieldKeyForColumn,
     resolveCollectionRelations
