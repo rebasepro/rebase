@@ -157,7 +157,7 @@ All committed on the branch (≈150 commits OSS, 12 in `saas`). Details per slic
 
 ## 6. What is running right now, and what is next
 
-> **STATUS UPDATE — 2026-11-14, about 01:00 CET. This block supersedes the lists below where
+> **STATUS UPDATE — 2026-11-13, about 22:00 CET. This block supersedes the lists below where
 > they disagree.**
 > Everything short of the release is DONE and committed:
 > - The fix pass landed (schema endpoint and every admin surface resolve the caller through
