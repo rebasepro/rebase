@@ -30,7 +30,7 @@ import type { HonoEnv } from "../src/api/types";
 
 const authors = defineTable("authors", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         name: col.text(),
         apiSecret: col.text().private()
     },

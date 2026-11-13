@@ -26,8 +26,8 @@ const items = defineTable("items", {
     columns: {
         id: col.text().primaryKey(),
         code: col.text().unique(),
-        status: col.text().oneOf(["draft", "live"]),
-        tags: col.array(col.text().oneOf(["a", "b", "c"]).validate({ max: 3 })).validate({ uniqueItems: true, maxItems: 3 }),
+        status: col.text({ enum: ["draft", "live"] }),
+        tags: col.text({ enum: ["a", "b", "c"] }).validate({ max: 3 }).array().validate({ uniqueItems: true, maxItems: 3 }),
         headline: col.jsonb(json.string().validate({ max: 5 })),
         block: col.jsonb(json.oneOf({ text: json.string().validate({ min: 2 }), count: json.number().validate({ integer: true }) })),
         doc: col.jsonb(json.object({

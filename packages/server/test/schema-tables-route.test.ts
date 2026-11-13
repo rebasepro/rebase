@@ -40,8 +40,8 @@ const users = defineAuthTable("users", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         email: col.text().notNull().unique(),
-        passwordHash: col.text().column("password_hash"),
-        roles: col.array(col.text()).notNull().default([])
+        passwordHash: col.text("password_hash"),
+        roles: col.text().array().notNull().default([])
     },
     rls: "admin-only",
     auth: {
@@ -74,8 +74,8 @@ const posts = defineTable("posts", {
         title: col.text().notNull(),
         status: col.enum(["draft", "published"]).notNull().default("draft"),
         internalNote: col.text().access({ read: ["editor"], write: ["editor"] }),
-        authorId: col.uuid().column("author_id"),
-        reviewerId: col.uuid().column("reviewer_id")
+        authorId: col.uuid("author_id"),
+        reviewerId: col.uuid("reviewer_id")
     },
     relations: {
         author: rel.belongsTo(() => authors, { localKey: "author_id" }),

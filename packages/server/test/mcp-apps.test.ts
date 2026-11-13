@@ -56,8 +56,8 @@ const candidates = defineTable("candidates", {
 const interviews = defineTable("interviews", {
     columns: {
         id: col.text().primaryKey(),
-        when: col.timestamptz(),
-        candidateId: col.text().column("candidate_id"),
+        when: col.timestamp({ withTimezone: true }),
+        candidateId: col.text("candidate_id"),
         notes: col.text().access({ read: ["hr"] }),
         verdict: col.text().access({ write: ["hr"] }),
         secret: col.text().private()

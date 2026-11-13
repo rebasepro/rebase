@@ -11,8 +11,8 @@ import { openApiDocument, schemaOf } from "./helpers/server-b-g1-openapi";
 const items = defineTable("items", {
     columns: {
         id: col.text().primaryKey(),
-        status: col.text().oneOf(["draft", "live"]),
-        tags: col.array(col.text()).validate({ uniqueItems: true }),
+        status: col.text({ enum: ["draft", "live"] }),
+        tags: col.text().array().validate({ uniqueItems: true }),
         headline: col.jsonb(json.string().validate({ max: 5 })),
         block: col.jsonb(json.oneOf({ text: json.string(), any: json.unknown() })),
         doc: col.jsonb(json.object({ extra: json.unknown(), title: json.string().required() }))

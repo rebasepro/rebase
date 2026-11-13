@@ -178,7 +178,7 @@ describe("GET /users/pick", () => {
             rls: [{ operations: ["insert", "update"], roles: ["editor"] }]
         }));
         const listed = descriptorOfDef(defineTable("teams", {
-            columns: { id: col.serial().primaryKey(), members: col.array(col.text().userId()) },
+            columns: { id: col.serial().primaryKey(), members: col.text().userId().array() },
             rls: [{ operations: ["insert", "update"], roles: ["editor"] }]
         }));
         configureUserPicking(() => [listed]);

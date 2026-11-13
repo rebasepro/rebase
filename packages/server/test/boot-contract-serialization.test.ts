@@ -180,7 +180,7 @@ describe("collection contract serialization", () => {
 
 describe("schema version — computed from the compiled tables", () => {
     const authors = defineTable("authors", {
-        columns: { id: col.integer().primaryKey().identity(), name: col.text() },
+        columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), name: col.text() },
         rls: "admin-only"
     });
     const others = defineTable("others", {
