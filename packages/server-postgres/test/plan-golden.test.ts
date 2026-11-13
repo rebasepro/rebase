@@ -60,8 +60,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { isSchemaDefinitionError } from "@rebasepro/common";
-import { compileHandedTables } from "../src/schema/collection-input";
-import { INPUT_ADJUSTMENTS, PLAN_GOLDEN_ALLOWED_DIFFERENCES, PLAN_REFUSAL_ALLOWED_MESSAGES, compileSet, lowerSet, planCollections } from "./helpers/plan-tables";
+import { INPUT_ADJUSTMENTS, PLAN_GOLDEN_ALLOWED_DIFFERENCES, PLAN_REFUSAL_ALLOWED_MESSAGES, compileSet, planCollections } from "./helpers/plan-tables";
 import {
     PLAN_REFUSALS,
     PLAN_REFUSALS_GOLDEN,
@@ -185,25 +184,6 @@ describe("the outputs do not depend on input order", () => {
             const permuted = render(shuffled(set.collections), set.options);
             for (const name of Object.keys(straight)) {
                 if (straight[name] !== permuted[name]) differing.push(`${set.id}/${name}`);
-            }
-        }
-        expect(differing).toEqual([]);
-    });
-});
-
-describe("the lowered collections the server still hands boot plan what their tables plan", () => {
-    // Boot's appliers are handed the server's lowered collections (until the
-    // server hands compiled tables) and compile them again
-    // (`compileHandedTables`); that round trip must not move a byte.
-    it("for each set", () => {
-        const differing: string[] = [];
-        for (const set of corpus.sets) {
-            const tables = compileSet(set.collections);
-            const roundTrip = compileHandedTables(lowerSet(set.collections));
-            const straight = renderAllOutputs(tables, set.options);
-            const handed = renderAllOutputs(roundTrip, set.options);
-            for (const name of Object.keys(straight)) {
-                if (straight[name] !== handed[name]) differing.push(`${set.id}/${name}`);
             }
         }
         expect(differing).toEqual([]);

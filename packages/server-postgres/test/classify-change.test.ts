@@ -23,7 +23,12 @@ import {
     type ChangeVerdict,
     type SchemaFacts
 } from "../src/schema/classify-change";
-import { classifyEditedTables } from "../src/schema/generate-schema-commit";
+import { classifyEditedTables as classifyCompiledTables } from "../src/schema/generate-schema-commit";
+import { compiledFromLegacy } from "./helpers/edited-tables";
+
+/** The fixtures compiled, as the server hands the planner both sides. */
+const classifyEditedTables = (before: Parameters<typeof compiledFromLegacy>[0], after: Parameters<typeof compiledFromLegacy>[0], facts?: Parameters<typeof classifyCompiledTables>[2]) =>
+    classifyCompiledTables(compiledFromLegacy(before), compiledFromLegacy(after), facts);
 
 const collection = (slug: string, properties: Record<string, unknown>): CollectionConfig =>
     ({
@@ -282,13 +287,11 @@ describe("needs-migration — the ensure path cannot express it at all", () => {
         expect(result.verdict).toBe("needs-migration");
     });
 
-    it("a proposal the planner refuses is refused with the planner's reason", () => {
-        const result = classifyEditedTables(
-            [collection("posts", { code: str() })],
-            [collection("posts", { code: str({ enum: [] }) })]
-        );
-        expect(result.applicable).toBe(false);
-        expect(result.changes.some(c => c.kind === "invalid-collection")).toBe(true);
+    // The planner is handed compiled tables: a proposal that does not compile
+    // never reaches it. The compile refuses it, with the reason (the server's
+    // preview answers that as SCHEMA_EDIT_DOES_NOT_COMPILE).
+    it("a proposal that does not compile is refused by the compile, with its reason", () => {
+        expect(() => compiledFromLegacy([collection("posts", { code: str({ enum: [] }) })])).toThrow(/empty `enum`/);
     });
 
     /**

@@ -87,6 +87,12 @@ export interface LiveSchemaRoutesConfig {
      * are mounted.
      */
     getCollections: () => CollectionConfig[];
+    /**
+     * The tables the running server serves, compiled — the `before` side of
+     * every plan and what a reconcile is planned against. Read at request time,
+     * like {@link getCollections}.
+     */
+    getCompiledTables: () => readonly CompiledTable[];
     /** The driver's admin, for planning and for running the DDL. */
     getAdmin: () => DatabaseAdmin | undefined;
     /**
@@ -323,8 +329,8 @@ const isClassification = (value: unknown): value is ClassifiedSchemaChanges =>
  */
 async function planOrRefusal(
     admin: SchemaEditingAdmin,
-    before: CollectionConfig[],
-    after: CollectionConfig[],
+    before: readonly CompiledTable[],
+    after: readonly CompiledTable[],
     paths: Partial<SchemaCommitPaths> | undefined
 ): Promise<SchemaChangePlan> {
     try {
@@ -384,8 +390,8 @@ function describePatch(patch: TablePatch): string {
  */
 async function planSourceOnly(
     admin: SchemaEditingAdmin,
-    before: CollectionConfig[],
-    after: CollectionConfig[],
+    before: readonly CompiledTable[],
+    after: readonly CompiledTable[],
     paths: Partial<SchemaCommitPaths> | undefined
 ): Promise<SchemaChangePlan> {
     let plan: SchemaChangePlan;
@@ -452,6 +458,14 @@ export function rlsChangedSlugs(before: readonly CollectionConfig[], after: read
     return after.filter(collection => previous.get(collection.slug) !== rlsIdentity(collection)).map(collection => collection.slug);
 }
 
+/**
+ * The edited definitions compiled, as boot compiles its own: what the planner
+ * and the policy applier plan from.
+ */
+function compiledEdit(schema: EditedSchema): CompiledTable[] {
+    return compileSchemaDefs(schema.defs, schema.defaultRls).tables;
+}
+
 /** Whether the default database stores a table: the one the apply's DDL ran on. */
 function onDefaultDatabase(table: CompiledTable): boolean {
     return table.descriptor.database === undefined || table.descriptor.database === "(default)";
@@ -470,7 +484,7 @@ async function applyChangedPolicies(
     try {
         // The edited definitions compiled, as boot compiles its own: the
         // policy applier plans from the compiled tables.
-        const tables = compileSchemaDefs(after.defs, after.defaultRls).tables;
+        const tables = compiledEdit(after);
         const { applied } = await config.applyPolicies(tables.filter(onDefaultDatabase));
         return { status: "applied", tables: changed, statements: applied };
     } catch (err) {
@@ -716,7 +730,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
         }
 
         const source = await preview(patches);
-        const plan = await planOrRefusal(admin, config.getCollections(), source.schema.collections, config.commitPaths);
+        const plan = await planOrRefusal(admin, config.getCompiledTables(), compiledEdit(source.schema), config.commitPaths);
         return c.json({
             applicable: plan.classified.applicable,
             verdict: plan.classified.verdict,
@@ -786,9 +800,11 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             const source = await preview(patches);
             const before = config.getCollections();
             const after = source.schema.collections;
+            const compiledBefore = config.getCompiledTables();
+            const compiledAfter = compiledEdit(source.schema);
             const plan = sourceOnly
-                ? await planSourceOnly(admin, before, after, config.commitPaths)
-                : await planOrRefusal(admin, before, after, config.commitPaths);
+                ? await planSourceOnly(admin, compiledBefore, compiledAfter, config.commitPaths)
+                : await planOrRefusal(admin, compiledBefore, compiledAfter, config.commitPaths);
             if (!plan.classified.applicable && !sourceOnly) {
                 const blocking = plan.classified.changes.filter(c => c.verdict !== "safe");
                 throw ApiError.badRequest(
@@ -926,7 +942,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
 
     router.post("/reconcile/plan", async (c) => {
         const { drop } = await readReconcileRequest(c);
-        const plan = await requireReconciler().plan(config.getCollections(), { drop });
+        const plan = await requireReconciler().plan(config.getCompiledTables(), { drop });
         return c.json(plan);
     });
 
@@ -944,7 +960,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
         const reconciler = requireReconciler();
 
         return oneApplyAtATime(async () => {
-            const plan = await reconciler.plan(config.getCollections(), { drop });
+            const plan = await reconciler.plan(config.getCompiledTables(), { drop });
             if (plan.problems.length > 0) {
                 throw ApiError.badRequest(
                     "This reconcile cannot be applied:\n" + plan.problems.map(p => `  • ${p}`).join("\n"),

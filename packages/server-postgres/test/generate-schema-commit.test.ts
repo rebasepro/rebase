@@ -17,20 +17,28 @@
  */
 import type { CollectionConfig, PostgresProperties, StringProperty } from "@rebasepro/types";
 import {
-    generateSchemaCommit,
+    generateSchemaCommit as generateCompiledCommit,
     additiveStatements,
     commitMessage,
     SchemaCommitError,
     DEFAULT_COMMIT_PATHS,
-    classifyEditedTables
+    classifyEditedTables as classifyCompiledTables
 } from "../src/schema/generate-schema-commit";
-import { compileEditedCollections } from "../src/schema/collection-input";
 import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
 import { compileSet } from "./helpers/plan-tables";
+import { compiledFromLegacy } from "./helpers/edited-tables";
+
+/** The fixtures compiled, as the server hands the planner both sides. */
+const classifyEditedTables = (before: Parameters<typeof compiledFromLegacy>[0], after: Parameters<typeof compiledFromLegacy>[0], facts?: Parameters<typeof classifyCompiledTables>[2]) =>
+    classifyCompiledTables(compiledFromLegacy(before), compiledFromLegacy(after), facts);
+
+/** {@link generateCompiledCommit} over the fixtures compiled, as the server hands the planner both sides. */
+const generateSchemaCommit = (input: Omit<Parameters<typeof generateCompiledCommit>[0], "before" | "after"> & { before: Parameters<typeof compiledFromLegacy>[0]; after: Parameters<typeof compiledFromLegacy>[0] }) =>
+    generateCompiledCommit({ ...input, before: compiledFromLegacy(input.before), after: compiledFromLegacy(input.after) });
 
 /** `additiveStatements` over the fixtures compiled, as the editor's input is. */
 const additiveStatementsOf = (before: CollectionConfig[], after: CollectionConfig[]): string[] =>
-    additiveStatements(compileEditedCollections(before), compileEditedCollections(after));
+    additiveStatements(compiledFromLegacy(before), compiledFromLegacy(after));
 
 const collection = (slug: string, properties: PostgresProperties = {}): CollectionConfig =>
     ({

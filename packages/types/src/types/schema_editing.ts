@@ -10,6 +10,7 @@
  *
  * Nothing here executes anything. These are the nouns.
  */
+import type { CompiledTable } from "../schema/compiled";
 
 /**
  * What a change will do to a live database.
@@ -171,10 +172,13 @@ export interface SchemaEditingAdmin {
      *
      * Rejects when the change is not applicable, carrying the classification so
      * a caller can say which change was the problem.
+     *
+     * @param before The tables the running server serves, compiled.
+     * @param after The edited definitions, compiled (`compileSchemaDefs`).
      */
     planSchemaChange(
-        before: unknown[],
-        after: unknown[],
+        before: readonly CompiledTable[],
+        after: readonly CompiledTable[],
         options?: {
             paths?: Partial<SchemaCommitPaths>;
             /**
@@ -200,7 +204,8 @@ export interface SchemaEditingAdmin {
      * Optional so a driver that cannot answer stays a valid admin.
      */
     planSchemaReconcile?(
-        collections: unknown[],
+        /** The tables the running server serves, compiled. */
+        tables: readonly CompiledTable[],
         options?: {
             /** Undeclared columns to drop, as `<collection slug>.<column>`. */
             drop?: string[];

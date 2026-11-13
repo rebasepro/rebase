@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { createServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CollectionConfig, CompiledTable, InitializedDriver } from "@rebasepro/types";
 
 import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
@@ -43,6 +43,12 @@ function generatedFrom(collections: CollectionConfig[]): string {
     return `export const tables = ${JSON.stringify(tables)};\n`;
 }
 
+/** {@link generatedFrom} over compiled tables: what the fake planner renders from `after`. */
+function generatedFromTables(tables: readonly CompiledTable[]): string {
+    const listed = tables.map(table => [table.descriptor.slug, table.descriptor.columns.map(column => column.key).sort()]);
+    return `export const tables = ${JSON.stringify(listed)};\n`;
+}
+
 /** The generated file for the collections `bootBundle` serves. */
 const SERVED = ["posts", "authors", "tags"];
 
@@ -59,8 +65,8 @@ function planningBootstrapper(): BackendBootstrapper {
                         // Rendered from `after`, as the real planner renders
                         // the Drizzle schema, so the generated file differs
                         // between collection sets.
-                        planSchemaChange: async (_before: unknown[], after: CollectionConfig[]) => ({
-                            files: [{ path: "config/schema.generated.ts", contents: generatedFrom(after) }],
+                        planSchemaChange: async (_before: readonly CompiledTable[], after: readonly CompiledTable[]) => ({
+                            files: [{ path: "config/schema.generated.ts", contents: generatedFromTables(after) }],
                             statements: ['ALTER TABLE "posts" ADD COLUMN IF NOT EXISTS "author_id" UUID;'],
                             classified: { changes: [], verdict: "safe", applicable: true },
                             message: "feat(schema): link posts to authors\n"

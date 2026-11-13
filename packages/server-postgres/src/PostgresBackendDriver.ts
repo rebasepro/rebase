@@ -78,7 +78,6 @@ import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
 import { readReconcileFacts } from "./schema/reconcile-schema";
-import { compileEditedCollections } from "./schema/collection-input";
 import { onOwnSession, openSqlCursorOnPool, readWithinBudget, refuseOversizedRows, RESET_SESSION_STATEMENTS, runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
 import { PgNotifyListener } from "./services/pg-notify-listener";
 import { diffDatabaseBranch, mergeDatabaseBranch } from "./branching/branch-diff";
@@ -589,24 +588,22 @@ export class PostgresBackendDriver implements DataDriver {
             // down to the values the type already carries — neither is knowable
             // from the collections, and both decide whether the statements this
             // returns are accepted or rejected by the database they name.
+            // Both sides arrive compiled: the server compiles the edited
+            // definitions as boot compiles its own (`compileSchemaDefs`), so a
+            // relation between edited tables plans like any other.
             planSchemaChange: async (before, after, options) => generateSchemaCommit({
-                before: before as CollectionConfig[],
-                after: after as CollectionConfig[],
+                before,
+                after,
                 paths: options?.paths,
                 sourceOnly: options?.sourceOnly,
-                existing: await readSchemaFactsFor(
-                    this.schemaFactsQueryable(),
-                    compileEditedCollections(after as CollectionConfig[])
-                )
+                existing: await readSchemaFactsFor(this.schemaFactsQueryable(), after)
             }),
             // The reviewed counterpart to boot's additive ensure: relaxing NOT
             // NULL and dropping columns no collection declares. Plans only;
             // the caller runs the statements once a person confirms them.
-            planSchemaReconcile: async (collections, options) => readReconcileFacts(
+            planSchemaReconcile: async (tables, options) => readReconcileFacts(
                 this.schemaFactsQueryable(),
-                // The served tables: each collection the server passes is one
-                // this driver registered.
-                (collections as CollectionConfig[]).map(collection => this.registry.requireTable(collection.slug).compiled),
+                tables,
                 options
             ),
             listen: (...args: Parameters<NonNullable<SQLAdmin["listen"]>>) => this.listen(...args),

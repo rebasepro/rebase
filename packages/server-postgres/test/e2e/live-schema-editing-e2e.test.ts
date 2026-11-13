@@ -25,6 +25,7 @@ import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
 import { FixtureTableRegistry } from "../helpers/tables";
+import { compiledFromLegacy } from "../helpers/edited-tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 
 // Relative, not by package name: inside a git worktree `@rebasepro/server`
@@ -107,7 +108,7 @@ describe("live schema editing, end to end", () => {
         const before = [posts({})];
         const after = [posts({ subtitle: { name: "Subtitle", type: "string" } })];
 
-        const plan = await driver.admin.planSchemaChange!(before, after);
+        const plan = await driver.admin.planSchemaChange!(compiledFromLegacy(before), compiledFromLegacy(after));
         expect(plan.classified.applicable).toBe(true);
 
         const result = await applySchemaChange({
@@ -151,7 +152,7 @@ describe("live schema editing, end to end", () => {
         // Postgres checks NOT NULL against the row already in the table, so the
         // ensure path withholds it and the column arrives nullable. The planner
         // refuses rather than applying something that does not match the config.
-        await expect(driver.admin.planSchemaChange!(before, after))
+        await expect(driver.admin.planSchemaChange!(compiledFromLegacy(before), compiledFromLegacy(after)))
             .rejects.toThrow(/NOT NULL/);
 
         // Nothing happened: no column, no commit.
@@ -162,7 +163,7 @@ describe("live schema editing, end to end", () => {
         const before = [posts({ subtitle: { name: "Subtitle", type: "string" } })];
         const after = [posts({})];
 
-        await expect(driver.admin.planSchemaChange!(before, after))
+        await expect(driver.admin.planSchemaChange!(compiledFromLegacy(before), compiledFromLegacy(after)))
             .rejects.toThrow(/cannot be applied/);
 
         expect(await columnsOf("posts")).toHaveProperty("subtitle");
@@ -182,7 +183,7 @@ describe("live schema editing, end to end", () => {
             }
         };
 
-        const plan = await driver.admin.planSchemaChange!(before, [...before, tags]);
+        const plan = await driver.admin.planSchemaChange!(compiledFromLegacy(before), compiledFromLegacy([...before, tags]));
         const result = await applySchemaChange({
             plan,
             repository: createLocalGitRepository({ root: repoRoot }),
@@ -206,7 +207,7 @@ describe("live schema editing, end to end", () => {
             summary: { name: "Summary", type: "string" }
         })];
 
-        const plan = await driver.admin.planSchemaChange!(before, after);
+        const plan = await driver.admin.planSchemaChange!(compiledFromLegacy(before), compiledFromLegacy(after));
         const result = await applySchemaChange({
             plan,
             repository: createLocalGitRepository({ root: repoRoot }),
@@ -251,7 +252,7 @@ describe("live schema editing, end to end", () => {
         };
 
         const applyThrough = async (before: CollectionConfig[], after: CollectionConfig[]) => {
-            const plan = await driver.admin.planSchemaChange!(before, after);
+            const plan = await driver.admin.planSchemaChange!(compiledFromLegacy(before), compiledFromLegacy(after));
             return applySchemaChange({
                 plan,
                 repository: createLocalGitRepository({ root: repoRoot }),
@@ -322,7 +323,7 @@ describe("live schema editing, end to end", () => {
                 author: { name: "Author", type: "string", validation: { required: true } }
             })];
 
-            await expect(driver.admin.planSchemaChange!(before, after))
+            await expect(driver.admin.planSchemaChange!(compiledFromLegacy(before), compiledFromLegacy(after)))
                 .rejects.toThrow(/already holds rows/);
             expect(await columnsOf("posts")).not.toHaveProperty("author");
         }, 180_000);

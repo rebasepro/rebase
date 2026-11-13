@@ -59,6 +59,7 @@ import { createRebaseClient } from "@rebasepro/client";
 import { BackendCollectionRegistry } from "../collections/BackendCollectionRegistry";
 import { TableRegistry } from "../schema/table-registry";
 import { resolveDeclaredTables } from "../schema/declared-tables";
+import { compileSchemaDefs } from "../schema/load-schema";
 import { introspectedDescriptors, type IntrospectedDriverResult } from "../schema/introspected-tables";
 import type { DriverCollectionOf } from "../schema/driver-seam";
 import {
@@ -696,6 +697,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     tableRegistry.replaceAll(declaredTables.tables);
     /** The lowered tables whose compiled policies are served; replaced by a live schema apply. */
     let servedPolicyCollections: PostgresCollectionConfig[] = declaredTables.collections;
+    /** The compiled tables served — what a live schema edit plans against; replaced by a live schema apply. */
+    let servedCompiledTables: readonly CompiledTable[] = declaredTables.tables;
     if (declaredTables.source === "schemaDir") {
         logger.info("Loaded the declared tables", { count: declaredTables.defs.length, dir: config.schemaDir });
     }
@@ -2341,6 +2344,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                         ?? parseEnvBoolean(process.env.REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY) === true
                 },
                 getCollections: () => collectionRegistry.getRawCollections(),
+                getCompiledTables: () => servedCompiledTables,
                 getAdmin: () => defaultDriver.admin,
                 // The token on the request names the uid only; the commit is
                 // authored by the account's name and address.
@@ -2435,7 +2439,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                         // what a restart or a second replica lacks.
                         const admin = defaultDriver.admin;
                         if (isSchemaEditingAdmin(admin)) {
-                            const served = collectionRegistry.getRawCollections();
+                            const served = servedCompiledTables;
                             const generated = await admin.planSchemaChange(served, served, { paths: commitPaths });
                             await refuseWhenRepositoryIsAhead(createGitHubRepository({
                                 auth: remoteRepo.auth,
@@ -2972,6 +2976,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         enforceAuthSecretExclusion(collections);
         tableRegistry.replaceAll(schema.descriptors);
         servedPolicyCollections = schema.collections;
+        servedCompiledTables = compileSchemaDefs(schema.defs, schema.defaultRls).tables;
         collectionRegistry.reset();
         collections.forEach(collection => collectionRegistry.register(collection));
         activeCollections = collections;

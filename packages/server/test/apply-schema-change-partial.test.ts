@@ -98,6 +98,7 @@ describe("a DDL failure after the first statement", () => {
         });
         app.route("/api/schema", createLiveSchemaRoutes({
             getCollections: () => [{ slug: "posts", name: "posts", properties: {} }],
+            getCompiledTables: () => [],
             getAdmin: () => admin,
             getRepository: () => repository(),
             previewSource: async () => ({

@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
 import path from "node:path";
 import type { DatabaseAdmin, PostgresCollectionConfig, SchemaChange, SchemaChangeFile, SchemaChangePlan, TablePatch } from "@rebasepro/types";
+import type { CompiledTable } from "@rebasepro/types";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createLiveSchemaRoutes, type PreviewedSource } from "../src/api/live-schema-routes";
@@ -64,6 +65,7 @@ function harness(change = REMOVAL) {
     });
     app.route("/api/schema", createLiveSchemaRoutes({
         getCollections: () => [products],
+        getCompiledTables: () => [],
         getAdmin: () => admin,
         getRepository: () => repository,
         previewSource: async () => ({
@@ -123,10 +125,10 @@ describe("deleting a table through the live door", () => {
 
     it("plans the schema without it and commits its file as deleted, with the index", async () => {
         const editor = new TableSourceEditor(fixture.dir);
-        const planned: unknown[][] = [];
+        const planned: (readonly CompiledTable[])[] = [];
         const committed: SchemaChangeFile[] = [];
         const admin: DatabaseAdmin = {
-            planSchemaChange: async (_b: unknown, after: unknown[], options?: { sourceOnly?: boolean }) => {
+            planSchemaChange: async (_b: unknown, after: readonly CompiledTable[], options?: { sourceOnly?: boolean }) => {
                 planned.push(after);
                 const change: SchemaChange = {
                     kind: "remove-collection", verdict: "needs-migration", collection: "tags",
@@ -145,6 +147,7 @@ describe("deleting a table through the live door", () => {
         app.use("/*", async (c, next) => { c.set("user", { uid: "u_1", roles: ["admin"] }); await next(); });
         app.route("/api/schema", createLiveSchemaRoutes({
             getCollections: () => [],
+            getCompiledTables: () => [],
             getAdmin: () => admin,
             getRepository: () => ({
                 root: fixture.root, currentBranch: async () => "main", dirtyPaths: async () => [],
@@ -166,7 +169,7 @@ describe("deleting a table through the live door", () => {
         }));
         const body = await response.json() as { summary: string };
         expect(response.status).toBe(200);
-        expect(planned[0].map(each => (typeof each === "object" && each !== null && "slug" in each ? each.slug : undefined)))
+        expect(planned[0].map(each => each.descriptor.slug))
             .toEqual(["users", "posts", "archived"]);
         expect(committed.filter(file => file.path.startsWith("backend/schema")).map(file => `${file.path}${file.deleted ? " (deleted)" : ""}`))
             .toEqual(["backend/schema/index.ts", "backend/schema/tags.ts (deleted)"]);

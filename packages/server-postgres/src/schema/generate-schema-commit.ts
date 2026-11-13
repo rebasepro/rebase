@@ -42,7 +42,6 @@ import {
     type CompiledTable,
     type SchemaCommitPaths
 } from "@rebasepro/types";
-import { compileHandedTables, editedSlugs, type EditedTables } from "./collection-input";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import {
     planCollectionSchemaEnsure,
@@ -50,7 +49,7 @@ import {
     type ExistingSchema,
     type WithheldConstraint
 } from "./ensure-collection-tables";
-import { classifyTableChanges, defaultChangeStatements, uncompilableChanges, type ClassifiedChanges, type SchemaFacts } from "./classify-change";
+import { classifyTableChanges, defaultChangeStatements, type ClassifiedChanges, type SchemaFacts } from "./classify-change";
 
 /**
  * Re-exported from the shared kernel. `@rebasepro/server` derives these for a
@@ -65,10 +64,10 @@ export interface SchemaCommitFile {
 }
 
 export interface SchemaCommitInput {
-    /** What the running database was built from. */
-    before: EditedTables;
-    /** What the editor is proposing. */
-    after: EditedTables;
+    /** What the running database was built from, compiled. */
+    before: readonly CompiledTable[];
+    /** What the editor is proposing, compiled (`compileSchemaDefs` over the edited definitions). */
+    after: readonly CompiledTable[];
     /**
      * Files the caller has already produced — in practice the rewritten
      * collection source from the AST editor. Carried through unchanged so the
@@ -215,18 +214,9 @@ export async function generateSchemaCommit(input: SchemaCommitInput): Promise<Sc
     // before it runs. See `ConstraintPolicy` for why the unattended boot does
     // not get the same latitude.
     const options: EnsureOptions = { constraints: "converge" };
-    const before = compiledOrError(input.before);
-    const afterTables = compiledOrError(input.after);
-    const classified = classifyCompiled(before, afterTables, input);
-    // Only reached once the classification accepted both sides.
-    const after = (): readonly CompiledTable[] => {
-        if (afterTables instanceof Error) throw afterTables;
-        return afterTables;
-    };
-    const beforeTables = (): readonly CompiledTable[] => {
-        if (before instanceof Error) throw before;
-        return before;
-    };
+    const classified = classifyTableChanges(input.before, input.after, input.existing);
+    const after = (): readonly CompiledTable[] => input.after;
+    const beforeTables = (): readonly CompiledTable[] => input.before;
 
     if (input.sourceOnly) {
         // A change with no account of what it leaves behind is one that may
@@ -298,36 +288,9 @@ export async function generateSchemaCommit(input: SchemaCommitInput): Promise<Sc
 }
 
 /**
- * Classify an edit as the live editor hands it ({@link classifyTableChanges}
- * over both sides compiled). A side that does not compile is a proposal the
- * planner cannot take, and the compiler's message says what to fix.
+ * Classify an edit as the live editor hands it: both sides compiled
+ * ({@link classifyTableChanges}).
  */
-export function classifyEditedTables(before: EditedTables, after: EditedTables, facts?: SchemaFacts): ClassifiedChanges {
-    return classifyCompiled(compiledOrError(before), compiledOrError(after), { before, after, existing: facts });
-}
-
-function classifyCompiled(
-    before: CompiledTable[] | Error,
-    after: CompiledTable[] | Error,
-    input: { before: EditedTables; after: EditedTables; existing?: SchemaFacts }
-): ClassifiedChanges {
-    if (after instanceof Error) return uncompilableChanges(after, firstNewSlug(input.before, input.after));
-    if (before instanceof Error) return uncompilableChanges(before, firstNewSlug(input.before, input.after));
-    return classifyTableChanges(before, after, input.existing);
-}
-
-/** The edited schema compiled, or why it cannot be. */
-function compiledOrError(handed: EditedTables): CompiledTable[] | Error {
-    try {
-        return compileHandedTables(handed);
-    } catch (err) {
-        return err instanceof Error ? err : new Error(String(err));
-    }
-}
-
-/** The table a refusal names: the first one the proposal adds, else its first. */
-function firstNewSlug(before: EditedTables, after: EditedTables): string {
-    const previous = new Set(editedSlugs(before));
-    const next = editedSlugs(after);
-    return next.find(slug => !previous.has(slug)) ?? next[0] ?? "";
+export function classifyEditedTables(before: readonly CompiledTable[], after: readonly CompiledTable[], facts?: SchemaFacts): ClassifiedChanges {
+    return classifyTableChanges(before, after, facts);
 }

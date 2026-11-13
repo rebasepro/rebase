@@ -42,7 +42,7 @@ function harness(over: Partial<LiveSchemaRoutesConfig> & { user?: HonoEnv["Varia
     const admin: DatabaseAdmin = {
         planSchemaChange: async () => { throw new Error("not under test"); },
         ...(over.reconcile === false ? {} : {
-            planSchemaReconcile: async (_collections: unknown[], options?: { drop?: string[] }) => {
+            planSchemaReconcile: async (_tables: unknown, options?: { drop?: string[] }) => {
                 planned.push(options?.drop ?? []);
                 return planFor(options?.drop);
             }
@@ -59,6 +59,7 @@ function harness(over: Partial<LiveSchemaRoutesConfig> & { user?: HonoEnv["Varia
     });
     app.route("/api/schema", createLiveSchemaRoutes({
         getCollections: (): CollectionConfig[] => [{ slug: "voice_cache", name: "Voice cache", properties: {} }],
+        getCompiledTables: () => [],
         getAdmin: () => admin,
         // A bundle deployment: no repository, and reconcile does not need one.
         getRepository: () => undefined,

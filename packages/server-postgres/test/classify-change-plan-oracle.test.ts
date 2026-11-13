@@ -23,11 +23,20 @@
  */
 import type { CollectionConfig } from "@rebasepro/types";
 import type { SchemaFacts } from "../src/schema/classify-change";
-import { classifyEditedTables, generateSchemaCommit } from "../src/schema/generate-schema-commit";
+import { classifyEditedTables as classifyCompiledTables, generateSchemaCommit as generateCompiledCommit } from "../src/schema/generate-schema-commit";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl, renderTriggersDdl, renderPgType } from "../src/schema/plan/render-ddl";
 import type { SchemaPlan } from "../src/schema/plan/types";
 import { planCollections } from "./helpers/plan-tables";
+import { compiledFromLegacy } from "./helpers/edited-tables";
+
+/** The fixtures compiled, as the server hands the planner both sides. */
+const classifyEditedTables = (before: Parameters<typeof compiledFromLegacy>[0], after: Parameters<typeof compiledFromLegacy>[0], facts?: Parameters<typeof classifyCompiledTables>[2]) =>
+    classifyCompiledTables(compiledFromLegacy(before), compiledFromLegacy(after), facts);
+
+/** {@link generateCompiledCommit} over the fixtures compiled, as the server hands the planner both sides. */
+const generateSchemaCommit = (input: Omit<Parameters<typeof generateCompiledCommit>[0], "before" | "after"> & { before: Parameters<typeof compiledFromLegacy>[0]; after: Parameters<typeof compiledFromLegacy>[0] }) =>
+    generateCompiledCommit({ ...input, before: compiledFromLegacy(input.before), after: compiledFromLegacy(input.after) });
 
 type Props = Record<string, unknown>;
 type Verdict = "none" | "safe" | "diverges" | "needs-migration";

@@ -19,7 +19,9 @@ import { Hono } from "hono";
 import path from "node:path";
 import type { DatabaseAdmin, PostgresCollectionConfig, SchemaChangePlan, TablePatch } from "@rebasepro/types";
 import { EMPTY_ACCESS_MODEL } from "@rebasepro/types";
+import type { CompiledTable } from "@rebasepro/types";
 import { HonoEnv } from "../src/api/types";
+import { compileSchemaDefs } from "../src/schema/load-schema";
 import { errorHandler } from "../src/api/errors";
 import { createLiveSchemaRoutes, type LiveSchemaRoutesConfig, type PreviewedSource } from "../src/api/live-schema-routes";
 import { TableSourceEditError, TableSourceEditor, type EditedSchema } from "../src/api/table-source-editor";
@@ -56,6 +58,9 @@ const PERSON = { uid: "u_1", roles: ["admin"], displayName: "Ada", email: "ada@e
 const API_KEY = { uid: "api-key:7c3f", roles: ["admin", "service"] };
 const SOURCE = "backend/schema/posts.ts";
 
+/** What the running server serves, compiled: the `before` side of every plan. */
+const SERVED_TABLES: readonly CompiledTable[] = [];
+
 const edited = (): EditedSchema => ({ defs: [], descriptors: [], collections: [collection("posts")] });
 
 function harness(over: Partial<LiveSchemaRoutesConfig> & {
@@ -81,6 +86,7 @@ function harness(over: Partial<LiveSchemaRoutesConfig> & {
 
     const config: LiveSchemaRoutesConfig = {
         getCollections: () => [collection("posts")],
+        getCompiledTables: () => SERVED_TABLES,
         getAdmin: () => admin,
         getRepository: () => repository,
         previewSource: async () => {
@@ -129,15 +135,17 @@ describe("POST /plan", () => {
     });
 
     it("plans against what the edit compiles to", async () => {
-        const seen: unknown[][] = [];
+        const seen: (readonly CompiledTable[])[] = [];
         const { post } = harness({
             getAdmin: () => ({
-                planSchemaChange: async (before: unknown[], after: unknown[]) => { seen.push(before, after); return okPlan(); }
+                planSchemaChange: async (before: readonly CompiledTable[], after: readonly CompiledTable[]) => { seen.push(before, after); return okPlan(); }
             })
         });
         await post("/plan", change);
-        expect(seen[0]).toEqual([collection("posts")]);
-        expect(seen[1]).toEqual(edited().collections);
+        // Both sides compiled: the served tables, and the edit's definitions
+        // compiled as boot compiles them.
+        expect(seen[0]).toBe(SERVED_TABLES);
+        expect(seen[1]).toEqual(compileSchemaDefs(edited().defs, edited().defaultRls).tables);
     });
 
     it("reports a blocked change rather than refusing to answer", async () => {
@@ -533,18 +541,17 @@ describe("over the real schema editor", () => {
         };
     };
 
-    it("plans the edited table, its new column lowered for the planner", async () => {
-        const planned: unknown[] = [];
+    it("plans the edited table compiled, its new column among its columns", async () => {
+        const planned: CompiledTable[] = [];
         const { post } = harness({
             previewSource: realPreview,
-            getAdmin: () => ({ planSchemaChange: async (_before: unknown[], after: unknown[]) => { planned.push(...after); return okPlan(); } })
+            getAdmin: () => ({ planSchemaChange: async (_before: readonly CompiledTable[], after: readonly CompiledTable[]) => { planned.push(...after); return okPlan(); } })
         });
         const res = await post("/plan", change);
         expect(res.status).toBe(200);
         expect(((await res.json()) as { files: string[] }).files).toEqual(["backend/schema/posts.ts", "backend/src/schema.generated.ts"]);
-        const posts = planned.find((each): each is PostgresCollectionConfig =>
-            typeof each === "object" && each !== null && "slug" in each && each.slug === "posts");
-        expect(Object.keys(posts?.properties ?? {})).toContain("subtitle");
+        const posts = planned.find(each => each.descriptor.slug === "posts");
+        expect(posts?.descriptor.columns.map(column => column.key)).toContain("subtitle");
     });
 
     it("refuses an edit whose result does not compile, naming the problem", async () => {

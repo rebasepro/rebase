@@ -52,6 +52,7 @@ function apply(over: Partial<LiveSchemaRoutesConfig>, user: HonoEnv["Variables"]
     });
     app.route("/api/schema", createLiveSchemaRoutes({
         getCollections: () => [tags],
+        getCompiledTables: () => [],
         getAdmin: () => admin,
         getRepository: (author) => { authors.push(author); return repository; },
         previewSource: async () => ({
