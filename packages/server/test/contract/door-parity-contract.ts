@@ -294,11 +294,7 @@ export const PARITY_CASES: readonly ParityCase[] = [
         name: "a read of a live row",
         given: "live",
         when: { op: "get" },
-        then: { outcome: "ok", hooks: [], history: [], ...live() },
-        pending: {
-            socket: "the socket's FETCH_ONE serves the admin view model (`{ __type: \"date\" }`), "
-                + "which the admin panel reads; a decision in the data-doors sweep report"
-        }
+        then: { outcome: "ok", hooks: [], history: [], ...live() }
     },
     {
         // REST and the SDK's `find()` loaded the relation and threw it away;
