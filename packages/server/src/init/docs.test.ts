@@ -8,8 +8,8 @@ import { createRequireAuth, requireAdmin } from "../auth/middleware";
 /**
  * Whether the OpenAPI spec is REACHABLE — not whether it is published.
  *
- * `resolveEnableSwagger` returns false in production whenever
- * REBASE_ENABLE_SWAGGER is unset, which is every managed tenant. The mount then
+ * `resolveEnableSwagger` used to return false in production whenever
+ * REBASE_ENABLE_SWAGGER was unset, which is every managed tenant. The mount then
  * returned early and `/api/docs` did not exist, so Rebase Cloud's console — whose
  * API Explorer fetches exactly that path — answered 404 for every project on the
  * platform, permanently. Nothing distinguished that from a project with no API.

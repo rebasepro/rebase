@@ -94,7 +94,7 @@ import { tsMorphInstallSentence } from "../utils/dev-dependency-command";
 import { configureMiddlewares } from "../init/middlewares";
 import { initializeStorage, assertStorageAccessControlConfigured } from "../init/storage";
 import { resolveStorageAccessControl } from "../storage/policies";
-import { loadOpenApiGenerator, mountOpenApiDocs, type OpenApiGenerator } from "../init/docs";
+import { loadOpenApiGenerator, mountOpenApiDocs, type OpenApiDocsAudience, type OpenApiGenerator } from "../init/docs";
 import { createHealthCheck } from "../init/health";
 import { createShutdown } from "../init/shutdown";
 import { createLiveSchemaRoutes, noRepositoryOff, readAccountIdentity } from "../api/live-schema-routes";
@@ -3677,6 +3677,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     let logsSurface: Hono<HonoEnv> | undefined;
     let metaSurface: Hono<HonoEnv> | undefined;
     let schemaTablesSurface: Hono<HonoEnv> | undefined;
+    /** Who `/api/docs` is served to by default: the schema endpoint's callers (see `init/docs`). */
+    let docsAudience: OpenApiDocsAudience | undefined;
 
     // 6b. Backup admin routes (for the Studio Backups panel).
     // Read the destination lazily from env so config changes don't need a
@@ -3931,18 +3933,27 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 "to anonymous callers (columns and relations with an access.read list, raw SQL and policies withheld)."
             );
         }
+        const schemaAuthenticate: MiddlewareHandler<HonoEnv>[] = [
+            provideServices,
+            ...(apiKeyPreAuth ? [apiKeyPreAuth] : []),
+            platformTokenPreAuth,
+            verifyIfPresented
+        ];
         schemaTablesSurface = createSchemaTablesRoutes({
             service: schemaTables,
             available: adminSurfacesGated,
             publicTables,
             persons: config.schemaTables?.persons ?? "granted",
-            authenticate: [
-                provideServices,
-                ...(apiKeyPreAuth ? [apiKeyPreAuth] : []),
-                platformTokenPreAuth,
-                verifyIfPresented
-            ]
+            authenticate: schemaAuthenticate
         });
+        // The OpenAPI document describes the same tables, so by default it is
+        // served to the same callers, each the tables they are described.
+        docsAudience = {
+            authenticate: schemaAuthenticate,
+            available: adminSurfacesGated,
+            publicTables,
+            persons: config.schemaTables?.persons ?? "granted"
+        };
         if (!adminSurfacesGated) {
             warnOnMount(
                 "schema",
@@ -4279,6 +4290,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // spec for URLs it 404s.
             mountOpenApiDocs(app, basePath, {
                 enableSwagger: config.enableSwagger,
+                audience: docsAudience,
                 serverTables: serverSlugs.flatMap(slug => tableRegistry.get(slug) ?? []),
                 requireAuth: resolveRequireAuth(config.auth),
                 adminGate: adminGate("schema:read"),

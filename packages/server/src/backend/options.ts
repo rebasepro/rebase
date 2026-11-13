@@ -781,6 +781,18 @@ export interface RebaseBackendOptions {
      * - `{ retention?: number }` — enable with optional retention period (days)
      */
     history?: HistoryConfig;
+    /**
+     * Who the OpenAPI document (`{basePath}/docs`) and the Swagger UI are served to.
+     *
+     * - unset (the default) — the document is served to the callers
+     *   `GET /schema/tables` describes the tables to, each the document of the
+     *   tables, columns and relations that endpoint describes to them (an
+     *   administrator gets all of it; anonymous callers are refused unless
+     *   `schemaTables.public`). No Swagger UI.
+     * - `true` — the whole document to everyone, and the Swagger UI outside
+     *   production: the explicit opt-in to publish the API (`REBASE_ENABLE_SWAGGER=true`).
+     * - `false` — the document behind the admin gate only.
+     */
     enableSwagger?: boolean;
     /**
      * Which HTTP surfaces this backend builds — and so which ones `mount()`

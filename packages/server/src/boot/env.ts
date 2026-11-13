@@ -250,23 +250,16 @@ export const bootEnvExtension = z.object({
     /**
      * The OpenAPI surface: `/api/docs` (the spec) and `/api/swagger` (the UI).
      *
-     * Deliberately tri-state, and resolved against NODE_ENV by
-     * {@link resolveEnableSwagger} rather than defaulted here. Unset means "on
-     * in development, off in production"; `false` turns both off anywhere.
+     * Tri-state ({@link resolveEnableSwagger}). Unset, the default in every
+     * environment: the spec is served to the callers `GET /schema/tables`
+     * describes the tables to, each the document of the tables it describes
+     * to them, and there is no UI. `true` publishes the whole spec to everyone
+     * (and the UI, outside production — `init/docs.ts` gates the UI on
+     * `NODE_ENV` independently, so this cannot open it in production).
+     * `false` serves the spec behind the admin gate only.
      *
-     * `true` in production is only half a switch, and the asymmetry is in
-     * `init/docs.ts` rather than here: the *spec* at `/api/docs` is served
-     * whenever this is not `false`, but the Swagger *UI* at `/api/swagger` is
-     * gated on `NODE_ENV !== "production"` independently and this variable
-     * cannot open it.
-     *
-     * It used to default to `"false"` outright, which reads as a safe default
-     * and was not one: the runtime is how every scaffolded project boots, so
-     * the docs disappeared from projects that never asked for that. `rebase
-     * init` prints "docs are at /api/swagger" on completion, the headless
-     * README repeats it, and the console's API Explorer fetches `/api/docs` —
-     * all three 404'd against a project running the runtime, and the baas e2e
-     * failed on exactly that.
+     * The spec is always routed: the console's API Explorer fetches
+     * `/api/docs` as an administrator, and a 404 reads as a project with no API.
      */
     REBASE_ENABLE_SWAGGER: z.enum(["true", "false", ""]).optional()
         .transform(v => (v === undefined || v === "" ? undefined : v === "true")),
@@ -452,21 +445,14 @@ export function isLocalhostOrigin(origin: string): boolean {
 }
 
 /**
- * Whether this process serves the OpenAPI docs.
- *
- * An explicit `REBASE_ENABLE_SWAGGER` wins in either direction. Left unset, the
- * docs follow the environment: on in development, where they are part of how a
- * scaffolded project is meant to be explored, and off in production, where the
- * spec enumerates every collection and field to anyone who asks for it.
- *
- * Returning `undefined` for development is the point rather than an oversight —
- * it hands the decision to the server's own policy in `init/docs.ts`, which also
- * knows to withhold the Swagger UI while still serving the spec. Two defaults
- * that can disagree about the same route is the bug this replaces.
+ * Who this process serves the OpenAPI docs to: `REBASE_ENABLE_SWAGGER` as
+ * written, `undefined` when unset — the server's default in `init/docs.ts`,
+ * the schema endpoint's audience, in every environment. It used to be
+ * "public in development, admin-only in production": a development server
+ * published every table and column to whoever reached it.
  */
 export function resolveEnableSwagger(env: RebaseBootEnv): boolean | undefined {
-    if (env.REBASE_ENABLE_SWAGGER !== undefined) return env.REBASE_ENABLE_SWAGGER;
-    return env.NODE_ENV === "production" ? false : undefined;
+    return env.REBASE_ENABLE_SWAGGER;
 }
 
 /** A CORS origin resolver of the shape Hono's `cors()` middleware expects. */

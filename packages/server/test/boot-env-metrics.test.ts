@@ -184,7 +184,7 @@ describe("resolveCorsOrigin", () => {
  * project boots — so `/api/docs` and `/api/swagger` 404'd for projects that
  * never asked, including the one `rebase init` tells the user to open. The
  * distinction the tests below pin is that "unset" is not "off": it defers to the
- * server's own policy in development and only hard-disables in production.
+ * server's own policy (the schema endpoint's audience) in every environment.
  */
 describe("resolveEnableSwagger", () => {
     it("defers to the server's policy when unset in development", () => {
@@ -193,10 +193,11 @@ describe("resolveEnableSwagger", () => {
         expect(resolveEnableSwagger(env({ NODE_ENV: "development" }))).toBeUndefined();
     });
 
-    it("is off when unset in production", () => {
-        // The spec enumerates every collection and field, so an unconfigured
-        // production deployment must not publish it.
-        expect(resolveEnableSwagger(env({ NODE_ENV: "production" }))).toBe(false);
+    it("defers to the server's policy when unset in production too", () => {
+        // The server's default serves the spec to the schema endpoint's
+        // audience, per caller, in every environment: neither published (it
+        // was, in development) nor admin-only (it was, in production).
+        expect(resolveEnableSwagger(env({ NODE_ENV: "production" }))).toBeUndefined();
     });
 
     it("honours an explicit value in either environment", () => {

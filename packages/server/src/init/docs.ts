@@ -1,6 +1,9 @@
-import { Hono, type MiddlewareHandler } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import type { TableDescriptor } from "@rebasepro/types";
 import { HonoEnv } from "../api/types";
+import { ApiError } from "../api/errors";
+import { schemaViewFor, schemaViewKey, serializeTables, type SchemaTablesPersons, type SchemaView } from "../api/schema-tables";
+import { schemaCallerOf } from "../api/schema-tables-routes";
 import { logger } from "../utils/logger";
 import { noCollectionsCause } from "../backend/no-collections";
 
@@ -17,8 +20,34 @@ export async function loadOpenApiGenerator(): Promise<OpenApiGenerator> {
     return generateOpenApiSpec;
 }
 
+/**
+ * Who the OpenAPI document is served to by default: the callers
+ * `GET /schema/tables` describes the tables to, each described the same
+ * tables, columns and relations (see `api/schema-tables`).
+ */
+export interface OpenApiDocsAudience {
+    /** Identify the caller, as the schema endpoint does: no credential passes through as anonymous. */
+    authenticate: MiddlewareHandler<HonoEnv>[];
+    /** `false` when no authentication is configured: there is no caller to describe the tables to. */
+    available: boolean;
+    /** `schemaTables.public`: anonymous callers are described the tables with a public `select` rule. */
+    publicTables?: boolean;
+    /** `schemaTables.persons`. */
+    persons?: SchemaTablesPersons;
+}
+
 export interface OpenApiDocsOptions {
+    /**
+     * `true` publishes the whole document to everyone (and the Swagger UI
+     * outside production) — the explicit opt-in. `false` serves it behind the
+     * admin gate. Unset — the default — serves it as `audience` says: to the
+     * callers the schema endpoint describes the tables to, each the document
+     * of the tables they are described; behind the admin gate when no
+     * `audience` is given.
+     */
     enableSwagger: boolean | undefined;
+    /** Who the document is served to when `enableSwagger` is unset. */
+    audience?: OpenApiDocsAudience;
     /**
      * The descriptors of the tables the REST routes serve, in route order.
      * Only those: documenting a table the routes do not serve publishes a full
@@ -43,7 +72,7 @@ export interface OpenApiDocsOptions {
  * Serve the OpenAPI document, and Swagger UI outside production when swagger is on.
  */
 export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: OpenApiDocsOptions): void {
-    const { enableSwagger, serverTables, requireAuth, adminGate, generate, unprotectedTables = [] } = options;
+    const { enableSwagger, serverTables, requireAuth, adminGate, generate, audience, unprotectedTables = [] } = options;
     if (serverTables.length === 0) {
         // Still routed, and still a 404 — but one that says which 404 it is.
         //
@@ -66,22 +95,16 @@ export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: 
         return;
     }
 
-    // `false` means "do not publish this", not "do not have it".
-    //
-    // `resolveEnableSwagger` returns false in production whenever
-    // REBASE_ENABLE_SWAGGER is unset, which is every managed tenant — so this
-    // used to return early and the route did not exist at all. Rebase Cloud's
-    // console has an API Explorer tab that fetches exactly this path, and it
-    // therefore answered 404 for every project on the platform, permanently,
-    // with no way for the operator to tell that from a project that had no API.
-    //
-    // A spec is a description of routes the caller can already discover by
-    // reading their own collections, so the risk of publishing it is small —
-    // but it is not zero, and it was a deliberate decision to keep it off the
-    // public surface. Both things are satisfied by serving it to a caller who
-    // proves they are an admin of this project, which is precisely who the
-    // console is asking on behalf of.
-    const isPublic = enableSwagger !== false;
+    // Who reads the document. It lists every served table, its columns, their
+    // descriptions and enum values: what `GET /schema/tables` withholds from a
+    // caller it does not describe a table to. So by default it is served to
+    // the same callers, each the document of the tables that endpoint
+    // describes to them (an administrator — Rebase Cloud's API Explorer — the
+    // whole of it). Publishing it to everyone is the explicit
+    // `enableSwagger: true` (`REBASE_ENABLE_SWAGGER=true`); `false` keeps it
+    // behind the admin gate. It is always ROUTED: a 404 would read as a
+    // project with no API.
+    const isPublic = enableSwagger === true;
 
     if (!generate) {
         throw new Error("mountOpenApiDocs: tables to document, and no document builder — pass `generate` (`await loadOpenApiGenerator()`).");
@@ -109,9 +132,10 @@ export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: 
         return c.body(serialized, 200, { "Content-Type": "application/json" });
     };
 
-
     if (isPublic) {
         app.get(`${basePath}/docs`, (c) => spec(c));
+    } else if (enableSwagger === undefined && audience) {
+        mountAudienceDocs(app, basePath, audience, (tables) => generateSpec(tables, { basePath, requireAuth }), serverTables);
     } else {
         // The gate every other admin surface sits behind, so "admin" means
         // one thing across the runtime — including that it is read from the
@@ -144,4 +168,62 @@ export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: 
         });
         if (options.announce !== false) logger.info("Swagger UI available", { path: `${basePath}/swagger` });
     }
+}
+
+/** Distinct views whose document is cached; more than this and the cache starts over. */
+const MAX_CACHED_DOCUMENTS = 64;
+
+/**
+ * `GET {basePath}/docs` for the schema endpoint's audience: the caller is
+ * identified as `GET /schema/tables` identifies it, refused as it refuses
+ * (401 anonymous unless `schemaTables.public`, 403 for a credential with no
+ * schema or data scope, 404 without authentication), and served the document
+ * of exactly the tables, columns and relations that endpoint describes to it.
+ * One document per view, cached: two callers with the same view get the same
+ * bytes.
+ */
+function mountAudienceDocs(
+    app: Hono<HonoEnv>,
+    basePath: string,
+    audience: OpenApiDocsAudience,
+    generate: (tables: readonly TableDescriptor[]) => unknown,
+    serverTables: readonly TableDescriptor[]
+): void {
+    if (!audience.available) {
+        app.get(`${basePath}/docs`, (c) => c.json({
+            error: {
+                code: "DOCS_UNAVAILABLE",
+                message: "The API document is served to the callers GET /schema/tables describes the tables to, and no " +
+                    "authentication is configured, so there is none. Configure auth, or publish the document to " +
+                    "everyone with `enableSwagger: true` (REBASE_ENABLE_SWAGGER=true)."
+            }
+        }, 404));
+        return;
+    }
+    const documents = new Map<string, Uint8Array<ArrayBuffer>>();
+    const viewOf = (c: Context<HonoEnv>): SchemaView => {
+        const caller = schemaCallerOf(c);
+        if (caller.kind === "anonymous" && !audience.publicTables) {
+            throw ApiError.unauthenticated("Authentication required: the API document describes the tables to signed-in callers and credentials only.");
+        }
+        const view = schemaViewFor(caller, { persons: audience.persons ?? "granted" });
+        if ("refused" in view) throw new ApiError(403, "SCOPE_MISSING", view.message, { requiredScope: "schema:read" });
+        return view;
+    };
+    app.use(`${basePath}/docs`, ...audience.authenticate);
+    app.get(`${basePath}/docs`, (c) => {
+        const view = viewOf(c);
+        const key = schemaViewKey(view);
+        let document = documents.get(key);
+        if (!document) {
+            document = new TextEncoder().encode(JSON.stringify(generate(serializeTables(serverTables, view))));
+            if (documents.size >= MAX_CACHED_DOCUMENTS) documents.clear();
+            documents.set(key, document);
+        }
+        return c.body(document, 200, {
+            "Content-Type": "application/json",
+            "Cache-Control": "private, no-cache",
+            "Vary": "Authorization"
+        });
+    });
 }
