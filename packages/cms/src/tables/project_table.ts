@@ -9,8 +9,19 @@
  * collection's slug is the descriptor's slug and every property key is a
  * column key or a relation name, because saved layouts, favourites, URLs and
  * API calls are all keyed by them.
+ *
+ * Presentation is the panel's, not the projector's. A projected collection
+ * states a presentation key only where the table states a fact that implies it
+ * (a column type, a validation rule, a storage column, a stamp, a relation);
+ * everything else — the view mode, how a record opens, the display slots, the
+ * columns shown — is left unset, so a table opens exactly as an authored
+ * collection that said nothing did, and `customizeTable` is where a project
+ * chooses otherwise. The one stated default beyond the facts is POSTGRES-FIRST.md
+ * §6.1's: audit stamps (`createdAt`/`updatedAt`) are left out of the default
+ * table columns.
  */
 import type {
+    AnyCollectionConfig,
     AuthCollectionConfig,
     PostgresProperties,
     TableDescriptor
@@ -20,7 +31,6 @@ import { tableLabels } from "./labels";
 import { enumValuesFrom, propertyFromColumn } from "./column_property";
 import { projectRelations, type TargetResolver } from "./relations";
 import { securityRulesFromRls } from "./rls";
-import { defaultDisplay } from "./display_defaults";
 
 /**
  * What a table projects to: the panel's collection view model.
@@ -40,6 +50,24 @@ export interface TableProjectionContext {
      * them by slug; a relation to a table not listed here is left out.
      */
     tables: readonly TableDescriptor[];
+}
+
+/**
+ * How {@link collectionsFromTables} resolves relation targets.
+ *
+ * @group Tables
+ */
+export interface TableProjectionOptions {
+    /**
+     * The collection a relation to the table `slug` opens, when it is not the
+     * bare projection: the panel passes the composed collection (projected,
+     * customized, with the workspace's preferences), so a relation's picker,
+     * preview and tab read the target as the panel shows it — what an authored
+     * collection's `target: () => other` handed them. Read lazily, each time a
+     * relation's `target()` is called; `undefined` falls back to the
+     * projection.
+     */
+    targetCollection?: (slug: string) => AnyCollectionConfig | undefined;
 }
 
 /**
@@ -73,11 +101,15 @@ class Projection {
         has: (slug) => this.bySlug.has(slug),
         get: (slug) => {
             const table = this.bySlug.get(slug);
-            return table ? this.project(table) : undefined;
+            if (!table) return undefined;
+            return this.targetCollection?.(slug) ?? this.project(table);
         }
     };
 
-    constructor(tables: readonly TableDescriptor[]) {
+    constructor(
+        tables: readonly TableDescriptor[],
+        private readonly targetCollection?: TableProjectionOptions["targetCollection"]
+    ) {
         for (const table of tables) {
             if (!this.bySlug.has(table.slug)) this.bySlug.set(table.slug, table);
         }
@@ -103,7 +135,6 @@ function build(table: TableDescriptor, resolveTarget: TargetResolver): Projected
     const columnKeys = new Set(table.columns.map(column => column.key));
 
     const properties: PostgresProperties = {};
-    const shown = new Set<string>();
     for (const column of table.columns) {
         const relation = replacing.get(column.key);
         if (relation) {
@@ -113,7 +144,6 @@ function build(table: TableDescriptor, resolveTarget: TargetResolver): Projected
         const property = propertyFromColumn(column, { primaryKey: table.primaryKey, tenantField: table.tenant?.field });
         if (!property) continue;
         properties[column.key] = property;
-        shown.add(column.key);
     }
     for (const relation of relations) {
         if (relation.replacesColumn) continue;
@@ -126,14 +156,13 @@ function build(table: TableDescriptor, resolveTarget: TargetResolver): Projected
     // The tenant column replaced by its relation is still the tenant column.
     const tenantRelation = table.tenant ? replacing.get(table.tenant.field) : undefined;
     if (tenantRelation) {
-        tenantRelation.property.admin = { ...tenantRelation.property.admin, filledByServer: true, hideFromCollection: true };
+        tenantRelation.property.admin = { ...tenantRelation.property.admin, filledByServer: true };
     }
 
     withDeclaredRoles(properties, table);
 
     const { name, singularName } = tableLabels(table);
     const auth = authConfig(table);
-    const display = defaultDisplay(table, shown);
 
     const collection: ProjectedCollection = {
         slug: table.slug,
@@ -143,7 +172,6 @@ function build(table: TableDescriptor, resolveTarget: TargetResolver): Projected
         schema: table.schema,
         properties,
         securityRules: securityRulesFromRls(table, { properties }),
-        defaultViewMode: "table",
         ...(table.description ? { description: table.description } : {}),
         ...(table.database ? { dataSource: table.database } : {}),
         ...(table.history ? { history: true } : {}),
@@ -169,8 +197,7 @@ function build(table: TableDescriptor, resolveTarget: TargetResolver): Projected
             }
             : {}),
         ...(table.strictWrites === false ? { strictWrites: false } : {}),
-        ...(table.metadata ? { metadata: table.metadata } : {}),
-        ...(display ? { display } : {})
+        ...(table.metadata ? { metadata: table.metadata } : {})
     };
     return collection;
 }
@@ -194,11 +221,12 @@ export function collectionFromTable(table: TableDescriptor, context: TableProjec
 /**
  * Every table as the panel's default collection, in the order served. Tables
  * that relate to each other share one projection, so a relation's target is
- * the very collection listed beside it.
+ * the very collection listed beside it — or, with
+ * `options.targetCollection`, the collection the caller composed from it.
  *
  * @group Tables
  */
-export function collectionsFromTables(tables: readonly TableDescriptor[]): ProjectedCollection[] {
-    const projection = new Projection(tables);
+export function collectionsFromTables(tables: readonly TableDescriptor[], options: TableProjectionOptions = {}): ProjectedCollection[] {
+    const projection = new Projection(tables, options.targetCollection);
     return tables.map(table => projection.project(table));
 }

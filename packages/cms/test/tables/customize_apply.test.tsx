@@ -50,8 +50,6 @@ function postsBase(): AdminPostgresCollection {
         name: "Posts",
         singularName: "Post",
         table: "posts",
-        defaultViewMode: "table",
-        display: { title: "title" },
         properties: {
             id: { type: "string", name: "Id", isId: "uuid" },
             title: { type: "string", name: "Title", validation: { required: true } },

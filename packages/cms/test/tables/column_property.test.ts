@@ -261,9 +261,10 @@ describe("column facts → form behaviour", () => {
         expect(project(column("title", { kind: "text" }))).not.toHaveProperty("columnName");
     });
 
-    it("the tenant column is filled by the server and out of the table", () => {
+    it("the tenant column is filled by the server and stays among the table columns", () => {
         const property = project(column("orgId", { kind: "uuid" }, { nullable: false }), [], "orgId");
-        expect(property).toMatchObject({ validation: { required: true }, admin: { filledByServer: true, hideFromCollection: true } });
+        expect(property).toMatchObject({ validation: { required: true }, admin: { filledByServer: true } });
+        expect(property.admin?.hideFromCollection).toBeUndefined();
         expect(property.admin?.readOnly).toBeUndefined();
     });
 });

@@ -111,10 +111,10 @@ describe("posts, compiled and projected", () => {
         expect(projectedPosts.properties.id).toMatchObject({ isId: "uuid" });
     });
 
-    it("keeps the audit dates read-only and out of the table, the tenant out of the table", () => {
+    it("keeps the audit dates read-only and out of the table, the tenant filled by the server", () => {
         expect(projectedPosts.properties.createdAt).toMatchObject({ autoValue: "on_create", admin: { readOnly: true, hideFromCollection: true } });
         expect(projectedPosts.properties.updatedAt).toMatchObject({ autoValue: "on_update", admin: { readOnly: true, hideFromCollection: true } });
-        expect(projectedPosts.properties.orgId.admin).toMatchObject({ hideFromCollection: true, filledByServer: true });
+        expect(projectedPosts.properties.orgId.admin).toEqual({ filledByServer: true });
     });
 
     it("resolves the relations to the collections projected beside it", () => {
@@ -127,14 +127,14 @@ describe("posts, compiled and projected", () => {
         expect(getEntityChildViews(projectedPosts).map(view => view.key)).toEqual(["tags"]);
     });
 
-    it("carries the table features and the default slots", () => {
+    it("carries the table features, and leaves presentation to the panel", () => {
         expect(projectedPosts).toMatchObject({
             history: true,
             softDelete: { field: "deletedAt" },
-            tenant: { field: "orgId", from: { claim: "org_id" } },
-            defaultViewMode: "table",
-            display: { title: "title", image: "heroImage", status: "status", date: "publishDate" }
+            tenant: { field: "orgId", from: { claim: "org_id" } }
         });
+        expect(projectedPosts).not.toHaveProperty("defaultViewMode");
+        expect(projectedPosts).not.toHaveProperty("display");
     });
 
     it("reflects the permissions for anonymous, editor and admin", () => {

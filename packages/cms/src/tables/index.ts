@@ -1,12 +1,11 @@
 export { collectionFromTable, collectionsFromTables } from "./project_table";
-export type { ProjectedCollection, TableProjectionContext } from "./project_table";
+export type { ProjectedCollection, TableProjectionContext, TableProjectionOptions } from "./project_table";
 export { tableLabels } from "./labels";
 export { enumValueColor, enumValuesFrom, jsonNodeProperty, propertyFromColumn, storageConfigFrom } from "./column_property";
 export type { ColumnProjectionContext } from "./column_property";
 export { projectRelations } from "./relations";
 export type { ProjectedRelation, TargetResolver } from "./relations";
 export { securityRulesFromRls } from "./rls";
-export { defaultDisplay, TITLE_KEYS } from "./display_defaults";
 export { customizeTable } from "./customize_table";
 export { applyTableCustomization, applyTableCustomizations } from "./apply_customization";
 export type { TableCollection } from "./apply_customization";

@@ -153,11 +153,6 @@ export function storageConfigFrom(storage: ColumnStorage): StorageConfig {
     });
 }
 
-/** Whether a storage rule accepts images (and so previews as one). */
-export function acceptsImages(storage: ColumnStorage | undefined): boolean {
-    return Boolean(storage?.accept?.some(type => type.toLowerCase().startsWith("image/")));
-}
-
 // ── Scalars by column type ───────────────────────────────────────────────────
 
 const INTEGER_KINDS: ReadonlySet<ColumnType["kind"]> = new Set([
@@ -555,9 +550,10 @@ function applyStamp(property: Property, stamp: NonNullable<ColumnDescriptor["sta
  *   a literal opens the form with the value, anything else is `databaseDefault`.
  * - `readOnly`, `generated` and stamps are read-only in the form; time stamps
  *   are also left out of the default table columns.
- * - The tenant column is filled by the server on create (`filledByServer`) and
- *   left out of the default table columns. It stays editable: a caller in a
- *   bypass role creates rows in a tenant they name.
+ * - The tenant column is filled by the server on create (`filledByServer`).
+ *   It stays editable and stays among the table columns, as an authored
+ *   collection's did: a caller in a bypass role creates rows in a tenant they
+ *   name.
  */
 export function propertyFromColumn(column: ColumnDescriptor, context: ColumnProjectionContext): PostgresProperty | undefined {
     if (column.private) return undefined;
@@ -605,7 +601,7 @@ export function propertyFromColumn(column: ColumnDescriptor, context: ColumnProj
     }
 
     if (context.tenantField === column.key) {
-        property.admin = { ...property.admin, filledByServer: true, hideFromCollection: true };
+        property.admin = { ...property.admin, filledByServer: true };
     }
 
     return compact(property);

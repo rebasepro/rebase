@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import type { TableDescriptor } from "@rebasepro/types";
 import { getPrimaryKeys } from "@rebasepro/cms-types";
-import { collectionFromTable, collectionsFromTables, defaultDisplay } from "../../src/tables";
+import { collectionFromTable, collectionsFromTables } from "../../src/tables";
 import { column, posts, table, tags, users, uuidId } from "./fixtures";
 
 const all = [posts, users, tags];
@@ -37,8 +37,12 @@ describe("identity", () => {
 describe("the collection", () => {
     const collection = collectionFromTable(posts, { tables: all });
 
-    it("is named from the table and opens as a table", () => {
-        expect(collection).toMatchObject({ name: "Posts", singularName: "Post", defaultViewMode: "table" });
+    it("is named from the table and leaves the view mode and open mode to the panel", () => {
+        expect(collection).toMatchObject({ name: "Posts", singularName: "Post" });
+        // An authored collection that said nothing opened as the list, a record
+        // in the side panel: a projected table must open the same way.
+        expect(collection).not.toHaveProperty("defaultViewMode");
+        expect(collection).not.toHaveProperty("openEntityMode");
         expect(collectionFromTable(table("order_items", { columns: [uuidId()] }), { tables: [] }))
             .toMatchObject({ name: "Order Items", singularName: "Order Item" });
     });
@@ -52,8 +56,8 @@ describe("the collection", () => {
         });
     });
 
-    it("hides the tenant column from the table and lets the server fill it on create", () => {
-        expect(collection.properties.orgId.admin).toEqual({ filledByServer: true, hideFromCollection: true });
+    it("lets the server fill the tenant column on create, and keeps it among the columns", () => {
+        expect(collection.properties.orgId.admin).toEqual({ filledByServer: true });
     });
 
     it("shows createdAt/updatedAt read-only and out of the default columns", () => {
@@ -99,62 +103,13 @@ describe("the auth table", () => {
     });
 });
 
-describe("default display slots", () => {
-    it("fills the spec's posts slots", () => {
-        expect(collectionFromTable(posts, { tables: all }).display).toEqual({
-            title: "title",
-            image: "heroImage",
-            status: "status",
-            date: "publishDate"
-        });
-    });
-
-    it("leaves slots to the panel when no column says it belongs there", () => {
+describe("display slots", () => {
+    it("are left to the panel's own derivation, as for an authored collection that names none", () => {
+        // A declared slot skips the panel's per-record ranking and draws the
+        // record header; neither happened for a collection that said nothing.
+        expect(collectionFromTable(posts, { tables: all })).not.toHaveProperty("display");
         const plain = table("events", { columns: [uuidId(), column("payload", { kind: "jsonb" }), column("kind", { kind: "text" })] });
         expect(collectionFromTable(plain, { tables: [] })).not.toHaveProperty("display");
-    });
-
-    it("falls back to the update stamp, then the create stamp, for the date", () => {
-        const stamped = table("t", {
-            columns: [
-                uuidId(),
-                column("createdAt", { kind: "timestamptz" }, { stamp: { on: "create", value: "now" } }),
-                column("updatedAt", { kind: "timestamptz" }, { stamp: { on: "update", value: "now" } })
-            ]
-        });
-        expect(defaultDisplay(stamped, new Set(["createdAt", "updatedAt"]))).toEqual({ date: "updatedAt" });
-        expect(defaultDisplay(stamped, new Set(["createdAt"]))).toEqual({ date: "createdAt" });
-    });
-
-    it("takes a name column as the title, never an enum or a file", () => {
-        const t = table("t", {
-            columns: [
-                uuidId(),
-                column("label", { kind: "enum", values: ["a"] }),
-                column("name", { kind: "text" }, { storage: { path: "x/" } }),
-                column("displayName", { kind: "varchar", length: 80 }),
-                column("title", { kind: "text" })
-            ]
-        });
-        expect(defaultDisplay(t, new Set(t.columns.map(c => c.key)))?.title).toBe("displayName");
-    });
-
-    it("takes only an image file as the image", () => {
-        const t = table("t", {
-            columns: [
-                uuidId(),
-                column("attachment", { kind: "text" }, { storage: { path: "x/", accept: ["application/pdf"] } }),
-                column("photo", { kind: "text" }, { storage: { path: "x/", accept: ["image/png"] } })
-            ]
-        });
-        expect(defaultDisplay(t, new Set(t.columns.map(c => c.key)))).toEqual({ image: "photo" });
-    });
-
-    it("takes status only from a closed set", () => {
-        const t = table("t", { columns: [uuidId(), column("status", { kind: "text" })] });
-        expect(defaultDisplay(t, new Set(["id", "status"]))).toBeUndefined();
-        const set = table("t", { columns: [uuidId(), column("status", { kind: "text" }, { oneOf: ["on", "off"] })] });
-        expect(defaultDisplay(set, new Set(["id", "status"]))).toEqual({ status: "status" });
     });
 });
 
