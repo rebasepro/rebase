@@ -158,74 +158,78 @@ All committed on the branch (≈150 commits OSS, 12 in `saas`). Details per slic
 ## 6. What is running right now, and what is next
 
 **The live list is the "CURRENT STATE" block at the top of `~/.rebase-audits/pgfirst/PLAN.md`**
-(agent ids, what each is doing, and the ordered NEXT list). It is appended to at every
-checkpoint; this file only carries the shape of the work. As of 2026-11-13 04:00 CET:
+(agent ids, what each is doing, results of every slice, the queue). It is appended to at every
+checkpoint; the newest lines are just above the text "(superseded line follows)". As of
+2026-11-13 06:40 CET (real clock):
 
-- Done: all of Stage A. Stage B: the driver, the server, the planner, boot and the live schema
-  editor run on compiled tables and descriptors only; the lowering bridge (`lowerTables`) is
-  deleted; the legacy model survives only as the frozen copy in `@rebasepro/common/migrate`.
-  The column spelling follows Drizzle everywhere (old spellings removed). First security and
-  parity reviews: every finding fixed. Control plane (`saas`) re-verified on the new tree.
-  English docs, CHANGELOG `[Unreleased]`, upgrade guide and skills are current up to the
-  slices listed as "one more docs touch" below. All four e2e lanes passed on a clean snapshot
-  (before the last four slices: they must be re-run).
-- Running (three builders): **B-VM** (one read shape: the Postgres driver's own read walk that
-  builds the admin's view model is deleted; the CMS builds it in the browser), **B-K7b** (the
-  CMS view-model types leave `@rebasepro/types` / `@rebasepro/common` for `@rebasepro/cms-types`;
-  it defers a few symbols until B-VM lands and must then be resumed), **PLAN-FIX** (a
-  many-to-many from a table to itself does not plan — regression; plus two leftovers).
+- Done and committed: all of Stage A; all of Stage B (driver, server, planner, boot, live
+  schema editor on compiled tables; lowering bridge deleted; legacy model only in
+  `@rebasepro/common/migrate`); ONE read shape and ONE write shape (the backend serves and
+  accepts wire rows only; the admin builds and unbuilds its view model in the browser; client
+  reviver deleted; offline queue migrated; history normalised); the CMS view-model types and
+  value classes moved to `@rebasepro/cms-types`; Drizzle-style columns everywhere; every
+  static gate green except `check:test-types`; the final security review (1 high, 1 medium,
+  3 low — ALL fixed with tests; three of them also exist in released 0.30.x); the migration
+  codemod proven on copies of every real project (no live project blocked; SQL byte-identical;
+  no rule changes meaning); English docs, CHANGELOG, upgrade guide, skills, Part II D + G
+  current up to here.
+- Running: **SDK-ROWS** (the SDK built directly on rows; `Entity` and its accessor leave the
+  kernel for the CMS packages; ends with the admin lane), **TEST-TYPES** (brings
+  `check:test-types` to or below its baseline by fixing tests; three red/flaky tests), and the
+  **translations** (a background shell running `website/scripts/translate_docs.mjs` over 645
+  stale or missing locale pages; log `~/.rebase-audits/pgfirst/tmp/coord/translate-run.log`;
+  re-running the same command is safe and incremental).
 - Notes each slice left for docs and the CHANGELOG: `~/.rebase-audits/pgfirst/stage-b-docs-notes.md`.
-  Reviews: `~/.rebase-audits/pgfirst/reviews/`. E2E findings: `~/.rebase-audits/pgfirst/e2e-findings.md`.
-  Gate leftovers: `~/.rebase-audits/pgfirst/final-pass-checklist.md`. Drizzle mapping:
-  `~/.rebase-audits/pgfirst/drizzle-alignment.md`.
+  Reviews: `~/.rebase-audits/pgfirst/reviews/` (`security-final.md` is the latest). Migration
+  trial: `~/.rebase-audits/pgfirst/migrate-real.md`, copies under `~/.rebase-audits/pgfirst/real/`.
+  Gate leftovers: `~/.rebase-audits/pgfirst/final-pass-checklist.md`. Part II F draft (to be
+  filled by the parity review): `~/.rebase-audits/pgfirst/part2-F-draft.md`.
 
-The Mac restarted at 20:18 and again at ~22:45 on 2026-11-12 (memory); each time every agent's
-uncommitted work was intact and all agents were resumed. Since then: at most three or four
-builders, heavy commands only through `locked.sh heavy`.
+The Mac restarted twice on 2026-11-12 (memory). Since then: at most four builders, heavy
+commands only through `locked.sh heavy`. Budget rule: about 1% of the weekly limit per
+agent-hour; code first, verification last (never verify before the last code slice lands).
 
 ## 7. What is left, in order
 
-1. **B-VM**, **B-K7b**, **PLAN-FIX** finish (see section 6). When B-VM reports, resume B-K7b
-   for its deferred symbols (value classes, `Entity`, the home of `buildRebaseData.ts`).
-2. **One more docs touch** (English): apply the notes sections B-R7b, SCHEMA-EDITOR-2,
-   LIVE-CATALOGUE, CORPUS, B-K8b, B-VM, B-K7b, PLAN-FIX (new error codes
-   `SCHEMA_EDITING_NO_REPOSITORY` / `SCHEMA_EDIT_STALE_FILE`, `refreshTables`, removed
-   `collections` inputs, the compiler's new refusals, the type-move rename list);
-   `docs/hosted-mcp-connector.md` still says payload version 2 (it is 3); rewrite Part II D's
-   last bullet and add the new decisions to Part II G.
-3. **Translations** of the stale locale twins — see the TRANSLATIONS note in `PLAN.md` (repo
-   script `website/scripts/translate_docs.mjs`, dry run first, key passed in the process
-   environment only; fallback: delete stale twins and say so).
-4. **Gates final pass**: `~/.rebase-audits/pgfirst/final-pass-checklist.md` (API-surface
-   banking, removed-names, casts / hooks / unused / untranslated baselines, bundle budgets,
-   template pins, stale paths in `docs/audits/systems.json`, `contracts/server.api.txt` and
-   `docs/gates.md` still naming `lowerTables`). Rebuild every `dist`.
+1. **SDK-ROWS** and **TEST-TYPES** finish. Then regenerate the codemod's import table
+   (`node tooling/scripts/codemod/moved-symbols-table.mjs`) if `moved-imports.test.ts` is red.
+2. **Docs, last touch**: resume the docs builder (or a fresh one with
+   `~/.rebase-audits/pgfirst/tmp/docs-4/running-list.md`) for SDK-ROWS: `packages/common/README.md`,
+   Part II G's "Entity pending" line, CHANGELOG / guide wording, the moved-imports page.
+3. **Translations**: when the background run has exited, read its log for failures, re-run it
+   once English is final, run the locale gates, commit the locale files.
+4. **Final banking** (`final-pass-checklist.md`): rebuild every `dist`; `pnpm write:api-surface`
+   then `removed-names --write`; `--update` the casts / hooks / unused / untranslated /
+   test-types baselines (they only went down); bundle budgets (look at why before banking);
+   `check:runtime-image:boots`.
 5. **Full verification** on a clean snapshot worktree (detached HEAD, `node_modules` cloned
    with `cp -Rc`, dist built there): `./tooling/scripts/verify-quality.sh`, all four
-   `pnpm ci:e2e` lanes, `saas` backend + console suites and tsc, `pnpm verify:docs:strict`.
-6. **Final independent reviews** (fresh agents, given code not conclusions): security (REST
-   paths, history, real-Postgres RLS, saas intake, the new read path), parity against
-   `reviews/parity.md` and the spec's §7 table, the codemod on the real projects. Fix findings.
+   `pnpm ci:e2e` lanes, `saas` backend + console suites and tsc, `pnpm verify:docs:strict`,
+   the built-dist `provision-off-e2e`.
+6. **Independent reviews** (fresh agents, given code not conclusions): parity — fills
+   `part2-F-draft.md` line by line and confirms every retired legacy test has a native
+   equivalent; a short security DELTA on the write direction, the security fixes and SDK-ROWS.
+   Fix what they find.
 7. Fill **Part II section F**; finalise `CHANGELOG.md`; delete this handoff file; final report.
-8. **Release and rollout** — only under section 9.
-9. Optional, if budget allows; otherwise tell Francesco: names that still say "collection" on
-   the wire (driver method names, socket frames, upload fields, offline queue, some JSON
-   keys); scripted conversion of the ~550 test files holding legacy collection literals.
+8. **Migration phase 2** (fresh agent; copies only until the release): per real project finish
+   the manual steps in its copy, typecheck and build against the packed 0.31 packages, boot on
+   a throwaway Postgres. The diff becomes that project's migration commit at rollout.
+9. **Release and rollout** — only under section 9.
+10. Optional, else tell Francesco: names that still say "collection" on the wire (driver
+    method names, socket frames, upload fields, offline queue, some JSON keys).
 
 ## 8. Known red or open right now
 
-- `view-plan` (server-postgres) red until PLAN-FIX lands. `pnpm check:casts` red on
-  `packages/cms-types` until B-K7b lands.
+- `check:test-types` red until TEST-TYPES lands. `moved-imports.test.ts` (cli) red while
+  SDK-ROWS has uncommitted guard-JSON edits. CLI `bin-output` red until `dist` is rebuilt.
+- Locale docs are stale until the translation run is committed (`verify:docs` ≈ 709 findings,
+  all locale but two that clear with the docs touch and final banking).
 - `pnpm check:bundle` over budget on two chunks (look at why before banking);
-  `check:templates` / `check:template-pins` are red on unreleased imports until the tag
-  exists — verify with `--released-as 0.31.0`. The version is **not** bumped (the release
-  script bumps).
-- `DRIVER_SKEW` (published drivers a format-3 bundle may run on) is empty until 0.31.0 exists:
-  add 0.31.0 right after the npm release.
-- Every `dist` is stale: rebuild before any e2e lane.
-- Names that still say "collection" on purpose until decided: offline queue,
-  `keyTargets.collections` (keep), log field + Prometheus label (rename only with
-  dashboards/alerts), saved-apps column `collections` (kept), driver method / socket frame names.
+  `check:templates` is red on unreleased imports until the tag exists — verify with
+  `--released-as 0.31.0`. The version is **not** bumped (the release script bumps).
+- `DRIVER_SKEW` is empty until 0.31.0 exists: add 0.31.0 right after the npm release.
+- Not yet proven: a server started from built packages with provisioning off; the hosted
+  connector against a tenant; `db push` / restore on a database with drifted policies.
 
 ## 9. Release and rollout — gates (all required, in this order)
 
@@ -270,6 +274,16 @@ builders, heavy commands only through `locked.sh heavy`.
 - `.references()` on a column is refused (use `rel.belongsTo`) — the one Drizzle spelling he
   may want flipped. A restore re-stamps policies. `policy-table-agreement` test deleted
   (plan-golden pins the policy SQL).
-- Usage: weekly limit at 71% on Fri 03:30 CET with three builders (~0.6% per agent-hour); it
-  resets Sun 2026-11-15 08:00 CET. Before ~90%: launch nothing new, let agents commit, update
-  this file and `PLAN.md`.
+- Security: the nested-include masking leak, declared tables served with RLS off when
+  provisioning is off, relation-key writes bypassing a child key's write rules and the public
+  API docs page ALSO exist in released 0.30.x (all fixed on this branch).
+- Breaking defaults he may want flipped: a to-one relation written as `{ id }` is now a 400
+  (send the key); `/api/docs` follows the schema endpoint's audience (`enableSwagger: true`
+  publishes it).
+- The fleet's source is pinned at 0.21–0.29 except one project: rollout is per-project
+  migration work. One dormant project (pre-0.30 config) needs hand fixes first.
+- Translations were regenerated with the repo's script and the Gemini key from the primary
+  checkout's `website/.env`, passed in the process environment only.
+- Usage: weekly limit at 79% on Fri 06:30 CET; about 1% per agent-hour; it resets
+  Sun 2026-11-15 08:00 CET. At 88%: launch nothing new, let agents commit, update this file
+  and `PLAN.md`. Verification, reviews, phase 2 and the release fall after the reset.
