@@ -103,6 +103,12 @@ export function boundKeyColumn(table: TableDescriptor, relation: RelationDescrip
  * `belongsTo`, not for a `hasMany` / `hasOne` (whose key is the target's) or a
  * `via` past its first step.
  *
+ * @param table - the table that declares the relation.
+ * @param relation - one of `table.relations`.
+ * @param viewer - the caller; `undefined` is the trusted server plane.
+ * @param related - the other tables, by slug or SQL name; pass it whenever the
+ *   relation may join through another table's columns.
+ *
  * @group Table
  */
 export function canReadRelation(
