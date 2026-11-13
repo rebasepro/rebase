@@ -531,7 +531,14 @@ export interface TableJunction {
  * they declare, keyed by junction table. Two tables may declare one junction
  * from opposite sides (`posts.tags` and `tags.posts` through `posts_tags`);
  * both become `declaringSides`, so the derived write grants consider both.
- * A relation whose target is not among `descriptors` is skipped, as is a view.
+ * A relation whose target is not among `descriptors` is skipped.
+ *
+ * Pass every descriptor, views included. A view declares no junction (it has
+ * no table to own one, and the planner plans none for it), so its
+ * `manyToMany` relations are skipped; but a view is a valid *target* — the
+ * junction keys into it without a foreign key — so it must be here for the
+ * table that links to it to resolve its junction. Filtering views out before
+ * the call loses every junction into a view.
  *
  * Input order decides the endpoints' order and the sides' — sort by slug at
  * the boundary, as the planner does.
@@ -542,6 +549,7 @@ export function resolveTableJunctions(descriptors: readonly TableDescriptor[]): 
     const bySlug = new Map(descriptors.map(descriptor => [descriptor.slug, descriptor]));
     const junctions = new Map<string, TableJunction>();
     for (const descriptor of descriptors) {
+        if (descriptor.kind === "view") continue;
         for (const relation of descriptor.relations) {
             if (relation.kind !== "manyToMany") continue;
             const target = bySlug.get(relation.target);

@@ -125,4 +125,20 @@ describe("junctions of compiled tables", () => {
         // junction is the author's to police, and gets no derived rule.
         expect(tableJunctionRules(junction)).toEqual([]);
     });
+
+    // A view is a valid target — the junction keys into it with no foreign
+    // key — but declares no junction of its own. Callers filtered views out
+    // before resolving, and lost every junction into one: the planner refused
+    // such a schema ("the junction table … was not resolved") and the doctor
+    // did not know the junction was managed.
+    it("resolves a junction into a view, and none declared by a view", () => {
+        const asView = (slug: string) => {
+            const found = descriptors.find(descriptor => descriptor.slug === slug);
+            if (!found) throw new Error(`no descriptor "${slug}"`);
+            return { ...found, kind: "view" as const };
+        };
+        const intoView = resolveTableJunctions(descriptors.map(d => (d.slug === "tags" ? asView("tags") : d))).get("posts_tags");
+        expect(intoView?.endpoints.map(end => [end.descriptor.slug, end.descriptor.kind])).toEqual([["posts", "table"], ["tags", "view"]]);
+        expect(resolveTableJunctions(descriptors.map(d => (d.slug === "posts" ? asView("posts") : d))).has("posts_tags")).toBe(false);
+    });
 });

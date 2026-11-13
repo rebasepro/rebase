@@ -23,7 +23,7 @@ export function managedTablesOf(descriptors: readonly TableDescriptor[]): Manage
     const tables = new Map<string, ManagedTable>();
     const add = (schema: string, table: string) => tables.set(`${schema}.${table}`, { schema, table });
     for (const descriptor of descriptors) add(descriptor.schema, descriptor.table);
-    for (const junction of resolveTableJunctions(descriptors.filter(d => d.kind !== "view")).values()) add(junction.schema, junction.table);
+    for (const junction of resolveTableJunctions(descriptors).values()) add(junction.schema, junction.table);
     return [...tables.values()];
 }
 

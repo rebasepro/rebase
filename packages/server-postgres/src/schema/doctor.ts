@@ -801,7 +801,7 @@ export async function checkTablesVsDatabase(
         // ── Compare each table against the database ──────────────────────
 
         // Where boot and `db push` create each junction table.
-        const junctions = resolveTableJunctions(sortTablesBySlug(tables).map(t => t.descriptor).filter(d => d.kind !== "view"));
+        const junctions = resolveTableJunctions(sortTablesBySlug(tables).map(t => t.descriptor));
 
         // What push and boot build, read once. The key and the junction checks
         // compare against it rather than against a fifth reading of the

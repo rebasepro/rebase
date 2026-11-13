@@ -50,6 +50,14 @@ describe("managedTablesOf", () => {
         ]);
     });
 
+    // A junction into a view is created like any other (keyed with no
+    // foreign key on the view's side); filtering the views out before
+    // resolving the junctions left it off the list.
+    it("lists the junction into a view", () => {
+        const intoView = described([posts, tags]).map(d => (d.slug === "tags" ? { ...d, kind: "view" as const } : d));
+        expect(managedTablesOf(intoView)).toContainEqual({ schema: "public", table: "posts_tags" });
+    });
+
     it("is empty for a project with no tables", () => {
         expect(managedTablesOf([])).toEqual([]);
     });

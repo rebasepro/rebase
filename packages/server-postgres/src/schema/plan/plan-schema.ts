@@ -716,7 +716,8 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
     // Each table, then any junction its relations imply, in the order the
     // tables arrive. `schema.sql` and `schema.generated.ts` are compared
     // against their committed copies, so this order is the file's.
-    const tableJunctions = resolveTableJunctions(tableDescriptors);
+    // Every descriptor: a view declares no junction, but one may be a target.
+    const tableJunctions = resolveTableJunctions(descriptors);
     const resolvePolicyTable = policyTableResolver(descriptors);
     const tableEntries = new Map<string, TableEntry>();
     const junctionShapes = new Map<string, { keys: string; claim: string }>();
