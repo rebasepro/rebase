@@ -21,7 +21,7 @@ import type { LegacyEnumValues, LiftNote } from "@rebasepro/common/migrate";
 import { enumValueLabel, labelFromIdentifier, singularLabel } from "@rebasepro/utils";
 
 import type { Member, PathSegment } from "./ast";
-import { collectReferences, nodeAtPath, nodeText, postDeclarationAssignments, resolveObject, toPosix, unwrap } from "./ast";
+import { collectReferences, nodeAtPath, nodeText, postDeclarationAssignments, resolveObject, spreadSource, toPosix, unwrap } from "./ast";
 import { memberFunctionText } from "./hooks";
 import { constantForEnum } from "./split-constants";
 import {
@@ -207,6 +207,12 @@ function printable(plan: PlanContext, builder: Builder, value: unknown, segments
     if (isCode(value)) {
         const located = locate(plan, builder.entry, segments);
         if (!located.member) {
+            // Spread in from one shared object (`...fixedOnceCreated`): carried as that object's member, its import with it.
+            const spread = builder.entry.site ? spreadSource(plan.ast, builder.entry.site.literal, segments) : undefined;
+            if (spread) {
+                builder.codeNodes.push(spread.spread);
+                return new RawSource(spread.text);
+            }
             refuse(plan, builder.entry, `${label} is code, and its source could not be found: ${located.reason}. Write it inline (or as a \`const\` in the same file, or import it) and run the codemod again.`, { key: segments.join(".") });
             builder.failed = true;
             return undefined;

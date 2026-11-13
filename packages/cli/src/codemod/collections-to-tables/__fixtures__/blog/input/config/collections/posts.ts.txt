@@ -5,6 +5,7 @@ import { defineCollection } from "@rebasepro/cms-types";
 import { slugify } from "../slugify";
 import { notify } from "../actions";
 import { squash } from "./_text";
+import { fixedOnceCreated } from "../form-rules";
 import authorsCollection from "./authors";
 import tagsCollection from "./tags";
 
@@ -22,7 +23,7 @@ const postsCollection = defineCollection({
             validation: { required: true },
             admin: { multiline: true }
         },
-        slug: { name: "Slug", type: "string", validation: { unique: true } }, // Unique, so a URL names one post.
+        slug: { name: "Slug", type: "string", validation: { unique: true }, ...fixedOnceCreated }, // Unique, so a URL names one post.
         status: {
             name: "Status",
             type: "string",

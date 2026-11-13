@@ -190,6 +190,64 @@ export function memberOf(ctx: AstContext, literal: ObjectLiteralExpression, name
     return { reason: `there is no \`${name}\` in the object literal at line ${literal.getStartLineNumber()}` };
 }
 
+/** Whether an expression is a module-scope name, or a property chain on one (`rules.fixed`): an import or a top-level `const`. */
+function isModuleName(ctx: AstContext, node: Node): boolean {
+    const { Node: N, SyntaxKind, VariableDeclarationKind } = ctx.tsm;
+    if (N.isPropertyAccessExpression(node)) return isModuleName(ctx, node.getExpression());
+    if (!N.isIdentifier(node)) return false;
+    const declarations = node.getSymbol()?.getDeclarations() ?? [];
+    return declarations.length > 0 && declarations.every(declaration => {
+        if (N.isImportSpecifier(declaration) || N.isImportClause(declaration) || N.isNamespaceImport(declaration)) return true;
+        if (!N.isVariableDeclaration(declaration)) return false;
+        const statement = declaration.getFirstAncestorByKind(SyntaxKind.VariableStatement);
+        return statement !== undefined && N.isSourceFile(statement.getParent()) && statement.getDeclarationKind() === VariableDeclarationKind.Const;
+    });
+}
+
+/**
+ * The value at `segments` below an object literal when an object literal on
+ * the way spreads the one object that must provide it — `{ ...fixedOnceCreated }`
+ * with no `dynamicProps` of its own — as an expression on that object:
+ * `fixedOnceCreated.dynamicProps`, the very value the evaluation saw. Returns
+ * the spread expression too, whose imports the caller carries.
+ *
+ * Only when nothing else could provide it: exactly one spread in that literal,
+ * no computed key, no member of that name (before or after the spread), a
+ * spread of an imported or top-level `const` name (not a call, not a
+ * parameter), and only names below it.
+ */
+export function spreadSource(ctx: AstContext, root: ObjectLiteralExpression, segments: readonly PathSegment[]): { text: string; spread: Expression } | undefined {
+    const { Node: N } = ctx.tsm;
+    let current: Member = { node: root, value: root };
+    for (let index = 0; index < segments.length; index++) {
+        const segment = segments[index];
+        if (typeof segment === "number" || current.method) return undefined;
+        const object = resolveObject(ctx, current.value);
+        if (!object.node) return undefined;
+        const member = memberOf(ctx, object.node, segment);
+        if (member.node) {
+            current = member.node;
+            continue;
+        }
+        const properties = object.node.getProperties();
+        const spreads = properties.filter(property => N.isSpreadAssignment(property));
+        if (spreads.length !== 1) return undefined;
+        for (const property of properties) {
+            if (N.isSpreadAssignment(property)) continue;
+            const name = memberName(ctx, property);
+            if (name === undefined || name === segment) return undefined;
+        }
+        const rest = segments.slice(index);
+        if (!rest.every(part => typeof part === "string" && /^[A-Za-z_$][\w$]*$/.test(part))) return undefined;
+        const spreadAssignment = spreads[0];
+        if (!spreadAssignment || !N.isSpreadAssignment(spreadAssignment)) return undefined;
+        const spread = unwrap(ctx, spreadAssignment.getExpression());
+        if (!N.isExpression(spread) || !isModuleName(ctx, spread)) return undefined;
+        return { text: `${spread.getText()}.${rest.join(".")}`, spread };
+    }
+    return undefined;
+}
+
 /** A path segment: a member name, or an array index. */
 export type PathSegment = string | number;
 

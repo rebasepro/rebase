@@ -47,6 +47,7 @@
     "create frontend/src/cms/authors.tsx",
     "create frontend/src/cms/index.ts",
     "create frontend/src/cms/lib/actions.ts",
+    "create frontend/src/cms/lib/form-rules.ts",
     "create frontend/src/cms/posts.tsx",
     "create frontend/src/cms/ui-config.json",
     "create frontend/src/cms/users.tsx",
@@ -63,7 +64,13 @@
       "message": "exports no collection: read as a module the collections import, not as a table. It moves with the code that imports it, or is listed under \"Files of config/ nothing moved\"."
     }
   ],
-  "manualSteps": [],
+  "manualSteps": [
+    {
+      "title": "Check fields.slug.dynamicProps of posts",
+      "detail": "`dynamicProps` returns a field customization now (flat keys: `hidden`, `fieldOrder`, …), not a partial property with an `admin` block. Check what it returns.",
+      "file": "frontend/src/cms/posts.tsx"
+    }
+  ],
   "verification": {
     "identical": true,
     "differences": []
