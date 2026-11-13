@@ -7,8 +7,7 @@ import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContainer";
 import { getIconForProperty } from "../../util/property_utils";
-import { resolveRelationProperty } from "@rebasepro/common";
-import { getRelationFrom } from "@rebasepro/cms-types";
+import { getRelationFrom, resolveRelationProperty } from "@rebasepro/cms-types";
 
 import { ErrorView, useTranslation } from "@rebasepro/app";
 import { Button, cls, ExpandablePanel, fieldBackgroundMixin, PencilIcon, Typography } from "@rebasepro/ui";

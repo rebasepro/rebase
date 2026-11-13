@@ -4,7 +4,12 @@
  * collection / property view model and nothing on the backend calls them, which
  * is why they live here and not in `@rebasepro/common`.
  */
+export * from "./child_views";
 export * from "./collection_policies";
+export * from "./collection_registry";
+export * from "./compose_callbacks";
+export * from "./copy";
+export * from "./field_access";
 export * from "./collections";
 export * from "./conditions";
 export * from "./entities";

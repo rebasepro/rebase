@@ -10,7 +10,8 @@ import {
     useRebaseContext,
     useUserConfigurationPersistence
 } from "@rebasepro/app";
-import { buildRoutedRebaseData, CollectionRegistry, resolveDataSource } from "@rebasepro/common";
+import { buildRoutedRebaseData, resolveDataSource } from "@rebasepro/common";
+import { CollectionRegistry } from "@rebasepro/cms-types";
 import type { AdminCollection, AppView, RebasePlugin, TableCustomization, UrlController } from "@rebasepro/cms-types";
 import type { TableDescriptor } from "@rebasepro/types";
 

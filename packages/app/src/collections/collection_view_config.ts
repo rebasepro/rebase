@@ -10,8 +10,7 @@
  * imported.
  */
 import type { ChildViewSource, CollectionConfig } from "@rebasepro/types";
-import { type AdminCollection, type DefaultSelectedViewBuilder, type DefaultSelectedViewParams, resolveAdminCollection } from "@rebasepro/cms-types";
-import { getEntityChildViews } from "@rebasepro/common";
+import { type AdminCollection, type DefaultSelectedViewBuilder, type DefaultSelectedViewParams, resolveAdminCollection, getEntityChildViews } from "@rebasepro/cms-types";
 
 export function resolveDefaultSelectedView(
     defaultSelectedView: string | DefaultSelectedViewBuilder | undefined,

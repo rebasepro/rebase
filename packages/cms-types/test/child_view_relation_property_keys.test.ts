@@ -1,6 +1,4 @@
-import { CollectionRegistry } from "@rebasepro/common";
-import { getEntityChildViews } from "@rebasepro/common";
-import { getChildViewDeclaringProperties, getChildViewRelationPropertyKeys } from "@rebasepro/cms-types";
+import { getChildViewDeclaringProperties, getChildViewRelationPropertyKeys, CollectionRegistry, getEntityChildViews } from "@rebasepro/cms-types";
 import type { CollectionConfig, PostgresCollectionConfig, PostgresProperties } from "@rebasepro/types";
 
 /**

@@ -11,7 +11,9 @@
  *
  * The guard is over every relation kind at once: each is declared on the same
  * collection, the original is read back the way the admin reads it, the copy is
- * built with the same function the admin's form uses, and afterwards every row
+ * built by the rule the admin's form applies (`getCopyValues` in
+ * `@rebasepro/cms-types`, unit-tested there over the same five kinds: the key
+ * and every link whose key is on the other row are dropped), and afterwards every row
  * that existed before must be exactly as it was. What the copy may carry — its
  * own `belongsTo` key and new `manyToMany` links — is asserted too, so the fix
  * cannot pass by dropping everything.
@@ -25,7 +27,6 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
 import type { RelationKind } from "@rebasepro/types";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
-import { getCopyValues } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
@@ -133,6 +134,17 @@ const RELATION_PROPERTIES: Record<string, { kind: RelationKind; relation: Record
  */
 const ALL_KINDS: RelationKind[] = ["belongsTo", "hasOne", "hasMany", "manyToMany", "via"];
 
+/** The kinds a copy carries: its own foreign key, and links through a junction. */
+const COPY_CARRIES: ReadonlySet<RelationKind> = new Set(["belongsTo", "manyToMany"]);
+
+/** What the admin's Duplicate sends: the original without its key and without the links it cannot share. */
+function copyOf(row: Record<string, unknown>): Record<string, unknown> {
+    const copy: Record<string, unknown> = { ...row };
+    delete copy.id;
+    for (const [key, { kind }] of Object.entries(RELATION_PROPERTIES)) if (!COPY_CARRIES.has(kind)) delete copy[key];
+    return copy;
+}
+
 const authorsCollection: LegacyCollectionConfig = {
     name: "Authors", slug: "authors", table: "authors",
     properties: {
@@ -230,7 +242,7 @@ describe("Duplicating a record (every relation kind)", () => {
 
         const before = await snapshot(admin);
 
-        const copy = getCopyValues(authorsCollection, loaded);
+        const copy = copyOf(loaded);
         expect(copy).not.toHaveProperty("id");
         await driver.save({
             path: "authors",

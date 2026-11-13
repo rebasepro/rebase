@@ -44,6 +44,7 @@
     "@rebasepro/common": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/utils": "workspace:*",
+    "fast-equals": "6.0.2",
     "json-logic-js": "^2.0.5"
   },
   "devDependencies": {

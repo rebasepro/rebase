@@ -6,8 +6,7 @@ import { renderHook } from "@testing-library/react";
 import React from "react";
 import { MemoryRouter } from "react-router";
 import { useBuildUrlController } from "../../src/hooks/navigation/useBuildUrlController";
-import { CollectionRegistryController } from "@rebasepro/cms-types";
-import { CollectionRegistry } from "@rebasepro/common";
+import { CollectionRegistryController, CollectionRegistry } from "@rebasepro/cms-types";
 import { fakeCollectionRegistry } from "../helpers/fakes";
 
 const mockRegistry = Object.assign(fakeCollectionRegistry(), {

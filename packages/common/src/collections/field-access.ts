@@ -1,19 +1,13 @@
-import type { FieldAccess, Property } from "@rebasepro/types";
 
 /**
- * Field-level access control: one mechanism, read by every enforcement point.
+ * Field-level access control: the one predicate every enforcement point reads.
  *
- * A collection's `securityRules` decide which *rows* a caller reaches;
- * `property.access` decides which *fields* of a reached row they see and may
- * set. The two are independent — a field rule never widens row access, and a
- * row a caller cannot read has no fields to talk about.
- *
- * `excludeFromApi` is sugar for `access: { read: [], write: [] }` and is
- * normalised into it by {@link effectiveAccess}, which is the only place either
- * spelling is read. It used to be its own code path in five files — the read
- * strip, the write refusal, the SDK generator, the OpenAPI schema builder and
- * the filter-parameter builder — and the second rule would have made ten.
- * There is one predicate now, and the flag is a shorthand for it.
+ * A table's `rls` decides which *rows* a caller reaches; a column's `access`
+ * decides which *fields* of a reached row they see and may set. The two are
+ * independent — a field rule never widens row access, and a row a caller
+ * cannot read has no fields to talk about. `.private()` is `access: { read: [],
+ * write: [] }` (`table/access.ts` expands it); the panel reads its property
+ * view model through the same predicates.
  *
  * @module
  */
@@ -45,24 +39,6 @@ export interface FieldViewer {
 export const ADMIN_ROLE = "admin";
 
 /**
- * What a property's access rules actually are, with `excludeFromApi` expanded.
- *
- * Returns `undefined` when the property constrains nothing, so callers can skip
- * the whole check for the overwhelmingly common case.
- */
-export function effectiveAccess(property: Property | undefined): FieldAccess | undefined {
-    if (!property) return undefined;
-    if (property.excludeFromApi) return EXCLUDED_ACCESS;
-    const access = property.access;
-    if (!access) return undefined;
-    if (access.read === undefined && access.write === undefined) return undefined;
-    return access;
-}
-
-/** The rule `excludeFromApi: true` expands to. Frozen: it is shared by every caller. */
-const EXCLUDED_ACCESS: FieldAccess = Object.freeze({ read: Object.freeze([]), write: Object.freeze([]) });
-
-/**
  * Does a caller holding `roles` satisfy `allowed`?
  *
  * Three cases, and the middle one is the one worth stating out loud:
@@ -85,23 +61,19 @@ function satisfies(allowed: readonly string[] | undefined, viewer: FieldViewer |
     return roles.includes(ADMIN_ROLE) || allowed.some(role => roles.includes(role));
 }
 
-/** May this caller receive this field's value? */
-export function canReadField(property: Property | undefined, viewer: FieldViewer | undefined): boolean {
-    const access = effectiveAccess(property);
-    return access ? satisfies(access.read, viewer) : true;
-}
-
 /**
  * May this caller receive a value whose read rule is `access`? The same
- * predicate {@link canReadField} applies to a property, for a rule that is not
- * on one: a column's or a relation's `access` in a table descriptor.
+ * predicate the panel's `canReadField` applies to a property, and the one a
+ * column's or a relation's `access` in a table descriptor is judged by.
  */
 export function canReadWithAccess(access: { read?: readonly string[] } | undefined, viewer: FieldViewer | undefined): boolean {
     return satisfies(access?.read, viewer);
 }
 
-/** May this caller set this field's value? */
-export function canWriteField(property: Property | undefined, viewer: FieldViewer | undefined): boolean {
-    const access = effectiveAccess(property);
-    return access ? satisfies(access.write, viewer) : true;
+/**
+ * May this caller set a value whose write rule is `access`? The write half of
+ * {@link canReadWithAccess}.
+ */
+export function canWriteWithAccess(access: { write?: readonly string[] } | undefined, viewer: FieldViewer | undefined): boolean {
+    return satisfies(access?.write, viewer);
 }

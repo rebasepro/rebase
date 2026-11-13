@@ -2,6 +2,12 @@
   "//": "Every symbol that left @rebasepro/types or @rebasepro/common (or moved between packages) in the Postgres-first refactor: from/to are package specifiers; to: null means removed, and instead says what a project writes in its place. The migration codemod rewrites a user project imports from this table. tooling/scripts/move-kernel-symbols.mts appends to it; never edit a row by hand.",
   "moves": [
     {
+      "symbol": "defineCollection",
+      "from": "@rebasepro/cms-types",
+      "to": null,
+      "instead": "defineTable (backend/schema) + customizeTable for the panel's presentation; defineFirestoreCollection (@rebasepro/firebase) for Firestore; defineLegacyCollection (@rebasepro/common/migrate) for 0.30 fixtures."
+    },
+    {
       "symbol": "apiHiddenFieldNames",
       "from": "@rebasepro/common",
       "to": null,
@@ -55,6 +61,16 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "canReadField",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "canWriteField",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "checkOperation",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
@@ -70,6 +86,11 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "CollectionRegistry",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "collectionsToTableDefs",
       "from": "@rebasepro/common",
       "to": "@rebasepro/common/migrate"
@@ -81,6 +102,16 @@
     },
     {
       "symbol": "compileRulePolicies",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "composeCallbacks",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "copyCarriesRelation",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
     },
@@ -113,10 +144,20 @@
       "instead": "defineTable (backend/schema); the CMS customizes a table with customizeTable; Firestore uses defineFirestoreCollection; legacy fixtures defineLegacyCollection from @rebasepro/common/migrate."
     },
     {
+      "symbol": "effectiveAccess",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "EntityCallbackContext",
       "from": "@rebasepro/common",
       "to": null,
       "instead": "TableHookProps[\"context\"] from @rebasepro/types."
+    },
+    {
+      "symbol": "enumToObjectEntries",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
     },
     {
       "symbol": "evaluateCondition",
@@ -144,6 +185,11 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "getCopyValues",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "getDefaultValueFor",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
@@ -165,6 +211,11 @@
     },
     {
       "symbol": "getEffectiveSecurityRulesOnce",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getEntityChildViews",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
     },
@@ -219,6 +270,11 @@
       "symbol": "getRelationTargetPath",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms"
+    },
+    {
+      "symbol": "getSubcollections",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
     },
     {
       "symbol": "getTenantConfig",
@@ -379,6 +435,11 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "resolveRelationProperty",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "resolveStorageFilenameString",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
@@ -465,6 +526,11 @@
       "from": "@rebasepro/common",
       "to": null,
       "instead": "vectorColumnKeys(descriptor) from @rebasepro/common."
+    },
+    {
+      "symbol": "composeCallbacks",
+      "from": "@rebasepro/server",
+      "to": "@rebasepro/cms-types"
     },
     {
       "symbol": "ADMIN_COLLECTION_KEYS",

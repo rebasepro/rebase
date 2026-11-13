@@ -3,7 +3,7 @@ import React from "react";
 
 import { EnumValuesChip } from "../components/EnumValuesChip";
 import type { PropertyPreviewProps } from "../../types/components/PropertyPreviewProps";
-import { enumToObjectEntries } from "@rebasepro/common";
+import { enumToObjectEntries } from "@rebasepro/cms-types";
 import { useCustomizationController } from "@rebasepro/app";
 import { formatNumber } from "../../util/number_format";
 

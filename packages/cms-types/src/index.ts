@@ -12,14 +12,6 @@
 import "./augment";
 
 export * from "./types/property_options";
-// Before `./collections`, and deliberately its own module: this is the builder
-// every collection file imports, and a collection file is loaded by the backend
-// as well as by the panel. `./collections` holds the panel's view models and
-// imports React as a value; nothing in the builder's graph may reach it.
-export * from "./define_collection";
-// Beside the builder, for the same reason: a collection file combines its
-// callback sets with it, and it is the panel-free `@rebasepro/common` one.
-export { composeCallbacks } from "@rebasepro/common";
 export * from "./collections";
 export * from "./admin_collection";
 // The admin block's keys as data, and the way back from the flat view model to the block.

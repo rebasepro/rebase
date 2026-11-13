@@ -3,9 +3,8 @@ import type { AppView, NavigationResult, RebasePlugin, NavigationStateController
 import { useCallback, useMemo, useRef } from "react";
 
 import { RebaseSdkData, User } from "@rebasepro/types";
-import { AuthController, CollectionRegistryController } from "@rebasepro/cms-types";
+import { AuthController, CollectionRegistryController, CollectionRegistry } from "@rebasepro/cms-types";
 import type { CollectionConfigsBuilder, AppViewsBuilder, EffectiveRoleController } from "@rebasepro/cms-types";
-import { CollectionRegistry } from "@rebasepro/common";
 
 import { useResolvedCollections } from "./useResolvedCollections";
 import { useResolvedViews } from "./useResolvedViews";

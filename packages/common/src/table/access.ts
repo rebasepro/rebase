@@ -1,6 +1,6 @@
 import type { ColumnAccess, ColumnDescriptor, RelationDescriptor, TableDescriptor } from "@rebasepro/types";
 
-import { canReadWithAccess, type FieldViewer } from "../collections/field-access";
+import { canReadWithAccess, canWriteWithAccess, type FieldViewer } from "../collections/field-access";
 
 /**
  * Column- and relation-level access over a {@link TableDescriptor}: the same
@@ -66,7 +66,7 @@ export function canReadColumn(target: Pick<ColumnDescriptor, "private" | "access
 export function canWriteColumn(target: AccessTarget, viewer: FieldViewer | undefined): boolean {
     if ("readOnly" in target && target.readOnly) return false;
     const access = columnAccess(target);
-    return canReadWithAccess(access ? { read: access.write } : undefined, viewer);
+    return canWriteWithAccess(access, viewer);
 }
 
 /**

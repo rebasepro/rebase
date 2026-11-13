@@ -12,7 +12,8 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import type { AdminCollection } from "@rebasepro/cms-types";
 import type { RelationProperty } from "@rebasepro/types";
 import { col, defineTable, rel } from "@rebasepro/types";
-import { compileTables, getEntityChildViews, resolveCollectionRelations } from "@rebasepro/common";
+import { compileTables, resolveCollectionRelations } from "@rebasepro/common";
+import { getEntityChildViews } from "@rebasepro/cms-types";
 import { getAdminEntityChildViews, getFormFieldKeys, getRedundantChildViewColumnIds } from "@rebasepro/app";
 import { composeCollections } from "../../src/hooks/navigation/compose_collections";
 import { customizeTable } from "../../src/tables/customize_table";

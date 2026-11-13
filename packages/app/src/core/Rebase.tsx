@@ -6,7 +6,7 @@ import type { ComponentOverrideMap } from "@rebasepro/cms-types";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CenteredView, TooltipProvider, Typography } from "@rebasepro/ui";
 import { AccessSimulation, User, DataDriver, DataSourceDefinition, RebaseData, DEFAULT_DATA_SOURCE_KEY, StorageSource, StorageSourceDefinition, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
-import { RebaseContext, UNRENDERED_SLOTS, CollectionRegistryController } from "@rebasepro/cms-types";
+import { RebaseContext, UNRENDERED_SLOTS, CollectionRegistryController, CollectionRegistry } from "@rebasepro/cms-types";
 import { PluginProviderStack } from "./PluginProviderStack";
 import { PluginLifecycleManager } from "./PluginLifecycleManager";
 import { warnDeprecatedPluginKeys } from "./deprecated_plugin_keys";
@@ -36,7 +36,7 @@ import { useBuildAdminModeController } from "../hooks/useBuildAdminModeControlle
 import { useBuildLocalConfigurationPersistence } from "../hooks/useBuildLocalConfigurationPersistence";
 import { RebaseClientInstanceContext } from "../contexts/RebaseClientInstanceContext";
 import { DialogsProvider } from "../contexts/DialogsProvider";
-import { buildRebaseData, wrapAsEntityData, CollectionRegistry } from "@rebasepro/common";
+import { buildRebaseData, wrapAsEntityData } from "@rebasepro/common";
 import { CustomizationControllerContext } from "../contexts/CustomizationControllerContext";
 import { AnalyticsContext } from "../contexts/AnalyticsContext";
 

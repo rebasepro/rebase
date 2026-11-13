@@ -14,7 +14,9 @@ import {
     getDeclaredSubcollections,
     type EntityChildView
 } from "@rebasepro/types";
-import { enumToObjectEntries, withDeprecatedAlias, isJunctionBackedRelation, resolveCollectionRelations, resolveRelation, getSubcollections, getEntityChildViews, resolveRelationProperty } from "@rebasepro/common";
+import { withDeprecatedAlias, isJunctionBackedRelation, resolveCollectionRelations, resolveRelation } from "@rebasepro/common";
+import { enumToObjectEntries } from "./enums";
+import { getSubcollections, getEntityChildViews, resolveRelationProperty } from "./child_views";
 import { isPropertyBuilder } from "./entities";
 import { DEFAULT_ONE_OF_TYPE } from "./one_of";
 import { isDefaultFieldConfigId } from "@rebasepro/utils";

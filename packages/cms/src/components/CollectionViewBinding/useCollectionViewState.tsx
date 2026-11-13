@@ -6,7 +6,8 @@ import {
     EntitySelection,
     TableController,
     SelectionQuery,
-    ViewMode
+    ViewMode,
+    getEntityChildViews
 } from "@rebasepro/cms-types";
 import { serializeSelectionQuery } from "../../selection";
 import type { UiFieldPreferences, UiTablePreferences } from "@rebasepro/types";
@@ -16,7 +17,6 @@ import { useSearchParams } from "react-router";
 
 import { deepEqual as equal, shallowEqual } from "fast-equals"
 import { CollectionRowActions, CollectionTableBinding } from "../CollectionTableBinding";
-import { getEntityChildViews } from "@rebasepro/common";
 import { useCollectionInlineEditor } from "./hooks/useCollectionInlineEditor";
 import { navigateToEntity } from "../../util/navigation_utils";
 import { mergeEntityActions } from "../../util/entity_actions";

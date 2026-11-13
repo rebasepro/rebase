@@ -61,8 +61,7 @@
   },
   "dependencies": {
     "@rebasepro/types": "workspace:*",
-    "@rebasepro/utils": "workspace:*",
-    "fast-equals": "6.0.2"
+    "@rebasepro/utils": "workspace:*"
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",

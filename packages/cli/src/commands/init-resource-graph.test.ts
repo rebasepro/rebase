@@ -62,13 +62,12 @@ afterEach(() => {
     fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-/** `@rebasepro/cms-types` as an installed scaffold would resolve it, for `defineCollection`. */
+/** `@rebasepro/cms-types` as an installed scaffold would resolve it: the scaffold imports only its types. */
 function giveCmsTypes(project: string): void {
     const pkg = path.join(project, "node_modules", "@rebasepro", "cms-types");
     fs.mkdirSync(pkg, { recursive: true });
     fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "@rebasepro/cms-types", type: "module", exports: "./index.ts" }));
-    const builder = path.resolve(PACKAGE_ROOT, "..", "cms-types", "src", "define_collection.ts");
-    fs.writeFileSync(path.join(pkg, "index.ts"), `export { defineCollection } from ${JSON.stringify(builder)};\n`);
+    fs.writeFileSync(path.join(pkg, "index.ts"), "export {};\n");
 }
 
 async function scaffold(shape: ScaffoldShape): Promise<string> {

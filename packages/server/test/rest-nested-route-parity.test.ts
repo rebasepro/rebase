@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { CollectionRegistry } from "@rebasepro/common";
+import { TableRegistry } from "../src/schema/table-registry";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import { rowETag } from "../src/api/rest/etag";
@@ -95,12 +95,13 @@ const SPELLINGS = ["blog_posts", "blog-posts", "entries"];
 describe("the parent's spelling", () => {
     it("is every spelling the driver's registry resolves", () => {
         // The guard on the list below: these are exactly the names
-        // `CollectionRegistry.get` — the lookup the driver walks a nested path
-        // with — answers for this collection. A spelling it accepts that the
-        // route did not was a path with no checks on it at all.
-        const registry = new CollectionRegistry([blogPosts, comments]);
+        // `TableRegistry.named` — the lookup a data path is routed by — answers
+        // for this table. A spelling it accepts that the route did not was a
+        // path with no checks on it at all.
+        const registry = new TableRegistry();
+        registry.replaceAll(tablesFromCollections([blogPosts, comments]).descriptors);
         for (const spelling of SPELLINGS) {
-            expect(registry.get(spelling)?.slug).toBe("blog_posts");
+            expect(registry.named(spelling)?.slug).toBe("blog_posts");
         }
     });
 

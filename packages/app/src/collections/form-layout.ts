@@ -19,7 +19,7 @@ import type {
     PropertySpan
 } from "@rebasepro/cms-types";
 import type { EnumValues, Property } from "@rebasepro/types";
-import { effectiveAccess } from "@rebasepro/common";
+import { effectiveAccess } from "@rebasepro/cms-types";
 import { isHidden } from "./property_presentation";
 
 /**

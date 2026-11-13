@@ -6,8 +6,7 @@ import {
 } from "@rebasepro/app";
 import { resolveEntityView } from "../../_cms_internals";
 import { User } from "@rebasepro/types";
-import { EntityCustomView, AdminCollection } from "@rebasepro/cms-types";
-import { getSubcollections } from "@rebasepro/common";
+import { EntityCustomView, AdminCollection, getSubcollections } from "@rebasepro/cms-types";
 import {
     Alert,
     Button,

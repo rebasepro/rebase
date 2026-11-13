@@ -65,7 +65,7 @@ export { rebase, _setRebaseMock, _resetRebaseMock } from "./singleton";
 // Collection callbacks are plain functions: one combines sets of them, the
 // other builds the `context` one is called with, so a hook can be run from a
 // test or a script without booting a driver.
-export { composeCallbacks, createCallContext } from "@rebasepro/common";
+export { createCallContext } from "@rebasepro/common";
 
 // What a schema file imports: the table builders, `policy` and the authoring
 // types — also served alone, loading no server code, as `@rebasepro/server/schema`.

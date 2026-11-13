@@ -1,5 +1,5 @@
 import type { CollectionConfig, RelationProperty } from "@rebasepro/types";
-import { resolveRelationProperty } from "@rebasepro/common";
+import { resolveRelationProperty } from "@rebasepro/cms-types";
 
 /**
  * A relation declared inline on the property is resolvable.

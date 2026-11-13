@@ -1,9 +1,7 @@
 import {
-    getSubcollections
-} from "@rebasepro/common";
-import {
     resolvePropertyEnum,
-    resolveEnumValues
+    resolveEnumValues,
+    getSubcollections
 } from "@rebasepro/cms-types";
 import { CollectionConfig, NumberProperty, StringProperty, EnumValueConfig, EnumValues } from "@rebasepro/types";
 

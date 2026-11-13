@@ -5,7 +5,7 @@ import type { AdminCollection, ResolvePropertyProps } from "@rebasepro/cms-types
 import type { AuthState, Property } from "@rebasepro/types";
 import type { ResolvedFormField } from "@rebasepro/app";
 import { isHidden, useAuthController, useCustomizationController, useRebaseContext } from "@rebasepro/app";
-import { effectiveAccess } from "@rebasepro/common";
+import { effectiveAccess } from "@rebasepro/cms-types";
 import { AlignLeftIcon, cls, paperMixin } from "@rebasepro/ui";
 import { FormexController, useFormexSelector } from "@rebasepro/forms";
 

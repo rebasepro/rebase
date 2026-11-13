@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { createServer } from "node:http";
-import { col, defineTable, type DatabaseAdapter, type TableDescriptor, type TableHooks } from "@rebasepro/types";
+import { col, defineTable, type DatabaseAdapter, type TableDescriptor, type TableHooks, type TableRegistryInterface } from "@rebasepro/types";
 import { jest } from "@jest/globals";
-import { CollectionRegistry, createCallContext } from "@rebasepro/common";
+import { createCallContext } from "@rebasepro/common";
 
 import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
@@ -24,8 +24,11 @@ import { fakeDataDriver } from "./helpers/server-a-fakes";
  */
 
 /** A driver registry that takes global hooks, as the Postgres driver's does. */
-class HookRegistry extends CollectionRegistry {
+class HookRegistry implements TableRegistryInterface {
     globalHooks?: TableHooks;
+    getTable(): undefined {
+        return undefined;
+    }
     setGlobalHooks(hooks: TableHooks): void {
         this.globalHooks = hooks;
     }
@@ -46,7 +49,7 @@ class DriverTableHooks {
     }
 }
 
-function adapter(options: { type?: string; registry?: CollectionRegistry | null; introspected?: TableDescriptor[]; driverRegistry?: DriverTableHooks } = {}): DatabaseAdapter {
+function adapter(options: { type?: string; registry?: HookRegistry | null; introspected?: TableDescriptor[]; driverRegistry?: DriverTableHooks } = {}): DatabaseAdapter {
     const registry = options.registry === undefined ? new HookRegistry() : options.registry;
     return {
         type: options.type ?? "postgres",

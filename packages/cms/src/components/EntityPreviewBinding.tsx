@@ -7,7 +7,7 @@ import { useEffect, useMemo } from "react";
 import { Entity } from "@rebasepro/types";
 import type { PreviewSize } from "../types/components/PropertyPreviewProps";
 import { buildEnumLabel, getEntityImagePreviewPropertyKey } from "@rebasepro/app";
-import { enumToObjectEntries } from "@rebasepro/common";
+import { enumToObjectEntries } from "@rebasepro/cms-types";
 import {
     ArrowRightToLineIcon,
     Chip,

@@ -8,9 +8,10 @@ import {
     WhereFilterOp
 } from "@rebasepro/types";
 import {
-    FilterFieldBindingProps
+    FilterFieldBindingProps,
+    enumToObjectEntries
 } from "@rebasepro/cms-types";
-import { enumToObjectEntries, normalizeToEntityRelation } from "@rebasepro/common";
+import { normalizeToEntityRelation } from "@rebasepro/common";
 import { resolveFilterOperators } from "@rebasepro/app";
 import { useCollectionScope, useComponentOverride } from "@rebasepro/app";
 import { StringNumberFilterField } from "./StringNumberFilterField";

@@ -59,7 +59,7 @@ import type { CollectionComponentOverrideMap } from "./types/component_overrides
  * When `M` is the default `Record<string, unknown>` — the plain
  * `const x: PostgresCollectionConfig = { … }` annotation, which infers nothing —
  * `Extract<keyof M, string>` is `string` and this accepts anything, exactly as
- * before. `defineCollection` is what supplies a real `M` and turns the check on.
+ * before. A typed `M` turns the check on.
  */
 export type PropertyPath<M> =
     | Extract<keyof M, string>
@@ -639,15 +639,6 @@ export type AdminCollectionOptions<
  *
  * after which `admin` is typed on every collection and every property. Without it,
  * writing one is an error — which is the guarantee a BaaS install depends on.
- */
-
-/**
- * `defineCollection` lives in `./define_collection`, and this is why.
- *
- * A collection file is loaded by the backend as well as by the panel, so the
- * builder it imports has to be reachable without React. This module names
- * `React` throughout — it describes the panel's option types — so the builder
- * sits apart from it and the barrel exports both.
  */
 
 /** Compiles only when `T` is `never` — see {@link _EveryAdminCollectionOptionIsListed}. */

@@ -3,9 +3,8 @@ import type { RebasePlugin, AdminCollection } from "@rebasepro/cms-types";
 import { useRef, useMemo } from "react";
 
 import { RebaseSdkData, User } from "@rebasepro/types";
-import { AuthController, CollectionRegistryController } from "@rebasepro/cms-types";
+import { AuthController, CollectionRegistryController, CollectionRegistry } from "@rebasepro/cms-types";
 import type { CollectionConfigsBuilder } from "@rebasepro/cms-types";
-import { CollectionRegistry } from "@rebasepro/common";
 
 import { resolveCollections } from "./useNavigationResolution";
 import { areCollectionListsEqual } from "./utils";

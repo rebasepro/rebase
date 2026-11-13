@@ -1,25 +1,24 @@
 import { describe, expect, it } from "@jest/globals";
-import type { LegacyCollectionCallbacks, LegacyCollectionConfig } from "@rebasepro/common/migrate";
+import { col, defineTable, type TableHooks } from "@rebasepro/types";
+import { compileTables, composeTableHooks } from "@rebasepro/common";
 
-import { composeCallbacks, createCallContext } from "../src/index";
+import { createCallContext } from "../src/index";
 
 /**
- * The two callback helpers, reached the way a backend author reaches them:
- * from `@rebasepro/server`. A callback is a plain function, so testing one is
- * calling it — no driver, no database, no boot.
+ * Testing a table hook is calling it — no driver, no database, no boot: the
+ * hooks compose with `composeTableHooks`, and `createCallContext` (from
+ * `@rebasepro/server`) builds the context a hook reads.
  */
-describe("callback helpers from @rebasepro/server", () => {
-    const posts: LegacyCollectionConfig = {
-        name: "Posts",
-        slug: "posts",
-        table: "posts",
-        properties: { title: { name: "Title", type: "string" }, slug: { name: "Slug", type: "string" } }
-    };
+describe("testing a table hook", () => {
+    const [posts] = compileTables([defineTable("posts", {
+        columns: { id: col.uuid().primaryKey().defaultRandom(), title: col.text(), slug: col.text() },
+        rls: "admin-only"
+    })]);
 
-    const slugFromTitle: LegacyCollectionCallbacks = {
+    const slugFromTitle: TableHooks = {
         beforeSave: ({ values }) => ({ slug: String(values.title).toLowerCase().replace(/\s+/g, "-") })
     };
-    const requireTitle: LegacyCollectionCallbacks = {
+    const requireTitle: TableHooks = {
         beforeSave: ({ values }) => {
             if (!values.title) throw new Error("A post needs a title.");
             return values;
@@ -27,30 +26,30 @@ describe("callback helpers from @rebasepro/server", () => {
     };
 
     it("runs a composed hook against a context built for the test", async () => {
-        const callbacks = composeCallbacks(requireTitle, slugFromTitle);
+        const hooks = composeTableHooks(requireTitle, slugFromTitle);
 
-        await expect(callbacks.beforeSave!({
-            collection: posts, path: "posts", status: "new",
+        await expect(hooks.beforeSave!({
+            table: posts, path: "posts", status: "new",
             values: { title: "Hello World" },
             context: createCallContext()
         })).resolves.toEqual({ title: "Hello World", slug: "hello-world" });
 
-        await expect(callbacks.beforeSave!({
-            collection: posts, path: "posts", status: "new",
+        await expect(hooks.beforeSave!({
+            table: posts, path: "posts", status: "new",
             values: {},
             context: createCallContext()
         })).rejects.toThrow("A post needs a title.");
     });
 
     it("names the context field a hook used and the test did not provide", async () => {
-        const notify: LegacyCollectionCallbacks = {
+        const notify: TableHooks = {
             afterSave: async ({ context, id }) => {
                 await context.client.functions!.invoke("notify", { id });
             }
         };
 
         await expect(notify.afterSave!({
-            collection: posts, path: "posts", id: 1, status: "new", values: {}, context: createCallContext()
+            table: posts, path: "posts", id: 1, status: "new", values: {}, context: createCallContext()
         })).rejects.toThrow("context.client was not provided to createCallContext");
     });
 });

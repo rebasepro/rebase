@@ -1,7 +1,7 @@
 
 import type { AppView, RebasePlugin, NavigationGroupMapping, AdminCollection } from "@rebasepro/cms-types";
 
-import { getSubcollections } from "@rebasepro/common";
+import { getSubcollections } from "@rebasepro/cms-types";
 import { deepEqual as equal } from "fast-equals";
 
 export const NAVIGATION_DEFAULT_GROUP_NAME = "Views";

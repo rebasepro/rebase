@@ -1,6 +1,6 @@
 import { EntityReference } from "@rebasepro/types";
 import { getCollectionPathsCombinations, removeInitialAndTrailingSlashes } from "./navigation_utils";
-import { getSubcollections } from "@rebasepro/common";
+import { getSubcollections } from "@rebasepro/cms-types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 export function getParentReferencesFromPath(props: {

@@ -1,6 +1,6 @@
 
 
-import { getSubcollections } from "@rebasepro/common";
+import { getSubcollections } from "@rebasepro/cms-types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 export function removeInitialAndTrailingSlashes(s: string): string {
