@@ -233,15 +233,20 @@ class TypeOracle {
         return project.createSourceFile(file, text, { overwrite: true });
     }
 
-    /** Whether a receiver's type is the SDK data surface: it has the SDK's `table` method. */
+    /**
+     * Whether a receiver's type is the SDK data surface: it has the SDK's
+     * `table` method — or, typed by the 0.30 packages a project still has
+     * installed when it migrates, the SDK's `collection` method. Either is
+     * the SDK's only when a `@rebasepro` package declares it.
+     */
     isSdkData(receiver: Node): boolean | undefined {
         try {
             const type = receiver.getType();
             if (type.isAny() || type.isUnknown()) return undefined;
-            const table = type.getProperty("table");
-            if (!table) return false;
+            const method = type.getProperty("table") ?? type.getProperty("collection");
+            if (!method) return false;
             this.used = true;
-            return table.getDeclarations().some(declaration => /[\\/](packages[\\/](client|types|common)|@rebasepro[\\/])/.test(declaration.getSourceFile().getFilePath()));
+            return method.getDeclarations().some(declaration => /[\\/](packages[\\/](client|types|common)|@rebasepro[\\/])/.test(declaration.getSourceFile().getFilePath()));
         } catch {
             return undefined;
         }

@@ -91,6 +91,8 @@ describe("rebase migrate sdk-calls", () => {
         // A receiver the list does not name, recognised by its type.
         const typedUse = fs.readFileSync(path.join(dir, "typed/src/use.ts"), "utf8");
         expect(typedUse).toContain(`surface.table("posts")`);
+        // Typed by the 0.30 package the project still has installed: `collection` declared by @rebasepro is the SDK too.
+        expect(fs.readFileSync(path.join(dir, "typed/src/installed.ts"), "utf8")).toContain(`surface.table("posts")`);
         // Spelled like a listed receiver, typed as the project's own interface: the type decides.
         expect(typedUse).toContain(`client.data.collection("posts")`);
         expect(report.typeAware).toBe(true);

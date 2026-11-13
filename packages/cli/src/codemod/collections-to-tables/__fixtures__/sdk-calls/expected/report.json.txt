@@ -25,13 +25,17 @@
       "edits": 1
     },
     {
+      "path": "typed/src/installed.ts",
+      "edits": 1
+    },
+    {
       "path": "typed/src/use.ts",
       "edits": 1
     }
   ],
   "counts": {
     "table-hooks": 5,
-    "collection-call": 7,
+    "collection-call": 8,
     "rule-vocabulary": 4,
     "boot-options": 1,
     "storage-authorize": 1,

@@ -1,0 +1,7 @@
+import type { RebaseClient } from "../installed/@rebasepro/client/index";
+
+/** Typed by the 0.30 package still installed: its `collection` is the SDK's, so the call is rewritten. */
+export async function total(api: RebaseClient) {
+    const surface = api.data;
+    return surface.collection("posts").count();
+}

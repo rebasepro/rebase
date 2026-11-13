@@ -1,0 +1,8 @@
+/**
+ * A stand-in for `node_modules/@rebasepro/client` as a 0.30 project has it
+ * installed when the migration runs: the data surface names its tables
+ * `collection`, and has no `table` yet.
+ */
+export interface CollectionClient { find(): Promise<unknown[]>; count(): Promise<number> }
+export interface RebaseData { collection(slug: string): CollectionClient }
+export interface RebaseClient { data: RebaseData }
