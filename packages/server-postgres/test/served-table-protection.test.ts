@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { RebaseApiError, col, defineTable } from "@rebasepro/types";
+import { RebaseApiError, col, defineTable, rel } from "@rebasepro/types";
 import { compileSchema } from "@rebasepro/common";
 
 import { findServedTableProtection, findUnprotectedServedTables, withheldTableMessage } from "../src/security/served-table-protection";
@@ -43,11 +43,25 @@ const narrow = defineTable("narrow", {
     columns: { id: col.serial().primaryKey() },
     rls: [{ operation: "select", access: "public" }, { operation: "insert", access: "authenticated" }]
 });
-const COMPILED = compileSchema([stray, open, bare, absent, full, gated, flipped, narrow]);
+// SEC-FIX-4 R-2: a many-to-many's implicit junction, held to the same rule.
+const tagged = defineTable("tagged", {
+    columns: { id: col.serial().primaryKey() },
+    relations: { labels: rel.manyToMany(() => labels) },
+    rls: [{ operation: "select", access: "public" }]
+});
+const labels = defineTable("labels", { columns: { id: col.serial().primaryKey() }, rls: [{ operation: "select", access: "public" }] });
+const COMPILED = compileSchema([stray, open, bare, absent, full, gated, flipped, narrow, tagged, labels]);
 const PLANS = new Map(planTablePolicies(COMPILED.filter(table => table.descriptor.kind === "table")).map(plan => [plan.table, plan]));
 
 /** The planned policies of a table, by the names provisioning gives them. */
 const planned = (table: string) => PLANS.get(table)?.policies ?? [];
+
+/** The SQL name of `tagged.labels`' junction, as the plan names it. */
+function junctionName(): string {
+    const relation = COMPILED.find(table => table.descriptor.slug === "tagged")?.descriptor.relations.find(candidate => candidate.name === "labels");
+    if (relation?.kind !== "manyToMany") throw new Error("tagged.labels is a many-to-many");
+    return relation.through.table;
+}
 
 /** `CREATE POLICY` under a planned name, with a body the check does not judge. */
 function createAs(table: string, name: string, restrictive: boolean): string {
@@ -84,7 +98,15 @@ beforeAll(async () => {
         // One permissive grant of two: narrower than declared.
         "CREATE TABLE narrow (id serial PRIMARY KEY);",
         "ALTER TABLE narrow ENABLE ROW LEVEL SECURITY;",
-        ...planned("narrow").slice(0, 1).map(policy => createAs("narrow", policy.name, policy.restrictive))
+        ...planned("narrow").slice(0, 1).map(policy => createAs("narrow", policy.name, policy.restrictive)),
+        // Both endpoints fully protected; their junction left with RLS off.
+        "CREATE TABLE tagged (id serial PRIMARY KEY);",
+        "ALTER TABLE tagged ENABLE ROW LEVEL SECURITY;",
+        ...planned("tagged").map(policy => createAs("tagged", policy.name, policy.restrictive)),
+        "CREATE TABLE labels (id serial PRIMARY KEY);",
+        "ALTER TABLE labels ENABLE ROW LEVEL SECURITY;",
+        ...planned("labels").map(policy => createAs("labels", policy.name, policy.restrictive)),
+        `CREATE TABLE ${junctionName()} (tagged_id integer, labels_id integer);`
     ];
     await db.exec(statements.join("\n"));
 });
@@ -106,11 +128,21 @@ describe("findUnprotectedServedTables", () => {
             ["flipped", "restrictive-missing"],
             ["gated", "restrictive-missing"],
             ["locked", "no-policies"],
-            ["open_notes", "rls-off"]
+            ["open_notes", "rls-off"],
+            ["tagged", "rls-off"]
         ]);
         const gate = found.find(table => table.slug === "gated");
         expect(gate?.missingPolicies).toEqual(planned("gated").filter(policy => policy.restrictive).map(policy => policy.name));
         expect(gate?.remediationSql).toContain("AS RESTRICTIVE");
+    });
+
+    it("withholds the table whose many-to-many junction is unprotected, not the related one, and says why (R-2)", async () => {
+        const found = await findUnprotectedServedTables(run, COMPILED);
+        const tagged = found.find(table => table.slug === "tagged");
+        expect(tagged?.junction).toBe(`public.${junctionName()}`);
+        expect(tagged?.remediationSql).toContain("ENABLE ROW LEVEL SECURITY");
+        expect(found.map(table => table.slug)).not.toContain("labels");
+        expect(withheldTableMessage({ slug: "tagged", problem: "rls-off", junction: "public.x" })).toContain("junction");
     });
 
     it("serves a table missing a permissive policy, and names the policy", async () => {

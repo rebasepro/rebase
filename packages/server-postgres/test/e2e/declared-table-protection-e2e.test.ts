@@ -64,7 +64,16 @@ const gated = defineTable("gated", {
         { operation: "select", mode: "restrictive", using: "{body} <> 'hidden by the gate'" }
     ]
 });
-const TABLES = [notes, shared, fine, gated];
+const labels = defineTable("labels", {
+    columns: { id: col.serial().primaryKey(), name: col.text() },
+    rls: [{ operation: "select", access: "public" }]
+});
+const tagged = defineTable("tagged", {
+    columns: { id: col.serial().primaryKey(), name: col.text() },
+    relations: { labels: rel.manyToMany(() => labels) },
+    rls: [{ operation: "select", access: "public" }]
+});
+const TABLES = [notes, shared, fine, gated, labels, tagged];
 const SECRET = "admin-only secret";
 
 type Row = Record<string, unknown>;
@@ -290,6 +299,26 @@ describe("a declared table the database does not protect is withheld (E2E)", () 
             expect((await narrowed.get("/shared")).status).toBe(200);
         } finally {
             await narrowed.stop();
+        }
+    });
+
+    it("a many-to-many junction the database does not protect withholds the table that reads through it (SEC-FIX-4 R-2)", async () => {
+        const fixing = await boot(true);
+        await fixing.stop();
+        const relation = compileSchema(TABLES).find(table => table.descriptor.slug === "tagged")?.descriptor.relations
+            .find(candidate => candidate.name === "labels");
+        if (relation?.kind !== "manyToMany") throw new Error("tagged.labels is a many-to-many");
+        await admin.query(`ALTER TABLE "${relation.through.table}" DISABLE ROW LEVEL SECURITY`);
+        const after = await boot(false);
+        try {
+            const taggedAnswer = await after.get("/tagged");
+            expect(taggedAnswer.status, taggedAnswer.text).toBe(503);
+            expect(taggedAnswer.text).toContain("TABLE_WITHHELD");
+            expect(taggedAnswer.text).toContain("junction");
+            expect((await after.get("/labels")).status).toBe(200);
+            expect((await after.get("/fine")).status).toBe(200);
+        } finally {
+            await after.stop();
         }
     });
 });

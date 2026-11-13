@@ -26,7 +26,10 @@
  *   not declare decides — a stray `USING (true)` would serve every row; or
  * - a **restrictive** policy it declares is missing, or is not restrictive in
  *   the database: a restrictive policy is a gate (a tenant, an `anon` deny),
- *   and the permissive grants without it reach rows it exists to keep out.
+ *   and the permissive grants without it reach rows it exists to keep out; or
+ * - a many-to-many **junction** it reads and writes through (declared or
+ *   implicit) fails any of the above, judged by the junction's own planned
+ *   policies.
  *
  * A missing **permissive** policy only narrows access (Postgres ORs the
  * permissive policies), so the table is served and the boot log warns, naming
@@ -60,6 +63,13 @@ export interface UnprotectedServedTable {
     remediationSql: string;
     /** The declared policies the database does not have as declared, by name. */
     missingPolicies: string[];
+    /**
+     * Set when the table is withheld for a many-to-many junction it writes
+     * and reads through, not for itself: the junction's `schema.table`.
+     * `qualified`, `problem`, `remediationSql` and `missingPolicies` are then
+     * the junction's.
+     */
+    junction?: string;
 }
 
 /** A declared table served without some of its permissive policies: access is narrower than declared. */
@@ -111,12 +121,35 @@ export async function findServedTableProtection(
 ): Promise<ServedTableProtection> {
     const served = tables.filter(table => table.descriptor.kind === "table");
     if (served.length === 0) return { unprotected: [], narrowed: [] };
-    const plans = new Map(planTablePolicies(served, options).map(plan => [plan.qualified, plan]));
+    const planned = planTablePolicies(served, options);
+    const plans = new Map(planned.map(plan => [plan.qualified, plan]));
     const wanted = served.map(({ descriptor }) => ({
         slug: descriptor.slug,
         schema: descriptor.schema,
         name: descriptor.table
     }));
+    // The many-to-many junctions, declared or implicit, and the tables that
+    // read and write through each (SEC-FIX-4 R-2). A junction no table
+    // declares is in the plan too, with its derived policies, and held to the
+    // same rule; one that fails withholds the tables whose relations use it.
+    const owners = new Map<string, Set<string>>();
+    for (const { descriptor } of served) {
+        for (const relation of descriptor.relations) {
+            if (relation.kind !== "manyToMany") continue;
+            const named = planned.filter(plan => plan.table === relation.through.table);
+            const junction = named.find(plan => plan.schema === descriptor.schema) ?? named[0];
+            if (!junction) continue;
+            const set = owners.get(junction.qualified) ?? new Set<string>();
+            set.add(descriptor.slug);
+            owners.set(junction.qualified, set);
+        }
+    }
+    const declaredQualified = new Set(served.map(({ descriptor }) => `${descriptor.schema}.${descriptor.table}`));
+    for (const qualified of owners.keys()) {
+        if (declaredQualified.has(qualified)) continue;
+        const plan = plans.get(qualified);
+        if (plan) wanted.push({ slug: "", schema: plan.schema, name: plan.table });
+    }
     const rows = await run(
         `SELECT w.slug, n.nspname AS schema, c.relname AS name, c.relrowsecurity AS rls,
                 (SELECT coalesce(jsonb_agg(jsonb_build_object('name', p.polname::text, 'permissive', p.polpermissive)), '[]'::jsonb)
@@ -169,7 +202,28 @@ export async function findServedTableProtection(
             });
         }
     }
-    return { unprotected, narrowed };
+    return { unprotected: withJunctionOwners(unprotected, owners), narrowed: narrowed.filter(table => table.slug !== "") };
+}
+
+/**
+ * The tables to withhold: each declared table found unprotected, and each
+ * table whose many-to-many junction was — once, the table's own problem
+ * first. An implicit junction has no slug of its own and is never served; it
+ * is reached only through its owners' relations, so withholding the owners is
+ * what keeps an unprotected junction from being read or written through the
+ * API. The related tables stay served: their rows are behind their own policies.
+ */
+function withJunctionOwners(found: readonly UnprotectedServedTable[], owners: ReadonlyMap<string, ReadonlySet<string>>): UnprotectedServedTable[] {
+    const out = found.filter(table => table.slug !== "");
+    const named = new Set(out.map(table => table.slug));
+    for (const junction of found) {
+        for (const slug of owners.get(junction.qualified) ?? []) {
+            if (named.has(slug)) continue;
+            named.add(slug);
+            out.push({ ...junction, slug, junction: junction.qualified });
+        }
+    }
+    return out;
 }
 
 /** The policies the catalogue read found on a table: name → permissive. */
@@ -185,7 +239,11 @@ function existingPolicies(value: unknown): Map<string, boolean> {
 }
 
 /** What a caller asking for a withheld table is told: the reason, never the SQL. */
-export function withheldTableMessage(table: Pick<UnprotectedServedTable, "slug" | "problem">): string {
+export function withheldTableMessage(table: Pick<UnprotectedServedTable, "slug" | "problem" | "junction">): string {
+    if (table.junction !== undefined) {
+        return `The table "${table.slug}" is not served: the junction table of one of its many-to-many relations is not ` +
+            "protected by row-level security in the database. The server's boot log names the statements that protect it.";
+    }
     if (table.problem === "rls-off") {
         return `The table "${table.slug}" is not served: row-level security is disabled on it in the database, so every ` +
             "caller would reach every row. The server's boot log names the statements that protect it.";
@@ -217,8 +275,11 @@ export function withholdUnprotectedTables(
                     "so its other policies would reach rows that gate keeps out"
                 : "it declares policies, and the database has none of them on it (a policy this schema does not declare decides " +
                     "who reads it, or nobody does)";
+        const subject = table.junction !== undefined
+            ? `its many-to-many junction ${table.junction}: ${what}`
+            : what;
         logger.error(
-            `🔒 [rls] Not serving "${table.slug}" (${table.qualified}): ${what}. This boot did not change that ` +
+            `🔒 [rls] Not serving "${table.slug}" (${table.junction !== undefined ? "through " : ""}${table.qualified}): ${subject}. This boot did not change that ` +
             "(it provisions nothing, or Postgres refused it). Run, as part of your change process (or `rebase db push`):\n" +
             table.remediationSql.split("\n").map(line => `      ${line}`).join("\n")
         );
