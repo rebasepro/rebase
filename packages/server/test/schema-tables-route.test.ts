@@ -286,11 +286,10 @@ describe("a signed-in user with no role", () => {
         expect(keys(postsTable)).not.toContain("internalNote");
         // `tags` is not described to this caller, so neither is the relation into it.
         expect(relationNames(postsTable)).toEqual(["author"]);
-        // A belongsTo's key column follows its own rules; it no longer names
-        // the relation it is withheld with.
-        const reviewerId = postsTable.columns.find(column => column.key === "reviewerId");
-        expect(reviewerId).toBeDefined();
-        expect(reviewerId?.foreignKeyOf).toBeUndefined();
+        // A link and its key column are one fact (SEC-FIX-3): `reviewer` is
+        // closed to this caller, so `reviewerId` is withheld with it — as the
+        // REST read strips it from every row they are served.
+        expect(keys(postsTable)).not.toContain("reviewerId");
         expect(JSON.stringify(postsTable)).not.toContain("ghostwriter");
     });
 
@@ -396,7 +395,11 @@ describe("credentials", () => {
         expect(tables.map(table => table.slug)).toEqual(["posts"]);
         const postsTable = tables[0];
         expect(postsTable.relations).toEqual([]);
-        expect(keys(postsTable)).toEqual(expect.arrayContaining(["authorId", "reviewerId"]));
+        // `authorId` stays (its relation is dropped only because `authors` is
+        // not served to the key); `reviewerId` goes with `reviewer`, which the
+        // key's roles cannot read — as the REST read strips it (SEC-FIX-3).
+        expect(keys(postsTable)).toContain("authorId");
+        expect(keys(postsTable)).not.toContain("reviewerId");
         expect(postsTable.columns.some(column => column.foreignKeyOf !== undefined)).toBe(false);
         expect(postsTable.rls.rules[2]).toEqual({ operation: "delete", roles: ["editor"], redacted: true });
         expect((await app.request("/api/schema/tables/authors", bearer(KEYS.postsOnly))).status).toBe(404);
