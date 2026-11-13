@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { and, cond, or } from "@rebasepro/common";
-import type { SDKTableClient } from "@rebasepro/types";
+import type { SDKTableClient, WhereFilterOp } from "@rebasepro/types";
 import { SDKQueryBuilder } from "../src/sdk_query_builder";
 import { buildQueryString } from "../src/transport";
 

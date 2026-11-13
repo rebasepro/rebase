@@ -44,21 +44,21 @@ offset: 20 })).toBe("?limit=10&offset=20");
         expect(buildQueryString({ include: [] })).toBe("");
     });
 
-    it("serializes PostgREST-style where clauses directly as query parameters", () => {
-        expect(buildQueryString({ where: { status: "eq.published",
-views: "gt.5" } }))
+    it("serializes where clauses as PostgREST-style query parameters", () => {
+        expect(buildQueryString({ where: { status: ["==", "published"],
+views: [">", 5] } }))
             .toBe("?status=eq.published&views=gt.5");
     });
 
     it("sends a filter on a column named `count` inside ?where=, since ?count= is the count switch", () => {
-        expect(buildQueryString({ where: { status: "eq.published", count: "gt.5" } }))
+        expect(buildQueryString({ where: { status: ["==", "published"], count: [">", 5] } }))
             .toBe("?status=eq.published&where=%7B%22count%22%3A%22gt.5%22%7D");
-        expect(buildQueryString({ count: "none", where: { count: "gt.5" } }))
+        expect(buildQueryString({ count: "none", where: { count: [">", 5] } }))
             .toBe("?count=none&where=%7B%22count%22%3A%22gt.5%22%7D");
     });
 
     it("URL encodes values correctly", () => {
-        expect(buildQueryString({ where: { name: "eq.John Doe&" } }))
+        expect(buildQueryString({ where: { name: ["==", "John Doe&"] } }))
             .toBe("?name=eq.John%20Doe%26");
     });
 
@@ -66,15 +66,15 @@ views: "gt.5" } }))
         const qs = buildQueryString({
             limit: 5,
             offset: 10,
-            orderBy: "name",
+            orderBy: ["name", "asc"],
             include: ["tags"],
-            where: { active: "true" }
+            where: { active: ["==", true] }
         });
         expect(qs).toContain("limit=5");
         expect(qs).toContain("offset=10");
-        expect(qs).toContain("orderBy=name");
+        expect(qs).toContain("orderBy=name%3Aasc");
         expect(qs).toContain("include=tags");
-        expect(qs).toContain("active=true");
+        expect(qs).toContain("active=eq.true");
         expect(qs.startsWith("?")).toBe(true);
     });
 });

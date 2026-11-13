@@ -11,8 +11,8 @@ function createMockTransport() {
         fetchFn: globalThis.fetch,
         setToken: jest.fn(),
         setAuthTokenGetter: jest.fn(),
-        getHeaders: jest.fn().mockReturnValue({}),
-        resolveToken: jest.fn().mockResolvedValue(null)
+        getHeaders: jest.fn((_init?: RequestInit): Record<string, string> => ({})),
+        resolveToken: jest.fn(async (): Promise<string | null> => null)
     };
     return { transport,
 mockRequest };
@@ -101,7 +101,7 @@ roles: [] } });
 email: "a@b.com",
 displayName: null,
 photoURL: null,
-provider: "local",
+providerId: "local",
 roles: [],
 createdAt: "",
 updatedAt: "" }

@@ -63,7 +63,7 @@ describe("a client-side error", () => {
 
     it("REALTIME_DISABLED — `listen` on a collection of the same client", async () => {
         const error = await refusal(() =>
-            client().data.table("posts").listen(() => undefined));
+            client().data.table("posts").listen(undefined, () => undefined));
 
         expect(error.code).toBe("REALTIME_DISABLED");
     });

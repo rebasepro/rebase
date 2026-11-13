@@ -49,7 +49,7 @@ describe("find() over HTTP", () => {
         const params: FindParams = {
             vectorSearch: { property: "embedding", vector: embedding(1536), distance: "cosine", threshold: 0.4 },
             where: { status: ["==", "published"], views: [[">=", 10], ["<", 99]], page: ["==", 3] },
-            orderBy: "title:desc",
+            orderBy: ["title", "desc"],
             include: ["author"],
             fields: ["id", "title"],
             limit: 7,
