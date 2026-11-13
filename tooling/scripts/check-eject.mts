@@ -105,10 +105,9 @@ function materialize(flavour: "cms" | "baas", into: string): void {
     if (flavour === "baas") {
         // Mirrors `applyHeadless` in commands/init.ts.
         fs.rmSync(path.join(into, "frontend"), { recursive: true, force: true });
-        fs.rmSync(path.join(into, "config/collections"), { recursive: true, force: true });
-        for (const stray of ["cms.d.ts", "frontend-assets.d.ts"]) {
-            fs.rmSync(path.join(into, "config", stray), { force: true });
-        }
+        // A headless project declares no tables: `rebase dev` / `rebase build`
+        // read the missing directory as "introspect from the database".
+        fs.rmSync(path.join(into, "backend/schema"), { recursive: true, force: true });
         fs.rmSync(path.join(into, "backend/src/schema.generated.ts"), { force: true });
         copyDir(baasOverlay, into);
     } else {
