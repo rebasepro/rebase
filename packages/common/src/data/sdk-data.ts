@@ -330,7 +330,7 @@ function toSdkTableClient<M extends Record<string, unknown>>(
             if (data.length === 0) return [];
             if (!snap.createMany) {
                 throw new Error(
-                    "Bulk writes are not supported by this collection's data source. " +
+                    "Bulk writes are not supported by this table's data source. " +
                     "Fall back to create() per record."
                 );
             }
@@ -355,7 +355,7 @@ function toSdkTableClient<M extends Record<string, unknown>>(
             refuseUnhonouredWriteOptions("upsert", slug, options);
             if (!snap.createMany) {
                 throw new Error(
-                    "Upsert is not supported by this collection's data source: it needs a bulk write, " +
+                    "Upsert is not supported by this table's data source: it needs a bulk write, " +
                     "which this driver does not implement. Fall back to create() or update()."
                 );
             }
@@ -384,7 +384,7 @@ function toSdkTableClient<M extends Record<string, unknown>>(
             if (updates.length === 0) return [];
             if (!snap.updateMany) {
                 throw new Error(
-                    "Bulk updates are not supported by this collection's data source. " +
+                    "Bulk updates are not supported by this table's data source. " +
                     "Fall back to update() per record."
                 );
             }
@@ -402,7 +402,7 @@ data: u.data as Partial<M> }))
             refuseUnhonouredWriteOptions("updateWhere", slug, options);
             if (!snap.updateWhere) {
                 throw new Error(
-                    "Filtered updates are not supported by this collection's data source. " +
+                    "Filtered updates are not supported by this table's data source. " +
                     "Read the rows, then updateMany() them."
                 );
             }
@@ -412,7 +412,7 @@ data: u.data as Partial<M> }))
             refuseUnhonouredWriteOptions("deleteWhere", slug, options);
             if (!snap.deleteWhere) {
                 throw new Error(
-                    "Filtered deletes are not supported by this collection's data source. " +
+                    "Filtered deletes are not supported by this table's data source. " +
                     "Read the rows, then deleteMany() their ids."
                 );
             }
@@ -426,7 +426,7 @@ data: u.data as Partial<M> }))
             if (ids.length === 0) return;
             if (!snap.deleteMany) {
                 throw new Error(
-                    "Bulk deletes are not supported by this collection's data source. " +
+                    "Bulk deletes are not supported by this table's data source. " +
                     "Fall back to delete() per record."
                 );
             }
@@ -526,7 +526,7 @@ function toSdkTrashClient<M extends Record<string, unknown>>(
             if (ids.length === 0) return;
             if (!trash.purgeMany) {
                 throw new Error(
-                    "Bulk deletes are not supported by this collection's data source. " +
+                    "Bulk deletes are not supported by this table's data source. " +
                     "Fall back to trash.purge() per record."
                 );
             }

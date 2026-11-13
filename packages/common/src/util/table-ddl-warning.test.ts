@@ -88,24 +88,24 @@ describe("table DDL guard", () => {
     it("tells the reader how to do it instead", () => {
         const message = tableDdlMessage({ statement: "create table", schema: "public", table: "songbuzz_events" });
         expect(message).toContain("CREATE TABLE songbuzz_events");
-        expect(message).toContain("config/collections/songbuzz-events.ts");
-        expect(message).toContain("defineCollection");
+        expect(message).toContain("backend/schema/songbuzz-events.ts");
+        expect(message).toContain("defineTable");
         expect(message).toContain("rebase.dataAsAdmin.<slug>");
         expect(message).toContain("pnpm schema:introspect");
         const index = tableDdlMessage({ statement: "create index", schema: "public", table: "songbuzz_events" });
         expect(index).toContain("`indexes`");
     });
 
-    it("says to change or remove the collection for ALTER and DROP, not to declare one", () => {
+    it("says to change or remove the declaration for ALTER and DROP, not to declare one", () => {
         const alter = tableDdlMessage({ statement: "alter table", schema: "public", table: "songbuzz_events" });
         expect(alter).toContain("ALTER TABLE songbuzz_events");
-        expect(alter).toContain("Change its collection");
-        expect(alter).toContain("table: \"songbuzz_events\"");
+        expect(alter).toContain("Change its `defineTable");
+        expect(alter).toContain("defineTable(\"songbuzz_events\"");
         expect(alter).toContain("pnpm db:generate");
         expect(alter).not.toContain("Declare it");
         const drop = tableDdlMessage({ statement: "drop table", schema: "app", table: "old_scores" });
         expect(drop).toContain("DROP TABLE app.old_scores");
-        expect(drop).toContain("Remove its collection");
+        expect(drop).toContain("Remove its `defineTable");
         expect(drop).not.toContain("Declare it");
         expect(drop).not.toContain("schema:introspect");
     });

@@ -107,8 +107,8 @@ export function unknownVectorProperty(property: string, vectorProperties: string
     return {
         message: `Unknown vector property "${property}". ` +
             (vectorProperties.length > 0
-                ? `This collection's vector properties are: ${vectorProperties.join(", ")}.`
-                : "This collection declares no `vector` property to search."),
+                ? `This table's vector columns are: ${vectorProperties.join(", ")}.`
+                : "This table declares no `vector` column to search."),
         code: "UNKNOWN_VECTOR_PROPERTY",
         details: { property, ...(vectorProperties.length > 0 && { vectorProperties }) }
     };

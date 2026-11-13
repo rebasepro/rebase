@@ -280,17 +280,17 @@ describe("in-process SDK rows (characterization)", () => {
             const { driver } = bareDriver();
             const posts = table(buildSdkData(driver));
             await expect(posts.createMany([{ title: "x" }])).rejects.toThrow(
-                "Bulk writes are not supported by this collection's data source. Fall back to create() per record.");
+                "Bulk writes are not supported by this table's data source. Fall back to create() per record.");
             await expect(posts.upsert({ title: "x" })).rejects.toThrow(
-                "Upsert is not supported by this collection's data source: it needs a bulk write, which this driver does not implement. Fall back to create() or update().");
+                "Upsert is not supported by this table's data source: it needs a bulk write, which this driver does not implement. Fall back to create() or update().");
             await expect(posts.updateMany([{ id: 1, data: {} }])).rejects.toThrow(
-                "Bulk updates are not supported by this collection's data source. Fall back to update() per record.");
+                "Bulk updates are not supported by this table's data source. Fall back to update() per record.");
             await expect(posts.updateWhere({ where: {} }, {})).rejects.toThrow(
-                "Filtered updates are not supported by this collection's data source. Read the rows, then updateMany() them.");
+                "Filtered updates are not supported by this table's data source. Read the rows, then updateMany() them.");
             await expect(posts.deleteWhere({ where: {} })).rejects.toThrow(
-                "Filtered deletes are not supported by this collection's data source. Read the rows, then deleteMany() their ids.");
+                "Filtered deletes are not supported by this table's data source. Read the rows, then deleteMany() their ids.");
             await expect(posts.deleteMany([1])).rejects.toThrow(
-                "Bulk deletes are not supported by this collection's data source. Fall back to delete() per record.");
+                "Bulk deletes are not supported by this table's data source. Fall back to delete() per record.");
         });
 
         it("an upsert the conflict rule kept answers undefined; without a rule an empty answer throws", async () => {

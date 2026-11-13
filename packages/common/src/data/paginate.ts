@@ -237,7 +237,7 @@ export async function* paginateFind<M extends Record<string, unknown> = Record<s
             throw new RebasePaginationError(
                 "max-pages",
                 `Iterating "${label}" made ${pages} requests without the server reporting the end of ` +
-                `the collection. Stopping rather than looping forever — raise \`maxPages\` if the walk ` +
+                `the table. Stopping rather than looping forever — raise \`maxPages\` if the walk ` +
                 `is genuinely this long, or check that the backend sets \`meta.hasMore\`.`
             );
         }

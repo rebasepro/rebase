@@ -126,34 +126,34 @@ export function findTableDdl(sqlText: string): TableDdl[] {
 export function tableDdlMessage(ddl: TableDdl): string {
     const qualified = ddl.schema === "public" ? ddl.table : `${ddl.schema}.${ddl.table}`;
     const file = ddl.table.replace(/_/g, "-");
-    const collection = `its collection in config/collections/ (the one with \`table: "${ddl.table}"\`)`;
+    const declaration = `its \`defineTable("${ddl.table}", …)\` in backend/schema/`;
     const migrations = "`pnpm db:push` in development, `pnpm db:generate` then `pnpm db:migrate` for production";
-    const introspect = "A table with no collection yet: `pnpm schema:introspect` writes one.";
+    const introspect = "A table with no declaration yet: `pnpm schema:introspect` writes one.";
     const ran = "The statement ran. See ai-instructions.md.";
     if (ddl.statement === "alter table") {
         return [
-            `rebase.sql() ran \`ALTER TABLE ${qualified}\`: in a Rebase project every application table is a collection.`,
-            `Change ${collection} and let the migration do it: ${migrations}.`,
+            `rebase.sql() ran \`ALTER TABLE ${qualified}\`: in a Rebase project every application table is declared in backend/schema.`,
+            `Change ${declaration} and let the migration do it: ${migrations}.`,
             introspect,
             ran
         ].join("\n");
     }
     if (ddl.statement === "drop table") {
         return [
-            `rebase.sql() ran \`DROP TABLE ${qualified}\`: in a Rebase project every application table is a collection.`,
-            `Remove ${collection} instead, and leave dropping the table to a person, who can see what it holds first.`,
+            `rebase.sql() ran \`DROP TABLE ${qualified}\`: in a Rebase project every application table is declared in backend/schema.`,
+            `Remove ${declaration} instead, and leave dropping the table to a person, who can see what it holds first.`,
             ran
         ].join("\n");
     }
     const what = ddl.statement === "create index"
-        ? `\`CREATE INDEX\` on ${qualified}: an index belongs in the collection's \`indexes\`, which boot creates.`
-        : `\`CREATE TABLE ${qualified}\`: in a Rebase project every application table is a collection.`;
+        ? `\`CREATE INDEX\` on ${qualified}: an index belongs in the table's \`indexes\`, which boot creates.`
+        : `\`CREATE TABLE ${qualified}\`: in a Rebase project every application table is declared in backend/schema.`;
     return [
         `rebase.sql() ran ${what}`,
-        `Declare it in config/collections/${file}.ts with defineCollection({ slug, table: "${ddl.table}", properties, securityRules, indexes }).` +
-        " `pnpm dev` (or `pnpm schema:generate`) creates the table and its columns and indexes, and gives it validation, callbacks, security rules, an admin view and SDK types.",
+        `Declare it in backend/schema/${file}.ts with defineTable("${ddl.table}", { columns, rls, indexes }).` +
+        " `pnpm dev` (or `pnpm schema:generate`) creates the table and its columns and indexes, and gives it validation, hooks, row-level security, an admin view and SDK types.",
         "Read and write it with `rebase.dataAsAdmin.<slug>`, or `getDriver(c)` to act as the caller — never raw SQL against an application table.",
-        `A table that already exists: \`pnpm schema:introspect\` writes its collection. A change boot leaves alone (a rename, a dropped column): ${migrations}.`,
+        `A table that already exists: \`pnpm schema:introspect\` writes its declaration. A change boot leaves alone (a rename, a dropped column): ${migrations}.`,
         ran
     ].join("\n");
 }
