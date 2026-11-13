@@ -31,7 +31,8 @@ import { rewriteSdkCalls } from "./sdk-calls";
 import { refreshSkillsStep } from "./skills-step";
 import { Journal } from "./journal";
 import { createSchemaModuleImporter } from "../../utils/import-schema-module";
-import { legacyLoadAliases } from "./legacy-shims";
+import { legacyLoadAliases, movedNameAliases } from "./legacy-shims";
+import { movedSymbolTable } from "./moved-imports";
 import { LegacyLoadError, loadLegacyProject } from "./load-legacy";
 import { Relocator } from "./modules";
 import type { CollectionEntry, PlanContext } from "./plan-context";
@@ -102,7 +103,10 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
     }
 
     // `config/` is evaluated with the packages installed now; 0.31 dropped the `defineCollection` its files import.
-    const importModule = await createSchemaModuleImporter(root, legacyLoadAliases(configDir, options.moduleAliases));
+    // …and with the names 0.31 moved to another package re-exported where the 0.30 files import them.
+    const baseAliases = legacyLoadAliases(configDir, options.moduleAliases);
+    const loadAliases = await movedNameAliases(configDir, baseAliases, await createSchemaModuleImporter(root, baseAliases), movedSymbolTable());
+    const importModule = await createSchemaModuleImporter(root, loadAliases);
     let legacy;
     try {
         legacy = await loadLegacyProject(configDir, importModule);

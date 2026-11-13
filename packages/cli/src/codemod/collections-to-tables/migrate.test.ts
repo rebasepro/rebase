@@ -252,7 +252,8 @@ describe("a relation field's form default", () => {
         expect(report.notes.filter(entry => entry.message.includes("defaultValue"))).toEqual([]);
         const content = report.files.find(entry => entry.path === "frontend/src/cms/posts.tsx")?.content;
         expect(content).toContain("defaultValue: new EntityRelation(\"a1\", \"authors\")");
-        expect(content).toContain("import { EntityRelation } from \"@rebasepro/types\";");
+        // A 0.30 file imports it from @rebasepro/types, where 0.31 no longer has it: it loads (the shim) and the import moves.
+        expect(content).toContain("import { EntityRelation } from \"@rebasepro/cms-types\";");
     }, 120_000);
 });
 
