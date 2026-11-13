@@ -111,7 +111,7 @@ describe("filtered writes and conflict rules (E2E)", () => {
             vi.spyOn(console, "debug").mockImplementation(() => undefined)
         );
         await provision(container.connectionString);
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [scores, notes], tables: tablesFromCollections([scores, notes]).tables, pool: { max: 2 } });
+        rebase = await openRebase({ databaseUrl: container.connectionString, tables: tablesFromCollections([scores, notes]).tables, pool: { max: 2 } });
         await rebase.sql(`INSERT INTO public.scores (day, sid, owner_id, hype, rev) VALUES
             ('d1', 'a', 'ada', 10, 1), ('d1', 'b', 'ada', 20, 1), ('d1', 'c', 'bob', 30, 1), ('d2', 'a', 'ada', 40, 1)`);
     }, 180_000);

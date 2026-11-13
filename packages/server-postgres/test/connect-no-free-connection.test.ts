@@ -103,7 +103,7 @@ describe("openRebase, when the database has no free connection", () => {
         const hint = "Stop another process that uses it, or run Postgres in Docker: `rebase dev --docker`.";
         const server = await fullServer(message, hint);
         try {
-            const opened = openRebase({ databaseUrl: server.url, collections: [] });
+            const opened = openRebase({ databaseUrl: server.url });
             await expect(opened).rejects.toThrow(`${message} (53300). ${hint}`);
         } finally {
             await server.close();

@@ -132,7 +132,7 @@ describe("a companion follows its rule (E2E)", () => {
         container = await startPgContainer();
         connection = createPostgresDatabaseConnection(container.connectionString);
         await boot(before);
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [before], tables: tablesFromCollections([before]).tables });
+        rebase = await openRebase({ databaseUrl: container.connectionString, tables: tablesFromCollections([before]).tables });
         await rebase.sql("INSERT INTO public.notes (owner_id) SELECT 'u' || g FROM generate_series(1, 10) g");
         await rebase.sql("INSERT INTO public.ops (owner_id) SELECT 'u' || g FROM generate_series(1, 10) g");
     }, 240_000);

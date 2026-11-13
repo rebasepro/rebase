@@ -22,6 +22,8 @@ import { execa } from "execa";
 import { logger } from "@rebasepro/server";
 import { runPluginCommand } from "../../src/cli.js";
 import { openRebase } from "../../src/index.js";
+import { col, defineTable } from "@rebasepro/types";
+import { compileSchema } from "@rebasepro/common";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const tsxBin = path.join(pkgRoot, "..", "..", "node_modules", ".bin", "tsx");
@@ -166,9 +168,9 @@ describe("db commands with the database down", () => {
     it("openRebase throws one readable error, and logs nothing, for a database it cannot reach", async () => {
         const error = vi.spyOn(logger, "error");
         try {
-            await expect(openRebase({ databaseUrl: process.env.DATABASE_URL ?? "", collections: [{
-                name: "Tasks", slug: "tasks", table: "tasks", properties: { id: { name: "ID", type: "string", isId: "uuid" } }
-            }] })).rejects.toThrow(new RegExp(`^Cannot connect to PostgreSQL at 127\\.0\\.0\\.1:${port}: connect ECONNREFUSED`));
+            // Declared tables, so the open fails on the connection, not on reading the catalogue.
+            const tasks = defineTable("tasks", { columns: { id: col.uuid().primaryKey() }, rls: "admin-only" });
+            await expect(openRebase({ databaseUrl: process.env.DATABASE_URL ?? "", tables: compileSchema([tasks]) })).rejects.toThrow(new RegExp(`^Cannot connect to PostgreSQL at 127\\.0\\.0\\.1:${port}: connect ECONNREFUSED`));
             expect(error).not.toHaveBeenCalled();
         } finally {
             error.mockRestore();

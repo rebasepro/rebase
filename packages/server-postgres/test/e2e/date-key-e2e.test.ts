@@ -55,7 +55,7 @@ describe("a date in a composite key (E2E)", () => {
         } finally {
             await conn.pool.end();
         }
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [scores], tables: tablesFromCollections([scores]).tables });
+        rebase = await openRebase({ databaseUrl: container.connectionString, tables: tablesFromCollections([scores]).tables });
     }, 180_000);
 
     afterAll(async () => {

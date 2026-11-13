@@ -186,7 +186,7 @@ describe("doctor and boot agree about schema drift", () => {
     });
 
     it("runDoctor reads schema.generated.ts from --schema and reports the same drift", async () => {
-        jest.mocked(loadTableSchema).mockResolvedValue({ collections: [authorsAfter], descriptors: [], tables: compileSet([authorsAfter]) });
+        jest.mocked(loadTableSchema).mockResolvedValue({ descriptors: [], tables: compileSet([authorsAfter]) });
         const logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
         const errSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
         const { dir, file } = writeGeneratedSchema(await generateSchema(compileSet([authorsAfter])));

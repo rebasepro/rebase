@@ -84,7 +84,7 @@ describe("data capabilities (E2E)", () => {
         } finally {
             await conn.pool.end();
         }
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [songs], tables: tablesFromCollections([songs]).tables });
+        rebase = await openRebase({ databaseUrl: container.connectionString, tables: tablesFromCollections([songs]).tables });
         songsOf = data => data.songs;
         await songsOf(rebase.dataAsAdmin).createMany([
             { ownerId: "ada", artist: "Rosalía", lang: "es", fame: 90, tags: ["pop", "flamenco"], playedAt: "2026-11-01T23:30:00Z", props: { music: "pop", players: 4 } },

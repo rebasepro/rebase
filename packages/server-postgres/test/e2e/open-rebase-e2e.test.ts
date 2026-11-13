@@ -191,7 +191,7 @@ describe("openRebase (E2E)", () => {
             const before = await catalogue(client);
             expect(before.roles).not.toContain("rebase_user");
 
-            const rebase = await openRebase({ databaseUrl: urlFor(container, "untouched"), collections: [notesCollection], tables: tablesFromCollections([notesCollection]).tables });
+            const rebase = await openRebase({ databaseUrl: urlFor(container, "untouched"), tables: tablesFromCollections([notesCollection]).tables });
             try {
                 expect(await rebase.sql("SELECT title FROM public.notes")).toEqual([{ title: "first" }]);
             } finally {
@@ -211,7 +211,7 @@ describe("openRebase (E2E)", () => {
             vi.stubEnv("REBASE_DB_POOL_MAX", "1");
             try {
                 const before = await catalogue(client);
-                const rebase = await openRebase({ databaseUrl: urlFor(container, "untouched"), collections: [notesCollection], tables: tablesFromCollections([notesCollection]).tables });
+                const rebase = await openRebase({ databaseUrl: urlFor(container, "untouched"), tables: tablesFromCollections([notesCollection]).tables });
                 try {
                     expect(await rebase.sql("SELECT count(*)::int AS n FROM public.notes")).toEqual([{ n: 1 }]);
                 } finally {
@@ -257,7 +257,7 @@ describe("openRebase (E2E)", () => {
         it("refuses a user's request rather than run it with no policy applied", async () => {
             // The connection is a superuser, which bypasses row-level security,
             // and the restricted role it would switch to was never created.
-            const rebase = await openRebase({ databaseUrl: urlFor(container, "untouched"), collections: [notesCollection], tables: tablesFromCollections([notesCollection]).tables });
+            const rebase = await openRebase({ databaseUrl: urlFor(container, "untouched"), tables: tablesFromCollections([notesCollection]).tables });
             try {
                 const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
                 await expect(ada.data.notes.find()).rejects.toThrow();
@@ -280,7 +280,7 @@ describe("openRebase (E2E)", () => {
             observer = new pg.Client({ connectionString: url });
             await observer.connect();
             before = await catalogue(observer);
-            rebase = await openRebase({ databaseUrl: urlFor(container, "app", APP_NAME), collections: [notesCollection, ledgerCollection], tables: tablesFromCollections([notesCollection, ledgerCollection]).tables });
+            rebase = await openRebase({ databaseUrl: urlFor(container, "app", APP_NAME), tables: tablesFromCollections([notesCollection, ledgerCollection]).tables });
         }, 120_000);
 
         afterAll(async () => {
@@ -314,8 +314,7 @@ describe("openRebase (E2E)", () => {
             // write and on no script write, while the table's own
             // `beforeSave` ran on both.
             const withGlobal = await openRebase({
-                databaseUrl: urlFor(container, "app", APP_NAME),
-                collections: [notesCollection, ledgerCollection], tables: tablesFromCollections([notesCollection, ledgerCollection]).tables,
+                databaseUrl: urlFor(container, "app", APP_NAME), tables: tablesFromCollections([notesCollection, ledgerCollection]).tables,
                 hooks: { beforeSave: ({ values }) => ({ ...values, title: `[stamped] ${String(values.title)}` }) }
             });
             try {
@@ -382,7 +381,7 @@ describe("openRebase (E2E)", () => {
         it("refuses writes where entries could not ride the write's transaction — the function is missing", async () => {
             const signature = "rebase.record_history(text, text, text, text[], jsonb, jsonb, text, smallint)";
             await observer.query(`ALTER FUNCTION ${signature} RENAME TO record_history_hidden`);
-            const unready = await openRebase({ databaseUrl: urlFor(container, "app"), collections: [notesCollection, ledgerCollection], tables: tablesFromCollections([notesCollection, ledgerCollection]).tables });
+            const unready = await openRebase({ databaseUrl: urlFor(container, "app"), tables: tablesFromCollections([notesCollection, ledgerCollection]).tables });
             try {
                 await expect(unready.dataAsAdmin.ledger.create({ ownerId: "bob", amount: 1 }))
                     .rejects.toMatchObject({ code: "HISTORY_UNAVAILABLE", message: expect.stringMatching(/rebase\.record_history function/) });
@@ -424,7 +423,7 @@ describe("openRebase (E2E)", () => {
             const posture = (spy: typeof info) => spy.mock.calls.filter(([message]) => /RLS enforcement/.test(String(message)));
             const url = urlFor(container, "app");
             try {
-                const rebase = await openRebase({ databaseUrl: url, collections: [notesCollection], tables: tablesFromCollections([notesCollection]).tables });
+                const rebase = await openRebase({ databaseUrl: url, tables: tablesFromCollections([notesCollection]).tables });
                 await rebase.close();
                 expect(posture(info)).toEqual([]);
                 expect(posture(debug)).toHaveLength(1);
@@ -725,7 +724,7 @@ describe("openRebase (E2E)", () => {
                         `import { openRebase } from ${JSON.stringify(path.join(packageRoot, "src/index.ts"))};\n` +
                         `import { tablesFromCollections } from ${JSON.stringify(path.join(packageRoot, "test/helpers/tables.ts"))};\n` +
                         `const collections = ${JSON.stringify([notesCollection])};\n` +
-                        "const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL ?? \"\", collections, tables: tablesFromCollections(collections).tables });\n" +
+                        "const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL ?? \"\", tables: tablesFromCollections(collections).tables });\n" +
                         "const [{ n }] = await rebase.sql(\"SELECT count(*)::int AS n FROM public.notes\");\n" +
                         "console.log(JSON.stringify({ n }));\n" +
                         "await rebase.close();\n",
@@ -819,7 +818,6 @@ describe("openRebase (E2E)", () => {
             };
             rebase = await openRebase({
                 databaseUrl: url,
-                collections: [hooked],
                 tables: tablesFromCollections([hooked]).tables
             });
         }, 120_000);

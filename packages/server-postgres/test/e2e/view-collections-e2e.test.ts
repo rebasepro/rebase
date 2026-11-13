@@ -113,7 +113,7 @@ describe("view collections (E2E)", () => {
         await admin.query(`INSERT INTO public.songs (owner_id, artist, lang) VALUES
             ('ada', 'Rosalía', 'es'), ('ada', 'ROSALÍA', 'es'), ('ada', 'Björk', 'en'), ('bob', 'Muse', 'en')`);
         await provision(container.connectionString, [songs, artists(), langs()]);
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [songs, artists(), langs()], tables: tablesFromCollections([songs, artists(), langs()]).tables });
+        rebase = await openRebase({ databaseUrl: container.connectionString, tables: tablesFromCollections([songs, artists(), langs()]).tables });
     }, 180_000);
 
     afterAll(async () => {

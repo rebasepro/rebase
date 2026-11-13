@@ -30,7 +30,7 @@ describe("rebase.sql positional parameters (E2E)", () => {
         await client.connect();
         await client.query("CREATE ROLE params_reader NOLOGIN; GRANT params_reader TO CURRENT_USER");
         await client.end();
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [] });
+        rebase = await openRebase({ databaseUrl: container.connectionString });
     }, 180_000);
 
     afterAll(async () => {

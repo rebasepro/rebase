@@ -105,7 +105,7 @@ describe("pipelined transactions (E2E)", () => {
         );
         await provision(container.connectionString);
         // One connection, so every request reuses the one the last one released.
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [notes], tables: tablesFromCollections([notes]).tables, pool: { max: 1 } });
+        rebase = await openRebase({ databaseUrl: container.connectionString, tables: tablesFromCollections([notes]).tables, pool: { max: 1 } });
         observer = new pg.Client({ connectionString: container.connectionString });
         await observer.connect();
         await rebase.sql("INSERT INTO public.notes (owner_id, title) VALUES ('ada', 'hers'), ('bob', 'his')");

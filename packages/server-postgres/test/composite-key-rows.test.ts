@@ -150,7 +150,6 @@ describe("a composite primary key, read and written by its whole address", () =>
         db = drizzle(pg, { schema: { ...catalogue.tables, ...catalogue.relations } });
         registry = buildTableRegistry({
             compiledTables: fixture.tables,
-            collections: [companies, translations, notes],
             tables: catalogue.tables,
             relations: catalogue.relations
         });

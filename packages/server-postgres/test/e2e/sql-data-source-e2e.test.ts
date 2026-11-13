@@ -90,8 +90,7 @@ describe("rebase.sql({ database }) on two real data sources (E2E)", () => {
         });
 
         script = await openRebase({
-            databaseUrl: urlFor(container.connectionString, "warehouse"),
-            collections: [pageViews], tables: tablesFromCollections([pageViews]).tables,
+            databaseUrl: urlFor(container.connectionString, "warehouse"), tables: tablesFromCollections([pageViews]).tables,
             dataSourceKey: "analytics"
         });
     }, 180_000);

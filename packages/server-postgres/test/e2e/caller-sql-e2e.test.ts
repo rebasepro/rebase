@@ -90,7 +90,7 @@ describe("SQL as the caller (E2E)", () => {
             vi.spyOn(console, "warn").mockImplementation(() => undefined)
         );
         await provision(container.connectionString, [songs, notes, people]);
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [songs, notes, people], tables: tablesFromCollections([songs, notes, people]).tables });
+        rebase = await openRebase({ databaseUrl: container.connectionString, tables: tablesFromCollections([songs, notes, people]).tables });
         await rebase.sql(`INSERT INTO public.songs (owner_id, artist) VALUES
             ('ada', 'Rosalía'), ('ada', 'Björk'), ('bob', 'Muse')`);
         await rebase.sql("INSERT INTO public.notes (org_id, body) VALUES ('a', 'first'), ('b', 'second')");

@@ -194,7 +194,7 @@ describe("data-plane cost budget (E2E)", () => {
             vi.spyOn(console, "debug").mockImplementation(() => undefined)
         );
         await provision(container.connectionString);
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections, tables: tablesFromCollections(collections).tables, pool: { max: 2 } });
+        rebase = await openRebase({ databaseUrl: container.connectionString, tables: tablesFromCollections(collections).tables, pool: { max: 2 } });
         observer = new pg.Client({ connectionString: container.connectionString });
         await observer.connect();
 
