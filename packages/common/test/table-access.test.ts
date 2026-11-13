@@ -32,7 +32,7 @@ const members = defineTable("members", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         name: col.text(),
-        salary: col.integer().column("salary_cents").access({ read: ["hr"], write: ["hr"] }),
+        salary: col.integer("salary_cents").access({ read: ["hr"], write: ["hr"] }),
         passwordHash: col.text().private(),
         notes: col.text().access({ read: [] }),
         bandId: col.uuid()

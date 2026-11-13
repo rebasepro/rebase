@@ -22,7 +22,7 @@ const orders = defineTable("orders", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         number: col.serial(),
-        customerId: col.uuid().column("customer_ref")
+        customerId: col.uuid("customer_ref")
     },
     rls: "admin-only"
 });
@@ -38,15 +38,15 @@ const lines = defineTable("order_lines", {
 
 const counters = defineTable("counters", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         day: col.date(),
-        name: col.varchar()
+        name: col.varchar({ length: 255 })
     },
     rls: "admin-only"
 });
 
 const days = defineTable("days", {
-    columns: { day: col.date().primaryKey(), code: col.text().primaryKey(), counter: col.bigserial() },
+    columns: { day: col.date().primaryKey(), code: col.text().primaryKey(), counter: col.bigserial({ mode: "number" }) },
     rls: "admin-only"
 });
 
