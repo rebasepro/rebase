@@ -204,8 +204,23 @@ import PhoneFrame from "./PhoneFrame.astro";
 
             const easingFactor = 0.08;
 
+            // ClientRouter keeps this document alive across navigations, and this
+            // runs on every `astro:page-load` that lands on a page with the
+            // container. Without a teardown each visit left its loop running
+            // forever and its scroll listener attached, writing transforms into
+            // the detached elements of the page before: three round trips through
+            // /product and /agencies had the home page running ~10 animation
+            // callbacks a frame. The swap is where this page's DOM goes away.
+            const teardown = new AbortController();
+            let frame = 0;
+            document.addEventListener("astro:before-swap", () => {
+                teardown.abort();
+                cancelAnimationFrame(frame);
+            }, { once: true });
+
             // Animation loop
             function animationLoop() {
+                if (teardown.signal.aborted) return;
                 elementsToAnimate.forEach(item => {
                     const dx = item.targetX - item.currentX;
                     const dy = item.targetY - item.currentY;
@@ -218,14 +233,14 @@ import PhoneFrame from "./PhoneFrame.astro";
                     item.element.style.transform = `translate3d(${item.currentX}px, ${item.currentY}px, 0)`;
                 });
 
-                requestAnimationFrame(animationLoop);
+                frame = requestAnimationFrame(animationLoop);
             }
 
             // Initialize
             setInitialPositions();
             updateTargetPositions();
-            window.addEventListener("scroll", updateTargetPositions, { passive: true });
-            requestAnimationFrame(animationLoop);
+            window.addEventListener("scroll", updateTargetPositions, { passive: true, signal: teardown.signal });
+            frame = requestAnimationFrame(animationLoop);
 
         }
     }

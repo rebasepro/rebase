@@ -236,8 +236,19 @@ import ChapterRule from "./ChapterRule.astro";
                 });
             };
 
-            window.addEventListener("scroll", requestTick, { passive: true });
-            window.addEventListener("resize", requestTick);
+            // The window outlives this page under ClientRouter, so its listeners
+            // must leave with the page: each visit used to add another pair that
+            // kept measuring the detached screens of every earlier visit. The
+            // observer goes too, for the same reason.
+            const teardown = new AbortController();
+            document.addEventListener("astro:before-swap", () => {
+                teardown.abort();
+                io.disconnect();
+                if (updateTimeout) clearTimeout(updateTimeout);
+            }, { once: true });
+
+            window.addEventListener("scroll", requestTick, { passive: true, signal: teardown.signal });
+            window.addEventListener("resize", requestTick, { signal: teardown.signal });
             requestTick();
         }
 

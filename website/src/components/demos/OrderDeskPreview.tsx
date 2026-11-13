@@ -2,7 +2,7 @@ import React from "react";
 import { Clock, DollarSign, Truck } from "lucide-react";
 import {
     BarChart, Button, ChartCard, Chip, KpiGrid, KpiTile, Select, SelectItem,
-    Table, TableBody, TableCell, TableHeader, TableRow, TextField, TimeSeriesChart,
+    Table, TableBody, TableCell, TableHeader, TableRow, TextField, TimeSeriesChart, UiLabelsProvider,
 } from "@rebasepro/ui";
 import type { ChipColorKey } from "@rebasepro/ui";
 
@@ -61,7 +61,23 @@ const DAY_MS = 86_400_000;
 const USD = { style: "currency", currency: "USD" } as const;
 const USD_COMPACT = { style: "currency", currency: "USD", notation: "compact" } as const;
 
+// The kit formats every figure in the provider's locale, and with no provider
+// that is `undefined` — Node's locale on the server, the reader's in the
+// island. They disagreed ("$37K" against "US$37k"), React threw the server
+// markup away and rebuilt the tree on the client. Pinned for the reason the
+// reference day below is: the server render and the island must agree. en-US
+// matches the table's own totals. Module scope, so the provider's memo holds.
+const DEMO_LABELS = { locale: "en-US" };
+
 export function OrderDeskPreview() {
+    return (
+        <UiLabelsProvider labels={DEMO_LABELS}>
+            <OrderDesk/>
+        </UiLabelsProvider>
+    );
+}
+
+function OrderDesk() {
     const [orders, setOrders] = React.useState(ORDERS);
     const [openId, setOpenId] = React.useState<string>("1");
     const open = orders.find((o) => o.id === openId);
