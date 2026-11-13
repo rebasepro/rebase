@@ -58,6 +58,15 @@ function mainConditions(rule: SecurityRule): { usingExpr: PolicyExpression | nul
     return { usingExpr: mainWithRoles(mainBaseUsing(rule), rule), withCheckExpr: mainWithRoles(mainBaseWithCheck(rule), rule) };
 }
 
+/**
+ * A legacy rule as a 0.30 config held it: any combination of clauses, the
+ * ones today's `SecurityRule` union excludes among them (the lift refuses
+ * those, and the sweep skips what it refuses).
+ */
+function legacyRule(base: SecurityRule, extra: Record<string, unknown>): SecurityRule {
+    return Object.assign({}, base, extra);
+}
+
 // ── The space ────────────────────────────────────────────────────────────────
 
 const CONDITION = policy.compare(policy.field("status"), "eq", policy.literal("open"));
@@ -85,8 +94,10 @@ function* rules(): Generator<SecurityRule> {
                             for (const using of DIMENSIONS.using)
                                 for (const withCheck of DIMENSIONS.withCheck)
                                     for (const operations of DIMENSIONS.operations) {
-                                        const rule: SecurityRule = {
-                                            ...(operations.length === 1 ? { operation: operations[0] } : { operations: [...operations] }),
+                                        const base: SecurityRule = operations.length === 1
+                                            ? { operation: operations[0] }
+                                            : { operations: [...operations] };
+                                        const extra: Record<string, unknown> = {
                                             ...(access !== undefined && { access }),
                                             ...(roles !== undefined && { roles: [...roles] }),
                                             ...(ownerField !== undefined && { ownerField }),
@@ -96,7 +107,7 @@ function* rules(): Generator<SecurityRule> {
                                             ...(using !== undefined && { using }),
                                             ...(withCheck !== undefined && { withCheck })
                                         };
-                                        yield rule;
+                                        yield legacyRule(base, extra);
                                     }
 }
 
@@ -173,7 +184,7 @@ describe("legacy rules carried by the migration: every change of meaning is list
 
     it("lists the reviewer's case: a restrictive role gate with a bare `access` widens", () => {
         for (const access of ["authenticated", "registered"] as const) {
-            const rule: SecurityRule = { name: "block", mode: "restrictive", operations: ["select"], access, roles: ["suspended"] };
+            const rule = legacyRule({ operations: ["select"] }, { name: "block", mode: "restrictive", access, roles: ["suspended"] });
             expect(difference(rule)).toBeDefined();
             const listed = legacyRuleMeaningChange(rule);
             expect(listed).toContain("restrictive");
