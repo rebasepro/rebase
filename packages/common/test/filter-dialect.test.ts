@@ -58,7 +58,7 @@ describe("serializeFilter", () => {
         expect(result).toEqual({ count: "gte.42" });
     });
 
-    it("serializes a relation's key as any other value (the admin sends the key, not its view model)", () => {
+    it("serializes a relation's key like any other value (the admin sends the key, not its view model)", () => {
         expect(serializeFilter({ company: ["==", 167] })).toEqual({ company: "eq.167" });
         expect(serializeFilter({ company: ["in", ["1", "2"]] })).toEqual({ company: "in.(1,2)" });
     });
