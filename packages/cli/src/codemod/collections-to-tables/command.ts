@@ -15,7 +15,7 @@ import chalk from "chalk";
 
 import { gitState, migrateCollectionsToTables } from "./migrate";
 import { rewriteSdkCalls, type SdkRewriteReport } from "./sdk-calls";
-import type { MigrationReport } from "./types";
+import type { ManualStep, MigrationReport, Note } from "./types";
 
 /** The help page. */
 export function printCollectionsToTablesHelp(): void {
@@ -103,16 +103,16 @@ function printReport(report: MigrationReport): void {
         }
     }
     if (report.notes.length > 0) {
+        const notes = groupNotes(report.notes);
         console.log("");
-        console.log(chalk.bold(`  Notes (${report.notes.length}):`));
-        for (const item of report.notes) {
-            console.log(`    ${chalk.gray("·")} ${item.file ? `${item.file}${item.line !== undefined ? `:${item.line}` : ""} ` : ""}${item.message}`);
-        }
+        console.log(chalk.bold(`  Notes (${report.notes.length}${notes.length < report.notes.length ? `, ${notes.length} kinds` : ""}):`));
+        for (const line of notes) console.log(`    ${chalk.gray("·")} ${line}`);
     }
     if (report.manualSteps.length > 0) {
+        const steps = groupSteps(report.manualSteps);
         console.log("");
-        console.log(chalk.bold(`  Manual steps (${report.manualSteps.length}):`));
-        report.manualSteps.forEach((step, index) => {
+        console.log(chalk.bold(`  Manual steps (${steps.length}${steps.length < report.manualSteps.length ? `, grouped from ${report.manualSteps.length}; --json lists each` : ""}):`));
+        steps.forEach((step, index) => {
             console.log(`    ${index + 1}. ${chalk.bold(step.title)}${step.file ? chalk.gray(` (${step.file})`) : ""}`);
             console.log(`       ${step.detail}`);
             if (step.snippet) for (const line of step.snippet.split("\n")) console.log(chalk.cyan(`         ${line}`));
@@ -166,6 +166,51 @@ function printReport(report: MigrationReport): void {
     }
     printRuleChanges(report);
     console.log("");
+}
+
+/**
+ * Manual steps for a person: steps that say the same thing (the same detail,
+ * no snippet) about several fields or files — "Check fields.X.dynamicProps"
+ * once per field — printed once, listing what they are about. `--json` keeps
+ * every step.
+ */
+export function groupSteps(steps: readonly ManualStep[]): ManualStep[] {
+    const out: ManualStep[] = [];
+    const groups = new Map<string, ManualStep[]>();
+    for (const step of steps) {
+        if (step.snippet) {
+            out.push(step);
+            continue;
+        }
+        const group = groups.get(step.detail);
+        if (group) group.push(step);
+        else {
+            const fresh = [step];
+            groups.set(step.detail, fresh);
+            out.push(step);
+        }
+    }
+    return out.map(step => {
+        const group = step.snippet ? undefined : groups.get(step.detail);
+        if (!group || group.length === 1) return step;
+        const about = group.map(member => `${member.title}${member.file ? ` (${member.file})` : ""}`);
+        return { title: `${group.length} steps that say the same`, detail: `${step.detail} — ${about.join("; ")}` };
+    });
+}
+
+/** Notes for a person: the same remark about several keys (`properties.id.isId is not carried: …`) printed once with the keys. */
+export function groupNotes(notes: readonly Note[]): string[] {
+    const groups = new Map<string, string[]>();
+    for (const item of notes) {
+        const where = item.file ? `${item.file}${item.line !== undefined ? `:${item.line}` : ""}` : "";
+        const keyed = /^([\w$]+(?:\.[\w$]+|\[\])*\.[\w$]+) (.+)$/.exec(item.message);
+        const key = keyed ? keyed[2] : item.message;
+        const label = keyed ? `${where} ${keyed[1]}`.trim() : where;
+        groups.set(key, [...(groups.get(key) ?? []), label]);
+    }
+    return [...groups].map(([message, labels]) => labels.length === 1
+        ? `${labels[0] ? `${labels[0]} ` : ""}${message}`
+        : `${labels.length}× ${message} — ${labels.join(", ")}`);
 }
 
 /** The rules that change meaning: last, so they cannot scroll away. */
@@ -295,8 +340,9 @@ export async function runSdkCalls(flags: { dryRun?: boolean; json?: boolean; for
     } else {
         console.log(chalk.bold(`\nrebase migrate sdk-calls — ${root}`));
         printSdkSection(report);
-        if (report.manualSteps.length > 0) console.log(chalk.bold(`\n  Manual steps (${report.manualSteps.length}):`));
-        report.manualSteps.forEach((step, index) => {
+        const steps = groupSteps(report.manualSteps);
+        if (steps.length > 0) console.log(chalk.bold(`\n  Manual steps (${steps.length}):`));
+        steps.forEach((step, index) => {
             console.log(`    ${index + 1}. ${chalk.bold(step.title)}${step.file ? chalk.gray(` (${step.file})`) : ""}`);
             console.log(`       ${step.detail}`);
             if (step.snippet) for (const line of step.snippet.split("\n")) console.log(chalk.cyan(`         ${line}`));
