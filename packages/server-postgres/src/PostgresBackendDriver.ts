@@ -51,7 +51,7 @@ import {
 import { sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Client, DatabaseError, Pool, type PoolClient } from "pg";
-import { sqlRows, anonymousWriteRefusedBy, applyCreateDefaults, applyStamps, createStampKeys, hasColumnAccessRules, buildSdkData, callbackRefusal, createAccessorSlugResolver, classifyTable, detectJunctionTables, isSoftDeleteRestore, requireCallbackClient, resolveTenantWrite, stampModifier, tenantOf, toCallbackError, updateStampKeys } from "@rebasepro/common";
+import { sqlRows, anonymousWriteRefusedBy, applyCreateDefaults, applyStamps, createStampKeys, hasColumnAccessRules, buildSdkData, callbackRefusal, createAccessorSlugResolver, classifyTable, detectJunctionTables, isSoftDeleteRestore, requireCallbackClient, resolveTenantWrite, stampModifier, tenantOf, toCallbackError, updateStampKeys, type SdkWriteCheck } from "@rebasepro/common";
 import { PostgresTableRegistry } from "./model/PostgresTableRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues, tableKeys } from "./services/collection-helpers";
 import { isJunctionBackedRelation, isNestedPath, resolveNestedPath, splitPathSegments } from "./services/nested-path";
@@ -62,7 +62,7 @@ import { currentWriteDepth, inWriteFrame, type WriteFrame } from "./services/wri
 import { afterDelete, afterReadOnRow, afterReadOnRows, afterSave, afterSaveError, beforeDeleteVetoes, beforeSave, declaresAnyHook, hasAfterRead, hasBeforeQueryHook, hasBeforeSave, hasRowHook, requireHookTable, resolveTableHooks, type TableHookSet } from "./services/table-hooks";
 import { stripUnreadable } from "./services/row-pipeline";
 import { HistoryService } from "./history/HistoryService";
-import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
+import { ApiError, assertColumnWriteRules, logger, resolveBatchRefs } from "@rebasepro/server";
 import { extractPgError, isRoleSwitchingPermissionError, reachedDatabase } from "./utils/pg-error-utils";
 import { rowsOfResult } from "./utils/result-rows";
 import { applyAuthContext, authContextStatement } from "./security/rls-enforcement";
@@ -71,6 +71,7 @@ import { assertCallerSql } from "./security/caller-sql";
 import { ColumnOrigins, fieldsOfResult, withoutUnreadableColumns } from "./security/caller-sql-columns";
 import { viewRowsName } from "./schema/plan/view-names";
 import { withFieldViewer } from "./services/field-viewer";
+import { foldLinkSpellings } from "./data-transformer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-tables";
 import { readReconcileFacts } from "./schema/reconcile-schema";
@@ -188,6 +189,13 @@ export class RoleSwitchUnavailableError extends Error {
 }
 
 /**
+ * The uid of the server's own identity (`SERVICE_IDENTITY` in
+ * `@rebasepro/server`): what `rebase.dataAsAdmin` and the service key run as.
+ * A driver scoped to it is the server speaking, not a caller.
+ */
+const SERVICE_UID = "service";
+
+/**
  * Fold what a `beforeSave` returned into the values being saved.
  *
  * The hook returns the values that will be saved, so a key it returns replaces
@@ -217,12 +225,15 @@ function insertOnlyKeysOf(
     afterHooks: Record<string, unknown>,
     table: TableDescriptor | undefined
 ): string[] {
-    const sent = new Set(Object.keys(callerValues ?? {}));
+    // A link the caller (or a hook) wrote by name was written as its key column.
+    const sent = new Set(Object.keys(foldLinkSpellings({ ...callerValues }, table)));
+    const before = foldLinkSpellings(beforeHooks, table);
+    const after = foldLinkSpellings(afterHooks, table);
     const updateStamps = new Set(table ? updateStampKeys(table) : []);
     return Object.keys(finalValues).filter(key =>
         !sent.has(key)
         && !updateStamps.has(key)
-        && beforeHooks[key] === afterHooks[key]);
+        && before[key] === after[key]);
 }
 
 /**
@@ -242,7 +253,7 @@ function assertUpdateDoesNotSoftDelete(
 ): void {
     const softDelete = resolveSoftDelete(table);
     if (!softDelete) return;
-    const value = values?.[softDelete.field];
+    const value = values ? foldLinkSpellings(values, table?.descriptor)[softDelete.field] : undefined;
     if (value === undefined || value === null) return;
     const slug = table?.slug ?? path;
     const message = `'${softDelete.field}' on '${slug}' records a delete, so an update may only clear it ` +
@@ -289,9 +300,11 @@ function assertKeyUnchanged(
         // An address the key cannot parse is the write's own 404 to give.
         return;
     }
+    // By either spelling: a key column bound to a link moves under its name too.
+    const written = foldLinkSpellings(values, table.descriptor);
     const moved = primaryKeys
         .map(key => key.fieldName)
-        .filter(field => values[field] !== undefined && String(values[field]) !== String(address[field]));
+        .filter(field => written[field] !== undefined && String(written[field]) !== String(address[field]));
     if (moved.length === 0) return;
     const slug = table.slug ?? path;
     const violations = moved.map(field => {
@@ -1320,6 +1333,11 @@ export class PostgresBackendDriver implements DataDriver {
     ): Partial<M> {
         const table = runtime?.descriptor;
         if (!table) return values;
+        // One spelling per column from here on: a link written by name is its
+        // key column (`foldLinkSpellings`), so the stamps below, the create
+        // stamps an update drops and the tenant check after this all judge
+        // it — `{ creator: victim }` no longer reattributes a row.
+        values = foldLinkSpellings(values, table);
         // Stamped at the application layer, after the hooks, so every write
         // through the backend carries them and a hook cannot attribute a
         // write to another time or user. The user comes from the call
@@ -2254,7 +2272,7 @@ export class PostgresBackendDriver implements DataDriver {
     }: UpdateWhereProps<M>): Promise<Record<string, unknown>[]> {
         this.assertWritable(path);
         const resolved = this.assertFilteredWrite(this.tableAt(path), path, filter, logical);
-        const written = values as Record<string, unknown>;
+        const written = foldLinkSpellings(values as Record<string, unknown>, resolved.descriptor);
         assertUpdateDoesNotSoftDelete(resolved, written, path);
         const keys = keysOfTable(resolved, this.registry).map(key => key.fieldName).filter(field => written[field] !== undefined);
         if (keys.length > 0) {
@@ -3451,11 +3469,36 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
     ) {
         this.user = user;
         this.data = buildSdkData(this, {
-            resolveAccessor: createAccessorSlugResolver(() => delegate.registry?.tables())
+            resolveAccessor: createAccessorSlugResolver(() => delegate.registry?.tables()),
+            // `context.data` writes as the caller, so on the caller's terms:
+            // the column write rules every API door applies, by every
+            // spelling (a link by name, a relation that moves another table's
+            // key, a `_pivot` field). The service identity — what
+            // `dataAsAdmin` and a hook nested in one run as — is the server
+            // speaking, and is not held to them.
+            ...(user.uid === SERVICE_UID ? {} : { checkWrite: this.columnWriteCheck() })
         });
 
         // Delegate admin ops to the base driver (no RLS wrapping for admin)
         this.admin = delegate.admin;
+    }
+
+    /**
+     * The column write rules of this caller, as the in-process SDK asks them
+     * before each write (see `SdkDataOptions.checkWrite`). A table this
+     * driver does not serve is left to the write itself, which refuses it.
+     */
+    private columnWriteCheck(): SdkWriteCheck {
+        const viewer = { roles: this.user?.roles ?? [] };
+        return (slug, values) => {
+            const registry = this.delegate.registry;
+            const table = registry?.getTable(slug)?.descriptor;
+            if (!table) return;
+            assertColumnWriteRules(values, table, {
+                viewer,
+                relatedTables: target => registry?.getTable(target)?.descriptor
+            });
+        };
     }
 
     /**

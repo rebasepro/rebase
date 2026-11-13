@@ -29,7 +29,7 @@
  */
 import type { AuthAdapter, CallerCredential, DataDriver, OrderBySpec, TableDescriptor, UiTablePreferences } from "@rebasepro/types";
 import { ALL_WHERE_FILTER_OPS, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, mergeUiTablePreferences, scopeGrants, scopeGrantsAny } from "@rebasepro/types";
-import { type FieldViewer, OrderBySpecError, canWriteColumn, columnByKey, isSoftDeleteRestore, serializeOrderBy } from "@rebasepro/common";
+import { type FieldViewer, OrderBySpecError, canWriteColumn, canWriteRelation, columnByKey, isSoftDeleteRestore, relationOf, serializeOrderBy } from "@rebasepro/common";
 import { scopeDataDriver } from "../auth/rls-scope.js";
 import { ApiError } from "../api/errors.js";
 import { assertWriteRequestValid } from "../api/rest/write-validation.js";
@@ -677,7 +677,10 @@ async function describeTable(resolved: ResolvedTable, ctx: McpToolContext): Prom
             ? null
             : narrowedSchema(buildTableInputSchema(served.table, lookupOf(ctx)), key => {
                 const column = columnByKey(served.table, key);
-                return column === undefined || canWriteColumn(column, viewer);
+                if (column !== undefined) return canWriteColumn(column, viewer);
+                // A link is writable exactly when its key column is.
+                const relation = relationOf(served.table, key);
+                return relation === undefined || canWriteRelation(served.table, relation, viewer);
             }),
         relations: descriptor.relations.map(relation => ({ name: relation.name, kind: relation.kind, target: relation.target })),
         rls,

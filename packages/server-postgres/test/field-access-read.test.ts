@@ -308,8 +308,9 @@ describe("a relation an include may load (`canReadRelation`)", () => {
     const sponsor = belongsTo("sponsor", "staff", "sponsor_id", "sponsorId");
     const hidden = { ...belongsTo("auditor", "staff", "auditor_id", "auditorId"), private: true as const };
 
-    const readable = (relation: Parameters<typeof canReadRelation>[0], roles: string[]) =>
-        withFieldViewer({ roles }, () => canReadRelation(relation));
+    const postsTable = described(posts);
+    const readable = (relation: Parameters<typeof canReadRelation>[1], roles: string[], table = postsTable) =>
+        withFieldViewer({ roles }, () => canReadRelation(table, relation));
 
     it.each([withheld, manager])("withholds '$name' from a caller without the role", (relation) => {
         expect(readable(relation, ["staff"])).toBe(false);
@@ -325,5 +326,21 @@ describe("a relation an include may load (`canReadRelation`)", () => {
 
     it("never serves a private relation, the admin included", () => {
         expect(readable(hidden, ["admin"])).toBe(false);
+    });
+
+    // SEC-FIX-3 D-2: a link is exactly as readable as the key column it is
+    // bound to — `?include=sponsor` hands over the value `sponsorId` holds.
+    it("withholds a link whose key column the caller cannot read, and never serves one bound to a private key", () => {
+        const keyColumn = (key: string, column: string, rule: { access?: { read: string[] }; private?: true }) => ({
+            ...postsTable.columns[0], key, column, primaryKey: false, ...rule
+        });
+        const table = {
+            ...postsTable,
+            columns: [...postsTable.columns, keyColumn("sponsorId", "sponsor_id", { access: { read: ["hr"] } }), keyColumn("auditorId", "auditor_id", { private: true })],
+            relations: [sponsor, belongsTo("auditor", "staff", "auditor_id", "auditorId")]
+        };
+        expect(readable(sponsor, ["staff"], table)).toBe(false);
+        expect(readable(sponsor, ["hr"], table)).toBe(true);
+        expect(readable(table.relations[1], ["admin"], table)).toBe(false);
     });
 });

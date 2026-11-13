@@ -1,6 +1,6 @@
 import { isPrototypePollutingKey } from "@rebasepro/utils";
 import { ApiError } from "@rebasepro/server";
-import type { ColumnDescriptor, ColumnType, JsonShape } from "@rebasepro/types";
+import type { ColumnDescriptor, ColumnType, JsonShape, TableDescriptor } from "@rebasepro/types";
 import { columnTypeLabel } from "@rebasepro/types";
 import { valueCodecOf, valueCodecOfType, type ValueCodec } from "@rebasepro/common";
 import type { RuntimeTable } from "./model/runtime-table";
@@ -201,6 +201,47 @@ joinPathRelationUpdates: [] };
         inverseRelationUpdates,
         joinPathRelationUpdates
     };
+}
+
+/**
+ * A write's `belongsTo` links folded onto the key columns they set:
+ * `{ reviewer: 7 }` becomes `{ reviewerId: 7 }`.
+ *
+ * A link and its key column are one fact under two names, and the write path
+ * judges the column — the create-time stamps an update drops
+ * (`.onCreateUser()`), the user and time stamps, the tenant a row may not
+ * leave, the key an update may not move. Judged by the column's name alone,
+ * each of them was skipped by the link's: `PATCH { creator: victim }`
+ * reattributed a row whose `createdBy` an update cannot touch. Folded once,
+ * before any of them runs, there is one spelling left to judge.
+ *
+ * The value is read as {@link serializeDataToServer} reads a link (a key, or
+ * `null` / `""` to unlink; anything else is a 400 naming the relation). A
+ * write naming both spellings with different keys is refused: which of the
+ * two it meant is not the server's to guess.
+ */
+export function foldLinkSpellings<V extends Record<string, unknown>>(values: V, table: TableDescriptor | undefined): V {
+    if (!table) return values;
+    let folded: Record<string, unknown> | undefined;
+    for (const relation of table.relations) {
+        if (relation.kind !== "belongsTo" || !Object.hasOwn(values, relation.name)) continue;
+        const raw = values[relation.name];
+        folded ??= { ...values };
+        delete folded[relation.name];
+        if (raw === undefined) continue;
+        const key = linkKey(raw, `'${table.slug}.${relation.name}'`, relation.target);
+        const column = values[relation.localField];
+        if (column !== undefined && String(column === "" ? null : column) !== String(key)) {
+            const message = `'${relation.name}' and '${relation.localField}' on '${table.slug}' set the same column, ` +
+                "and this write gives them different values. Write one of them.";
+            throw ApiError.badRequest(message, "VALIDATION_INVALID_VALUE", {
+                collection: table.slug,
+                violations: [{ field: relation.name, code: "conflict", message }]
+            });
+        }
+        folded[relation.localField] = key;
+    }
+    return (folded ?? values) as V;
 }
 
 /**

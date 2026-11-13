@@ -40,7 +40,7 @@ import { toSnakeCase } from "@rebasepro/utils";
 import { mergeIncludeSpecs } from "./include-spec";
 import { collectAllPages, paginateFind } from "./paginate";
 import { normalizeOrderBy } from "./sort-dialect";
-import { createDriverTableRows, type DriverTableRows } from "./driver-rows";
+import { createDriverTableRows, type DriverTableRows, type SdkWriteCheck } from "./driver-rows";
 
 /**
  * The developer SDK's data layer over a driver: `rebase.data`, a hook's
@@ -559,6 +559,14 @@ export interface SdkDataOptions {
      * `undefined`, the slug is the stored path. Rows are served as stored.
      */
     resolveDataPath?: (slug: string) => string | undefined;
+
+    /**
+     * Asked before every write, `batch()` included, and expected to throw to
+     * refuse it — see {@link SdkWriteCheck}. A caller-scoped server driver
+     * passes the column write rules, so `context.data` writes on the API's
+     * terms; `dataAsAdmin` passes none.
+     */
+    checkWrite?: SdkWriteCheck;
 }
 
 /**
@@ -596,7 +604,8 @@ export function buildSdkData<DB = unknown>(
         let accessor = cache.get(slug);
         if (!accessor) {
             const rows = createDriverTableRows(driver, slug, {
-                storedPath: () => options?.resolveDataPath?.(slug) ?? slug
+                storedPath: () => options?.resolveDataPath?.(slug) ?? slug,
+                ...(options?.checkWrite ? { checkWrite: options.checkWrite } : {})
             });
             accessor = toSdkTableClient(rows, slug);
             cache.set(slug, accessor);
@@ -615,6 +624,10 @@ export function buildSdkData<DB = unknown>(
         if (operations.length === 0) return { data: [], meta: { operations: 0 } };
         if (!driver.batchWrite) {
             throw new RebaseClientError("This data source cannot write a batch atomically.", { code: "BATCH_UNSUPPORTED" });
+        }
+        for (const operation of operations) {
+            if (!("values" in operation) || !operation.values) continue;
+            options?.checkWrite?.(slugOf(operation.table), { ...operation.values }, operation.op === "update" ? "existing" : "new");
         }
         const data = await driver.batchWrite({
             operations: operations.map(operation => ({

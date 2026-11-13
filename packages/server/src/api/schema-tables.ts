@@ -15,6 +15,7 @@ import {
     type TableDescriptor
 } from "@rebasepro/types";
 import {
+    canReadRelation,
     canReadWithAccess,
     compileTableRulePolicies,
     junctionPolicyTable,
@@ -43,7 +44,7 @@ import { logger } from "../utils/logger";
  * |---|---|
  * | a `private` column or relation | nobody, administrators included |
  * | a column or relation the caller fails `access.read` for | dropped (`access` itself is kept on what remains) |
- * | a `belongsTo`'s foreign-key column | its own rules when declared in `columns`; withheld with the relation when derived from it |
+ * | a `belongsTo` and its foreign-key column | one fact under two names: each is described only when both pass — a link whose key column the caller cannot read is dropped, and so is a key column whose link is |
  * | a relation whose target table the caller is not served | dropped |
  * | a table | administrators and `schema:read` holders: every one; any other person (`schemaTables.persons: "granted"`, the default): those some rule could grant their roles something on (see {@link tableReachable}), every one with `persons: "all"`; a credential (API key, token): the tables its `data:*` scopes name, or all with `schema:read`; an anonymous caller (public opt-in): those with a public `select` rule |
  * | structured `rls.rules` | everyone served the table; a non-privileged person under `"granted"` only the rules that can apply to their roles (see {@link ruleAppliesTo}), the rest dropped |
@@ -431,8 +432,14 @@ function columnServed(column: ColumnDescriptor, viewer: FieldViewer): boolean {
     return column.private !== true && canReadWithAccess(column.access, viewer);
 }
 
-function servedRelation(relation: RelationDescriptor, view: SchemaView, served: ReadonlySet<string>): RelationDescriptor | undefined {
-    if (relation.private === true || !canReadWithAccess(relation.access, view.viewer)) return undefined;
+/**
+ * A relation as this view describes it, or `undefined` when it is withheld:
+ * private, closed to the viewer, a `belongsTo` whose key column is (a link is
+ * exactly as readable as its key), or pointing at a table the view does not
+ * serve.
+ */
+function servedRelation(table: TableDescriptor, relation: RelationDescriptor, view: SchemaView, served: ReadonlySet<string>): RelationDescriptor | undefined {
+    if (!canReadRelation(table, relation, view.viewer)) return undefined;
     if (!served.has(relation.target)) return undefined;
     if (relation.kind !== "manyToMany") return relation;
     return {
@@ -458,19 +465,19 @@ function serializeTable(
     policies: TablePolicies | undefined
 ): TableDescriptor {
     const relations = table.relations
-        .map(relation => servedRelation(relation, view, served))
+        .map(relation => servedRelation(table, relation, view, served))
         .filter((relation): relation is RelationDescriptor => relation !== undefined);
     const relationNames = new Set(relations.map(relation => relation.name));
-    // A foreign-key column the relation derived has no rules of its own: it is
-    // the relation's, and is withheld with it (as the REST read strips it).
+    // A link and its key column are one fact under two names: a key column
+    // whose relation is withheld is withheld with it (as the REST read strips
+    // it), derived or declared.
     const withheldKeys = new Set(table.relations
-        .filter(relation => relation.kind === "belongsTo"
-            && (relation.private === true || !canReadWithAccess(relation.access, view.viewer)))
+        .filter(relation => relation.kind === "belongsTo" && !canReadRelation(table, relation, view.viewer))
         .map(relation => relation.kind === "belongsTo" ? relation.localField : ""));
     const hookFlags = !withholdsHookFlags(view);
     const columns = table.columns
         .filter(column => columnServed(column, view.viewer))
-        .filter(column => !(column.derived === true && withheldKeys.has(column.key)))
+        .filter(column => !withheldKeys.has(column.key))
         .map(column => {
             let served = column;
             if (!hookFlags && served.transforms !== undefined) {

@@ -126,7 +126,7 @@ function assertRelationReadable(
     relation: RelationDescriptor,
     use: string
 ): void {
-    if (canReadRelation(relation)) return;
+    if (canReadRelation(runtime.descriptor, relation)) return;
     throw ApiError.badRequest(
         `'${key}' is not readable on table '${runtime.slug}' with your roles, so it cannot be used in ${use}.`,
         "FIELD_NOT_READABLE",
@@ -897,7 +897,7 @@ target });
         // door reaches (REST, `POST …/query`, the in-process SDK, socket fetches
         // and subscriptions), and at every level of a nested include. The REST
         // rows were stripped before this runs, so the strip cannot catch it.
-        const levels = requested.filter(({ relation }) => canReadRelation(relation));
+        const levels = requested.filter(({ relation }) => canReadRelation(runtime.descriptor, relation));
 
         for (const { key, node, relation } of levels) {
             // The target's lowered collection, looked up by the relation's

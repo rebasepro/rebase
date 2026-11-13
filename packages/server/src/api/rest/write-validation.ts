@@ -8,6 +8,7 @@ import {
     type ColumnType,
     type ColumnValidation,
     type IncludeSpec,
+    type JoinStep,
     type JsonShape,
     type TableDescriptor
 } from "@rebasepro/types";
@@ -220,10 +221,12 @@ function assertRelationTargetsWritable(
     relatedTables: RelatedTableLookup | undefined
 ): void {
     for (const relation of table.relations) {
-        if (relation.kind !== "hasMany" && relation.kind !== "hasOne") continue;
         if (!Object.hasOwn(values, relation.name)) continue;
-        const target = relatedTables?.(relation.target);
-        if (!target) {
+        const written = columnsWrittenOnOtherRows(relation);
+        if (!written) continue;
+        const target = relatedTables?.(written.table);
+        if (!target || written.columns.length === 0) {
+            if (!written.required) continue;
             throw ApiError.badRequest(
                 `${where}'${relation.name}' on table '${table.slug}' writes the foreign key of '${relation.target}', ` +
                 "whose rules this write cannot read, so it is refused. Write the key on the related rows themselves.",
@@ -231,14 +234,65 @@ function assertRelationTargetsWritable(
                 { collection: table.slug, fields: [relation.name] }
             );
         }
-        const foreignKey = keyForColumn(target, relation.foreignKey) ?? relation.foreignKey;
-        assertNoClosedFields(
-            { [foreignKey]: true },
-            target,
-            `${where}Writing '${relation.name}' on '${table.slug}' sets '${foreignKey}' on the rows of '${target.slug}': `,
-            viewer
-        );
+        for (const sqlName of written.columns) {
+            const key = keyForColumn(target, sqlName) ?? sqlName;
+            assertNoClosedFields(
+                { [key]: true },
+                target,
+                `${where}Writing '${relation.name}' on '${table.slug}' sets '${key}' on the rows of '${target.slug}': `,
+                viewer
+            );
+        }
     }
+}
+
+/**
+ * The column a `via` step's condition names on one side, unqualified — or
+ * `undefined` for a step with alternatives or a composite condition, which is
+ * not writable (the write path refuses it naming the relation).
+ */
+function soleStepColumn(step: JoinStep, side: "from" | "to"): string | undefined {
+    const on = Array.isArray(step.on) ? (step.on.length === 1 ? step.on[0] : undefined) : step.on;
+    if (!on) return undefined;
+    const named = on[side];
+    const column = Array.isArray(named) ? (named.length === 1 ? named[0] : undefined) : named;
+    if (column === undefined) return undefined;
+    const dot = column.lastIndexOf(".");
+    return dot >= 0 ? column.slice(dot + 1) : column;
+}
+
+/**
+ * The columns a relation write sets on rows other than the one written, and
+ * the table (by slug or SQL name, as the lookup takes it) that holds them:
+ *
+ * - `hasMany` / `hasOne` — the target's foreign key;
+ * - a to-one `via` — the column its one step joins to on the target;
+ * - a writable to-many `via` — the junction's two link columns, judged when
+ *   the junction is a declared table (an undeclared one has no rules);
+ * - `belongsTo` and `manyToMany` — none: the first sets a column of this
+ *   table (judged as that column), the second a junction the relation owns,
+ *   whose `_pivot` columns are judged as columns.
+ *
+ * `required` says whether the write must be refused when the table's rules
+ * cannot be read: it must for the target of a key the write moves.
+ */
+function columnsWrittenOnOtherRows(relation: TableDescriptor["relations"][number]):
+    { table: string; columns: string[]; required: boolean } | undefined {
+    if (relation.kind === "hasMany" || relation.kind === "hasOne") {
+        return { table: relation.target, columns: [relation.foreignKey], required: true };
+    }
+    if (relation.kind !== "via" || relation.steps.length === 0) return undefined;
+    if (relation.cardinality === "one") {
+        const column = soleStepColumn(relation.steps[relation.steps.length - 1], "to");
+        // A chain whose written column cannot be named is refused by the
+        // write path; refusing it here too fails closed.
+        return { table: relation.target, columns: column ? [column] : [], required: true };
+    }
+    if (relation.steps.length !== 2) return undefined;
+    const junction = relation.steps[0];
+    const columns = [soleStepColumn(junction, "to"), soleStepColumn(relation.steps[1], "from")]
+        .filter((column): column is string => column !== undefined);
+    return { table: junction.table, columns, required: false };
 }
 
 /**
@@ -287,6 +341,52 @@ function assertFieldOpsReadable(
 }
 
 /**
+ * Refuse a write that sets a column this caller may not set, through any
+ * spelling that reaches the column: its own key or SQL name, the `belongsTo`
+ * bound to it (`{ reviewer: 7 }` sets `reviewerId`), the relation that sets it
+ * on other rows (`hasMany` / `hasOne`, a to-one `via`), a `_pivot` field of a
+ * many-to-many — and a field operation on a column the caller may not read.
+ *
+ * The column's rules, one list for every spelling: `.readOnly()`, `.private()`
+ * and generated columns answer `VALIDATION_EXCLUDED_FIELDS` for every caller,
+ * an `access.write` list `FIELD_NOT_WRITABLE` for a caller outside it. The
+ * server's stamps, the tenant and the key are the driver's to judge (it folds
+ * a link onto its key column before them).
+ *
+ * The part of {@link assertKnownWriteFields} that is not about unknown keys:
+ * the in-process SDK on a caller's driver asks this alone, since the driver
+ * refuses a key no column answers to on its own.
+ */
+export function assertColumnWriteRules(
+    values: Record<string, unknown>,
+    table: TableDescriptor,
+    options?: {
+        /** A prefix for every message (`Row 3: `). */
+        where?: string;
+        viewer?: FieldViewer;
+        /** The related tables' descriptors; a write that moves another table's key is refused without them. */
+        relatedTables?: RelatedTableLookup;
+    }
+): void {
+    const where = options?.where ?? "";
+    assertNoClosedFields(values, table, where, options?.viewer);
+    assertRelationTargetsWritable(values, table, where, options?.viewer, options?.relatedTables);
+    assertFieldOpsReadable(values, table, where, options?.viewer);
+
+    // A membership element may name the link's own columns under `_pivot`.
+    // They belong to the junction, so they are checked against its columns —
+    // by the same function, so a pivot column with `access.write: ["admin"]`
+    // or `.private()` is refused on exactly the terms a table's column is.
+    // Whatever the parent's `strictWrites` says: the junction's own decides
+    // its unknown keys, the parent's decides nothing about its rules.
+    for (const [key, junction] of junctionsWithPayload(table)) {
+        for (const { pivot } of pivotsIn(values[key])) {
+            assertKnownWriteFields(pivot, junction, { viewer: options?.viewer });
+        }
+    }
+}
+
+/**
  * Reject a write naming a column the table does not have.
  *
  * An unknown key does not reach the INSERT and come back as `column "titel"
@@ -328,15 +428,16 @@ export function assertKnownWriteFields(
 
     const where = options?.rowIndex !== undefined ? `Row ${options.rowIndex}: ` : "";
 
-    // Checked BEFORE the `strictWrites` opt-out: that flag says "accept a key
-    // this table does not declare", a convenience. The refusal below is a
-    // security rule, and a convenience flag must not be able to turn it off.
-    assertNoClosedFields(values, table, where, options?.viewer);
-    assertRelationTargetsWritable(values, table, where, options?.viewer, options?.relatedTables);
-    assertFieldOpsReadable(values, table, where, options?.viewer);
+    // Every rule of a DECLARED column is checked BEFORE the `strictWrites`
+    // opt-out. That flag says one thing — "a key this table does not declare
+    // is not a typo" — and a convenience flag must not be able to open a
+    // closed column. What it decides, and all it decides, is below.
+    assertColumnWriteRules(values, table, { where, viewer: options?.viewer, relatedTables: options?.relatedTables });
 
-    // The opt-out lets a key through that this table does not describe; the
-    // driver still requires a real column behind it.
+    // `strictWrites: false`: a key the table does not declare is handed to the
+    // driver instead of refused here. The driver writes it only when the
+    // database has a column of that name (`assertWritableColumns`) and refuses
+    // it otherwise — it is never dropped in silence. No other rule moves.
     if (table.strictWrites === false) return;
 
     const known = new Set<string>([
@@ -352,16 +453,6 @@ export function assertKnownWriteFields(
     for (const name of restricted.declared) known.delete(name);
 
     for (const field of options?.extraKnownFields ?? []) known.add(field);
-
-    // A membership element may name the link's own columns under `_pivot`.
-    // They belong to the junction, so they are checked against its columns —
-    // by the same function, so a pivot column with `access.write: ["admin"]`
-    // or `.private()` is refused on exactly the terms a table's column is.
-    for (const [key, junction] of junctionsWithPayload(table)) {
-        for (const { pivot } of pivotsIn(values[key])) {
-            assertKnownWriteFields(pivot, junction, { viewer: options?.viewer });
-        }
-    }
 
     const unknown = Object.keys(values).filter(key => !known.has(key));
     if (unknown.length === 0) return;

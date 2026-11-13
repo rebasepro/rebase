@@ -70,12 +70,76 @@ export function canWriteColumn(target: AccessTarget, viewer: FieldViewer | undef
 }
 
 /**
+ * The column a `belongsTo` is bound to on its own table — the declared (or
+ * derived) column its `localKey` names — or `undefined` for any other kind, or
+ * a link whose key the table does not describe.
+ *
+ * The two are one fact under two names: `{ reviewer: 7 }` sets the column
+ * `{ reviewerId: 7 }` sets, and `?include=reviewer` hands over the value the
+ * column holds. So every rule of one is a rule of the other — see
+ * {@link canReadRelation} and {@link canWriteRelation}.
+ *
+ * @group Table
+ */
+export function boundKeyColumn(table: TableDescriptor, relation: RelationDescriptor): ColumnDescriptor | undefined {
+    if (relation.kind !== "belongsTo") return undefined;
+    return table.columns.find(column => column.key === relation.localField);
+}
+
+/**
+ * May this caller be handed the rows of this relation?
+ *
+ * The relation's own rules, and — for a `belongsTo` — its key column's: a link
+ * is exactly as readable as the key it is bound to. `?include=handler` embeds
+ * the staff row whose key `handlerId` holds, so a caller `handlerId`'s
+ * `access.read` withholds may not include `handler`, filter on it or sort by
+ * it either.
+ *
+ * @group Table
+ */
+export function canReadRelation(table: TableDescriptor, relation: RelationDescriptor, viewer: FieldViewer | undefined): boolean {
+    if (!canReadColumn(relation, viewer)) return false;
+    const bound = boundKeyColumn(table, relation);
+    return bound === undefined || canReadColumn(bound, viewer);
+}
+
+/**
+ * May this caller set this relation?
+ *
+ * The relation's own rules, and — for a `belongsTo` — its key column's
+ * (`.readOnly()`, `.private()`, `access.write`): writing a link by name sets
+ * that column, so it is closed exactly when writing the column is.
+ *
+ * @group Table
+ */
+export function canWriteRelation(table: TableDescriptor, relation: RelationDescriptor, viewer: FieldViewer | undefined): boolean {
+    if (!canWriteColumn(relation, viewer)) return false;
+    const bound = boundKeyColumn(table, relation);
+    return bound === undefined || canWriteColumn(bound, viewer);
+}
+
+/**
+ * Whether the API does not have this relation at all: it is `.private()`, or
+ * it is a `belongsTo` bound to a `.private()` key column — the link would
+ * otherwise put the hidden column back on the surface under another name.
+ *
+ * @group Table
+ */
+export function isPrivateRelation(table: TableDescriptor, relation: RelationDescriptor): boolean {
+    return relation.private === true || boundKeyColumn(table, relation)?.private === true;
+}
+
+/**
  * The names on this table a caller may not touch, in both spellings a caller
  * can write them in: `declared` holds column keys and relation names, `refused`
  * those plus the SQL names behind the columns.
  *
- * A restricted `belongsTo` relation takes its foreign key with it: `bandId: 7`
- * names the band exactly as `band: { id: 7 }` does.
+ * A column and the `belongsTo` bound to it are one fact under two names, so a
+ * restriction on either restricts both: a restricted relation takes its foreign
+ * key with it (`bandId: 7` names the band exactly as `band: 7` does), and a
+ * restricted key column takes its link with it (`reviewer: 7` sets the
+ * `.readOnly()` `reviewerId`; `?include=handler` reads the `access.read`-closed
+ * `handlerId`).
  *
  * Replaces `restrictedFieldNames(collection, viewer, kind)`.
  *
@@ -92,8 +156,9 @@ export function restrictedKeys(
 
 /**
  * The names the API does not have, in every spelling: the private columns,
- * their SQL names, the private relations and the foreign key of a private
- * `belongsTo`. A query naming one is answered as a query naming nothing.
+ * their SQL names, the private relations, the foreign key of a private
+ * `belongsTo` and the `belongsTo` bound to a private key column. A query naming
+ * one is answered as a query naming nothing.
  *
  * Not {@link restrictedKeys}: a column restricted by role is public by name
  * (OpenAPI and MCP describe it); a private one is described nowhere.
@@ -135,7 +200,8 @@ function namesWhere(
         refused.add(column.column);
     }
     for (const relation of table.relations) {
-        if (!restricted(relation)) continue;
+        const bound = boundKeyColumn(table, relation);
+        if (!restricted(relation) && !(bound !== undefined && restricted(bound))) continue;
         restrict(relation.name);
         if (relation.kind === "belongsTo") restrictForeignKey(table, relation, restrict, refused);
     }

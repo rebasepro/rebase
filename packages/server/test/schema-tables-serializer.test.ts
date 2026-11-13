@@ -7,6 +7,7 @@ import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import { createSchemaTablesRoutes, createSchemaTablesService } from "../src/api/schema-tables-routes";
 import { redactRule, ruleAppliesTo, schemaViewFor, schemaViewKey, serializeTables, tableReachable } from "../src/api/schema-tables";
+import { buildTableInputSchema, buildTableSchema } from "../src/api/openapi-generator";
 
 /**
  * The serializer on its own — the MCP caller class, which reaches it in
@@ -158,5 +159,68 @@ describe("the route's cache follows the registry", () => {
         expect(after.status).toBe(200);
         expect(after.headers.get("etag")).not.toBe(tag);
         expect((await after.json() as TableDescriptor[]).map(table => table.slug)).toEqual(["authors"]);
+    });
+});
+
+/**
+ * A link is described exactly when its key column is (SEC-FIX-3 D-2): the
+ * per-caller schema and the OpenAPI document built from it never describe a
+ * `belongsTo` whose key the caller cannot read, nor a key column whose link is
+ * withheld from them; the input schema never offers a link whose key nobody
+ * writes.
+ */
+describe("a link and its key column are described together", () => {
+    const staff = defineTable("staff", {
+        columns: { id: col.serial().primaryKey(), name: col.text() },
+        rls: [{ operation: "select", access: "authenticated" }]
+    });
+    const cases = defineTable("cases", {
+        columns: {
+            id: col.serial().primaryKey(),
+            title: col.text(),
+            handlerId: col.integer().access({ read: ["hr"] }),
+            informantId: col.integer().private(),
+            reviewerId: col.integer().readOnly(),
+            ownerId: col.integer()
+        },
+        relations: {
+            handler: rel.belongsTo(() => staff, { localKey: "handler_id" }),
+            informant: rel.belongsTo(() => staff, { localKey: "informant_id" }),
+            reviewer: rel.belongsTo(() => staff, { localKey: "reviewer_id" }),
+            owner: rel.belongsTo(() => staff, { localKey: "owner_id", access: { read: ["hr"] } })
+        },
+        rls: [{ operation: "select", access: "authenticated" }]
+    });
+    const tables = () => compileSchemaDefs([staff, cases]).descriptors;
+    const casesFor = (roles: string[]) => {
+        const view = schemaViewFor({ kind: "person", roles, scopes: [] });
+        if ("refused" in view) throw new Error("refused");
+        const found = serializeTables(tables(), view).find(table => table.slug === "cases");
+        if (!found) throw new Error("cases not served");
+        return found;
+    };
+
+    it("withholds a link whose key the caller cannot read, and a key whose link is withheld", () => {
+        const editor = casesFor(["editor"]);
+        expect(editor.relations.map(relation => relation.name).sort()).toEqual(["reviewer"]);
+        expect(editor.columns.map(column => column.key)).not.toEqual(expect.arrayContaining(["handlerId"]));
+        expect(editor.columns.map(column => column.key)).not.toContain("informantId");
+        expect(editor.columns.map(column => column.key)).not.toContain("ownerId");
+        const hr = casesFor(["hr"]);
+        expect(hr.relations.map(relation => relation.name).sort()).toEqual(["handler", "owner", "reviewer"]);
+        expect(hr.columns.map(column => column.key)).toEqual(expect.arrayContaining(["handlerId", "ownerId"]));
+    });
+
+    it("the OpenAPI schemas built from that view agree, and the input schema offers no link whose key nobody writes", () => {
+        const editor = casesFor(["editor"]);
+        const lookup = (slug: string) => tables().find(table => table.slug === slug);
+        const row = buildTableSchema(editor, new Set(), lookup);
+        const rowKeys = Object.keys((row as { properties?: Record<string, unknown> }).properties ?? {});
+        for (const hidden of ["handler", "handlerId", "informant", "informantId", "owner", "ownerId"]) expect(rowKeys).not.toContain(hidden);
+        const input = buildTableInputSchema(casesFor(["hr"]), lookup);
+        const inputKeys = Object.keys((input as { properties?: Record<string, unknown> }).properties ?? {});
+        expect(inputKeys).not.toContain("reviewer");
+        expect(inputKeys).not.toContain("reviewerId");
+        expect(inputKeys).not.toContain("informant");
     });
 });

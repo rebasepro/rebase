@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { col, defineTable, rel, type TableDescriptor } from "@rebasepro/types";
 import { compileSchemaDefs } from "../src/schema/load-schema";
-import { assertKnownWriteFields, assertWriteRequestValid } from "../src/api/rest/write-validation";
+import { assertColumnWriteRules, assertKnownWriteFields, assertWriteRequestValid } from "../src/api/rest/write-validation";
 
 /**
  * A `hasMany` / `hasOne` write from the parent is a write of the child's
@@ -52,7 +52,56 @@ const tags = defineTable("tags", {
     rls: [{ operation: "all", access: "authenticated" }]
 });
 
-const DESCRIPTORS = compileSchemaDefs([readOnlyKeyThreads, replies, boards, cards, covers, notes, tags]).descriptors;
+// SEC-FIX-3: the spellings of one column — its key, the link bound to it, a
+// to-one `via` that sets it on the target, a `_pivot` field — and the rules.
+const people = defineTable("people", {
+    columns: { id: col.text().primaryKey(), name: col.text() },
+    rls: [{ operation: "all", access: "authenticated" }]
+});
+const docs = defineTable("docs", {
+    columns: {
+        id: col.serial().primaryKey(),
+        title: col.text(),
+        createdBy: col.text().onCreateUser(),
+        reviewerId: col.text().readOnly(),
+        approverId: col.text().access({ write: ["admin"] }),
+        informantId: col.text().private()
+    },
+    relations: {
+        creator: rel.belongsTo(() => people, { localKey: "created_by" }),
+        reviewer: rel.belongsTo(() => people, { localKey: "reviewer_id" }),
+        approver: rel.belongsTo(() => people, { localKey: "approver_id" }),
+        informant: rel.belongsTo(() => people, { localKey: "informant_id" })
+    },
+    rls: [{ operation: "all", access: "authenticated" }]
+});
+const badges = defineTable("badges", {
+    columns: { id: col.serial().primaryKey(), label: col.text(), ownerId: col.integer().readOnly() },
+    rls: [{ operation: "all", access: "authenticated" }]
+});
+const owners = defineTable("owners", {
+    columns: { id: col.serial().primaryKey(), name: col.text() },
+    relations: {
+        badge: rel.via(() => badges, { steps: [{ table: "badges", on: { from: "id", to: "owner_id" } }], cardinality: "one" })
+    },
+    rls: [{ operation: "all", access: "authenticated" }]
+});
+const labels = defineTable("labels", {
+    columns: { id: col.serial().primaryKey(), name: col.text() },
+    rls: [{ operation: "all", access: "authenticated" }]
+});
+const loose = defineTable("loose", {
+    columns: { id: col.serial().primaryKey(), name: col.text(), sealed: col.text().readOnly() },
+    relations: {
+        labels: rel.manyToMany(() => labels, {
+            pivot: { grade: col.text().access({ write: ["admin"] }), locked: col.text().readOnly() }
+        })
+    },
+    strictWrites: false,
+    rls: [{ operation: "all", access: "authenticated" }]
+});
+
+const DESCRIPTORS = compileSchemaDefs([readOnlyKeyThreads, replies, boards, cards, covers, notes, tags, people, docs, badges, owners, labels, loose]).descriptors;
 const tableOf = (slug: string): TableDescriptor => {
     const table = DESCRIPTORS.find(candidate => candidate.slug === slug);
     if (!table) throw new Error(slug);
@@ -106,5 +155,73 @@ describe("a hasMany / hasOne write is held to the child's foreign-key rules", ()
         const answer = refusal(() => assertKnownWriteFields({ notes: [1] }, tableOf("boards"), { viewer: editor }));
         expect(answer?.code).toBe("VALIDATION_EXCLUDED_FIELDS");
         expect(answer?.message).toContain("whose rules this write cannot read");
+    });
+});
+
+/**
+ * One rule: a restriction on a column is a restriction on every spelling that
+ * writes it (SEC-FIX-3). Each cell answers exactly as the column's own name
+ * does — the same code, or the same acceptance.
+ */
+describe("every spelling of a column is held to the column's write rules", () => {
+    const docsT = () => tableOf("docs");
+    const check = (body: Record<string, unknown>, viewer = editor) =>
+        refusal(() => assertKnownWriteFields(body, docsT(), { viewer, relatedTables }))?.code;
+
+    it.each([
+        ["reviewerId", "reviewer", "VALIDATION_EXCLUDED_FIELDS"],
+        ["informantId", "informant", "VALIDATION_EXCLUDED_FIELDS"],
+        ["approverId", "approver", "FIELD_NOT_WRITABLE"]
+    ])("a link written by name answers as its key column %s does (D-1)", (column, link, code) => {
+        expect(check({ [column]: "v" })).toBe(code);
+        expect(check({ [link]: "v" })).toBe(code);
+    });
+
+    it("admits a link whose key column admits the caller", () => {
+        expect(check({ approver: "v" }, { roles: ["admin"] })).toBeUndefined();
+        expect(check({ approverId: "v" }, { roles: ["admin"] })).toBeUndefined();
+    });
+
+    it("leaves a stamped key to the driver, by either spelling (it drops both on an update)", () => {
+        expect(check({ createdBy: "v" })).toBeUndefined();
+        expect(check({ creator: "v" })).toBeUndefined();
+    });
+
+    it("runs on the socket's, MCP's and the in-process SDK's check too", () => {
+        expect(refusal(() => assertWriteRequestValid({ reviewer: "v" }, docsT(), { status: "existing", viewer: editor, relatedTables }))?.code)
+            .toBe("VALIDATION_EXCLUDED_FIELDS");
+        expect(refusal(() => assertColumnWriteRules({ approver: "v" }, docsT(), { viewer: editor, relatedTables }))?.code)
+            .toBe("FIELD_NOT_WRITABLE");
+    });
+
+    it("refuses a to-one `via` that moves target rows whose key is `.readOnly()`, as the direct write is (D-3)", () => {
+        expect(refusal(() => assertKnownWriteFields({ ownerId: 1 }, tableOf("badges"), { viewer: editor, relatedTables }))?.code)
+            .toBe("VALIDATION_EXCLUDED_FIELDS");
+        const viaWrite = refusal(() => assertKnownWriteFields({ badge: 3 }, tableOf("owners"), { viewer: editor, relatedTables }));
+        expect(viaWrite?.code).toBe("VALIDATION_EXCLUDED_FIELDS");
+        expect(viaWrite?.message).toContain("Writing 'badge' on 'owners' sets 'ownerId' on the rows of 'badges'");
+        expect(refusal(() => assertKnownWriteFields({ badge: null }, tableOf("owners"), { viewer: editor, relatedTables }))?.code)
+            .toBe("VALIDATION_EXCLUDED_FIELDS");
+        // Fails closed without the target's rules.
+        expect(refusal(() => assertKnownWriteFields({ badge: 3 }, tableOf("owners"), { viewer: editor }))?.code)
+            .toBe("VALIDATION_EXCLUDED_FIELDS");
+    });
+
+    it("judges `_pivot` fields under `strictWrites: false` exactly as under the default (D-4)", () => {
+        const looseT = tableOf("loose");
+        const pivot = (fields: Record<string, unknown>) => ({ labels: [{ id: 1, _pivot: fields }] });
+        expect(refusal(() => assertKnownWriteFields(pivot({ grade: "A+" }), looseT, { viewer: editor, relatedTables }))?.code)
+            .toBe("FIELD_NOT_WRITABLE");
+        expect(refusal(() => assertKnownWriteFields(pivot({ locked: "no" }), looseT, { viewer: editor, relatedTables }))?.code)
+            .toBe("VALIDATION_EXCLUDED_FIELDS");
+        expect(refusal(() => assertKnownWriteFields(pivot({ grade: "A+" }), looseT, { viewer: { roles: ["admin"] }, relatedTables })))
+            .toBeUndefined();
+    });
+
+    it("`strictWrites: false` decides only an unknown key: a closed column stays closed, an undeclared key passes to the driver", () => {
+        const looseT = tableOf("loose");
+        expect(refusal(() => assertKnownWriteFields({ sealed: "x" }, looseT, { viewer: editor, relatedTables }))?.code)
+            .toBe("VALIDATION_EXCLUDED_FIELDS");
+        expect(refusal(() => assertKnownWriteFields({ undeclared: "x" }, looseT, { viewer: editor, relatedTables }))).toBeUndefined();
     });
 });

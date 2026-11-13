@@ -13,7 +13,7 @@ import {
     type RelationDescriptor,
     type TableDescriptor
 } from "@rebasepro/types";
-import { columnAccess, tenantOf, textMaxLength, validationPattern } from "@rebasepro/common";
+import { boundKeyColumn, columnAccess, tenantOf, textMaxLength, validationPattern } from "@rebasepro/common";
 import { labelFromIdentifier, singularLabel } from "@rebasepro/utils";
 import { DELETED_QUERY_PARAM, HARD_DELETE_QUERY_PARAM } from "./rest/soft-delete-params";
 import type { TableLookup } from "./rest/served-table";
@@ -1392,7 +1392,12 @@ function excludedApiKeys(table: TableDescriptor, direction: "read" | "write" = "
         excluded.add(column.column);
     }
     for (const relation of table.relations) {
-        if (!isDocumented(relation, direction)) excluded.add(relation.name);
+        // A link is documented exactly when its key column is: `{ reviewer }`
+        // writes the `.readOnly()` `reviewerId`, and reads its value.
+        const bound = boundKeyColumn(table, relation);
+        if (!isDocumented(relation, direction) || (bound !== undefined && !isDocumented(bound, direction))) {
+            excluded.add(relation.name);
+        }
     }
     return excluded;
 }
