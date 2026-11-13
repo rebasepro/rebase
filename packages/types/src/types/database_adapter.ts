@@ -236,11 +236,11 @@ export interface DatabaseAdapter {
  */
 export interface DatabaseAdapterInitConfig {
     /**
-     * The collections the declared tables were lowered into: one per entry of
-     * {@link tables}, by slug. Read by the parts of a driver not yet moved onto
-     * {@link tables}; removed once none reads it.
+     * The collections the declared tables were lowered into. Not read by the
+     * Postgres driver, which runs on {@link tables} alone; the server still
+     * passes it, and it is removed with that call site.
      */
-    collections: CollectionConfig[];
+    collections?: CollectionConfig[];
     /**
      * The tables the backend declares, compiled (`compileSchema`): each
      * descriptor with its hooks, field-level hooks and definition. The input

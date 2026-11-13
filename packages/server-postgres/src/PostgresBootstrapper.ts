@@ -666,7 +666,8 @@ export async function openPostgresDriver(
     pgConfig: PostgresDriverConfig,
     config: DatabaseAdapterInitConfig
 ): Promise<InitializedDriver & { internals: PostgresDriverInternals }> {
-    const { collections, tables: declaredTables, introspectCollections, baas, schemaProvisioning, realtime } = config;
+    // `config.collections` is not read: the driver runs on `tables` alone.
+    const { tables: declaredTables, introspectCollections, baas, schemaProvisioning, realtime } = config;
     // `false` keeps every DDL statement out of this open: the restricted
     // role, the branch table, channel-history tables, capture triggers.
     const provision = config.provision !== false;
@@ -702,7 +703,7 @@ export async function openPostgresDriver(
     let skippedUnprotected: { schema: string; table: string }[] | undefined;
     let introspectedTables: Record<string, PgTable> | undefined;
     let introspectedRelations: Record<string, Relations> | undefined;
-    if (introspectCollections && (!collections || collections.length === 0)) {
+    if (introspectCollections && (!declaredTables || declaredTables.length === 0)) {
         const pgSchemaName = pgConfig.introspectionSchema ?? "public";
 
         // ── Only serve what the database protects ────────────────
@@ -1956,11 +1957,12 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             const db = internals.db;
             const registry = internals.registry;
 
-            // Resolve the auth collection from the explicit config.
-            // This replaces the old `registry.getPgTable("users")` magic string lookup.
-            const authCollection = authConfig.collection as CollectionConfig | undefined;
-            // The users table's descriptor: its name, schema and key type.
-            const authDescriptor = authCollection ? registry.requireTable(authCollection.slug).descriptor : undefined;
+            // The auth table: the one this driver serves that `defineAuthTable`
+            // declared (`descriptor.auth`), read off the registry — never off a
+            // collection the server hands over. Its descriptor says its name,
+            // schema and key type; none means the default `rebase.users`.
+            const authRuntime = registry.tables().find(table => table.descriptor.auth !== undefined);
+            const authDescriptor = authRuntime?.descriptor;
 
             // A driver opened without provisioning creates and migrates nothing:
             // the tables are another process's to make. The one read that
@@ -1991,13 +1993,13 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             // The driver bootstrapped before these tables existed, so CDC skipped
             // them. Instrument them now, or writes to the user table emit no
             // realtime events until the next restart.
-            if (authCollection && internals.provisionCdcForTables) {
-                const authSchema = "schema" in authCollection && typeof authCollection.schema === "string"
-                    ? authCollection.schema
-                    : "rebase";
-                const authTable = "table" in authCollection && typeof authCollection.table === "string"
-                    ? authCollection.table
-                    : authCollection.slug;
+            if (authRuntime && internals.provisionCdcForTables) {
+                // Where the users table is: the descriptor's schema. The
+                // lowered collection carried none for a public table, and this
+                // defaulted to "rebase" — a table that does not exist, so the
+                // trigger was never attached (a warning per boot).
+                const authSchema = authRuntime.descriptor.schema;
+                const authTable = authRuntime.descriptor.table;
                 if (authTable) {
                     try {
                         await internals.provisionCdcForTables([{
@@ -2006,7 +2008,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                             // The auth table above all: its rows carry password
                             // hashes and verification tokens, and the payload
                             // names the row by its key and nothing else.
-                            identityColumns: tableKeyColumns(registry.requireTable(authCollection.slug)).map((k) => k.columnName)
+                            identityColumns: tableKeyColumns(authRuntime).map((k) => k.columnName)
                         }]);
                     } catch (err) {
                         logger.warn(
@@ -2025,19 +2027,16 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
 
             // Resolve the Drizzle table for the internal UserService/AuthRepository.
             // These are internal Postgres-specific services that need the Drizzle table reference.
-            const tableName = authCollection
-                ? ("table" in authCollection && typeof authCollection.table === "string"
-                    ? authCollection.table
-                    : authCollection.slug)
-                : undefined;
-            const usersTable = tableName
-                ? registry.getPgTable(tableName) as RebasePgTable | undefined
+            const usersTable = authDescriptor
+                ? registry.getPgTable(authDescriptor.table) as RebasePgTable | undefined
                 : undefined;
 
-            let usersSchemaName = "rebase";
-            if (authCollection && "schema" in authCollection && typeof authCollection.schema === "string") {
-                usersSchemaName = authCollection.schema;
-            }
+            // Where auth's own tables live — the schema `ensureAuthTablesExist`
+            // created them in (`resolveAuthSchema`): "rebase" beside a public
+            // users table, else the users table's schema. The objects of an
+            // existing project stay where they are: a schema-less (public)
+            // auth collection read "rebase" here too.
+            const usersSchemaName = resolveAuthSchema(authDescriptor);
 
             // Named field by field through `asRebasePgTable`, not asserted
             // wholesale. `createAuthSchema` returns ten tables and

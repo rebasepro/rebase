@@ -15,7 +15,6 @@ import {
     isSQLAdmin,
     resourceKeyOf,
     type CallerSqlOptions,
-    type CollectionConfig,
     type CompiledTable,
     type RebaseSdkData,
     type RebaseServerClient,
@@ -55,20 +54,15 @@ export interface OpenRebaseOptions {
      */
     connection?: NodePgDatabase<Record<string, unknown>> & { $client: Pool };
     /**
-     * The project's collections — what the server is configured with. Empty
-     * reads them from the database instead, the way a server with no
-     * collection files does.
-     */
-    collections: CollectionConfig[];
-    /**
-     * The tables those collections were lowered from, compiled
-     * (`compileSchemaDefs(...).tables`): one per collection. What the driver
-     * builds its runtime model from; required beside non-empty `collections`.
+     * The project's tables, compiled (`compileSchemaDefs(...).tables`, or
+     * `loadTableSchema(dir).tables`): what the driver builds its runtime model
+     * from. Absent or empty reads them from the database instead, the way a
+     * server with no `backend/schema` does.
      */
     tables?: CompiledTable[];
     /** Pool tuning, when `databaseUrl` is given. */
     pool?: PostgresPoolConfig;
-    /** The data source these collections are served from. Defaults to `(default)`. */
+    /** The data source these tables are served from. Defaults to `(default)`. */
     dataSourceKey?: string;
     /**
      * The project's global table hooks — the `hooks` `backend/hooks.ts`
@@ -103,8 +97,6 @@ export interface OpenedRebase<DB = RegisteredDatabase> extends Pick<RebaseServer
         data: RebaseSdkData<DB>;
         sql(query: string, options?: CallerSqlOptions): Promise<Record<string, unknown>[]>;
     }>;
-    /** The collections this was opened with, or the ones the database described. */
-    readonly collections: CollectionConfig[];
     /** The descriptors of the tables this serves: the declared ones, or the ones the database described. */
     readonly tables: TableDescriptor[];
     /** End the pool `openRebase` created. Safe to call twice; a `connection` you passed stays open. */
@@ -136,7 +128,7 @@ function userFor(identity: RebaseIdentity): User {
  * Open a project's database the way its server would serve it, from code.
  *
  * ```ts
- * const rebase = await openRebase({ databaseUrl, collections });
+ * const rebase = await openRebase({ databaseUrl, tables });
  * const posts = await rebase.dataAsAdmin.posts.find({ limit: 10 });
  * const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
  * const hers = await ada.data.posts.find();
@@ -194,10 +186,9 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
     let opened: Awaited<ReturnType<typeof openPostgresDriver>>;
     try {
         opened = await openPostgresDriver({ connection: db, connectionString }, {
-            collections: options.collections,
             tables: options.tables,
             dataSourceKey: ownKey,
-            introspectCollections: options.collections.length === 0,
+            introspectCollections: (options.tables ?? []).length === 0,
             provision: false,
             realtime: false,
             schemaProvisioning: {
@@ -228,8 +219,7 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
     // unaudited. Reads are unaffected. Entries are not pruned here: the
     // retention is the server's setting, which a script does not know, and
     // pruning to the default could delete entries the server keeps.
-    const collections = opened.collections ?? options.collections;
-    if (collections.some(collection => collection.history)) {
+    if (registry.tables().some(table => table.descriptor.history)) {
         try {
             const state = await readHistoryTableState(opened.internals.db);
             driver.historyService = new HistoryService(opened.internals.db, undefined, {
@@ -256,7 +246,6 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
 
     return {
         dataAsAdmin,
-        collections,
         tables: registry.tables().map(table => table.descriptor),
         async sqlAsAdmin(query, sqlOptions) {
             if (!service.scoped.sql) throw new Error("This driver cannot run SQL under row-level security.");
