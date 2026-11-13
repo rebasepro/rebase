@@ -25,6 +25,8 @@ import type { RelationOfKind } from "./relations";
  * collection the legacy readers built for the same purpose.
  *
  * @group Table
+ *
+ * @internal Shared with @rebasepro/server's REST layer; not part of the public API.
  */
 export function pivotTable(owner: Pick<TableDescriptor, "schema">, relation: RelationOfKind<"manyToMany">): TableDescriptor {
     const { through } = relation;

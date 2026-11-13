@@ -11,13 +11,26 @@ export * from "./column-types";
 export * from "./codecs";
 export * from "./keys";
 export * from "./write-values";
-export * from "./access";
+// Listed, not `export *`: `isPrivateRelation` is this package's own helper.
+export {
+    apiHiddenKeys,
+    boundKeyColumn,
+    canReadColumn,
+    canReadRelation,
+    canWriteColumn,
+    canWriteRelation,
+    columnAccess,
+    hasColumnAccessRules,
+    restrictedKeys
+} from "./access";
 export * from "./relations";
 export * from "./table-options";
-export * from "./json-shape";
+// Only the path printer crosses the package boundary; the walkers are internal.
+export { formatJsonPath } from "./json-shape";
 export * from "./field-operations";
 export * from "./field-operation-bounds";
-export * from "./validation";
+// Listed, not `export *`: `sameValueKey` is `firstDuplicate`'s own helper.
+export { firstDuplicate, textMaxLength, validationPattern } from "./validation";
 export * from "./query-names";
 export * from "./junction";
 export * from "./storage";

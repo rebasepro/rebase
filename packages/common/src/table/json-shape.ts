@@ -81,6 +81,8 @@ export function jsonPositions(
  * A path as text, for messages: `seo.title`, `blocks[].image.caption`.
  *
  * @group Table
+ *
+ * @internal Shared with @rebasepro/server's upload limits; not part of the public API.
  */
 export function formatJsonPath(path: readonly JsonPathStep[]): string {
     let out = "";

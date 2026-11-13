@@ -22,6 +22,8 @@ import { isNumericColumnType, isTextColumnType } from "@rebasepro/types";
  * driver casts back). Replaces the `property.type === "number"` sites.
  *
  * @group Table
+ *
+ * @internal Shared with @rebasepro/server-postgres's fetch service; not part of the public API.
  */
 export function isJsNumberType(type: ColumnType): boolean {
     return isNumericColumnType(type);

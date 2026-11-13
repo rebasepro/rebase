@@ -88,6 +88,8 @@ export function databaseOwnsDefault(column: ColumnDescriptor): boolean {
  * `.onCreateNow()`, `.onUpdateNow()`, `.onCreateUser()`, `.onUpdateUser()`.
  *
  * @group Table
+ *
+ * @internal Shared with @rebasepro/server-postgres's driver; not part of the public API.
  */
 export function stampModifier(stamp: ColumnStamp): string {
     const on = stamp.on === "create" ? "Create" : "Update";

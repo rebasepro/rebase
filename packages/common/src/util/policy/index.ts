@@ -5,4 +5,6 @@ export * from "./policyToPostgres";
 export * from "./evaluatePolicy";
 export * from "./policyToSecurityRule";
 export * from "./compileRulePolicies";
-export * from "./policy-table";
+// Listed, not `export *`: `claimCastOf` is the policy compiler's own helper.
+export type { ClaimCastType, PolicyColumn, PolicyTable, ResolvePolicyTable } from "./policy-table";
+export { policyTableFromDescriptor, policyTableResolver } from "./policy-table";

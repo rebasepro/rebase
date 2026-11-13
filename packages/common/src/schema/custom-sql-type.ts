@@ -30,6 +30,8 @@ const CUSTOM_TYPE_TOKEN = /\s*(?:([A-Za-z_][A-Za-z0-9_$]*)|("(?:[^"]|"")+")|(\.)
  * more words, so the words that begin one are refused by name.
  *
  * @group Schema
+ *
+ * @internal Shared with @rebasepro/server-postgres's planner; not part of the public API.
  */
 export function customSqlTypeProblem(sqlType: string): string | undefined {
     const text = sqlType.trim();

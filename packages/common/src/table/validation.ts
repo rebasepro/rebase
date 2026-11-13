@@ -79,6 +79,8 @@ export function sameValueKey(value: unknown): string {
  * uniqueness says nothing about a value that is not there.
  *
  * @group Table
+ *
+ * @internal Shared with @rebasepro/server's write validation; not part of the public API.
  */
 export function firstDuplicate(items: readonly unknown[], field?: string): [number, number] | undefined {
     const seen = new Map<string, number>();

@@ -80,6 +80,8 @@ export function canWriteColumn(target: AccessTarget, viewer: FieldViewer | undef
  * {@link canReadRelation} and {@link canWriteRelation}.
  *
  * @group Table
+ *
+ * @internal Shared with @rebasepro/server's OpenAPI generator; not part of the public API.
  */
 export function boundKeyColumn(table: TableDescriptor, relation: RelationDescriptor): ColumnDescriptor | undefined {
     if (relation.kind !== "belongsTo") return undefined;

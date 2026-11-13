@@ -1,4 +1,5 @@
-import { DRIZZLE_REFUSALS, col, defineTable, pgEnum, sql } from "../../src/schema";
+import { col, defineTable, pgEnum, sql } from "../../src/schema";
+import { DRIZZLE_REFUSALS } from "../../src/schema/columns";
 import type { InferInsert, InferRow } from "../../src/schema";
 
 /**
