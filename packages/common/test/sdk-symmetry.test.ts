@@ -181,16 +181,17 @@ function envelope(values: Record<string, unknown>, path: string) {
  */
 function createRelationDriver({ shadowFk = false }: { shadowFk?: boolean } = {}): DataDriver {
     const relationKey = shadowFk ? "company_id" : "company";
-    const cmsRow = () => ({ ...JOB, [relationKey]: envelope({ ...COMPANY }, "companies") });
     const restRow = (include?: string[]) => include?.includes(relationKey)
         ? { ...JOB, [relationKey]: { ...COMPANY } }
         : { ...JOB };
 
+    // Every read of the Postgres driver is the REST row — its own
+    // `fetchCollection` / `fetchOne` and the realtime refetch included.
     return {
-        fetchCollection: jest.fn().mockImplementation(async () => [cmsRow()]),
-        fetchOne: jest.fn().mockImplementation(async () => cmsRow()),
-        listenCollection: jest.fn().mockImplementation(({ onUpdate }: any) => { onUpdate([cmsRow()]); return () => {}; }),
-        listenOne: jest.fn().mockImplementation(({ onUpdate }: any) => { onUpdate(cmsRow()); return () => {}; }),
+        fetchCollection: jest.fn().mockImplementation(async ({ include }: { include?: string[] }) => [restRow(include)]),
+        fetchOne: jest.fn().mockImplementation(async ({ include }: { include?: string[] }) => restRow(include)),
+        listenCollection: jest.fn().mockImplementation(({ onUpdate, include }: any) => { onUpdate([restRow(include)]); return () => {}; }),
+        listenOne: jest.fn().mockImplementation(({ onUpdate, include }: any) => { onUpdate(restRow(include)); return () => {}; }),
         save: jest.fn(),
         delete: jest.fn(),
         checkUniqueField: jest.fn(),
@@ -274,8 +275,15 @@ describe("SDK relation shape (one shape, with or without `include`)", () => {
         // The admin reaches rows through `buildRebaseData` over a browser
         // driver, and no browser driver has a `restFetchService`. Nothing about
         // that path may change: the envelope is the view-model it renders.
-        const driver = createRelationDriver();
-        delete (driver as { restFetchService?: unknown }).restFetchService;
+        const cmsRow = () => ({ ...JOB, company: envelope({ ...COMPANY }, "companies") });
+        const driver: DataDriver = {
+            fetchCollection: jest.fn().mockImplementation(async () => [cmsRow()]),
+            fetchOne: jest.fn().mockImplementation(async () => cmsRow()),
+            listenCollection: jest.fn().mockImplementation(({ onUpdate }: any) => { onUpdate([cmsRow()]); return () => {}; }),
+            save: jest.fn(),
+            delete: jest.fn(),
+            checkUniqueField: jest.fn()
+        };
 
         const row = (await entity(buildRebaseData(driver), "jobs").find()).data[0];
         expect(shapeOf(row.values.company)).toBe("relation-envelope");

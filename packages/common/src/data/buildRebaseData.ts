@@ -149,9 +149,10 @@ function createPrimaryKeyResolver(options?: EntityDataOptions) {
  * this conversion is what left every date cell reading "Invalid date value"
  * and every relation cell "Unexpected value".
  *
- * Values already in view-model form pass through untouched: a driver that
- * still sends `{ __type: "date" }` or a relation ref (the client revives both)
- * is served by the same walk.
+ * Values already in view-model form pass through untouched: a direct driver
+ * (Firestore, a custom one) that serves a `Date` or an `EntityRelation` is
+ * served by the same walk. A Rebase server never sends one — its every read
+ * is the wire row.
  */
 function toViewModelValues(
     values: Record<string, unknown>,
@@ -301,54 +302,6 @@ function rowsToEntities<M extends Record<string, unknown>>(
     toViewModel?: (values: Record<string, unknown>) => Record<string, unknown>
 ): Entity<M>[] {
     return rows.map(row => rowToEntity<M>(row, slug, primaryKeys, toViewModel));
-}
-
-/**
- * The relation envelope `toFlatRow` writes where a relation was:
- * `{ id, path, __type: "relation", data: { id, path, values } }`. It is the
- * admin's view-model, and the only pipeline that produces one is postgres'.
- */
-function isRelationEnvelope(
-    value: unknown
-): value is { __type: "relation"; data?: { values?: Record<string, unknown> } } {
-    return typeof value === "object"
-        && value !== null
-        && !Array.isArray(value)
-        && (value as { __type?: unknown }).__type === "relation";
-}
-
-/** The target's own columns, as `toRestRow` would have inlined them. */
-function inlineEnvelope(envelope: { data?: { values?: Record<string, unknown> } }): Record<string, unknown> {
-    return envelope.data?.values ?? {};
-}
-
-/**
- * Replace every relation envelope on a row with the target's flat columns.
- *
- * The SDK serves one relation shape — the inlined one (see
- * {@link RestFetchService}) — and Postgres now serves it on every read, so
- * against that driver this walk finds nothing to do. It stays for the drivers
- * whose own `fetchCollection` still answers with refs: a developer reading
- * through this accessor gets one shape whichever driver is underneath.
- *
- * Only applied where the REST pipeline is the contract (see `find`); a driver
- * without a `restFetchService` keeps whatever it returns.
- *
- * Note this is NOT how the admin gets its view model — that is built in the
- * browser by {@link toViewModelValues}, from the same flat row.
- */
-function inlineRelationRefs(row: Record<string, unknown>): Record<string, unknown> {
-    let out: Record<string, unknown> | undefined;
-    for (const [key, value] of Object.entries(row)) {
-        if (isRelationEnvelope(value)) {
-            out = out ?? { ...row };
-            out[key] = inlineEnvelope(value);
-        } else if (Array.isArray(value) && value.some(isRelationEnvelope)) {
-            out = out ?? { ...row };
-            out[key] = value.map((item) => isRelationEnvelope(item) ? inlineEnvelope(item) : item);
-        }
-    }
-    return out ?? row;
 }
 
 function createDriverAccessor<M extends Record<string, unknown> = Record<string, unknown>>(
@@ -712,12 +665,6 @@ ids });
         listen: driver.listenCollection
             ? (params: FindParams<M> | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void) => {
                 const { limit, offset, driverOffset } = resolveFindWindow(params);
-                // Belt and braces. Postgres serves one shape on every read now,
-                // realtime included, so this flattens nothing there — but a
-                // driver whose `listen` still answers with refs is normalized
-                // to the shape the rest of this accessor serves rather than
-                // handing a developer two.
-                const normalize = driver.restFetchService ? inlineRelationRefs : (row: Record<string, unknown>) => row;
                 return driver.listenCollection!<M>({
                     path: storedPath(),
                     limit,
@@ -738,7 +685,7 @@ ids });
                     vectorSearch: params?.vectorSearch,
                     onUpdate: (entities) => {
                         onUpdate({
-                            data: entities.map((row: Record<string, unknown>) => rowToEntity<M>(normalize(row), slug, getPks(), toViewModel)),
+                            data: entities.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug, getPks(), toViewModel)),
                             meta: {
                                 // No count is issued on this path, so the total
                                 // is unknown; the lower bound is the rows in
@@ -758,12 +705,11 @@ ids });
 
         listenById: driver.listenOne
             ? (id: string | number, onUpdate: (entity: Entity<M> | undefined) => void, onError?: (error: Error) => void, options?: ByIdReadOptions) => {
-                const normalize = driver.restFetchService ? inlineRelationRefs : (row: Record<string, unknown>) => row;
                 return driver.listenOne!<M>({
                     path: storedPath(),
                     id: id,
                     include: options?.include,
-                    onUpdate: (entity) => onUpdate(entity ? rowToEntity<M>(normalize(entity), slug, getPks(), toViewModel) : undefined),
+                    onUpdate: (entity) => onUpdate(entity ? rowToEntity<M>(entity, slug, getPks(), toViewModel) : undefined),
                     onError
                 });
             } : undefined,
