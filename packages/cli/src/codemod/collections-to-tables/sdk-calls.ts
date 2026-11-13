@@ -377,6 +377,8 @@ export interface RewriteSdkOptions {
     schemaDir?: string;
     /** The legacy collections directory, to recognise a `collectionsDir` that points at it. */
     collectionsDir?: string;
+    /** The auth table's module and the collection file it came from (absolute): an `auth.collection` naming either is dropped. */
+    authFiles?: readonly string[];
 }
 
 /**
@@ -692,6 +694,54 @@ function adaptHooks(ctx: AstContext, sf: SourceFile, relative: string, report: S
 }
 
 /** The boot options of a backend entry: the provable shape rewritten, the rest a manual step. */
+/** The range of a node with its trailing comma and the rest of its line, when that is only whitespace. */
+function rangeWithTrailer(node: Node): { start: number; end: number } {
+    const text = node.getSourceFile().getFullText();
+    let end = node.getEnd();
+    if (text[end] === ",") end++;
+    const lineEnd = text.indexOf("\n", end);
+    if (lineEnd !== -1 && /^[ \t]*$/.test(text.slice(end, lineEnd))) {
+        const lineStart = text.lastIndexOf("\n", node.getStart() - 1) + 1;
+        if (/^[ \t]*$/.test(text.slice(lineStart, node.getStart()))) return { start: lineStart, end: lineEnd + 1 };
+    }
+    return { start: node.getStart(), end };
+}
+
+/**
+ * Drop `auth: { collection: usersCollection }` from a backend entry when the
+ * value is an import of the auth table (or of the collection file it came
+ * from): the auth table is the one defined with `defineAuthTable`, so the
+ * option goes — and the import with it when nothing else uses it. Anything
+ * else stays a manual step.
+ */
+function removeAuthCollection(ctx: AstContext, sf: SourceFile, property: Node, edits: Edit[], options: RewriteSdkOptions): boolean {
+    const { Node: N, SyntaxKind } = ctx.tsm;
+    const authFiles = new Set((options.authFiles ?? []).map(file => file.replace(/\.(tsx?|mts|jsx?|mjs)$/, "")));
+    if (authFiles.size === 0 || !N.isPropertyAssignment(property)) return false;
+    const value = property.getInitializer();
+    if (!value || !N.isIdentifier(value)) return false;
+    const local = value.getText();
+    const declaration = sf.getImportDeclarations().find(candidate =>
+        candidate.getDefaultImport()?.getText() === local || candidate.getNamedImports().some(named => (named.getAliasNode()?.getText() ?? named.getName()) === local));
+    if (!declaration) return false;
+    const specifier = declaration.getModuleSpecifierValue();
+    if (!specifier.startsWith(".")) return false;
+    const target = path.resolve(path.dirname(sf.getFilePath()), specifier).replace(/\.(tsx?|mts|jsx?|mjs)$/, "");
+    if (!authFiles.has(target)) return false;
+    edits.push({ ...rangeWithTrailer(property), text: "", rule: "boot-options" });
+    const otherUses = sf.getDescendantsOfKind(SyntaxKind.Identifier).filter(identifier =>
+        identifier.getText() === local && identifier !== value && !identifier.getFirstAncestorByKind(SyntaxKind.ImportDeclaration));
+    if (otherUses.length > 0) return true;
+    const named = declaration.getNamedImports();
+    const onlyThis = (declaration.getDefaultImport() ? 1 : 0) + named.length + (declaration.getNamespaceImport() ? 1 : 0) === 1;
+    if (onlyThis) edits.push({ ...rangeWithTrailer(declaration), text: "", rule: "boot-options" });
+    else {
+        const binding = named.find(entry => (entry.getAliasNode()?.getText() ?? entry.getName()) === local);
+        if (binding) edits.push({ ...rangeWithTrailer(binding), text: "", rule: "boot-options" });
+    }
+    return true;
+}
+
 function bootOptions(ctx: AstContext, call: CallExpression, relative: string, report: SdkRewriteReport, edits: Edit[], options: RewriteSdkOptions): void {
     const { Node: N } = ctx.tsm;
     const object = call.getArguments()[0];
@@ -722,7 +772,10 @@ function bootOptions(ctx: AstContext, call: CallExpression, relative: string, re
         if (name === "collections" || name === "callbacks" || name === "collectionsDir") legacy.push(name);
         if (name === "auth" && N.isPropertyAssignment(property)) {
             const auth = property.getInitializerOrThrow();
-            if (N.isObjectLiteralExpression(auth) && auth.getProperty("collection")) legacy.push("auth.collection");
+            const collection = N.isObjectLiteralExpression(auth) ? auth.getProperty("collection") : undefined;
+            if (collection) {
+                if (!removeAuthCollection(ctx, call.getSourceFile(), collection, edits, options)) legacy.push("auth.collection");
+            }
         }
     }
     if (legacy.length === 0) return;

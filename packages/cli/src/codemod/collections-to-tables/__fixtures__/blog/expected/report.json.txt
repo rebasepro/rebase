@@ -37,6 +37,7 @@
     "create backend/schema/posts.ts",
     "create backend/schema/tags.ts",
     "create backend/schema/users.ts",
+    "update backend/src/index.ts",
     "create backend/storage.ts",
     "update backend/tsconfig.json",
     "update frontend/src/App.tsx",

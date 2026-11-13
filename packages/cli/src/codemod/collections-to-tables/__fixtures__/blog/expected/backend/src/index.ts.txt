@@ -1,0 +1,12 @@
+import path from "node:path";
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { storageAuthorize } from "../storage";
+
+// A custom backend entry: the collections directory, the auth collection, the storage rule.
+await initializeRebaseBackend({
+    schemaDir: path.join(__dirname, "../schema"),
+    auth: {
+        jwtSecret: process.env.JWT_SECRET ?? ""
+    },
+    storageAuthorize
+});

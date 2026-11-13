@@ -190,6 +190,8 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
     let customizationModules: { identifier: string; file: string; slug: string }[] = [];
     /** Collection files → the table each became, for repointing the project's imports of them. */
     const tableHomes = new Map<string, TableHome>();
+    /** The auth table's module and its collection file: an `auth.collection` naming either is dropped. */
+    const authFiles: string[] = [];
     if (lift) {
         for (const item of lift.notCarried) {
             if (item.kind !== "meaning") continue;
@@ -226,6 +228,7 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
             const name = names.get(entry.collection.slug);
             if (!name) continue;
             const cms = customizationModules.find(module => module.slug === entry.collection.slug);
+            if (name.kind === "auth-table") authFiles.push(name.file, entry.file);
             tableHomes.set(entry.file, { identifier: name.identifier, file: name.file, ...(cms ? { cms: { identifier: cms.identifier, file: cms.file } } : {}) });
         }
         if (!cmsDir && lift.notCarried.some(item => item.kind === "ui" || item.kind === "browser")) {
@@ -420,7 +423,8 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
             skipFiles: [...movedWiring, ...(removed.includes(indexFile) ? [indexFile] : [])],
             ...(options.moduleAliases ? { aliases: options.moduleAliases } : {}),
             schemaDir,
-            collectionsDir: legacy.collectionsDir
+            collectionsDir: legacy.collectionsDir,
+            authFiles
         });
         for (const [file, content] of sdk.files) {
             const planned = plan.files.get(file);

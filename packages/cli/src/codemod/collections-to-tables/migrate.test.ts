@@ -184,6 +184,12 @@ describe("what the blog fixture says about routing", () => {
         const users = report.files.find(file => file.path === "backend/schema/users.ts");
         expect(users?.content).toContain("        // Only admins list users.\n        { operation: \"select\"");
         expect(report.files.find(file => file.path === "backend/schema/index.ts")?.content).toContain("/** Anyone reads, admins write. */\nexport const defaultRls");
+        // A custom backend entry: the auth collection option and its import go (the auth table is defineAuthTable's), storage is repointed.
+        const entry = report.files.find(file => file.path === "backend/src/index.ts")?.content ?? "";
+        expect(entry).not.toContain("usersCollection");
+        expect(entry).toContain(`import { storageAuthorize } from "../storage";`);
+        expect(entry).toContain(`schemaDir: path.join(__dirname, "../schema")`);
+        expect(report.manualSteps.map(step => step.title)).not.toContain("Update the backend options in backend/src/index.ts");
         // config/ keeps the project's own modules: still a workspace package, still compiled by the backend.
         expect(report.files.some(file => file.path === "pnpm-workspace.yaml")).toBe(false);
         expect(report.files.find(file => file.path === "backend/tsconfig.json")?.content).toContain(`"../config/**/*"`);
