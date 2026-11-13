@@ -189,7 +189,6 @@
   "packages/cms/src/preview/PropertyPreview.tsx::unexpected_value": 1,
   "packages/studio/src/components/ApiExplorer/EndpointDetail.tsx::description": 1,
   "packages/studio/src/components/JSEditor/JSEditorSidebar.tsx::find_by_id": 1,
-  "packages/studio/src/components/JSEditor/JSEditorSidebar.tsx::no_collections_found": 1,
   "packages/studio/src/components/JSEditor/JSEditorSidebar.tsx::studio_sql_sidebar_snippets": 2,
   "packages/studio/src/components/RLSEditor/RLSEditor.tsx::studio_rls_no_policies": 1,
   "packages/studio/src/components/SchemaVisualizer/SchemaVisualizer.tsx::studio_tool_schema_visualizer": 1,
