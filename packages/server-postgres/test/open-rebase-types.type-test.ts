@@ -27,7 +27,7 @@ type Database = {
 };
 
 export async function typedByItsTypeArgument(): Promise<void> {
-    const rebase = await openRebase<Database>({ databaseUrl: "postgres://localhost/app", collections: [] });
+    const rebase = await openRebase<Database>({ databaseUrl: "postgres://localhost/app" });
 
     const { data } = await rebase.dataAsAdmin.posts.find({ limit: 3 });
     const titles: string[] = data.map(post => post.title);
@@ -62,7 +62,7 @@ export async function countPosts(rebase: OpenedRebase<Database>): Promise<number
  * generated types.
  */
 export async function untypedWithoutARegistration(): Promise<void> {
-    const rebase = await openRebase({ databaseUrl: "postgres://localhost/app", collections: [] });
+    const rebase = await openRebase({ databaseUrl: "postgres://localhost/app" });
     const { data } = await rebase.dataAsAdmin.anyCollection.find();
     const value: unknown = data[0]?.anyField;
     void value;

@@ -61,7 +61,6 @@
       "id": "schema-pipeline",
       "title": "Collection definition to database",
       "paths": [
-        "packages/server/src/collections/**",
         "packages/server/src/schema/**",
         "packages/server/src/boot/**",
         "packages/server-postgres/src/schema/**",

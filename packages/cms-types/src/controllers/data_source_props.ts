@@ -1,5 +1,6 @@
 import type {
     CollectionConfig,
+    DataDriver,
     DeleteProps,
     FetchCollectionProps,
     FetchOneProps,
@@ -50,3 +51,21 @@ export type CmsSaveProps<M extends Record<string, unknown> = Record<string, unkn
 
 /** {@link DeleteProps} as a CMS data source receives them. @group Data */
 export type CmsDeleteProps<M extends Record<string, unknown> = Record<string, unknown>> = DeleteProps<M> & WithViewCollection<M>;
+
+/**
+ * A data source the admin panel talks to directly, reading the panel's
+ * collection beside each call's path: a {@link DataDriver} whose calls take the
+ * props above. Assignable to `DataDriver` (the collection is optional), so
+ * one can be handed wherever a driver is expected.
+ *
+ * @group Data
+ */
+export type CmsDataDriver = Omit<DataDriver, "fetchCollection" | "listenCollection" | "fetchOne" | "listenOne" | "save" | "delete" | "count"> & {
+    fetchCollection<M extends Record<string, unknown> = Record<string, unknown>>(props: CmsFetchCollectionProps<M>): Promise<Record<string, unknown>[]>;
+    listenCollection?<M extends Record<string, unknown> = Record<string, unknown>>(props: CmsListenCollectionProps<M>): () => void;
+    fetchOne<M extends Record<string, unknown> = Record<string, unknown>>(props: CmsFetchOneProps<M>): Promise<Record<string, unknown> | undefined>;
+    listenOne?<M extends Record<string, unknown> = Record<string, unknown>>(props: CmsListenOneProps<M>): () => void;
+    save<M extends Record<string, unknown> = Record<string, unknown>>(props: CmsSaveProps<M>): Promise<Record<string, unknown>>;
+    delete<M extends Record<string, unknown> = Record<string, unknown>>(props: CmsDeleteProps<M>): Promise<void>;
+    count?<M extends Record<string, unknown> = Record<string, unknown>>(props: CmsFetchCollectionProps<M>): Promise<number>;
+};

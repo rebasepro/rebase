@@ -31,10 +31,9 @@
 import {
     DEFAULT_DATA_SOURCE_KEY,
     type CollectionConfig,
-    type DataDriver,
     type RestFetchService
 } from "@rebasepro/types";
-import type { CmsDeleteProps, CmsFetchCollectionProps, CmsFetchOneProps, CmsSaveProps } from "@rebasepro/cms-types";
+import type { CmsDataDriver, CmsDeleteProps, CmsFetchCollectionProps, CmsFetchOneProps, CmsSaveProps } from "@rebasepro/cms-types";
 import {
     buildCompositeId,
     fieldKeyForColumn,
@@ -230,14 +229,14 @@ type Row = Record<string, unknown>;
 
 export interface ToolDriver {
     /** For `<Rebase>`: the admin panel's reads and saves. */
-    driver: DataDriver;
+    driver: CmsDataDriver;
     /**
      * The same driver, asking the person before each write the tool does not
      * plan itself: for the row hooks (`useRowWrites`), since code can write
      * without a click. A declined write rejects with {@link SaveCancelledError}
      * and nothing is sent.
      */
-    confirmingDriver: DataDriver;
+    confirmingDriver: CmsDataDriver;
 }
 
 /** A row asked for by key, waiting on its batch's page. */
@@ -575,7 +574,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         options.onWritten?.(intent);
     };
 
-    const driver: DataDriver = {
+    const driver: CmsDataDriver = {
         key: DEFAULT_DATA_SOURCE_KEY,
         initialised: true,
 
@@ -642,7 +641,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         }
     };
 
-    const confirmingDriver: DataDriver = {
+    const confirmingDriver: CmsDataDriver = {
         ...driver,
         async save(props: CmsSaveProps): Promise<Record<string, unknown>> {
             const gesture = fromClick();
