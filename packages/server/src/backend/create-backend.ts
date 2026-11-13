@@ -108,6 +108,7 @@ import {
 import { createGitHubRepository } from "../schema-edit/github-repository";
 import { previewRemoteSchema } from "../schema-edit/remote-source";
 import { refuseWhenRepositoryIsAhead } from "../schema-edit/deployed-schema-guard";
+import type { SchemaEditServing } from "../schema-edit/apply-schema-change";
 import type { EditedSchema, TableSourceEdit, TableSourceEditor } from "../api/table-source-editor";
 import type { PreviewedSource } from "../api/live-schema-routes";
 import type { CompiledTable } from "@rebasepro/types";
@@ -2099,7 +2100,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
      * Swap the tables this backend serves for the ones an apply left, set by
      * the data surface once it is built (below). See `serveTables`.
      */
-    const editedTables: { serve?: (schema: EditedSchema) => void } = {};
+    const editedTables: { serve?: (schema: EditedSchema) => Promise<SchemaEditServing> } = {};
     /** The tables whose hooks the deployment attached at runtime (`backend.setTableHooks`): a live apply leaves those. */
     const runtimeHookSlugs = new Set<string>();
 
@@ -2923,27 +2924,56 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     /**
      * Serve the tables a live schema apply left, without a restart.
      *
-     * The same population boot does, from the same compile: the descriptors
+     * The data drivers first: each reads the edited tables back from its own
+     * database (`refreshTables`) and swaps them in at once, so the routes
+     * built below never reach a driver that does not know their table. Then
+     * the same population boot does, from the same compile: the descriptors
      * into the table registry (a new revision, which invalidates what
      * `GET /api/schema/tables` and the contract cache) and the lists the
-     * routes read — then the REST routes regenerated over them. The data driver keeps the tables it was
-     * opened with until the process restarts: refreshing its catalogue is the
-     * driver's to offer.
+     * routes read — then the REST routes regenerated over them.
+     *
+     * Hooks: the compiled ones, edited in source, run from now on — in the
+     * table model (storage's read-hook check, the masking refusals) and in
+     * every driver, which runs them natively. A table whose hooks the
+     * deployment attached at runtime (`backend.setTableHooks`) keeps those:
+     * they are put on its compiled table before any registry sees it.
+     *
+     * Resolves to whether every driver serves the change now; a driver that
+     * cannot refresh, or whose refresh failed, keeps the tables it opened with
+     * until a restart, and the outcome says so.
      */
-    editedTables.serve = (schema: EditedSchema): void => {
+    editedTables.serve = async (schema: EditedSchema): Promise<SchemaEditServing> => {
         warnOnImplicitAuthSecrets(schema.tables);
-        // The compiled tables, hooks and transforms with them: the hooks
-        // edited in source are the ones that run from now on — in the table
-        // model (storage's read-hook check, the masking refusals) and in every
-        // driver, which runs them natively. A table whose hooks the deployment
-        // attached at runtime (`backend.setTableHooks`) keeps those.
         const attached = new Map([...runtimeHookSlugs].map(slug => [slug, tableRegistry.table(slug)?.hooks ?? {}]));
-        tableRegistry.replaceAll(schema.tables);
-        for (const [slug, hooks] of attached) tableRegistry.setHooks(slug, hooks);
-        for (const registry of hookTargets()) {
-            for (const table of schema.tables) {
-                if (!runtimeHookSlugs.has(table.descriptor.slug)) registry.setTableHooks(table.descriptor.slug, table.hooks ?? {});
+        const tables = schema.tables.map(table => {
+            const hooks = attached.get(table.descriptor.slug);
+            return hooks ? { ...table, hooks } : table;
+        });
+
+        const stale: string[] = [];
+        for (const [bootstrapper, driverResult] of driverResults) {
+            const source = bootstrapper.id || DEFAULT_DRIVER_ID;
+            if (!driverResult.refreshTables) {
+                if (storedTablesChanged(servedCompiledTables, tables, source)) {
+                    stale.push(`The "${source}" driver cannot refresh its tables while running.`);
+                }
+                continue;
             }
+            try {
+                const outcome = await driverResult.refreshTables(tables);
+                if (outcome.status === "restart") stale.push(outcome.reason);
+            } catch (err) {
+                const error = err instanceof Error ? err.message : String(err);
+                logger.error(`[schema-edit] The "${source}" driver could not read back the edited tables; it serves the previous ones until a restart.`, { error });
+                stale.push(`The "${source}" driver could not read back the edited tables (${error}).`);
+            }
+        }
+
+        tableRegistry.replaceAll(tables);
+        // The drivers that refreshed hold these hooks already; one that could
+        // not still runs the edited hooks of the tables it serves.
+        for (const registry of hookTargets()) {
+            for (const table of tables) registry.setTableHooks(table.descriptor.slug, table.hooks ?? {});
         }
         servedPolicyTables = schema.descriptors;
         servedCompiledTables = schema.tables;
@@ -2960,8 +2990,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         }
         logger.info("Serving the tables the schema edit left", {
             tables: schema.descriptors.length,
-            revision: tableRegistry.revision
+            revision: tableRegistry.revision,
+            ...(stale.length > 0 ? { staleUntilRestart: stale } : {})
         });
+        if (stale.length === 0) return { status: "now" };
+        return {
+            status: "after-restart",
+            message: `Saved and applied; the data API serves it after the server restarts. ${stale.join(" ")}`
+        };
     };
 
     // ── OpenAPI / Swagger ─────────────────────────────────────────────────
@@ -4587,6 +4623,16 @@ async function loadMcpApps(): Promise<readonly McpAppResource[]> {
 async function loadAppCompiler(): Promise<McpAppCompiler> {
     const { compileApp } = await import("@rebasepro/mcp-apps");
     return source => compileApp(source, MCP_APP_MODULES);
+}
+
+/**
+ * Whether an edit changed a table the data source `source` stores: one added,
+ * removed or changed among the tables whose `database` names it.
+ */
+function storedTablesChanged(before: readonly CompiledTable[], after: readonly CompiledTable[], source: string): boolean {
+    const stored = (tables: readonly CompiledTable[]) => JSON.stringify(
+        tables.map(table => table.descriptor).filter(descriptor => (descriptor.database ?? DEFAULT_DRIVER_ID) === source));
+    return stored(before) !== stored(after);
 }
 
 /** The collection registry a driver carries, if it has one: not part of `DataDriver`, so found by looking. */

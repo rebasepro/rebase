@@ -56,6 +56,7 @@ import {
     UnapplicableChangeError,
     POLICIES_DEFERRED_MESSAGE,
     type SchemaEditPolicyOutcome,
+    type SchemaEditServing,
     type SchemaEditRepository
 } from "../schema-edit/apply-schema-change";
 import {
@@ -111,10 +112,12 @@ export interface LiveSchemaRoutesConfig {
     /**
      * Called after an apply that ran against the database, with the schema it
      * left: the running server swaps its tables for these, so the change is
-     * served without a restart. Not called for a source-only commit — the
-     * database does not have the change.
+     * served without a restart, and says whether every driver could
+     * (`serving` on the result; omitted when this answers nothing). Not
+     * called for a source-only commit — the database does not have the
+     * change.
      */
-    onApplied?: (schema: EditedSchema) => void | Promise<void>;
+    onApplied?: (schema: EditedSchema) => SchemaEditServing | void | Promise<SchemaEditServing | void>;
     /**
      * The descriptors the running server serves — the `before` side of a
      * table's `rls`, kept on the served tables when an apply's policies could
@@ -493,6 +496,11 @@ async function applyChangedPolicies(
     }
 }
 
+/** What the receipt says about serving the change: live now, or from the next start. */
+function servingSummary(serving: SchemaEditServing): string {
+    return serving.status === "now" ? "The running server serves it now." : serving.message;
+}
+
 function policySummary(policies: SchemaEditPolicyOutcome): string {
     if (policies.status === "applied") return `Applied the RLS policies of ${policies.tables.join(", ")}.`;
     return policies.status === "failed"
@@ -868,6 +876,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             // the panel, the Studio and MCP never report a posture Postgres
             // does not hold.
             let policies: SchemaEditPolicyOutcome | undefined;
+            let serving: SchemaEditServing | undefined;
             if (!sourceOnly && result.applied) {
                 const changed = rlsChangedSlugs(compiledBefore.map(table => table.descriptor), source.schema.descriptors);
                 let served = source.schema;
@@ -875,14 +884,19 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
                     policies = await applyChangedPolicies(config, source.schema, changed);
                     if (policies.status !== "applied") served = keepEnforcedRls(source.schema, changed, config.getTables?.() ?? []);
                 }
-                await config.onApplied?.(served);
+                const outcome = await config.onApplied?.(served);
+                if (outcome) serving = outcome;
             }
             const policyFollowUp = policies && policies.status !== "applied" ? [policies.message] : [];
+            const summary = [result.summary, policies && policySummary(policies), serving && servingSummary(serving)]
+                .filter((part): part is string => Boolean(part)).join(" ");
             // Carried onto the result as well as the plan: whoever reads the
             // outcome may not be whoever read the preview.
             return c.json({
                 ...result,
-                ...(policies ? { policies, summary: `${result.summary} ${policySummary(policies)}` } : {}),
+                ...(policies ? { policies } : {}),
+                ...(serving ? { serving } : {}),
+                summary,
                 withheldConstraints: plan.withheldConstraints ?? [],
                 followUp: [...policyFollowUp, ...followUpFor(config, plan.statements)]
             });

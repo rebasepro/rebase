@@ -83,6 +83,13 @@ export interface LiveSchemaResult {
     summary: string;
     withheldConstraints: WithheldConstraint[];
     followUp?: string[];
+    /**
+     * Whether the running server serves the applied change: `now`, or only
+     * once it restarts (a data driver that cannot read its tables back while
+     * running) — `summary` then says so and why. Absent when nothing ran or
+     * the server did not say.
+     */
+    serving?: { status: "now" } | { status: "after-restart"; message: string };
 }
 
 /**

@@ -207,7 +207,28 @@ export interface SchemaEditResult {
      * same apply. See {@link SchemaEditPolicyOutcome}.
      */
     policies?: SchemaEditPolicyOutcome;
+    /**
+     * Whether the running server serves what the apply left: set by the live
+     * apply route on an apply whose DDL ran. See {@link SchemaEditServing}.
+     */
+    serving?: SchemaEditServing;
 }
+
+/**
+ * Whether the running server serves an applied change.
+ *
+ * - `now` — every data driver read the edited tables back and serves them:
+ *   the change is live without a restart.
+ * - `after-restart` — the database has the change and the source holds it,
+ *   but a driver keeps serving the tables it opened with until the process
+ *   restarts (a driver without `refreshTables`, or one whose refresh
+ *   failed). `message` is what to show.
+ *
+ * @group Schema
+ */
+export type SchemaEditServing =
+    | { status: "now" }
+    | { status: "after-restart"; message: string };
 
 /**
  * The policies of an apply's changed tables.

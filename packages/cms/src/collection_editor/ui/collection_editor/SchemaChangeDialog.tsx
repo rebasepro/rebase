@@ -246,7 +246,9 @@ function Applied({ result }: { result: LiveSchemaResult }) {
     const { t } = useTranslation();
     return (
         <div className="flex flex-col gap-4">
-            <Alert color={result.applied || result.sourceOnly ? "success" : "warning"}>
+            {/* Applied but served only after a restart is not a plain
+                success: the summary says what is not live yet. */}
+            <Alert color={(result.applied || result.sourceOnly) && result.serving?.status !== "after-restart" ? "success" : "warning"}>
                 <Typography variant="body2">{result.summary}</Typography>
             </Alert>
 
