@@ -575,6 +575,32 @@ describe("a component path written in a shared module", () => {
     }, 120_000);
 });
 
+describe("a view filter computed when the config loads", () => {
+    it("is carried as its expression, never frozen to the run's clock", async () => {
+        const dir = materialize("blog");
+        fs.writeFileSync(path.join(dir, "config", "time-presets.ts"),
+            "export function presetAsOf(label: string, at: (moment: Date) => Record<string, unknown>) {\n    return { label, filterValues: at(new Date()) };\n}\n");
+        const posts = path.join(dir, "config", "collections", "posts.ts");
+        fs.writeFileSync(posts, fs.readFileSync(posts, "utf8")
+            .replace("import { squash } from \"./_text\";", "import { squash } from \"./_text\";\nimport { presetAsOf } from \"../time-presets\";")
+            .replace("        group: \"Content\",\n", "        group: \"Content\",\n        filterPresets: [\n" +
+                "            presetAsOf(\"Upcoming\", moment => ({ __order: [\">\", moment.toISOString()] })),\n" +
+                "            { label: \"Recent\", filterValues: { __order: [\">\", new Date(Date.now() - 86400000).toISOString()] } },\n" +
+                "            { label: \"Drafts\", filterValues: { status: [\"==\", \"draft\"] } }\n" +
+                "        ],\n"));
+        const report = await run(dir, { dryRun: true });
+        expect(report.refusals).toEqual([]);
+        const cms = report.files.find(file => file.path === "frontend/src/cms/posts.tsx")?.content ?? "";
+        expect(cms).not.toMatch(/"\d{4}-\d{2}-\d{2}T/);
+        expect(cms).toContain("presetAsOf(\"Upcoming\", moment => ({ __order: [\">\", moment.toISOString()] }))");
+        expect(cms).toContain("new Date(Date.now() - 86400000).toISOString()");
+        expect(cms).toContain("import { presetAsOf } from");
+        // Data written as data stays data.
+        expect(cms).toMatch(/label: "Drafts"/);
+        expect(report.notes.filter(entry => entry.message.includes("computed when the config loads"))).toHaveLength(2);
+    }, 120_000);
+});
+
 describe("a Firestore reference written outside the converted literal", () => {
     it("is named in a step for that collection, since defineFirestoreCollection throws on its path", async () => {
         const dir = materialize("firestore");

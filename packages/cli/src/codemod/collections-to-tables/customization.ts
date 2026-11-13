@@ -230,12 +230,80 @@ function lazyImport(plan: PlanContext, node: Node): { specifier: string; importe
     return { specifier: argument.getLiteralValue(), imported };
 }
 
+/** Calls whose result differs from one load to the next: a value computed with one is not data. */
+const LOAD_TIME_CALLS = /\bnew\s+Date\s*\(\s*\)|\bDate\.now\s*\(|\bMath\.random\s*\(|\bprocess\.env\b|\bimport\.meta\.env\b|\bcrypto\.randomUUID\s*\(|\bperformance\.now\s*\(/;
+
+/** How close to the run a date must be to count as the run's clock (a preset of "today" lands within hours of it). */
+const RUN_CLOCK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Whether an evaluated value holds a date read from the clock while the codemod loaded the config. */
+function holdsRunClock(value: unknown, depth = 0): boolean {
+    if (depth > 8) return false;
+    const now = Date.now();
+    const near = (time: number): boolean => Number.isFinite(time) && Math.abs(time - now) < RUN_CLOCK_WINDOW_MS;
+    if (value instanceof Date) return near(value.getTime());
+    if (typeof value === "string") return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value) && near(Date.parse(value));
+    if (typeof value === "number") return value > 1e12 && near(value);
+    if (Array.isArray(value)) return value.some(item => holdsRunClock(item, depth + 1));
+    if (isPlainObject(value)) return Object.values(value).some(item => holdsRunClock(item, depth + 1));
+    return false;
+}
+
+/** Whether an expression is written out as data (no call, no reference: what it evaluates to is what it says). */
+function isLiteralExpression(plan: PlanContext, node: Node): boolean {
+    const { Node: N, SyntaxKind } = plan.ast.tsm;
+    const current = unwrap(plan.ast, node);
+    if (N.isStringLiteral(current) || N.isNumericLiteral(current) || N.isNoSubstitutionTemplateLiteral(current) || N.isObjectLiteralExpression(current) || N.isArrayLiteralExpression(current)) return true;
+    const kind = current.getKind();
+    if (kind === SyntaxKind.TrueKeyword || kind === SyntaxKind.FalseKeyword || kind === SyntaxKind.NullKeyword) return true;
+    if (N.isPrefixUnaryExpression(current)) return N.isNumericLiteral(current.getOperand());
+    return N.isIdentifier(current) && current.getText() === "undefined";
+}
+
+/**
+ * A data value the config COMPUTED when it was loaded — `new Date()`, `Date.now()`,
+ * `Math.random()`, an environment read, or a helper that read the clock — is not
+ * data: printed as evaluated it would be frozen to the codemod's run. Where the
+ * expression that computed it is found in the collection's literal, it is carried
+ * as that SOURCE (its imports with it); where it cannot be attributed, it is left
+ * out and a step names it.
+ *
+ * @returns `handled` with what to print when this value is decided here;
+ *   otherwise whether its source was attributed (no need to look again below it)
+ */
+function loadTimeValue(plan: PlanContext, builder: Builder, value: unknown, segments: PathSegment[], label: string): { handled: true; printed: unknown } | { handled: false; attributed: boolean } {
+    if (segments.length === 0) return { handled: false, attributed: false };
+    const located = locate(plan, builder.entry, segments);
+    const member = located.member;
+    if (member && !member.method) {
+        const valueNode = member.value ?? member.node;
+        if (isLiteralExpression(plan, valueNode)) return { handled: false, attributed: false };
+        const source = nodeText(valueNode);
+        if (!LOAD_TIME_CALLS.test(source) && !holdsRunClock(value)) return { handled: false, attributed: true };
+        builder.codeNodes.push(member.node);
+        note(plan, builder.entry, `${label} is computed when the config loads (\`${source.length > 80 ? `${source.slice(0, 77)}…` : source}\`): carried as that expression, not as the value it had during the migration. It now runs in the panel, when the customization module loads.`);
+        return { handled: true, printed: new RawSource(source) };
+    }
+    if (!holdsRunClock(value) || Array.isArray(value) || isPlainObject(value)) return { handled: false, attributed: false };
+    plan.manualSteps.push({
+        title: `Write ${label} of ${builder.name.table} by hand`,
+        detail: `${label} held ${JSON.stringify(value)} when the codemod loaded the config — a date read from the clock at load time, whose source cannot be attributed (${located.reason ?? "it was computed"}). It was left out rather than frozen to the run's time. Write the expression that computes it in ${relativeToRoot(plan, builder.file)} under the same key.`,
+        file: relativeToRoot(plan, builder.file)
+    });
+    return { handled: true, printed: undefined };
+}
+
 /**
  * A value as something printable: data as itself, code from its source.
  *
  * @param segments where the value is in the legacy literal, for finding a function's source
  */
-function printable(plan: PlanContext, builder: Builder, value: unknown, segments: PathSegment[], label: string): unknown {
+function printable(plan: PlanContext, builder: Builder, value: unknown, segments: PathSegment[], label: string, attributed = false): unknown {
+    if (!isCode(value) && !attributed && value !== undefined) {
+        const computed = loadTimeValue(plan, builder, value, segments, label);
+        if (computed.handled) return computed.printed;
+        attributed = computed.attributed;
+    }
     if (isCode(value)) {
         const located = locate(plan, builder.entry, segments);
         if (!located.member) {
@@ -280,12 +348,12 @@ function printable(plan: PlanContext, builder: Builder, value: unknown, segments
             return undefined;
         }
     }
-    if (Array.isArray(value)) return value.map((item, index) => printable(plan, builder, item, [...segments, index], `${label}[${index}]`));
+    if (Array.isArray(value)) return value.map((item, index) => printable(plan, builder, item, [...segments, index], `${label}[${index}]`, attributed));
     if (isPlainObject(value)) {
         const out: Record<string, unknown> = {};
         for (const [key, entry] of Object.entries(value)) {
             if (entry === undefined) continue;
-            out[key] = printable(plan, builder, entry, [...segments, key], `${label}.${key}`);
+            out[key] = printable(plan, builder, entry, [...segments, key], `${label}.${key}`, attributed);
         }
         return out;
     }
