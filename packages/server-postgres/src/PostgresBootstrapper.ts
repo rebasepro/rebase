@@ -47,7 +47,7 @@ import { introspectTables } from "./schema/introspect-tables";
 import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema";
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
-import { findUnprotectedServedTables, withholdUnprotectedTables } from "./security/served-table-protection";
+import { findServedTableProtection, warnNarrowedTables, withholdUnprotectedTables } from "./security/served-table-protection";
 import { assertAppRoleRestricted, assertRecordedRequestRoles, detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, ensureConnectionInheritsAdminRole, findExposedInternalTables, findOtherRoleMembers, findUngrantableTables, proveRoleSwitch, readRecordedRequestRoles, recordRequestRoles, revokeUserRoleSql, roleHoldsTableGrants, settleAdminSwitch, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type ManagedTable, type RawSqlRunner } from "./security/rls-enforcement";
 import { resolveRlsSettings, rlsConfigFromEnv, rlsHandoverNotes, type PostgresRlsConfig, type RlsSettings } from "./security/rls-settings";
 import { provisionTriggerCdc, removeTriggerCdc, settleInstalledCapture, type CdcTableRef } from "./services/cdc/trigger-cdc";
@@ -226,7 +226,8 @@ export interface PostgresDriverInternals {
     exposedInternalTables?: string[];
     /**
      * Withhold every declared table of this source the database does not
-     * protect — RLS off, or RLS on without any of its declared policies (see
+     * protect — RLS off, RLS on without any of its declared policies, or
+     * without a restrictive one it declares (see
      * `security/served-table-protection`). A catalogue read; no DDL. The boot
      * runs it once the policies step is over (`finalizeSecurityPosture`),
      * whether this process provisioned or not.
@@ -946,10 +947,12 @@ export async function openPostgresDriver(
         const own = target.tables()
             .filter(table => table.pg && (table.descriptor.database ?? DEFAULT_DATA_SOURCE_KEY) === sourceKey)
             .map(table => table.compiled);
-        withholdUnprotectedTables(target, await findUnprotectedServedTables(readCatalogue, own, {
+        const protection = await findServedTableProtection(readCatalogue, own, {
             adminRoleAvailable: adminPoliciesLive,
             adminRequestRoleAvailable: adminRequestPoliciesLive
-        }));
+        });
+        withholdUnprotectedTables(target, protection.unprotected);
+        warnNarrowedTables(protection.narrowed);
     };
 
     // Create services

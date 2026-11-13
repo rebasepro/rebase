@@ -19,9 +19,19 @@
  *
  * - its row-level security is **off** (`relrowsecurity`): every row would be
  *   served to every caller; or
- * - it declares policies and the database has **none** on it: RLS on with no
- *   policy denies every row, so the table would answer every read with nothing
- *   and every write with a refusal, while its declaration says otherwise.
+ * - it declares policies and the database has **none of them** (by the name
+ *   the provisioning path gives each — `planTablePolicies`, the same plan, so
+ *   the same derived names): RLS on with no declared policy is either a table
+ *   that answers nothing, or one whose access some policy this schema does
+ *   not declare decides — a stray `USING (true)` would serve every row; or
+ * - a **restrictive** policy it declares is missing, or is not restrictive in
+ *   the database: a restrictive policy is a gate (a tenant, an `anon` deny),
+ *   and the permissive grants without it reach rows it exists to keep out.
+ *
+ * A missing **permissive** policy only narrows access (Postgres ORs the
+ * permissive policies), so the table is served and the boot log warns, naming
+ * the policy. A policy the schema does not declare cannot be judged here — it
+ * may be the database's own business — and is `rebase doctor`'s to report.
  *
  * Withheld is what introspection does with a table that has RLS off: not
  * served, the statements that protect it in the log. A request for it is
@@ -41,10 +51,31 @@ export interface UnprotectedServedTable {
     slug: string;
     /** `schema.table`. */
     qualified: string;
-    /** What is wrong: RLS off, or RLS on with none of its declared policies. */
-    problem: "rls-off" | "no-policies";
+    /**
+     * What is wrong: RLS off, RLS on with none of its declared policies, or a
+     * declared restrictive policy missing (or permissive in the database).
+     */
+    problem: "rls-off" | "no-policies" | "restrictive-missing";
     /** The statements that bring the table to what a provisioning boot leaves. */
     remediationSql: string;
+    /** The declared policies the database does not have as declared, by name. */
+    missingPolicies: string[];
+}
+
+/** A declared table served without some of its permissive policies: access is narrower than declared. */
+export interface NarrowedServedTable {
+    slug: string;
+    qualified: string;
+    /** The declared permissive policies the database does not have. */
+    missingPolicies: string[];
+    /** The statements that create them. */
+    remediationSql: string;
+}
+
+/** What {@link findServedTableProtection} found: tables to withhold, and tables served narrower than declared. */
+export interface ServedTableProtection {
+    unprotected: UnprotectedServedTable[];
+    narrowed: NarrowedServedTable[];
 }
 
 /** What {@link findUnprotectedServedTables} renders the policies with — the boot's admin switch. */
@@ -66,8 +97,20 @@ export async function findUnprotectedServedTables(
     tables: readonly CompiledTable[],
     options: ServedTableProtectionOptions = {}
 ): Promise<UnprotectedServedTable[]> {
+    return (await findServedTableProtection(run, tables, options)).unprotected;
+}
+
+/**
+ * {@link findUnprotectedServedTables}, with the tables served narrower than
+ * declared (a permissive policy missing) beside them. One catalogue read.
+ */
+export async function findServedTableProtection(
+    run: RawSqlRunner,
+    tables: readonly CompiledTable[],
+    options: ServedTableProtectionOptions = {}
+): Promise<ServedTableProtection> {
     const served = tables.filter(table => table.descriptor.kind === "table");
-    if (served.length === 0) return [];
+    if (served.length === 0) return { unprotected: [], narrowed: [] };
     const plans = new Map(planTablePolicies(served, options).map(plan => [plan.qualified, plan]));
     const wanted = served.map(({ descriptor }) => ({
         slug: descriptor.slug,
@@ -76,38 +119,84 @@ export async function findUnprotectedServedTables(
     }));
     const rows = await run(
         `SELECT w.slug, n.nspname AS schema, c.relname AS name, c.relrowsecurity AS rls,
-                (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid = c.oid) AS policies
+                (SELECT coalesce(jsonb_agg(jsonb_build_object('name', p.polname::text, 'permissive', p.polpermissive)), '[]'::jsonb)
+                   FROM pg_policy p WHERE p.polrelid = c.oid) AS policies
            FROM jsonb_to_recordset(${quoteSqlLiteral(JSON.stringify(wanted))}::jsonb) AS w(slug text, schema text, name text)
            JOIN pg_namespace n ON n.nspname = w.schema
            JOIN pg_class c ON c.relnamespace = n.oid AND c.relname = w.name AND c.relkind IN ('r', 'p')`
     );
-    const found: UnprotectedServedTable[] = [];
+    const unprotected: UnprotectedServedTable[] = [];
+    const narrowed: NarrowedServedTable[] = [];
     for (const row of rows) {
         const qualified = `${String(row.schema)}.${String(row.name)}`;
         const plan = plans.get(qualified);
-        const declaresPolicies = (plan?.policyStatements.length ?? 0) > 0;
+        const declared = plan?.policies ?? [];
+        const existing = existingPolicies(row.policies);
         const rls = row.rls === true;
-        const policies = Number(row.policies ?? 0);
-        if (rls && (policies > 0 || !declaresPolicies)) continue;
+        const slug = String(row.slug);
         const enable = plan?.enableRls ?? `ALTER TABLE ${qualified} ENABLE ROW LEVEL SECURITY;`;
-        const statements = rls ? plan?.policyStatements ?? [] : [enable, ...(plan?.policyStatements ?? [])];
-        found.push({
-            slug: String(row.slug),
-            qualified,
-            problem: rls ? "no-policies" : "rls-off",
-            remediationSql: statements.join("\n")
-        });
+        if (!rls) {
+            unprotected.push({
+                slug,
+                qualified,
+                problem: "rls-off",
+                remediationSql: [enable, ...(plan?.policyStatements ?? [])].join("\n"),
+                missingPolicies: declared.map(policy => policy.name)
+            });
+            continue;
+        }
+        if (declared.length === 0) continue;
+        const present = declared.filter(policy => existing.has(policy.name));
+        const restrictiveMissing = declared.filter(policy => policy.restrictive && existing.get(policy.name) !== false);
+        const permissiveMissing = declared.filter(policy => !policy.restrictive && !existing.has(policy.name));
+        if (present.length === 0 || restrictiveMissing.length > 0) {
+            const missing = present.length === 0 ? declared : restrictiveMissing;
+            unprotected.push({
+                slug,
+                qualified,
+                problem: present.length === 0 ? "no-policies" : "restrictive-missing",
+                remediationSql: missing.flatMap(policy => policy.statements).join("\n"),
+                missingPolicies: missing.map(policy => policy.name)
+            });
+            continue;
+        }
+        if (permissiveMissing.length > 0) {
+            narrowed.push({
+                slug,
+                qualified,
+                missingPolicies: permissiveMissing.map(policy => policy.name),
+                remediationSql: permissiveMissing.flatMap(policy => policy.statements).join("\n")
+            });
+        }
     }
-    return found;
+    return { unprotected, narrowed };
+}
+
+/** The policies the catalogue read found on a table: name → permissive. */
+function existingPolicies(value: unknown): Map<string, boolean> {
+    const out = new Map<string, boolean>();
+    const list: unknown = typeof value === "string" ? JSON.parse(value) : value;
+    if (!Array.isArray(list)) return out;
+    for (const entry of list) {
+        if (typeof entry !== "object" || entry === null || !("name" in entry) || typeof entry.name !== "string") continue;
+        out.set(entry.name, !("permissive" in entry) || entry.permissive !== false);
+    }
+    return out;
 }
 
 /** What a caller asking for a withheld table is told: the reason, never the SQL. */
 export function withheldTableMessage(table: Pick<UnprotectedServedTable, "slug" | "problem">): string {
-    return table.problem === "rls-off"
-        ? `The table "${table.slug}" is not served: row-level security is disabled on it in the database, so every ` +
-            "caller would reach every row. The server's boot log names the statements that protect it."
-        : `The table "${table.slug}" is not served: it declares row-level security policies and the database has ` +
-            "none on it. The server's boot log names the statements that create them.";
+    if (table.problem === "rls-off") {
+        return `The table "${table.slug}" is not served: row-level security is disabled on it in the database, so every ` +
+            "caller would reach every row. The server's boot log names the statements that protect it.";
+    }
+    if (table.problem === "restrictive-missing") {
+        return `The table "${table.slug}" is not served: a restrictive row-level security policy it declares is missing ` +
+            "in the database, so its other policies would reach rows that policy keeps out. The server's boot log names the " +
+            "statements that create it.";
+    }
+    return `The table "${table.slug}" is not served: it declares row-level security policies and the database has ` +
+        "none of them on it. The server's boot log names the statements that create them.";
 }
 
 /**
@@ -122,10 +211,32 @@ export function withholdUnprotectedTables(
         registry.withhold(table.slug, withheldTableMessage(table));
         const what = table.problem === "rls-off"
             ? "row-level security is DISABLED on it in the database, so every request role would read and write every row"
-            : "it declares policies, and the database has none on it, so every read would answer nothing";
+            : table.problem === "restrictive-missing"
+                ? `the restrictive polic${table.missingPolicies.length > 1 ? "ies" : "y"} ${table.missingPolicies.map(name => `"${name}"`).join(", ")} ` +
+                    "it declares " + (table.missingPolicies.length > 1 ? "are" : "is") + " missing in the database (or not restrictive there), " +
+                    "so its other policies would reach rows that gate keeps out"
+                : "it declares policies, and the database has none of them on it (a policy this schema does not declare decides " +
+                    "who reads it, or nobody does)";
         logger.error(
             `🔒 [rls] Not serving "${table.slug}" (${table.qualified}): ${what}. This boot did not change that ` +
             "(it provisions nothing, or Postgres refused it). Run, as part of your change process (or `rebase db push`):\n" +
+            table.remediationSql.split("\n").map(line => `      ${line}`).join("\n")
+        );
+    }
+}
+
+/**
+ * Say, once per table, that it is served with some of its declared permissive
+ * policies missing: those callers are refused rows the schema grants them. It
+ * is served — a missing grant only narrows access — and the log names the
+ * statements that create the policies.
+ */
+export function warnNarrowedTables(found: readonly NarrowedServedTable[]): void {
+    for (const table of found) {
+        logger.warn(
+            `🔒 [rls] "${table.slug}" (${table.qualified}) is served without the polic${table.missingPolicies.length > 1 ? "ies" : "y"} ` +
+            `${table.missingPolicies.map(name => `"${name}"`).join(", ")} it declares, so the callers ` +
+            (table.missingPolicies.length > 1 ? "they grant" : "it grants") + " are refused rows. Run (or `rebase db push`):\n" +
             table.remediationSql.split("\n").map(line => `      ${line}`).join("\n")
         );
     }

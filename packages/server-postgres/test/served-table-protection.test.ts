@@ -1,22 +1,58 @@
 /**
  * The catalogue check behind "a declared table the database does not protect
- * is not served" (SEC-FIX-2 F-2), on a real Postgres (PGlite), and what the
- * registry does with a table it withholds. The boot and refresh wiring is
- * driven end to end in `e2e/declared-table-protection-e2e`.
+ * is not served" (SEC-FIX-2 F-2, tightened in SEC-FIX-3), on a real Postgres
+ * (PGlite), and what the registry does with a table it withholds. The boot and
+ * refresh wiring is driven end to end in `e2e/declared-table-protection-e2e`.
+ *
+ * A declared table is served when RLS is on, at least one of its declared
+ * policies is present by the name the provisioning path gives it, and no
+ * declared restrictive policy is missing (or permissive in the database). A
+ * missing permissive policy narrows access: served, with a warning. A policy
+ * the schema does not declare counts for nothing — "any one policy" was the
+ * old rule, and a stray `USING (true)` passed it.
  */
 import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { RebaseApiError, col, defineTable } from "@rebasepro/types";
 import { compileSchema } from "@rebasepro/common";
 
-import { findUnprotectedServedTables, withheldTableMessage } from "../src/security/served-table-protection";
+import { findServedTableProtection, findUnprotectedServedTables, withheldTableMessage } from "../src/security/served-table-protection";
+import { planTablePolicies } from "../src/schema/generate-postgres-ddl-logic";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 
-const locked = defineTable("locked", { columns: { id: col.serial().primaryKey() }, rls: [{ operation: "select", access: "public" }] });
+const stray = defineTable("locked", { columns: { id: col.serial().primaryKey() }, rls: [{ operation: "select", access: "public" }] });
 const open = defineTable("open_notes", { columns: { id: col.serial().primaryKey() }, rls: "admin-only" });
 const bare = defineTable("bare", { columns: { id: col.serial().primaryKey() }, rls: [{ operation: "select", access: "public" }] });
 const absent = defineTable("absent", { columns: { id: col.serial().primaryKey() }, rls: "admin-only" });
-const COMPILED = compileSchema([locked, open, bare, absent]);
+const full = defineTable("complete", { columns: { id: col.serial().primaryKey() }, rls: [{ operation: "select", access: "public" }] });
+const gated = defineTable("gated", {
+    columns: { id: col.serial().primaryKey(), org: col.text() },
+    rls: [
+        { operation: "select", access: "public" },
+        { operation: "select", mode: "restrictive", using: "{org} = 'acme'" }
+    ]
+});
+const flipped = defineTable("flipped", {
+    columns: { id: col.serial().primaryKey(), org: col.text() },
+    rls: [
+        { operation: "select", access: "public" },
+        { operation: "select", mode: "restrictive", using: "{org} = 'acme'" }
+    ]
+});
+const narrow = defineTable("narrow", {
+    columns: { id: col.serial().primaryKey() },
+    rls: [{ operation: "select", access: "public" }, { operation: "insert", access: "authenticated" }]
+});
+const COMPILED = compileSchema([stray, open, bare, absent, full, gated, flipped, narrow]);
+const PLANS = new Map(planTablePolicies(COMPILED.filter(table => table.descriptor.kind === "table")).map(plan => [plan.table, plan]));
+
+/** The planned policies of a table, by the names provisioning gives them. */
+const planned = (table: string) => PLANS.get(table)?.policies ?? [];
+
+/** `CREATE POLICY` under a planned name, with a body the check does not judge. */
+function createAs(table: string, name: string, restrictive: boolean): string {
+    return `CREATE POLICY "${name}" ON ${table} AS ${restrictive ? "RESTRICTIVE" : "PERMISSIVE"} FOR ALL USING (true);`;
+}
 
 let db: PGlite;
 const run = async (text: string) => (await db.query<Record<string, unknown>>(text)).rows;
@@ -24,14 +60,33 @@ const run = async (text: string) => (await db.query<Record<string, unknown>>(tex
 beforeAll(async () => {
     db = new PGlite();
     await db.waitReady;
-    await db.exec(`
-        CREATE TABLE locked (id serial PRIMARY KEY);
-        ALTER TABLE locked ENABLE ROW LEVEL SECURITY;
-        CREATE POLICY anything ON locked FOR SELECT USING (true);
-        CREATE TABLE open_notes (id serial PRIMARY KEY);
-        CREATE TABLE bare (id serial PRIMARY KEY);
-        ALTER TABLE bare ENABLE ROW LEVEL SECURITY;
-    `);
+    const statements = [
+        // RLS on, but its only policy is one the schema does not declare.
+        "CREATE TABLE locked (id serial PRIMARY KEY);",
+        "ALTER TABLE locked ENABLE ROW LEVEL SECURITY;",
+        "CREATE POLICY anything ON locked FOR SELECT USING (true);",
+        "CREATE TABLE open_notes (id serial PRIMARY KEY);",
+        "CREATE TABLE bare (id serial PRIMARY KEY);",
+        "ALTER TABLE bare ENABLE ROW LEVEL SECURITY;",
+        // Every declared policy, and a stray one beside them: served.
+        "CREATE TABLE complete (id serial PRIMARY KEY);",
+        "ALTER TABLE complete ENABLE ROW LEVEL SECURITY;",
+        ...planned("complete").map(policy => createAs("complete", policy.name, policy.restrictive)),
+        "CREATE POLICY extra ON complete FOR SELECT USING (true);",
+        // The grant without its restrictive gate.
+        "CREATE TABLE gated (id serial PRIMARY KEY, org text);",
+        "ALTER TABLE gated ENABLE ROW LEVEL SECURITY;",
+        ...planned("gated").filter(policy => !policy.restrictive).map(policy => createAs("gated", policy.name, false)),
+        // The gate present by name, but permissive in the database.
+        "CREATE TABLE flipped (id serial PRIMARY KEY, org text);",
+        "ALTER TABLE flipped ENABLE ROW LEVEL SECURITY;",
+        ...planned("flipped").map(policy => createAs("flipped", policy.name, false)),
+        // One permissive grant of two: narrower than declared.
+        "CREATE TABLE narrow (id serial PRIMARY KEY);",
+        "ALTER TABLE narrow ENABLE ROW LEVEL SECURITY;",
+        ...planned("narrow").slice(0, 1).map(policy => createAs("narrow", policy.name, policy.restrictive))
+    ];
+    await db.exec(statements.join("\n"));
 });
 
 afterAll(async () => {
@@ -39,11 +94,30 @@ afterAll(async () => {
 });
 
 describe("findUnprotectedServedTables", () => {
-    it("names a table with RLS off and one with RLS on but none of its declared policies — and only those", async () => {
+    it("plans the policies each case needs (a guard on the fixtures themselves)", () => {
+        expect(planned("gated").some(policy => policy.restrictive)).toBe(true);
+        expect(planned("narrow").filter(policy => !policy.restrictive).length).toBeGreaterThan(1);
+    });
+
+    it("withholds RLS off, no declared policy (a stray one does not count), and a missing or permissive restrictive gate — and only those", async () => {
         const found = await findUnprotectedServedTables(run, COMPILED);
         expect(found.map(({ slug, problem }) => [slug, problem]).sort()).toEqual([
             ["bare", "no-policies"],
+            ["flipped", "restrictive-missing"],
+            ["gated", "restrictive-missing"],
+            ["locked", "no-policies"],
             ["open_notes", "rls-off"]
+        ]);
+        const gate = found.find(table => table.slug === "gated");
+        expect(gate?.missingPolicies).toEqual(planned("gated").filter(policy => policy.restrictive).map(policy => policy.name));
+        expect(gate?.remediationSql).toContain("AS RESTRICTIVE");
+    });
+
+    it("serves a table missing a permissive policy, and names the policy", async () => {
+        const { unprotected, narrowed } = await findServedTableProtection(run, COMPILED);
+        expect(unprotected.map(table => table.slug)).not.toContain("narrow");
+        expect(narrowed.map(({ slug, missingPolicies }) => [slug, missingPolicies])).toEqual([
+            ["narrow", planned("narrow").slice(1).map(policy => policy.name)]
         ]);
     });
 
@@ -65,6 +139,14 @@ describe("findUnprotectedServedTables", () => {
         }, COMPILED);
         expect(statements).toHaveLength(1);
         expect(statements[0].trim()).toMatch(/^SELECT /);
+    });
+
+    it("says why a withheld table is not served, never the SQL", () => {
+        for (const problem of ["rls-off", "no-policies", "restrictive-missing"] as const) {
+            const message = withheldTableMessage({ slug: "t", problem });
+            expect(message).toContain('"t" is not served');
+            expect(message).not.toMatch(/CREATE|ALTER/);
+        }
     });
 });
 
