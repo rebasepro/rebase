@@ -16,7 +16,6 @@ import {
     type RealtimeConnectionState
 } from "@rebasepro/types";
 import { buildCompositeId, COMPOSITE_ID_SEPARATOR, warnDeprecated, withETag, type PrimaryKeyInfo } from "@rebasepro/common";
-import { parseRebaseJson } from "./reviver";
 import { unref } from "@rebasepro/utils";
 import { readSqlScriptResult } from "./sql-script";
 import type { SqlScriptResult } from "@rebasepro/types";
@@ -1122,9 +1121,10 @@ export class RebaseWebSocketClient {
             this.ws!.onmessage = (event) => {
                 this.lastFrameAt = Date.now();
                 try {
-                    // A reviver parse calls back for every key and value of the
-                    // frame; most frames have nothing to revive. Same result.
-                    const message = parseRebaseJson<WebSocketMessage>(String(event.data));
+                    // Plain JSON: a Rebase server serves the wire row, with no
+                    // `{ __type }` envelope to revive (the admin builds its
+                    // view model from the row and the table descriptor).
+                    const message: WebSocketMessage = JSON.parse(String(event.data));
                     this.handleWebSocketMessage(message);
                 } catch (error) {
                     console.error("Error parsing WebSocket message:", error);

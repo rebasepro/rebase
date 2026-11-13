@@ -1,6 +1,5 @@
 import { AggregateParams, FindParams as TypesFindParams, FindResponse as TypesFindResponse, IMPERSONATE_HEADER, type IncludeSpec, type LogicalCondition, RebaseApiError, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
 import { RESERVED_QUERY_KEYS, resolveFindWindow, serializeFilter, serializeInclude, serializeLogicalCondition, serializeOrderBy } from "@rebasepro/common";
-import { parseRebaseJson } from "./reviver";
 
 // The canonical client error now lives in `@rebasepro/types` so every package
 // (client, auth, …) throws one type. Re-exported here to preserve the historical
@@ -859,7 +858,8 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
     function parseBody(text: string): Record<string, unknown> | undefined {
         if (!text) return {};
         try {
-            return parseRebaseJson<Record<string, unknown>>(text);
+            const body: Record<string, unknown> = JSON.parse(text);
+            return body;
         } catch (e) {
             return undefined;
         }

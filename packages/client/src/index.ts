@@ -40,7 +40,7 @@ import { toSnakeCase } from "@rebasepro/utils";
 // curated list — NOT `export *` — so that adding an export to a module below
 // does not silently republish it to app developers. Internal factories
 // (`createTransport`, `createAuth`, `createTableClient`, …), the raw
-// `Transport`, the storage-source registry impl, the JSON reviver, and the
+// `Transport`, the storage-source registry impl, and the
 // concrete `SDKQueryBuilder` class are intentionally NOT re-exported: they are
 // implementation details of `createRebaseClient()` and have no external
 // consumers. App developers reach them through the client instance, never by

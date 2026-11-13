@@ -1,5 +1,4 @@
 import { EntityReference, EntityRelation, GeoPoint, Vector } from "@rebasepro/types";
-import { rebaseReviver } from "./reviver";
 import type { PendingMutation } from "./offline-store";
 
 /**
@@ -8,7 +7,7 @@ import type { PendingMutation } from "./offline-store";
  * Both persistence backends move values by structured clone, which keeps
  * `Date` but flattens every class instance to a plain object. For
  * `EntityReference`/`EntityRelation` that is harmless — they carry their own
- * `__type` discriminator, so the JSON reviver can rebuild them — but
+ * `__type` discriminator, so {@link reviveTagged} can rebuild them — but
  * `GeoPoint` and `Vector` do not, and would come back out of the cache as
  * anonymous `{ latitude, longitude }` / `{ value }` bags. A row read from the
  * cache must be indistinguishable from the same row read from the network, so
@@ -63,11 +62,45 @@ function dehydrateValue(value: unknown): unknown {
     return value;
 }
 
+/**
+ * The class instance a tagged plain object stands for, or the object itself.
+ *
+ * Only the offline store needs this: values the admin hands the client to
+ * write (an `EntityRelation`, a `GeoPoint`, …) are queued and cached by
+ * structured clone, which drops their prototypes. Nothing read from a Rebase
+ * server carries a tag — the wire row has none.
+ */
+function reviveTagged(value: Record<string, unknown>): unknown {
+    switch (value.__type) {
+        case "reference":
+            return new EntityReference({
+                id: String(value.id),
+                path: String(value.path),
+                driver: typeof value.driver === "string" ? value.driver : undefined,
+                databaseId: typeof value.databaseId === "string" ? value.databaseId : undefined
+            });
+        case "relation": {
+            const id = value.id;
+            if (typeof id !== "string" && typeof id !== "number") return value;
+            const data = value.data;
+            return new EntityRelation(id, String(value.path), isPlainObject(data) ? data : undefined);
+        }
+        case "GeoPoint":
+            return typeof value.latitude === "number" && typeof value.longitude === "number"
+                ? new GeoPoint(value.latitude, value.longitude)
+                : value;
+        case "Vector":
+            return Array.isArray(value.value) ? new Vector(value.value.map(Number)) : value;
+        default:
+            return value;
+    }
+}
+
 function hydrateValue(value: unknown): unknown {
     if (value === null || value === undefined || isDate(value)) return value;
     if (Array.isArray(value)) return value.map(hydrateValue);
     if (typeof value === "object") {
-        const revived = rebaseReviver("", value);
+        const revived = isPlainObject(value) ? reviveTagged(value) : value;
         // The reviver recognised it — hand back the class instance untouched
         // rather than walking into its (now private) internals.
         if (revived !== value) return revived;
