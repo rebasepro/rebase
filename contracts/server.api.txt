@@ -595,7 +595,6 @@ const DEFAULT_SEARCH_WEIGHT
 const DEFAULT_STORAGE_SOURCE_KEY
 const DEFAULT_TENANT_BYPASS_ROLES
 const DEFAULT_VECTOR_LIST_LIMIT
-const DRIZZLE_REFUSALS { arrayOfArray, arrayOrder, arraySize, bigintMode, bigintModeMissing, charLength, customDataType, dateMode, defaultFn, enumName, generatedValue, identityAlways, identityOptions, numericMode, numericPositional, onUpdateFn, pgEnumObject, references, sqlInterpolation, timePrecision, timeZone, timestamp, timestampMode, timestampPrecision, uniqueName, varcharLength, vectorPositional }
 const EMPTY_ACCESS_MODEL { roles, scopes }
 const FIELDLESS_AGGREGATES
 const FIELD_OPERATORS
@@ -639,7 +638,6 @@ const SIMULATED_CONTEXT_HEADER
 const SIMULATE_API_KEY_ID_HEADER
 const SIMULATE_ROLE_HEADER
 const SIMULATE_USER_ID_HEADER
-const SQL_BRAND
 const STORAGE_REFERENCE_SCHEME
 const TABLE_BRAND
 const TABLE_OPTION_KEYS
@@ -1542,16 +1540,18 @@ function applyStamps
 function arrayElementType
 function authSecretsMissingExclusion
 function belongsToForColumn
+function boundKeyColumn
 function buildCompositeId
 function buildRoutedSdkData
 function buildSdkData
 function callbackRefusal
 function canReadColumn
+function canReadRelation
 function canReadWithAccess
 function canWriteColumn
+function canWriteRelation
 function canWriteWithAccess
 function checkTableOperation
-function claimCastOf
 function classifyTable
 function collectAllPages
 function columnAccess
@@ -1630,7 +1630,6 @@ function isSoftDeleteRestore
 function isTimeOfDayType
 function isVectorType
 function joinTransformPath
-function jsonPositions
 function junctionPolicyTable
 function junctionRules
 function keyAddressInfo
@@ -1687,7 +1686,6 @@ function restCodecOf
 function restrictedKeys { declared, refused }
 function revokeInternalTableAccess
 function revokeInternalTableSql
-function sameValueKey
 function securityRuleToConditions
 function serializeFilter
 function serializeInclude
@@ -1738,7 +1736,6 @@ function validationPattern
 function valueCodecOf
 function valueCodecOfType
 function vectorColumnKeys
-function walkJsonShape
 function warnDeprecated
 function warnOnTableDdl
 function withETag
@@ -1760,7 +1757,6 @@ interface DriverTableRows { aggregate, count, create, createMany, delete, delete
 interface DriverTableRowsOptions { storedPath }
 interface FieldViewer { roles }
 interface IncludeNode { children, count, fields, limit, logical, orderBy, where }
-interface JsonShapeVisit { parent, path, shape }
 interface NormalizedInclude { tree, wildcard }
 interface NumberOperationBounds { kind, lessThan, max, min, moreThan, negative, positive }
 interface PolicyColumn { claimCast, column }
