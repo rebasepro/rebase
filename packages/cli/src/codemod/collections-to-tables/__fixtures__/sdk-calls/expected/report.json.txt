@@ -21,13 +21,17 @@
       "edits": 13
     },
     {
+      "path": "frontend/src/pages.ts",
+      "edits": 1
+    },
+    {
       "path": "typed/src/use.ts",
       "edits": 1
     }
   ],
   "counts": {
     "table-hooks": 5,
-    "collection-call": 6,
+    "collection-call": 7,
     "rule-vocabulary": 4,
     "boot-options": 1,
     "storage-authorize": 1,

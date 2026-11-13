@@ -129,6 +129,8 @@ describe("rebase migrate sdk-calls", () => {
         expect(report.counts["rule-vocabulary"]).toBe(4);
         // Generated SDK files are regenerated, not rewritten.
         expect(report.generated).toEqual(["frontend/src/generated/sdk/database.types.ts"]);
+        // A file the project's own generator marks "do not edit" is the project's code, not SDK output: rewritten, never "regenerate the SDK".
+        expect(fs.readFileSync(path.join(dir, "frontend/src/pages.ts"), "utf8")).toContain(`client.data.table("pages")`);
         expect(fs.readFileSync(path.join(dir, "frontend/src/generated/sdk/database.types.ts"), "utf8")).toContain("CollectionName");
 
         // Idempotent: a second run has nothing to rewrite.
