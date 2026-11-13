@@ -743,6 +743,59 @@ export function unimportedConfigModules(
     return kept.filter(file => !used.has(file));
 }
 
+/** Files a build or a deploy reads by name: container files, shell scripts, CI and workspace YAML, JS build scripts, manifests. */
+const DEPLOY_FILE = /^(Dockerfile.*|.*\.dockerfile|\.dockerignore.*|Makefile|.*\.(sh|bash|ya?ml|toml|mjs|cjs|js)|package\.json)$/i;
+
+/**
+ * Build and deploy files that name what the migration removes: the config
+ * workspace package by name (`pnpm --filter "<name>" run build`, a deploy
+ * workspace list, an `allowBuilds` entry) when the package goes, and the
+ * collections directory (`COPY config/collections`, a watcher on
+ * `../config/**`). The run rewrites `pnpm-workspace.yaml` and the manifests it
+ * owns; read as it leaves them, whatever still names these is a step per file
+ * with its lines — the codemod does not edit a Dockerfile or a CI pipeline.
+ *
+ * @param packageGoes whether the config package is removed (nothing of the project's own is left in it)
+ */
+export function findDeployReferences(plan: PlanContext, configDir: string, collectionsDir: string, packageGoes: boolean): ManualStep[] {
+    const steps: ManualStep[] = [];
+    const ignored = new Set(["node_modules", "dist", "build", ".git", "coverage", ".turbo", ".next", "generated"]);
+    const configPackage = readJson(path.join(configDir, "package.json"));
+    const packageName = configPackage && typeof configPackage.value.name === "string" ? configPackage.value.name : undefined;
+    const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const configRelative = toPosix(path.relative(plan.root, configDir));
+    const patterns: RegExp[] = [new RegExp(`(^|[^\\w-])${escape(toPosix(path.relative(plan.root, collectionsDir)))}\\b`)];
+    if (packageGoes) {
+        if (packageName) patterns.push(new RegExp(`(^|[^\\w@/-])${escape(packageName)}(?![\\w-])`));
+        patterns.push(new RegExp(`(\\.\\./|\\./|^|[\\s"'=])${escape(configRelative)}/\\*\\*`));
+    }
+    const inConfig = (file: string): boolean => !path.relative(configDir, file).startsWith("..");
+    const walk = (dir: string): void => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (ignored.has(entry.name) || (entry.name.startsWith(".") && !/^\.(github|gitlab|circleci|dockerignore)/.test(entry.name) && !/\.gitlab-ci\.ya?ml$/.test(entry.name))) continue;
+            const full = path.join(dir, entry.name);
+            if (inConfig(full)) continue;
+            if (entry.isDirectory()) {
+                walk(full);
+                continue;
+            }
+            if (!DEPLOY_FILE.test(entry.name) || entry.name === "pnpm-lock.yaml") continue;
+            const planned = plan.files.get(full);
+            const text = planned ? planned.content : fs.readFileSync(full, "utf8");
+            if (text.length > 1_000_000 || !patterns.some(pattern => text.split("\n").some(line => pattern.test(line)))) continue;
+            const lines = text.split("\n").flatMap((line, index) => (patterns.some(pattern => pattern.test(line)) ? [index + 1] : []));
+            const relative = relativeToRoot(plan, full);
+            steps.push({
+                title: `Update the build and deploy references in ${relative}`,
+                detail: `Line${lines.length > 1 ? "s" : ""} ${lines.join(", ")}: ${relative} names ${packageGoes && packageName ? `the config workspace package (\`${packageName}\`) or ` : ""}${toPosix(path.relative(plan.root, collectionsDir))}, which the migration removes. Drop the step (the backend builds from backend/schema; there is no config package to build or copy) or point it at backend/schema.`,
+                file: relative
+            });
+        }
+    };
+    walk(plan.root);
+    return steps;
+}
+
 /** The names a module's text exports (`export { a, b as c }`, `export const x`); `export *` is not followed. */
 export function exportedNamesOf(text: string): Set<string> {
     const out = new Set<string>();

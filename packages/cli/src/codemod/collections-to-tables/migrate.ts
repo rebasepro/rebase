@@ -50,6 +50,7 @@ import {
     unmovedConfigFiles,
     unimportedConfigModules,
     findLegacyConfigReads,
+    findDeployReferences,
     exportedNamesOf,
     keptConfigModules,
     withoutRebaseReexports
@@ -563,6 +564,7 @@ async function migrateWithShims(options: MigrateOptions, shimDir: ShimDir): Prom
         const after = exportedNamesOf(indexAfter);
         const lost = new Set([...exportedNamesOf(indexBefore)].filter(name => !after.has(name)));
         plan.manualSteps.push(...findLegacyConfigReads(plan, configDir, legacy.collectionsDir, lost, readPathAliases(root)));
+        plan.manualSteps.push(...findDeployReferences(plan, configDir, legacy.collectionsDir, !configStays));
     }
 
     // Kept modules of config/ that only the collections imported: nothing needs them once the run is written.

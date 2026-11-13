@@ -606,6 +606,28 @@ describe("an additional field named in a column list", () => {
     }, 120_000);
 });
 
+describe("deploy files that build the config package by name", () => {
+    it("are a step per file with its lines, when the package goes", async () => {
+        const dir = materialize("firestore");
+        fs.writeFileSync(path.join(dir, "Dockerfile"), [
+            "FROM node:22",
+            "COPY . .",
+            "RUN pnpm --filter \"firestore-config\" run build",
+            "RUN pnpm --filter firestore-backend run build",
+            ""
+        ].join("\n"));
+        fs.mkdirSync(path.join(dir, "scripts"), { recursive: true });
+        fs.writeFileSync(path.join(dir, "scripts", "deploy-prepare.sh"), "#!/bin/sh\ncp -r config/collections dist/\n");
+        fs.writeFileSync(path.join(dir, "scripts", "unrelated.sh"), "#!/bin/sh\necho ok\n");
+        const report = await run(dir, { dryRun: true });
+        expect(report.refusals).toEqual([]);
+        const steps = report.manualSteps.filter(step => step.title.startsWith("Update the build and deploy references"));
+        expect(steps.map(step => step.file).sort()).toEqual(["Dockerfile", "scripts/deploy-prepare.sh"]);
+        expect(steps.find(step => step.file === "Dockerfile")?.detail).toMatch(/^Line 3:/);
+        expect(steps.find(step => step.file === "scripts/deploy-prepare.sh")?.detail).toMatch(/^Line 2:/);
+    }, 120_000);
+});
+
 describe("tests that read what config/ loses", () => {
     it("are listed with file and line: the removed collections export, and config/collections read as text", async () => {
         const dir = materialize("blog");
