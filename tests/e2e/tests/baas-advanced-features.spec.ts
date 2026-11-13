@@ -172,7 +172,7 @@ test.describe("BaaS Advanced Engine Features", () => {
      * written. Asserting the resolved id is what proves the reference was
      * substituted rather than stored as the literal string.
      */
-    test("cross-collection atomic batch transactions with $ref resolution", async ({ request }) => {
+    test("cross-table atomic batch transactions with $ref resolution", async ({ request }) => {
         const stamp = Date.now();
         const batchRes = await request.post(`${baseUrl}/api/data/_batch`, {
             headers: authHeaders,
@@ -180,13 +180,13 @@ test.describe("BaaS Advanced Engine Features", () => {
                 operations: [
                     {
                         op: "create",
-                        collection: "authors",
+                        table: "authors",
                         values: { name: `Batch Author ${stamp}`, email: `batch-${stamp}@rebase.pro` },
                         ref: "createdAuthor"
                     },
                     {
                         op: "create",
-                        collection: "posts",
+                        table: "posts",
                         values: {
                             title: `Batch Post ${stamp}`,
                             slug: `batch-post-${stamp}`,

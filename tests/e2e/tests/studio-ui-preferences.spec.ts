@@ -61,7 +61,9 @@ test.describe("Studio: a presentation change is a UI preference", () => {
         const before = await workspacePreferences();
         expect(before.workspace?.[SLUG]?.name).toBeUndefined();
 
-        await page.goto(`/schema/${SLUG}`);
+        // The schema editor lists the tables; picking one opens its editor.
+        await page.goto("/schema");
+        await page.getByRole("main").getByRole("button", { name: "Tags", exact: true }).click();
         const nameInput = page.getByLabel("Name", { exact: true });
         await expect(nameInput).toBeVisible({ timeout: 15000 });
         await page.waitForTimeout(500); // the form hydrates after the dialog animates in
