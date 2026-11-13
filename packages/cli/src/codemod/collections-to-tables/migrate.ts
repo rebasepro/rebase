@@ -110,6 +110,12 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
         });
         return report;
     }
+    for (const helper of legacy.helperFiles) {
+        report.notes.push({
+            file: toPosix(path.relative(root, helper)),
+            message: "exports no collection: read as a module the collections import, not as a table. It moves with the code that imports it, or is listed under \"Files of config/ nothing moved\"."
+        });
+    }
 
     const tsm: TsMorph = await import("ts-morph");
     const ast = createAstContext(tsm);

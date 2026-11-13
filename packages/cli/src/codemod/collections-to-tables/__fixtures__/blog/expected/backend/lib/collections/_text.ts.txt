@@ -1,0 +1,8 @@
+/**
+ * A helper beside the collections, not a collection: it has no default
+ * export. A project that passed its collections as an array never had this
+ * directory read, so a file like this was always fine there.
+ */
+export function squash(text: string): string {
+    return text.trim().replace(/\s+/g, " ");
+}

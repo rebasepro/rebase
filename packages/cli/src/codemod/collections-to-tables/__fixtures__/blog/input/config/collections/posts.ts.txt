@@ -4,6 +4,7 @@
 import { defineCollection } from "@rebasepro/cms-types";
 import { slugify } from "../slugify";
 import { notify } from "../actions";
+import { squash } from "./_text";
 import authorsCollection from "./authors";
 import tagsCollection from "./tags";
 
@@ -72,7 +73,7 @@ const postsCollection = defineCollection({
         // Derive the slug once, from the first title.
         beforeSave: ({ values, previousValues }) => {
             const merged = { ...previousValues, ...values };
-            if (typeof merged.title === "string" && !merged.slug) values.slug = slugify(merged.title);
+            if (typeof merged.title === "string" && !merged.slug) values.slug = slugify(squash(merged.title));
             return values;
         },
         afterRead({ row }) {

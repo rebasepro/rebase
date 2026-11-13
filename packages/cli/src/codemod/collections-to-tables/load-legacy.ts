@@ -44,6 +44,14 @@ export interface LegacyProject {
     navigationOrder?: LegacyCollectionConfig[];
     /** Named exports of `<config>/index.ts`, when there is one (to find `callbacks`, `storageAuthorize`). */
     configIndexExports: string[];
+    /**
+     * Files of `<config>/collections` that export no collection at all — no
+     * default export, and no named export shaped like one: helpers the
+     * collection files import (`_predicates.ts`), absolute. A project that passed
+     * its collections as an array never had its directory read, so these were
+     * never collections; they are moved like any other module of `config/`.
+     */
+    helperFiles: string[];
 }
 
 /** A module importer: the CLI's jiti importer (`createSchemaModuleImporter`), or a stand-in in tests. */
@@ -87,6 +95,7 @@ export async function loadLegacyProject(configDir: string, importModule: ModuleI
         .filter(file => isLegacyCollectionFile(file) && fs.statSync(path.join(collectionsDir, file)).isFile())
         .sort();
     const collections: LoadedCollection[] = [];
+    const helperFiles: string[] = [];
     const failures: string[] = [];
     for (const file of files) {
         const full = path.join(collectionsDir, file);
@@ -94,6 +103,11 @@ export async function loadLegacyProject(configDir: string, importModule: ModuleI
             const mod = await importModule(full);
             const exported = mod.default;
             if (isCollection(exported)) collections.push({ collection: exported, file: full });
+            // Nothing in it is a collection: a helper. A collection exported by
+            // name, or a default export that is something else, may be a table
+            // the project serves — dropping it would drop the table — so those
+            // still refuse.
+            else if (exported === undefined && !Object.values(mod).some(isCollection)) helperFiles.push(full);
             else failures.push(`${file}: no default export of a collection`);
         } catch (error) {
             failures.push(`${file}: ${error instanceof Error ? error.message : String(error)}`);
@@ -162,6 +176,7 @@ export async function loadLegacyProject(configDir: string, importModule: ModuleI
         collections,
         ...(defaultSecurityRules ? { defaultSecurityRules } : {}),
         ...(navigationOrder ? { navigationOrder } : {}),
-        configIndexExports
+        configIndexExports,
+        helperFiles
     };
 }

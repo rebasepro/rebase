@@ -31,6 +31,7 @@
   ],
   "files": [
     "update backend/entrypoint.sh",
+    "create backend/lib/collections/_text.ts",
     "create backend/lib/slugify.ts",
     "update backend/package.json",
     "create backend/resources.ts",
@@ -56,7 +57,12 @@
     "update rebase.json"
   ],
   "refusals": [],
-  "notes": [],
+  "notes": [
+    {
+      "file": "config/collections/_text.ts",
+      "message": "exports no collection: read as a module the collections import, not as a table. It moves with the code that imports it, or is listed under \"Files of config/ nothing moved\"."
+    }
+  ],
   "manualSteps": [],
   "verification": {
     "identical": true,
