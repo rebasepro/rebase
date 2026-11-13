@@ -49,6 +49,8 @@ import {
     readRawManifest,
     unmovedConfigFiles,
     unimportedConfigModules,
+    findLegacyConfigReads,
+    exportedNamesOf,
     keptConfigModules,
     withoutRebaseReexports
 } from "./project-files";
@@ -553,6 +555,15 @@ async function migrateWithShims(options: MigrateOptions, shimDir: ShimDir): Prom
         plan.manualSteps.push(...sdk.report.manualSteps);
     }
     tableUseSteps(plan, tableBindings, file => plan.files.get(file)?.content ?? fs.readFileSync(file, "utf8"));
+
+    // Code that still reads what config/ loses, in a way no import rewrite fixes: names the index stopped exporting, config/collections read as files.
+    {
+        const indexBefore = fs.existsSync(indexFile) ? fs.readFileSync(indexFile, "utf8") : "";
+        const indexAfter = !configStays || removed.includes(indexFile) ? "" : plan.files.get(indexFile)?.content ?? indexBefore;
+        const after = exportedNamesOf(indexAfter);
+        const lost = new Set([...exportedNamesOf(indexBefore)].filter(name => !after.has(name)));
+        plan.manualSteps.push(...findLegacyConfigReads(plan, configDir, legacy.collectionsDir, lost, readPathAliases(root)));
+    }
 
     // Kept modules of config/ that only the collections imported: nothing needs them once the run is written.
     if (configStays) {

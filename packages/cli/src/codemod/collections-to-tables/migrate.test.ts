@@ -575,6 +575,31 @@ describe("a component path written in a shared module", () => {
     }, 120_000);
 });
 
+describe("tests that read what config/ loses", () => {
+    it("are listed with file and line: the removed collections export, and config/collections read as text", async () => {
+        const dir = materialize("blog");
+        fs.writeFileSync(path.join(dir, "config", "index.ts"), "export { collections } from \"./collections\";\nexport { slugify } from \"./slugify\";\n");
+        fs.mkdirSync(path.join(dir, "backend", "test"), { recursive: true });
+        fs.writeFileSync(path.join(dir, "backend", "test", "collections.test.ts"), [
+            "import fs from \"node:fs\";",
+            "import path from \"node:path\";",
+            "import { collections, slugify } from \"../../config\";",
+            "",
+            "const source = fs.readFileSync(path.join(__dirname, \"..\", \"..\", \"config\", \"collections\", \"posts.ts\"), \"utf8\");",
+            "const listed = fs.readdirSync(\"config/collections\");",
+            "export const checked = [collections.length, slugify(\"a\"), source, listed];",
+            ""
+        ].join("\n"));
+        const report = await run(dir, { dryRun: true });
+        expect(report.refusals).toEqual([]);
+        const imports = report.manualSteps.find(step => step.title === "Replace what backend/test/collections.test.ts imports from config/index.ts");
+        expect(imports?.detail).toContain("line 3: `collections` from \"../../config\"");
+        expect(imports?.detail).not.toContain("`slugify`");
+        const reads = report.manualSteps.find(step => step.title === "Stop reading config/collections in backend/test/collections.test.ts");
+        expect(reads?.detail).toMatch(/^Lines 5, 6:/);
+    }, 120_000);
+});
+
 describe("a package only config/ declared", () => {
     it("is added to the package that now imports it, when carried code names it", async () => {
         const dir = materialize("blog");

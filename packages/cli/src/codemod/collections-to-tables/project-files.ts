@@ -13,9 +13,11 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { AstContext } from "./ast";
+import { toPosix } from "./ast";
 import { aliasToRelative, type PathAlias } from "./path-aliases";
 import { resolveRelative } from "./modules";
 import type { PlanContext } from "./plan-context";
+import type { ManualStep } from "./types";
 import { note, planFile, relativeToRoot } from "./plan-context";
 import { BACKEND_GUARD_EXPORT, BACKEND_GUARD_SNIPPET } from "../../utils/backend-guard";
 
@@ -739,6 +741,111 @@ export function unimportedConfigModules(
         if (next !== undefined) targetsOf(next).forEach(reach);
     }
     return kept.filter(file => !used.has(file));
+}
+
+/** The names a module's text exports (`export { a, b as c }`, `export const x`); `export *` is not followed. */
+export function exportedNamesOf(text: string): Set<string> {
+    const out = new Set<string>();
+    for (const match of text.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}/g)) {
+        for (const part of match[1].split(",")) {
+            const name = part.trim().split(/\s+as\s+/).pop()?.trim();
+            if (name) out.add(name);
+        }
+    }
+    for (const match of text.matchAll(/export\s+(?:declare\s+)?(?:async\s+)?(?:const|let|var|function\*?|class|type|interface|enum)\s+([A-Za-z_$][\w$]*)/g)) out.add(match[1]);
+    if (/export\s+default\b/.test(text)) out.add("default");
+    return out;
+}
+
+/**
+ * The project's own code that still reads what the migration removes from
+ * `config/` in a way no import rewrite can fix — each a manual step with
+ * file:line, since the codemod cannot rewrite an assertion:
+ *
+ * - an import of a name `config/index.ts` no longer exports (`collections`,
+ *   `storageAuthorize`, … — the re-exports of what Rebase read), relative, through
+ *   a path alias, or by the config package's name;
+ * - a file that reads `config/collections` as TEXT (`readFileSync`, `readdirSync`,
+ *   a path built with `path.join(…, "config", "collections")`): a test asserting
+ *   over the collection files' source, a script listing them.
+ *
+ * @param removedIndexNames what the index exported before the run and does not after
+ *   (every export when the index goes)
+ */
+export function findLegacyConfigReads(
+    plan: PlanContext,
+    configDir: string,
+    collectionsDir: string,
+    removedIndexNames: ReadonlySet<string>,
+    aliases: readonly PathAlias[] = []
+): ManualStep[] {
+    const steps: ManualStep[] = [];
+    const ignored = new Set(["node_modules", "dist", "build", ".git", "coverage", ".turbo", ".next"]);
+    const inConfig = (file: string): boolean => !path.relative(configDir, file).startsWith("..");
+    const configPackage = readJson(path.join(configDir, "package.json"));
+    const packageName = configPackage && typeof configPackage.value.name === "string" ? configPackage.value.name : undefined;
+    const files = new Set<string>();
+    const walk = (dir: string): void => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (entry.name.startsWith(".") || ignored.has(entry.name)) continue;
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                if (!inConfig(full)) walk(full);
+            } else if (SOURCE_FILE.test(entry.name) && !entry.name.endsWith(".d.ts")) {
+                files.add(full);
+            }
+        }
+    };
+    walk(plan.root);
+    for (const file of plan.files.keys()) if (SOURCE_FILE.test(file) && !inConfig(file)) files.add(file);
+    const collectionsRelative = toPosix(path.relative(plan.root, collectionsDir));
+    const segments = collectionsRelative.split("/").map(segment => `["'\`]${segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'\`]`).join("\\s*,\\s*");
+    const textRead = new RegExp(`["'\`][^"'\`\\n]*\\b${collectionsRelative.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b|${segments}`);
+    for (const file of [...files].sort()) {
+        const planned = plan.files.get(file);
+        const text = blankComments(planned ? planned.content : fs.readFileSync(file, "utf8"));
+        const relative = relativeToRoot(plan, file);
+        const lineOf = (index: number | undefined): number => text.slice(0, index ?? 0).split("\n").length;
+        // Imports of names the index lost.
+        if (removedIndexNames.size > 0) {
+            const lost: string[] = [];
+            for (const match of text.matchAll(/import\s+(type\s+)?(?:([A-Za-z_$][\w$]*)\s*,?\s*)?(?:\{([^}]*)\}|\*\s+as\s+([A-Za-z_$][\w$]*))?\s*from\s*["']([^"']+)["']/g)) {
+                const specifier = match[5];
+                const isPackage = packageName !== undefined && specifier === packageName;
+                const relativeSpecifier = /^\.{1,2}\//.test(specifier) ? specifier : aliasToRelative(aliases, file, specifier);
+                const target = relativeSpecifier !== undefined ? resolveRelative(file, relativeSpecifier).target : undefined;
+                const isIndex = isPackage || (target !== undefined && (target === configDir || (path.dirname(target) === configDir && /^index\.(tsx?|mts|jsx?|mjs)$/.test(path.basename(target)))));
+                if (!isIndex) continue;
+                const named = (match[3] ?? "").split(",").map(part => part.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0]?.trim()).filter((name): name is string => Boolean(name));
+                const names = named.filter(name => removedIndexNames.has(name));
+                const namespace = match[4];
+                if (namespace) for (const name of removedIndexNames) if (new RegExp(`\\b${namespace}\\.${name}\\b`).test(text)) names.push(`${namespace}.${name}`);
+                if (names.length > 0) lost.push(`line ${lineOf(match.index)}: ${names.map(name => `\`${name}\``).join(", ")} from "${specifier}"`);
+            }
+            if (lost.length > 0) {
+                steps.push({
+                    title: `Replace what ${relative} imports from config/index.ts`,
+                    detail: `${lost.join("; ")} — config/index.ts no longer exports ${lost.length > 1 ? "these" : "this"}: it re-exported what Rebase read (the collections, storageAuthorize), which is gone or moved. Read the tables from backend/schema (\`compileTables\` for their descriptors), presentation from frontend/src/cms, storageAuthorize from backend/storage. The codemod cannot rewrite what a test asserts about them.`,
+                    file: relative
+                });
+            }
+        }
+        // Reads of config/collections as files.
+        const lines: number[] = [];
+        let offset = 0;
+        for (const line of text.split("\n")) {
+            if (textRead.test(line) && !/\bcollectionsDir\b/.test(line) && !/^\s*(import|export)\b|\bfrom\s*["']|\bimport\s*\(|\brequire\s*\(/.test(line)) lines.push(lineOf(offset));
+            offset += line.length + 1;
+        }
+        if (lines.length > 0) {
+            steps.push({
+                title: `Stop reading ${collectionsRelative} in ${relative}`,
+                detail: `Line${lines.length > 1 ? "s" : ""} ${lines.join(", ")}: ${relative} reads ${collectionsRelative} as files (a path to it), which the migration removes. Point it at backend/schema (the tables) or frontend/src/cms (the customizations), or assert on the compiled tables instead of their source text. The codemod cannot rewrite an assertion.`,
+                file: relative
+            });
+        }
+    }
+    return steps;
 }
 
 /** Where a relative specifier written in `fromFile` points, without its extension. */
