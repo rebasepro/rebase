@@ -382,57 +382,171 @@ export function columnStorageOf(storage: StorageConfig): ColumnStorage {
     });
 }
 
-/** A JSON document's node, from the property that edits it. */
-export function jsonShapeOf(property: Property): JsonShape {
-    const base = compact({
+/** The nominal column type a JSON node's rules are read against: never a length or an integer type. */
+const NODE_RULE_TYPE: Readonly<Record<"string" | "number" | "date" | "array", ColumnType>> = {
+    string: { kind: "text" },
+    number: { kind: "numeric" },
+    date: { kind: "timestamptz" },
+    array: { kind: "jsonb" }
+};
+
+/**
+ * A JSON node's rules: the ones the property states, and the API error for a
+ * missing key, which the form never shows and so never edits, kept from the
+ * served node.
+ */
+function nodeRules(property: Property, kind: keyof typeof NODE_RULE_TYPE, served: JsonShape | undefined): ColumnValidation | undefined {
+    const rules: ColumnValidation = { ...validateOf(property, NODE_RULE_TYPE[kind]) };
+    const servedMessage = served && "validate" in served ? served.validate?.requiredMessage : undefined;
+    if (rules.requiredMessage === undefined && servedMessage !== undefined) rules.requiredMessage = servedMessage;
+    if (property.type === "array" && !Array.isArray(property.of) && property.of?.type === "map" && property.of.properties) {
+        // `uniqueBy` is projected onto the item's fields as `uniqueInArray` —
+        // on a field that is not itself an array, where it means `uniqueItems`.
+        const uniqueBy = Object.entries(property.of.properties)
+            .filter(([, field]) => marksUniqueBy(field))
+            .map(([key]) => key);
+        if (uniqueBy.length > 0) rules.uniqueBy = uniqueBy;
+    }
+    return nonEmpty(rules);
+}
+
+/**
+ * The DEFAULT of a JSON node: the property's `defaultValue` for the kinds the
+ * form opens with one, else the served node's, which the form never shows.
+ */
+function nodeDefault(property: Property, served: JsonShape | undefined, kind: JsonShape["kind"]): unknown {
+    switch (property.type) {
+        case "string":
+        case "number":
+        case "boolean":
+        case "map":
+        case "array":
+            if (kind !== "unknown") return property.defaultValue;
+            break;
+        default:
+            break;
+    }
+    return served?.kind === kind ? served.default : undefined;
+}
+
+/**
+ * A JSON document's node, from the property that edits it, read over the
+ * node as served: what the form does not carry (a user stamp, an open
+ * object, the API error for a missing key, a default it does not open with)
+ * is kept from `served`, so a save never drops it.
+ *
+ * @param property the property that edits the node
+ * @param served the node as the column serves it, when there is one
+ */
+export function jsonShapeOf(property: Property, served?: JsonShape): JsonShape {
+    return nodeShape(property, served, {
         description: property.description,
         required: property.validation?.required ? true : undefined
     });
+}
+
+/**
+ * One node. `base` is what the node says about itself: for a nested node,
+ * read from its property; for the document itself, the served node's — the
+ * property's description and required flag are the column's.
+ */
+function nodeShape(property: Property, served: JsonShape | undefined, base: { description?: string; required?: true }): JsonShape {
+    const head = (kind: JsonShape["kind"]) => compact({ ...base, default: nodeDefault(property, served, kind) });
     switch (property.type) {
         case "string":
         case "reference": {
             const oneOf = property.type === "string" ? enumIds(property.enum)?.map(String) : undefined;
             const storage = property.type === "string" && property.storage ? columnStorageOf(property.storage) : undefined;
-            return compact({ ...base, kind: "string" as const, oneOf, storage, semantic: property.type === "string" && property.userSelect ? "user" as const : undefined });
+            const stamp = served?.kind === "string" ? served.stamp : undefined;
+            return compact({
+                ...head("string"),
+                kind: "string" as const,
+                validate: nodeRules(property, "string", served),
+                oneOf,
+                storage,
+                stamp,
+                semantic: property.type === "string" && property.userSelect ? "user" as const : undefined
+            });
         }
         case "number": {
             const oneOf = enumIds(property.enum)?.filter((id): id is number => typeof id === "number");
-            return compact({ ...base, kind: "number" as const, oneOf: oneOf && oneOf.length > 0 ? oneOf : undefined });
+            return compact({ ...head("number"), kind: "number" as const, validate: nodeRules(property, "number", served), oneOf: oneOf && oneOf.length > 0 ? oneOf : undefined });
         }
-        case "boolean": return { ...base, kind: "boolean" };
+        case "boolean": return { ...head("boolean"), kind: "boolean" };
         case "date": {
             const stamp = property.autoValue === "on_create" ? "create" as const : property.autoValue === "on_update" ? "update" as const : undefined;
-            return compact({ ...base, kind: "date" as const, stamp });
+            return compact({ ...head("date"), kind: "date" as const, validate: nodeRules(property, "date", served), stamp });
         }
-        case "geopoint": return { ...base, kind: "geopoint" };
-        case "map":
-            if (!property.properties || property.keyValue) return { ...base, kind: "unknown" };
-            return { ...base, kind: "object", fields: jsonFieldsOf(property.properties, property.propertiesOrder) };
+        case "geopoint": return { ...head("geopoint"), kind: "geopoint" };
+        case "map": {
+            if (!property.properties || property.keyValue) return { ...head("unknown"), kind: "unknown" };
+            const servedObject = served?.kind === "object" ? served : undefined;
+            return compact({
+                ...head("object"),
+                kind: "object" as const,
+                fields: jsonFieldsOf(property.properties, property.propertiesOrder, servedObject?.fields),
+                additional: servedObject?.additional
+            });
+        }
         case "array": {
+            const servedArray = served?.kind === "array" ? served : undefined;
+            const validate = nodeRules(property, "array", served);
             if (property.oneOf) {
-                return {
-                    ...base,
-                    kind: "array",
+                const servedVariants = servedArray?.of.kind === "oneOf" ? servedArray.of.variants : undefined;
+                return compact({
+                    ...head("array"),
+                    kind: "array" as const,
+                    validate,
                     of: {
-                        kind: "oneOf",
+                        kind: "oneOf" as const,
                         typeField: property.oneOf.typeField ?? "type",
                         valueField: property.oneOf.valueField ?? "value",
-                        variants: jsonFieldsOf(property.oneOf.properties, property.oneOf.propertiesOrder)
+                        variants: jsonFieldsOf(property.oneOf.properties, property.oneOf.propertiesOrder, servedVariants)
                     }
-                };
+                });
             }
             const item = Array.isArray(property.of) ? undefined : property.of;
-            return { ...base, kind: "array", of: item ? jsonShapeOf(item) : { kind: "unknown" } };
+            return compact({
+                ...head("array"),
+                kind: "array" as const,
+                validate,
+                of: item ? jsonShapeOf(withoutItemUniqueness(item), servedArray?.of) : { kind: "unknown" as const }
+            });
         }
         default:
-            return { ...base, kind: "unknown" };
+            return { ...head("unknown"), kind: "unknown" };
     }
 }
 
-function jsonFieldsOf(properties: Properties, order: readonly string[] | undefined): Record<string, JsonShape> {
+/** Whether an array item's field carries the `uniqueInArray` mark of its array's `uniqueBy`. */
+function marksUniqueBy(field: Property): boolean {
+    return field.type !== "array" && field.validation !== undefined
+        && "uniqueInArray" in field.validation && field.validation.uniqueInArray === true;
+}
+
+/**
+ * An array's item without the `uniqueInArray` marks `uniqueBy` put on its
+ * fields: those are the array's rule ({@link nodeRules}), not the fields'.
+ */
+function withoutItemUniqueness(item: Property): Property {
+    if (item.type !== "map" || !item.properties) return item;
+    const properties: Properties = {};
+    for (const [key, field] of Object.entries(item.properties)) {
+        if (!marksUniqueBy(field) || field.validation === undefined || !("uniqueInArray" in field.validation)) {
+            properties[key] = field;
+            continue;
+        }
+        const { uniqueInArray: _unique, ...validation } = field.validation;
+        void _unique;
+        properties[key] = Object.assign({}, field, { validation });
+    }
+    return { ...item, properties };
+}
+
+function jsonFieldsOf(properties: Properties, order: readonly string[] | undefined, served: Record<string, JsonShape> | undefined): Record<string, JsonShape> {
     const keys = [...(order ?? []).filter(key => key in properties), ...Object.keys(properties).filter(key => !order?.includes(key))];
     const out: Record<string, JsonShape> = {};
-    for (const key of keys) out[key] = jsonShapeOf(properties[key]);
+    for (const key of keys) out[key] = jsonShapeOf(properties[key], served?.[key]);
     return out;
 }
 
@@ -524,7 +638,10 @@ export function wireColumnFromProperty(key: string, property: Property, base?: W
     if (stamp) out.stamp = stamp;
     else if (base?.stamp && property.type !== "date" && property.type !== "string") out.stamp = base.stamp;
 
-    const validate = validateOf(property, type);
+    // A document's rules are its shape's (below); the column's own, which the
+    // form does not show, are kept as served.
+    const isDocument = type.kind === "json" || type.kind === "jsonb";
+    const validate = isDocument ? base?.validate : validateOf(property, type);
     if (validate) out.validate = validate;
 
     // Enum values on a non-enum column are `.oneOf()`.
@@ -556,10 +673,16 @@ export function wireColumnFromProperty(key: string, property: Property, base?: W
             if (Object.keys(element).length > 1) out.element = element;
         }
     }
-    if (type.kind === "json" || type.kind === "jsonb") {
+    if (isDocument) {
         const shaped = (property.type === "map" && property.properties && !property.keyValue) || property.type === "array";
         if (shaped) {
-            const shape = jsonShapeOf(property);
+            const servedShape = sameType ? base?.json : undefined;
+            // The document's own description and required flag are the
+            // served node's: the property's are the column's.
+            const shape = nodeShape(property, servedShape, compact({
+                description: servedShape?.description,
+                required: servedShape?.required ? true as const : undefined
+            }));
             // A shape the editor reads the same way as the served one is the
             // served one: its nested hooks and defaults stay as written.
             out.json = sameType && base?.json && JSON.stringify(stripShape(base.json)) === JSON.stringify(stripShape(shape)) ? base.json : shape;

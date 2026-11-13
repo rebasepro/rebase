@@ -17,6 +17,7 @@ import {
 
 import { collectionFromTable } from "../../src/tables";
 import { splitEdit, SplitEditError, sameValue } from "../../src/collection_editor/split_edit";
+import { wireColumnOfDescriptor } from "../../src/collection_editor/property_column";
 import { column, posts, rules, table, tags, users, uuidId } from "../tables/fixtures";
 import { productsCollectionTemplate } from "../../src/collection_editor/ui/collection_editor/templates/products_template";
 import { blogCollectionTemplate } from "../../src/collection_editor/ui/collection_editor/templates/blog_template";
@@ -431,5 +432,44 @@ describe("the partition", () => {
     it("sameValue compares deeply", () => {
         expect(sameValue({ a: [1, { b: 2 }] }, { a: [1, { b: 2 }], c: undefined })).toBe(true);
         expect(sameValue({ a: 1 }, { a: 2 })).toBe(false);
+    });
+});
+
+describe("a JSON document column keeps the rules the editor did not change", () => {
+    // Every nested rule a JSON shape can state: array bounds, unique items,
+    // `uniqueBy`, nested required fields, string, number and date rules, a
+    // nested default, a user stamp, an open object.
+    const lines = column("lines", { kind: "jsonb" }, {
+        json: {
+            kind: "array",
+            validate: { minItems: 1, maxItems: 20, uniqueBy: ["sku"] },
+            of: {
+                kind: "object",
+                additional: true,
+                fields: {
+                    sku: { kind: "string", required: true, validate: { min: 3, max: 12, matches: "^[A-Z0-9-]+$", requiredMessage: "Every line needs a SKU" } },
+                    quantity: { kind: "number", required: true, default: 1, validate: { min: 1, integer: true } },
+                    note: { kind: "string", validate: { trim: true } },
+                    addedBy: { kind: "string", stamp: "createUser", semantic: "user" },
+                    shipBy: { kind: "date", validate: { min: "2020-01-01T00:00:00.000Z" } },
+                    labels: { kind: "array", of: { kind: "string" }, validate: { uniqueItems: true, maxItems: 5 } }
+                }
+            }
+        }
+    });
+    const orders = table("orders", { columns: [uuidId(), lines] });
+
+    it("a label change alone sends no schema edit", () => {
+        const result = edit(orders, after => { after.properties.lines.name = "Order lines"; });
+        expect(result.schema).toEqual([]);
+    });
+
+    it("a schema edit of the column carries its JSON shape unchanged", () => {
+        const result = edit(orders, after => { after.properties.lines.description = "What was ordered"; });
+        expect(result.schema).toHaveLength(1);
+        const [patch] = result.schema;
+        expect(patch.op).toBe("changeColumn");
+        if (patch.op !== "changeColumn") return;
+        expect(patch.column).toEqual({ ...wireColumnOfDescriptor(lines), description: "What was ordered" });
     });
 });
