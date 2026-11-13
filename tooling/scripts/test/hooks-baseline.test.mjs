@@ -5,7 +5,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bankable, compareToBaseline, lintTolerantly } from "../check-hooks-baseline.mjs";
+import { bankable, compareToBaseline, findingKey, lintTolerantly } from "../check-hooks-baseline.mjs";
 
 const RULE_MSG = "React Hook useEffect has a missing dependency: 'x'.";
 
@@ -53,4 +53,11 @@ test("a file that vanishes mid-lint is skipped and the lint re-run without it", 
 test("any other lint error still fails loudly", async () => {
     const makeEslint = () => ({ async lintFiles() { throw new Error("config is broken"); } });
     await assert.rejects(lintTolerantly(makeEslint, ["."]), /config is broken/);
+});
+
+test("a message that names a line is keyed without it, so an edit above it is not a new finding", () => {
+    const at = (line) => `The 'x' conditional could make the dependencies of useMemo Hook (at line ${line}) change on every render.`;
+    assert.equal(findingKey("a.tsx", at(305)), findingKey("a.tsx", at(307)));
+    assert.equal(findingKey("a.tsx", at(305)), "a.tsx::The 'x' conditional could make the dependencies of useMemo Hook change on every render.");
+    assert.equal(findingKey("a.tsx", RULE_MSG), `a.tsx::${RULE_MSG}`);
 });

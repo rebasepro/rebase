@@ -30,7 +30,10 @@
  * Keyed on `file + message`, never the line number. The message names the
  * dependencies, so it identifies the finding; line numbers move whenever
  * anything above them is edited, and a baseline that churns on unrelated edits
- * is one people regenerate blindly, which defeats it.
+ * is one people regenerate blindly, which defeats it. One message class names
+ * a line itself — "could make the dependencies of useMemo Hook (at line 305)
+ * change" — so that reference is dropped from the key ({@link findingKey}): a
+ * two-line edit above it read as one new finding and one fixed.
  *
  *     pnpm check:hooks            # verify
  *     pnpm check:hooks --update   # bank the current state
@@ -83,6 +86,17 @@ export async function lintTolerantly(makeEslint, patterns, { root = ROOT, maxRet
 }
 
 /**
+ * The baseline key of a finding: its file and its message, without the
+ * "(at line N)" some messages carry, so the key never holds a line number.
+ *
+ * @param {string} file the file, relative to the repository root
+ * @param {string} message eslint's message
+ */
+export function findingKey(file, message) {
+    return `${file}::${message.replace(/ \(at line \d+\)/g, "")}`;
+}
+
+/**
  * Compare current findings with the banked baseline.
  *
  * `fileExists(file)` decides whether a removed site's file is gone altogether,
@@ -127,7 +141,7 @@ async function main() {
         const rel = path.relative(ROOT, result.filePath);
         for (const message of result.messages) {
             if (message.ruleId !== RULE) continue;
-            const key = `${rel}::${message.message}`;
+            const key = findingKey(rel, message.message);
             const entry = found.get(key) ?? { count: 0,
     lines: [] };
             entry.count += 1;
