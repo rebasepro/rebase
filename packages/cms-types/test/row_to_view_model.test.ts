@@ -1,4 +1,5 @@
-import { type CollectionConfig, EntityReference, EntityRelation } from "@rebasepro/types";
+import { EntityReference, EntityRelation } from "@rebasepro/types";
+import { type CollectionConfig } from "@rebasepro/cms-types";
 import { rowToViewModel } from "../src/data/collection_view_model";
 
 /**

@@ -10,7 +10,8 @@ import { buildValidation } from "./builders/validation_builder";
 import { buildReferenceProperty } from "./builders/reference_property_builder";
 import { extractEnumFromValues, mergeDeep, prettifyIdentifier, resolveEnumValues } from "./util";
 import { readNumberExactly } from "./numbers";
-import { DataType, EnumValues, Properties, Property, StringProperty, Vector } from "@rebasepro/types";
+import { Vector } from "@rebasepro/types";
+import { DataType, EnumValues, Properties, Property, StringProperty } from "@rebasepro/cms-types";
 
 export type InferenceTypeBuilder = (value: unknown) => DataType;
 

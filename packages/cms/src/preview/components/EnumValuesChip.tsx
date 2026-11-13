@@ -1,7 +1,6 @@
 import React from "react";
 import { Chip } from "@rebasepro/ui";
-import { EnumValues } from "@rebasepro/types";
-import { getLabelOrConfigFrom, enumToObjectEntries } from "@rebasepro/cms-types";
+import { getLabelOrConfigFrom, enumToObjectEntries, EnumValues } from "@rebasepro/cms-types";
 import { buildEnumLabel, getColorScheme } from "@rebasepro/app";
 
 export interface EnumValuesChipProps {

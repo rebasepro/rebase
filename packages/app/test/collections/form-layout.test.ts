@@ -1,5 +1,4 @@
-import type { AdminCollection } from "@rebasepro/cms-types";
-import type { PostgresProperties, Property } from "@rebasepro/types";
+import type { AdminCollection, PostgresProperties, Property } from "@rebasepro/cms-types";
 import {
     isIdPropertyEditable,
     pairCompactFields,

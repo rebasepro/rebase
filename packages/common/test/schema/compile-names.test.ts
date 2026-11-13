@@ -15,8 +15,7 @@ import {
     deriveTargetForeignKey,
     deriveViaWritable
 } from "../../src/schema/derive-names";
-import { getTableName } from "../../src/util/relations";
-import { resolveRelation } from "../../src/util/resolve-relation";
+import { legacyTableName as getTableName, resolveLegacyRelation as resolveRelation } from "../../src/migrate";
 
 /**
  * The compiler's derived names, against the legacy pipeline's.

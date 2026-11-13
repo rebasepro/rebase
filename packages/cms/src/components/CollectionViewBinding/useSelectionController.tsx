@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import type { CollectionConfig, Entity } from "@rebasepro/types";
-import type { EntitySelection, EntitySelectionController, SelectionController, SelectionQuery } from "@rebasepro/cms-types";
+import type { Entity } from "@rebasepro/types";
+import type { EntitySelection, EntitySelectionController, SelectionController, SelectionQuery, CollectionConfig } from "@rebasepro/cms-types";
 import { selectionControllerOf } from "@rebasepro/app";
 
 /**

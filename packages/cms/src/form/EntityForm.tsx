@@ -2,7 +2,6 @@
 import type { FormContext } from "../types/fields";
 import React, { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
-import type { Properties, Property } from "@rebasepro/types";
 import type { EntityFormProps } from "../types/components/EntityFormProps";
 import { deepEqual as equal } from "fast-equals";
 
@@ -15,7 +14,7 @@ import { useAuthController, useCustomizationController, useTranslation } from "@
 
 import { getFormFieldKeys, resolveFormLayout } from "@rebasepro/app";
 import type { ResolvedFormField, ResolvedFormLayout } from "@rebasepro/app";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Properties, Property } from "@rebasepro/cms-types";
 import { Alert, Button, CircularProgressCenter, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
 import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
 

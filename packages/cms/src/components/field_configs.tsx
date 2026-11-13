@@ -1,7 +1,6 @@
 
 import type { DefaultFieldConfig } from "../types/fields";
-import type { Property } from "@rebasepro/types";
-import type { PropertyConfig } from "@rebasepro/cms-types";
+import type { PropertyConfig, Property } from "@rebasepro/cms-types";
 import { ArrayCustomShapedFieldBinding } from "../form/field_bindings/ArrayCustomShapedFieldBinding";
 import { ArrayOfReferencesFieldBinding } from "../form/field_bindings/ArrayOfReferencesFieldBinding";
 import { BlockFieldBinding } from "../form/field_bindings/BlockFieldBinding";

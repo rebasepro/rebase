@@ -1,5 +1,5 @@
-import type { PostgresCollectionConfig } from "@rebasepro/types";
-import { getTableName } from "./relations";
+import type { PostgresCollectionConfig } from "../src/types/collections";
+import { getTableName } from "../src/util/collection_relations";
 
 /**
  * `table` was required on the type while `getTableName()` had always derived it

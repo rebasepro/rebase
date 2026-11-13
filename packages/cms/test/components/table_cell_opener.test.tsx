@@ -4,8 +4,8 @@
 import React from "react";
 import { beforeAll, describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import type { ArrayProperty, BooleanProperty, DateProperty, Entity, NumberProperty, Property, StringProperty } from "@rebasepro/types";
-import type { SelectedCellProps } from "@rebasepro/cms-types";
+import type { Entity } from "@rebasepro/types";
+import type { SelectedCellProps, ArrayProperty, BooleanProperty, DateProperty, NumberProperty, Property, StringProperty } from "@rebasepro/cms-types";
 import type { DataCollectionTableController } from "@rebasepro/app";
 
 /**

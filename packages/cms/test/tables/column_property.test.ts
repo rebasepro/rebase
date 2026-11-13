@@ -4,7 +4,8 @@
  * so a projection that names the wrong facts fails here, not in a browser.
  */
 import { describe, expect, it } from "@jest/globals";
-import type { ColumnDescriptor, ColumnType, Property } from "@rebasepro/types";
+import type { ColumnDescriptor, ColumnType } from "@rebasepro/types";
+import type { Property } from "@rebasepro/cms-types";
 import { getColorSchemeForKey, getColorSchemeForSeed } from "@rebasepro/ui";
 import { isReadOnly } from "@rebasepro/app";
 import { getDefaultFieldId } from "../../src/components/field_ids";

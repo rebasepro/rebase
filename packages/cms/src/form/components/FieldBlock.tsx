@@ -1,5 +1,4 @@
-import type { Property } from "@rebasepro/types";
-import type { PropertySpan } from "@rebasepro/cms-types";
+import type { PropertySpan, Property } from "@rebasepro/cms-types";
 import React from "react";
 import { cls, ErrorBoundary, Typography } from "@rebasepro/ui";
 import { isReadOnly } from "@rebasepro/app";

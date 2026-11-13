@@ -4,7 +4,7 @@
 import React from "react";
 import { beforeAll, describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { EnumValueConfig } from "@rebasepro/types";
+import type { EnumValueConfig } from "@rebasepro/cms-types";
 
 /**
  * What a filter value typed by hand turns into.

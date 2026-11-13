@@ -30,19 +30,23 @@
  */
 import {
     DEFAULT_DATA_SOURCE_KEY,
-    type CollectionConfig,
     type RestFetchService
 } from "@rebasepro/types";
+import {
+    type CollectionConfig
+} from "@rebasepro/cms-types";
 import type { CmsDataDriver, CmsDeleteProps, CmsFetchCollectionProps, CmsFetchOneProps, CmsSaveProps } from "@rebasepro/cms-types";
 import {
     buildCompositeId,
-    fieldKeyForColumn,
     getDeclaredPrimaryKeys,
     numericKeyPart,
-    resolveCollectionRelations,
     resolvePrimaryKeys,
     type PrimaryKeyInfo
 } from "@rebasepro/common";
+import {
+    fieldKeyForColumn,
+    resolveCollectionRelations
+} from "@rebasepro/cms-types";
 import { toWireRow } from "@rebasepro/app";
 import { isRecord, type ToolResult } from "./bridge";
 

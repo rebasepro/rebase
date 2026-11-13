@@ -10,7 +10,7 @@
 
 import { resourceKeyOf } from "@rebasepro/types";
 import { serializeRegExp } from "@rebasepro/utils";
-import { isRelationalCollectionConfig, type Relation, type ArrayProperty, type BinaryProperty, type BooleanProperty, type DateProperty, type GeopointProperty, type MapProperty, type NumberProperty, type Properties, type Property, type ReferenceProperty, type RelationProperty, type StorageConfig, type StringProperty, type VectorProperty } from "@rebasepro/types";
+import { isRelationalCollectionConfig, type Relation, type ArrayProperty, type BinaryProperty, type BooleanProperty, type DateProperty, type GeopointProperty, type MapProperty, type NumberProperty, type Properties, type Property, type ReferenceProperty, type RelationProperty, type StorageConfig, type StringProperty, type VectorProperty } from "@rebasepro/cms-types";
 import type { AdminPropertyOptions } from "@rebasepro/cms-types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 

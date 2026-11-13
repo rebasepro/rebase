@@ -1,7 +1,6 @@
 import { renderHook } from "@testing-library/react";
 import { resetDeprecationWarningsForTests } from "@rebasepro/common";
-import type { Properties, StringProperty } from "@rebasepro/types";
-import type { EntityTableController } from "@rebasepro/cms-types";
+import type { EntityTableController, Properties, StringProperty } from "@rebasepro/cms-types";
 import { mapPropertiesToConfigs, mapPropertyToConfig } from "../../src/util/propertyConfigMapper";
 import { createStaticDataController, useCollectionDataController } from "../../src/util/dataControllerAdapter";
 import { fakeTableController } from "../helpers/fakes";

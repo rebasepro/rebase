@@ -1,8 +1,9 @@
 import {
     getRelationFrom,
-    traverseValueProperty
+    traverseValueProperty,
+    Property
 } from "@rebasepro/cms-types";
-import { EntityRelation, type Entity, Property } from "@rebasepro/types";
+import { EntityRelation, type Entity } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
 // getRelationFrom

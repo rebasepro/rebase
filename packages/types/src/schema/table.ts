@@ -6,7 +6,7 @@ import type {
     AuthCollectionContext,
     AuthCollectionCreateResult,
     AuthCollectionResetResult
-} from "../types/collections";
+} from "../types/auth_hooks";
 import type { ColumnsShape } from "./columns";
 import { isColumnBuilder } from "./columns";
 import type { RelationsShape } from "./relations";

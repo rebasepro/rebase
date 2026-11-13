@@ -6,7 +6,7 @@
  * This is the bridge between the entity-aware and headless layers.
  */
 
-import type { Property, Properties, EnumValues, EnumValueConfig } from "@rebasepro/types";
+import type { Property, Properties, EnumValues, EnumValueConfig } from "@rebasepro/cms-types";
 import type { CollectionPropertyConfig, CollectionEnumValueConfig } from "@rebasepro/ui";
 import { prettifyIdentifier } from "@rebasepro/utils";
 import { warnDeprecated } from "@rebasepro/common";

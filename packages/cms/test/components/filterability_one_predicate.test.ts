@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import type { DataType, Property } from "@rebasepro/types";
+import type { DataType, Property } from "@rebasepro/cms-types";
 import { resolveFilterOperators } from "@rebasepro/app";
 
 import { propertiesToColumns } from "../../src/components/CollectionTableBinding/column_utils";

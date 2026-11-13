@@ -10,7 +10,7 @@
  */
 import { buildSdkData } from "@rebasepro/common";
 import { createCallContext, defineCron, defineFunction, rebase } from "@rebasepro/server";
-import type { CollectionCallbacks, DataDriver, RebaseSdkData, RegisteredDatabase } from "@rebasepro/types";
+import type { TableHooks, DataDriver, RebaseSdkData, RegisteredDatabase } from "@rebasepro/types";
 
 import type { Database } from "../src/typed-sdk/database.types";
 
@@ -20,7 +20,7 @@ const assertType = <T extends true>(): T | undefined => undefined;
 assertType<Equal<RegisteredDatabase, Database>>();
 
 /** A collection callback: `context.data` is typed, without naming the type. */
-export const callbacks: CollectionCallbacks = {
+export const callbacks: TableHooks = {
     async beforeSave({ context, values }) {
         const author = await context.data.authors.findById(1);
         // A typed row: `name` is a `string`, not `unknown`.
@@ -110,7 +110,7 @@ export const cron = defineCron({
  */
 const publishedCount = (data: RebaseSdkData<RegisteredDatabase>): Promise<number> | undefined =>
     data.posts.count?.({ where: { status: ["==", "published"] } });
-export const helperProbes: CollectionCallbacks = {
+export const helperProbes: TableHooks = {
     async afterSave({ context }) {
         await publishedCount(context.data);
         await publishedCount(rebase.dataAsAdmin);

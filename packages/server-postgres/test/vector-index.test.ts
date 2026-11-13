@@ -10,7 +10,8 @@
  *    database in the field carries whichever one created it;
  *  - a column too wide for pgvector is skipped rather than thrown, and says so.
  */
-import { CollectionConfig, PostgresCollectionConfig, col, defineTable, type VectorIndexOptions } from "@rebasepro/types";
+import { col, defineTable, type VectorIndexOptions } from "@rebasepro/types";
+import { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { compileSchema } from "@rebasepro/common";
 import {
     buildTableVectorColumnSpecs,
@@ -25,7 +26,7 @@ import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { planTableSchemaEnsure } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
-const collection = (properties: Record<string, unknown>, extra: Record<string, unknown> = {}): CollectionConfig =>
+const collection = (properties: Record<string, unknown>, extra: Record<string, unknown> = {}): LegacyCollectionConfig =>
     ({
         slug: "documents",
         name: "Documents",
@@ -40,7 +41,7 @@ const vector = (over: Record<string, unknown> = {}) =>
     ({ type: "vector", name: "Embedding", dimensions: 1536, ...over });
 
 /** The plan of a legacy fixture, lifted and compiled as the backend runs it. */
-const plan = (c: CollectionConfig) => buildTableVectorIndexPlan(compileSet([c])[0].descriptor);
+const plan = (c: LegacyCollectionConfig) => buildTableVectorIndexPlan(compileSet([c])[0].descriptor);
 
 describe("buildTableVectorIndexPlan", () => {
     it("indexes cosine by default, because that is what vectorSearch defaults to", () => {
@@ -102,8 +103,8 @@ describe("buildTableVectorIndexPlan", () => {
         const c = collection(
             { embedding: vector({ columnName: "vec" }) },
             { schema: "app" }
-        ) as PostgresCollectionConfig;
-        const [spec] = plan(c as CollectionConfig).specs;
+        ) as LegacyPostgresCollectionConfig;
+        const [spec] = plan(c as LegacyCollectionConfig).specs;
         expect(spec.column).toBe("vec");
         expect(spec.schema).toBe("app");
         expect(spec.indexName).toBe("documents_vec_hnsw_cosine");

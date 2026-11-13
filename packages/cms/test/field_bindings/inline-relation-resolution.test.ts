@@ -1,4 +1,4 @@
-import type { CollectionConfig, RelationProperty } from "@rebasepro/types";
+import type { CollectionConfig, RelationProperty } from "@rebasepro/cms-types";
 import { resolveRelationProperty } from "@rebasepro/cms-types";
 
 /**

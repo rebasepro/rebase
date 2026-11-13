@@ -5,7 +5,7 @@ import { useTranslation } from "@rebasepro/app";
 import { deepEqual as equal } from "fast-equals"
 
 ;
-import { EnumValueConfig, EnumValues } from "@rebasepro/types";
+import { EnumValueConfig, EnumValues } from "@rebasepro/cms-types";
 import { ArrayContainer, ArrayEntryParams } from "../../_cms_internals";
 import {
     Badge,

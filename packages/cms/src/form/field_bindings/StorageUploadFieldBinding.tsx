@@ -1,8 +1,8 @@
 import type { FieldProps } from "../../types/fields";
-import type { ArrayProperty, StringProperty } from "@rebasepro/types";
+import type { ArrayProperty, StringProperty } from "@rebasepro/cms-types";
 import React, { useCallback, useState } from "react";
 
-import { StorageConfig } from "@rebasepro/types";
+import { StorageConfig } from "@rebasepro/cms-types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { useDropzone } from "react-dropzone";
 import { FieldHelperText } from "../components/FieldHelperText";

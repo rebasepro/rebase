@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import { getEntitySchema } from "../../src/form/validation";
-import type { Properties } from "@rebasepro/types";
+import type { Properties } from "@rebasepro/cms-types";
 
 /**
  * A `oneOf` array (blocks) declares a property per block type. Each block's

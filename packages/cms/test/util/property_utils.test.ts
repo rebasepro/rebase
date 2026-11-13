@@ -10,7 +10,7 @@ import {
     getPropertiesWithPropertiesOrder,
     getDefaultPropertiesOrder
 } from "../../src/util/property_utils";
-import type { Property, CollectionConfig, Properties, MapProperty } from "@rebasepro/types";
+import type { Property, CollectionConfig, Properties, MapProperty } from "@rebasepro/cms-types";
 import { fakeCollection } from "../helpers/fakes";
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 import { User as FirebaseUser } from "firebase/auth";
 import { FirebaseApp } from "firebase/app";
-import { CollectionConfig } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/cms-types";
 
 export type FirestoreTextSearchControllerBuilder = (props: {
     firebaseApp: FirebaseApp;

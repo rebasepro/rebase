@@ -4,8 +4,8 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { FilterValues, Properties } from "@rebasepro/types";
-import type { EntityTableController } from "@rebasepro/cms-types";
+import type { FilterValues } from "@rebasepro/types";
+import type { EntityTableController, Properties } from "@rebasepro/cms-types";
 
 /**
  * A collection's `fixedFilter` scopes the view; the user's filters combine with

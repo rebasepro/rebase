@@ -1,5 +1,5 @@
 
-import type { Properties } from "@rebasepro/types";
+import type { Properties } from "@rebasepro/cms-types";
 import React, { useState } from "react";
 import {
     AlertTriangleIcon,

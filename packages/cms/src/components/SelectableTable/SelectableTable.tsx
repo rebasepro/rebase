@@ -1,5 +1,6 @@
 import { createSelectionStore, AdminSelectedCell } from "./SelectionStore";
-import type { Property, WhereFilterOp } from "@rebasepro/types";
+import type { WhereFilterOp } from "@rebasepro/types";
+import type { Property } from "@rebasepro/cms-types";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { Entity, FilterValues } from "@rebasepro/types";
 import { CollectionSize, EntityTableController, SelectedCellProps, AdminCollection } from "@rebasepro/cms-types";

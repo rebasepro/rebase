@@ -19,8 +19,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen } from "@testing-library/react";
-import type { Entity, PostgresProperties, PostgresProperty } from "@rebasepro/types";
-import type { AdminCollection, EntityCustomViewParams, FormContext, TableCustomizationOptions } from "@rebasepro/cms-types";
+import type { Entity } from "@rebasepro/types";
+import type { AdminCollection, EntityCustomViewParams, FormContext, TableCustomizationOptions, PostgresProperties, PostgresProperty } from "@rebasepro/cms-types";
 import { col, defineTable } from "@rebasepro/types";
 import { compileTables } from "@rebasepro/common";
 

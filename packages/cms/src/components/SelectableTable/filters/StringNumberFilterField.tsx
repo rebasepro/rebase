@@ -10,7 +10,7 @@ import {
     VirtualTableWhereFilterOp,
     XIcon
 } from "@rebasepro/ui";
-import { EnumValueConfig } from "@rebasepro/types";
+import { EnumValueConfig } from "@rebasepro/cms-types";
 import { useTranslation } from "@rebasepro/app";
 
 interface StringNumberFilterFieldProps {

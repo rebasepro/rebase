@@ -10,8 +10,7 @@
  * that id, and a failed save only reached the console.
  */
 import React from "react";
-import type { EnumValueConfig } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, EnumValueConfig } from "@rebasepro/cms-types";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 

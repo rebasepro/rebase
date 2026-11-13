@@ -1,5 +1,4 @@
 import type {
-    CollectionConfig,
     DataDriver,
     DeleteProps,
     FetchCollectionProps,
@@ -8,6 +7,9 @@ import type {
     ListenOneProps,
     SaveProps
 } from "@rebasepro/types";
+import type {
+    CollectionConfig
+} from "../types/collections";
 
 /**
  * The admin panel's data calls, as a CMS data source receives them.

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "@jest/globals";
-import { CollectionConfig, Entity, FindParams, FindResponse, FindResult, resolveClientListLimit } from "@rebasepro/types";
+import { Entity, FindParams, FindResponse, FindResult, resolveClientListLimit } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/cms-types";
 import type { EntitySelection, RowSelection, SelectionQuery } from "@rebasepro/cms-types";
 import {
     MAX_SELECTION_ROWS,

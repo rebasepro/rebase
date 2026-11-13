@@ -3,7 +3,6 @@ import { act, render, waitFor } from "@testing-library/react";
 import {
     type AggregateParams,
     type AggregateResult,
-    type CollectionConfig,
     type DataDriver,
     type FetchCollectionProps,
     type FindParams,
@@ -12,6 +11,9 @@ import {
     type RebaseData,
     unsupportedMethod
 } from "@rebasepro/types";
+import {
+    type CollectionConfig
+} from "@rebasepro/cms-types";
 import { Rebase } from "../src/core/Rebase";
 import { CollectionResolverRegistrationContext } from "../src/contexts/CollectionResolverContext";
 import { useData } from "../src/hooks/data/useData";

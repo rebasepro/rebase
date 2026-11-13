@@ -5,8 +5,8 @@
 import { describe, expect, it } from "@jest/globals";
 import type { Entity, SecurityOperation, User } from "@rebasepro/types";
 import { col, defineAuthTable, defineTable, rel } from "@rebasepro/types";
-import { compileTables, resolveCollectionRelations } from "@rebasepro/common";
-import { checkOperation, getEntityChildViews } from "@rebasepro/cms-types";
+import { compileTables } from "@rebasepro/common";
+import { checkOperation, getEntityChildViews, resolveCollectionRelations } from "@rebasepro/cms-types";
 import { getDefaultFieldId } from "../../src/components/field_ids";
 import { collectionsFromTables } from "../../src/tables";
 

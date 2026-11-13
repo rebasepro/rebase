@@ -17,8 +17,7 @@
  * `undefined`, renders the same thing under every field on the form.
  */
 import React from "react";
-import type { Property } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Property } from "@rebasepro/cms-types";
 import { describe, expect, test, jest, beforeEach } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
 

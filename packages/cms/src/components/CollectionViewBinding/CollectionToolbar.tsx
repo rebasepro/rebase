@@ -1,5 +1,5 @@
 import React from "react";
-import { getCollectionDataPath } from "@rebasepro/types";
+import { getCollectionDataPath } from "@rebasepro/cms-types";
 import { useTranslation } from "@rebasepro/app";
 import { SearchBar } from "@rebasepro/ui";
 import { CollectionTableToolbar, useToolbarLabels } from "../CollectionTableBinding/internal/CollectionTableToolbar";

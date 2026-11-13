@@ -1,12 +1,14 @@
 import {
     ALL_WHERE_FILTER_OPS,
-    DataType,
     DEFAULT_FILTERABLE_RELATION_KINDS,
     getDataSourceCapabilities,
-    Property,
-    RelationProperty,
     WhereFilterOp
 } from "@rebasepro/types";
+import {
+    DataType,
+    Property,
+    RelationProperty
+} from "@rebasepro/cms-types";
 
 /**
  * Default operators offered per property type, before engine capabilities and

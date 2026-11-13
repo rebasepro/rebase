@@ -8,7 +8,7 @@
  * project's functions, crons and callbacks already look like.
  */
 import { defineCron, defineFunction, rebase } from "@rebasepro/server";
-import type { CollectionCallbacks, RebaseSdkData, RegisteredDatabase } from "@rebasepro/types";
+import type { TableHooks, RebaseSdkData, RegisteredDatabase } from "@rebasepro/types";
 
 import type { Database } from "./typed-sdk/database.types";
 
@@ -18,7 +18,7 @@ const assertType = <T extends true>(): T | undefined => undefined;
 assertType<Equal<RegisteredDatabase, unknown>>();
 
 /** A callback's `context.data` is the untyped data object it always was. */
-export const callbacks: CollectionCallbacks = {
+export const callbacks: TableHooks = {
     async beforeSave({ context, values }) {
         assertType<Equal<typeof context.data, RebaseSdkData>>();
         const { data: rows } = await context.data.anyCollection.find({ where: { anyColumn: ["==", 1] } });

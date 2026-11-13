@@ -1,15 +1,15 @@
 import React, { Suspense } from "react";
 import {
-    ArrayProperty,
-    Property,
-    ReferenceProperty,
     EntityRelation,
-    RelationProperty,
     WhereFilterOp
 } from "@rebasepro/types";
 import {
     FilterFieldBindingProps,
-    enumToObjectEntries
+    enumToObjectEntries,
+    ArrayProperty,
+    Property,
+    ReferenceProperty,
+    RelationProperty
 } from "@rebasepro/cms-types";
 import { normalizeToEntityRelation } from "@rebasepro/common";
 import { resolveFilterOperators } from "@rebasepro/app";

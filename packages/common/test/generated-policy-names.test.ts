@@ -1,6 +1,6 @@
 import { getGeneratedPolicyNames } from "./helpers/legacy-policies";
 import { getPolicyNamesForRules } from "@rebasepro/utils";
-import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 
 /**
  * Which live policies did the codebase produce?
@@ -19,7 +19,7 @@ import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/type
  * generated is called drift, and something hand-written still is.
  */
 
-function collection(overrides: Partial<PostgresCollectionConfig> = {}): CollectionConfig {
+function collection(overrides: Partial<LegacyPostgresCollectionConfig> = {}): LegacyCollectionConfig {
     return {
         name: "Authors",
         slug: "authors",

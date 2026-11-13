@@ -8,16 +8,19 @@
  *
  * @module
  */
-import { EntityReference, EntityRelation, type CollectionConfig } from "@rebasepro/types";
+import { EntityReference, EntityRelation } from "@rebasepro/types";
+import { type CollectionConfig } from "../types/collections";
 import { toWireKey } from "@rebasepro/utils";
 import {
     buildCompositeId,
-    fieldKeyForColumn,
-    resolveCollectionRelations,
     resolvePrimaryKeys,
     type EntityDataOptions,
     type PrimaryKeyInfo
 } from "@rebasepro/common";
+import {
+    fieldKeyForColumn,
+    resolveCollectionRelations
+} from "../util/collection_relations";
 import { routeCrossSourceReferences, storeCrossSourceReferences } from "./cross_source_references";
 
 /** A collection's config by slug — the admin's registry. */

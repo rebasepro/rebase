@@ -1,11 +1,13 @@
 import "../capabilities";
 import type {
-    AnyCollectionConfig,
-    FirebaseCollectionConfig,
     ResourceRef,
-    StrictProperties,
     User
 } from "@rebasepro/types";
+import type {
+    AnyCollectionConfig,
+    FirebaseCollectionConfig,
+    StrictProperties
+} from "@rebasepro/cms-types";
 import { resolveResourceRefs, resourceKeyOf } from "@rebasepro/types";
 import {
     FirestoreDocumentOf,

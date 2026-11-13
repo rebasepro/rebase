@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/cms-types";
 import { SelectionController, SelectionQuery } from "@rebasepro/cms-types";
 import { Checkbox, ChevronDownIcon, Menu, MenuItem, Tooltip, cls, iconSize } from "@rebasepro/ui";
 import { idOfRow, useTranslation } from "@rebasepro/app";

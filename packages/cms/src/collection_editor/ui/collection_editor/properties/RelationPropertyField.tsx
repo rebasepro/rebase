@@ -8,7 +8,8 @@ import {
     TextField,
     Typography
 } from "@rebasepro/ui";
-import { OnAction, RelationProperty, RelationKind, JoinStep } from "@rebasepro/types";
+import { OnAction, RelationKind, JoinStep } from "@rebasepro/types";
+import { RelationProperty } from "@rebasepro/cms-types";
 import {
     RELATION_KINDS,
     RELATION_KIND_ORDER,

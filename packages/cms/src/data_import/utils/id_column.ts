@@ -1,4 +1,4 @@
-import { Properties } from "@rebasepro/types";
+import { Properties } from "@rebasepro/cms-types";
 
 /**
  * The column an import uses as the row id before the user touches the mapping.

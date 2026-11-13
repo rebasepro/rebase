@@ -1,6 +1,5 @@
 import { describe, expect, jest, test } from "@jest/globals";
-import { Properties } from "@rebasepro/types";
-import { AuthController, CollectionRegistryController } from "@rebasepro/cms-types";
+import { AuthController, CollectionRegistryController, Properties } from "@rebasepro/cms-types";
 import { convertFileToJson } from "../../src/data_import/utils/file_to_json";
 import { ImportCollectionLookup, convertDataToEntity, processValueMapping } from "../../src/data_import/utils/data";
 import { fakeAuthController } from "../helpers/fakes";

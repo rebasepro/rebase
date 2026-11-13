@@ -2,9 +2,8 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { eq, SQL } from "drizzle-orm";
 import { integer, pgTable, PgDialect, PgTable, primaryKey, serial, varchar, text } from "drizzle-orm/pg-core";
 import { EntityRelation, type JoinStep, WhereFilterOp } from "@rebasepro/types";
-import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
+import { LegacyCollectionConfig, resolveLegacyRelation } from "@rebasepro/common/migrate";
 import { manyToMany, via } from "./helpers/relation-descriptors";
-import { resolveRelation } from "@rebasepro/common";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
@@ -604,14 +603,14 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
 
 
-            const m2m = resolveRelation({ kind: "manyToMany", relationName: "posts", target: () => posts }, tags);
+            const m2m = resolveLegacyRelation({ kind: "manyToMany", relationName: "posts", target: () => posts }, tags);
 
 
             expect(m2m).not.toHaveProperty("foreignKeyOnTarget");
 
 
 
-            const oneToMany = resolveRelation({ kind: "hasMany", relationName: "posts", target: () => posts }, tags);
+            const oneToMany = resolveLegacyRelation({ kind: "hasMany", relationName: "posts", target: () => posts }, tags);
 
 
             expect(oneToMany).not.toHaveProperty("through");
@@ -640,7 +639,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
         it("uses the junction the relation declares", () => {
 
-            const rel = resolveRelation({
+            const rel = resolveLegacyRelation({
 
                 kind: "manyToMany", relationName: "posts", target: () => posts,
 
@@ -659,7 +658,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
         it("derives one when the relation names none", () => {
 
-            const rel = resolveRelation({ kind: "manyToMany", relationName: "posts", target: () => posts }, tags);
+            const rel = resolveLegacyRelation({ kind: "manyToMany", relationName: "posts", target: () => posts }, tags);
 
             expect(rel.kind === "manyToMany" && rel.through.sourceColumn).toBe("tag_id");
 

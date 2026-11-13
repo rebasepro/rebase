@@ -1,7 +1,7 @@
 import { FirestoreTextSearchController, FirestoreTextSearchControllerBuilder } from "../types";
 import { FirebaseApp } from "firebase/app";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { CollectionConfig } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/cms-types";
 
 /**
  * Configuration returned by the Rebase Search Extension

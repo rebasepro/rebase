@@ -4,7 +4,8 @@
 import React from "react";
 import { beforeAll, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { EntityRelation, type Relation } from "@rebasepro/types";
+import { EntityRelation } from "@rebasepro/types";
+import { type Relation } from "@rebasepro/cms-types";
 
 /**
  * The picker shows the record its value holds, however the value got there.

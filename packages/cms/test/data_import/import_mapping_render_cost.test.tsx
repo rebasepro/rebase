@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
-import type { PostgresProperties } from "@rebasepro/types";
+import type { PostgresProperties } from "@rebasepro/cms-types";
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 

@@ -14,8 +14,7 @@
 import React from "react";
 import { describe, expect, test, jest } from "@jest/globals";
 import { render } from "@testing-library/react";
-import type { FieldProps, PluginFieldBuilderParams, RebasePlugin } from "@rebasepro/cms-types";
-import type { Property } from "@rebasepro/types";
+import type { FieldProps, PluginFieldBuilderParams, RebasePlugin, Property } from "@rebasepro/cms-types";
 
 const TheField = () => <input data-testid="the-field"/>;
 

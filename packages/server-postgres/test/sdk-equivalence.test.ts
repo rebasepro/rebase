@@ -19,10 +19,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { compileTables, toTableAccessor, type AnySchemaDef } from "@rebasepro/common";
-import { collectionsToTableDefs, type LegacyCollectionConfig } from "@rebasepro/common/migrate";
+import { collectionsToTableDefs, type LegacyCollectionConfig, isLegacyPostgresCollection } from "@rebasepro/common/migrate";
 import { generateTypedefs } from "@rebasepro/codegen";
 import {
-    isPostgresCollectionConfig,
     isRelationDef,
     isTableDef,
     isViewDef,
@@ -62,7 +61,7 @@ const INPUT_ADJUSTMENTS: { set: string; reason: string; apply: (collections: Leg
             "conversion refuses it, and it leaves `Row` and `Relations`.",
         apply: collections => {
             const authors = collections.find(c => c.slug === "authors");
-            if (!authors || !isPostgresCollectionConfig(authors)) return;
+            if (!authors || !isLegacyPostgresCollection(authors)) return;
             delete authors.properties.commentsVia;
             authors.relations = authors.relations?.filter(relation => relation.relationName !== "commentsVia");
         },

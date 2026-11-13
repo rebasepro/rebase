@@ -1,5 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
-import { CollectionRegistry } from "@rebasepro/cms-types";
+import { CollectionRegistry, CollectionConfig } from "@rebasepro/cms-types";
 import { createDataSourceRegistry } from "@rebasepro/common";
 
 describe("CollectionRegistry — data source resolution stamping", () => {

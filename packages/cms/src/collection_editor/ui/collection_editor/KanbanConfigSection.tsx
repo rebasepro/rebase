@@ -2,7 +2,7 @@
 import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useRef, useState } from "react";
 import { useAuthController, useCustomizationController, useTranslation } from "@rebasepro/app";
-import { Property } from "@rebasepro/types";
+import { Property } from "@rebasepro/cms-types";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { getFieldConfig } from "../../../components/field_configs";
 import { Button, IconButton, iconSize, Select, SelectItem, Typography, XIcon } from "@rebasepro/ui";

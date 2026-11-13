@@ -1,7 +1,9 @@
 import jsonLogic from "json-logic-js";
 import {
+    AuthState
+} from "@rebasepro/types";
+import {
     ArrayProperty,
-    AuthState,
     ConditionRule,
     EnumValueConfig,
     NumberProperty,
@@ -9,7 +11,7 @@ import {
     Property,
     ReferenceProperty,
     StringProperty
-} from "@rebasepro/types";
+} from "../types/properties";
 
 /**
  * Access a nested property from an object via dot notation.

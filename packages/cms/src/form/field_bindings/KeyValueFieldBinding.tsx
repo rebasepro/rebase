@@ -1,7 +1,7 @@
 import type { FieldProps } from "../../types/fields";
-import type { MapProperty } from "@rebasepro/types";
+import type { MapProperty } from "@rebasepro/cms-types";
 import React, { useEffect, useState } from "react";
-import { DataType, GeoPoint } from "@rebasepro/types";
+import { GeoPoint } from "@rebasepro/types";
 
 import { ArrayContainer } from "../../components/ArrayContainer";
 import { FieldHelperText } from "../components/FieldHelperText";
@@ -26,7 +26,7 @@ import {
 import { getIconForProperty } from "../../util/property_utils";
 import { useCustomizationController, useTranslation } from "@rebasepro/app";
 import { getIn } from "@rebasepro/forms";
-import { getDefaultValueFortype } from "@rebasepro/cms-types";
+import { getDefaultValueFortype, DataType } from "@rebasepro/cms-types";
 
 type MapEditViewRowState = [number, {
     key: string,

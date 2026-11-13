@@ -9,7 +9,7 @@
  * (`DefaultSelectedViewBuilder`), which was the last UI symbol any core package
  * imported.
  */
-import type { ChildViewSource, CollectionConfig } from "@rebasepro/types";
+import type { ChildViewSource, CollectionConfig } from "@rebasepro/cms-types";
 import { type AdminCollection, type DefaultSelectedViewBuilder, type DefaultSelectedViewParams, resolveAdminCollection, getEntityChildViews } from "@rebasepro/cms-types";
 
 export function resolveDefaultSelectedView(

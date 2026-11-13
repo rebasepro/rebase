@@ -1,5 +1,5 @@
 import { mapPropertiesToConfigs, mapPropertyToConfig } from "../../src/util/propertyConfigMapper";
-import type { Properties, StringProperty } from "@rebasepro/types";
+import type { Properties, StringProperty } from "@rebasepro/cms-types";
 
 /**
  * A column header has to say something, and `name` is optional on a property —

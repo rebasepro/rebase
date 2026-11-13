@@ -1,6 +1,6 @@
 import { buildReferenceProperty } from "../../src/builders/reference_property_builder";
 import type { InferencePropertyBuilderProps, ValuesCountEntry } from "../../src/types";
-import type { ReferenceProperty } from "@rebasepro/types";
+import type { ReferenceProperty } from "@rebasepro/cms-types";
 
 function makeRefValues(paths: string[]): ValuesCountEntry {
     const valuesCount = new Map<unknown, number>();

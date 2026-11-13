@@ -18,7 +18,7 @@ if (typeof window !== "undefined") {
     });
 }
 
-import { Properties } from "@rebasepro/types";
+import { Properties } from "@rebasepro/cms-types";
 import { getValueInPath } from "@rebasepro/utils";
 
 import { getSimplifiedProperties } from "../utils/properties";

@@ -1,4 +1,5 @@
-import type { CollectionConfig, Entity } from "@rebasepro/types";
+import type { Entity } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/cms-types";
 import { AdditionalFieldDelegate, ExportMappingFunction, RebaseContext } from "@rebasepro/cms-types";
 import { rowOfEntity } from "@rebasepro/app";
 

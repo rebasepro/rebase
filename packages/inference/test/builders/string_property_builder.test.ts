@@ -1,6 +1,6 @@
 import { buildStringProperty } from "../../src/builders/string_property_builder";
 import type { ValuesCountEntry } from "../../src/types";
-import type { StringProperty } from "@rebasepro/types";
+import type { StringProperty } from "@rebasepro/cms-types";
 
 function makeValuesResult(values: unknown[]): ValuesCountEntry {
     const valuesCount = new Map<unknown, number>();

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { col, defineTable } from "@rebasepro/types";
-import type { AuthState, CollectionConfig, SecurityRule, User } from "@rebasepro/types";
+import type { AuthState, SecurityRule, User } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import {
     SchemaDefinitionError,
     compileTables
@@ -23,7 +24,7 @@ function caller(roles: string[], uid = "u-1"): AuthState<User> {
 }
 const anonymous: AuthState<User> = { user: null };
 
-function table(securityRules: SecurityRule[]): CollectionConfig {
+function table(securityRules: SecurityRule[]): LegacyCollectionConfig {
     return { name: "notes", slug: "notes", table: "notes", properties: { id: { name: "id", type: "string", isId: "uuid" } }, securityRules };
 }
 

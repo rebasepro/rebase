@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { resolveCollectionRelations } from "@rebasepro/common";
+import { resolveCollectionRelations } from "@rebasepro/cms-types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**

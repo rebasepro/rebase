@@ -31,7 +31,7 @@ import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
 import pg from "pg";
 import { Hono } from "hono";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
@@ -49,7 +49,7 @@ const SERVICE_KEY = "include-field-access-e2e-service-key-0123456789abcdef";
 
 const readable = [{ operation: "select" as const, access: "public" as const }];
 
-const people: CollectionConfig = {
+const people: LegacyCollectionConfig = {
     name: "People", slug: "people", table: "people",
     securityRules: readable,
     properties: {
@@ -58,7 +58,7 @@ const people: CollectionConfig = {
     }
 };
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     name: "Tags", slug: "tags", table: "tags",
     securityRules: readable,
     properties: {
@@ -67,7 +67,7 @@ const tags: CollectionConfig = {
     }
 };
 
-const staff: CollectionConfig = {
+const staff: LegacyCollectionConfig = {
     name: "Staff", slug: "staff", table: "staff",
     securityRules: readable,
     properties: {
@@ -84,7 +84,7 @@ const staff: CollectionConfig = {
  * One relation of each shape withheld from everyone without `hr`, and one
  * readable relation beside them as the control.
  */
-const departments: CollectionConfig = {
+const departments: LegacyCollectionConfig = {
     name: "Departments", slug: "departments", table: "departments",
     securityRules: readable,
     properties: {

@@ -1,8 +1,7 @@
-import {
-    createRelationRefWithData,
-    resolveCollectionRelations
-} from "../src/util";
-import type { CollectionConfig, Entity } from "@rebasepro/types";
+import { createRelationRefWithData } from "@rebasepro/common";
+import type { Entity } from "@rebasepro/types";
+import { resolveCollectionRelations } from "../src/util/collection_relations";
+import type { CollectionConfig } from "../src/types/collections";
 
 // ─────────────────────────────────────────────────────────────
 // createRelationRefWithData

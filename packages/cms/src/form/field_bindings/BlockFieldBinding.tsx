@@ -1,5 +1,5 @@
 import type { FieldProps, FormContext, PropertyFieldBindingProps } from "../../types/fields";
-import type { ArrayProperty, Property } from "@rebasepro/types";
+import type { ArrayProperty, Property } from "@rebasepro/cms-types";
 import React, { useCallback, useEffect, useState } from "react";
 
 import { FormexController, getIn, useFormexGetter, useFormexSelector } from "@rebasepro/forms";

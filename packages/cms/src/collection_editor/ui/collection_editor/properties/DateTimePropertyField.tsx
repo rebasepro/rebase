@@ -2,7 +2,7 @@ import { FieldCaption } from "../../../_cms_internals";
 import React from "react";
 import { getIn, useFormex } from "@rebasepro/forms";
 ;
-import { NumberProperty, StringProperty } from "@rebasepro/types";
+import { NumberProperty, StringProperty } from "@rebasepro/cms-types";
 import { Select, SelectItem } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
 import { GeneralPropertyValidation } from "./validation/GeneralPropertyValidation";

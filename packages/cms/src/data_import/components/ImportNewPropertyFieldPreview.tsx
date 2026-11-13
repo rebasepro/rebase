@@ -1,6 +1,6 @@
 import React from "react";
 import { useCustomizationController, useTranslation } from "@rebasepro/app";
-import { Property } from "@rebasepro/types";
+import { Property } from "@rebasepro/cms-types";
 import { getFieldConfig } from "../../components/field_configs";
 import { PropertyConfigBadge } from "../../components/PropertyConfigBadge";
 import { ErrorBoundary, IconButton, PencilIcon, TextField } from "@rebasepro/ui";

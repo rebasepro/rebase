@@ -5,9 +5,9 @@
  * collection the projector really makes of a served table.
  */
 import { describe, expect, it } from "@jest/globals";
-import type { AdminCollection, AdminPostgresCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, AdminPostgresCollection, Property } from "@rebasepro/cms-types";
 import { FIELD_CUSTOMIZATION_KEYS, TABLE_CUSTOMIZATION_KEYS } from "@rebasepro/cms-types";
-import type { Property, SecurityRule, TableDescriptor, TablePatch } from "@rebasepro/types";
+import type { SecurityRule, TableDescriptor, TablePatch } from "@rebasepro/types";
 import {
     UI_PREFERENCE_FIELD_KEYS,
     UI_PREFERENCE_TABLE_KEYS,

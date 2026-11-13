@@ -1,6 +1,5 @@
 import React from "react";
-import type { CollectionCustomViewParams } from "@rebasepro/cms-types";
-import type { Property } from "@rebasepro/types";
+import type { CollectionCustomViewParams, Property } from "@rebasepro/cms-types";
 import { CHIP_HUES, cls, getColorSchemeForKey, Typography } from "@rebasepro/ui";
 
 /**

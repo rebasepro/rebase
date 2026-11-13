@@ -42,12 +42,30 @@
  */
 import type {
     TableDescriptor,
-    VectorDistance,
-    VectorIndexConfig,
     VectorIndexOptions,
     VectorMetric
 } from "@rebasepro/types";
 import { toPostgresIdentifier } from "@rebasepro/utils";
+
+/**
+ * A pgvector distance as the index plan names it — one operator class each,
+ * spelled the way `vectorSearch`'s `distance` spells it.
+ */
+export type VectorDistance = "cosine" | "l2" | "inner_product";
+
+/** How one column's ANN index is built: what a column's `VectorIndexOptions` resolves to. */
+export interface VectorIndexConfig {
+    /** `hnsw` (the default) or `ivfflat`. */
+    method?: "hnsw" | "ivfflat";
+    /** The distance(s) indexed, one index each; `cosine` by default. */
+    distance?: VectorDistance | VectorDistance[];
+    /** HNSW: connections per node. */
+    m?: number;
+    /** HNSW: candidate-list size while building. */
+    efConstruction?: number;
+    /** IVFFlat: number of partitions. */
+    lists?: number;
+}
 
 /**
  * The widest `vector` pgvector will build an HNSW or IVFFlat index over.

@@ -1,5 +1,4 @@
-import type { Property } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Property } from "@rebasepro/cms-types";
 import { getTitlePropertyKey, getTitlePropertyKeyForValues } from "@rebasepro/app";
 import { isPropertyBuilder } from "@rebasepro/cms-types";
 

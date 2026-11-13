@@ -1,5 +1,5 @@
 import type { FieldProps } from "../../types/fields";
-import type { BooleanProperty } from "@rebasepro/types";
+import type { BooleanProperty } from "@rebasepro/cms-types";
 import React from "react";
 
 ;

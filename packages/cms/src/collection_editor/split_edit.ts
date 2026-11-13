@@ -27,11 +27,6 @@
  * @module
  */
 import type {
-    EnumValueConfig,
-    EnumValues,
-    Properties,
-    Property,
-    Relation,
     SecurityRule,
     TableDescriptor,
     TablePatch,
@@ -45,7 +40,7 @@ import type {
 } from "@rebasepro/types";
 import { isRedactedSecurityRule, isUiTablePreferences, rulePatches } from "@rebasepro/types";
 import { enumValueLabel } from "@rebasepro/utils";
-import type { AdminCollection, FIELD_CUSTOMIZATION_KEYS, TABLE_CUSTOMIZATION_KEYS } from "@rebasepro/cms-types";
+import type { AdminCollection, FIELD_CUSTOMIZATION_KEYS, TABLE_CUSTOMIZATION_KEYS, EnumValueConfig, EnumValues, Properties, Property, Relation } from "@rebasepro/cms-types";
 import { SplitEditError } from "./split_edit_error";
 import {
     PropertyNotAColumnError,

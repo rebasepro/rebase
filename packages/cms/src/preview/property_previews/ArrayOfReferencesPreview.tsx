@@ -1,4 +1,5 @@
-import type { ArrayProperty, ReferenceProperty, EntityReference } from "@rebasepro/types";
+import type { EntityReference } from "@rebasepro/types";
+import type { ArrayProperty, ReferenceProperty } from "@rebasepro/cms-types";
 import type { PropertyPreviewProps, PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { ReferencePreview } from "../components/ReferencePreview";
 import { useIsNestedEntityPreview } from "../../components/EntityPreviewNesting";

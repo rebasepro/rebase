@@ -21,12 +21,9 @@
  * table columns.
  */
 import type {
-    AnyCollectionConfig,
-    AuthCollectionConfig,
-    PostgresProperties,
     TableDescriptor
 } from "@rebasepro/types";
-import type { AdminPostgresCollection } from "@rebasepro/cms-types";
+import type { AdminPostgresCollection, AnyCollectionConfig, AuthCollectionConfig, PostgresProperties } from "@rebasepro/cms-types";
 import { tableLabels } from "./labels";
 import { enumValuesFrom, propertyFromColumn } from "./column_property";
 import { projectRelations, type TargetResolver } from "./relations";

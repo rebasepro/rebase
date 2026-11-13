@@ -1,7 +1,7 @@
 
 import { getPolicyNamesForRule, getPolicyNamesForRules } from "@rebasepro/utils";
-import { getTableName, policyToSecurityRule } from "@rebasepro/common";
-import { getGeneratedPolicyNamesOnce } from "@rebasepro/cms-types";
+import { policyToSecurityRule } from "@rebasepro/common";
+import { getGeneratedPolicyNamesOnce, getTableName, isPostgresCollectionConfig, type CollectionConfig } from "@rebasepro/cms-types";
 import React, { useState, useEffect, useMemo } from "react";
 
 /**
@@ -44,10 +44,8 @@ import { useCollectionsConfigController } from "../../useCollectionsConfigContro
 import { useRebaseContext, useTranslation } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import {
-    isPostgresCollectionConfig,
     RLS_ROLES_SQL,
     RLS_UID_SQL,
-    type CollectionConfig,
     type PolicyCondition,
     type PostgresPolicy,
     type SecurityOperation,

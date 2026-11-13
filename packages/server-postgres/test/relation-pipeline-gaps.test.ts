@@ -23,8 +23,7 @@ import { RelationWriteService } from "../src/services/RelationWriteService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { relationOfTable } from "./helpers/relation-descriptors";
-import { LegacyCollectionConfig, LegacyRelation, LegacyRelationProperty } from "@rebasepro/common/migrate";
-import { resolveCollectionRelations, resolveRelation } from "@rebasepro/common";
+import { LegacyCollectionConfig, LegacyRelation, LegacyRelationProperty, resolveLegacyCollectionRelations, resolveLegacyRelation } from "@rebasepro/common/migrate";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
@@ -401,7 +400,7 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
             target: () => target,
             };
 
-        const normalized = resolveRelation(relation, source);
+        const normalized = resolveLegacyRelation(relation, source);
 
         if (normalized.kind !== "manyToMany") throw new Error("expected a manyToMany");
 
@@ -429,7 +428,7 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
             target: () => target,
             };
 
-        const normalized = resolveRelation(relation, source);
+        const normalized = resolveLegacyRelation(relation, source);
 
         if (normalized.kind !== "manyToMany") throw new Error("expected a manyToMany");
 
@@ -456,7 +455,7 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
             target: () => target,
             };
 
-        const normalized = resolveRelation(relation, source);
+        const normalized = resolveLegacyRelation(relation, source);
 
         if (normalized.kind !== "manyToMany") throw new Error("expected a manyToMany");
 
@@ -483,7 +482,7 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
             target: () => target,
             };
 
-        const normalized = resolveRelation(relation, source);
+        const normalized = resolveLegacyRelation(relation, source);
 
         if (normalized.kind !== "manyToMany") throw new Error("expected a manyToMany");
 
@@ -518,7 +517,7 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
             }
         };
 
-        const normalized = resolveRelation(relation, source);
+        const normalized = resolveLegacyRelation(relation, source);
 
         if (normalized.kind !== "manyToMany") throw new Error("expected a manyToMany");
 
@@ -541,7 +540,7 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
             target: () => usersCollection,
             };
 
-        const normalized = resolveRelation(relation, usersCollection);
+        const normalized = resolveLegacyRelation(relation, usersCollection);
 
         if (normalized.kind !== "manyToMany") throw new Error("expected a manyToMany");
 
@@ -578,7 +577,7 @@ to: "id" } }
             ]
         };
 
-        const normalized = resolveRelation(relation, source);
+        const normalized = resolveLegacyRelation(relation, source);
 
         // joinPath takes precedence — no through should be auto-generated
         expect("through" in normalized ? normalized.through : undefined).toBeUndefined();

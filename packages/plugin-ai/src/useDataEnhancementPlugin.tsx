@@ -1,7 +1,7 @@
 import React from "react";
 
-import { CollectionConfig, User } from "@rebasepro/types";
-import { RebasePlugin } from "@rebasepro/cms-types";
+import { User } from "@rebasepro/types";
+import { RebasePlugin, CollectionConfig } from "@rebasepro/cms-types";
 import { DataEnhancementControllerProvider } from "./components/DataEnhancementControllerProvider";
 import { FormEnhanceAction } from "./components/FormEnhanceAction";
 

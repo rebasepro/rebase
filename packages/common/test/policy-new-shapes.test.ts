@@ -18,13 +18,15 @@ import {
     isPolicyShorthand,
     policy,
     type AuthState,
-    type CollectionConfig,
     type Entity,
     type PolicyCondition,
     type PolicyExpression,
     type SecurityRule,
     type User
 } from "@rebasepro/types";
+import {
+    type LegacyCollectionConfig
+} from "@rebasepro/common/migrate";
 import { getPolicyNameHash, getPolicyNamesForRule, isNewShapeRule, newShapeHashInput } from "@rebasepro/utils";
 import {
     policyConditionToExpression,
@@ -39,7 +41,7 @@ import {
 
 const SIGNED_IN = "(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')";
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     name: "Posts",
     slug: "posts",
     table: "posts",
@@ -68,7 +70,7 @@ const anonymous: AuthState<User> = { user: null };
 const row = (values: Record<string, unknown>): Entity => ({ id: "p1", path: "posts", values });
 /** A value from outside the type system — what a JS config or a stored rule can hold. */
 const loose = (json: string): PolicyCondition => JSON.parse(json);
-const withRules = (securityRules: SecurityRule[]): CollectionConfig => ({ ...posts, securityRules });
+const withRules = (securityRules: SecurityRule[]): LegacyCollectionConfig => ({ ...posts, securityRules });
 
 describe("isPolicyShorthand", () => {
     it("accepts a plain object of column → literal", () => {
@@ -214,8 +216,8 @@ describe("compiling the new shapes", () => {
     });
 
     it("accepts a `belongsTo` relation key, compiled to its foreign-key column", () => {
-        const orgs: CollectionConfig = { name: "Orgs", slug: "orgs", table: "orgs", properties: { id: { name: "ID", type: "string", isId: "uuid" } } };
-        const projects: CollectionConfig = {
+        const orgs: LegacyCollectionConfig = { name: "Orgs", slug: "orgs", table: "orgs", properties: { id: { name: "ID", type: "string", isId: "uuid" } } };
+        const projects: LegacyCollectionConfig = {
             name: "Projects", slug: "projects", table: "projects",
             properties: {
                 id: { name: "ID", type: "string", isId: "uuid" },

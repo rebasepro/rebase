@@ -1,4 +1,4 @@
-import type { Properties, Property, RelationProperty } from "@rebasepro/types";
+import type { Properties, Property, RelationProperty } from "@rebasepro/cms-types";
 import React from "react";
 import { DateColumnFormatting, getTableCellAlignment, getTablePropertyColumnWidth } from "./internal/common";
 import { FilterValues } from "@rebasepro/types";

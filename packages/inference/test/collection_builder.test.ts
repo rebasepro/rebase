@@ -1,5 +1,5 @@
 import { buildPropertiesOrder, buildEntityPropertiesFromData } from "../src/collection_builder";
-import { DataType, Properties, Property } from "@rebasepro/types";
+import { DataType, Properties, Property } from "@rebasepro/cms-types";
 
 // Simple type inferrer for testing
 function inferType(value: any): DataType {

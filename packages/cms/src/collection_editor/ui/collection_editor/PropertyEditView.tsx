@@ -6,8 +6,7 @@ import { Formex, FormexController, getIn, useCreateFormex } from "@rebasepro/for
 import { ConfirmationDialog, useTranslation } from "@rebasepro/app";
 import { DEFAULT_FIELD_CONFIGS, getFieldConfig, getFieldId } from "../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
-import { Property } from "@rebasepro/types";
-import { PropertyConfig, PropertyConfigId, AdminCollection, isPropertyBuilder } from "@rebasepro/cms-types";
+import { PropertyConfig, PropertyConfigId, AdminCollection, isPropertyBuilder, Property } from "@rebasepro/cms-types";
 import type { PropertyTypePreset, PropertyType } from "../../extensibility_types";
 import { toSerializableProperty, toSerializableCollectionConfig } from "../../serializable_utils";
 import type { SerializableProperty, SerializableCollectionConfig } from "../../serializable_types";
@@ -54,7 +53,7 @@ import { isValidRegExp, mergeDeep } from "@rebasepro/utils";
 
 export type PropertyWithId = Property & {
     id?: string;
-    conditions?: import("@rebasepro/types").PropertyConditions;
+    conditions?: import("@rebasepro/cms-types").PropertyConditions;
 };
 
 export type OnPropertyChangedParams = {

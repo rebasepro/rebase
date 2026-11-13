@@ -2,8 +2,8 @@ import type { AdditionalFieldDelegate, AdminCollection } from "@rebasepro/cms-ty
 import { AdditionalFieldValue } from "../AdditionalFieldValue";
 import { rowOfEntity } from "@rebasepro/app";
 import React, { useCallback, useContext, useMemo, useRef } from "react";
-import { Entity, User, Property } from "@rebasepro/types";
-import { CollectionSize, RebaseContext } from "@rebasepro/cms-types";
+import { Entity, User } from "@rebasepro/types";
+import { CollectionSize, RebaseContext, Property } from "@rebasepro/cms-types";
 import { PropertyTableCell } from "./PropertyTableCell";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { useRebaseContext, useCollectionScope, useCustomizationController } from "@rebasepro/app";

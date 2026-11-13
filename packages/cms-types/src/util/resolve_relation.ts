@@ -1,12 +1,16 @@
 import {
-    CollectionConfig,
-    JoinStep,
+    JoinStep
+} from "@rebasepro/types";
+import {
+    CollectionConfig
+} from "../types/collections";
+import {
     Relation,
     ResolvedRelation
-} from "@rebasepro/types";
+} from "../types/relation_kinds";
 import { generateForeignKeyName, toSnakeCase } from "@rebasepro/utils";
 
-import { getTableName } from "./relations";
+import { getTableName } from "./collection_relations";
 
 /**
  * Fill in a relation's defaults.

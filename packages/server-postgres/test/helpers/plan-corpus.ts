@@ -27,13 +27,13 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
-    isPostgresCollectionConfig,
     resolveResourceRefs,
     type CompiledTable,
     type SecurityRule
 } from "@rebasepro/types";
 import {
-    type LegacyCollectionConfig
+    type LegacyCollectionConfig,
+    isLegacyPostgresCollection
 } from "@rebasepro/common/migrate";
 
 import {
@@ -214,7 +214,7 @@ async function readCollectionDirectory(dir: string): Promise<LegacyCollectionCon
         const defaults = mod.defaultSecurityRules;
         if (isSecurityRuleList(defaults) && defaults.length > 0) {
             for (const collection of collections) {
-                if (isPostgresCollectionConfig(collection) && !collection.securityRules?.length) {
+                if (isLegacyPostgresCollection(collection) && !collection.securityRules?.length) {
                     collection.securityRules = defaults;
                 }
             }

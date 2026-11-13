@@ -7,14 +7,13 @@
  */
 import {
     type AuthState,
-    type CollectionConfig,
     type Entity,
     type PolicyCondition,
     type SecurityRule,
     type User
 } from "@rebasepro/types";
 import { evaluatePolicy, securityRuleToConditions } from "@rebasepro/common";
-import { checkOperation, compileRulePolicies } from "@rebasepro/cms-types";
+import { checkOperation, compileRulePolicies, type CollectionConfig } from "@rebasepro/cms-types";
 
 const SIGNED_IN = "(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')";
 

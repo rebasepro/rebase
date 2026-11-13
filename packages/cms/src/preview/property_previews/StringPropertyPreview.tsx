@@ -1,4 +1,4 @@
-import type { StringProperty } from "@rebasepro/types";
+import type { StringProperty } from "@rebasepro/cms-types";
 import React from "react";
 
 import { EnumValuesChip } from "../components/EnumValuesChip";

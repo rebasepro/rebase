@@ -7,7 +7,7 @@ import { useStorageSources } from "@rebasepro/app";
 import { resolveStorageSource } from "@rebasepro/cms-types";
 import { getIconForProperty } from "../../util/property_utils";
 import type { FieldProps } from "../../types/fields";
-import type { ArrayProperty, StringProperty } from "@rebasepro/types";
+import type { ArrayProperty, StringProperty } from "@rebasepro/cms-types";
 import {
     cls,
     fieldBackgroundDisabledMixin,

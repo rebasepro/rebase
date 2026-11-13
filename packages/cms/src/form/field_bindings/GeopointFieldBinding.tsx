@@ -1,5 +1,5 @@
 import type { FieldProps } from "../../types/fields";
-import type { GeopointProperty } from "@rebasepro/types";
+import type { GeopointProperty } from "@rebasepro/cms-types";
 import React, { useCallback, useEffect, useState } from "react";
 import { IconButton, TextField, Trash2Icon } from "@rebasepro/ui";
 

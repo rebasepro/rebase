@@ -19,7 +19,7 @@ jest.mock("@rebasepro/app", () => {
 
 import { RebaseI18nProvider } from "@rebasepro/app";
 import { useCreateFormex } from "@rebasepro/forms";
-import type { MapProperty } from "@rebasepro/types";
+import type { MapProperty } from "@rebasepro/cms-types";
 import type { FormContext } from "../../src/types/fields";
 import { KeyValueFieldBinding } from "../../src/form/field_bindings/KeyValueFieldBinding";
 

@@ -1,4 +1,4 @@
-import type { Property } from "@rebasepro/types";
+import type { Property } from "@rebasepro/cms-types";
 import React from "react";
 import { Checkbox, cls } from "@rebasepro/ui";
 import { PreviewSize } from "../../types/components/PropertyPreviewProps";

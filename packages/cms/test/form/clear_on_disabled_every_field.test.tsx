@@ -32,7 +32,7 @@ jest.mock("@rebasepro/app", () => {
 
 import { Formex, useCreateFormex, type FormexController } from "@rebasepro/forms";
 import { PropertyFieldBinding } from "../../src/form/PropertyFieldBinding";
-import type { Property } from "@rebasepro/types";
+import type { Property } from "@rebasepro/cms-types";
 import { fakeCollection, fakeFormContext } from "../helpers/fakes";
 
 const PlainField = () => <span data-testid="plain"/>;

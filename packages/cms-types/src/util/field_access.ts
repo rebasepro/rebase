@@ -6,7 +6,7 @@
  *
  * @module
  */
-import type { FieldAccess, Property } from "@rebasepro/types";
+import type { FieldAccess, Property } from "../types/properties";
 import { canReadWithAccess, canWriteWithAccess, type FieldViewer } from "@rebasepro/common";
 
 /**

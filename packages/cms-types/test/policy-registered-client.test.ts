@@ -1,5 +1,5 @@
-import { policy, type CollectionConfig, type User } from "@rebasepro/types";
-import { checkOperation } from "@rebasepro/cms-types";
+import { policy, type User } from "@rebasepro/types";
+import { checkOperation, type CollectionConfig } from "@rebasepro/cms-types";
 
 /**
  * `policy.registered()` in the panel's client-side evaluator: a guest — a real

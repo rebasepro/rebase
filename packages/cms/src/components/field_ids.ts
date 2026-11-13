@@ -1,4 +1,4 @@
-import type { ArrayProperty, NumberProperty, Property, StringProperty } from "@rebasepro/types";
+import type { ArrayProperty, NumberProperty, Property, StringProperty } from "@rebasepro/cms-types";
 import { isPropertyBuilder } from "@rebasepro/cms-types";
 
 /**

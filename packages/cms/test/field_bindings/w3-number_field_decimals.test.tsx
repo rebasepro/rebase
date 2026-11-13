@@ -14,7 +14,7 @@
 import React, { useState } from "react";
 import { describe, expect, it } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { NumberProperty } from "@rebasepro/types";
+import type { NumberProperty } from "@rebasepro/cms-types";
 import { RebaseI18nProvider } from "@rebasepro/app";
 import { TextFieldBinding } from "../../src/form/field_bindings/TextFieldBinding";
 import type { FieldProps } from "../../src/types/fields";

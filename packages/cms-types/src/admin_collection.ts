@@ -16,15 +16,21 @@
  */
 import type React from "react";
 import type {
-    CollectionCallbacks,
-    CollectionConfig,
     FilterValues,
     OrderBySpec,
-    PostgresCollectionConfig,
-    Property,
-    Properties,
     User
 } from "@rebasepro/types";
+import type {
+    CollectionCallbacks
+} from "./types/entity_callbacks";
+import type {
+    CollectionConfig,
+    PostgresCollectionConfig
+} from "./types/collections";
+import type {
+    Property,
+    Properties
+} from "./types/properties";
 import type {
     FilterPreset
 } from "./types/filter_preset";

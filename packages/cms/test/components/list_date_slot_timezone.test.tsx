@@ -2,8 +2,8 @@
  * @jest-environment ./test/helpers/los-angeles-tz-environment.cjs
  */
 import { describe, expect, it } from "@jest/globals";
-import type { DateProperty, Entity } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { Entity } from "@rebasepro/types";
+import type { AdminCollection, DateProperty } from "@rebasepro/cms-types";
 
 import { resolveEntitySlots, type CollectionSlotKeys } from "../../src/components/CollectionViewBinding/usePreviewSlots";
 import { formatCollectionDate } from "../../src/util/format_collection_date";

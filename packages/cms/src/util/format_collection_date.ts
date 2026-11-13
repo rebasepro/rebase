@@ -1,4 +1,4 @@
-import type { Property } from "@rebasepro/types";
+import type { Property } from "@rebasepro/cms-types";
 import { formatRelativeTime, type RelativeTimeLabels } from "@rebasepro/utils";
 import { getDatePropertyMode, getDatePropertyTimezone } from "../preview/util";
 

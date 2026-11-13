@@ -4,7 +4,7 @@ import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useState } from "react";
 import { useAuthController, useCustomizationController, useTranslation } from "@rebasepro/app";
 import { getFieldConfig, PropertyConfigBadge, SearchIconsView } from "../../_cms_internals";
-import { Property } from "@rebasepro/types";
+import { Property } from "@rebasepro/cms-types";
 import {
     BooleanSwitchWithLabel,
     Button,

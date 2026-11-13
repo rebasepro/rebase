@@ -1,4 +1,4 @@
-import { DataType } from "@rebasepro/types";
+import { DataType } from "@rebasepro/cms-types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**

@@ -21,10 +21,11 @@
  */
 import { describe, it, expect } from "@jest/globals";
 import { policyToPostgres } from "./helpers/legacy-policies";
-import { policy, CollectionConfig } from "@rebasepro/types";
+import { policy } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 /** A collection introspected from a camelCase database, plus two keyword columns. */
-const legacyDocs: CollectionConfig = {
+const legacyDocs: LegacyCollectionConfig = {
     slug: "docs",
     name: "Docs",
     properties: {
@@ -36,7 +37,7 @@ const legacyDocs: CollectionConfig = {
 };
 
 /** No `columnName`, ordinary keys — the shape every existing policy has. */
-const plainDocs: CollectionConfig = {
+const plainDocs: LegacyCollectionConfig = {
     slug: "documents",
     name: "Documents",
     properties: {
@@ -83,7 +84,7 @@ describe("policyToPostgres — column identifiers", () => {
     });
 
     it("quotes an existsIn subquery's inner and outer columns alike", () => {
-        const members: CollectionConfig = {
+        const members: LegacyCollectionConfig = {
             slug: "members", name: "Members",
             properties: { docId: { type: "string", name: "Doc", columnName: "docId" } }
         };
@@ -101,7 +102,7 @@ describe("policyToPostgres — column identifiers", () => {
     });
 
     it("escapes an embedded double quote rather than closing the identifier", () => {
-        const odd: CollectionConfig = {
+        const odd: LegacyCollectionConfig = {
             slug: "odd", name: "Odd",
             properties: { weird: { type: "string", name: "Weird", columnName: 'we"ird' } }
         };

@@ -1,4 +1,4 @@
-import { Properties } from "@rebasepro/types";
+import { Properties } from "@rebasepro/cms-types";
 import { guessIdColumn, ImportConfig } from "../../../_cms_internals";
 import { slugify } from "@rebasepro/utils";
 

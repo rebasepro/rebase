@@ -1,5 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
-import { CollectionRegistry } from "@rebasepro/cms-types";
+import { CollectionRegistry, CollectionConfig } from "@rebasepro/cms-types";
 
 /**
  * A slug may contain slashes. Firestore apps address versioned or

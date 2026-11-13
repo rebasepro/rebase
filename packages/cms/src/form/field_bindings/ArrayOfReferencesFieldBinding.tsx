@@ -1,7 +1,6 @@
 import { useEntitySelectionDialog } from "../../hooks/useSelectionDialog";
 
 import type { FieldProps } from "../../types/fields";
-import type { ArrayProperty, Property } from "@rebasepro/types";
 import React, { useCallback, useMemo } from "react";
 import { Entity, EntityReference } from "@rebasepro/types";
 import { ReferencePreview } from "../../preview";
@@ -14,7 +13,7 @@ import { useTranslation, ErrorView } from "@rebasepro/app";
 import { Button, cls, ExpandablePanel, fieldBackgroundMixin, PencilIcon, Typography } from "@rebasepro/ui";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import { useReferencePaths } from "../../hooks/useReferencePaths";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, ArrayProperty, Property } from "@rebasepro/cms-types";
 
 type ArrayOfReferencesFieldProps = FieldProps<ArrayProperty, EntityReference[]>;
 

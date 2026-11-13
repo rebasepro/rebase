@@ -10,22 +10,25 @@
  * @module
  */
 import {
-    isPostgresCollectionConfig,
-    type AuthCollectionConfig,
-    type CollectionConfig,
     type CollectionTenantConfig,
     type PolicyExpression,
-    type Property,
-    type ResolvedRelation,
     type SecurityRule
 } from "@rebasepro/types";
+import {
+    isPostgresCollectionConfig,
+    type AuthCollectionConfig,
+    type CollectionConfig
+} from "../types/collections";
+import {
+    type Property
+} from "../types/properties";
+import {
+    type ResolvedRelation
+} from "../types/relation_kinds";
 import { getPolicyNamesForRules, toSnakeCase } from "@rebasepro/utils";
 import {
     compilePolicyExpression,
     compileTableRulePolicies,
-    findRelation,
-    getTableName,
-    resolveCollectionRelations,
     tableEffectiveRules,
     tableGeneratedPolicyNames,
     tableInjectedRules,
@@ -36,6 +39,11 @@ import {
     type ResolvePolicyTable,
     type RulePolicySwitches
 } from "@rebasepro/common";
+import {
+    findRelation,
+    getTableName,
+    resolveCollectionRelations
+} from "./collection_relations";
 
 type ResolveCollection = (slug: string) => CollectionConfig | undefined;
 

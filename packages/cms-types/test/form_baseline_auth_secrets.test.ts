@@ -1,5 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
-import { getDefaultValuesFor, CollectionRegistry } from "@rebasepro/cms-types";
+import { getDefaultValuesFor, CollectionRegistry, CollectionConfig } from "@rebasepro/cms-types";
 
 /**
  * The panel's form baseline for a redeclared users collection: the registry

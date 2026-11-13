@@ -1,6 +1,6 @@
 import { User as FirebaseUser } from "firebase/auth";
 import { FirestoreTextSearchController, FirestoreTextSearchControllerBuilder } from "../types";
-import { CollectionConfig } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/cms-types";
 
 const DEFAULT_SERVER = "https://api.rebase.pro";
 

@@ -1,5 +1,6 @@
 import React from "react";
-import { DataType, Entity, Property } from "@rebasepro/types";
+import { Entity } from "@rebasepro/types";
+import { DataType, Property } from "@rebasepro/cms-types";
 
 export type ImportConfig = {
 

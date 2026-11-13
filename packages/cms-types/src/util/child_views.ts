@@ -1,15 +1,21 @@
 import {
+    getDataSourceCapabilities
+} from "@rebasepro/types";
+import {
     CollectionConfig,
-    Property,
-    RelationProperty,
-    ResolvedRelation,
-    getDataSourceCapabilities,
     getDeclaredSubcollections,
     type EntityChildView
-} from "@rebasepro/types";
+} from "../types/collections";
+import {
+    Property,
+    RelationProperty
+} from "../types/properties";
+import {
+    ResolvedRelation
+} from "../types/relation_kinds";
 import { mergeDeep } from "@rebasepro/utils";
-import { isJunctionBackedRelation, resolveCollectionRelations } from "@rebasepro/common";
-import { resolveRelation } from "@rebasepro/common";
+import { isJunctionBackedRelation, resolveCollectionRelations } from "./collection_relations";
+import { resolveRelation } from "./resolve_relation";
 
 /**
  * The resolved relation a relation property refers to.

@@ -1,5 +1,6 @@
 import { isRedactedSecurityRule } from "@rebasepro/types";
-import type { AuthState, CollectionConfig, SecurityRule, User } from "@rebasepro/types";
+import type { AuthState, SecurityRule, User } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/cms-types";
 import { securityRuleToConditions } from "@rebasepro/common";
 import { checkOperation } from "@rebasepro/cms-types";
 

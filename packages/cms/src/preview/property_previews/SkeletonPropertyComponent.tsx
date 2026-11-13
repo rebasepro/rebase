@@ -1,5 +1,5 @@
-import type { Properties } from "@rebasepro/types";
-import type { ArrayProperty, MapProperty, Property, StringProperty } from "@rebasepro/types";
+import type { Properties } from "@rebasepro/cms-types";
+import type { ArrayProperty, MapProperty, Property, StringProperty } from "@rebasepro/cms-types";
 import { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import React from "react";
 import { Skeleton, Table, TableBody, TableRow, TableCell, Typography } from "@rebasepro/ui";

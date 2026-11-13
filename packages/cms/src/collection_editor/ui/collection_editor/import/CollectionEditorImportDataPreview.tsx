@@ -5,7 +5,7 @@ import { useAuthController } from "@rebasepro/app";
 import { CollectionTableBinding } from "../../../../components/CollectionTableBinding/CollectionTableBinding";
 import { useEntitySelectionController } from "../../../../components/CollectionViewBinding/useSelectionController";
 import { CircularProgressCenter } from "@rebasepro/ui";
-import { Properties } from "@rebasepro/types";
+import { Properties } from "@rebasepro/cms-types";
 import { useEffect, useState } from "react";
 import { Typography } from "@rebasepro/ui";
 

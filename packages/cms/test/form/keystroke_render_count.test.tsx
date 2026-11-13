@@ -17,10 +17,9 @@
  * through `context.values` from its callbacks.
  */
 import React from "react";
-import type { PostgresProperties } from "@rebasepro/types";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import type { AdminCollection, FieldProps, FormContext } from "@rebasepro/cms-types";
+import type { AdminCollection, FieldProps, FormContext, PostgresProperties } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}

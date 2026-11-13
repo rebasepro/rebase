@@ -1,5 +1,6 @@
 import { getParentReferencesFromPath } from "../../src/collections/parent_references_from_path";
-import { CollectionConfig, EntityReference } from "@rebasepro/types";
+import { EntityReference } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/cms-types";
 
 function makeCollection(overrides: Partial<CollectionConfig> = {}): CollectionConfig {
     return {

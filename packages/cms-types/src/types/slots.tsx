@@ -2,7 +2,7 @@ import React from "react";
 
 import type { CollectionActionsProps, SelectionController, TableController } from "../collections";
 import type { PluginFormActionProps, PluginGenericProps, PluginHomePageActionsProps, PluginHomePageAdditionalCardsProps } from "./plugins";
-import type { Property } from "@rebasepro/types";
+import type { Property } from "./properties";
 import type { RebaseContext } from "../rebase_context";
 import type { AdminCollection } from "@rebasepro/cms-types";
 

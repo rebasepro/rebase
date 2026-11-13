@@ -1,5 +1,5 @@
 import { resolveFilterOperators } from "../../src/collections/filter-operator-resolution";
-import type { CollectionConfig, Property } from "@rebasepro/types";
+import type { CollectionConfig, Property } from "@rebasepro/cms-types";
 
 const tags: CollectionConfig = { slug: "tags", name: "Tags", properties: {} };
 const authors: CollectionConfig = { slug: "authors", name: "Authors", properties: {} };

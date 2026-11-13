@@ -1,6 +1,6 @@
 import { RebaseApiError } from "../errors";
 import type { EntityStatus, EntityValues } from "../types/entities";
-import type { CollectionConfig, FilterValues } from "../types/collections";
+import type { FilterValues } from "../types/filter-operators";
 import type { OrderByTuple } from "../types/filter-operators";
 import type { RebaseCallContext } from "../call_context";
 import type { AggregateGroupTransform, IncludeSpec, LogicalCondition } from "./data";
@@ -215,8 +215,7 @@ export interface FetchCollectionProps<M extends Record<string, unknown> = Record
      * not expressible as a filter, because the field is not part of the
      * caller's vocabulary.
      *
-     * Ignored by collections that do not declare {@link
-     * PostgresCollectionConfig.softDelete}: there is no stamp to look at, and
+     * Ignored by tables that declare no `softDelete`: there is no stamp to look at, and
      * silently returning nothing for `"only"` on such a collection would be a
      * worse answer than ignoring it.
      */
@@ -426,8 +425,7 @@ export interface DeleteProps<M extends Record<string, unknown> = Record<string, 
      */
     row: { id: string | number; path: string };
     /**
-     * Issue a real `DELETE` on a collection that declares
-     * {@link PostgresCollectionConfig.softDelete}.
+     * Issue a real `DELETE` on a table that declares `softDelete`.
      *
      * The row and every cascade behind it go. It needs the same permission an
      * ordinary delete does and nothing more: it is the same verb, and a second
@@ -505,7 +503,6 @@ export interface BatchWriteProps<M extends Record<string, unknown> = Record<stri
 export type FilterCombinationValidProps = {
     path: string;
     databaseId?: string;
-    collection: CollectionConfig;
     filterValues: FilterValues<string>;
     sortBy?: [string, "asc" | "desc"];
 };
@@ -856,9 +853,7 @@ export interface DataDriver {
      * Check if the given filter combination is valid
      * @param props
      */
-    isFilterCombinationValid?(props: Omit<FilterCombinationValidProps, "collection"> & {
-        databaseId?: string
-    }): boolean;
+    isFilterCombinationValid?(props: FilterCombinationValidProps): boolean;
 
     /**
      * Get the object to generate the current time in the driver
@@ -868,15 +863,6 @@ export interface DataDriver {
     delegateToCMSModel?: (data: unknown) => unknown;
 
     cmsToDelegateModel?: (data: unknown) => unknown;
-
-    initTextSearch?: (props: {
-        context: RebaseCallContext,
-        path: string,
-        databaseId?: string,
-        collection: CollectionConfig,
-        parentCollectionSlugs?: string[];
-        parentEntityIds?: string[];
-    }) => Promise<boolean>;
 
     /**
      * Flag to indicate if the driver has requested the initialization of the text search index

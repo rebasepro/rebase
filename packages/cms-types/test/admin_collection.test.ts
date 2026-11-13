@@ -8,7 +8,7 @@ import {
 import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS } from "../src/admin_block";
 // There is no separate admin authoring type: `augment.ts` declares `admin` onto
 // `CollectionConfig` itself, so core's type *is* the nested authoring shape.
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/cms-types";
 
 /**
  * `ADMIN_COLLECTION_KEYS` is the same list as `AdminCollectionOptions`, in data

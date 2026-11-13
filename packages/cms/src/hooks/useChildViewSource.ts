@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { ChildViewSource } from "@rebasepro/types";
+import type { ChildViewSource } from "@rebasepro/cms-types";
 import { getEntityChildViews } from "@rebasepro/cms-types";
 
 import { useCollectionRegistryController } from "./navigation/contexts/CollectionRegistryContext";

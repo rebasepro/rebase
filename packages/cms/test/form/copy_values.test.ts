@@ -9,7 +9,8 @@
  * form itself opens with.
  */
 import type { AdminCollection, AuthController } from "@rebasepro/cms-types";
-import { EntityRelation, type CollectionConfig } from "@rebasepro/types";
+import { EntityRelation } from "@rebasepro/types";
+import { type CollectionConfig } from "@rebasepro/cms-types";
 import { getInitialEntityValues } from "../../src/form/form_utils";
 
 const target = (slug: string) => (): CollectionConfig => ({ slug, table: slug, name: slug, properties: { id: { type: "string", isId: true } } });

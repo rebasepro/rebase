@@ -1,4 +1,4 @@
-import type { RelationProperty } from "@rebasepro/types";
+import type { RelationProperty } from "@rebasepro/cms-types";
 
 /**
  * The path of the collection a relation property points at, derived from the

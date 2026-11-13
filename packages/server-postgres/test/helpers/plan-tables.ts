@@ -22,9 +22,11 @@ import type {
     AnyViewDef,
     CompiledTable,
     DefaultRls,
-    PostgresCollectionConfig,
     SecurityRule
 } from "@rebasepro/types";
+import type {
+    LegacyPostgresCollectionConfig
+} from "@rebasepro/common/migrate";
 import { planSchema } from "../../src/schema/plan/plan-schema";
 import { buildTableSearchColumnSpec, type SearchColumnSpec } from "../../src/schema/search-column";
 import { buildTableIndexSpecs, type TableIndexSpec } from "../../src/schema/table-index";

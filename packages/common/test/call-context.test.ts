@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionCallbacks, CollectionConfig, DataDriver, StorageSource, User } from "@rebasepro/types";
+import type { DataDriver, StorageSource, User } from "@rebasepro/types";
+import type { LegacyCollectionCallbacks, LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { buildSdkData, createCallContext } from "../src";
 
 /**
@@ -9,7 +10,7 @@ import { buildSdkData, createCallContext } from "../src";
  * stand-in that throws — naming the field — only if the hook actually uses it.
  */
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     name: "Posts",
     slug: "posts",
     table: "posts",
@@ -44,7 +45,7 @@ function authorsDriver(): DataDriver {
 }
 
 /** Stamps the author's name, read through `context.data`, on a new post. */
-const stampAuthor: CollectionCallbacks = {
+const stampAuthor: LegacyCollectionCallbacks = {
     beforeSave: async ({ values, context }) => {
         const uid = context.user?.uid;
         if (!uid) throw new Error("Sign in to post.");
@@ -114,7 +115,7 @@ describe("createCallContext", () => {
     });
 
     it("throws on the first use of a missing `storageSource`, naming the field", async () => {
-        const upload: CollectionCallbacks = {
+        const upload: LegacyCollectionCallbacks = {
             afterSave: async ({ context }) => {
                 await context.storageSource.putObject({ file: new File(["x"], "x.txt"), key: "x.txt" });
             }

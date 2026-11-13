@@ -15,8 +15,8 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen } from "@testing-library/react";
-import type { Entity, Property } from "@rebasepro/types";
-import type { AdminCollection, EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
+import type { Entity } from "@rebasepro/types";
+import type { AdminCollection, EntityCustomViewParams, FormContext, Property } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}

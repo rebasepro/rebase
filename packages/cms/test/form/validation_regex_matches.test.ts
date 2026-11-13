@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import type { StringProperty } from "@rebasepro/types";
+import type { StringProperty } from "@rebasepro/cms-types";
 import { hydrateRegExp } from "@rebasepro/utils";
 import { mapPropertyToZod } from "../../src/form/validation";
 import { fromSerializableProperty, toSerializableProperty } from "../../src/collection_editor/serializable_utils";

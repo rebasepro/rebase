@@ -1,5 +1,5 @@
 import { isReadOnly, isHidden } from "../../src/collections/property_presentation";
-import type { Property } from "@rebasepro/types";
+import type { Property } from "@rebasepro/cms-types";
 
 describe("isReadOnly", () => {
     it("returns true for readOnly property", () => {

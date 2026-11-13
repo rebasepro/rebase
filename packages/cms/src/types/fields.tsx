@@ -1,6 +1,6 @@
-import { InferPropertyType } from "@rebasepro/types";
+import { InferPropertyType } from "@rebasepro/cms-types";
 
-import { Property } from "@rebasepro/types";
+import { Property } from "@rebasepro/cms-types";
 import type { FormContext } from "@rebasepro/cms-types";
 
 // One declaration, in the types package, which the entity views and actions

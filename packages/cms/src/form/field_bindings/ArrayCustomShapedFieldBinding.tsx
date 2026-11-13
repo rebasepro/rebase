@@ -1,5 +1,5 @@
 import type { FieldProps } from "../../types/fields";
-import type { ArrayProperty, Property } from "@rebasepro/types";
+import type { ArrayProperty, Property } from "@rebasepro/cms-types";
 import React from "react";
 ;
 import { FieldHelperText } from "../components/FieldHelperText";

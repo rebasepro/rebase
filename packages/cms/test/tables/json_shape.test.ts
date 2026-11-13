@@ -4,7 +4,8 @@
  * in an array is a list of typed blocks, and the leaves are ordinary fields.
  */
 import { describe, expect, it } from "@jest/globals";
-import type { JsonShape, Property } from "@rebasepro/types";
+import type { JsonShape } from "@rebasepro/types";
+import type { Property } from "@rebasepro/cms-types";
 import { getDefaultFieldId } from "../../src/components/field_ids";
 import { propertyFromColumn } from "../../src/tables";
 import { column } from "./fixtures";

@@ -29,7 +29,8 @@
  * generated file or a planned statement.
  */
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
-import { columnByKey, getTableName, getTableVarName } from "@rebasepro/common";
+import { columnByKey, getTableVarName } from "@rebasepro/common";
+import { legacyTableName } from "@rebasepro/common/migrate";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { planTableSchemaEnsure, type ExistingSchema } from "../src/schema/ensure-tables";
@@ -58,14 +59,14 @@ const NO_COLUMN: ColumnFacts = {
 // ── Shared lookups ───────────────────────────────────────────────────────────
 
 const qualifiedOf = (collection: LegacyCollectionConfig): string => {
-    const table = getTableName(collection);
+    const table = legacyTableName(collection);
     const schema = (collection as { schema?: string }).schema ?? "public";
     return `${schema}.${table.includes(".") ? table.split(".").pop() : table}`;
 };
 
 /** Drizzle table variable → the `schema.table` it creates. */
 const tableVars = new Map<string, LegacyCollectionConfig>(
-    everything.map(c => [getTableVarName(getTableName(c)), c])
+    everything.map(c => [getTableVarName(legacyTableName(c)), c])
 );
 
 /** Enum variable → the qualified type name the DDL creates, read out of the file. */

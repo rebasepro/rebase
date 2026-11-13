@@ -1,5 +1,5 @@
 import { getChildViewDeclaringProperties, getChildViewRelationPropertyKeys, CollectionRegistry, getEntityChildViews } from "@rebasepro/cms-types";
-import type { CollectionConfig, PostgresCollectionConfig, PostgresProperties } from "@rebasepro/types";
+import type { CollectionConfig, PostgresCollectionConfig, PostgresProperties } from "@rebasepro/cms-types";
 
 /**
  * A many-relation is declared once and surfaced once.

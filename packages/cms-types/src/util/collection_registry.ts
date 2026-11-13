@@ -1,26 +1,36 @@
 import {
+    getDataSourceCapabilities
+} from "@rebasepro/types";
+import {
     ArrayProperty,
-    CollectionCallbacks,
     EngineProperties,
-    CollectionConfig,
-    getCollectionDataPath,
-    getDataSourceCapabilities,
-    getDeclaredSubcollections,
     NumberProperty,
     Properties,
     Property,
-    Relation,
     RelationProperty,
     StringProperty
-} from "@rebasepro/types";
+} from "../types/properties";
+import {
+    CollectionCallbacks
+} from "../types/entity_callbacks";
+import {
+    CollectionConfig,
+    getCollectionDataPath,
+    getDeclaredSubcollections
+} from "../types/collections";
+import {
+    Relation
+} from "../types/relation_kinds";
 import { deepEqual } from "fast-equals";
 
 import {
     findRelation,
     getTableName,
-    resolveCollectionRelations,
+    resolveCollectionRelations
+} from "./collection_relations";
+import {
     resolveRelation
-} from "@rebasepro/common";
+} from "./resolve_relation";
 import {
     enumToObjectEntries
 } from "./enums";

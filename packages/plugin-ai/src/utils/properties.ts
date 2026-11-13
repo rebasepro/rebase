@@ -1,6 +1,5 @@
 import { getFieldId } from "@rebasepro/cms";
-import { EnumValues, Properties, Property } from "@rebasepro/types";
-import { isPropertyBuilder } from "@rebasepro/cms-types";
+import { isPropertyBuilder, EnumValues, Properties, Property } from "@rebasepro/cms-types";
 import { InputProperty } from "../types/data_enhancement_controller";
 import { getValueInPath } from "@rebasepro/utils";
 import { isDisabled, isHidden, isReadOnly } from "@rebasepro/app";

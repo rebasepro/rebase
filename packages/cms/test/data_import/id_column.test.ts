@@ -1,5 +1,5 @@
 import { describe, expect, test } from "@jest/globals";
-import { Properties } from "@rebasepro/types";
+import { Properties } from "@rebasepro/cms-types";
 import { guessIdColumn, remapImportColumn } from "../../src/data_import/utils/id_column";
 
 /**

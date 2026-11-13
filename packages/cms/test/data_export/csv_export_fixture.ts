@@ -1,4 +1,5 @@
-import { Entity, EntityReference, EntityRelation, Properties } from "@rebasepro/types";
+import { Entity, EntityReference, EntityRelation } from "@rebasepro/types";
+import { Properties } from "@rebasepro/cms-types";
 
 /**
  * A collection export that exercises every way a CSV cell is built: nested

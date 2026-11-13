@@ -1,5 +1,5 @@
 import type { FieldProps } from "../../types/fields";
-import type { Property } from "@rebasepro/types";
+import type { Property } from "@rebasepro/cms-types";
 import React from "react";
 
 import { PropertyPreview } from "../../preview";

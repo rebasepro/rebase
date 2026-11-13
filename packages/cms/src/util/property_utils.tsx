@@ -1,7 +1,5 @@
 
-import type { Properties } from "@rebasepro/types";
-import type { MapProperty, Property } from "@rebasepro/types";
-import type { PropertyConfig, AdminCollection } from "@rebasepro/cms-types";
+import type { PropertyConfig, AdminCollection, Properties, MapProperty, Property } from "@rebasepro/cms-types";
 import React from "react";
 
 import { isPropertyBuilder } from "@rebasepro/cms-types";

@@ -1,5 +1,4 @@
-import { CollectionConfig, RelationProperty, MapProperty } from "@rebasepro/types";
-import { CollectionRegistry } from "@rebasepro/cms-types";
+import { CollectionRegistry, CollectionConfig, RelationProperty, MapProperty } from "@rebasepro/cms-types";
 
 describe("CollectionRegistry Dual-Layer Store", () => {
     it("preserves un-mutated definitions when resolving relations", () => {

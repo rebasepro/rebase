@@ -1,5 +1,5 @@
-import type { Properties } from "@rebasepro/types";
-import type { ArrayProperty, MapProperty, NumberProperty, Property, BooleanProperty, DateProperty, GeopointProperty, ReferenceProperty, RelationProperty, StringProperty, StringPropertyValidationSchema, VectorProperty, BinaryProperty } from "@rebasepro/types";
+import type { Properties } from "@rebasepro/cms-types";
+import type { ArrayProperty, MapProperty, NumberProperty, Property, BooleanProperty, DateProperty, GeopointProperty, ReferenceProperty, RelationProperty, StringProperty, StringPropertyValidationSchema, VectorProperty, BinaryProperty } from "@rebasepro/cms-types";
 ;
 import { z, ZodTypeAny } from "zod";
 import { deepEqual as isDeepEqual } from "fast-equals";

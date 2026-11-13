@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import { describe, expect, it } from "@jest/globals";
-import { NumberProperty, Property, RelationProperty, StringProperty } from "@rebasepro/types";
+import { NumberProperty, Property, RelationProperty, StringProperty } from "@rebasepro/cms-types";
 
 /**
  * A table cell is not an open picker.

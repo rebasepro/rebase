@@ -1,5 +1,5 @@
 import React from "react";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/cms-types";
 
 /**
  * Look up a collection's config by slug.

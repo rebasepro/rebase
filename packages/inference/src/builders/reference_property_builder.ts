@@ -1,6 +1,6 @@
 import { findCommonInitialStringInPath } from "../strings";
 import { InferencePropertyBuilderProps } from "../types";
-import { Property } from "@rebasepro/types";
+import { Property } from "@rebasepro/cms-types";
 
 export function buildReferenceProperty({
     name,

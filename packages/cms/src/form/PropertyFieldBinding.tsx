@@ -1,8 +1,7 @@
 
 import type { FieldProps as CoreFieldProps, AdminCollection } from "@rebasepro/cms-types";
 import type { FieldProps, PropertyFieldBindingProps } from "../types/fields";
-import type { Property } from "@rebasepro/types";
-import type { RebasePlugin, PluginFieldBuilderParams, PropertyConfig } from "@rebasepro/cms-types";
+import type { RebasePlugin, PluginFieldBuilderParams, PropertyConfig, Property } from "@rebasepro/cms-types";
 import React, { ComponentType, ReactElement, Suspense, useCallback, useRef } from "react";
 import { deepEqual as equal } from "fast-equals"
 

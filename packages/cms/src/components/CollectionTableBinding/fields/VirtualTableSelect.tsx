@@ -1,8 +1,7 @@
-import { EnumValues } from "@rebasepro/types";
 import { EnumValuesChip } from "../../../preview";
 import React, { useCallback, useEffect } from "react";
 import { MultiSelect, MultiSelectItem, Select, SelectItem } from "@rebasepro/ui";
-import { resolveEnumValues } from "@rebasepro/cms-types";
+import { resolveEnumValues, EnumValues } from "@rebasepro/cms-types";
 
 export function VirtualTableSelect(props: {
     name: string;

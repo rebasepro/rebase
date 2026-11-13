@@ -2,11 +2,11 @@ import {
     SchemaDefinitionError,
     compileTable,
     compiledTable,
-    resolveCollectionRelations,
     type SchemaDefinitionProblem
 } from "@rebasepro/common";
 import {
-    collectionsToTableDefs
+    collectionsToTableDefs,
+    resolveLegacyCollectionRelations
 } from "@rebasepro/common/migrate";
 import { isTableDef, isViewDef } from "@rebasepro/types";
 import type {
@@ -153,7 +153,7 @@ function withRelationTargets(...roots: LegacyCollectionConfig[]): LegacyCollecti
     while (queue.length > 0) {
         const next = queue.shift();
         if (!next) break;
-        for (const relation of Object.values(resolveCollectionRelations(next))) {
+        for (const relation of Object.values(resolveLegacyCollectionRelations(next))) {
             const target = relation.target();
             if (seen.has(target.slug)) continue;
             seen.set(target.slug, target);

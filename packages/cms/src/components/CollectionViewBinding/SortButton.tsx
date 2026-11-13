@@ -1,4 +1,5 @@
-import type { OrderByTuple, Properties } from "@rebasepro/types";
+import type { OrderByTuple } from "@rebasepro/types";
+import type { Properties } from "@rebasepro/cms-types";
 
 import React, { useCallback, useMemo, useState } from "react";
 import { EntityTableController } from "@rebasepro/cms-types";

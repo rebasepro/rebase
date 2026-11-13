@@ -24,7 +24,8 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { useFormex } from "@rebasepro/forms";
-import { Relation, RelationKind, JoinCondition, JoinStep, OnAction, joinConditions } from "@rebasepro/types";
+import { RelationKind, JoinCondition, JoinStep, OnAction, joinConditions } from "@rebasepro/types";
+import { Relation } from "@rebasepro/cms-types";
 import { RELATION_KINDS, RELATION_KIND_ORDER } from "../../relation_kinds";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import type { AdminPostgresCollection } from "@rebasepro/cms-types";

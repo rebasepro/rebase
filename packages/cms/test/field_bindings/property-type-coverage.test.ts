@@ -1,4 +1,4 @@
-import type { Property } from "@rebasepro/types";
+import type { Property } from "@rebasepro/cms-types";
 
 import { DEFAULT_FIELD_CONFIGS, getDefaultFieldId } from "../../src/components/field_configs";
 import { supportedFieldsIds } from "../../src/collection_editor/ui/collection_editor/utils/supported_fields";

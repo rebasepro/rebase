@@ -1,5 +1,6 @@
 import { describe, expect, test } from "@jest/globals";
-import type { CollectionConfig, Entity } from "@rebasepro/types";
+import type { Entity } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/cms-types";
 import { RebaseContext } from "@rebasepro/cms-types";
 import { resolveAdditionalExportValues } from "../../src/data_export/export/additional_fields";
 import { getEntityCSVExportableData } from "../../src/data_export/export/export";

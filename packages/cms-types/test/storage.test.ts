@@ -1,5 +1,5 @@
-import { resolveStoragePathString, resolveStorageFilenameString, resolveStorageSource } from "@rebasepro/cms-types";
-import { StorageConfig, StringProperty, StorageSource, UploadedFileContext } from "@rebasepro/types";
+import { resolveStoragePathString, resolveStorageFilenameString, resolveStorageSource, StorageConfig, StringProperty, UploadedFileContext } from "@rebasepro/cms-types";
+import { StorageSource } from "@rebasepro/types";
 import { resetDeprecationWarningsForTests } from "@rebasepro/common";
 
 // Helpers

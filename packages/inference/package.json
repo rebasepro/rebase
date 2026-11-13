@@ -29,6 +29,7 @@
   "module": "./dist/index.es.js",
   "types": "dist/index.d.ts",
   "dependencies": {
+    "@rebasepro/cms-types": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/utils": "workspace:*"
   },

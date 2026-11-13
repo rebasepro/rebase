@@ -10,8 +10,7 @@
  * keystroke anywhere in the record. Each entry now reads its own type.
  */
 import React from "react";
-import type { PostgresProperties } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, PostgresProperties } from "@rebasepro/cms-types";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 

@@ -1,6 +1,7 @@
 import React from "react";
 import { render } from "@testing-library/react";
-import type { StorageSource, StringProperty, UploadFileProps } from "@rebasepro/types";
+import type { StorageSource, UploadFileProps } from "@rebasepro/types";
+import type { StringProperty } from "@rebasepro/cms-types";
 import { useStorageUploadController } from "../src/util/useStorageUploadController";
 
 /**

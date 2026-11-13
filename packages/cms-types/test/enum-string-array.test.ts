@@ -1,4 +1,4 @@
-import type { CollectionConfig, EnumValueConfig, StringProperty } from "@rebasepro/types";
+import type { CollectionConfig, EnumValueConfig, StringProperty } from "@rebasepro/cms-types";
 import { resolvePropertyEnum, enumToObjectEntries, CollectionRegistry } from "@rebasepro/cms-types";
 
 /**

@@ -1,8 +1,8 @@
 /**
  * The admin block, added back onto the core types by declaration merging.
  *
- * `@rebasepro/types` declares no `admin` field — not on `BaseCollectionConfig`, not on
- * any property. A BaaS install therefore cannot write one: `admin: { … }` on a property
+ * The collection and property view model (`./types/collections`, `./types/properties`)
+ * declares no `admin` field — not on `BaseCollectionConfig`, not on any property. A BaaS install therefore cannot write one: `admin: { … }` on a property
  * there is a type error, which is the whole point. Installing this package is what makes
  * the surface exist.
  *
@@ -35,10 +35,10 @@ import type {
     AdminVectorOptions
 } from "./types/property_options";
 import type { AdminCollectionOptions } from "./admin_collection";
-// Named in the merged declaration's parameter list, which must match core's.
+// Named in the merged declaration's parameter list, which must match the declaration's.
 import type { User } from "@rebasepro/types";
 
-declare module "@rebasepro/types" {
+declare module "./types/collections" {
 
     /**
      * Presentation and behaviour for a collection in the admin panel.
@@ -61,6 +61,9 @@ declare module "@rebasepro/types" {
     > {
         admin?: AdminCollectionOptions<M, USER>;
     }
+}
+
+declare module "./types/properties" {
 
     interface BaseProperty<CustomProps = unknown> {
         admin?: AdminPropertyOptions<CustomProps>;

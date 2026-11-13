@@ -9,11 +9,10 @@
  * the form's pickers, relation previews and table cells, the row codec.
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import type { AdminCollection } from "@rebasepro/cms-types";
-import type { RelationProperty } from "@rebasepro/types";
+import type { AdminCollection, RelationProperty } from "@rebasepro/cms-types";
 import { col, defineTable, rel } from "@rebasepro/types";
-import { compileTables, resolveCollectionRelations } from "@rebasepro/common";
-import { getEntityChildViews } from "@rebasepro/cms-types";
+import { compileTables } from "@rebasepro/common";
+import { getEntityChildViews, resolveCollectionRelations } from "@rebasepro/cms-types";
 import { getAdminEntityChildViews, getFormFieldKeys, getRedundantChildViewColumnIds } from "@rebasepro/app";
 import { composeCollections } from "../../src/hooks/navigation/compose_collections";
 import { customizeTable } from "../../src/tables/customize_table";

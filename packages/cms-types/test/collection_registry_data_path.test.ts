@@ -1,5 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
-import { CollectionRegistry } from "@rebasepro/cms-types";
+import { CollectionRegistry, CollectionConfig } from "@rebasepro/cms-types";
 
 /**
  * A Firestore collection may declare where its driver stores it.

@@ -1,7 +1,4 @@
-import { CollectionConfig, RelationProperty, MapProperty } from "@rebasepro/types";
-import { CollectionRegistry } from "@rebasepro/cms-types";
-import { resolveRelation } from "@rebasepro/common";
-import { resolveCollectionRelations } from "@rebasepro/common";
+import { CollectionRegistry, CollectionConfig, RelationProperty, MapProperty, resolveRelation, resolveCollectionRelations } from "@rebasepro/cms-types";
 
 /**
  * Replaces the suites that pinned `sanitizeRelation` and the property-hoisting

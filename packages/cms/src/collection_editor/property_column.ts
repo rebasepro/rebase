@@ -18,27 +18,29 @@
  * @module
  */
 import type {
-    ArrayProperty,
     ColumnDefault,
     ColumnDescriptor,
     ColumnStorage,
     ColumnType,
     ColumnValidation,
+    JsonShape,
+    RelationDescriptor,
+    TableDescriptor,
+    WireColumnDef,
+    WireRelation
+} from "@rebasepro/types";
+import type {
+    ArrayProperty,
     DateProperty,
     EnumValues,
-    JsonShape,
     MapProperty,
     NumberProperty,
     Properties,
     Property,
     Relation,
-    RelationDescriptor,
     StorageConfig,
-    StringProperty,
-    TableDescriptor,
-    WireColumnDef,
-    WireRelation
-} from "@rebasepro/types";
+    StringProperty
+} from "@rebasepro/cms-types";
 
 // ── From what the server serves ─────────────────────────────────────────────
 

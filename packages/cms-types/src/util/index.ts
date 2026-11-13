@@ -6,6 +6,7 @@
  */
 export * from "./child_views";
 export * from "./collection_policies";
+export * from "./collection_relations";
 export * from "./collection_registry";
 export * from "./compose_callbacks";
 export * from "./copy";
@@ -18,4 +19,5 @@ export * from "./one_of";
 export * from "./paths";
 export * from "./permissions";
 export * from "./resolutions";
+export * from "./resolve_relation";
 export * from "./storage";

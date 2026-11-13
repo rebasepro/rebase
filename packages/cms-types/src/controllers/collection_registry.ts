@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig } from "../types/collections";
 import type { EntityReference } from "@rebasepro/types";
 
 /**

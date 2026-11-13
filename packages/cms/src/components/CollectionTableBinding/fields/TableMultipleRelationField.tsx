@@ -1,14 +1,13 @@
 import { useEntitySelectionDialog } from "../../../hooks/useSelectionDialog";
 
-import { getCollectionDataPath } from "@rebasepro/types";
 import React, { useCallback, useEffect } from "react";
 import { deepEqual as equal } from "fast-equals";
 
 import { normalizeToEntityRelation } from "@rebasepro/common";
 
 import { RelationPreview } from "../../../preview";
-import { Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
-import { AdminCollection, getRelationFrom } from "@rebasepro/cms-types";
+import { Entity, EntityRelation, FilterValues } from "@rebasepro/types";
+import { AdminCollection, getRelationFrom, getCollectionDataPath, Relation } from "@rebasepro/cms-types";
 import { } from "@rebasepro/app";
 import { ErrorView } from "@rebasepro/app";
 import { CompactEntityCellField } from "./CompactEntityCellField";

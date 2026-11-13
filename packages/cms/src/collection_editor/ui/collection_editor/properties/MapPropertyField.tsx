@@ -1,8 +1,7 @@
 import { FieldCaption } from "../../../_cms_internals";
 import React, { useState } from "react";
 ;
-import { MapProperty, Property } from "@rebasepro/types";
-import { PropertyConfig } from "@rebasepro/cms-types";
+import { PropertyConfig, MapProperty, Property } from "@rebasepro/cms-types";
 import { BooleanSwitchWithLabel, Button, Paper, PlusIcon, Typography } from "@rebasepro/ui";
 import { PropertyFormDialog } from "../PropertyEditView";
 import { getIn, useFormex } from "@rebasepro/forms";

@@ -15,7 +15,8 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
-import type { Entity, PostgresProperties, Property } from "@rebasepro/types";
+import type { Entity } from "@rebasepro/types";
+import type { PostgresProperties, Property } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}

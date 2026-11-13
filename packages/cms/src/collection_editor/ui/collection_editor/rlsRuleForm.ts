@@ -2,7 +2,6 @@ import { isPolicyShorthand, isRedactedSecurityRule } from "@rebasepro/types";
 import type {
     AuthenticatedSecurityRule,
     CheckedAccessSecurityRule,
-    CollectionConfig,
     ConditionalAccessSecurityRule,
     OwnerSecurityRule,
     PolicyCondition,
@@ -15,6 +14,9 @@ import type {
     SecurityRule,
     StructuredSecurityRule
 } from "@rebasepro/types";
+import type {
+    CollectionConfig
+} from "@rebasepro/cms-types";
 import { policyConditionToExpression } from "@rebasepro/common";
 import { policyToPostgres } from "@rebasepro/cms-types";
 

@@ -7,8 +7,8 @@
  * that: it built a new `Entity` for every row of every frame, so a push that
  * changed one row of fifty handed every consumer fifty new objects.
  */
-import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig, Entity, FindResult } from "@rebasepro/types";
+import type { Entity, FindResult } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/cms-types";
 import { wrapAsEntityData } from "@rebasepro/common";
 import { collectionEntityDataOptions } from "../src/data/collection_view_model";
 import { sdkClient } from "./helpers/inert-driver";

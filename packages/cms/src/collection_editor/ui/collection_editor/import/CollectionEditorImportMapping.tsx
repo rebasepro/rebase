@@ -6,8 +6,7 @@ import { getIn, useFormex } from "@rebasepro/forms";
 
 import { getFieldConfig, getFieldId } from "../../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../../components/PropertyConfigBadge";
-import { Properties, Property } from "@rebasepro/types";
-import { PropertyConfig, AdminCollection } from "@rebasepro/cms-types";
+import { PropertyConfig, AdminCollection, Properties, Property } from "@rebasepro/cms-types";
 import { cls, Container, Select, SelectItem, Tooltip, Typography } from "@rebasepro/ui";
 import React, { useState } from "react";
 import { OnPropertyChangedParams, PropertyFormDialog, PropertyWithId } from "../PropertyEditView";

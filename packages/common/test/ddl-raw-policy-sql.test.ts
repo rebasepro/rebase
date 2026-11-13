@@ -1,10 +1,11 @@
 import { describe, it, expect } from "@jest/globals";
-import { CollectionConfig, SecurityRule, policy } from "@rebasepro/types";
+import { SecurityRule, policy } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { compileRulePolicies } from "./helpers/legacy-policies";
 import { policyToPostgres } from "./helpers/legacy-policies";
 import { sqlToPolicy } from "../src/util/policy/sqlToPolicy";
 
-const orgs: CollectionConfig = {
+const orgs: LegacyCollectionConfig = {
     slug: "orgs",
     table: "orgs",
     name: "Orgs",

@@ -1,5 +1,4 @@
-import type { AdminCollection, AdminPostgresCollection } from "@rebasepro/cms-types";
-import type { PostgresProperties } from "@rebasepro/types";
+import type { AdminCollection, AdminPostgresCollection, PostgresProperties } from "@rebasepro/cms-types";
 import { readOnlyFieldKeys } from "../../src/components/EntityViewBinding";
 import { HEADER_DISPLAY_ROLES } from "../../src/components/EntityDisplayHeader";
 

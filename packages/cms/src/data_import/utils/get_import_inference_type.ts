@@ -1,4 +1,4 @@
-import { DataType } from "@rebasepro/types";
+import { DataType } from "@rebasepro/cms-types";
 
 export function getInferenceType(value: any): DataType {
     // `typeof null === "object"`, so a null or empty CSV cell used to fall past

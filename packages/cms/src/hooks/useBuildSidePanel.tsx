@@ -1,8 +1,7 @@
 
-import type { Property } from "@rebasepro/types";
 import { warnDeprecated } from "@rebasepro/common";
 import { hasEntityId } from "../util/identity";
-import type { CustomizationController, SidePanelBindingProps, SideDialogPanelProps, SideDialogsController, SidePanelController, UrlController, NavigationStateController, AdminCollection } from "@rebasepro/cms-types";
+import type { CustomizationController, SidePanelBindingProps, SideDialogPanelProps, SideDialogsController, SidePanelController, UrlController, NavigationStateController, AdminCollection, Property } from "@rebasepro/cms-types";
 import { useCallback, useEffect, useRef, useMemo } from "react";
 import { AuthController, CollectionRegistryController } from "@rebasepro/cms-types";
 import { useLocation } from "react-router";

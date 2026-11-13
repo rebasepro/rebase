@@ -1,4 +1,4 @@
-import type { ArrayProperty, MapProperty, Property } from "@rebasepro/types";
+import type { ArrayProperty, MapProperty, Property } from "@rebasepro/cms-types";
 import React from "react";
 import { ErrorBoundary } from "@rebasepro/ui";
 import type { PropertyPreviewProps } from "../../types/components/PropertyPreviewProps";

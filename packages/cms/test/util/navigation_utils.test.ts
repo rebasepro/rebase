@@ -14,8 +14,7 @@ import {
     navigateToEntity
 } from "../../src/util/navigation_utils";
 
-import type { CollectionConfig } from "@rebasepro/types";
-import type { SidePanelController, UrlController } from "@rebasepro/cms-types";
+import type { SidePanelController, UrlController, CollectionConfig } from "@rebasepro/cms-types";
 import { fakeSidePanelController, fakeUrlController } from "../helpers/fakes";
 
 // ---------------------------------------------------------------------------

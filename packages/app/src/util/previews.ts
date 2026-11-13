@@ -1,7 +1,5 @@
-import type { Property } from "@rebasepro/types";
-import type { PropertyConfig, AdminCollection } from "@rebasepro/cms-types";
-import { AuthController, isPropertyBuilder } from "@rebasepro/cms-types";
-import { resolveCollectionRelations } from "@rebasepro/common";
+import type { PropertyConfig, AdminCollection, Property } from "@rebasepro/cms-types";
+import { AuthController, isPropertyBuilder, resolveCollectionRelations } from "@rebasepro/cms-types";
 import { getTitlePropertyKey } from "@rebasepro/app";
 import { SUMMARY_RANK, isStorageProperty, rankSummaryProperty } from "../collections/summary-property";
 

@@ -4,8 +4,8 @@
 
 import { configure, renderHook, waitFor } from "@testing-library/react";
 import { useResolvedCollections } from "../../src/hooks/navigation/useResolvedCollections";
-import { RebaseSdkData, CollectionConfig } from "@rebasepro/types";
-import { AuthController, CollectionRegistryController, CollectionRegistry } from "@rebasepro/cms-types";
+import { RebaseSdkData } from "@rebasepro/types";
+import { AuthController, CollectionRegistryController, CollectionRegistry, CollectionConfig } from "@rebasepro/cms-types";
 import { jest } from "@jest/globals";
 import { fakeAuthController, fakeCollectionRegistry, fakeSdkData, fakeUser } from "../helpers/fakes";
 

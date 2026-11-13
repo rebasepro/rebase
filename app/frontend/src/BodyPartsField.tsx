@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from "react";
 import type { FieldProps } from "@rebasepro/cms";
-import type { ArrayProperty } from "@rebasepro/types";
+import type { ArrayProperty } from "@rebasepro/cms-types";
 import { Typography, cls, defaultBorderMixin, fieldBackgroundMixin } from "@rebasepro/ui";
 
 import bodyFrontImg from "./assets/body_front.png";

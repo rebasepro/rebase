@@ -1,4 +1,4 @@
-import type { EnumValues } from "@rebasepro/types";
+import type { EnumValues } from "@rebasepro/cms-types";
 
 import { extractEnumFromValues, resolveEnumValues } from "../src/util";
 

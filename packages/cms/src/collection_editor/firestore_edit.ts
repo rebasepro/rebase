@@ -16,9 +16,8 @@
  *
  * @module
  */
-import type { Properties, Property } from "@rebasepro/types";
 import { nestAdminCollectionKeys, nestAdminPropertyKeys } from "@rebasepro/cms-types";
-import type { AdminCollection, FirestoreCollectionPatch, FirestorePatchValue } from "@rebasepro/cms-types";
+import type { AdminCollection, FirestoreCollectionPatch, FirestorePatchValue, Properties, Property } from "@rebasepro/cms-types";
 import { SplitEditError } from "./split_edit_error";
 import { sameValue } from "./split_edit";
 

@@ -1,6 +1,4 @@
-import type { Properties } from "@rebasepro/types";
-import type { AdditionalFieldDelegate } from "@rebasepro/cms-types";
-import type { Property } from "@rebasepro/types";
+import type { AdditionalFieldDelegate, Properties, Property } from "@rebasepro/cms-types";
 import React from "react";
 import { Entity, FilterValues, User } from "@rebasepro/types";
 import { CollectionSize, EntityTableController, EntitySelectionController } from "@rebasepro/cms-types";

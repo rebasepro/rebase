@@ -1,6 +1,6 @@
 import { useTranslation } from "@rebasepro/app";
 import type { FieldProps } from "../../types/fields";
-import type { NumberProperty, StringProperty } from "@rebasepro/types";
+import type { NumberProperty, StringProperty } from "@rebasepro/cms-types";
 import React, { useCallback, useId } from "react";
 
 import { FieldHelperText } from "../components/FieldHelperText";

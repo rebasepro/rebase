@@ -8,7 +8,6 @@ export * from "./resumable-upload";
 export * from "./resumable-upload-threshold";
 export * from "./callback-errors";
 export * from "./relations";
-export * from "./resolve-relation";
 export * from "./auth-default-policies";
 export * from "./junction-policies";
 export * from "./tenant";

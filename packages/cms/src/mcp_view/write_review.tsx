@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
-import type { AdminCollection } from "@rebasepro/cms-types";
-import type { Property } from "@rebasepro/types";
+import type { AdminCollection, Property } from "@rebasepro/cms-types";
 import { enumToObjectEntries } from "@rebasepro/cms-types";
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
 import { getPropertyInPath } from "../util/property_utils";

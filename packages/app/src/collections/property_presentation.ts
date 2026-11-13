@@ -18,8 +18,7 @@
  * gates are consulted everywhere a field is laid out — including places with
  * no entity to evaluate a rule against.
  */
-import type { ConditionRule, EnumValueConfig, Property, PropertyConditions, ReferenceProperty } from "@rebasepro/types";
-import type { AdminArrayOptions, AdminReferenceOptions, ConditionContext } from "@rebasepro/cms-types";
+import type { AdminArrayOptions, AdminReferenceOptions, ConditionContext, ConditionRule, EnumValueConfig, Property, PropertyConditions, ReferenceProperty } from "@rebasepro/cms-types";
 import { evaluateCondition } from "@rebasepro/cms-types";
 
 /**

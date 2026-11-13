@@ -1,6 +1,6 @@
 import { useTranslation } from "@rebasepro/app";
 import type { FieldProps } from "../../types/fields";
-import type { VectorProperty } from "@rebasepro/types";
+import type { VectorProperty } from "@rebasepro/cms-types";
 import React, { useState, useEffect, useCallback } from "react";
 import {
     Button,

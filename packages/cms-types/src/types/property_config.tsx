@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrayProperty, MapProperty, Property, StringProperty, NumberProperty, BooleanProperty, DateProperty, GeopointProperty, ReferenceProperty, RelationProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";import { BaseProperty } from "@rebasepro/types";
+import { ArrayProperty, MapProperty, Property, StringProperty, NumberProperty, BooleanProperty, DateProperty, GeopointProperty, ReferenceProperty, RelationProperty, VectorProperty, BinaryProperty } from "./properties";import { BaseProperty } from "./properties";
 
 type AdminBasePropertyNoName = Omit<BaseProperty, "name">;
 

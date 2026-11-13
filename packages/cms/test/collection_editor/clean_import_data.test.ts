@@ -1,5 +1,5 @@
 import { describe, expect, test } from "@jest/globals";
-import { Properties } from "@rebasepro/types";
+import { Properties } from "@rebasepro/cms-types";
 import { cleanPropertiesFromImport } from "../../src/collection_editor/ui/collection_editor/import/clean_import_data";
 
 /**

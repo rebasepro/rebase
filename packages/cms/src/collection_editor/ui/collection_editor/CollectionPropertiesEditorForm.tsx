@@ -23,8 +23,8 @@ import {
     Tooltip,
     Typography
 } from "@rebasepro/ui";
-import { MapProperty, Properties, Property, User } from "@rebasepro/types";
-import { PropertyConfig, AdminCollection, isPropertyBuilder } from "@rebasepro/cms-types";
+import { User } from "@rebasepro/types";
+import { PropertyConfig, AdminCollection, isPropertyBuilder, MapProperty, Properties, Property } from "@rebasepro/cms-types";
 
 import { getFullId, idToPropertiesPath, namespaceToPropertiesOrderPath } from "./util";
 import { OnPropertyChangedParams, PropertyForm, PropertyFormDialog } from "./PropertyEditView";

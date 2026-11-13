@@ -1,5 +1,4 @@
 
-import type { Property } from "@rebasepro/types";
 import { hasEntityId } from "../util/identity";
 import * as React from "react";
 import { useEffect, useMemo } from "react";
@@ -35,7 +34,7 @@ import { useCollectionRegistryController } from "../hooks/navigation/contexts/Co
 import { useSidePanel } from "../hooks/useSidePanel";
 import { EntityPreviewLayout, NestedEntityPreviewBoundary } from "./EntityPreviewNesting";
 import { isEmptyPreviewValue } from "../preview/util";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Property } from "@rebasepro/cms-types";
 
 export type EntityPreviewBindingProps = {
     size?: PreviewSize,

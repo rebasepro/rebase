@@ -2,7 +2,7 @@
 //     type,
 //     getPropertyInPath
 // } from "@rebasepro/app";
-import { Properties, Property } from "@rebasepro/types";
+import { Properties, Property } from "@rebasepro/cms-types";
 // import { typeMapping } from "@rebasepro/types";
 //
 // export function getPropertiesMapping(originProperties: Properties,

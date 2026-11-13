@@ -1,8 +1,6 @@
-import type { Properties } from "@rebasepro/types";
 import { hasEntityId } from "../../../../util/identity";
 
 import type { FormContext, PropertyFieldBindingProps } from "../../../../types/fields";
-import type { Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useLayoutEffect, useState } from "react";
 
 import { Button, DialogActions, IconButton, Portal, Typography, XIcon } from "@rebasepro/ui";
@@ -19,7 +17,7 @@ import { PropertyFieldBinding, zodToFormErrors } from "../../../../form";
 import { useAuthController, useCustomizationController, useData, useRebaseContext } from "@rebasepro/app";
 import type { OnCellValueChangeParams } from "@rebasepro/app";
 import { isDisabled, isReadOnly } from "@rebasepro/app";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Properties, Property } from "@rebasepro/cms-types";
 import { rowOfEntity } from "@rebasepro/app";
 
 interface PopupFormFieldProps<M extends Record<string, unknown>> {

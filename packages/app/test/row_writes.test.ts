@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import type { CollectionCallbacks, SDKTableClient } from "@rebasepro/types";
-import type { AdminCollection, RebaseContext } from "@rebasepro/cms-types";
+import type { SDKTableClient } from "@rebasepro/types";
+import type { AdminCollection, RebaseContext, CollectionCallbacks } from "@rebasepro/cms-types";
 import { createDataChanges, type DataChanges } from "../src/hooks/data/dataChanges";
 import { buildContextData, createRowWriter, MAX_WRITE_DEPTH } from "../src/hooks/data/rowWrites";
 import type { SdkDataLayer } from "../src/hooks/data/sdkData";

@@ -1,8 +1,9 @@
-import type { ArrayProperty, StringProperty } from "@rebasepro/types";
+import type { ArrayProperty, StringProperty } from "@rebasepro/cms-types";
 import * as React from "react";
 import { useMemo } from "react";
 
-import { Entity, StorageConfig } from "@rebasepro/types";
+import { Entity } from "@rebasepro/types";
+import { StorageConfig } from "@rebasepro/cms-types";
 import { PreviewSize } from "../../../types";
 import { useDropzone } from "react-dropzone";
 import { PropertyPreview } from "../../../preview";

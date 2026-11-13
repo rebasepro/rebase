@@ -1,0 +1,458 @@
+/**
+ * The panel's relation view model: a relation as a collection declares it
+ * (`relations: [...]` or a `relation` property), and resolved against its
+ * target collection.
+ *
+ * @module
+ */
+import type { AnyCollectionConfig } from "./collections";
+import type { Properties } from "./properties";
+import type { JoinStep, OnAction, RelationKind } from "@rebasepro/types";
+
+/** Fields every relation carries, whatever its kind. @group Models */
+export interface RelationBase {
+    /**
+     * The name this link is addressed by: the key in `include`, the tab in the
+     * admin panel, and the path segment of a nested URL.
+     *
+     * Defaults to the declaring property's key, or to the target's slug for an
+     * entry in `relations`.
+     */
+    relationName?: string;
+
+    /** The collection on the other end. */
+    target: () => AnyCollectionConfig;
+
+    /**
+     * What the database does to this side's foreign key when the target row's
+     * key changes. Emitted as the constraint's `ON UPDATE`.
+     *
+     * Unset means no clause, which Postgres reads as `NO ACTION`. Set
+     * `"cascade"` when the target's key is a natural key that can be edited —
+     * a slug, a SKU — so the pointers follow it.
+     *
+     * Only a `belongsTo` puts the key on this table, so this is the only kind
+     * where the clause is written here; on the other kinds it describes the
+     * constraint the target's own column carries.
+     */
+    onUpdate?: OnAction;
+    /**
+     * What the database does to this side's rows when the target row is
+     * deleted. Emitted as the constraint's `ON DELETE`.
+     *
+     * Defaults, when unset, to `"set null"` for an optional relation and
+     * **`"restrict"`** for a required one. `NOT NULL` says a child cannot exist
+     * without a parent; it does not say deleting the parent should delete the
+     * child. Ask for `"cascade"` when that is what you mean — it is the one
+     * value that destroys rows you did not name.
+     *
+     * A `manyToMany` is the exception: its junction rows default to
+     * `"cascade"`, because the row deleted there is the link and not the target.
+     */
+    onDelete?: OnAction;
+
+    /**
+     * Presentation overrides applied when this relation is rendered as a tab.
+     *
+     * Whether the link is *required* is not here: it is
+     * `validation: { required: true }` on the declaring property, the same key
+     * every other field uses. A relation carried its own copy until 0.18, and
+     * the two disagreed by construction — the DDL generator read the property
+     * (so the column was `NOT NULL`) while codegen read the relation (so the
+     * generated `Insert` type made it optional), and a `create()` that
+     * typechecked failed at the database.
+     */
+    overrides?: Partial<AnyCollectionConfig>;
+}
+
+/**
+ * This collection holds the foreign key. One target row per source row.
+ *
+ * ```ts
+ * author: { kind: "belongsTo", target: () => authors, localKey: "author_id" }
+ * ```
+ * @group Models
+ */
+export interface BelongsToRelation extends RelationBase {
+    kind: "belongsTo";
+    /**
+     * Column on **this** collection's table holding the target's key.
+     * Defaults to `<relationName>_id`.
+     */
+    localKey?: string;
+    /**
+     * Whether Rebase creates a btree index on {@link localKey}. Defaults to
+     * `true`.
+     *
+     * Postgres indexes the key a foreign key *points at* but never the column
+     * holding it, so without one every read from the other side seq-scans this
+     * table: a `hasMany`/`hasOne` include, a nested listing such as
+     * `/authors/5/posts`, and the `ON DELETE` check when a target row is
+     * deleted. The derived index is skipped on its own when the column already
+     * leads one — the primary key, a `validation.unique`, or an entry in
+     * `indexes:` — so it never duplicates an index you declared.
+     *
+     * Set `false` for a table so write-heavy that the index costs more than
+     * the lookups it serves, or when you keep an index of your own on the
+     * column outside Rebase's `indexes:` block.
+     */
+    index?: boolean;
+}
+
+/**
+ * The target holds the foreign key, and at most one target row points back.
+ *
+ * ```ts
+ * profile: { kind: "hasOne", target: () => profiles, foreignKeyOnTarget: "user_id" }
+ * ```
+ * @group Models
+ */
+export interface HasOneRelation extends RelationBase {
+    kind: "hasOne";
+    /**
+     * Column on the **target's** table holding this collection's key.
+     * Defaults to `<thisCollection>_id`.
+     */
+    foreignKeyOnTarget?: string;
+    /**
+     * Column on **this** collection's table whose value `foreignKeyOnTarget`
+     * holds. Defaults to this collection's primary key.
+     *
+     * Set it when the two sides are joined on a natural key rather than on the
+     * row id — an external identity id, a SKU, a tenant slug. See
+     * {@link HasManyRelation.sourceKey}, which this mirrors.
+     */
+    sourceKey?: string;
+}
+
+/**
+ * The target holds the foreign key, and many target rows point back. The
+ * children belong to this parent alone — deleting one deletes a row.
+ *
+ * ```ts
+ * posts: { kind: "hasMany", target: () => posts, foreignKeyOnTarget: "author_id" }
+ * ```
+ * @group Models
+ */
+export interface HasManyRelation extends RelationBase {
+    kind: "hasMany";
+    /**
+     * Column on the **target's** table holding this collection's key.
+     * Defaults to `<thisCollection>_id`.
+     */
+    foreignKeyOnTarget?: string;
+    /**
+     * Column on **this** collection's table whose value `foreignKeyOnTarget`
+     * holds. Defaults to this collection's primary key.
+     *
+     * The mirror of `localKey` on {@link BelongsToRelation}: that one names the
+     * column this side reads from, this one names the column the other side
+     * points at. Without it the pair can only be joined on the row id, which
+     * makes a natural-key link — `auth_user_id ↔ auth_user_id`, a SKU, a tenant
+     * slug — inexpressible as `hasMany`, and it has to drop to the read-only
+     * `via`.
+     *
+     * The column must be unique: the link addresses one source row per value,
+     * and Postgres will not accept a foreign key against a non-unique column.
+     *
+     * ```ts
+     * applications: {
+     *     kind: "hasMany",
+     *     target: () => talentApplications,
+     *     sourceKey: "auth_user_id",
+     *     foreignKeyOnTarget: "auth_user_id"
+     * }
+     * ```
+     */
+    sourceKey?: string;
+}
+
+/**
+ * Both sides hold many, through a junction table. The target rows are shared,
+ * so this collection owns the *link* and not the row: removing one removes a
+ * junction row and leaves the target alone.
+ *
+ * Declared the same way from either side — there is no owning and inverse
+ * version. Swap `sourceColumn` and `targetColumn` to describe the other
+ * direction.
+ *
+ * ```ts
+ * tags: { kind: "manyToMany", target: () => tags }
+ * ```
+ * @group Models
+ */
+export interface ManyToManyRelation extends RelationBase {
+    kind: "manyToMany";
+    /**
+     * The junction table and its two key columns. Every part defaults: the
+     * table to both table names sorted and joined, the columns to
+     * `<collection>_id` and `<relationName>_id`.
+     */
+    through?: {
+        table?: string;
+        /** Junction column holding **this** collection's key. */
+        sourceColumn?: string;
+        /** Junction column holding the **target's** key. */
+        targetColumn?: string;
+        /**
+         * Extra columns the junction row carries, declared exactly like a
+         * collection's properties.
+         *
+         * A membership is often not only a membership. "This user is in that
+         * organisation" is really "…as an `owner`, since March"; "this tag is
+         * on that post" is really "…in third place". Until this existed the
+         * junction was two key columns and nothing else, so the role and the
+         * position had to become a collection of their own — which is a
+         * different data model, a different set of policies and a different
+         * URL, for what is still one link.
+         *
+         * The properties are read by the same planner that reads a
+         * collection's, so a payload column gets the type, `NOT NULL`,
+         * `DEFAULT`, `UNIQUE` and enum type it would get on a table. What it
+         * does **not** get is `indexes` (declared per collection, and no
+         * collection declares a junction), `search`, `vector`, or anything a
+         * relation would put on it — a payload property may not be a
+         * `relation`, a `reference` or a `vector`, and config validation
+         * refuses one that is.
+         *
+         * On the wire the values travel under {@link JUNCTION_PIVOT_KEY}: a
+         * read serves `{ …target, _pivot: { role } }`, and a membership write
+         * accepts `{ id, _pivot: { role } }` beside the bare ids.
+         *
+         * ```ts
+         * members: {
+         *     kind: "manyToMany",
+         *     target: () => users,
+         *     through: {
+         *         table: "org_members",
+         *         properties: {
+         *             role: { type: "string", enum: { owner: "Owner", admin: "Admin", member: "Member" },
+         *                     defaultValue: "member", validation: { required: true } },
+         *             joinedAt: { type: "date", autoValue: "on_create" }
+         *         }
+         *     }
+         * }
+         * ```
+         *
+         * Both sides of the same junction may declare it, and both must agree:
+         * `resolveTableJunctions` refuses two declarations of the same payload
+         * key that do not describe the same column, because only one of them
+         * could ever be created.
+         */
+        properties?: Properties;
+    };
+}
+
+/**
+ * An explicit chain of joins, for links the four shapes above cannot express:
+ * multi-hop paths, composite keys, or a join whose condition is not a plain
+ * foreign key.
+ *
+ * Read-only. Rebase will not infer how to write through an arbitrary join
+ * chain, and guessing is what this type exists to stop.
+ *
+ * ```ts
+ * permissions: {
+ *     kind: "via",
+ *     target: () => permissions,
+ *     cardinality: "many",
+ *     joinPath: [
+ *         { table: "user_roles",       on: { from: "id",            to: "user_id" } },
+ *         { table: "role_permissions", on: { from: "role_id",       to: "role_id" } },
+ *         { table: "permissions",      on: { from: "permission_id", to: "id" } }
+ *     ]
+ * }
+ * ```
+ * @group Models
+ */
+export interface ViaRelation extends RelationBase {
+    kind: "via";
+    /** Whether the chain yields one row or many. Cannot be derived from a join chain. */
+    cardinality: "one" | "many";
+    /**
+     * The joins, in order, from this collection's table to the target's.
+     *
+     * Each step names a table and the columns to join it on; the last step's
+     * table is the target. A single-hop chain is writable through a create or
+     * update — to-one in one step (the target holds the key), to-many through
+     * one junction table — and a longer one is read-only, because Rebase will
+     * not work out how to write through an arbitrary chain, and guessing is
+     * what this kind exists to stop.
+     */
+    joinPath: JoinStep[];
+}
+
+/**
+ * A link from one collection to another, as authored.
+ *
+ * A closed union: pick the kind that describes the link and the type offers
+ * exactly the fields that kind needs. See {@link ResolvedRelation} for the form
+ * the runtime works with, which has every default filled in.
+ *
+ * @group Models
+ */
+export type Relation =
+    | BelongsToRelation
+    | HasOneRelation
+    | HasManyRelation
+    | ManyToManyRelation
+    | ViaRelation;
+
+/**
+ * A relation with every default filled in — the form the runtime works with.
+ *
+ * The authored {@link Relation} and this are deliberately different types.
+ * They used to be one, which meant no reader could tell which fields had been
+ * supplied and which had been guessed, and so every consumer re-derived what it
+ * needed with its own chain of `if (through) … else if (localKey) …` fallbacks.
+ * Those chains disagreed with each other; that disagreement is what produced
+ * silently wrong reads and corrupt writes.
+ *
+ * Here each variant carries exactly its own fields, all required. A consumer
+ * switches on `kind` and gets what it needs without a fallback, and the cases
+ * it forgot are a compile error rather than a wrong answer at runtime.
+ *
+ * @group Models
+ */
+export type ResolvedRelation =
+    | ResolvedBelongsTo
+    | ResolvedHasOne
+    | ResolvedHasMany
+    | ResolvedManyToMany
+    | ResolvedVia;
+
+/** Fields present on every resolved relation. @group Models */
+export interface ResolvedRelationBase {
+    /** Always set: defaulted during resolution if the author omitted it. */
+    relationName: string;
+    /**
+     * The collection on the other end.
+     *
+     * Still a thunk — a relation between two collections that import each other
+     * has to be — but normalised: resolution unwraps the module namespace the
+     * author's `() => import(…)` may hand back, so every consumer gets the
+     * config and not a `{ default: … }` wrapper.
+     */
+    target: () => AnyCollectionConfig;
+    /** The target's slug, resolved once so consumers need not call `target()`. */
+    targetSlug: string;
+    /** As authored — see {@link RelationBase.onUpdate}. Defaults are not filled in. */
+    onUpdate?: OnAction;
+    /**
+     * As authored — see {@link RelationBase.onDelete}. `undefined` here means
+     * the author said nothing, and the DDL generator picks the default; it does
+     * **not** mean "no action".
+     */
+    onDelete?: OnAction;
+    /** Presentation overrides applied when this relation is rendered as a tab. */
+    overrides?: Partial<AnyCollectionConfig>;
+    /**
+     * Whether one row or many come back. Derived from `kind` — kept because it
+     * is what most consumers actually branch on, and because `via` is the one
+     * kind where it is authored rather than implied.
+     */
+    cardinality: "one" | "many";
+    /**
+     * Whether Rebase writes this link through a create or update. True for
+     * every kind but a multi-hop {@link ResolvedVia}: a `via` is writable when
+     * it has a single link to set — a to-one chain of one step (the target
+     * holds the key) or a to-many chain through one junction table — and
+     * read-only otherwise, since Rebase will not invent a write for a longer
+     * chain.
+     */
+    writable: boolean;
+    /**
+     * Whether the target rows are shared with other parents. True for
+     * many-to-many and for multi-hop `via`: what the parent owns is the link,
+     * so removing one must not delete the row.
+     */
+    shared: boolean;
+}
+
+/** @group Models */
+export interface ResolvedBelongsTo extends ResolvedRelationBase {
+    kind: "belongsTo";
+    cardinality: "one";
+    writable: true;
+    shared: false;
+    /** Column on this collection's table. */
+    localKey: string;
+    /** As authored, with the default filled in — see {@link BelongsToRelation.index}. */
+    index: boolean;
+}
+
+/** @group Models */
+export interface ResolvedHasOne extends ResolvedRelationBase {
+    kind: "hasOne";
+    cardinality: "one";
+    writable: true;
+    shared: false;
+    /** Column on the target's table. */
+    foreignKeyOnTarget: string;
+    /** @see ResolvedHasMany.sourceKey */
+    sourceKey?: string;
+}
+
+/** @group Models */
+export interface ResolvedHasMany extends ResolvedRelationBase {
+    kind: "hasMany";
+    cardinality: "many";
+    writable: true;
+    shared: false;
+    /** Column on the target's table. */
+    foreignKeyOnTarget: string;
+    /**
+     * Column on the source's table that `foreignKeyOnTarget` points at, or
+     * `undefined` for the source's primary key.
+     *
+     * The one optional field on a resolved relation, and deliberately so. Every
+     * other default is filled in here because it can be: a table name and a
+     * column name are derivable from the relation and its two endpoints alone.
+     * The primary key is not — this driver resolves it from `isId`, then the
+     * Drizzle schema, then a column named `id`, and the middle tier does not
+     * exist at resolution time.
+     *
+     * So `undefined` is a sentinel with exactly one meaning, not a field a
+     * consumer is invited to guess at. Read it through `sourceKeyField()`,
+     * which is the only place that turns it into a column name.
+     */
+    sourceKey?: string;
+}
+
+/** @group Models */
+export interface ResolvedManyToMany extends ResolvedRelationBase {
+    kind: "manyToMany";
+    cardinality: "many";
+    writable: true;
+    shared: true;
+    /**
+     * The junction table and its two key columns, with every default filled in:
+     * the table from both table names sorted and joined, the columns from each
+     * endpoint's slug.
+     */
+    through: {
+        table: string;
+        sourceColumn: string;
+        targetColumn: string;
+        /**
+         * The payload columns as authored, or `{}` when there are none —
+         * never `undefined`, so a consumer reads one shape.
+         * See {@link ManyToManyRelation.through}.
+         */
+        properties: Properties;
+    };
+}
+
+/** @group Models */
+export interface ResolvedVia extends ResolvedRelationBase {
+    kind: "via";
+    /**
+     * True for a single-hop chain — to-one through one step, or to-many through
+     * one junction table — and false for anything longer. See
+     * {@link ResolvedRelationBase.writable}.
+     */
+    writable: boolean;
+    /** The chain as authored — see {@link ViaRelation.joinPath}. Nothing to default. */
+    joinPath: JoinStep[];
+}
+

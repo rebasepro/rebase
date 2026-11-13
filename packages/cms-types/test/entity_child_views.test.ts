@@ -1,6 +1,6 @@
 import { CollectionRegistry } from "@rebasepro/cms-types";
 import { getEntityChildViews, getSubcollections } from "@rebasepro/cms-types";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/cms-types";
 
 /**
  * A child view is keyed by the **relation key**, and both path resolvers agree

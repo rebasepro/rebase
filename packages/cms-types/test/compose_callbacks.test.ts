@@ -1,5 +1,5 @@
-import { describe, expect, it } from "@jest/globals";
-import type { CollectionCallbacks, CollectionConfig, ReadQuery } from "@rebasepro/types";
+import type { ReadQuery } from "@rebasepro/types";
+import type { CollectionCallbacks, CollectionConfig } from "@rebasepro/cms-types";
 import { createCallContext } from "@rebasepro/common";
 import { composeCallbacks } from "@rebasepro/cms-types";
 

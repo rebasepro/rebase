@@ -1,6 +1,7 @@
 import { jest } from "@jest/globals";
 import { resolveCollections } from "../../src/hooks/navigation/useNavigationResolution";
-import type { AfterSaveProps, EntityStatus } from "@rebasepro/types";
+import type { EntityStatus } from "@rebasepro/types";
+import type { AfterSaveProps } from "@rebasepro/cms-types";
 import { resolveAdminCollection, type AdminCollection, type AuthCapabilities, type AuthController } from "@rebasepro/cms-types";
 import { fakeAuthController, fakeDialogsController, fakeRebaseContext, fakeSdkData, fakeUser } from "../helpers/fakes";
 import { col, defineAuthTable } from "@rebasepro/types";

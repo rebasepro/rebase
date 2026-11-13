@@ -1,5 +1,4 @@
-import { Properties } from "@rebasepro/types";
-import { applyDefaultValuesOnCreate, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/cms-types";
+import { applyDefaultValuesOnCreate, updateDateAutoValues, updateUserAutoValues, Properties } from "@rebasepro/cms-types";
 
 describe("applyDefaultValuesOnCreate", () => {
     const properties: Properties = {

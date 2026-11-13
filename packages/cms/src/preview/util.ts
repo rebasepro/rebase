@@ -1,5 +1,5 @@
 import { CollectionSize } from "@rebasepro/cms-types";
-import type { DateProperty } from "@rebasepro/types";
+import type { DateProperty } from "@rebasepro/cms-types";
 import type { PreviewSize } from "../types/components/PropertyPreviewProps";
 /**
  * The schemes a preview link may use — everything else becomes `about:blank`.

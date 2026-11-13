@@ -3,7 +3,7 @@
  * is handed by `CollectionPanel.onRowClick` and reads with `useRows`.
  */
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/cms-types";
 import { EntityRelation } from "@rebasepro/types";
 import { copyRow, fromWireRow, toWireRow } from "../src/util/wire_row";
 

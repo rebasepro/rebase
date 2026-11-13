@@ -13,8 +13,7 @@
  * unhandled rejection with nothing on screen.
  */
 import React from "react";
-import type { CollectionConfig } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, CollectionConfig } from "@rebasepro/cms-types";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 

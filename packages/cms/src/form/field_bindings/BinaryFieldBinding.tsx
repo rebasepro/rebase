@@ -1,5 +1,5 @@
 import type { FieldProps } from "../../types/fields";
-import type { BinaryProperty } from "@rebasepro/types";
+import type { BinaryProperty } from "@rebasepro/cms-types";
 import React, { useCallback, useEffect, useState } from "react";
 import { Button, CheckIcon, cls, defaultBorderMixin, IconButton, PencilIcon, TextField, Trash2Icon } from "@rebasepro/ui";
 

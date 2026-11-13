@@ -20,7 +20,7 @@ if (typeof window !== "undefined") {
 
 import { getSimplifiedProperties } from "../utils/properties";
 import { flatMapEntityValues, omitDisabledValues } from "../utils/values";
-import { Properties } from "@rebasepro/types";
+import { Properties } from "@rebasepro/cms-types";
 
 /**
  * The schema serializer.

@@ -1,5 +1,5 @@
 import { FirestoreTextSearchController, FirestoreTextSearchControllerBuilder } from "../types";
-import { CollectionConfig } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/cms-types";
 
 /**
  * Utility function to perform a text search in an external index,

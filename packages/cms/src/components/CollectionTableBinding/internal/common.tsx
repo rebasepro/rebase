@@ -1,6 +1,5 @@
 
-import type { ArrayProperty, DateProperty, Property } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, ArrayProperty, DateProperty, Property } from "@rebasepro/cms-types";
 import { DatePreviewFormatOptions, formatDatePreview } from "../../../preview/components/DatePreview";
 import { getDatePropertyMode, getDatePropertyTimezone } from "../../../preview/util";
 

@@ -7,13 +7,13 @@ import {
     sanitizeData,
     getReferenceFrom,
     traverseValuesProperties,
-    traverseValueProperty
+    traverseValueProperty,
+    Property,
+    Properties
 } from "@rebasepro/cms-types";
 import {
     type Entity,
-    Property,
-    EntityReference,
-    Properties
+    EntityReference
 } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────

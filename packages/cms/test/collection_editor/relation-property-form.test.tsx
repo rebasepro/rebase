@@ -4,8 +4,8 @@
 import React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Formex, useCreateFormex, type FormexController } from "@rebasepro/forms";
-import { resolveRelation } from "@rebasepro/common";
-import type { CollectionConfig, Property, Relation } from "@rebasepro/types";
+import { resolveRelation } from "@rebasepro/cms-types";
+import type { CollectionConfig, Property, Relation } from "@rebasepro/cms-types";
 import { tablePatchProblems } from "@rebasepro/types";
 
 import { wireRelationFromRelation } from "../../src/collection_editor/property_column";

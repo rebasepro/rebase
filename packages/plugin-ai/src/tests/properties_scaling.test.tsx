@@ -19,7 +19,6 @@ if (typeof window !== "undefined") {
 import React from "react";
 import { act, render } from "@testing-library/react";
 import { AuthControllerContext } from "@rebasepro/app";
-import type { PostgresProperties } from "@rebasepro/types";
 
 /**
  * The property map the autofill request carries is built from the form's
@@ -42,7 +41,7 @@ jest.mock("../utils/properties", () => {
 import { getSimplifiedProperties } from "../utils/properties";
 import { DataEnhancementControllerProvider, useDataEnhancementController } from "../components/DataEnhancementControllerProvider";
 import { clearAiStatusCache } from "../api";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, PostgresProperties } from "@rebasepro/cms-types";
 import { authControllerFor, formStandIn, installFetch } from "../test/fixtures";
 
 const BLOCKS: PostgresProperties = {

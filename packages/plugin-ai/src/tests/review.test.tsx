@@ -22,8 +22,8 @@ import React from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 
 import { AuthControllerContext } from "@rebasepro/app";
-import type { AdminCollection } from "@rebasepro/cms-types";
-import type { CollectionConfig, User } from "@rebasepro/types";
+import type { AdminCollection, CollectionConfig } from "@rebasepro/cms-types";
+import type { User } from "@rebasepro/types";
 import { authControllerFor, formStandIn, installFetch } from "../test/fixtures";
 
 import {

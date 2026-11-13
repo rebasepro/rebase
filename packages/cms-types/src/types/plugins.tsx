@@ -2,7 +2,7 @@ import React, { PropsWithChildren } from "react";
 
 import type { CollectionActionsProps } from "../collections";
 import type { EntityStatus } from "@rebasepro/types";
-import type { InferPropertyType, Property } from "@rebasepro/types";
+import type { InferPropertyType, Property } from "./properties";
 import type { FormContext } from "./entity_views";
 import type { RebaseContext } from "../rebase_context";
 import type { NavigationGroupMapping, AppView } from "../controllers/navigation";

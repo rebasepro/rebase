@@ -2,8 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
-import type { AdminCollection } from "@rebasepro/cms-types";
-import type { CollectionConfig, RelationProperty } from "@rebasepro/types";
+import type { AdminCollection, CollectionConfig, RelationProperty } from "@rebasepro/cms-types";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react";
 

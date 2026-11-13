@@ -1,5 +1,5 @@
 import { useCellSelected, createSelectionStore } from "../SelectableTable/SelectionStore";
-import type { ArrayProperty, NumberProperty, Property, ReferenceProperty, StringProperty } from "@rebasepro/types";
+import type { ArrayProperty, NumberProperty, Property, ReferenceProperty, StringProperty } from "@rebasepro/cms-types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deepEqual as equal, shallowEqual } from "fast-equals"
 

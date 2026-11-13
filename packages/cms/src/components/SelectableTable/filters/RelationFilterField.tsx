@@ -1,6 +1,7 @@
 import React, { useId, useMemo, useState } from "react";
 import { VirtualTableWhereFilterOp } from "@rebasepro/ui";
-import { EntityRelation, Relation } from "@rebasepro/types";
+import { EntityRelation } from "@rebasepro/types";
+import { Relation } from "@rebasepro/cms-types";
 import { Checkbox, Label, Select, SelectItem } from "@rebasepro/ui";
 import { RelationSelector } from "../../RelationSelector";
 import { isNullFilterOperator, nullFilterOperatorFor, valueOperatorFor } from "./null_filter";

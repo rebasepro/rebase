@@ -3,7 +3,7 @@
  * `server-postgres/test/e2e/time-column-e2e.test.ts`), so the form and the
  * table show it in UTC — in the browser's zone a stored 09:30 read as 10:30.
  */
-import type { DateProperty } from "@rebasepro/types";
+import type { DateProperty } from "@rebasepro/cms-types";
 import { getDatePropertyTimezone } from "../../src/preview/util";
 
 describe("the zone a date property is shown in", () => {

@@ -1,6 +1,5 @@
-import { EnumValueConfig } from "@rebasepro/types";
 import { ChipColorScheme, getColorSchemeForKey, getColorSchemeForSeed } from "@rebasepro/ui";
-import { getLabelOrConfigFrom } from "@rebasepro/cms-types";
+import { getLabelOrConfigFrom, EnumValueConfig } from "@rebasepro/cms-types";
 
 export function getColorScheme(enumValues: EnumValueConfig[], key: string | number): ChipColorScheme | undefined {
     const labelOrConfig = getLabelOrConfigFrom(enumValues, key);

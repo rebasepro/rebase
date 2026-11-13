@@ -1,4 +1,5 @@
-import { AuthState, Entity, CollectionConfig, isPostgresCollectionConfig, SecurityOperation, SecurityRule, User } from "@rebasepro/types";
+import { AuthState, Entity, SecurityOperation, SecurityRule, User } from "@rebasepro/types";
+import { CollectionConfig, isPostgresCollectionConfig } from "../types/collections";
 import { securityRuleToConditions } from "@rebasepro/common";
 import { evaluatePolicy, PolicyEvalContext, TriState } from "@rebasepro/common";
 

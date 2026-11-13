@@ -23,11 +23,11 @@ import * as UI from "@rebasepro/ui";
 import { useAggregate, useRow, useRowCount, useRows, useRowWrites, type UseRowWritesResult } from "@rebasepro/app";
 import type { SidePanelBindingProps, SidePanelController } from "@rebasepro/cms-types";
 import {
-    getCollectionDataPath,
     type McpAppModule
 } from "@rebasepro/types";
 import {
-    type McpAppModuleExport
+    type McpAppModuleExport,
+    getCollectionDataPath
 } from "@rebasepro/cms-types";
 import { CollectionPanel, type CollectionPanelProps } from "../components/CollectionPanel";
 import { RecordForm, type RecordFormProps } from "../components/RecordForm";

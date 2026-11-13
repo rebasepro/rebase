@@ -1,4 +1,4 @@
-import { EnumValueConfig, EnumValues } from "@rebasepro/types";
+import { EnumValueConfig, EnumValues } from "@rebasepro/cms-types";
 import { unslugify } from "@rebasepro/utils";
 
 // Canonical utility functions — single source of truth in @rebasepro/utils

@@ -13,8 +13,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { Properties } from "@rebasepro/types";
-import { AuthController } from "@rebasepro/cms-types";
+import { AuthController, Properties } from "@rebasepro/cms-types";
 import { buildEntityPropertiesFromData } from "@rebasepro/inference";
 import { parseCsvToObjects } from "../../../src/data_import/utils/csv";
 import { mapJsonParse, unflattenObject } from "../../../src/data_import/utils/transforms";

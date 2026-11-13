@@ -1,5 +1,7 @@
-import type { CollectionConfig, Property, RelationProperty, ResolvedRelation } from "@rebasepro/types";
-import { resolveCollectionRelations } from "@rebasepro/common";
+import type { CollectionConfig } from "../types/collections";
+import type { Property, RelationProperty } from "../types/properties";
+import type { ResolvedRelation } from "../types/relation_kinds";
+import { resolveCollectionRelations } from "./collection_relations";
 import { resolveRelationProperty } from "./child_views";
 
 /**

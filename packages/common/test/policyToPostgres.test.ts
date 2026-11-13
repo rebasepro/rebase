@@ -2,15 +2,16 @@ import { describe, it, expect } from "@jest/globals";
 import { policyToPostgres } from "./helpers/legacy-policies";
 import { evaluatePolicy } from "../src/util/policy/evaluatePolicy";
 import { findAnonymousGrants, sqlToPolicy } from "../src/util/policy/sqlToPolicy";
-import { ANONYMOUS_USER_ID, policy, CollectionConfig } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, policy } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
-const documents: CollectionConfig = {
+const documents: LegacyCollectionConfig = {
     slug: "documents",
     name: "Documents",
     properties: { team_id: { type: "string", name: "Team" } }
 };
 
-const teamMembers: CollectionConfig = {
+const teamMembers: LegacyCollectionConfig = {
     slug: "team_members",
     name: "Team Members",
     properties: {
@@ -331,7 +332,7 @@ describe("sqlToPolicy → policyToPostgres round-trip", () => {
  * are the same.
  */
 describe("policyToPostgres — row-independent parts become initPlans", () => {
-    const owned: CollectionConfig = { slug: "notes", name: "Notes", properties: { ownerId: { type: "string", columnName: "owner_id" } } };
+    const owned: LegacyCollectionConfig = { slug: "notes", name: "Notes", properties: { ownerId: { type: "string", columnName: "owner_id" } } };
 
     it("wraps the whole server-or-admin baseline in one subquery", () => {
         expect(policyToPostgres(policy.or(policy.serverContext(), policy.rolesOverlap(["admin"]))))

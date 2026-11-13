@@ -1,13 +1,15 @@
 import {
-    DataType,
     Entity,
     EntityReference,
     EntityRelation,
     EntityStatus,
-    EntityValues,
+    EntityValues
+} from "@rebasepro/types";
+import {
+    DataType,
     Properties,
     Property
-} from "@rebasepro/types";
+} from "../types/properties";
 import { DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "./one_of";
 import { mergeDeep } from "@rebasepro/utils";
 

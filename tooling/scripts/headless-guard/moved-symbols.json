@@ -165,6 +165,16 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "fieldKeyForColumn",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "findRelation",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "fullPathToCollectionSegments",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
@@ -277,6 +287,11 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "getTableName",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "getTenantConfig",
       "from": "@rebasepro/common",
       "to": null,
@@ -298,6 +313,11 @@
       "from": "@rebasepro/common",
       "to": null,
       "instead": "includableRelations(descriptor) from @rebasepro/common."
+    },
+    {
+      "symbol": "isJunctionBackedRelation",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
     },
     {
       "symbol": "isPropertyBuilder",
@@ -399,6 +419,11 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "resolveCollectionRelations",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "resolveEnumValues",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
@@ -431,6 +456,11 @@
     },
     {
       "symbol": "ResolvePropertyProps",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "resolveRelation",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
     },
@@ -558,12 +588,117 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "AfterDeleteProps",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "AfterReadProps",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "AfterSaveErrorProps",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "AfterSaveProps",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "AnyCollectionConfig",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ArrayProperty",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ArrayPropertyValidationSchema",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "AuthCollectionConfig",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "BaseCollectionConfig",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "BaseProperty",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "BeforeDeleteProps",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "BeforeQueryProps",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "BeforeSaveProps",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "BelongsToRelation",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "BinaryProperty",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "BooleanProperty",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ChildViewSource",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "CollectionCallbacks",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "CollectionConfig",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "CollectionRegistryController",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "CollectionView",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "ConditionContext",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ConditionRule",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
     },
@@ -574,12 +709,97 @@
       "instead": "Nothing: the Postgres driver's codecs read the column descriptor."
     },
     {
+      "symbol": "DataType",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "DateProperty",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "DatePropertyValidationSchema",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "deserializeCollections",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "EffectiveRoleController",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "EngineProperties",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "EntityChildView",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "EnumValueConditions",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "EnumValueConfig",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "EnumValues",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "FieldAccess",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "FileType",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "FilterPreset",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "FirebaseCollectionConfig",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "FirebaseProperties",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "FirebaseProperty",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "GeopointProperty",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getCollectionDataPath",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getDeclaredSubcollections",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
     },
@@ -590,10 +810,40 @@
       "instead": "Read RelationDescriptor.kind (hasOne | hasMany)."
     },
     {
+      "symbol": "HasManyRelation",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "HasOneRelation",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ImageResize",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "InferCollectionConfigType",
       "from": "@rebasepro/types",
       "to": null,
       "instead": "Infer a table's row with InferRow<typeof table>."
+    },
+    {
+      "symbol": "InferEntityType",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "InferPropertyType",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "isFirebaseCollectionConfig",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
     },
     {
       "symbol": "isManyToMany",
@@ -602,10 +852,40 @@
       "instead": "Read RelationDescriptor.kind === \"manyToMany\"."
     },
     {
+      "symbol": "isPostgresCollectionConfig",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "isRelationalCollectionConfig",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "isSerializedCollectionRef",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "isToMany",
       "from": "@rebasepro/types",
       "to": null,
       "instead": "Read RelationDescriptor.kind (hasMany | manyToMany | via)."
+    },
+    {
+      "symbol": "JsonLogicRule",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ManyToManyRelation",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "MapProperty",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
     },
     {
       "symbol": "McpAppModuleExport",
@@ -628,10 +908,190 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "NoSuchKey",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "NumberProperty",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "NumberPropertyValidationSchema",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "PostgresCollectionConfig",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "PostgresProperties",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "PostgresProperty",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "Properties",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "Property",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "PropertyBuilderProps",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "PropertyCallbacks",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "PropertyConditions",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "PropertyTypeNotOnThisEngine",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "PropertyValidationSchema",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ReferenceProperty",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "Relation",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "RelationBase",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "RelationProperty",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ResolvedBelongsTo",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "ResolvedForeignKeyOnTarget",
       "from": "@rebasepro/types",
       "to": null,
       "instead": "Read RelationDescriptor.kind (hasOne | hasMany)."
+    },
+    {
+      "symbol": "ResolvedHasMany",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ResolvedHasOne",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ResolvedManyToMany",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ResolvedRelation",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ResolvedRelationBase",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ResolvedVia",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "serializeCollections",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "SerializedCollectionRef",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "SqlExpression",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "StorageConfig",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "StrictProperties",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "StringProperty",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "StringPropertyValidationSchema",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "UploadedFileContext",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "VectorDistance",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "VectorIndexConfig",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "VectorProperty",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ViaRelation",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
     }
   ]
 }

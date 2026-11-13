@@ -1,6 +1,6 @@
 import React from "react";
 import type { PropertyPreviewProps } from "@rebasepro/cms";
-import type { ArrayProperty, EnumValueConfig, StringProperty } from "@rebasepro/types";
+import type { ArrayProperty, EnumValueConfig, StringProperty } from "@rebasepro/cms-types";
 import { cls, Tooltip } from "@rebasepro/ui";
 import { resolveEnumValues } from "@rebasepro/cms-types";
 

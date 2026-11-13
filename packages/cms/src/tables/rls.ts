@@ -11,12 +11,14 @@
  */
 import type {
     CollectionTenantConfig,
-    PostgresCollectionConfig,
-    PostgresProperties,
     RedactedSecurityRule,
     SecurityRule,
     TableDescriptor
 } from "@rebasepro/types";
+import type {
+    PostgresCollectionConfig,
+    PostgresProperties
+} from "@rebasepro/cms-types";
 import { isRedactedSecurityRule, policy } from "@rebasepro/types";
 import { getEffectiveSecurityRules } from "@rebasepro/cms-types";
 

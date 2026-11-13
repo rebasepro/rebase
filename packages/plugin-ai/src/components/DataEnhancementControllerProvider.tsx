@@ -7,8 +7,8 @@ import {
     InputProperty,
     ProposedField
 } from "../types/data_enhancement_controller";
-import { CollectionConfig, User } from "@rebasepro/types";
-import { FormContext, PluginFormActionProps } from "@rebasepro/cms-types";
+import { User } from "@rebasepro/types";
+import { FormContext, PluginFormActionProps, CollectionConfig } from "@rebasepro/cms-types";
 import { EditorAIControllerProvider } from "@rebasepro/cms";
 import { useAuthController } from "@rebasepro/app";
 import { autofillStream, fetchAiStatusCached, fetchPromptSuggestions } from "../api";

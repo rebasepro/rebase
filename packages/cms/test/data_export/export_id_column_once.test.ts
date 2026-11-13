@@ -1,5 +1,5 @@
 import { describe, expect, test } from "@jest/globals";
-import type { Properties } from "@rebasepro/types";
+import type { Properties } from "@rebasepro/cms-types";
 import { createCsvExportWriter } from "../../src/data_export/export/export";
 
 /**

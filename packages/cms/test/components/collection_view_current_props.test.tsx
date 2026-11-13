@@ -5,7 +5,8 @@ import React from "react";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import type { Entity, PostgresProperties } from "@rebasepro/types";
+import type { Entity } from "@rebasepro/types";
+import type { PostgresProperties } from "@rebasepro/cms-types";
 
 /**
  * The collection view shows what it is given now, not what it was given first.

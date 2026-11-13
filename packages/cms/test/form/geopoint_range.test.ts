@@ -2,7 +2,8 @@
  * @jest-environment jsdom
  */
 import { mapPropertyToZod } from "../../src/form/validation";
-import { GeoPoint, type GeopointProperty } from "@rebasepro/types";
+import { GeoPoint } from "@rebasepro/types";
+import { type GeopointProperty } from "@rebasepro/cms-types";
 
 /**
  * A geopoint out of range. The field showed "Latitude must be between -90 and

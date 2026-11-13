@@ -1,7 +1,6 @@
 // Types only: brings the admin augmentation (`admin` on every property kind)
 // into any program that reads these field types.
-import type {} from "@rebasepro/cms-types";
-import type { FirebaseProperties, FirebaseProperty, InferEntityType, Property } from "@rebasepro/types";
+import type { FirebaseProperties, FirebaseProperty, InferEntityType, Property } from "@rebasepro/cms-types";
 
 /**
  * The keys a Firestore field adds to the property it describes. Each is a

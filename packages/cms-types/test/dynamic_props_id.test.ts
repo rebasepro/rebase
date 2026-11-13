@@ -1,4 +1,4 @@
-import type { Property, PropertyBuilderProps, StringProperty } from "@rebasepro/types";
+import type { Property, PropertyBuilderProps, StringProperty } from "@rebasepro/cms-types";
 import { resolveProperty } from "@rebasepro/cms-types";
 import { resetDeprecationWarningsForTests } from "@rebasepro/common";
 

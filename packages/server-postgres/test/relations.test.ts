@@ -1,6 +1,5 @@
-import { LegacyCollectionConfig, LegacyRelation } from "@rebasepro/common/migrate";
+import { LegacyCollectionConfig, LegacyRelation, resolveLegacyRelation } from "@rebasepro/common/migrate";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
-import { resolveRelation } from "@rebasepro/common";
 import { col, defineTable, rel } from "@rebasepro/types";
 import { compileSchema } from "@rebasepro/common";
 import { compileSet } from "./helpers/plan-tables";
@@ -57,7 +56,7 @@ describe("resolveRelation", () => {
             kind: "belongsTo",
             target: () => mockPostCollection,
             };
-        const normalized = resolveRelation(relation, mockAuthorCollection);
+        const normalized = resolveLegacyRelation(relation, mockAuthorCollection);
         expect(normalized.relationName).toBe("posts");
     });
 
@@ -69,7 +68,7 @@ describe("resolveRelation", () => {
                 relationName: "post",
                 target: () => mockPostCollection,
                 };
-            const normalized = resolveRelation(relation, mockAuthorCollection);
+            const normalized = resolveLegacyRelation(relation, mockAuthorCollection);
             expect(normalized.localKey).toEqual("post_id");
         });
 
@@ -80,7 +79,7 @@ describe("resolveRelation", () => {
                 target: () => mockPostCollection,
                 localKey: "custom_post_fk"
             };
-            const normalized = resolveRelation(relation, mockAuthorCollection);
+            const normalized = resolveLegacyRelation(relation, mockAuthorCollection);
             expect(normalized.localKey).toEqual("custom_post_fk");
         });
     });
@@ -93,7 +92,7 @@ describe("resolveRelation", () => {
                 relationName: "profile",
                 target: () => mockPostCollection,
                 };
-            const normalized = resolveRelation(relation, mockAuthorCollection);
+            const normalized = resolveLegacyRelation(relation, mockAuthorCollection);
             expect(normalized.foreignKeyOnTarget).toEqual("author_id");
         });
 
@@ -104,7 +103,7 @@ describe("resolveRelation", () => {
                 target: () => mockPostCollection,
                 foreignKeyOnTarget: "custom_author_fk"
             };
-            const normalized = resolveRelation(relation, mockAuthorCollection);
+            const normalized = resolveLegacyRelation(relation, mockAuthorCollection);
             expect(normalized.foreignKeyOnTarget).toEqual("custom_author_fk");
         });
 
@@ -124,7 +123,7 @@ describe("resolveRelation", () => {
                 target: () => mockPostCollection,
                 inverseRelationName: "author_profile"
             };
-            const normalized = resolveRelation(relation, mockAuthorCollection);
+            const normalized = resolveLegacyRelation(relation, mockAuthorCollection);
             expect(normalized.foreignKeyOnTarget).toEqual("author_id");
             expect(normalized).not.toHaveProperty("inverseRelationName");
         });
@@ -143,7 +142,7 @@ describe("resolveRelation", () => {
                 relationName: "posts",
                 target: () => mockPostCollection,
                 };
-            const normalized = resolveRelation(relation, mockAuthorCollection);
+            const normalized = resolveLegacyRelation(relation, mockAuthorCollection);
             expect(normalized.kind).toEqual("hasMany");
             expect(normalized.cardinality).toEqual("many");
             expect(normalized.foreignKeyOnTarget).toEqual("author_id");
@@ -156,7 +155,7 @@ describe("resolveRelation", () => {
                 target: () => mockPostCollection,
                 foreignKeyOnTarget: "writer_id"
             };
-            const normalized = resolveRelation(relation, mockAuthorCollection);
+            const normalized = resolveLegacyRelation(relation, mockAuthorCollection);
             expect(normalized.foreignKeyOnTarget).toEqual("writer_id");
         });
     });
@@ -174,7 +173,7 @@ describe("resolveRelation", () => {
                     targetColumn: "tag_id"
                 }
             };
-            const normalized = resolveRelation(relation, mockPostCollection);
+            const normalized = resolveLegacyRelation(relation, mockPostCollection);
             expect(normalized.through).toEqual({
                 table: "posts_tags",
                 sourceColumn: "post_id",
@@ -203,7 +202,7 @@ describe("resolveRelation", () => {
                 relationName: "posts",
                 target: () => mockPostCollection
             };
-            expect(() => resolveRelation(relation, mockAuthorCollection)).toThrow(/Unknown relation kind/);
+            expect(() => resolveLegacyRelation(relation, mockAuthorCollection)).toThrow(/Unknown relation kind/);
         });
 
         it("should handle 'one' with 'owning' direction", () => {
@@ -212,7 +211,7 @@ describe("resolveRelation", () => {
                 relationName: "author",
                 target: () => mockAuthorCollection,
                 };
-            const normalized = resolveRelation(relation, mockPostCollection);
+            const normalized = resolveLegacyRelation(relation, mockPostCollection);
             expect(normalized.localKey).toEqual("author_id");
         });
     });

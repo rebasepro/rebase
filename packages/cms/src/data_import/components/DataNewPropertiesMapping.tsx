@@ -1,6 +1,6 @@
 
 import { getPropertyInPath } from "../../util";
-import { Properties, Property } from "@rebasepro/types";
+import { Properties, Property } from "@rebasepro/cms-types";
 import {
     BooleanSwitchWithLabel,
     ChevronRightIcon,

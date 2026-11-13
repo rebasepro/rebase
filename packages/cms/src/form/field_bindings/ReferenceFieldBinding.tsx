@@ -1,7 +1,6 @@
 import { useEntitySelectionDialog } from "../../hooks/useSelectionDialog";
 
 import type { FieldProps } from "../../types/fields";
-import type { Property, ReferenceProperty } from "@rebasepro/types";
 import React, { useCallback, useMemo } from "react";
 
 import { Entity, EntityReference } from "@rebasepro/types";
@@ -16,7 +15,7 @@ import { getIconForProperty } from "../../util/property_utils";
 import { cls } from "@rebasepro/ui";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import { useReferencePaths } from "../../hooks/useReferencePaths";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Property, ReferenceProperty } from "@rebasepro/cms-types";
 
 /**
  * Field that opens a reference selection dialog.

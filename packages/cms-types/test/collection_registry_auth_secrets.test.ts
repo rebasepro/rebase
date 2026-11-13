@@ -1,5 +1,4 @@
-import { CollectionConfig, Property } from "@rebasepro/types";
-import { CollectionRegistry } from "@rebasepro/cms-types";
+import { CollectionRegistry, CollectionConfig, Property } from "@rebasepro/cms-types";
 import { authSecretsMissingExclusion } from "@rebasepro/common";
 
 /**

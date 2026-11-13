@@ -17,8 +17,7 @@
  */
 import { describe, expect, it } from "@jest/globals";
 import { renderHook } from "@testing-library/react";
-import type { AdminCollection } from "@rebasepro/cms-types";
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import type { AdminCollection, PostgresCollectionConfig } from "@rebasepro/cms-types";
 import { col, defineTable, json, rel } from "@rebasepro/types";
 import { compileTables } from "@rebasepro/common";
 import { getAdminEntityChildViews, getFormFieldKeys, resolveFormLayout, useColumnIds } from "@rebasepro/app";

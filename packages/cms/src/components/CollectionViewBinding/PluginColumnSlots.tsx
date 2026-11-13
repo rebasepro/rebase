@@ -1,5 +1,4 @@
-import type { Property } from "@rebasepro/types";
-import type { AdminCollection, SlotContribution, TableController } from "@rebasepro/cms-types";
+import type { AdminCollection, SlotContribution, TableController, Property } from "@rebasepro/cms-types";
 import React from "react";
 import { ErrorBoundary } from "@rebasepro/ui";
 

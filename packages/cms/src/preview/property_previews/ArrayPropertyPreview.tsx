@@ -1,4 +1,4 @@
-import type { ArrayProperty, Property } from "@rebasepro/types";
+import type { ArrayProperty, Property } from "@rebasepro/cms-types";
 import React from "react";
 
 import type { PropertyPreviewProps, PreviewSize } from "../../types/components/PropertyPreviewProps";

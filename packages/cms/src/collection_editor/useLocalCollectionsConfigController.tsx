@@ -12,8 +12,7 @@ import {
 import type { TableDescriptor, TablePatch, UiTablePreferences, UnmappedTable } from "@rebasepro/types";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { AdminCollection, AdminPostgresCollection } from "@rebasepro/cms-types";
-import type { EnumValues, FirebaseProperty, PostgresProperty, Property } from "@rebasepro/types";
+import type { AdminCollection, AdminPostgresCollection, EnumValues, FirebaseProperty, PostgresProperty, Property } from "@rebasepro/cms-types";
 import { DEFAULT_API_PATH } from "@rebasepro/app";
 import { useLiveSchemaEditing } from "./useLiveSchemaEditing";
 import { LiveSchemaError, type SchemaEditProblem } from "./liveSchemaClient";

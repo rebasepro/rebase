@@ -5,7 +5,8 @@ import React from "react";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { beforeAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { EntityRelation, type Entity, type FindParams, type Relation } from "@rebasepro/types";
+import { EntityRelation, type Entity, type FindParams } from "@rebasepro/types";
+import { type Relation } from "@rebasepro/cms-types";
 
 /**
  * The rows a picker opens with — the ones already linked — are read in one

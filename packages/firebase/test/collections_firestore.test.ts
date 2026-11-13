@@ -1,8 +1,7 @@
 import { afterAll, describe, expect, it } from "@jest/globals";
 import { deleteApp, initializeApp } from "firebase/app";
 import { collection, disableNetwork, doc, getDocsFromCache, getFirestore, setDoc, terminate } from "firebase/firestore";
-import { COLLECTION_PATH_SEPARATOR } from "@rebasepro/cms-types";
-import { getDeclaredSubcollections } from "@rebasepro/types";
+import { COLLECTION_PATH_SEPARATOR, getDeclaredSubcollections } from "@rebasepro/cms-types";
 import { docsToCollectionTree } from "../src/utils/collections_firestore";
 
 const app = initializeApp({

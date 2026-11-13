@@ -1,5 +1,6 @@
 import { CollectionsConfigController } from "./config_controller";
-import { Entity, Property } from "@rebasepro/types";
+import { Entity } from "@rebasepro/types";
+import { Property } from "@rebasepro/cms-types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**

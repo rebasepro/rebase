@@ -4,7 +4,7 @@
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { render, screen, fireEvent } from "@testing-library/react";
-import type { CollectionConfig, Relation } from "@rebasepro/types";
+import type { CollectionConfig, Relation } from "@rebasepro/cms-types";
 import type { VirtualTableWhereFilterOp } from "@rebasepro/ui";
 
 /**

@@ -4,7 +4,8 @@
 import React from "react";
 import { beforeAll, expect, it, jest } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
-import { EntityRelation, type Relation } from "@rebasepro/types";
+import { EntityRelation } from "@rebasepro/types";
+import { type Relation } from "@rebasepro/cms-types";
 
 /**
  * The relation field's "open this record" button is named in the admin's

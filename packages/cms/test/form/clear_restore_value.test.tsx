@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "@jest/globals";
 import { renderHook } from "@testing-library/react";
-import type { Property } from "@rebasepro/types";
+import type { Property } from "@rebasepro/cms-types";
 import { useClearRestoreValue } from "../../src/form/useClearRestoreValue";
 
 /**

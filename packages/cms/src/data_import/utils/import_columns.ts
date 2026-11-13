@@ -1,4 +1,4 @@
-import { Properties, Property } from "@rebasepro/types";
+import { Properties, Property } from "@rebasepro/cms-types";
 import { isPrototypePollutingKey, slugify } from "@rebasepro/utils";
 import { getPropertyInPath } from "../../util";
 

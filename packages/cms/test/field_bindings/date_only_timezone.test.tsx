@@ -2,7 +2,7 @@
  * @jest-environment ./test/helpers/los-angeles-tz-environment.cjs
  */
 import React from "react";
-import type { DateProperty } from "@rebasepro/types";
+import type { DateProperty } from "@rebasepro/cms-types";
 import { describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react";
 

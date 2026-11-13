@@ -4,7 +4,8 @@
 import React from "react";
 import { beforeAll, describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { DateProperty, Entity, Property, WhereFilterOp } from "@rebasepro/types";
+import type { Entity, WhereFilterOp } from "@rebasepro/types";
+import type { DateProperty, Property } from "@rebasepro/cms-types";
 
 /**
  * The table's date cell and the date filter read and write a date the way the

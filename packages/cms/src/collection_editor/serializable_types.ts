@@ -12,25 +12,25 @@
  */
 
 import type {
-    ArrayPropertyValidationSchema,
-    EnumValues,
-    FileType,
     FilterValues,
-    ImageResize,
     JoinStep,
-    NumberPropertyValidationSchema,
     OnAction,
-    PropertyConditions,
-    PropertyValidationSchema,
     SecurityRule,
-    SqlExpression,
     WhereFilterOp
 } from "@rebasepro/types";
 import type {
     CollectionSize,
     KanbanConfig,
     ViewMode,
-    FilterPreset
+    FilterPreset,
+    ArrayPropertyValidationSchema,
+    EnumValues,
+    FileType,
+    ImageResize,
+    NumberPropertyValidationSchema,
+    PropertyConditions,
+    PropertyValidationSchema,
+    SqlExpression
 } from "@rebasepro/cms-types";
 
 // ═══════════════════════════════════════════════════════════════════════

@@ -1,5 +1,5 @@
-import { InferPropertyType } from "@rebasepro/types";
-import { Property } from "@rebasepro/types";
+import { InferPropertyType } from "@rebasepro/cms-types";
+import { Property } from "@rebasepro/cms-types";
 
 /**
  * @group Preview components

@@ -1,4 +1,4 @@
-import type { Property } from "@rebasepro/types";
+import type { Property } from "@rebasepro/cms-types";
 import { useEffect, useRef } from "react";
 ;
 

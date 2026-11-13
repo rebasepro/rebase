@@ -1,13 +1,7 @@
 import {
-    CollectionConfig,
-    PostgresCollectionConfig,
-    FirebaseCollectionConfig,
-    ReferenceProperty,
-    RelationProperty,
-    StringProperty,
     getDataSourceCapabilities
 } from "@rebasepro/types";
-import { CollectionRegistry } from "@rebasepro/cms-types";
+import { CollectionRegistry, CollectionConfig, PostgresCollectionConfig, FirebaseCollectionConfig, ReferenceProperty, RelationProperty, StringProperty } from "@rebasepro/cms-types";
 
 /**
  * These fixtures used to declare the engine as `driver: "firestore"`. There is

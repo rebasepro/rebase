@@ -1,5 +1,5 @@
 import type React from "react";
-import type { Property } from "@rebasepro/types";
+import type { Property } from "./properties";
 import type { WhereFilterOp } from "@rebasepro/types";
 
 // ── Scoped component name unions ──────────────────────────────────────

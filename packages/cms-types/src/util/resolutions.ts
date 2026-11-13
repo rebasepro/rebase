@@ -1,20 +1,28 @@
 import {
-    ArrayProperty,
     AuthState,
-    CollectionConfig,
+    getDataSourceCapabilities
+} from "@rebasepro/types";
+import {
+    ArrayProperty,
     EnumValueConfig,
     EnumValues,
     NumberProperty,
     Properties,
     Property,
     RelationProperty,
-    ResolvedRelation,
-    StringProperty,
-    getDataSourceCapabilities,
+    StringProperty
+} from "../types/properties";
+import {
+    CollectionConfig,
     getDeclaredSubcollections,
     type EntityChildView
-} from "@rebasepro/types";
-import { withDeprecatedAlias, isJunctionBackedRelation, resolveCollectionRelations, resolveRelation } from "@rebasepro/common";
+} from "../types/collections";
+import {
+    ResolvedRelation
+} from "../types/relation_kinds";
+import { withDeprecatedAlias } from "@rebasepro/common";
+import { isJunctionBackedRelation, resolveCollectionRelations } from "./collection_relations";
+import { resolveRelation } from "./resolve_relation";
 import { enumToObjectEntries } from "./enums";
 import { getSubcollections, getEntityChildViews, resolveRelationProperty } from "./child_views";
 import { isPropertyBuilder } from "./entities";

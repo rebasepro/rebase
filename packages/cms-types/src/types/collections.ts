@@ -1,17 +1,17 @@
 import type { CollectionCallbacks } from "./entity_callbacks";
+import type { AuthCollectionContext, AuthCollectionCreateResult, AuthCollectionResetResult } from "@rebasepro/types";
 
 import type { EnumValues, Properties, PostgresProperties, FirebaseProperties } from "./properties";
 
-import type { User } from "../users";
-import type { EmailSendResult } from "../controllers/email";
-import type { Relation } from "./relations";
-import type { SecurityRule } from "./security_rules";
-import type { RoleDefinition, ScopeDefinition } from "./scopes";
-import { getDataSourceCapabilities } from "./data_source";
-import type { WhereFilterOp, FilterValues } from "./filter-operators";
-import type { SearchConfig } from "./search";
-import type { CollectionIndex } from "./indexes";
-import type { CollectionTenantConfig } from "./tenancy";
+import type { User } from "@rebasepro/types";
+import type { Relation } from "./relation_kinds";
+import type { SecurityRule } from "@rebasepro/types";
+import type { RoleDefinition, ScopeDefinition } from "@rebasepro/types";
+import { getDataSourceCapabilities } from "@rebasepro/types";
+import type { WhereFilterOp, FilterValues } from "@rebasepro/types";
+import type { SearchConfig } from "@rebasepro/types";
+import type { CollectionIndex } from "@rebasepro/types";
+import type { CollectionTenantConfig } from "@rebasepro/types";
 
 /**
  * Base interface containing all driver-agnostic collection properties.
@@ -696,7 +696,6 @@ export interface EntityChildView<M extends Record<string, unknown> = Record<stri
 }
 
 
-export type { WhereFilterOp, FilterValues, WireFilterValues } from "./filter-operators";
 
 /**
  * Configuration for authentication collections.
@@ -809,60 +808,4 @@ export interface AuthCollectionConfig {
     actions?: {
         resetPassword?: boolean | object;
     };
-}
-
-/**
- * Context provided to collection-level auth hooks.
- *
- * This is a simplified facade over the server internals —
- * it exposes only what's needed for custom auth flows without
- * coupling collection config to internal interfaces.
- *
- * @group Models
- */
-export interface AuthCollectionContext {
-    /** Hash a password using the configured algorithm (scrypt by default). */
-    hashPassword: (password: string) => Promise<string>;
-    /**
-     * Send an email. Only available when email service is configured.
-     *
-     * Resolves with what the provider reported — the assigned Message-ID, most
-     * usefully — so a hook that sends a message can store the id and later
-     * thread a reply back to it. Callers that do not care may ignore it.
-     */
-    sendEmail?: (options: { to: string; subject: string; html: string; text?: string }) => Promise<EmailSendResult>;
-    /** Whether the email service is configured and available. */
-    emailConfigured: boolean;
-    /** The app name from email config (for templates). */
-    appName: string;
-    /** The base URL for password reset links. */
-    resetPasswordUrl: string;
-}
-
-/**
- * Result of a collection-level `onCreateUser` hook.
- * @group Models
- */
-export interface AuthCollectionCreateResult {
-    /** Processed values to persist (must include passwordHash, NOT raw password). */
-    values: Record<string, unknown>;
-    /** If set, shown to the admin in the creation result dialog. */
-    temporaryPassword?: string;
-    /** Whether an invitation email was sent. */
-    invitationSent?: boolean;
-}
-
-/**
- * Result of a collection-level `onResetPassword` hook.
- * @group Models
- */
-export interface AuthCollectionResetResult {
-    /**
-     * The account's new password. Rebase hashes and saves it, then shows it to
-     * the admin; leave it unset when the account keeps its password for now
-     * (for example, because the hook emailed a link).
-     */
-    temporaryPassword?: string;
-    /** Whether a reset email was sent. */
-    invitationSent?: boolean;
 }

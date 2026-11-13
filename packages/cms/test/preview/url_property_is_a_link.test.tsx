@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from "react";
-import type { StringProperty } from "@rebasepro/types";
+import type { StringProperty } from "@rebasepro/cms-types";
 import { render, screen } from "@testing-library/react";
 
 /**

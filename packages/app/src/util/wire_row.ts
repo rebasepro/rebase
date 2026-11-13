@@ -1,7 +1,6 @@
-import type { CollectionConfig, Properties, Property, ResolvedRelation } from "@rebasepro/types";
+import type { CollectionConfig, Properties, Property, ResolvedRelation } from "@rebasepro/cms-types";
 import { EntityRelation } from "@rebasepro/types";
-import { fieldKeyForColumn, resolveCollectionRelations } from "@rebasepro/common";
-import { rowToViewModel } from "@rebasepro/cms-types";
+import { rowToViewModel, fieldKeyForColumn, resolveCollectionRelations } from "@rebasepro/cms-types";
 
 /**
  * A record's values from the admin's view model (`entity.values`), as the

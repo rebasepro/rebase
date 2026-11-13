@@ -16,9 +16,10 @@
 import type {
     AdminCollection,
     FormSection,
-    PropertySpan
+    PropertySpan,
+    EnumValues,
+    Property
 } from "@rebasepro/cms-types";
-import type { EnumValues, Property } from "@rebasepro/types";
 import { effectiveAccess } from "@rebasepro/cms-types";
 import { isHidden } from "./property_presentation";
 

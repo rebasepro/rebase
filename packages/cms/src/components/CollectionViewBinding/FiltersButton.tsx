@@ -1,5 +1,4 @@
-import type { Properties } from "@rebasepro/types";
-import type { EntityTableController } from "@rebasepro/cms-types";
+import type { EntityTableController, Properties } from "@rebasepro/cms-types";
 import type { FilterValues } from "@rebasepro/types";
 import React, { useState } from "react";
 import { useTranslation } from "@rebasepro/app";

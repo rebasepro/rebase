@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import type { Properties } from "@rebasepro/types";
+import type { Properties } from "@rebasepro/cms-types";
 import { fakeCollection, resolvedManyToMany } from "../helpers/fakes";
 
 const authors = fakeCollection("authors");

@@ -1,4 +1,4 @@
-import { PropertyValidationSchema } from "@rebasepro/types";
+import { PropertyValidationSchema } from "@rebasepro/cms-types";
 import { InferencePropertyBuilderProps } from "../types";
 
 export function buildValidation({

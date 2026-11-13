@@ -2,8 +2,7 @@
  * @jest-environment jsdom
  */
 import { act, renderHook } from "@testing-library/react";
-import type { CollectionConfig } from "@rebasepro/types";
-import type { AdminCollection, UserConfigurationPersistence } from "@rebasepro/cms-types";
+import type { AdminCollection, UserConfigurationPersistence, CollectionConfig } from "@rebasepro/cms-types";
 import { useBuildCollectionRegistryController } from "../../src/hooks/navigation/useBuildCollectionRegistryController";
 import { fakeUserConfigPersistence } from "../helpers/fakes";
 

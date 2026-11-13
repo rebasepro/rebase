@@ -1,6 +1,5 @@
-import type { Property } from "@rebasepro/types";
 
-import type { AdditionalFieldDelegateProps, AdminCollection } from "@rebasepro/cms-types";
+import type { AdditionalFieldDelegateProps, AdminCollection, Property } from "@rebasepro/cms-types";
 import type { ResolvedFormField, ResolvedFormSection } from "@rebasepro/app";
 import type { FormContext } from "../types/fields";
 import React, { useCallback, useMemo, useRef, useState } from "react";

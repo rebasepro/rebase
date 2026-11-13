@@ -3,7 +3,7 @@
  */
 import React from "react";
 import { act, renderHook } from "@testing-library/react";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/cms-types";
 import { useBuildCollectionRegistryController } from "../../src/hooks/navigation/useBuildCollectionRegistryController";
 import { CollectionRegistryContext } from "../../src/hooks/navigation/contexts/CollectionRegistryContext";
 import { useChildViewSource } from "../../src/hooks/useChildViewSource";

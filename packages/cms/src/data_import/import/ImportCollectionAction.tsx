@@ -5,8 +5,8 @@ import {
     useSnackbarController
 } from "@rebasepro/app";
 import { getPropertiesWithPropertiesOrder, getPropertyInPath } from "../../util";
-import { Properties, Property, User } from "@rebasepro/types";
-import { CollectionActionsProps, AdminCollection } from "@rebasepro/cms-types";
+import { User } from "@rebasepro/types";
+import { CollectionActionsProps, AdminCollection, Properties, Property } from "@rebasepro/cms-types";
 import { getFieldConfig } from "../../components/field_configs";
 import { PropertyConfigBadge } from "../../components/PropertyConfigBadge";
 import { useEntitySelectionController } from "../../components/CollectionViewBinding/useSelectionController";

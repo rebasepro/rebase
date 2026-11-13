@@ -2,7 +2,7 @@ import { collection, getFirestore, onSnapshot, query } from "firebase/firestore"
 import Fuse from "fuse.js"
 
 import { FirebaseApp } from "firebase/app";
-import { CollectionConfig } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/cms-types";
 import { FirestoreTextSearchController, FirestoreTextSearchControllerBuilder } from "../types";
 
 const MAX_SEARCH_RESULTS = 80;

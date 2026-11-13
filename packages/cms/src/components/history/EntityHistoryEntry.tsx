@@ -1,5 +1,4 @@
 
-import type { Property } from "@rebasepro/types";
 import * as React from "react";
 
 import { ArrowLeftIcon, Chip, cls, defaultBorderMixin, iconSize, Tooltip, Typography } from "@rebasepro/ui";
@@ -11,7 +10,7 @@ import { useAuthController } from "@rebasepro/app";
 import { UserChip } from "./UserChip";
 import { HistoryEntryData } from "../../hooks";
 import { getValueInPath } from "@rebasepro/utils";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Property } from "@rebasepro/cms-types";
 
 /**
  * Recursive deep equality for primitives, arrays and plain objects.

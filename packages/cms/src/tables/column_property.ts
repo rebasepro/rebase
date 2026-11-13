@@ -8,16 +8,19 @@
  * `autoValue`, `admin.readOnly`, …).
  */
 import type {
-    ArrayProperty,
     ColumnDescriptor,
     ColumnElementDescriptor,
     ColumnStorage,
     ColumnType,
     ColumnValidation,
+    JsonShape,
+    VectorMetric
+} from "@rebasepro/types";
+import type {
+    ArrayProperty,
     DateProperty,
     DatePropertyValidationSchema,
     EnumValueConfig,
-    JsonShape,
     MapProperty,
     NumberProperty,
     NumberPropertyValidationSchema,
@@ -29,9 +32,8 @@ import type {
     StringPropertyValidationSchema,
     VectorDistance,
     VectorIndexConfig,
-    VectorMetric,
     VectorProperty
-} from "@rebasepro/types";
+} from "@rebasepro/cms-types";
 import { CHIP_COLORS, CHIP_SEED_KEYS, getColorSchemeForSeed } from "@rebasepro/ui";
 import { enumValueLabel, labelFromIdentifier } from "@rebasepro/utils";
 

@@ -1,5 +1,6 @@
 import { resolveFilterOperators } from "@rebasepro/app";
-import type { Property, Relation, RelationKind } from "@rebasepro/types";
+import type { RelationKind } from "@rebasepro/types";
+import type { Property, Relation } from "@rebasepro/cms-types";
 import { renderableRelationOperators } from "../../src/components/SelectableTable/filters/RelationFilterField";
 import { fakeCollection } from "../helpers/fakes";
 

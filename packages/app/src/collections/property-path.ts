@@ -1,4 +1,4 @@
-import type { Properties, Property } from "@rebasepro/types";
+import type { Properties, Property } from "@rebasepro/cms-types";
 
 /**
  * The property at a dotted path, walking `map` children — `address.street`.

@@ -31,9 +31,7 @@ import type {
     StorageCustomization,
     TableCustomization,
     TableCustomizationOptions,
-    TableDisplay
-} from "@rebasepro/cms-types";
-import type {
+    TableDisplay,
     AnyCollectionConfig,
     ArrayProperty,
     EnumValueConfig,
@@ -45,7 +43,7 @@ import type {
     ReferenceProperty,
     Relation,
     StorageConfig
-} from "@rebasepro/types";
+} from "@rebasepro/cms-types";
 
 /**
  * A table's collection in the panel, after customization.

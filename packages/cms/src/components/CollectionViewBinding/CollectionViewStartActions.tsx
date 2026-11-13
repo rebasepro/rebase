@@ -1,4 +1,4 @@
-import type { Properties } from "@rebasepro/types";
+import type { Properties } from "@rebasepro/cms-types";
 
 import React, { useCallback } from "react";
 import { useAuthController, useTranslation, useSlot } from "@rebasepro/app";

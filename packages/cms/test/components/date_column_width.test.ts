@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import type { DateProperty } from "@rebasepro/types";
+import type { DateProperty } from "@rebasepro/cms-types";
 
 import { getDateColumnWidth } from "../../src/components/CollectionTableBinding/internal/common";
 import { formatDatePreview } from "../../src/preview/components/DatePreview";

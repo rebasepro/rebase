@@ -1,4 +1,4 @@
-import type { NumberProperty } from "@rebasepro/types";
+import type { NumberProperty } from "@rebasepro/cms-types";
 import React from "react";
 
 import { EnumValuesChip } from "../components/EnumValuesChip";

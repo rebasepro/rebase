@@ -1,5 +1,4 @@
-import type { Property } from "@rebasepro/types";
-import type { AdditionalFieldDelegate, EntityAction, AdminCollection } from "@rebasepro/cms-types";
+import type { AdditionalFieldDelegate, EntityAction, AdminCollection, Property } from "@rebasepro/cms-types";
 import { Entity } from "@rebasepro/types";
 import {
     CollectionSize,

@@ -4,7 +4,8 @@
 import React from "react";
 import { beforeAll, describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { FilterValues, Property } from "@rebasepro/types";
+import type { FilterValues } from "@rebasepro/types";
+import type { Property } from "@rebasepro/cms-types";
 
 /**
  * Filters → "Clear all" emptied the dialog's filters, and the count, but every

@@ -1,5 +1,4 @@
-import type { AdminCollection } from "@rebasepro/cms-types";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { AdminCollection, CollectionConfig } from "@rebasepro/cms-types";
 import { getFormFieldKeys } from "../../src/components/common/useColumnsIds";
 import { resolveFormLayout } from "../../src/collections/form-layout";
 

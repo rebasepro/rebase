@@ -1,5 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import type { PostgresCollectionConfig } from "@rebasepro/cms-types";
 import { getCopyValues } from "../src/util/copy";
 
 /**

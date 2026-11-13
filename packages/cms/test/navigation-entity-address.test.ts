@@ -1,5 +1,5 @@
-import { CollectionConfig, User } from "@rebasepro/types";
-import { RebaseContext } from "@rebasepro/cms-types";
+import { User } from "@rebasepro/types";
+import { RebaseContext, CollectionConfig } from "@rebasepro/cms-types";
 import { NavigationResolutionContext, resolveNavigationFrom } from "../src/hooks/useResolvedNavigationFrom";
 import { fakeCollectionRegistry, fakeNavigationState } from "./helpers/fakes";
 

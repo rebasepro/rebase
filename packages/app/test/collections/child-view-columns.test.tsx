@@ -1,7 +1,6 @@
 import React from "react";
 import { render } from "@testing-library/react";
-import type { AdminCollection } from "@rebasepro/cms-types";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { AdminCollection, CollectionConfig } from "@rebasepro/cms-types";
 import { getRedundantChildViewColumnIds, useColumnIds } from "../../src/components/common/useColumnsIds";
 
 /**

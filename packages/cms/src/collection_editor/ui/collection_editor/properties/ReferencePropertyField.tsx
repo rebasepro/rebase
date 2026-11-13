@@ -3,7 +3,7 @@ import { FieldCaption, useCollectionRegistryController } from "../../../_cms_int
 import React from "react";
 import { Field, getIn, useFormex } from "@rebasepro/forms";
 ;
-import { NumberProperty, StringProperty } from "@rebasepro/types";
+import { NumberProperty, StringProperty } from "@rebasepro/cms-types";
 import { CircularProgress, Select, SelectItem, Typography } from "@rebasepro/ui";
 
 export function ReferencePropertyField({

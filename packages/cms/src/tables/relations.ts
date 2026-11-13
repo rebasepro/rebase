@@ -9,14 +9,16 @@
  * (`getEntityChildViews`), with the redundant picker beside it hidden.
  */
 import type {
-    AnyCollectionConfig,
     ColumnDescriptor,
-    Properties,
-    Relation,
     RelationDescriptor,
-    RelationProperty,
     TableDescriptor
 } from "@rebasepro/types";
+import type {
+    AnyCollectionConfig,
+    Properties,
+    Relation,
+    RelationProperty
+} from "@rebasepro/cms-types";
 import { labelFromIdentifier } from "@rebasepro/utils";
 
 import { propertyFromColumn } from "./column_property";

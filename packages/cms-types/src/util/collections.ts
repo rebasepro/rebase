@@ -1,8 +1,10 @@
 import {
-    CollectionConfig,
+    CollectionConfig
+} from "../types/collections";
+import {
     Properties,
     Property
-} from "@rebasepro/types";
+} from "../types/properties";
 import { isPropertyBuilder } from "./entities";
 
 export function sortProperties<M extends Record<string, unknown>>(properties: Properties, propertiesOrder?: string[]): Properties {

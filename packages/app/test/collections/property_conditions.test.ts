@@ -1,7 +1,6 @@
 import { applyPropertyConditions, isDisabled, isHidden, isReadOnly } from "../../src/collections/property_presentation";
 import { registerConditionOperations } from "@rebasepro/cms-types";
-import type { EnumValueConfig, Property, PropertyConditions } from "@rebasepro/types";
-import type { ConditionContext } from "@rebasepro/cms-types";
+import type { ConditionContext, EnumValueConfig, Property, PropertyConditions } from "@rebasepro/cms-types";
 
 /** The enum options a resolved property carries, as the array form the conditions write. */
 function enumOptions(property: Property): EnumValueConfig[] {

@@ -1,6 +1,7 @@
-import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig, JoinStep, RelationProperty } from "@rebasepro/types";
-import { resolveCollectionRelations } from "../src";
+import type { JoinStep } from "@rebasepro/types";
+import type { CollectionConfig } from "../src/types/collections";
+import type { RelationProperty } from "../src/types/properties";
+import { resolveCollectionRelations } from "../src/util/collection_relations";
 
 /**
  * Which `via` chains Rebase writes: the ones with a single link to set.

@@ -1,7 +1,7 @@
-import { isRelationalCollectionConfig, joinConditions, type Property, type Relation } from "@rebasepro/types";
+import { joinConditions } from "@rebasepro/types";
 import { generateForeignKeyName } from "@rebasepro/utils";
 import type { AdminCollection } from "@rebasepro/cms-types";
-import { getPrimaryKeys, isPropertyBuilder } from "@rebasepro/cms-types";
+import { getPrimaryKeys, isPropertyBuilder, isRelationalCollectionConfig, type Property, type Relation } from "@rebasepro/cms-types";
 import { getPropertyInPath } from "./property-path";
 import { getDisplayPropertyKey, hasDeclaredDisplay } from "./entity-display";
 import { isStorageProperty } from "./summary-property";

@@ -25,7 +25,8 @@ import {
 import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
-import { Entity, EntityRelation, FilterValues, Relation, getCollectionDataPath } from "@rebasepro/types";
+import { Entity, EntityRelation, FilterValues } from "@rebasepro/types";
+import { Relation, getCollectionDataPath } from "@rebasepro/cms-types";
 import { EntityPreviewBindingData } from "./EntityPreviewBinding";
 import { PickerTrigger } from "./PickerTrigger";
 import { getTitlePropertyKey, useData, usePermissions, useRelationSelector, useTranslation } from "@rebasepro/app";

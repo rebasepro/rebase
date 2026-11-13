@@ -1,5 +1,4 @@
-import type { Property } from "@rebasepro/types";
-import type { PropertyConfig } from "@rebasepro/cms-types";
+import type { PropertyConfig, Property } from "@rebasepro/cms-types";
 import { isReadOnly } from "@rebasepro/app";
 import { getFieldId } from "../components/field_ids";
 

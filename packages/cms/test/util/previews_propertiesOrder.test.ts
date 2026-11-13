@@ -6,8 +6,7 @@ import {
     getEntityTitlePropertyKey
 } from "../../src/util/previews";
 import { resolveCollectionSlotKeys } from "../../src/components/CollectionViewBinding/usePreviewSlots";
-import type { CollectionConfig, Property } from "@rebasepro/types";
-import type { AdminCollection, AuthController, PropertyConfig } from "@rebasepro/cms-types";
+import type { AdminCollection, AuthController, PropertyConfig, CollectionConfig, Property } from "@rebasepro/cms-types";
 import { fakeAuthController, fakeUser } from "../helpers/fakes";
 
 const mockAuthController = fakeAuthController({ user: fakeUser("test") });

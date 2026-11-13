@@ -2,7 +2,7 @@ import type { RebaseCallContext } from "../call_context";
 import type { GeneratedDatabase } from "../types/register";
 import type { User } from "../users";
 import type { EntityStatus } from "../types/entities";
-import type { QueryNarrowing, ReadOperation, ReadQuery } from "../types/entity_callbacks";
+import type { QueryNarrowing, ReadOperation, ReadQuery } from "../types/read_query";
 import type { TableDescriptor } from "./descriptor";
 
 /** A row, keyed by column key. */

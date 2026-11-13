@@ -19,7 +19,8 @@
 // value use. Written as a type import it is the compiler's job instead of a
 // bundler's habit. `check:headless` loads this graph and proves it.
 import type React from "react";
-import type { Entity, EntityStatus, FilterValues, OrderByTuple, Property, User } from "@rebasepro/types";
+import type { Entity, EntityStatus, FilterValues, OrderByTuple, User } from "@rebasepro/types";
+import type { Property } from "./types/properties";
 
 import type { RebaseContext } from "./rebase_context";
 import type { AdminCollection, PropertyPath } from "@rebasepro/cms-types";

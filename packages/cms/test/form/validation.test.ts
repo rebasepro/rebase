@@ -7,7 +7,7 @@ import {
     mapPropertyToZod,
     getZodMapObjectSchema
 } from "../../src/form/validation";
-import type { StringProperty, NumberProperty, BooleanProperty, DateProperty, MapProperty, ArrayProperty, ReferenceProperty, RelationProperty, Property, Properties, GeopointProperty } from "@rebasepro/types";
+import type { StringProperty, NumberProperty, BooleanProperty, DateProperty, MapProperty, ArrayProperty, ReferenceProperty, RelationProperty, Property, Properties, GeopointProperty } from "@rebasepro/cms-types";
 import { fakeCollection } from "../helpers/fakes";
 
 // ---------------------------------------------------------------------------

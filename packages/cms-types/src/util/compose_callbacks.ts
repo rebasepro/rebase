@@ -1,4 +1,5 @@
-import type { CollectionCallbacks, FilterValues, QueryNarrowing, User } from "@rebasepro/types";
+import type { FilterValues, QueryNarrowing, User } from "@rebasepro/types";
+import type { CollectionCallbacks } from "../types/entity_callbacks";
 import { toFilterTuples } from "@rebasepro/common";
 
 /**

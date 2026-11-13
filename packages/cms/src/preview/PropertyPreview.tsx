@@ -1,4 +1,4 @@
-import type { ArrayProperty, MapProperty, NumberProperty, Property, StringProperty } from "@rebasepro/types";
+import type { ArrayProperty, MapProperty, NumberProperty, Property, StringProperty } from "@rebasepro/cms-types";
 import React, { createElement, Suspense } from "react";
 import { deepEqual as equal } from "fast-equals"
 

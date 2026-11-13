@@ -1,4 +1,4 @@
-import type { Property } from "@rebasepro/types";
+import type { Property } from "@rebasepro/cms-types";
 
 /**
  * Whether a property can stand in for a record in *one line*.

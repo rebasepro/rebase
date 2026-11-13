@@ -46,7 +46,6 @@ import type {
     BuilderKind,
     ColorKey,
     ColorScheme,
-    CollectionCallbacks,
     EntityRelation,
     ColumnsShape,
     FilterValues,
@@ -55,16 +54,21 @@ import type {
     InferUpdate,
     NumericColumnKind,
     OrderBySpec,
-    Property,
-    PropertyBuilderProps,
-    PropertyConditions,
     RelationsShape,
     TemporalColumnKind,
     TextColumnKind,
-    UploadedFileContext,
     User,
     WhereFilterOp
 } from "@rebasepro/types";
+import type {
+    CollectionCallbacks
+} from "./types/entity_callbacks";
+import type {
+    Property,
+    PropertyBuilderProps,
+    PropertyConditions,
+    UploadedFileContext
+} from "./types/properties";
 import type {
     FilterPreset
 } from "./types/filter_preset";

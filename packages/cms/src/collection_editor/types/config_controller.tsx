@@ -1,5 +1,6 @@
 import type React from "react";
-import type { Property, TableDescriptor, TablePatch, UnmappedTable } from "@rebasepro/types";
+import type { TableDescriptor, TablePatch, UnmappedTable } from "@rebasepro/types";
+import type { Property } from "@rebasepro/cms-types";
 import { NavigationGroupMapping, AdminCollection } from "@rebasepro/cms-types";
 
 export interface CollectionsSetupInfo {

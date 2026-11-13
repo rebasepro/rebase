@@ -1,5 +1,5 @@
 
-import type { Property } from "@rebasepro/types";
+import type { Property } from "@rebasepro/cms-types";
 import React, { useCallback, useMemo, useState } from "react";
 import { FilterValues, WhereFilterOp } from "@rebasepro/types";
 import { Button, Chip, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
