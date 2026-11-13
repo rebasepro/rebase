@@ -6,7 +6,7 @@ import type { ComponentOverrideMap } from "@rebasepro/cms-types";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CenteredView, TooltipProvider, Typography } from "@rebasepro/ui";
 import { AccessSimulation, User, DataDriver, DataSourceDefinition, RebaseData, DEFAULT_DATA_SOURCE_KEY, StorageSource, StorageSourceDefinition, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
-import { RebaseContext, UNRENDERED_SLOTS, CollectionRegistryController, CollectionRegistry } from "@rebasepro/cms-types";
+import { RebaseContext, UNRENDERED_SLOTS, CollectionRegistryController, CollectionRegistry, collectionEntityDataOptions } from "@rebasepro/cms-types";
 import { PluginProviderStack } from "./PluginProviderStack";
 import { PluginLifecycleManager } from "./PluginLifecycleManager";
 import { warnDeprecatedPluginKeys } from "./deprecated_plugin_keys";
@@ -201,7 +201,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         }
         resolversRef.current.set(owner, { resolveCollection: resolver, resolveDataPath });
     }, []);
-    const entityDataOptions = useMemo(() => ({
+    const collectionResolvers = useMemo(() => ({
         resolveCollection: (slug: string) => {
             for (const { resolveCollection } of resolversRef.current.values()) {
                 const collection = resolveCollection?.(slug);
@@ -223,6 +223,12 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
             return undefined;
         }
     }), []);
+    // The data layer's hooks, built from those resolvers: rows addressed by
+    // their collection's key and converted to its view model (`@rebasepro/cms-types`).
+    const entityDataOptions = useMemo(
+        () => collectionEntityDataOptions(collectionResolvers.resolveCollection, { resolveDataPath: collectionResolvers.resolveDataPath }),
+        [collectionResolvers]
+    );
 
     // What says a collection changed, to every view of it below: both data
     // layers emit on each write that succeeds, and so does a driver that
@@ -350,8 +356,8 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         client: simulatedClient ?? client,
         dataSources: normalizedDataSources,
         rowHooksDriver: embed?.rowHooksDriver,
-        resolveDataPath: entityDataOptions.resolveDataPath,
-        resolveCollection: entityDataOptions.resolveCollection,
+        resolveDataPath: collectionResolvers.resolveDataPath,
+        resolveCollection: collectionResolvers.resolveCollection,
         changes: dataChanges
     });
 

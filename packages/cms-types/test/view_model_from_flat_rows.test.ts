@@ -1,6 +1,7 @@
 import { EntityRelation } from "@rebasepro/types";
 import type { TableAccessor, CollectionConfig, DataDriver, RebaseData } from "@rebasepro/types";
-import { buildRebaseData } from "../src/data/buildRebaseData";
+import { buildRebaseData } from "@rebasepro/common";
+import { collectionEntityDataOptions } from "../src/data/collection_view_model";
 
 /**
  * The admin's view model, built in the browser from the row the wire serves.
@@ -57,7 +58,7 @@ describe("the admin's view model, from a flat row", () => {
     });
 
     const read = async (row: Record<string, unknown>) => {
-        const data: RebaseData = buildRebaseData(driverServing(row), { resolveCollection });
+        const data: RebaseData = buildRebaseData(driverServing(row), collectionEntityDataOptions(resolveCollection));
         const accessor = data.table("orders") as TableAccessor;
         const res = await accessor.find();
         return res.data[0].values as Record<string, unknown>;

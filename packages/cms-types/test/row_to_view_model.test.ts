@@ -1,5 +1,5 @@
 import { type CollectionConfig, EntityReference, EntityRelation } from "@rebasepro/types";
-import { rowToViewModel } from "../src/data/buildRebaseData";
+import { rowToViewModel } from "../src/data/collection_view_model";
 
 /**
  * A flat row, in the view model the admin hands its callbacks and renders —

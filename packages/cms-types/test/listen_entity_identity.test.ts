@@ -9,7 +9,8 @@
  */
 import { describe, expect, it } from "@jest/globals";
 import type { CollectionConfig, Entity, FindResult } from "@rebasepro/types";
-import { wrapAsEntityData } from "../src/data/buildRebaseData";
+import { wrapAsEntityData } from "@rebasepro/common";
+import { collectionEntityDataOptions } from "../src/data/collection_view_model";
 import { sdkClient } from "./helpers/inert-driver";
 
 type Row = Record<string, unknown>;
@@ -38,7 +39,7 @@ describe("a live list through the admin boundary", () => {
 
     it("keeps the entity of a row the socket kept, and builds one for a row that changed", () => {
         const { sdk, push } = liveSdk();
-        const data = wrapAsEntityData(sdk, { resolveCollection: () => products });
+        const data = wrapAsEntityData(sdk, collectionEntityDataOptions(() => products));
         const frames: Entity[][] = [];
         const stop = data.table("products").listen!({}, (result) => frames.push(result.data));
 
@@ -57,7 +58,7 @@ describe("a live list through the admin boundary", () => {
     it("builds the entities again when the collection it converts with is replaced", () => {
         const { sdk, push } = liveSdk();
         let collection: CollectionConfig | undefined;
-        const data = wrapAsEntityData(sdk, { resolveCollection: () => collection });
+        const data = wrapAsEntityData(sdk, collectionEntityDataOptions(() => collection));
         const frames: Entity[][] = [];
         data.table("products").listen!({}, (result) => frames.push(result.data));
 

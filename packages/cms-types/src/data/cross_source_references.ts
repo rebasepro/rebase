@@ -1,5 +1,5 @@
 import { EntityReference } from "@rebasepro/types";
-import { resolveDataSource } from "./resolveDataSource";
+import { resolveDataSource } from "@rebasepro/common";
 
 /**
  * References between data sources: a Firestore document pointing at a

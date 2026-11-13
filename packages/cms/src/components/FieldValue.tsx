@@ -1,6 +1,7 @@
 import React, { useContext, useMemo } from "react";
 import type { Property } from "@rebasepro/types";
-import { resolveCollectionRelations, rowToViewModel } from "@rebasepro/common";
+import { resolveCollectionRelations } from "@rebasepro/common";
+import { rowToViewModel } from "@rebasepro/cms-types";
 import { toWireKey } from "@rebasepro/utils";
 import type { AdminCollection } from "@rebasepro/cms-types";
 

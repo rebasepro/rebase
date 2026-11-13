@@ -1,5 +1,6 @@
 import type { CollectionConfig, Entity } from "@rebasepro/types";
-import { buildCompositeId, resolvePrimaryKeys, rowToViewModel } from "@rebasepro/common";
+import { buildCompositeId, resolvePrimaryKeys } from "@rebasepro/common";
+import { rowToViewModel } from "@rebasepro/cms-types";
 import { toWireRow } from "./wire_row";
 
 const NO_CONFIG: CollectionConfig = { slug: "", name: "", properties: {} };

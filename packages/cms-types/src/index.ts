@@ -25,3 +25,4 @@ export * from "./types";
 export * from "./controllers";
 // The view-model helpers the panel runs on (resolution, defaults, conditions, permissions).
 export * from "./util";
+export * from "./data/collection_view_model";

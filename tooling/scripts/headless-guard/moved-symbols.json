@@ -472,6 +472,11 @@
       "instead": "restrictedKeys(descriptor, viewer, kind) from @rebasepro/common."
     },
     {
+      "symbol": "rowToViewModel",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "sanitizeData",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"

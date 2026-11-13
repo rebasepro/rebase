@@ -4,7 +4,8 @@
  * primary keys, not from anything the server wrote into the payload.
  */
 import { describe, expect, it, jest } from "@jest/globals";
-import { buildRebaseData } from "../src/data/buildRebaseData";
+import { buildRebaseData } from "@rebasepro/common";
+import { collectionEntityDataOptions } from "../src/data/collection_view_model";
 import { type CollectionConfig, DataDriver } from "@rebasepro/types";
 import { inertDriver } from "./helpers/inert-driver";
 
@@ -48,7 +49,7 @@ const makeDriver = (): DataDriver => inertDriver({
 });
 
 const dataWith = (resolve?: (slug: string) => CollectionConfig | undefined) =>
-    buildRebaseData(makeDriver(), resolve ? { resolveCollection: resolve } : undefined);
+    buildRebaseData(makeDriver(), resolve ? collectionEntityDataOptions(resolve) : undefined);
 
 describe("rowToEntity — the address is derived, not carried", () => {
 
@@ -110,9 +111,7 @@ role: "admin" });
         // collections — so the resolver is registered after the fact. A miss
         // must not be memoized, or the collection stays address-less forever.
         let registry: Record<string, CollectionConfig> = {};
-        const data = buildRebaseData(makeDriver(), {
-            resolveCollection: slug => registry[slug]
-        });
+        const data = buildRebaseData(makeDriver(), collectionEntityDataOptions(slug => registry[slug]));
 
         const before = await data.table("products").find();
         expect(before.data[0].id).toBe(42); // no keys yet: falls back to row.id

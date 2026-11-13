@@ -75,6 +75,7 @@
       "resolveStorageFilenameString",
       "resolveStoragePathString",
       "resolveStorageSource",
+      "rowToViewModel",
       "sanitizeData",
       "segmentsToStrippedPath",
       "sortProperties",

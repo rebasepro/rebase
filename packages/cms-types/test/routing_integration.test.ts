@@ -1,5 +1,5 @@
 import { CollectionConfig, DataDriver, EntityReference } from "@rebasepro/types";
-import { CollectionRegistry } from "@rebasepro/cms-types";
+import { CollectionRegistry, collectionEntityDataOptions } from "@rebasepro/cms-types";
 import { buildRebaseData } from "@rebasepro/common";
 import { buildRoutedRebaseData } from "@rebasepro/common";
 import { resolveDataSource, createDataSourceRegistry } from "@rebasepro/common";
@@ -151,10 +151,10 @@ describe("references across data sources (hybrid Postgres + Firestore)", () => {
 
     function buildHybrid(rows: { postgres?: Record<string, unknown>[], firestore?: Record<string, unknown>[] } = {}) {
         const registry = new CollectionRegistry([customers, firestoreCustomers, firestoreEvents], dsRegistry);
-        const options = {
-            resolveCollection: (slug: string) => registry.get(slug),
-            resolveDataPath: (path: string) => registry.resolveDataPath(path)
-        };
+        const options = collectionEntityDataOptions(
+            (slug: string) => registry.get(slug),
+            { resolveDataPath: (path: string) => registry.resolveDataPath(path) }
+        );
         const pg = mockDriver("postgres");
         const fs = mockDriver("firestore");
         (pg.fetchCollection as jest.Mock).mockResolvedValue(rows.postgres ?? []);
