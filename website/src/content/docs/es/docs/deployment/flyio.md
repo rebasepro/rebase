@@ -1,13 +1,13 @@
 ---
-sourceHash: 10c8baa5ed2e63bf
+sourceHash: 15a0356fd585a797
 title: Desplegar Rebase en Fly.io
-description: Aprende a desplegar Rebase a nivel global o restringirlo a centros de datos europeos usando Fly.io.
+description: Aprende cómo desplegar Rebase globalmente o restringirlo a centros de datos europeos utilizando Fly.io.
 sidebar_label: Fly.io
 ---
 
-Fly.io ejecuta contenedores Docker cerca de tus usuarios en una red anycast global y es altamente configurable en cuanto a dónde residen los datos, lo que resulta ideal para un despliegue de Rebase con un enfoque europeo estricto. Fly cuenta con centros de datos en **Ámsterdam (ams)**, **Frankfurt (fra)**, **Madrid (mad)** y **París (cdg)**.
+Fly.io ejecuta contenedores Docker cerca de tus usuarios en una red anycast global y es altamente configurable en cuanto a la ubicación de los datos: una buena opción para un despliegue de Rebase con un enfoque estrictamente europeo. Fly cuenta con centros de datos en **Ámsterdam (ams)**, **Fráncfort (fra)**, **Madrid (mad)** y **París (cdg)**.
 
-Nada en esta página sobre tu proyecto es específico de Fly. Un despliegue de Rebase consta de dos partes separables: la imagen en tiempo de ejecución (runtime) publicada y el **bundle** que genera `rebase build`; y el mismo bundle se ejecuta bajo Docker Compose en una laptop, en Rebase Cloud, con el [Helm chart](/docs/deployment/kubernetes) y aquí.
+Nada en esta página sobre tu proyecto es específico de Fly. Un despliegue de Rebase consta de dos partes separables: la imagen de runtime publicada y el **bundle** que genera `rebase build`; y el mismo bundle se ejecuta bajo Docker Compose en un portátil, en Rebase Cloud, bajo el [chart de Helm](/docs/deployment/kubernetes) y aquí.
 
 ## 1. Inicializar la aplicación de Fly
 
@@ -17,19 +17,19 @@ Con `flyctl` instalado, desde tu proyecto:
 fly launch --no-deploy
 ```
 
-1. **Nombre de la app:** `my-rebase-app`
-2. **Organización:** personal o la organización de tu empresa.
-3. **Región:** elige un centro de datos europeo: Frankfurt (`fra`) o París (`cdg`).
-4. **Base de datos:** responde **Yes** para un clúster de Postgres. Fly lo crea en la misma región e inyecta `DATABASE_URL`.
+1. **App name:** `my-rebase-app`
+2. **Organization:** personal, o tu organización corporativa.
+3. **Region:** elige un centro de datos europeo — Fráncfort (`fra`) o París (`cdg`).
+4. **Database:** responde **Yes** a un clúster de Postgres. Fly lo creará en la misma región e inyectará `DATABASE_URL`.
 5. **Redis:** responde **No**.
 
 `--no-deploy` porque los secretos y el bundle deben estar listos primero.
 
 Si tus tablas declaran una columna `col.vector()`, habilita la extensión una vez en esa base de datos: `CREATE EXTENSION vector;`.
 
-## 2. Compilar el bundle y apuntar fly.toml a la imagen de runtime
+## 2. Construir el bundle y apuntar fly.toml a la imagen de runtime
 
-**No hay ninguna imagen de aplicación que compilar desde tu código fuente**. `rebase build` genera un directorio `dist-bundle` con tus tablas compiladas, funciones, crons y, si tu proyecto declara una app estática, tu frontend compilado:
+**No hay ninguna imagen de aplicación que compilar a partir de tu código fuente**. `rebase build` genera un directorio `dist-bundle` con tus tablas, funciones y tareas cron compiladas y, si tu proyecto declara una aplicación estática, tu frontend compilado:
 
 ```bash
 rebase build
@@ -66,9 +66,9 @@ primary_region = "fra"
   path = "/livez"
 ```
 
-Usa `/livez` en lugar de `/health`: la segunda realiza un viaje de ida y vuelta a la base de datos, por lo que un liveness check sobre ella reiniciaría una máquina en buen estado durante un breve fallo temporal de la base de datos.
+Usa `/livez` en lugar de `/health`: la segunda realiza un viaje de ida y vuelta a la base de datos (round-trip), por lo que un control de liveness sobre ella reiniciaría una máquina en buen estado durante un breve fallo transitorio de la base de datos.
 
-Actualizar Rebase más adelante solo requiere cambiar esa línea `FROM`. Tu bundle no se modifica.
+Actualizar Rebase más adelante consiste simplemente en cambiar esa línea `FROM`. Tu bundle no se toca.
 
 ## 3. Configurar los secretos de producción
 
@@ -83,7 +83,7 @@ fly secrets set \
   -a my-rebase-app
 ```
 
-Los dos últimos son nuevos y representan la única forma en que esta aplicación obtiene un administrador: en producción, la primera cuenta en registrarse no se promueve automáticamente, por lo que nada más genera el primer usuario autenticado. Configúralos antes de que el primer despliegue reciba tráfico; consulta [Tu primer administrador](/docs/getting-started/deployment/#your-first-admin). `fly secrets list` solo muestra resúmenes (digests), así que guarda la contraseña generada con este comando; no hay forma de recuperarla más adelante.
+Los dos últimos son nuevos y representan la única forma en que esta aplicación obtiene un administrador: en producción, la primera cuenta en registrarse no es promovida, por lo que nada más generará el primer llamador autenticado. Configúralos antes de que el primer despliegue comience a servir tráfico — consulta [Tu primer administrador](/docs/getting-started/deployment/#your-first-admin). `fly secrets list` solo muestra resúmenes (digests), así que guarda la contraseña generada por este comando; no hay forma de volver a leerla.
 
 ## 4. Desplegar
 
@@ -91,31 +91,31 @@ Los dos últimos son nuevos y representan la única forma en que esta aplicació
 fly deploy
 ```
 
-Luego ejecuta `fly open`.
+Luego `fly open`.
 
 ## 5. El esquema
 
 <span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-**El runtime crea las tablas que falten durante el inicio, incluidas las que declara `backend/schema`.** `REBASE_MIGRATE_ON_BOOT` tiene como valor predeterminado `ensure`, el cual es acumulativo en todo el esquema: crea las tablas, columnas y tipos enum faltantes y aplica su seguridad a nivel de fila, de modo que el primer inicio frente a una base de datos vacía queda listo sirviendo tus colecciones.
+**El runtime crea las tablas faltantes al iniciar, incluidas las que declara `backend/schema`.** `REBASE_MIGRATE_ON_BOOT` tiene por defecto el valor `ensure`, el cual es aditivo en todo el esquema: crea las tablas, columnas y tipos enum que falten y aplica su seguridad a nivel de fila (RLS), de modo que el primer arranque contra una base de datos vacía se inicia sirviendo tus tablas.
 
-Lo que `ensure` nunca hace es modificar algo que ya existe: no altera el tipo de una columna, no elimina nada ni edita las etiquetas de un enum existente, ya que el reinicio de una máquina no debe remodelar un esquema como efecto secundario de un despliegue.
+Lo que `ensure` nunca hace es cambiar algo que ya existe: no altera el tipo de una columna, no elimina nada ni edita las etiquetas de un enum existente, ya que el reinicio de una máquina no debe alterar la estructura de un esquema como efecto secundario de un despliegue.
 
-Por lo tanto, una cosa todavía requiere la CLI, ejecutada desde una copia local o un trabajo de CI:
+Por lo tanto, hay algo que aún requiere la CLI, ejecutada desde una copia local o un trabajo de CI:
 
 ```bash
 rebase db push
 ```
 
-Cualquier cambio que no sea puramente acumulativo: una columna renombrada, un tipo más restringido, un campo eliminado.
+Cualquier cambio que no sea puramente aditivo: una columna renombrada, un tipo más restringido, un campo eliminado.
 
-Para un Fly Postgres privado, abre un túnel con `fly proxy 5432 -a <your-db-app>` y apunta `DATABASE_URL` a `localhost:5432`. La imagen de runtime se distribuye sin la CLI, por lo que esto nunca se ejecuta dentro de la máquina y un `release_command` tampoco puede invocarlo. Para migraciones versionadas, haz commit de los archivos de migración con `rebase db generate` y ejecuta `rebase db migrate` como un paso de release en su lugar.
+Para una base de datos Postgres privada en Fly, abre un túnel con `fly proxy 5432 -a <your-db-app>` y apunta `DATABASE_URL` a `localhost:5432`. La imagen del runtime viene sin la CLI, por lo que esto nunca se ejecuta dentro de la máquina y un `release_command` tampoco puede invocarlo. Para migraciones versionadas, haz commit de los archivos de migración con `rebase db generate` y ejecuta `rebase db migrate` como un paso de release en su lugar.
 
 ## Almacenamiento de archivos
 
-El sistema de archivos de una máquina de Fly no sobrevive a un despliegue, por lo que el almacenamiento local de archivos implicaría una pérdida silenciosa de datos y el runtime lo rechaza en producción. Conecta un bucket compatible con S3 —Tigris es el que Fly aprovisiona— con `STORAGE_TYPE=s3`. Consulta [Almacenamiento](/docs/backend/storage).
+El sistema de archivos de una máquina Fly no sobrevive a un despliegue, por lo que el almacenamiento local de archivos implica una pérdida silenciosa de datos y el runtime lo rechaza en producción. Conecta un bucket compatible con S3 (Tigris es el que aprovisiona Fly) con `STORAGE_TYPE=s3`. Consulta [Almacenamiento](/docs/backend/storage).
 
 ## Próximos pasos
 
-- [Despliegue](/docs/getting-started/deployment) — la lista de verificación para producción y las reglas del primer administrador que todas las plataformas comparten.
+- [Despliegue](/docs/getting-started/deployment) — la lista de verificación para producción y las reglas del primer administrador que comparten todas las plataformas.
 - [Configuración](/docs/getting-started/configuration) — todas las variables de entorno que lee el runtime.

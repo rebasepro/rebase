@@ -1,60 +1,62 @@
 ---
-sourceHash: 4e057bf3f4bd759b
-title: Datenbank-Befehle
-sidebar_label: Datenbank-Befehle
-description: Die rebase-db-Befehle — push, generate und migrate, Backups und Wiederherstellungen, eine Kopie ziehen, der Verbindungsstring, die verwaltete Entwicklungsdatenbank und Branches.
+sourceHash: 6d4d1426d30011ff
+title: Datenbankbefehle
+sidebar_label: Datenbankbefehle
+description: Die rebase db-Befehle — push, generate und migrate, Backups und Wiederherstellungen, Abrufen einer Kopie, der Verbindungs-String, die verwaltete Entwicklungsdatenbank und Branches.
 ---
 
 ## Übersicht
 
-`rebase db` ist die Familie der Befehle, die die Datenbank des Projekts erreichen. Jeder
-arbeitet auf der Datenbank, die das Projekt auflöst, in der Reihenfolge, die
-[Datenbank-Branching](/docs/backend/branching/#cli-integration) aufführt: `--database-url`,
-dann `DATABASE_URL` in der Shell, der Branch, zu dem der Checkout gewechselt hat,
-`DATABASE_URL` in `.env`, `--docker` und andernfalls die verwaltete Entwicklungsdatenbank,
-die `rebase dev` startet. `rebase db url` gibt aus, welche das ist.
+`rebase db` ist die Befehlsfamilie, die auf die Datenbank des Projekts zugreift. Jeder
+Befehl arbeitet auf der Datenbank, die das Projekt auflöst, in der Reihenfolge, die unter
+[Database Branching](/docs/backend/branching/#cli-integration) aufgeführt ist:
+`--database-url`, dann `DATABASE_URL` in der Shell, der Branch, zu dem das Checkout
+gewechselt ist, `DATABASE_URL` in `.env`, `--docker` und andernfalls die verwaltete
+Entwicklungsdatenbank, die `rebase dev` startet. `rebase db url` gibt aus, um welche es
+sich handelt.
 
-`request-role` und `provision` sind für eine Datenbank gedacht, die Rebase nicht allein gehört;
-siehe [Betrieb auf einer bestehenden oder geteilten Datenbank](/docs/deployment/existing-database/).
-`push`, `generate` und `migrate` werden ausführlich unter
-[Schema-Generierung](/docs/cli/schema/) beschrieben, und jeder andere Befehl steht in der
+`request-role` und `provision` sind für eine Datenbank gedacht, die Rebase nicht vollständig gehört;
+siehe [Ausführen auf einer bestehenden oder geteilten Datenbank](/docs/deployment/existing-database/).
+`push`, `generate` und `migrate` werden unter
+[Schema-Generierung](/docs/cli/schema/) ausführlich beschrieben, und alle anderen Befehle finden sich in der
 [CLI-Referenz](/docs/cli/).
 
 ## Befehle
 
 ### `rebase db push`
 
-Überträgt Schema-Änderungen direkt in die Datenbank (nur für die Entwicklung):
+Schemaänderungen direkt auf die Datenbank übertragen (nur Entwicklung):
 
 ```bash
 rebase db push
 ```
 
-`--database-url <url>` benennt die Datenbank und `--docker` die aus Compose, die bei Bedarf
-gestartet wird. `generate`, `migrate`, `branch`, `backup` und `restore` nehmen ebenfalls beides entgegen.
+`--database-url <url>` benennt die Datenbank und `--docker` die Compose-Datenbank, die bei Bedarf
+gestartet wird. `generate`, `migrate`, `branch`, `backup` und `restore` akzeptieren ebenfalls beides.
 
-Er lässt in Ruhe, was Ihre Collections nicht beschreiben: andere Tabellen und Views, Indizes, die
-Sie geschrieben haben, und die CHECK- und EXCLUDE-Constraints auf der Tabelle einer Collection,
-die eine Collection nicht deklarieren kann. Was er anwendet und wovor er anhält, steht unter
-[`rebase db push`](/docs/cli/schema/#rebase-db-push).
+Es lässt unberührt, was deine Tabellendeklarationen nicht beschreiben: andere Tabellen und
+Views, selbst geschriebene Indizes sowie die CHECK- und EXCLUDE-Constraints auf einer deklarierten
+Tabelle, die eine Deklaration nicht ausdrücken kann. Siehe
+[`rebase db push`](/docs/cli/schema/#rebase-db-push) für Details darüber, was angewendet wird und
+wovor gestoppt wird.
 
 :::caution
-`db push` modifiziert die Datenbank direkt ohne Migrationsdateien. Verwenden Sie `db generate` + `db migrate` für die Produktion.
+`db push` ändert die Datenbank direkt ohne Migrationsdateien. Verwende `db generate` + `db migrate` für die Produktion.
 :::
 
 ### `rebase db generate`
 
-Generiert SQL-Migrationsdateien aus Schema-Änderungen:
+SQL-Migrationsdateien aus Schemaänderungen generieren:
 
 ```bash
 rebase db generate
 ```
 
-Erstellt mit Zeitstempeln versehene Migrationsdateien in `backend/drizzle/migrations/`, die überprüft und committed werden können.
+Erstellt mit einem Zeitstempel versehene Migrationsdateien in `backend/drizzle/migrations/`, die überprüft und committet werden können.
 
 ### `rebase db migrate`
 
-Führt ausstehende Datenbankmigrationen aus:
+Ausstehende Datenbankmigrationen ausführen:
 
 ```bash
 rebase db migrate
@@ -62,29 +64,30 @@ rebase db migrate
 
 Wendet alle noch nicht angewendeten Migrationen auf die Datenbank an.
 
-Auf einer Datenbank, die bereits gebootet hat, legt die erste Migration Tabellen an, die der Boot
-schon angelegt hat, daher hält das erste `db migrate` dort bei `already exists` an. Verzeichnen Sie
-diese Migration stattdessen einmal als angewendet:
+Auf einer Datenbank, die bereits gestartet wurde (booted), erstellt die erste Migration Tabellen,
+die der Boot-Vorgang bereits angelegt hat, sodass das erste `db migrate` dort mit `already exists`
+abbricht. Erfasse diese Migration stattdessen einmalig als angewendet:
 
 ```bash
 rebase db migrate --baseline <version>
 ```
 
-Die Version ist das Zahlenpräfix der Migrationsdatei; `db generate` gibt den Befehl mit
-eingesetzter Version aus. Siehe
-[`--baseline`](/docs/cli/schema/#rebase-db-migrate) für eine Datenbank, die bereits Migrationen
-verzeichnet.
+Die Version ist das numerische Präfix der Migrationsdatei; `db generate` gibt den
+Befehl mit bereits ausgefüllter Version aus. Siehe
+[`--baseline`](/docs/cli/schema/#rebase-db-migrate) für eine Datenbank, die bereits
+Migrationen erfasst.
 
-Danach wendet `db migrate` an, was der Boot nicht angewendet hat, und auf einer Datenbank, die
-`rebase dev` bedient, ist das weniger, als es scheint. Der Boot fügt jede neue Tabelle, Spalte und
-jeden neuen Enum-Wert hinzu, sobald sich eine Collection ändert, sodass die Spalte bereits da ist,
-wenn `db generate` die Migration schreibt, die sie hinzufügt: Dieses `db migrate` hält erneut bei
-`already exists` an und nennt das `--baseline <version>`, das sie verzeichnet. Jede neue Property
-bedeutet eine weitere Baseline. Verzeichnen Sie eine Migration nur, wenn der Boot jede Änderung
-darin vorgenommen hat. Eine, die außerdem etwas löscht, umbenennt oder verengt, enthält Statements,
-die der Boot nie ausführt, und das Verzeichnen überspringt sie. In der Entwicklung ist
-`rebase db push` der Befehl, der das Schema ändert; behalten Sie `db generate` und `db migrate` für
-eine Datenbank, die der Boot nicht bereits verändert hat.
+Danach wendet `db migrate` an, was der Boot-Vorgang nicht angewendet hat – und auf einer von
+`rebase dev` bereitgestellten Datenbank ist das weniger, als es scheint. Der Boot-Vorgang fügt jede neue Tabelle,
+Spalte und jeden neuen Enum-Wert hinzu, sobald sich die Deklaration einer Tabelle ändert. Bis
+`db generate` die Migration schreibt, die eine Spalte hinzufügt, existiert die Spalte also bereits:
+Jenes `db migrate` bricht erneut mit `already exists` ab und nennt das
+`--baseline <version>`, das sie erfasst. Jede neue Eigenschaft bedeutet eine weitere
+Baseline. Erfasse eine Migration nur dann, wenn der Boot-Vorgang jede darin enthaltene Änderung vorgenommen hat.
+Eine Migration, die auch etwas löscht (drop), umbenennt oder einschränkt, enthält Anweisungen, die der Boot-Vorgang
+niemals ausführt, und das Erfassen würde diese überspringen. In der Entwicklung ist `rebase db push` der Befehl,
+der das Schema ändert; behalte `db generate` und `db migrate` für eine Datenbank vor, die der Boot-Vorgang
+noch nicht verändert hat.
 
 ### `rebase db backup` / `backups` / `restore`
 
@@ -94,111 +97,115 @@ rebase db backups list                  # list what is stored
 rebase db restore ./backups/<file>.dump --yes
 ```
 
-`backup` führt `pg_dump` aus; `restore` führt `pg_restore` aus und verlangt, da destruktiv,
-in einem Terminal ein getipptes `yes` oder nimmt `--yes` entgegen; ohne Terminal und ohne
-`--yes` verweigert es und sagt, dass es zu übergeben ist.
-In eine Datenbank, die bereits enthält, was das Backup anlegt,
-braucht `restore` `--clean`. Ohne das Flag verweigert es, bevor irgendetwas angewendet wird, die
-Cluster-Rollen eingeschlossen, und nennt die Objekte, die im Weg sind, sowie beide Wege daran
-vorbei: `--clean` oder `--create-db --target-db <new name>`.
-Mit `--clean` ist die Wiederherstellung eine einzige
-Transaktion: Sie löscht die Schemas des Backups mit allem, was darin ist, stellt wieder her und
-committet erst, wenn die gesamte Wiederherstellung gelungen ist, sodass ein Fehler die Datenbank
-so lässt, wie sie war. Bevor sie nachfragt, nennt sie, was sie löscht, das das Backup nicht
-enthält. Sie führt `psql` aus, das mit `pg_restore` ausgeliefert wird.
-`restore` verweigert die verwaltete Entwicklungsdatenbank: Ein
-Backup trägt seine Zeilen als COPY-Daten, die sie nicht empfangen kann. Stellen Sie in Postgres in Docker wieder
-her (`rebase db restore <dump> --docker --clean --yes`), dann kopiert
-`rebase db pull --from "$(rebase db url --docker)" --yes` sie in die verwaltete Datenbank. Ein
-Backup der verwalteten Datenbank lässt sie, wie sie war.
-Relative Pfade und der Standard
-`./backups` werden gegen das Verzeichnis aufgelöst, aus dem Sie `rebase` ausführen, sodass sich
-die drei Zeilen oben in einem Verzeichnis treffen; eine Option, die ein Befehl nicht kennt, wird
-verweigert, bevor etwas läuft.
-Der Dump und seine Rollen-Datei sind
-nur für Sie lesbar (0600), und gegenüber einer Datenbank, die nicht läuft, geben `backup` und
-`restore` das Banner aus, das `db push` ausgibt.
-Planung, die Rollen-Datei, die mit jedem Dump mitreist, und das Restore-Verfahren finden Sie unter
-[Backups und Wiederherstellung](/docs/deployment/backups/).
+`backup` führt `pg_dump` aus; `restore` führt `pg_restore` aus und fragt, da es destruktiv ist,
+im Terminal nach einem eingegebenen `yes` oder akzeptiert `--yes`; ohne Terminal und ohne
+`--yes` verweigert es die Ausführung und weist darauf hin, das Flag zu übergeben.
+In eine Datenbank,
+die bereits das enthält, was das Backup erstellt, erfordert `restore` die Option `--clean`. Ohne
+diese verweigert es die Ausführung, bevor irgendetwas angewendet wird (einschließlich der Cluster-Rollen),
+und nennt die im Weg stehenden Objekte sowie beide Auswege darum herum: `--clean` oder
+`--create-db --target-db <neuer Name>`.
+Mit `--clean`
+ist die Wiederherstellung eine einzige Transaktion: Es löscht die Schemas des Backups mit allem,
+was darin enthalten ist, stellt wieder her und committet erst, wenn die gesamte Wiederherstellung
+erfolgreich war, sodass ein Fehler die Datenbank im vorherigen Zustand belässt. Vor der Bestätigungsabfrage
+listet es auf, was es löscht, das nicht im Backup enthalten ist. Es führt `psql` aus, das mit `pg_restore` mitgeliefert wird.
+`restore` verweigert
+die verwaltete Entwicklungsdatenbank: Ein Backup transportiert seine Zeilen als COPY-Daten,
+die diese nicht empfangen kann.
+Stelle die Daten in Postgres in Docker wieder her (`rebase db restore <dump> --docker --clean --yes`),
+danach kopiert `rebase db pull --from "$(rebase db url --docker)" --yes` sie in
+die verwaltete Datenbank. Ein Backup der verwalteten Datenbank belässt sie unverändert.
+Relative Pfade
+und der Standardpfad `./backups` werden relativ zu dem Verzeichnis aufgelöst, aus dem du `rebase`
+ausführst, sodass die drei oben genannten Zeilen in einem Verzeichnis zusammentreffen; eine Option, die ein Befehl
+nicht unterstützt, wird abgewiesen, bevor irgendetwas ausgeführt wird.
+Der Dump und seine Rollendatei sind nur für dich lesbar (0600), und
+gegen eine nicht laufende Datenbank geben `backup` und `restore` dasselbe
+Banner aus wie `db push`.
+Zeitplanung, die Rollendatei, die mit jedem Dump transportiert wird, und das Wiederherstellungsverfahren werden unter [Backups und Wiederherstellung](/docs/deployment/backups/) beschrieben.
 
 ### `rebase db pull`
 
-Kopiert eine andere Datenbank in die lokale Entwicklungsdatenbank:
+Eine andere Datenbank in die lokale Entwicklungsdatenbank kopieren:
 
 ```bash
 rebase db pull --from postgres://…  [--anonymize]
 ```
 
-`--from` nimmt eine `postgres://`- oder `postgresql://`-URL entgegen, oder die
-`host=… port=… dbname=…`-Paare von libpq, als ein einziges Argument in Anführungszeichen. Alles
-andere wird verweigert, bevor irgendetwas gelesen oder gestartet wird, ohne den Wert zu wiederholen.
+`--from` nimmt eine `postgres://`- oder `postgresql://`-URL entgegen oder libpqs
+`host=… port=… dbname=…`-Paare, die als ein einziges Argument in Anführungszeichen gesetzt sind. Alles andere wird abgewiesen,
+bevor etwas gelesen oder gestartet wird, ohne den Wert zu wiederholen.
 
-`--anonymize` ersetzt personenbezogene Felder beim Importieren, sodass eine Produktionskopie
-lokal bearbeitet werden kann, ohne echte Kundendaten auf einen Laptop zu übertragen. Es gleicht
-Spalten nach Namen ab und arbeitet nach bestem Bemühen. Eine bloße `name`-Spalte wird nur in einer
-Tabelle von Personen ersetzt: einer namens `users`, `authors`, `customers` oder ähnlich, oder
-jeder Tabelle, die außerdem eine Spalte für E-Mail-Adressen enthält.
-Eine Spalte unter einem Unique-Index erhält pro Zeile einen eigenen Wert, und der Durchlauf ist
-eine Transaktion: Schlägt er fehl, werden die Tabellen, die er umgeschrieben hätte, geleert und
-namentlich genannt, und der Befehl beendet sich mit 1.
+`--anonymize` ersetzt personenbezogene Felder beim Import, sodass eine Produktionskopie
+lokal bearbeitet werden kann, ohne echte Kundendaten auf ein Notebook zu übertragen. Der Abgleich
+von Spalten erfolgt nach Namen und nach bestem Bemühen (Best-Effort). Eine bloße `name`-Spalte wird nur in einer
+Personentabelle ersetzt: einer Tabelle namens `users`, `authors`, `customers` oder ähnlich, oder jeder
+Tabelle, die auch eine E-Mail-Adressspalte enthält.
+Eine Spalte unter einem Unique-Index erhält einen eindeutigen Wert pro Zeile, und der Durchlauf ist eine
+einzige Transaktion: Schlägt er fehl, werden die Tabellen, die umgeschrieben worden wären, geleert und
+benannt, und der Befehl wird mit Statuscode 1 beendet.
 
-Ein Flag, das `pull` nicht kennt, wird verweigert, bevor
-irgendetwas gelesen oder kopiert wird, und das vermutlich gemeinte wird genannt: `--anonymise`
-antwortet mit "did you mean --anonymize?" und beendet sich mit 1.
-Bei `pull` und bei jedem anderen Befehl liest ein Schalter, dem ein Wert gegeben wird, diesen Wert:
-`--anonymize=true` oder `=1` schaltet ihn ein, `--anonymize=false` oder `=0` lässt ihn aus, und
-jeder andere Wert wird verweigert.
+Ein Flag, das `pull`
+nicht unterstützt, wird abgewiesen, bevor etwas gelesen oder kopiert wird, wobei das wahrscheinlich
+beabsichtigte Flag vorgeschlagen wird: `--anonymise` antwortet mit „did you mean --anonymize?“ und
+beendet mit Statuscode 1.
+Bei `pull` und bei jedem anderen Befehl liest ein Schalter, dem ein Wert übergeben wird, diesen aus:
+`--anonymize=true` oder `=1` schaltet ihn ein, `--anonymize=false` oder `=0` lässt ihn aus,
+und jeder andere Wert wird abgewiesen.
 
-`pg_dump` entfernt Berechtigungen, sodass die Kopie mit den RLS-Policies der Quelle ankommen
-würde, aber ohne die dahinterliegenden Grants — jeder Lesevorgang als `rebase_user` würde
-mit `permission denied` fehlschlagen. Der Pull stellt die App-Rolle anschließend neu bereit,
-wobei dieselbe Routine wie beim Booten und bei `rebase db push` verwendet wird, sodass die
-internen Tabellen von Rebase wie vorgesehen gesperrt bleiben.
+`pg_dump` entfernt Berechtigungen, sodass die Kopie mit den RLS-Policies der Quelle, aber ohne die
+dahinterliegenden Berechtigungen ankommen würde — jeder Lesevorgang als `rebase_user` würde mit
+`permission denied` fehlschlagen. Der Pull richtet die App-Rolle anschließend neu ein, unter
+Verwendung derselben Routine, die auch der Boot-Vorgang und `rebase db push` verwenden, sodass die internen Tabellen von Rebase
+wie vorgesehen entzogen (revoked) bleiben.
 
 Das Ziel ist immer die lokale Entwicklungsdatenbank dieses Projekts und kann nicht
-ausgewählt werden: `--database-url` wird verweigert statt akzeptiert, sodass es keine Möglichkeit
-gibt, "in die Produktion pullen" zu formulieren. `--from` ist die einzige Richtung.
+ausgewählt werden: `--database-url` wird abgewiesen statt akzeptiert, sodass es keine Möglichkeit gibt,
+versehentlich einen Pull in die Produktion auszuführen („pull into production“). `--from` ist die einzige Richtung.
 
-Ein Pull ersetzt den Inhalt der lokalen Datenbank: Er leert
-zuerst jedes Schema, das er kopiert, sodass eine Tabelle, die nur lokal existiert, ihn nicht
-überlebt. In die verwaltete Entwicklungsdatenbank reisen die Zeilen als `INSERT`-Anweisungen, die
-sie annimmt, wo `COPY` sie anhalten würde.
+Ein Pull ersetzt
+die Inhalte der lokalen Datenbank: Zunächst leert er jedes Schema, das er kopiert, sodass eine
+Tabelle, die nur lokal existiert, diesen Vorgang nicht überlebt. In die verwaltete Entwicklungsdatenbank
+gelangen die Zeilen als `INSERT`-Anweisungen, die sie dort akzeptiert, wo `COPY`
+sie stoppen würde.
 
 ### `rebase db url`
 
-Gibt den Verbindungsstring aus, den dieses Projekt verwendet, und sonst nichts, sodass er
-weitergeleitet werden kann:
+Gibt den Verbindungs-String aus, den dieses Projekt verwendet, und sonst nichts, sodass er
+über Pipes weitergeleitet werden kann:
 
 ```bash
 rebase db url
 psql "$(rebase db url)"
 ```
 
-Die verwaltete Entwicklungsdatenbank ist der Fall, der dies erfordert: `.env` lässt
-`DATABASE_URL` mit Absicht auskommentiert, und der Port wird aus dem Projektpfad
-abgeleitet, sodass nichts auf der Festplatte ihn benennt.
-Die Datenbank behält diesen Port über ein Stoppen und Starten
-hinweg, es sei denn, etwas anderes hat ihn belegt.
-Wenn Sie eine eigene
-`DATABASE_URL` festgelegt haben, wird genau diese ausgegeben — die Auflösungsreihenfolge ist
-dieselbe, der auch jeder andere Befehl folgt. Startet die verwaltete Datenbank, falls sie
-noch nicht läuft.
+Die verwaltete Entwicklungsdatenbank ist der Fall, der dies erfordert: In `.env` bleibt
+`DATABASE_URL` absichtlich auskommentiert, und der Port wird vom
+Projektpfad abgeleitet, sodass nichts auf der Festplatte ihn explizit nennt.
+Sie behält diesen
+Port über ein Beenden und Starten hinweg bei, es sei denn, ein anderer Prozess hat ihn belegt. Wenn du eine eigene `DATABASE_URL`
+festgelegt hast, wird diese ausgegeben — die Auflösungsreihenfolge ist dieselbe, der
+jeder andere Befehl folgt. Der Befehl startet die verwaltete Datenbank, falls sie nicht
+bereits läuft.
 
-Nach `rebase dev --docker`
-verwenden `db url` und die anderen Befehle diese Docker-Datenbank (und sagen das auf stderr),
-bis ein `rebase dev` ohne das Flag läuft. Die Wahl wird in `.rebase/dev-database.json`
-gespeichert und steht dort im Rang, wo `--docker` steht, unter jedem Verbindungsstring. Ein von
-Ihnen getipptes `--docker`, das ein Verbindungsstring übertrumpft, startet keinen Container: Eine
-Zeile auf stderr sagt, dass es ignoriert wurde, nennt, was gewonnen hat, und sagt, wie Sie
-stattdessen Docker erreichen. Ein so übertrumpftes `rebase dev --docker` lässt die gespeicherte
-Wahl unverändert, sodass die Befehle wieder Docker folgen, sobald der Verbindungsstring weg ist.
+Nach
+`rebase dev --docker` verwenden `db url` und die anderen Befehle diese Docker-Datenbank
+(und weisen auf stderr darauf hin), bis ein `rebase dev` ohne dieses Flag ausgeführt wird. Die Auswahl wird
+in `.rebase/dev-database.json` gespeichert und rangiert an derselben Stelle wie `--docker`, unterhalb jedes
+Verbindungs-Strings. Ein eingegebenes `--docker`, das von einem Verbindungs-String überstimmt wird,
+startet keinen Container: Eine Zeile auf stderr meldet, dass es ignoriert wurde, nennt die vorrangige Option
+und erklärt, wie Docker stattdessen erreicht werden kann. Ein auf diese Weise überstimmtes `rebase dev --docker`
+behält die gemerkte Auswahl bei, sodass die Befehle wieder Docker folgen, sobald der Verbindungs-String
+entfernt wurde.
 
-`rebase init` gibt jedem Projekt seinen eigenen Compose-Port,
-aus 5433–5632 nach dem Pfad des Projekts, und `--docker` prüft, dass das, was darauf antwortet,
-der `db`-Container dieses Projekts ist. Wenn ein anderer Container oder ein Postgres außerhalb von
-Docker den Port hält, hält es an und nennt, wer ihn hält, statt sich bei der Datenbank eines
-anderen anzumelden. Um das Projekt zu verlegen, ändern Sie den Host-Port des `db`-Service in
-`docker-compose.yml` und `DATABASE_URL`, falls `.env` eine setzt.
+`rebase init`
+weist jedem Projekt einen eigenen Compose-Port zu, basierend auf dem Projektpfad im Bereich 5433–5632,
+und `--docker` prüft, ob der antwortende Dienst tatsächlich der `db`-Container dieses Projekts ist.
+Wenn ein anderer Container oder ein Postgres außerhalb von Docker den Port belegt, bricht der Befehl ab und
+nennt diesen, anstatt sich bei der Datenbank eines Drittanbieters anzumelden. Um das
+Projekt zu verschieben, ändere den Host-Port des `db`-Dienstes in `docker-compose.yml` sowie
+`DATABASE_URL`, falls in `.env` festgelegt.
 
 ### `rebase db stop` / `rebase db reset`
 
@@ -209,61 +216,61 @@ rebase db stop     # stop it; the data is kept
 rebase db reset    # delete it and start over
 ```
 
-Die Datenbank gehört dem Projekt, nicht dem Befehl, der sie gestartet hat, sodass das Beenden von
-`rebase dev` sie für die anderen Befehle weiterlaufen lässt. Nach 30 Minuten ohne Verbindung
-stoppt sie sich selbst, und der nächste Befehl, der sie braucht, startet sie wieder.
-`rebase dev` sagt das beim Beenden, zusammen damit, wie Sie die
-Datenbank sofort stoppen.
+Sie gehört zum Projekt, nicht zu dem Befehl, der sie gestartet hat; das Beenden von
+`rebase dev` lässt sie daher für die anderen Befehle weiterlaufen. Nach 30 Minuten ohne
+aktive Verbindung stoppt sie sich selbst, und der nächste Befehl, der sie benötigt, startet sie
+wieder. `rebase dev`
+weist beim Beenden darauf hin und erklärt, wie die Datenbank sofort gestoppt werden kann.
 
-`db stop` unter einem laufenden `rebase dev` sagt, dass dessen
-Backend die Datenbank nicht erreichen kann, bis sie wieder da ist. Der nächste Befehl, der sie
-braucht, etwa `rebase db url`, startet sie auf demselben Port, und das Backend verbindet sich ohne
-Neustart wieder.
+`db stop` bei laufendem
+`rebase dev` meldet, dass dessen Backend die Datenbank nicht erreichen kann, bis sie
+wieder da ist. Der nächste Befehl, der sie benötigt (unter anderem `rebase db url`), startet sie auf
+demselben Port, und das Backend verbindet sich ohne Neustart wieder.
 
 ### `rebase db request-role migrate`
 
-Verschiebt die Requests dieser Datenbank von einer Postgres-Rolle auf eine andere:
+Anfragen dieser Datenbank von einer Postgres-Rolle auf eine andere migrieren:
 
 ```bash
 rebase db request-role migrate --to <role[,role]> [--dry-run] [--yes]
 ```
 
-Requests laufen als `rebase_user`, sofern das Projekt keine andere Rolle angibt
-(`REBASE_RLS_REQUEST_ROLE` oder `rls.requestRole`). Eine Rolle gehört zum ganzen
-Cluster, daher sollten Projekte, die sich eine teilen, jeweils eine eigene haben. Der erste
-provisionierende Start hält die Rolle in der Datenbank fest, und ein späterer Start, der mit
-einer anderen Rolle konfiguriert ist, wird verweigert, bis die Datenbank umgezogen ist.
+Anfragen werden als `rebase_user` ausgeführt, es sei denn, das Projekt gibt eine andere Rolle an
+(`REBASE_RLS_REQUEST_ROLE` oder `rls.requestRole`). Eine Rolle gehört zum gesamten
+Cluster, daher sollten Projekte, die sich einen Cluster teilen, jeweils ihre eigene Rolle besitzen. Der erste
+Boot-Vorgang bei der Bereitstellung erfasst die Rolle in der Datenbank, und ein späterer Start
+mit einer anderen konfigurierten Rolle verweigert den Dienst, bis die Datenbank migriert wurde.
 
-Der Befehl zieht von der Rolle um, die die Datenbank festgehalten hat, oder von `rebase_user`. In
-einer Transaktion legt er die neue Rolle an, falls sie fehlt, erlaubt der Verbindung, zu ihr zu
-wechseln, vergibt nur in dieser Datenbank jeden Grant der alten Rolle neu, richtet Richtlinien,
-die sie nennen, auf die neue Rolle aus und hält die neue Rolle fest. Die alte Rolle bleibt
-unverändert, weil eine andere Datenbank im Cluster sie verwenden könnte. Anschließend gibt er die
-`REVOKE`-Anweisungen aus, die die Grants der alten Rolle hier zurücknehmen, zum Ausführen, sobald
-nichts sie mehr braucht.
+Der Befehl migriert von der Rolle, die die Datenbank erfasst hat, oder von `rebase_user`. In
+einer einzigen Transaktion erstellt er die neue Rolle, falls sie fehlt, erlaubt der Verbindung
+den Wechsel zu ihr, vergibt nur in dieser Datenbank jedes Grant neu, das die alte Rolle innehatte,
+passt Policies an, die sie benennen, und erfasst die neue Rolle. Die alte Rolle wird
+unverändert belassen, da eine andere Datenbank auf dem Cluster sie möglicherweise verwendet. Danach
+gibt der Befehl die `REVOKE`-Anweisungen aus, die die Berechtigungen der alten Rolle hier entziehen,
+um ausgeführt zu werden, sobald sie nicht mehr benötigt werden.
 
-`--dry-run` gibt die Anweisungen und die `REVOKE`s aus und ändert nichts. In einem
-Terminal fragt er zuerst; ohne Terminal verweigert er ohne `--yes`. Setzen Sie danach
-`REBASE_RLS_REQUEST_ROLE` auf jedem Server, der die Datenbank nutzt, auf die neue Rolle.
-Siehe [Betrieb auf einer bestehenden oder geteilten Datenbank](/docs/deployment/existing-database/).
+`--dry-run` gibt die Anweisungen und die `REVOKE`s aus und ändert nichts. Im
+Terminal wird zuvor eine Bestätigung verlangt; ohne Terminal bricht der Befehl ohne `--yes` ab. Setze anschließend
+`REBASE_RLS_REQUEST_ROLE` auf die neue Rolle auf jedem Server, der die
+Datenbank verwendet. Siehe [Ausführen auf einer bestehenden oder geteilten Datenbank](/docs/deployment/existing-database/).
 
 ### `rebase db provision --print`
 
-Gibt das SQL aus, das die Request-Rolle(n) für diese Datenbank einrichtet, damit ein
-Datenbankadministrator es ausführt:
+Das SQL ausgeben, das die Request-Rolle(n) für diese Datenbank einrichtet, damit ein
+Datenbankadministrator es ausführen kann:
 
 ```bash
 rebase db provision --print > request-role.sql
 ```
 
-Für jede Request-Rolle gibt er die Anweisungen aus, die die Rolle anlegen, der
-Verbindungsrolle das Recht geben, zu ihr zu wechseln, und ihr unter dem Standard
-`grants: "schema"` die Schemas `public` und `rebase` gewähren. Die Rollen sind
-`REBASE_RLS_REQUEST_ROLE`, wenn gesetzt, sonst die, die ein Start in der Datenbank
-festgehalten hat, sonst `rebase_user`. Die Erklärung steht als SQL-Kommentare darin, sodass
-die Ausgabe unverändert ausführbar ist. Er liest die Verbindungsrolle und führt sonst nichts aus.
-`--print` ist erforderlich. Kombinieren Sie es mit `REBASE_RLS_PROVISION_ROLE=never`, wenn Rollen
-von einem DBA oder von Infrastruktur-Code angelegt werden.
+Für jede Request-Rolle werden die Anweisungen ausgegeben, die die Rolle erstellen, der
+Verbindungsrolle das Recht gewähren, zu ihr zu wechseln, und ihr unter dem Standard
+`grants: "schema"` Rechte für die Schemas `public` und `rebase` erteilen. Die Rollen entsprechen
+`REBASE_RLS_REQUEST_ROLE`, falls gesetzt, andernfalls den Rollen, die ein Boot-Vorgang in der
+Datenbank erfasst hat, andernfalls `rebase_user`. Die Erklärung ist als SQL-Kommentare verfasst, sodass
+die Ausgabe direkt ausgeführt werden kann. Der Befehl liest die Verbindungsrolle aus und führt sonst nichts aus.
+`--print` ist erforderlich. Kombiniere dies mit `REBASE_RLS_PROVISION_ROLE=never`, wenn Rollen
+von einem DBA oder über Infrastructure-as-Code erstellt werden.
 
 ### `rebase db branch`
 
@@ -279,49 +286,58 @@ rebase db branch delete <name>
 rebase db branch prune [--older-than 14d] [--include-dev-diff]
 ```
 
-PostgreSQL kopiert oder löscht keine Datenbank, mit der noch etwas verbunden ist, und
-dieses "etwas" ist üblicherweise Ihr eigenes `rebase dev`. `create` und `delete` nennen
-das, was die Datenbank offen hält; `--force` trennt diese Sitzungen zuerst.
+PostgreSQL kopiert oder löscht keine Datenbank, mit der noch eine Verbindung besteht, und
+das übliche „irgendetwas anderes“ ist dein eigenes `rebase dev`. `create` und `delete` benennen,
+was die Datenbank offen hält; `--force` trennt diese Sitzungen zuvor.
 
-Jeder Branch ist eine vollständige Kopie auf der Festplatte, daher müssen sie aufgeräumt werden.
-`prune` entfernt drei Dinge: einen Eintrag, dessen Datenbank außerhalb von Rebase gelöscht wurde,
-eine Branch-Datenbank, deren Eintrag nie geschrieben wurde, und — nur mit `--older-than` — Branches,
-die älter als ein von Ihnen angegebenes Alter sind. Vor dem Entfernen wird nachgefragt, es sei denn, Sie übergeben `--yes`.
-Ohne Terminal, in dem nachgefragt werden
-könnte, etwa in CI, entfernt es nichts, sagt, dass `--yes` zu übergeben ist, und beendet sich mit 1. `list` und `info` lesen nur: Eine
-Datenbank, auf der kein Branch angelegt wurde, hat keine, und sie legen dort kein `rebase`-Schema an.
+Jeder Branch ist eine vollständige Kopie auf der Festplatte, daher müssen sie aufgeräumt werden. `prune` entfernt
+drei Dinge: einen Eintrag, dessen Datenbank außerhalb von Rebase gelöscht wurde, eine
+Branch-Datenbank, deren Eintrag nie geschrieben wurde, und — nur mit `--older-than` — Branches,
+die ein bestimmtes Alter überschritten haben. Es fragt vor dem Löschen nach einer Bestätigung, es sei denn, `--yes` wird übergeben.
+Ohne Terminal für die Abfrage, wie etwa in CI, entfernt es nichts, weist darauf hin,
+`--yes` zu übergeben, und beendet mit Statuscode 1.
+`list` und `info` lesen nur: Eine Datenbank, auf der kein Branch erstellt wurde, hat keine, und
+sie erstellen dort kein `rebase`-Schema.
 
-`diff` zeigt, was ein Branch gegenüber der Datenbank geändert hat, aus der er erstellt wurde: hinzugefügte, entfernte oder geänderte Tabellen, Spalten, Constraints, Indizes, Trigger, RLS-Richtlinien, Enum-Typen, Views und Funktionen, und pro Tabelle die Zeilen, die er eingefügt, aktualisiert und gelöscht hat. Zeilen, die der Elternteil seitdem selbst geändert hat, werden getrennt gezählt, und Zeilen, die beide geändert haben, sind Konflikte. `--json` gibt den ganzen Diff aus, mit bis zu `--sample-limit` Zeilen pro Tabelle (Standard 100). Er liest beide Datenbanken und ändert keine; zusammengeführt wird in Studio – siehe [Einen Branch prüfen und zusammenführen](/docs/backend/branching/#reviewing-and-merging-a-branch).
+`diff` zeigt, was ein Branch gegenüber der Datenbank geändert hat, aus der er erstellt wurde:
+Tabellen, Spalten, Constraints, Indizes, Trigger, RLS-Policies, Enum-Typen,
+Views und Funktionen, die hinzugefügt, gelöscht oder geändert wurden, sowie pro Tabelle die Zeilen, die
+eingefügt, aktualisiert und gelöscht wurden. Zeilen, die die übergeordnete Datenbank seitdem selbst geändert hat,
+werden separat gezählt, und Zeilen, die von beiden geändert wurden, gelten als Konflikte. `--json` gibt das
+gesamte Diff aus, mit bis zu `--sample-limit` Zeilen pro Tabelle (Standard: 100). Es liest
+beide Datenbanken und ändert keine von beiden; das Mergen erfolgt in Studio — siehe
+[Überprüfen und Zusammenführen eines Branch](/docs/backend/branching/#reviewing-and-merging-a-branch).
 
-`switch` speichert den Branch in `.rebase/branch.json` und bearbeitet `.env` niemals. Es
-hat Vorrang vor `DATABASE_URL` in `.env` und unterliegt `--database-url` oder einer
+`switch` speichert den Branch in `.rebase/branch.json` und ändert niemals `.env`. Es
+hat Vorrang vor `DATABASE_URL` in `.env` und weicht `--database-url` oder einer
 `DATABASE_URL` in der Shell, sodass ein Flag in der Befehlszeile immer Vorrang vor einem
-zuvor durchgeführten Wechsel hat. `delete` verweigert den Branch, auf dem Sie sich befinden, da jeder
-Befehl im Checkout, das Löschen eingeschlossen, auf ihn zeigt: erst `switch --off`, dann löschen.
-Den gesamten Workflow finden Sie unter [Datenbank-Branching](/docs/backend/branching/).
+zuvor vorgenommenen Wechsel hat. `delete` verweigert den Branch, auf dem du dich gerade befindest, da jeder Befehl
+im Checkout (einschließlich des Löschens) darauf ausgerichtet ist: Führe zuerst `switch --off` aus
+und lösche ihn dann. Der gesamte Workflow ist unter [Database Branching](/docs/backend/branching/) beschrieben.
 
 :::note[Auf der verwalteten Entwicklungsdatenbank]
 `push`, `generate` und `migrate` funktionieren hier wie auf jeder Datenbank.
-`push` und `generate` planen ihre Arbeit mit Atlas, welches eine zweite
-leere Datenbank zum Vergleichen benötigt — und das verwaltete PGlite stellt genau eine bereit. Auf
-der verwalteten Datenbank startet daher jeder dieser Befehle ein zweites, wegwerfbares PGlite im Speicher
-für Atlas und stoppt es, wenn der Befehl endet. So wird dort eine Spalte gelöscht,
-umbenannt oder verengt: `rebase dev` fügt immer nur hinzu. Das Destructive-Gate ist
-dasselbe wie überall. Damit Atlas stattdessen gegen eine leere Datenbank von Ihnen plant,
-setzen Sie `REBASE_ATLAS_DEV_URL` darauf; Rebase legt eine so benannte Datenbank weder an noch löscht es sie.
+`push` und `generate` planen ihre Änderungen mit Atlas, das eine zweite
+leere Datenbank zum Vergleichen benötigt — und das verwaltete PGlite stellt genau eine bereit. Daher
+startet jeder dieser Befehle auf der verwalteten Datenbank ein zweites, temporäres PGlite im Arbeitsspeicher
+für Atlas und stoppt es, sobald der Befehl beendet ist. Auf diese Weise wird dort eine Spalte gelöscht,
+umbenannt oder eingeschränkt: `rebase dev` fügt immer nur hinzu. Die Schutzschranke für destruktive Änderungen ist dieselbe
+wie überall. Um Atlas stattdessen gegen eine eigene leere Datenbank planen zu lassen,
+setze `REBASE_ATLAS_DEV_URL` darauf; Rebase erstellt oder löscht keine
+so benannte Datenbank.
 
-`branch` wird dort verweigert. `CREATE DATABASE ... TEMPLATE`
-auf PGlite schreibt einen Katalogeintrag und kopiert nichts, sodass der Branch auf die Datenbank
-verweisen würde, von der er geklont wurde — jeder Schreibvorgang, den Sie isolieren wollten,
-würde in Ihrer Entwicklungsdatenbank landen. `rebase dev --docker` liefert Ihnen einen echten
-Server, mit dem Branches funktionieren.
+`branch` wird dort abgewiesen. `CREATE DATABASE ... TEMPLATE`
+erzeugt unter PGlite lediglich einen Katalogeintrag und kopiert nichts, sodass der Branch auf
+die Datenbank verweisen würde, von der er geklont wurde — jeder Schreibvorgang, den du isolieren
+wolltest, würde in deiner Entwicklungsdatenbank landen. `rebase dev --docker` stellt einen echten
+Server bereit, mit dem Branches funktionieren.
 :::
 
 ## Verwandte Themen
 
-- [CLI-Referenz](/docs/cli/) — jeder andere `rebase`-Befehl
+- [CLI-Referenz](/docs/cli/) — alle anderen `rebase`-Befehle
 - [Schema-Generierung](/docs/cli/schema/) — `db push`, `db generate`, `db migrate` und `db branch` im Detail
-- [Backups und Wiederherstellung](/docs/deployment/backups/) — Planung, die Rollen-Datei, Wiederherstellung
-- [Datenbank-Branching](/docs/backend/branching/) — wie ein Branch entsteht und was er kostet
-- [Betrieb auf einer bestehenden oder geteilten Datenbank](/docs/deployment/existing-database/) — die Request-Rolle, ihre Einstellungen und `rebase doctor --database`
-- [Skripte und die Konsole](/docs/backend/scripts/) — dieselbe Datenbank aus einem Skript oder einer REPL
+- [Backups und Wiederherstellung](/docs/deployment/backups/) — Zeitplanung, die Rollendatei, Wiederherstellung
+- [Database Branching](/docs/backend/branching/) — wie ein Branch erstellt wird und was er an Ressourcen kostet
+- [Ausführen auf einer bestehenden oder geteilten Datenbank](/docs/deployment/existing-database/) — die Request-Rolle, ihre Einstellungen und `rebase doctor --database`
+- [Skripte und die Konsole](/docs/backend/scripts/) — dieselbe Datenbank über ein Skript oder eine REPL

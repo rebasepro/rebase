@@ -1,60 +1,60 @@
 ---
-sourceHash: b9c4866ee9cfe4b3
+sourceHash: 647f2c704c061b1a
 slug: es/docs/upgrading/0-30-to-0-31
-title: Actualización de 0.30 a 0.31
+title: Actualizar de 0.30 a 0.31
 sidebar_label: 0.30 → 0.31
-description: "Los cambios disruptivos que 0.31 introduce para una aplicación en 0.30: las tablas en backend/schema reemplazan a config/collections, el panel renderiza lo que sirve el servidor, el SDK utiliza data.table(slug), junto con el codemod que migra un proyecto y cada paso manual posterior."
+description: "Los cambios disruptivos que 0.31 introduce para una aplicación en 0.30: las tablas en backend/schema reemplazan a config/collections, el panel renderiza lo que sirve el servidor, el SDK usa data.table(slug), junto con el codemod que migra un proyecto y cada paso manual posterior."
 ---
 
 # Actualización de 0.30 → 0.31
 
 <span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-0.31 convierte el backend en una arquitectura orientada a Postgres (Postgres-first). Las tablas que declara con `defineTable` en `backend/schema/` son lo único que el backend conoce sobre sus datos; lo que el panel de administración muestra sobre ellas reside en el frontend. Casi cada punto a continuación es una consecuencia de esa separación, y casi todo se realiza automáticamente con un solo comando.
+0.31 hace que el backend priorice Postgres (Postgres-first). Las tablas que declaras con `defineTable` en `backend/schema/` son lo único que el backend conoce sobre tus datos; lo que el panel de administración muestra sobre ellas reside en el frontend. Casi cada entrada a continuación es una consecuencia de esa división, y casi todo se realiza automáticamente con un solo comando.
 
 ### La lista de verificación, por proyecto
 
-1. **Actualice primero cada paquete de `@rebasepro`**, en cada paquete del workspace, para que los tipos que lea el codemod sean los de la versión 0.31: `pnpm -r up "@rebasepro/*@0.31.0"`, luego `pnpm install`. Un proyecto en una versión anterior a 0.30 debe aplicar primero los cambios de código de las guías intermedias ([Actualización](/docs/upgrading/)), y cumplir con los requisitos mínimos de herramientas de 0.31: Node 22.22, TypeScript 6, React 19.2.7, React Router 8, Vite 8 ([la lista](/docs/upgrading/0-30-to-0-31-by-hand/#a-project-on-a-release-before-030)): el codemod carga un `config/` de 0.20–0.29 y su comprobación de SQL pasa, pero esa comprobación compara el compilador de 0.31 consigo mismo; solo el paso 7, contra su base de datos, demuestra que el DDL generado es el que realmente tiene su base de datos.
-2. **Haga commit y luego ejecute el codemod como un simulacro (dry run):** `rebase migrate collections-to-tables --dry-run`. Imprime los archivos que escribiría, lo que rechaza (con archivo y línea), las notas y los pasos manuales, sin escribir nada. Corrija primero en `config/` lo que haya sido rechazado.
-3. **Ejecútelo de forma definitiva:** `rebase migrate collections-to-tables`. Escribe `backend/schema/`, `frontend/src/cms/` (con `ui-config.json`), los módulos de `backend/` y los archivos del proyecto, añade `rebaseBackendGuard()` al `vite.config.ts` del scaffold, reescribe sus llamadas al SDK, mueve las importaciones de nombres que 0.31 trasladó a otro paquete ([sección 135](#135-rebaseprotypes-y-rebaseprocommon-eliminan-el-modelo-de-colecciones-de-sus-raíces)) y comprueba que el SQL generado sea idéntico byte por byte — o restaura cada archivo a su estado original. Consulte la [sección 108](#108-las-tablas-en-backendschema-reemplazan-a-configcollections-ejecute-el-codemod-primero).
-4. **Lea la última sección de su salida, "Revisar antes de desplegar: estas reglas cambian de significado"**, y decida sobre cada regla listada ([más abajo](#revisar-antes-de-desplegar-estas-reglas-cambian-de-significado)).
-5. **Realice los pasos manuales que imprime**, en orden. Cada uno indica su archivo y la mayoría incluye el fragmento de código a escribir: el montaje de `<RebaseCMS>` con `tableCustomizations` y `uiConfig` cuando su `App.tsx` no es el del scaffold (o el panel está montado en otro módulo, el cual se indica en el paso), `rebaseBackendGuard()` cuando su `vite.config.ts` no lo es y en cada otra aplicación estática de `rebase.json` ([sección 130](#130-rebase-build-rechaza-un-frontend-sin-rebasebackendguard)), hooks globales, una importación de un nombre que 0.31 eliminó ([sección 135](#135-rebaseprotypes-y-rebaseprocommon-eliminan-el-modelo-de-colecciones-de-sus-raíces)) y `rebase skills install` cuando el proyecto contiene agent skills ([sección 128](#128-la-skill-del-agente-rebase-collections-ahora-es-rebase-tables)). Ejecute `pnpm install` cuando la salida liste "Dependencies added". Luego lea dos listas en la parte del SDK de la salida:
-   - **"Rewritten by name — review"**: llamadas `.collection(` en un receptor sin tipo (`any`), reescritas porque el receptor se llama `dataAsAdmin`, o es `.data` con un nombre de tabla literal; el miembro `collection` de un tipo que contiene un slot `data` / `dataAsAdmin`; y dobles de prueba (test doubles). Verifique que cada uno pertenezca al SDK.
-   - **"Left unchanged — check each"**: llamadas `.collection(` que el codemod no pudo verificar que pertenecieran al SDK, como una llamada a través de un tipo declarado por su propio proyecto. Una llamada que permanezca aquí y que *sea* del SDK fallará en tiempo de ejecución en 0.31: cámbiele el nombre a `.table(` manualmente. El código que comprueba si `collection` existe (`typeof data.collection === "function"`) es un paso manual: en 0.31 tomará silenciosamente la otra rama.
+1. **Actualiza primero cada paquete de `@rebasepro`**, en cada paquete del workspace, para que los tipos que lee el codemod sean los de 0.31: `pnpm -r up "@rebasepro/*@0.31.0"`, luego `pnpm install`. Un proyecto en una versión anterior a 0.30 debe aplicar primero los cambios de código de las guías intermedias ([Actualización](/docs/upgrading/)), y cumplir con los requisitos mínimos de toolchain de 0.31 — Node 22.22, TypeScript 6, React 19.2.7, React Router 8, Vite 8 ([la lista](/docs/upgrading/0-30-to-0-31-by-hand/#a-project-on-a-release-before-030)): el codemod carga un `config/` de 0.20–0.29 y su comprobación SQL pasa, pero esa comprobación compara el compilador 0.31 consigo mismo — solo el paso 7, contra tu base de datos, demuestra que el DDL generado es lo que tiene tu base de datos.
+2. **Haz un commit y luego ejecuta el codemod en modo simulado (dry run):** `rebase migrate collections-to-tables --dry-run`. Muestra los archivos que escribiría, lo que rechaza (con archivo y línea), las notas y los pasos manuales, sin escribir nada. Corrige primero en `config/` lo que rechace.
+3. **Ejecútalo de forma definitiva:** `rebase migrate collections-to-tables`. Escribe `backend/schema/`, `frontend/src/cms/` (con `ui-config.json`), los módulos de `backend/` y los archivos del proyecto, añade `rebaseBackendGuard()` al `vite.config.ts` del scaffold, reescribe tus llamadas al SDK, mueve las importaciones de nombres que 0.31 trasladó a otro paquete ([sección 135](#135-rebaseprotypes-y-rebaseprocommon-eliminan-el-modelo-de-colecciones-de-su-raíz)), y demuestra que el SQL generado es idéntico byte por byte — o restaura cada archivo. Consulta la [sección 108](#108-las-tablas-en-backendschema-reemplazan-a-configcollections--ejecuta-el-codemod-primero).
+4. **Lee la última sección de su salida, "Review before deploying: these rules change meaning"**, y decide sobre cada regla listada ([más abajo](#revisar-antes-de-desplegar-estas-reglas-cambian-de-significado)).
+5. **Realiza los pasos manuales que muestra**, en orden. Cada uno indica su archivo, y la mayoría incluye el fragmento de código a escribir: el montaje de `<RebaseCMS>` con `tableCustomizations` y `uiConfig` cuando tu `App.tsx` no es el del scaffold (o el panel está montado en otro módulo, el cual se indica en el paso), `rebaseBackendGuard()` cuando tu `vite.config.ts` no lo es y en cualquier otra aplicación estática de `rebase.json` ([sección 130](#130-rebase-build-rechaza-frontends-sin-rebasebackendguard)), hooks globales, una importación de un nombre que 0.31 eliminó ([sección 135](#135-rebaseprotypes-y-rebaseprocommon-eliminan-el-modelo-de-colecciones-de-su-raíz)), y `rebase skills install` cuando el proyecto contiene habilidades de agentes ([sección 128](#128-la-habilidad-de-agente-rebase-collections-pasa-a-ser-rebase-tables)). Ejecuta `pnpm install` cuando la salida liste "Dependencies added". Luego revisa dos listas en la parte del SDK de la salida:
+   - **"Rewritten by name — review"**: llamadas a `.collection(` en un receptor sin tipo (`any`), reescritas porque el receptor se llama `dataAsAdmin`, o es `.data` con un nombre literal de tabla; el miembro `collection` de un tipo contenido en un slot `data` / `dataAsAdmin`; y dobles de prueba (test doubles). Comprueba que cada uno pertenezca al SDK.
+   - **"Left unchanged — check each"**: llamadas a `.collection(` que el codemod no pudo confirmar que pertenecieran al SDK, como una llamada a través de un tipo declarado por tu propio proyecto. Una llamada que permanezca aquí y que *sí* sea del SDK fallará en tiempo de ejecución en 0.31: renómbrala a `.table(` manualmente. El código que comprueba si `collection` existe (`typeof data.collection === "function"`) requiere un paso manual: en 0.31 tomará silenciosamente la otra rama.
 
-   Un archivo commiteado como salida de compilación (un `.js` empaquetado o minificado) nunca se edita: se lista para que lo recompile después de migrar, y reemplace cualquier copia vendored del cliente con la compilación de 0.31. Los pasos repetidos de un mismo tipo se imprimen una sola vez, listando cada archivo y línea afectados; `--json` mantiene cada paso por separado. Luego lea [Qué cambiaron los proyectos manualmente](/docs/upgrading/0-30-to-0-31-by-hand/): las modificaciones que proyectos reales tuvieron que hacer tras estos pasos.
-6. **`rebase generate-sdk`**: los nombres de los módulos generados han cambiado ([sección 115](#115-el-sdk-referencia-una-tabla-datatableslug)).
-7. **Contra su base de datos**, ejecute `rebase db push --dry-run` y espere ver "No changes: the database already matches these tables.", luego ejecute `rebase doctor --policies` y espere que no haya discrepancias en las políticas. La comprobación de SQL del codemod demuestra que la conversión es fiel; estas dos validaciones lo confirman contra la base de datos real, y cualquier diferencia de políticas que cualquiera de ellas liste representa un cambio en quién puede acceder a qué.
-8. **`rebase verify`**: ahora también lee `frontend/src/cms`: una personalización que nombre una tabla o campo inexistente, una columna requerida omitida en el formulario, un `rebaseBackendGuard()` faltante o un `ui-config.json` no pasado a `<RebaseCMS>`.
-9. **Ejecute la línea `git rm` que imprimió el codemod** una vez revisado el diff: `git rm -r config/collections …` y las conexiones que se movieron a `backend/`, o `git rm -r config` cuando no quede nada propio allí ([sección 109](#109-ya-no-existe-el-paquete-config)).
-10. **Recompile y despliegue.** Un bundle compilado antes de 0.31 no arrancará en un runtime de 0.31 ([sección 112](#112-formato-de-bundle-3-se-rechazan-los-bundles-de-formato-2)). El primer arranque actualizará la versión del esquema de la base de datos una sola vez ([sección 113](#113-la-versión-del-esquema-se-calcula-a-partir-de-las-tablas-v2)).
+   Un archivo confirmado como salida de compilación (un `.js` empaquetado o minificado) nunca se edita: se lista para que lo recompiles tras la migración, y reemplaces cualquier copia vendored del cliente con la compilación de 0.31. Los pasos repetidos de un mismo tipo se muestran una sola vez, listando cada archivo y línea correspondientes; `--json` mantiene cada paso por separado. Luego lee [Qué modificaron los proyectos manualmente](/docs/upgrading/0-30-to-0-31-by-hand/): los ajustes que proyectos reales aún tuvieron que hacer tras estos pasos.
+6. **Ejecuta la línea `git rm` que imprimió el codemod** una vez revisado el diff y tras verificar que `rebase migrate collections-to-tables --check` pasa con éxito: `git rm -r config/collections …` y el cableado que se movió a `backend/`, o `git rm -r config` si no queda nada propio allí ([sección 109](#109-ya-no-existe-el-paquete-config)). Los siguientes tres pasos requieren que esto esté hecho: `generate-sdk`, `db push`, `doctor` y `verify` rechazan proyectos que aún contengan `config/collections`.
+7. **`rebase generate-sdk`** — los nombres del módulo generado han cambiado ([sección 115](#115-el-sdk-referencia-tablas-datatableslug)).
+8. **Contra tu base de datos**, ejecuta `rebase db push --dry-run` y espera "No changes: the database already matches these tables.", luego ejecuta `rebase doctor --policies` y espera que no haya desviaciones de políticas (policy drift). La comprobación SQL del codemod demuestra que la conversión es fiel; estas dos lo comprueban contra la base de datos real, y cualquier diferencia de políticas listada por cualquiera de ellas representa un cambio en quién puede acceder a qué.
+9. **`rebase verify`** — ahora también lee `frontend/src/cms`: una personalización que nombre una tabla o campo inexistente, una columna obligatoria excluida del formulario, la ausencia de `rebaseBackendGuard()`, o un `ui-config.json` no suministrado a `<RebaseCMS>`.
+10. **Recompila y despliega.** Un bundle compilado antes de 0.31 no arrancará en un runtime 0.31 ([sección 112](#112-formato-de-bundle-3-los-bundles-de-formato-2-son-rechazados)). El primer arranque actualizará la versión del esquema de la base de datos una sola vez ([sección 113](#113-la-versión-del-esquema-se-calcula-a-partir-de-las-tablas-v2)).
 
-Ejecute `rebase migrate collections-to-tables --check` en CI hasta que `config/` haya sido eliminado: verifica que las tablas migradas sigan generando el mismo SQL que las colecciones de origen, y sale con código 1 si alguna regla listada en "Revisar antes de desplegar" no ha sido confirmada; use `--accept-rule-changes` una vez que las haya revisado.
+Ejecuta `rebase migrate collections-to-tables --check` en CI hasta que `config/` haya desaparecido: verifica que las tablas migradas sigan generando el mismo SQL que las colecciones de origen, y sale con código 1 mientras haya una regla listada bajo "Review before deploying" sin confirmar — pasa `--accept-rule-changes` una vez las hayas revisado.
 
 ### Revisar antes de desplegar: estas reglas cambian de significado
 
-El codemod traslada cada regla de seguridad tal como está escrita, y cada una conserva el nombre de su política. Sin embargo, el compilador de 0.30 solo leía la primera opción entre `condition`, `using`, `access: "public"` y `ownerField`, y no reconocía ningún otro valor de `access`, por lo que cuatro variantes de reglas ahora otorgan permisos distintos. Dos de ellas amplían el acceso:
+El codemod traslada cada regla de seguridad tal como fue escrita, y cada una conserva el nombre de su directiva. Pero el compilador 0.30 solo leía la primera cláusula entre `condition`, `using`, `access: "public"` y `ownerField`, y no reconocía ningún otro valor de `access`, por lo que cuatro estructuras de reglas ahora otorgan permisos distintos. Dos de ellas amplían el acceso:
 
 | La regla | 0.30 otorgaba | 0.31 otorga | |
 |---|---|---|---|
-| un simple `access: "authenticated"` (sin `roles`) | nada | cualquier invocador autenticado, incluidos invitados | **amplía** |
+| un `access: "authenticated"` simple (sin `roles`) | nada | cualquier invocador autenticado, incluidos invitados | **amplía** |
 | `access` + `check`, sin `condition`, en `select` / `update` / `delete` / `all` | ninguna fila existente | todas las filas existentes, a los invocadores de `access` | **amplía** |
 | `access: "authenticated"` + `condition` | cualquiera que cumpla `condition` | solo invocadores autenticados que la cumplan | restringe |
-| `access: "authenticated"` + `check`, en `insert` | cualquiera que inserte una fila coincidente | solo invocadores autenticados | restringe |
+| `access: "authenticated"` + `check`, en `insert` | cualquiera que inserte una fila que coincida | solo invocadores autenticados | restringe |
 
-La más común es la primera. Escriba `access: "registered"` para admitir únicamente a invocadores con cuenta (no invitados anónimos), o elimine la regla para continuar sin otorgar nada. `access` con `roles`, y un `condition` como objeto simple, significan lo mismo que antes y no se listan.
+La más habitual es la primera. Escribe `access: "registered"` para admitir únicamente a invocadores con cuenta (no invitados anónimos), o elimina la regla para seguir denegando todo acceso. `access` con `roles` y un `condition` como objeto plano significan lo mismo que antes y no se listan.
 
-El codemod también rechaza cualquier regla que el compilador de 0.31 rechace: una que combine cláusulas que el tipo `SecurityRule` excluye (`access` junto a `ownerField`, `using` o `withCheck`; `ownerField` junto a `using`, `withCheck`, `condition` o `check`; `condition` o `check` junto a `using` o `withCheck`), y una con un valor no válido de `access`, `mode`, `operation(s)` o `roles` (un `"restrictive"` mal escrito solía compilarse como permisivo). Consulte [Reglas de seguridad](/docs/collections/security-rules/).
+El codemod también rechaza cualquier regla que el compilador de 0.31 rechace: una que combine cláusulas que el tipo `SecurityRule` excluye (`access` junto a `ownerField`, `using` o `withCheck`; `ownerField` junto a `using`, `withCheck`, `condition` o `check`; `condition` o `check` junto a `using` o `withCheck`), y una con un valor no válido para `access`, `mode`, `operation(s)` o `roles` — un `"restrictive"` mal escrito solía compilarse como permisivo. Consulta [Reglas de seguridad](/docs/collections/security-rules/).
 
 ### Qué más se comporta de forma diferente
 
-- **Lo que `GET /api/schema/tables` muestra a un usuario.** Los administradores y quienes posean `schema:read` obtienen todas las tablas. Cualquier otro usuario autenticado, incluidos invitados, solo obtiene las tablas alcanzables por sus roles, con únicamente las reglas aplicables a ellos; las relaciones hacia otras tablas se descartan y los flags de hooks se retienen. Un frontend que leía la descripción de otra tabla como usuario estándar recibirá menos información; `schemaTables: { persons: "all" }` en las opciones del backend restablece la descripción completa. Consulte [Endpoints](/docs/backend/endpoints/#schema).
-- **Los nombres de las relaciones son exactos**, y **las claves foráneas de tipo big-integer son números** ([sección 131](#131-las-filas-en-tránsito-siguen-a-su-columna)).
-- **El historial se sirve enmascarado** ([sección 132](#132-el-historial-se-sirve-como-lecturas)).
-- **Los nombres de herramientas MCP y el payload de la vista** cambian a la par para el conector alojado y los runtimes a los que accede ([sección 122](#122-las-herramientas-mcp-se-nombran-para-tablas)).
-- **Restricciones intencionales.** Los sellos de auditoría (columnas `.onCreateNow()` / `.onUpdateNow()`) se ocultan de las columnas de lista del panel de forma predeterminada: una lista migrada que mostraba `created_at` perderá esa columna hasta que defina `fields: { created_at: { hidden: false } }` en su `customizeTable`. El codemod rechaza, indicando el motivo: arrays JSON de tuplas, un `vector` / `binary` / `reference` dentro de un map, `databaseId` en una colección de Postgres, `isId: "cuid"`, una relación única con `isId` y `disableDefaultPolicies: true` sin reglas. Una relación de una columna hacia una tabla con clave compuesta es rechazada (defínala con `rel.via()`). Los tags de OpenAPI provienen del slug, no del nombre para mostrar. `rebase schema introspect` omite tablas sin clave primaria e indica el motivo (un servidor que introspeccione la base de datos la seguirá sirviendo). Una vista simple que declare `roles` es un error de compilación; el codemod la descarta con una nota.
-- **Qué cambiaron los proyectos reales manualmente**: requisitos de herramientas, `({ entity })` en código de administración, includes de relaciones renombradas, objetos de colección modificados en runtime, llamadas SDK en receptores sin tipo: [Qué cambiaron los proyectos manualmente](/docs/upgrading/0-30-to-0-31-by-hand/).
-- **Restauración en otro clúster.** El sello de las políticas de administración predeterminadas genera un hash a partir de los OID de los roles, por lo que tras un dump o una restauración point-in-time en un clúster diferente, el primer `db push` o arranque recreará esas políticas una sola vez, con los mismos nombres y el mismo SQL.
+- **Lo que `GET /api/schema/tables` informa al usuario.** Los administradores y poseedores del permiso `schema:read` reciben todas las tablas. Cualquier otro usuario autenticado, incluidos invitados, recibe únicamente las tablas accesibles por sus roles, con solo las reglas aplicables a ellos; se omiten las relaciones hacia otras tablas y se retienen los flags de hooks. Un frontend que lea la descripción de otra tabla como usuario regular obtendrá menos información; definir `schemaTables: { persons: "all" }` en las opciones del backend restablece la descripción completa. Consulta [Endpoints](/docs/backend/endpoints/#schema).
+- **Los nombres de las relaciones son exactos**, y **las claves foráneas de enteros grandes (big-integer) son números** ([sección 131](#131-los-datos-transmitidos-respetan-el-tipo-de-su-columna)).
+- **El historial se sirve enmascarado** ([sección 132](#132-el-historial-se-procesa-como-lecturas)).
+- **Los nombres de herramientas MCP y el payload de vistas** cambian al unísono para el conector alojado y los runtimes a los que accede ([sección 122](#122-las-herramientas-de-mcp-adoptan-nombres-basados-en-tablas)).
+- **Restricciones deliberadas.** Las marcas de auditoría (columnas `.onCreateNow()` / `.onUpdateNow()`) se ocultan de las columnas de lista del panel por defecto: una lista migrada que mostraba `created_at` perderá esa columna hasta que definas `fields: { created_at: { hidden: false } }` en su `customizeTable`. El codemod rechaza, indicando el motivo: arrays JSON de tuplas, `vector` / `binary` / `reference` dentro de un map, `databaseId` en una colección de Postgres, `isId: "cuid"`, una relación única con `isId` y `disableDefaultPolicies: true` sin reglas. Se rechaza una relación de una columna hacia una tabla con clave compuesta (defínela con `rel.via()`). Las etiquetas de OpenAPI se derivan del slug, no del nombre para mostrar. `rebase schema introspect` excluye tablas sin clave primaria e indica la razón (un servidor que introspeccione la base de datos continuará sirviéndola). Una vista plana que declare `roles` produce un error de compilación; el codemod la descarta con una nota.
+- **Qué cambiaron aún manualmente los proyectos reales** — versiones mínimas de toolchain, `({ entity })` en código de administración, inclusiones de una relación renombrada, objetos de colección modificados en tiempo de ejecución, llamadas al SDK en receptores sin tipo: [Qué modificaron los proyectos manualmente](/docs/upgrading/0-30-to-0-31-by-hand/).
+- **Restauración en otro clúster.** El sello de las directivas de administración por defecto aplica un hash sobre los OID de los roles, por lo que tras un volcado o restauración puntual (PITR) en un clúster diferente, el primer `db push` o arranque recrea esas directivas una sola vez, con los mismos nombres y el mismo SQL.
 
 ### Los términos
 
@@ -62,19 +62,19 @@ El codemod también rechaza cualquier regla que el compilador de 0.31 rechace: u
 |---|---|---|
 | una colección en `config/collections/` | una **tabla** en `backend/schema/` (`defineTable`) | — |
 | `properties` | `columns` (`col.*`) y `relations` (`rel.*`) | — |
-| `securityRules`, `defaultSecurityRules` | `rls` (requerido), `defaultRls` | — |
-| `callbacks`, `Property.callbacks` | `hooks`, el `.transform()` de una columna | — |
+| `securityRules`, `defaultSecurityRules` | `rls` (obligatorio), `defaultRls` | — |
+| `callbacks`, `Property.callbacks` | `hooks`, un `.transform()` de columna | — |
 | el bloque `admin` | `customizeTable` en `frontend/src/cms/` | — |
 | `data.collection(slug)` | `data.table(slug)` | — |
-| lo que dibuja el panel de administración | una **colección**: una tabla tal como la muestra el panel, o una colección de Firestore | el CMS: `CollectionPanel`, el Collection Editor, `externalCollections` |
+| lo que dibuja el panel de administración | una **colección**: una tabla tal como la muestra el panel, o una colección de Firestore | el CMS: `CollectionPanel`, el Editor de Colecciones, `externalCollections` |
 
 ---
 
-## 108. Las tablas en `backend/schema` reemplazan a `config/collections`: ejecute el codemod primero
+## 108. Las tablas en `backend/schema` reemplazan a `config/collections` — ejecuta el codemod primero
 
-**A quién afecta:** a todos los proyectos con un directorio `config/collections/`.
+**A quién afecta:** a todo proyecto con un directorio `config/collections/`.
 
-**Qué cambió:** el backend solo lee `backend/schema/index.ts` y los resultados exportados por `defineTable`, `defineAuthTable` y `defineView`. Los archivos de `defineCollection` no son leídos por nada: el runtime, cada comando de CLI y la validación de `rebase.json` rechazan cualquier proyecto que aún conserve `config/collections`, indicando el comando siguiente. `rls` es obligatorio en cada tabla (una lista de reglas, `"admin-only"`, o `"inherit"` para el `defaultRls` que exporta el index), y `disableDefaultPolicies` ahora es `defaultPolicies: false`.
+**Qué cambió:** el backend solo lee `backend/schema/index.ts` y los resultados exportados de `defineTable`, `defineAuthTable` y `defineView`. Ninguna herramienta lee archivos `defineCollection`: el runtime, cada comando de la CLI y la validación de `rebase.json` rechazan cualquier proyecto que aún contenga `config/collections`, indicando el comando que se muestra abajo. `rls` es obligatorio en cada tabla — una lista de reglas, `"admin-only"`, o `"inherit"` para el `defaultRls` exportado por el index — y `disableDefaultPolicies` pasa a ser `defaultPolicies: false`.
 
 **Qué hacer:**
 
@@ -82,32 +82,32 @@ El codemod también rechaza cualquier regla que el compilador de 0.31 rechace: u
 rebase migrate collections-to-tables            # o --dry-run primero
 ```
 
-Escribe una tabla por colección, haciendo explícita cada columna física en su posición original (de modo que la columna de clave de un `belongsTo` queda escrita explícitamente), el index con `defaultRls` a partir de `defaultSecurityRules`, un `customizeTable` para cada colección cuya presentación no fuera la predeterminada y archivos `defineFirestoreCollection` para colecciones de Firestore. Los callbacks de una colección pasan a ser los `hooks` de su tabla y los `.transform()` de sus columnas; los `callbacks` globales que exportaba `config/index.ts` requieren un paso manual (sección 109). A continuación, vuelve a leer el resultado mediante el nuevo pipeline: el DDL, las políticas, la búsqueda, los vectores, los triggers, las vistas y el esquema de Drizzle deben ser idénticos byte por byte a lo que generaban las colecciones, o de lo contrario se restaura cada archivo y el comando termina con código 1 mostrando el diff.
+Escribe una tabla por colección, cada columna física explícita en su posición original (de modo que la columna de clave de un `belongsTo` queda expuesta), el index con `defaultRls` a partir de `defaultSecurityRules`, un `customizeTable` para cada colección cuya presentación difiera de la predeterminada, y archivos `defineFirestoreCollection` para colecciones de Firestore. Los callbacks de una colección pasan a ser los `hooks` de su tabla y los `.transform()` de sus columnas; los `callbacks` globales que exportaba `config/index.ts` requieren un paso manual (sección 109). A continuación, vuelve a leer el resultado a través del nuevo pipeline: DDL, directivas, búsqueda, vectores, triggers, vistas y el esquema de Drizzle deben ser idénticos byte por byte a lo generado por las colecciones, o de lo contrario se restaura cada archivo y el proceso sale con código 1 mostrando el diff.
 
-También traslada automáticamente lo que antes requería trabajo manual:
+También traslada lo que antes requería trabajo manual:
 
-- **Callbacks creados mediante un helper** (`callbacks: softDeleteCallbacks(...)` o un objeto de callbacks importado) pasan a ser `hooks:` con la misma expresión, y las funciones del helper se convierten en props de table-hook donde estén definidas (el codemod sigue importaciones relativas, `const`, accesos a propiedades y sentencias `return` simples). Cuando no puede rastrear el helper, un paso indica los hooks que deben revisarse.
-- **Una función en `storagePath`** se migra en dos partes: la función pasa a ser el `storage.path` de la personalización, de modo que el panel sigue decidiendo a dónde va una subida, y la plantilla `path` de la columna toma la forma de las claves que devuelve: el texto estático de su template literal con cada `${…}` reemplazado por `{path}` (`` `${owner}/cv` `` → `{path}/cv`). Ahora el servidor aplica `maxBytes` y `accept` de la columna a cada subida cuya clave coincida con esa plantilla, no solo a la que nombre la columna, por lo que los límites son más estrictos que en 0.30. Una función cuyo resultado no contenga texto estático es rechazada: asígnele uno primero.
-- **Un `policy.existsIn({ collection })` de 0.30** mantiene su tabla, y `auth: { collection: usersCollection }` en un entry personalizado del backend se elimina (el `defineAuthTable` pasa a ser la tabla de autenticación). La opción de arranque `collections` se convierte en `schemaDir`.
-- **Un builder de `dynamicProps`** devuelve una personalización de campo con claves planas en 0.31 (`{ readOnly: true }`, no `{ admin: { readOnly: true } }`). El codemod reescribe aquellos builders cuyos retornos sean literales de objeto, en línea o en un módulo compartido, y lista cualquier otro caso.
-- **La presentación propagada desde un objeto compartido** se traslada a la personalización (`….dynamicProps`); la presentación calculada por una función envoltorio genera un paso a revisar, no el rechazo del proyecto. La ruta de un componente se resuelve contra el módulo que la definió, y cualquier valor calculado cuando se carga `config/` (`new Date()`, `Date.now()`, lecturas de entorno) se preserva como su expresión correspondiente, nunca congelado al valor de la ejecución.
-- **Colecciones de Firestore construidas por una función** (un `getAllFirestoreCollections()` propagado al panel) se convierten a `defineFirestoreCollection` una a una donde el archivo de la colección contenga su literal; un paso por cada builder indica los restantes y la estructura requerida, y otro señala cualquier referencia escrita fuera de un literal convertido, que todavía diría `path`.
-- **Las importaciones de `config/` mediante alias de ruta** (una entrada en `paths` de tsconfig o un `resolve.alias` de Vite) se reescriben o listan igual que las relativas, y cualquier `storageAuthorize` reexportado por `config/index.ts` se traslada a `backend/storage.ts`.
-- **Una relación renombrada a `<key>Relation`** conserva su etiqueta, columna en la lista y título: la personalización referencia la nueva clave. El código que la incluye mediante `include` no se actualiza automáticamente ([qué modificar](/docs/upgrading/0-30-to-0-31-by-hand/#a-belongsto-key-is-a-column-and-a-relation-can-be-renamed)).
+- **Callbacks construidos mediante helpers** (`callbacks: softDeleteCallbacks(...)`, o un objeto de callbacks importado) pasan a ser `hooks:` con la misma expresión, y las funciones del helper se convierten en props de hooks de tabla allí donde se declaran (el codemod sigue importaciones relativas, `const`, lecturas de propiedades y retornos únicos `return`). Cuando no puede seguir el helper, un paso indica los hooks a revisar.
+- **Una función `storagePath`** se migra en dos partes: la función pasa a ser el `storage.path` de la personalización, permitiendo que el panel siga eligiendo el destino de la subida, y la plantilla `path` de la columna toma la forma de las claves que devuelve — el texto estático de su template literal con cada `${…}` convertido a `{path}` (`` `${owner}/cv` `` → `{path}/cv`). El servidor ahora aplica `maxBytes` y `accept` de la columna a cualquier subida cuya clave coincida con esa plantilla, no solo a la que nombre la columna, por lo que los límites son más estrictos que en 0.30. Una función cuyo resultado carezca de texto estático será rechazada: añade texto estático primero.
+- **Un `policy.existsIn({ collection })` de 0.30** conserva su tabla, y `auth: { collection: usersCollection }` en una entrada personalizada de backend se elimina (la tabla declarada con `defineAuthTable` pasa a ser la tabla de autenticación). La opción de arranque `collections` se convierte en `schemaDir`.
+- **Un constructor `dynamicProps`** devuelve en 0.31 una personalización de campo con claves planas (`{ readOnly: true }`, no `{ admin: { readOnly: true } }`). El codemod reescribe constructores cuyo retorno sean objetos literales, en línea o en módulos compartidos, y lista cualquier otro caso.
+- **La presentación propagada mediante spread desde un objeto compartido** se transfiere a la personalización (`….dynamicProps`); la presentación calculada por una función envoltorio se registra como un paso a revisar, sin rechazar el proyecto. La ruta de un componente se resuelve contra el módulo que la definió, y un valor calculado al cargar `config/` (`new Date()`, `Date.now()`, lecturas de variables de entorno) se conserva como su expresión, sin congelarse con el valor de la ejecución.
+- **Las colecciones de Firestore generadas por función** (un `getAllFirestoreCollections()` propagado al panel) se convierten a `defineFirestoreCollection` una a una allí donde el archivo de la colección contenga su literal; un paso por constructor lista el resto y la estructura a escribir, y otro señala cualquier referencia escrita fuera de un literal convertido, que aún conservaría `path`.
+- **Las importaciones de `config/` mediante alias de ruta** (entradas `paths` en tsconfig, `resolve.alias` en Vite) se reescriben o listan de la misma forma que las relativas, y un `storageAuthorize` reexportado por `config/index.ts` se transfiere a `backend/storage.ts`.
+- **Una relación renombrada a `<key>Relation`** conserva su etiqueta, columna de lista y título: la personalización asigna la nueva clave. El código que la incluya no se actualiza automáticamente ([qué cambiar](/docs/upgrading/0-30-to-0-31-by-hand/#a-belongsto-key-is-a-column-and-a-relation-can-be-renamed)).
 
-Aquello que no pueda trasladarse con exactitud será rechazado indicando archivo y línea, sin escribir nada en disco: una colección creada invocando una función, un spread o accessor que no pueda resolverse, un motor distinto de Postgres o Firestore, o un archivo de salida que ya exista con contenido diferente (muévalo o use `--force`). Un árbol de git con cambios sin commitear o un proyecto fuera de git también serán rechazados, garantizando que la migración sea un único diff revisable. `--json` imprime el informe completo para scripts o agentes. Consulte [`rebase migrate`](/docs/cli/schema/#rebase-migrate) y [Tablas](/docs/schema/).
+Aquello que no pueda trasladarse con exactitud será rechazado indicando archivo y línea, sin escribir nada: colecciones construidas mediante invocación de funciones, spreads o accesores que no puedan analizarse, motores distintos a Postgres o Firestore, o archivos de salida existentes con contenido diferente (muévelos o usa `--force`). Un árbol de git sucio o un proyecto fuera de git también serán rechazados, garantizando que la migración genere un único diff revisable. `--json` imprime el informe completo para scripts o agentes. Consulta [`rebase migrate`](/docs/cli/schema/#rebase-migrate) y [Tablas](/docs/schema/).
 
-Las tablas generadas declaran sus columnas siguiendo la sintaxis de `pg-core` de Drizzle: `col.varchar({ length: 160 })`, `col.timestamp({ withTimezone: true })`, `col.text().array()`, `pgEnum(...)`, `` .default(sql`…`) ``, `.generatedByDefaultAsIdentity()`, por lo que su salida no requiere ajustes adicionales; consulte [Columnas](/docs/schema/columns/). Una tabla escrita a mano contra una versión previa de 0.31 con las sintaxis anteriores (`col.timestamptz()`, `col.varchar(160)`, `col.array(col.text())`, `col.enum(values, { name })`, `.defaultSql()`, `.identity()`, `.column("…")`) ya no compilará: `tooling/scripts/drizzle-sweep.mts` en el repositorio de Rebase la convierte reescribiendo únicamente las cadenas de builders, y con `--verify` comprueba que cada tabla convertida compile con el mismo descriptor (`npx tsx drizzle-sweep.mts --verify backend/schema`).
+Las tablas generadas declaran sus columnas siguiendo la sintaxis de `pg-core` de Drizzle — `col.varchar({ length: 160 })`, `col.timestamp({ withTimezone: true })`, `col.text().array()`, `pgEnum(...)`, `` .default(sql`…`) ``, `.generatedByDefaultAsIdentity()` — por lo que su salida no requiere ajustes adicionales; consulta [Columnas](/docs/schema/columns/). Una tabla escrita a mano contra una versión previa a 0.31 con la sintaxis antigua (`col.timestamptz()`, `col.varchar(160)`, `col.array(col.text())`, `col.enum(values, { name })`, `.defaultSql()`, `.identity()`, `.column("…")`) ya no compilará: `tooling/scripts/drizzle-sweep.mts` en el repositorio de Rebase la convierte, reescribiendo únicamente las cadenas de builders, y con `--verify` comprueba que cada tabla convertida compile con el mismo descriptor (`npx tsx drizzle-sweep.mts --verify backend/schema`).
 
-El paso posterior `sdk-calls` también reescribe el origen de las reglas: `existsIn({ collection })` y `membership: { collection }` pasan a ser `table` (sección 123); `--skip-sdk-calls` omite también esta parte. Lo que quede pendiente se imprimirá como pasos manuales numerados, y si el proyecto tiene agent skills instaladas, el último paso será la línea `rebase skills install` para actualizarlas (sección 128). Ejecutar `rebase migrate` sin argumentos muestra la ayuda para ambos subcomandos.
+El paso posterior `sdk-calls` también reescribe los orígenes de reglas: `existsIn({ collection })` y `membership: { collection }` pasan a ser `table` (sección 123); `--skip-sdk-calls` omite esto también. Las tareas pendientes se muestran como pasos manuales numerados, y cuando el proyecto contiene habilidades de agente instaladas, el último paso será la línea `rebase skills install` para actualizarlas (sección 128). Un `rebase migrate` sin argumentos muestra la ayuda para ambos subcomandos.
 
 ## 109. Ya no existe el paquete config
 
-**A quién afecta:** a todos los proyectos (`config/` constituía un workspace independiente).
+**A quién afecta:** a todos los proyectos — `config/` era un workspace independiente.
 
-0.31 deja de leer `config/collections`; no prohíbe el uso de `config/`. El codemod elimina lo que Rebase leía —los archivos de colección y las conexiones que traslada a `backend/` (`resources.ts`, `storage.ts`, `generated/register.ts`, y las reexportaciones de estos en `config/index.ts`)— y mantiene sus propios módulos en `config/` intactos, importables como siempre: `config/` sigue siendo un paquete del workspace y el backend continúa compilando `../config/**/*`. Solo se reescriben las importaciones de los elementos eliminados: un archivo de colección importado por código de backend apuntará al módulo de la tabla correspondiente (un paso listará los usos que lo leen como un objeto); si es importado por código de frontend, se convertirá en una importación de tipo de la tabla cuando solo se use como tal, o en un paso que indique la personalización; cualquier helper dentro de `config/collections` se copiará junto al código que lo requiera.
+0.31 deja de leer `config/collections`; no prohíbe el uso de `config/`. El codemod elimina lo que Rebase leía — los archivos de colecciones y el cableado que se traslada a `backend/` (`resources.ts`, `storage.ts`, `generated/register.ts`, y las reexportaciones correspondientes en `config/index.ts`) — y mantiene tus propios módulos en `config/` tal como estaban, importables como siempre: `config/` sigue siendo un paquete del workspace y el backend continúa compilando `../config/**/*`. Solo se reescriben las importaciones de lo que se elimina: un archivo de colección importado por código de backend apuntará al módulo de la tabla (un paso lista los usos que lo leían como objeto); importado por código de frontend, se convierte en una importación de tipo de la tabla si solo se usaba como tipo, o en un paso que indica la personalización; un helper dentro de `config/collections` se copia junto al código que lo requiere.
 
-**Qué cambió:** los elementos situados junto a las colecciones se trasladan a `backend/`:
+**Qué cambió:** lo que residía junto a las colecciones se traslada a `backend/`:
 
 | Antes | Ahora |
 |---|---|
@@ -117,13 +117,13 @@ El paso posterior `sdk-calls` también reescribe el origen de las reglas: `exist
 | `config/generated/register.ts` | `backend/generated/register.ts` |
 | `rebase.json` `config`, `usersCollection` | `tables` (por defecto `backend/schema`); la tabla de autenticación es la declarada con `defineAuthTable` |
 
-El runtime lee `storageAuthorize` y `hooks` y nada más de esos módulos; cualquier otra exportación se notificará en el arranque. El frontend solo debe importar `backend/**` como tipos: `pnpm check:frontend-backend-imports` rechazará cualquier importación por valor, ya que incluiría código del servidor en el bundle del navegador.
+El runtime solo lee `storageAuthorize` y `hooks` de esos módulos; cualquier otra exportación se notificará durante el arranque. El frontend importa `backend/**` únicamente como tipos — `pnpm check:frontend-backend-imports` rechaza importaciones de valores para evitar enviar código del servidor al navegador.
 
-**Qué hacer:** el codemod mueve `resources.ts`, `storage.ts` y el registro, y reescribe `rebase.json`, `package.json`, `pnpm-workspace.yaml` y `backend/tsconfig.json`. Los `callbacks` globales se presentan como un paso manual impreso: muévalos a `backend/hooks.ts` manualmente y agregue `hooks.ts` al array `include` de `backend/tsconfig.json` para que `tsc` lo verifique. Luego ejecute la línea de `git rm` generada: `git rm -r config/collections …`, o `git rm -r config` cuando no quede nada propio.
+**Qué hacer:** el codemod traslada `resources.ts`, `storage.ts` y el registro, y reescribe `rebase.json`, `package.json`, `pnpm-workspace.yaml` y `backend/tsconfig.json`. Los `callbacks` globales requieren un paso manual indicado en la salida: muévelos a `backend/hooks.ts` manualmente, y añade `hooks.ts` al `include` de `backend/tsconfig.json` para que `tsc` lo verifique. Luego ejecuta la línea `git rm` mostrada: `git rm -r config/collections …`, o `git rm -r config` si ya no queda nada propio en ese directorio.
 
-## 110. Las opciones de arranque y los hooks nombran tablas
+## 110. Las opciones de arranque y los hooks hacen referencia a tablas
 
-**A quién afecta:** a backends iniciados manualmente (`initializeRebaseBackend`, `createRebaseBackend`) y al código que vincula hooks tras el arranque.
+**A quién afecta:** a backends arrancados manualmente (`initializeRebaseBackend`, `createRebaseBackend`) y a código que registre hooks tras el arranque.
 
 **Qué cambió:**
 
@@ -131,34 +131,34 @@ El runtime lee `storageAuthorize` y `hooks` y nada más de esos módulos; cualqu
 |---|---|
 | `collections`, `collectionsDir` | `tables`, `defaultRls`, `schemaDir` |
 | `callbacks` | `hooks` |
-| `auth.collection` | eliminado: ahora es el `defineAuthTable` en `tables` |
+| `auth.collection` | eliminado: el `defineAuthTable` en `tables` |
 | `backend.setCollectionCallbacks(slug, cb)` | `backend.setTableHooks(slug, hooks)` |
-| props del hook: `collection`, `row` | `table` (el descriptor), `values` |
-| `composeCallbacks` | `composeTableHooks` desde `@rebasepro/common` |
+| props de hook `collection`, `row` | `table` (el descriptor), `values` |
+| `composeCallbacks` | `composeTableHooks` de `@rebasepro/common` |
 | `openRebase({ collections, callbacks })` | `openRebase({ tables, hooks })`, `tables` desde `compileSchema([...])` |
-| `OpenedRebase.collections`; la variable de `rebase console` `collections` | `.tables`; `tables` |
+| `OpenedRebase.collections`; la variable `collections` en `rebase console` | `.tables`; `tables` |
 
 ```diff ts
 -await initializeRebaseBackend({ app, server, collectionsDir: "./config/collections", callbacks });
 +await initializeRebaseBackend({ app, server, schemaDir: path.resolve(__dirname, "../schema"), hooks });
 ```
 
-Los hooks asociados a un objeto de colección pasado directamente en una llamada ya no se ejecutan: el driver ejecuta los hooks de las tablas que sirve, por lo que deben asociarse mediante `setTableHooks`.
+Los hooks vinculados a un objeto de colección pasado en un punto de llamada ya no se ejecutarán: el driver ejecuta los hooks de las tablas que sirve, por lo que deben vincularse mediante `setTableHooks`.
 
-**Qué hacer:** `rebase migrate sdk-calls` reescribe `setCollectionCallbacks` y adapta las props del hook, listando cada objeto de opciones de backend que deba actualizarse manualmente. Un script que abra los datos compila sus tablas:
+**Qué hacer:** `rebase migrate sdk-calls` reescribe `setCollectionCallbacks`, adapta las propiedades de los hooks y lista cada objeto de opciones del backend que deba actualizarse manualmente. Un script que abra los datos compila sus tablas:
 
 ```diff ts
 -const rebase = await openRebase({ databaseUrl, collections, callbacks });
 +const rebase = await openRebase({ databaseUrl, tables: compileSchema([products, orders]), hooks });
 ```
 
-Consulte [Scripts](/docs/backend/scripts/#openrebase). Consulte [Visión general del backend](/docs/backend/) y [Hooks globales](/docs/backend/hooks/).
+Consulta [Scripts](/docs/backend/scripts/#openrebase). Consulta [Información general del backend](/docs/backend/) y [Hooks globales](/docs/backend/hooks/).
 
 ## 111. El panel de administración renderiza las tablas que sirve el servidor
 
-**A quién afecta:** a todos los frontends que montan `<RebaseCMS>`.
+**A quién afecta:** a cualquier frontend que monte `<RebaseCMS>`.
 
-**Qué cambió:** `<RebaseCMS collections>` ha sido eliminado. El panel muestra cada tabla que el backend sirve en `GET /api/schema/tables`, sin requerir un archivo por tabla, seguido de `externalCollections` (Firestore). `tableCustomizations` recibe los objetos `customizeTable` procedentes de `frontend/src/cms/`. El plugin de colecciones para Vite y `virtual:rebase-collections` han sido eliminados. `CollectionsProvider` acepta las mismas tres entradas (`tableCustomizations`, `externalCollections`, `tables`).
+**Qué cambió:** `<RebaseCMS collections>` ha desaparecido. El panel muestra todas las tablas que el backend sirve en `GET /api/schema/tables`, sin un archivo por tabla, seguidas de `externalCollections` (Firestore). `tableCustomizations` recibe los objetos `customizeTable` procedentes de `frontend/src/cms/`. Se eliminan el plugin de colecciones de Vite y `virtual:rebase-collections`. `CollectionsProvider` acepta las mismas tres entradas (`tableCustomizations`, `externalCollections`, `tables`).
 
 ```diff tsx
 -import { collections } from "virtual:rebase-collections";
@@ -167,27 +167,27 @@ Consulte [Scripts](/docs/backend/scripts/#openrebase). Consulte [Visión general
 +<RebaseCMS tableCustomizations={[postsCms]}/>
 ```
 
-**Qué hacer:** el codemod crea `frontend/src/cms/index.ts`, que exporta `tableCustomizations` (y `externalCollections`), y lo monta automáticamente en el `App.tsx` del scaffold; si no reconoce `App.tsx`, el plugin en `vite.config.ts` y la declaración del módulo virtual se presentarán como pasos manuales en la salida. Consulte [Personalizar una tabla](/docs/frontend/customize-table/).
+**Qué hacer:** el codemod genera `frontend/src/cms/index.ts`, que exporta `tableCustomizations` (y `externalCollections`), y lo monta en el `App.tsx` del scaffold automáticamente; un `App.tsx` no reconocido, el plugin en `vite.config.ts` y la declaración del módulo virtual se listan como pasos manuales en la salida. Consulta [Personalizar una tabla](/docs/frontend/customize-table/).
 
-## 112. Formato de bundle 3; se rechazan los bundles de formato 2
+## 112. Formato de bundle 3; los bundles de formato 2 son rechazados
 
-**A quién afecta:** a cualquier despliegue de un bundle compilado, ya sea autoalojado con la imagen de runtime o en Rebase Cloud.
+**A quién afecta:** a cualquier despliegue de un bundle compilado — autoalojado con la imagen de runtime o en Rebase Cloud.
 
-**Qué cambió:** el esquema del bundle es `entry.tables`, junto a `entry.resources`, `entry.storage` y `entry.hooks`; `bundleFormat` pasa a ser 3 y el contrato de runtime es 2. Un bundle de formato 1 o 2 incluye `config/collections`, el cual un runtime de 0.31 no puede interpretar, por lo que rechazará el arranque indicando el codemod en el mensaje de error en lugar de introspeccionar la base de datos y servir una API inconsistente.
+**Qué cambió:** el esquema de un bundle reside en `entry.tables`, junto a `entry.resources`, `entry.storage` y `entry.hooks`; `bundleFormat` pasa a ser 3 y el contrato de runtime 2. Un bundle de formato 1 o 2 incluye `config/collections`, el cual un runtime 0.31 no puede interpretar, por lo que rechazará el arranque mostrando la sugerencia del codemod en el mensaje, en lugar de inspeccionar la base de datos y servir una API inconsistente.
 
-**Qué hacer:** migre el código fuente, luego ejecute `rebase build` y despliegue. En Rebase Cloud, desplegar el repositorio migrado recompilará la aplicación automáticamente. Consulte [Runtime y bundles](/docs/architecture/runtime-and-bundles/).
+**Qué hacer:** migra el código fuente, ejecuta `rebase build` y despliega. En Rebase Cloud, desplegar el repositorio migrado recompilará automáticamente. Consulta [Runtime y bundles](/docs/architecture/runtime-and-bundles/).
 
 ## 113. La versión del esquema se calcula a partir de las tablas (`v2:`)
 
-**A quién afecta:** a toda base de datos aprovisionada por un runtime anterior a 0.31 y a cualquier SDK generado.
+**A quién afecta:** a toda base de datos aprovisionada por un runtime previo a 0.31 y a cada SDK generado.
 
-**Qué cambió:** la versión del esquema genera un hash a partir de los descriptores compilados de las tablas y comienza con el prefijo `v2:`. Una base de datos marcada con `v1:` reportará el cambio de modelo una sola vez —el log de arranque y `rebase doctor` lo indicarán junto con las instrucciones para actualizar el sello— y cada SDK generado será marcado como desactualizado una vez.
+**Qué cambió:** la versión del esquema genera un hash a partir de los descriptores de tabla compilados y comienza con `v2:`. Una base de datos marcada con `v1:` notificará el cambio de modelo una vez — los logs de arranque y `rebase doctor` lo indicarán junto con instrucciones para actualizar la marca — y cada SDK generado se marcará como desactualizado una vez.
 
-**Qué hacer:** aprovisione una vez con el nuevo runtime: inicie el proceso que controla el esquema o ejecute `rebase db push`. Con `REBASE_REQUIRE_SCHEMA_MATCH=true`, actualice el sello antes de desplegar el resto de procesos. Regenere el SDK.
+**Qué hacer:** aprovisiona una vez con el nuevo runtime: arranca el proceso propietario del esquema o ejecuta `rebase db push`. Con `REBASE_REQUIRE_SCHEMA_MATCH=true`, actualiza la marca antes de reiniciar el resto de los procesos. Regenera el SDK.
 
-## 114. Los códigos de error nombran tablas
+## 114. Los códigos de error hacen referencia a tablas
 
-**A quién afecta:** al código que evalúa un `code` de error de forma condicional.
+**A quién afecta:** a código con lógica condicional basada en un `code` de error.
 
 **Qué cambió:**
 
@@ -198,11 +198,11 @@ Consulte [Scripts](/docs/backend/scripts/#openrebase). Consulte [Visión general
 | `UNKNOWN_COLLECTION` (SDK) | `UNKNOWN_TABLE` |
 | `INVALID_COLLECTION_PATH` (SDK) | `INVALID_TABLE_PATH` |
 
-**Qué hacer:** `rebase migrate sdk-calls` reescribe los literales de cadena. Consulte [Errores](/docs/backend/errors/).
+**Qué hacer:** `rebase migrate sdk-calls` reescribe los literales de cadena. Consulta [Errores](/docs/backend/errors/).
 
-## 115. El SDK referencia una tabla: `data.table(slug)`
+## 115. El SDK referencia tablas: `data.table(slug)`
 
-**A quién afecta:** a todo cliente, función, cron, hook y script que referencie una tabla por su slug o pase el diccionario generado.
+**A quién afecta:** a cualquier cliente, función, cron, hook y script que referencie una tabla por su slug o suministre el diccionario generado.
 
 **Qué cambió:**
 
@@ -210,142 +210,144 @@ Consulte [Scripts](/docs/backend/scripts/#openrebase). Consulte [Visión general
 |---|---|
 | `data.collection(slug)` | `data.table(slug)` |
 | `createRebaseClient({ collections: collectionsDictionary })` | `createRebaseClient({ tables: tablesDictionary })` |
-| generados: `CollectionName`, `CollectionsDictionary` | `TableName`, `TablesDictionary` |
-| batch: `{ op, collection }` (SDK y `POST /api/data/_batch`) | `{ op, table }` |
+| los generados `CollectionName`, `CollectionsDictionary` | `TableName`, `TablesDictionary` |
+| batch `{ op, collection }` (SDK y `POST /api/data/_batch`) | `{ op, table }` |
 | `CollectionClient`, `SDKCollectionClient`, `CollectionAccessor`, `CollectionTrashAccessor` | `TableClient`, `SDKTableClient`, `TableAccessor`, `TableTrashAccessor` |
-| offline: `maxCachedRowsPerCollection`, `maxCachedQueriesPerCollection` | `…PerTable` |
-| accessor reservado: `<name>Collection`; `collectionCollection` | `<name>Table`; la tabla `collection` es `collection` |
+| configuraciones offline `maxCachedRowsPerCollection`, `maxCachedQueriesPerCollection` | `…PerTable` |
+| accesor reservado `<name>Collection`; `collectionCollection` | `<name>Table`; la tabla `collection` es `collection` |
 
 ```diff ts
 -const { data } = await client.data.collection("posts").find();
 +const { data } = await client.data.table("posts").find();
 ```
 
-Los accessors tipados (`client.data.posts`) no sufren cambios.
+Los accesores con tipos (`client.data.posts`) no cambian.
 
-**Qué hacer:** el codemod ejecuta `rebase migrate sdk-calls` sobre su código (ejecútelo individualmente si el proyecto ya fue migrado) y luego `rebase generate-sdk`. Toda llamada `.collection(` cuyo receptor no sea el SDK permanecerá inalterada y será listada. Consulte [SDK tipado](/docs/sdk/).
+**Qué hacer:** el codemod ejecuta `rebase migrate sdk-calls` sobre tu código — ejecútalo de forma aislada en proyectos previamente migrados — y después ejecuta `rebase generate-sdk`. Las llamadas a `.collection(` cuyo receptor no pertenezca al SDK se mantendrán sin cambios y se listarán. Consulta [SDK tipado](/docs/sdk/).
 
-## 116. Flags de la CLI: `--schema-dir`, no `--collections`
+## 116. Flags de CLI: `--schema-dir`, no `--collections`
 
-**A quién afecta:** a scripts y pasos de CI que invocan la CLI con una ruta de esquema.
+**A quién afecta:** a scripts y pasos de CI que invocan la CLI pasando una ruta de esquema.
 
-**Qué cambió:** `--collections` / `-c` se rechazan en cualquier comando que lea el esquema, sugiriendo el codemod en el mensaje de error (`generate-sdk` ignora un `--collections-dir` residual); `--schema-dir` permite especificar un directorio de esquema distinto de `backend/schema`. `rebase schema introspect` escribe archivos `defineTable` en `backend/schema/` (`--output` ha sido eliminado). `REBASE_STRICT_COLLECTION_CONFIG` ya no se evalúa: un esquema que no compile impedirá siempre el arranque.
+**Qué cambió:** `--collections` / `-c` se rechazan en todos los comandos que lean el esquema, indicando el uso del codemod en el mensaje (`generate-sdk` ignora un `--collections-dir` residual); `--schema-dir` especifica un directorio de esquema distinto de `backend/schema`. `rebase schema introspect` escribe archivos `defineTable` en `backend/schema/` — `--output` se ha eliminado. `REBASE_STRICT_COLLECTION_CONFIG` ya no tiene efecto: un esquema que no compile impedirá siempre el arranque.
 
-**Qué hacer:** reemplace los flags correspondientes. Consulte [CLI](/docs/cli/) y [Generación de esquemas](/docs/cli/schema/).
+**Qué hacer:** reemplaza los flags. Consulta [CLI](/docs/cli/) y [Generación de esquemas](/docs/cli/schema/).
 
-## 117. El editor de esquemas edita `backend/schema` con `TablePatch`
+## 117. El editor de esquemas modifica `backend/schema` mediante `TablePatch`
 
-**A quién afecta:** al código que invoca las rutas del editor de esquemas o de esquema en vivo, y a los despliegues que configuran variables de edición en vivo.
+**A quién afecta:** a código que consuma las rutas del editor de esquemas o de edición de esquemas en vivo, y a despliegues con variables de edición en vivo activas.
 
-**Qué cambió:** las rutas `/api/admin/schema-editor/collection/save`, `collection/delete`, `property/save` y `property/delete` han sido eliminadas. El editor ahora sirve `GET /tables`, `POST /preview` y `POST /apply`, y las rutas `/plan` y `/apply` de edición de esquema en vivo reciben `{ patches: TablePatch[] }` en lugar de una colección o un parche de esta. `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH` se rechaza en el arranque: debe usarse `REBASE_LIVE_SCHEMA_PATH` (por defecto `backend/schema`), y `liveSchema.repository.collectionsPath` pasa a ser `schemaPath`. La presentación nunca constituye una edición de esquema: se almacena como preferencias de UI (`/api/admin/ui-config`). Cualquier edición cuyo archivo haya cambiado en disco tras prepararse la modificación (guardado en el IDE, otro proceso) responderá con 409 `SCHEMA_EDIT_STALE_FILE` sin escribir nada (anteriormente devolvía 400 `SCHEMA_EDIT_REFUSED`).
+**Qué cambió:** `/api/admin/schema-editor/collection/save`, `collection/delete`, `property/save` y `property/delete` se han eliminado. El editor sirve ahora `GET /tables`, `POST /preview` y `POST /apply`, mientras que `/plan` y `/apply` de live schema editing reciben `{ patches: TablePatch[] }` en lugar de una colección o un parche de la misma. `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH` es rechazado al arrancar: debe ser `REBASE_LIVE_SCHEMA_PATH` (por defecto `backend/schema`), y `liveSchema.repository.collectionsPath` pasa a ser `schemaPath`. Los ajustes de presentación nunca forman parte de una edición de esquema: se guardan como preferencias de interfaz (`/api/admin/ui-config`). Toda edición sobre un archivo que haya cambiado en disco tras prepararse el cambio (guardado en IDE, otro proceso) devolverá 409 `SCHEMA_EDIT_STALE_FILE` sin aplicar nada; anteriormente devolvía 400 `SCHEMA_EDIT_REFUSED`.
 
-**Qué hacer:** renombre la variable; adapte quien invoque las rutas para enviar modificaciones con `TablePatch` y recargue en caso de recibir `SCHEMA_EDIT_STALE_FILE`. Consulte [Edición de esquema en vivo](/docs/backend/live-schema-editing/).
+**Qué hacer:** renombra la variable; actualiza los consumidores de estas rutas para enviar operaciones `TablePatch` y recargar en caso de recibir `SCHEMA_EDIT_STALE_FILE`. Consulta [Edición de esquemas en vivo](/docs/backend/live-schema-editing/).
 
-## 118. Un slot de componente es un componente
+## 118. Un slot de componente es directamente un componente
 
-**A quién afecta:** a las personalizaciones que definían un componente de React mediante una ruta de texto o una función diferida `() => import(…)`.
+**A quién afecta:** a personalizaciones que referenciaban componentes de React mediante cadenas con rutas o thunks lazy tipo `() => import(…)`.
 
-**Qué cambió:** los elementos `Field` / `Preview` / `Filter` de un campo, las `Actions` de colección, `entityViews[].Builder`, `collectionViews[].Builder`, `formView.Builder` y las sustituciones de componentes aceptan directamente el componente en sí. `ComponentRef`, `ComponentLike`, `LazyComponentRef` y `isLazyComponentRef` (`@rebasepro/types`), `asComponentRef` y `asReactComponent` (`@rebasepro/cms-types`) y `resolveComponentRef` / `useResolvedComponent` (`@rebasepro/app`) han sido eliminados. `customizeTable` rechaza cadenas de texto o funciones diferidas mostrando el mensaje "imported by value".
+**Qué cambió:** las propiedades de campo `Field` / `Preview` / `Filter`, las `Actions` de colección, `entityViews[].Builder`, `collectionViews[].Builder`, `formView.Builder` y las sobreescrituras de componentes reciben directamente el componente. Se han eliminado `ComponentRef`, `ComponentLike`, `LazyComponentRef` y `isLazyComponentRef` (`@rebasepro/types`), `asComponentRef` y `asReactComponent` (`@rebasepro/cms-types`), así como `resolveComponentRef` / `useResolvedComponent` (`@rebasepro/app`). `customizeTable` rechaza el paso de cadenas o thunks mostrando el mensaje "imported by value".
 
-**Qué hacer:** importe el componente en el archivo dentro de `frontend/src/cms/` y páselo directamente. Consulte [Campos personalizados](/docs/frontend/custom-fields/).
+**Qué hacer:** importa el componente directamente en el archivo `frontend/src/cms/` y pásalo como referencia. Consulta [Campos personalizados](/docs/frontend/custom-fields/).
 
 ## 119. Las preferencias del panel son preferencias de UI
 
-**A quién afecta:** al código que implementa `UserConfigurationPersistence`.
+**A quién afecta:** a implementaciones de `UserConfigurationPersistence`.
 
-**Qué cambió:** la forma en que un usuario redimensiona o reordena una tabla se maneja como un delta de `UiTablePreferences`: `getTablePreferences` / `saveTablePreferences` reemplazan a `getCollectionConfig` / `onCollectionModified`, y el tipo parcial de configuración de colección que recibía ha sido eliminado. El almacenamiento del navegador las guarda bajo `table_preferences::<slug>` e ignora los datos guardados por paneles antiguos, por lo que el ancho de columnas y los modos de visualización de cada usuario se restablecerán una vez. Se eliminó `userSelect` en los campos: una columna `.userId()` actúa como selector de usuario.
+**Qué cambió:** las modificaciones del usuario sobre el tamaño u orden de columnas se gestionan como un delta `UiTablePreferences`: `getTablePreferences` / `saveTablePreferences` reemplazan a `getCollectionConfig` / `onCollectionModified`, eliminándose el tipo parcial de configuración de colección que aceptaba. El almacenamiento del navegador las guarda bajo la clave `table_preferences::<slug>` e ignora los registros de paneles antiguos, restableciendo una única vez el ancho de columnas y los modos de vista de cada usuario. `userSelect` en campos ha sido eliminado: una columna `.userId()` actúa como selector de usuario.
 
-El puente de Studio se adapta en consecuencia: `StudioSchemaEditing.updateCollection` pasa a ser `applyTablePatches(slug, patches)`, y el editor de colecciones envía `{ patches }` al editor de esquemas.
+El puente de Studio refleja estos cambios: `StudioSchemaEditing.updateCollection` pasa a ser `applyTablePatches(slug, patches)`, y el editor de colecciones envía `{ patches }` al editor de esquemas.
 
-**Qué hacer:** adapte cualquier persistencia personalizada a los dos métodos nuevos, y cualquier `StudioSchemaEditing` personalizado a `applyTablePatches`.
+**Qué hacer:** adapta las implementaciones de persistencia personalizada a los dos nuevos métodos, y actualiza cualquier `StudioSchemaEditing` personalizado para utilizar `applyTablePatches`.
 
 ## 120. Se retira el soporte para MongoDB
 
-**A quién afecta:** a proyectos que utilicen `@rebasepro/server-mongo` o que declaren `database(…, { engine: "mongodb" })`.
+**A quién afecta:** a proyectos que dependan de `@rebasepro/server-mongo` o que declaren `database(…, { engine: "mongodb" })`.
 
-**Qué cambió:** el paquete ha sido eliminado, junto con los tipos de colección de Mongo y el resto de su modelo. Postgres es el único motor de base de datos para el servidor: un origen de transporte de servidor configurado con otro motor impedirá el arranque, señalándolo explícitamente.
+**Qué cambió:** el paquete ha sido eliminado, junto con los tipos de colecciones de Mongo y el resto de su modelo. Postgres es el único motor de base de datos para el servidor: cualquier origen configurado con otro motor de transporte impedirá el arranque indicándolo en el error.
 
-**Qué hacer:** migre los datos a Postgres. No existe un mecanismo de migración interno dentro de Rebase.
+**Qué hacer:** migra los datos a Postgres. No existe una ruta de migración interna dentro de Rebase.
 
 ## 121. Las colecciones de Firestore residen en el frontend
 
-**A quién afecta:** a proyectos híbridos con colecciones que utilizan `engine: "firestore"`.
+**A quién afecta:** a proyectos híbridos que utilicen colecciones con `engine: "firestore"`.
 
-**Qué cambió:** una colección de Firestore es un origen de CMS que el navegador consulta directamente: se declara con `defineFirestoreCollection` de `@rebasepro/firebase`, dentro de `frontend/src/cms/`, y se pasa a `<RebaseCMS externalCollections>`. Las referencias entre Firestore y una tabla de Postgres se almacenan utilizando el identificador de la entidad de destino, y una referencia de Firestore cuyo `path` coincida con el slug de una tabla de Postgres apuntará a dicha tabla.
+**Qué cambió:** una colección de Firestore se convierte en un origen de CMS que el navegador consume directamente: se utiliza `defineFirestoreCollection` de `@rebasepro/firebase` dentro de `frontend/src/cms/`, pasándolo a `<RebaseCMS externalCollections>`. Las referencias cruzadas entre Firestore y una tabla de Postgres se almacenan utilizando el identificador de destino, y una referencia de Firestore cuyo `path` coincida con el slug de una tabla de Postgres apuntará ahora a dicha tabla.
 
-**Qué hacer:** el codemod genera los archivos `defineFirestoreCollection`. Apunte las referencias a colecciones de Firestore utilizando el slug de la colección. Consulte [Firebase](/docs/frontend/firebase/).
+**Qué hacer:** el codemod genera los archivos `defineFirestoreCollection`. Apunta las referencias a una colección de Firestore empleando el slug de dicha colección. Consulta [Firebase](/docs/frontend/firebase/).
 
-## 122. Las herramientas MCP se nombran para tablas
+## 122. Las herramientas de MCP adoptan nombres basados en tablas
 
-**A quién afecta:** a prompts, scripts y listas de permisos que hagan referencia a herramientas MCP.
+**A quién afecta:** a prompts, scripts y listas de permisos que invoquen herramientas de MCP.
 
-**Qué cambió:** en `/mcp` remoto: `list_collections`, `describe_collection`, `query_collection`, `show_collection`, `count_documents`, `aggregate_documents`, `get_document`, `create_document`, `update_document`, `delete_document` pasan a llamarse `list_tables`, `describe_table`, `query_table`, `show_table`, `count_rows`, `aggregate_rows`, `get_row`, `create_row`, `update_row`, `delete_row`; el argumento `collection` pasa a ser `table`, y `show_app` / `save_app` aceptan `tables`. En el servidor local: `list_documents` → `query_table`, `get_document` → `get_row`, `create_document` → `create_row`, `update_document` → `update_row`, `delete_document` → `delete_row`; `rebase_schema_plan` recibe `patches`; los recursos son `rebase://tables/{name}`. El payload de vista de MCP Apps utiliza la versión 3: descriptores de tablas filtrados según el invocador, permisos por tabla y preferencias de UI de cada usuario en `preferences` (`file`, `workspace`, `user`; una API key no tiene capa de usuario), con bloques y seeds haciendo referencia a `table`. La vista `collection-table` ha sido eliminada. `list_tables` ya no incluye `title`; `describe_table` añade `primaryKey`, `relations`, el `rls` aplicable al invocador, `title` y `presentation`.
+**Qué cambió:** en `/mcp` remoto: `list_collections`, `describe_collection`, `query_collection`, `show_collection`, `count_documents`, `aggregate_documents`, `get_document`, `create_document`, `update_document`, `delete_document` pasan a ser `list_tables`, `describe_table`, `query_table`, `show_table`, `count_rows`, `aggregate_rows`, `get_row`, `create_row`, `update_row`, `delete_row`; el argumento `collection` pasa a llamarse `table`, y `show_app` / `save_app` reciben `tables`. En el servidor local: `list_documents` → `query_table`, `get_document` → `get_row`, `create_document` → `create_row`, `update_document` → `update_row`, `delete_document` → `delete_row`; `rebase_schema_plan` recibe `patches`; los recursos adoptan el esquema `rebase://tables/{name}`. El payload de vistas para MCP Apps pasa a versión 3: descriptores de tabla redactados por invocador, permisos por tabla y preferencias de interfaz de usuario organizadas bajo `preferences` (`file`, `workspace`, `user`; una clave de API carece de capa de usuario), utilizando `table` en bloques y semillas. La vista `collection-table` ha sido eliminada. `list_tables` no incluye `title`; `describe_table` añade `primaryKey`, `relations`, las `rls` aplicables al invocador, `title` y `presentation`.
 
-**Qué hacer:** renombre las herramientas. La vista y el servidor deben manejar la misma versión de payload: los conectores alojados y los runtimes a los que se conectan deben actualizarse conjuntamente, y cualquier vista MCP personalizada en el proyecto debe recompilarse con los paquetes de 0.31. Consulte la [Referencia de herramientas MCP](/docs/ai/mcp-tool-reference/) y [MCP remoto](/docs/ai/remote-mcp/).
+**Qué hacer:** renombra las referencias. La vista y el servidor deben utilizar la misma versión de payload: los conectores alojados y sus runtimes de destino deben actualizarse conjuntamente, y las vistas de MCP integradas en el proyecto deben recompilarse con los paquetes 0.31. Consulta la [Referencia de herramientas MCP](/docs/ai/mcp-tool-reference/) y [MCP remoto](/docs/ai/remote-mcp/).
 
-## 123. El vocabulario de las reglas usa `table`
+## 123. El vocabulario de reglas utiliza `table`
 
-**A quién afecta:** a las reglas que emplean `policy.existsIn` o un tenant por membresía, así como a las reglas que combinan `access` con otras cláusulas.
+**A quién afecta:** a reglas que utilicen `policy.existsIn` o tenant de membresía, y reglas que combinen `access` con otras cláusulas.
 
-**Qué cambió:** `policy.existsIn({ collection, where })` pasa a ser `existsIn({ table, where })`, y `tenant.from.membership.collection` pasa a ser `membership.table`; los nombres de las políticas no se modifican. Cuatro estructuras de reglas otorgan ahora permisos distintos, dos de ellas ampliando el acceso ([la tabla anterior](#revisar-antes-de-desplegar-estas-reglas-cambian-de-significado)): un simple `{ access: "authenticated" }`, que no otorgaba nada, ahora admite a cualquier invocador autenticado, y las tablas intermedias (junctions) de dicha tabla adquieren sus políticas de escritura de relaciones (edge-write). Las reglas que combinen cláusulas excluidas por el tipo `SecurityRule`, o que contengan un valor inválido en `access`, `mode`, `operation` o `roles`, serán rechazadas.
+**Qué cambió:** `policy.existsIn({ collection, where })` pasa a ser `existsIn({ table, where })`, y `tenant.from.membership.collection` pasa a ser `membership.table`; los nombres de las políticas se conservan. Cuatro estructuras de reglas conceden ahora permisos diferentes, dos de ellas de forma más amplia ([según la tabla anterior](#revisar-antes-de-desplegar-estas-reglas-cambian-de-significado)): un `{ access: "authenticated" }` simple, que antes denegaba todo, ahora autoriza a cualquier invocador autenticado, y las tablas de unión vinculadas adquieren directivas de escritura periféricas. Se rechazan reglas que mezclen cláusulas incompatibles según el tipo `SecurityRule`, o que contengan valores no válidos en `access`, `mode`, `operation` o `roles`.
 
-**Qué hacer:** el codemod renombra las claves, rechaza las reglas no válidas indicando archivo y línea, y lista aquellas que cambian de significado bajo "Revisar antes de desplegar". Para cada una: manténgala, defina `access: "registered"` (usuarios autenticados con cuenta) o elimínela. Posteriormente, ejecute y revise `rebase db push --dry-run` y `rebase doctor --policies` contra su base de datos.
+**Qué hacer:** el codemod actualiza los nombres de claves, rechaza reglas no válidas indicando archivo y línea, y lista aquellas que cambien de comportamiento bajo "Review before deploying". Decide para cada caso si mantenerla, cambiarla a `access: "registered"` (usuarios autenticados no anónimos) o removerla. Posteriormente revisa la salida de `rebase db push --dry-run` y `rebase doctor --policies` contra tu base de datos.
 
 ## 124. Studio lee las tablas desde el servidor
 
-**A quién afecta:** a instancias de Studio conectadas a un backend anterior a 0.31 y a scripts de la consola JS de Studio.
+**A quién afecta:** a instancias de Studio conectadas a backends anteriores a 0.31, y scripts de la consola JS de Studio.
 
-**Qué cambió:** toda herramienta que interprete esquemas lee `GET /api/schema/tables`; ante un runtime que no lo soporte mostrarán un aviso de actualización. La definición mostrada en el editor de RLS corresponde a lo compilado por el servidor. Los scripts de la consola JS reciben `context.tables` (antes era `context.collections`).
+**Qué cambió:** todas las herramientas con conocimiento del esquema leen `GET /api/schema/tables`; frente a runtimes antiguos mostrarán una notificación de actualización requerida. La vista declarada en el editor de RLS refleja lo compilado por el servidor. Los scripts de la consola JS reciben ahora `context.tables` (anteriormente `context.collections`).
 
-**Qué hacer:** actualice el runtime a la par que el panel. Consulte [Studio](/docs/studio/).
+**Qué hacer:** actualiza el runtime a la par que el panel. Consulta [Studio](/docs/studio/).
 
-## 125. `rls-check --format agent` usa `rls`
+## 125. `rls-check --format agent` utiliza `rls`
 
-**A quién afecta:** a herramientas que consumen la salida de `rls-check --format agent`.
+**A quién afecta:** a herramientas que consuman la salida de `rls-check --format agent`.
 
-**Qué cambió:** `remediation.rebase.securityRules` pasa a ser `remediation.rebase.rls`, el extracto devuelto corresponde a un `defineTable(…, { rls })`, y la versión de formato del documento es 2. `--json` no sufre cambios. Consulte [rls-check](/docs/rls-check/).
+**Qué cambió:** `remediation.rebase.securityRules` pasa a ser `remediation.rebase.rls`, el extracto adopta la forma `defineTable(…, { rls })`, y la versión de formato del documento pasa a ser 2. `--json` permanece sin cambios. Consulta [rls-check](/docs/rls-check/).
 
-**Qué hacer:** actualice el código para leer la nueva clave.
+**Qué hacer:** adapta el consumo a la nueva clave.
 
 ## 126. `@rebasepro/plugin-review`: `reviewRls`
 
-**A quién afecta:** a proyectos que utilizan el plugin de revisión.
+**A quién afecta:** a proyectos que utilicen el plugin de revisión.
 
-**Qué cambió:** `reviewSecurityRules(slug, review)` pasa a ser `reviewRls(slug, review)`, incorporándose mediante spread al `rls` de la tabla; `findReviewConfigProblems` y `assertReviewConfig` reciben descriptores de tabla.
+**Qué cambió:** `reviewSecurityRules(slug, review)` pasa a ser `reviewRls(slug, review)`, integrándose en el `rls` de la tabla; `findReviewConfigProblems` y `assertReviewConfig` reciben descriptores de tabla.
 
-**Qué hacer:** renombre la llamada y pase `services.tables()` o `compileTables(…)`.
+**Qué hacer:** actualiza el nombre de la llamada y suministra `services.tables()` o `compileTables(…)`.
 
-## 127. `@rebasepro/codegen` lee descriptores
+## 127. `@rebasepro/codegen` consume descriptores
 
-**A quién afecta:** al código que invoque directamente el generador.
+**A quién afecta:** a código que invoque el generador directamente.
 
-**Qué cambió:** `generateTypedefs(tables)` y `generateSDK(tables, options)` reciben `TableDescriptor[]` —lo que devuelve `compileTables` y sirve `GET /api/schema/tables`— en lugar de colecciones.
+**Qué cambió:** `generateTypedefs(tables)` y `generateSDK(tables, options)` reciben `TableDescriptor[]` — el formato retornado por `compileTables` y servido en `GET /api/schema/tables` — en lugar de colecciones.
 
-**Qué hacer:** compile sus definiciones previamente o utilice `rebase generate-sdk`.
+**Qué hacer:** compila las definiciones previamente o utiliza el comando `rebase generate-sdk`.
 
-## 128. La skill del agente `rebase-collections` ahora es `rebase-tables`
+## 128. La habilidad de agente `rebase-collections` pasa a ser `rebase-tables`
 
-**A quién afecta:** a proyectos con agent skills instaladas, y a prompts o archivos de instrucciones que hagan referencia a dicha skill.
+**A quién afecta:** a proyectos con habilidades de agente instaladas, y prompts o instrucciones que hagan referencia a dicha habilidad.
 
-**Qué cambió:** la skill que define el modelo de datos pasa a ser `rebase-tables`: creación de tablas, columnas, relaciones, `rls`, hooks y la capa superior de CMS. `rebase skills install` elimina la copia anterior de `rebase-collections`, incluso de instalaciones previas a la existencia del manifiesto de skills, preservando cualquier directorio con ese nombre creado manualmente por usted.
+**Qué cambió:** la habilidad encargada del modelo de datos pasa a llamarse `rebase-tables`: abarca la definición de tablas, columnas, relaciones, `rls`, hooks y la capa superior de CMS. `rebase skills install` remueve la copia obsoleta `rebase-collections`, incluyendo instalaciones realizadas antes de la existencia del manifiesto de habilidades, preservando directorios con dicho nombre creados por el usuario.
 
-**Qué hacer:** ejecute `rebase skills install` tras la actualización. Los pasos que imprime `rebase migrate collections-to-tables` también lo indicarán. Renombre la skill en los archivos de instrucciones donde aparezca. Consulte [Agent Skills](/docs/ai/skills/).
+**Qué hacer:** ejecuta `rebase skills install` tras la actualización. Los pasos mostrados por `rebase migrate collections-to-tables` también lo indicarán. Actualiza las menciones de la habilidad en tus archivos de instrucciones. Consulta [Habilidades de agentes](/docs/ai/skills/).
 
 ## 129. Se elimina `useJsonCollectionsConfigController`
 
-**A quién afecta:** a proyectos que guardaban definiciones de colecciones en formato JSON mediante `@rebasepro/cms`.
+**A quién afecta:** a proyectos que persistían definiciones de colecciones en formato JSON mediante `@rebasepro/cms`.
 
-**Qué cambió:** `useJsonCollectionsConfigController` ha sido eliminado, junto con su tipo de opciones y la clase subyacente de almacenamiento JSON. El esquema de una tabla reside en `backend/schema`, y su representación en el panel se gestiona mediante preferencias de UI: `frontend/src/cms/ui-config.json` en desarrollo, y la tabla `rebase.ui_preferences` en entornos desplegados.
+**Qué cambió:** `useJsonCollectionsConfigController` ha sido eliminado, junto con sus tipos de opciones y la clase subyacente de persistencia JSON. El esquema de una tabla reside en `backend/schema`, y su representación en el panel se gestiona mediante preferencias de interfaz: `frontend/src/cms/ui-config.json` en desarrollo, y la tabla `rebase.ui_preferences` en entornos desplegados.
 
-**Qué hacer:** declare las tablas con `defineTable` (`rebase migrate collections-to-tables` las genera a partir de las definiciones de colecciones) y pase el `uiConfig` del scaffold a `<RebaseCMS>`. Consulte [Personalizar una tabla](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences).
+**Qué hacer:** declara las tablas mediante `defineTable` (`rebase migrate collections-to-tables` las genera a partir de las colecciones existentes) y suministra el `uiConfig` del scaffold a `<RebaseCMS>`. Consulta [Personalizar una tabla](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences).
 
-## 130. `rebase build` rechaza un frontend sin `rebaseBackendGuard()`
+## 130. `rebase build` rechaza frontends sin `rebaseBackendGuard()`
 
-**A quién afecta:** a todos los proyectos con frontend.
+**A quién afecta:** a cualquier proyecto con aplicación frontend.
 
-**Qué cambió:** el frontend únicamente puede importar contenido de `backend/` como tipos. Una importación por valor incluiría código del servidor (hooks y cualquier secreto asociado) en el bundle del navegador. `rebaseBackendGuard()` de `@rebasepro/app/vitePlugin` interrumpe `vite build` y `vite dev` si algún módulo del frontend resuelve dependencias hacia `backend/`, indicando el módulo importador, la importación y el archivo afectado, tras evaluar alias, rutas de tsconfig, resolución por paquete o absoluta, globs, `?raw`, reexportaciones e importaciones dinámicas. `rebase build`, al igual que la compilación de frontend ejecutada por `rebase cloud deploy`, rechaza frontends cuya configuración de Vite no incluya este guard; `rebase dev` emite una advertencia; `rebase verify` reporta `cms-backend-guard-missing`.
+**Qué cambió:** el frontend solo puede importar elementos de `backend/` como tipos. Una
+importación de valores trasladaría código del servidor — hooks y secretos asociados — al
+bundle del navegador. `rebaseBackendGuard()` de `@rebasepro/app/vitePlugin` interrumpe `vite build` y `vite dev` si cualquier módulo del frontend resuelve dependencias hacia `backend/`, indicando el importador, la importación y el archivo involucrado, tras evaluar alias, rutas de tsconfig, resolución absoluta y de paquetes, globs, `?raw`, reexportaciones e importaciones dinámicas. `rebase build`, así como la compilación de frontend ejecutada por `rebase cloud deploy`, rechazarán configuraciones de Vite que no lo incluyan; `rebase dev` emitirá una advertencia; `rebase verify` reportará el error `cms-backend-guard-missing`.
 
-**Qué hacer:** el codemod lo incorpora automáticamente al archivo `frontend/vite.config.ts` del scaffold, e imprime las instrucciones para cualquier otra configuración:
+**Qué hacer:** el codemod lo incorpora automáticamente en el `frontend/vite.config.ts` del scaffold, y detalla la configuración requerida para cualquier otra variante:
 
 ```diff ts
 +import { rebaseBackendGuard } from "@rebasepro/app/vitePlugin";
@@ -356,46 +358,46 @@ El puente de Studio se adapta en consecuencia: `StudioSchemaEditing.updateCollec
  });
 ```
 
-Posteriormente, convierta cualquier importación por valor de `backend/` en `import type`.
+Posteriormente, cambia cualquier importación de valor desde `backend/` por `import type`.
 
-## 131. Las filas en tránsito siguen a su columna
+## 131. Los datos transmitidos respetan el tipo de su columna
 
-**A quién afecta:** a clientes que consultan claves foráneas o referencian relaciones, y a operaciones de escritura que envían columnas generadas o fragmentos de objetos JSON.
+**A quién afecta:** a clientes que consuman claves foráneas o utilicen relaciones nombradas, y a escrituras que involucren columnas generadas u objetos JSON parciales.
 
-**Qué cambió:** los valores pasan por el codec de su columna al emitirse y se validan con las reglas de la columna al recibirse.
+**Qué cambió:** los valores son procesados por el codec de su columna durante la salida y por las reglas de la columna durante la entrada.
 
-- Una columna de clave foránea de tipo `bigint` o `numeric` generada por una relación, devuelta por Postgres como texto, se entrega como **número** en REST, el SDK y el panel de administración. Las claves numéricas declaradas ya funcionaban de este modo.
-- En arrays nativos, **los elementos se sirven según su tipo escalar correspondiente**, en REST, el SDK, websockets y el driver:
+- Las columnas de clave foránea de tipo `bigint` o `numeric` generadas por relaciones, retornadas como texto por Postgres, se sirven ahora como **número** en la API REST, en el SDK y en el panel de administración. Las claves numéricas declaradas explícitamente ya operaban así.
+- Los **elementos de arrays nativos se sirven según su tipo escalar**, en REST, SDK, WebSockets y en el driver:
 
   | Columna | 0.30 servía | 0.31 sirve |
   |---|---|---|
   | `timestamptz[]` | `["2026-01-02 11:00:00+01"]` | `["2026-01-02T10:00:00.000Z"]` |
-  | `numeric[]` (driver inicializado sin el parámetro numérico de arranque: pruebas, scripts) | `["1.50", "2.25"]` | `[1.5, 2.25]` |
-  | `bigint[]` con un elemento nulo | `[1, 0, 3]` | `[1, null, 3]` |
-  | `date[]`, `timestamptz[]` o un array de enum con un elemento nulo | `["2026-01-02", "NULL"]` | `["2026-01-02", null]` |
+  | `numeric[]` (driver inicializado sin la opción numérica de arranque: tests, scripts) | `["1.50", "2.25"]` | `[1.5, 2.25]` |
+  | `bigint[]` con elementos nulos | `[1, 0, 3]` | `[1, null, 3]` |
+  | `date[]`, `timestamptz[]` o array de enum con elementos nulos | `["2026-01-02", "NULL"]` | `["2026-01-02", null]` |
 
-  Las columnas `date[]`, `time[]`, `text[]`, `uuid[]`, `boolean[]`, `integer[]` y `double precision[]` se sirven como hasta ahora. Lo que se almacena no cambia: una fila leída y vuelta a guardar almacena exactamente el mismo array.
-- Toda relación especificada en `include`, filtros u ordenamientos debe coincidir con su **nombre exacto**. Los reintentos alternativos usando el slug o la variante en snake_case han sido eliminados.
-- Las columnas generadas son rechazadas en operaciones de escritura y se excluyen del esquema de entrada de OpenAPI.
-- Se exige el cumplimiento de campos obligatorios dentro de objetos JSON; los modificadores `$inc` y los elementos de un array sobre una columna entera deben ser números enteros.
+  `date[]`, `time[]`, `text[]`, `uuid[]`, `boolean[]`, `integer[]` y `double precision[]` se sirven como antes. El formato de persistencia no sufre variaciones: una fila leída y vuelta a guardar conservará el array original sin alteraciones.
+- Las relaciones referenciadas en `include`, filtros u ordenamientos deben coincidir con su **nombre exacto**. Se eliminan los intentos de resolución alternativa mediante slugs o formato snake_case.
+- Las columnas generadas son rechazadas en operaciones de escritura y se omiten del esquema de entrada de OpenAPI.
+- Se valida la obligatoriedad de campos requeridos dentro de objetos JSON; las operaciones `$inc` y los elementos de array sobre columnas de enteros deben ser números enteros.
 
-**Qué hacer:** procese las claves foráneas como números en los lugares donde antes comparaba strings, parsee elementos de `timestamptz[]` bajo la norma RFC 3339 y trate los elementos de array nulos como `null`, escribiendo los nombres de las relaciones tal como los declara la tabla (sus claves en `relations`). Deje de enviar valores para columnas generadas.
+**Qué hacer:** procesa claves foráneas como valores numéricos donde antes se comparaban cadenas, analiza los elementos de `timestamptz[]` bajo el estándar RFC 3339, gestiona elementos nulos en arrays como `null`, y nombra las relaciones exactamente como las define la tabla (sus claves en `relations`). Deja de enviar valores para columnas generadas.
 
-## 132. El historial se sirve como lecturas
+## 132. El historial se procesa como lecturas
 
-**A quién afecta:** a consumidores de snapshots históricos y a quienes implementen un `DataDriver`.
+**A quién afecta:** a consumidores de snapshots del historial y a desarrolladores que implementen un `DataDriver`.
 
-**Qué cambió:** las entradas del historial se sirven bajo la semántica de lecturas: primero el acceso a nivel de campo, seguido de `afterRead` (global, tabla, columna). Una columna enmascarada mediante un hook o un `.transform({ afterRead })` aparecerá enmascarada en cada snapshot; una columna que el solicitante no tenga permisos para leer se omitirá y se excluirá de `changed_fields`; las claves de columnas eliminadas se omitirán, y una reversión nunca escribirá en una columna que el usuario no tenga permiso para leer. Si un hook lanza un error al evaluar un snapshot antiguo, la solicitud fallará. Dado que 0.30 servía los valores almacenados en crudo, cualquier proyecto que utilice historial con hooks de enmascaramiento debe actualizarse.
+**Qué cambió:** las entradas del historial se sirven aplicando las reglas de lectura: primero el acceso a nivel de campo, seguido de los hooks `afterRead` (globales, de tabla y de columna). Las columnas enmascaradas mediante hooks o `.transform({ afterRead })` se mostrarán enmascaradas en cada snapshot, las columnas inaccesibles para el invocador se omiten tanto de los datos como de `changed_fields`, se descartan las claves de columnas eliminadas y una restauración nunca escribirá sobre columnas para las cuales el invocador no posea permisos de lectura. La emisión de un error dentro de un hook sobre un snapshot antiguo abortará la petición. La versión 0.30 retornaba valores almacenados en bruto, por lo que todo proyecto que combine historial y hooks de enmascaramiento debe actualizarse.
 
-Una entrada contiene la fila en el mismo formato en que `GET /api/data/<table>/<id>` la leería sin `include`: valores simples y un `belongsTo` representado mediante su clave foránea. Una entrada registrada por una versión previa con el modelo de vista del panel de administración se sirve, y se revierte, adaptada a dicha fila: un contenedor `{ "__type": "date", "value" }` como valor, una referencia `{ "__type": "relation" }` de una relación propietaria como clave foránea bajo el nombre propio de la clave, y cualquier otra referencia como la clave de la fila vinculada. 0.30 devolvía dichas referencias tal como estaban guardadas.
+Una entrada preserva la fila en el mismo formato en que `GET /api/data/<table>/<id>` la entrega sin parámetros `include`: valores simples, con un `belongsTo` expresado a través de su clave foránea. Las entradas históricas registradas bajo el modelo de vista del panel de administración se sirven y se restauran adaptadas a este formato: envoltorios `{ "__type": "date", "value" }` convertidos a valores planos, referencias `{ "__type": "relation" }` de relaciones propietarias expuestas como claves foráneas bajo su nombre correspondiente, y referencias de otras relaciones asignadas a la clave de la fila relacionada. La versión 0.30 servía dichas referencias sin procesar.
 
-Un driver sirve el historial mediante `DataDriver.serveStoredRows(path, rows)`, dentro de la transacción de solo lectura del solicitante; las rutas de historial responden con 501 si el driver no lo implementa, impidiendo que el historial se exponga sin enmascaramiento.
+El driver procesa el historial a través de `DataDriver.serveStoredRows(path, rows)`, operando dentro de la transacción de solo lectura del invocador; las rutas de historial responden con 501 ante drivers que carezcan de este método, garantizando que el historial nunca se exponga sin el debido enmascaramiento.
 
-**Qué hacer:** no se requiere ninguna acción si usa el driver de Postgres integrado. Un driver personalizado debe implementar `serveStoredRows`. Consulte [Historial](/docs/backend/history/).
+**Qué hacer:** no requiere acción si se usa el driver de Postgres integrado. Los drivers personalizados deben implementar `serveStoredRows`. Consulta [Historial](/docs/backend/history/).
 
-## 133. Las exportaciones de `@rebasepro/server` nombran tablas
+## 133. Las exportaciones de `@rebasepro/server` adoptan nombres de tabla
 
-**A quién afecta:** a implementaciones de servidores construidas directamente a partir de módulos de `@rebasepro/server` en lugar de `initializeRebaseBackend` / `createRebaseBackend`.
+**A quién afecta:** a arquitecturas donde el servidor se ensamble a partir de módulos individuales de `@rebasepro/server` en lugar de usar `initializeRebaseBackend` / `createRebaseBackend`.
 
 **Qué cambió:**
 
@@ -403,82 +405,82 @@ Un driver sirve el historial mediante `DataDriver.serveStoredRows(path, rows)`, 
 |---|---|
 | `new RestApiGenerator(collections, …)` | `new RestApiGenerator(tables, …)` (`RestTables`) |
 | `mountOpenApiDocs({ collections })`, `createHistoryRoutes({ collections })` | `mountOpenApiDocs({ serverTables })`, `createHistoryRoutes({ tables })` |
-| `versionProperty`, `buildCollection*Schema` | `versionColumn`, `buildTable*Schema`; validadores y helpers de conflictos y ETag reciben un `TableDescriptor` |
+| `versionProperty`, `buildCollection*Schema` | `versionColumn`, `buildTable*Schema`; validadores y utilidades de conflictos y ETag reciben `TableDescriptor` |
 | `auth-collection-writes` | `auth-table-writes`: `createUserThroughAuthTable`, `isAuthTable`, `prepareAuthTableUpdates`, `deletingAuthTableUsers` |
-| opción del adaptador de autenticación: `collectionAuthConfig` | `authTableHooks` (`CompiledAuthHooks`) |
+| opción de adaptador de autenticación `collectionAuthConfig` | `authTableHooks` (`CompiledAuthHooks`) |
 | `McpRoutesConfig.getCollections` | `getTables()` |
-| `assertUploadWithinPropertyLimits`, `readUploadPropertyContext` | `assertUploadWithinColumnLimits`, `readUploadColumnContext` (devuelve `{ table, column }`); los detalles de rechazo indican `column` |
+| `assertUploadWithinPropertyLimits`, `readUploadPropertyContext` | `assertUploadWithinColumnLimits`, `readUploadColumnContext` (devuelve `{ table, column }`); los detalles de rechazo señalan `column` |
 | `provisionCollectionTables`, `provisionCollectionPolicies`, `collectionsStoredBy` | `provisionTableSchema`, `provisionTablePolicies`, `tablesStoredBy` |
 | `handGlobalCallbacksTo`, `warnOnAuthCollectionDataCallbacks` | `handGlobalHooksTo`, `warnOnAuthTableDataHooks` |
 | `SchemaEditingAdmin.planSchemaChange(collections, …)` | `planSchemaChange(tables, …)` con `CompiledTable[]`; `EditedSchema.tables` |
 | `buildCollectionFromTableMetadata`, `IntrospectedCollection`, `IntrospectedRelation` | eliminados: una tabla introspeccionada es un `TableDescriptor` |
 | `createUserThroughAuthCollection`; `NestedWriteHop.parentCollection` / `.targetCollection`; `ContractRoutesConfig.collectionRegistry` | `createUserThroughAuthTable`; `.parent` / `.target` (descriptores); eliminados |
-| el cargador de colecciones: `CollectionConfigError`, `ConfigProblem`, `applyCollectionDefaults`, `CollectionDefaults` y el tipo de opciones del validador, `accessModelFromCollections`, `loadBundleConfigExports`, `BundleConfigExports`, `unknownKeyPolicyFromEnv`, `UnknownKeyPolicy` | eliminados: `compileSchema` / `loadBackendSchema` cargan y validan `backend/schema`, y un `SchemaDefinitionError` especifica cada problema |
+| el cargador de colecciones: `CollectionConfigError`, `ConfigProblem`, `applyCollectionDefaults`, `CollectionDefaults` y opciones del validador, `accessModelFromCollections`, `loadBundleConfigExports`, `BundleConfigExports`, `unknownKeyPolicyFromEnv`, `UnknownKeyPolicy` | eliminados: `compileSchema` / `loadBackendSchema` leen y verifican `backend/schema`, reportando cualquier fallo mediante `SchemaDefinitionError` |
 
-**Qué hacer:** renombre los identificadores. `rebase migrate sdk-calls` renombra `assertUploadWithinPropertyLimits` y las constantes de campos de subida (`UPLOAD_COLLECTION_FIELD` / `UPLOAD_PROPERTY_FIELD` → `UPLOAD_TABLE_FIELD` / `UPLOAD_COLUMN_FIELD`, manteniendo los mismos valores), e indica cualquier otra importación u opción de esta tabla como un paso manual numerado.
+**Qué hacer:** renombra los identificadores. `rebase migrate sdk-calls` renombra automáticamente `assertUploadWithinPropertyLimits` y las constantes de campos de subida (`UPLOAD_COLLECTION_FIELD` / `UPLOAD_PROPERTY_FIELD` → `UPLOAD_TABLE_FIELD` / `UPLOAD_COLUMN_FIELD`, conservando los mismos valores), registrando cualquier otra importación u opción de esta tabla como un paso manual numerado.
 
-## 134. Las exportaciones de `@rebasepro/server-postgres` nombran tablas
+## 134. Las exportaciones de `@rebasepro/server-postgres` adoptan nombres de tabla
 
-**A quién afecta:** al código que inicializa el driver de Postgres directamente, envuelve el adaptador o importa el planificador de esquemas.
+**A quién afecta:** a código que instancie el driver de Postgres de manera directa, encapsule el adaptador o consuma el planificador de esquema.
 
 **Qué cambió:**
 
 | Antes | Ahora |
 |---|---|
 | la clase PostgresCollectionRegistry, `getTable(name)`, `registerTable` | `PostgresTableRegistry`, `getPgTable`, `registerPgTable` |
-| `openPostgresDriver(config, { collections })` | `openPostgresDriver(config, { tables })`, obteniendo `tables` desde `compileSchema`; las llamadas al driver no incluyen la propiedad `collection` ([sección 137](#137-las-interfaces-del-driver-y-del-backend-manejan-tablas-no-colecciones)) |
-| en adapter / bootstrapper: `ensureCollectionSchema`, `ensureCollectionPolicies`, `readCollectionsSchemaVersion`, `stampCollectionsSchemaVersion` | `ensureTableSchema`, `ensureTablePolicies`, `readTablesSchemaVersion`, `stampTablesSchemaVersion`, recibiendo `CompiledTable[]` |
-| `serializePropertyToServer`, `parsePropertyFromServer` | `serializeColumnToServer(value, column)`; se elimina `parsePropertyFromServer`: la lectura desde el driver devuelve la fila REST ([sección 136](#136-el-driver-de-postgres-y-las-lecturas-one-shot-del-socket-devuelven-la-fila-rest)) |
+| `openPostgresDriver(config, { collections })` | `openPostgresDriver(config, { tables })`, obteniendo `tables` desde `compileSchema`; las invocaciones al driver omiten la propiedad `collection` ([sección 137](#137-las-interfaces-del-driver-y-del-backend-operan-con-tablas-no-con-colecciones)) |
+| en adaptadores / inicializadores: `ensureCollectionSchema`, `ensureCollectionPolicies`, `readCollectionsSchemaVersion`, `stampCollectionsSchemaVersion` | `ensureTableSchema`, `ensureTablePolicies`, `readTablesSchemaVersion`, `stampTablesSchemaVersion`, recibiendo `CompiledTable[]` |
+| `serializePropertyToServer`, `parsePropertyFromServer` | `serializeColumnToServer(value, column)`; `parsePropertyFromServer` ha sido eliminado — una lectura del driver entrega directamente la fila REST ([sección 136](#136-el-driver-de-postgres-y-las-lecturas-directas-por-socket-retornan-la-fila-rest)) |
 | `ensureCollectionTables`, `planCollectionSchemaEnsure`, `planCollectionPolicies`, `CollectionPolicyPlan`, `lockCollectionTables` | `ensureTables`, `planTableSchemaEnsure`, `planTablePolicies`, `TablePolicyPlan`, `lockTables` |
 | `CollectionIndexSpec`, `CollectionIndexConfigError`, `collectionIndexStatements` | `TableIndexSpec`, `TableIndexConfigError`, `tableIndexStatements` |
 | `checkCollectionsVsDatabase` / `…VsSchema` / `…VsSdk`, `columnKeysFromCollections`, `buildDrizzleRelationsFromCollections`, `schemaOfCollection`, `getTableIncludesFromCollections` | `checkTablesVs…`, `columnKeysFromTables`, `buildDrizzleRelationsFromTables`, `schemaOfTable`, `getTableIncludesFromTables` |
-| `SchemaDifference.collection`, `.property` (y los campos de log de advertencia de desalineación en el arranque) | `.slug`, `.key` |
+| `SchemaDifference.collection`, `.property` (así como los campos de logs para advertencias de desalineación en el arranque) | `.slug`, `.key` |
 | `createStampKeys`, `sharedRelationName`, `isAuthCollection`, `lowerCompiledTables`, `buildCollectionIndexPlan` | eliminados |
 
-El JSON generado por el planificador conserva sus claves: `SchemaReconcileColumn.collection` y los tipos de `SchemaChange` se mantienen sin cambios.
+El payload JSON emitido por el planificador conserva sus claves: `SchemaReconcileColumn.collection` y los tipos correspondientes a `SchemaChange` se mantienen sin cambios.
 
-**Qué hacer:** renombre los identificadores. Cualquier envoltorio que adapte la clase a un `BackendBootstrapper` debe delegar `ensureTableSchema` y `ensureTablePolicies`. Consulte [Integración del driver de Postgres](/docs/backend/embedding-postgres-driver/).
+**Qué hacer:** renombra las entidades. Cualquier capa que adapte el conector para actuar como `BackendBootstrapper` debe propagar las llamadas a `ensureTableSchema` y `ensureTablePolicies`. Consulta [Integración embebida del driver de Postgres](/docs/backend/embedding-postgres-driver/).
 
-## 135. `@rebasepro/types` y `@rebasepro/common` eliminan el modelo de colecciones de sus raíces
+## 135. `@rebasepro/types` y `@rebasepro/common` eliminan el modelo de colecciones de su raíz
 
-**A quién afecta:** al código que importe tipos de colecciones o propiedades, utilidades del panel de administración o funciones de migración desde `@rebasepro/types` o `@rebasepro/common` (campos personalizados, vistas personalizadas, plugins, tests con fixtures de colecciones) y drivers personalizados que implementen el registro.
+**A quién afecta:** a código que importe tipos de colecciones o propiedades, utilidades del panel de administración o helpers de migración desde `@rebasepro/types` o `@rebasepro/common` — campos personalizados, vistas a medida, plugins, tests basados en fixtures de colecciones — y a drivers personalizados que dependan del registro.
 
-**Qué cambió:** los paquetes centrales describen exclusivamente tablas. Lo que describe una colección para su representación en el panel de administración reside en `@rebasepro/cms-types`:
+**Qué cambió:** los paquetes base representan exclusivamente tablas. Los elementos descriptivos de colecciones para el panel de administración residen ahora en `@rebasepro/cms-types`:
 
-- **Tipos** reubicados desde `@rebasepro/types`: `CollectionConfig`, `PostgresCollectionConfig`, `FirebaseCollectionConfig`, `AnyCollectionConfig`, cada variante de `…Property` (`StringProperty`, `NumberProperty`, `ArrayProperty`, …) y `Properties`, `CollectionCallbacks` y sus props de hook, las variantes de relaciones de 0.30 y sus formas `Resolved…`, `CollectionIndex`, los colores de chips (`ColorScheme`, `ColorKey`, …), `FieldAccess`, `EnumValues`.
-- **Helpers** reubicados desde `@rebasepro/common`: los helpers de políticas estructurados para colecciones (`policyToPostgres`, `compileRulePolicies`, `getEffectiveSecurityRules`, `getGeneratedPolicyNames`, …), `CollectionRegistry`, `resolveCollectionRelations`, `resolveRelation`, `getTableName`, `findRelation`, `rowToViewModel`, `resolvePrimaryKeys`, la vista de acceso a campos de una propiedad (`effectiveAccess`, `canReadField`, `canWriteField`), `evaluateCondition`, `canEditEntity`, `resolveProperty`, `getDefaultValuesFor`, `getSubcollections`, `getCopyValues`, `enumToObjectEntries`. Una regla construida desde una expresión simple utiliza `compilePolicyExpression(expr)` de `@rebasepro/common`.
-- **`composeCallbacks`** combina los callbacks de una colección para el panel y se trasladó a `@rebasepro/cms-types`; `@rebasepro/server` ya no lo reexporta. En el backend, los hooks de una tabla se componen mediante `composeTableHooks` de `@rebasepro/common`, y el codemod marcará cualquier importación de `composeCallbacks` en el backend como un paso manual informativo.
-- **`defineCollection`** ha sido eliminado de `@rebasepro/common` y `@rebasepro/cms-types`: declare la tabla mediante `defineTable` en `backend/schema` y personalícela con `customizeTable` en `frontend/src/cms`; para Firestore use `defineFirestoreCollection` de `@rebasepro/firebase`.
-- **El accessor del panel de administración y sus tipos**: `Entity`, `EntityValues`, `TableAccessor`, `TableTrashAccessor`, `FindResponse`, `QueryBuilderInterface`, `RebaseData` y `AuthState` salieron de `@rebasepro/types`; `buildRebaseData`, `wrapAsEntityData`, `buildRoutedRebaseData`, `EntityDataOptions`, `QueryBuilder`, `RelationRef` y `createRelationRef` salieron de `@rebasepro/common`. Todos se importan ahora desde `@rebasepro/cms-types`. La capa de datos propia del SDK (`buildSdkData`, `createDriverTableRows`, `buildRoutedSdkData`, en `@rebasepro/common`) sirve filas directamente y mantiene su valor de retorno previo.
-- **`EntityDataOptions.resolveCollection`** se sustituye por `primaryKeysOf`, `viewModelOf`, `storedValuesOf` y `viewModelSourceOf`; la función `collectionEntityDataOptions(resolveCollection, { resolveDataPath, resolveAccessor })` de `@rebasepro/cms-types` se encarga de construirlos.
-- **Las herramientas de migración** (`collectionsToTableDefs`, `collectionToTableDef`, `LiftNote`, `LiftResult`, `LiftOptions`) pasaron a `@rebasepro/common/migrate`, junto a una instantánea fija del modelo de colecciones de 0.30 (tipos `Legacy…`) y `defineLegacyCollection`.
-- **Otras eliminaciones en los paquetes raíz**, reportadas como pasos manuales por el codemod: la API de parches de colecciones de `@rebasepro/types` (`CollectionPatch`, `CollectionPatchOp`, `applyCollectionPatch`, `collectionPatchProblems`, `isCollectionPatch`, `nestCollectionPatchPaths` → use `TablePatch`), sus utilidades JSON para colecciones (`diffCollections`, `diffJsonValues`, `toCollectionJson`, `RUNTIME_ONLY_COLLECTION_KEYS`, `runtimeOnlyKeyIn`), las capacidades heredadas de Mongo `DocumentAdmin`, `isDocumentAdmin` y `supportsDocumentAdmin`, así como `RebaseProjectContract.collectionSlugs` / `.collections` / `.generatedAt` (`/api/meta/contract` devuelve `tables`); en `@rebasepro/common`: `buildTenantSecurityRule` → `tenantSecurityRule`, `defaultPoliciesDisabled` → `tableDefaultPoliciesDisabled`, `restoresSoftDeletedRow` → `isSoftDeleteRestore`, `softDeleteFieldOf` → `softDeleteColumn`, `getJunctionConfigForRelation` → `resolveTableJunctions`, y quedan sin sustituto directo `isRelationRequired`, `relationDeclaringProperty`, `requireCallbackCollection` (debe consultarse el `TableDescriptor`).
-- **El registro de un driver** es ahora un `TableRegistryInterface` (anteriormente `CollectionRegistryInterface`): `setGlobalHooks?` y `setTableHooks?` reemplazan a `getGlobalCallbacks` / `setGlobalCallbacks?`. Se eliminaron `globalHooksAsCallbacks`, `resolveDriftCheckName` y `PENDING_TABLE_FEATURES`.
+- **Tipos** migrados desde `@rebasepro/types`: `CollectionConfig`, `PostgresCollectionConfig`, `FirebaseCollectionConfig`, `AnyCollectionConfig`, todas las variantes de `…Property` (`StringProperty`, `NumberProperty`, `ArrayProperty`, …) y `Properties`, `CollectionCallbacks` junto con sus props de hook, los modelos de relación de 0.30 y sus formas `Resolved…`, `CollectionIndex`, las definiciones de color para chips (`ColorScheme`, `ColorKey`, …), `FieldAccess`, `EnumValues`.
+- **Helpers** migrados desde `@rebasepro/common`: utilidades de políticas vinculadas a colecciones (`policyToPostgres`, `compileRulePolicies`, `getEffectiveSecurityRules`, `getGeneratedPolicyNames`, …), `CollectionRegistry`, `resolveCollectionRelations`, `resolveRelation`, `getTableName`, `findRelation`, `rowToViewModel`, `resolvePrimaryKeys`, funciones de evaluación de acceso a campos (`effectiveAccess`, `canReadField`, `canWriteField`), `evaluateCondition`, `canEditEntity`, `resolveProperty`, `getDefaultValuesFor`, `getSubcollections`, `getCopyValues`, `enumToObjectEntries`. Las reglas compiladas desde expresiones simples utilizan ahora `compilePolicyExpression(expr)` de `@rebasepro/common`.
+- **`composeCallbacks`** gestiona la composición de callbacks de colecciones para el panel y pasa a `@rebasepro/cms-types`; `@rebasepro/server` ya no lo reexporta. El código de backend debe componer los hooks de tabla con `composeTableHooks` de `@rebasepro/common`; el codemod señalará como paso manual cualquier importación de `composeCallbacks` en el backend.
+- **`defineCollection`** ha sido eliminado de `@rebasepro/common` y `@rebasepro/cms-types`: declara las tablas mediante `defineTable` en `backend/schema` y añade personalizaciones con `customizeTable` en `frontend/src/cms`; las colecciones de Firestore adoptan `defineFirestoreCollection` de `@rebasepro/firebase`.
+- **Accesores del panel de administración y sus tipos asociados**: `Entity`, `EntityValues`, `TableAccessor`, `TableTrashAccessor`, `FindResponse`, `QueryBuilderInterface`, `RebaseData` y `AuthState` salen de `@rebasepro/types`; `buildRebaseData`, `wrapAsEntityData`, `buildRoutedRebaseData`, `EntityDataOptions`, `QueryBuilder`, `RelationRef` y `createRelationRef` salen de `@rebasepro/common`. Todos ellos se importan ahora desde `@rebasepro/cms-types`. La capa de datos nativa del SDK — `buildSdkData`, `createDriverTableRows`, `buildRoutedSdkData`, ubicados en `@rebasepro/common` — sirve filas directamente retornando las mismas estructuras que antes.
+- **`EntityDataOptions.resolveCollection`** se reemplaza por `primaryKeysOf`, `viewModelOf`, `storedValuesOf` y `viewModelSourceOf`; el constructor `collectionEntityDataOptions(resolveCollection, { resolveDataPath, resolveAccessor })` de `@rebasepro/cms-types` permite construirlos.
+- **El soporte de migración** (`collectionsToTableDefs`, `collectionToTableDef`, `LiftNote`, `LiftResult`, `LiftOptions`) pasa a `@rebasepro/common/migrate`, acompañado de una instantánea congelada del modelo de colecciones de 0.30 (tipos `Legacy…`) y `defineLegacyCollection`.
+- **Otros elementos eliminados de la raíz de los paquetes base**, listados como pasos manuales por el codemod: la API de parches sobre colecciones de `@rebasepro/types` (`CollectionPatch`, `CollectionPatchOp`, `applyCollectionPatch`, `collectionPatchProblems`, `isCollectionPatch`, `nestCollectionPatchPaths` → reemplazados por `TablePatch`), utilidades JSON asociadas (`diffCollections`, `diffJsonValues`, `toCollectionJson`, `RUNTIME_ONLY_COLLECTION_KEYS`, `runtimeOnlyKeyIn`), las capacidades históricas de Mongo `DocumentAdmin`, `isDocumentAdmin` y `supportsDocumentAdmin`, así como `RebaseProjectContract.collectionSlugs` / `.collections` / `.generatedAt` (`/api/meta/contract` entrega ahora `tables`); desde `@rebasepro/common`, `buildTenantSecurityRule` → `tenantSecurityRule`, `defaultPoliciesDisabled` → `tableDefaultPoliciesDisabled`, `restoresSoftDeletedRow` → `isSoftDeleteRestore`, `softDeleteFieldOf` → `softDeleteColumn`, `getJunctionConfigForRelation` → `resolveTableJunctions`, quedando sin sucesores directos `isRelationRequired`, `relationDeclaringProperty` y `requireCallbackCollection` (debe consultarse el `TableDescriptor`).
+- **El registro del driver** implementa `TableRegistryInterface` (anteriormente `CollectionRegistryInterface`): `setGlobalHooks?` y `setTableHooks?` sustituyen a `getGlobalCallbacks` / `setGlobalCallbacks?`. Se eliminan `globalHooksAsCallbacks`, `resolveDriftCheckName` y `PENDING_TABLE_FEATURES`.
 
-**Qué hacer:** `rebase migrate sdk-calls` (integrado en `collections-to-tables`) actualiza cada importación detallada abajo hacia su nuevo paquete (combinándola con importaciones existentes en el archivo, preservando `import type`, `type` en línea y alias `as`) y añade el paquete a las dependencias del módulo del workspace correspondiente; ejecute `pnpm install` al finalizar. Las importaciones de identificadores eliminados, importaciones de espacios de nombres (`import * as`), `export *`, importaciones dinámicas `import()` o llamadas a `require()` con nombres trasladados se listarán como pasos manuales numerados. Las pruebas que mantengan literales de colección como fixtures deben tiparse con los tipos `Legacy…` y transformarse con `@rebasepro/common/migrate`.
+**Qué hacer:** `rebase migrate sdk-calls` (ejecutado dentro de `collections-to-tables`) actualiza las importaciones hacia los nuevos paquetes — fusionándolas con importaciones preexistentes del mismo paquete, preservando `import type`, `type` en línea y alias `as` — e incorpora las dependencias requeridas en el `package.json` del workspace correspondiente; ejecuta `pnpm install` al finalizar. Las importaciones de símbolos eliminados, importaciones de espacios de nombres (`import * as`), `export *`, `import()` dinámicos o llamadas a `require()` con nombres reubicados se registrarán como pasos manuales numerados. Aquellos tests que conserven literales de colecciones deberán tiparse con los modelos `Legacy…` y procesarse mediante `@rebasepro/common/migrate`.
 
-### Importaciones que cambiaron de ubicación
+### Importaciones trasladadas
 
-Cada identificador que 0.31 trasladó a otro paquete o eliminó se encuentra detallado en [Importaciones trasladadas en 0.31](/docs/upgrading/0-30-to-0-31-imports/), incluyendo la alternativa para cada elemento eliminado. Dicho listado se genera a partir de la misma tabla que consulta el codemod, por lo que coincide exactamente con lo que `rebase migrate sdk-calls` procesa.
+Todos los nombres reubicados o retirados en la versión 0.31 se detallan en [Importaciones trasladadas en 0.31](/docs/upgrading/0-30-to-0-31-imports/), indicando el reemplazo aplicable para los casos retirados. La tabla proviene de la misma fuente que utiliza el codemod, correspondiendo exactamente con las transformaciones realizadas por `rebase migrate sdk-calls`.
 
-## 136. El driver de Postgres y las lecturas one-shot del socket devuelven la fila REST
+## 136. El driver de Postgres y las lecturas directas por socket retornan la fila REST
 
-**A quién afecta:** a funciones o plugins que consulten a través de `requireDriver(c)` / `getDriver(c)`, código que emita frames `FETCH_COLLECTION` / `FETCH_ONE` por sockets, y código que interprete objetos con la estructura `{ __type }` en la respuesta.
+**A quién afecta:** a plugins o funciones que consulten datos mediante `requireDriver(c)` / `getDriver(c)`, implementaciones que emitan tramas WebSocket `FETCH_COLLECTION` / `FETCH_ONE`, y código que procese objetos con la propiedad `{ __type }`.
 
-**Qué cambió:** se unifica la estructura de lectura. `fetchCollection` y `fetchOne` en el driver de Postgres —empleados por `requireDriver(c)` en funciones, plugins, frames one-shot de sockets, MCP y el simulador de RLS— devuelven exactamente lo mismo que `GET /api/data/<table>`:
+**Qué cambió:** se homogeniza la estructura de lectura. Las operaciones `fetchCollection` y `fetchOne` del driver de Postgres — empleadas por `requireDriver(c)`, plugins, tramas directas por socket, MCP y el evaluador de RLS — retornan exactamente la misma estructura que `GET /api/data/<table>`:
 
-| Valor | Lectura de driver en 0.30 | 0.31 |
+| Valor | Lectura en driver 0.30 | 0.31 |
 |---|---|---|
-| una marca de tiempo | `{ "__type": "date", "value": … }` | una cadena RFC 3339 |
-| un `belongsTo` | `{ "__type": "relation", "id", "path" }` bajo el nombre de la relación | la clave foránea bajo su propio identificador (`authorId`) |
-| una fila vinculada | cada relación cargada automáticamente por `fetchOne` | únicamente las relaciones especificadas en `include`, como la fila propia de la entidad destino |
-| un vector, un `bytea` | `{ "__type": "Vector" }`, una URL de datos | tal como los entrega REST |
+| una marca de tiempo | `{ "__type": "date", "value": … }` | una cadena con formato RFC 3339 |
+| una relación `belongsTo` | `{ "__type": "relation", "id", "path" }` bajo el identificador de la relación | la clave foránea bajo su propia clave (`authorId`) |
+| una fila vinculada | todas las relaciones cargadas mediante `fetchOne` | exclusivamente las relaciones requeridas mediante `include`, presentadas como la fila de la entidad asociada |
+| un vector o dato `bytea` | `{ "__type": "Vector" }`, o URL data | representados idénticamente a la salida REST |
 
-`FetchOneProps` recibe `include` (se elimina `ListenOneTarget`: utilice `FetchOneProps`). `rebase.data`, `context.data` y el SDK ya devolvían esta estructura y se mantienen sin alteraciones.
+`FetchOneProps` incorpora `include` (`ListenOneTarget` ha sido eliminado: emplea `FetchOneProps`). Por su parte, `rebase.data`, `context.data` y el SDK ya retornaban este formato y se mantienen sin alteraciones.
 
-`@rebasepro/client` interpreta los cuerpos REST y los frames del socket como JSON plano: un valor que contenga la clave `__type` ya no se convertirá en `Date`, `EntityReference`, `EntityRelation`, `GeoPoint` o `Vector`, y un documento JSON que posea una clave `__type` se entregará tal como fue almacenado.
+`@rebasepro/client` interpreta los cuerpos REST y las tramas de socket como JSON plano: los valores con propiedad `__type` ya no se instancian en clases como `Date`, `EntityReference`, `EntityRelation`, `GeoPoint` o `Vector`, preservando cualquier documento JSON que contenga dicha clave tal como fue almacenado.
 
-**Qué hacer:** consuma la fila en plano: convierta las cadenas de fecha a objetos Date, lea las claves foráneas por su propio identificador y pase el parámetro `include` para cada relación que necesite consultar:
+**Qué hacer:** procesa la fila en su formato plano: convierte fechas a partir de sus cadenas, accede a las claves foráneas mediante su propio identificador y especifica `include` para cada relación requerida:
 
 ```diff ts
 -const article = await requireDriver(c).fetchOne({ path: "articles", id });
@@ -487,85 +489,85 @@ Cada identificador que 0.31 trasladó a otro paquete o eliminó se encuentra det
 +const authorId = article?.authorId;
 ```
 
-## 137. Las interfaces del driver y del backend manejan tablas, no colecciones
+## 137. Las interfaces del driver y del backend operan con tablas, no con colecciones
 
-**A quién afecta:** a implementaciones personalizadas de `DataDriver`, adaptadores de bases de datos o backends construidos artesanalmente con piezas de `@rebasepro/server`.
+**A quién afecta:** a implementaciones personalizadas de `DataDriver`, adaptadores de bases de datos o servidores configurados directamente mediante componentes de `@rebasepro/server`.
 
 **Qué cambió:**
 
 | Antes | Ahora |
 |---|---|
-| la prop `collection` en llamadas de `DataDriver` (fetch, save, delete, count, search, listen) | eliminada: el driver identifica la tabla a consultar mediante `path` |
+| el parámetro `collection` en llamadas de `DataDriver` (fetch, save, delete, count, search, listen) | eliminado: el driver identifica la tabla a consultar mediante `path` |
 | `checkUniqueField(path, name, value, id, collection)` | `checkUniqueField(path, name, value, id?)` |
 | `scanStoredRows({ path, collection, pageSize })` | `scanStoredRows({ path, pageSize })` |
 | `DataDriver.initTextSearch` | eliminado |
 | `DatabaseAdapterInitConfig.collections`, `.collectionRegistry` | eliminados: el adaptador recibe `CompiledTable[]` |
 | `BackendServices.collections()` | `services.tables()` |
-| `serializeCollections`, `deserializeCollections`, `isSerializedCollectionRef`, `SerializedCollectionRef` | eliminados: los descriptores se sirven mediante `GET /api/schema/tables` |
+| `serializeCollections`, `deserializeCollections`, `isSerializedCollectionRef`, `SerializedCollectionRef` | eliminados: los descriptores se sirven en `GET /api/schema/tables` |
 | `AuthAdapter.prepareUserCreation(values, collectionAuth, options?)`, `describeUserCreationContract(collectionAuth)` | `prepareUserCreation(values, options?)`, `describeUserCreationContract()` |
-| `initializeDriver` devolviendo `{ driver, collectionRegistry, … }`; `BackendInstance.collectionRegistry` | `{ driver, tableRegistry, … }`; `BackendInstance.tableRegistry` |
-| `PolicyEvalContext.entity` (de tipo `Entity`) | `PolicyEvalContext.row` (los valores directos de la fila) |
-| `wrapAsSdkData(…)` | `buildSdkData(driver)`; para múltiples fuentes de datos: `buildRoutedSdkData` |
-| `FindResponse` de `@rebasepro/client` | `FindResult` |
-| `ListenCollectionRequest`, `ListenEntityRequest` de `@rebasepro/server` | `ListenCollectionProps`, `ListenOneProps` |
+| `initializeDriver` retornando `{ driver, collectionRegistry, … }`; `BackendInstance.collectionRegistry` | `{ driver, tableRegistry, … }`; `BackendInstance.tableRegistry` |
+| `PolicyEvalContext.entity` (instancia de `Entity`) | `PolicyEvalContext.row` (valores de la fila) |
+| `wrapAsSdkData(…)` | `buildSdkData(driver)`; para múltiples orígenes: `buildRoutedSdkData` |
+| `FindResponse` en `@rebasepro/client` | `FindResult` |
+| `ListenCollectionRequest`, `ListenEntityRequest` en `@rebasepro/server` | `ListenCollectionProps`, `ListenOneProps` |
 
-**Qué hacer:** elimine los argumentos correspondientes y consulte las tablas mediante `path`. El codemod identificará cualquier caso con `implements DataDriver` como un paso manual. Consulte [Integración del driver de Postgres](/docs/backend/embedding-postgres-driver/).
+**Qué hacer:** elimina dichos argumentos y resuelve las tablas a través de `path`. El codemod reportará implementaciones de `implements DataDriver` como un paso manual. Consulta [Integración embebida del driver de Postgres](/docs/backend/embedding-postgres-driver/).
 
-## 138. El backend acepta únicamente los valores documentados en la API REST
+## 138. El backend admite exclusivamente los valores documentados en la API REST
 
-**A quién afecta:** a clientes que escriban una relación to-one como un objeto o un vector como `{ value }`, código que aplique filtros sobre una relación pasando un objeto, código que importe clases de valores del panel de administración y aplicaciones offline con escrituras pendientes encoladas desde la versión 0.30.
+**A quién afecta:** a clientes que persistan relaciones uno a uno mediante objetos o vectores mediante `{ value }`, consultas que filtren relaciones utilizando objetos, código que instancie clases de valores del panel de administración, y clientes offline con operaciones pendientes originadas en 0.30.
 
-**Qué cambió:** una operación de escritura requiere el mismo formato devuelto por una lectura: una estructura uniforme para REST, websockets, MCP y el SDK en proceso:
+**Qué cambió:** las escrituras exigen la misma estructura retornada por las lecturas — unificando el formato para REST, WebSockets, MCP y el SDK en memoria:
 
-| Valor | Aceptado | Rechazado a partir de ahora |
+| Valor | Permitido | Rechazado a partir de 0.31 |
 |---|---|---|
-| una relación to-one (`belongsTo`, `hasOne`, un `via` de tipo to-one) | la clave de la fila relacionada, o `null` (`""` equivale a `null`), bajo el nombre de la relación o el de la clave foránea | un objeto como `{ "id": 5 }`: `400 VALIDATION_INVALID_VALUE`, "'posts.author' links one 'authors' row: write that row's key (a string or a number), or null to unlink — not an object." |
-| una relación to-many (`hasMany`, `manyToMany`, un `via` de tipo to-many editable) | una lista de claves, o de `{ id, _pivot? }` | — (otras claves en el objeto se descartan, como antes) |
-| un vector | una lista de números | una instancia de `Vector` o `{ "value": [...] }`: `400`, "'embedding' expects a vector as a list of numbers" |
-| una fecha, una hora | texto ISO (`Date` en llamadas en proceso) | — |
-| un geopunto | `{ latitude, longitude }` | — |
-| un `bytea` | una URL en formato `data:application/octet-stream;base64,` (`Buffer` / `Uint8Array` en llamadas en proceso) | — |
-| un filtro sobre una relación | la clave | los objetos ya no se desestructuran: se evalúan exactamente como se envían |
+| relación uno a uno (`belongsTo`, `hasOne`, o `via` uno a uno) | el identificador de la fila relacionada, o `null` (`""` equivale a `null`), indicado bajo el nombre de la relación o de la clave foránea | objetos tales como `{ "id": 5 }`: error `400 VALIDATION_INVALID_VALUE`, "'posts.author' links one 'authors' row: write that row's key (a string or a number), or null to unlink — not an object." |
+| relación uno a muchos / muchos a muchos (`hasMany`, `manyToMany`, o `via` uno a muchos escribible) | un array de identificadores, o de `{ id, _pivot? }` | — (otras propiedades en el objeto se omiten, como anteriormente) |
+| vector | un array de números | instancias `Vector`, o `{ "value": [...] }`: error `400`, "'embedding' expects a vector as a list of numbers" |
+| fecha u hora | texto en formato ISO (`Date` en memoria) | — |
+| punto geográfico | `{ latitude, longitude }` | — |
+| `bytea` | URL con formato `data:application/octet-stream;base64,` (`Buffer` / `Uint8Array` en memoria) | — |
+| filtro sobre una relación | el identificador directo | los objetos ya no se extraen: se evalúan exactamente según la estructura suministrada |
 
-0.30 admitía relaciones to-one enviadas en forma de objeto extrayendo silenciosamente su propiedad `id`; esa variante nunca estuvo documentada y formaba parte del modelo de vista del panel de administración. Ahora, el panel de administración transforma su modelo de vista a valores de transporte directamente en el navegador antes de cualquier escritura o filtro.
+La versión 0.30 admitía relaciones uno a uno expresadas como objetos, extrayendo silenciosamente la propiedad `id`; dicho formato pertenecía al modelo de vista interno del panel y nunca formó parte de la especificación pública. En 0.31, el panel de administración transforma internamente su modelo de vista al formato de red antes de ejecutar cualquier filtro o persistencia.
 
-Las clases de valores del panel se trasladaron junto al resto de su modelo de vista: `EntityReference`, `EntityRelation`, `GeoPoint`, `Vector` y `EntityReferenceProps` se importan desde `@rebasepro/cms-types` (salieron de `@rebasepro/types`), al igual que `normalizeToEntityRelation` (salió de `@rebasepro/common`); se eliminó `withRelationReferencesOnly`. El historial almacena la fila tal como la devuelve una lectura; las entradas registradas con anterioridad se entregan y revierten como valores planos ([sección 132](#132-el-historial-se-sirve-como-lecturas)).
+Las clases asociadas al modelo de vista del panel se reubicaron junto con este: `EntityReference`, `EntityRelation`, `GeoPoint`, `Vector` y `EntityReferenceProps` pasan a importarse desde `@rebasepro/cms-types` (saliendo de `@rebasepro/types`), al igual que `normalizeToEntityRelation` (que abandona `@rebasepro/common`); se descarta `withRelationReferencesOnly`. El historial persiste las filas en el mismo formato en que se leen; las entradas previas se retornan y revierten como valores planos ([sección 132](#132-el-historial-se-procesa-como-lecturas)).
 
-La cola offline de `@rebasepro/client` almacena valores de transporte. Una operación de escritura encolada sin conexión por el SDK de 0.30 se transforma automáticamente al leerse y reintentarse: ninguna operación encolada antes de la actualización se perderá.
+La cola offline de `@rebasepro/client` opera sobre valores en formato de red. Cualquier modificación encolada offline bajo la versión 0.30 se convertirá al leerse para su reintento: no se pierden operaciones acumuladas antes de la actualización.
 
-**Qué hacer:** envíe la clave directamente: `{ "author": 5 }`, no `{ "author": { "id": 5 } }`; envíe los vectores como listas de números, y filtre las relaciones usando su clave correspondiente. `rebase migrate sdk-calls` ajusta las importaciones de clases de valores ([el listado](/docs/upgrading/0-30-to-0-31-imports/)). Consulte [Escrituras](/docs/backend/writes/).
+**Qué hacer:** envía directamente el identificador: `{ "author": 5 }`, en lugar de `{ "author": { "id": 5 } }`; transmite vectores como arrays numéricos y filtra relaciones utilizando su identificador directo. `rebase migrate sdk-calls` adaptará las importaciones de estas clases de valor ([ver listado](/docs/upgrading/0-30-to-0-31-imports/)). Consulta [Escrituras](/docs/backend/writes/).
 
-## 139. `/api/docs` se sirve a la audiencia del endpoint de esquema
+## 139. `/api/docs` se expone según la audiencia del endpoint de esquema
 
-**A quién afecta:** a usuarios o herramientas que consuman `/api/docs` o accedan a `/api/swagger` (Swagger UI, generadores de clientes de API, pasos de CI).
+**A quién afecta:** a usuarios o utilidades que consuman `/api/docs` o accedan a `/api/swagger` — Swagger UI, generadores de clientes API, pipelines de CI.
 
-**Qué cambió:** cuando `enableSwagger` no está definido (`REBASE_ENABLE_SWAGGER` sin definir), en cualquier entorno, el documento de OpenAPI se sirve a los mismos usuarios para los que `GET /api/schema/tables` describe tablas, aplicando los mismos controles de rechazo (401 para usuarios anónimos salvo que exista `schemaTables.public`, y 403 para credenciales sin scopes de esquema o datos), y cada cliente obtiene el documento correspondiente de forma exacta a las tablas, columnas y relaciones que dicho endpoint le muestra (un administrador accede a la totalidad). Swagger UI no se incluye. Un servidor sin autenticación configurada responderá `404 DOCS_UNAVAILABLE`. En desarrollo, 0.30 exponía el documento completo con todas las tablas servidas y columnas no privadas a usuarios anónimos, reservándolo exclusivamente para administradores en producción.
+**Qué cambió:** sin definir `enableSwagger` (o sin configurar la variable `REBASE_ENABLE_SWAGGER`), en cualquier entorno, el documento OpenAPI se comparte exclusivamente con los invocadores a los que `GET /api/schema/tables` expone las tablas, replicando idénticas restricciones de acceso — 401 ante accesos anónimos salvo que `schemaTables.public` esté habilitado, y 403 si las credenciales carecen de ámbito sobre el esquema o los datos — recibiendo cada cliente únicamente la definición de tablas, columnas y relaciones a las que tiene visibilidad autorizada (un administrador recibe la totalidad). Swagger UI no se incluye por defecto. Un servidor sin mecanismos de autenticación responderá con `404 DOCS_UNAVAILABLE`. En 0.30, el documento se publicaba íntegramente a clientes anónimos en entornos de desarrollo, reservándose a administradores en producción.
 
 | `enableSwagger` / `REBASE_ENABLE_SWAGGER` | `/api/docs` | `/api/swagger` |
 |---|---|---|
-| sin definir (por defecto) | a cada cliente al que el endpoint de esquema describe tablas: sus tablas | no disponible |
-| `true` | el documento completo, para todo el mundo | disponible fuera de producción |
-| `false` | el documento completo, protegido bajo acceso de administrador | no disponible |
+| sin definir (por defecto) | cada cliente según el alcance determinado por el endpoint de esquema: sus tablas asignadas | no disponible |
+| `true` | documento íntegro accesible a todos los clientes | disponible fuera de producción |
+| `false` | documento íntegro restringido bajo autorización de administración | no disponible |
 
-**Qué hacer:** realice las peticiones a `/api/docs` con una sesión autenticada. Para exponer el documento íntegro tal como hacía 0.30 en desarrollo, configure `REBASE_ENABLE_SWAGGER=true` (o `enableSwagger: true`). Consulte [Endpoints](/docs/backend/endpoints/).
+**Qué hacer:** autentícate antes de consultar `/api/docs`. Si requieres exponer la totalidad del documento tal como ocurría en desarrollo en 0.30, define `REBASE_ENABLE_SWAGGER=true` (o la opción `enableSwagger: true`). Consulta [Endpoints](/docs/backend/endpoints/).
 
-## 140. Una columna `pivot` de tipo many-to-many no puede declarar `.transform()`
+## 140. Las columnas `pivot` en relaciones many-to-many no pueden declarar `.transform()`
 
-**A quién afecta:** a definiciones `rel.manyToMany(…, { pivot: { … } })` cuya columna de pivot contenga un `.transform()`.
+**A quién afecta:** a relaciones `rel.manyToMany(…, { pivot: { … } })` cuyas columnas pivote utilicen `.transform()`.
 
-**Qué cambió:** el compilador la rechazará ("the pivot column "x" declares `.transform()` …"). La transformación de una columna intermedia de pivot nunca llegaba a ejecutarse, por lo que cualquier valor que intentara enmascararse se devolvía tal como estaba guardado.
+**Qué cambió:** el compilador abortará la operación ("the pivot column "x" declares `.transform()` …"). Las transformaciones sobre columnas pivote nunca llegaron a ejecutarse en ninguna capa del sistema, lo que causaba que valores sujetos a enmascaramiento se sirvieran tal como estaban almacenados.
 
-**Qué hacer:** elimine el `.transform()` y enmascare `_pivot` dentro del hook `hooks.afterRead` de la tabla de destino. Consulte [Relaciones](/docs/collections/relations/).
+**Qué hacer:** elimina la directiva `.transform()` y aplica el enmascaramiento sobre `_pivot` desde el hook `hooks.afterRead` de la tabla destino. Consulta [Relaciones](/docs/collections/relations/).
 
-## 141. Un enlace es exactamente tan legible y modificable como su columna clave
+## 141. La lectura y escritura de un enlace comparte idénticos permisos que su columna de clave
 
-**A quién afecta:** a clientes que escriban un `belongsTo` mediante el nombre de su relación, lean o filtren relaciones cuya columna clave posea restricciones, o dependan de `strictWrites: false`.
+**A quién afecta:** a aplicaciones que persistan relaciones `belongsTo` a través de su identificador de relación, ejecuten lecturas o filtros sobre relaciones con restricciones en su columna clave, o dependan de `strictWrites: false`.
 
-**Qué cambió:** cualquier restricción definida sobre una columna clave aplica a cualquier forma utilizada para leerla o escribirla.
+**Qué cambió:** toda limitación aplicada sobre la columna clave condiciona a cualquier identificador alternativo que intente leerla o modificarla.
 
-- Escribir un enlace mediante el nombre de su relación (`{ "reviewer": 7 }`) queda sujeto a todas las reglas de la columna clave que modifica (`.readOnly()`, `.private()`, `access.write`, marcas temporales de creación, la columna tenant, inmutabilidad de clave) en REST, bulk, `_batch`, sockets y MCP. Enviar el enlace bajo ambos nombres simultáneamente (`{ "reviewer": 7, "reviewerId": 8 }`) con valores discrepantes producirá un error 400 `VALIDATION_INVALID_VALUE`. Intentar trasladar una fila a otro tenant a través de su enlace responderá 400 `TENANT_IMMUTABLE` (anteriormente generaba un error 500).
-- Una relación solo es legible si el solicitante tiene permisos de lectura para todas las columnas involucradas en su join, en todas las tablas por las que transite: la clave del `belongsTo`, la clave foránea de destino en un `hasMany` / `hasOne`, y cada columna unida en los pasos de un `via`. Si alguna falla, se omitirá de `include` y `_count`, y cualquier filtro, ordenamiento o ruta relacional que pase por ella devolverá `FIELD_NOT_READABLE` (o una relación desconocida si la columna es `.private()`). Una escritura to-one via `via` que intente replicar una columna inaccesible para el usuario será rechazada con `FIELD_NOT_READABLE`. Los casos inversos y con `via` ya presentaban este comportamiento en 0.30.x.
-- Un enlace cuya columna clave sea inaccesible para el solicitante se omitirá de `include`, y cualquier filtro, ordenamiento, elemento en `fields` o ruta relacional a través de él responderá `FIELD_NOT_READABLE`; un enlace asociado a una clave `.private()` se comportará como una relación desconocida. `GET /api/schema/tables`, OpenAPI y la herramienta `describe_table` de MCP describen los enlaces junto con sus claves, por lo que una columna clave cuyo enlace esté cerrado también se omitirá allí.
-- `strictWrites: false` determina una sola cosa: que una clave no declarada pase al driver (se escribirá si la base de datos contiene la columna, de lo contrario devolverá 400 `VALIDATION_UNKNOWN_FIELDS`). En ningún caso desbloqueará una columna declarada, marcas temporales, el tenant, la clave, el destino de una relación o una regla sobre `_pivot`.
+- Escribir una relación mediante su nombre (`{ "reviewer": 7 }`) queda sujeto a la totalidad de las reglas impuestas en su columna clave — tales como `.readOnly()`, `.private()`, `access.write`, marcas temporales de creación, pertenencia a tenants e inmutabilidad de claves — en REST, operaciones masivas, `_batch`, WebSockets y MCP. Intentar definir el enlace simultáneamente bajo ambos nombres (`{ "reviewer": 7, "reviewerId": 8 }`) con valores discrepantes provocará un error 400 `VALIDATION_INVALID_VALUE`. Intentar trasladar una fila a otro tenant mediante la modificación de su relación responderá con 400 `TENANT_IMMUTABLE` (en 0.30 producía un error 500).
+- Una relación solo permite lectura si el invocador tiene autorización para consultar todas las columnas intervinientes en sus joins, abarcando todas las tablas involucradas: la clave foránea en un `belongsTo`, la clave foránea de destino en `hasMany` / `hasOne`, y cada columna de salto en un `via`. Cualquier omisión por falta de permisos excluirá la relación de `include` y `_count`, y su uso en filtros, ordenamientos o rutas de relación generará un error `FIELD_NOT_READABLE` (o se reportará como relación inexistente si la columna es `.private()`). Una mutación a través de un `via` uno a uno que requiera copiar datos sobre columnas no autorizadas será rechazada con `FIELD_NOT_READABLE`. Los casos inversos y basados en `via` presentaban esta vulnerabilidad en las versiones 0.30.x.
+- Si el invocador carece de acceso de lectura a la columna de clave, la relación se omitirá en `include`, y cualquier intento de filtrado, ordenamiento, selección en `fields` o navegación a través de ella fallará con `FIELD_NOT_READABLE`; un enlace asociado a una clave `.private()` será considerado inexistente. `GET /api/schema/tables`, OpenAPI y `describe_table` de MCP documentan de manera conjunta el enlace y su clave, de forma que una clave foránea cuyo enlace esté bloqueado tampoco será revelada en dichas interfaces.
+- `strictWrites: false` regula únicamente el envío de propiedades no declaradas al driver subyacente (persistiendo el valor si la base de datos cuenta con dicha columna, o retornando 400 `VALIDATION_UNKNOWN_FIELDS` en caso contrario). No exime ni anula las protecciones de columnas declaradas, marcas de auditoría, pertenencia a tenants, claves primarias, validaciones del destino de relaciones o restricciones de `_pivot`.
 
-**Qué hacer:** especifique un enlace utilizando un único nombre, o ambos con idéntico valor; acceda a enlaces restringidos con un rol que tenga permisos para leer su clave correspondiente. Consulte [Acceso a campos](/docs/collections/field-access/).
+**Qué hacer:** define los enlaces empleando un único identificador, o ambos asegurando que coincidan en valor; consulta relaciones restringidas haciendo uso de roles con permisos suficientes para acceder a la columna clave correspondiente. Consulta [Acceso a campos](/docs/collections/field-access/).

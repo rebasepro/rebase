@@ -1,19 +1,19 @@
 ---
-sourceHash: 294751194daf2945
+sourceHash: 939f091d469cc389
 title: Adaptateurs d'authentification personnalisés
 sidebar_label: Adaptateurs d'authentification personnalisés
 description: Remplacez l'authentification intégrée de Rebase par Clerk, Firebase Auth ou votre propre fournisseur d'identité en implémentant le contrat AuthAdapter.
 ---
 
-Rebase intègre sa propre authentification — [configurez-la ici](/docs/backend/authentication/). Cette page traite de l'autre cas : un fournisseur d'identité que vous utilisez ou payez déjà.
+Rebase intègre sa propre authentification — [configurez-la ici](/docs/backend/authentication/). Cette page traite de l'autre cas : un fournisseur d'identité que vous utilisez déjà ou pour lequel vous payez déjà.
 
 ## Adaptateurs d'authentification personnalisés
 
-Rebase permet le remplacement complet du système d'authentification intégré via une architecture d'authentification enfichable. Cela découple la vérification de l'authentification de la base de données et des couches REST/WebSocket, permettant une intégration fluide avec des fournisseurs externes tels que **Clerk**, **Auth0**, **Firebase Auth**, ou des services d'identité JWT personnalisés.
+Rebase permet le remplacement complet du système d'authentification intégré via une architecture d'authentification enfichable. Cela découple la vérification de l'authentification de la base de données et des couches REST/WebSocket, permettant une intégration transparente avec des fournisseurs externes tels que **Clerk**, **Auth0**, **Firebase Auth** ou des services d'identité JWT personnalisés.
 
 ### Le contrat AuthAdapter
 
-Vous pouvez implémenter directement l'interface `AuthAdapter` pour un contrôle total. L'interface, sous forme abrégée (la définition complète, avec les hooks facultatifs d'administration des utilisateurs et `transformAuthResponse`, correspond à `AuthAdapter` dans `@rebasepro/types`) :
+Vous pouvez implémenter directement l'interface `AuthAdapter` pour un contrôle total. L'interface, abrégée (la définition complète, avec l'administration optionnelle des utilisateurs et les hooks `transformAuthResponse`, correspond à `AuthAdapter` dans `@rebasepro/types`) :
 
 ```typescript
 import { Hono } from "hono";
@@ -58,7 +58,7 @@ export interface AuthAdapter {
   initialize?(): Promise<void>;
   destroy?(): Promise<void>;
 
-  /** Custom user lifecycle hooks (e.g., hash passwords before collection writes) */
+  /** Custom user lifecycle hooks (e.g., hash passwords before users-table writes) */
   prepareUserCreation?(
     values: Record<string, unknown>,
     collectionAuth?: unknown
@@ -78,13 +78,13 @@ export interface AuthAdapter {
 
 <span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-`verifyRequest` est l'unique endroit où le backend demande qui a envoyé une requête. Les routes de données et de fonctions l'interrogent, tout comme `GET /api/schema/tables`, le document OpenAPI accessible à `/api/docs` et toutes les surfaces d'administration sous `/api/admin` (préférences de l'interface utilisateur, édition de schéma en direct, éditeur de schéma, cron, journaux, sauvegardes et le reste). Une clé d'API (`rk_`) ou un jeton de plateforme (`rpt_`) est toujours résolu par Rebase avant que l'adaptateur ne soit sollicité. Un identifiant que l'adaptateur ne reconnaît pas produit une erreur `401`, et n'est jamais interprété comme personne (anonyme) ; une requête sans aucun identifiant correspond à personne, à laquelle le point de terminaison du schéma et le document répondent par un `401` (sauf `schemaTables.public`) et les surfaces d'administration répondent toujours par un `401`. Les rôles renvoyés par l'adaptateur déterminent la description de l'appelant et l'accès ou non aux surfaces d'administration (`403` lorsqu'il leur manque la portée requise). Un adaptateur qui lève une exception équivaut au refus de l'appelant, jamais à un `500`. Voir [Schéma](/docs/backend/endpoints/#schema).
+`verifyRequest` est l'unique endroit où le backend vérifie qui a envoyé une requête. Les routes de données et de fonctions l'interrogent, tout comme `GET /api/schema/tables`, le document OpenAPI sur `/api/docs` et chaque surface d'administration sous `/api/admin` (préférences de l'interface utilisateur, modification du schéma en direct, l'éditeur de schéma, les tâches cron, les journaux, les sauvegardes et le reste). Une clé d'API (`rk_`) ou un jeton de plateforme (`rpt_`) est toujours résolu par Rebase avant de solliciter l'adaptateur. Un identifiant que l'adaptateur ne reconnaît pas produit une erreur `401`, et n'est jamais interprété comme personne ; une requête sans aucun identifiant correspond à personne, ce à quoi le point de terminaison du schéma et le document répondent par un `401` (sauf si `schemaTables.public`), et les surfaces d'administration répondent toujours par un `401`. Les rôles renvoyés par l'adaptateur déterminent la description de l'appelant et si une surface d'administration l'autorise (`403` s'il lui manque la portée nécessaire). Un adaptateur qui lève une exception constitue un refus de l'appelant, jamais un `500`. Voir [Schéma](/docs/backend/endpoints/#schema).
 
-Avant la version 0.31, le point de terminaison du schéma, le document et les surfaces d'administration ne vérifiaient que le JWT du framework ; ainsi, un backend disposant de son propre adaptateur leur répondait par un `500` et son panneau d'administration ne se chargeait pas.
+Avant la version 0.31, le point de terminaison du schéma, le document et les surfaces d'administration ne vérifiaient que le JWT du framework ; ainsi, un backend disposant de son propre adaptateur leur renvoyait un `500` et son panneau d'administration ne se chargeait pas.
 
 ### Le payload de l'utilisateur authentifié
 
-Quel que soit le fournisseur d'authentification externe choisi, votre adaptateur doit résoudre les vérifications de jetons réussies en un objet `AuthenticatedUser` uniforme. L'injecteur de portée RLS de Rebase mappe directement ces valeurs aux variables de session PostgreSQL au sein des transactions :
+Quel que soit le fournisseur d'authentification externe choisi, votre adaptateur doit résoudre les vérifications de jetons réussies en un objet `AuthenticatedUser` uniforme. L'injecteur de portée RLS de Rebase mappe directement ces valeurs sur les variables de session PostgreSQL à l'intérieur des transactions :
 
 ```typescript
 export interface AuthenticatedUser {
@@ -105,11 +105,11 @@ export interface AuthenticatedUser {
 
 ### Intégration rapide via `createCustomAuthAdapter`
 
-Pour les scénarios standards (comme la validation de JWT provenant d'un service tiers), vous pouvez utiliser l'utilitaire `createCustomAuthAdapter`. Cet utilitaire gère les valeurs par défaut des capacités et implémente la validation des jetons WebSocket prête à l'emploi en encapsulant votre implémentation de `verifyRequest`.
+Pour les scénarios standards (comme la validation de JWT provenant d'un service tiers), vous pouvez utiliser l'utilitaire `createCustomAuthAdapter`. Cet utilitaire gère les valeurs par défaut des fonctionnalités et implémente la validation des jetons WebSocket clé en main en encapsulant votre implémentation de `verifyRequest`.
 
 #### Exemple : Intégration avec Clerk
 
-Pour connecter un backend Rebase avec **Clerk**, vous pouvez vérifier les jetons JWT Clerk à l'aide du JSON Web Key Set (JWKS) de Clerk :
+Pour connecter un backend Rebase à **Clerk**, vous pouvez vérifier les jetons JWT Clerk à l'aide de l'ensemble de clés JSON Web Key Set (JWKS) de Clerk :
 
 ```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
@@ -221,13 +221,13 @@ L'adaptateur vérifie le jeton du fournisseur ; le client doit l'envoyer. Fourni
 client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
 ```
 
-Avec Firebase Auth, le getter est `() => auth.currentUser?.getIdToken() ?? Promise.resolve(null)`. Le client l'appelle pour chaque requête HTTP et à chaque fois que le socket temps réel s'authentifie, garantissant ainsi que les requêtes en direct (live queries) s'exécutent sous la même identité que les appels REST. Dans le panneau d'administration, définissez-le sur le client transmis à `<Rebase client>`. Voir [Votre propre fournisseur d'authentification](/docs/sdk/your-own-auth-provider/).
+Avec Firebase Auth, le getter est `() => auth.currentUser?.getIdToken() ?? Promise.resolve(null)`. Le client l'appelle pour chaque requête HTTP et chaque fois que le socket temps réel s'authentifie, garantissant ainsi que les requêtes en direct s'exécutent sous la même identité que les appels REST. Dans le panneau d'administration, définissez-le sur le client que vous transmettez à `<Rebase client>`. Voir [Votre propre fournisseur d'authentification](/docs/sdk/your-own-auth-provider/).
 
 ---
 
-### Monter des routes d'authentification et des actions de panneau
+### Montage des routes d'authentification et actions du panneau
 
-Si votre fournisseur d'authentification personnalisé nécessite de monter des points de terminaison de redirection (comme des routes de rappel OAuth ou des boucles de connexion SAML), implémentez la méthode `createAuthRoutes` sur votre adaptateur :
+Si votre fournisseur d'authentification personnalisé nécessite le montage de points de terminaison de redirection (comme des routes de rappel OAuth ou des boucles de connexion SAML), implémentez la méthode `createAuthRoutes` sur votre adaptateur :
 
 ```typescript
 const myOauthAdapter: AuthAdapter = {
@@ -267,7 +267,7 @@ const myOauthAdapter: AuthAdapter = {
 };
 ```
 
-Si vous souhaitez autoriser les opérations CRUD sur les utilisateurs directement au sein du panneau, implémentez le helper `userManagement` dans les options de l'adaptateur, qui fournit des hooks pour `listUsers`, `getUserById`, `createUser`, `updateUser`, `deleteUser`, `getUserRoles` et `setUserRoles`.
+Si vous souhaitez autoriser les opérations CRUD sur les utilisateurs directement depuis le panneau, implémentez l'assistant `userManagement` dans les options de l'adaptateur, qui fournit des hooks pour `listUsers`, `getUserById`, `createUser`, `updateUser`, `deleteUser`, `getUserRoles` et `setUserRoles`.
 
 ## Prochaines étapes
 

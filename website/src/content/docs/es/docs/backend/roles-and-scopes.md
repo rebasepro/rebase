@@ -1,59 +1,59 @@
 ---
-sourceHash: 3b3d8ad69537b827
+sourceHash: 1610ca294114442e
 title: Roles y scopes
 sidebar_label: Roles y scopes
-description: "Lo que puede hacer quien realiza la llamada: el plano de datos que cada persona posee, el plano de administración que otorgan los roles, los scopes que una aplicación declara para sí misma y cómo los porta cada credencial."
+description: "Lo que un solicitante puede hacer: el plano de datos que cada persona posee, el plano de administración que otorgan los roles, los scopes que una aplicación declara para sí misma y cómo los porta cada credencial."
 ---
 
-Cada solicitud a un backend de Rebase hace una sola pregunta: ¿puede este invocador hacer esto?
+Cada solicitud a un backend de Rebase plantea una pregunta: ¿puede este solicitante hacer esto?
 La respuesta es un **scope**, una cadena con el formato `resource:action`: `data:read`,
-`users:write`, `cron:read`. La sesión de una persona, una API key, un token MCP y un
+`users:write`, `cron:read`. La sesión de una persona, una clave de API, un token MCP y un
 rol contienen scopes, y todos usan las mismas cadenas. Una concesión se lee igual
 en una clave, en un rol y en una pantalla de consentimiento.
 
 ## Dos planos
 
-Los scopes se dividen en dos planos, y una persona los posee de manera diferente.
+Los scopes se dividen en dos planos, y una persona los posee de forma diferente.
 
 **El plano de datos** comprende `data:*`, `storage:*` y `functions:invoke`. Toda
-persona que haya iniciado sesión posee la totalidad de este plano. Lo que una persona puede hacer con una fila lo decide
+persona que haya iniciado sesión lo posee por completo. Lo que una persona puede hacer con una fila lo determina
 la [seguridad a nivel de fila](/docs/collections/security-rules/) de la tabla, fila por fila,
-y lo que puede hacer con un archivo lo deciden las [políticas de almacenamiento](/docs/backend/storage-authorization/).
+y lo que puede hacer con un archivo lo determinan las [políticas de almacenamiento](/docs/backend/storage-authorization/).
 Un scope nunca decide eso para una persona. En una clave o un token, los scopes del plano de datos
-se restringen: una clave que solo tiene `data:read:posts` lee `posts` y nada más,
-sin importar lo que permitirían las reglas.
+se restringen: una clave que solo posea `data:read:posts` lee `posts` y nada más,
+independientemente de lo que permitirían las reglas.
 
 **El plano de administración** es todo lo demás: usuarios, esquema, base de datos, copias de seguridad,
-cron, registros y claves. Nadie lo posee de forma implícita. El rol integrado `admin` posee
-la totalidad de este plano. Cualquier otro rol posee lo que la aplicación declare para él.
+cron, registros (logs) y claves. Nadie lo posee de forma implícita. El rol integrado `admin` lo posee
+por completo. Cualquier otro rol posee lo que la aplicación declare para él.
 
 ## Los scopes
 
-| Scope | Plano | Destino | Lo que permite |
+| Scope | Plano | Objetivo | Lo que permite |
 |---|---|---|---|
-| `data:read` | data | colección | Leer filas, a través de la seguridad a nivel de fila del invocador |
-| `data:write` | data | colección | Crear y actualizar filas, a través de la seguridad a nivel de fila del invocador |
-| `data:delete` | data | colección | Eliminar filas, a través de la seguridad a nivel de fila del invocador |
-| `storage:read` | data | fuente de almacenamiento | Listar y descargar archivos |
-| `storage:write` | data | fuente de almacenamiento | Subir archivos y crear carpetas |
-| `storage:delete` | data | fuente de almacenamiento | Eliminar archivos |
-| `functions:invoke` | data | función | Llamar a funciones personalizadas. Una función puede hacer todo lo que haga su código |
+| `data:read` | datos | colección | Leer filas, mediante la seguridad a nivel de fila del solicitante |
+| `data:write` | datos | colección | Crear y actualizar filas, mediante la seguridad a nivel de fila del solicitante |
+| `data:delete` | datos | colección | Eliminar filas, mediante la seguridad a nivel de fila del solicitante |
+| `storage:read` | datos | fuente de almacenamiento | Listar y descargar archivos |
+| `storage:write` | datos | fuente de almacenamiento | Subir archivos y crear carpetas |
+| `storage:delete` | datos | fuente de almacenamiento | Eliminar archivos |
+| `functions:invoke` | datos | función | Invocar funciones personalizadas. Una función puede hacer todo lo que haga su código |
 | `users:read` | admin | — | Listar cuentas y sus roles |
-| `users:write` | admin | — | Crear, editar y eliminar cuentas, restablecer contraseñas y segundos factores, asignar roles hasta los propios del titular |
-| `schema:read` | admin | — | Leer el esquema, planificar cambios de esquema, ejecutar la auditoría RLS, leer la documentación de la API privada |
-| `schema:write` | admin | — | Aplicar cambios de esquema: edita los archivos de esquema y modifica la base de datos |
+| `users:write` | admin | — | Crear, editar y eliminar cuentas, restablecer contraseñas y segundos factores, asignar roles hasta los que posea el propio titular |
+| `schema:read` | admin | — | Leer el esquema, planificar cambios en el esquema, ejecutar la auditoría de RLS, leer la documentación de la API privada |
+| `schema:write` | admin | — | Aplicar cambios en el esquema: edita los archivos del esquema y modifica la base de datos |
 | `database:read` | admin | — | Listar bases de datos, tablas, roles de Postgres y ramas |
 | `database:write` | admin | — | Ejecutar SQL como propietario de la base de datos, fuera de la seguridad a nivel de fila, y crear o eliminar ramas |
 | `backups:read` | admin | — | Listar y descargar copias de seguridad: cada fila, fuera de la seguridad a nivel de fila |
 | `cron:read` | admin | — | Listar tareas cron y leer su historial de ejecución |
-| `cron:write` | admin | — | Activar tareas cron y encenderlas o apagarlas |
+| `cron:write` | admin | — | Activar tareas cron y habilitarlas o deshabilitarlas |
 | `logs:read` | admin | — | Leer los registros del servidor |
 | `keys:read` | admin | — | Listar las claves de servicio del proyecto. Nunca se puede otorgar a una clave |
 | `keys:write` | admin | — | Crear, modificar y revocar claves de servicio. Nunca se puede otorgar a una clave |
 
 `GET /api/auth/scopes` devuelve esta lista para el backend en ejecución, con los scopes
-propios de la aplicación agregados, más los scopes que posee el invocador. Cualquier invocador
-que haya iniciado sesión puede leerla:
+propios de la aplicación añadidos, más los scopes que posee el solicitante. Cualquier
+solicitante que haya iniciado sesión puede leerla:
 
 ```ts
 const { scopes, held } = await client.personalKeys.listScopes();
@@ -63,27 +63,27 @@ const { scopes, held } = await client.personalKeys.listScopes();
 
 ## Objetivos
 
-Un scope del plano de datos puede restringirse a un objetivo, después de dos puntos adicionales:
+Un scope del plano de datos se puede delimitar a un único objetivo, tras un segundo signo de dos puntos:
 
 - `data:read:posts` lee únicamente la tabla `posts`. El objetivo es el slug de una tabla.
-- `storage:write:avatars` solo sube a la fuente de almacenamiento `avatars`. El id de la fuente
-  predeterminada es `(default)`: `storage:read:(default)`.
+- `storage:write:avatars` solo sube archivos a la fuente de almacenamiento `avatars`. El id de la
+  fuente predeterminada es `(default)`: `storage:read:(default)`.
 - `functions:invoke:export` solo llama a la función `export`.
 
-El scope genérico cubre todos los objetivos. Un scope restringido cubre su propio objetivo y
-nada más. Nunca responde a una pregunta sobre todos los objetivos: una clave que contiene
+El scope general cubre todos los objetivos. Un scope delimitado cubre su propio objetivo y
+nada más. Nunca responde a una consulta sobre todos los objetivos: una clave que posea
 `data:read:posts` no puede listar todas las tablas.
 
-Los scopes del plano de administración no admiten objetivos. Un scope de aplicación admite uno cuando declara un
+Los scopes del plano de administración no aceptan objetivos. Un scope de aplicación acepta uno cuando declara un
 `target`, como se muestra a continuación.
 
-## Declarar roles
+## Declaración de roles
 
 <span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Los roles se declaran en la [tabla de usuarios](/docs/schema/auth-table/), bajo
-`auth.roles`. Un rol es un nombre que la base de datos reconoce, con el cual pueden
-coincidir las políticas de seguridad a nivel de fila, además de una lista de scopes de aplicación y del plano de administración.
+`auth.roles`. Un rol es un nombre que la base de datos reconoce, con el cual
+pueden coincidir las políticas de seguridad a nivel de fila, más una lista de scopes del plano de administración y de la aplicación.
 
 ```ts
 import { defineAuthTable, col } from "@rebasepro/server/schema";
@@ -111,28 +111,28 @@ export const users = defineAuthTable("users", {
 });
 ```
 
-Una persona posee un rol cuando su columna `roles` lo incluye. Asígnalo en el panel de administración
-o con `PUT /api/admin/users/:uid`.
+Una persona posee un rol cuando su columna `roles` lo incluye. Asígnalo en el panel
+de administración o mediante `PUT /api/admin/users/:uid`.
 
-El inicio del sistema rechaza cualquier declaración que parezca una concesión cuando no lo es:
+El arranque rechaza cualquier declaración que parezca una concesión que en realidad no es:
 
-- **`admin` no se puede declarar.** Está integrado y contiene todos los scopes.
-- **Un rol no puede incluir un scope del plano de datos.** Todas las personas ya poseen el plano
+- **`admin` no se puede declarar.** Viene integrado y posee todos los scopes.
+- **Un rol no puede listar un scope del plano de datos.** Cada persona ya posee el plano
   de datos. `data:write` en un rol no otorgaría nada y daría la impresión de haber otorgado
-  algo. Lo que un rol puede hacer con las filas corresponde a la directiva [`rls`](/docs/collections/security-rules/) de la tabla.
-- **Cada scope debe existir.** Un nombre desconocido provoca un fallo en el arranque y muestra la lista de los válidos.
+  algo. Lo que un rol puede hacer con las filas corresponde a la configuración [`rls`](/docs/collections/security-rules/) de la tabla.
+- **Cada scope debe existir.** Un nombre desconocido provoca un error en el arranque y lista los válidos.
 
-Un rol que no declares sigue siendo un rol. `editor` en el ejemplo anterior no tiene ninguna entrada, por lo que
-no contiene ningún scope del plano de administración, y una política RLS aún puede coincidir con él.
+Un rol que no declares sigue siendo un rol. `editor` en el ejemplo anterior no tiene entrada, por lo que
+no posee ningún scope del plano de administración, y una política de RLS aún puede coincidir con él.
 
 `defaultRole`, el rol que recibe cada nuevo usuario registrado, no puede ser `admin` ni un
-rol declarado que contenga algún scope del plano de administración. Un desconocido que se registre no debería
-poseer nada que administre el proyecto. El arranque lo rechazará.
+rol declarado que posea algún scope del plano de administración. Un desconocido que se registre
+no debería poseer nada que administre el proyecto. El arranque lo rechazará.
 
 :::note[`schema-admin` ya no existe]
 Las versiones anteriores trataban a un rol llamado `schema-admin` como un segundo administrador. Ahora
-no tiene ningún significado por sí solo. Si tu proyecto lo utilizaba, decláralo con los scopes
-que deseabas, por ejemplo
+no significa nada por sí solo. Si tu proyecto lo utilizaba, decláralo con los scopes
+que pretendías, por ejemplo
 `"schema-admin": { scopes: ["schema:read", "schema:write", "database:read", "database:write"] }`.
 :::
 
@@ -172,17 +172,17 @@ export const users = defineAuthTable("users", {
 });
 ```
 
-El nombre sigue el formato `resource:action`, en minúsculas, sin objetivo. No puede reutilizar un
+El nombre es `resource:action`, en minúsculas, sin objetivo. No puede reutilizar un
 recurso integrado: `data`, `storage`, `functions`, `users`, `schema`,
 `database`, `backups`, `cron`, `logs` y `keys` ya están ocupados. `label` es obligatorio,
-porque es lo que una persona lee cuando concede el scope. `target` define el significado
-del objetivo, de modo que una clave pueda contener `project:deploy:p1`.
+ya que es lo que lee una persona al otorgar el scope. `target` especifica qué
+significa un objetivo, permitiendo que una clave contenga `project:deploy:p1`.
 
-Toda persona que haya iniciado sesión posee todos los scopes de la aplicación. Al igual que en el plano de datos, el código
+Toda persona que haya iniciado sesión posee todos los scopes de la aplicación. Al igual que con el plano de datos, el código
 detrás del scope decide si esta persona puede actuar. El scope existe para que
-una clave se pueda restringir a esa única acción. Un rol también puede listar scopes de aplicación.
+una clave pueda restringirse a esa única acción. Un rol también puede incluir scopes de aplicación.
 
-Comprueba uno en una [función personalizada](/docs/backend/custom-functions/) con `requireScope`:
+Verifica uno en una [función personalizada](/docs/backend/custom-functions/) mediante `requireScope`:
 
 ```typescript
 import { defineFunction, requireAuth, requireScope, getUserId } from "@rebasepro/server/functions";
@@ -201,17 +201,17 @@ export default defineFunction((app) => {
 });
 ```
 
-Una clave que contenga `project:deploy:p1` pasa para `p1` y recibe `403 SCOPE_MISSING`
+Una clave que contenga `project:deploy:p1` es válida para `p1` y recibe `403 SCOPE_MISSING`
 para cualquier otro proyecto. También necesita `functions:invoke`, o
-`functions:invoke:<name>` para esta función, para poder acceder a ella.
+`functions:invoke:<name>` para esta función, para poder acceder a la función en absoluto.
 `hasScope(c, scope, target)` y `getScopes(c)` responden a la misma pregunta dentro de un
-manejador.
+controlador.
 
 `requireScope`
-rechaza cualquier scope que nadie podría tener. Un nombre que no sea un scope, o uno integrado
-mal escrito como `data:raed`, lanza un error cuando la función se carga. Un scope de aplicación que el
-backend no declara bajo `auth.scopes` responde a cualquier invocador,
-incluido un administrador, con `500 SCOPE_NOT_DECLARED`.
+rechaza un scope que nadie podría poseer. Un nombre que no sea un scope, o un scope integrado
+mal escrito como `data:raed`, lanza un error al cargar la función. Un scope de aplicación que
+el backend no declare bajo `auth.scopes` responde a cualquier solicitante,
+incluso a un administrador, con `500 SCOPE_NOT_DECLARED`.
 
 ## Qué significa admin
 
@@ -219,61 +219,60 @@ incluido un administrador, con `500 SCOPE_NOT_DECLARED`.
 
 - Posee todos los scopes del plano de administración, incluido `keys:*`.
 - Es un rol que la base de datos reconoce. Las políticas predeterminadas que Rebase agrega a cada
-  tabla lo admiten, por lo que un administrador lee y escribe en cada fila de una tabla que las conserve.
+  tabla lo admiten, por lo que un admin lee y escribe cada fila de una tabla que las conserve.
   Una tabla con `defaultPolicies: false` las descarta.
-- Solo un administrador puede otorgar `admin`. Un rol que liste todos los scopes del plano de administración
-  sigue sin ser `admin`: no puede conceder `admin` y las políticas predeterminadas no
-  lo admiten.
+- Solo un admin puede otorgar `admin`. Un rol que liste todos los scopes del plano de administración
+  sigue sin ser `admin`: no puede conceder `admin` y las políticas predeterminadas no lo admiten.
 
-`requireAdmin` comprueba si se posee el rol. Prefiere `requireScope` para cualquier cosa que un
-rol más acotado o una clave deban poder realizar.
+`requireAdmin` comprueba si se posee el rol. Prefiere `requireScope` para cualquier acción que un
+rol más restringido o una clave deban poder realizar.
 
 ## Nadie otorga más de lo que posee
 
-Una regla rige cada vía que otorga acceso: **no se concede nada con más permisos
+Una regla abarca cada vía que concede acceso: **no se otorga nada con más permisos
 de los que posee quien lo otorga.**
 
-Para claves:
+Para las claves:
 
 - Los scopes de una clave deben estar dentro de los de su creador. De lo contrario, `403 SCOPE_EXCEEDS_CREATOR`.
-- Los roles RLS de una clave de servicio deben ser roles que su creador posea, a menos que el creador
-  sea un administrador. De lo contrario, `403 ROLE_EXCEEDS_CREATOR`.
-- `keys:read` y `keys:write` nunca se asignan a una clave. Una clave que gestiona claves podría
-  generar su propia sucesora. `400 KEY_MANAGEMENT_SCOPE`.
+- Los roles de RLS de una clave de servicio deben ser roles que su creador posea, a menos que el creador
+  sea un admin. De lo contrario, `403 ROLE_EXCEEDS_CREATOR`.
+- `keys:read` y `keys:write` nunca se asignan a una clave. Una clave que administre claves podría
+  acuñar su propia sucesora. `400 KEY_MANAGEMENT_SCOPE`.
 - Quien posea `keys:write` no puede modificar ni revocar una clave que tenga un rol o
-  scope que no posea, a menos que sea un administrador: `403 KEY_OUTRANKS_CALLER`.
-  Sin esto, podría ampliar una clave con rol de administrador a todos los scopes de datos.
+  scope que no posea, a menos que sea admin: `403 KEY_OUTRANKS_CALLER`.
+  Sin esto, podría ampliar una clave con rol de admin a todos los scopes de datos.
 
-Para cuentas, quien posea `users:write`:
+Para las cuentas, quien posea `users:write`:
 
-- no puede editar, restablecer ni eliminar una cuenta cuyos roles contengan un scope que no posea,
-  ni `admin` si no es administrador:
-  `403 ACCOUNT_OUTRANKS_CALLER`. Sin esto, un rol de soporte podría restablecer la contraseña de un
-  administrador e iniciar sesión en su lugar.
-- no puede otorgar roles que posean más permisos de los que tiene, incluido `admin`: `403 ROLE_EXCEEDS_CALLER`.
+- No puede editar, restablecer ni eliminar una cuenta cuyos roles contengan un scope que no posea,
+  ni a un `admin` si no es administrador:
+  `403 ACCOUNT_OUTRANKS_CALLER`. Sin esto, un rol de soporte podría restablecer la contraseña
+  de un admin e iniciar sesión en su nombre.
+- No puede otorgar roles que contengan más de lo que posee, incluido `admin`: `403 ROLE_EXCEEDS_CALLER`.
 
-El nombre de un rol puede ser cualquiera, excepto uno que pueda malinterpretarse como otros
-roles: un nombre vacío, o uno que contenga `,` `{` `}` `"` `\` o un carácter de control,
-se rechaza con `400 INVALID_ROLE` en cualquier lugar donde se escriba un rol (usuarios,
+El nombre de un rol puede ser cualquiera, excepto uno que pueda interpretarse como otros
+roles: un nombre vacío o que contenga `,`, `{`, `}`, `"`, `\` o un carácter
+de control se rechaza con `400 INVALID_ROLE` dondequiera que se escriba un rol (usuarios,
 la tabla de usuarios, claves de servicio).
 
-## Cómo porta los scopes cada credencial
+## Cómo porta scopes cada credencial
 
 | Credencial | Actúa como | Posee |
 |---|---|---|
-| La sesión de una persona | la persona | el plano de datos, todos los scopes de la aplicación y los scopes de sus roles. Un admin posee todo |
-| [Clave de servicio](/docs/backend/api-keys/#service-keys) `rk_live_…` | `api-key:<id>`, con los roles RLS `service` más sus propios `roles` | exactamente sus scopes |
-| [Clave personal](/docs/backend/api-keys/#personal-keys) `rk_live_…` | su propietario, con los roles del propietario tal como están en cada solicitud | sus scopes, limitados a lo que el propietario posee en ese momento |
-| [Token MCP](/docs/ai/remote-mcp/) | la persona que lo conectó | `data:read`, `data:write`, `data:delete` según lo otorgado, opcionalmente por colección |
+| Sesión de una persona | la persona | el plano de datos, todos los scopes de aplicación y los scopes de sus roles. Un admin posee todo |
+| [Clave de servicio](/docs/backend/api-keys/#service-keys) `rk_live_…` | `api-key:<id>`, con los roles de RLS `service` más sus propios `roles` | exactamente sus scopes |
+| [Clave personal](/docs/backend/api-keys/#personal-keys) `rk_live_…` | su propietario, con los roles del propietario tal como estén en cada solicitud | sus scopes, limitados a lo que el propietario posea en ese momento |
+| [Token MCP](/docs/ai/remote-mcp/) | la persona que lo conectó | `data:read`, `data:write`, `data:delete` según lo otorgado, opcionalmente por tabla |
 | `REBASE_SERVICE_KEY` | `service`, con el rol `admin` | todo |
 
-Una clave o un token nunca eluden la seguridad a nivel de fila. Sus scopes representan un límite superior,
-y las políticas de la base de datos para la identidad bajo la que actúa representan otro.
+Una clave o un token nunca elude la seguridad a nivel de fila. Sus scopes constituyen un límite,
+y las políticas de la base de datos para la identidad como la que actúa constituyen otro.
 
 ## Cuando falta un scope
 
 La respuesta es `403 SCOPE_MISSING`, y `details.requiredScope` indica el scope,
-junto con su objetivo si lo tiene:
+con su objetivo si lo tiene:
 
 ```json
 {
@@ -290,7 +289,7 @@ que lo posea.
 
 ## Próximos pasos
 
-- [API keys](/docs/backend/api-keys/): claves de servicio, claves personales y las reglas de emisión
+- [Claves de API](/docs/backend/api-keys/): claves de servicio, claves personales y las reglas de creación
 - [Seguridad a nivel de fila](/docs/collections/security-rules/): lo que una persona puede hacer con cada fila
 - [Índice de endpoints](/docs/backend/endpoints/): el scope que necesita cada ruta
-- [Códigos de error](/docs/backend/errors/#authentication-and-accounts): cada uno de los rechazos anteriores
+- [Códigos de error](/docs/backend/errors/#authentication-and-accounts): cada rechazo mencionado anteriormente

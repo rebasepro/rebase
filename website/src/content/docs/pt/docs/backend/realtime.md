@@ -1,19 +1,19 @@
 ---
-sourceHash: 8cfa91fb2859caf0
-title: Tempo Real & WebSocket
+sourceHash: 0804be5779f90bbb
+title: Tempo Real e WebSocket
 sidebar_label: Tempo Real
 description: Sincronização de dados em tempo real, canais de broadcast e rastreamento de presença via WebSocket.
 ---
 
-O Rebase inclui um mecanismo de tempo real integrado que envia alterações de dados para clientes conectados via WebSocket.
-Quando qualquer registro é criado, atualizado ou excluído, cada assinante que monitora essa tabela ou entidade recebe a atualização instantaneamente — sem necessidade de polling.
+O Rebase inclui um motor de tempo real integrado que envia alterações de dados para clientes conectados via WebSocket.
+Quando qualquer registro é criado, atualizado ou excluído, cada assinante que estiver monitorando aquela tabela ou entidade recebe a atualização instantaneamente — sem necessidade de polling.
 
 ## Como Funciona
 
-O pipeline de tempo real possui três estágios:
+O pipeline de tempo real possui três etapas:
 
-1. **Gatilho de banco de dados** — Uma mutação atinge o banco de dados PostgreSQL (via API REST, SDK ou Studio).
-2. **Distribuição do servidor (fan-out)** — O servidor Rebase detecta a alteração e a distribui para todas as assinaturas WebSocket ativas que correspondem à tabela ou entidade afetada.
+1. **Gatilho no banco de dados** — Uma mutação atinge o banco de dados PostgreSQL (via API REST, SDK ou Studio).
+2. **Fan-out do servidor** — O servidor Rebase detecta a alteração e a distribui para cada assinatura WebSocket ativa que corresponda à tabela ou entidade afetada.
 3. **Callback do cliente** — O SDK tipado dispara seu callback `onUpdate` com os dados atualizados.
 
 ```
@@ -23,32 +23,32 @@ O pipeline de tempo real possui três estágios:
 └──────────────┘      └────────────────────┘      └──────────────┘
 ```
 
-Para implantações com múltiplas instâncias, o Rebase usa o `LISTEN/NOTIFY` do PostgreSQL para transmitir alterações entre as instâncias do servidor. Isso é gerenciado automaticamente. Com a [captura de alterações no nível do banco de dados](/docs/backend/realtime-cdc/) ativada (o padrão onde a role do banco de dados puder criar gatilhos), cada instância escuta no canal `rebase_cdc` no qual os gatilhos de captura publicam, de modo que uma gravação seja ouvida independentemente do processo ou ferramenta que a realizou. Sem a captura, cada instância anuncia suas próprias gravações no canal `rebase_entity_changes`, e uma conexão dedicada em cada outra instância as retransmite para seus assinantes locais.
+Para implantações com múltiplas instâncias, o Rebase usa o `LISTEN/NOTIFY` do PostgreSQL para transportar alterações entre as instâncias do servidor. Isso é tratado automaticamente. Com a [captura de alterações no nível do banco de dados (CDC)](/docs/backend/realtime-cdc/) ativada (o padrão sempre que a role do banco de dados puder criar gatilhos), cada instância escuta no canal `rebase_cdc` onde os gatilhos de captura publicam, para que uma gravação seja percebida independentemente de qual processo ou ferramenta a realizou. Sem a captura, cada instância anuncia suas próprias gravações no canal `rebase_entity_changes`, e uma conexão dedicada em todas as outras instâncias as retransmite para seus assinantes locais.
 
 ### Configuração Zero
 
-O recurso de tempo real vem habilitado por padrão. Não há nenhuma flag para alternar ou serviço para iniciar — se o seu servidor Rebase estiver em execução, o endpoint do WebSocket estará disponível.
+O suporte a tempo real já vem habilitado por padrão. Não há nenhuma flag para ativar nem serviço para iniciar — se o seu servidor Rebase estiver em execução, o endpoint WebSocket estará disponível.
 
 ### Qual caminho o socket responde
 
-O socket responde a upgrades em um caminho: o caminho base da API com a terminação `/api` removida, ou seja, `/` para uma API em `/api`. É para lá que o SDK disca: ele se conecta à sua `baseUrl`, enquanto suas requisições HTTP vão para `${baseUrl}/api`. Um upgrade para qualquer outro caminho é deixado para os outros ouvintes de `upgrade` do servidor, permitindo que seu aplicativo execute seu próprio servidor WebSocket no mesmo `http.Server`. Sem nenhum outro ouvinte, tal upgrade recebe uma resposta `404`.
+O socket responde a upgrades em um único caminho: o caminho base da API sem o `/api` final, ou seja, `/` para uma API em `/api`. É para onde o SDK se conecta: ele conecta ao seu `baseUrl`, enquanto suas requisições HTTP vão para `${baseUrl}/api`. Um upgrade para qualquer outro caminho é deixado para os outros listeners de `upgrade` do servidor, permitindo que sua aplicação execute seu próprio servidor WebSocket no mesmo `http.Server`. Sem nenhum outro listener, esse upgrade é respondido com `404`.
 
-Em um [servidor personalizado](/docs/backend/custom-server/), `backend.attachRealtime(server, { path })` define o caminho, e o `realtime.path` do adaptador Postgres sobrescreve o que o servidor derivou.
+Em um [servidor customizado](/docs/backend/custom-server/), `backend.attachRealtime(server, { path })` define o caminho, e o `realtime.path` do adaptador Postgres sobrescreve o que o servidor deduziu.
 
-> Por padrão, o Rebase também emite eventos em tempo real para gravações feitas **fora** da API (via `psql`, outro serviço ou pelo editor SQL do Studio) sempre que a conexão do banco de dados permitir — consulte [captura de alterações no nível do banco de dados](/docs/backend/realtime-cdc/).
+> Por padrão, o Rebase também emite eventos em tempo real para gravações feitas **fora** da API (via `psql`, outro serviço ou o editor SQL do Studio) sempre que a conexão com o banco de dados suportar — consulte a [captura de alterações no nível do banco de dados](/docs/backend/realtime-cdc/).
 
 ## Assinaturas no SDK Tipado
 
 O SDK tipado do Rebase expõe dois métodos de assinatura em cada acessador de tabela:
 
-- **`listen()`** — Assinar uma tabela inteira (com filtros opcionais).
-- **`listenById()`** — Assinar uma única entidade pelo seu ID.
+- **`listen()`** — Assina uma tabela inteira (com filtros opcionais).
+- **`listenById()`** — Assina uma única entidade pelo seu ID.
 
-Ambos os métodos retornam uma **função para cancelar a assinatura** que você chama para parar de receber atualizações.
+Ambos os métodos retornam uma **função de cancelamento de assinatura (unsubscribe)** que você chama para parar de receber atualizações.
 
 ### Assinando uma Tabela
 
-Use `listen()` para receber atualizações sempre que registros em uma tabela forem alterados:
+Use `listen()` para receber atualizações sempre que os registros em uma tabela forem alterados:
 
 ```typescript
 const unsubscribe = client.data.products.listen(
@@ -64,7 +64,7 @@ const unsubscribe = client.data.products.listen(
 ```
 
 O callback recebe um `FindResult<M>` contendo:
-- `data` — As linhas, de forma plana, conforme `find()` as retorna (`row.name`, e não `row.values.name`).
+- `data` — As linhas, planas, como o `find()` as retorna (`row.name`, e não `row.values.name`).
 - `meta` — Informações de paginação (`total`, `limit`, `offset`, `hasMore`).
 
 ### Assinando uma Tabela com Filtros
@@ -84,7 +84,7 @@ const unsubscribe = client.data.products.listen(
 );
 ```
 
-O servidor respeita esses filtros — apenas registros correspondentes são incluídos nas atualizações.
+O servidor respeita esses filtros — apenas os registros correspondentes são incluídos nas atualizações.
 
 ### Assinando uma Única Entidade
 
@@ -106,13 +106,13 @@ const unsubscribe = client.data.products.listenById(
 );
 ```
 
-O callback recebe a linha, plana, como `findById()` a retorna (`row.name`, e não `row.values.name`), ou `undefined` quando a linha for excluída.
+O callback recebe a linha, plana, como o `findById()` a retorna (`row.name`, e não `row.values.name`), ou `undefined` assim que a linha for excluída.
 
-**Cada frame carrega a versão da linha.** `etagOf(row)` é a `ETag` que um `GET` da linha responde, portanto uma edição feita contra o que um frame exibiu pode ser salva com `ifMatch: etagOf(row)` e é recusada com `412` se a linha tiver sido alterada (consulte [Gravações condicionais](/docs/backend/writes/)). Na transmissão (on the wire), o `subscribe_one` do SDK solicita com `etag: true`, e cada frame `single_update` para uma linha existente traz `"etag"` ao lado de `"row"`. Um servidor anterior a isso ignora a solicitação e não envia a tag, e um cliente que não solicita recebe frames sem ela.
+**Cada frame carrega a versão da linha.** `etagOf(row)` é a `ETag` que um `GET` da linha responde, portanto, uma edição feita com base no que um frame exibiu pode ser salva com `ifMatch: etagOf(row)` e é recusada com `412` se a linha já tiver sido alterada (consulte [Gravações condicionais](/docs/backend/writes/)). Na rede, o `subscribe_one` do SDK solicita com `etag: true`, e cada frame `single_update` para uma linha existente traz `"etag"` ao lado de `"row"`. Um servidor anterior a isso ignora a solicitação e não envia nenhuma tag, e um cliente que não solicita recebe frames sem ela.
 
 ### Cancelando a Assinatura
 
-Tanto `listen()` quanto `listenById()` retornam uma função de cancelamento de assinatura. Chame-a para parar de receber atualizações e limpar recursos no lado do servidor:
+Tanto `listen()` quanto `listenById()` retornam uma função de cancelamento de assinatura. Chame-a para parar de receber atualizações e liberar recursos no lado do servidor:
 
 ```typescript
 const unsubscribe = client.data.products.listen(undefined, (response) => {
@@ -124,12 +124,12 @@ unsubscribe();
 ```
 
 :::tip
-Sempre chame a função de cancelamento de assinatura quando um componente for desmontado ou a página for navegada para fora. Isso evita vazamentos de memória e trabalho desnecessário no servidor.
+Sempre chame a função de cancelamento de assinatura quando um componente for desmontado ou ao navegar para fora da página. Isso evita vazamentos de memória e processamento desnecessário no servidor.
 :::
 
-## Query Builder `.listen()`
+## `.listen()` no Query Builder
 
-O construtor de consultas fluente também oferece suporte a assinaturas em tempo real. Encadeie seus filtros e depois chame `.listen()` em vez de `.find()`:
+O query builder fluente também suporta assinaturas em tempo real. Encadeie seus filtros e chame `.listen()` em vez de `.find()`:
 
 ```typescript
 const unsubscribe = client.data.orders
@@ -147,56 +147,56 @@ const unsubscribe = client.data.orders
 ```
 
 :::note
-`.listen()` — tanto no query builder quanto no acessador de tabela — necessita do WebSocket do cliente. O cliente deriva sua URL de `baseUrl`, a menos que `websocketUrl` seja fornecida. Em um cliente criado com `realtime: false`, ou em um que não conseguiu derivar uma URL, chamar `.listen()` lança um erro.
+O `.listen()` — tanto no query builder quanto no acessador de tabela — necessita do WebSocket do cliente. O cliente deduz sua URL a partir de `baseUrl`, a menos que `websocketUrl` seja fornecido. Em um cliente criado com `realtime: false`, ou que não conseguiu deduzir nenhuma URL, chamar `.listen()` lança um erro.
 :::
 
-## Entrega de Atualizações: Patch Instantâneo + Refetch de Correção
+## Entrega de Atualizações: Instant Patch + Refetch de Correção
 
 Uma alteração nunca viaja até um assinante como dados. Ela viaja como o fato de que
-algo mudou, e cada assinante é então informado sobre o que *ele* pode ver através de
-uma consulta executada em seu nome:
+algo mudou, e cada assinante é então informado sobre o que *ele* pode ver através de uma
+consulta executada com a identidade dele:
 
-1. **Invalidação.** Quando uma entidade muda (criada, atualizada, excluída), o
-   servidor marca os caminhos afetados. A linha gravada não é encaminhada —
-   ela foi lida sob a autorização de quem gravou, o que não diz nada sobre o que
+1. **Invalidação.** Quando uma entidade é alterada (criada, atualizada, excluída), o
+   servidor marca os caminhos afetados. A linha que foi gravada não é encaminhada —
+   ela foi lida sob a autorização do autor da gravação, o que não diz nada sobre o que
    qualquer assinante tem permissão para ver.
 
-2. **Refetch com RLS debounced.** Após **300ms** (`REFETCH_DEBOUNCE_MS`), o servidor
-   busca novamente a tabela com seus filtros e ordem de classificação originais. A consulta
-   é executada dentro de uma transação que define `app.user_id` e
-   `app.user_roles` locais da transação a partir do `SubscriptionAuthContext` do assinante, para que o Postgres
-   avalie o Row-Level Security sob a identidade daquele cliente e apenas as linhas
-   que ele tem autorização para ver sejam enviadas no `collection_update`. O debounce
+2. **Refetch com debounce e RLS.** Após **300ms** (`REFETCH_DEBOUNCE_MS`), o servidor
+   busca a tabela novamente com seus filtros e ordem de classificação originais. A consulta
+   é executada dentro de uma transação que define os parâmetros locais da transação `app.user_id` e
+   `app.user_roles` a partir do `SubscriptionAuthContext` do assinante, para que o Postgres
+   avalie o Row-Level Security sob a identidade daquele cliente e apenas as linhas que
+   ele tem autorização para ver sejam enviadas no `collection_update`. O debounce
    também agrupa uma rajada de gravações em uma única consulta. Ele aguarda 300 ms sem
-   nenhuma alteração adicional, mas nunca mais do que **1 s** (`REFETCH_MAX_WAIT_MS`) após
-   a primeira, de modo que uma tabela que receba gravações várias vezes por segundo ainda envie
-   aos seus assinantes um frame pelo menos uma vez por segundo. Defina esse limite com `REALTIME_REFETCH_MAX_WAIT_MS` (ou `realtime.refetchMaxWaitMs`): um valor maior busca novamente uma tabela movimentada com menos frequência; um valor menor envia frames mais recentes.
+   novas alterações, mas nunca mais do que **1 s** (`REFETCH_MAX_WAIT_MS`) após
+   a primeira, de modo que uma tabela que recebe gravações várias vezes por segundo ainda envie
+   um frame aos seus assinantes pelo menos uma vez por segundo. Defina esse limite com `REALTIME_REFETCH_MAX_WAIT_MS` (ou `realtime.refetchMaxWaitMs`): valores mais altos realizam o refetch de uma tabela movimentada com menor frequência; valores mais baixos enviam frames mais atualizados.
 
-   Um refetch que lê exatamente o que foi enviado pela última vez a um assinante não envia
-   nada a ele: uma gravação na linha 9.000 de uma lista que mostra os primeiros 50 itens custa
-   a leitura, não um frame para cada visualizador. Após um frame de erro, as próximas linhas
-   são enviadas novamente, mesmo que sejam idênticas.
+   Um refetch que lê exatamente o que foi enviado pela última vez ao assinante não envia
+   nada a ele: uma gravação na linha 9.000 de uma lista que mostra as primeiras 50 custa
+   apenas a leitura, não um frame para cada visualizador. Após um frame de erro, as próximas linhas
+   são enviadas novamente, mesmo que sejam as mesmas.
 
 Versões anteriores enviavam um `collection_patch` imediato contendo a linha gravada
-antes desse refetch, para feedback entre abas em sub-milissegundos. Essa linha havia sido
-lida sob o escopo de quem a gravou, portanto podia — e conseguia — alcançar assinantes cujas
-próprias políticas teriam negado o acesso, e o próprio filtro `where` da assinatura também não
-era aplicado a ela. O patch foi removido: a latência percebida para uma
+antes desse refetch, para feedback entre abas em menos de um milissegundo. Essa linha havia sido
+lida sob o escopo de quem gravou, portanto ela poderia alcançar — e de fato alcançava — assinantes cujas
+próprias políticas a teriam negado, e o próprio filtro `where` da assinatura
+tampouco era aplicado a ela. O patch foi removido: a latência percebida para uma
 atualização agora é a janela do debounce.
 
 ### O refetch é a leitura REST
 
-O refetch executa o mesmo pipeline que o `GET /api/data/<collection>` executa, com o
+O refetch executa o mesmo pipeline que o `GET /api/data/<table>` executa, com o
 mesmo tratamento de `include`. É isso que faz com que `find({ q })` e `listen({ q })`
-retornem linhas idênticas campo por campo.
+retornem linhas que são idênticas campo a campo.
 
 Costumava ser um método diferente — que aninhava cada relação sob um
 envelope `{ "__type": "relation" }` e, como uma assinatura não podia carregar nenhum
-`include`, carregava ansiosamente (eagerly) **todas** as relações declaradas pela tabela. Assim, a mesma
-consulta respondia com um formato via HTTP e outro via socket, e um cliente
-renderizando ambos via suas linhas mudarem de formato no instante em que uma gravação ocorria.
+`include`, carregava antecipadamente **todas** as relações que a tabela declarava. Assim, a mesma
+consulta respondia em um formato via HTTP e em outro via socket, e um cliente
+que renderizava ambos via suas linhas mudarem de formato no instante em que uma gravação ocorria.
 
-Portanto, um frame de assinatura aceita o mesmo que uma requisição de listagem: `filter`,
+Um frame de assinatura aceita, portanto, o mesmo que uma requisição de listagem aceita: `filter`,
 `logical`, `orderBy`, `limit`, `offset`/`page`, `searchString`, `include` e
 `fields`. `vectorSearch` é a exceção e é **recusado** com
 `VECTOR_SEARCH_NOT_LIVE` — uma assinatura é reexecutada a cada gravação correspondente e
@@ -216,32 +216,32 @@ O frame é `{ rows, pks, meta }`:
 }
 ```
 
-`meta` é contabilizado dentro da mesma transação vinculada ao RLS que leu as linhas, de modo
-que descreve com exatidão as linhas ao lado. Sem isso, um cliente que precisasse de um total
-teria que emitir um `GET /count` **por push** — uma viagem de ida e volta (round trip) extra por gravação,
-por assinante, e uma janela na qual a contagem e as linhas descreviam diferentes
-estados da tabela.
+`meta` é contado dentro da mesma transação vinculada ao RLS que leu as linhas, portanto,
+ele descreve exatamente as linhas ao seu lado. Sem ele, um cliente que precisasse de um total
+teria que emitir um `GET /count` **por push** — um round trip extra por gravação, por
+assinante, e uma janela na qual a contagem e as linhas descreviam estados
+diferentes da tabela.
 
-Quando a contagem em si falha, o frame traz `partial: true` e nenhum `total`;
+Quando a contagem em si falha, o frame carrega `partial: true` e nenhum `total`;
 isso não é um erro de assinatura, e o cliente deve manter o último total real
-em vez de substituí-lo pelo tamanho da página. Em uma tabela grande, a contagem representa a maior parte do custo de um frame. Com `REALTIME_RECOUNT_INTERVAL_MS` definido, uma lista cujo último total foi de pelo menos `REALTIME_RECOUNT_MIN_ROWS` (100.000 por padrão) reutiliza esse total durante o intervalo em vez de contar a cada gravação, e tal frame traz `meta.totalAsOf`, indicando quando o total foi obtido. Quando o intervalo termina, uma lista cujo último frame reutilizou o total é contada novamente e o novo total é enviado, quer algo tenha sido gravado desde então ou não. Não definido, como por padrão, cada frame faz a contagem.
+em vez de substituí-lo pelo tamanho da página. Em uma tabela grande, a contagem é a maior parte do custo de um frame. Com `REALTIME_RECOUNT_INTERVAL_MS` definido, uma lista cujo último total era de pelo menos `REALTIME_RECOUNT_MIN_ROWS` (100.000 por padrão) reutiliza esse total durante o intervalo em vez de contar a cada gravação, e esse frame traz `meta.totalAsOf`, informando quando o total foi obtido. Quando o intervalo termina, uma lista cujo último frame reutilizou o total é contada novamente e o novo total é enviado, quer algo tenha sido gravado desde então ou não. Se não estiver configurado, como por padrão, cada frame realiza a contagem.
 
 ### Quanto custa uma gravação e os limites
 
-Como cada frame é uma consulta executada como seu assinante, o custo de uma gravação cresce
-com o número de **perguntas distintas feitas por entidades principais (principals) distintas** na
-tabela afetada — e não com o número de sockets abertos:
+Como cada frame é uma consulta executada com a identidade do seu assinante, o custo de uma gravação cresce
+com o número de **perguntas distintas feitas por entidades (principals) distintas** na
+tabela que ela alterou — e não com o número de sockets abertos:
 
 - Assinaturas que fazem a mesma pergunta (mesmo caminho, filtros, ordenação, página,
   `include`, `fields`, busca) como o mesmo principal (mesmo ID de usuário, roles,
-  flag de convidado e claims) compartilham um único refetch. Uma gravação em uma lista custa **uma
-  transação por grupo desse tipo** — a leitura e sua contagem — independentemente de quantos sockets
-  a mantenham; cada membro ainda recebe um frame construído a partir de linhas lidas sob essa
+  flag de visitante e claims) compartilham um único refetch. Uma gravação em uma lista custa **uma
+  transação por esse grupo** — a leitura e sua contagem — independentemente de quantos sockets
+  a possuam; cada membro ainda recebe um frame construído a partir de linhas lidas sob aquela
   identidade. Uma primeira página que retorne menos itens do que o seu `limit` representa o conjunto
-  completo, portanto não é contada de forma alguma.
-- Uma assinatura de registro único só é consultada quando seu próprio registro é alterado.
+  completo, portanto não é contada novamente.
+- Uma assinatura de registro único é consultada apenas quando seu próprio registro é alterado.
 - Principals diferentes nunca compartilham uma leitura — é isso que impede que um frame
-  carregue uma linha que seu leitor não tem permissão para ver. Uma lista observada por mil
+  carregue uma linha que seu leitor não tem permissão para ver. Uma lista monitorada por mil
   usuários autenticados diferentes resulta em mil leituras e mil contagens a cada
   gravação nela, em mil transações.
 
@@ -250,51 +250,65 @@ gravação em uma lista:
 
 | Assinantes | Transações para a gravação | Último frame após a gravação |
 |-------------|----------------------------|----------------------------|
-| 1.000, um único principal | 2 | ~310 ms |
-| 1.000, cada um com um principal diferente | ~1.000 | ~600 ms |
+| 1.000, um principal | 2 | ~310 ms |
+| 1.000, cada um um principal diferente | ~1.000 | ~600 ms |
 
-300 ms de cada é o debounce. A segunda linha é o teto para o qual se deve planejar. Os
-refetches são executados no mesmo pool do seu tráfego REST, mas usando no máximo um quarto de
-suas conexões por vez (5 das 20 padrão, nunca menos de 2); o restante aguarda sua vez no servidor,
-de modo que a distribuição (fan-out) de uma gravação atrase seus próprios frames
-em vez de suas requisições. Uma tabela gravada várias vezes por segundo enquanto
+300 ms de cada um é o debounce. A segunda linha é o teto para o qual você deve planejar. Os
+refetches são executados no mesmo pool do seu tráfego REST, mas usando no máximo um quarto das
+suas conexões por vez (5 das 20 padrão, nunca menos de 2); o restante
+aguarda sua vez no servidor, para que o fan-out de uma gravação atrase seus próprios frames
+em vez de atrasar suas requisições. Uma tabela que recebe gravações várias vezes por segundo enquanto
 **centenas de usuários diferentes** observam a mesma lista é onde esses frames
-começam a sofrer atraso (lag). Além disso, dê preferência a assinaturas mais restritas (uma página, um filtro nas
-próprias linhas do usuário) ou a um [canal de broadcast](#canais-de-broadcast) transmitindo a
-alteração para que os clientes façam o refetch em seu próprio ritmo.
+começam a sofrer atrasos. Além desse ponto, prefira assinaturas mais restritas (uma página, um filtro nas
+próprias linhas do usuário) ou um [canal de broadcast](#canais-de-broadcast) transmitindo a
+alteração para que os clientes façam o refetch no seu próprio ritmo.
 
-**Um socket pode manter no máximo 1.000 assinaturas.** A seguinte é recusada com um frame de erro com o código `TOO_MANY_SUBSCRIPTIONS`; assinar novamente sob um ID que o socket já possui substitui essa assinatura e não conta novamente. O SDK compartilha assinaturas idênticas em um socket, portanto isso conta as listas e registros distintos que uma página mantém abertos. Altere isso com `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` ou `realtime.maxSubscriptionsPerSocket` no adaptador Postgres (a variável de ambiente tem precedência); um valor que não seja um número inteiro positivo interrompe o servidor na inicialização. **Os sockets que um usuário mantém também podem ser limitados**, por instância de servidor: defina `REALTIME_MAX_SOCKETS_PER_USER` (ou `realtime.maxSocketsPerUser`), e um login além desse limite será recusado com `TOO_MANY_SOCKETS` e o socket fechado com 4002. Sockets autenticados com uma chave de API contam contra essa chave, cada chave individualmente, e não contra a conta que a criou; a chave de serviço é uma credencial única, portanto todos os seus sockets contam juntos. Os sockets de um administrador que personifica um usuário contam contra o administrador, junto com seus próprios sockets, e não contra o usuário em cujo nome atuam. O SDK notifica todas as assinaturas ativas e o `onConnectionLost` de uma só vez, com um erro `CONNECTION_LOST` cujo `details.reason` é `TOO_MANY_SOCKETS`, e continua tentando novamente, esperando mais tempo a cada tentativa até 30 s, para que a aba consiga se conectar assim que outro socket for fechado. Não definido, como por padrão, não há teto.
+**Um socket pode conter no máximo 1.000 assinaturas.** A próxima é recusada com um frame de erro com o código `TOO_MANY_SUBSCRIPTIONS`; assinar novamente sob um id que o socket já possui substitui essa assinatura e não conta novamente. O SDK compartilha assinaturas idênticas em um socket, portanto isso conta as listas e registros distintos que uma página tem abertos. Altere isso com `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` ou `realtime.maxSubscriptionsPerSocket` no adaptador Postgres (a variável de ambiente tem precedência); um valor que não seja um número inteiro positivo interrompe o servidor na inicialização. **Os sockets que um usuário possui também podem ser limitados**, por instância de servidor: defina `REALTIME_MAX_SOCKETS_PER_USER` (ou `realtime.maxSocketsPerUser`), e um login além desse limite será recusado com `TOO_MANY_SOCKETS` e o socket fechado com 4002. Sockets autenticados com uma chave de API contam contra essa chave, cada chave individualmente, não contra a conta que a criou; a chave de serviço é uma única credencial, portanto todos os seus sockets contam juntos. Os sockets de um administrador que personifica um usuário contam contra o administrador, junto com seus próprios sockets, não contra o usuário como o qual ele atua. O SDK notifica todas as assinaturas ativas e `onConnectionLost` de uma só vez, com um erro `CONNECTION_LOST` cujo `details.reason` é `TOO_MANY_SOCKETS`, e continua tentando novamente, esperando mais tempo a cada tentativa até 30 s, para que a aba consiga se conectar assim que outro socket for fechado. Não definido, como por padrão, não há limite máximo.
 
-O ID de uma assinatura pertence ao próprio socket: dois clientes que nomeiem uma assinatura como `"sub-1"` mantêm cada um a sua, e um `unsubscribe` encerra apenas a do remetente.
+O id de uma assinatura pertence ao próprio socket: dois clientes que nomeiem uma assinatura como `"sub-1"` mantêm cada um a sua, e um `unsubscribe` encerra apenas a do remetente.
 
-**A assinatura conta contra o rate limit de dados.** O primeiro frame de uma assinatura é uma leitura, executada como o assinante, assim como a requisição de histórico de um canal. Portanto, `subscribe_collection`, `subscribe_one` e `channel_history` contam como requisições de dados no bucket de rate limit de quem chama (aquele compartilhado entre suas requisições HTTP e seus outros sockets) assim que a cota própria do socket é consumida. Cada socket pode enviar 1.000 dessas requisições sem que sejam contabilizadas, ou tantas quantas forem o seu teto de assinaturas quando este for maior, e a cota se renova ao longo de 15 minutos. Isso é tudo o que um socket pode comportar, de modo que a nova assinatura após uma reconexão nunca seja recusada e nunca gaste o limite do usuário. Ultrapassada a cota, um frame que exceda o limite é recusado com um frame de erro com o código `RATE_LIMITED`, que o SDK entrega ao `onError` daquela assinatura ou ao do canal.
+**Assinar consome o limite de taxa (rate limit) de dados.** O primeiro frame de uma assinatura é uma leitura, executada com a identidade do assinante, assim como a requisição de histórico de um canal. Portanto, `subscribe_collection`, `subscribe_one` e `channel_history` contam como requisições de dados no bucket de rate limit do chamador (aquele que suas requisições HTTP e seus outros sockets compartilham) uma vez que a cota do próprio socket for esgotada. Cada socket pode enviar 1.000 dessas requisições sem que sejam contabilizadas, ou tantas quanto o teto de assinaturas quando este for maior, e a cota se restabelece ao longo de 15 minutos. Isso cobre tudo o que um socket pode manter, de modo que a reassinatura após uma reconexão nunca seja recusada e nunca gaste o orçamento da pessoa. Ultrapassada a cota, um frame que exceda o limite é recusado com um frame de erro codificado como `RATE_LIMITED`, que o SDK entrega ao `onError` dessa assinatura ou ao do canal.
 
 ### Sockets que param de responder
 
-Um cliente pode desaparecer sem fechar seu socket: um celular perde o sinal, um notebook entra em repouso, um NAT esquece a conexão. Nenhum frame de encerramento chega, portanto nada avisa o servidor. Por essa razão, o servidor envia um ping a cada socket a cada 30 segundos e encerra aquele que não tiver respondido até o próximo ping, fazendo com que um cliente desconectado seja liberado em até um minuto. Navegadores e o SDK respondem aos pings automaticamente; um cliente que se comunique diretamente pelo protocolo também deve respondê-los, como faz a maioria das bibliotecas de WebSocket.
+Um cliente pode desaparecer sem fechar seu socket: um telefone perde o
+sinal, um laptop entra em repouso, um NAT esquece a conexão. Nenhum frame de encerramento
+chega, portanto nada informa o servidor. O servidor, portanto, envia um ping a cada socket
+a cada 30 segundos e encerra qualquer um que não tenha respondido até o próximo ping, de modo que
+um cliente desaparecido seja liberado em até um minuto. Os navegadores e o SDK respondem aos
+pings automaticamente; um cliente que se comunique diretamente com o protocolo também deve respondê-los,
+como a maioria das bibliotecas de WebSocket faz.
 
-**O lado do navegador.** Um navegador não pode enviar um ping nem ver um, portanto um socket semiaberto parece conectado para ele indefinidamente. O SDK abre o socket com `?rebase_caps=heartbeat,channel_seq,cancel_sql`; um servidor que os reconheça responde com `{"type":"hello","capabilities":[…],"heartbeatMs":30000}`, listando os recursos suportados (`cancel_sql`: ele aceita o frame `CANCEL_SQL` do console SQL) e envia `{"type":"heartbeat"}` a cada 30 segundos, e o SDK derruba o socket e [reconecta-se](#reconexão-automática) após perder dois heartbeats. Um cliente que não especifica nada não recebe nenhum dos dois, e um servidor mais antigo ignora o parâmetro, fazendo com que um SDK comunicando-se com ele se comporte como antes.
+**O lado do navegador.** Um navegador não pode enviar um ping nem ver um, portanto, um socket semiaberto parece conectado para ele indefinidamente. O SDK abre o socket com `?rebase_caps=heartbeat,channel_seq,cancel_sql`; um servidor que os reconhece responde com `{"type":"hello","capabilities":[…],"heartbeatMs":30000}`, listando aqueles que honra (`cancel_sql`: aceita o frame `CANCEL_SQL` do console SQL), e envia `{"type":"heartbeat"}` a cada 30 segundos, e o SDK derruba o socket e [reconecta](#reconexão-automática) após dois perdidos. Um cliente que não especifica nada não recebe nenhum dos dois, e um servidor mais antigo ignora o parâmetro, de modo que um SDK conversando com ele se comporta como antes.
 
-Um socket também é encerrado quando mais de 16&nbsp;MiB em frames enviados a ele ainda não foram lidos. Isso indica um cliente que não lê o que lhe é enviado, ou um tão atrasado que o que ele leria já estaria obsoleto. E quando os sockets de um servidor mantêm juntos mais de 256&nbsp;MiB não lidos (ou um quarto do limite de memória sob o qual o servidor roda, quando este for menor), aqueles com mais dados não lidos são encerrados primeiro, até que o restante se acomode.
+Um socket também é encerrado quando mais de 16&nbsp;MiB de frames enviados a ele
+permanecem não lidos. Isso indica um cliente que não lê o que lhe é enviado, ou um tão
+atrasado que o que ele leria estaria obsoleto. E quando os sockets de um servidor mantêm juntos
+mais de 256&nbsp;MiB não lidos (ou um quarto do limite de memória sob o qual o servidor
+opera, o que for menor), aqueles com a maior quantidade não lida são encerrados
+primeiro, até que o restante caiba.
 
-Um socket encerrado é limpo da mesma forma que um fechado. Suas assinaturas terminam, ele sai de seus canais e sua presença é removida, com a saída sendo anunciada aos outros membros. Um cliente que ainda esteja lá percebe a queda da conexão, e o SDK [reconecta-se](#reconexão-automática) e assina novamente.
+Um socket encerrado é limpo da mesma forma que um socket fechado. Suas assinaturas terminam, ele
+sai de seus canais e sua presença é removida, com a saída sendo anunciada
+para os outros membros. Um cliente que ainda está presente vê a conexão cair,
+e o SDK [reconecta](#reconexão-automática) e assina novamente.
 
 ## Canais de Broadcast
 
-Os canais de broadcast permitem que os clientes enviem mensagens arbitrárias entre si em tempo real — útil para recursos como indicadores de digitação, posições do cursor ou notificações personalizadas.
+Os canais de broadcast permitem que os clientes enviem mensagens arbitrárias entre si em tempo real — útil para funcionalidades como indicadores de digitação, posições do cursor ou notificações customizadas.
 
-O broadcast é gerenciado no nível do protocolo WebSocket. O servidor suporta os seguintes tipos de mensagem:
+O broadcast é gerenciado no nível do protocolo WebSocket. O servidor suporta estes tipos de mensagens:
 
-| Tipo de Mensagem | Direção         | Descrição                                |
+| Message Type     | Direction       | Description                              |
 |-----------------|-----------------|------------------------------------------|
-| `join_channel`    | Cliente → Servidor | Entrar em um canal nomeado               |
-| `leave_channel`   | Cliente → Servidor | Sair de um canal                         |
-| `broadcast`       | Cliente → Servidor | Enviar uma mensagem para todos os membros do canal |
-| `broadcast`       | Servidor → Cliente | Receber uma mensagem de outro membro     |
-| `channel_history` | Cliente → Servidor | Solicitar mensagens retidas após uma sequência |
-| `channel_history` | Servidor → Cliente | As mensagens retidas que um cliente perdeu |
+| `join_channel`    | Client → Server | Entrar em um canal nomeado               |
+| `leave_channel`   | Client → Server | Sair de um canal                         |
+| `broadcast`       | Client → Server | Enviar uma mensagem para todos os membros do canal |
+| `broadcast`       | Server → Client | Receber uma mensagem de outro membro     |
+| `channel_history` | Client → Server | Solicitar mensagens retidas após uma sequência |
+| `channel_history` | Server → Client | As mensagens retidas que um cliente perdeu |
 
-Quando um cliente envia uma mensagem `broadcast`, o servidor a retransmite para **todos os outros membros** daquele canal (o remetente não recebe sua própria mensagem).
+Quando um cliente envia uma mensagem de `broadcast`, o servidor a retransmite para **todos os outros membros** daquele canal (o remetente não recebe sua própria mensagem).
 
 ```typescript
 // Broadcast message structure (sent by client)
@@ -318,13 +332,15 @@ Quando um cliente envia uma mensagem `broadcast`, o servidor a retransmite para 
 
 ## Retenção de Canais
 
-Por padrão, um broadcast alcança os membros conectados no momento e depois desaparece. Esse é o equilíbrio ideal para notificações e cursores, e não custa nada.
+Por padrão, uma transmissão (broadcast) atinge os membros atualmente conectados e depois desaparece. Esse é o compromisso ideal para notificações e cursores, e não custa nada.
 
-Para um fluxo de operações — edição colaborativa ou qualquer situação em que uma lacuna silenciosa cause divergência — um canal pode ser configurado para **reter** suas mensagens. Os broadcasts retidos recebem um número de sequência por canal e são armazenados, permitindo que um cliente que se reconecte possa solicitar tudo após a última mensagem que viu.
+Para um fluxo de operações — edição colaborativa, qualquer situação em que uma lacuna silenciosa cause divergência — um canal pode ser configurado para **reter** suas mensagens. Os broadcasts retidos recebem um número de sequência por canal e são armazenados, para que um cliente que se reconecte possa solicitar tudo após a última mensagem que viu.
 
-:::caution[Onde isso vai]
-**Runtime gerenciado: em lugar nenhum.** A retenção de canal e o `realtime.bus` fazem parte do adaptador de banco de dados que o próprio runtime gerenciado constrói, e nenhum dos dois tem formato em variáveis de ambiente. Faça o eject para configurá-los.
-**Após eject:** `createPostgresAdapter({ realtime })` em `backend/src/index.ts`.
+:::caution[Where this goes]
+**Runtime gerenciado: em nenhum lugar.** A retenção de canais e o `realtime.bus` fazem parte
+do adaptador de banco de dados que o próprio runtime gerenciado constrói, e nenhum dos dois tem um
+formato por variáveis de ambiente. Faça o eject para configurá-los.
+**Após o eject:** `createPostgresAdapter({ realtime })` em `backend/src/index.ts`.
 :::
 
 A retenção é opcional (opt-in) e configurada aqui, no servidor:
@@ -350,53 +366,53 @@ await initializeRebaseBackend({
 });
 ```
 
-| Campo   | Descrição                                                                   |
+| Field   | Description                                                                 |
 |---------|-----------------------------------------------------------------------------|
 | `match` | Nome exato do canal (`"doc:42"`) ou um prefixo terminado em `*` (`"doc:*"`) |
-| `limit` | Manter no máximo esta quantidade das mensagens mais recentes por canal       |
-| `ttl`   | Manter mensagens por no máximo este tempo — `"30s"`, `"15m"`, `"24h"`, `"7d"` ou milissegundos |
+| `limit` | Manter no máximo esta quantidade das mensagens mais recentes por canal      |
+| `ttl`   | Manter as mensagens por no máximo este tempo — `"30s"`, `"15m"`, `"24h"`, `"7d"` ou milissegundos |
 
-Uma regra precisa de pelo menos um entre `limit` ou `ttl`. Uma regra sem nenhum dos dois é ignorada e registrada em log, pois a retenção ilimitada quase nunca é intencional e não pode ser desfeita facilmente depois que a tabela cresceu.
+Uma regra precisa de pelo menos um entre `limit` ou `ttl`. Uma regra sem nenhum dos dois é ignorada e registrada em log, porque uma retenção ilimitada quase nunca é intencional e não pode ser revertida facilmente depois que a tabela crescer.
 
-:::note[Por que não permitir que os clientes solicitem o histórico?]
-Um canal é criado por quem o nomeia. Se um cliente pudesse escolher sua própria profundidade de histórico, qualquer visitante poderia comprometer seu backend com armazenamento ilimitado. Configurá-lo aqui também significa que canais de presença e notificação — a grande maioria — não pagam nada: sem regras configuradas, nenhuma tabela é criada e o broadcast segue o mesmo caminho síncrono de sempre.
+:::note[Why not let clients ask for history?]
+Um canal é criado por quem o nomeia. Se um cliente pudesse escolher sua própria profundidade de histórico, qualquer visitante poderia comprometer seu backend com armazenamento ilimitado. Configurá-lo aqui também significa que os canais de presença e notificação — a esmagadora maioria — não pagam nada: sem regras configuradas, nenhuma tabela é criada e o broadcast segue o mesmo caminho síncrono de sempre.
 :::
 
 ### Armazenamento
 
-Canais retidos usam duas tabelas no esquema `rebase`, criadas automaticamente na inicialização quando pelo menos uma regra é configurada:
+Os canais retidos usam duas tabelas no esquema `rebase`, criadas automaticamente na inicialização quando pelo menos uma regra é configurada:
 
-| Tabela                    | Conteúdo                                                        |
+| Table                     | Contents                                                        |
 |---------------------------|-----------------------------------------------------------------|
-| `rebase.channel_messages` | As mensagens retidas, indexadas por `(channel, seq)`             |
-| `rebase.channel_cursors`  | A maior sequência emitida por canal                              |
+| `rebase.channel_messages` | As mensagens retidas, indexadas por `(channel, seq)`            |
+| `rebase.channel_cursors`  | A maior sequência emitida por canal                             |
 
-A limpeza (pruning) ocorre à medida que as mensagens chegam, com taxa limitada (throttled) por canal para que o custo acompanhe o tempo decorrido em vez do volume de gravações. Ela remove apenas linhas de `channel_messages` — os cursores são mantidos indefinidamente (eles representam uma linha pequena por canal), pois reiniciar a sequência de um canal alteraria o significado do ponto de retomada salvo por um cliente.
+A poda (pruning) acontece à medida que as mensagens chegam, com taxa limitada por canal para que o custo acompanhe o tempo decorrido em vez do volume de gravações. Ela remove apenas linhas de `channel_messages` — os cursores são mantidos indefinidamente (eles representam uma linha pequena por canal), pois reiniciar a sequência de um canal mudaria o significado do ponto de retomada salvo por um cliente.
 
 ### Garantias de entrega
 
-- **Ordenado.** Números de sequência são alocados por canal, e a ordem de entrega corresponde à ordem da sequência — em uma única instância e entre instâncias no barramento `postgres`, onde a instrução que numera uma mensagem também a anuncia, de modo que cada instância (incluindo a do remetente) receba os anúncios na ordem da sequência. Um barramento fornecido por você mesmo transporta os frames na ordem em que os entrega.
-- **Durável antes de entregue.** Uma mensagem que não pode ser armazenada não é entregue a ninguém, e o remetente é avisado. Entregá-la colocaria a mensagem na frente dos assinantes em tempo real, enquanto a deixaria de fora de qualquer reprodução (replay) futura, e nenhuma mensagem posterior conseguiria reparar essa lacuna.
-- **Pelo menos uma vez (at-least-once) na recuperação.** Um intervalo de reprodução pode se sobrepor a mensagens que o cliente já recebeu; o SDK descarta aquelas que já tiver entregue.
-- **Sem lacunas.** Uma mensagem retida chega a todos os membros: o remetente, que nunca recebe a sua própria mensagem, recebe `{"type":"broadcast_ack","channel","seq"}` quando opta por `channel_seq`. Portanto, uma mensagem além de `lastSeq + 1` significa que uma foi perdida, e o SDK a retém, solicita o histórico intermediário e entrega todas elas em ordem. Em relação a um servidor sem `channel_seq`, um salto é entregue assim que chega.
+- **Ordenado.** Os números de sequência são alocados por canal, e a ordem de entrega corresponde à ordem de sequência — em uma única instância e entre instâncias no barramento `postgres`, onde a instrução que numera uma mensagem também a anuncia, de modo que cada instância (incluindo a do remetente) receba os anúncios na ordem de sequência. Um barramento que você mesmo forneça transporta os frames em qualquer ordem em que os entregar.
+- **Durável antes de entregue.** Uma mensagem que não pode ser armazenada não é entregue a ninguém, e o remetente é informado. Entregá-la a colocaria diante de assinantes ativos enquanto a deixaria de fora de qualquer replay futuro, e nenhuma mensagem posterior poderia reparar essa lacuna.
+- **Ao menos uma vez (At-least-once) na recuperação.** Um intervalo de repetição (replay) pode se sobrepor a mensagens que um cliente já recebeu; o SDK descarta aquelas que já tiver entregue.
+- **Sem lacunas.** Uma mensagem retida atinge todos os membros: o remetente, que nunca recebe sua própria mensagem, recebe `{"type":"broadcast_ack","channel","seq"}` quando tiver optado pelo `channel_seq`. Portanto, uma mensagem além de `lastSeq + 1` significa que uma foi perdida, e o SDK a retém, solicita o histórico intermediário e entrega todas elas em ordem. Em relação a um servidor sem `channel_seq`, um salto é entregue assim que chega.
 
-:::caution[O histórico tem o mesmo modelo de acesso do canal]
-Um cliente que entrou em um canal pode reproduzir suas mensagens retidas, incluindo aquelas transmitidas antes de sua chegada — ser membro é a única verificação, e entrar está aberto a qualquer cliente que saiba o nome do canal. A retenção é opcional por padrão de canal, portanto ativá-la torna o passado daquele canal legível para qualquer visitante que adivinhe o nome. Canais retidos são o caso em que isso se torna durável em vez de momentâneo, portanto trate o conteúdo de um canal retido como público para seus usuários.
+:::caution[History has the same access model as the channel]
+Um cliente que ingressou em um canal pode reproduzir suas mensagens retidas, incluindo aquelas transmitidas antes de sua chegada — ser membro é a única verificação, e a entrada é permitida a qualquer cliente que souber o nome do canal. A retenção é opcional por padrão de canal, portanto habilitá-la torna o passado desse canal legível para qualquer visitante que adivinhe o nome. Os canais retidos são o caso em que isso se torna durável em vez de momentâneo, portanto trate o conteúdo de um canal retido como público para os seus usuários.
 :::
 
 ## Rastreamento de Presença
 
-O rastreamento de presença monitora quais usuários estão online no momento em um canal e permite que cada usuário compartilhe um estado personalizado (ex.: posição do cursor, status).
+O recurso de presença rastreia quais usuários estão online em um canal no momento e permite que cada usuário compartilhe estado customizado (por exemplo, posição do cursor, status).
 
-| Tipo de Mensagem   | Direção         | Descrição                                            |
+| Message Type       | Direction       | Description                                          |
 |-------------------|-----------------|------------------------------------------------------|
-| `presence_track`  | Cliente → Servidor | Iniciar o rastreamento de presença com estado personalizado |
-| `presence_untrack`| Cliente → Servidor | Parar o rastreamento de presença                     |
-| `presence_state`  | Cliente → Servidor | Solicitar o estado completo de presença de um canal  |
-| `presence_state`  | Servidor → Cliente | Todas as presenças no canal, por completo            |
-| `presence_diff`   | Servidor → Cliente | Atualização incremental (entradas e saídas)          |
+| `presence_track`  | Client → Server | Iniciar o rastreamento de presença com estado customizado |
+| `presence_untrack`| Client → Server | Parar o rastreamento de presença                     |
+| `presence_state`  | Client → Server | Solicitar o estado completo de presença de um canal  |
+| `presence_state`  | Server → Client | Todas as presenças no canal, na íntegra              |
+| `presence_diff`   | Server → Client | Atualização incremental (entradas e saídas)          |
 
-Quando um cliente envia `presence_track`, o servidor o adiciona automaticamente ao canal (sem necessidade de um `join_channel` separado) e transmite um `presence_diff` para todos os membros do canal. O SDK reenvia seu estado a cada ~20 segundos como um heartbeat; um heartbeat cujo estado não mudou apenas renova o timeout do cliente e não envia nenhum `presence_diff`.
+Quando um cliente envia `presence_track`, o servidor o adiciona automaticamente ao canal (sem necessidade de um `join_channel` separado) e transmite um `presence_diff` para todos os membros do canal. O SDK reenvia seu estado a cada ~20 segundos como um heartbeat; um heartbeat cujo estado permaneça inalterado apenas renova o timeout do cliente e não envia nenhum `presence_diff`.
 
 ```typescript
 // Track presence
@@ -431,23 +447,24 @@ Presenças inativas são limpas automaticamente após 30 segundos de inatividade
 
 ## Reconexão Automática
 
-O SDK tipado reconecta-se automaticamente quando a conexão WebSocket cai:
+O SDK tipado reconecta automaticamente quando a conexão WebSocket cai:
 
-- **Backoff exponencial** — Cada nova tentativa de conexão aguarda por um intervalo que começa em 2 segundos e dobra a cada vez, até 30 segundos. O atraso é sorteado aleatoriamente dentro do intervalo, mas nunca abaixo de um quarto de segundo, para que clientes desconectados juntos por um deploy retornem distribuídos ao longo de todo o intervalo em vez de no mesmo instante.
-- **Sem desistência enquanto algo estiver ativo** — Enquanto existir uma assinatura ou um canal no qual o cliente entrou, o cliente continuará tentando reconectar no teto de 30 segundos durante todo o tempo em que durar a interrupção. Sem nada registrado, ele para após 5 tentativas com falha, e a próxima assinatura tenta discar novamente. Em um navegador, o evento `online` e o retorno da visibilidade da aba acionam a reconexão imediatamente, em vez de aguardar o término do backoff.
-- **Interrupções são reportadas uma única vez** — Quando a conexão fica inoperante por 14 segundos, independentemente de quantas tentativas tenham ocorrido, o `onError` de cada assinatura ativa e o `onError` de cada canal conectado recebem um `RebaseApiError` com o código `CONNECTION_LOST`. A assinatura é **mantida**: o erro indica que seus dados não estão sendo atualizados, e não que ela foi finalizada.
-- **Reassinatura automática** — Após a reconexão bem-sucedida, todas as assinaturas ativas são registradas novamente no servidor, e o próximo `onUpdate` de cada uma carrega tudo o que foi gravado enquanto o cliente esteve desconectado. Essa atualização é o sinal de recuperação. Nenhuma intervenção manual é necessária.
-- **Requisições são do tipo at-most-once (no máximo uma vez)** — Uma requisição feita enquanto o socket está fora do ar aguarda por ele por até 30 segundos a partir da chamada, e então falha com `REQUEST_TIMEOUT` sem nunca ter sido enviada. Uma requisição que já havia sido enviada quando a conexão caiu falha com `CONNECTION_LOST` e **não** é enviada novamente: o servidor pode ou não tê-la executado, e somente o chamador sabe se executá-la duas vezes é seguro.
+- **Backoff exponencial** — Cada nova tentativa de discagem espera por um intervalo que começa em 2 segundos e dobra a cada vez, até 30 segundos. O atraso é escolhido aleatoriamente de qualquer ponto desse intervalo, mas nunca inferior a um quarto de segundo, para que clientes desconectados juntos por um deploy retornem distribuídos ao longo de todo o intervalo, em vez de no mesmo instante.
+- **Sem desistência enquanto algo estiver ativo** — Enquanto existir uma assinatura ou um canal no qual tenha entrado, o cliente continua tentando rediscar no teto de 30 segundos durante todo o tempo em que a interrupção durar. Sem nada registrado, ele para após 5 tentativas com falha, e a próxima assinatura tenta discar novamente. Em um navegador, o evento `online` e o retorno da visibilidade da aba disparam uma nova discagem imediatamente, em vez de esperar o término do backoff.
+- **Interrupções são reportadas uma única vez** — Quando a conexão fica inoperante por 14 segundos, independentemente de quantas tentativas tenham ocorrido, o `onError` de cada assinatura ativa e o `onError` de cada canal acessado recebe um `RebaseApiError` com o código `CONNECTION_LOST`. A assinatura é **mantida**: o erro indica que seus dados não estão sendo atualizados, não que ela foi encerrada.
+- **Reassinatura automática** — Após uma reconexão bem-sucedida, todas as assinaturas ativas são registradas novamente no servidor, e o próximo `onUpdate` de cada uma carrega tudo o que foi gravado enquanto o cliente esteve desconectado. Essa atualização é o sinal de recuperação. Nenhuma intervenção manual é necessária.
+- **As requisições são no máximo uma vez (at-most-once)** — Uma requisição feita enquanto o socket está fora do ar aguarda por ele por até 30 segundos a partir da chamada e, em seguida, falha com `REQUEST_TIMEOUT` sem nunca ter sido enviada. Uma requisição que já havia sido enviada quando a conexão caiu falha com `CONNECTION_LOST` e **não** é enviada novamente: o servidor pode ou não tê-la executado, e apenas o chamador sabe se executá-la duas vezes é seguro.
 
-`client.ws.state` informa em que estado a conexão se encontra, e `onStateChange` é notificado a cada alteração:
+`client.ws.state` informa o estado atual da conexão, e `onStateChange` é notificado a cada
+mudança:
 
-| Estado | Significado |
+| State | Meaning |
 |---|---|
-| `idle` | Nenhum socket, e nenhum solicitado ainda (a conexão é lazy), ou um logout o desconectou. |
-| `connecting` | Discando (conectando), sem interrupção em andamento. |
+| `idle` | Sem socket, e nenhum desejado ainda (a conexão é lazy), ou um sign-out o encerrou. |
+| `connecting` | Discando/conectando, sem nenhuma interrupção em andamento. |
 | `connected` | O socket está aberto. |
-| `reconnecting` | O socket caiu e o cliente está tentando reconectar. Nada foi reportado ainda. |
-| `disconnected` | A interrupção durou 14 segundos ou mais. `CONNECTION_LOST` foi reportado, e o cliente continua tentando reconectar. |
+| `reconnecting` | O socket caiu e o cliente está tentando se reconectar. Nada foi reportado ainda. |
+| `disconnected` | A interrupção durou 14 segundos ou mais. `CONNECTION_LOST` foi reportado, e o cliente continua tentando rediscar. |
 | `closed` | `client.close()` foi chamado. Final. |
 
 ```typescript
@@ -464,25 +481,35 @@ if (ws) {
 }
 ```
 
-O painel de administração do Rebase exibe um banner próprio enquanto o estado for `disconnected`, mantendo as linhas e registros já exibidos na tela em vez de substituí-los por um erro.
+O painel admin do Rebase exibe um banner próprio enquanto o estado estiver como `disconnected`, e mantém as linhas e registros já presentes na tela em vez de substituí-los por um erro.
 
-## Autenticação & RLS
+## Autenticação e RLS
 
 As assinaturas WebSocket respeitam automaticamente as políticas de Row-Level Security (RLS). Quando o cliente está autenticado:
 
 1. A conexão WebSocket se autentica usando o mesmo token JWT da API REST.
-2. Todo refetch de assinatura é executado dentro de uma transação PostgreSQL com `set_config('app.user_id', ...)` e `set_config('app.user_roles', ...)` — garantindo que as políticas de RLS sejam aplicadas.
-3. A identidade é verificada novamente enquanto o socket estiver aberto, e não apenas no momento da autenticação. Antes de cada frame, o servidor verifica o mesmo que uma requisição HTTP verificaria: o token ainda é válido, sua sessão foi encerrada ou revogada, a conta ainda existe e quais roles ela possui agora. Frames de canal são verificados no máximo uma vez por segundo. Frames que chegam em um socket enquanto sua verificação ainda está em andamento — como um cliente reenviando suas assinaturas após uma reconexão — compartilham essa mesma verificação em vez de cada um consultar novamente; o frame seguinte após sua conclusão fará uma nova consulta. Um socket que apenas escuta é consultado pelo menos a cada 30 segundos, e um token deixa de ser aceito no instante em que expira. Uma role removida é aplicada a partir do próximo frame (ou, para um frame que compartilhou uma verificação já em andamento, a partir do subsequente), tanto para leituras, gravações quanto para assinaturas abertas. Um socket cuja identidade foi encerrada recebe um frame `AUTH_ERROR` e é fechado com o código `4001`. Com a autenticação integrada, o código do frame diz o motivo, assim como as rotas HTTP dizem: `SESSION_REVOKED` (logout realizado, revogado ou conta excluída), `ACCOUNT_DISABLED` ou `TOKEN_EXPIRED`; em outro adaptador de autenticação é `SESSION_ENDED`. Um `AUTHENTICATE` para uma sessão revogada ou conta desativada é recusado com `SESSION_REVOKED` ou `ACCOUNT_DISABLED` (um token que não é verificado ou que expirou, com `INVALID_TOKEN`). O SDK não tenta novamente com o mesmo token e repassa a recusa, código incluído, para o `onError` de tudo o que precisava da conta. O SDK autentica seu socket novamente toda vez que renova seu token; um novo token para a mesma identidade (mesmo ID de usuário, roles, flag de convidado e claims) mantém as assinaturas abertas como estão, e um para uma identidade diferente executa o refetch de cada uma delas com essa nova identidade. Após um `4001`, ele reconecta com a sessão que possuir no momento, ou sem nenhuma. Um cliente que se comunica diretamente pelo protocolo precisa enviar um novo token em `AUTHENTICATE` antes que o antigo expire.
+2. Cada refetch de assinatura é executado dentro de uma transação PostgreSQL com `set_config('app.user_id', ...)` e `set_config('app.user_roles', ...)` — garantindo que as políticas de RLS sejam aplicadas.
+3. A identidade é verificada novamente enquanto o socket estiver aberto, não apenas no momento da autenticação. Antes de cada frame, o servidor verifica o que uma requisição HTTP verificaria: o token ainda é válido, sua sessão foi encerrada ou revogada, a conta ainda existe e quais roles ela possui agora. Frames de canal realizam essa checagem no máximo uma vez por segundo. Frames que chegam a um socket enquanto a checagem ainda está em andamento — como um cliente reenviando suas assinaturas após uma reconexão — compartilham essa checagem em vez de cada um consultar novamente; o frame seguinte após sua conclusão consulta do zero. Um socket que apenas escuta é consultado pelo menos a cada 30 segundos, e um token deixa de ser aceito no instante exato em que expira. Uma role removida é aplicada a partir do próximo frame (ou, no caso de um frame que compartilhou uma checagem em andamento, a partir do subsequente), para leituras, gravações e assinaturas abertas da mesma forma. Um socket cuja identidade foi finalizada recebe um frame `AUTH_ERROR` e é fechado com o código `4001`. Com a autenticação integrada, o código do frame diz o motivo, assim como as rotas HTTP informam: `SESSION_REVOKED` (sessão finalizada, revogada ou a conta excluída), `ACCOUNT_DISABLED` ou `TOKEN_EXPIRED`; para outro adaptador de autenticação, o código é `SESSION_ENDED`. Um `AUTHENTICATE` para uma sessão revogada ou conta desativada é recusado com `SESSION_REVOKED` ou `ACCOUNT_DISABLED` (um token que não seja válido ou que tenha expirado é recusado com `INVALID_TOKEN`). O SDK não faz uma nova solicitação com o mesmo token e entrega a recusa, com o código incluído, ao `onError` do recurso que precisava da conta. O SDK autentica seu socket novamente a cada vez que atualiza seu token; um novo token para a mesma identidade (mesmo id de usuário, roles, flag de convidado e claims) mantém as assinaturas abertas como estão, e um para uma identidade diferente refaz o fetch de cada uma delas com a nova identidade. Após um `4001`, ele se reconecta com a sessão que possuir no momento, ou sem nenhuma. Um cliente que utilize o protocolo diretamente precisa enviar um token novo no `AUTHENTICATE` antes que o antigo expire.
 
-Isso significa que cada socket recebe atualizações apenas para registros que sua identidade autenticada tem permissão para ver.
+Isso significa que cada socket recebe atualizações apenas para os registros que sua identidade autenticada tem permissão de visualizar.
 
-Uma [chave de API](/docs/backend/api-keys/) também autentica o socket: envie a chave `rk_…` onde iria o token de acesso. O socket então verifica cada frame contra os [escopos](/docs/backend/roles-and-scopes/) da chave: uma busca (fetch), contagem ou assinatura precisa de `data:read` em sua tabela, um salvamento de `data:write`, uma exclusão de `data:delete`. Um caminho aninhado precisa do escopo simples. Canais (broadcast e presença) são recusados para uma chave, pois nenhum escopo os abrange. O editor SQL e mensagens de branch precisam de `database:read` ou `database:write`, tanto para uma chave quanto para uma pessoa.
+Uma [chave de API](/docs/backend/api-keys/) também autentica o socket: envie a
+chave `rk_…` onde o token de acesso iria. O socket então verifica cada frame
+em relação aos [escopos](/docs/backend/roles-and-scopes/) da chave: uma busca (fetch), uma contagem ou uma
+assinatura precisa de `data:read` em sua tabela, uma gravação (save) precisa de `data:write`, uma exclusão
+`data:delete`. Um caminho aninhado necessita do escopo simples correspondente. Canais (broadcast e
+presença) são recusados para uma chave de API, pois nenhum escopo os cobre. As mensagens do editor SQL e
+de branches exigem `database:read` ou `database:write`, tanto para uma chave quanto para uma pessoa.
 
-A execução de mais de uma instância — o barramento LISTEN/NOTIFY, como a presença funciona entre processos e como escrever seu próprio transporte — tem uma página dedicada: [Tempo real entre instâncias](/docs/backend/realtime-transports/).
+Executar mais de uma instância — o barramento LISTEN/NOTIFY, como a presença funciona
+entre processos e como escrever seu próprio transporte — possui uma página própria:
+[Tempo real entre instâncias](/docs/backend/realtime-transports/).
 
 ## Captura de Alterações no Nível do Banco de Dados (CDC)
 
-Toda gravação confirmada (committed) emite eventos em tempo real, independentemente de como foi feita: REST, SDK, Studio, `psql`, um cron job em outro serviço. Como a captura funciona, a configuração `REALTIME_CDC` e seus requisitos: [Captura de alterações do banco de dados](/docs/backend/realtime-cdc/).
+Toda gravação confirmada emite eventos em tempo real, independentemente de como foi feita: REST,
+SDK, Studio, `psql`, um cron job em outro serviço. Como a captura funciona, a
+configuração `REALTIME_CDC` e o que ela requer: [Captura de alterações no banco de dados](/docs/backend/realtime-cdc/).
 
 ## Timeout de Requisições Pendentes
 
@@ -490,11 +517,14 @@ Para evitar que as requisições do cliente fiquem travadas indefinidamente, tod
 
 Se o servidor não responder dentro dessa janela de 30 segundos, o cliente exclui automaticamente a requisição pendente e rejeita a promise com um `RebaseApiError` cujo código é `REQUEST_TIMEOUT`.
 
-Mensagens unidirecionais que não esperam resposta (como `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, `presence_state` e `channel_history`) são resolvidas imediatamente após a transmissão e não acionam esse timeout. Uma assinatura cujo primeiro frame não tiver chegado 30 segundos após o envio do subscribe falhará com `SUBSCRIPTION_TIMEOUT` em seu `onError`.
+Mensagens unidirecionais que não esperam uma resposta (como `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, `presence_state` e `channel_history`) são resolvidas imediatamente após a transmissão e não acionam esse timeout. Uma assinatura cujo primeiro frame não tiver chegado 30 segundos após o envio do subscribe falha, com `SUBSCRIPTION_TIMEOUT` em seu `onError`.
 
 ### Quando um frame de canal é recusado
 
-Um frame de canal é do tipo fire-and-forget: `await channel.broadcast(...)` resolve quando o frame é gravado no socket, e **não** quando o servidor o aceitou. Isso é intencional — um aplicativo colaborativo transmite uma posição de cursor sessenta vezes por segundo, e esperar por uma confirmação em cada uma tornaria cada envio uma viagem de ida e volta (round trip).
+Um frame de canal é no estilo fire-and-forget: `await channel.broadcast(...)` é resolvido quando
+o frame é gravado no socket, **não** quando o servidor o aceita. Isso é
+intencional — um aplicativo colaborativo transmite a posição do cursor sessenta vezes por
+segundo, e aguardar uma confirmação para cada uma tornaria cada envio um round trip.
 
 Portanto, uma recusa não pode ser uma promise rejeitada. Ela chega no `onError`:
 
@@ -507,19 +537,21 @@ channel.onError((error) => {
 });
 ```
 
-| Código | Significado |
+| Code | Means |
 |------|-------|
-| `CHANNEL_FORBIDDEN` | Você não é membro do canal — entre nele antes de transmitir ou ler seu histórico |
-| `RATE_LIMITED` | Excedeu a cota de frames do canal (7.200 frames de canal por minuto por socket) ou, para uma requisição de histórico, excedeu o [rate limit de dados](#quanto-custa-uma-gravação-e-os-limites) |
-| `CHANNEL_HISTORY_WRITE_FAILED` | Um broadcast retido não pôde ser persistido, portanto foi descartado |
-| `CHANNEL_HISTORY_READ_FAILED` | Uma requisição de recuperação (catch-up) não pôde ser atendida |
-| `CHANNEL_HISTORY_GAP` | Disparado pelo cliente: uma recuperação identificou que o servidor não retém mais as mensagens que este cliente nunca recebeu. `details` é `{ from, to }`, os números de sequência perdidos. Ressincronize o estado do canal a partir da sua fonte da verdade |
-| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | O broadcast alcançou apenas esta instância — consulte [O limite de 8 KB no barramento do Postgres](/docs/backend/realtime-transports/#the-8-kb-limit-on-the-postgres-bus) |
+| `CHANNEL_FORBIDDEN` | Você não é um membro do canal — entre nele antes de transmitir ou ler seu histórico |
+| `RATE_LIMITED` | Ultrapassou a cota de frames de canal (7.200 frames de canal por minuto por socket) ou, para uma requisição de histórico, ultrapassou o [limite de taxa de dados](#quanto-custa-uma-gravação-e-os-limites) |
+| `CHANNEL_HISTORY_WRITE_FAILED` | Um broadcast retido não pôde ser persistido e foi descartado |
+| `CHANNEL_HISTORY_READ_FAILED` | Uma requisição de recuperação não pôde ser atendida |
+| `CHANNEL_HISTORY_GAP` | Gerado pelo cliente: uma recuperação identificou que o servidor não retém mais as mensagens que este cliente nunca recebeu. `details` é `{ from, to }`, os números de sequência perdidos. Ressincronize o estado do canal a partir da sua fonte da verdade |
+| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | O broadcast atingiu apenas esta instância — consulte [O limite de 8 KB no barramento Postgres](/docs/backend/realtime-transports/#the-8-kb-limit-on-the-postgres-bus) |
 
-Sem nenhum manipulador (handler) associado, estes erros são registrados como aviso no log. Anteriormente, eles eram completamente descartados: não havia promise para rejeitar nem canal para entregar, portanto um broadcast proibido era indistinguível de um entregue.
+Sem nenhum manipulador associado, estes erros são registrados como um aviso. Eles costumavam ser
+descartados completamente: não havia promise para rejeitar nem canal para entregar,
+de modo que um broadcast proibido era indistinguível de um entregue.
 
 ## Próximos Passos
 
-- [SDK Tipado](/docs/sdk) — Referência completa do SDK, incluindo acessadores tipados de tabela.
+- [SDK Tipado](/docs/sdk) — Referência completa do SDK, incluindo acessadores de tabelas tipados.
 - [Autenticação](/docs/backend/authentication) — Configure a autenticação JWT e políticas de RLS.
-- [Arquitetura de Backend](/docs/backend) — Visão geral da arquitetura do servidor Rebase.
+- [Arquitetura do Backend](/docs/backend) — Visão geral da arquitetura do servidor Rebase.
