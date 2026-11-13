@@ -5,7 +5,7 @@
 import { defineTable, col, rel } from "@rebasepro/server/schema";
 import { tags } from "./tags";
 import { authors } from "./authors";
-import { slugify } from "../lib/slugify";
+import { slugify } from "../../config/slugify";
 import { squash } from "../lib/collections/_text";
 
 export const posts = defineTable("posts", {

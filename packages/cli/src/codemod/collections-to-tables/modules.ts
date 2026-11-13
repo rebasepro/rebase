@@ -4,11 +4,13 @@
  * import block.
  *
  * A relative import from `config/collections/orders.ts` keeps pointing at the
- * same file from `backend/schema/orders.ts` — unless that file lives in
- * `config/`, which is going away: such a helper is copied next to the code
- * that needs it (`backend/lib/…` for server code, `frontend/src/cms/lib/…` for
- * the panel's), its own imports moved the same way. A helper that imports a
- * collection file cannot move (the collection is a table now) and is refused.
+ * same file from `backend/schema/orders.ts` — a module of `config/` included:
+ * the project's own modules there stay, importable as before. Only a helper
+ * inside `config/collections`, which the migration removes, is copied next to
+ * the code that needs it (`backend/lib/…` for server code,
+ * `frontend/src/cms/lib/…` for the panel's), its own imports moved the same
+ * way. A helper that imports a collection file cannot move (the collection is a
+ * table now) and is refused.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -32,14 +34,15 @@ export class RelocationError extends Error {
 const CODE_EXTENSIONS = [".ts", ".tsx", ".mts", ".js", ".jsx", ".mjs"];
 
 /** How a relative specifier was written, so the moved one is written the same way. */
-type SpecifierStyle = "extensionless" | "directory" | { extension: string };
+export type SpecifierStyle = "extensionless" | "directory" | { extension: string };
 
-interface ResolvedSpecifier {
+export interface ResolvedSpecifier {
     target: string;
     style: SpecifierStyle;
 }
 
-function resolveRelative(fromFile: string, specifier: string): ResolvedSpecifier {
+/** The file a relative specifier written in `fromFile` names, and how it was written. */
+export function resolveRelative(fromFile: string, specifier: string): ResolvedSpecifier {
     const base = path.resolve(path.dirname(fromFile), specifier);
     const extension = path.extname(specifier);
     if (extension === ".js" || extension === ".jsx" || extension === ".mjs") {
@@ -59,7 +62,8 @@ function resolveRelative(fromFile: string, specifier: string): ResolvedSpecifier
     return { target: base, style: extension ? { extension } : "extensionless" };
 }
 
-function writeSpecifier(fromFile: string, target: string, style: SpecifierStyle): string {
+/** A relative specifier from `fromFile` to `target`, written in `style`. */
+export function writeSpecifier(fromFile: string, target: string, style: SpecifierStyle): string {
     let destination = target;
     if (style === "directory") destination = path.dirname(target);
     else if (style === "extensionless") destination = target.replace(/\.(tsx?|mts|jsx?|mjs)$/, "");
@@ -84,6 +88,8 @@ export interface HelperCopy {
  */
 export class Relocator {
     readonly helpers = new Map<string, HelperCopy>();
+    /** Modules of the project's own in config/ that backend code the run writes imports in place. */
+    readonly keptBackendModules = new Set<string>();
     /** Collection files that move rather than become tables (Firestore ones): legacy path → new path. */
     readonly moved = new Map<string, string>();
 
@@ -100,7 +106,13 @@ export class Relocator {
         return this.configDir;
     }
 
-    /** Whether `file` is inside the config directory (and so goes away). */
+    /** Whether `file` is inside `<config>/collections`, which the migration removes. */
+    isInCollections(file: string): boolean {
+        const relative = path.relative(path.join(this.configDir, "collections"), file);
+        return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
+    }
+
+    /** Whether `file` is inside the config directory. */
     isInConfig(file: string): boolean {
         const relative = path.relative(this.configDir, file);
         return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
@@ -120,6 +132,13 @@ export class Relocator {
         if (!this.isInConfig(target)) return writeSpecifier(destFile, target, style);
         if (!fs.existsSync(target)) {
             throw new RelocationError(fromFile, `${toPosix(path.relative(this.projectRoot, fromFile))} imports "${specifier}", which does not exist.`);
+        }
+        // A module of the project's own in config/ stays where it is: 0.31
+        // stops reading config/collections, not config/. Only a helper inside
+        // config/collections — a directory that must go — is copied out.
+        if (!this.isInCollections(target)) {
+            if (side === "backend") this.keptBackendModules.add(target);
+            return writeSpecifier(destFile, target, style);
         }
         const copy = this.copyHelper(target, side);
         return writeSpecifier(destFile, copy.to, style);
@@ -149,6 +168,25 @@ export class Relocator {
         const moved = this.moveSpecifiersInText(text, copy.from, copy.to, copy.side);
         this.contents.set(key, moved);
         return moved;
+    }
+
+    /**
+     * A module of config/ that backend code imports in place, with the
+     * collection-model types it imports replaced by table-model aliases (as a
+     * copy to backend/lib gets them): the hooks it serves are table hooks now.
+     */
+    keptBackendContent(file: string): string {
+        const text = fs.readFileSync(file, "utf8");
+        const sf = this.ctx.project.createSourceFile(`/__rebase_migrate__/kept-${path.basename(file)}`, text, { overwrite: true });
+        try {
+            const edits: { start: number; end: number; text: string }[] = [];
+            this.legacyTypeEdits(sf, text, edits);
+            let out = text;
+            for (const edit of edits.sort((a, b) => b.start - a.start || b.end - a.end)) out = out.slice(0, edit.start) + edit.text + out.slice(edit.end);
+            return out;
+        } finally {
+            this.ctx.project.removeSourceFile(sf);
+        }
     }
 
     /** Collection-model types left in moved backend code (used with type arguments), for the report. */

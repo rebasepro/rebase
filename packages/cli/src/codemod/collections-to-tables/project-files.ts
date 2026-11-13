@@ -12,6 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import type { AstContext } from "./ast";
 import type { PlanContext } from "./plan-context";
 import { note, planFile, relativeToRoot } from "./plan-context";
 import { BACKEND_GUARD_EXPORT, BACKEND_GUARD_SNIPPET } from "../../utils/backend-guard";
@@ -103,7 +104,9 @@ function withoutConfigFilter(script: string, configRelative: string): string {
 }
 
 /** The workspace, the packages and the scripts that named the config package or directory. */
-export function planWorkspace(plan: PlanContext, configDir: string, frontendRoot: string | undefined): void {
+export function planWorkspace(plan: PlanContext, configDir: string, frontendRoot: string | undefined, keepConfigPackage = false): void {
+    // When config/ keeps modules of the project's own, it stays a workspace
+    // package, depended on as before: only the collections flags go.
     const root = plan.root;
     const configRelative = relativeToRoot(plan, configDir);
     const packageName = configPackageName(configDir);
@@ -112,7 +115,7 @@ export function planWorkspace(plan: PlanContext, configDir: string, frontendRoot
     if (rootPackage) {
         const value = { ...rootPackage.value };
         let changed = false;
-        if (Array.isArray(value.workspaces)) {
+        if (Array.isArray(value.workspaces) && !keepConfigPackage) {
             const kept = value.workspaces.filter(entry => entry !== configRelative && entry !== `./${configRelative}`);
             if (kept.length !== value.workspaces.length) {
                 value.workspaces = kept;
@@ -122,7 +125,8 @@ export function planWorkspace(plan: PlanContext, configDir: string, frontendRoot
         if (isObject(value.scripts)) {
             const scripts: JsonObject = {};
             for (const [name, script] of Object.entries(value.scripts)) {
-                const next = typeof script === "string" ? withoutConfigFilter(script.replace(COLLECTIONS_FLAG, ""), configRelative) : script;
+                const flagless = typeof script === "string" ? script.replace(COLLECTIONS_FLAG, "") : script;
+                const next = typeof flagless === "string" && !keepConfigPackage ? withoutConfigFilter(flagless, configRelative) : flagless;
                 if (next !== script) changed = true;
                 scripts[name] = next;
             }
@@ -132,7 +136,7 @@ export function planWorkspace(plan: PlanContext, configDir: string, frontendRoot
     }
 
     const workspaceFile = path.join(root, "pnpm-workspace.yaml");
-    if (fs.existsSync(workspaceFile)) {
+    if (fs.existsSync(workspaceFile) && !keepConfigPackage) {
         const text = fs.readFileSync(workspaceFile, "utf8");
         const escaped = configRelative.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const next = text.replace(new RegExp(`^[ \\t]*-[ \\t]*["']?(?:\\./)?${escaped}["']?[ \\t]*\\r?\\n`, "m"), "");
@@ -148,7 +152,7 @@ export function planWorkspace(plan: PlanContext, configDir: string, frontendRoot
         let changed = false;
         for (const field of ["dependencies", "devDependencies", "peerDependencies"]) {
             const deps = value[field];
-            if (!isObject(deps) || packageName === undefined || !(packageName in deps)) continue;
+            if (!isObject(deps) || packageName === undefined || !(packageName in deps) || keepConfigPackage) continue;
             const { [packageName]: _removed, ...rest } = deps;
             void _removed;
             value[field] = rest;
@@ -159,7 +163,8 @@ export function planWorkspace(plan: PlanContext, configDir: string, frontendRoot
             for (const [name, script] of Object.entries(value.scripts)) {
                 let next = script;
                 if (typeof script === "string") {
-                    next = script.replace(COLLECTIONS_FLAG, "").replace(/\s+--watch=\.\.\/config\/\S*/g, "");
+                    const flagless = script.replace(COLLECTIONS_FLAG, "");
+                    next = keepConfigPackage ? flagless : flagless.replace(/\s+--watch=\.\.\/config\/\S*/g, "");
                 }
                 if (next !== script) changed = true;
                 scripts[name] = next;
@@ -218,7 +223,7 @@ function withoutConfigParagraphs(block: readonly string[]): string[] {
  * `dist/src`, so the scripts, `entrypoint.sh` and Dockerfile that name the old
  * path follow. A tsconfig not in that shape is a manual step.
  */
-export function planBackendTsconfig(plan: PlanContext, wanted: readonly string[]): void {
+export function planBackendTsconfig(plan: PlanContext, wanted: readonly string[], keepConfig = false): void {
     const backendDir = path.join(plan.root, "backend");
     const file = path.join(backendDir, "tsconfig.json");
     if (!fs.existsSync(file)) return;
@@ -227,6 +232,16 @@ export function planBackendTsconfig(plan: PlanContext, wanted: readonly string[]
     const entries = match ? [...match[1].matchAll(/"((?:[^"\\]|\\.)*)"/g)].map(found => found[1]) : [];
     const namesConfig = entries.some(entry => entry.startsWith("../config"));
     const rootUp = /"rootDir"\s*:\s*"\.\."/.test(original);
+    if (keepConfig) {
+        // The backend still compiles the project's own modules of config/: only add what the migration writes.
+        if (!match) return;
+        const covers = (pattern: string): boolean => entries.includes(pattern) || entries.includes("**/*") || entries.includes("**/*.ts");
+        const missing = wanted.filter(entry => !covers(entry));
+        if (missing.length === 0) return;
+        const next = [...entries, ...missing];
+        planFile(plan, file, `${original.slice(0, match.index)}"include": [${next.map(entry => JSON.stringify(entry)).join(", ")}]${original.slice(match.index + match[0].length)}`, "backend/tsconfig.json");
+        return;
+    }
     if (!namesConfig && !rootUp) return;
     if (!match) {
         plan.manualSteps.push({
@@ -560,4 +575,72 @@ function scanSources(root: string, configDir: string, skip: ReadonlySet<string>)
     };
     walk(root);
     return { importers: out, apis };
+}
+
+/**
+ * The modules of `config/` that are the project's own: everything but what
+ * Rebase read — `config/collections`, the wiring the run moves to `backend/`
+ * (`resources.ts`, `storage.ts`, `generated/register.ts`), the package's index,
+ * declarations and package files. 0.31 stops reading `config/collections`, not
+ * `config/`: these stay where they are, importable as before.
+ *
+ * @param moved the wiring files the run moves, absolute
+ */
+export function keptConfigModules(plan: PlanContext, configDir: string, collectionsDir: string, moved: readonly string[]): string[] {
+    const out: string[] = [];
+    const skip = new Set(["node_modules", "dist", "generated"]);
+    const walk = (dir: string): void => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (entry.name.startsWith(".") || skip.has(entry.name)) continue;
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                if (full !== collectionsDir) walk(full);
+                continue;
+            }
+            if (moved.includes(full) || full === path.join(configDir, "index.ts") || full === path.join(configDir, "index.js")) continue;
+            if (/\.d\.ts$/.test(entry.name) || entry.name === "package.json" || /^tsconfig.*\.json$/.test(entry.name)) continue;
+            if (!/\.(ts|tsx|mts|js|mjs|json)$/.test(entry.name)) continue;
+            out.push(relativeToRoot(plan, full));
+        }
+    };
+    if (fs.existsSync(configDir)) walk(configDir);
+    return out.sort();
+}
+
+/** Where a relative specifier written in `fromFile` points, without its extension. */
+function specifierStem(fromFile: string, specifier: string): string {
+    return path.resolve(path.dirname(fromFile), specifier).replace(/\.(tsx?|mts|jsx?|mjs)$/, "").replace(/[\\/]index$/, "");
+}
+
+/**
+ * `config/index.ts` without its re-exports of what Rebase read
+ * (`export { collections } from "./collections"`, `export { storageAuthorize }
+ * from "./storage"`), so the package keeps exporting the project's own modules.
+ * Undefined when nothing but comments would be left: the index goes too.
+ */
+export function withoutRebaseReexports(ctx: AstContext, indexFile: string, collectionsDir: string, moved: readonly string[]): string | undefined {
+    const text = fs.readFileSync(indexFile, "utf8");
+    const sf = ctx.project.createSourceFile(`/__rebase_migrate__/config-index-${path.basename(indexFile)}`, text, { overwrite: true });
+    try {
+        const movedStems = moved.map(file => file.replace(/\.(tsx?|mts|jsx?|mjs)$/, ""));
+        const isRebases = (specifier: string | undefined): boolean => {
+            if (specifier === undefined || !specifier.startsWith(".")) return false;
+            const stem = specifierStem(indexFile, specifier);
+            const relative = path.relative(collectionsDir, stem);
+            return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative)) || movedStems.includes(stem);
+        };
+        const drop = [...sf.getExportDeclarations(), ...sf.getImportDeclarations()].filter(declaration => isRebases(declaration.getModuleSpecifierValue()));
+        if (drop.length === 0) return text;
+        let out = text;
+        for (const declaration of [...drop].sort((a, b) => b.getStart() - a.getStart())) {
+            const end = out[declaration.getEnd()] === "\n" ? declaration.getEnd() + 1 : declaration.getEnd();
+            out = out.slice(0, declaration.getFullStart() === 0 ? 0 : declaration.getStart()) + out.slice(end);
+        }
+        const remaining = ctx.project.createSourceFile(`/__rebase_migrate__/config-index-rest-${path.basename(indexFile)}`, out, { overwrite: true });
+        const empty = remaining.getStatements().length === 0;
+        ctx.project.removeSourceFile(remaining);
+        return empty ? undefined : out;
+    } finally {
+        ctx.project.removeSourceFile(sf);
+    }
 }

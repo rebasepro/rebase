@@ -367,8 +367,10 @@ function ruleSourceOf(ctx: AstContext, object: ObjectLiteralExpression): keyof t
 export interface RewriteSdkOptions {
     /** Files to read instead of the ones on disk (what the migration is about to write). */
     overrides?: ReadonlyMap<string, string>;
-    /** Directories not to read (the legacy `config/`, which is deleted after the migration). */
+    /** Directories not to read (the legacy `config/collections`, which is deleted after the migration). */
     skipDirs?: readonly string[];
+    /** Files not to read (what the migration moves out of `config/` and removes). */
+    skipFiles?: readonly string[];
     /** Module specifiers → files, for the type checker (the workspace's sources in-repo). */
     aliases?: Record<string, string>;
     /** The `backend/schema` directory a `collectionsDir` boot option becomes. */
@@ -390,7 +392,8 @@ export async function rewriteSdkCalls(root: string, options: RewriteSdkOptions =
     /** Source file → the packages its moved imports now name. */
     const needed = new Map<string, Set<string>>();
     const out = new Map<string, string>();
-    const files = new Set(sdkSourceFiles(root, options.skipDirs));
+    const skipped = new Set((options.skipFiles ?? []).map(file => path.resolve(file)));
+    const files = new Set(sdkSourceFiles(root, options.skipDirs).filter(file => !skipped.has(file)));
     for (const file of options.overrides?.keys() ?? []) if (SOURCE.test(file)) files.add(file);
     for (const file of [...files].sort()) {
         const text = options.overrides?.get(file) ?? fs.readFileSync(file, "utf8");

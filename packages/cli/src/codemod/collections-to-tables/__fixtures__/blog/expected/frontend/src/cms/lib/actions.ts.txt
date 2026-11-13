@@ -1,4 +1,0 @@
-/** Tell the editor something happened. */
-export function notify(message: string): void {
-    console.info(message);
-}

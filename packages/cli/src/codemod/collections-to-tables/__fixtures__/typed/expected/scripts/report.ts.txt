@@ -1,0 +1,11 @@
+/**
+ * A script outside config/. Its live import of a collection must be repointed;
+ * the commented-out ones (as the scaffold's example script ships them) are not
+ * imports, and say nothing about the migration.
+ */
+// import type { Database } from "../config/database.types"; // Optional: for fully typed tables
+/* import events from "../config/collections/events"; */
+import { tickets } from "../backend/schema/tickets";
+// The README says to write `collectionsDir: "../config/collections"` — a comment, not an option.
+
+console.log(tickets.slug);

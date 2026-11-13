@@ -8,16 +8,14 @@
     }
   ],
   "files": [
-    "update backend/package.json",
     "create backend/schema/index.ts",
     "update backend/tsconfig.json",
-    "update frontend/package.json",
+    "update config/shared.ts",
     "update frontend/src/App.tsx",
     "create frontend/src/cms/ui-config.json",
     "update frontend/src/virtual.d.ts",
     "update frontend/vite.config.ts",
     "update package.json",
-    "update pnpm-workspace.yaml",
     "update rebase.json"
   ],
   "refusals": [
@@ -28,11 +26,18 @@
       "reason": "`callbacks` holds functions, and their source could not be found: the collection: `callbacks` may come from `...auditing` (line 7), which the codemod does not read through. Write the callbacks inline in the collection literal (or as a `const` in the same file) and run the codemod again."
     }
   ],
-  "notes": [],
+  "notes": [
+    {
+      "file": "config",
+      "message": "keeps 1 module(s) of the project's own (config/shared.ts): 0.31 stops reading config/collections, not config/. They stay where they are, importable as before; only what Rebase read is removed."
+    }
+  ],
   "manualSteps": [
     {
-      "title": "Files of config/ nothing moved",
-      "detail": "Nothing the codemod carried imports these, so they were not moved: config/shared.ts. Move what is still used before deleting config/."
+      "title": "Add @rebasepro/cms-types to config/package.json",
+      "detail": "Imports under config now name @rebasepro/cms-types, which config/package.json does not depend on, and it lists no other @rebasepro package to copy the version from. Add it at the version of your other @rebasepro packages, then install.",
+      "snippet": "\"@rebasepro/cms-types\": \"<the version of your other @rebasepro packages>\"",
+      "file": "config/package.json"
     }
   ]
 }

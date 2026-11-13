@@ -45,9 +45,12 @@ import {
     findConfigImporters,
     findLegacyApiUses,
     readRawManifest,
-    unmovedConfigFiles
+    unmovedConfigFiles,
+    keptConfigModules,
+    withoutRebaseReexports
 } from "./project-files";
 import type { CollectionOutcome, MigrateOptions, MigrationReport, PlannedFile } from "./types";
+import { repointConfigImports, tableUseSteps, type TableHome } from "./repoint";
 import { verifyMigration } from "./verify";
 
 /** The directory every table module is written to. */
@@ -113,7 +116,7 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
     for (const helper of legacy.helperFiles) {
         report.notes.push({
             file: toPosix(path.relative(root, helper)),
-            message: "exports no collection: read as a module the collections import, not as a table. It moves with the code that imports it, or is listed under \"Files of config/ nothing moved\"."
+            message: "exports no collection: read as a module the collections import, not as a table. It is copied next to the code that imports it, since config/collections goes; when nothing imports it, a step lists it."
         });
     }
 
@@ -185,6 +188,8 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
         outcomes.set(entry.collection.slug, { slug: entry.collection.slug, file: relativeToRoot(plan, entry.file), kind: "refused" });
     }
     let customizationModules: { identifier: string; file: string; slug: string }[] = [];
+    /** Collection files → the table each became, for repointing the project's imports of them. */
+    const tableHomes = new Map<string, TableHome>();
     if (lift) {
         for (const item of lift.notCarried) {
             if (item.kind !== "meaning") continue;
@@ -217,6 +222,12 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
             }
         }
         placeCollectionComments(plan, postgres, lift, names, customizationModules);
+        for (const entry of postgres) {
+            const name = names.get(entry.collection.slug);
+            if (!name) continue;
+            const cms = customizationModules.find(module => module.slug === entry.collection.slug);
+            tableHomes.set(entry.file, { identifier: name.identifier, file: name.file, ...(cms ? { cms: { identifier: cms.identifier, file: cms.file } } : {}) });
+        }
         if (!cmsDir && lift.notCarried.some(item => item.kind === "ui" || item.kind === "browser")) {
             plan.manualSteps.push({
                 title: "Presentation not carried",
@@ -269,11 +280,14 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
     for (const name of ["index.ts", "index.js"]) handled.add(path.join(legacy.collectionsDir, name));
     handled.add(path.join(configDir, "index.ts"));
     const backendWanted = ["schema/**/*"];
+    /** Rebase's own modules of config/ the run moves to backend/ (removed afterwards). */
+    const movedWiring: string[] = [];
     for (const [file, target] of [["resources.ts", "resources.ts"], ["storage.ts", "storage.ts"]] as const) {
         const from = path.join(configDir, file);
         try {
             if (planMove(plan, from, path.join(root, "backend", target), `backend/${target}`)) {
                 handled.add(from);
+                movedWiring.push(from);
                 backendWanted.push(target);
             }
         } catch (error) {
@@ -284,6 +298,7 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
     try {
         if (planMove(plan, register, path.join(root, "backend", "generated", "register.ts"), "backend/generated/register.ts")) {
             handled.add(register);
+            movedWiring.push(register);
             backendWanted.push("generated/**/*");
         }
     } catch (error) {
@@ -322,43 +337,61 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
         }
     }
 
+    // The project's own modules backend code imports in place: their collection-model types become table-model aliases.
+    for (const module of relocator.keptBackendModules) {
+        const content = relocator.keptBackendContent(module);
+        if (content !== fs.readFileSync(module, "utf8")) planFile(plan, module, content, `${relativeToRoot(plan, module)} (collection-model types → table-model aliases)`);
+    }
+
     for (const { file, name } of relocator.legacyTypesLeft) {
         plan.manualSteps.push({
             title: `Replace the collection-model type ${name} in ${file}`,
-            detail: `A helper copied to backend/lib uses \`${name}\` with type arguments; a table-model alias cannot stand for it. Use the table-model type from \`@rebasepro/server/schema\` (\`TableHooks\`, \`TableBeforeSaveProps\`, \`TableHookProps["context"]\`, …).`
+            detail: `A module the backend uses (copied to backend/lib, or kept in config/) \`${name}\` with type arguments; a table-model alias cannot stand for it. Use the table-model type from \`@rebasepro/server/schema\` (\`TableHooks\`, \`TableBeforeSaveProps\`, \`TableHookProps["context"]\`, …).`
         });
+    }
+
+    // config/ minus what Rebase read: the project's own modules, which stay where they are.
+    const configLeft = keptConfigModules(plan, configDir, legacy.collectionsDir, movedWiring);
+    const configStays = configLeft.length > 0;
+    const removed = [legacy.collectionsDir, ...movedWiring];
+    const indexFile = path.join(configDir, "index.ts");
+    if (configStays) {
+        if (fs.existsSync(indexFile)) {
+            const rewritten = withoutRebaseReexports(ast, indexFile, legacy.collectionsDir, movedWiring);
+            if (rewritten === undefined) removed.push(indexFile);
+            else if (rewritten !== fs.readFileSync(indexFile, "utf8")) planFile(plan, indexFile, rewritten, "config/index.ts (re-exports of what moved)");
+        }
+        report.notes.push({
+            file: relativeToRoot(plan, configDir),
+            message: `keeps ${configLeft.length} module(s) of the project's own (${configLeft.join(", ")}): 0.31 stops reading ${relativeToRoot(plan, legacy.collectionsDir)}, not ${relativeToRoot(plan, configDir)}/. They stay where they are, importable as before; only what Rebase read is removed.`
+        });
+    }
+
+    // The project's own imports of what config/ loses: repointed where that is mechanical (see repoint.ts).
+    const wiringHomes = new Map<string, string>();
+    for (const from of movedWiring) {
+        const to = from === path.join(configDir, "generated", "register.ts") ? path.join(root, "backend", "generated", "register.ts") : path.join(root, "backend", path.basename(from));
+        wiringHomes.set(from, to);
+    }
+    for (const [from, to] of relocator.moved) wiringHomes.set(from, to);
+    const tableBindings = repointConfigImports(plan, {
+        configDir,
+        collectionsDir: legacy.collectionsDir,
+        tables: tableHomes,
+        movedWiring: wiringHomes,
+        indexRemoved: !configStays || removed.includes(indexFile)
+    }, findConfigImporters(root, configDir, new Set(plan.files.keys())));
+    // Helpers beside the collections the project's own code imports, copied out by the repointing.
+    for (const copy of relocator.helpers.values()) {
+        if (plan.files.has(copy.to)) continue;
+        handled.add(copy.from);
+        planFile(plan, copy.to, relocator.helperContent(copy), `helper ${relativeToRoot(plan, copy.from)} (${copy.side})`);
+        if (copy.side === "backend") backendWanted.push("lib/**/*");
     }
 
     planManifest(plan, manifest);
-    planWorkspace(plan, configDir, manifest.frontendRoot);
-    planBackendTsconfig(plan, [...new Set(backendWanted)]);
-
-    // Modules outside config/ that import from it: they point at nothing after the move.
-    const newHomes = new Map<string, string>();
-    for (const outcome of outcomes.values()) {
-        const home = outcome.backendFile ?? outcome.frontendFile;
-        if (home) newHomes.set(stripExtension(path.join(root, outcome.file)), home);
-    }
-    newHomes.set(stripExtension(path.join(legacy.collectionsDir, "index.ts")), toPosix(SCHEMA_DIR));
-    newHomes.set(stripExtension(legacy.collectionsDir), toPosix(SCHEMA_DIR));
-    newHomes.set(stripExtension(path.join(configDir, "resources.ts")), "backend/resources.ts");
-    newHomes.set(stripExtension(path.join(configDir, "storage.ts")), "backend/storage.ts");
-    for (const copy of relocator.helpers.values()) newHomes.set(stripExtension(copy.from), relativeToRoot(plan, copy.to));
-    const importers = findConfigImporters(root, configDir, new Set(plan.files.keys()));
-    const byFile = new Map<string, string[]>();
-    for (const importer of importers) {
-        const home = newHomes.get(stripExtension(importer.target));
-        const lines = byFile.get(importer.file) ?? [];
-        lines.push(`line ${importer.line}: "${importer.specifier}"${home ? ` → ${home}` : " → (not moved: see below)"}`);
-        byFile.set(importer.file, lines);
-    }
-    for (const [file, lines] of byFile) {
-        plan.manualSteps.push({
-            title: `Repoint the imports of ${relativeToRoot(plan, file)}`,
-            detail: `It imports from ${relativeToRoot(plan, configDir)}/, which the migration replaces: ${lines.join("; ")}. A collection is a table now (\`defineTable\` / \`defineAuthTable\`), and a backend entry passes \`tables\` / \`schemaDir\` instead of \`collections\` / \`collectionsDir\`.`,
-            file: relativeToRoot(plan, file)
-        });
-    }
+    planWorkspace(plan, configDir, manifest.frontendRoot, configStays);
+    planBackendTsconfig(plan, [...new Set(backendWanted)], configStays);
 
     // Server APIs of the collection model in the project's own code.
     const apiUses = new Map<string, { api: string; replacement: string; lines: number[] }>();
@@ -382,7 +415,9 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
         const overrides = new Map([...plan.files].map(([file, { content }]) => [file, content]));
         const sdk = await rewriteSdkCalls(root, {
             overrides,
-            skipDirs: [configDir],
+            // config/collections goes; the project's own modules of config/ are its code like any other.
+            skipDirs: [legacy.collectionsDir],
+            skipFiles: [...movedWiring, ...(removed.includes(indexFile) ? [indexFile] : [])],
             ...(options.moduleAliases ? { aliases: options.moduleAliases } : {}),
             schemaDir,
             collectionsDir: legacy.collectionsDir
@@ -394,12 +429,13 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
         report.sdk = sdk.report;
         plan.manualSteps.push(...sdk.report.manualSteps);
     }
+    tableUseSteps(plan, tableBindings, file => plan.files.get(file)?.content ?? fs.readFileSync(file, "utf8"));
 
-    const unmoved = unmovedConfigFiles(plan, configDir, handled);
+    const unmoved = unmovedConfigFiles(plan, configDir, handled).filter(file => relocator.isInCollections(path.join(root, file)));
     if (unmoved.length > 0) {
         plan.manualSteps.push({
-            title: "Files of config/ nothing moved",
-            detail: `Nothing the codemod carried imports these, so they were not moved: ${unmoved.join(", ")}. Move what is still used before deleting config/.`
+            title: `Files of ${relativeToRoot(plan, legacy.collectionsDir)} nothing moved`,
+            detail: `Nothing imports these, so they were not moved, and they go with ${relativeToRoot(plan, legacy.collectionsDir)}: ${unmoved.join(", ")}. Move what is still used out of that directory before removing it.`
         });
     }
 
@@ -446,7 +482,7 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
             report.status = "rule-changes";
             return report;
         }
-        if (report.verification.identical) report.removeCommand = removeCommand(plan, configDir);
+        if (report.verification.identical) report.removeCommand = removeCommand(plan, configStays ? removed : [configDir]);
         return report;
     }
     if (options.dryRun) {
@@ -466,7 +502,7 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
         return report;
     }
     report.status = pending.length === 0 ? "already-migrated" : "migrated";
-    report.removeCommand = removeCommand(plan, configDir);
+    report.removeCommand = removeCommand(plan, configStays ? removed : [configDir]);
     return report;
 }
 
@@ -506,10 +542,7 @@ function rank(order: readonly LegacyCollectionConfig[], collection: LegacyCollec
     return index < 0 ? order.length : index;
 }
 
-function stripExtension(file: string): string {
-    return file.replace(/\.(tsx?|mts|jsx?|mjs)$/, "").replace(/[\\/]index$/, "");
-}
 
-function removeCommand(plan: PlanContext, configDir: string): string {
-    return `git rm -r ${relativeToRoot(plan, configDir)}`;
+function removeCommand(plan: PlanContext, paths: readonly string[]): string {
+    return `git rm -r ${paths.filter(file => fs.existsSync(file)).map(file => relativeToRoot(plan, file)).join(" ")}`;
 }

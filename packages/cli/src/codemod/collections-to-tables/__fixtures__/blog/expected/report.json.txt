@@ -30,10 +30,7 @@
     }
   ],
   "files": [
-    "update backend/entrypoint.sh",
     "create backend/lib/collections/_text.ts",
-    "create backend/lib/slugify.ts",
-    "update backend/package.json",
     "create backend/resources.ts",
     "create backend/schema/authors.ts",
     "create backend/schema/index.ts",
@@ -42,26 +39,26 @@
     "create backend/schema/users.ts",
     "create backend/storage.ts",
     "update backend/tsconfig.json",
-    "update frontend/package.json",
     "update frontend/src/App.tsx",
     "create frontend/src/cms/authors.tsx",
     "create frontend/src/cms/index.ts",
-    "create frontend/src/cms/lib/actions.ts",
-    "create frontend/src/cms/lib/form-rules.ts",
     "create frontend/src/cms/posts.tsx",
     "create frontend/src/cms/ui-config.json",
     "create frontend/src/cms/users.tsx",
     "update frontend/src/virtual.d.ts",
     "update frontend/vite.config.ts",
     "update package.json",
-    "update pnpm-workspace.yaml",
     "update rebase.json"
   ],
   "refusals": [],
   "notes": [
     {
       "file": "config/collections/_text.ts",
-      "message": "exports no collection: read as a module the collections import, not as a table. It moves with the code that imports it, or is listed under \"Files of config/ nothing moved\"."
+      "message": "exports no collection: read as a module the collections import, not as a table. It is copied next to the code that imports it, since config/collections goes; when nothing imports it, a step lists it."
+    },
+    {
+      "file": "config",
+      "message": "keeps 3 module(s) of the project's own (config/actions.ts, config/form-rules.ts, config/slugify.ts): 0.31 stops reading config/collections, not config/. They stay where they are, importable as before; only what Rebase read is removed."
     }
   ],
   "manualSteps": [
@@ -75,5 +72,5 @@
     "identical": true,
     "differences": []
   },
-  "removeCommand": "git rm -r config"
+  "removeCommand": "git rm -r config/collections config/resources.ts config/storage.ts"
 }

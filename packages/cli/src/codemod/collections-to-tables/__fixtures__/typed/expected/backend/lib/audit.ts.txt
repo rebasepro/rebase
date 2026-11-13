@@ -1,4 +1,0 @@
-export async function audit(slug: string, id: string | number): Promise<void> {
-    void slug;
-    void id;
-}

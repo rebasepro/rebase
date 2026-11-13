@@ -23,27 +23,27 @@
     }
   ],
   "files": [
-    "create backend/lib/audit.ts",
     "create backend/lib/locales.ts",
-    "create backend/lib/notify.ts",
-    "update backend/package.json",
     "create backend/schema/events.ts",
     "create backend/schema/index.ts",
     "create backend/schema/open_tickets.ts",
     "create backend/schema/tickets.ts",
     "update backend/tsconfig.json",
-    "update frontend/package.json",
+    "update config/fragments.ts",
+    "update config/locales.ts",
+    "update config/notify.ts",
     "update frontend/src/App.tsx",
     "create frontend/src/cms/index.ts",
     "create frontend/src/cms/lib/locales.ts",
     "create frontend/src/cms/open_tickets.tsx",
     "create frontend/src/cms/tickets.tsx",
     "create frontend/src/cms/ui-config.json",
+    "update frontend/src/lib/ticket-shape.ts",
     "update frontend/src/virtual.d.ts",
     "update frontend/vite.config.ts",
     "update package.json",
-    "update pnpm-workspace.yaml",
-    "update rebase.json"
+    "update rebase.json",
+    "update scripts/report.ts"
   ],
   "refusals": [],
   "notes": [
@@ -57,6 +57,10 @@
       "file": "config/collections/tickets.ts",
       "collection": "support-tickets",
       "message": "tickets: carried code has TODO(rebase-migrate) lines to check."
+    },
+    {
+      "file": "config",
+      "message": "keeps 4 module(s) of the project's own (config/audit.ts, config/fragments.ts, config/locales.ts, config/notify.ts): 0.31 stops reading config/collections, not config/. They stay where they are, importable as before; only what Rebase read is removed."
     }
   ],
   "manualSteps": [
@@ -71,18 +75,25 @@
       "file": "config/collections/tickets.ts"
     },
     {
-      "title": "Repoint the imports of scripts/report.ts",
-      "detail": "It imports from config/, which the migration replaces: line 8: \"../config/collections/tickets\" → backend/schema/tickets.ts. A collection is a table now (`defineTable` / `defineAuthTable`), and a backend entry passes `tables` / `schemaDir` instead of `collections` / `collectionsDir`.",
-      "file": "scripts/report.ts"
+      "title": "Repoint the imports of frontend/src/lib/ticket-status.ts",
+      "detail": "What it imports from config/collections is gone, and the codemod could not rewrite these: line 1: \"../../../config/collections/tickets\" — `ticketsCollection` is read as a value in the frontend; a collection object is gone and the frontend may import backend/ as types only: use the customization `ticketsCms` (frontend/src/cms/tickets.tsx) for what the panel shows, or the table descriptor the server serves (`GET /api/schema/tables`) for its columns and enum values.",
+      "file": "frontend/src/lib/ticket-status.ts"
     },
     {
-      "title": "Files of config/ nothing moved",
-      "detail": "Nothing the codemod carried imports these, so they were not moved: config/fragments.ts. Move what is still used before deleting config/."
+      "title": "Add @rebasepro/cms-types to config/package.json",
+      "detail": "Imports under config now name @rebasepro/cms-types, which config/package.json does not depend on, and it lists no other @rebasepro package to copy the version from. Add it at the version of your other @rebasepro packages, then install.",
+      "snippet": "\"@rebasepro/cms-types\": \"<the version of your other @rebasepro packages>\"",
+      "file": "config/package.json"
+    },
+    {
+      "title": "Check the uses of the tables scripts/report.ts imports",
+      "detail": "Its imports of collection files now import the table definitions from backend/schema: `tickets` (now the table `tickets`) on line 11. A table definition is not a collection — `columns`, `hooks`, `rls` where a collection had `properties`, `callbacks`, `securityRules` — so check each use.",
+      "file": "scripts/report.ts"
     }
   ],
   "verification": {
     "identical": true,
     "differences": []
   },
-  "removeCommand": "git rm -r config"
+  "removeCommand": "git rm -r config/collections"
 }

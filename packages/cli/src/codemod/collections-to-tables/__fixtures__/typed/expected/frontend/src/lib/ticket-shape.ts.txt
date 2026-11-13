@@ -1,0 +1,4 @@
+import type { tickets as ticketsCollection } from "../../../backend/schema/tickets";
+
+/** The collection used as a type only: it becomes a type import of the table. */
+export type TicketsCollection = typeof ticketsCollection;

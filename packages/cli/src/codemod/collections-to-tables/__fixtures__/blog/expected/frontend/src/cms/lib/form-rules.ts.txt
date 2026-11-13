@@ -1,8 +1,0 @@
-/** Form rules several collections share, spread into their properties. */
-
-const READ_ONLY = { readOnly: true };
-
-/** Editable while the record is new, read-only once it exists. */
-export const fixedOnceCreated = {
-    dynamicProps: ({ id }: { id?: string | number }) => (id === undefined ? {} : READ_ONLY)
-};

@@ -283,7 +283,7 @@ export async function runSdkCalls(flags: { dryRun?: boolean; json?: boolean; for
             return undefined;
         }
     }
-    const legacyConfig = path.join(root, "config");
+    const legacyConfig = path.join(root, "config", "collections");
     const { files, report } = await rewriteSdkCalls(root, { skipDirs: [legacyConfig], ...(aliases ? { aliases } : {}) });
     if (!flags.dryRun) for (const [file, content] of files) fs.writeFileSync(file, content);
     if (flags.json) {

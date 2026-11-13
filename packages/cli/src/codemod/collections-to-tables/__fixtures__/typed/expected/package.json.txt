@@ -4,10 +4,11 @@
     "type": "module",
     "workspaces": [
         "frontend",
-        "backend"
+        "backend",
+        "config"
     ],
     "scripts": {
         "db:push": "rebase db push",
-        "build": "pnpm --filter \"./frontend\" -r run build"
+        "build": "pnpm --filter \"./frontend\" --filter \"./config\" -r run build"
     }
 }

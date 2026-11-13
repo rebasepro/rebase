@@ -1,6 +1,6 @@
 import { defineTable, col } from "@rebasepro/server/schema";
-import { audit } from "../lib/audit.js";
-import { notifyOwner } from "../lib/notify.js";
+import { audit } from "../../config/audit.js";
+import { notifyOwner } from "../../config/notify.js";
 import { LOCALES } from "../lib/locales";
 
 export const tickets = defineTable("tickets", {

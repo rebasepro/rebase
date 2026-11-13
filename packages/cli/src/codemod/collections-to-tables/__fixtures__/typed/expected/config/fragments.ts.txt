@@ -1,0 +1,9 @@
+import type { Properties } from "@rebasepro/cms-types";
+
+/** Stamps shared by every table. */
+export const timestamps: Properties = {
+    created_at: { name: "Created at", type: "date", autoValue: "on_create" },
+    updated_at: { name: "Updated at", type: "date", autoValue: "on_update" }
+};
+
+export const PRIORITIES = ["low", "normal", "high"] as const;

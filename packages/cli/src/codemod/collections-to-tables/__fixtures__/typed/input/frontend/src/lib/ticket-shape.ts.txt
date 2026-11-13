@@ -1,0 +1,4 @@
+import ticketsCollection from "../../../config/collections/tickets";
+
+/** The collection used as a type only: it becomes a type import of the table. */
+export type TicketsCollection = typeof ticketsCollection;

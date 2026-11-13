@@ -1,0 +1,4 @@
+import ticketsCollection from "../../../config/collections/tickets";
+
+/** The collection read as a value in the panel: a manual step, the frontend may not import the backend's tables by value. */
+export const statusProperty = ticketsCollection.properties.status;

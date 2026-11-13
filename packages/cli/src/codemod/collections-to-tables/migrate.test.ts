@@ -138,7 +138,8 @@ describe("fixture projects", () => {
         expectMatchesFixture(fixture, dir, report);
         // config/ is never deleted: deleting the user's files is their step.
         expect(fs.existsSync(path.join(dir, "config", "collections"))).toBe(true);
-        expect(report.removeCommand).toBe("git rm -r config");
+        // Only what Rebase read is removed; the project's own modules of config/ stay.
+        expect(report.removeCommand).toMatch(/^git rm -r config(\/collections)?( |$)/);
     }, 120_000);
 
     it.each(["refuse-spread-callbacks", "refuse-cuid"])("refuses %s, names the file, and writes nothing", async fixture => {
@@ -172,7 +173,8 @@ describe("what the blog fixture says about routing", () => {
         // `afterRead({ row })` gets the row as `values` now; the body keeps its name.
         const table = report.files.find(file => file.path === "backend/schema/posts.ts");
         expect(table?.content).toContain("({ values: row }) => {");
-        expect(table?.content).toContain(`import { slugify } from "../lib/slugify";`);
+        // A module of the project's own in config/ stays where it is, imported in place.
+        expect(table?.content).toContain(`import { slugify } from "../../config/slugify";`);
         // Comments move with what they describe.
         expect(table?.content).toContain("        // Unique, so a URL names one post.\n        slug: col.text()");
         expect(table?.content).toContain("        // Tags are shared between posts.\n        tags: rel.manyToMany");
@@ -182,9 +184,26 @@ describe("what the blog fixture says about routing", () => {
         const users = report.files.find(file => file.path === "backend/schema/users.ts");
         expect(users?.content).toContain("        // Only admins list users.\n        { operation: \"select\"");
         expect(report.files.find(file => file.path === "backend/schema/index.ts")?.content).toContain("/** Anyone reads, admins write. */\nexport const defaultRls");
-        // With config/ gone the backend compiles from its own directory, and runs from dist/src.
+        // config/ keeps the project's own modules: still a workspace package, still compiled by the backend.
+        expect(report.files.some(file => file.path === "pnpm-workspace.yaml")).toBe(false);
+        expect(report.files.find(file => file.path === "backend/tsconfig.json")?.content).toContain(`"../config/**/*"`);
+        expect(report.notes.map(entry => entry.message).join("\n")).toContain("keeps 3 module(s) of the project's own (config/actions.ts, config/form-rules.ts, config/slugify.ts)");
+    }, 120_000);
+
+    it("with nothing of its own left in config/, drops the config package and compiles the backend from its own directory", async () => {
+        const dir = materialize("blog");
+        // The blog's helpers moved beside the collections: config/ holds nothing but what Rebase read.
+        const collections = path.join(dir, "config", "collections");
+        for (const helper of ["slugify.ts", "actions.ts", "form-rules.ts"]) fs.renameSync(path.join(dir, "config", helper), path.join(collections, `_${helper}`));
+        const posts = path.join(collections, "posts.ts");
+        fs.writeFileSync(posts, fs.readFileSync(posts, "utf8").replace(`"../slugify"`, `"./_slugify"`).replace(`"../actions"`, `"./_actions"`).replace(`"../form-rules"`, `"./_form-rules"`));
+        const report = await run(dir, { dryRun: true });
+        expect(report.refusals).toEqual([]);
+        expect(report.files.find(file => file.path === "backend/schema/posts.ts")?.content).toContain(`import { slugify } from "../lib/collections/_slugify";`);
         expect(report.files.find(file => file.path === "backend/tsconfig.json")?.content).toContain(`"rootDir": "."`);
         expect(report.files.find(file => file.path === "backend/entrypoint.sh")?.content).toContain("exec node dist/src/index.js");
+        expect(report.files.some(file => file.path === "pnpm-workspace.yaml")).toBe(true);
+        expect(report.notes.some(entry => entry.message.includes("module(s) of the project's own"))).toBe(false);
     }, 120_000);
 });
 

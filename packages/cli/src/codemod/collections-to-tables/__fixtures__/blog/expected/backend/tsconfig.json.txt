@@ -1,10 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    // Everything this program compiles lives under backend/, so the emit
-    // mirrors it: `dist/schema/…`, `dist/functions/…`, `dist/src/…`. Saying so
-    // is required from TypeScript 6, which refuses to infer it (TS5011).
-    "rootDir": "."
+    "rootDir": ".."
   },
-  "include": ["src/**/*", "functions/**/*", "schema/**/*", "resources.ts", "storage.ts", "lib/**/*"]
+  // The program includes the shared config package.
+  "include": ["src/**/*", "functions/**/*", "../config/**/*", "schema/**/*", "resources.ts", "storage.ts", "lib/**/*"]
 }

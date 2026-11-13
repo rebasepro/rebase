@@ -2,8 +2,8 @@ import { customizeTable } from "@rebasepro/cms";
 import type { posts } from "../../../backend/schema/posts";
 import MarkdownField from "../MarkdownField";
 import CoverPreview from "../CoverPreview";
-import { notify } from "./lib/actions";
-import { fixedOnceCreated } from "./lib/form-rules";
+import { notify } from "../../../config/actions";
+import { fixedOnceCreated } from "../../../config/form-rules";
 
 export const postsCms = customizeTable<typeof posts>("posts", {
     name: "Blog Posts",

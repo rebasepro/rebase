@@ -1,4 +1,0 @@
-packages:
-  - "frontend"
-  - "backend"
-linkWorkspacePackages: true
