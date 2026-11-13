@@ -106,7 +106,10 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
     // `config/` is evaluated with the packages installed now; 0.31 dropped the `defineCollection` its files import.
     // …and with the names 0.31 moved to another package re-exported where the 0.30 files import them.
     const baseAliases = legacyLoadAliases(configDir, options.moduleAliases);
-    const loadAliases = await movedNameAliases(configDir, baseAliases, await createSchemaModuleImporter(root, baseAliases), movedSymbolTable());
+    // (Only for a project that has collections to load: it imports every package once to see what moved.)
+    const loadAliases = fs.existsSync(path.join(configDir, "collections"))
+        ? await movedNameAliases(configDir, baseAliases, await createSchemaModuleImporter(root, baseAliases), movedSymbolTable())
+        : baseAliases;
     const importModule = await createSchemaModuleImporter(root, loadAliases);
     let legacy;
     try {
