@@ -149,11 +149,27 @@ meet:
   never rewritten by the codemod.
 - **Refresh the project's agent skills** — `rebase skills install --agent <found>`
   (`--force` for edited files), when the project holds installed skills.
-- **Files of config/ nothing moved** — move whatever is still used before
-  deleting `config/`.
+- **The project's own modules in `config/` stay.** Rebase reads nothing from
+  `config/` any more, but does not forbid it: the codemod removes only
+  `config/collections` and the wiring it moves to `backend/` (`resources.ts`,
+  `storage.ts`, `generated/register.ts`, their re-exports in `config/index.ts`),
+  repoints imports of collection files to the tables, and ends with
+  `git rm -r config/collections …` (or `git rm -r config` when nothing of the
+  project's own is left).
 - **An import of a removed name** — the step says what to write instead
   (`defineCollection` → `defineTable` + `customizeTable`, `InferCollectionConfigType`
   → `InferRow`, …).
+
+Also carried without a hand step: callbacks built by a helper
+(`callbacks: softDeleteCallbacks(...)` → `hooks:`, the helper's functions
+converted where written); a function `storagePath` (the function becomes the
+customization's `storage.path`, the column gets the template of the keys it
+returns, e.g. `{path}/cv` — and the column's `maxBytes` / `accept` then apply
+to every upload under that template, stricter than 0.30; a function with no
+static text is refused); `auth: { collection }` in a custom backend entry; a
+`collections` boot option (→ `schemaDir`); a 0.30 `existsIn({ collection })`
+(keeps its table). Repeated manual steps are printed grouped, one step listing
+every file; `--json` keeps each.
 
 ## SDK calls in your own code: `rebase migrate sdk-calls`
 

@@ -29,8 +29,8 @@ All data routes are mounted under `/api/data/`. Other route categories:
 | `/api/storage/*` | File uploads and downloads |
 | `/api/functions/{name}` | Custom backend functions |
 | `/api/admin/schema-editor/*` | Visual schema editor (dev only; `/api/schema-editor/*` is a deprecated alias) |
-| `/api/docs` | OpenAPI 3.0.3 JSON spec (needs `schema:read` when `enableSwagger` is false — the bundle runtime's production default) |
-| `/api/swagger` | Swagger UI (dev only) |
+| `/api/docs` | OpenAPI 3.0.3 JSON spec — by default for the callers `GET /api/schema/tables` describes tables to, each the tables they may see; everyone with `enableSwagger: true`; admins with `false` |
+| `/api/swagger` | Swagger UI — only with `enableSwagger: true` (`REBASE_ENABLE_SWAGGER=true`), never in production |
 | `/api/health` | Health check |
 | `/api/schema/tables` | The tables this backend serves, as `TableDescriptor[]` redacted for the caller (`/api/schema/tables/{slug}` for one) — what the CMS, Studio and MCP read |
 | `/api/meta/contract` | Schema contract, for remote SDK generation (needs `schema:read`) |
@@ -580,7 +580,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ### OpenAPI 3.0.3 Spec
 
-Available at `GET /api/docs`. Returns a JSON OpenAPI specification of the data API. It does not cover the auth, storage, functions or admin routes. With `enableSwagger: false` — which the bundle runtime sets in production unless `REBASE_ENABLE_SWAGGER=true` — it is served only to a caller holding `schema:read`.
+Available at `GET /api/docs`. Returns a JSON OpenAPI specification of the data API. It does not cover the auth, storage, functions or admin routes. Who gets it follows `enableSwagger` (`REBASE_ENABLE_SWAGGER`): unset (the default, every environment) — the callers the schema endpoint describes tables to, each a document of exactly the tables, columns and relations `GET /api/schema/tables` describes to them (401 anonymous unless `schemaTables.public`; `404 DOCS_UNAVAILABLE` with no auth configured); `true` — the whole document to everyone; `false` — the admin gate.
 
 The spec includes:
 - All table CRUD, bulk and `_batch` routes with parameters and schemas
@@ -593,7 +593,7 @@ The spec includes:
 
 ### Swagger UI
 
-Available at `GET /api/swagger` when `NODE_ENV` is not `production` (`REBASE_ENABLE_SWAGGER` does not change this). Renders an interactive Swagger UI that loads the spec from `/api/docs`.
+Available at `GET /api/swagger` only when `enableSwagger` is `true` (`REBASE_ENABLE_SWAGGER=true`) and `NODE_ENV` is not `production`. Renders an interactive Swagger UI that loads the spec from `/api/docs`.
 
 ## Metadata Endpoints
 

@@ -413,7 +413,7 @@ skill.
 The full `RebaseBackendConfig` table — every option, its default, and what the runtime fills it from — is in the **`rebase-basics`** skill: `../rebase-basics/references/backend-configuration.md`. Two defaults differ between a hand-written call and the runtime, and are the ones to check first:
 
 - **`history`** is off when omitted from `initializeRebaseBackend`; the runtime passes `REBASE_HISTORY`, which defaults to `true`.
-- **`enableSwagger`** defaults to `true` (spec public at `/api/docs`); the runtime passes `false` in production unless `REBASE_ENABLE_SWAGGER` is set, which keeps the spec admin-only.
+- **`enableSwagger`** is unset by default: `/api/docs` is served to the schema endpoint's audience, each caller the tables they may see, and there is no Swagger UI. `true` (`REBASE_ENABLE_SWAGGER=true`) publishes the whole spec, `false` keeps it admin-only.
 
 ### Auth Configuration (RebaseAuthConfig)
 

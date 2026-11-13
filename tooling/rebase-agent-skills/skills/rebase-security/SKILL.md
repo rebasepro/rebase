@@ -493,7 +493,7 @@ in-process read through `context.data` on a caller's behalf, which the driver
 refuses (`FIELD_NOT_READABLE`) when it filters, sorts, projects, includes or
 aggregates on a column the caller cannot read. `afterRead` masks rows
 everywhere they leave: responses, realtime frames, rows embedded by `include`
-or a relation (the target table's `afterRead`, one level deep), MCP results,
+or a relation (the target table's `afterRead`, at every depth an include loads), MCP results,
 and history snapshots (history is served as reads).
 
 **A client-direct engine** is the other case the database does not enforce:

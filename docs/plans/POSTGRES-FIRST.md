@@ -647,7 +647,7 @@ rule that silently drops a clause.
      only, in `@rebasepro/common/migrate`.
 - The schema-version hash is computed over descriptors, so every project
   restamps once and every generated SDK is reported stale once.
-- **One read shape — the read side is done.** REST, the SDK, the socket's
+- **One read shape and one write shape — both done.** REST, the SDK, the socket's
   one-shot frames and subscriptions, MCP, the RLS simulator and the Postgres
   driver's own `fetchCollection` / `fetchOne` return the same row: columns
   under their keys, a foreign key as a key, RFC 3339 timestamps, numeric as
@@ -660,9 +660,16 @@ rule that silently drops a clause.
   view model in the browser (`toViewModelValues`, `collectionEntityDataOptions`
   in `@rebasepro/cms-types`). The view-model builders of the driver
   (`parseDataFromServer`, `normalizeDbValues`, `toFlatRow`) are deleted.
-- **One write shape — in progress.** The admin sends wire values rather than
-  its view model, and the server's writes and filters accept wire values only;
-  the remaining write-direction work is tracked by the B-VM-W slice.
+  Writes take the same shape: REST, the socket, MCP and the in-process SDK
+  accept the values the REST API documents (a to-one relation as its key or
+  `null`, a to-many as keys or `{ id, _pivot? }`, a vector as numbers, a point
+  as `{ latitude, longitude }`, a date as ISO text) and nothing else, and a
+  relation filter compares the key. The admin converts its view model to wire
+  values in the browser before every write and filter (`viewModelToWire`,
+  `wireValuesOf` / `wireFilterValueOf`); the value classes (`EntityRelation`,
+  `GeoPoint`, `Vector`, …) live in `@rebasepro/cms-types`; the offline queue
+  stores wire values (layout 2) and converts entries the previous version
+  queued.
 
 ## E. Things to review first (unsure)
 
@@ -816,10 +823,29 @@ One line each: what, and why. Grouped by area.
   kernel.** `buildSdkData` is built on the `Entity` accessor layer
   (`buildRebaseData`, `createDriverAccessor`, `PolicyEvalContext`); moving
   `Entity` out means rewriting the SDK onto rows, which is its own slice.
-- **Two leaks found here are older than this branch** and were fixed on it:
-  the history endpoint served stored rows unmasked (released 0.30.x), and
-  `afterRead` masked an include's rows one level deep only, so a nested
-  include served masked columns in clear (released 0.30.x).
+- **A to-one relation written as an object (`{ id }`) is a 400 naming the
+  relation**, not silently unwrapped. Why: it was never documented or typed —
+  it is the admin's `EntityRelation` JSON — and unwrapping it was the last
+  server-side trace of the view model; the error says to send the key.
+- **A pivot column's `.transform()` is refused.** Why: it never ran on any
+  door, so a value someone meant to mask was served as stored; the target's
+  `afterRead` sees `_pivot`.
+- **`/api/docs` defaults to the schema endpoint's audience** (each caller the
+  document of the tables `GET /schema/tables` describes to it, no Swagger UI);
+  `enableSwagger: true` publishes it. Why: the document lists what that
+  endpoint withholds, and in development it was public to anonymous callers
+  (also in 0.30.x). No new option.
+- **A declared table the database does not protect is withheld, the boot is not
+  refused** (F-2: provisioning off and RLS off, or declared policies missing →
+  503 `TABLE_WITHHELD`, remediation SQL in the boot log). Why: it matches what
+  introspection already does for an RLS-off table; refusing the whole boot is
+  kept for framework tables only.
+- **Leaks found here that are older than this branch** (all in released
+  0.30.x), fixed on it: the history endpoint served stored rows unmasked;
+  `afterRead` masked an include's rows one level deep only; a backend that
+  does not provision served a declared table with RLS off; a parent's
+  `hasMany` / `hasOne` write moved child rows whose key the caller may not
+  write; `/api/docs` was public in development.
 
 ### CMS defaults
 
