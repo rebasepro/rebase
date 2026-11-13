@@ -19,7 +19,7 @@ const myNotes: LegacyCollectionConfig = { slug: "my-notes", table: "notes", name
 
 function buildDriver() {
     const registry = registryServing(myNotes);
-    jest.spyOn(registry, "getCollections").mockReturnValue([myNotes]);
+    jest.spyOn(registry, "tables").mockReturnValue([registry.requireTable(myNotes.slug)]);
     const { db } = spiedDrizzle();
     const driver = new PostgresBackendDriver(db, quietRealtime(db, registry), registry);
     const paths: string[] = [];

@@ -58,19 +58,16 @@ export const NO_HOOKS: TableHookSet = { table: undefined, global: undefined, own
 /**
  * The hooks for the table a path addresses.
  *
- * The path is resolved through the registry (a slug, or a nested path such as
- * `posts/1/comments`, which addresses `comments`); `slug`, when given, is the
- * table the caller already holds, used when the path does not resolve.
+ * The path is resolved through the registry (`registry.tableAt`: a slug, or a
+ * nested path such as `posts/1/comments`, which addresses `comments`). A path
+ * that names no table has only the global hooks.
  */
 export function resolveTableHooks(
     registry: PostgresTableRegistry | undefined,
-    path: string,
-    slug?: string
+    path: string
 ): TableHookSet {
     if (!registry) return NO_HOOKS;
-    const atPath = path ? registry.getCollectionByPath(path) : undefined;
-    const tableSlug = atPath?.slug ?? slug;
-    const table = tableSlug ? registry.requireTable(tableSlug) : undefined;
+    const table = path ? registry.tableAt(path) : undefined;
     return hookSetOf(registry, table);
 }
 

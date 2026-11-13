@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
-import { CollectionConfig, Properties, ResolvedRelation, Vector, hasForeignKeyOnTarget, type ResolvedVia } from "@rebasepro/types";
-import { resolveCollectionRelations, findRelation, createRelationRef } from "@rebasepro/common";
+import { Vector } from "@rebasepro/types";
+import { createRelationRef } from "@rebasepro/common";
 import { isPrototypePollutingKey } from "@rebasepro/utils";
 import { PostgresTableRegistry } from "./model/PostgresTableRegistry";
 import { buildCompositeId, rowIdentityCondition, tableKeys } from "./services/collection-helpers";
@@ -36,14 +36,14 @@ export interface SerializedEntityData {
      * the *input* values, which nothing ever read.
      */
     inverseRelationUpdates: Array<{
+        /** The relation's name on the written table. */
         relationKey: string;
-        relation: ResolvedRelation;
         newValue: unknown;
     }>;
     /** JoinPath relation updates that require multi-hop writes. */
     joinPathRelationUpdates: Array<{
+        /** The `via` relation's name on the written table. */
         relationKey: string;
-        relation: ResolvedVia;
         newTargetId: string | number | null;
     }>;
 }
@@ -129,21 +129,16 @@ function normalizeDateText(value: unknown): unknown {
  * Read from the table: which keys are columns, which are relations, and what
  * each column's Postgres type is. A key the table does not declare is kept as
  * sent; the catalogue check (`assertWritableColumns`) refuses it later.
- *
- * `collection` is read for one thing only: the resolved relation an inverse or
- * `via` update hands `PersistService`, which still takes the legacy shape.
  */
 export function serializeDataToServer<M extends Record<string, unknown>>(
     row: M,
-    table: RuntimeTable,
-    collection?: CollectionConfig
+    table: RuntimeTable
 ): SerializedEntityData {
     if (!row) return { scalarData: {},
 inverseRelationUpdates: [],
 joinPathRelationUpdates: [] };
 
     const result: Record<string, unknown> = {};
-    const resolvedRelations = collection ? resolveCollectionRelations(collection) : {};
 
     // Track inverse relations that need to be handled separately
     const inverseRelationUpdates: SerializedEntityData["inverseRelationUpdates"] = [];
@@ -183,33 +178,29 @@ joinPathRelationUpdates: [] };
                 if (serializedValue !== undefined) result[relation.localField] = serializedValue;
                 continue;
             }
-            const resolved = findRelation(resolvedRelations, key);
-            if (resolved && hasForeignKeyOnTarget(resolved)) {
+            if (relation.kind === "hasOne" || relation.kind === "hasMany") {
                 // Inverse relation: the target table's foreign key is updated.
                 inverseRelationUpdates.push({
                     relationKey: key,
-                    relation: resolved,
                     newValue: serializeRelationValue(effectiveValue)
                 });
                 continue;
             }
-            if (resolved && resolved.kind === "via") {
+            if (relation.kind === "via") {
                 // A join chain is written through its own machinery, one row at
                 // a time for a to-one and as a set for a to-many.
                 const serializedValue = serializeRelationValue(effectiveValue);
-                if (resolved.cardinality === "one") {
+                if (relation.cardinality === "one") {
                     // Ordering matters: PersistService applies these BEFORE
                     // the main UPDATE, so the mapping reads the pre-update
                     // foreign key rather than a value the same save changed.
                     joinPathRelationUpdates.push({
                         relationKey: key,
-                        relation: resolved,
                         newTargetId: relationTargetId(serializedValue)
                     });
                 } else {
                     inverseRelationUpdates.push({
                         relationKey: key,
-                        relation: resolved,
                         newValue: serializedValue
                     });
                 }
@@ -470,37 +461,30 @@ export function serializeColumnToServer(value: unknown, column: ColumnDescriptor
 }
 
 /**
- * Transform IDs back to relation objects for frontend
+ * A stored row as the admin view model reads it: every column through its
+ * codec, and relation refs for the relations the row does not carry yet.
  */
 export async function parseDataFromServer<M extends Record<string, unknown>>(
     data: M,
     table: RuntimeTable,
-    collection: CollectionConfig,
     db?: DrizzleClient,
     registry?: PostgresTableRegistry
 ): Promise<M> {
-    const properties = collection.properties;
-    if (!data || !properties) return data;
-
-    // Get the normalized relations once
-    const resolvedRelations = resolveCollectionRelations(collection);
+    if (!data) return data;
 
     // Shared scalar + relation value normalization
     const result = normalizeScalarValues(data, table, { skipRelations: false });
 
-    // The relation properties the row does not carry yet: a ref from the
-    // row's own foreign key, or one read from the target (`db`, `registry`).
-    if (registry) {
-        const owner = registry.getTable(collection.slug);
-        if (owner) await loadRelationRefs(data, result, properties, owner, registry, db);
-    }
+    // The relations the row does not carry yet: a ref from the row's own
+    // foreign key, or one read from the target (`db`, `registry`).
+    if (registry) await loadRelationRefs(data, result, table, registry, db);
 
     return result as M;
 }
 
 /**
  * The admin view model's relation refs for one row, read from the owning
- * table's relation descriptors: every relation property the row does not
+ * table's relation descriptors: every relation the row does not
  * already carry gets a `{ __type: "relation" }` ref — from the row's own
  * foreign key for a `belongsTo` (no query), and, when `db` is given, from the
  * target for a `hasOne`/`hasMany` (the rows whose foreign key holds this row's
@@ -510,15 +494,12 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
 async function loadRelationRefs(
     data: Record<string, unknown>,
     result: Record<string, unknown>,
-    properties: Properties,
     owner: RuntimeTable,
     registry: PostgresTableRegistry,
     db: DrizzleClient | undefined
 ): Promise<void> {
-    for (const [propKey, property] of Object.entries(properties)) {
-        if (property.type !== "relation" || propKey in result) continue;
-        const relation = owner.relations.get(propKey);
-        if (!relation) continue;
+    for (const [propKey, relation] of owner.relations) {
+        if (propKey in result) continue;
         const target = registry.getTable(relation.target);
         if (!target) {
             logger.warn(`Could not resolve the target table '${relation.target}' of relation property: ${propKey}`);

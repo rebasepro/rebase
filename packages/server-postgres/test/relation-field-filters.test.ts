@@ -149,7 +149,7 @@ describe("filtering by a column of a related row", () => {
             filter,
             table,
             "talents",
-            { collection: talentsCollection, registry, sourceIdColumn: table.id }
+            { owner: registry.requireTable(talentsCollection.slug), registry, sourceIdColumn: table.id }
         );
 
     describe("hasMany — the queue shape", () => {

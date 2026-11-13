@@ -1,8 +1,8 @@
-import type { CollectionConfig, RelationDescriptor } from "@rebasepro/types";
+import type { RelationDescriptor } from "@rebasepro/types";
 import { namesHiddenFromCaller } from "./field-viewer";
 import { ApiError } from "@rebasepro/server";
 
-import { getCollectionByPath } from "./collection-helpers";
+import { requireTableAt } from "./collection-helpers";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import type { RuntimeTable } from "../model/runtime-table";
 import { isSharedRelation, relationTarget, relationWritable, requireRelation } from "./relation-tables";
@@ -12,7 +12,7 @@ import { isSharedRelation, relationTarget, relationWritable, requireRelation } f
  *
  * The walk that produces this was written out four separate times — in
  * `FetchService.fetchCollectionFromPath`, `FetchService.countEntitiesFromPath`,
- * `PersistService.save` and `CollectionRegistry.getCollectionByPath` — and had
+ * `PersistService.save` and the registry's path lookup — and had
  * drifted, so the read path and the write path did not agree on which relation
  * a path named. It lives here once now.
  */
@@ -26,13 +26,6 @@ export interface NestedPathHop {
     relation: RelationDescriptor;
     /** The table the relation points at (`registry.requireTable(relation.target)`). */
     target: RuntimeTable;
-    /**
-     * The lowered collections of {@link parent} and {@link target}, looked up
-     * by slug, for the subsystems that still read one (the codecs, the field
-     * strip, `beforeQuery`). Removed with the lowered collections (K8).
-     */
-    parentCollection: CollectionConfig;
-    targetCollection: CollectionConfig;
 }
 
 /**
@@ -71,8 +64,7 @@ export function resolveNestedPath(
         throw new Error(`Invalid relation path: ${path}. Expected format: collection/id/relation`);
     }
 
-    let parentCollection = getCollectionByPath(segments[0], registry);
-    let parent = registry.requireTable(parentCollection.slug);
+    let parent = requireTableAt(segments[0], registry);
     let parentId = segments[1];
 
     for (let i = 2; i < segments.length; i += 2) {
@@ -82,7 +74,6 @@ export function resolveNestedPath(
         // An unknown one is a 404 `UNKNOWN_RELATION` listing the others.
         const relation = requireRelation(parent, relationKey, namesHiddenFromCaller(parent.descriptor));
         const target = relationTarget(registry, relation);
-        const targetCollection = getCollectionByPath(target.slug, registry);
 
         if (i === segments.length - 1) {
             return {
@@ -90,14 +81,11 @@ export function resolveNestedPath(
                 parentId,
                 relationKey,
                 relation,
-                target,
-                parentCollection,
-                targetCollection
+                target
             };
         }
 
         parent = target;
-        parentCollection = targetCollection;
         parentId = segments[i + 1];
     }
 

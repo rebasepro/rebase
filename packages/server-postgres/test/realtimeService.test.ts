@@ -349,7 +349,7 @@ subscriptionId: "sub-2" }
             await Promise.resolve();
 
             // It should fetch the single row
-            expect(mockFetchEntity).toHaveBeenCalledWith("posts", "1", undefined, undefined);
+            expect(mockFetchEntity).toHaveBeenCalledWith("posts", "1", undefined);
 
             // It should send row update
             expect(ws.send).toHaveBeenCalled();

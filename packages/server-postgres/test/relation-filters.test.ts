@@ -129,7 +129,7 @@ describe("filtering by a relation with no column on this row", () => {
             filter,
             postsTable,
             "posts",
-            { collection: postsCollection, registry, sourceIdColumn: postsTable.id }
+            { owner: registry.requireTable(postsCollection.slug), registry, sourceIdColumn: postsTable.id }
         );
 
     describe("manyToMany", () => {
@@ -202,7 +202,7 @@ describe("filtering by a relation with no column on this row", () => {
                 { children: ["==", 3] },
                 categoriesTable,
                 "categories",
-                { collection: categoriesCollection, registry, sourceIdColumn: categoriesTable.id }
+                { owner: registry.requireTable(categoriesCollection.slug), registry, sourceIdColumn: categoriesTable.id }
             );
             expect(render(condition).sql).toBe(
                 'EXISTS (SELECT 1 FROM "categories" AS "__rel_filter" ' +
@@ -393,7 +393,7 @@ describe("filtering by a relation with no column on this row", () => {
                 },
                 postsTable,
                 "posts",
-                { collection: postsCollection, registry, sourceIdColumn: postsTable.id }
+                { owner: registry.requireTable(postsCollection.slug), registry, sourceIdColumn: postsTable.id }
             );
             const query = render(condition!);
             expect(query.sql).toContain('"posts"."title" = $1');
@@ -414,7 +414,7 @@ describe("filtering by a relation with no column on this row", () => {
                 },
                 postsTable,
                 "posts",
-                { collection: postsCollection, registry, sourceIdColumn: postsTable.id }
+                { owner: registry.requireTable(postsCollection.slug), registry, sourceIdColumn: postsTable.id }
             )).toThrow(ApiError);
         });
     });
@@ -437,7 +437,7 @@ describe("filtering by a relation with no column on this row", () => {
                 { tags: ["==", 4] },
                 postsTable,
                 "posts",
-                { collection: postsCollection, registry }
+                { owner: registry.requireTable(postsCollection.slug), registry }
             )).toThrow(ApiError);
         });
 
@@ -463,7 +463,7 @@ describe("filtering by a relation with no column on this row", () => {
                 { coAuthors: ["==", 4] },
                 postsTable,
                 "posts",
-                { collection: viaCollection, registry, sourceIdColumn: postsTable.id }
+                { owner: registry.requireTable(viaCollection.slug), registry, sourceIdColumn: postsTable.id }
             )).toThrow(ApiError);
         });
     });

@@ -1,9 +1,8 @@
 import { PgTable, AnyPgColumn, getTableConfig } from "drizzle-orm/pg-core";
 import { and, eq, getTableColumns, type SQL } from "drizzle-orm";
-import { CollectionConfig, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import type { RuntimeTable } from "../model/runtime-table";
-import { fieldKeyForColumn, getTableName, keyAddressInfoOf } from "@rebasepro/common";
+import { keyAddressInfoOf } from "@rebasepro/common";
 import { ApiError } from "@rebasepro/server";
 
 // Row identity is derived on both sides of the wire — the driver parses an
@@ -128,13 +127,18 @@ function columnFieldName(table: PgTable, column: AnyPgColumn): string {
     return column.name;
 }
 
-export function getCollectionByPath(collectionPath: string, registry: PostgresTableRegistry): CollectionConfig {
-    const collection = registry.getCollectionByPath(collectionPath);
-    if (!collection) {
-        const registered = registry.getCollections().map(c => c.slug).join(", ");
-        throw new Error(`Collection not found: ${collectionPath}. Registered collections: [${registered}]`);
+/**
+ * The runtime table a data path addresses (`registry.tableAt`): a root by
+ * slug or SQL name, or the target of a walk through relations. Throws, naming
+ * the path and every table this driver serves, when the root names none.
+ */
+export function requireTableAt(path: string, registry: PostgresTableRegistry): RuntimeTable {
+    const table = registry.tableAt(path);
+    if (!table) {
+        const served = registry.tables().map(candidate => candidate.slug).join(", ");
+        throw new Error(`Table not found: ${path}. Served tables: [${served}]`);
     }
-    return collection;
+    return table;
 }
 
 /**
@@ -271,13 +275,17 @@ export function relationMisconfigured(label: string, detail: string): ApiError {
     );
 }
 
-export function getTableForCollection(collection: CollectionConfig, registry: PostgresTableRegistry): PgTable<any> {
-    const tableName = getTableName(collection);
-    const table = registry.getPgTable(tableName);
-    if (!table) {
-        throw new Error(`Table not found for '${collection.slug}' (table: ${tableName})`);
+/**
+ * The catalogue drizzle table a runtime table's statements are built on.
+ * Throws, naming the slug and the SQL name, when this database holds none.
+ */
+export function pgTableOf(table: RuntimeTable, registry: PostgresTableRegistry): PgTable<any> {
+    const tableName = table.descriptor.table;
+    const pg = registry.getPgTable(tableName);
+    if (!pg) {
+        throw new Error(`Table not found for '${table.slug}' (table: ${tableName})`);
     }
-    return table;
+    return pg;
 }
 
 /**
@@ -307,13 +315,11 @@ export function tableKeys(table: RuntimeTable, pg: PgTable | undefined = table.p
 }
 
 /**
- * The key columns of the table a lowered collection was lowered from: the
- * lookup for a call site that still holds the collection. Reads the runtime
- * table ({@link tableKeys}); throws when the driver serves no table of that
- * slug.
+ * The key columns of a runtime table ({@link tableKeys}), a keyless table's
+ * read from the catalogue table registered under its SQL name. `[]` when it
+ * has none.
  */
-export function getPrimaryKeys(collection: CollectionConfig, registry: PostgresTableRegistry): PrimaryKeyInfo[] {
-    const table = registry.requireTable(collection.slug);
+export function getPrimaryKeys(table: RuntimeTable, registry: PostgresTableRegistry): PrimaryKeyInfo[] {
     return tableKeys(table, registry.getPgTable(table.descriptor.table) ?? table.pg);
 }
 
@@ -365,8 +371,8 @@ export function requireTableKeys(table: RuntimeTable, pg: PgTable | undefined = 
 }
 
 /**
- * {@link requireTableKeys} for a call site that still holds the lowered
- * collection.
+ * {@link requireTableKeys} over the catalogue table registered under the
+ * table's SQL name.
  *
  * {@link getPrimaryKeys} answers "what keys, if any" and returns `[]` for a
  * table with no address. Most of this driver, though, is building a WHERE
@@ -375,8 +381,7 @@ export function requireTableKeys(table: RuntimeTable, pg: PgTable | undefined = 
  * undefined` three frames from where the real problem is. This says what is
  * wrong and which collection it is wrong about.
  */
-export function requirePrimaryKeys(collection: CollectionConfig, registry: PostgresTableRegistry): PrimaryKeyInfo[] {
-    const table = registry.requireTable(collection.slug);
+export function requirePrimaryKeys(table: RuntimeTable, registry: PostgresTableRegistry): PrimaryKeyInfo[] {
     return requireTableKeys(table, registry.getPgTable(table.descriptor.table) ?? table.pg);
 }
 
@@ -451,54 +456,7 @@ export function columnNamed(table: PgTable, name: string): AnyPgColumn | undefin
 }
 
 /**
- * The column on the *source* table that a `hasOne`/`hasMany` link points at.
- *
- * `sourceKey` is authored when the two sides join on a natural key — an
- * external identity id, a SKU — and left off when they join on the row id,
- * which is the overwhelming majority. That makes `undefined` the only optional
- * field on a resolved relation, so it gets exactly one reader: this function.
- * Every consumer that needs the column asks here, and none of them re-derives
- * "or else the primary key" for itself. That is the whole point — the fallback
- * chains this codebase removed from relation resolution were dangerous because
- * they were *duplicated* and could disagree, not because they existed.
- */
-export function sourceKeyField(
-    relation: ResolvedHasOne | ResolvedHasMany,
-    sourceCollection: CollectionConfig,
-    registry: PostgresTableRegistry
-): string {
-    // A **field**, as the name says: callers index the Drizzle table and the
-    // rows it returns with what comes back from here, and both are keyed by the
-    // wire name. `sourceKey` is authored in *column* terms, like every other
-    // link on a relation, so it is translated here rather than at each of the
-    // call sites — where it used to be `tenant_id` looked up on a table whose
-    // key is `tenantId`, finding nothing.
-    if (relation.sourceKey) return fieldKeyForColumn(sourceCollection, relation.sourceKey);
-    return requirePrimaryKeys(sourceCollection, registry)[0].fieldName;
-}
-
-/**
- * Whether this link joins on something other than the source's primary key.
- *
- * Callers that hold a parent *id* — which is most of them, since an id is what
- * a URL carries — must translate it to the source key's value before it can be
- * compared with the target's foreign key. Those that hold the parent *row*, or
- * that build a correlated subquery over the source table, can read the column
- * directly and skip the lookup.
- */
-export function joinsOnNaturalKey(
-    relation: ResolvedHasOne | ResolvedHasMany,
-    sourceCollection: CollectionConfig,
-    registry: PostgresTableRegistry
-): boolean {
-    if (!relation.sourceKey) return false;
-    // Compared as fields, because the right-hand side is one.
-    return fieldKeyForColumn(sourceCollection, relation.sourceKey)
-        !== requirePrimaryKeys(sourceCollection, registry)[0].fieldName;
-}
-
-/**
- * The address of a row: derived from the collection's primary keys, because a
+ * The address of a row: derived from the table's primary keys, because a
  * row does not carry one — it is exactly its columns.
  *
  * Falls back to a literal `id` column, for a row that reached us from somewhere
@@ -508,10 +466,10 @@ export function joinsOnNaturalKey(
  */
 export function deriveRowAddress(
     row: Record<string, unknown>,
-    collection: CollectionConfig,
+    table: RuntimeTable,
     registry: PostgresTableRegistry,
-    /** The collection's keys, when the caller already has them — a batch derives one address per row. */
-    primaryKeys: PrimaryKeyInfo[] = getPrimaryKeys(collection, registry)
+    /** The table's keys, when the caller already has them — a batch derives one address per row. */
+    primaryKeys: PrimaryKeyInfo[] = getPrimaryKeys(table, registry)
 ): string {
     const composite = buildCompositeId(row, primaryKeys);
     // An all-empty composite is indistinguishable from a missing key, and

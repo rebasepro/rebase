@@ -453,8 +453,7 @@ describe("PostgresBackendDriver", () => {
                     searchExplain: true,
                     include: { author: true },
                     fields: ["id", "title"],
-                    distinct: true,
-                    databaseId: "db-2"
+                    distinct: true
                 });
             });
 

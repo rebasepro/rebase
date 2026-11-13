@@ -50,7 +50,6 @@
 import { and, SQL } from "drizzle-orm";
 import { PgTable } from "drizzle-orm/pg-core";
 import type {
-    CollectionConfig,
     QueryNarrowing,
     ReadOperation,
     ReadQuery,
@@ -59,6 +58,7 @@ import type {
     TableHooks
 } from "@rebasepro/types";
 import type { PostgresTableRegistry } from "../model/PostgresTableRegistry";
+import type { RuntimeTable } from "../model/runtime-table";
 import { assertViewReadable } from "./view-access";
 import {
     DrizzleConditionBuilder,
@@ -79,7 +79,7 @@ export type ReadCallContextProvider = () => RebaseCallContext;
 /** The `beforeQuery` hooks of one table, in the order they run, and the table they run for. */
 interface ResolvedBeforeQuery {
     hooks: NonNullable<TableHooks["beforeQuery"]>[];
-    /** The table the hooks are told about; `undefined` when the collection has no table here. */
+    /** The table the hooks are told about; `undefined` when the path names no table here. */
     table: TableDescriptor | undefined;
 }
 
@@ -97,9 +97,8 @@ interface ResolvedBeforeQuery {
  */
 function resolveBeforeQuery(
     registry: PostgresTableRegistry | undefined,
-    collection: CollectionConfig | undefined
+    table: RuntimeTable | undefined
 ): ResolvedBeforeQuery {
-    const table = collection ? registry?.getTable(collection.slug) : undefined;
     const hooks: NonNullable<TableHooks["beforeQuery"]>[] = [];
     const global = registry?.globalHooks();
     if (global?.beforeQuery) hooks.push(global.beforeQuery);
@@ -111,9 +110,9 @@ function resolveBeforeQuery(
 /** Whether anything at all would run for this table. */
 export function hasBeforeQuery(
     registry: PostgresTableRegistry | undefined,
-    collection: CollectionConfig | undefined
+    table: RuntimeTable | undefined
 ): boolean {
-    return resolveBeforeQuery(registry, collection).hooks.length > 0;
+    return resolveBeforeQuery(registry, table).hooks.length > 0;
 }
 
 /**
@@ -149,19 +148,19 @@ export interface BeforeQueryEnv {
  */
 export async function beforeQueryConditions(
     env: BeforeQueryEnv,
-    collection: CollectionConfig | undefined,
+    runtime: RuntimeTable | undefined,
     path: string,
     table: PgTable<never>,
     description: ReadQueryDescription,
     filterContext: Omit<FilterCompilationOptions, "unknownFields">
 ): Promise<SQL[]> {
-    // Every read of a collection comes through here, so a materialized view's
+    // Every read of a table comes through here, so a materialized view's
     // roles are judged here too (see `view-access.ts`).
-    assertViewReadable(collection);
-    const { hooks, table: hookTable } = resolveBeforeQuery(env.registry, collection);
+    assertViewReadable(runtime?.descriptor);
+    const { hooks, table: hookTable } = resolveBeforeQuery(env.registry, runtime);
     if (hooks.length === 0) return [];
 
-    if (!collection || !hookTable) {
+    if (!runtime || !hookTable) {
         // A hook reaching here with no table can only be a global one, and a
         // global hook has no columns to compile its filter against. It cannot
         // be honoured — so it is refused, not skipped.
@@ -173,7 +172,7 @@ export async function beforeQueryConditions(
 
     if (!env.callContext) {
         throw new Error(
-            `[beforeQuery] The table "${collection.slug}" has a \`beforeQuery\` hook, and this read was compiled by a ` +
+            `[beforeQuery] The table "${runtime.slug}" has a \`beforeQuery\` hook, and this read was compiled by a ` +
             "service that was built without a call-context provider, so the hook could not run. Serving the read " +
             "unnarrowed is not an option — a hook that does not run widens the result set. Construct the " +
             "service through the driver (which passes one), or pass a provider explicitly."
@@ -208,7 +207,7 @@ export async function beforeQueryConditions(
         // hook rather than about an empty condition list.
         if (!narrowing.filter && !narrowing.logical) {
             throw new Error(
-                `[beforeQuery] The \`beforeQuery\` hook of "${collection.slug}" returned an object with neither \`filter\` nor \`logical\`. ` +
+                `[beforeQuery] The \`beforeQuery\` hook of "${runtime.slug}" returned an object with neither \`filter\` nor \`logical\`. ` +
                 "Return nothing (or `undefined`) to add no conditions; an empty object reads as a scope that was " +
                 "meant to be built and was not."
             );
@@ -235,13 +234,13 @@ export async function beforeQueryConditions(
  */
 export async function beforeQueryCondition(
     env: BeforeQueryEnv,
-    collection: CollectionConfig | undefined,
+    runtime: RuntimeTable | undefined,
     path: string,
     table: PgTable<never>,
     description: ReadQueryDescription,
     filterContext: Omit<FilterCompilationOptions, "unknownFields">
 ): Promise<SQL | undefined> {
-    const conditions = await beforeQueryConditions(env, collection, path, table, description, filterContext);
+    const conditions = await beforeQueryConditions(env, runtime, path, table, description, filterContext);
     if (conditions.length === 0) return undefined;
     if (conditions.length === 1) return conditions[0];
     return and(...conditions);

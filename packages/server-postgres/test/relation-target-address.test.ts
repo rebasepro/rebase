@@ -61,7 +61,7 @@ isId: "increment" },
     // local only exists to bind `registry`, and sharing the name makes it call
     // itself — which is a stack overflow, not a test failure anyone can read.
     const flatten = (row: Record<string, unknown>, collection: LegacyCollectionConfig) =>
-        toFlatRow(row, collection, registry);
+        toFlatRow(row, registry.requireTable(collection.slug), registry);
 
     it("joins a composite target key into the ref address", () => {
         const result = flatten({

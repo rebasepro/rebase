@@ -1,6 +1,6 @@
 import { and, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
-import { CollectionConfig, JUNCTION_PIVOT_KEY, type ColumnDescriptor, type RelationDescriptor } from "@rebasepro/types";
+import { JUNCTION_PIVOT_KEY, type ColumnDescriptor, type RelationDescriptor } from "@rebasepro/types";
 import { soleJoinCondition } from "@rebasepro/types";
 import type { RelationOfKind } from "@rebasepro/common";
 import { ApiError, logger } from "@rebasepro/server";
@@ -104,11 +104,6 @@ export class RelationWriteService {
         private callContext?: ReadCallContextProvider
     ) {
         this.reads = new RelationService(db, registry, callContext);
-    }
-
-    /** The served table a lowered collection was lowered from. */
-    private tableOf(collection: CollectionConfig): RuntimeTable {
-        return this.registry.requireTable(collection.slug);
     }
 
     /**
@@ -244,11 +239,10 @@ export class RelationWriteService {
      */
     async updateRelationsUsingJoins<M extends Record<string, unknown>>(
         tx: DrizzleClient,
-        collection: CollectionConfig,
+        owner: RuntimeTable,
         id: string | number,
         relationValues: Partial<M>
     ) {
-        const owner = this.tableOf(collection);
 
         for (const [key, value] of Object.entries(relationValues)) {
             const relation = owner.relations.get(key);
@@ -374,7 +368,7 @@ export class RelationWriteService {
      */
     async updateInverseRelations(
         tx: DrizzleClient,
-        sourceCollection: CollectionConfig,
+        owner: RuntimeTable,
         sourceEntityId: string | number,
         inverseRelationUpdates: Array<{
             /** The relation's name. */
@@ -382,7 +376,6 @@ export class RelationWriteService {
             newValue: unknown;
         }>
     ) {
-        const owner = this.tableOf(sourceCollection);
         for (const update of inverseRelationUpdates) {
             const { newValue } = update;
             const relation = this.relationNamed(owner, update.relationKey);
@@ -522,7 +515,7 @@ export class RelationWriteService {
      */
     async updateJoinPathOneToOneRelations(
         tx: DrizzleClient,
-        parentCollection: CollectionConfig,
+        parent: RuntimeTable,
         parentId: string | number,
         updates: Array<{
             /** The relation's name. */
@@ -530,7 +523,6 @@ export class RelationWriteService {
             newTargetId: string | number | null;
         }>
     ) {
-        const parent = this.tableOf(parentCollection);
         for (const upd of updates) {
             const { newTargetId } = upd;
             const relation = this.relationNamed(parent, upd.relationKey);

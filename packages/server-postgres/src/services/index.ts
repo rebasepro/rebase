@@ -5,8 +5,8 @@ export { RelationService } from "./RelationService";
 
 // Re-export helper functions
 export {
-    getCollectionByPath,
-    getTableForCollection,
+    requireTableAt,
+    pgTableOf,
     getPrimaryKeys,
     deriveRowAddress,
     parseIdValues,

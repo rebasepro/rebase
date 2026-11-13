@@ -111,7 +111,7 @@ describe("junction writes diff rather than replace", () => {
     const writeTags = async (existing: (string | number)[], value: unknown, deletedRowCount?: number) => {
         const recording = recordingTx(existing, deletedRowCount);
         const service = new RelationWriteService(recording.db, registry);
-        await service.updateRelationsUsingJoins(recording.db, postsCollection, "p1", { tags: value });
+        await service.updateRelationsUsingJoins(recording.db, registry.requireTable(postsCollection.slug), "p1", { tags: value });
         return recording;
     };
 
@@ -187,7 +187,7 @@ describe("junction writes diff rather than replace", () => {
         const inverse = [{ relationKey: "tags", newValue: [] }];
 
         await expect(service.updateInverseRelations(
-            recording.db, postsCollection, "p1", inverse
+            recording.db, registry.requireTable(postsCollection.slug), "p1", inverse
         )).rejects.toMatchObject({ statusCode: 403, code: "WRITE_DENIED" });
     });
 
@@ -197,14 +197,15 @@ describe("junction writes diff rather than replace", () => {
         // same defect, so a running server cannot reach this — it is the second
         // line, for a registry assembled by hand.
         const recording = recordingTx([]);
-        const service = new RelationWriteService(recording.db, registryWith({
+        const misconfigured = registryWith({
             ...tagsRelation,
             through: { table: "does_not_exist", sourceColumn: "post_id", targetColumn: "tag_id" }
-        }));
+        });
+        const service = new RelationWriteService(recording.db, misconfigured);
         const inverse = [{ relationKey: "tags", newValue: [] }];
 
         await expect(service.updateInverseRelations(
-            recording.db, postsCollection, "p1", inverse
+            recording.db, misconfigured.requireTable(postsCollection.slug), "p1", inverse
         )).rejects.toMatchObject({ code: "RELATION_MISCONFIGURED" });
     });
 
@@ -223,7 +224,7 @@ describe("junction writes diff rather than replace", () => {
         const inverse = [{ relationKey: "tags", newValue: [] }];
 
         await expect(service.updateInverseRelations(
-            recording.db, postsCollection, "p1", inverse
+            recording.db, exploding.requireTable(postsCollection.slug), "p1", inverse
         )).resolves.toBeUndefined();
     });
 

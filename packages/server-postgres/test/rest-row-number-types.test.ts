@@ -42,7 +42,7 @@ describe("REST row — declared number properties keep their declared type", () 
     it("parses a NUMERIC string into a number", () => {
         const row = toRestRow(
             { id: 3, name: "Widget", price: "9.99" },
-            productsCollection,
+            registry.requireTable(productsCollection.slug),
             registry
         );
 
@@ -56,7 +56,7 @@ describe("REST row — declared number properties keep their declared type", () 
         const createdAt = "2026-07-17T10:00:00.000Z";
         const row = toRestRow(
             { id: 3, name: "Widget", price: "1", created_at: createdAt },
-            productsCollection,
+            registry.requireTable(productsCollection.slug),
             registry
         );
 
@@ -69,7 +69,7 @@ describe("REST row — declared number properties keep their declared type", () 
         // they are not ours to reinterpret.
         const row = toRestRow(
             { id: 3, price: "2.50", legacy_total: "1234.5" },
-            productsCollection,
+            registry.requireTable(productsCollection.slug),
             registry
         );
 
@@ -78,16 +78,16 @@ describe("REST row — declared number properties keep their declared type", () 
     });
 
     it("nulls a number that is not one rather than serving NaN", () => {
-        const row = toRestRow({ id: 3, price: "not-a-number" }, productsCollection, registry);
+        const row = toRestRow({ id: 3, price: "not-a-number" }, registry.requireTable(productsCollection.slug), registry);
 
         expect(row.price).toBeNull();
     });
 
     it("leaves null and already-numeric values alone", () => {
-        const row = toRestRow({ id: 3, price: null }, productsCollection, registry);
+        const row = toRestRow({ id: 3, price: null }, registry.requireTable(productsCollection.slug), registry);
         expect(row.price).toBeNull();
 
-        const numeric = toRestRow({ id: 3, price: 4.25 }, productsCollection, registry);
+        const numeric = toRestRow({ id: 3, price: 4.25 }, registry.requireTable(productsCollection.slug), registry);
         expect(numeric.price).toBe(4.25);
     });
 
@@ -104,14 +104,19 @@ describe("REST row — declared number properties keep their declared type", () 
             ]
         } as LegacyCollectionConfig;
 
+        // The link column declared, as a table with a `belongsTo` declares it.
+        const related = new FixtureTableRegistry([
+            { ...withRelation, properties: { ...productsCollection.properties, category_id: { type: "number", columnType: "integer" } } } as LegacyCollectionConfig,
+            categoriesCollection
+        ]);
         const row = toRestRow(
             {
                 id: 3,
                 price: "9.99",
                 category: { id: 2, name: "Gadgets", rating: "4.5" }
             },
-            withRelation,
-            registry
+            related.requireTable(withRelation.slug),
+            related
         );
 
         expect(row.price).toBe(9.99);

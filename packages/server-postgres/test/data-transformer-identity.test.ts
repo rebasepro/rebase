@@ -127,7 +127,6 @@ isId: true },
             { sku: "EVT-1",
 id: "external-ref-99" },
             registry.requireTable("events"),
-            eventsCollection,
             db,
             registry
         );
@@ -148,7 +147,6 @@ event_sku: "EVT-1" }
         const result = await parseDataFromServer(
             { sku: "EVT-1" },
             registry.requireTable("events_with_seats"),
-            eventsWithSeats,
             db,
             registry
         ) as Record<string, unknown>;
@@ -169,7 +167,6 @@ event_sku: "EVT-1" }
             { sku: "EVT-1",
 id: "external-ref-99" },
             registry.requireTable("events"),
-            eventsCollection,
             db,
             registry
         ) as Record<string, unknown>;

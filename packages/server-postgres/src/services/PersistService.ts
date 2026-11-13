@@ -1,13 +1,13 @@
 import { eq, and, isNotNull, isNull, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionConfig, FilterValues, JUNCTION_PIVOT_KEY, type LogicalCondition, ResolvedRelation, joinConditions } from "@rebasepro/types";
-import { createStampKeys, getTableName, resolveCollectionRelations } from "@rebasepro/common";
+import { FilterValues, JUNCTION_PIVOT_KEY, type LogicalCondition, joinConditions } from "@rebasepro/types";
+import { createStampKeys } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
     assertWritableColumns,
-    getCollectionByPath,
-    getTableForCollection,
+    requireTableAt,
+    pgTableOf,
     getPrimaryKeys,
     idCanAddressTable,
     requirePrimaryKeys,
@@ -24,6 +24,7 @@ import { columnKeyOf, pointsBack } from "./relation-tables";
 import { FetchService } from "./FetchService";
 import { DrizzleClient } from "../interfaces";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
+import type { RuntimeTable } from "../model/runtime-table";
 import {
     assertNoReadOnlyRelationValues,
     assertWritableThrough,
@@ -238,9 +239,9 @@ export class PersistService {
      */
     async lockRow(collectionPath: string, id: string | number): Promise<void> {
         const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
-        const collection = hop ? hop.targetCollection : getCollectionByPath(collectionPath, this.registry);
-        const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = requirePrimaryKeys(collection, this.registry);
+        const runtime = hop ? hop.target : requireTableAt(collectionPath, this.registry);
+        const table = pgTableOf(runtime, this.registry);
+        const idInfoArray = requirePrimaryKeys(runtime, this.registry);
         // An id the key cannot hold names no row, and the read after this
         // answers that as a 404 — sent to Postgres it is a 22P02 that aborts
         // the write's transaction instead.
@@ -273,8 +274,8 @@ export class PersistService {
                 // Shared target: drop the link, not the row.
                 if (hop.relation.kind !== "manyToMany") {
                     throw ApiError.badRequest(
-                        `"${collectionPath}" reaches '${hop.targetCollection.slug}' through a \`via\` relation, ` +
-                        `so there is no single link to remove. Delete the row at "${hop.targetCollection.slug}" ` +
+                        `"${collectionPath}" reaches '${hop.target.slug}' through a \`via\` relation, ` +
+                        `so there is no single link to remove. Delete the row at "${hop.target.slug}" ` +
                         "directly if that is what you meant.",
                         "RELATION_NOT_UNLINKABLE"
                     );
@@ -286,11 +287,11 @@ export class PersistService {
             // and membership above has established it is this parent's child.
         }
 
-        const collection = getCollectionByPath(collectionPath, this.registry);
-        const table = getTableForCollection(collection, this.registry);
+        const runtime = requireTableAt(collectionPath, this.registry);
+        const table = pgTableOf(runtime, this.registry);
         // `requirePrimaryKeys`: with no key there is no condition, and a DELETE
         // without one empties the table.
-        const condition = rowIdentityCondition(table, requirePrimaryKeys(collection, this.registry), id, collectionPath);
+        const condition = rowIdentityCondition(table, requirePrimaryKeys(runtime, this.registry), id, collectionPath);
 
         // In a transaction of its own, as `save` is: inside a write's
         // transaction that is a SAVEPOINT, so a delete the database refuses (a
@@ -307,7 +308,7 @@ export class PersistService {
                 return statement;
             });
         } catch (error: unknown) {
-            throw this.toUserFriendlyError(error, collection.slug, collection, "delete");
+            throw this.toUserFriendlyError(error, runtime.slug, runtime, "delete");
         }
 
         if ((result.rowCount ?? 0) === 0) {
@@ -319,8 +320,8 @@ export class PersistService {
      * Delete all rows from a collection
      */
     async deleteAll(collectionPath: string, _databaseId?: string): Promise<void> {
-        const collection = getCollectionByPath(collectionPath, this.registry);
-        const table = getTableForCollection(collection, this.registry);
+        const runtime = requireTableAt(collectionPath, this.registry);
+        const table = pgTableOf(runtime, this.registry);
         await this.db.delete(table);
     }
 
@@ -422,10 +423,10 @@ export class PersistService {
 
         if (hop) {
             assertWritableThrough(hop, collectionPath);
-            effectiveCollectionPath = hop.targetCollection.slug;
+            effectiveCollectionPath = hop.target.slug;
 
             const parentIdForWrite = () => {
-                const parentPks = getPrimaryKeys(hop.parentCollection, this.registry);
+                const parentPks = getPrimaryKeys(hop.parent, this.registry);
                 return parseIdValues(hop.parentId, parentPks)[parentPks[0].fieldName];
             };
 
@@ -484,11 +485,11 @@ export class PersistService {
             }
         }
 
-        const collection = getCollectionByPath(effectiveCollectionPath, this.registry);
+        const runtime = requireTableAt(effectiveCollectionPath, this.registry);
         // Before anything is written or even planned: see the function.
-        assertNoReadOnlyRelationValues(effectiveValues as Record<string, unknown>, this.registry.requireTable(collection.slug));
-        const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = getPrimaryKeys(collection, this.registry);
+        assertNoReadOnlyRelationValues(effectiveValues as Record<string, unknown>, runtime);
+        const table = pgTableOf(runtime, this.registry);
+        const idInfoArray = getPrimaryKeys(runtime, this.registry);
         const primaryKeyFields = idInfoArray.map(info => info.fieldName);
 
         // Build an object mapping required for dynamic returning
@@ -505,7 +506,7 @@ export class PersistService {
         // marker object to the column as data.
         const { values: plainValues, fieldOps } = splitFieldOps(
             effectiveValues as Record<string, unknown>,
-            this.registry.getTable(collection.slug)?.descriptor
+            runtime.descriptor
         );
         const fieldOpKeys = Object.keys(fieldOps);
         if (fieldOpKeys.length > 0) {
@@ -534,11 +535,8 @@ export class PersistService {
         // Separate relations that require special handling
         const relationValues: Record<string, unknown> = {};
         const otherValues: Partial<M> = { ...(plainValues as Partial<M>) };
-        const resolvedRelations = resolveCollectionRelations(collection);
-
-        for (const key in resolvedRelations) {
-            const relation = resolvedRelations[key];
-            if (relation && relation.cardinality === "many") {
+        for (const [key, relation] of runtime.relations) {
+            if (relation.cardinality === "many") {
                 if (Object.prototype.hasOwnProperty.call(otherValues, key)) {
                     relationValues[key] = otherValues[key as keyof M];
                     delete otherValues[key as keyof M];
@@ -551,7 +549,7 @@ export class PersistService {
         let returnedRow: Record<string, unknown> | undefined;
         try {
             // Transform relations to IDs, then sanitize
-            const serializedResult = serializeDataToServer(otherValues as M, this.registry.requireTable(collection.slug), collection);
+            const serializedResult = serializeDataToServer(otherValues as M, runtime);
 
             // Extract relation updates from the typed result
             const inverseRelationUpdates = serializedResult.inverseRelationUpdates;
@@ -601,7 +599,7 @@ export class PersistService {
                     // Example: changing author A→B with stale profile P1 (A's):
                     //   reads old author_id=A → clears P1.author_id → re-sets P1.author_id=A (no-op).
                     if (joinPathRelationUpdates.length > 0) {
-                        await this.relationWrites.updateJoinPathOneToOneRelations(tx, collection, currentId, joinPathRelationUpdates);
+                        await this.relationWrites.updateJoinPathOneToOneRelations(tx, runtime, currentId, joinPathRelationUpdates);
                     }
 
                     // Only issue an UPDATE if there are scalar columns to set.
@@ -619,7 +617,7 @@ export class PersistService {
                     // declared bounds by the same statement — see
                     // `compileFieldOpBounds` for why it cannot be a read first.
                     const bounds = fieldOpKeys.length > 0
-                        ? compileFieldOpBounds(table, fieldOps, this.registry.requireTable(collection.slug), { collectionPath: effectiveCollectionPath })
+                        ? compileFieldOpBounds(table, fieldOps, runtime, { collectionPath: effectiveCollectionPath })
                         : [];
                     const condition = rowIdentityCondition(table, idInfoArray, id, effectiveCollectionPath);
                     if (scalarKeys.length > 0 || compiledOps) {
@@ -629,7 +627,7 @@ export class PersistService {
                         });
                         // The whole row, when it can stand in for the read back
                         // below, as for an INSERT: the UPDATE's own RETURNING.
-                        const returning = rowIsWrittenLast ? this.fetchService.insertReturning(collection.slug) : undefined;
+                        const returning = rowIsWrittenLast ? this.fetchService.insertReturning(runtime.slug) : undefined;
                         const statement = updateQuery
                             .where(and(condition, ...bounds.map(bound => bound.holds)))
                             .returning(returning?.columns ?? returningKeys);
@@ -641,7 +639,7 @@ export class PersistService {
                         // already applied above do not survive a rejected update.
                         if (updated.length === 0) {
                             const broken = await brokenFieldOpBounds(tx, table, [condition], bounds);
-                            if (broken.length > 0) throw fieldOpBoundsError(collection.slug, broken);
+                            if (broken.length > 0) throw fieldOpBoundsError(runtime.slug, broken);
                             throw await this.explainZeroRowWrite(
                                 tx, table, [condition], effectiveCollectionPath, currentId, "update"
                             );
@@ -717,7 +715,7 @@ export class PersistService {
                         // `createdAt` on everything it touched, and handed
                         // `createdBy` to whoever ran it. The INSERT branch keeps
                         // the values: they are right there.
-                        for (const key of createStampKeys(this.registry.requireTable(collection.slug).descriptor)) {
+                        for (const key of createStampKeys(runtime.descriptor)) {
                             delete set[key];
                         }
                         // The same for everything else the create alone filled
@@ -732,13 +730,12 @@ export class PersistService {
                         // runs when the row is out of scope; here the stored row
                         // is only known once the INSERT meets it, so the scope
                         // rides along as the conflict-update's own WHERE.
-                        const scope = await this.writeScope(collection, effectiveCollectionPath, table);
+                        const scope = await this.writeScope(runtime, effectiveCollectionPath, table);
                         // And never a row in the trash. The driver refuses an
                         // upsert onto a trashed key before it gets here (see
                         // `findUpsertTarget`); this is the same rule held by
                         // the statement, for the row that read could not see
                         // or that was trashed since.
-                        const runtime = this.registry.requireTable(collection.slug);
                         const softDelete = resolveSoftDelete(runtime);
                         const trashColumn = softDelete ? softDeleteColumn(runtime, table) : undefined;
                         const writable = trashColumn
@@ -753,7 +750,7 @@ export class PersistService {
                         const setWhere = condition.length > 0 ? and(...(writable ? [writable] : []), ...condition) : writable;
                         // The whole row, when it can stand in for the read back
                         // below — whichever branch wrote it.
-                        const returning = rowIsWrittenLast ? this.fetchService.insertReturning(collection.slug) : undefined;
+                        const returning = rowIsWrittenLast ? this.fetchService.insertReturning(runtime.slug) : undefined;
                         const statement = updating
                             ? insertQuery.onConflictDoUpdate({ target, set, setWhere }).returning(returning?.columns ?? returningKeys)
                             : insertQuery.onConflictDoNothing({ target }).returning(returning?.columns ?? returningKeys);
@@ -799,7 +796,7 @@ export class PersistService {
                     } else {
                         // The whole row, when it can stand in for the read
                         // back below — see `FetchService.insertReturning`.
-                        const returning = rowIsWrittenLast ? this.fetchService.insertReturning(collection.slug) : undefined;
+                        const returning = rowIsWrittenLast ? this.fetchService.insertReturning(runtime.slug) : undefined;
                         const statement = insertQuery.returning(returning?.columns ?? returningKeys);
                         lastStatement();
                         result = await statement;
@@ -825,18 +822,18 @@ export class PersistService {
 
                     // For inserts, apply joinPath after since the parent row didn't exist before
                     if (joinPathRelationUpdates.length > 0) {
-                        await this.relationWrites.updateJoinPathOneToOneRelations(tx, collection, currentId, joinPathRelationUpdates);
+                        await this.relationWrites.updateJoinPathOneToOneRelations(tx, runtime, currentId, joinPathRelationUpdates);
                     }
                 }
 
                 // Handle inverse relation updates
                 if (inverseRelationUpdates.length > 0) {
-                    await this.relationWrites.updateInverseRelations(tx, collection, currentId, inverseRelationUpdates);
+                    await this.relationWrites.updateInverseRelations(tx, runtime, currentId, inverseRelationUpdates);
                 }
 
                 // Update many-to-many relations
                 if (Object.keys(relationValues).length > 0) {
-                    await this.relationWrites.updateRelationsUsingJoins(tx, collection, currentId, relationValues);
+                    await this.relationWrites.updateRelationsUsingJoins(tx, runtime, currentId, relationValues);
                 }
 
                 // Attach the row to the parent's set. Runs for updates as well as
@@ -853,7 +850,7 @@ export class PersistService {
             if (kept === undefined) return undefined;
             savedId = kept;
         } catch (error: unknown) {
-            throw this.toUserFriendlyError(error, collection.slug, collection);
+            throw this.toUserFriendlyError(error, runtime.slug, runtime);
         }
 
         // Fetch the saved row back through the same walk `GET /:id` serves, so a
@@ -883,7 +880,7 @@ export class PersistService {
         // A bulk create of 1,000 rows was 1,000 of these reads.
         if (returnedRow) return returnedRow;
         const finalEntity = await this.fetchService.fetchOneForRest(
-            collection.slug, savedId, undefined, databaseId, { withDeleted: true }
+            runtime.slug, savedId, undefined, databaseId, { withDeleted: true }
         );
         if (!finalEntity) throw new Error("Could not fetch row after save.");
         return finalEntity;
@@ -920,27 +917,26 @@ export class PersistService {
         options?: { upsert?: boolean; onConflict?: readonly string[]; commitsTransaction?: boolean } & ConflictRule
     ): Promise<(Record<string, unknown> | undefined)[] | undefined> {
         if (isNestedPath(collectionPath)) return undefined;
-        const collection = getCollectionByPath(collectionPath, this.registry);
-        const returning = this.fetchService.insertReturning(collection.slug);
+        const runtime = requireTableAt(collectionPath, this.registry);
+        const returning = this.fetchService.insertReturning(runtime.slug);
         if (!returning) return undefined;
-        const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = getPrimaryKeys(collection, this.registry);
-        const resolvedRelations = resolveCollectionRelations(collection);
-        const manyRelationKeys = Object.keys(resolvedRelations).filter(key => resolvedRelations[key]?.cardinality === "many");
+        const table = pgTableOf(runtime, this.registry);
+        const idInfoArray = getPrimaryKeys(runtime, this.registry);
+        const manyRelationKeys = [...runtime.relations.values()].filter(relation => relation.cardinality === "many").map(relation => relation.name);
         const upsert = options?.upsert === true;
         const targetFields = options?.onConflict && options.onConflict.length > 0
             ? [...options.onConflict]
             : idInfoArray.map(info => info.fieldName);
-        const createStamps = createStampKeys(this.registry.requireTable(collection.slug).descriptor);
+        const createStamps = createStampKeys(runtime.descriptor);
 
         // Each row as `save` would write it, or `undefined` for the batch.
         const prepared: { data: Record<string, unknown>; set: string[]; key: string }[] = [];
         for (const row of rows) {
-            assertNoReadOnlyRelationValues(row.values, this.registry.requireTable(collection.slug));
-            const { values: plainValues, fieldOps } = splitFieldOps(row.values, this.registry.getTable(collection.slug)?.descriptor);
+            assertNoReadOnlyRelationValues(row.values, runtime);
+            const { values: plainValues, fieldOps } = splitFieldOps(row.values, runtime.descriptor);
             if (Object.keys(fieldOps).length > 0) return undefined;
             if (manyRelationKeys.some(key => Object.prototype.hasOwnProperty.call(plainValues, key))) return undefined;
-            const serialized = serializeDataToServer(plainValues, this.registry.requireTable(collection.slug), collection);
+            const serialized = serializeDataToServer(plainValues, runtime);
             if (serialized.inverseRelationUpdates.length > 0 || serialized.joinPathRelationUpdates.length > 0) return undefined;
             const data = { ...(sanitizeAndConvertDates(serialized.scalarData) as Record<string, unknown>) };
             assertWritableColumns(data, table, collectionPath);
@@ -970,8 +966,7 @@ export class PersistService {
             }
             return column;
         }) : [];
-        const scope = upsert ? await this.writeScope(collection, collectionPath, table) : undefined;
-        const runtime = this.registry.requireTable(collection.slug);
+        const scope = upsert ? await this.writeScope(runtime, collectionPath, table) : undefined;
         const softDelete = upsert ? resolveSoftDelete(runtime) : undefined;
         const trashColumn = softDelete ? softDeleteColumn(runtime, table) : undefined;
         const writable = trashColumn ? (scope ? and(scope, isNull(trashColumn)) : isNull(trashColumn)) : scope;
@@ -1060,7 +1055,7 @@ export class PersistService {
             } else if (conditional && (options?.ignoreDuplicates || (!scope && !trashColumn))) {
                 saved.push(undefined);
             } else {
-                saved.push(await this.saveUnlessKept(collectionPath, rows[i].values, undefined, collection.databaseId, {
+                saved.push(await this.saveUnlessKept(collectionPath, rows[i].values, undefined, undefined, {
                     upsert,
                     onConflict: options?.onConflict,
                     insertOnlyKeys: rows[i].insertOnlyKeys,
@@ -1091,23 +1086,22 @@ export class PersistService {
         updates: readonly { id: string | number; values: Record<string, unknown> }[]
     ): Promise<Record<string, unknown>[] | undefined> {
         if (isNestedPath(collectionPath)) return undefined;
-        const collection = getCollectionByPath(collectionPath, this.registry);
-        if (resolveSoftDelete(this.registry.requireTable(collection.slug))) return undefined;
-        const returning = this.fetchService.insertReturning(collection.slug);
+        const runtime = requireTableAt(collectionPath, this.registry);
+        if (resolveSoftDelete(runtime)) return undefined;
+        const returning = this.fetchService.insertReturning(runtime.slug);
         if (!returning) return undefined;
-        const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = requirePrimaryKeys(collection, this.registry);
-        const resolvedRelations = resolveCollectionRelations(collection);
-        const manyRelationKeys = Object.keys(resolvedRelations).filter(key => resolvedRelations[key]?.cardinality === "many");
+        const table = pgTableOf(runtime, this.registry);
+        const idInfoArray = requirePrimaryKeys(runtime, this.registry);
+        const manyRelationKeys = [...runtime.relations.values()].filter(relation => relation.cardinality === "many").map(relation => relation.name);
         const columnOf = (field: string): AnyPgColumn => table[field as keyof typeof table] as AnyPgColumn;
 
         const prepared: { key: Record<string, unknown>; data: Record<string, unknown>; columns: string; id: string }[] = [];
         for (const { id, values } of updates) {
-            assertNoReadOnlyRelationValues(values, this.registry.requireTable(collection.slug));
-            const { values: plainValues, fieldOps } = splitFieldOps(values, this.registry.getTable(collection.slug)?.descriptor);
+            assertNoReadOnlyRelationValues(values, runtime);
+            const { values: plainValues, fieldOps } = splitFieldOps(values, runtime.descriptor);
             if (Object.keys(fieldOps).length > 0) return undefined;
             if (manyRelationKeys.some(key => Object.prototype.hasOwnProperty.call(plainValues, key))) return undefined;
-            const serialized = serializeDataToServer(plainValues, this.registry.requireTable(collection.slug), collection);
+            const serialized = serializeDataToServer(plainValues, runtime);
             if (serialized.inverseRelationUpdates.length > 0 || serialized.joinPathRelationUpdates.length > 0) return undefined;
             const data = { ...(sanitizeAndConvertDates(serialized.scalarData) as Record<string, unknown>) };
             assertWritableColumns(data, table, collectionPath);
@@ -1202,16 +1196,15 @@ export class PersistService {
         values: Record<string, unknown>,
         options?: { commitsTransaction?: boolean }
     ): Promise<Record<string, unknown>[] | undefined> {
-        const collection = getCollectionByPath(collectionPath, this.registry);
-        const returning = this.fetchService.insertReturning(collection.slug);
+        const runtime = requireTableAt(collectionPath, this.registry);
+        const returning = this.fetchService.insertReturning(runtime.slug);
         if (!returning) return undefined;
-        assertNoReadOnlyRelationValues(values, this.registry.requireTable(collection.slug));
-        const table = getTableForCollection(collection, this.registry);
-        const { values: plainValues, fieldOps } = splitFieldOps(values, this.registry.getTable(collection.slug)?.descriptor);
-        const resolvedRelations = resolveCollectionRelations(collection);
-        if (Object.keys(resolvedRelations).some(key => resolvedRelations[key]?.cardinality === "many"
-            && Object.prototype.hasOwnProperty.call(plainValues, key))) return undefined;
-        const serialized = serializeDataToServer(plainValues, this.registry.requireTable(collection.slug), collection);
+        assertNoReadOnlyRelationValues(values, runtime);
+        const table = pgTableOf(runtime, this.registry);
+        const { values: plainValues, fieldOps } = splitFieldOps(values, runtime.descriptor);
+        if ([...runtime.relations.values()].some(relation => relation.cardinality === "many"
+            && Object.prototype.hasOwnProperty.call(plainValues, relation.name))) return undefined;
+        const serialized = serializeDataToServer(plainValues, runtime);
         if (serialized.inverseRelationUpdates.length > 0 || serialized.joinPathRelationUpdates.length > 0) return undefined;
         const data = { ...(sanitizeAndConvertDates(serialized.scalarData) as Record<string, unknown>) };
         assertWritableColumns(data, table, collectionPath);
@@ -1227,7 +1220,7 @@ export class PersistService {
         }
         const compiledOps = fieldOpKeys.length > 0 ? compileFieldOps(table, fieldOps, { collectionPath }) : {};
         const bounds = fieldOpKeys.length > 0
-            ? compileFieldOpBounds(table, fieldOps, this.registry.requireTable(collection.slug), { collectionPath })
+            ? compileFieldOpBounds(table, fieldOps, runtime, { collectionPath })
             : [];
         const conditions = this.fetchService.buildWriteConditions(filter, logical, table, collectionPath);
         if (conditions.length === 0) throw filterRequired(collectionPath);
@@ -1240,11 +1233,11 @@ export class PersistService {
             const updated = await statement;
             if (bounds.length > 0) {
                 const broken = await brokenFieldOpBounds(this.db, table, conditions, bounds);
-                if (broken.length > 0) throw fieldOpBoundsError(collection.slug, broken);
+                if (broken.length > 0) throw fieldOpBoundsError(runtime.slug, broken);
             }
             return updated.map(row => returning.render(row));
         } catch (error: unknown) {
-            throw this.toUserFriendlyError(error, collection.slug, collection);
+            throw this.toUserFriendlyError(error, runtime.slug, runtime);
         }
     }
 
@@ -1259,10 +1252,10 @@ export class PersistService {
         logical: LogicalCondition | undefined,
         options?: { commitsTransaction?: boolean }
     ): Promise<Record<string, unknown>[]> {
-        const collection = getCollectionByPath(collectionPath, this.registry);
-        const table = getTableForCollection(collection, this.registry);
+        const runtime = requireTableAt(collectionPath, this.registry);
+        const table = pgTableOf(runtime, this.registry);
         const keyColumns: Record<string, AnyPgColumn> = Object.fromEntries(
-            requirePrimaryKeys(collection, this.registry).map(info => [info.fieldName, table[info.fieldName as keyof typeof table] as AnyPgColumn])
+            requirePrimaryKeys(runtime, this.registry).map(info => [info.fieldName, table[info.fieldName as keyof typeof table] as AnyPgColumn])
         );
         const conditions = this.fetchService.buildWriteConditions(filter, logical, table, collectionPath);
         if (conditions.length === 0) throw filterRequired(collectionPath);
@@ -1271,7 +1264,7 @@ export class PersistService {
             if (options?.commitsTransaction) commitWithNextStatement();
             return await statement;
         } catch (error: unknown) {
-            throw this.toUserFriendlyError(error, collection.slug, collection, "delete");
+            throw this.toUserFriendlyError(error, runtime.slug, runtime, "delete");
         }
     }
 
@@ -1280,9 +1273,9 @@ export class PersistService {
      * it: for an upsert under a `conflictWhere` that found its row first.
      */
     async rowMatches(collectionPath: string, id: string | number, filter: FilterValues<string>): Promise<boolean> {
-        const collection = getCollectionByPath(collectionPath, this.registry);
-        const table = getTableForCollection(collection, this.registry);
-        const condition = rowIdentityCondition(table, requirePrimaryKeys(collection, this.registry), id, collectionPath);
+        const runtime = requireTableAt(collectionPath, this.registry);
+        const table = pgTableOf(runtime, this.registry);
+        const condition = rowIdentityCondition(table, requirePrimaryKeys(runtime, this.registry), id, collectionPath);
         const [row] = await this.db.select({ one: sql`1` }).from(table)
             .where(and(condition, ...this.fetchService.buildFilterConditions(filter, table, collectionPath))).limit(1);
         return row !== undefined;
@@ -1314,14 +1307,14 @@ export class PersistService {
      * same scope the update gate and the single get apply; `undefined` when the
      * collection declares no hook.
      */
-    private writeScope(collection: CollectionConfig, collectionPath: string, table: PgTable): Promise<SQL | undefined> {
-        const [key] = getPrimaryKeys(collection, this.registry);
+    private writeScope(runtime: RuntimeTable, collectionPath: string, table: PgTable): Promise<SQL | undefined> {
+        const [key] = getPrimaryKeys(runtime, this.registry);
         return beforeQueryCondition(
             { registry: this.registry, callContext: this.callContext },
-            collection, collectionPath, table as PgTable<never>,
+            runtime, collectionPath, table as PgTable<never>,
             { operation: "get", query: {} },
             {
-                collection,
+                owner: runtime,
                 registry: this.registry,
                 sourceIdColumn: key ? table[key.fieldName as keyof typeof table] as AnyPgColumn | undefined : undefined
             }
@@ -1363,7 +1356,7 @@ export class PersistService {
     private toUserFriendlyError(
         error: unknown,
         collectionSlug: string,
-        collection?: CollectionConfig,
+        runtime?: RuntimeTable,
         operation: "save" | "delete" = "save"
     ): Error {
         // Deliberate API errors already carry their own status, code and wording.
@@ -1377,7 +1370,7 @@ export class PersistService {
         const pgError = extractPgError(error);
 
         if (pgError) {
-            const { message, code, violations } = pgErrorToFriendlyMessage(pgError, collectionSlug, { collection });
+            const { message, code, violations } = pgErrorToFriendlyMessage(pgError, collectionSlug, { table: runtime?.descriptor });
             /** `details` for a 4xx, carrying the field(s) — never the values. */
             const details = violations.length > 0
                 ? { collection: collectionSlug, violations }

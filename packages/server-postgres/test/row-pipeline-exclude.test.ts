@@ -54,7 +54,7 @@ describe("excludeFromApi", () => {
             emailVerificationToken: "tok_123"
         };
 
-        const served = toRestRow(row, usersCollection, registry);
+        const served = toRestRow(row, registry.requireTable(usersCollection.slug), registry);
 
         expect(served.email).toBe("a@b.c");
         expect(served).not.toHaveProperty("passwordHash");
@@ -69,7 +69,7 @@ describe("excludeFromApi", () => {
             emailVerificationToken: "tok_123"
         };
 
-        const served = toFlatRow(row, usersCollection, registry);
+        const served = toFlatRow(row, registry.requireTable(usersCollection.slug), registry);
 
         expect(served.email).toBe("a@b.c");
         expect(served).not.toHaveProperty("passwordHash");
@@ -84,7 +84,7 @@ describe("excludeFromApi", () => {
             email_verification_token: "tok_123"
         };
 
-        const served = toRestRow(row, usersCollection, registry);
+        const served = toRestRow(row, registry.requireTable(usersCollection.slug), registry);
 
         expect(served).not.toHaveProperty("password_hash");
         expect(served).not.toHaveProperty("email_verification_token");
@@ -132,7 +132,7 @@ describe("excludeFromApi", () => {
 
         it("strips the target's excluded columns from an inlined relation (REST)", () => {
             registry.registerMultiple([postsCollection]);
-            const served = toRestRow({ id: 1, title: "hi", author }, postsCollection, registry);
+            const served = toRestRow({ id: 1, title: "hi", author }, registry.requireTable(postsCollection.slug), registry);
 
             const inlined = served.author as Record<string, unknown>;
             expect(inlined.email).toBe("author@example.com");
@@ -143,7 +143,7 @@ describe("excludeFromApi", () => {
         });
 
         it("strips them from a relation REFERENCE too (admin, WebSocket, realtime)", () => {
-            const served = toFlatRow({ id: 1, title: "hi", author }, postsCollection, registry);
+            const served = toFlatRow({ id: 1, title: "hi", author }, registry.requireTable(postsCollection.slug), registry);
 
             const ref = served.author as { data?: { values?: Record<string, unknown> } };
             expect(ref.data?.values?.email).toBe("author@example.com");
@@ -171,7 +171,7 @@ describe("excludeFromApi", () => {
             };
 
             registry.registerMultiple([authorsCollection]);
-            const served = toFlatRow({ id: 1, editors: [author, { ...author, id: 8 }] }, authorsCollection, registry);
+            const served = toFlatRow({ id: 1, editors: [author, { ...author, id: 8 }] }, registry.requireTable(authorsCollection.slug), registry);
 
             for (const ref of served.editors as Array<{ data?: { values?: Record<string, unknown> } }>) {
                 expect(ref.data?.values?.email).toBe("author@example.com");
@@ -193,7 +193,7 @@ describe("excludeFromApi", () => {
 
         registry.registerMultiple([posts]);
         const served = toRestRow({ id: 1,
-title: "hello" }, posts, registry);
+title: "hello" }, registry.requireTable(posts.slug), registry);
 
         expect(served).toEqual({ id: 1,
 title: "hello" });

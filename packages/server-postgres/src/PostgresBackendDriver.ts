@@ -13,8 +13,6 @@ import {
     CallerSqlOptions,
     DataDriver,
     DeleteProps,
-    CollectionConfig,
-    isPostgresCollectionConfig,
     FetchCollectionProps,
     FetchOneProps,
     FilterValues,
@@ -55,7 +53,7 @@ import {
 import { sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Client, DatabaseError, Pool, type PoolClient } from "pg";
-import { sqlRows, anonymousWriteRefusedBy, applyCreateDefaults, applyStamps, createStampKeys, hasFieldAccessRules, buildSdkData, callbackRefusal, createAccessorSlugResolver, classifyTable, getTableName, detectJunctionTables, requireCallbackClient, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, stampModifier, tenantOf, toCallbackError, updateStampKeys } from "@rebasepro/common";
+import { sqlRows, anonymousWriteRefusedBy, applyCreateDefaults, applyStamps, createStampKeys, hasColumnAccessRules, buildSdkData, callbackRefusal, createAccessorSlugResolver, classifyTable, detectJunctionTables, isSoftDeleteRestore, requireCallbackClient, resolveTenantWrite, stampModifier, tenantOf, toCallbackError, updateStampKeys } from "@rebasepro/common";
 import { PostgresTableRegistry } from "./model/PostgresTableRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues, tableKeys } from "./services/collection-helpers";
 import { isJunctionBackedRelation, isNestedPath, resolveNestedPath, splitPathSegments } from "./services/nested-path";
@@ -83,7 +81,7 @@ import { PgNotifyListener } from "./services/pg-notify-listener";
 import { diffDatabaseBranch, mergeDatabaseBranch } from "./branching/branch-diff";
 import { isPooledPool, pooledTransactionSettings, transactionSettingsConfig, transactionSettingsStatements } from "./connection";
 import { commitWithNextStatement, pipelineTarget, runPipelinedTransaction } from "./pipelined-transaction";
-import { assertCollectionWritable, assertViewReadable } from "./services/view-access";
+import { assertTableWritable, assertViewReadable } from "./services/view-access";
 import { isReplicaFallbackError, type ReadRouter } from "./read-routing";
 import { poolStatsOf, sampleDatabaseHealth } from "./database-health";
 import { positionalStatement } from "./utils/positional-params";
@@ -545,7 +543,7 @@ export class PostgresBackendDriver implements DataDriver {
         this.user = user;
         // `data.myNotes` is the collection whose accessor is `myNotes` (the
         // `my-notes` slug, whatever its table), as the generated types say.
-        this.data = buildSdkData(this, { resolveAccessor: createAccessorSlugResolver(() => registry?.getCollections()) });
+        this.data = buildSdkData(this, { resolveAccessor: createAccessorSlugResolver(() => registry?.tables()) });
 
         // Initialize BranchService when adminConnectionString is configured
         if (poolManager) {
@@ -625,13 +623,11 @@ export class PostgresBackendDriver implements DataDriver {
         };
     }
 
-    /** The diff with each table named by the collection it backs, where one does. */
+    /** The diff with each table named by the slug it is served at, where it is served. */
     private nameDiffCollections(diff: BranchDiff): BranchDiff {
-        const collections = this.registry?.getCollections() ?? [];
-        const slugOf = (schema: string, table: string): string | undefined => collections.find((collection) => {
-            const declared = "schema" in collection && typeof collection.schema === "string" ? collection.schema : "public";
-            return declared === schema && getTableName(collection) === table;
-        })?.slug;
+        const tables = this.registry?.tables() ?? [];
+        const slugOf = (schema: string, table: string): string | undefined => tables.find(served =>
+            served.descriptor.schema === schema && served.descriptor.table === table)?.slug;
         return {
             ...diff,
             data: diff.data.map((entry) => {
@@ -771,12 +767,13 @@ export class PostgresBackendDriver implements DataDriver {
      * a driver that was never given a client refuses by name, at the read.
      */
     /**
-     * The runtime table a resolved collection was lowered from — for the call
-     * sites that still hold the collection. Throws when the driver serves no
-     * table of that slug.
+     * The runtime table a data path addresses (`registry.tableAt`: a slug,
+     * a table name, or a walk through relations), `undefined` for no path.
+     * Every write and read resolves its table here, from the path — never
+     * from a `collection` a caller handed in.
      */
-    private tableOf(collection: { slug: string } | undefined): RuntimeTable | undefined {
-        return collection ? this.registry.requireTable(collection.slug) : undefined;
+    private tableAt(path: string): RuntimeTable | undefined {
+        return path ? this.registry.tableAt(path) : undefined;
     }
 
     private buildCallContext(): RebaseCallContext {
@@ -798,25 +795,12 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     /**
-     * The collection a path addresses: the registry's copy, over the one the
-     * caller handed in (which a socket frame deserialized), for the call sites
-     * that still read a collection.
-     */
-    private resolvedCollectionAt<M extends Record<string, unknown>>(collection: CollectionConfig<M> | undefined, path: string): CollectionConfig<M> | undefined {
-        if (!collection && !path) return undefined;
-        const registryCollection = this.registry?.getCollectionByPath(path);
-        return registryCollection
-            ? { ...collection, ...registryCollection } as CollectionConfig<M>
-            : collection;
-    }
-
-    /**
      * The hooks that run for the table a path addresses — global, the table's
      * own, its columns' transforms — read off the compiled table in the
      * registry, never off a collection (a socket frame's included).
      */
-    private hooksAt(collection: { slug: string } | undefined, path: string): TableHookSet {
-        return resolveTableHooks(this.registry, path, collection?.slug);
+    private hooksAt(path: string): TableHookSet {
+        return resolveTableHooks(this.registry, path);
     }
 
     /**
@@ -840,7 +824,7 @@ export class PostgresBackendDriver implements DataDriver {
         const plainCount = (options.groupBy?.length ?? 0) === 0
             && options.aggregates.every(aggregate => (aggregate.fn === "count" || aggregate.fn === "fingerprint") && !aggregate.field);
         if (plainCount) return;
-        if (!hasAfterRead(this.hooksAt(undefined, path))) return;
+        if (!hasAfterRead(this.hooksAt(path))) return;
         throw ApiError.badRequest(
             `Aggregates other than count are refused on a table whose rows an afterRead hook rewrites ("${path}"): ` +
             "a sum, average, minimum, maximum, field count or group would read the stored values the hook hides. " +
@@ -891,12 +875,11 @@ export class PostgresBackendDriver implements DataDriver {
      */
     private applyAfterRead(
         rows: Record<string, unknown>[],
-        path: string,
-        collection?: { slug: string }
+        path: string
     ): Promise<Record<string, unknown>[]> {
         return afterReadOnRows(
             this.registry,
-            this.hooksAt(collection, path),
+            this.hooksAt(path),
             rows,
             path,
             () => this.buildCallContext(),
@@ -911,18 +894,18 @@ export class PostgresBackendDriver implements DataDriver {
         // `fields`, `distinct`, `withDeleted` and `searchExplain` were accepted
         // and dropped — an `or(...)` read returned every row while `count`
         // with the same group answered 1.
-        { path, collection, startAfter, ...query }: FetchCollectionProps<M>
+        // `collection` is not read: the table is the one `path` names.
+        { path, collection: _collection, startAfter, ...query }: FetchCollectionProps<M>
     ): Promise<Record<string, unknown>[]> {
 
         const rows = await this.dataService.fetchCollection<M>(path, {
             ...query,
-            startAfter: startAfter as Record<string, unknown> | undefined,
-            databaseId: collection?.databaseId
+            startAfter: startAfter as Record<string, unknown> | undefined
         });
 
         // The one chain: every tier, embedded relations included. A hook that
         // mutates the row and returns nothing leaves the row it mutated.
-        return this.applyAfterRead(rows, path, collection);
+        return this.applyAfterRead(rows, path);
     }
 
     /**
@@ -931,7 +914,7 @@ export class PostgresBackendDriver implements DataDriver {
      * it: {@link AuthenticatedPostgresBackendDriver} reads as a caller, and a
      * caller's reads are scoped.
      */
-    scanStoredRows(props: { path: string; collection: CollectionConfig; pageSize?: number }): AsyncIterable<Record<string, unknown>[]> {
+    scanStoredRows(props: { path: string; pageSize?: number }): AsyncIterable<Record<string, unknown>[]> {
         return this.dataService.getFetchService().scanStoredRows(props.path, props.pageSize);
     }
 
@@ -945,7 +928,7 @@ export class PostgresBackendDriver implements DataDriver {
      */
     async serveStoredRows(path: string, rows: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
         if (rows.length === 0) return rows;
-        const set = this.hooksAt(undefined, path);
+        const set = this.hooksAt(path);
         const descriptor = requireHookTable(set, path);
         const visible = rows.map(row => stripUnreadable({ ...row }, descriptor));
         return this.applyAfterRead(visible, path);
@@ -966,7 +949,8 @@ export class PostgresBackendDriver implements DataDriver {
         // was handed every row. Held back, as they always were here:
         // `vectorSearch`, which a subscription cannot serve, and `page` and
         // `withDeleted`, which the stored request has no field for.
-        { path, collection, startAfter, onUpdate, onError, vectorSearch: _vectorSearch, page: _page, withDeleted: _withDeleted, ...query }: ListenCollectionProps<M>,
+        // `collection` is not read: the table is the one `path` names.
+        { path, collection: _collection, startAfter, onUpdate, onError, vectorSearch: _vectorSearch, page: _page, withDeleted: _withDeleted, ...query }: ListenCollectionProps<M>,
         authContext: SubscriptionAuthContext | undefined = this.user ? authContextOf(this.user) : undefined
     ): () => void {
         const subscriptionId = this.generateSubscriptionId();
@@ -976,8 +960,7 @@ export class PostgresBackendDriver implements DataDriver {
             path,
             collectionRequest: {
                 ...query,
-                startAfter: startAfter as Record<string, unknown> | undefined,
-                databaseId: collection?.databaseId
+                startAfter: startAfter as Record<string, unknown> | undefined
             },
             authContext,
             onError: fetchErrorListener(onError)
@@ -992,17 +975,16 @@ export class PostgresBackendDriver implements DataDriver {
                                                              path,
                                                              id,
                                                              databaseId,
-                                                             collection,
                                                              withDeleted
                                                          }: FetchOneProps<M>): Promise<Record<string, unknown> | undefined> {
         const row = await this.dataService.fetchOne<M>(
             path,
             id,
-            databaseId || collection?.databaseId,
+            databaseId,
             withDeleted
         );
         if (!row) return row;
-        const [served] = await this.applyAfterRead([row], path, collection);
+        const [served] = await this.applyAfterRead([row], path);
         return served;
     }
 
@@ -1052,13 +1034,12 @@ export class PostgresBackendDriver implements DataDriver {
      * case and costs one descriptor read.
      */
     private async applyTenantScope<M extends Record<string, unknown>>(
-        collection: CollectionConfig | undefined,
+        table: RuntimeTable | undefined,
         path: string,
         values: Partial<EntityValues<M>>,
         status: EntityStatus,
         previousValues: Record<string, unknown> | undefined
     ): Promise<Partial<EntityValues<M>>> {
-        const table = this.tableOf(collection);
         const tenant = table ? tenantOf(table.descriptor) : undefined;
         if (!tenant) return values;
 
@@ -1073,7 +1054,7 @@ export class PostgresBackendDriver implements DataDriver {
 
         const { tenants, complete } = bypass
             ? { tenants: [] as unknown[], complete: true }
-            : await this.resolveCallerTenants(tenant, collection);
+            : await this.resolveCallerTenants(tenant);
 
         const decision = resolveTenantWrite({
             tenant,
@@ -1113,8 +1094,7 @@ export class PostgresBackendDriver implements DataDriver {
      * collection is readable by its own members in the first place.
      */
     private async resolveCallerTenants(
-        tenant: TenantDescriptor,
-        collection: CollectionConfig | undefined
+        tenant: TenantDescriptor
     ): Promise<{ tenants: unknown[]; complete: boolean }> {
         if ("claim" in tenant.from) {
             const value = this.user?.claims?.[tenant.from.claim];
@@ -1136,8 +1116,7 @@ export class PostgresBackendDriver implements DataDriver {
             // tenant at all.
             const rows = await withFieldViewer(undefined, () => this.dataService.fetchCollection(slug, {
                 filter: { [userField]: ["==", uid] },
-                limit: cap + 1,
-                databaseId: collection?.databaseId
+                limit: cap + 1
             }));
             const tenants = Array.from(new Set(
                 rows.slice(0, cap)
@@ -1176,7 +1155,7 @@ export class PostgresBackendDriver implements DataDriver {
     private storedRowPath(path: string): string {
         if (!isNestedPath(path)) return path;
         const hop = resolveNestedPath(path, this.registry);
-        return hop && isJunctionBackedRelation(hop.relation) ? hop.targetCollection.slug : path;
+        return hop && isJunctionBackedRelation(hop.relation) ? hop.target.slug : path;
     }
 
     /**
@@ -1237,12 +1216,12 @@ export class PostgresBackendDriver implements DataDriver {
      */
     private async findUpsertTarget<M extends Record<string, unknown>>(
         path: string,
-        collection: CollectionConfig,
+        table: RuntimeTable,
         values: Partial<EntityValues<M>>,
         id: string | number | undefined,
         onConflict: readonly string[] | undefined
     ): Promise<{ id: string; values: Partial<EntityValues<M>>; row: Record<string, unknown> } | undefined> {
-        const primaryKeys = keysOfTable(this.registry.requireTable(collection.slug), this.registry);
+        const primaryKeys = keysOfTable(table, this.registry);
         const key: Record<string, unknown> = { ...values };
         if (isPresentKey(id)) Object.assign(key, parseIdValues(id, primaryKeys));
         const targetFields = onConflict && onConflict.length > 0
@@ -1258,11 +1237,10 @@ export class PostgresBackendDriver implements DataDriver {
             filter[field] = ["==", value];
         }
 
-        const softDelete = resolveSoftDelete(this.tableOf(collection));
+        const softDelete = resolveSoftDelete(table);
         const [row] = await withFieldViewer(undefined, () => this.dataService.fetchCollectionForRest(path, {
             filter,
             limit: 1,
-            databaseId: collection.databaseId,
             withDeleted: softDelete ? true : undefined
         }));
         // The row must be the one the key names. A filter key the table does
@@ -1276,7 +1254,7 @@ export class PostgresBackendDriver implements DataDriver {
         const rest: Record<string, unknown> = { ...values };
         for (const field of [...primaryKeys.map(info => info.fieldName), ...targetFields]) delete rest[field];
         return {
-            id: deriveRowAddress(row, collection, this.registry),
+            id: deriveRowAddress(row, table, this.registry),
             values: rest as Partial<EntityValues<M>>,
             row
         };
@@ -1287,16 +1265,14 @@ export class PostgresBackendDriver implements DataDriver {
      * `view-access.ts`. A path this cannot resolve is the write's own to
      * answer — this refuses views, and never fails a write over a lookup.
      */
-    private assertWritable(collection: CollectionConfig | undefined, path: string): void {
-        let resolved: CollectionConfig | undefined = collection;
-        if (!resolved) {
-            try {
-                resolved = this.resolvedCollectionAt(undefined, path);
-            } catch {
-                return;
-            }
+    private assertWritable(path: string): void {
+        let table: RuntimeTable | undefined;
+        try {
+            table = this.tableAt(path);
+        } catch {
+            return;
         }
-        assertCollectionWritable(resolved, path);
+        assertTableWritable(table?.descriptor, path);
     }
 
     /**
@@ -1307,12 +1283,12 @@ export class PostgresBackendDriver implements DataDriver {
      * row and when — facts no later write can change.
      */
     private stampWrite<M extends Record<string, unknown>>(
-        collection: CollectionConfig | undefined,
+        runtime: RuntimeTable | undefined,
         values: Partial<EntityValues<M>>,
         status: EntityStatus,
         path: string
     ): Partial<EntityValues<M>> {
-        const table = this.tableOf(collection)?.descriptor;
+        const table = runtime?.descriptor;
         if (!table) return values;
         // Stamped at the application layer, after the hooks, so every write
         // through the backend carries them and a hook cannot attribute a
@@ -1355,7 +1331,7 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     /**
-     * Whether a write to `collection` has to read the stored row before it
+     * Whether a write to `table` has to read the stored row before it
      * writes: for the hooks and history that are handed it, the tenancy and
      * per-field rules that judge it, a `beforeQuery` that scopes which rows
      * the caller addresses, the trash an update must not reach, and a nested
@@ -1364,20 +1340,20 @@ export class PostgresBackendDriver implements DataDriver {
      * upsert's conflict branch finds the stored row.
      */
     private writeReadsStoredRow(
-        collection: CollectionConfig | undefined,
+        table: RuntimeTable | undefined,
         path: string,
         hooks: TableHookSet
     ): boolean {
-        if (!collection) return true;
+        if (!table) return true;
         return Boolean(
             hasBeforeSave(hooks)
             || hasRowHook(hooks, "afterSave")
             || hasRowHook(hooks, "afterSaveError")
             || hasBeforeQueryHook(hooks)
-            || collection.history
-            || tenantOf(this.registry.requireTable(collection.slug).descriptor)
-            || hasFieldAccessRules(collection)
-            || resolveSoftDelete(this.tableOf(collection))
+            || table.descriptor.history
+            || tenantOf(table.descriptor)
+            || hasColumnAccessRules(table.descriptor)
+            || resolveSoftDelete(table)
             || isNestedPath(path)
         );
     }
@@ -1396,7 +1372,7 @@ export class PostgresBackendDriver implements DataDriver {
      * it — no hook, no history, no event.
      */
     private async saveRowUnlessKept<M extends Record<string, unknown>>(props: SaveProps<M>, rule?: ConflictRule): Promise<Record<string, unknown> | undefined> {
-        this.assertWritable(props.collection, props.path);
+        this.assertWritable(props.path);
         // A frame per write, so a hook whose `context.data` write runs that
         // hook again is refused at a bounded depth instead of looping inside
         // the request's transaction. See `write-depth.ts`.
@@ -1411,18 +1387,17 @@ export class PostgresBackendDriver implements DataDriver {
      * which may read through `context.data`) and no history entry.
      */
     private lastWriteCommits(
-        collection: CollectionConfig | undefined,
+        table: RuntimeTable | undefined,
         hooks?: TableHookSet
     ): boolean {
         return this._commitsWithLastWrite && currentWriteDepth() <= 1
-            && !(hooks && declaresAnyHook(hooks)) && !collection?.history;
+            && !(hooks && declaresAnyHook(hooks)) && !table?.descriptor.history;
     }
 
     private async saveInFrame<M extends Record<string, unknown>>({
                                                             path,
                                                             id,
                                                             values,
-                                                            collection,
                                                             status,
                                                             upsert,
                                                             onConflict,
@@ -1436,12 +1411,12 @@ export class PostgresBackendDriver implements DataDriver {
                                                         /** An upsert's conflict rule: see {@link saveRowUnlessKept}. */
                                                         rule?: ConflictRule): Promise<Record<string, unknown> | undefined> {
 
-        const resolvedCollection = this.resolvedCollectionAt(collection, path);
-        const hooks = this.hooksAt(collection, path);
+        const runtime = this.tableAt(path);
+        const hooks = this.hooksAt(path);
         if (declaresAnyHook(hooks)) currentWriteScope()?.noteApplicationCode();
         // Before anything runs, hooks included: a write whose audit entry
         // cannot be recorded is refused, not made and rolled back.
-        if (resolvedCollection?.history) this.historyService?.assertRecordable(resolvedCollection.slug);
+        if (runtime?.descriptor.history) this.historyService?.assertRecordable(runtime.slug);
 
         // An upsert that finds its row is an update of that row, and runs as
         // one: the update gate, `beforeSave` told "existing" with the stored
@@ -1456,9 +1431,9 @@ export class PostgresBackendDriver implements DataDriver {
         // statement's own conflict branch below.
         const assertUpdateShape = () => {
             if (status !== "existing") return;
-            assertUpdateDoesNotSoftDelete(this.tableOf(resolvedCollection as CollectionConfig | undefined), values, path);
+            assertUpdateDoesNotSoftDelete(runtime, values, path);
             if (isPresentKey(id)) {
-                assertKeyUnchanged(this.tableOf(resolvedCollection as CollectionConfig | undefined), this.registry, id, values as Record<string, unknown>, path);
+                assertKeyUnchanged(runtime, this.registry, id, values as Record<string, unknown>, path);
             }
         };
         // A caller's precondition is answered first, as the REST routes
@@ -1470,10 +1445,10 @@ export class PostgresBackendDriver implements DataDriver {
         const upserting = upsert === true && status !== "existing";
         // Read first only for what needs the stored row; otherwise the
         // INSERT's conflict branch below is the update, in one statement.
-        const readsStoredRow = this.writeReadsStoredRow(resolvedCollection as CollectionConfig | undefined, path, hooks);
-        if (upserting && resolvedCollection && readsStoredRow) {
+        const readsStoredRow = this.writeReadsStoredRow(runtime, path, hooks);
+        if (upserting && runtime && readsStoredRow) {
             const stored = await this.findUpsertTarget<M>(
-                path, resolvedCollection as CollectionConfig, values, id, onConflict
+                path, runtime, values, id, onConflict
             );
             // A stored row the rule keeps: nothing to update, nothing to run.
             if (stored && rule && (rule.ignoreDuplicates || (rule.conflictWhere
@@ -1489,9 +1464,9 @@ export class PostgresBackendDriver implements DataDriver {
                 // find ran on the trusted plane for per-field read access, and a
                 // nested path reads the row from elsewhere.
                 const reusable = !hasBeforeQueryHook(hooks)
-                    && !hasFieldAccessRules(resolvedCollection as CollectionConfig) && !isNestedPath(path);
+                    && !hasColumnAccessRules(runtime.descriptor) && !isNestedPath(path);
                 return this.saveInFrame<M>(
-                    { path, id: stored.id, values: stored.values, collection, status: "existing" },
+                    { path, id: stored.id, values: stored.values, status: "existing" },
                     frame,
                     reusable ? stored.row : undefined
                 );
@@ -1510,7 +1485,7 @@ export class PostgresBackendDriver implements DataDriver {
         // Before validation too: `.notNull()` on create is satisfied by a
         // default, which is why `assertWriteValuesValid` skips a column that
         // declares one.
-        const writtenTable = this.tableOf(resolvedCollection as CollectionConfig | undefined)?.descriptor;
+        const writtenTable = runtime?.descriptor;
         if ((status === "new" || status === "copy") && writtenTable) {
             updatedValues = applyCreateDefaults(writtenTable, updatedValues as Record<string, unknown>) as Partial<EntityValues<M>>;
         }
@@ -1531,7 +1506,7 @@ export class PostgresBackendDriver implements DataDriver {
             // and before the write, as `delete` answers it. The read is the
             // caller's: their policies, their `beforeQuery`, and the trash
             // hidden. So a row in the trash is a 404 too, unless this update
-            // is its restore (`restoresSoftDeletedRow`), which is the one edit
+            // is its restore (`isSoftDeleteRestore`), which is the one edit
             // that reaches a stamped row.
             //
             // This used to refuse only when the collection declared a
@@ -1555,8 +1530,8 @@ export class PostgresBackendDriver implements DataDriver {
             // is locked, when it asks for that — so the routes no longer read
             // the row in a transaction of their own first.
             try {
-                const withDeleted = restoresSoftDeletedRow(
-                    resolvedCollection as CollectionConfig | undefined,
+                const withDeleted = runtime && isSoftDeleteRestore(
+                    runtime.descriptor,
                     values as Record<string, unknown>
                 ) ? true : undefined;
                 if (precondition?.lock) await this.dataService.getPersistService().lockRow(path, id);
@@ -1564,11 +1539,11 @@ export class PostgresBackendDriver implements DataDriver {
                 const existing = knownStored && !precondition
                     ? knownStored
                     : await this.dataService.getFetchService().fetchOneForRest(
-                        storedPath, id, undefined, resolvedCollection?.databaseId, { withDeleted }
+                        storedPath, id, undefined, undefined, { withDeleted }
                     );
                 if (precondition) {
                     const addressed = await this.rowAnUpdateAddresses(
-                        path, storedPath, id, existing, resolvedCollection?.databaseId, withDeleted
+                        path, storedPath, id, existing, undefined, withDeleted
                     );
                     await precondition.check(await this.asRestServes(addressed, path));
                 }
@@ -1620,10 +1595,10 @@ export class PostgresBackendDriver implements DataDriver {
         }
         const afterHooks: Partial<EntityValues<M>> = updatedValues;
         if (status === "existing" && isPresentKey(id)) {
-            assertKeyUnchanged(this.tableOf(resolvedCollection as CollectionConfig | undefined), this.registry, id, updatedValues as Record<string, unknown>, path);
+            assertKeyUnchanged(runtime, this.registry, id, updatedValues as Record<string, unknown>, path);
         }
 
-        updatedValues = this.stampWrite(resolvedCollection, updatedValues, status ?? "new", path);
+        updatedValues = this.stampWrite(runtime, updatedValues, status ?? "new", path);
 
         // Tenancy, last of the three stamps and for the same reason they are
         // here rather than in a hook: the tenant comes from the *call context*,
@@ -1633,7 +1608,7 @@ export class PostgresBackendDriver implements DataDriver {
         // one layer earlier, with the field named. See `@rebasepro/common`'s
         // `resolveTenantWrite`.
         updatedValues = await this.applyTenantScope(
-            resolvedCollection as CollectionConfig | undefined,
+            runtime,
             path,
             updatedValues,
             status ?? "new",
@@ -1650,10 +1625,10 @@ export class PostgresBackendDriver implements DataDriver {
         // of refused. Only `status: "existing"` addresses a stored row; a
         // duplicate key here is the driver's 409, as it is for any create.
         let writeId = id;
-        if ((status === "new" || status === "copy") && !upsert && isPresentKey(id) && resolvedCollection) {
+        if ((status === "new" || status === "copy") && !upsert && isPresentKey(id) && runtime) {
             updatedValues = {
                 ...updatedValues,
-                ...parseIdValues(id, keysOfTable(this.registry.requireTable(resolvedCollection.slug), this.registry))
+                ...parseIdValues(id, keysOfTable(runtime, this.registry))
             } as Partial<EntityValues<M>>;
             writeId = undefined;
         }
@@ -1670,7 +1645,7 @@ export class PostgresBackendDriver implements DataDriver {
         // A stamped soft-delete field may create a row already trashed, and
         // may not trash a stored one: that is a delete (see
         // `assertUpdateDoesNotSoftDelete`).
-        const softDeleteField = resolveSoftDelete(this.tableOf(resolvedCollection as CollectionConfig | undefined))?.field;
+        const softDeleteField = resolveSoftDelete(runtime)?.field;
         if (insertOnlyKeys && softDeleteField
             && updatedValues[softDeleteField] !== undefined && updatedValues[softDeleteField] !== null) {
             insertOnlyKeys.push(softDeleteField);
@@ -1682,11 +1657,11 @@ export class PostgresBackendDriver implements DataDriver {
                 onConflict,
                 insertOnlyKeys,
                 unreadRow,
-                commitsTransaction: this.lastWriteCommits(resolvedCollection as CollectionConfig | undefined, hooks)
+                commitsTransaction: this.lastWriteCommits(runtime, hooks)
             };
             const storedRow = upserting && rule
-                ? await this.dataService.saveUnlessKept<M>(path, updatedValues, writeId, resolvedCollection?.databaseId, { ...persistOptions, ...rule })
-                : await this.dataService.save<M>(path, updatedValues, writeId, resolvedCollection?.databaseId, persistOptions);
+                ? await this.dataService.saveUnlessKept<M>(path, updatedValues, writeId, undefined, { ...persistOptions, ...rule })
+                : await this.dataService.save<M>(path, updatedValues, writeId, undefined, persistOptions);
             // Left as it was by the conflict rule: nothing was written.
             if (!storedRow) return undefined;
 
@@ -1706,11 +1681,7 @@ export class PostgresBackendDriver implements DataDriver {
             // literally named `id`, and is ordinary data for a table that has such
             // a column without it being the key. From the stored row: an
             // `afterRead` may reshape or mask the key columns of the view.
-            const savedId = deriveRowAddress(
-                storedRow,
-                (resolvedCollection ?? collection) as CollectionConfig,
-                this.registry
-            );
+            const savedId = runtime ? deriveRowAddress(storedRow, runtime, this.registry) : "";
             // `values` are the row's columns — all of them, as stored. For an
             // `id`-keyed table that includes `id`, which used to be stripped here
             // because it was the synthesized address rather than the column it now is.
@@ -1744,13 +1715,13 @@ export class PostgresBackendDriver implements DataDriver {
             // not held, the service swallowed its own errors — which meant the
             // audit trail of a collection that opted into one had silent,
             // unbounded gaps. See `HistoryService.recordHistory` for the trade.
-            if (this.historyService && resolvedCollection?.history) {
+            if (this.historyService && runtime?.descriptor.history) {
                 await this.historyService.recordHistory({
                     // The collection's slug, which is what the history route
                     // reads — not the path the write came in on. Keyed by
                     // `owners/1/docs`, a write made through a parent never
                     // appeared in the row's own history.
-                    tableName: resolvedCollection.slug,
+                    tableName: runtime.slug,
                     id: savedId,
                     action: status === "existing" ? "update" : "create",
                     values: savedValues as Record<string, unknown>,
@@ -1764,8 +1735,8 @@ export class PostgresBackendDriver implements DataDriver {
                 path,
                 id: savedId,
                 row: savedRow,
-                databaseId: resolvedCollection?.databaseId
-            }, ...this.childListNotifications(resolvedCollection, savedId, updatedValues as Record<string, unknown>)];
+                databaseId: undefined
+            }, ...this.childListNotifications(runtime, savedId, updatedValues as Record<string, unknown>)];
             if (this._deferNotifications) {
                 this._pendingNotifications.push(...notifications);
             } else {
@@ -1908,13 +1879,12 @@ export class PostgresBackendDriver implements DataDriver {
     async saveMany<M extends Record<string, unknown>>({
                                                           path,
                                                           rows,
-                                                          collection,
                                                           upsert,
                                                           onConflict,
                                                           conflictWhere,
                                                           ignoreDuplicates
                                                       }: SaveManyProps<M>): Promise<Record<string, unknown>[]> {
-        this.assertWritable(collection, path);
+        this.assertWritable(path);
         // A conflict rule shapes what an upsert does to a stored row; on an
         // insert there is no conflict for it to shape.
         if ((conflictWhere || ignoreDuplicates) && upsert !== true) {
@@ -1935,11 +1905,11 @@ export class PostgresBackendDriver implements DataDriver {
         // Together first, in a transaction of its own; a batch the database
         // refuses is undone whole and replayed row by row below, which names
         // the row that fails.
-        if (rows.length > 1 && this.writesRowsTogether(collection, path)) {
+        if (rows.length > 1 && this.writesRowsTogether(path)) {
             try {
                 const together = await this.inBatchTransaction(txDriver => {
                     txDriver._commitsWithLastWrite = commitsWithLastWrite;
-                    return txDriver.saveRowsTogether<M>(path, rows, collection, upsert === true, onConflict, rule);
+                    return txDriver.saveRowsTogether<M>(path, rows, upsert === true, onConflict, rule);
                 });
                 if (together) return together;
             } catch (error) {
@@ -1971,7 +1941,6 @@ export class PostgresBackendDriver implements DataDriver {
                         // every one. Leaving the key inside `values` is what
                         // single-row `create(data, id)` does, and it inserts.
                         // Callers who want existing rows overwritten pass `upsert`.
-                        collection,
                         status: "new",
                         upsert,
                         onConflict
@@ -2004,10 +1973,10 @@ export class PostgresBackendDriver implements DataDriver {
      * hook runs once per row between that row's writes, and history and
      * tenancy read per row, so those batches keep the row-by-row pipeline.
      */
-    private writesRowsTogether(collection: CollectionConfig | undefined, path: string): boolean {
-        const resolved = this.resolvedCollectionAt(collection, path);
-        if (!resolved || isNestedPath(path) || resolved.history || tenantOf(this.registry.requireTable(resolved.slug).descriptor)) return false;
-        const hooks = this.hooksAt(collection, path);
+    private writesRowsTogether(path: string): boolean {
+        const resolved = this.tableAt(path);
+        if (!resolved || isNestedPath(path) || resolved.descriptor.history || tenantOf(resolved.descriptor)) return false;
+        const hooks = this.hooksAt(path);
         return !hasBeforeSave(hooks) && !hasRowHook(hooks, "afterSave") && !hasRowHook(hooks, "afterSaveError");
     }
 
@@ -2024,27 +1993,24 @@ export class PostgresBackendDriver implements DataDriver {
     private async saveRowsTogether<M extends Record<string, unknown>>(
         path: string,
         rows: readonly Partial<EntityValues<M>>[],
-        collection: CollectionConfig | undefined,
         upsert: boolean,
         onConflict: readonly string[] | undefined,
         rule?: ConflictRule
     ): Promise<Record<string, unknown>[] | undefined> {
-        const resolved = this.resolvedCollectionAt(collection, path);
+        const resolved = this.tableAt(path);
         if (!resolved) return undefined;
-        const hooks = this.hooksAt(collection, path);
+        const hooks = this.hooksAt(path);
 
         // What `saveInFrame` does to a new row with no hooks to run: the
         // declared defaults, then the stamps, and for an upsert the keys its
         // conflict-update must leave alone.
-        const runtimeTable = this.tableOf(resolved);
+        const runtimeTable = resolved;
         const softDeleteField = resolveSoftDelete(runtimeTable)?.field;
         const prepared = rows.map(values => {
-            const withDefaults = runtimeTable
-                ? applyCreateDefaults(runtimeTable.descriptor, values as Record<string, unknown>) as Partial<EntityValues<M>>
-                : values;
+            const withDefaults = applyCreateDefaults(runtimeTable.descriptor, values as Record<string, unknown>) as Partial<EntityValues<M>>;
             const stamped = this.stampWrite(resolved, withDefaults, "new", path) as Record<string, unknown>;
             const insertOnlyKeys = upsert
-                ? insertOnlyKeysOf(stamped, values, withDefaults as Record<string, unknown>, withDefaults as Record<string, unknown>, runtimeTable?.descriptor)
+                ? insertOnlyKeysOf(stamped, values, withDefaults as Record<string, unknown>, withDefaults as Record<string, unknown>, runtimeTable.descriptor)
                 : undefined;
             if (insertOnlyKeys && softDeleteField && stamped[softDeleteField] !== undefined && stamped[softDeleteField] !== null) {
                 insertOnlyKeys.push(softDeleteField);
@@ -2073,19 +2039,18 @@ export class PostgresBackendDriver implements DataDriver {
      */
     private async updateRowsTogether<M extends Record<string, unknown>>(
         path: string,
-        updates: UpdateManyProps<M>["updates"],
-        collection: CollectionConfig | undefined
+        updates: UpdateManyProps<M>["updates"]
     ): Promise<Record<string, unknown>[] | undefined> {
-        const resolved = this.resolvedCollectionAt(collection, path);
+        const resolved = this.tableAt(path);
         if (!resolved) return undefined;
         const prepared = updates.map(({ id, values }) => {
-            assertUpdateDoesNotSoftDelete(this.tableOf(resolved), values as Record<string, unknown>, path);
-            assertKeyUnchanged(this.tableOf(resolved), this.registry, String(id), values as Record<string, unknown>, path);
+            assertUpdateDoesNotSoftDelete(resolved, values as Record<string, unknown>, path);
+            assertKeyUnchanged(resolved, this.registry, String(id), values as Record<string, unknown>, path);
             return { id, values: this.stampWrite(resolved, values, "existing", path) as Record<string, unknown> };
         });
         const stored = await this.dataService.getPersistService().updateRows(path, prepared);
         if (!stored) return undefined;
-        return this.answerRowsWritten(stored, prepared.map(row => row.values), resolved, path, this.hooksAt(collection, path));
+        return this.answerRowsWritten(stored, prepared.map(row => row.values), resolved, path, this.hooksAt(path));
     }
 
     /**
@@ -2096,21 +2061,21 @@ export class PostgresBackendDriver implements DataDriver {
     private async answerRowsWritten(
         stored: Record<string, unknown>[],
         written: Record<string, unknown>[],
-        collection: CollectionConfig,
+        table: RuntimeTable,
         path: string,
         hooks: TableHookSet
     ): Promise<Record<string, unknown>[]> {
         const context = this.buildCallContext();
-        const primaryKeys = getPrimaryKeys(collection, this.registry);
+        const primaryKeys = getPrimaryKeys(table, this.registry);
         const saved: Record<string, unknown>[] = [];
         const notifications: PostgresBackendDriver["_pendingNotifications"] = [];
         for (let i = 0; i < stored.length; i++) {
             const storedRow = stored[i];
             const savedRow = await this.viewOfSavedRow(storedRow, path, hooks, context);
-            const savedId = deriveRowAddress(storedRow, collection, this.registry, primaryKeys);
+            const savedId = deriveRowAddress(storedRow, table, this.registry, primaryKeys);
             notifications.push(
-                { path, id: savedId, row: savedRow, databaseId: collection.databaseId },
-                ...this.childListNotifications(collection, savedId, written[i])
+                { path, id: savedId, row: savedRow, databaseId: undefined },
+                ...this.childListNotifications(table, savedId, written[i])
             );
             saved.push(savedRow);
         }
@@ -2141,17 +2106,16 @@ export class PostgresBackendDriver implements DataDriver {
      */
     async updateMany<M extends Record<string, unknown>>({
         path,
-        updates,
-        collection
+        updates
     }: UpdateManyProps<M>): Promise<Record<string, unknown>[]> {
-        this.assertWritable(collection, path);
+        this.assertWritable(path);
         const commitsWithLastWrite = this._commitsWithLastWrite;
         // Together first, as `saveMany` does: one statement per run of updates
         // that set the same columns. Refused or partly matched, the batch is
         // undone and replayed one by one below, which names the entry and why.
-        if (updates.length > 1 && this.writesRowsTogether(collection, path)) {
+        if (updates.length > 1 && this.writesRowsTogether(path)) {
             try {
-                const together = await this.inBatchTransaction(txDriver => txDriver.updateRowsTogether<M>(path, updates, collection));
+                const together = await this.inBatchTransaction(txDriver => txDriver.updateRowsTogether<M>(path, updates));
                 if (together) return together;
             } catch (error) {
                 logger.debug(`[updateMany] A batch update of "${path}" failed; updating its rows one by one to name the row`, {
@@ -2179,7 +2143,6 @@ export class PostgresBackendDriver implements DataDriver {
                         path,
                         id: String(id),
                         values,
-                        collection,
                         status: "existing",
                         precondition: { check: stored => assertBatchRowFound(stored, id) }
                     }));
@@ -2215,10 +2178,9 @@ export class PostgresBackendDriver implements DataDriver {
     async deleteMany<M extends Record<string, unknown>>({
         path,
         ids,
-        collection,
         hard
     }: DeleteManyProps<M>): Promise<void> {
-        this.assertWritable(collection, path);
+        this.assertWritable(path);
         const commitsWithLastWrite = this._commitsWithLastWrite;
         await this.inBatchTransaction(async (txDriver) => {
 
@@ -2232,7 +2194,6 @@ export class PostgresBackendDriver implements DataDriver {
                     // back like any other failure.
                     await txDriver.delete<M>({
                         row: { id: String(id), path },
-                        collection,
                         hard
                     });
                 } catch (error) {
@@ -2259,14 +2220,13 @@ export class PostgresBackendDriver implements DataDriver {
         path,
         filter,
         logical,
-        values,
-        collection
+        values
     }: UpdateWhereProps<M>): Promise<Record<string, unknown>[]> {
-        this.assertWritable(collection, path);
-        const resolved = this.assertFilteredWrite(this.resolvedCollectionAt(collection, path), path, filter, logical);
+        this.assertWritable(path);
+        const resolved = this.assertFilteredWrite(this.tableAt(path), path, filter, logical);
         const written = values as Record<string, unknown>;
-        assertUpdateDoesNotSoftDelete(this.tableOf(resolved), written, path);
-        const keys = keysOfTable(this.registry.requireTable(resolved.slug), this.registry).map(key => key.fieldName).filter(field => written[field] !== undefined);
+        assertUpdateDoesNotSoftDelete(resolved, written, path);
+        const keys = keysOfTable(resolved, this.registry).map(key => key.fieldName).filter(field => written[field] !== undefined);
         if (keys.length > 0) {
             throw ApiError.badRequest(
                 `'${keys[0]}' is the key of '${resolved.slug}', and an update cannot change it — a filtered one least of all, ` +
@@ -2275,7 +2235,7 @@ export class PostgresBackendDriver implements DataDriver {
                 { collection: resolved.slug, violations: keys.map(field => ({ field, code: "key_immutable" })) }
             );
         }
-        const hooks = this.hooksAt(collection, path);
+        const hooks = this.hooksAt(path);
         if (!this.writeReadsStoredRow(resolved, path, hooks)) {
             const stamped = this.stampWrite(resolved, values, "existing", path) as Record<string, unknown>;
             const stored = await this.dataService.getPersistService().updateWhere(path, filter, logical, stamped, {
@@ -2285,7 +2245,7 @@ export class PostgresBackendDriver implements DataDriver {
         }
         const ids = await this.addressesMatching(resolved, path, filter, logical);
         if (ids.length === 0) return [];
-        return this.updateMany<M>({ path, updates: ids.map(id => ({ id, values })), collection });
+        return this.updateMany<M>({ path, updates: ids.map(id => ({ id, values })) });
     }
 
     /**
@@ -2298,13 +2258,12 @@ export class PostgresBackendDriver implements DataDriver {
         path,
         filter,
         logical,
-        collection,
         hard
     }: DeleteWhereProps<M>): Promise<number> {
-        this.assertWritable(collection, path);
-        const resolved = this.assertFilteredWrite(this.resolvedCollectionAt(collection, path), path, filter, logical);
-        const softDeleting = !hard && resolveSoftDelete(this.tableOf(resolved)) !== undefined;
-        if (!softDeleting && !resolved.history && !declaresAnyHook(this.hooksAt(collection, path))) {
+        this.assertWritable(path);
+        const resolved = this.assertFilteredWrite(this.tableAt(path), path, filter, logical);
+        const softDeleting = !hard && resolveSoftDelete(resolved) !== undefined;
+        if (!softDeleting && !resolved.descriptor.history && !declaresAnyHook(this.hooksAt(path))) {
             const deleted = await this.dataService.getPersistService().deleteWhere(path, filter, logical, {
                 commitsTransaction: this.lastWriteCommits(resolved)
             });
@@ -2312,7 +2271,7 @@ export class PostgresBackendDriver implements DataDriver {
                 path,
                 id: deriveRowAddress(row, resolved, this.registry),
                 row: null,
-                databaseId: resolved.databaseId
+                databaseId: undefined
             }));
             if (this._deferNotifications) {
                 this._pendingNotifications.push(...notifications);
@@ -2325,7 +2284,7 @@ export class PostgresBackendDriver implements DataDriver {
         }
         const ids = await this.addressesMatching(resolved, path, filter, logical);
         if (ids.length === 0) return 0;
-        await this.deleteMany<M>({ path, ids, collection, hard });
+        await this.deleteMany<M>({ path, ids, hard });
         return ids.length;
     }
 
@@ -2333,35 +2292,35 @@ export class PostgresBackendDriver implements DataDriver {
      * A row's address in the spelling a read derives it in — `010` is row
      * `10` — for an event about a row this write did not read.
      */
-    private canonicalAddress(collection: CollectionConfig | undefined, id: string | number): string {
-        if (!collection) return String(id);
+    private canonicalAddress(table: RuntimeTable | undefined, id: string | number): string {
+        if (!table) return String(id);
         try {
-            return deriveRowAddress(parseIdValues(id, getPrimaryKeys(collection, this.registry)), collection, this.registry) || String(id);
+            return deriveRowAddress(parseIdValues(id, getPrimaryKeys(table, this.registry)), table, this.registry) || String(id);
         } catch {
             return String(id);
         }
     }
 
     /**
-     * The collection a filtered write addresses, refused when it cannot be
+     * The table a filtered write addresses, refused when it cannot be
      * one: a path through a relation (a filter there would reach rows the
      * path does not), or a filter with no condition (every row).
      */
     private assertFilteredWrite(
-        collection: CollectionConfig | undefined,
+        table: RuntimeTable | undefined,
         path: string,
         filter: FilterValues<string> | undefined,
         logical: LogicalCondition | undefined
-    ): CollectionConfig {
-        if (!collection || isNestedPath(path)) {
+    ): RuntimeTable {
+        if (!table || isNestedPath(path)) {
             throw ApiError.badRequest(
-                `A filtered write addresses a collection, and "${path}" is ${collection ? "a path through a relation" : "not one"}. ` +
+                `A filtered write addresses a collection, and "${path}" is ${table ? "a path through a relation" : "not one"}. ` +
                 "Write to the related collection with a filter on its link instead.",
                 "INVALID_FILTERED_WRITE"
             );
         }
         if ((!filter || Object.keys(filter).length === 0) && !logical) throw filterRequired(path);
-        return collection;
+        return table;
     }
 
     /**
@@ -2370,19 +2329,18 @@ export class PostgresBackendDriver implements DataDriver {
      * filtered write that runs row by row.
      */
     private async addressesMatching(
-        collection: CollectionConfig,
+        table: RuntimeTable,
         path: string,
         filter: FilterValues<string> | undefined,
         logical: LogicalCondition | undefined
     ): Promise<string[]> {
-        const primaryKeys = getPrimaryKeys(collection, this.registry);
+        const primaryKeys = getPrimaryKeys(table, this.registry);
         const rows = await this.dataService.getFetchService().fetchCollectionForRest(path, {
             filter,
             logical,
-            fields: primaryKeys.map(key => key.fieldName),
-            databaseId: collection.databaseId
+            fields: primaryKeys.map(key => key.fieldName)
         });
-        return rows.map(row => deriveRowAddress(row, collection, this.registry, primaryKeys));
+        return rows.map(row => deriveRowAddress(row, table, this.registry, primaryKeys));
     }
 
     /**
@@ -2437,7 +2395,6 @@ export class PostgresBackendDriver implements DataDriver {
                             row = await txDriver.save<M>({
                                 path: operation.path,
                                 values: values ?? ({} as Partial<EntityValues<M>>),
-                                collection: operation.collection,
                                 status: "new"
                             });
                             break;
@@ -2445,7 +2402,6 @@ export class PostgresBackendDriver implements DataDriver {
                             row = await txDriver.save<M>({
                                 path: operation.path,
                                 values: values ?? ({} as Partial<EntityValues<M>>),
-                                collection: operation.collection,
                                 status: "new",
                                 upsert: true,
                                 onConflict: operation.onConflict
@@ -2460,7 +2416,6 @@ export class PostgresBackendDriver implements DataDriver {
                                 path: operation.path,
                                 id: id!,
                                 values: values ?? ({} as Partial<EntityValues<M>>),
-                                collection: operation.collection,
                                 status: "existing",
                                 precondition: { check: stored => assertBatchRowFound(stored, id) }
                             });
@@ -2469,8 +2424,7 @@ export class PostgresBackendDriver implements DataDriver {
                         case "delete":
                             // `delete` reads the row itself and 404s on a miss.
                             await txDriver.delete<M>({
-                                row: { id: id!, path: operation.path },
-                                collection: operation.collection
+                                row: { id: id!, path: operation.path }
                             });
                             row = null;
                             break;
@@ -2502,14 +2456,13 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     async delete<M extends Record<string, unknown>>(props: DeleteProps<M>): Promise<void> {
-        this.assertWritable(props.collection, props.row.path);
+        this.assertWritable(props.row.path);
         // A frame per write, as `save` has: see `write-depth.ts`.
         return inWriteFrame(props.row.path, "delete", frame => this.deleteInFrame(props, frame));
     }
 
     private async deleteInFrame<M extends Record<string, unknown>>({
                                                               row,
-                                                              collection,
                                                               hard,
                                                               precondition
                                                           }: DeleteProps<M>, frame: WriteFrame): Promise<void> {
@@ -2518,8 +2471,8 @@ export class PostgresBackendDriver implements DataDriver {
 
         // The hooks come from the compiled table in the registry, never from
         // the collection a caller (a socket frame) handed in.
-        const resolvedCollection = this.resolvedCollectionAt(collection, targetPath);
-        const hooks = this.hooksAt(collection, targetPath);
+        const runtime = this.tableAt(targetPath);
+        const hooks = this.hooksAt(targetPath);
         if (declaresAnyHook(hooks)) currentWriteScope()?.noteApplicationCode();
 
         // Through a many-to-many path the target row is not what is deleted —
@@ -2527,7 +2480,7 @@ export class PostgresBackendDriver implements DataDriver {
         const hop = isNestedPath(targetPath) ? resolveNestedPath(targetPath, this.registry) : undefined;
         const unlinking = hop !== undefined && isJunctionBackedRelation(hop.relation);
         // Before anything runs, as `save` does.
-        if (resolvedCollection?.history && !unlinking) this.historyService?.assertRecordable(resolvedCollection.slug);
+        if (runtime?.descriptor.history && !unlinking) this.historyService?.assertRecordable(runtime.slug);
 
         // The row being deleted is read here, from the database, by this
         // driver — which on a user request is bound to that user's
@@ -2559,14 +2512,14 @@ export class PostgresBackendDriver implements DataDriver {
         // row that is not there (or not the caller's) is its 404, answered as
         // the read would have answered it — see `explainZeroRowWrite` — and
         // the row's address comes back from the statement.
-        const softDeleting = !hard && !unlinking && resolveSoftDelete(this.tableOf(resolvedCollection as CollectionConfig | undefined)) !== undefined;
-        if (!precondition && !hop && !softDeleting && !resolvedCollection?.history
+        const softDeleting = !hard && !unlinking && resolveSoftDelete(runtime) !== undefined;
+        if (!precondition && !hop && !softDeleting && !runtime?.descriptor.history
             && !declaresAnyHook(hooks)) {
-            await this.dataService.delete(targetPath, row.id, resolvedCollection?.databaseId, {
-                commitsTransaction: this.lastWriteCommits(resolvedCollection as CollectionConfig | undefined)
+            await this.dataService.delete(targetPath, row.id, undefined, {
+                commitsTransaction: this.lastWriteCommits(runtime)
             });
-            const deletedAddress = this.canonicalAddress(resolvedCollection as CollectionConfig | undefined, row.id);
-            const notification = { path: targetPath, id: deletedAddress, row: null, databaseId: resolvedCollection?.databaseId };
+            const deletedAddress = this.canonicalAddress(runtime, row.id);
+            const notification = { path: targetPath, id: deletedAddress, row: null, databaseId: undefined };
             if (this._deferNotifications) this._pendingNotifications.push(notification);
             else await this.realtimeService.notifyUpdate(notification.path, notification.id, null, notification.databaseId);
             return;
@@ -2577,7 +2530,7 @@ export class PostgresBackendDriver implements DataDriver {
             targetPath,
             row.id,
             undefined,
-            resolvedCollection?.databaseId,
+            undefined,
             { withDeleted: hard ? true : undefined }
         );
         if (precondition) await precondition.check(await this.asRestServes(stored, targetPath));
@@ -2596,8 +2549,8 @@ export class PostgresBackendDriver implements DataDriver {
         // history entry and its realtime event are keyed by. Not `row.id`, the
         // caller's spelling: `010` finds row 10, and an entry keyed `010` is
         // one `GET /docs/10/history` never shows.
-        const address = (resolvedCollection
-            ? deriveRowAddress(stored, resolvedCollection as CollectionConfig, this.registry)
+        const address = (runtime
+            ? deriveRowAddress(stored, runtime, this.registry)
             : "") || row.id.toString();
 
         const contextForCallback = this.buildCallContext();
@@ -2634,19 +2587,19 @@ export class PostgresBackendDriver implements DataDriver {
         // here, it trashed the tag for every post and re-asserted the link.
         const softDelete = hard || unlinking
             ? undefined
-            : resolveSoftDelete(this.tableOf(resolvedCollection as CollectionConfig | undefined));
+            : resolveSoftDelete(runtime);
         if (softDelete) {
             await this.dataService.save(
                 targetPath,
                 { [softDelete.field]: new Date() } as Partial<EntityValues<M>>,
                 row.id,
-                resolvedCollection?.databaseId
+                undefined
             );
         } else {
             await this.dataService.delete(
                 targetPath,
                 row.id,
-                resolvedCollection?.databaseId
+                undefined
             );
         }
 
@@ -2666,10 +2619,10 @@ export class PostgresBackendDriver implements DataDriver {
         // describes is gone.
         // An unlink changed a parent's set, not the target row, so it is not
         // an entry in that row's history.
-        if (this.historyService && resolvedCollection?.history && !unlinking) {
+        if (this.historyService && runtime?.descriptor.history && !unlinking) {
             await this.historyService.recordHistory({
                 // Keyed like the save's entry: the slug, whatever the path.
-                tableName: resolvedCollection.slug,
+                tableName: runtime.slug,
                 id: address,
                 action: "delete",
                 values: stored,
@@ -2683,14 +2636,14 @@ export class PostgresBackendDriver implements DataDriver {
                 path: targetPath,
                 id: address,
                 row: null,
-                databaseId: resolvedCollection?.databaseId
+                databaseId: undefined
             });
         } else {
             await this.realtimeService.notifyUpdate(
                 targetPath,
                 address,
                 null,
-                resolvedCollection?.databaseId
+                undefined
             );
         }
 
@@ -2711,19 +2664,18 @@ export class PostgresBackendDriver implements DataDriver {
      * rows' foreign keys.
      */
     private childListNotifications(
-        collection: CollectionConfig | undefined,
+        table: RuntimeTable | undefined,
         id: string,
         values: Record<string, unknown>
     ): PostgresBackendDriver["_pendingNotifications"] {
-        if (!collection) return [];
-        const relations = resolveCollectionRelations(collection);
-        const written = Object.keys(values).filter((key) => relations[key]?.cardinality === "many");
+        if (!table) return [];
+        const written = Object.keys(values).filter((key) => table.relations.get(key)?.cardinality === "many");
         if (written.length === 0 || this.realtimeService.isCdcActive()) return [];
         return written.map((key) => ({
-            path: `${collection.slug}/${id}/${key}`,
+            path: `${table.slug}/${id}/${key}`,
             id: "*",
             row: { _rebase_invalidated: true },
-            databaseId: collection.databaseId
+            databaseId: undefined
         }));
     }
 
@@ -2733,16 +2685,15 @@ export class PostgresBackendDriver implements DataDriver {
      * refresh needs: Postgres lets only a view's owner refresh it.
      */
     async refreshView(path: string, options?: { concurrently?: boolean }): Promise<void> {
-        const collection = this.resolvedCollectionAt(undefined, path);
-        if (!collection || !isPostgresCollectionConfig(collection) || !collection.view?.materialized) {
+        const table = this.tableAt(path)?.descriptor;
+        if (!table || table.kind !== "view" || !table.view?.materialized) {
             throw ApiError.badRequest(
-                `"${collection?.slug ?? path}" is not a materialized view, so there is nothing to refresh.`,
+                `"${table?.slug ?? path}" is not a materialized view, so there is nothing to refresh.`,
                 "NOT_A_MATERIALIZED_VIEW"
             );
         }
-        const schema = collection.schema ?? "public";
-        // The stored rows, not the gate the collection is named after (`view-names.ts`).
-        const qualified = drizzleSql`${drizzleSql.identifier(schema)}.${drizzleSql.identifier(viewRowsName(getTableName(collection)))}`;
+        // The stored rows, not the gate the view is named after (`view-names.ts`).
+        const qualified = drizzleSql`${drizzleSql.identifier(table.schema)}.${drizzleSql.identifier(viewRowsName(table.table))}`;
         await this.db.execute(options?.concurrently
             ? drizzleSql`REFRESH MATERIALIZED VIEW CONCURRENTLY ${qualified}`
             : drizzleSql`REFRESH MATERIALIZED VIEW ${qualified}`);
@@ -2750,14 +2701,14 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     async deleteAll(path: string): Promise<void> {
-        this.assertWritable(undefined, path);
+        this.assertWritable(path);
         await this.dataService.deleteAll(path);
         // Notify real-time subscribers of bulk change
         await this.realtimeService.notifyUpdate(path, "*", null);
     }
 
     async updateRelationPivot({ path, targetId, pivot }: UpdateRelationPivotProps): Promise<void> {
-        this.assertWritable(undefined, path);
+        this.assertWritable(path);
         await this.dataService.updateRelationPivot(path, targetId, pivot);
         // The junction row itself is what changed. Under change capture the
         // junction table's trigger reaches the subscribers of
@@ -2778,21 +2729,18 @@ export class PostgresBackendDriver implements DataDriver {
         path: string,
         name: string,
         value: unknown,
-        id?: string,
-        collection?: CollectionConfig
+        id?: string
     ): Promise<boolean> {
         return this.dataService.checkUniqueField(
             path,
             name,
             value,
-            id,
-            collection?.databaseId
+            id
         );
     }
 
     async count<M extends Record<string, unknown>>({
                                                                path,
-                                                               collection,
                                                                filter,
                                                                logical,
                                                                searchString,
@@ -3473,7 +3421,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
     ) {
         this.user = user;
         this.data = buildSdkData(this, {
-            resolveAccessor: createAccessorSlugResolver(() => delegate.registry?.getCollections())
+            resolveAccessor: createAccessorSlugResolver(() => delegate.registry?.tables())
         });
 
         // Delegate admin ops to the base driver (no RLS wrapping for admin)
@@ -3899,9 +3847,9 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
      * the owner refresh, and the caller's restricted role is not it.
      */
     async refreshView(path: string, options?: { concurrently?: boolean }): Promise<void> {
-        const collection = this.delegate.registry?.getCollectionByPath(path);
+        const table = this.delegate.registry?.tableAt(path)?.descriptor;
         await withFieldViewer({ roles: (this.user?.roles ?? []).map(role => typeof role === "string" ? role : String((role as { id?: unknown }).id ?? role)) },
-            async () => assertViewReadable(collection));
+            async () => assertViewReadable(table));
         return this.delegate.refreshView(path, options);
     }
 
@@ -3913,10 +3861,9 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         path: string,
         name: string,
         value: unknown,
-        id?: string,
-        collection?: CollectionConfig
+        id?: string
     ): Promise<boolean> {
-        return this.withTransaction((delegate) => delegate.checkUniqueField(path, name, value, id, collection), { accessMode: "read only" });
+        return this.withTransaction((delegate) => delegate.checkUniqueField(path, name, value, id), { accessMode: "read only" });
     }
 
     async count<M extends Record<string, unknown>>(props: FetchCollectionProps<M>): Promise<number> {

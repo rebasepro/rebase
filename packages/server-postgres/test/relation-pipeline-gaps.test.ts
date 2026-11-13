@@ -342,7 +342,7 @@ describe("updateRelationsUsingJoins: M2M through junction writes", () => {
 
         await service.updateRelationsUsingJoins(
             db,
-            postsCollection,
+            registry.requireTable(postsCollection.slug),
             1,
             { tags: [{ id: 1 }, { id: 2 }] }
         );
@@ -364,7 +364,7 @@ describe("updateRelationsUsingJoins: M2M through junction writes", () => {
 
         await service.updateRelationsUsingJoins(
             db,
-            postsCollection,
+            registry.requireTable(postsCollection.slug),
             1,
             { tags: [] }
         );

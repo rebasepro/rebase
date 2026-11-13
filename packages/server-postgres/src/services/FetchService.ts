@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, is, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable, PgTimestamp, PgTimestampString } from "drizzle-orm/pg-core";
-import { CollectionConfig, FilterValues, INCLUDE_COUNT_KEY, isPercentileFraction, isPostgresCollectionConfig, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, type RelationDescriptor, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
+import { FilterValues, INCLUDE_COUNT_KEY, isPercentileFraction, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, type RelationDescriptor, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
 import { isTimeZoneName } from "@rebasepro/types";
 import type { ColumnDescriptor } from "@rebasepro/types";
 import { isJsNumberType } from "@rebasepro/common";
@@ -14,8 +14,8 @@ import { enableIterativeScan, inTransaction, iterativeScansAvailable } from "./v
 import {
     columnAtKey,
     getColumnMeta,
-    getCollectionByPath,
-    getTableForCollection,
+    requireTableAt,
+    pgTableOf,
     getPrimaryKeys,
     requirePrimaryKeys,
     deriveRowAddress,
@@ -33,7 +33,8 @@ import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query
 import { DrizzleClient } from "../interfaces";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import { toFlatRow, toRestRow, stripUnreadable, canReadRelation } from "./row-pipeline";
-import { visibleColumnProjection, hiddenColumnsOption } from "../schema/search-column";
+import { visibleColumnProjection, hiddenColumnsOption } from "./hidden-columns";
+import type { RuntimeTable } from "../model/runtime-table";
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
 import { relatedRowsOrder } from "./relation-tables";
 // One rule, one place. See `soft-delete.ts` for why every read has to ask.
@@ -124,17 +125,17 @@ export function numericAggregateAliases(
  * get here, so reaching this with one is a missed door — refused all the same.
  */
 function assertRelationReadable(
-    collection: CollectionConfig,
+    runtime: RuntimeTable,
     key: string,
     relation: RelationDescriptor,
     use: string
 ): void {
     if (canReadRelation(relation)) return;
     throw ApiError.badRequest(
-        `'${key}' is not readable on table '${collection.slug}' with your roles, so it cannot be used in ${use}.`,
+        `'${key}' is not readable on table '${runtime.slug}' with your roles, so it cannot be used in ${use}.`,
         "FIELD_NOT_READABLE",
         {
-            collection: collection.slug,
+            collection: runtime.slug,
             fields: [key],
             violations: [{ field: key, code: "access", message: `'${key}' is not readable with your roles.` }]
         }
@@ -237,11 +238,11 @@ export class FetchService {
      * compile stays unresolvable and so fails closed.
      */
     private filterContext(collectionPath: string, table: PgTable<any>): FilterCompilationOptions {
-        const collection = this.registry.getCollectionByPath(collectionPath) ?? undefined;
+        const runtime = this.registry.tableAt(collectionPath);
         return {
-            collection,
+            owner: runtime,
             registry: this.registry,
-            sourceIdColumn: collection ? this.resolveIdColumn(collection, table) : undefined
+            sourceIdColumn: runtime ? this.resolveIdColumn(runtime, table) : undefined
         };
     }
 
@@ -261,14 +262,14 @@ export class FetchService {
      */
     private narrowRead(
         collectionPath: string,
-        collection: CollectionConfig,
+        runtime: RuntimeTable,
         table: PgTable<any>,
         operation: ReadOperation,
         query: ReadQuery
     ): Promise<SQL[]> {
         return beforeQueryConditions(
             { registry: this.registry, callContext: this.callContext },
-            collection, collectionPath, table as PgTable<never>,
+            runtime, collectionPath, table as PgTable<never>,
             { operation, query }, this.filterContext(collectionPath, table)
         );
     }
@@ -276,14 +277,14 @@ export class FetchService {
     /** {@link narrowRead}, pre-combined, for the reads that hold one `SQL`. */
     private narrowReadCondition(
         collectionPath: string,
-        collection: CollectionConfig,
+        runtime: RuntimeTable,
         table: PgTable<any>,
         operation: ReadOperation,
         query: ReadQuery
     ): Promise<SQL | undefined> {
         return beforeQueryCondition(
             { registry: this.registry, callContext: this.callContext },
-            collection, collectionPath, table as PgTable<never>,
+            runtime, collectionPath, table as PgTable<never>,
             { operation, query }, this.filterContext(collectionPath, table)
         );
     }
@@ -317,7 +318,7 @@ export class FetchService {
             fields: options.fields,
             relatedTo: options.relatedTo
                 ? {
-                    parentSlug: options.relatedTo.parentCollection.slug,
+                    parentSlug: options.relatedTo.parent.slug,
                     parentId: options.relatedTo.parentId,
                     relationName: options.relatedTo.relation.name
                 }
@@ -333,8 +334,8 @@ export class FetchService {
      * relation filters that would correlate on it cannot be compiled, which
      * the builder already handles by failing that field closed.
      */
-    private resolveIdColumn(collection: CollectionConfig, table: PgTable<any>): AnyPgColumn | undefined {
-        const [idInfo] = getPrimaryKeys(collection, this.registry);
+    private resolveIdColumn(runtime: RuntimeTable, table: PgTable<any>): AnyPgColumn | undefined {
+        const [idInfo] = getPrimaryKeys(runtime, this.registry);
         if (!idInfo) return undefined;
         return table[idInfo.fieldName as keyof typeof table] as AnyPgColumn | undefined;
     }
@@ -412,14 +413,14 @@ export class FetchService {
     private resolveOrderTarget(
         table: PgTable<any>,
         orderBy: string,
-        collection?: CollectionConfig,
+        runtime?: RuntimeTable,
         searchString?: string
     ): AnyPgColumn | SQL | undefined {
-        if (orderBy === FetchService.SCORE_FIELD && collection && searchString) {
-            const rank = DrizzleConditionBuilder.buildSearchRankExpression(searchString, table, this.registry.requireTable(collection.slug).descriptor);
+        if (orderBy === FetchService.SCORE_FIELD && runtime && searchString) {
+            const rank = DrizzleConditionBuilder.buildSearchRankExpression(searchString, table, runtime.descriptor);
             if (rank) return rank;
         }
-        return this.resolveOrderByField(table, orderBy, collection);
+        return this.resolveOrderByField(table, orderBy, runtime);
     }
 
     /**
@@ -437,13 +438,13 @@ export class FetchService {
     private resolveAggregateOrderTarget(
         table: PgTable<any>,
         orderBy: string,
-        collection: CollectionConfig | undefined,
+        runtime: RuntimeTable | undefined,
         collectionPath: string | undefined,
         cursorId?: unknown
     ): SQL | undefined {
         const spec = parseRelationAggregateSort(orderBy);
         if (!spec) return undefined;
-        if (!collection || !collectionPath) {
+        if (!runtime || !collectionPath) {
             throw ApiError.badRequest(
                 `Cannot sort by '${orderBy}': an aggregate sort needs the collection it is written against, ` +
                 "and this query carries none.",
@@ -456,11 +457,11 @@ export class FetchService {
         // builder below, which refuses it naming the ones there are.
         // A relation the API does not have is the builder's to refuse too, as
         // the unknown relation it is for this caller.
-        const sorted = namesHiddenFromCaller(this.registry.requireTable(collection.slug).descriptor).has(spec.relation)
+        const sorted = namesHiddenFromCaller(runtime.descriptor).has(spec.relation)
             ? undefined
-            : this.registry.getTable(collection.slug)?.relations.get(spec.relation);
-        if (sorted) assertRelationReadable(collection, spec.relation, sorted, "`orderBy`");
-        const primaryKeys = getPrimaryKeys(collection, this.registry);
+            : runtime.relations.get(spec.relation);
+        if (sorted) assertRelationReadable(runtime, spec.relation, sorted, "`orderBy`");
+        const primaryKeys = getPrimaryKeys(runtime, this.registry);
         const idColumn = primaryKeys.length === 1
             ? table[primaryKeys[0].fieldName as keyof typeof table] as AnyPgColumn
             : undefined;
@@ -473,7 +474,7 @@ export class FetchService {
             );
         }
         return DrizzleConditionBuilder.buildRelationAggregateExpression(
-            spec, table, collection, this.registry, idColumn, collectionPath, cursorId
+            spec, table, runtime, this.registry, idColumn, collectionPath, cursorId
         );
     }
 
@@ -489,7 +490,7 @@ export class FetchService {
     private resolveOrderKeys(
         table: PgTable<any>,
         keys: OrderByTuple[],
-        collection?: CollectionConfig,
+        runtime?: RuntimeTable,
         searchString?: string,
         collectionPath?: string,
         cursorId?: unknown
@@ -498,7 +499,7 @@ export class FetchService {
         for (const [field, direction, nulls] of keys) {
             // Checked before the column path: an aggregate key is not a column
             // name and would otherwise be reported as a typo'd one.
-            const aggregate = this.resolveAggregateOrderTarget(table, field, collection, collectionPath);
+            const aggregate = this.resolveAggregateOrderTarget(table, field, runtime, collectionPath);
             if (aggregate) {
                 resolved.push({
                     field,
@@ -510,13 +511,13 @@ export class FetchService {
                     // to compare against.
                     ...(cursorId !== undefined && {
                         cursorTarget: this.resolveAggregateOrderTarget(
-                            table, field, collection, collectionPath, cursorId
+                            table, field, runtime, collectionPath, cursorId
                         )
                     })
                 });
                 continue;
             }
-            const target = this.resolveOrderTarget(table, field, collection, searchString);
+            const target = this.resolveOrderTarget(table, field, runtime, searchString);
             if (target) resolved.push({ field,
 direction,
 nulls,
@@ -598,7 +599,7 @@ target });
     private resolveOrderByField(
         table: PgTable<any>,
         orderBy: string,
-        collection?: CollectionConfig
+        runtime?: RuntimeTable
     ): AnyPgColumn | undefined {
         const columnAt = (key: string): AnyPgColumn | undefined => columnAtKey(table, key);
 
@@ -606,7 +607,7 @@ target });
         if (direct) return direct;
 
         // Owning relation, resolved: the relation names its own local key.
-        const declaredRelation = collection ? this.registry.getTable(collection.slug)?.relations.get(orderBy) : undefined;
+        const declaredRelation = runtime ? runtime.relations.get(orderBy) : undefined;
         if (declaredRelation?.kind === "belongsTo") {
             // `localKey` is the column; the table is keyed by the column's key.
             const foreignKey = columnAt(declaredRelation.localField);
@@ -619,7 +620,7 @@ target });
         // property under its column name. Only then, for the reason the filter
         // resolution gives: with a collection, a guess sorts on a column under
         // a name the field-access check never saw.
-        if (!collection) {
+        if (!runtime) {
             for (const guess of [
                 `${orderBy}Id`,
                 toWireKey(generateForeignKeyName(orderBy)),
@@ -643,7 +644,7 @@ target });
         // schema, so it answers the same way and honours the same switch: one
         // knob, because a deployment that wants the lenient behaviour wants it
         // for both.
-        const collectionName = collection?.slug ?? collection?.name;
+        const collectionName = runtime?.slug;
         const onCollection = collectionName ? ` on table '${collectionName}'` : "";
 
         // A declared to-many relation is a different mistake from a typo, and
@@ -671,7 +672,7 @@ target });
         // The REST check answers a private sort key with the same function, so
         // a hidden column and a typo cannot be told apart.
         const answer = unknownOrderByField(
-            orderBy, collectionName, listedColumnKeys(table, collection && this.registry.getTable(collection.slug)?.descriptor)
+            orderBy, collectionName, listedColumnKeys(table, runtime?.descriptor)
         );
         throw ApiError.badRequest(answer.message, "UNKNOWN_ORDER_BY_FIELD", answer.details);
     }
@@ -701,11 +702,11 @@ target });
      * no related row, so a typo in an `include` looked like empty data.
      */
     private resolveIncludeLevel(
-        collection: CollectionConfig,
+        runtime: RuntimeTable,
         tree: Record<string, IncludeNode>,
         wildcard: boolean
     ): { key: string; node: IncludeNode; relation: RelationDescriptor }[] {
-        const owner = this.registry.requireTable(collection.slug);
+        const owner = runtime;
         const out: { key: string; node: IncludeNode; relation: RelationDescriptor }[] = [];
 
         if (wildcard) {
@@ -725,7 +726,7 @@ target });
                 // The REST check answers an include of a private relation
                 // with the same function, and neither lists one.
                 const answer = unknownIncludeRelation(
-                    key, collection.slug ?? collection.name, includableRelations(owner.descriptor)
+                    key, runtime.slug, includableRelations(owner.descriptor)
                 );
                 throw ApiError.badRequest(answer.message, "UNKNOWN_RELATION", answer.details);
             }
@@ -747,17 +748,17 @@ target });
      * request became a 400 the first time a row matched.
      */
     private assertIncludeResolvable(
-        collection: CollectionConfig,
+        runtime: RuntimeTable,
         include: NormalizedInclude,
         depth = 1
     ): void {
         if (depth > MAX_INCLUDE_DEPTH) return;
-        const levels = this.resolveIncludeLevel(collection, include.tree, include.wildcard);
-        this.assertCountsAllowed(collection, levels);
+        const levels = this.resolveIncludeLevel(runtime, include.tree, include.wildcard);
+        this.assertCountsAllowed(runtime, levels);
         for (const { node, relation } of levels) {
             if (Object.keys(node.children).length === 0) continue;
             this.assertIncludeResolvable(
-                getCollectionByPath(relation.target, this.registry), { wildcard: false, tree: node.children }, depth + 1
+                this.registry.requireTable(relation.target), { wildcard: false, tree: node.children }, depth + 1
             );
         }
     }
@@ -769,10 +770,10 @@ target });
      * filtering afterwards reads every related row of every parent to throw
      * most of them away, and on a to-many relation that is the whole table.
      */
-    private includeNarrowing(node: IncludeNode, targetCollection: CollectionConfig): SQL | undefined {
+    private includeNarrowing(node: IncludeNode, targetRuntime: RuntimeTable): SQL | undefined {
         if (!node.where && !node.logical) return undefined;
-        const targetPath = targetCollection.slug;
-        const targetTable = getTableForCollection(targetCollection, this.registry);
+        const targetPath = targetRuntime.slug;
+        const targetTable = pgTableOf(targetRuntime, this.registry);
         const conditions: SQL[] = [];
         if (node.where) {
             conditions.push(...this.buildFilterConditions(node.where, targetTable, targetPath));
@@ -798,12 +799,12 @@ target });
      *   the column gone, so it is a 400 naming why.
      */
     private assertCountsAllowed(
-        collection: CollectionConfig,
+        runtime: RuntimeTable,
         levels: { key: string; node: IncludeNode; relation: RelationDescriptor }[]
     ): void {
         const counted = levels.filter(({ node }) => node.count);
         if (counted.length === 0) return;
-        const collectionName = collection.slug ?? collection.name;
+        const collectionName = runtime.slug;
         for (const { key, relation } of counted) {
             if (relation.cardinality === "one") {
                 throw ApiError.badRequest(
@@ -814,9 +815,9 @@ target });
                 );
             }
         }
-        if (Object.prototype.hasOwnProperty.call(collection.properties ?? {}, INCLUDE_COUNT_KEY)) {
+        if (runtime.columnsByKey.has(INCLUDE_COUNT_KEY) || runtime.relations.has(INCLUDE_COUNT_KEY)) {
             throw ApiError.badRequest(
-                `Cannot serve \`count\` on table '${collectionName}': it declares a property named ` +
+                `Cannot serve \`count\` on table '${collectionName}': it declares a column named ` +
                 `'${INCLUDE_COUNT_KEY}', which is where the totals would go.`,
                 "INVALID_INCLUDE",
                 { collection: collectionName, field: INCLUDE_COUNT_KEY }
@@ -838,7 +839,7 @@ target });
     private shapeRelatedRows(
         rows: Record<string, unknown>[],
         node: IncludeNode,
-        targetCollection: CollectionConfig
+        targetRuntime: RuntimeTable
     ): Record<string, unknown>[] {
         let out = rows;
         if (node.limit !== undefined && out.length > node.limit) out = out.slice(0, node.limit);
@@ -846,7 +847,7 @@ target });
             const keep = new Set(node.fields);
             // The key always survives: a related row nobody can address cannot
             // be followed, updated or deduplicated by the caller.
-            for (const pk of getPrimaryKeys(targetCollection, this.registry)) keep.add(pk.fieldName);
+            for (const pk of getPrimaryKeys(targetRuntime, this.registry)) keep.add(pk.fieldName);
             // So does the link's own data. `fields` narrows the TARGET's
             // columns — it is keyed off the target's collection and validated
             // against it — and `_pivot` is not one of them: dropping it would
@@ -876,15 +877,15 @@ target });
      */
     private async loadIncludes(
         rows: Record<string, unknown>[],
-        collection: CollectionConfig,
+        runtime: RuntimeTable,
         collectionPath: string,
         include: NormalizedInclude,
         depth = 1
     ): Promise<void> {
-        if (depth === 1) this.assertIncludeResolvable(collection, include);
+        if (depth === 1) this.assertIncludeResolvable(runtime, include);
         if (rows.length === 0 || depth > MAX_INCLUDE_DEPTH) return;
 
-        const idInfoArray = getPrimaryKeys(collection, this.registry);
+        const idInfoArray = getPrimaryKeys(runtime, this.registry);
         if (idInfoArray.length === 0) return;
 
         // The address the batch groups its results by. Both sides derive it the
@@ -900,8 +901,8 @@ target });
         if (addressable.length === 0) return;
         const rowIds = addressable.map(row => addressOf(row) as string);
 
-        const requested = this.resolveIncludeLevel(collection, include.tree, include.wildcard);
-        this.assertCountsAllowed(collection, requested);
+        const requested = this.resolveIncludeLevel(runtime, include.tree, include.wildcard);
+        this.assertCountsAllowed(runtime, requested);
 
         // A relation property this caller may not read is withheld whole: not
         // loaded, so neither embedded nor counted — absent from the row, as the
@@ -914,12 +915,12 @@ target });
         for (const { key, node, relation } of levels) {
             // The target's lowered collection, looked up by the relation's
             // target slug, for the readers still on one (filters, codecs).
-            const targetCollection = getCollectionByPath(relation.target, this.registry);
+            const targetRuntime = this.registry.requireTable(relation.target);
             // Deliberately unguarded: a `where` inside an include that names a
             // column the target does not have is the caller's mistake, and it
             // is already an ApiError. Anything else is not this loop's to
             // swallow either, so both travel to the caller untouched.
-            const narrow: SQL | undefined = this.includeNarrowing(node, targetCollection);
+            const narrow: SQL | undefined = this.includeNarrowing(node, targetRuntime);
 
             // Rows loaded at this level, to recurse into. Collected as the
             // objects actually attached to the parents, so a nested include
@@ -945,7 +946,7 @@ target });
                         // nothing is a fact about the row, and leaving the key
                         // off makes it indistinguishable from not having asked.
                         if (!related) { row[key] = null; continue; }
-                        const [shaped] = this.shapeRelatedRows([related.values], node, targetCollection);
+                        const [shaped] = this.shapeRelatedRows([related.values], node, targetRuntime);
                         row[key] = shaped;
                         loaded.push(shaped);
                     }
@@ -982,7 +983,7 @@ target });
                             // REST rendering for the same reason: the target's
                             // collection does not describe the link's columns.
                             related.map(e => (e.pivot ? { ...e.values, [JUNCTION_PIVOT_KEY]: e.pivot } : e.values)),
-                            node, targetCollection
+                            node, targetRuntime
                         );
                         row[key] = shaped;
                         loaded.push(...shaped);
@@ -1004,7 +1005,7 @@ target });
                 : undefined;
             if (children && loaded.length > 0) {
                 await this.loadIncludes(
-                    loaded, targetCollection, targetCollection.slug, children, depth + 1
+                    loaded, targetRuntime, targetRuntime.slug, children, depth + 1
                 );
             }
         }
@@ -1047,12 +1048,12 @@ target });
      */
     private columnProjection(
         table: PgTable<any>,
-        collection: CollectionConfig,
+        runtime: RuntimeTable,
         fields: string[] | undefined,
         idInfoArray: { fieldName: string; type: "string" | "number" }[],
         distinct?: boolean
     ): Record<string, AnyPgColumn> | undefined {
-        const visible = visibleColumnProjection<AnyPgColumn>(getTableColumns(table), collection);
+        const visible = visibleColumnProjection<AnyPgColumn>(getTableColumns(table), runtime.descriptor);
         if (!fields || fields.length === 0) return visible;
 
         let tableColumns: Record<string, AnyPgColumn>;
@@ -1067,7 +1068,7 @@ target });
 
         const keep = new Set(fields);
         if (!distinct) for (const pk of idInfoArray) keep.add(pk.fieldName);
-        const relations = this.registry.getTable(collection.slug)?.relations;
+        const relations = runtime.relations;
 
         const projection: Record<string, AnyPgColumn> = {};
         for (const name of keep) {
@@ -1083,7 +1084,7 @@ target });
             // The REST check answers a private column with the same function,
             // so a hidden column and a typo cannot be told apart.
             const answer = unknownProjectionField(
-                name, collection.slug ?? collection.name, queryableColumnKeys(this.registry.requireTable(collection.slug).descriptor)
+                name, runtime.slug, queryableColumnKeys(runtime.descriptor)
             );
             throw ApiError.badRequest(answer.message, "UNKNOWN_FIELD", answer.details);
         }
@@ -1113,8 +1114,8 @@ target });
         // holds for its rows — which are the ones carrying a distance.
         if (FetchService.DISTANCE_FIELD in row) return undefined;
         try {
-            const collection = getCollectionByPath(collectionPath, this.registry);
-            const pks = getPrimaryKeys(collection, this.registry);
+            const runtime = requireTableAt(collectionPath, this.registry);
+            const pks = getPrimaryKeys(runtime, this.registry);
             if (pks.length === 0) return undefined;
             const address = buildCompositeId(row, pks);
             if (!address || !address.split(COMPOSITE_ID_SEPARATOR).some(part => part !== "")) return undefined;
@@ -1148,7 +1149,7 @@ target });
     private async loadRelationRefs(
         row: Record<string, unknown>,
         address: string,
-        collection: CollectionConfig,
+        runtime: RuntimeTable,
         collectionPath: string,
         /** The row as read, so a `belongsTo` takes its foreign key from it. */
         sourceRow: Record<string, unknown>
@@ -1161,7 +1162,7 @@ target });
                 values: related.values
             });
 
-        for (const [key, relation] of this.registry.requireTable(collection.slug).relations) {
+        for (const [key, relation] of runtime.relations) {
             try {
                 if (relation.cardinality === "one") {
                     const related = (await this.relationService.batchFetchRelatedEntities(
@@ -1219,9 +1220,9 @@ target });
                     { field: FetchService.SCORE_FIELD }
                 );
             }
-            const collection = getCollectionByPath(collectionPath, this.registry);
+            const runtime = requireTableAt(collectionPath, this.registry);
             const resolved = this.resolveOrderKeys(
-                table, keys, collection, undefined, collectionPath,
+                table, keys, runtime, undefined, collectionPath,
                 // An aggregate key correlates on a single key column — a
                 // composite-key collection is refused one — so only a single
                 // key's value can pin its subquery to the cursor row.
@@ -1482,8 +1483,8 @@ target });
 
     private buildRelationScope(hop: NestedPathHop): SQL {
         // The rows of this relation, reached by URL rather than by `include`.
-        assertRelationReadable(hop.parentCollection, hop.relationKey, hop.relation, "a nested path");
-        const parentPks = requirePrimaryKeys(hop.parentCollection, this.registry);
+        assertRelationReadable(hop.parent, hop.relationKey, hop.relation, "a nested path");
+        const parentPks = requirePrimaryKeys(hop.parent, this.registry);
         const parsedParent = parseIdValues(hop.parentId, parentPks);
         // What a single-column link compares against. A link from a composite
         // key has no such value, and `findRelationDefects` refuses one at boot.
@@ -1491,19 +1492,19 @@ target });
 
         // The parent row by every key column, for the shapes that read it.
         const parent = () => {
-            const table = getTableForCollection(hop.parentCollection, this.registry);
-            const columns = primaryKeyColumns(table, parentPks, hop.parentCollection.slug);
+            const table = pgTableOf(hop.parent, this.registry);
+            const columns = primaryKeyColumns(table, parentPks, hop.parent.slug);
             return {
                 table,
                 key: columns.map((column, i) => ({ column, value: parsedParent[parentPks[i].fieldName] }))
             };
         };
 
-        const targetTable = getTableForCollection(hop.targetCollection, this.registry);
-        const targetPks = requirePrimaryKeys(hop.targetCollection, this.registry);
+        const targetTable = pgTableOf(hop.target, this.registry);
+        const targetPks = requirePrimaryKeys(hop.target, this.registry);
         const targetIdColumn = targetTable[targetPks[0].fieldName as keyof typeof targetTable] as AnyPgColumn;
         if (!targetIdColumn) {
-            throw new Error(`ID field '${targetPks[0].fieldName}' not found in table '${hop.targetCollection.slug}'`);
+            throw new Error(`ID field '${targetPks[0].fieldName}' not found in table '${hop.target.slug}'`);
         }
 
         return DrizzleConditionBuilder.buildRelationScopeCondition(
@@ -1532,7 +1533,7 @@ target });
         if (!hop) return true;
         // "Is row 7 one of this parent's members" is the relation's value one
         // row at a time — the same reading the listing below is refused.
-        assertRelationReadable(hop.parentCollection, hop.relationKey, hop.relation, "a nested path");
+        assertRelationReadable(hop.parent, hop.relationKey, hop.relation, "a nested path");
         return this.relationService.isRelated(hop, id);
     }
 
@@ -1547,9 +1548,9 @@ target });
     ): Promise<Record<string, unknown> | undefined> {
         if (!await this.isAddressableUnder(collectionPath, id)) return undefined;
 
-        const collection = getCollectionByPath(collectionPath, this.registry);
-        const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = requirePrimaryKeys(collection, this.registry);
+        const runtime = requireTableAt(collectionPath, this.registry);
+        const table = pgTableOf(runtime, this.registry);
+        const idInfoArray = requirePrimaryKeys(runtime, this.registry);
 
         // An address the key columns cannot hold names no row — the same answer
         // as a well-formed id nobody has. Asking Postgres instead raises 22P02
@@ -1561,7 +1562,7 @@ target });
         // Part of the identity, so a row the hook excludes is absent here
         // exactly as it is from the listing.
         const narrowing = await this.narrowReadCondition(
-            collectionPath, collection, table, "get", {}
+            collectionPath, runtime, table, "get", {}
         );
         const identity = narrowing
             ? and(addressed, narrowing) as SQL
@@ -1576,13 +1577,13 @@ target });
             // row that is not there.
             let row: Record<string, unknown> | undefined | null = null;
             try {
-                const hidden = hiddenColumnsOption(getTableColumns(table), collection);
+                const hidden = hiddenColumnsOption(getTableColumns(table), runtime.descriptor);
 
                 row = await qb.findFirst({
                     // Soft delete: a stamped row answers 404 like any other
                     // absent one, so `findById` and `find` agree about which
                     // rows exist.
-                    where: andSoftDelete(identity, this.registry.requireTable(collection.slug), table, withDeleted),
+                    where: andSoftDelete(identity, runtime, table, withDeleted),
                     ...(hidden ? { columns: hidden } : {})
                 } as Parameters<NonNullable<typeof qb>["findFirst"]>[0]);
             } catch (e) {
@@ -1592,23 +1593,23 @@ target });
 
             if (row === undefined) return undefined;
             if (row !== null) {
-                const flatRow = toFlatRow(row, collection, this.registry);
-                await this.loadRelationRefs(flatRow, buildCompositeId(row, idInfoArray), collection, collectionPath, row);
+                const flatRow = toFlatRow(row, runtime, this.registry);
+                await this.loadRelationRefs(flatRow, buildCompositeId(row, idInfoArray), runtime, collectionPath, row);
 
                 // Again, now the relations are on the row: a relation property
                 // the caller may not read is withheld like any other field.
-                return stripUnreadable(flatRow, this.registry.requireTable(collection.slug).descriptor);
+                return stripUnreadable(flatRow, runtime.descriptor);
             }
         }
 
         // Fallback: db.select, then the same relation loader
         // `select()` and `select(getTableColumns(table))` differ only once a
         // join is added, and this read has none: the same SQL, the same rows.
-        const visibleOne = visibleColumnProjection<AnyPgColumn>(getTableColumns(table), collection) ?? getTableColumns(table);
+        const visibleOne = visibleColumnProjection<AnyPgColumn>(getTableColumns(table), runtime.descriptor) ?? getTableColumns(table);
         const result = await this.db
             .select(visibleOne)
             .from(table)
-            .where(andSoftDelete(identity, this.registry.requireTable(collection.slug), table, withDeleted))
+            .where(andSoftDelete(identity, runtime, table, withDeleted))
             .limit(1);
 
         if (result.length === 0) return undefined;
@@ -1618,13 +1619,13 @@ target });
         // foreign key into a ref (the registry names its target). Given `db`,
         // it queried each inverse relation itself, with neither the target's
         // scope nor its soft delete.
-        const values = await parseDataFromServer(raw, this.registry.requireTable(collection.slug), collection, undefined, this.registry) as Record<string, unknown>;
-        await this.loadRelationRefs(values, buildCompositeId(raw, idInfoArray), collection, collectionPath, raw);
+        const values = await parseDataFromServer(raw, runtime, undefined, this.registry) as Record<string, unknown>;
+        await this.loadRelationRefs(values, buildCompositeId(raw, idInfoArray), runtime, collectionPath, raw);
 
         // The primary path strips inside `toFlatRow`; this one parses the row
         // itself, so it strips itself. Without it a fetch that fell back served
         // every declared column, `excludeFromApi` ones included.
-        stripUnreadable(values, this.registry.requireTable(collection.slug).descriptor);
+        stripUnreadable(values, runtime.descriptor);
 
         return {
             ...values,
@@ -1670,10 +1671,10 @@ target });
             distinct?: boolean;
         } = {}
     ): Promise<Record<string, unknown>[]> {
-        const collection = getCollectionByPath(collectionPath, this.registry);
-        this.assertCallerMayRead(collection.slug, options);
-        const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = requirePrimaryKeys(collection, this.registry);
+        const runtime = requireTableAt(collectionPath, this.registry);
+        this.assertCallerMayRead(runtime.slug, options);
+        const table = pgTableOf(runtime, this.registry);
+        const idInfoArray = requirePrimaryKeys(runtime, this.registry);
         const idInfo = idInfoArray[0];
         const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
 
@@ -1693,7 +1694,7 @@ target });
         const results = await this.fetchRowsWithConditionsRaw<M>(collectionPath, options);
 
         return this.processRowResults<M>(
-            results, collection, collectionPath, idInfo, options.databaseId,
+            results, runtime, collectionPath, idInfo, options.databaseId,
             normalizeInclude(options.include), idInfoArray
         );
     }
@@ -1709,7 +1710,7 @@ target });
      */
     private async processRowResults<M extends Record<string, unknown>>(
         results: Record<string, unknown>[],
-        collection: CollectionConfig,
+        runtime: RuntimeTable,
         collectionPath: string,
         idInfo: { fieldName: string; type: "string" | "number" },
         _databaseId?: string,
@@ -1727,7 +1728,7 @@ target });
     ): Promise<Record<string, unknown>[]> {
         if (results.length === 0) {
             // An unknown relation is a 400 whether or not a row matched.
-            if (include) this.assertIncludeResolvable(collection, include);
+            if (include) this.assertIncludeResolvable(runtime, include);
             return [];
         }
 
@@ -1739,13 +1740,13 @@ target });
         // per relation per level, avoiding the N+1 that plagued the old path.
         void idInfo;
         const values = await Promise.all(results.map(async (rawRow: Record<string, unknown>) =>
-            await parseDataFromServer(rawRow as M, this.registry.requireTable(collection.slug), collection, undefined, this.registry) as Record<string, unknown>));
+            await parseDataFromServer(rawRow as M, runtime, undefined, this.registry) as Record<string, unknown>));
 
         // Second pass: the relations the caller named, through the same batched
         // loader every other read uses — so a row from here and a row from the
         // REST list carry the same relations, loaded the same way.
         if (include) {
-            await this.loadIncludes(values, collection, collectionPath, include);
+            await this.loadIncludes(values, runtime, collectionPath, include);
         }
 
         // Last, once the includes have read the key columns they group by: the
@@ -1754,7 +1755,7 @@ target });
         // the pipeline and it is what the socket's `FETCH_COLLECTION`, a text
         // search and the MCP tools are served from. Without it every one of
         // them handed a plain user each row's password hash.
-        for (const row of values) stripUnreadable(row, this.registry.requireTable(collection.slug).descriptor);
+        for (const row of values) stripUnreadable(row, runtime.descriptor);
 
         // Columns only — the address is the consumer's to derive.
         return values;
@@ -1772,9 +1773,9 @@ target });
      * deleted during the scan never shifts another past the next page.
      */
     async *scanStoredRows(collectionPath: string, pageSize = 500): AsyncGenerator<Record<string, unknown>[]> {
-        const collection = getCollectionByPath(collectionPath, this.registry);
-        const table = getTableForCollection(collection, this.registry);
-        const keys = primaryKeyColumns(table, requirePrimaryKeys(collection, this.registry), collectionPath);
+        const runtime = requireTableAt(collectionPath, this.registry);
+        const table = pgTableOf(runtime, this.registry);
+        const keys = primaryKeyColumns(table, requirePrimaryKeys(runtime, this.registry), collectionPath);
         const keyNames = keys.map(column => {
             const entry = Object.entries(getTableColumns(table)).find(([, candidate]) => candidate === column);
             if (!entry) throw new Error(`Key column '${column.name}' not found in table '${collectionPath}'`);
@@ -1847,7 +1848,7 @@ target });
         // this method's to derive from the path, never the caller's to send.
         const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
         return this.fetchRowsWithConditions<M>(
-            hop ? hop.targetCollection.slug : collectionPath,
+            hop ? hop.target.slug : collectionPath,
             { ...options, orderBy: FetchService.nestedOrder(hop, options.orderBy), relatedTo: hop }
         );
     }
@@ -1909,11 +1910,11 @@ target });
         // the same `filter` and `searchString` too, so `total` describes the
         // rows that were actually served.
         const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
-        const effectivePath = hop ? hop.targetCollection.slug : collectionPath;
+        const effectivePath = hop ? hop.target.slug : collectionPath;
 
-        const collection = getCollectionByPath(effectivePath, this.registry);
-        this.assertCallerMayRead(collection.slug, options);
-        const table = getTableForCollection(collection, this.registry);
+        const runtime = requireTableAt(effectivePath, this.registry);
+        this.assertCallerMayRead(runtime.slug, options);
+        const table = pgTableOf(runtime, this.registry);
 
         let query = this.db.select({ count: count() }).from(table).$dynamic();
         const allConditions: SQL[] = [];
@@ -1922,11 +1923,11 @@ target });
 
         // Soft delete. A listing that filters and a count that does not is a
         // page saying "1 of 4 results".
-        withSoftDelete(allConditions, this.registry.requireTable(collection.slug), table, options.withDeleted);
+        withSoftDelete(allConditions, runtime, table, options.withDeleted);
 
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
-                options.searchString, table, this.registry.requireTable(collection.slug).descriptor
+                options.searchString, table, runtime.descriptor
             );
             if (searchConditions.length === 0) return 0;
             allConditions.push(DrizzleConditionBuilder.combineConditionsWithOr(searchConditions)!);
@@ -1949,7 +1950,7 @@ target });
         // failure mode as the soft-delete condition above, which is why they sit
         // together.
         allConditions.push(...await this.narrowRead(
-            effectivePath, collection, table, "count",
+            effectivePath, runtime, table, "count",
             FetchService.describeRead({ ...options, relatedTo: hop })
         ));
 
@@ -1966,7 +1967,7 @@ target });
             // threshold it contributes no filter, so the count is unchanged and
             // what is gained is that `/count` refuses the request the listing
             // refuses instead of answering it with a number.
-            const vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch, this.registry.requireTable(collection.slug).descriptor);
+            const vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch, runtime.descriptor);
             if (vectorMeta.filter) allConditions.push(vectorMeta.filter);
         }
 
@@ -2014,13 +2015,13 @@ target });
             withDeleted?: WithDeleted;
         }
     ): Promise<Record<string, unknown>[]> {
-        const collection = getCollectionByPath(collectionPath, this.registry);
-        this.assertCallerMayRead(collection.slug, { filter: options.filter, logical: options.logical });
-        const table = getTableForCollection(collection, this.registry);
+        const runtime = requireTableAt(collectionPath, this.registry);
+        this.assertCallerMayRead(runtime.slug, { filter: options.filter, logical: options.logical });
+        const table = pgTableOf(runtime, this.registry);
         const columns = getTableColumns(table);
         const hidden: ReadonlySet<string> = currentFieldViewer() === undefined
             ? new Set()
-            : apiHiddenKeys(this.registry.requireTable(collection.slug).descriptor);
+            : apiHiddenKeys(runtime.descriptor);
 
         const columnFor = (field: string, forWhat: string): AnyPgColumn => {
             // A private column is a column the API does not have: an API
@@ -2028,12 +2029,12 @@ target });
             // private column — the REST check answers with the same function.
             const column = hidden.has(field) ? undefined : columns[field as keyof typeof columns] as AnyPgColumn | undefined;
             if (!column) {
-                const answer = unknownAggregateField(field, forWhat, listedColumnKeys(table, this.registry.requireTable(collection.slug).descriptor));
+                const answer = unknownAggregateField(field, forWhat, listedColumnKeys(table, runtime.descriptor));
                 throw ApiError.badRequest(answer.message, "UNKNOWN_AGGREGATE_FIELD", answer.details);
             }
             // An aggregate over a column reads it: a role-restricted one is
             // refused for a caller without the role.
-            this.assertCallerMayRead(collection.slug, { fields: [field] });
+            this.assertCallerMayRead(runtime.slug, { fields: [field] });
             return column;
         };
 
@@ -2099,9 +2100,9 @@ target });
             if (aggregate.fn === "fingerprint") {
                 // A plain view stores no row versions to read; a materialized
                 // view does, and its refresh writes new ones.
-                if (isPostgresCollectionConfig(collection) && collection.view && !collection.view.materialized) {
+                if (runtime.descriptor.kind === "view" && !runtime.descriptor.view?.materialized) {
                     throw ApiError.badRequest(
-                        `\`fingerprint()\` reads the versions of stored rows, and "${collection.slug}" is a view that stores none. ` +
+                        `\`fingerprint()\` reads the versions of stored rows, and "${runtime.slug}" is a view that stores none. ` +
                         "Fingerprint the tables it reads, or make it a materialized view.",
                         "INVALID_AGGREGATE_SELECT"
                     );
@@ -2156,10 +2157,10 @@ target });
         const conditions: SQL[] = [];
         // Soft delete. A dashboard that sums deleted orders is reporting
         // revenue that was withdrawn.
-        withSoftDelete(conditions, this.registry.requireTable(collection.slug), table, options.withDeleted);
+        withSoftDelete(conditions, runtime, table, options.withDeleted);
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
-                options.searchString, table, this.registry.requireTable(collection.slug).descriptor
+                options.searchString, table, runtime.descriptor
             );
             // No searchable field means no row matches — the same impossible
             // WHERE the listing uses, rather than an unfiltered aggregate.
@@ -2179,7 +2180,7 @@ target });
         // select, so it is narrowed by the same hook as the listing. Without
         // this, `count(*)` over a scoped collection reports the unscoped total.
         conditions.push(...await this.narrowRead(
-            collectionPath, collection, table, "aggregate", FetchService.describeRead(options)
+            collectionPath, runtime, table, "aggregate", FetchService.describeRead(options)
         ));
         if (conditions.length > 0) {
             const finalCondition = DrizzleConditionBuilder.combineConditionsWithAnd(conditions);
@@ -2217,7 +2218,7 @@ target });
         // value, and the `Number.isNaN` guard below would not catch it.
         const numericAliases = numericAggregateAliases(
             options.aggregates,
-            this.registry.requireTable(collection.slug).columnsByKey
+            runtime.columnsByKey
         );
         return rows.map(row => {
             const out: Record<string, unknown> = { ...row };
@@ -2364,14 +2365,14 @@ target });
     ): Promise<boolean> {
         if (value === undefined || value === null) return true;
 
-        const collection = getCollectionByPath(collectionPath, this.registry);
+        const runtime = requireTableAt(collectionPath, this.registry);
         // A private column is a column the API does not have, and a column
         // the table does not have is never taken (below): the same answer.
-        if (currentFieldViewer() !== undefined && apiHiddenKeys(this.registry.requireTable(collection.slug).descriptor).has(fieldName)) return true;
+        if (currentFieldViewer() !== undefined && apiHiddenKeys(runtime.descriptor).has(fieldName)) return true;
         // "Is this value taken?" is a filter on the column, answered 1 or 0.
-        this.assertCallerMayRead(collection.slug, { filter: { [fieldName]: ["==", value] } });
-        const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = requirePrimaryKeys(collection, this.registry);
+        this.assertCallerMayRead(runtime.slug, { filter: { [fieldName]: ["==", value] } });
+        const table = pgTableOf(runtime, this.registry);
+        const idInfoArray = requirePrimaryKeys(runtime, this.registry);
         const field = table[fieldName as keyof typeof table] as AnyPgColumn;
 
         if (!field) return true;
@@ -2476,7 +2477,7 @@ target });
             const hop = resolveNestedPath(collectionPath, this.registry);
             if (hop) {
                 return this.fetchCollectionForRest<M>(
-                    hop.targetCollection.slug, { ...options,
+                    hop.target.slug, { ...options,
 orderBy: FetchService.nestedOrder(hop, options.orderBy),
 relatedTo: hop }, include
                 );
@@ -2485,8 +2486,8 @@ relatedTo: hop }, include
         // `relatedTo` is applied by `fetchRowsWithConditionsRaw`, which builds
         // the scope condition itself — this used to build a second one here and
         // hand it to a `db.query` branch that no longer exists.
-        const collection = getCollectionByPath(collectionPath, this.registry);
-        this.assertCallerMayRead(collection.slug, { ...options, include });
+        const runtime = requireTableAt(collectionPath, this.registry);
+        this.assertCallerMayRead(runtime.slug, { ...options, include });
 
         const normalizedInclude = normalizeInclude(include);
 
@@ -2494,10 +2495,10 @@ relatedTo: hop }, include
         // relation per level of the include tree — never one per row, and never
         // the lateral join the relational query API compiles a to-many into.
         const rows = (await this.fetchRowsWithConditionsRaw<M>(collectionPath, options))
-            .map(row => toRestRow(row, collection, this.registry));
+            .map(row => toRestRow(row, runtime, this.registry));
 
         if (normalizedInclude) {
-            await this.loadIncludes(rows, collection, collectionPath, normalizedInclude);
+            await this.loadIncludes(rows, runtime, collectionPath, normalizedInclude);
         }
 
         return rows;
@@ -2527,14 +2528,14 @@ relatedTo: hop }, include
     ): Promise<Record<string, unknown> | null> {
         if (!await this.isAddressableUnder(collectionPath, id)) return null;
 
-        const collection = getCollectionByPath(collectionPath, this.registry);
+        const runtime = requireTableAt(collectionPath, this.registry);
 
         // An unknown relation is a 400 before it is a 404: whether the row
         // exists must not decide whether the request was well-formed.
         const normalizedInclude = normalizeInclude(include);
-        if (normalizedInclude) this.assertIncludeResolvable(collection, normalizedInclude);
-        const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = requirePrimaryKeys(collection, this.registry);
+        if (normalizedInclude) this.assertIncludeResolvable(runtime, normalizedInclude);
+        const table = pgTableOf(runtime, this.registry);
+        const idInfoArray = requirePrimaryKeys(runtime, this.registry);
 
         // See `fetchOne`: an unaddressable id is a 404, not a database error.
         if (!idCanAddressTable(id, table, idInfoArray)) return null;
@@ -2544,13 +2545,13 @@ relatedTo: hop }, include
         // Soft delete: a stamped row is a 404 through the REST read too, so
         // `GET /:id` and the listing agree about which rows exist.
         const withDeleted = options?.withDeleted;
-        const projection = this.columnProjection(table, collection, options?.fields, idInfoArray);
+        const projection = this.columnProjection(table, runtime, options?.fields, idInfoArray);
         // The REST single get is narrowed by the same hook as the listing, so
         // `find()[0]` and `findById()` agree about which rows exist — and so
         // that a row excluded from a scoped listing cannot be read by guessing
         // its id.
         const narrowing = await this.narrowReadCondition(
-            collectionPath, collection, table, "get",
+            collectionPath, runtime, table, "get",
             FetchService.describeRead({ fields: options?.fields })
         );
         const identity = narrowing
@@ -2560,15 +2561,15 @@ relatedTo: hop }, include
         const result = await this.db
             .select(projection ?? getTableColumns(table))
             .from(table)
-            .where(andSoftDelete(identity, this.registry.requireTable(collection.slug), table, withDeleted))
+            .where(andSoftDelete(identity, runtime, table, withDeleted))
             .limit(1);
 
         if (result.length === 0) return null;
 
-        const row = toRestRow(result[0] as Record<string, unknown>, collection, this.registry);
+        const row = toRestRow(result[0] as Record<string, unknown>, runtime, this.registry);
 
         if (normalizedInclude) {
-            await this.loadIncludes([row], collection, collectionPath, normalizedInclude);
+            await this.loadIncludes([row], runtime, collectionPath, normalizedInclude);
         }
 
         return row;
@@ -2604,22 +2605,22 @@ relatedTo: hop }, include
         columns: Record<string, AnyPgColumn>;
         render: (returned: Record<string, unknown>) => Record<string, unknown>;
     } | undefined {
-        const collection = getCollectionByPath(collectionPath, this.registry);
-        if (hasBeforeQuery(this.registry, collection)) return undefined;
-        const table = getTableForCollection(collection, this.registry);
+        const runtime = requireTableAt(collectionPath, this.registry);
+        if (hasBeforeQuery(this.registry, runtime)) return undefined;
+        const table = pgTableOf(runtime, this.registry);
         // Not a real drizzle table (a stub in a test): nothing to return, so
         // the read stays.
         const tableColumns: Record<string, AnyPgColumn> | undefined = getTableColumns(table);
         if (!tableColumns) return undefined;
-        const idInfoArray = requirePrimaryKeys(collection, this.registry);
+        const idInfoArray = requirePrimaryKeys(runtime, this.registry);
         // The read's projection, kept in the table's column order, so the
         // rendered row has its keys in the order the read gives them.
-        const visible = this.columnProjection(table, collection, undefined, idInfoArray);
+        const visible = this.columnProjection(table, runtime, undefined, idInfoArray);
         const columns: Record<string, AnyPgColumn> = {};
         for (const [name, column] of Object.entries(tableColumns)) {
             if (!visible || name in visible) columns[name] = column;
         }
-        return { columns, render: returned => toRestRow(returned, collection, this.registry) };
+        return { columns, render: returned => toRestRow(returned, runtime, this.registry) };
     }
 
     /**
@@ -2659,9 +2660,9 @@ relatedTo: hop }, include
             distinct?: boolean;
         } = {}
     ): Promise<Record<string, unknown>[]> {
-        const collection = getCollectionByPath(collectionPath, this.registry);
-        const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = requirePrimaryKeys(collection, this.registry);
+        const runtime = requireTableAt(collectionPath, this.registry);
+        const table = pgTableOf(runtime, this.registry);
+        const idInfoArray = requirePrimaryKeys(runtime, this.registry);
 
         // A vector read orders by distance, and a distance is computed per
         // query and stored nowhere, so there is no value on the cursor row to
@@ -2691,26 +2692,26 @@ relatedTo: hop }, include
 
         let vectorMeta: { orderBy: SQL; filter?: SQL; distanceSelect: SQL } | undefined;
         if (options.vectorSearch) {
-            vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch, this.registry.requireTable(collection.slug).descriptor);
+            vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch, runtime.descriptor);
         }
 
         // A generated search column is an index in column form; `SELECT *`
         // would ship it to every caller. The projection is undefined — and the
         // SQL therefore unchanged — for any table without one. `fields`
         // narrows it further, in SQL rather than after the fact.
-        const visible = this.columnProjection(table, collection, options.fields, idInfoArray, options.distinct === true);
+        const visible = this.columnProjection(table, runtime, options.fields, idInfoArray, options.distinct === true);
 
         // Relevance, alongside the row, exactly as `_distance` rides along with
         // a vector search. Present only when the collection opted in and the
         // request carried a search string, so a caller can order by it, show
         // it, or blend it with a score of their own.
         const rankSelect = options.searchString
-            ? DrizzleConditionBuilder.buildSearchRankExpression(options.searchString, table, this.registry.requireTable(collection.slug).descriptor)
+            ? DrizzleConditionBuilder.buildSearchRankExpression(options.searchString, table, runtime.descriptor)
             : undefined;
 
         // Only when asked: a `ts_headline` per declared field per row.
         const matchesSelect = options.searchString && options.searchExplain
-            ? DrizzleConditionBuilder.buildSearchMatchesExpression(options.searchString, table, this.registry.requireTable(collection.slug).descriptor)
+            ? DrizzleConditionBuilder.buildSearchMatchesExpression(options.searchString, table, runtime.descriptor)
             : undefined;
 
         // `SELECT DISTINCT`, over exactly the projection above.
@@ -2753,11 +2754,11 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         // Soft delete, on the `db.select` path. Both paths serve the same
         // request, so a deleted row must not come back down one and not the
         // other — which is exactly what happens when each grows its own filter.
-        withSoftDelete(allConditions, this.registry.requireTable(collection.slug), table, options.withDeleted);
+        withSoftDelete(allConditions, runtime, table, options.withDeleted);
 
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
-                options.searchString, table, this.registry.requireTable(collection.slug).descriptor
+                options.searchString, table, runtime.descriptor
             );
             if (searchConditions.length === 0) return [];
             allConditions.push(DrizzleConditionBuilder.combineConditionsWithOr(searchConditions)!);
@@ -2777,7 +2778,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         // place the hook has to be applied for the listing, the search, the
         // vector read, the nested-path listing and the realtime refetch.
         allConditions.push(...await this.narrowRead(
-            collectionPath, collection, table, "list", FetchService.describeRead(options)
+            collectionPath, runtime, table, "list", FetchService.describeRead(options)
         ));
 
         // A vector `threshold` is not a WHERE condition here. The rows come
@@ -2827,7 +2828,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                 // (`count(applications)`) resolves its subquery against it, and
                 // without it every such sort on this path — the REST list, the
                 // SDK's `find()` — was refused as a query that "carries none".
-                this.resolveOrderKeys(table, sortKeys, collection, options.searchString, collectionPath),
+                this.resolveOrderKeys(table, sortKeys, runtime, options.searchString, collectionPath),
                 wantsDistinct ? [] : keyColumns
             );
         if (orderExpressions.length > 0) query = query.orderBy(...orderExpressions);

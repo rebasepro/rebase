@@ -1047,7 +1047,7 @@ status: "active" }
 
             await expect(
                 dataService.fetchOne("nonexistent", 1)
-            ).rejects.toThrow("Collection not found: nonexistent");
+            ).rejects.toThrow("Table not found: nonexistent");
         });
 
         it("should handle missing table definitions", async () => {

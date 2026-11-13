@@ -102,12 +102,12 @@ describe("getPrimaryKeys / requirePrimaryKeys — from a call site holding the l
     registry.registerTables(compileSchema([items]));
 
     it("reads the runtime table of the collection's slug", () => {
-        expect(getPrimaryKeys({ slug: "items", name: "items", properties: {} }, registry).map(k => k.fieldName)).toEqual(["sku"]);
-        expect(requirePrimaryKeys({ slug: "items", name: "items", properties: {} }, registry).map(k => k.fieldName)).toEqual(["sku"]);
+        expect(getPrimaryKeys(registry.requireTable({ slug: "items", name: "items", properties: {} }.slug), registry).map(k => k.fieldName)).toEqual(["sku"]);
+        expect(requirePrimaryKeys(registry.requireTable({ slug: "items", name: "items", properties: {} }.slug), registry).map(k => k.fieldName)).toEqual(["sku"]);
     });
 
     it("refuses a collection the driver serves no table for, naming the slug", () => {
-        expect(() => getPrimaryKeys({ slug: "elsewhere", name: "elsewhere", properties: {} }, registry))
+        expect(() => getPrimaryKeys(registry.requireTable({ slug: "elsewhere", name: "elsewhere", properties: {} }.slug), registry))
             .toThrow(/The table "elsewhere" is not one this driver serves\. It serves: items\./);
     });
 });

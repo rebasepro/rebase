@@ -86,18 +86,18 @@ isId: true },
 
     it("derives a single key from its own column", () => {
         expect(deriveRowAddress({ id: 42,
-name: "Camera" }, productsCollection, registry)).toBe("42");
+name: "Camera" }, registry.requireTable(productsCollection.slug), registry)).toBe("42");
     });
 
     it("derives a string key that is not called `id`", () => {
         expect(deriveRowAddress({ sku: "ABC-1",
-label: "Widget" }, skuItemsCollection, registry)).toBe("ABC-1");
+label: "Widget" }, registry.requireTable(skuItemsCollection.slug), registry)).toBe("ABC-1");
     });
 
     it("joins a composite key in primary-key order", () => {
         expect(deriveRowAddress({ tenant_id: 1,
 user_id: 2,
-role: "admin" }, membershipsCollection, registry)).toBe("1:::2");
+role: "admin" }, registry.requireTable(membershipsCollection.slug), registry)).toBe("1:::2");
     });
 
     it("prefers the real key over a column that is merely named `id`", () => {
@@ -107,7 +107,7 @@ role: "admin" }, membershipsCollection, registry)).toBe("1:::2");
             { event_id: 7,
 id: "external-ref-99",
 name: "Launch" },
-            eventsCollection,
+            registry.requireTable(eventsCollection.slug),
             registry
         )).toBe("7");
     });
@@ -116,17 +116,17 @@ name: "Launch" },
         // A collection declaring no key lifts to the implicit `id` key; the
         // database holds no table for it here, so the descriptor answers.
         expect(deriveRowAddress({ id: "abc",
-name: "Boo" }, unregisteredCollection, registry)).toBe("abc");
+name: "Boo" }, registry.requireTable(unregisteredCollection.slug), registry)).toBe("abc");
     });
 
     it("returns empty when there is no key and no `id`", () => {
-        expect(deriveRowAddress({ name: "Boo" }, unregisteredCollection, registry)).toBe("");
+        expect(deriveRowAddress({ name: "Boo" }, registry.requireTable(unregisteredCollection.slug), registry)).toBe("");
     });
 
     it("returns empty rather than a bare separator when a composite key is absent", () => {
         // `buildCompositeId` renders missing parts as empty strings, so an
         // unkeyed row would otherwise be addressed as ":::" — a token that
         // matches nothing and looks like a real one.
-        expect(deriveRowAddress({ role: "admin" }, membershipsCollection, registry)).toBe("");
+        expect(deriveRowAddress({ role: "admin" }, registry.requireTable(membershipsCollection.slug), registry)).toBe("");
     });
 });

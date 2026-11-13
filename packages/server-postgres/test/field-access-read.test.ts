@@ -65,18 +65,18 @@ const row = () => ({ id: 1, name: "Ada", salary: 90_000, rating: 5, passwordHash
 
 describe("the REST row", () => {
     it("withholds a field the caller's roles cannot read", () => {
-        const served = withFieldViewer({ roles: ["staff"] }, () => toRestRow(row(), staff, registry));
+        const served = withFieldViewer({ roles: ["staff"] }, () => toRestRow(row(), registry.requireTable(staff.slug), registry));
         expect(served.name).toBe("Ada");
         expect(served).not.toHaveProperty("salary");
     });
 
     it("serves it to a caller holding the role", () => {
-        const served = withFieldViewer({ roles: ["hr"] }, () => toRestRow(row(), staff, registry));
+        const served = withFieldViewer({ roles: ["hr"] }, () => toRestRow(row(), registry.requireTable(staff.slug), registry));
         expect(served.salary).toBe(90_000);
     });
 
     it("serves it to `admin`, who satisfies any non-empty list", () => {
-        const served = withFieldViewer({ roles: ["admin"] }, () => toRestRow(row(), staff, registry));
+        const served = withFieldViewer({ roles: ["admin"] }, () => toRestRow(row(), registry.requireTable(staff.slug), registry));
         expect(served.salary).toBe(90_000);
     });
 
@@ -85,18 +85,18 @@ describe("the REST row", () => {
         // stored `null` — which turns a permission boundary into a question a
         // client answers by counting nulls, and makes an echoing update
         // overwrite the real value.
-        const served = withFieldViewer({ roles: ["anon"] }, () => toRestRow(row(), staff, registry));
+        const served = withFieldViewer({ roles: ["anon"] }, () => toRestRow(row(), registry.requireTable(staff.slug), registry));
         expect("salary" in served).toBe(false);
     });
 
     it("keeps a field whose rule is only about writing", () => {
-        const served = withFieldViewer({ roles: ["anon"] }, () => toRestRow(row(), staff, registry));
+        const served = withFieldViewer({ roles: ["anon"] }, () => toRestRow(row(), registry.requireTable(staff.slug), registry));
         expect(served.rating).toBe(5);
     });
 
     it("still withholds an `excludeFromApi` column from everybody", () => {
         for (const roles of [["hr"], ["admin"], ["anon"]]) {
-            const served = withFieldViewer({ roles }, () => toRestRow(row(), staff, registry));
+            const served = withFieldViewer({ roles }, () => toRestRow(row(), registry.requireTable(staff.slug), registry));
             expect(served).not.toHaveProperty("passwordHash");
         }
     });
@@ -104,7 +104,7 @@ describe("the REST row", () => {
 
 describe("the admin row", () => {
     it("applies the same rule as REST", () => {
-        const served = withFieldViewer({ roles: ["staff"] }, () => toFlatRow(row(), staff, registry));
+        const served = withFieldViewer({ roles: ["staff"] }, () => toFlatRow(row(), registry.requireTable(staff.slug), registry));
         expect(served).not.toHaveProperty("salary");
         expect(served.name).toBe("Ada");
     });
@@ -114,7 +114,7 @@ describe("a relation target", () => {
     const post = () => ({ id: 7, title: "Hello", author: row() });
 
     it("is stripped when inlined into the parent (REST)", () => {
-        const served = withFieldViewer({ roles: ["staff"] }, () => toRestRow(post(), posts, registry));
+        const served = withFieldViewer({ roles: ["staff"] }, () => toRestRow(post(), registry.requireTable(posts.slug), registry));
         const author = served.author as Record<string, unknown>;
         expect(author.name).toBe("Ada");
         expect(author).not.toHaveProperty("salary");
@@ -123,7 +123,7 @@ describe("a relation target", () => {
     type Ref = { data?: { values?: Record<string, unknown> } };
 
     it("is stripped inside the ref the admin and every realtime frame carry", () => {
-        const served = withFieldViewer({ roles: ["staff"] }, () => toFlatRow(post(), posts, registry));
+        const served = withFieldViewer({ roles: ["staff"] }, () => toFlatRow(post(), registry.requireTable(posts.slug), registry));
         const ref = served.author as Ref;
         expect(ref.data?.values?.name).toBe("Ada");
         expect(ref.data?.values).not.toHaveProperty("salary");
@@ -132,9 +132,9 @@ describe("a relation target", () => {
     });
 
     it("carries the field for a caller who may read it, in both renderings", () => {
-        const inlined = withFieldViewer({ roles: ["hr"] }, () => toRestRow(post(), posts, registry));
+        const inlined = withFieldViewer({ roles: ["hr"] }, () => toRestRow(post(), registry.requireTable(posts.slug), registry));
         expect((inlined.author as Record<string, unknown>).salary).toBe(90_000);
-        const ref = withFieldViewer({ roles: ["hr"] }, () => toFlatRow(post(), posts, registry));
+        const ref = withFieldViewer({ roles: ["hr"] }, () => toFlatRow(post(), registry.requireTable(posts.slug), registry));
         expect((ref.author as Ref).data?.values?.salary).toBe(90_000);
     });
 });
@@ -234,11 +234,11 @@ describe("the trusted server plane", () => {
      * able to read the column.
      */
     it("receives a role-restricted field", () => {
-        expect(toRestRow(row(), staff, registry).salary).toBe(90_000);
+        expect(toRestRow(row(), registry.requireTable(staff.slug), registry).salary).toBe(90_000);
     });
 
     it("still does not receive an `excludeFromApi` one", () => {
-        expect(toRestRow(row(), staff, registry)).not.toHaveProperty("passwordHash");
+        expect(toRestRow(row(), registry.requireTable(staff.slug), registry)).not.toHaveProperty("passwordHash");
     });
 });
 
@@ -249,14 +249,14 @@ describe("the ambient viewer", () => {
                 expect(currentFieldViewer()).toEqual({ roles: ["admin"] });
             });
             expect(currentFieldViewer()).toEqual({ roles: ["staff"] });
-            expect(toRestRow(row(), staff, registry)).not.toHaveProperty("salary");
+            expect(toRestRow(row(), registry.requireTable(staff.slug), registry)).not.toHaveProperty("salary");
         });
     });
 
     it("survives an await, which is what every read does", async () => {
         await withFieldViewer({ roles: ["staff"] }, async () => {
             await Promise.resolve();
-            expect(toRestRow(row(), staff, registry)).not.toHaveProperty("salary");
+            expect(toRestRow(row(), registry.requireTable(staff.slug), registry)).not.toHaveProperty("salary");
         });
     });
 });
@@ -295,14 +295,14 @@ describe("a withheld to-one relation", () => {
     registry.registerMultiple([bands, people]);
 
     it("takes its foreign key with it, under the wire name and the column name", () => {
-        const rest = withFieldViewer({ roles: ["staff"] }, () => toRestRow(person(), people, registry));
+        const rest = withFieldViewer({ roles: ["staff"] }, () => toRestRow(person(), registry.requireTable(people.slug), registry));
         expect(rest).toEqual({ id: 1, name: "Ann" });
         const raw = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable({ id: 1, band_id: 7 }, described(people)));
         expect(raw).toEqual({ id: 1 });
     });
 
     it("keeps it for a caller who may read the relation", () => {
-        const rest = withFieldViewer({ roles: ["hr"] }, () => toRestRow(person(), people, registry));
+        const rest = withFieldViewer({ roles: ["hr"] }, () => toRestRow(person(), registry.requireTable(people.slug), registry));
         expect(rest.bandId).toBe(7);
     });
 });

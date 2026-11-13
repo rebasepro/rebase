@@ -2,7 +2,7 @@ import { and, eq, ne, not, or, sql, SQL, ilike, inArray, getTableColumns, getTab
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import {
     ALL_WHERE_FILTER_OPS,
-    CollectionConfig, FilterValues, WhereFilterOp, JoinStep, joinConditions, LogicalCondition, FilterCondition,
+    FilterValues, WhereFilterOp, JoinStep, joinConditions, LogicalCondition, FilterCondition,
     type RelationDescriptor,
     encodeRelationAggregateSort, parseCaseFoldedFieldPath, type RelationAggregateFn, type RelationAggregateSort
 } from "@rebasepro/types";
@@ -299,11 +299,11 @@ export interface FilterCompilationOptions {
      */
     unknownFields?: UnknownFilterFieldsMode;
     /**
-     * The collection the filter is written against. Its resolved relations are
-     * what turn an owning-relation filter key into the foreign-key column it
-     * actually lives in; without it only the default key shapes can be guessed.
+     * The table the filter is written against. Its relations are what turn an
+     * owning-relation filter key into the foreign-key column it actually lives
+     * in; without it only the default key shapes can be guessed.
      */
-    collection?: CollectionConfig;
+    owner?: RuntimeTable;
     /**
      * The driver's registry, for relations whose link is not on this row at
      * all. A `manyToMany` compiles to an `EXISTS` over its junction and a
@@ -774,7 +774,7 @@ export class DrizzleConditionBuilder {
         mode: UnknownFilterFieldsMode,
         options: FilterCompilationOptions
     ): FilterTarget | undefined {
-        const { collection, registry, sourceIdColumn } = options;
+        const { owner, registry, sourceIdColumn } = options;
 
         const columnAt = (key: string): AnyPgColumn | undefined => columnAtKey(table, key);
 
@@ -816,9 +816,8 @@ export class DrizzleConditionBuilder {
             return { kind: "text", expression: folded.fn === "lower" ? sql`lower(${text})` : sql`upper(${text})` };
         }
 
-        if (collection) {
-            const owner = registry?.getTable(collection.slug);
-            const relation = owner?.relations.get(field);
+        if (owner) {
+            const relation = owner.relations.get(field);
 
             // Owning relation, resolved: the relation names its own local key.
             if (relation?.kind === "belongsTo") {
@@ -862,18 +861,18 @@ export class DrizzleConditionBuilder {
             }
         }
 
-        // No collection in hand — the shapes an owning relation's key takes by
+        // No table in hand — the shapes an owning relation's key takes by
         // default (e.g. `project` → `projectId`, `userProfile` →
         // `userProfileId`). The snake forms stay in the list because a project
         // may have authored the property under its column name, which is still
         // its wire name.
         //
-        // Only then. With a collection, a declared relation has resolved
+        // Only then. With a table, a declared relation has resolved
         // above, and a guess past it reaches a column under a name that is not
         // the property's: the field-access check at the door judges the name
         // it was sent, so `manager` filtered on a `managerId` its caller may
         // not read, one predicate at a time.
-        if (!collection) {
+        if (!owner) {
             for (const guess of [
                 `${field}Id`,
                 toWireKey(generateForeignKeyName(field)),
@@ -885,8 +884,7 @@ export class DrizzleConditionBuilder {
             }
         }
 
-        const described = collection && options.registry ? options.registry.getTable(collection.slug)?.descriptor : undefined;
-        return this.unknownFilterField(table, field, collectionPath, mode, described);
+        return this.unknownFilterField(table, field, collectionPath, mode, owner?.descriptor);
     }
 
     /**
@@ -1663,7 +1661,7 @@ export class DrizzleConditionBuilder {
     static buildRelationAggregateExpression(
         spec: RelationAggregateSort,
         table: PgTable<any>,
-        collection: CollectionConfig,
+        ownerTable: RuntimeTable,
         registry: PostgresTableRegistry,
         sourceIdColumn: AnyPgColumn,
         collectionPath: string,
@@ -1671,10 +1669,9 @@ export class DrizzleConditionBuilder {
     ): SQL {
         // A relation the API does not have is not a relation there, for this
         // caller — the same answer, byte for byte, as one never declared.
-        const ownerTable = registry.getTable(collection.slug);
-        const relation = namesHiddenFromCaller(ownerTable?.descriptor).has(spec.relation)
+        const relation = namesHiddenFromCaller(ownerTable.descriptor).has(spec.relation)
             ? undefined
-            : ownerTable?.relations.get(spec.relation);
+            : ownerTable.relations.get(spec.relation);
         if (!relation) {
             throw ApiError.badRequest(
                 `Cannot sort by '${encodeRelationAggregateSort(spec)}' on table '${collectionPath}': ` +

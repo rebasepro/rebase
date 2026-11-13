@@ -1,12 +1,12 @@
 import { and, eq, getTableColumns, inArray, lte, or, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../interfaces";
-import type { CollectionConfig, FilterValues, OrderByTuple, RelationDescriptor } from "@rebasepro/types";
+import type { FilterValues, OrderByTuple, RelationDescriptor } from "@rebasepro/types";
 import { joinConditions, type JoinStep } from "@rebasepro/types";
 import type { RelationOfKind } from "@rebasepro/common";
 import { DrizzleConditionBuilder, joinColumn } from "../utils/drizzle-conditions";
 import {
-    getCollectionByPath,
+    requireTableAt,
     parseIdValues,
     buildCompositeId,
     rowIdentityCondition,
@@ -28,7 +28,7 @@ import {
 import type { RuntimeTable } from "../model/runtime-table";
 import { parseDataFromServer } from "../data-transformer";
 import { stripUnreadable, toRestRow } from "./row-pipeline";
-import { hiddenColumnsOption } from "../schema/search-column";
+import { hiddenColumnsOption } from "./hidden-columns";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import type { NestedPathHop } from "./nested-path";
 import { bindThroughJunction, readPivotColumns } from "./junction-writes";
@@ -287,12 +287,6 @@ interface RelationEnds {
     targetTable: PgTable;
     targetPks: PrimaryKeyInfo[];
     targetIdField: AnyPgColumn;
-    /**
-     * The target's lowered collection, for the subsystems that still render a
-     * row from one (the view-model codec, the field strip, `beforeQuery`).
-     * Looked up by the target's slug — never through the relation.
-     */
-    targetCollection: CollectionConfig;
 }
 
 /** The row a joined select keyed under `table`, or the row itself for a plain select. */
@@ -318,9 +312,9 @@ export class RelationService {
         private callContext?: ReadCallContextProvider
     ) { }
 
-    /** The runtime table a parent path names (`getCollectionByPath` resolves aliases and reports unknown paths). */
+    /** The runtime table a parent path names (`requireTableAt` resolves aliases and reports unknown paths). */
     private tableAt(path: string): RuntimeTable {
-        return this.registry.requireTable(getCollectionByPath(path, this.registry).slug);
+        return requireTableAt(path, this.registry);
     }
 
     private ends(parent: RuntimeTable, relation: RelationDescriptor): RelationEnds {
@@ -337,8 +331,7 @@ export class RelationService {
             target,
             targetTable,
             targetPks,
-            targetIdField: targetTable[targetPks[0].fieldName as keyof typeof targetTable] as AnyPgColumn,
-            targetCollection: getCollectionByPath(target.slug, this.registry)
+            targetIdField: targetTable[targetPks[0].fieldName as keyof typeof targetTable] as AnyPgColumn
         };
     }
 
@@ -362,11 +355,10 @@ export class RelationService {
         parentId?: string | number
     ): Promise<SQL | undefined> {
         const target = relationTarget(this.registry, relation);
-        const targetCollection = getCollectionByPath(target.slug, this.registry);
         const targetTable = catalogueTableOf(this.registry, target);
         return beforeQueryCondition(
             { registry: this.registry, callContext: this.callContext },
-            targetCollection,
+            target,
             target.slug,
             targetTable as PgTable<never>,
             {
@@ -379,7 +371,7 @@ export class RelationService {
                     }
                 }
             },
-            { collection: targetCollection, registry: this.registry }
+            { owner: target, registry: this.registry }
         );
     }
 
@@ -417,7 +409,7 @@ export class RelationService {
      */
     private async toRelatedRow<M extends Record<string, unknown>>(
         targetRow: Record<string, unknown>,
-        targetCollection: CollectionConfig,
+        target: RuntimeTable,
         targetPks: PrimaryKeyInfo[],
         options?: {
             resolveNested?: boolean;
@@ -430,20 +422,20 @@ export class RelationService {
             values = options.rest(targetRow);
         } else {
             values = options?.resolveNested
-                ? await parseDataFromServer(targetRow, this.registry.requireTable(targetCollection.slug), targetCollection, this.db, this.registry)
-                : await parseDataFromServer(targetRow, this.registry.requireTable(targetCollection.slug), targetCollection, undefined, this.registry);
+                ? await parseDataFromServer(targetRow, target, this.db, this.registry)
+                : await parseDataFromServer(targetRow, target, undefined, this.registry);
 
             // The target's OWN exclusions, applied to the target's own columns.
             // WebSocket fetches and every realtime frame come through here, so
             // a leak here is invisible from the REST surface people test.
-            stripUnreadable(values, this.registry.requireTable(targetCollection.slug).descriptor);
+            stripUnreadable(values, target.descriptor);
         }
 
         return {
             // The whole key: a composite target addressed by its first column
             // names every row that shares it.
             id: buildCompositeId(targetRow, targetPks),
-            path: targetCollection.slug,
+            path: target.slug,
             values: values as M
         };
     }
@@ -457,15 +449,15 @@ export class RelationService {
      * Built once per batch: the hidden set is a property of the table.
      */
     private restRendering(
-        targetCollection: CollectionConfig,
+        target: RuntimeTable,
         targetTable: PgTable
     ): (row: Record<string, unknown>) => Record<string, unknown> {
-        const hidden = Object.keys(hiddenColumnsOption(getTableColumns(targetTable), targetCollection) ?? {});
+        const hidden = Object.keys(hiddenColumnsOption(getTableColumns(targetTable), target.descriptor) ?? {});
         return (row) => {
-            if (hidden.length === 0) return toRestRow(row, targetCollection, this.registry);
+            if (hidden.length === 0) return toRestRow(row, target, this.registry);
             const visible = { ...row };
             for (const name of hidden) delete visible[name];
-            return toRestRow(visible, targetCollection, this.registry);
+            return toRestRow(visible, target, this.registry);
         };
     }
 
@@ -665,7 +657,7 @@ export class RelationService {
             databaseId?: string;
         } = {}
     ): Promise<RelatedRow<M>[]> {
-        const { target, targetTable, targetPks, targetIdField, targetCollection, parentTable, parentPks, parentIdCol } = this.ends(parent, relation);
+        const { target, targetTable, targetPks, targetIdField, parentTable, parentPks, parentIdCol } = this.ends(parent, relation);
         const parsedParentId = parseIdValues(parentId, parentPks)[parentPks[0].fieldName];
 
         // The target table's `beforeQuery`, resolved before either branch
@@ -708,7 +700,7 @@ export class RelationService {
 
             const rows: RelatedRow<M>[] = [];
             for (const row of results as Array<Record<string, unknown>>) {
-                rows.push(await this.toRelatedRow<M>(rowOf(row, targetTableName), targetCollection, targetPks, { resolveNested: true }));
+                rows.push(await this.toRelatedRow<M>(rowOf(row, targetTableName), target, targetPks, { resolveNested: true }));
             }
 
             return rows;
@@ -740,7 +732,7 @@ export class RelationService {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
                 options.searchString,
                 targetTable,
-                this.registry.requireTable(targetCollection.slug).descriptor
+                target.descriptor
             );
 
             if (searchConditions.length === 0) {
@@ -789,7 +781,7 @@ export class RelationService {
 
         const rows: RelatedRow<M>[] = [];
         for (const row of results as Array<Record<string, unknown>>) {
-            rows.push(await this.toRelatedRow<M>(rowOf(row, target.descriptor.table), targetCollection, targetPks, { resolveNested: true }));
+            rows.push(await this.toRelatedRow<M>(rowOf(row, target.descriptor.table), target, targetPks, { resolveNested: true }));
         }
 
         return rows;
@@ -937,8 +929,8 @@ export class RelationService {
         if (parentIds.length === 0) return new Map();
 
         const parent = this.tableAt(parentCollectionPath);
-        const { target, targetTable, targetPks, targetIdField, targetCollection, parentTable, parentPks, parentIdCol } = this.ends(parent, relation);
-        const render = { rest: options?.style === "rest" ? this.restRendering(targetCollection, targetTable) : undefined };
+        const { target, targetTable, targetPks, targetIdField, parentTable, parentPks, parentIdCol } = this.ends(parent, relation);
+        const render = { rest: options?.style === "rest" ? this.restRendering(target, targetTable) : undefined };
         const targetIdInfo = targetPks[0];
 
         const parsedParentIds = parentIds.map(id => parseIdValues(id, parentPks)[parentPks[0].fieldName]);
@@ -982,7 +974,7 @@ export class RelationService {
             for (const row of results as Array<Record<string, unknown>>) {
                 resultMap.set(
                     buildCompositeId(rowOf(row, parent.descriptor.table), parentPks),
-                    await this.toRelatedRow(rowOf(row, targetTableName), targetCollection, targetPks, render)
+                    await this.toRelatedRow(rowOf(row, targetTableName), target, targetPks, render)
                 );
             }
 
@@ -1059,7 +1051,7 @@ export class RelationService {
             for (const [parentIdStr, fkValue] of parentToFk) {
                 const targetRow = targetById.get(String(fkValue));
                 if (targetRow) {
-                    resultMap.set(parentIdStr, await this.toRelatedRow(targetRow, targetCollection, targetPks, render));
+                    resultMap.set(parentIdStr, await this.toRelatedRow(targetRow, target, targetPks, render));
                 }
             }
 
@@ -1119,7 +1111,7 @@ export class RelationService {
 
             const parentId = parentIdByKey.get(String(foreignKeyValue));
             if (parentId !== undefined) {
-                resultMap.set(String(parentId), await this.toRelatedRow(targetRow, targetCollection, targetPks, render));
+                resultMap.set(String(parentId), await this.toRelatedRow(targetRow, target, targetPks, render));
             }
         }
 
@@ -1153,8 +1145,8 @@ export class RelationService {
         if (parentIds.length === 0) return new Map();
 
         const parent = this.tableAt(parentCollectionPath);
-        const { target, targetTable, targetPks, targetIdField, targetCollection, parentTable, parentPks, parentIdCol } = this.ends(parent, relation);
-        const render = { rest: options?.style === "rest" ? this.restRendering(targetCollection, targetTable) : undefined };
+        const { target, targetTable, targetPks, targetIdField, parentTable, parentPks, parentIdCol } = this.ends(parent, relation);
+        const render = { rest: options?.style === "rest" ? this.restRendering(target, targetTable) : undefined };
 
         const parsedParentIds = parentIds.map(id => parseIdValues(id, parentPks)[parentPks[0].fieldName]);
 
@@ -1211,7 +1203,7 @@ export class RelationService {
                 const parentId = buildCompositeId(rowOf(row, parent.descriptor.table), parentPks);
                 recordTotal(window, parentId, row);
                 const arr = resultMap.get(parentId) || [];
-                arr.push(await this.toRelatedRow(rowOf(row, targetTableName), targetCollection, targetPks, render));
+                arr.push(await this.toRelatedRow(rowOf(row, targetTableName), target, targetPks, render));
                 resultMap.set(parentId, arr);
             }
 
@@ -1274,7 +1266,7 @@ export class RelationService {
                 const parentId = String(junctionData[parentKey]);
                 recordTotal(window, parentId, row);
                 const arr = resultMap.get(parentId) || [];
-                const related = await this.toRelatedRow(targetData, targetCollection, targetPks, render);
+                const related = await this.toRelatedRow(targetData, target, targetPks, render);
                 if (pivot.length > 0) related.pivot = readPivotColumns(junctionData, pivot, render.rest ? "rest" : "admin");
                 arr.push(related);
                 resultMap.set(parentId, arr);
@@ -1337,7 +1329,7 @@ export class RelationService {
                 const key = String(parentId);
                 recordTotal(window, key, row);
                 const arr = resultMap.get(key) || [];
-                arr.push(await this.toRelatedRow(targetRow, targetCollection, targetPks, render));
+                arr.push(await this.toRelatedRow(targetRow, target, targetPks, render));
                 resultMap.set(key, arr);
             }
         }

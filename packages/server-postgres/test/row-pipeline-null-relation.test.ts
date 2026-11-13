@@ -51,7 +51,7 @@ describe("toRestRow: a relation that is not set", () => {
     const registry = makeRegistry();
 
     it("leaves an absent belongsTo null rather than making it {}", () => {
-        const rest = toRestRow({ id: 1, title: "Orphan", author: null }, postsCollection, registry);
+        const rest = toRestRow({ id: 1, title: "Orphan", author: null }, registry.requireTable(postsCollection.slug), registry);
 
         expect(rest.author).toBeNull();
         // Stated separately: `toBeNull` would also pass on a value that is
@@ -62,7 +62,7 @@ describe("toRestRow: a relation that is not set", () => {
     it("still inlines a relation that is set", () => {
         const rest = toRestRow(
             { id: 2, title: "Attributed", author: { id: 9, name: "Ada" } },
-            postsCollection,
+            registry.requireTable(postsCollection.slug),
             registry
         );
 
@@ -72,7 +72,7 @@ describe("toRestRow: a relation that is not set", () => {
     it("leaves an undefined relation alone too", () => {
         // Drizzle omits the key entirely when a join finds nothing, which takes
         // a different branch from an explicit null.
-        const rest = toRestRow({ id: 3, title: "No key at all" }, postsCollection, registry);
+        const rest = toRestRow({ id: 3, title: "No key at all" }, registry.requireTable(postsCollection.slug), registry);
 
         expect(rest.author).toBeUndefined();
     });

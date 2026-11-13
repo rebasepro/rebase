@@ -79,7 +79,7 @@ count: 42 },
     it("handles null/undefined entity gracefully", () => {
         // Deliberately invalid: the null guard under test has no typed caller, so the null arrives untyped.
         const noRow: Record<string, unknown> | null = JSON.parse("null");
-        const result = serializeDataToServer(noRow as Record<string, unknown>, runtimeTableOf(makeCollection("items", properties)));
+        const result = serializeDataToServer(noRow as Record<string, unknown>);
         // Object.entries(null) yields nothing → empty object
         expect(result.scalarData).toEqual({});
         expect(result.inverseRelationUpdates).toEqual([]);

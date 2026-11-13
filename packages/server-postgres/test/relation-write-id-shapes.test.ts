@@ -88,7 +88,7 @@ describe("relation writes accept rows or bare keys", () => {
     const writeTags = async (value: unknown) => {
         const { tx, inserted } = recordingTx();
         const service = new RelationWriteService(unusedDb(), registry);
-        await service.updateRelationsUsingJoins(tx, postsCollection, "p1", { tags: value });
+        await service.updateRelationsUsingJoins(tx, registry.requireTable(postsCollection.slug), "p1", { tags: value });
         return inserted();
     };
 
@@ -126,7 +126,7 @@ describe("relation writes accept rows or bare keys", () => {
     it("clears the membership when given an empty list", async () => {
         const { tx, deleted, inserted } = recordingTx(["t-1", "t-2"]);
         const service = new RelationWriteService(unusedDb(), registry);
-        await service.updateRelationsUsingJoins(tx, postsCollection, "p1", { tags: [] });
+        await service.updateRelationsUsingJoins(tx, registry.requireTable(postsCollection.slug), "p1", { tags: [] });
 
         expect(deleted()).toBe(true);
         expect(inserted()).toEqual([]);

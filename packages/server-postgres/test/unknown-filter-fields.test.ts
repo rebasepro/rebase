@@ -200,7 +200,7 @@ describe("unknown filter fields", () => {
                 { userProfile: ["==", 3] },
                 accountsTable,
                 "accounts",
-                { collection: accountsCollection, registry: accountsRegistry }
+                { owner: accountsRegistry.requireTable(accountsCollection.slug), registry: accountsRegistry }
             );
             expect(conditions).toHaveLength(1);
             expect(pgDialect.sqlToQuery(conditions[0]).sql).toBe('"accounts"."user_profile_id" = $1');
@@ -215,7 +215,7 @@ describe("unknown filter fields", () => {
                 { users: ["==", 3] },
                 accountsTable,
                 "accounts",
-                { collection: accountsCollection, registry: accountsRegistry }
+                { owner: accountsRegistry.requireTable(accountsCollection.slug), registry: accountsRegistry }
             );
             expect(conditions).toHaveLength(1);
             expect(pgDialect.sqlToQuery(conditions[0]).sql).toBe('"accounts"."user_id" = $1');
@@ -229,7 +229,7 @@ describe("unknown filter fields", () => {
                 { owner: ["==", 3] },
                 accountsTable,
                 "accounts",
-                { collection: accountsCollection, registry: accountsRegistry }
+                { owner: accountsRegistry.requireTable(accountsCollection.slug), registry: accountsRegistry }
             );
             expect(conditions).toHaveLength(1);
             expect(pgDialect.sqlToQuery(conditions[0]).sql).toBe('"accounts"."owner_uid" = $1');
@@ -260,7 +260,7 @@ describe("unknown filter fields", () => {
                 },
                 accountsTable,
                 "accounts",
-                { collection: accountsCollection, registry: accountsRegistry }
+                { owner: accountsRegistry.requireTable(accountsCollection.slug), registry: accountsRegistry }
             );
             expect(condition).not.toBeNull();
         });

@@ -178,7 +178,7 @@ describe("compiling an aggregate sort to SQL", () => {
         DrizzleConditionBuilder.buildRelationAggregateExpression(
             parseRelationAggregateSort(key)!,
             talentsTable,
-            talentsCollection,
+            registry.requireTable(talentsCollection.slug),
             registry,
             talentsTable.id,
             "talents",
@@ -328,10 +328,10 @@ describe("paging over an aggregate sort", () => {
         const service = new FetchService(unusedDb(), registry);
         const spec = parseRelationAggregateSort("min(applications.created_at)")!;
         const target = DrizzleConditionBuilder.buildRelationAggregateExpression(
-            spec, talentsTable, talentsCollection, registry, talentsTable.id, "talents"
+            spec, talentsTable, registry.requireTable(talentsCollection.slug), registry, talentsTable.id, "talents"
         );
         const cursorTarget = DrizzleConditionBuilder.buildRelationAggregateExpression(
-            spec, talentsTable, talentsCollection, registry, talentsTable.id, "talents", 42
+            spec, talentsTable, registry.requireTable(talentsCollection.slug), registry, talentsTable.id, "talents", 42
         );
         const comparison = callPrivate(service, "buildKeysetComparison",
             [{ field: "min(applications.created_at)", direction, target, cursorTarget }],

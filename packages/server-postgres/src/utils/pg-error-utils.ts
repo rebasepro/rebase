@@ -8,8 +8,9 @@
  */
 
 import { DATABASE_UNAVAILABLE_MESSAGE, declaredErrorAnswer, isDatabaseUnreachable, logger } from "@rebasepro/server";
-import type { CollectionConfig } from "@rebasepro/types";
-import { fieldKeyForColumn, getTableName } from "@rebasepro/common";
+import type { TableDescriptor } from "@rebasepro/types";
+import { columnBySqlName, keyForColumn } from "@rebasepro/common";
+import { toWireKey } from "@rebasepro/utils";
 import { extractCauseMessage } from "./error-cause";
 
 /**
@@ -253,7 +254,7 @@ export interface PgFieldViolation {
  * because a value outside an enum's labels is the most common 22P02 anyone
  * hits and the least legible one.
  */
-function offendingColumns(pgError: PostgresError, collection?: CollectionConfig): string[] {
+function offendingColumns(pgError: PostgresError, described?: TableDescriptor): string[] {
     if (pgError.column) return [pgError.column];
 
     const detail = pgError.detail;
@@ -267,31 +268,25 @@ function offendingColumns(pgError: PostgresError, collection?: CollectionConfig)
     if (pgError.code === "22P02") {
         // `invalid input value for enum posts_status: "archived"`
         const enumType = /invalid input value for enum ([^:\s]+)/i.exec(pgError.message ?? "");
-        if (enumType && collection) {
+        if (enumType && described) {
             const typeName = enumType[1].replace(/^.*\./, "").replace(/"/g, "");
-            const table = getTableName(collection);
+            const table = described.table;
             if (typeName.startsWith(`${table}_`)) return [typeName.slice(table.length + 1)];
         }
         return [];
     }
 
     const constraint = pgError.constraint;
-    if (constraint && collection) {
-        const table = getTableName(collection);
+    if (constraint && described) {
+        const table = described.table;
         const stripped = constraint
             .replace(new RegExp(`^${table}_`), "")
             .replace(/_(pkey|key|fkey|unique|check|excl|idx)$/, "");
-        // Only when it names something the collection actually has: a
-        // hand-written constraint name is not a column list, and guessing at one
-        // would put a field in the response that does not exist.
+        // Only when it names a column the table actually has: a hand-written
+        // constraint name is not a column list, and guessing at one would put a
+        // field in the response that does not exist.
         if (stripped && stripped !== constraint) {
-            const columns = new Set<string>();
-            for (const [key, prop] of Object.entries(collection.properties ?? {})) {
-                columns.add((prop as { columnName?: string })?.columnName ?? key);
-            }
-            if (columns.has(stripped)) return [stripped];
-            const wire = fieldKeyForColumn(collection, stripped);
-            if (collection.properties && wire in collection.properties) return [stripped];
+            if (columnBySqlName(described, stripped)) return [stripped];
         }
     }
 
@@ -313,19 +308,19 @@ function offendingColumns(pgError: PostgresError, collection?: CollectionConfig)
  */
 export function pgFieldViolations(
     pgError: PostgresError,
-    collection?: CollectionConfig
+    table?: TableDescriptor
 ): PgFieldViolation[] {
     const code = pgError.code;
     if (code !== "23502" && code !== "23505" && code !== "22P02" && code !== "23503") return [];
-    // Without the collection there is no mapping, only a guess. `toWireKey`
+    // Without the table there is no mapping, only a guess. `toWireKey`
     // would get the default case right and silently invent a field for any
-    // property carrying an explicit `columnName` — and a form pointed at an
-    // input that does not exist is worse off than one shown the raw column.
-    if (!collection) return [];
-    const columns = offendingColumns(pgError, collection);
+    // column carrying an explicit SQL name — and a form pointed at an input
+    // that does not exist is worse off than one shown the raw column.
+    if (!table) return [];
+    const columns = offendingColumns(pgError, table);
     if (columns.length === 0) return [];
     return columns.map(column => ({
-        field: fieldKeyForColumn(collection, column),
+        field: keyForColumn(table, column) ?? toWireKey(column),
         code
     }));
 }
@@ -350,7 +345,7 @@ const SCHEMA_BEHIND =
 export function pgErrorToFriendlyMessage(
     pgError: PostgresError,
     context: string,
-    options: { verbose?: boolean; collection?: CollectionConfig } = {}
+    options: { verbose?: boolean; table?: TableDescriptor } = {}
 ): { message: string; code: string; violations: PgFieldViolation[] } {
     // Postgres's own `DETAIL` and `HINT`, and the raw driver message, are what
     // make these errors useful while you are building — and what makes them an
@@ -381,7 +376,7 @@ export function pgErrorToFriendlyMessage(
     // production — a column name is already published in the OpenAPI and the
     // generated SDK — where the value that broke the rule is not, and is never
     // included. See `pgFieldViolations`.
-    const violations = pgFieldViolations(pgError, options.collection);
+    const violations = pgFieldViolations(pgError, options.table);
 
     const suffix = hint ? ` Hint: ${hint}` : "";
     const tableRef = table ?? context;
@@ -520,7 +515,7 @@ export function pgErrorToFriendlyMessage(
 export function sanitizeErrorForClient(
     error: unknown,
     context: string,
-    options: { collection?: CollectionConfig } = {}
+    options: { table?: TableDescriptor } = {}
 ): { message: string; code?: string; violations?: PgFieldViolation[] } {
     // ── A deliberate 4xx is not a database failure ──────────────────
     // Its message and code are written for the client; replacing them with
@@ -568,7 +563,7 @@ export function sanitizeErrorForClient(
             // value; the wrapper added only the leak. `logger` strips the
             // wrapper as well, but the field itself carried nothing else.
         });
-        const { message, code, violations } = pgErrorToFriendlyMessage(pgError, context, { collection: options.collection });
+        const { message, code, violations } = pgErrorToFriendlyMessage(pgError, context, { table: options.table });
         return { message, code, ...(violations.length > 0 && { violations }) };
     }
 

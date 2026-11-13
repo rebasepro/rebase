@@ -557,6 +557,6 @@ describe("PersistService – deleteAll", () => {
 
         await expect(
             dataService.deleteAll("nonexistent")
-        ).rejects.toThrow("Collection not found: nonexistent");
+        ).rejects.toThrow("Table not found: nonexistent");
     });
 });

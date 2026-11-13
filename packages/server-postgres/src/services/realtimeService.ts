@@ -3,12 +3,12 @@ import { EventEmitter } from "events";
 import { createHash, randomUUID } from "crypto";
 import { DataService } from "./dataService";
 
-import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, CollectionUpdateMeta, IncludeSpec, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, LogicalCondition, OrderByTuple, CollectionConfig, RebaseCallContext, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, CollectionUpdateMeta, IncludeSpec, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, LogicalCondition, OrderByTuple, RebaseCallContext, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import { Pool } from "pg";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig, DrizzleClient, type PgSqlDatabase } from "../interfaces";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
-import { deserializeFilter, getTableName, normalizeDriverOrderBy, OrderBySpecError, parseOrderBySpecStrict, UnknownFilterOperatorError } from "@rebasepro/common";
+import { deserializeFilter, normalizeDriverOrderBy, OrderBySpecError, parseOrderBySpecStrict, UnknownFilterOperatorError } from "@rebasepro/common";
 import { applyAuthContext } from "../security/rls-enforcement";
 import type { RequestIdentity } from "../security/rls-settings";
 import { withFieldViewer } from "./field-viewer";
@@ -24,6 +24,7 @@ import type { CdcTableRef } from "./cdc/trigger-cdc";
 import { PgNotifyListener } from "./pg-notify-listener";
 import { terminateIfBacklogged } from "./socket-liveness";
 import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collection-helpers";
+import type { RuntimeTable } from "../model/runtime-table";
 import { isNestedPath } from "./nested-path";
 import { afterReadApplies, afterReadOnRows, resolveTableHooks } from "./table-hooks";
 import { ChannelHistoryStore, type ResolvedRetention } from "./channel-history";
@@ -779,8 +780,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     /** How many changed rows one turn of the event loop routes: ~5–10 ms of work. */
     private static readonly CDC_ROWS_PER_TURN = 5000;
 
-    /** Reverse lookup: `schema.table` (and bare `table`) → collection, built when CDC starts. */
-    private cdcTableMap?: Map<string, CollectionConfig>;
+    /** Reverse lookup: `schema.table` (and bare `table`) → served table, built when CDC starts. */
+    private cdcTableMap?: Map<string, RuntimeTable>;
     /**
      * Short-lived record of `path/id` keys this instance just fanned out via the
      * app path (a Rebase-API mutation). When CDC echoes the same committed change
@@ -1507,9 +1508,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
         try {
             // Early validation: ensure the requested collection exists in the registry
-            const collection = this.registry.getCollectionByPath(request.path);
-            if (!collection) {
-                const registered = this.registry.getCollections().map(c => c.slug).join(", ");
+            const served = this.registry.tableAt(request.path);
+            if (!served) {
+                const registered = this.registry.tables().map(table => table.slug).join(", ");
                 const msg = `Table not found: '${request.path}'. Registered: [${registered}]`;
                 logger.error(`[RealtimeService] ${msg}`);
                 this.sendError(clientId, msg, subscriptionId);
@@ -1597,7 +1598,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             try {
                 assertReadRequestReadable(
                     { ...request, filter, orderBy },
-                    collection,
+                    served,
                     { roles: authContext?.roles ?? ["anon"] },
                     this.registry
                 );
@@ -1624,7 +1625,6 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     ? (request.page - 1) * boundedLimit
                     : request.offset,
                 startAfter: request.startAfter as Record<string, unknown> | undefined,
-                databaseId: request.collection?.databaseId,
                 searchString: request.searchString,
                 searchExplain: request.searchExplain,
                 // Stored, so every refetch answers the same query the
@@ -1683,9 +1683,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
         try {
             // Early validation: ensure the requested collection exists in the registry
-            const collection = this.registry.getCollectionByPath(request.path);
-            if (!collection) {
-                const registered = this.registry.getCollections().map(c => c.slug).join(", ");
+            const served = this.registry.tableAt(request.path);
+            if (!served) {
+                const registered = this.registry.tables().map(table => table.slug).join(", ");
                 const msg = `Table not found: '${request.path}'. Registered: [${registered}]`;
                 logger.error(`[RealtimeService] ${msg}`);
                 this.sendError(clientId, msg, subscriptionId);
@@ -1699,7 +1699,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             try {
                 assertReadRequestReadable(
                     { include: request.include },
-                    collection,
+                    served,
                     { roles: authContext?.roles ?? ["anon"] },
                     this.registry
                 );
@@ -1828,10 +1828,10 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 }
                 : subscription.type === "single" ? { include: subscription.include } : undefined;
             if (judged) {
-                const collection = this.registry.getCollectionByPath(subscription.path);
+                const served = this.registry.tableAt(subscription.path);
                 try {
-                    if (collection) {
-                        assertReadRequestReadable(judged, collection, { roles: authContext.roles ?? ["anon"] }, this.registry);
+                    if (served) {
+                        assertReadRequestReadable(judged, served, { roles: authContext.roles ?? ["anon"] }, this.registry);
                     }
                 } catch (e) {
                     if (!(e instanceof ApiError)) throw e;
@@ -2079,7 +2079,6 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         options: { meta: boolean; group?: SubscriptionGroup }
     ): Promise<{ rows: Record<string, unknown>[]; meta?: CollectionUpdateMeta }> {
         if (this.driver) {
-            const collection = this.registry.getCollectionByPath(notifyPath);
             // Always wrap in a transaction with session vars, defaulting to anonymous context if missing.
             // Refetches are reads: apply the same GUCs + reader-role downgrade as the
             // driver's read path, so realtime cannot leak rows the initial fetch hid.
@@ -2154,7 +2153,7 @@ roles: ["anon"] };
                     // callbackContextWithin for what this used to be.
                     const rows = await afterReadOnRows(
                         this.registry,
-                        resolveTableHooks(this.registry, notifyPath, collection?.slug),
+                        resolveTableHooks(this.registry, notifyPath),
                         fetchedEntities,
                         notifyPath,
                         () => callbackContextWithin(this.driver, tx, activeAuth)
@@ -2316,13 +2315,13 @@ roles: ["anon"] };
         const tagged = loadsRelations ? await this.fetchEntityWithAuth(path, id, authContext) : undefined;
         const row = (await this.fetchEntityWithAuth(path, id, authContext, include)) ?? null;
         if (!row) return { row };
-        let collection: CollectionConfig | undefined;
+        let served: RuntimeTable | undefined;
         try {
-            collection = this.registry.getCollectionByPath(path);
+            served = this.registry.tableAt(path);
         } catch {
-            collection = undefined;
+            served = undefined;
         }
-        const etag = await rowETag(loadsRelations ? tagged : row, collection && this.registry.getTable(collection.slug)?.descriptor);
+        const etag = await rowETag(loadsRelations ? tagged : row, served?.descriptor);
         return { row, ...(etag && { etag }) };
     }
 
@@ -2353,7 +2352,6 @@ roles: ["anon"] };
         include?: IncludeSpec
     ): Promise<Record<string, unknown> | undefined> {
         if (this.driver) {
-            const collection = this.registry.getCollectionByPath(notifyPath);
             // Always wrap in a transaction with session vars, defaulting to anonymous context if missing.
             // Same read isolation as collection refetches: GUCs + reader-role downgrade.
             const activeAuth = authContext || { uid: ANONYMOUS_USER_ID,
@@ -2392,14 +2390,14 @@ roles: ["anon"] };
                     // eagerly loaded, each under a `{ __type: "relation" }`
                     // envelope. A subscriber got one shape and a fetch the other.
                     let processedEntity = await txEntityService.fetchOneForRest(
-                        notifyPath, id, include, collection?.databaseId
+                        notifyPath, id, include
                     ) ?? undefined;
 
                     if (processedEntity) {
                         // The same chain as the collection refetch above.
                         [processedEntity] = await afterReadOnRows(
                             this.registry,
-                            resolveTableHooks(this.registry, notifyPath, collection?.slug),
+                            resolveTableHooks(this.registry, notifyPath),
                             [processedEntity],
                             notifyPath,
                             () => callbackContextWithin(this.driver, tx, activeAuth)
@@ -2484,15 +2482,15 @@ roles: ["anon"] };
      * columns and no address. The SDK holds no collection config to derive one
      * from, so this is the only place the mapping can come from.
      */
-    /** The key columns of the collection at `path`, if they can be resolved. */
+    /** The key columns of the table at `path`, if they can be resolved. */
     private primaryKeysForPath(path: string): PrimaryKeyInfo[] | undefined {
         try {
-            const collection = this.registry.getCollectionByPath(path);
-            if (!collection) return undefined;
-            const keys = getPrimaryKeys(collection, this.registry);
+            const served = this.registry.tableAt(path);
+            if (!served) return undefined;
+            const keys = getPrimaryKeys(served, this.registry);
             return keys.length > 0 ? keys : undefined;
         } catch {
-            // `getCollectionByPath` throws on a path it cannot walk — and this
+            // `tableAt` throws on a path it cannot walk — and this
             // is called for parent paths too, which include entity paths like
             // `posts/1` that name no collection. Telling the subscriber nothing
             // is right here; letting it throw would drop the notification.
@@ -2581,7 +2579,7 @@ roles: ["anon"] };
     /** The slug of the collection a path lands on, or `undefined` for one that names none. */
     private collectionSlugAt(path: string): string | undefined {
         try {
-            return this.registry.getCollectionByPath(path)?.slug;
+            return this.registry.tableAt(path)?.slug;
         } catch {
             // A malformed or stale path names no collection, and a
             // notification is not the place to refuse it.
@@ -3903,20 +3901,18 @@ lastSeen: Date.now() });
      * path (slug). We index by both `schema.table` and bare `table` so the lookup
      * works whether or not the collection declares an explicit schema.
      */
-    private buildCdcTableMap(): Map<string, CollectionConfig> {
-        const map = new Map<string, CollectionConfig>();
-        for (const collection of this.registry.getCollections()) {
-            const table = getTableName(collection);
-            if (!table) continue;
-            const schema = (collection as { schema?: string }).schema ?? "public";
-            map.set(`${schema}.${table}`, collection);
+    private buildCdcTableMap(): Map<string, RuntimeTable> {
+        const map = new Map<string, RuntimeTable>();
+        for (const served of this.registry.tables()) {
+            const { schema, table } = served.descriptor;
+            map.set(`${schema}.${table}`, served);
             // Bare-table fallback; first registration wins to keep it deterministic.
-            if (!map.has(table)) map.set(table, collection);
+            if (!map.has(table)) map.set(table, served);
         }
         return map;
     }
 
-    private resolveCollectionForTable(schema: string, table: string): CollectionConfig | undefined {
+    private resolveTableForChange(schema: string, table: string): RuntimeTable | undefined {
         if (!this.cdcTableMap) return undefined;
         return this.cdcTableMap.get(`${schema}.${table}`) ?? this.cdcTableMap.get(table);
     }
@@ -3972,8 +3968,8 @@ lastSeen: Date.now() });
     }
 
     private async handleCdcEvent(event: CdcChangeEvent): Promise<void> {
-        const collection = this.resolveCollectionForTable(event.schema, event.table);
-        if (!collection) {
+        const served = this.resolveTableForChange(event.schema, event.table);
+        if (!served) {
             // A junction table backs no collection, but its rows *are* a child
             // list. Route the change to the lists it changes before giving up.
             if (await this.handleJunctionCdcEvent(event)) return;
@@ -3983,16 +3979,15 @@ lastSeen: Date.now() });
             return;
         }
 
-        const path = collection.slug;
-        const databaseId = (collection as { databaseId?: string }).databaseId;
+        const path = served.slug;
         // A TRUNCATE names no row: it changed every one.
-        const id = event.op === "TRUNCATE" ? ANY_ROW : this.extractIdFromCdcRow(collection, event.row);
+        const id = event.op === "TRUNCATE" ? ANY_ROW : this.extractIdFromCdcRow(served, event.row);
 
         // Deletes carry a null row (subscribers drop the id); inserts/updates carry
         // an invalidation marker that forces a per-subscriber RLS-bound refetch.
         const row = event.op === "DELETE" || event.op === "TRUNCATE" ? null : { _rebase_invalidated: true };
 
-        await this.notifyUpdate(path, id, row, databaseId, /* broadcast */ false, /* origin */ "cdc");
+        await this.notifyUpdate(path, id, row, undefined, /* broadcast */ false, /* origin */ "cdc");
     }
 
     /**
@@ -4078,10 +4073,10 @@ lastSeen: Date.now() });
      * or {@link ANY_ROW} when it names none — a key too large to notify, a
      * table with no key.
      */
-    private extractIdFromCdcRow(collection: CollectionConfig, row: Record<string, unknown>): string {
+    private extractIdFromCdcRow(served: RuntimeTable, row: Record<string, unknown>): string {
         // Unaddressable is a change to the whole collection. It used to reach
         // its lists only: a single-row subscriber of the row it was never heard.
-        return deriveRowAddress(this.cdcRowByKeyFields(collection, row), collection, this.registry) || ANY_ROW;
+        return deriveRowAddress(this.cdcRowByKeyFields(served, row), served, this.registry) || ANY_ROW;
     }
 
     /**
@@ -4093,9 +4088,9 @@ lastSeen: Date.now() });
      * row, the address fell back to `*`, and no single-row subscriber heard
      * about any write made outside this server.
      */
-    private cdcRowByKeyFields(collection: CollectionConfig, row: Record<string, unknown>): Record<string, unknown> {
+    private cdcRowByKeyFields(served: RuntimeTable, row: Record<string, unknown>): Record<string, unknown> {
         const keyed: Record<string, unknown> = { ...row };
-        for (const { fieldName, columnName } of tableKeyColumns(this.registry.requireTable(collection.slug))) {
+        for (const { fieldName, columnName } of tableKeyColumns(served)) {
             if (fieldName in row) continue;
             if (columnName in row) keyed[fieldName] = row[columnName];
         }

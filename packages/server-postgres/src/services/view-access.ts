@@ -1,5 +1,5 @@
 /**
- * What a collection that serves a SQL view (`PostgresCollectionConfig.view`)
+ * What a table that serves a SQL view (`defineView`, `descriptor.kind === "view"`)
  * allows: reads, and for a materialized view only by the roles it names.
  *
  * A plain view runs as the caller (`security_invoker`), so the policies of the
@@ -10,40 +10,40 @@
  * `beforeQueryConditions`) — and not of the server's own work, which reads
  * with no viewer at all.
  */
-import { isPostgresCollectionConfig, type CollectionConfig } from "@rebasepro/types";
+import type { TableDescriptor } from "@rebasepro/types";
 import { ApiError } from "@rebasepro/server";
 import { currentFieldViewer } from "./field-viewer";
 import { DEFAULT_VIEW_ROLES } from "../schema/plan/view-names";
 
 export { DEFAULT_VIEW_ROLES };
 
-/** Whether a collection serves a view rather than a table. */
-export function isViewCollection(collection: CollectionConfig | undefined): boolean {
-    return Boolean(collection && isPostgresCollectionConfig(collection) && collection.view);
+/** Whether a table serves a view rather than a stored table. */
+export function isViewTable(table: TableDescriptor | undefined): boolean {
+    return table?.kind === "view";
 }
 
 /** Refuse a caller who holds none of a materialized view's roles. A no-op for anything else. */
-export function assertViewReadable(collection: CollectionConfig | undefined): void {
-    if (!collection || !isPostgresCollectionConfig(collection) || !collection.view?.materialized) return;
+export function assertViewReadable(table: TableDescriptor | undefined): void {
+    if (!table || table.kind !== "view" || !table.view?.materialized) return;
     const viewer = currentFieldViewer();
     if (!viewer) return;
-    const allowed = collection.view.roles ?? DEFAULT_VIEW_ROLES;
+    const allowed = table.view.roles ?? DEFAULT_VIEW_ROLES;
     if ((viewer.roles ?? []).some(role => allowed.includes(role))) return;
     throw ApiError.forbidden(
-        `"${collection.slug}" is a materialized view, which has no row-level security, so it is served whole and ` +
+        `"${table.slug}" is a materialized view, which has no row-level security, so it is served whole and ` +
         `only to ${allowed.map(role => `'${role}'`).join(", ")}.`,
         "VIEW_NOT_READABLE"
     );
 }
 
-/** Refuse a write to a collection that serves a view. */
-export function assertCollectionWritable(collection: CollectionConfig | undefined, path: string): void {
-    if (!isViewCollection(collection)) return;
+/** Refuse a write to a table that serves a view. */
+export function assertTableWritable(table: TableDescriptor | undefined, path: string): void {
+    if (!isViewTable(table)) return;
     throw new ApiError(
         405,
         "TABLE_READ_ONLY",
-        `"${collection?.slug ?? path}" serves a SQL view, which is read-only: write to the tables it reads.`,
-        { collection: collection?.slug ?? path },
+        `"${table?.slug ?? path}" serves a SQL view, which is read-only: write to the tables it reads.`,
+        { collection: table?.slug ?? path },
         true
     );
 }

@@ -243,7 +243,7 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
             throw error;
         }
     }
-    const resolveAccessor = createAccessorSlugResolver(() => registry.getCollections());
+    const resolveAccessor = createAccessorSlugResolver(() => registry.tables());
     const scopedTo = async (identity: RebaseIdentity) => {
         const scoped = await driver.withAuth(userFor(identity));
         return { scoped, data: buildSdkData<DB>(scoped, { resolveAccessor }) };

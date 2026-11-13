@@ -436,12 +436,12 @@ export const PUBLIC_TYPES = new Set([
  * server does not have, with the answer REST gives (`NOT_FOUND`).
  */
 function assertKnownCollection(
-    registry: Pick<PostgresTableRegistry, "getCollectionByPath"> | undefined,
+    registry: Pick<PostgresTableRegistry, "tableNamed"> | undefined,
     path: unknown
 ): void {
     if (!registry || typeof path !== "string") return;
     const root = path.split("/").find(segment => segment !== "");
-    if (root !== undefined && !registry.getCollectionByPath(root)) {
+    if (root !== undefined && !registry.tableNamed(root)) {
         throw ApiError.notFound(`Unknown table '${root}'.`);
     }
 }
@@ -1402,8 +1402,7 @@ roles: verifiedUser.roles }
                  */
                 const assertWriteRequest = (path: string | undefined, values: unknown, status?: SaveProps["status"]): void => {
                     if (!path || !values || typeof values !== "object") return;
-                    const collection = driver.registry?.getCollectionByPath(path);
-                    const table = collection && driver.registry?.getTable(collection.slug)?.descriptor;
+                    const table = driver.registry?.tableAt(path)?.descriptor;
                     if (!table) return;
                     // The session's roles, and `["anon"]` for a socket that
                     // never authenticated — the same list `getScopedDelegate`
@@ -1443,17 +1442,17 @@ roles: verifiedUser.roles }
                     request: Parameters<typeof assertReadRequestReadable>[0]
                 ): void => {
                     if (!path) return;
-                    let collection;
+                    let served;
                     try {
-                        collection = driver.registry?.getCollectionByPath(path);
+                        served = driver.registry?.tableAt(path);
                     } catch {
                         // A malformed nested path: the driver refuses it with
                         // its own message.
                         return;
                     }
-                    if (!collection || !driver.registry) return;
+                    if (!served || !driver.registry) return;
                     const session = clientSessions.get(clientId);
-                    assertReadRequestReadable(request, collection, {
+                    assertReadRequestReadable(request, served, {
                         roles: session?.user?.roles ?? ["anon"]
                     }, driver.registry);
                 };
@@ -1476,7 +1475,7 @@ roles: verifiedUser.roles }
                     const registry = driver.registry;
                     if (!registry) throw ApiError.forbidden(`A write through '${path}' cannot be checked: this server has no table registry.`, "FIELD_NOT_WRITABLE");
                     const hop = resolveNestedPath(path, registry);
-                    const parent = hop && registry.getTable(hop.parentCollection.slug)?.descriptor;
+                    const parent = hop?.parent.descriptor;
                     const relation = parent && hop && relationOf(parent, hop.relation.name);
                     const target = relation && registry.getTable(relation.target)?.descriptor;
                     if (!parent || !relation || !target) {
@@ -1528,8 +1527,7 @@ roles: verifiedUser.roles }
                             "INVALID_CONFLICT_TARGET"
                         );
                     }
-                    const collection = driver.registry?.getCollectionByPath(request.path);
-                    const table = collection && driver.registry?.getTable(collection.slug)?.descriptor;
+                    const table = driver.registry?.tableAt(request.path)?.descriptor;
                     const onConflict = table
                         ? resolveConflictTarget(request.onConflict, table, { where: "`onConflict`" })
                         : undefined;

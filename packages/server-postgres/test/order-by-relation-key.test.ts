@@ -66,7 +66,7 @@ describe("orderBy on an owning relation resolves through localKey", () => {
 
     const service = new FetchService(recordingDb().db, new FixtureTableRegistry([postsCollection]));
     const resolve = (orderBy: string, collection?: LegacyCollectionConfig): PgColumn | undefined => {
-        const column = callPrivate(service, "resolveOrderByField", postsTable, orderBy, collection);
+        const column = callPrivate(service, "resolveOrderByField", postsTable, orderBy, collection && new FixtureTableRegistry([collection]).requireTable(collection.slug));
         return column instanceof PgColumn ? column : undefined;
     };
 
@@ -125,7 +125,7 @@ describe("orderBy on an owning relation resolves through localKey", () => {
                 "resolveOrderKeys",
                 postsTable,
                 [nulls ? ["title", order, nulls] : ["title", order]],
-                registry.getCollectionByPath("posts"),
+                registry.requireTable("posts"),
                 undefined,
                 "posts"
             );

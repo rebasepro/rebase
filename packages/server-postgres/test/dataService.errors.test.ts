@@ -107,7 +107,7 @@ dataType: "number" },
         it("should throw error when collection is not found", async () => {
             await expect(
                 dataService.fetchOne("nonexistent", 1)
-            ).rejects.toThrow("Collection not found: nonexistent");
+            ).rejects.toThrow("Table not found: nonexistent");
         });
 
         it("should throw error when table is not found for collection", async () => {

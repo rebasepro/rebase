@@ -1,7 +1,7 @@
 import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
-import { FixtureTableRegistry } from "./helpers/tables";
+import { FixtureTableRegistry, tablesFromCollections } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { HistoryService } from "../src/history/HistoryService";
 import { unusedDb } from "./helpers/spg-c-db";
@@ -181,16 +181,17 @@ name: "Camera" }
         setup({ sku: "ABC-1",
 label: "Widget" });
 
+        // History is the table's to declare (`history: true`), never the
+        // caller's: a table of its own, over the same SQL table.
+        registry.registerTables(tablesFromCollections([{ ...skuItemsCollection, slug: "audited_sku_items", history: true }]).tables);
         await driver.save({
-            path: "sku_items",
+            path: "audited_sku_items",
             values: { label: "Widget" },
-            collection: { ...skuItemsCollection,
-history: true } as LegacyCollectionConfig,
             status: "new"
         });
 
         expect(historyService.recordHistory).toHaveBeenCalledWith(expect.objectContaining({
-            tableName: "sku_items",
+            tableName: "audited_sku_items",
             id: "ABC-1",
             action: "create"
         }));

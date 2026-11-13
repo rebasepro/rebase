@@ -93,7 +93,7 @@ describe("read-shape parity across the entry points", () => {
         jest.spyOn(relations, "batchFetchRelatedEntities").mockImplementation((...args: unknown[]) => {
             const options = args[5];
             const style = typeof options === "object" && options !== null && "style" in options ? options.style : undefined;
-            const values = style === "rest" ? toRestRow({ ...AUTHOR }, authorsCollection, registry) : AUTHOR;
+            const values = style === "rest" ? toRestRow({ ...AUTHOR }, registry.requireTable(authorsCollection.slug), registry) : AUTHOR;
             return Promise.resolve(new Map([["1", { id: 7, path: "authors", values }]]));
         });
         jest.spyOn(relations, "batchFetchRelatedEntitiesMany").mockResolvedValue(new Map());

@@ -25,6 +25,8 @@ import { buildRuntimeTable, withCatalogueTable, type RuntimeTable } from "./runt
 export class PostgresTableRegistry extends CollectionRegistry implements CollectionRegistryInterface {
 
     private readonly runtimeTables = new Map<string, RuntimeTable>();
+    /** {@link tables}, built once per change: callers cache on its identity. */
+    private tableList?: RuntimeTable[];
     private readonly pgTables = new Map<string, PgTable>();
     private readonly enums = new Map<string, PgEnum<[string, ...string[]]>>();
     private readonly relations = new Map<string, Relations>();
@@ -43,6 +45,7 @@ export class PostgresTableRegistry extends CollectionRegistry implements Collect
             const pg = this.pgTables.get(compiled.descriptor.table);
             this.runtimeTables.set(compiled.descriptor.slug, buildRuntimeTable(compiled, pg));
         }
+        this.tableList = undefined;
     }
 
     /** The runtime table served at `/api/data/<slug>`, or `undefined`. */
@@ -78,6 +81,44 @@ export class PostgresTableRegistry extends CollectionRegistry implements Collect
         return undefined;
     }
 
+    /**
+     * The runtime table a root path names: its slug, the slug spelled with
+     * hyphens (`blog-posts` for `blog_posts` — URLs are kebab-case), then the
+     * table's SQL name. `undefined` when none matches.
+     */
+    tableNamed(name: string): RuntimeTable | undefined {
+        return this.getTable(name)
+            ?? (name.includes("-") ? this.getTable(name.replace(/-/g, "_")) : undefined)
+            ?? this.getTableBySqlName(name);
+    }
+
+    /**
+     * The runtime table a data path addresses: a root (`posts`, see
+     * {@link tableNamed}) or a walk through relations (`authors/1/posts` — the
+     * target of `authors`' relation `posts`). `undefined` for a root that
+     * names no table; throws, naming the table and the relation, for a nested
+     * path that is malformed or names a relation the table does not have.
+     *
+     * The walk reads every relation the table declares: whether the caller
+     * may address it is the nested-path walk's question (`resolveNestedPath`),
+     * not this lookup's.
+     */
+    tableAt(path: string): RuntimeTable | undefined {
+        if (!path.includes("/")) return this.tableNamed(path);
+        const segments = path.split("/").filter(segment => segment);
+        if (segments.length < 3 || segments.length % 2 === 0) {
+            throw new Error(`Invalid relation path: ${path}. Expected format: table/id/relation or table/id/relation/id/relation`);
+        }
+        let current = this.tableNamed(segments[0]);
+        if (!current) throw new Error(`Root table not found: ${segments[0]}`);
+        for (let i = 2; i < segments.length; i += 2) {
+            const relation = current.relations.get(segments[i]);
+            if (!relation) throw new Error(`Relation '${segments[i]}' not found in table '${current.slug}'`);
+            current = this.requireTable(relation.target);
+        }
+        return current;
+    }
+
     // ── Hooks ───────────────────────────────────────────────────────────────
 
     /**
@@ -106,12 +147,17 @@ export class PostgresTableRegistry extends CollectionRegistry implements Collect
         if (!table) return false;
         const compiled: CompiledTable = { ...table.compiled, hooks };
         this.runtimeTables.set(slug, { ...table, compiled });
+        this.tableList = undefined;
         return true;
     }
 
-    /** Every runtime table, in registration order. */
-    tables(): RuntimeTable[] {
-        return [...this.runtimeTables.values()];
+    /**
+     * Every runtime table, in registration order. The same array until a
+     * table is registered or replaced, so a caller may cache on its identity.
+     */
+    tables(): readonly RuntimeTable[] {
+        if (!this.tableList) this.tableList = [...this.runtimeTables.values()];
+        return this.tableList;
     }
 
     // ── Catalogue tables ────────────────────────────────────────────────────
@@ -126,6 +172,7 @@ export class PostgresTableRegistry extends CollectionRegistry implements Collect
         for (const [slug, runtime] of this.runtimeTables) {
             if (runtime.descriptor.table === tableName) this.runtimeTables.set(slug, withCatalogueTable(runtime, table));
         }
+        this.tableList = undefined;
     }
 
     /** The drizzle table with this SQL name — a served table or a junction — or `undefined`. */

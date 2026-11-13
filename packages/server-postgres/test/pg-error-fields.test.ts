@@ -1,4 +1,5 @@
 import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
+import { tablesFromCollections } from "./helpers/tables";
 import { pgErrorToFriendlyMessage, pgFieldViolations, sanitizeErrorForClient, type PostgresError } from "../src/utils/pg-error-utils";
 
 /**
@@ -9,7 +10,7 @@ import { pgErrorToFriendlyMessage, pgFieldViolations, sanitizeErrorForClient, ty
  * all, on the most common data error there is.
  */
 describe("pg errors name the field, not the column", () => {
-    const posts: LegacyCollectionConfig = {
+    const postsCollection: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",
@@ -21,6 +22,8 @@ describe("pg errors name the field, not the column", () => {
             contactEmail: { type: "string", columnName: "email" }
         }
     };
+
+    const posts = tablesFromCollections([postsCollection]).descriptors[0];
 
     const err = (parts: Partial<PostgresError> & { code: string }): PostgresError =>
         Object.assign(new Error(parts.message ?? "boom"), parts) as PostgresError;
@@ -40,7 +43,7 @@ describe("pg errors name the field, not the column", () => {
             const { message } = pgErrorToFriendlyMessage(
                 err({ code: "23502", column: "author_id", table: "posts" }),
                 "posts",
-                { collection: posts }
+                { table: posts }
             );
             expect(message).toContain("authorId");
             expect(message).not.toContain("author_id");
@@ -99,7 +102,7 @@ describe("pg errors name the field, not the column", () => {
                     table: "posts"
                 }),
                 "posts",
-                { verbose: false, collection: posts }
+                { verbose: false, table: posts }
             );
             // The sharp one: this detail answers "is this person registered?"
             // for any address on a table RLS is otherwise hiding.
@@ -136,7 +139,7 @@ describe("pg errors name the field, not the column", () => {
             const { message } = pgErrorToFriendlyMessage(
                 err({ code: "22P02", message: 'invalid input value for enum posts_status: "archived"' }),
                 "posts",
-                { verbose: false, collection: posts }
+                { verbose: false, table: posts }
             );
             expect(message).not.toContain("archived");
         });
@@ -172,7 +175,7 @@ describe("pg errors name the field, not the column", () => {
             const wrapped = new Error("Failed query: insert into posts", {
                 cause: err({ code: "23502", column: "author_id", table: "posts" })
             });
-            const result = sanitizeErrorForClient(wrapped, "posts", { collection: posts });
+            const result = sanitizeErrorForClient(wrapped, "posts", { table: posts });
             expect(result.violations).toEqual([{ field: "authorId", code: "23502" }]);
             jest.restoreAllMocks();
         });
@@ -180,7 +183,7 @@ describe("pg errors name the field, not the column", () => {
         it("omits the key entirely when there is nothing to say", () => {
             jest.spyOn(console, "error").mockImplementation(() => {});
             const wrapped = new Error("Failed query", { cause: err({ code: "42P01", table: "posts" }) });
-            expect("violations" in sanitizeErrorForClient(wrapped, "posts", { collection: posts })).toBe(false);
+            expect("violations" in sanitizeErrorForClient(wrapped, "posts", { table: posts })).toBe(false);
             jest.restoreAllMocks();
         });
     });

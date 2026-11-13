@@ -1,5 +1,5 @@
-import { CollectionConfig, INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, ResolvedRelation, isManyToMany, type ColumnDescriptor, type ResolvedVia } from "@rebasepro/types";
-import { canReadColumn, hasColumnAccessRules, restrictedKeys, resolveCollectionRelations, findRelation, createRelationRefWithData, restCodecOf } from "@rebasepro/common";
+import { INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, type ColumnDescriptor } from "@rebasepro/types";
+import { canReadColumn, hasColumnAccessRules, restrictedKeys, createRelationRefWithData, restCodecOf } from "@rebasepro/common";
 import type { RelationDescriptor, TableDescriptor } from "@rebasepro/types";
 import { currentFieldViewer } from "./field-viewer";
 import { normalizeDbValues } from "../data-transformer";
@@ -36,11 +36,11 @@ export type RelationStyle = "ref" | "inline";
  * the query has to nest one level deeper for a junction, and the row walk has
  * to unwrap that same level back out.
  */
-export function isJunctionRelation(relation: ResolvedRelation): boolean {
+export function isJunctionRelation(relation: RelationDescriptor): boolean {
     // An explicit `through` says so outright.
-    if (isManyToMany(relation)) return true;
+    if (relation.kind === "manyToMany") return true;
     // A multi-hop join path is the same thing spelled longhand.
-    return relation.kind === "via" && relation.joinPath.length > 1;
+    return relation.kind === "via" && relation.steps.length > 1;
 }
 
 /**
@@ -51,20 +51,20 @@ export function isJunctionRelation(relation: ResolvedRelation): boolean {
  * only object among them, so that is how it is found. A junction row that has
  * not been nested (no `with` on the join) has no object and is returned as-is.
  *
- * "The only object" stopped being true when a junction gained
- * `through.properties`: a payload `map` is an object too, and it sits in the
+ * "The only object" stopped being true when a junction gained pivot columns
+ * (`through.pivot`): a json pivot column is an object too, and it sits in the
  * row beside the target with no guaranteed order between them — so this would
- * have unwrapped to the payload and served it as the tag. The payload keys are
+ * have unwrapped to the payload and served it as the tag. The pivot keys are
  * known from the relation, so they are skipped by name rather than by shape.
  */
 function unwrapJunctionRow(
     item: Record<string, unknown>,
-    relation: ResolvedRelation
+    relation: RelationDescriptor
 ): Record<string, unknown> {
-    const payload = isManyToMany(relation) ? relation.through.properties : undefined;
+    const pivot = relation.kind === "manyToMany" ? new Set(relation.through.pivot.map(column => column.key)) : undefined;
     const nestedKey = Object.keys(item).find(
         key => key !== JUNCTION_PIVOT_KEY
-            && !(payload && key in payload)
+            && !(pivot && pivot.has(key))
             && typeof item[key] === "object" && item[key] !== null && !Array.isArray(item[key])
     );
     return nestedKey ? item[nestedKey] as Record<string, unknown> : item;
@@ -123,25 +123,26 @@ function toRestDate(value: unknown): unknown {
  * How {@link toRestRow} renders one key of a row: inline as a relation, or as
  * a scalar through a renderer, or `null` for a value served as it arrived.
  */
-type RestKeyStep = { relation: ResolvedRelation } | ((value: unknown) => unknown) | null;
+type RestKeyStep = { relation: RelationDescriptor } | ((value: unknown) => unknown) | null;
 
 /**
- * What every row of a collection shares, worked out once rather than per row
- * and per column: what each key renders as. Keyed by the collection object,
- * as `resolveCollectionRelations` caches its relations.
+ * What every row of a table shares, worked out once rather than per row and
+ * per column: what each key renders as. Keyed by the table's descriptor, which
+ * outlives the runtime record (rebuilt when hooks or the catalogue table are
+ * attached).
  */
 interface RestRowPlan {
     /** Filled as keys are first seen: a row has the keys its read selected. */
     steps: Map<string, RestKeyStep>;
 }
 
-const restRowPlans = new WeakMap<CollectionConfig, RestRowPlan>();
+const restRowPlans = new WeakMap<TableDescriptor, RestRowPlan>();
 
-function restRowPlan(collection: CollectionConfig): RestRowPlan {
-    let plan = restRowPlans.get(collection);
+function restRowPlan(table: TableDescriptor): RestRowPlan {
+    let plan = restRowPlans.get(table);
     if (!plan) {
         plan = { steps: new Map() };
-        restRowPlans.set(collection, plan);
+        restRowPlans.set(table, plan);
     }
     return plan;
 }
@@ -158,8 +159,8 @@ function restScalarStep(column: ColumnDescriptor | undefined): ((value: unknown)
     }
 }
 
-function restKeyStep(collection: CollectionConfig, table: RuntimeTable, key: string): RestKeyStep {
-    const relation = findRelation(resolveCollectionRelations(collection), key);
+function restKeyStep(table: RuntimeTable, key: string): RestKeyStep {
+    const relation = table.relations.get(key);
     if (relation) return { relation };
     return restScalarStep(table.columnsByKey.get(key));
 }
@@ -285,19 +286,18 @@ export function canReadRelation(relation: RelationDescriptor): boolean {
 
 function renderTarget(
     targetRow: Record<string, unknown>,
-    targetCollection: CollectionConfig,
+    target: RuntimeTable,
     style: RelationStyle,
     registry: PostgresTableRegistry
 ): unknown {
     if (style === "inline") {
         // The target's columns, and only those: its address is the consumer's
         // to derive, and merging one in overwrites a real `id` column.
-        const target = registry.requireTable(targetCollection.slug);
         return stripUnreadable(toRestValues({ ...targetRow }, target), target.descriptor);
     }
 
-    const address = relationTargetAddress(targetRow, targetCollection, registry);
-    const path = targetCollection.slug;
+    const address = relationTargetAddress(targetRow, target, registry);
+    const path = target.slug;
     return createRelationRefWithData(address, path, {
         id: address,
         path,
@@ -308,8 +308,8 @@ function renderTarget(
         // hash that REST correctly withheld rode out on every `.listen()` frame
         // and every WebSocket fetch of anything with a relation to users.
         values: stripUnreadable(
-            normalizeDbValues(targetRow, registry.requireTable(targetCollection.slug)) as Record<string, unknown>,
-            registry.requireTable(targetCollection.slug).descriptor
+            normalizeDbValues(targetRow, target) as Record<string, unknown>,
+            target.descriptor
         )
     });
 }
@@ -326,10 +326,10 @@ function renderTarget(
  */
 export function relationTargetAddress(
     targetRow: Record<string, unknown>,
-    targetCollection: CollectionConfig,
+    target: RuntimeTable,
     registry: PostgresTableRegistry
 ): string {
-    const address = deriveRowAddress(targetRow, targetCollection, registry);
+    const address = deriveRowAddress(targetRow, target, registry);
     if (address) return address;
     return String(targetRow[Object.keys(targetRow)[0]] ?? "");
 }
@@ -339,38 +339,36 @@ export function relationTargetAddress(
  *
  * Values are normalized (dates, numbers, NaN) because the admin's view-model
  * expects real types. The row's own address is *not* among the columns — it is
- * derived by the consumer from the collection's primary keys.
+ * derived by the consumer from the table's primary keys.
  */
 export function toFlatRow(
     row: Record<string, unknown>,
-    collection: CollectionConfig,
+    table: RuntimeTable,
     registry: PostgresTableRegistry
 ): Record<string, unknown> {
-    const resolvedRelations = resolveCollectionRelations(collection);
-    const normalized = normalizeDbValues(row, registry.requireTable(collection.slug)) as Record<string, unknown>;
+    const normalized = normalizeDbValues(row, table) as Record<string, unknown>;
 
-    // Keyed by relation, reading the drizzle relation name off the raw row: the
-    // relation's property key and the name drizzle nested it under are not
-    // always the same, and the value is written back under the property key.
-    for (const [key, relation] of Object.entries(resolvedRelations)) {
-        const relData = row[relation.relationName || key];
+    // Keyed by relation: a relation the read nested (`with`) sits on the raw
+    // row under its name.
+    for (const [key, relation] of table.relations) {
+        const relData = row[key];
         if (relData === undefined || relData === null) continue;
 
         if (relation.cardinality === "many" && Array.isArray(relData)) {
-            const targetCollection = relation.target();
+            const target = registry.requireTable(relation.target);
             normalized[key] = relData.map((item: Record<string, unknown>) =>
                 renderTarget(
                     isJunctionRelation(relation) ? unwrapJunctionRow(item, relation) : item,
-                    targetCollection,
+                    target,
                     "ref",
                     registry
                 ));
         } else if (relation.cardinality === "one" && typeof relData === "object" && !Array.isArray(relData)) {
-            normalized[key] = renderTarget(relData as Record<string, unknown>, relation.target(), "ref", registry);
+            normalized[key] = renderTarget(relData as Record<string, unknown>, registry.requireTable(relation.target), "ref", registry);
         }
     }
 
-    return stripUnreadable(normalized, registry.requireTable(collection.slug).descriptor);
+    return stripUnreadable(normalized, table.descriptor);
 }
 
 /**
@@ -389,18 +387,17 @@ export function toFlatRow(
  */
 export function toRestRow(
     row: Record<string, unknown>,
-    collection: CollectionConfig,
+    table: RuntimeTable,
     registry: PostgresTableRegistry
 ): Record<string, unknown> {
-    const { steps } = restRowPlan(collection);
-    const table = registry.requireTable(collection.slug);
+    const { steps } = restRowPlan(table.descriptor);
     const flat: Record<string, unknown> = {};
 
     for (const key of Object.keys(row)) {
         const value = row[key];
         let step = steps.get(key);
         if (step === undefined) {
-            step = restKeyStep(collection, table, key);
+            step = restKeyStep(table, key);
             steps.set(key, step);
         }
 
@@ -413,12 +410,12 @@ export function toRestRow(
             flat[key] = value.map((item: Record<string, unknown>) =>
                 renderTarget(
                     isJunctionRelation(relation) ? unwrapJunctionRow(item, relation) : item,
-                    relation.target(),
+                    registry.requireTable(relation.target),
                     "inline",
                     registry
                 ));
         } else if (typeof value === "object" && value !== null) {
-            flat[key] = renderTarget(value as Record<string, unknown>, step.relation.target(), "inline", registry);
+            flat[key] = renderTarget(value as Record<string, unknown>, registry.requireTable(step.relation.target), "inline", registry);
         } else {
             // A relation's key holding a scalar: its foreign key, as a scalar.
             flat[key] = toRestScalar(value, table.columnsByKey.get(key));
