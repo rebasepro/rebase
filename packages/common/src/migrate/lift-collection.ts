@@ -103,6 +103,9 @@ import { liftRuleSpelling, liftTenantSourceSpelling } from "./lift-rule-spelling
 
 // ── Notes ────────────────────────────────────────────────────────────────────
 
+/** Relation keys the earliest versions wrote on the relation property itself, before `relation: { … }`. */
+const FLAT_RELATION_KEYS = ["relationName", "target", "cardinality", "direction", "localKey", "foreignKeyOnTarget", "onDelete"] as const;
+
 /**
  * Why a legacy field is not carried into the table.
  *
@@ -124,6 +127,7 @@ import { liftRuleSpelling, liftTenantSourceSpelling } from "./lift-rule-spelling
  *
  * @group Migration
  */
+
 export type LiftNoteKind = "ui" | "browser" | "metadata" | "unknown" | "inert" | "derived" | "redundant" | "renamed" | "meaning";
 
 /**
@@ -515,7 +519,10 @@ class CollectionLift {
             const target = findLegacyRelation(resolved, name);
             const entry = target ? this.relations.find(r => r.resolved === target) : undefined;
             if (!entry) {
-                this.refuse(propertyKey, `is a relation property, and no relation named "${name}" is declared. Declare it in \`relations\` or inline.`);
+                const flat = FLAT_RELATION_KEYS.filter(key => Object.keys(property).includes(key));
+                this.refuse(propertyKey, flat.length > 0
+                    ? `is a relation property in the flat shape of early versions (${flat.map(key => `\`${key}\``).join(", ")} on the property itself), which 0.30 already refused. Move them inside \`relation: { kind, target, … }\`: \`cardinality: "one"\` with \`direction: "owning"\` is \`kind: "belongsTo"\` (its \`localKey\` is the column property it reads), \`"one"\` with \`"inverse"\` is \`"hasOne"\`, \`"many"\` with \`"inverse"\` is \`"hasMany"\`, \`"many"\` with a junction table is \`"manyToMany"\` (\`through: { table }\`). Or declare it in \`relations\` with \`relationName: "${propertyKey}"\`.`
+                    : `is a relation property, and no relation named "${name}" is declared. Declare it in \`relations\` or inline.`);
             }
             for (const [otherKey, other] of this.addressed) {
                 if (other === entry && entry.resolved.kind === "belongsTo") {

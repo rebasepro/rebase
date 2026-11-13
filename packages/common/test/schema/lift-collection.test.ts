@@ -505,6 +505,10 @@ describe("collectionToTableDef — refusals", () => {
         ["a belongsTo over a column nobody declares", () => [collection("t", { id: uuidKey }, { relations: [{ kind: "belongsTo", relationName: "author", target: () => authors }] }), authors], /^t\.author: is a `belongsTo` declared only in `relations`, over the column "author_id", which no property declares/],
         ["an inline relation named after another key", () => [collection("t", { id: uuidKey, a: { type: "relation", relation: { kind: "belongsTo", relationName: "b", target: () => authors } } }), authors], /^t\.a: declares an inline relation named "b"/],
         ["a relation property naming no relation", () => [collection("t", { id: uuidKey, a: { type: "relation" } })], /no relation named "a" is declared/],
+        ["a relation in the flat shape of early versions", () => {
+            const flat = { type: "relation" as const, relationName: "item", target: () => authors, cardinality: "one", direction: "owning", localKey: "itemId" };
+            return [collection("t", { id: uuidKey, item: flat }), authors];
+        }, /^t\.item: is a relation property in the flat shape of early versions \(`relationName`, `target`, `cardinality`, `direction`, `localKey` on the property itself\).*`kind: "belongsTo"`/],
         ["a lone relation key", () => [collection("t", { a: { type: "relation", isId: true, relation: { kind: "belongsTo", target: () => authors } } }), authors], /is the only `isId` property, and it is a relation/],
         ["callbacks on a relation property", () => [collection("t", { id: uuidKey, a: { type: "relation", callbacks: { afterRead: ({ value }) => value }, relation: { kind: "hasMany", target: () => authors } } }), authors], /^t\.a: is a hasMany relation property declaring `callbacks`\. .*move the logic into the table's `hooks`/],
         ["excludeFromApi with access on a relation property", () => [collection("t", { id: uuidKey, a: { type: "relation", excludeFromApi: true, access: { read: [] }, relation: { kind: "hasMany", target: () => authors } } }), authors], /^t\.a: declares both `excludeFromApi` and `access`/],
