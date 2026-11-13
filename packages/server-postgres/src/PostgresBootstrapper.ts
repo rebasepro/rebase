@@ -47,6 +47,7 @@ import { introspectTables } from "./schema/introspect-tables";
 import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema";
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
+import { findUnprotectedServedTables, withholdUnprotectedTables } from "./security/served-table-protection";
 import { assertAppRoleRestricted, assertRecordedRequestRoles, detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, ensureConnectionInheritsAdminRole, findExposedInternalTables, findOtherRoleMembers, findUngrantableTables, proveRoleSwitch, readRecordedRequestRoles, recordRequestRoles, revokeUserRoleSql, roleHoldsTableGrants, settleAdminSwitch, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type ManagedTable, type RawSqlRunner } from "./security/rls-enforcement";
 import { resolveRlsSettings, rlsConfigFromEnv, rlsHandoverNotes, type PostgresRlsConfig, type RlsSettings } from "./security/rls-settings";
 import { provisionTriggerCdc, removeTriggerCdc, settleInstalledCapture, type CdcTableRef } from "./services/cdc/trigger-cdc";
@@ -223,6 +224,14 @@ export interface PostgresDriverInternals {
      * server's boot refuses on any; a script's `openRebase` only warns.
      */
     exposedInternalTables?: string[];
+    /**
+     * Withhold every declared table of this source the database does not
+     * protect — RLS off, or RLS on without any of its declared policies (see
+     * `security/served-table-protection`). A catalogue read; no DDL. The boot
+     * runs it once the policies step is over (`finalizeSecurityPosture`),
+     * whether this process provisioned or not.
+     */
+    withholdUnprotectedTables?: () => Promise<void>;
 }
 
 // Re-export from shared CLI error utilities
@@ -925,6 +934,22 @@ export async function openPostgresDriver(
         if (introspectedHere) return all;
         return all.filter(table => table.descriptor.database === sourceKey
             || (!table.descriptor.database && sourceKey === DEFAULT_DATA_SOURCE_KEY));
+    };
+
+    // ── Serve only what the database protects ──
+    // A declared table is served under the `rls` it declares only if Postgres
+    // enforces one: see `security/served-table-protection`. Run on the boot's
+    // registry after the policies step, and on a refresh's before its swap.
+    const readCatalogue: RawSqlRunner = async (text) => (await rawClient.query(text)).rows;
+    const withholdUnprotectedIn = async (target: PostgresTableRegistry): Promise<void> => {
+        if (introspectedHere) return;
+        const own = target.tables()
+            .filter(table => table.pg && (table.descriptor.database ?? DEFAULT_DATA_SOURCE_KEY) === sourceKey)
+            .map(table => table.compiled);
+        withholdUnprotectedTables(target, await findUnprotectedServedTables(readCatalogue, own, {
+            adminRoleAvailable: adminPoliciesLive,
+            adminRequestRoleAvailable: adminRequestPoliciesLive
+        }));
     };
 
     // Create services
@@ -1750,11 +1775,15 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         if (key === servedOwnKey) {
             // Nothing this database stores changed (hooks, or another
             // source's tables): the catalogue tables stay, read at boot.
-            registry.replaceWith(buildTableRegistry({
+            const same = buildTableRegistry({
                 compiledTables: compiled,
                 tables: registry.getAllPgTables(),
                 relations: registry.getAllRelations()
-            }));
+            });
+            // What the database did not protect stays withheld: nothing this
+            // database stores changed, so neither did that answer.
+            for (const [slug, message] of registry.withheld()) same.withhold(slug, message);
+            registry.replaceWith(same);
             return { status: "served" };
         }
         const own = compiled.map(t => t.descriptor).filter(d => (d.database ?? DEFAULT_DATA_SOURCE_KEY) === sourceKey);
@@ -1820,6 +1849,10 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
             }
         }
 
+        // A table the edit starts serving — an adopted one among them — is
+        // held to what boot holds it to: protected by the database, or not served.
+        await withholdUnprotectedIn(next);
+
         // The swap: synchronous from here to the return.
         const relational = { ...catalogue.tables, ...catalogue.relations };
         registry.replaceWith(next);
@@ -1845,7 +1878,8 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         managedTables,
         rlsEnforcement,
         exposedInternalTables,
-        provisionCdcForTables
+        provisionCdcForTables,
+        withholdUnprotectedTables: () => withholdUnprotectedIn(registry)
     };
 
     return {
@@ -2531,6 +2565,9 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
          */
         async finalizeSecurityPosture(driverResult: InitializedDriver): Promise<void> {
             const internals = driverResult.internals as PostgresDriverInternals;
+            // First, on every boot: the policies step is over (or was never
+            // run), so what the catalogue says now is what will be enforced.
+            await internals.withholdUnprotectedTables?.();
             const { driver, realtimeService, registry, db } = internals;
             if (!db) return;
             // Opened without provisioning: nothing has been created since the

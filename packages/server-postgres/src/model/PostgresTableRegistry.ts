@@ -1,4 +1,4 @@
-import type { CompiledTable, TableHooks, TableRegistryInterface } from "@rebasepro/types";
+import { RebaseApiError, type CompiledTable, type TableHooks, type TableRegistryInterface } from "@rebasepro/types";
 import { PgEnum, PgTable } from "drizzle-orm/pg-core";
 import { Relations } from "drizzle-orm";
 import { buildRuntimeTable, withCatalogueTable, type RuntimeTable } from "./runtime-table";
@@ -18,6 +18,8 @@ import { buildRuntimeTable, withCatalogueTable, type RuntimeTable } from "./runt
 export class PostgresTableRegistry implements TableRegistryInterface {
 
     private readonly runtimeTables = new Map<string, RuntimeTable>();
+    /** Tables declared but not served, by slug: their SQL name and what a caller is told. */
+    private readonly withheldTables = new Map<string, { table: string; message: string }>();
     /** {@link tables}, built once per change: callers cache on its identity. */
     private tableList?: RuntimeTable[];
     private readonly pgTables = new Map<string, PgTable>();
@@ -47,6 +49,40 @@ export class PostgresTableRegistry implements TableRegistryInterface {
     }
 
     /**
+     * Stop serving a declared table: it leaves the runtime tables (so no
+     * read, write, include or subscription reaches it), and a request that
+     * names it — by slug, kebab-case slug or SQL name, as a root or as a
+     * relation's target — is refused with `message` (503 `TABLE_WITHHELD`)
+     * rather than "not found". Its catalogue table stays registered: a
+     * junction or a policy subquery may still name it.
+     *
+     * What the boot and a live refresh do with a table the database does not
+     * protect (see `security/served-table-protection`).
+     */
+    withhold(slug: string, message: string): void {
+        const table = this.runtimeTables.get(slug);
+        if (!table) return;
+        this.runtimeTables.delete(slug);
+        this.withheldTables.set(slug, { table: table.descriptor.table, message });
+        this.tableList = undefined;
+    }
+
+    /** The slugs of the tables {@link withhold} took out, each with what a caller is told. */
+    withheld(): ReadonlyMap<string, string> {
+        return new Map([...this.withheldTables].map(([slug, { message }]) => [slug, message]));
+    }
+
+    /** Throw the refusal for a withheld table `name` (slug, kebab slug or SQL name) names, if it names one. */
+    private refuseWithheld(name: string): void {
+        const slug = name.replace(/-/g, "_");
+        for (const [key, entry] of this.withheldTables) {
+            if (key === name || key === slug || entry.table === name) {
+                throw new RebaseApiError(entry.message, { status: 503, code: "TABLE_WITHHELD", details: { table: key } });
+            }
+        }
+    }
+
+    /**
      * The runtime table served at `/api/data/<slug>`. Throws, naming the slug
      * and every table this driver does serve, when there is none — a request
      * that reached the driver for a table it was never given is a wiring
@@ -55,6 +91,7 @@ export class PostgresTableRegistry implements TableRegistryInterface {
     requireTable(slug: string): RuntimeTable {
         const table = this.runtimeTables.get(slug);
         if (table) return table;
+        this.refuseWithheld(slug);
         const served = [...this.runtimeTables.keys()];
         throw new Error(
             `The table "${slug}" is not one this driver serves. ` +
@@ -80,9 +117,11 @@ export class PostgresTableRegistry implements TableRegistryInterface {
      * table's SQL name. `undefined` when none matches.
      */
     tableNamed(name: string): RuntimeTable | undefined {
-        return this.getTable(name)
+        const table = this.getTable(name)
             ?? (name.includes("-") ? this.getTable(name.replace(/-/g, "_")) : undefined)
             ?? this.getTableBySqlName(name);
+        if (!table) this.refuseWithheld(name);
+        return table;
     }
 
     /**
@@ -167,6 +206,7 @@ export class PostgresTableRegistry implements TableRegistryInterface {
      */
     replaceWith(next: PostgresTableRegistry): void {
         refill(this.runtimeTables, next.runtimeTables);
+        refill(this.withheldTables, next.withheldTables);
         refill(this.pgTables, next.pgTables);
         refill(this.enums, next.enums);
         refill(this.relations, next.relations);
