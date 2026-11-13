@@ -556,8 +556,10 @@ describe("the schema stamp", () => {
     }, 120_000);
 
     it("warns a process whose collections do not match the database", async () => {
+        // A `v2:` stamp: a `v1:` one is a database stamped before 0.31, which
+        // gets its own one-time notice that says nothing about drift.
         const real = await stampedSchemaVersion();
-        await setStampedSchemaVersion("v1:0000000000000000");
+        await setStampedSchemaVersion("v2:0000000000000000");
         try {
             const functions = await start({ REBASE_ROLE: "functions", REBASE_MIGRATE_ON_BOOT: "none" });
 
@@ -565,7 +567,7 @@ describe("the schema stamp", () => {
             // deployment that crash-loops through its own rollout has traded a
             // silent problem for a loud outage.
             expect(functions.output()).toMatch(/different set of collections/);
-            expect(functions.output()).toContain("v1:0000000000000000");
+            expect(functions.output()).toContain("v2:0000000000000000");
             expect((await fetch(`${functions.origin}/api/functions/echo/hello`)).status).toBe(200);
         } finally {
             await setStampedSchemaVersion(real!);
@@ -574,7 +576,7 @@ describe("the schema stamp", () => {
 
     it("refuses the boot under REBASE_REQUIRE_SCHEMA_MATCH", async () => {
         const real = await stampedSchemaVersion();
-        await setStampedSchemaVersion("v1:0000000000000000");
+        await setStampedSchemaVersion("v2:0000000000000000");
         try {
             const said = await startExpectingRefusal({
                 REBASE_ROLE: "functions",
@@ -725,7 +727,7 @@ describe("the chart's migration Job", () => {
     it("leaves a schema the pod after it serves, without that pod provisioning", async () => {
         const pod = await start({ REBASE_MIGRATE_ON_BOOT: "none", DATABASE_URL: databaseUrl });
         try {
-            expect(pod.output()).toMatch(/Collection schema: skipped — REBASE_MIGRATE_ON_BOOT=none/);
+            expect(pod.output()).toMatch(/Table schema: skipped — REBASE_MIGRATE_ON_BOOT=none/);
             expect((await fetch(`${pod.origin}/api/data/notes`)).status).toBe(200);
         } finally {
             await stop(pod);

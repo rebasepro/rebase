@@ -263,7 +263,7 @@ describe("remote MCP tools on the real driver (E2E)", () => {
 
         it("aggregate_rows serves only count() where afterRead rewrites the rows, as REST does", async () => {
             const refused = await refusalOf("aggregate_rows", { table: "readers", select: ["max(email)"] });
-            expect(refused).toContain("Aggregates other than count are refused on a collection whose rows an afterRead callback rewrites");
+            expect(refused).toContain("Aggregates other than count are refused on a table whose rows an afterRead hook rewrites");
             expect(refused).not.toContain("ada@example.com");
             expect((await rest("/readers/aggregate?select=max(email)")).status).toBe(400);
             expect(await tool("aggregate_rows", { table: "readers", select: ["count()"] })).toEqual({ data: [{ count: 1 }] });
