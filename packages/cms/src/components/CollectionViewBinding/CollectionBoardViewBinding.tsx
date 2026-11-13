@@ -110,7 +110,7 @@ export function CollectionBoardViewBinding<M extends Record<string, unknown> = R
             return undefined;
         }
         return rawOrderProperty;
-    }, [rawOrderProperty, collection.properties]);
+    }, [rawOrderProperty, collection.properties, collection.slug]);
 
     // Get columns from the property's enumValues
     const {

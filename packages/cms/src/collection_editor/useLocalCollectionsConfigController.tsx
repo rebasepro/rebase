@@ -338,7 +338,7 @@ export function useLocalCollectionsConfigController(
         })();
 
         return () => { cancelled = true; };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `request`, `resolveToken` and `refreshFrontendCalls` are rebuilt every render over the editor URL and the token source, which `editorUrl` and `authKey` stand for; listing them would re-ask on every render
     }, [editorUrl, forcedReadOnly, authKey]);
 
     // A Firestore collection's file is re-read after every save (the dev
@@ -347,7 +347,7 @@ export function useLocalCollectionsConfigController(
     const sourceEditorEnabled = availability.state === "known" && availability.enabled;
     useEffect(() => {
         if (sourceEditorEnabled && forcedReadOnly !== true) void refreshFrontendCalls();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- re-read when the served collections change (the module reloaded); the availability effect does its own first read when the editor turns on
     }, [parsedCollections]);
 
     // ── Live schema editing ───────────────────────────────────────────
@@ -648,7 +648,7 @@ export function useLocalCollectionsConfigController(
         saveNavigationEntries: async () => { }
         // Every input that can change is listed under the name it varies with;
         // the helpers rebuilt per render close over exactly these.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- the helpers rebuilt per render close over exactly the inputs listed
     }), [
         clientOrUrl,
         parsedCollections,

@@ -112,7 +112,7 @@ hasMore: false });
     offset,
     orderBy: options?.orderBy,
     where: options?.where
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `where` (its JSON) stands in for `options.where`, so a fresh but equal object each render does not re-query
   }), [limit, offset, options?.orderBy, where]);
 
   useEffect(() => {
