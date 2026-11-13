@@ -11,6 +11,10 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 ## [Unreleased]
 
+### Added
+
+- `rebase db generate --ptah-output <file>` exports one Ptah desired-state SQL file from collection declarations, including sidecar policies, search, vector, and trigger objects.
+
 ## [0.30.1] - 2026-11-11
 
 ### Added

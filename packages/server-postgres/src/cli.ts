@@ -2485,6 +2485,7 @@ async function generatePostgresDdlCommand(
         {
             "--collections": String,
             "--output": String,
+            "--ptah-output": String,
             "-c": "--collections",
             "-o": "--output"
         },
@@ -2503,6 +2504,7 @@ async function generatePostgresDdlCommand(
 
     const collectionsPath = argsList["--collections"] || path.join("..", "config", "collections");
     const outputPath = argsList["--output"] || path.join(GENERATED_SQL_DIR, "schema.sql");
+    const ptahOutputPath = argsList["--ptah-output"];
 
     // Only for the default location: an explicit `--output` is somebody's own
     // arrangement, and its directory is theirs to manage.
@@ -2526,7 +2528,8 @@ async function generatePostgresDdlCommand(
         await generateInProcess("Postgres DDL generator", "Postgres DDL", async ({ writePostgresDdl }) => {
             await writePostgresDdl({
                 collectionsPath: path.resolve(process.cwd(), collectionsPath),
-                outputPath: path.resolve(process.cwd(), outputPath)
+                outputPath: path.resolve(process.cwd(), outputPath),
+                ptahOutputPath: ptahOutputPath ? path.resolve(process.cwd(), ptahOutputPath) : undefined
             });
         });
         return;
@@ -2536,7 +2539,8 @@ async function generatePostgresDdlCommand(
         ddl.bin,
         ...ddl.args,
         `--collections=${collectionsPath}`,
-        `--output=${outputPath}`
+        `--output=${outputPath}`,
+        ...(ptahOutputPath ? [`--ptah-output=${ptahOutputPath}`] : [])
     ];
 
     try {

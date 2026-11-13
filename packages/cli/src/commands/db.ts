@@ -83,7 +83,7 @@ const REMOTE_DESTINATION_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
  * `rebase schema generate --collections ./config/collections` was "not found",
  * while the same spelling worked for `generate-sdk`. See `utils/path-flags.ts`.
  */
-export const LOCAL_PATH_FLAGS: readonly string[] = ["--out", "--output", "-o", "--collections", "-c"];
+export const LOCAL_PATH_FLAGS: readonly string[] = ["--out", "--output", "-o", "--collections", "-c", "--ptah-output"];
 
 /**
  * Rewrite local path arguments so they mean what the user typed.
@@ -115,7 +115,7 @@ export function absolutizeLocalPathArgs(
      * database name into a path while leaving the real dump path unresolved.
      */
     const VALUE_FLAGS = new Set([
-        "--out", "--output", "-o", "--target-db", "--exclude-schema", "--row-security-role"
+        "--out", "--output", "-o", "--target-db", "--exclude-schema", "--row-security-role", "--ptah-output"
     ]);
     const out = [...args];
 
@@ -1721,10 +1721,11 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         ]
     },
     generate: {
-        usage: "rebase db generate [--collections <dir>]",
+        usage: "rebase db generate [--collections <dir>] [--ptah-output <file>]",
         summary: "Generate the Drizzle schema, the Postgres DDL and a SQL migration file from the collections.",
         notes: [
             "A migration that drops or narrows data is named when it is written. It is still written.",
+            "--ptah-output writes a separate desired-state SQL file for Ptah schema comparison.",
             `--collections <dir>: ${COLLECTIONS_FLAG_HELP}.`,
             DATABASE_FLAGS_HELP
         ]

@@ -7,6 +7,7 @@ import { loadCollectionsFromDirectory } from "@rebasepro/server";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import {
     generatePostgresDdl,
+    generatePtahDdl,
     generatePostgresPoliciesDdl,
     generatePostgresSearchDdl,
     generatePostgresTriggersDdl,
@@ -49,6 +50,8 @@ export interface GenerateFileOptions {
     collectionsPath: string;
     /** Where to write. Absent: print to stdout instead. */
     outputPath?: string;
+    /** Optional Ptah desired-state file, separate from Atlas's schema.sql. */
+    ptahOutputPath?: string;
     /**
      * End on the line that says what to run next. Only `rebase schema
      * generate` itself wants it: inside `db push` it told the push to run
@@ -157,11 +160,32 @@ export async function writePostgresDdl(options: GenerateFileOptions): Promise<vo
         const viewsContent = generatePostgresViewsDdl(collections);
 
         const outputPath = options.outputPath;
+        if (options.ptahOutputPath && !outputPath) {
+            throw new Error("Ptah output requires a file path for the Atlas schema output.");
+        }
+        if (options.ptahOutputPath && outputPath) {
+            const outputDir = path.dirname(path.resolve(outputPath));
+            const generatedPaths = [outputPath, ...["policies.sql", "search.sql", "vector.sql", "triggers.sql", "views.sql"]
+                .map(name => path.join(outputDir, name))];
+            const ptahOutputPath = path.resolve(options.ptahOutputPath);
+            if (generatedPaths.some(candidate => path.resolve(candidate) === ptahOutputPath)) {
+                throw new Error("Ptah output must differ from Rebase's generated SQL files.");
+            }
+        }
+        const ptahContent = options.ptahOutputPath
+            ? generatePtahDdl(collections, { extensions: declaredDatabaseExtensions() })
+            : undefined;
         if (outputPath) {
             const outputDir = path.dirname(outputPath);
             await fsPromises.mkdir(outputDir, { recursive: true });
             await fsPromises.writeFile(outputPath, ddlContent);
             out(`✅ PostgreSQL DDL generated successfully at ${outputPath}`);
+
+            if (options.ptahOutputPath && ptahContent !== undefined) {
+                await fsPromises.mkdir(path.dirname(options.ptahOutputPath), { recursive: true });
+                await fsPromises.writeFile(options.ptahOutputPath, ptahContent);
+                out(`✅ Ptah desired-state DDL generated successfully at ${options.ptahOutputPath}`);
+            }
 
             const policiesPath = path.join(outputDir, "policies.sql");
             await fsPromises.writeFile(policiesPath, policiesContent);

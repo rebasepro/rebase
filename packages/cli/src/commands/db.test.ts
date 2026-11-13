@@ -108,6 +108,11 @@ describe("absolutizeLocalPathArgs", () => {
         expect(out).toContain(path.join(ROOT, "backups/x.dump"));
     });
 
+    it("resolves the optional Ptah output against the project root", () => {
+        expect(absolutizeLocalPathArgs(["db", "generate", "--ptah-output", "./ptah.sql"], ROOT))
+            .toEqual(["db", "generate", "--ptah-output", path.join(ROOT, "ptah.sql")]);
+    });
+
     it("leaves commands that carry no path untouched", () => {
         const args = ["db", "push", "--allow-destructive"];
         expect(absolutizeLocalPathArgs(args, ROOT)).toEqual(args);

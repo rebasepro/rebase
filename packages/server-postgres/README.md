@@ -101,6 +101,12 @@ process.on("SIGTERM", async () => {
 });
 ```
 
+## Ptah desired-state export
+
+`rebase db generate --ptah-output .rebase/sql/ptah.sql` writes a separate declarative schema from the collection plan. The file includes policies, full-text search, vector indexes, and update triggers that Rebase keeps outside Atlas's `schema.sql`. `db generate` still generates the usual Atlas migration; the Ptah file is an additional output for `ptah schema compare --schema-file .rebase/sql/ptah.sql --db-url "$DB_URL"`.
+
+Vector columns require a declared `vector` database extension. The export refuses collections with views until they can be represented as Ptah desired state. Rebase provisions database roles and auth objects separately; scope a comparison with Ptah's `--include` when the target database contains objects outside the exported collection plan. Review any plan before applying it. See the [Ptah drift case study](https://blog.ptah.run/posts/rebase-postgresql-schema-drift-with-ptah/) for a measured example.
+
 ## From a script
 
 ```typescript
