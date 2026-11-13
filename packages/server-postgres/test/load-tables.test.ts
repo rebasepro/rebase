@@ -110,9 +110,9 @@ describe("a backend/schema directory, loaded", () => {
         expect(slugs).toHaveLength(lifted.tables.length);
     });
 
-    it("returns the compiled descriptors beside the lowered tables, in the same order", async () => {
-        const { collections, descriptors } = await loadTableSchema(writeFixture());
-        expect(descriptors.map(d => d.slug)).toEqual(collections.map(c => c.slug));
+    it("returns the compiled descriptors beside the compiled tables, in the same order", async () => {
+        const { tables, descriptors } = await loadTableSchema(writeFixture());
+        expect(descriptors.map(d => d.slug)).toEqual(tables.map(t => t.descriptor.slug));
     });
 });
 
