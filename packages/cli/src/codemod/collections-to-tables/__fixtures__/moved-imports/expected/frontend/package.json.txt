@@ -1,0 +1,11 @@
+{
+  "name": "shop-frontend",
+  "private": true,
+  "dependencies": {
+    "@rebasepro/app": "^0.30.1",
+    "@rebasepro/cms-types": "^0.30.1",
+    "@rebasepro/common": "^0.30.1",
+    "@rebasepro/types": "^0.30.1",
+    "react": "^19.0.0"
+  }
+}

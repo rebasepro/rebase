@@ -1,0 +1,14 @@
+{
+  "name": "shop-backend",
+  "private": true,
+  "scripts": {
+    "introspect": "rebase schema introspect --output src/schema",
+    "dev": "rebase dev"
+  },
+  "dependencies": {
+    "@rebasepro/server": "0.30.1",
+    "@rebasepro/plugin-review": "0.30.1",
+    "hono": "^4.0.0",
+    "@rebasepro/cms-types": "0.30.1"
+  }
+}

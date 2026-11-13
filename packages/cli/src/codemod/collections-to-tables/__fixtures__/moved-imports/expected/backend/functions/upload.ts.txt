@@ -1,0 +1,12 @@
+import { assertUploadWithinColumnLimits, UPLOAD_COLUMN_FIELD, loadCollectionsFromDirectory } from "@rebasepro/server";
+import { openRebase } from "@rebasepro/server-postgres";
+import { reviewRls } from "@rebasepro/plugin-review/config";
+
+export const rules = { reviewSecurityRules: reviewRls };
+
+export async function upload(body: Record<string, unknown>) {
+    assertUploadWithinColumnLimits(undefined, { size: 1 });
+    const field = body[UPLOAD_COLUMN_FIELD];
+    const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL, collections: [] });
+    return { field, rebase, legacy: loadCollectionsFromDirectory };
+}

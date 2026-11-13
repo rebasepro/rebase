@@ -1,0 +1,2 @@
+// The MCP tools this frontend's agent panel may call.
+export const ALLOWED_MCP_TOOLS = ["list_collections", "query_collection", "describe_table"];

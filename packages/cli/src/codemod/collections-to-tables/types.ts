@@ -150,3 +150,24 @@ export interface MigrateOptions {
      */
     acceptRuleChanges?: boolean;
 }
+
+/**
+ * One exported name that left where a 0.30 project imported it from
+ * (`moved-symbols.generated.ts`, `export-changes.ts`). `rebase migrate
+ * sdk-calls` moves the import when `to` is a package, and prints a manual step
+ * with `instead` when `to` is null.
+ */
+export interface MovedSymbol {
+    /** The exported name, as a 0.30 project imported it. */
+    symbol: string;
+    /** The module specifier it was imported from (`@rebasepro/common`). */
+    from: string;
+    /** The module specifier to import it from now, or null when the codemod does not rewrite it. */
+    to: string | null;
+    /** The name it is exported under now, when it was renamed. */
+    as?: string;
+    /** With `to: null`: what a project writes instead. */
+    instead?: string;
+    /** The upgrade-guide section that explains it (`#133-…`), when there is one. */
+    guide?: string;
+}

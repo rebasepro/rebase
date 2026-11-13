@@ -1,0 +1,9 @@
+import { checkOperation } from "@rebasepro/cms-types";
+import type { MongoDBCollectionConfig } from "@rebasepro/types";
+
+export type Legacy = MongoDBCollectionConfig;
+
+export async function allowed() {
+    const { evaluateCondition } = await import("@rebasepro/common");
+    return checkOperation("read", {}) && evaluateCondition({}, {});
+}

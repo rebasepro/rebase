@@ -1,0 +1,108 @@
+{
+  "files": [
+    {
+      "path": "backend/functions/upload.ts",
+      "edits": 3
+    },
+    {
+      "path": "backend/src/access.ts",
+      "edits": 1
+    },
+    {
+      "path": "frontend/src/cms/index.ts",
+      "edits": 2
+    },
+    {
+      "path": "frontend/src/fields/RatingField.tsx",
+      "edits": 3
+    },
+    {
+      "path": "frontend/src/lib/storage.ts",
+      "edits": 1
+    },
+    {
+      "path": "frontend/src/views/ReportView.tsx",
+      "edits": 2
+    }
+  ],
+  "counts": {
+    "moved-imports": 12
+  },
+  "left": [],
+  "manualSteps": [
+    {
+      "title": "Replace what 0.31 removed or changed in backend/functions/upload.ts",
+      "detail": "The codemod leaves these imports as written; each needs a hand edit. line 1: `loadCollectionsFromDirectory` from @rebasepro/server — `compileTables` (@rebasepro/common) checks the tables and throws one `SchemaDefinitionError` naming every problem; `schemaDir` / `loadBackendSchema` load backend/schema. See https://rebase.pro/docs/upgrading/0-30-to-0-31/#108-tables-in-backendschema-replace-configcollections--run-the-codemod-first",
+      "file": "backend/functions/upload.ts"
+    },
+    {
+      "title": "Update what changed meaning in backend/functions/upload.ts",
+      "detail": "The codemod does not rewrite these: the new spelling means something different, so each is yours to adapt. `openRebase({ collections })` (line 10): `openRebase({ tables, hooks })` with `tables` from `compileSchema([...])`; the result's `.collections` is `.tables`. See https://rebase.pro/docs/upgrading/0-30-to-0-31/#110-boot-options-and-hooks-name-tables",
+      "file": "backend/functions/upload.ts"
+    },
+    {
+      "title": "Replace what 0.31 removed or changed in backend/src/access.ts",
+      "detail": "The codemod leaves these imports as written; each needs a hand edit. line 2: `MongoDBCollectionConfig` from @rebasepro/types — Nothing: MongoDB is retired and Postgres is the only server engine; move the data to Postgres. See https://rebase.pro/docs/upgrading/0-30-to-0-31/#120-mongodb-is-retired",
+      "file": "backend/src/access.ts"
+    },
+    {
+      "title": "Repoint the moved names backend/src/access.ts reaches without a named import",
+      "detail": "The codemod rewrites named imports only. line 7: `import(\"@rebasepro/common\")` and `evaluateCondition` (line 7, 8; now in @rebasepro/cms-types), `checkOperation` (line 8; now in @rebasepro/cms-types)",
+      "file": "backend/src/access.ts"
+    },
+    {
+      "title": "Repoint the moved names frontend/src/cms/index.ts reaches without a named import",
+      "detail": "The codemod rewrites named imports only. line 4: `export * from \"@rebasepro/types\";` no longer re-exports 12 name(s) that moved (ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS, AdminCollectionKey, AdminPropertyKey, CollectionRegistryController, ConditionContext, …). If this module's importers read them through it, also re-export them from @rebasepro/cms-types.",
+      "file": "frontend/src/cms/index.ts"
+    },
+    {
+      "title": "Update what changed meaning in frontend/src/lib/mcp.ts",
+      "detail": "The codemod does not rewrite these: the new spelling means something different, so each is yours to adapt. an MCP tool named for collections (line 2): `list_tables`, `describe_table`, `query_table`, `show_table`, `count_rows`, `aggregate_rows`, `get_row`, `create_row`, `update_row`, `delete_row` (`list_documents` → `query_table`); their `collection` argument is `table`. See https://rebase.pro/docs/upgrading/0-30-to-0-31/#122-mcp-tools-are-named-for-tables",
+      "file": "frontend/src/lib/mcp.ts"
+    },
+    {
+      "title": "Repoint the moved names frontend/src/lib/storage.ts reaches without a named import",
+      "detail": "The codemod rewrites named imports only. line 1: `import * as K from \"@rebasepro/common\"` uses `K.resolveStorageSource` (line 6; now in @rebasepro/cms-types)",
+      "file": "frontend/src/lib/storage.ts"
+    },
+    {
+      "title": "Install the packages added to backend/package.json",
+      "detail": "Imports moved to @rebasepro/cms-types, so the codemod added it to backend/package.json at 0.30.1, the range of your other @rebasepro packages. Run your package manager's install.",
+      "file": "backend/package.json"
+    },
+    {
+      "title": "Install the packages added to frontend/package.json",
+      "detail": "Imports moved to @rebasepro/cms-types, so the codemod added it to frontend/package.json at ^0.30.1, the range of your other @rebasepro packages. Run your package manager's install.",
+      "file": "frontend/package.json"
+    },
+    {
+      "title": "Update the CLI flags in backend/package.json",
+      "detail": "script \"introspect\" uses schema introspect --output: `rebase schema introspect` writes `defineTable` files to backend/schema: drop `--output`. See https://rebase.pro/docs/upgrading/0-30-to-0-31/#116-cli-flags---schema-dir-not---collections",
+      "file": "backend/package.json"
+    }
+  ],
+  "notes": [
+    {
+      "file": "backend/package.json",
+      "message": "added @rebasepro/cms-types@0.30.1 to dependencies: imports moved there. Run your package manager's install."
+    },
+    {
+      "file": "frontend/package.json",
+      "message": "added @rebasepro/cms-types@^0.30.1 to dependencies: imports moved there. Run your package manager's install."
+    }
+  ],
+  "generated": [],
+  "typeAware": false,
+  "dependencies": [
+    {
+      "file": "backend/package.json",
+      "name": "@rebasepro/cms-types",
+      "version": "0.30.1"
+    },
+    {
+      "file": "frontend/package.json",
+      "name": "@rebasepro/cms-types",
+      "version": "^0.30.1"
+    }
+  ]
+}

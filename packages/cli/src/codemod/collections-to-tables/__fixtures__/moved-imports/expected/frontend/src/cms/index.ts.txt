@@ -1,0 +1,4 @@
+// The frontend's barrel: helpers the custom views share.
+export { normalizeEmail } from "@rebasepro/common";
+export { canEditEntity, type FilterPreset } from "@rebasepro/cms-types";
+export * from "@rebasepro/types";

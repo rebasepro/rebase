@@ -1,0 +1,15 @@
+import React from "react";
+import {
+    type CustomizableTable
+} from "@rebasepro/cms-types";
+import { buildCompositeId } from "@rebasepro/common";
+import {
+    getDefaultValuesFor,
+    evaluateCondition as evalCond
+} from "@rebasepro/common";
+
+export function ReportView({ table }: { table: CustomizableTable }) {
+    const defaults = getDefaultValuesFor({});
+    const visible = evalCond({}, {});
+    return <pre>{JSON.stringify({ table, defaults, visible, id: buildCompositeId({}, []) })}</pre>;
+}

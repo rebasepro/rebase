@@ -214,6 +214,10 @@ function printSdkSection(sdk: SdkRewriteReport): void {
     console.log("");
     console.log(chalk.bold(`  SDK calls: ${total} rewrite(s) in ${sdk.files.length} file(s)${sdk.typeAware ? " (receivers checked by type where a program could be built)" : ""}`));
     for (const [rule, count] of Object.entries(sdk.counts)) console.log(`    ${rule}: ${count}`);
+    if (sdk.dependencies.length > 0) {
+        console.log(chalk.bold(`  Dependencies added (${sdk.dependencies.length}) — imports moved to these packages; run your package manager's install:`));
+        for (const added of sdk.dependencies) console.log(`    ${added.file}: ${chalk.green(`"${added.name}": "${added.version}"`)}`);
+    }
     if (sdk.left.length > 0) {
         console.log(chalk.yellow(`  Left unchanged (${sdk.left.length}) — check each:`));
         for (const left of sdk.left) console.log(`    ${left.file}:${left.line} ${chalk.gray(left.code)} — ${left.reason}`);
@@ -236,6 +240,14 @@ ${chalk.bold("Usage")}
   A .collection( call whose receiver is not the SDK is left as written and listed.
   Generated SDK files are not rewritten: run rebase generate-sdk.
 
+  Imports of names 0.31 moved to another package (the admin-panel helpers and types that left
+  @rebasepro/types and @rebasepro/common for @rebasepro/cms-types, the migration lift now in
+  @rebasepro/common/migrate) are moved to it — merged into an import the file has, import type,
+  inline type and as aliases kept — and renamed exports (reviewSecurityRules → reviewRls,
+  assertUploadWithinPropertyLimits → assertUploadWithinColumnLimits, …) are renamed with their
+  references. A package an import now names is added to that workspace package's dependencies,
+  at the range of its other @rebasepro packages.
+
 ${chalk.bold("When to use it")}
   On a project already migrated (or migrated with --skip-sdk-calls), and again after pulling in
   code written against the old names. A second run on rewritten code changes nothing.
@@ -246,8 +258,11 @@ ${chalk.bold("Options")}
   --force     Run on a dirty (or absent) git tree. Without it the run refuses, so its edits stay one diff.
 
 ${chalk.bold("Manual steps")}
-  What it cannot rewrite safely — a boot option it cannot prove, a generated SDK file — is printed
-  after the counts, each with the file and what to do.
+  What it cannot rewrite safely is printed after the counts as a numbered list, each with the file,
+  the line and what to write instead: a boot option it cannot prove, a generated SDK file, an export
+  that was removed or now means something else, a namespace import, export * or dynamic import that
+  uses a moved name, an option, variable, route or MCP tool name whose meaning changed, an old CLI
+  flag in a package.json script. Each points at its section of the upgrade guide.
 `);
 }
 
@@ -276,7 +291,12 @@ export async function runSdkCalls(flags: { dryRun?: boolean; json?: boolean; for
     } else {
         console.log(chalk.bold(`\nrebase migrate sdk-calls — ${root}`));
         printSdkSection(report);
-        for (const step of report.manualSteps) console.log(`\n  ${chalk.bold(step.title)}${step.file ? chalk.gray(` (${step.file})`) : ""}\n    ${step.detail}`);
+        if (report.manualSteps.length > 0) console.log(chalk.bold(`\n  Manual steps (${report.manualSteps.length}):`));
+        report.manualSteps.forEach((step, index) => {
+            console.log(`    ${index + 1}. ${chalk.bold(step.title)}${step.file ? chalk.gray(` (${step.file})`) : ""}`);
+            console.log(`       ${step.detail}`);
+            if (step.snippet) for (const line of step.snippet.split("\n")) console.log(chalk.cyan(`         ${line}`));
+        });
         console.log(flags.dryRun ? "\n  Dry run: nothing was written.\n" : files.size > 0 ? "\n  Rewritten. Review the diff, then run your type check.\n" : "\n  Nothing to rewrite.\n");
     }
     return report;

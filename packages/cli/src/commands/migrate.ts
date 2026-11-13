@@ -49,8 +49,10 @@ ${chalk.bold("Subcommands")}
                                 Run it once, on a project the CLI refuses with "still on the collections layout".
                                 It runs sdk-calls too, unless --skip-sdk-calls.
   ${chalk.blue.bold("sdk-calls")} ${chalk.gray("[dir]")}               data.collection("x") → data.table("x"), the rule keys (existsIn / membership:
-                                collection → table) and the other renames, in your own code. Run it alone on a
-                                project already migrated, or after a migration run with --skip-sdk-calls.
+                                collection → table) and the other renames, in your own code — including imports
+                                of names that moved package (@rebasepro/types / common → @rebasepro/cms-types, …),
+                                adding that package to your package.json. Run it alone on a project already
+                                migrated, or after a migration run with --skip-sdk-calls.
 
 ${chalk.bold("Options")} ${chalk.gray("(each subcommand's --help lists its own)")}
   --dry-run   Print the plan and write nothing. Start here.

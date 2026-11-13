@@ -1,0 +1,7 @@
+import * as K from "@rebasepro/common";
+
+export type Preset = import("@rebasepro/cms-types").FilterPreset;
+
+export function sourceFor(path: string) {
+    return K.resolveStorageSource(path) ?? K.normalizeEmail(path);
+}

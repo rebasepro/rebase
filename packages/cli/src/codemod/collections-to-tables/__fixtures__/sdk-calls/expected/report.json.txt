@@ -69,5 +69,6 @@
   "generated": [
     "frontend/src/generated/sdk/database.types.ts"
   ],
-  "typeAware": true
+  "typeAware": true,
+  "dependencies": []
 }

@@ -56,6 +56,7 @@ import type { CallExpression, Node, ObjectLiteralExpression, Project, SourceFile
 import type { AstContext, Member, TsMorph } from "./ast";
 import { createAstContext, nodeText, resolveObject, toPosix } from "./ast";
 import { carryHook } from "./hooks";
+import { detectChangedSpellings, detectScriptSpellings, mayNeedImportPass, planDependencies, rewriteMovedImports, type AddedDependency } from "./moved-imports";
 import { own } from "./own";
 import { reindent } from "./print-js";
 import type { ManualStep, Note } from "./types";
@@ -64,7 +65,7 @@ import { RULE_KEY_RENAMES } from "./vocabulary";
 /** The rules, by the name the report counts them under. */
 export type SdkRule =
     | "collection-call" | "client-options" | "generated-types" | "batch-op" | "type-names" | "error-codes"
-    | "offline-options" | "typed-accessor" | "table-hooks" | "storage-authorize" | "boot-options" | "rule-vocabulary";
+    | "offline-options" | "typed-accessor" | "table-hooks" | "storage-authorize" | "boot-options" | "rule-vocabulary" | "moved-imports";
 
 /** One `.collection(` left alone, and why. */
 export interface LeftUnchanged {
@@ -87,6 +88,8 @@ export interface SdkRewriteReport {
     generated: string[];
     /** Whether receivers were checked by type in at least one file. */
     typeAware: boolean;
+    /** Packages added to a workspace package's dependencies because imports moved there. */
+    dependencies: AddedDependency[];
 }
 
 const RECEIVER_OWNERS = new Set(["client", "rebase", "rebaseClient", "context", "ctx"]);
@@ -337,7 +340,10 @@ export async function rewriteSdkCalls(root: string, options: RewriteSdkOptions =
     const tsm: TsMorph = await import("ts-morph");
     const ctx = createAstContext(tsm);
     const oracle = new TypeOracle(tsm, root, options.aliases ?? {});
-    const report: SdkRewriteReport = { files: [], counts: {}, left: [], manualSteps: [], notes: [], generated: [], typeAware: false };
+    const report: SdkRewriteReport = { files: [], counts: {}, left: [], manualSteps: [], notes: [], generated: [], typeAware: false, dependencies: [] };
+    const read = (file: string): string | undefined => options.overrides?.get(file) ?? (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : undefined);
+    /** Source file → the packages its moved imports now name. */
+    const needed = new Map<string, Set<string>>();
     const out = new Map<string, string>();
     const files = new Set(sdkSourceFiles(root, options.skipDirs));
     for (const file of options.overrides?.keys() ?? []) if (SOURCE.test(file)) files.add(file);
@@ -348,29 +354,72 @@ export async function rewriteSdkCalls(root: string, options: RewriteSdkOptions =
             if (/collection/i.test(text)) report.generated.push(relative);
             continue;
         }
-        if (!/collection|Collection|COLLECTION/.test(text)) continue;
-        const typed = oracle.sourceFile(file, text);
-        const sf = typed ?? ctx.project.createSourceFile(file, text, { overwrite: true });
-        const edits = rewriteFile(ctx, sf, oracle, typed !== undefined, relative, report, options);
-        if (!typed) ctx.project.removeSourceFile(sf);
-        const apply = (source: string, list: readonly Edit[]): string => {
+        const apply = (source: string, list: readonly { start: number; end: number; text: string }[]): string => {
             let next = source;
             for (const edit of [...list].sort((a, b) => b.start - a.start || b.end - a.end)) next = next.slice(0, edit.start) + edit.text + next.slice(edit.end);
             return next;
         };
-        const afterFirst = apply(text, edits);
-        const second = ctx.project.createSourceFile(file, afterFirst, { overwrite: true });
-        const hookEdits = adaptHooks(ctx, second, relative, report);
-        ctx.project.removeSourceFile(second);
-        const all = [...edits, ...hookEdits];
-        if (all.length > 0) {
-            const next = apply(afterFirst, hookEdits);
-            if (next !== text) {
-                out.set(file, next);
-                report.files.push({ path: relative, edits: all.length });
-                for (const edit of all) report.counts[edit.rule] = (report.counts[edit.rule] ?? 0) + 1;
+        let current = text;
+        const fileCounts = new Map<SdkRule, number>();
+        let editCount = 0;
+        if (/collection|Collection|COLLECTION/.test(text)) {
+            const typed = oracle.sourceFile(file, text);
+            const sf = typed ?? ctx.project.createSourceFile(file, text, { overwrite: true });
+            const edits = rewriteFile(ctx, sf, oracle, typed !== undefined, relative, report, options);
+            if (!typed) ctx.project.removeSourceFile(sf);
+            const afterFirst = apply(text, edits);
+            const second = ctx.project.createSourceFile(file, afterFirst, { overwrite: true });
+            const hookEdits = adaptHooks(ctx, second, relative, report);
+            ctx.project.removeSourceFile(second);
+            const all = [...edits, ...hookEdits];
+            if (all.length > 0) {
+                current = apply(afterFirst, hookEdits);
+                editCount += all.length;
+                for (const edit of all) fileCounts.set(edit.rule, (fileCounts.get(edit.rule) ?? 0) + 1);
             }
         }
+        // The third pass, on what the first two wrote: names that moved, were renamed or removed.
+        if (mayNeedImportPass(current)) {
+            const third = ctx.project.createSourceFile(file, current, { overwrite: true });
+            const moved = rewriteMovedImports(ctx, third, relative);
+            report.manualSteps.push(...moved.manualSteps, ...detectChangedSpellings(ctx, third, relative));
+            ctx.project.removeSourceFile(third);
+            if (moved.edits.length > 0) {
+                current = apply(current, moved.edits);
+                editCount += moved.moved.length;
+                fileCounts.set("moved-imports", (fileCounts.get("moved-imports") ?? 0) + moved.moved.length);
+                const packages = needed.get(file) ?? new Set<string>();
+                for (const name of moved.moved) packages.add(name.to);
+                needed.set(file, packages);
+            }
+        }
+        if (current !== text) {
+            out.set(file, current);
+            report.files.push({ path: relative, edits: editCount });
+            for (const [rule, count] of fileCounts) report.counts[rule] = (report.counts[rule] ?? 0) + count;
+        }
+    }
+    // The workspace packages: a destination a moved import names becomes a dependency; old CLI flags in scripts are steps.
+    const dependencies = planDependencies(root, needed, read);
+    for (const [file, content] of dependencies.files) out.set(file, content);
+    report.dependencies = dependencies.added;
+    report.notes.push(...dependencies.notes);
+    report.manualSteps.push(...dependencies.manualSteps);
+    const manifests = new Set<string>([path.join(root, "package.json")]);
+    for (const file of files) {
+        let dir = path.dirname(file);
+        while (dir.startsWith(root) && dir !== root) {
+            const candidate = path.join(dir, "package.json");
+            if (fs.existsSync(candidate)) {
+                manifests.add(candidate);
+                break;
+            }
+            dir = path.dirname(dir);
+        }
+    }
+    for (const manifest of [...manifests].sort()) {
+        const text = out.get(manifest) ?? read(manifest);
+        if (text !== undefined) report.manualSteps.push(...detectScriptSpellings(text, toPosix(path.relative(root, manifest))));
     }
     report.typeAware = oracle.used;
     if (report.generated.length > 0) {

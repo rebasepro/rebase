@@ -1,0 +1,16 @@
+// A custom field: the stars of a rating column, with the condition context the form evaluates.
+import React from "react";
+import type { TableDescriptor } from "@rebasepro/types";
+import { type ConditionContext, resolveProperty, type ResolvePropertyProps } from "@rebasepro/cms-types";
+import { normalizeEmail } from "@rebasepro/common";
+
+export interface RatingFieldProps {
+    table: TableDescriptor;
+    context: ConditionContext;
+    resolve: ResolvePropertyProps;
+}
+
+export function RatingField({ resolve }: RatingFieldProps) {
+    const property = resolveProperty(resolve);
+    return <span title={normalizeEmail("a@b.c")}>{String(property)}</span>;
+}
