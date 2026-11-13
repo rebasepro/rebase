@@ -1,0 +1,15 @@
+// Receivers with no type: `any`, as a function written against an older SDK often has them.
+export async function untyped(api: any, table: string, name: string) {
+    const data = (api as any).dataAsAdmin;
+    const db = () => api.dataAsAdmin;
+    const users = await data.table("users").find({});
+    const rows = await db().table(table).find({});
+    const posts = await api.data.table("posts").find({});
+    // Not a literal table name, and not dataAsAdmin: left and listed.
+    const other = await api.data.collection(name).find({});
+    // Feature detection of the old name: rewritten with its receiver here, a step where the receiver is not the SDK.
+    if (typeof data.table !== "function") return [];
+    const guarded = api.store;
+    if (typeof guarded.collection === "function" || "collection" in guarded) return [];
+    return [users, rows, posts, other];
+}

@@ -100,9 +100,18 @@ describe("rebase migrate sdk-calls", () => {
         const firestore = fs.readFileSync(path.join(dir, "frontend/src/firestore.ts"), "utf8");
         expect(firestore).toContain(`collection(db, "events")`);
         expect(firestore).toContain(`registry.collection("events")`);
-        // A script the checker throws on: no answer by type, not on the list, so left and listed — the run goes on.
-        expect(fs.readFileSync(path.join(dir, "typed/web/feed.js"), "utf8")).toContain(`e.data.collection("posts")`);
-        expect(report.left.map(left => `${left.file}:${left.line}`)).toEqual(["frontend/src/firestore.ts:8", "typed/src/use.ts:6", "typed/web/feed.js:5"]);
+        // A script the checker throws on: no answer by type, so `.data` with a literal table decides by name — the run goes on.
+        expect(fs.readFileSync(path.join(dir, "typed/web/feed.js"), "utf8")).toContain(`e.data.table("posts")`);
+        expect(report.left.map(left => `${left.file}:${left.line}`)).toEqual(["backend/functions/untyped.ts:9", "frontend/src/firestore.ts:8", "typed/src/use.ts:6"]);
+        // Untyped receivers named as the SDK: rewritten, and listed for review.
+        const untyped = fs.readFileSync(path.join(dir, "backend/functions/untyped.ts"), "utf8");
+        expect(untyped).toContain(`data.table("users")`);
+        expect(untyped).toContain(`db().table(table)`);
+        expect(untyped).toContain(`api.data.table("posts")`);
+        expect(untyped).toContain(`api.data.collection(name)`);
+        expect(untyped).toContain(`typeof data.table !== "function"`);
+        expect(report.byName.map(entry => `${entry.file}:${entry.line}`)).toEqual(["backend/functions/untyped.ts:5", "backend/functions/untyped.ts:6", "backend/functions/untyped.ts:7", "backend/functions/untyped.ts:11", "typed/web/feed.js:5"]);
+        expect(report.manualSteps.find(step => step.file === "backend/functions/untyped.ts")?.detail).toMatch(/^Line 13: code that tests whether `collection` exists/);
         // A minified bundle (a vendored build of the client) is never edited: its own option names are not the project's calls.
         expect(fs.readFileSync(path.join(dir, "typed/web/vendor/client.min.js"), "utf8")).toContain("e.maxCachedQueriesPerCollection");
         expect(written).not.toContain("typed/web/vendor/client.min.js");

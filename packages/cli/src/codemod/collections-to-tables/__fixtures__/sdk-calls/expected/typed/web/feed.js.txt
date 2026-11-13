@@ -1,0 +1,7 @@
+// A browser script, not a module, under a tsconfig without allowJs: the type
+// checker throws on a class member's parameter here instead of answering.
+class Feed {
+    load(e) {
+        return e.data.table("posts").find({ limit: 10 });
+    }
+}

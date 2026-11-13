@@ -218,6 +218,10 @@ function printSdkSection(sdk: SdkRewriteReport): void {
         console.log(chalk.bold(`  Dependencies added (${sdk.dependencies.length}) — imports moved to these packages; run your package manager's install:`));
         for (const added of sdk.dependencies) console.log(`    ${added.file}: ${chalk.green(`"${added.name}": "${added.version}"`)}`);
     }
+    if (sdk.byName.length > 0) {
+        console.log(chalk.yellow(`  Rewritten by name — review (${sdk.byName.length}): the receiver has no type, so its name (\`dataAsAdmin\`, \`.data\` with a literal table) decided:`));
+        for (const entry of sdk.byName) console.log(`    ${entry.file}:${entry.line} ${chalk.gray(entry.code)}`);
+    }
     if (sdk.left.length > 0) {
         console.log(chalk.yellow(`  Left unchanged (${sdk.left.length}) — check each:`));
         for (const left of sdk.left) console.log(`    ${left.file}:${left.line} ${chalk.gray(left.code)} — ${left.reason}`);

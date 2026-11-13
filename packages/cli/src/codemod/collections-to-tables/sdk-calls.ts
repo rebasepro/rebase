@@ -90,6 +90,12 @@ export interface SdkRewriteReport {
     typeAware: boolean;
     /** Packages added to a workspace package's dependencies because imports moved there. */
     dependencies: AddedDependency[];
+    /**
+     * `.collection(` calls rewritten by name alone — an untyped (`any`)
+     * receiver that is `dataAsAdmin`, or `.data` with a literal table name —
+     * printed under "Rewritten by name — review".
+     */
+    byName: { file: string; line: number; code: string }[];
 }
 
 const RECEIVER_OWNERS = new Set(["client", "rebase", "rebaseClient", "context", "ctx"]);
@@ -283,6 +289,42 @@ function isListedReceiver(ctx: AstContext, receiver: Node, depth = 0): boolean {
     return false;
 }
 
+/**
+ * Whether an untyped receiver is the SDK by its name: a `dataAsAdmin` property
+ * (whatever owns it — `(rebase as any).dataAsAdmin`), reached directly, through
+ * a `const`, or through a `const db = () => rebase.dataAsAdmin` call; or a
+ * `.data` property, when the call names its table with a string literal.
+ */
+function isNamedSdkReceiver(ctx: AstContext, receiver: Node, literalTable: boolean, depth = 0): boolean {
+    const { Node: N } = ctx.tsm;
+    if (depth > 3) return false;
+    if (N.isNonNullExpression(receiver) || N.isParenthesizedExpression(receiver) || N.isAsExpression(receiver)) {
+        return isNamedSdkReceiver(ctx, receiver.getExpression(), literalTable, depth);
+    }
+    if (N.isPropertyAccessExpression(receiver)) {
+        if (receiver.getName() === "dataAsAdmin") return true;
+        return receiver.getName() === "data" && literalTable;
+    }
+    const initializerOf = (identifier: Node): Node | undefined => {
+        const declaration = symbolOf(identifier)?.getDeclarations()[0];
+        if (!declaration || !N.isVariableDeclaration(declaration)) return undefined;
+        const statement = declaration.getVariableStatement();
+        if (statement && statement.getDeclarationKind() !== ctx.tsm.VariableDeclarationKind.Const) return undefined;
+        return declaration.getInitializer();
+    };
+    if (N.isIdentifier(receiver)) {
+        const initializer = initializerOf(receiver);
+        return initializer !== undefined && isNamedSdkReceiver(ctx, initializer, literalTable, depth + 1);
+    }
+    if (N.isCallExpression(receiver) && receiver.getArguments().length === 0 && N.isIdentifier(receiver.getExpression())) {
+        const initializer = initializerOf(receiver.getExpression());
+        if (!initializer || !N.isArrowFunction(initializer) || initializer.getParameters().length > 0) return false;
+        const body = initializer.getBody();
+        return !N.isBlock(body) && isNamedSdkReceiver(ctx, body, literalTable, depth + 1);
+    }
+    return false;
+}
+
 /** Whether an identifier names a `createRebaseClient(...)` result declared in its file. */
 function isFactoryResult(ctx: AstContext, identifier: Node): boolean {
     const { Node: N } = ctx.tsm;
@@ -389,7 +431,7 @@ export async function rewriteSdkCalls(root: string, options: RewriteSdkOptions =
     const tsm: TsMorph = await import("ts-morph");
     const ctx = createAstContext(tsm);
     const oracle = new TypeOracle(tsm, root, options.aliases ?? {});
-    const report: SdkRewriteReport = { files: [], counts: {}, left: [], manualSteps: [], notes: [], generated: [], typeAware: false, dependencies: [] };
+    const report: SdkRewriteReport = { files: [], counts: {}, left: [], manualSteps: [], notes: [], generated: [], typeAware: false, dependencies: [], byName: [] };
     const read = (file: string): string | undefined => options.overrides?.get(file) ?? (fs.existsSync(file) ? fs.readFileSync(file, "utf8") : undefined);
     /** Source file → the packages its moved imports now name. */
     const needed = new Map<string, Set<string>>();
@@ -516,6 +558,12 @@ function rewriteFile(
         if (byType !== undefined) return byType;
         return isListedReceiver(ctx, receiver);
     };
+    /** No type and not on the list, but named as the SDK is: `dataAsAdmin`, or `.data` called with a literal table name. */
+    const isSdkByName = (receiver: Node, call: CallExpression): boolean => {
+        if (typed && oracle.isSdkData(receiver) !== undefined) return false;
+        const literal = call.getArguments()[0];
+        return isNamedSdkReceiver(ctx, receiver, literal !== undefined && N.isStringLiteral(literal));
+    };
 
     // Imports: generated types (3), SDK type names (5), CollectionCallbacks with setTableHooks (9).
     const renamedLocals = new Map<string, string>();
@@ -601,7 +649,10 @@ function rewriteFile(
         const isCall = parent !== undefined && N.isCallExpression(parent) && parent.getExpression() === access;
         if (name === "collection" && isCall) {
             if (isSdk(receiver)) add(access.getNameNode(), "table", "collection-call");
-            else {
+            else if (isSdkByName(receiver, parent)) {
+                add(access.getNameNode(), "table", "collection-call");
+                report.byName.push({ file: relative, line: access.getStartLineNumber(), code: parent.getText().split("\n")[0].slice(0, 120) });
+            } else {
                 report.left.push({
                     file: relative,
                     line: access.getStartLineNumber(),
@@ -617,6 +668,11 @@ function rewriteFile(
             add(access.getNameNode(), "table", "collection-call");
             continue;
         }
+        if (name === "collection" && !isCall && !(typed && oracle.isSdkData(receiver) !== undefined) && isNamedSdkReceiver(ctx, receiver, false)) {
+            add(access.getNameNode(), "table", "collection-call");
+            report.byName.push({ file: relative, line: access.getStartLineNumber(), code: (parent ?? access).getText().split("\n")[0].slice(0, 120) });
+            continue;
+        }
         if (/^[a-z]\w*Collection$/.test(name) && !isCall && isSdk(receiver)) {
             add(access.getNameNode(), name === "collectionCollection" ? "collection" : `${name.slice(0, -"Collection".length)}Table`, "typed-accessor");
             continue;
@@ -625,6 +681,29 @@ function rewriteFile(
             add(access.getNameNode(), "setTableHooks", "table-hooks");
             continue;
         }
+    }
+
+    // Feature detection of the old name: `typeof x.collection === "function"`,
+    // `"collection" in x`. Left as written, it now silently takes the other
+    // branch (on 0.31 there is no `collection`), so each is a manual step.
+    const detections: number[] = [];
+    for (const typeOf of sf.getDescendantsOfKind(SyntaxKind.TypeOfExpression)) {
+        const operand = typeOf.getExpression();
+        const access = N.isParenthesizedExpression(operand) ? operand.getExpression() : operand;
+        if (!N.isPropertyAccessExpression(access) || access.getName() !== "collection") continue;
+        if (edits.some(edit => edit.start === access.getNameNode().getStart())) continue; // rewritten with its receiver
+        detections.push(typeOf.getStartLineNumber());
+    }
+    for (const binary of sf.getDescendantsOfKind(SyntaxKind.BinaryExpression)) {
+        const left = binary.getLeft();
+        if (binary.getOperatorToken().getKind() === SyntaxKind.InKeyword && N.isStringLiteral(left) && left.getLiteralValue() === "collection") detections.push(binary.getStartLineNumber());
+    }
+    if (detections.length > 0) {
+        report.manualSteps.push({
+            title: `Replace the checks for \`collection\` in ${relative}`,
+            detail: `Line ${[...new Set(detections)].sort((a, b) => a - b).join(", ")}: code that tests whether \`collection\` exists (\`typeof x.collection\`, \`"collection" in x\`) silently takes the other branch on 0.31, where the data surface has \`table\` instead. Test for \`table\` and call \`.table(…)\` — or drop the check.`,
+            file: relative
+        });
     }
 
     // Boot options.

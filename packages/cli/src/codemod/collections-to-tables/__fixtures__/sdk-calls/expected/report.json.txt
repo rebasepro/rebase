@@ -1,6 +1,10 @@
 {
   "files": [
     {
+      "path": "backend/functions/untyped.ts",
+      "edits": 4
+    },
+    {
       "path": "backend/hooks.ts",
       "edits": 6
     },
@@ -31,11 +35,15 @@
     {
       "path": "typed/src/use.ts",
       "edits": 1
+    },
+    {
+      "path": "typed/web/feed.js",
+      "edits": 1
     }
   ],
   "counts": {
+    "collection-call": 13,
     "table-hooks": 5,
-    "collection-call": 8,
     "rule-vocabulary": 4,
     "boot-options": 1,
     "storage-authorize": 1,
@@ -48,6 +56,12 @@
   },
   "left": [
     {
+      "file": "backend/functions/untyped.ts",
+      "line": 9,
+      "code": "api.data.collection(name)",
+      "reason": "left unchanged: receiver not recognised"
+    },
+    {
       "file": "frontend/src/firestore.ts",
       "line": 8,
       "code": "registry.collection(\"events\")",
@@ -58,15 +72,14 @@
       "line": 6,
       "code": "client.data.collection(\"posts\")",
       "reason": "left unchanged: the receiver's type is not the SDK data surface"
-    },
-    {
-      "file": "typed/web/feed.js",
-      "line": 5,
-      "code": "e.data.collection(\"posts\")",
-      "reason": "left unchanged: the receiver's type is not the SDK data surface"
     }
   ],
   "manualSteps": [
+    {
+      "title": "Replace the checks for `collection` in backend/functions/untyped.ts",
+      "detail": "Line 13: code that tests whether `collection` exists (`typeof x.collection`, `\"collection\" in x`) silently takes the other branch on 0.31, where the data surface has `table` instead. Test for `table` and call `.table(…)` — or drop the check.",
+      "file": "backend/functions/untyped.ts"
+    },
     {
       "title": "Update the backend options in backend/src/index.ts",
       "detail": "Line 4: `callbacks` belong to the collection model. Pass the tables instead — `schemaDir` (the directory whose index exports them) or `tables` + `defaultRls` imported from backend/schema; `hooks` (backend/hooks.ts) for global hooks; the auth table is the one defined with `defineAuthTable`, so `auth.collection` goes.",
@@ -89,5 +102,32 @@
     "frontend/src/generated/sdk/database.types.ts"
   ],
   "typeAware": true,
-  "dependencies": []
+  "dependencies": [],
+  "byName": [
+    {
+      "file": "backend/functions/untyped.ts",
+      "line": 5,
+      "code": "data.collection(\"users\")"
+    },
+    {
+      "file": "backend/functions/untyped.ts",
+      "line": 6,
+      "code": "db().collection(table)"
+    },
+    {
+      "file": "backend/functions/untyped.ts",
+      "line": 7,
+      "code": "api.data.collection(\"posts\")"
+    },
+    {
+      "file": "backend/functions/untyped.ts",
+      "line": 11,
+      "code": "typeof data.collection"
+    },
+    {
+      "file": "typed/web/feed.js",
+      "line": 5,
+      "code": "e.data.collection(\"posts\")"
+    }
+  ]
 }
