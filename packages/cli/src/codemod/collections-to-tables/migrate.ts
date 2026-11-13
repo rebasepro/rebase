@@ -31,6 +31,7 @@ import { rewriteSdkCalls } from "./sdk-calls";
 import { refreshSkillsStep } from "./skills-step";
 import { Journal } from "./journal";
 import { createSchemaModuleImporter } from "../../utils/import-schema-module";
+import { legacyLoadAliases } from "./legacy-shims";
 import { LegacyLoadError, loadLegacyProject } from "./load-legacy";
 import { Relocator } from "./modules";
 import type { CollectionEntry, PlanContext } from "./plan-context";
@@ -97,7 +98,8 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
         }
     }
 
-    const importModule = await createSchemaModuleImporter(root, options.moduleAliases);
+    // `config/` is evaluated with the packages installed now; 0.31 dropped the `defineCollection` its files import.
+    const importModule = await createSchemaModuleImporter(root, legacyLoadAliases(configDir, options.moduleAliases));
     let legacy;
     try {
         legacy = await loadLegacyProject(configDir, importModule);
