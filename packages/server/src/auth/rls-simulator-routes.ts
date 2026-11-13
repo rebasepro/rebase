@@ -26,7 +26,6 @@ import {
     type DataDriver,
     type TableDescriptor
 } from "@rebasepro/types";
-import type { DriverCollectionOf } from "../schema/driver-seam";
 import type { HonoEnv } from "../api/types";
 import { ApiError, errorHandler } from "../api/errors";
 import { scopeDataDriver } from "./rls-scope";
@@ -40,8 +39,6 @@ export interface RlsSimulatorRouteConfig {
     tables(): readonly TableDescriptor[];
     /** The unscoped driver a table's rows live in. */
     driverFor(table: TableDescriptor): DataDriver;
-    /** What a driver call names a table by (see `DriverCollectionOf`). */
-    driverCollection: DriverCollectionOf;
     resolveUser?: ImpersonationUserResolver;
     apiKeyStore?: ApiKeyStore;
 }
@@ -158,10 +155,8 @@ export function createRlsSimulatorRoutes(config: RlsSimulatorRouteConfig): Hono<
         const callerIdentity = { uid: simulator, roles: callerOf(c)?.roles ?? [] };
 
         const countRows = async (driver: DataDriver, table: TableDescriptor): Promise<number> => {
-            const collection = config.driverCollection(table.slug);
-            if (!collection) throw new Error(`No data driver serves "${table.slug}" here.`);
-            if (driver.count) return driver.count({ path: table.slug, collection });
-            return (await driver.fetchCollection({ path: table.slug, collection })).length;
+            if (driver.count) return driver.count({ path: table.slug });
+            return (await driver.fetchCollection({ path: table.slug })).length;
         };
         const collections: SimulatedCollectionView[] = [];
         for (const table of config.tables()) {

@@ -138,7 +138,6 @@ describe("a private column answers as a field that does not exist (E2E)", () => 
         return definition.run(args, {
             driver: driver,
             tables: TABLES,
-            driverCollection: slug => ALL.find(collection => collection.slug === slug),
             caller: { ...EDITOR, scopes: ["data:read"], clientId: "hidden-field-e2e" }
         });
     }

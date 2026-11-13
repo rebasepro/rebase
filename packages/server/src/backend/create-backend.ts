@@ -60,7 +60,6 @@ import { BackendCollectionRegistry } from "../collections/BackendCollectionRegis
 import { TableRegistry } from "../schema/table-registry";
 import { resolveDeclaredTables } from "../schema/declared-tables";
 import { introspectedDescriptors, type IntrospectedDriverResult } from "../schema/introspected-tables";
-import type { DriverCollectionOf } from "../schema/driver-seam";
 import {
     logUnprovisionedTables,
     tablesStoredBy,
@@ -180,7 +179,7 @@ import { MemoryRateLimitStore } from "../auth/rate-limit-store";
 import { createSqlRateLimitStore } from "../auth/sql-rate-limit-store";
 import { resolveRateLimitStoreKind } from "../auth/resolve-rate-limit-store";
 import { warnOnAuthTableDataHooks } from "../auth/auth-table-hooks-warning";
-import { enforceAuthSecretExclusion } from "../auth/exclude-auth-secrets";
+import { warnOnImplicitAuthSecrets } from "../auth/implicit-auth-secrets";
 import { seedInitialAdmin } from "../auth/seed-admin";
 import { createHistoryRoutes } from "../history";
 import type { HistoryService } from "../history/history-routes";
@@ -706,23 +705,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // driver is handed them below (`handGlobalHooksTo`), as declared.
     const globalHooks = config.hooks;
     let activeCollections: CollectionConfig[] = [...declaredTables.collections];
-    // The B-R7 seam (see `schema/driver-seam.ts`): table-model code decides
-    // from descriptors and names a table to a driver call by its lowered
-    // collection, which it asks for here and reads nothing from. The registry
-    // once the drivers are open; the lowered list before (boot provisioning).
-    const driverCollection: DriverCollectionOf = slug =>
-        collectionRegistry.getRaw(slug) ?? activeCollections.find(collection => collection.slug === slug);
-
-    // Before anything copies them. Every registry re-normalizes what it is
-    // handed — `normalizeCollection` rebuilds each property as `{ ...property }`
-    // — so a flag set after a registry was built reaches the config object and
-    // none of the copies serving requests. The driver's own registry is built
-    // inside `initializeDriver` below, which is where reads are rendered from:
-    // running this only before `collectionRegistry.register` (as it did) fixed
-    // the write path, whose validation reads the server's copy, and left the
-    // read path serving `password_hash` in every row of the users collection.
-    // Repeated after the loop for collections the drivers introspected.
-    enforceAuthSecretExclusion(activeCollections);
+    // The auth table's secret columns are private in its descriptor whatever
+    // the declaration says (the compiler sees to it); say so when the
+    // declaration does not. See implicit-auth-secrets.ts.
+    warnOnImplicitAuthSecrets(declaredTables.tables);
 
     // Declared collections, or the database's own schema.
     //
@@ -937,22 +923,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
     const driverRegistry = DefaultDriverRegistry.create(delegates);
 
-    // A redeclared `users` collection must not lose the exclusions the default
-    // one carries. Again, for whatever a driver introspected and appended
-    // above; the declared ones were done before the drivers ran, and a property
-    // already carrying the flag is skipped here, so this neither re-fixes nor
-    // re-warns about them. See exclude-auth-secrets.ts.
-    const excludedSecrets = enforceAuthSecretExclusion(activeCollections);
-
     activeCollections.forEach(collection => collectionRegistry.register(collection));
 
     // What introspection found, as the drivers described it from the
     // catalogue: `GET /api/schema/tables` serves a database-only project to
     // the zero-config CMS, the schema version covers it, and a global hook
-    // gets its table's descriptor. After the secret exclusion above, so a
-    // users table found here carries its secrets as private columns.
+    // gets its table's descriptor.
     if (introspectCollections && introspectedResults.length > 0) {
-        tableRegistry.replaceAll(introspectedDescriptors(introspectedResults, excludedSecrets));
+        tableRegistry.replaceAll(introspectedDescriptors(introspectedResults));
     }
 
     const defaultDriver = driverRegistry.getOrDefault(defaultDriverId);
@@ -1099,11 +1077,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
             if (defaultBootstrapper.initializeAuth) {
                 logger.debug("Bootstrapping authentication via driver protocol");
-                // The driver stores users in the auth table's lowered collection,
-                // exactly as it always has; the option the application no
-                // longer writes is supplied from `defineAuthTable` here.
+                // The driver finds the auth table among the tables it was
+                // opened with (`defineAuthTable`: its descriptor carries `auth`).
                 authConfigResult = await defaultBootstrapper.initializeAuth(
-                    { ...safeAuthConfig, collection: authTable ? driverCollection(authTable.descriptor.slug) : undefined },
+                    safeAuthConfig,
                     defaultDriverResult
                 );
 
@@ -1814,8 +1791,6 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 getUiPreferences: async (caller: McpCaller) => composableLayers(
                     await readUiPreferenceLayers(preferenceSources, caller.credential ? undefined : caller.uid))
             }),
-            // The RESOLVED set the data path reads, not `config.collections`.
-            driverCollection,
             // The write tools' door into the users table answers to the
             // adapter, as the REST routes and the socket do.
             getAuthAdapter: () => authAdapter,
@@ -1898,7 +1873,6 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             oauthBasePath: `${basePath}/oauth`,
             getDriver: () => defaultDriver,
             getTables: () => tableRegistry.list(),
-            driverCollection,
             getAuthAdapter: () => authAdapter,
             serverInfo: {
                 name: "rebase",
@@ -1931,7 +1905,6 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             oauthBasePath: `${basePath}/oauth`,
             getDriver: () => defaultDriver,
             getTables: () => tableRegistry.list(),
-            driverCollection,
             getAuthAdapter: () => authAdapter,
             serverInfo: {
                 name: "rebase",
@@ -2629,7 +2602,6 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // and read hooks alike: a row a policy or a `beforeQuery` hides
             // from the admin still names its files.
             driverFor: unscopedDriverServing,
-            driverCollection,
             globalHooks: () => config.hooks,
             // A revert restores what an entry holds: its files are in use.
             history: historyConfigResult?.historyService,
@@ -2974,7 +2946,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
      */
     editedTables.serve = (schema: EditedSchema): void => {
         const collections: CollectionConfig[] = [...schema.collections];
-        enforceAuthSecretExclusion(collections);
+        warnOnImplicitAuthSecrets(schema.tables);
         // The compiled tables, hooks and transforms with them: the hooks
         // edited in source are the ones that run from now on — in the table
         // model (storage's read-hook check, the masking refusals) and in every
@@ -3747,7 +3719,6 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         rlsSimulatorRouter.route("/", createRlsSimulatorRoutes({
             tables: () => tableRegistry.list(),
             driverFor: table => unscopedDriverServing(table) ?? defaultDriver,
-            driverCollection,
             resolveUser: authAdapter?.resolveUser ? authAdapter.resolveUser.bind(authAdapter) : undefined,
             apiKeyStore
         }));

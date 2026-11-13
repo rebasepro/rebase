@@ -17,7 +17,6 @@ import type {
     LegacyCollectionConfig
 } from "@rebasepro/common/migrate";
 import { compileSchemaDefs } from "../../src/schema/load-schema";
-import type { DriverCollectionOf } from "../../src/schema/driver-seam";
 import type { ServedTable } from "../../src/api/rest/served-table";
 
 /**
@@ -194,21 +193,18 @@ export async function tablesFromLegacyDirectory(dir: string): Promise<LiftedTabl
 }
 
 /**
- * Tables as the server's table-model code receives them: compiled (with their
- * hooks and transforms) and paired with the B-R7 driver seam, which answers a
- * slug with the collection the table was lowered into for the data driver.
+ * Tables as the server's table-model code receives them: compiled, with their
+ * hooks and transforms.
  *
  * ```ts
- * const { tables, driverCollection } = servedTablesFor([posts, authors]);
+ * const { tables } = servedTablesFor([posts, authors]);
  * ```
  */
 export function servedTablesFor(
     defs: readonly (AnyTableDef | AnyViewDef)[],
     defaultRls?: DefaultRls
-): { tables: CompiledTable[]; driverCollection: DriverCollectionOf } {
-    const { tables, collections } = compileSchemaDefs(defs, defaultRls);
-    const bySlug = new Map<string, LegacyCollectionConfig>(collections.map(collection => [collection.slug, collection]));
-    return { tables, driverCollection: slug => bySlug.get(slug) };
+): { tables: CompiledTable[] } {
+    return { tables: compileSchemaDefs(defs, defaultRls).tables };
 }
 
 /** A table with a text key and nothing else, named `slug`: a fixture whose rows a fake driver supplies. */

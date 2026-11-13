@@ -20,7 +20,6 @@ import type { JobQueueClient } from "../jobs/types";
 import type { StorageController } from "./types";
 import type { StorageRegistry } from "./storage-registry";
 import type { RegisteredTable } from "../schema/table-registry";
-import type { DriverCollectionOf } from "../schema/driver-seam";
 import { canonicalStorageId } from "./keys";
 import { findOrphans, InvalidMaintenanceRequestError, moveObjects, storesInSamePlace, verifyMove } from "./maintenance";
 import {
@@ -41,8 +40,6 @@ export interface StorageMaintenanceRoutesConfig {
      * every read hook.
      */
     driverFor: (table: TableDescriptor) => DataDriver | undefined;
-    /** What the driver's read calls name a table by (see `DriverCollectionOf`). */
-    driverCollection: DriverCollectionOf;
     /** The global table hooks, read per request: a global read hook makes every table hooked. */
     globalHooks?: () => TableHooks | undefined;
     /** Row history, when kept: a file only an entry names is restored by a revert. */
@@ -84,7 +81,6 @@ export function createStorageMaintenanceRoutes(config: StorageMaintenanceRoutesC
             controller,
             tables: config.tables(),
             driverFor: config.driverFor,
-            driverCollection: config.driverCollection,
             globalHooks: config.globalHooks?.(),
             history: config.history,
             olderThanMs: parseOlderThanHours(olderThan) * 3_600_000

@@ -28,10 +28,7 @@ export interface IntrospectedDriverResult {
 }
 
 /**
- * The descriptors of every table the drivers introspected, each one's
- * auth-secret columns made private (`excluded`, what
- * `enforceAuthSecretExclusion` stripped from the collections — the same
- * columns must never be described as served).
+ * The descriptors of every table the drivers introspected.
  *
  * Throws, naming the driver and the tables, when a driver served a collection
  * without its descriptor or described a table it does not serve: the two lists
@@ -40,10 +37,7 @@ export interface IntrospectedDriverResult {
  *
  * @group Schema
  */
-export function introspectedDescriptors(
-    results: readonly IntrospectedDriverResult[],
-    excluded: readonly { slug: string; columns: readonly string[] }[] = []
-): TableDescriptor[] {
+export function introspectedDescriptors(results: readonly IntrospectedDriverResult[]): TableDescriptor[] {
     const out: TableDescriptor[] = [];
     for (const { driver, collections, tables } of results) {
         if (collections.length === 0) continue;
@@ -64,13 +58,7 @@ export function introspectedDescriptors(
                 (unserved.length > 0 ? `; described but not served: ${unserved.join(", ")}` : "") + "."
             );
         }
-        for (const table of tables) {
-            const secret = new Set(excluded.find(entry => entry.slug === table.slug)?.columns ?? []);
-            out.push(secret.size === 0 ? table : {
-                ...table,
-                columns: table.columns.map(column => secret.has(column.key) ? { ...column, private: true } : column)
-            });
-        }
+        out.push(...tables);
     }
     return out;
 }

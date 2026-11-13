@@ -132,7 +132,6 @@ export async function runOrphanSweep(
     const sources: ReferenceSources = {
         tables: deps.tables(),
         driverFor: deps.driverFor,
-        driverCollection: deps.driverCollection,
         globalHooks: deps.globalHooks?.(),
         history: deps.history
     };

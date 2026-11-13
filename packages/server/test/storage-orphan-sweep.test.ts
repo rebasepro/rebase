@@ -58,7 +58,7 @@ describe("the sweep a bucket declares", () => {
     it("is one cron job per source that asks, with safe defaults", () => {
         const { jobs, problems } = orphanSweepJobs(
             [source({ orphanSweep: {} }), source({ key: "voice", orphanSweep: { olderThanHours: 72, schedule: "0 3 * * 0" } }), source({ key: "plain" })],
-            { tables: () => [], driverCollection: served.driverCollection, driverFor: () => undefined }
+            { tables: () => [], driverFor: () => undefined }
         );
         expect(problems).toEqual([]);
         expect(jobs.map(j => j.id)).toEqual(["storage-orphan-sweep-default", "storage-orphan-sweep-voice"]);
@@ -72,7 +72,7 @@ describe("the sweep a bucket declares", () => {
     it("refuses a grace period short enough to take an upload whose row is not saved yet", () => {
         const { jobs, problems } = orphanSweepJobs(
             [source({ key: "voice", orphanSweep: { olderThanHours: 2 } })],
-            { tables: () => [], driverCollection: served.driverCollection, driverFor: () => undefined }
+            { tables: () => [], driverFor: () => undefined }
         );
         expect(jobs).toEqual([]);
         expect(problems[0]).toMatch(/at least 24/);
@@ -81,7 +81,7 @@ describe("the sweep a bucket declares", () => {
     it("refuses a bucket the backend never reaches", () => {
         const { jobs, problems } = orphanSweepJobs(
             [source({ key: "direct", transport: "direct", orphanSweep: {} })],
-            { tables: () => [], driverCollection: served.driverCollection, driverFor: () => undefined }
+            { tables: () => [], driverFor: () => undefined }
         );
         expect(jobs).toEqual([]);
         expect(problems[0]).toMatch(/"direct"/);
@@ -119,7 +119,6 @@ describe("one sweep", () => {
         const result = await runOrphanSweep("(default)", 168, {
             controller: storage,
             tables: () => served.tables,
-            driverCollection: served.driverCollection,
             driverFor: () => driverOver([{ id: "1", audio: "voice/named.wav" }])
         }, ctx);
 
@@ -134,7 +133,6 @@ describe("one sweep", () => {
         const result = await runOrphanSweep("(default)", 168, {
             controller: storage,
             tables: () => served.tables,
-            driverCollection: served.driverCollection,
             driverFor: () => driverOver([], "connection refused")
         }, ctx);
 
@@ -147,7 +145,6 @@ describe("one sweep", () => {
     it("fails the run, rather than sweeping nothing, when the source is not configured", async () => {
         await expect(runOrphanSweep("voice", 168, {
             tables: () => [],
-            driverCollection: served.driverCollection,
             driverFor: () => undefined
         }, ctx)).rejects.toThrow(/"voice" is not configured/);
     });

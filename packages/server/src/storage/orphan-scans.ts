@@ -31,7 +31,6 @@ import type { JobQueueClient } from "../jobs/types";
 import type { StorageController } from "./types";
 import type { StorageRegistry } from "./storage-registry";
 import type { RegisteredTable } from "../schema/table-registry";
-import type { DriverCollectionOf } from "../schema/driver-seam";
 import { canonicalStorageId } from "./keys";
 import { MAINTENANCE_PREFIX } from "./maintenance-keys";
 import {
@@ -138,8 +137,6 @@ export interface OrphanScanServiceConfig {
     tables: () => readonly RegisteredTable[];
     /** The unscoped driver serving a table. See `StorageMaintenanceRoutesConfig.driverFor`. */
     driverFor: (table: TableDescriptor) => DataDriver | undefined;
-    /** What the driver's read calls name a table by (see `DriverCollectionOf`). */
-    driverCollection: DriverCollectionOf;
     /** The global table hooks, read when a scan runs. */
     globalHooks?: () => TableHooks | undefined;
     history?: StoredHistory;
@@ -357,7 +354,6 @@ export function createOrphanScanService(config: OrphanScanServiceConfig): Orphan
                 controller,
                 tables: config.tables(),
                 driverFor: config.driverFor,
-                driverCollection: config.driverCollection,
                 globalHooks: config.globalHooks?.(),
                 history: config.history,
                 olderThanMs: state.olderThanHours * 3_600_000,
@@ -395,7 +391,6 @@ export function createOrphanScanService(config: OrphanScanServiceConfig): Orphan
                 candidates: result.orphans,
                 tables: config.tables(),
                 driverFor: config.driverFor,
-                driverCollection: config.driverCollection,
                 globalHooks: config.globalHooks?.(),
                 history: config.history,
                 olderThanMs: state.olderThanHours * 3_600_000,

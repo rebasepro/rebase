@@ -1,110 +1,83 @@
-import { enforceAuthSecretExclusion } from "../src/auth/exclude-auth-secrets";
+import { describe, expect, it, jest, afterEach } from "@jest/globals";
+import { compileSchema } from "@rebasepro/common";
+import { col, defineAuthTable, defineTable } from "@rebasepro/types";
+
+import { warnOnImplicitAuthSecrets } from "../src/auth/implicit-auth-secrets";
 
 /**
- * The users collection a project scaffolds for itself REPLACES the framework's
- * default rather than merging with it, so every protection the default carried
- * has to survive the copy. `excludeFromApi` is the one that fails silently when
- * it does not: the neighbouring admin flags hide the field from the CMS and look
- * like they did the job, while the column keeps riding out on every row a read
- * policy admits.
+ * The users table a project redeclares REPLACES the framework's default rather
+ * than merging with it, so every protection the default carried has to survive
+ * the copy. "Never on the wire" is the one that fails silently when it does
+ * not. The compiler makes the auth table's secret columns private in the
+ * descriptor whatever the declaration says (common's compile-tables tests);
+ * every reader reads the descriptor; the server says so, once per column, so
+ * the declaration can be made to say it too.
  */
-describe("auth secret exclusion", () => {
-    /** The exact shape that leaked: admin hints, no excludeFromApi. */
-    function usersCollectionWithAdminHintsOnly() {
-        return {
-            slug: "users",
-            auth: true,
-            properties: {
-                email: { name: "Email", type: "string" },
-                password_hash: {
-                    name: "Password Hash",
-                    type: "string",
-                    admin: { hideFromCollection: true, disabled: { hidden: true } }
-                },
-                email_verification_token: {
-                    name: "Email Verification Token",
-                    type: "string",
-                    admin: { hideFromCollection: true, disabled: { hidden: true } }
-                }
-            }
-        } as Record<string, unknown>;
-    }
 
-    it("excludes the password hash and the verification token from the API", () => {
-        const users = usersCollectionWithAdminHintsOnly();
+afterEach(() => {
+    jest.restoreAllMocks();
+});
 
-        const fixed = enforceAuthSecretExclusion([users]);
+/** The shape that leaked: a redeclared users table whose secrets are not `.private()`. */
+function redeclaredUsers() {
+    return defineAuthTable("users", {
+        columns: {
+            id: col.uuid().primaryKey(),
+            email: col.text(),
+            password_hash: col.text(),
+            email_verification_token: col.text()
+        },
+        rls: "admin-only"
+    });
+}
 
-        const properties = users.properties as Record<string, { excludeFromApi?: boolean }>;
-        expect(properties.password_hash.excludeFromApi).toBe(true);
-        expect(properties.email_verification_token.excludeFromApi).toBe(true);
-        expect(fixed).toEqual([
+describe("warnOnImplicitAuthSecrets", () => {
+    it("names the secrets the compiler made private, and only those", () => {
+        jest.spyOn(console, "warn").mockImplementation(() => {});
+        const tables = compileSchema([redeclaredUsers()], {});
+
+        const users = tables[0].descriptor;
+        expect(users.columns.find(column => column.key === "password_hash")?.private).toBe(true);
+        expect(users.columns.find(column => column.key === "email_verification_token")?.private).toBe(true);
+        expect(users.columns.find(column => column.key === "email")?.private).toBeUndefined();
+        expect(warnOnImplicitAuthSecrets(tables)).toEqual([
             { slug: "users", columns: ["password_hash", "email_verification_token"] }
         ]);
     });
 
-    it("leaves ordinary columns alone", () => {
-        const users = usersCollectionWithAdminHintsOnly();
+    /** Keys differ between the default and a redeclaration; the column does not. */
+    it("matches on the column name when the key is spelled differently", () => {
+        jest.spyOn(console, "warn").mockImplementation(() => {});
+        const people = defineAuthTable("people", {
+            columns: { id: col.uuid().primaryKey(), secret: col.text("password_hash") },
+            rls: "admin-only"
+        });
 
-        enforceAuthSecretExclusion([users]);
-
-        const properties = users.properties as Record<string, { excludeFromApi?: boolean }>;
-        expect(properties.email.excludeFromApi).toBeUndefined();
+        expect(warnOnImplicitAuthSecrets(compileSchema([people], {}))).toEqual([{ slug: "people", columns: ["secret"] }]);
     });
 
-    /** Property names differ between the default and a redeclaration; the column does not. */
-    it("matches on the column name when the property is spelled differently", () => {
-        const users = {
-            slug: "people",
-            auth: true,
-            properties: {
-                secret: { name: "Secret", type: "string", columnName: "password_hash" }
-            }
-        } as Record<string, unknown>;
+    it("says nothing about a table that already marks them private", () => {
+        const users = defineAuthTable("users", {
+            columns: { id: col.uuid().primaryKey(), passwordHash: col.text("password_hash").private() },
+            rls: "admin-only"
+        });
 
-        enforceAuthSecretExclusion([users]);
-
-        expect((users.properties as Record<string, { excludeFromApi?: boolean }>).secret.excludeFromApi).toBe(true);
-    });
-
-    it("says nothing about a collection that already excludes them", () => {
-        const users = {
-            slug: "users",
-            auth: true,
-            properties: {
-                passwordHash: { name: "Password Hash", type: "string", excludeFromApi: true }
-            }
-        } as Record<string, unknown>;
-
-        expect(enforceAuthSecretExclusion([users])).toEqual([]);
+        expect(warnOnImplicitAuthSecrets(compileSchema([users], {}))).toEqual([]);
     });
 
     /**
-     * A `password_hash` column on a collection that is not the user store is
-     * someone else's data — a CRM importing hashes, say — and not this
-     * function's business.
+     * A `password_hash` column on a table that is not the user store is
+     * someone else's data — a CRM importing hashes, say — and not this rule's
+     * business.
      */
-    it("only touches the auth collection", () => {
-        const notUsers = {
-            slug: "legacy_import",
-            properties: {
-                password_hash: { name: "Password Hash", type: "string" }
-            }
-        } as Record<string, unknown>;
+    it("only looks at the auth table", () => {
+        const legacyImport = defineTable("legacy_import", {
+            columns: { id: col.uuid().primaryKey(), password_hash: col.text() },
+            rls: "admin-only"
+        });
+        const tables = compileSchema([legacyImport], {});
 
-        expect(enforceAuthSecretExclusion([notUsers])).toEqual([]);
-        expect(
-            (notUsers.properties as Record<string, { excludeFromApi?: boolean }>).password_hash.excludeFromApi
-        ).toBeUndefined();
-    });
-
-    it("recognises the object form of the auth flag", () => {
-        const users = {
-            slug: "users",
-            auth: { enabled: true },
-            properties: { password_hash: { name: "Password Hash", type: "string" } }
-        } as Record<string, unknown>;
-
-        expect(enforceAuthSecretExclusion([users])).toHaveLength(1);
+        expect(warnOnImplicitAuthSecrets(tables)).toEqual([]);
+        expect(tables[0].descriptor.columns.find(column => column.key === "password_hash")?.private).toBeUndefined();
     });
 });

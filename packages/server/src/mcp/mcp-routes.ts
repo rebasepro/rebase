@@ -27,7 +27,6 @@ import type { Context, HonoRequest } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { createMiddleware } from "hono/factory";
 import type { AuthAdapter, DataDriver, TableDescriptor } from "@rebasepro/types";
-import type { DriverCollectionOf } from "../schema/driver-seam.js";
 import { untrustedEnvelope } from "@rebasepro/common";
 import type { HonoEnv } from "../api/types.js";
 import { declaredErrorAnswer } from "../api/errors.js";
@@ -140,8 +139,6 @@ export interface McpRoutesConfig {
      * with the panel's defaults.
      */
     getUiPreferences?(caller: McpCaller): Promise<McpViewPreferences>;
-    /** What a data driver call names a table by (see `DriverCollectionOf`). Deleted with slice B-R7. */
-    driverCollection: DriverCollectionOf;
     /**
      * The deployment's auth adapter. A write to the auth table is user
      * administration, and the adapter holds it to the rules `/admin/users`
@@ -657,7 +654,6 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
             const result = await tool.run(args, {
                 driver,
                 tables: config.getTables(),
-                driverCollection: config.driverCollection,
                 authAdapter: config.getAuthAdapter?.(),
                 caller,
                 ...(compileApp && { compileApp }),

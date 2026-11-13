@@ -7,7 +7,7 @@ import { introspectedDescriptors } from "../src/schema/introspected-tables";
 /**
  * The descriptors an introspecting driver reports are what the server serves
  * for a project with no `backend/schema` — taken as they are, checked against
- * the collections served beside them, with the auth secrets made private.
+ * the collections served beside them. (An introspected table never carries `auth`.)
  */
 
 const descriptor = (slug: string, keys: string[] = ["id"]): TableDescriptor => ({
@@ -29,18 +29,6 @@ describe("introspectedDescriptors", () => {
             { driver: "b", collections: [collection("posts")], tables: [posts] }
         ]);
         expect(out).toEqual([users, posts]);
-    });
-
-    it("makes the columns the auth-secret exclusion stripped private", () => {
-        const out = introspectedDescriptors(
-            [{ driver: "a", collections: [collection("users")], tables: [descriptor("users", ["id", "email", "password_hash"])] }],
-            [{ slug: "users", columns: ["password_hash"] }]
-        );
-        expect(out[0].columns.map(column => [column.key, column.private ?? false])).toEqual([
-            ["id", false],
-            ["email", false],
-            ["password_hash", true]
-        ]);
     });
 
     it("refuses a driver that serves tables it did not describe, naming it", () => {

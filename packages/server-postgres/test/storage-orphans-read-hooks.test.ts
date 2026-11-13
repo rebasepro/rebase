@@ -65,7 +65,6 @@ function scanSources(collections: LegacyCollectionConfig[]) {
     const fixture = tablesFromCollections(collections);
     return {
         tables: fixture.tables,
-        driverCollection: (slug: string) => fixture.collections.find(collection => collection.slug === slug)
     };
 }
 

@@ -40,8 +40,8 @@ function driverOver(rows: Record<string, unknown>[], fail?: string): DataDriver 
 /** The tables `users` and `posts`, with the driver seam that names them to a driver. */
 const served = servedTablesFor([plainTable("users"), plainTable("posts")]);
 const users = served.tables[0];
-const both = { tables: served.tables, driverCollection: served.driverCollection };
-const none = { tables: [], driverCollection: served.driverCollection };
+const both = { tables: served.tables };
+const none = { tables: [] };
 
 async function put(controller: LocalStorageController, key: string, content = "x"): Promise<void> {
     await controller.putObject({ file: new File([content], key.split("/").pop() ?? "f", { type: "text/plain" }), key });
@@ -116,7 +116,6 @@ describe("storage orphans", () => {
         const report = await findOrphans({
             controller: storage,
             tables: [users],
-            driverCollection: served.driverCollection,
             driverFor: () => driverOver(many),
             olderThanMs: 24 * HOUR
         });
@@ -134,19 +133,19 @@ describe("storage orphans", () => {
         };
 
         const refused = await findOrphans({
-            controller: storage, tables: [hooked], driverCollection: served.driverCollection, driverFor: () => fetchOnly, olderThanMs: 24 * HOUR
+            controller: storage, tables: [hooked], driverFor: () => fetchOnly, olderThanMs: 24 * HOUR
         });
         expect(refused.unscanned.map(u => u.collection)).toEqual(["users"]);
 
         // A global hook applies to every table.
         const global = await findOrphans({
-            controller: storage, tables: [users], driverCollection: served.driverCollection, driverFor: () => fetchOnly, olderThanMs: 24 * HOUR,
+            controller: storage, tables: [users], driverFor: () => fetchOnly, olderThanMs: 24 * HOUR,
             globalHooks: { afterRead: ({ values }) => values }
         });
         expect(global.unscanned.map(u => u.collection)).toEqual(["users"]);
 
         const scanned = await findOrphans({
-            controller: storage, tables: [hooked], driverCollection: served.driverCollection, driverFor: () => scanning, olderThanMs: 24 * HOUR
+            controller: storage, tables: [hooked], driverFor: () => scanning, olderThanMs: 24 * HOUR
         });
         expect(scanned.unscanned).toEqual([]);
         expect(scanned.orphans.map(o => o.key)).not.toContain("avatars/kept.png");
@@ -182,7 +181,6 @@ describe("storage orphans", () => {
             hono.route("/admin/storage", createStorageMaintenanceRoutes({
                 registry: DefaultStorageRegistry.create({ "(default)": storage }),
                 tables: () => served.tables,
-                driverCollection: served.driverCollection,
                 driverFor: (t) => driverOver(data[t.slug as keyof typeof data], t.slug === "posts" ? fail : undefined)
             }));
             return hono;
@@ -356,7 +354,6 @@ describe("storage move", () => {
             hono.route("/admin/storage", createStorageMaintenanceRoutes({
                 registry: DefaultStorageRegistry.create({ "(default)": from, uploads: target }),
                 tables: () => [],
-                driverCollection: none.driverCollection,
                 driverFor: () => undefined
             }));
             const refused = await hono.request("/admin/storage/move", {
@@ -381,7 +378,6 @@ describe("storage move", () => {
         hono.route("/admin/storage", createStorageMaintenanceRoutes({
             registry: DefaultStorageRegistry.create({ "(default)": from, media: to }),
             tables: () => [],
-            driverCollection: none.driverCollection,
             driverFor: () => undefined
         }));
         const same = await hono.request("/admin/storage/move", { method: "POST", body: JSON.stringify({ from: "media", to: "media" }) });

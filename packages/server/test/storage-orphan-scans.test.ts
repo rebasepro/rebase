@@ -112,7 +112,6 @@ describe("the orphan scan, in the background", () => {
     const sources = () => ({
         registry: DefaultStorageRegistry.create({ "(default)": storage }),
         tables: () => served.tables,
-        driverCollection: served.driverCollection,
         driverFor: (t: TableDescriptor) => driverOver(() => rows[t.slug], () => t.slug === "posts" ? failing : undefined),
         now: () => clock
     });

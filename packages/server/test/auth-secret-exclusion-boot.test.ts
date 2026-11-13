@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
 import { createServer } from "node:http";
-import type { BackendBootstrapper, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CompiledTable, DataDriver, InitializedDriver, TableDescriptor } from "@rebasepro/types";
 import type { LegacyCollectionConfig, LegacyStringProperty } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
@@ -12,7 +12,7 @@ import { tablesFrom } from "./helpers/tables";
 /**
  * WHEN the exclusion is applied, not just whether.
  *
- * `enforceAuthSecretExclusion` has its own unit tests and they always passed:
+ * The server-side exclusion this replaced had its own unit tests and they passed:
  * the function was correct. It was called too late. Boot builds each driver's
  * registry inside `initializeDriver`, and a registry copies every property it
  * is handed (`{ ...property }`), so a flag set afterwards reached the config
@@ -22,8 +22,9 @@ import { tablesFrom } from "./helpers/tables";
  * the users collection returned the scrypt hash to whoever the select policy
  * admitted. Two paths, one flag, opposite answers, and every unit test green.
  *
- * So this asserts on the collections the driver is HANDED, which is the moment
- * the copies are made.
+ * The driver now reads the auth table's secrets off the descriptor it is
+ * handed (`private`, set by the compiler), so this asserts on the tables the
+ * driver is HANDED.
  */
 
 /**
@@ -65,17 +66,16 @@ function stubDriver(): DataDriver {
 }
 
 /**
- * Records the collections handed to `initializeDriver` — as a SNAPSHOT, not by
- * reference. The whole bug is a mutation that arrives late: keeping the live
- * objects would show them carrying the flag a driver never saw, which is
- * exactly the illusion that let this ship. A copy is what a registry takes.
+ * Records the descriptors of the tables handed to `initializeDriver` — as a
+ * SNAPSHOT, not by reference: a flag that arrives late on the live objects is
+ * exactly the illusion that let the leak ship.
  */
-function capturingBootstrapper(seen: LegacyCollectionConfig[][]): BackendBootstrapper {
+function capturingBootstrapper(seen: TableDescriptor[][]): BackendBootstrapper {
     return {
         type: "fake",
         isDefault: true,
-        async initializeDriver({ collections }: { collections: LegacyCollectionConfig[] }): Promise<InitializedDriver> {
-            seen.push(JSON.parse(JSON.stringify(collections)) as LegacyCollectionConfig[]);
+        async initializeDriver({ tables }: { tables?: readonly CompiledTable[] }): Promise<InitializedDriver> {
+            seen.push((tables ?? []).map(table => structuredClone(table.descriptor)));
             return {
                 driver: stubDriver(),
                 collections: undefined,
@@ -98,9 +98,9 @@ afterEach(() => {
 
 describe("auth secret exclusion at boot", () => {
 
-    it("excludes the secrets before any driver reads the collections", async () => {
+    it("hands the driver the secrets as private columns", async () => {
         jest.spyOn(console, "warn").mockImplementation(() => {});
-        const seen: LegacyCollectionConfig[][] = [];
+        const seen: TableDescriptor[][] = [];
 
         await initializeRebaseBackend({
             app: new Hono<HonoEnv>(),
@@ -110,13 +110,13 @@ describe("auth secret exclusion at boot", () => {
         });
 
         expect(seen).toHaveLength(1);
-        const users = seen[0].find(c => c.slug === "users");
-        const properties = users?.properties as Record<string, { excludeFromApi?: boolean }>;
-        expect(properties.password_hash.excludeFromApi).toBe(true);
-        expect(properties.email_verification_token.excludeFromApi).toBe(true);
+        const users = seen[0].find(table => table.slug === "users");
+        const privacy = (key: string) => users?.columns.find(column => column.key === key)?.private;
+        expect(privacy("password_hash")).toBe(true);
+        expect(privacy("email_verification_token")).toBe(true);
         // The column the flag is not about, so a blanket exclusion would pass
         // the two assertions above and fail this one.
-        expect(properties.email.excludeFromApi).toBeUndefined();
+        expect(privacy("email")).toBeUndefined();
     });
 
     it("still says so, once, in the logs", async () => {
@@ -129,10 +129,7 @@ describe("auth secret exclusion at boot", () => {
             bootstrappers: [capturingBootstrapper([])]
         });
 
-        // Moving the call earlier must not cost the developer the warning that
-        // tells them to declare the flag themselves — nor repeat it, now that
-        // the enforcement runs twice: the second pass exists for collections a
-        // driver introspected, and finds nothing left to fix in these.
+        // The developer is told to declare the flag themselves — once.
         const warnings = warn.mock.calls
             .map(call => call.join(" "))
             .filter(line => line.includes("without marking it private"));

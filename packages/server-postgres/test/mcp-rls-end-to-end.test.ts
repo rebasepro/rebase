@@ -105,7 +105,6 @@ const tool = (name: string) => {
 const ctx = (driver: DataDriver, uid: string, scope = "data:read data:write data:delete") => ({
     driver,
     tables: TABLES,
-    driverCollection: (slug: string) => COLLECTIONS.find(collection => collection.slug === slug),
     caller: { uid, roles: ["recruiter"], scopes: scope.split(" "), clientId: "mcp_test" }
 });
 

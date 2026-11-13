@@ -854,8 +854,6 @@ export interface DataDriver {
      */
     scanStoredRows?(props: {
         path: string;
-        /** Ignored by the Postgres driver, which resolves the table from `path`; to be removed from the contract. */
-        collection: CollectionConfig;
         /** Rows per page. */
         pageSize?: number;
     }): AsyncIterable<Record<string, unknown>[]>;

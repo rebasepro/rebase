@@ -37,7 +37,6 @@ import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "../api/rest/field
 import { parseQueryOptions } from "../api/rest/query-parser.js";
 import { RestApiGenerator, type RowAddress } from "../api/rest/api-generator.js";
 import type { ServedTable } from "../api/rest/served-table.js";
-import type { DriverCollectionOf } from "../schema/driver-seam.js";
 import type { QueryOptions } from "../api/types.js";
 import { buildTableInputSchema, buildTableSchema } from "../api/openapi-generator.js";
 import { schemaViewFor, serializeTables, type SchemaView } from "../api/schema-tables.js";
@@ -89,12 +88,6 @@ export interface McpToolContext {
      * the shared serializer for its credential (`servedTables`).
      */
     tables: readonly TableDescriptor[];
-    /**
-     * What a data driver call names a table by (see `DriverCollectionOf`):
-     * every decision a tool makes reads the descriptors above; the driver
-     * contract still takes this until slice B-R7.
-     */
-    driverCollection: DriverCollectionOf;
     caller: McpCaller;
     /**
      * The deployment's auth adapter. The auth table's rows are the users, so

@@ -130,7 +130,6 @@ describe("remote MCP tools on the real driver (E2E)", () => {
         return definition.run(args, {
             driver: driver,
             tables: TABLES,
-            driverCollection: slug => COLLECTIONS.find(collection => collection.slug === slug),
             caller: { ...USER, scopes: ["data:read", "data:write", "data:delete"], clientId: "mcp-e2e" }
         });
     }
@@ -347,7 +346,6 @@ describe("remote MCP tools on the real driver (E2E)", () => {
             const result = await definition!.run({ tables: ["posts"], code: "export default () => null;" }, {
                 driver: driver,
                 tables: TABLES,
-                driverCollection: slug => COLLECTIONS.find(collection => collection.slug === slug),
                 caller: { ...USER, scopes: ["data:read"], clientId: "mcp-e2e" },
                 compileApp: async source => ({ ok: true, code: source })
             }) as { view: { tables: { slug: string }[]; grants: Record<string, { read: boolean; write: boolean; delete: boolean }> } };
@@ -373,7 +371,6 @@ describe("remote MCP tools on the real driver (E2E)", () => {
             const context: McpToolContext = {
                 driver,
                 tables: TABLES,
-                driverCollection: slug => COLLECTIONS.find(collection => collection.slug === slug),
                 caller: { ...USER, scopes: ["data:read", "data:write"], clientId: "mcp-e2e" },
                 compileApp: async (source: string) => ({ ok: true as const, code: source })
             };

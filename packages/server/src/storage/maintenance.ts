@@ -14,7 +14,6 @@
 import type { DataDriver, TableDescriptor, TableHooks, TransformNode } from "@rebasepro/types";
 import { storageTargetsInText } from "@rebasepro/types";
 import type { RegisteredTable } from "../schema/table-registry";
-import type { DriverCollectionOf } from "../schema/driver-seam";
 import type { StorageController } from "./types";
 import { isRenditionKey } from "./rendition-cache";
 import { randomUUID } from "crypto";
@@ -202,7 +201,7 @@ export function hasReadHooks(table: RegisteredTable, globalHooks?: TableHooks): 
 export async function removeReferencedKeys(
     keys: Set<string>,
     tables: readonly RegisteredTable[],
-    readers: Pick<ReferenceSources, "driverFor" | "driverCollection">,
+    readers: Pick<ReferenceSources, "driverFor">,
     options: {
         pageSize?: number;
         globalHooks?: TableHooks;
@@ -239,14 +238,13 @@ export async function removeReferencedKeys(
         if (progress) progress.currentCollection = slug;
         try {
             const driver = readers.driverFor(table.descriptor);
-            const collection = readers.driverCollection(slug);
-            if (!driver || !collection) {
+            if (!driver) {
                 notRead({ collection: slug, reason: "no data driver serves it here" });
                 continue;
             }
             try {
                 if (driver.scanStoredRows) {
-                    for await (const rows of driver.scanStoredRows({ path: slug, collection, pageSize })) {
+                    for await (const rows of driver.scanStoredRows({ path: slug, pageSize })) {
                         pageRead(rows);
                     }
                 } else if (hasReadHooks(table, options.globalHooks)) {
@@ -260,7 +258,6 @@ export async function removeReferencedKeys(
                     for (;;) {
                         const rows = await driver.fetchCollection({
                             path: slug,
-                            collection,
                             limit: pageSize,
                             withDeleted: true,
                             ...(after ? { startAfter: after } : {})
@@ -377,8 +374,6 @@ export interface ReferenceSources {
     tables: readonly RegisteredTable[];
     /** The unscoped driver serving a table here, or `undefined` when none does. */
     driverFor: (table: TableDescriptor) => DataDriver | undefined;
-    /** What the driver's read calls name the table by (see `DriverCollectionOf`). */
-    driverCollection: DriverCollectionOf;
     /** The hooks every table runs (`backend/hooks.ts`), which may scope or rewrite its reads. */
     globalHooks?: TableHooks;
     /**
