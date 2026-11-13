@@ -133,7 +133,7 @@ describe("col.custom(): generated from a database, pushed, booted and served", (
         // The same table, declared with another range type: reported, never altered.
         const [sessions] = defs;
         const changed = defineTable("sessions", {
-            columns: { ...sessions.config.columns, seats: col.custom("int8range") },
+            columns: { ...sessions.config.columns, seats: col.custom({ dataType: "int8range" }) },
             rls: "admin-only"
         });
         const existing = await readExistingSchema(queryable(target), ["public"]);

@@ -181,7 +181,7 @@ describe("diffGeneratedSchemaAgainstCatalogue", () => {
         // changes none of them, so the warning survived its own fix on every
         // boot forever.
         const [users] = compileTables([defineAuthTable("users", {
-            columns: { id: col.uuid().primaryKey(), roles: col.array(col.text()) },
+            columns: { id: col.uuid().primaryKey(), roles: col.text().array() },
             rls: "admin-only"
         })]);
 

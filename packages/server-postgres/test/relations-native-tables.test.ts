@@ -27,7 +27,7 @@ import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
 const tags = defineTable("tags", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         label: col.text()
     },
     rls: "admin-only"
@@ -35,7 +35,7 @@ const tags = defineTable("tags", {
 
 const authors = defineTable("authors", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         name: col.text(),
         handle: col.text().unique()
     },
@@ -59,7 +59,7 @@ const authors = defineTable("authors", {
 
 const posts = defineTable("posts", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         title: col.text(),
         rank: col.integer(),
         signedBy: col.text()
@@ -72,7 +72,7 @@ const posts = defineTable("posts", {
             through: "post_tags",
             sourceKey: "post_id",
             targetKey: "tag_id",
-            pivot: { position: col.integer(), role: col.text(), weight: col.numeric(), addedAt: col.timestamptz() }
+            pivot: { position: col.integer(), role: col.text(), weight: col.numeric(), addedAt: col.timestamp({ withTimezone: true }) }
         })
     },
     rls: "admin-only"
@@ -80,7 +80,7 @@ const posts = defineTable("posts", {
 
 const profiles = defineTable("profiles", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         bio: col.text(),
         authorHandle: col.text().unique()
     },

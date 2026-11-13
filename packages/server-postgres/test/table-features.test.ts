@@ -16,7 +16,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { compileSchema, compileTables, findRelation, isSchemaDefinitionError, lowerTables, resolveCollectionRelations, type LoweredCollection } from "@rebasepro/common";
-import { col, defineTable, rel, type AnyTableDef } from "@rebasepro/types";
+import { col, defineTable, rel, type AnyTableDef, pgEnum } from "@rebasepro/types";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
@@ -412,8 +412,10 @@ describe("table features: a shared enum type, `col.enum(values, { name })`", () 
     });
 
     it("refuses two value lists under one name, as compileTables does", () => {
+        const priorityEnum = pgEnum("priority", ["low", "high"]);
+
         const other = defineTable("others", {
-            columns: { id: col.uuid().primaryKey(), priority: col.enum(["low", "high"], { name: "priority" }) },
+            columns: { id: col.uuid().primaryKey(), priority: priorityEnum() },
             rls: "admin-only"
         });
         expect(() => planOf([tasks, other])).toThrow(/Columns sharing a named enum type must list the same values/);

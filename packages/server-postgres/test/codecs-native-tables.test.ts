@@ -32,9 +32,9 @@ import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
 const shelves = defineTable("shelves", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         stock: col.integer().validate({ min: 0, max: 10 }),
-        tags: col.array(col.text()).validate({ minItems: 1, maxItems: 3, uniqueItems: true }),
+        tags: col.text().array().validate({ minItems: 1, maxItems: 3, uniqueItems: true }),
         meta: col.jsonb(json.object({ color: json.string(), size: json.number() })),
         opensAt: col.time(),
         place: col.geopoint(),
