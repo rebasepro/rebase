@@ -932,6 +932,9 @@ async function verifyChains(rewrites: ChainRewrite[]): Promise<ChainVerdict> {
             else verdict.differ.push({ line: rewrite.line, before: rewrite.before, after: rewrite.after });
         } else if (before.error !== undefined && before.error === after.error && /ReferenceError/.test(before.error)) {
             verdict.unverifiable.push({ line: rewrite.line, reason: before.error });
+        } else if (before.def === undefined && after.def !== undefined) {
+            // The installed builders no longer take the old spelling (Rebase after the sweep): nothing to compare with.
+            verdict.unverifiable.push({ line: rewrite.line, reason: `the old spelling does not build here: ${before.error}` });
         } else if (before.def === undefined && after.def === undefined) {
             verdict.unverifiable.push({ line: rewrite.line, reason: `${before.error} / ${after.error}` });
         } else {
@@ -1036,7 +1039,9 @@ function verifyModule(file: string, before: string): { ok: boolean; detail: stri
         };
         const pre = run(copy);
         const post = run(file);
-        if (typeof pre === "string" || typeof post === "string") return { ok: false, detail: typeof pre === "string" ? `pre-image ${pre}` : `working file ${post}` };
+        if (typeof post === "string") return { ok: false, detail: `working file ${post}` };
+        // A Rebase that no longer has the old builders cannot load the pre-image: the new text compiled, which is all it can show.
+        if (typeof pre === "string") return { ok: true, detail: `${Object.keys(post).length} table(s) compile; the pre-image does not load with these builders (${pre})` };
         const names = new Set([...Object.keys(pre), ...Object.keys(post)]);
         if (names.size === 0) return { ok: false, detail: "exports no table after loading" };
         const differing = [...names].filter(name => pre[name] !== post[name]);

@@ -62,7 +62,7 @@ export function drizzleRowTypes(): void {
     assertType<Equal<Row["embedding"], number[] | null>>();
     assertType<Equal<Row["metadata"], { seoTitle?: string } | null>>();
     assertType<Equal<Row["createdAt"], string>>();
-    // Defaults make a create optional, exactly as the old spellings did.
+    // Defaults make a create optional.
     assertType<Equal<undefined extends Insert["short"] ? true : false, true>>();
     assertType<Equal<undefined extends Insert["createdAt"] ? true : false, true>>();
     assertType<Equal<undefined extends Insert["seq"] ? true : false, true>>();
@@ -70,23 +70,44 @@ export function drizzleRowTypes(): void {
     assertType<Equal<undefined extends Insert["tags"] ? true : false, true>>();
 }
 
-/** The old spellings carry the same static types (they are retired by the sweep, not yet). */
-const old = defineTable("old_posts", {
-    columns: {
-        id: col.uuid().primaryKey().defaultRandom(),
-        tags: col.array(col.text()).notNull().default([]),
-        metadata: col.jsonb<{ seoTitle?: string }>(),
-        createdAt: col.timestamptz().notNull().onCreateNow(),
-        seq: col.integer().identity()
-    },
-    rls: "admin-only"
-});
-
-export function oldAndNewAgree(): void {
-    assertType<Equal<InferRow<typeof old>["tags"], InferRow<typeof drizzle>["tags"]>>();
-    assertType<Equal<InferRow<typeof old>["metadata"], InferRow<typeof drizzle>["metadata"]>>();
-    assertType<Equal<InferRow<typeof old>["createdAt"], InferRow<typeof drizzle>["createdAt"]>>();
-    assertType<Equal<InferInsert<typeof old>["seq"], InferInsert<typeof drizzle>["seq"]>>();
+/**
+ * The spellings Rebase had before it took Drizzle's (`drizzle-alignment-renames.json`)
+ * are gone: each fails to compile, and the ones a JavaScript caller can still
+ * reach throw the instruction.
+ */
+export function retiredSpellings(): void {
+    // @ts-expect-error — a bare varchar is unbounded in Drizzle: `col.varchar({ length: 255 })`.
+    col.varchar();
+    // @ts-expect-error — the length is a config key: `col.varchar({ length: 160 })`.
+    col.varchar(160);
+    // @ts-expect-error — a bare char is char(1) in Drizzle: `col.char({ length: 2 })`.
+    col.char();
+    // @ts-expect-error — `col.bigint({ mode: "number" })`.
+    col.bigint();
+    // @ts-expect-error — `col.bigserial({ mode: "number" })`.
+    col.bigserial();
+    // @ts-expect-error — `col.numeric({ precision: 10, scale: 2 })`.
+    col.numeric(10, 2);
+    // @ts-expect-error — `col.vector({ dimensions: 3 })`.
+    col.vector(3, { index: false });
+    // @ts-expect-error — a lone string is the SQL column name: `col.custom({ dataType: "inet" })`.
+    col.custom("inet");
+    // @ts-expect-error — a named enum type is a `pgEnum`.
+    col.enum(["draft", "published"], { name: "post_status" });
+    // @ts-expect-error — `col.timestamp({ withTimezone: true })`.
+    col.timestamptz();
+    // @ts-expect-error — `col.text().array()`.
+    col.array(col.text());
+    // @ts-expect-error — `col.jsonb().$type<T>()`.
+    col.jsonb<{ seoTitle?: string }>();
+    // @ts-expect-error — the SQL name is the builder's leading argument: `col.text("legacy")`.
+    col.text().column("legacy");
+    // @ts-expect-error — `.default(sql\`gen_short_id()\`)`.
+    col.text().defaultSql("gen_short_id()");
+    // @ts-expect-error — `.generatedAlwaysAs(sql\`lower(title)\`)`.
+    col.text().generatedAs("lower(title)");
+    // @ts-expect-error — `.generatedByDefaultAsIdentity()`.
+    col.integer().identity();
 }
 
 /** Every refused Drizzle spelling fails to compile; the message is the `this` / argument / key type. */
@@ -177,6 +198,20 @@ describe("Drizzle spellings Rebase refuses", () => {
         throwsWith(DRIZZLE_REFUSALS.generatedValue, () => callMethod(col.text(), "generatedAlwaysAs", "lower(x)"));
         throwsWith(DRIZZLE_REFUSALS.pgEnumObject, () => Reflect.apply(pgEnum, undefined, ["mood", { Happy: "happy" }]));
         throwsWith("write `col.custom({ dataType: \"inet\" })`", () => callMethod(col, "inet"));
+    });
+
+    it("throws the instruction for a retired spelling a JavaScript caller can still write", () => {
+        throwsWith(DRIZZLE_REFUSALS.varcharLength, () => callMethod(col, "varchar"));
+        throwsWith(DRIZZLE_REFUSALS.varcharLength, () => callMethod(col, "varchar", 160));
+        throwsWith(DRIZZLE_REFUSALS.charLength, () => callMethod(col, "char", 2));
+        throwsWith(DRIZZLE_REFUSALS.bigintModeMissing, () => callMethod(col, "bigint"));
+        throwsWith(DRIZZLE_REFUSALS.bigintModeMissing, () => callMethod(col, "bigserial"));
+        throwsWith(DRIZZLE_REFUSALS.numericPositional, () => callMethod(col, "numeric", 10, 2));
+        throwsWith(DRIZZLE_REFUSALS.vectorPositional, () => callMethod(col, "vector", 3));
+        throwsWith(DRIZZLE_REFUSALS.customDataType, () => callMethod(col, "custom", "inet"));
+        throwsWith(DRIZZLE_REFUSALS.enumName, () => callMethod(col, "enum", ["a"], { name: "kind" }));
+        for (const gone of ["timestamptz", "array"]) expect(gone in col).toBe(false);
+        for (const gone of ["column", "defaultSql", "generatedAs", "identity"]) expect(gone in col.text()).toBe(false);
     });
 
     it("refuses an interpolation in sql``", () => {

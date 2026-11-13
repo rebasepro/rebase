@@ -195,7 +195,7 @@ describe("col.* — modifiers", () => {
     it("is immutable: every modifier returns a new builder and leaves the first alone", () => {
         const plain = col.text();
         const before = JSON.stringify(plain.def);
-        const modified = plain.notNull().unique().default("x").validate({ min: 1 }).column("c").describe("d").readOnly().private();
+        const modified = plain.notNull().unique().default("x").validate({ min: 1 }).describe("d").readOnly().private();
         expect(modified).not.toBe(plain);
         expect(JSON.stringify(plain.def)).toBe(before);
         const shared = col.timestamp({ withTimezone: true });
@@ -216,7 +216,7 @@ describe("col.* — refusals", () => {
     });
 
     it("refuses a numeric scale without a precision", () => {
-        expect(() => col.numeric(undefined, 2)).toThrow("`col.numeric(precision, scale)`: a scale needs a precision.");
+        expect(() => col.numeric({ scale: 2 })).toThrow("`col.numeric({ precision, scale })`: a scale needs a precision.");
     });
 
     it("refuses a non-positive vector dimension", () => {
@@ -225,7 +225,8 @@ describe("col.* — refusals", () => {
     });
 
     it("refuses an array of arrays", () => {
-        expect(() => col.array(col.text().array())).toThrow("`col.array()` of an array is not supported. Use `col.jsonb()` for nested lists.");
+        // @ts-expect-error — the types refuse it too.
+        expect(() => col.text().array().array()).toThrow("An array of arrays is not supported: use `col.jsonb()` for nested lists.");
     });
 
     it("refuses a storage column without a path", () => {
