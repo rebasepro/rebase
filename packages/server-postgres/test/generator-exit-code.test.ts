@@ -19,6 +19,7 @@ import os from "os";
 import path from "path";
 
 const packageRoot = path.resolve(__dirname, "..");
+const repoRoot = path.resolve(packageRoot, "..", "..");
 const fixtures = path.join(packageRoot, "test", "fixtures");
 
 /** The workspace's tsx, found the way `resolveLocalBin` finds it. */
@@ -42,7 +43,17 @@ function runGenerator(script: string, fixture: string, outputPath: string) {
             `--schema-dir=${path.join(fixtures, fixture, "schema")}`,
             `--output=${outputPath}`
         ],
-        { cwd: packageRoot, encoding: "utf8", env: { ...process.env, DOTENV_CONFIG_QUIET: "true" } }
+        {
+            cwd: packageRoot,
+            encoding: "utf8",
+            env: {
+                ...process.env,
+                DOTENV_CONFIG_QUIET: "true",
+                // Workspace packages from source, as the neighbouring CLI
+                // tests run them: a unit test must not need `dist` built.
+                TSX_TSCONFIG_PATH: path.join(repoRoot, "tsconfig.typecheck.json")
+            }
+        }
     );
 }
 
