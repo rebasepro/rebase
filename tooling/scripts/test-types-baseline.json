@@ -1,8 +1,7 @@
 {
-  "app": 25,
-  "cli": 16,
+  "app": 20,
   "client": 47,
-  "cms": 63,
-  "server": 138,
-  "server-postgres": 305
+  "cms": 43,
+  "server": 66,
+  "server-postgres": 2
 }
