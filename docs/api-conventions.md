@@ -256,8 +256,8 @@ Paths are relative to `basePath` unless they start at `/.well-known`, `/mcp`,
 | Path | Notes |
 |---|---|
 | `/meta/contract` | `schema:read`-gated inside an ungated router — see §7 |
-| `/docs` | the OpenAPI document. Public unless `enableSwagger` is `false` — the production default when `REBASE_ENABLE_SWAGGER` is unset — and then gated on `schema:read`. With no collections served it answers `404 NO_COLLECTIONS` |
-| `/swagger` | Swagger UI over `/docs`. Not mounted in production |
+| `/docs` | the OpenAPI document. Unset `enableSwagger` (the default, every environment): the schema endpoint's audience, each caller the document of the tables `/schema/tables` describes to it (`404 DOCS_UNAVAILABLE` with no auth configured); `true`: public; `false`: the admin gate. With no tables served it answers `404 NO_TABLES` |
+| `/swagger` | Swagger UI over `/docs`. Only with `enableSwagger: true`, never in production |
 | `/metrics` | Prometheus text, only when `REBASE_METRICS=true`. Bearer `REBASE_METRICS_TOKEN` when that is set; readable by anyone who can reach the port when it is not, which boot warns about |
 
 ### Known drift, not yet fixed

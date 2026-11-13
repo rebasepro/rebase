@@ -426,7 +426,7 @@ are typed by the document's keys. See [Arrays and JSON](/docs/collections/arrays
 | Option | Type | Effect |
 |---|---|---|
 | `previewFields` | `string[]` | The target's fields shown in the chip for a related row. At most three fit. |
-| `defaultValue` | `EntityRelation \| EntityRelation[]` | The related row(s) a new record's form starts with: `new EntityRelation(id, "<target slug>")`, or a list for a to-many relation. Written only when the form is saved. A column's own default is `.default()` on the column. |
+| `defaultValue` | `EntityRelation \| EntityRelation[]` | The related row(s) a new record's form starts with: `new EntityRelation(id, "<target slug>")` (`EntityRelation` from `@rebasepro/cms-types`), or a list for a to-many relation. Written only when the form is saved. A column's own default is `.default()` on the column. |
 | `widget` | `"select" \| "dialog"` | How a related row is picked. |
 | `fixedFilter` | `FilterValues` | Offer only rows that pass this filter. |
 | `includeId` | `boolean` | Show the related row's id in previews. |

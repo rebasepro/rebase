@@ -184,7 +184,11 @@ rows[0].title;
 
 The admin itself renders an `Entity` view model — the `id` / `path` / `values`
 wrapper its collection views and forms draw from, with dates as `Date`s and a
-relation as an `EntityRelation`. That layer is the admin's own and is not part of
+relation as an `EntityRelation` (the value classes `EntityRelation`, `EntityReference`,
+`GeoPoint` and `Vector` come from `@rebasepro/cms-types`). Before every write and
+every filter the admin converts it to wire values in the browser — relations as
+keys, vectors as number lists, points as `{ latitude, longitude }`, dates as ISO
+text — so the server sees what any other client sends. That layer is the admin's own and is not part of
 the public surface: an entity action, a display resolver, a view mode
 `Builder`'s `tableController.rows`, a collection action's selection and a slot
 are all handed rows, with each record's id beside its row. You meet `Entity` only in a copy of one of the admin's own

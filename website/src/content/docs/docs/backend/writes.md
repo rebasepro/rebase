@@ -20,6 +20,24 @@ everything in this section applies to them too, except `?on_conflict=`.
 A write's body must be a JSON object. `null`, a number, a string or an array is
 a `400 BAD_REQUEST`.
 
+<span class="since-badge" data-since="0.31">Since 0.31</span> A write takes the values the REST API documents and nothing else — the
+same shape a read returns: a to-one relation (`belongsTo`, `hasOne`, a to-one
+`via`) as the related row's key or `null`, a to-many relation as a list of keys
+or `{ id, _pivot? }` objects, a date as ISO text, a vector as a list of numbers,
+a geopoint as `{ latitude, longitude }`, a `bytea` as a
+`data:application/octet-stream;base64,` URL. A to-one relation written as an
+object (`{ "author": { "id": 5 } }`) is a `400 VALIDATION_INVALID_VALUE`
+("'posts.author' links one 'authors' row: write that row's key …"), and so is a
+vector written as `{ "value": [...] }`. In process, `rebase.data` also takes a
+`Date` and a `Buffer` / `Uint8Array`.
+
+Writing a `hasMany` or `hasOne` relation from the parent (`{ "replies": [1, 2] }`
+on a thread) sets the foreign key on the child rows, so it is held to that key's
+rules: a key column that is `.readOnly()`, `.private()` or restricted by
+`access.write` refuses it (`400 VALIDATION_EXCLUDED_FIELDS` /
+`FIELD_NOT_WRITABLE`, "Writing 'replies' on 'threads' sets 'threadId' on the
+rows of 'replies'"), as a write of the key on the child does.
+
 An update cannot change a row's key. A body that names the key with another
 value is a `400 KEY_IMMUTABLE`, before any hook runs and with nothing written,
 whichever way the update arrives: REST, the realtime socket, MCP or the

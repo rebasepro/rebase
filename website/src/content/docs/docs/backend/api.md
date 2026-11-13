@@ -9,8 +9,8 @@ description: Auto-generated REST API endpoints for every table, with filtering, 
 Rebase automatically generates a complete API from your tables:
 
 - **REST API** — CRUD endpoints for every table at `/api/data/:slug`
-- **OpenAPI spec** — Machine-readable spec at `/api/docs`
-- **Swagger UI** — Interactive API explorer at `/api/swagger` (dev mode only)
+- **OpenAPI spec** — Machine-readable spec at `/api/docs`, served to each signed-in caller for the tables they may see
+- **Swagger UI** — Interactive API explorer at `/api/swagger`, when you publish the document (`REBASE_ENABLE_SWAGGER=true`, outside production)
 
 No code is required — [declare your tables](/docs/schema/) and the API appears automatically.
 
@@ -425,8 +425,8 @@ Every hook is awaited, and a throw from any of them undoes the whole write:
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/health` and `/api/health` | none | Liveness/readiness check |
-| `GET` | `/api/docs` | none; `schema:read` when `enableSwagger` is `false` (the runtime's default in production) | The OpenAPI 3.0 JSON specification |
-| `GET` | `/api/swagger` | none | Swagger UI. Served only outside production; `REBASE_ENABLE_SWAGGER` cannot turn it on in production. Not served when `enableSwagger` is `false`, in development either |
+| `GET` | `/api/docs` | <span class="since-badge" data-since="0.31">Since 0.31</span> by default, the callers `GET /api/schema/tables` describes tables to (401 anonymous unless `schemaTables.public`); none when `enableSwagger` is `true`; the admin gate when it is `false` | The OpenAPI 3.0 JSON specification — by default only the tables, columns and relations the schema endpoint describes to that caller. `404 DOCS_UNAVAILABLE` when no authentication is configured |
+| `GET` | `/api/swagger` | none | Swagger UI. Served only when `enableSwagger` is `true` (`REBASE_ENABLE_SWAGGER=true`), and never in production |
 | `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from, and the runtime version — deliberately unauthenticated, and nothing that describes the schema |
 | `GET` | `/api/meta/contract` | `schema:read`: an admin, the service key, or an API key holding it | The schema version, the runtime and every table as an administrator sees it, for `rebase generate-sdk --from`. Fail-closed: `404` when no auth is configured |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |
@@ -475,8 +475,9 @@ GET /api/meta/schema-version
 ```
 
 For the shape of the endpoints rather than the schema behind them, the OpenAPI
-document is at `GET /api/docs`, with Swagger UI at `/api/swagger` outside
-production.
+document is at `GET /api/docs`: signed in, you get the document of the
+tables you may see. Swagger UI at `/api/swagger` is served only when the
+document is published with `REBASE_ENABLE_SWAGGER=true`, outside production.
 
 ## Next Steps
 

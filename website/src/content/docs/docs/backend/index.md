@@ -50,8 +50,7 @@ const instance = await initializeRebaseBackend({
         jwtSecret: env.JWT_SECRET,
     },
     storage: { type: "local", basePath: "./uploads" },
-    history: true,
-    enableSwagger: env.NODE_ENV !== "production"
+    history: true
 });
 ```
 
@@ -93,7 +92,7 @@ Both paths reach the same `RebaseBackendConfig`. This is the whole map.
 | `storageDownloadTokenTtl` | `STORAGE_DOWNLOAD_TOKEN_TTL` |
 | `hooks` | `export const hooks` from `backend/hooks.ts` — global table hooks |
 | `history` | `REBASE_HISTORY` (on by default) — the boolean form only |
-| `enableSwagger` | `REBASE_ENABLE_SWAGGER`; unset means on outside production |
+| `enableSwagger` | `REBASE_ENABLE_SWAGGER`; unset serves `/api/docs` to the schema endpoint's audience, `true` publishes it with the Swagger UI, `false` keeps it behind the admin gate |
 | `compression` | `REBASE_COMPRESSION` |
 | `maxBodySize` | `REBASE_MAX_BODY_SIZE` |
 | `logging` | `LOG_LEVEL` |
@@ -130,8 +129,8 @@ After initialization, these routes are mounted:
 | `/api/storage/*` | File upload, download, and deletion |
 | `/api/data/:slug` | CRUD operations per table (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Entity change history (when enabled) |
-| `/api/docs` | OpenAPI spec (public unless `enableSwagger: false`, which puts it behind `schema:read`) |
-| `/api/swagger` | Swagger UI (outside production only) |
+| `/api/docs` | OpenAPI spec of the tables the caller may see (public with `enableSwagger: true`; admin-only with `false`) |
+| `/api/swagger` | Swagger UI (with `enableSwagger: true`, outside production only) |
 | `/api/schema/tables` | The tables this backend serves, as the caller may see them — see [Endpoints](/docs/backend/endpoints/#schema) |
 | `/api/meta/contract` | The schema version, the runtime and every table as an administrator sees it (needs `schema:read`) |
 | `/api/meta/schema-version` | A version string for that schema (unauthenticated) |

@@ -516,8 +516,8 @@ Every run reads the result back: the generated SQL — DDL, policies, search,
 vector, triggers, views, the Drizzle schema — must be byte-identical, or every
 file is put back. What it cannot carry is refused with its file and line, and
 what it leaves to you is printed as numbered manual steps, ending with
-`rebase skills install` when the project holds agent skills. `config/` is never
-deleted; the run prints the `git rm` line.
+`rebase skills install` when the project holds agent skills. Your own modules in
+`config/` stay; the run prints the `git rm` line for what it replaced.
 
 | Flag | Effect |
 |---|---|

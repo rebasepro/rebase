@@ -849,9 +849,9 @@ export function initNextSteps(input: InitNextStepsInput): string[] {
         ? introspected
             ? chalk.gray("This starts a headless API (Hono + PostgreSQL) over the tables just ")
                 + chalk.gray("generated from your database in backend/schema. Edit them to change what the ")
-                + chalk.gray("API exposes; docs are at /api/swagger.")
+                + chalk.gray("API exposes; its OpenAPI document is /api/docs for signed-in callers (Swagger UI: set REBASE_ENABLE_SWAGGER=true).")
             : chalk.gray("This starts a headless API (Hono + PostgreSQL). There is no backend/schema: ")
-                + chalk.gray("the API is derived from your database schema. Once it serves a table, docs are at /api/swagger.")
+                + chalk.gray("the API is derived from your database schema. Once it serves a table, its OpenAPI document is /api/docs for signed-in callers (Swagger UI: set REBASE_ENABLE_SWAGGER=true).")
         : chalk.gray("This starts both the backend (Hono + PostgreSQL)")
             + chalk.gray(" and the frontend (Vite + React) concurrently."));
     return lines;

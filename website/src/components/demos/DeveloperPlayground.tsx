@@ -245,6 +245,7 @@ export function DeveloperPlayground() {
                                         <span className="text-purple-400">import</span> &#123; <span className="text-blue-300">customizeTable</span> &#125; <span className="text-purple-400">from</span> <span className="text-green-400">"@rebasepro/cms"</span>;{"\n"}
                                         <span className="text-purple-400">import type</span> &#123; <span className="text-blue-300">products</span> &#125; <span className="text-purple-400">from</span> <span className="text-green-400">"../../../backend/schema/products"</span>;{"\n"}
                                         <span className="text-purple-400">import</span> &#123; <span className="text-blue-300">RatingField</span> &#125; <span className="text-purple-400">from</span> <span className="text-green-400">"./widgets"</span>;{"\n\n"}
+                                        <span className="text-surface-500">// backend/schema/products.ts: rating: col.smallint().validate(&#123; min: 0, max: 5 &#125;)</span>{"\n"}
                                         <span className="text-purple-400">export const</span> productsCms = <span className="text-blue-300">customizeTable</span>&lt;<span className="text-purple-400">typeof</span> products&gt;(<span className="text-green-400">"products"</span>, &#123;{"\n"}
                                         {"  "}fields: &#123;{"\n"}
                                         {"    "}rating: &#123; Field: <span className="text-blue-300">RatingField</span> &#125;{"\n"}

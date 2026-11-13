@@ -407,8 +407,11 @@ A row then carries both the foreign key and the related row:
 filters, ordering and nesting.
 
 A write sets a to-one link by its key (`{ author: "u7" }` or
-`{ authorId: "u7" }`) and a to-many link as a list of target ids or `{ id }`
-objects (`{ tags: ["t1", "t2"] }`). See [Writing data](/docs/sdk/writing/).
+`{ authorId: "u7" }`), or `null` to unlink, and a to-many link as a list of
+target ids or `{ id, _pivot? }` objects (`{ tags: ["t1", "t2"] }`). A to-one
+link written as an object (`{ author: { id: "u7" } }`) is a
+`400 VALIDATION_INVALID_VALUE` naming the relation: send the key. A filter on a
+relation compares its key. See [Writing data](/docs/sdk/writing/).
 
 In the CMS, every to-many relation becomes a tab under the record. See
 [Relations in the admin panel](/docs/collections/relations-in-the-admin-panel/).

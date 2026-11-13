@@ -45,7 +45,7 @@ project's path rather than fixed, so several Rebase projects can run at once,
 and `PORT` in `.env` applies to `rebase start`, not here.
 
 - API: `<the printed URL>/api/data/<table>` — once a table is served
-- Docs: `<the printed URL>/api/swagger` — likewise
+- Docs: `<the printed URL>/api/docs` — likewise; the OpenAPI document of the tables you may see, for a signed-in caller. Set `REBASE_ENABLE_SWAGGER=true` to publish it to everyone with the Swagger UI at `/api/swagger`
 - Health: `<the printed URL>/health`
 
 A headless project starts with no tables, so the first two answer

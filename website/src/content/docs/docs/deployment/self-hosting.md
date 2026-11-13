@@ -196,6 +196,12 @@ is there instead:
 - **An optional table missing** (API keys, idempotency keys, cron claims,
   rate-limit counters, presence, metrics history): that feature is off, and the
   log says which table it needs.
+- <span class="since-badge" data-since="0.31">Since 0.31</span> **A declared table the database does not protect** — row-level security
+  disabled, or none of the policies it declares present: that table is not
+  served. A request for it answers `503 TABLE_WITHHELD`, and the boot log
+  names the SQL that protects it (or `rebase db push`). The other tables are
+  served, and the boot goes on. This holds with `REBASE_MIGRATE_ON_BOOT=none`
+  too, and on a live schema refresh.
 
 Rows still change, as they would on any database: sign-ins, sessions, API key
 usage, idempotency keys, cron claims. The first admin account

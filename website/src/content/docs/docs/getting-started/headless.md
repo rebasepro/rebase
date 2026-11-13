@@ -151,10 +151,11 @@ const { data: posts } = await rebase.data.table("posts").find({
 
 - [REST API](/docs/backend/api/) — the endpoint shapes, filters and errors
 - [Typed SDK](/docs/sdk/) — querying, auth, realtime, storage
-- `/api/docs` and `/api/swagger` — the OpenAPI document and its viewer, served
-  by the running backend once it serves a table. A project with none serves
-  neither: the document is generated from the tables, so there is nothing
-  to describe until the section above has run
+- `/api/docs` — the OpenAPI document, served by the running backend once it
+  serves a table, to a signed-in caller (the tables they may see). Set
+  `REBASE_ENABLE_SWAGGER=true` to publish it to everyone, with the Swagger UI
+  at `/api/swagger` outside production. A project with no table serves
+  neither: the document is generated from the tables
 
 ## `404 NO_TABLES`
 

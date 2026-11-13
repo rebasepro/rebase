@@ -178,7 +178,7 @@ symmetric about it, so it is worth knowing all three:
 
 | Where | Shape | Why |
 |-------|-------|-----|
-| **Write** | `{ author: id }` **or** `{ authorId: id }` | Both are accepted. The write transformer maps the relation property onto the foreign-key column, so the two are the same write. |
+| **Write** | `{ author: id }` **or** `{ authorId: id }` | Both are accepted. The write transformer maps the relation property onto the foreign-key column, so the two are the same write. An object (`{ author: { id } }`) is a 400 that names the relation: send the key. |
 | **Read** | `authorId` | It is a column. Every read returns it. |
 | **Read with `include`** | `author`, the target's own row | Loaded only when the query names it, so it is absent from every other read. |
 

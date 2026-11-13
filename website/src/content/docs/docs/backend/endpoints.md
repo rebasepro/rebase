@@ -276,8 +276,8 @@ inventory of a deployment's custom endpoints is not public.
 |---|---|---|---|
 | `GET` | `/livez` | none | Liveness alone: is this process running. Does not touch the database, which is why it is the probe path a container should use — `RUNTIME_LIVENESS_PATH` |
 | `GET` | `/health`, `/api/health` | none | Liveness and readiness. Reports every configured data source, not only the default |
-| `GET` | `/api/docs` | none (`schema:read` when `enableSwagger` is `false`, the runtime's default in production) | The OpenAPI 3.0 document |
-| `GET` | `/api/swagger` | none | Swagger UI. Outside production only; `REBASE_ENABLE_SWAGGER` cannot turn it on in production. Not served when `enableSwagger` is `false`, in development either |
+| `GET` | `/api/docs` | <span class="since-badge" data-since="0.31">Since 0.31</span> the schema endpoint's audience by default (401 anonymous unless `schemaTables.public`, 403 for a credential without a schema or data scope); none when `enableSwagger` is `true`; the admin gate when `false` | The OpenAPI 3.0 document of the tables `GET /api/schema/tables` describes to the caller (all of them with `enableSwagger: true`). `404 DOCS_UNAVAILABLE` when no authentication is configured |
+| `GET` | `/api/swagger` | none | Swagger UI. Only when `enableSwagger` is `true`, and never in production |
 | `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from and the runtime version, and nothing else |
 | `GET` | `/api/meta/contract` | `schema:read` | `{ schemaVersion, runtime: { version, contract }, tables }` — every table as an administrator sees it, the input of `rebase generate-sdk --from`. `404` when no auth is configured |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |

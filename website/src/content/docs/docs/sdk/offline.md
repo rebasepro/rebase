@@ -75,6 +75,18 @@ Writes replay in the order you made them, across tables — so a create in one t
 
 Each queued write is one request by default, so 500 rows typed offline take 500 round trips to drain. With `replayBatchSize` set (up to 1 000), a run of consecutive offline creates in one table replays as one `createMany` instead. Only creates with an id the SDK generated as a string are folded, and never one that references another row of the same run. If the server refuses or defers the run for any reason other than a lost connection, nothing is written (a bulk write is one transaction), and the run replays one write at a time, as it would by default.
 
+### Writes queued by an earlier version
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+The queue stores a write as the values it sends — keys for relations, number
+lists for vectors, `{ latitude, longitude }` for points, ISO text for dates —
+and cached rows as the server's rows. A write queued offline by the previous
+version of the SDK, which stored them as classes (`EntityRelation`, `GeoPoint`,
+`Vector`), is converted to those values when it is read back and replayed as
+usual: nothing queued before the upgrade is lost. An older SDK that meets a
+write queued by this one leaves it queued.
+
 ## Live queries
 
 `observe()` is the reactive read, and the one to reach for in a UI:

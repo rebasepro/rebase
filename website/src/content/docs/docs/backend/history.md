@@ -88,7 +88,9 @@ Entries that older versions recorded through the admin panel's view of the row
 a `{ "__type": "date", "value" }` envelope as its value, a
 `{ "__type": "relation" }` ref of an owning relation as the foreign key under
 the key's own name, any other relation's ref as the related row's key, and a
-related row the ref embedded is never served.
+related row the ref embedded is never served. Reverting such an entry writes
+those plain values; a to-many list it holds is not written, and is named in
+`dropped_fields`.
 
 On a table with [soft delete](/docs/collections/soft-delete/), a delete is
 recorded as `delete` and a restore (the update setting the soft-delete field
