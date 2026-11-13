@@ -29,25 +29,21 @@ const packageRoot = path.resolve(fileURLToPath(new URL("../..", import.meta.url)
 const serverEntry = path.resolve(packageRoot, "../server/src/index.ts");
 const driverEntry = path.join(packageRoot, "src/index.ts");
 
-const posts = {
-    name: "Posts",
-    slug: "posts",
-    table: "posts",
-    properties: {
-        id: { name: "ID", type: "number", isId: "increment" },
-        title: { name: "Title", type: "string" }
-    }
-};
+const typesEntry = path.resolve(packageRoot, "../types/src/index.ts");
+
+/** The script's one table, as a project's backend/schema declares it. */
+const POSTS_TABLE = "defineTable(\"posts\", { columns: { id: col.integer().primaryKey().identity(), title: col.text() }, rls: \"admin-only\" })";
 
 /** The documented script: build, read, `fetch`, print one JSON line, shut down. */
 function scriptSource(provision: boolean): string {
     return [
         `import { createRebaseBackend } from ${JSON.stringify(serverEntry)};`,
         `import { createPostgresAdapter, createPostgresDatabaseConnection, postgresDriverConfigFromEnv } from ${JSON.stringify(driverEntry)};`,
+        `import { col, defineTable } from ${JSON.stringify(typesEntry)};`,
         "const { db, pool, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL ?? \"\");",
         "const backend = await createRebaseBackend({",
         "    database: createPostgresAdapter(postgresDriverConfigFromEnv({ connection: db, connectionString })),",
-        `    collections: [${JSON.stringify(posts)}],`,
+        `    tables: [${POSTS_TABLE}],`,
         `    provision: ${provision}`,
         "});",
         "const { data } = await backend.rebase.dataAsAdmin.posts.find({ limit: 5 });",

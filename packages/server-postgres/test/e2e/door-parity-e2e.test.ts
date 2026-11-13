@@ -429,7 +429,7 @@ describe("door parity: one operation, one answer (E2E)", () => {
             c.set("driver", await driver.withAuth(USER));
             await next();
         });
-        app.route("/api/data", createHistoryRoutes({ historyService, registry: registry, driver }));
+        app.route("/api/data", createHistoryRoutes({ historyService, tables: () => ({ descriptors: TABLES, collections: COLLECTIONS }), driver }));
         app.route("/api/data", new RestApiGenerator(tablesFromCollections(COLLECTIONS), driver).generateRoutes());
 
         // The socket, signed in as the same caller.

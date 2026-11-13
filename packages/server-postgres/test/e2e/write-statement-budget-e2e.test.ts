@@ -367,7 +367,7 @@ describe("a write's statements (E2E)", () => {
             await next();
         });
         if (historyService) {
-            app.route("/api/data", createHistoryRoutes({ historyService, registry: backend.collectionRegistry, driver }));
+            app.route("/api/data", createHistoryRoutes({ historyService, tables: () => tablesFromCollections(collections), driver }));
         }
         app.route("/api/data", new RestApiGenerator(tablesFromCollections(collections), driver).generateRoutes());
 

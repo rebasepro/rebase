@@ -111,9 +111,9 @@ describe("db commands with the database down", () => {
 
     it("rebase schema introspect names it, says it once, and leaves no empty directory", async () => {
         // Spawned: the introspector is a child process of the driver CLI.
-        const output = path.join(workDir, "config", "collections");
+        const output = path.join(workDir, "backend", "schema");
         const env = { ...process.env, DATABASE_URL: process.env.DATABASE_URL ?? "" };
-        const run = await execa(tsxBin, [path.join(pkgRoot, "src", "cli.ts"), "schema", "introspect", "--output", output],
+        const run = await execa(tsxBin, [path.join(pkgRoot, "src", "cli.ts"), "schema", "introspect", "--schema-dir", output],
             { cwd: workDir, env, reject: false, stdin: "ignore", all: true });
         expect(run.exitCode).toBe(1);
         expect(run.all).toContain(`Cannot connect to PostgreSQL at 127.0.0.1:${port}`);
