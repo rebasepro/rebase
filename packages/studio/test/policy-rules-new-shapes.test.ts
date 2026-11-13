@@ -20,7 +20,7 @@ import { servedTables } from "./helpers/servedTables";
 /** `posts` declaring the one rule, as the server serves it to an administrator. */
 function postsWith(rule: SecurityRule) {
     const [posts] = servedTables([defineTable("posts", {
-        columns: { id: col.uuid().primaryKey().defaultRandom(), status: col.text(), orgId: col.text().column("org_id") },
+        columns: { id: col.uuid().primaryKey().defaultRandom(), status: col.text(), orgId: col.text("org_id") },
         rls: [rule]
     })]);
     return posts;

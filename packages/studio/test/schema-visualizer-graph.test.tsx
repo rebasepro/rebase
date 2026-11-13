@@ -26,7 +26,7 @@ const authors = defineTable("authors", {
     rls: [{ operation: "select", access: "authenticated" }]
 });
 const tags = defineTable("tags", {
-    columns: { id: col.serial().primaryKey(), label: col.varchar(40).notNull() },
+    columns: { id: col.serial().primaryKey(), label: col.varchar({ length: 40 }).notNull() },
     rls: "admin-only"
 });
 const blogPosts = defineTable("blog-posts", {
@@ -35,8 +35,8 @@ const blogPosts = defineTable("blog-posts", {
         id: col.uuid().primaryKey().defaultRandom(),
         title: col.text().notNull(),
         status: col.enum(["draft", "published"]).notNull().default("draft"),
-        subtotal: col.numeric(10, 2),
-        authorId: col.uuid().column("author_id")
+        subtotal: col.numeric({ precision: 10, scale: 2 }),
+        authorId: col.uuid("author_id")
     },
     relations: {
         author: rel.belongsTo(() => authors, { localKey: "author_id" }),

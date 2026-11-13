@@ -64,7 +64,7 @@ function served(rules: SecurityRule[]): TableDescriptorsState {
     const [first, ...rest] = rules;
     return readyTables(servedTables([defineTable("writers", {
         table: "authors",
-        columns: { id: col.serial().primaryKey(), authorId: col.text().column("author_id") },
+        columns: { id: col.serial().primaryKey(), authorId: col.text("author_id") },
         rls: first ? [first, ...rest] : "admin-only"
     })]));
 }

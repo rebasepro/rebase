@@ -11,7 +11,7 @@ import { EDITOR, servedTables } from "./helpers/servedTables";
  */
 
 const notes = defineTable("notes", {
-    columns: { id: col.serial().primaryKey(), ownerId: col.text().column("owner_id") },
+    columns: { id: col.serial().primaryKey(), ownerId: col.text("owner_id") },
     rls: [{ name: "own_notes", operation: "select", ownerField: "ownerId" }]
 });
 

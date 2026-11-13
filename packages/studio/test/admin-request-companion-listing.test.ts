@@ -12,7 +12,7 @@ import { servedTables } from "./helpers/servedTables";
  * missing where a server wrote none.
  */
 const [tasks] = servedTables([defineTable("tasks", {
-    columns: { id: col.serial().primaryKey(), ownerId: col.text().column("owner_id") },
+    columns: { id: col.serial().primaryKey(), ownerId: col.text("owner_id") },
     rls: [{ name: "owner_select", operation: "select", ownerField: "ownerId" }]
 })]);
 const declared = declaredPoliciesOf(tasks.rls);
