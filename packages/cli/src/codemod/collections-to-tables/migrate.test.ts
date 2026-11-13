@@ -245,6 +245,24 @@ describe("a backend tsconfig that reached ../config without a rootDir", () => {
     }, 120_000);
 });
 
+describe("a second static app beside the panel", () => {
+    it("is told to add the backend guard, which rebase build requires of every static app", async () => {
+        const dir = materialize("blog");
+        const manifest = path.join(dir, "rebase.json");
+        const json = JSON.parse(fs.readFileSync(manifest, "utf8"));
+        json.apps.web = { type: "static", root: "web", output: "web/dist", path: "/site" };
+        fs.writeFileSync(manifest, JSON.stringify(json, null, 4));
+        fs.mkdirSync(path.join(dir, "web"));
+        fs.writeFileSync(path.join(dir, "web", "vite.config.ts"), `import { defineConfig } from "vite";\nexport default defineConfig({ plugins: [] });\n`);
+        fs.writeFileSync(path.join(dir, "web", "package.json"), JSON.stringify({ name: "web", devDependencies: { vite: "^7.0.0" } }));
+        const report = await run(dir, { dryRun: true });
+        const step = report.manualSteps.find(entry => entry.file === "web/vite.config.ts");
+        expect(step?.title).toBe("Add the backend guard to the Vite config");
+        expect(step?.detail).toContain("Add `@rebasepro/app` to its devDependencies (web/package.json)");
+        expect(report.manualSteps.filter(entry => entry.file === "frontend/vite.config.ts")).toEqual([]);
+    }, 120_000);
+});
+
 describe("a function storage path no template can name", () => {
     it("is refused, since any template would claim keys the function never writes", async () => {
         const dir = materialize("blog");

@@ -435,6 +435,34 @@ function planViteConfig(plan: PlanContext, viteFile: string): void {
     }
 }
 
+/**
+ * The other static apps `rebase.json` declares (a public site beside the
+ * panel): `rebase build` refuses every one whose Vite config lacks
+ * `rebaseBackendGuard()`, not only `frontend/`. Each without it is a manual
+ * step — the codemod does not add a dependency on `@rebasepro/app` to an app
+ * that may not have one.
+ */
+export function planStaticAppGuards(plan: PlanContext, frontendDir: string | undefined): void {
+    // Read raw: a legacy rebase.json (a backend `config` key) does not validate against today's manifest.
+    const read = readJson(path.join(plan.root, "rebase.json"));
+    const apps = read && isObject(read.value.apps) ? Object.values(read.value.apps) : [];
+    const roots = apps.flatMap(app => (isObject(app) && app.type === "static" && typeof app.root === "string" ? [path.resolve(plan.root, app.root)] : []));
+    for (const root of new Set(roots)) {
+        if (root === plan.root || (frontendDir && root === path.resolve(frontendDir))) continue;
+        const viteFile = ["vite.config.ts", "vite.config.mts", "vite.config.js"].map(name => path.join(root, name)).find(file => fs.existsSync(file));
+        if (!viteFile || /\brebaseBackendGuard\s*\(/.test(fs.readFileSync(viteFile, "utf8"))) continue;
+        const pkgFile = path.join(root, "package.json");
+        const hasApp = fs.existsSync(pkgFile) && fs.readFileSync(pkgFile, "utf8").includes('"@rebasepro/app"');
+        plan.manualSteps.push({
+            title: "Add the backend guard to the Vite config",
+            detail: `${relativeToRoot(plan, root)}/ is a static app of rebase.json, and \`rebase build\` refuses a static app whose Vite config does not use \`rebaseBackendGuard()\`` +
+                (hasApp ? "." : `. Add \`@rebasepro/app\` to its devDependencies (${relativeToRoot(plan, pkgFile)}) for \`@rebasepro/app/vitePlugin\`.`),
+            snippet: BACKEND_GUARD_SNIPPET,
+            file: relativeToRoot(plan, viteFile)
+        });
+    }
+}
+
 /** Files of `config/` nothing the codemod moved needs, which the user should look at before deleting the directory. */
 export function unmovedConfigFiles(plan: PlanContext, configDir: string, handled: ReadonlySet<string>): string[] {
     const out: string[] = [];

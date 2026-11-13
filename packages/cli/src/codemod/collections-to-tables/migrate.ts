@@ -40,6 +40,7 @@ import { note, planFile, relativeToRoot } from "./plan-context";
 import {
     planBackendTsconfig,
     planFrontendWiring,
+    planStaticAppGuards,
     planManifest,
     planMove,
     planWorkspace,
@@ -292,6 +293,7 @@ async function migrateWithShims(options: MigrateOptions, shimDir: ShimDir): Prom
         }
         planFrontendWiring(plan, frontendDir, external.length > 0);
     }
+    planStaticAppGuards(plan, frontendDir);
 
     // The legacy index's comments, onto the two indexes.
     const legacyIndexFile = ["index.ts", "index.js"].map(file => path.join(legacy.collectionsDir, file)).find(file => fs.existsSync(file));
