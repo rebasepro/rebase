@@ -34,7 +34,6 @@
         "packages/common/src/table-classification.ts",
         "packages/client/src/table.ts",
         "packages/client/src/sdk_query_builder.ts",
-        "packages/client/src/reviver.ts",
         "packages/server/src/services/driver-registry.ts",
         "packages/server/src/db/**"
       ],
@@ -171,7 +170,7 @@
         "packages/server/src/auth/middleware.ts",
         "packages/server/src/auth/rls-scope.ts",
         "packages/server/src/auth/admin-roles-route.ts",
-        "packages/common/src/util/permissions.ts",
+        "packages/cms-types/src/util/permissions.ts",
         "packages/common/src/util/policy/**",
         "packages/common/src/util/auth-default-policies.ts",
         "packages/common/src/util/junction-policies.ts",
@@ -236,7 +235,7 @@
         "packages/client/src/storage.ts",
         "packages/client/src/storage-registry.ts",
         "packages/utils/src/storage.ts",
-        "packages/common/src/util/storage.ts"
+        "packages/cms-types/src/util/storage.ts"
       ],
       "focus": "Local, S3 and GCS controllers implement one interface: list/get/delete/copy/move/metadata/errors/content-type/streaming must agree. Orphans when a row is deleted, a field cleared or a file replaced. Uploads: size limits, content-type sniffing, SVG/HTML stored XSS, path canonicalisation, unicode names, multi-GB files, an interrupted tus upload resumed after restart, two instances. Image transforms: params, decompression bombs, cache. Signed URLs. Multi-source topology and a missing env for a declared source. CMS storage fields' upload/replace/delete UX.",
       "audits": [
@@ -273,7 +272,6 @@
         "packages/server/src/init/callback-client.ts",
         "packages/server/src/init/global-hooks.ts",
         "packages/server-postgres/src/history/**",
-        "packages/common/src/util/callbacks.ts",
         "packages/common/src/util/callback-errors.ts",
         "packages/client/src/functions.ts",
         "packages/client/src/cron.ts"

@@ -23,7 +23,7 @@ import path from "node:path";
  * someone wrote down rather than an omission.
  */
 const ROOT = path.resolve(__dirname, "../../../..");
-const CORE = path.join(ROOT, "packages/types/src/types/properties.ts");
+const CORE = path.join(ROOT, "packages/cms-types/src/types/properties.ts");
 const ADMIN_OPTS = path.join(ROOT, "packages/cms-types/src/types/property_options.ts");
 const MIRROR = path.join(ROOT, "packages/cms/src/collection_editor/serializable_types.ts");
 
