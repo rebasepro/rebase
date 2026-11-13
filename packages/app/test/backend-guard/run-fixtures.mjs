@@ -54,7 +54,22 @@ const FORMS = {
     "dynamic-literal": "import(\"../../backend/schema/posts\").then(console.log);",
     // A module outside the project (a linked workspace package) that imports the backend.
     "outside-project": "import { posts } from \"__ROOT__-outside/lib\";\nconsole.log(posts);",
-    "package-name-preserve-symlinks": "import { posts } from \"rebase-app-backend/schema/posts\";\nconsole.log(posts);"
+    "package-name-preserve-symlinks": "import { posts } from \"rebase-app-backend/schema/posts\";\nconsole.log(posts);",
+    // Ways a Vite build pulls a file in without an `import` statement (SEC-FIX-2 F-5).
+    "new-url": "console.log(new URL(\"../../backend/schema/posts.ts\", import.meta.url).href);",
+    "new-url-large": "console.log(new URL(\"../../backend/data/large.json\", import.meta.url).href);",
+    "new-url-alias": "console.log(new URL(\"@backend/schema/posts.ts\", import.meta.url).href);",
+    "new-url-template": "const name = \"posts\";\nconsole.log(new URL(`../../backend/schema/${name}.ts`, import.meta.url).href);",
+    "url-query": "import url from \"../../backend/schema/posts.ts?url\";\nconsole.log(url);",
+    "url-inline-query": "import url from \"../../backend/schema/posts.ts?url&inline\";\nconsole.log(url);",
+    "glob-url": "const m = import.meta.glob(\"../../backend/schema/*.ts\", { query: \"?url\", import: \"default\", eager: true });\nconsole.log(m);",
+    "css-inline-query": "import css from \"../../backend/theme.css?inline\";\nconsole.log(css);",
+    "css-import": { main: "import \"./leaky.css\";", files: { "frontend/src/leaky.css": "@import \"../../backend/theme.css\";\nbody { color: red; }\n" } },
+    "css-url": { main: "import \"./leaky.css\";", files: { "frontend/src/leaky.css": "body { background: url(\"../../backend/schema/posts.ts\"); }\n" } },
+    "worker-query": { main: "import W from \"./work.ts?worker\";\nnew W();", files: { "frontend/src/work.ts": "import { posts } from \"../../backend/schema/posts\";\nconsole.log(posts);\n" } },
+    "worker-new-url": { main: "new Worker(new URL(\"./work.ts\", import.meta.url), { type: \"module\" });", files: { "frontend/src/work.ts": "import { posts } from \"../../backend/schema/posts\";\nconsole.log(posts);\n" } },
+    "worker-backend-file": "new Worker(new URL(\"../../backend/schema/posts.ts\", import.meta.url), { type: \"module\" });",
+    "html-asset": { main: "console.log(1);", files: { "frontend/index.html": "<!doctype html><html><body><img src=\"../backend/data/large.json\"><script type=\"module\" src=\"/src/main.ts\"></script></body></html>" } }
 };
 
 /** A project that builds clean with the guard on: a type import, a `?raw` text file, CSS, a JSON file. */
@@ -76,8 +91,9 @@ function write(root, files) {
 }
 
 /** A project: rebase.json, backend/ (a package with a hook file), shared/, frontend/ (a package). */
-function project(base, name, main) {
+function project(base, name, form) {
     const root = path.join(base, name);
+    const main = typeof form === "string" ? form : form.main;
     write(root, {
         "rebase.json": JSON.stringify({ rebase: "^1", apps: { backend: { type: "backend" }, admin: { type: "static", root: "frontend" } } }),
         "backend/package.json": JSON.stringify({ name: "rebase-app-backend", type: "module" }),
@@ -98,8 +114,13 @@ function project(base, name, main) {
         "frontend/src/notes.txt": "plain text",
         "frontend/src/data.json": "{\"a\":1}",
         "frontend/src/style.css": "body { color: red; }",
-        "frontend/src/App.tsx": "export function App() { return null; }\n"
+        "frontend/src/App.tsx": "export function App() { return null; }\n",
+        // Non-module backend files a build could pull in as assets: one under
+        // the inline limit's reach, one over it, and a stylesheet.
+        "backend/data/large.json": JSON.stringify({ marker: MARKER, padding: "x".repeat(8192) }),
+        "backend/theme.css": `.secret::after { content: "${MARKER}"; }\n`
     });
+    if (typeof form !== "string") write(root, Object.fromEntries(Object.entries(form.files).map(([rel, text]) => [rel, text.replaceAll("__ROOT__", root)])));
     write(`${root}-outside`, { "lib.ts": `export { posts } from ${JSON.stringify(path.join(root, "backend/schema/posts"))};\n` });
     // The workspace link pnpm makes for `"rebase-app-backend": "workspace:*"`.
     fs.mkdirSync(path.join(root, "frontend/node_modules"), { recursive: true });
@@ -139,6 +160,11 @@ function readOutput(dir) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
         out += entry.isDirectory() ? readOutput(full) : fs.readFileSync(full, "utf8");
+    }
+    // An asset under the inline limit ships as a base64 `data:` URL: decoded,
+    // so a file inlined that way counts as shipped.
+    for (const [, encoded] of out.matchAll(/data:[^;,"')\s]*;base64,([A-Za-z0-9+/=]+)/g)) {
+        out += Buffer.from(encoded, "base64").toString("utf8");
     }
     return out;
 }

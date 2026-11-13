@@ -62,6 +62,30 @@ const SHIPPING_FORMS: Record<string, string> = {
 };
 
 /**
+ * Ways a Vite build pulls a file in without an `import` statement (SEC-FIX-2
+ * F-5): the form, the file that names the backend, how it names it, and the
+ * backend file. "imports" forms go through module resolution (a query, a
+ * glob, a worker's own build); "references" forms are files Vite copies or
+ * inlines (`new URL`, a stylesheet's `@import` / `url()`, an HTML `src`).
+ */
+const NON_IMPORT_FORMS: [string, string, "imports" | "references", string][] = [
+    ["new-url", "frontend/src/main.ts", "references", "backend/schema/posts.ts"],
+    ["new-url-large", "frontend/src/main.ts", "references", "backend/data/large.json"],
+    ["new-url-alias", "frontend/src/main.ts", "references", "backend/schema/posts.ts"],
+    ["new-url-template", "frontend/src/main.ts", "imports", "backend/schema/posts.ts"],
+    ["url-query", "frontend/src/main.ts", "imports", "backend/schema/posts.ts"],
+    ["url-inline-query", "frontend/src/main.ts", "imports", "backend/schema/posts.ts"],
+    ["glob-url", "frontend/src/main.ts", "imports", "backend/schema/posts.ts"],
+    ["css-inline-query", "frontend/src/main.ts", "imports", "backend/theme.css"],
+    ["css-import", "frontend/src/leaky.css", "references", "backend/theme.css"],
+    ["css-url", "frontend/src/leaky.css", "references", "backend/schema/posts.ts"],
+    ["worker-query", "frontend/src/work.ts", "imports", "backend/schema/posts.ts"],
+    ["worker-new-url", "frontend/src/work.ts", "imports", "backend/schema/posts.ts"],
+    ["worker-backend-file", "frontend/src/main.ts", "references", "backend/schema/posts.ts"],
+    ["html-asset", "frontend/index.html", "references", "backend/data/large.json"]
+];
+
+/**
  * Forms the bundler does not follow: `createRequire(…)(path)` and `import(variable)`
  * put no backend code in the bundle (the control proves it), so there is
  * nothing to refuse. In a browser they fail at runtime.
@@ -84,6 +108,15 @@ describe("rebaseBackendGuard in a real build", () => {
         expect(guarded.error).toContain(`${importer} imports "`);
         expect(guarded.error).toContain("which resolves to backend/schema/posts.ts");
         expect(guarded.error).toContain("import type");
+    });
+
+    it.each(NON_IMPORT_FORMS)("%s: the control ships the backend file, the guarded build is refused", (form, importer, how, file) => {
+        const { guarded, control } = report.forms[form];
+        expect(control).toEqual({ ok: true, leaked: true });
+        expect(guarded.ok).toBe(false);
+        expect(guarded.error).toContain("[rebase-backend-guard]");
+        expect(guarded.error).toContain(`${importer} ${how} "`);
+        expect(guarded.error).toContain(`which resolves to ${file}`);
     });
 
     it.each(NON_SHIPPING_FORMS)("%s: nothing reaches the bundle, with or without the guard", (form) => {
