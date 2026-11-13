@@ -1,5 +1,5 @@
 import { defineFirestoreCollection } from "@rebasepro/firebase";
-import type { FirebaseCollectionConfig } from "@rebasepro/types";
+import type { FirebaseCollectionConfig } from "@rebasepro/cms-types";
 
 const notesCollection = defineFirestoreCollection({
     name: "Notes",

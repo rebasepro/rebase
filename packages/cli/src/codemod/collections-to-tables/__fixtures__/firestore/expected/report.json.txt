@@ -44,7 +44,13 @@
       "message": "Firestore collections are moved and rewritten in place; they have no SQL, so the SQL check does not cover them."
     }
   ],
-  "manualSteps": [],
+  "manualSteps": [
+    {
+      "title": "Install the packages added to frontend/package.json",
+      "detail": "Imports moved to @rebasepro/cms-types, so the codemod added it to frontend/package.json at workspace:*, the range of your other @rebasepro packages. Run your package manager's install.",
+      "file": "frontend/package.json"
+    }
+  ],
   "verification": {
     "identical": true,
     "differences": []
