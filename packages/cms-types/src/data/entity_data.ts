@@ -196,14 +196,17 @@ function entityAccessorOverRows<M extends Record<string, unknown> = Record<strin
 
         delete: (id: string | number) => rows.delete(id),
 
+        // Every write passes `toStored`, the batch ones too: an import that
+        // updates in bulk stores a cross-source reference as its id, as a
+        // single update does.
         updateMany: rows.updateMany
-            ? async (updates) => (await rows.updateMany!(updates)).map(entity)
+            ? async (updates) => (await rows.updateMany!(updates.map(({ id, data }) => ({ id, data: toStored(data) })))).map(entity)
             : undefined,
 
         deleteMany: rows.deleteMany,
 
         updateWhere: rows.updateWhere
-            ? async (query, data) => (await rows.updateWhere!(query, data)).map(entity)
+            ? async (query, data) => (await rows.updateWhere!(query, toStored(data))).map(entity)
             : undefined,
 
         deleteWhere: rows.deleteWhere,

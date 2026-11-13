@@ -419,6 +419,24 @@ path: "products" })
             expect(new Set(pathsHanded)).toEqual(new Set(["diagnosis"]));
         });
 
+        it("passes every write through `storedValuesOf`, the batch ones too", async () => {
+            const driver = createMockDriver({
+                save: jest.fn().mockResolvedValue({ id: "abc" }),
+                updateMany: jest.fn().mockResolvedValue([]),
+                updateWhere: jest.fn().mockResolvedValue([])
+            });
+            const storedValuesOf = () => <V extends Record<string, unknown>>(values: V): V => ({ ...values, stored: true });
+            const accessor = buildRebaseData(driver, { storedValuesOf }).table("items");
+
+            await accessor.update("abc", { name: "one" });
+            await accessor.updateMany!([{ id: "abc", data: { name: "two" } }]);
+            await accessor.updateWhere!({ where: { name: ["==", "two"] } }, { name: "three" });
+
+            expect(jest.mocked(driver.save).mock.calls[0][0].values).toEqual({ name: "one", stored: true });
+            expect(jest.mocked(driver.updateMany!).mock.calls[0][0].updates).toEqual([{ id: "abc", values: { name: "two", stored: true } }]);
+            expect(jest.mocked(driver.updateWhere!).mock.calls[0][0].values).toEqual({ name: "three", stored: true });
+        });
+
         it("translates a subcollection path as a whole", async () => {
             const driver = createListeningDriver();
             await buildRebaseData(driver, { resolveDataPath }).table("fs_diagnosis/abc/locales").find();
