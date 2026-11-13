@@ -133,7 +133,6 @@ describe("the write path over defineTable tables", () => {
             await setup(user).save({
                 path: "posts",
                 values: { title: "Hi", createdBy: "someone-else", updatedBy: "someone-else" },
-               
                 status: "new"
             });
             expect(written().createdAt).toBeInstanceOf(Date);
@@ -149,7 +148,6 @@ describe("the write path over defineTable tables", () => {
                 path: "posts",
                 id: "1",
                 values: { title: "x", createdBy: "someone-else", createdAt: "2020-01-01" },
-               
                 status: "existing"
             });
             expect("createdBy" in written()).toBe(false);
@@ -195,7 +193,6 @@ describe("the write path over defineTable tables", () => {
                 path: "posts",
                 id: "1",
                 values: { audit: { firstAt: "2020-01-01", by: "creator", note: "n" } },
-               
                 status: "existing"
             });
             const audit = written().audit as Record<string, unknown>;
@@ -215,7 +212,6 @@ describe("the write path over defineTable tables", () => {
                 path: "translations",
                 id: "7:::en",
                 values: { locale: "fr", title: "x" },
-               
                 status: "existing"
             })).rejects.toMatchObject({ statusCode: 400, code: "KEY_IMMUTABLE" });
             expect(saveSpy).not.toHaveBeenCalled();
@@ -226,7 +222,6 @@ describe("the write path over defineTable tables", () => {
                 path: "translations",
                 id: "7:::en",
                 values: { companyId: 7, locale: "en", title: "x" },
-               
                 status: "existing"
             });
             expect(saveSpy).toHaveBeenCalled();
@@ -245,7 +240,6 @@ describe("the write path over defineTable tables", () => {
             await expect(setup(member).save({
                 path: "projects",
                 values: { name: "p", orgId: "globex" },
-               
                 status: "new"
             })).rejects.toMatchObject({ statusCode: 400, code: "TENANT_MISMATCH" });
         });
@@ -258,7 +252,6 @@ describe("the write path over defineTable tables", () => {
                 path: "projects",
                 id: "1",
                 values: { orgId: "globex" },
-               
                 status: "existing"
             })).rejects.toMatchObject({ statusCode: 400, code: "TENANT_IMMUTABLE" });
             expect(saveSpy).not.toHaveBeenCalled();
