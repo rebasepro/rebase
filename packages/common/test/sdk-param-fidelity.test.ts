@@ -1,4 +1,4 @@
-import { buildSdkData } from "../src/data/buildRebaseData";
+import { buildSdkData } from "../src/data/sdk-data";
 import { or, cond } from "../src/data/query_builder";
 import { DEFAULT_LIST_LIMIT, DataDriver, RebaseSdkData, SDKTableClient } from "@rebasepro/types";
 

@@ -8,7 +8,7 @@ import type {
     StorageSource,
     User
 } from "@rebasepro/types";
-import { buildSdkData } from "./buildRebaseData";
+import { buildSdkData } from "./sdk-data";
 
 /**
  * Build the context a collection callback receives, for calling one directly —

@@ -1,6 +1,6 @@
 import React, { useContext, useRef } from "react";
 import { DataDriver, DataSourceDefinition, DEFAULT_DATA_SOURCE_KEY, RebaseSdkData } from "@rebasepro/types";
-import { buildRebaseData, buildRoutedRebaseData, resolveDataSource, wrapAsSdkData } from "@rebasepro/common";
+import { buildRoutedSdkData, buildSdkData, resolveDataSource } from "@rebasepro/common";
 import type { DataChanges } from "./dataChanges";
 
 /**
@@ -31,9 +31,9 @@ interface FlatSourceInputs {
      * write the person's to confirm.
      */
     rowHooksDriver?: DataDriver;
-    /** Where a driver stores a collection (see `EntityDataOptions.resolveDataPath`). */
+    /** Where a driver stores a collection (see `SdkDataOptions.resolveDataPath`). */
     resolveDataPath: (slug: string) => string | undefined;
-    /** A collection's config by slug (see `EntityDataOptions.resolveCollection`). */
+    /** A collection's config by slug, where the admin registered one. */
     resolveCollection: (slug: string) => object | undefined;
     /** The `<Rebase>`'s change signal. */
     changes: DataChanges;
@@ -59,12 +59,12 @@ function dataSourceKeyOf(collection: object | undefined): string {
  *
  * An embedding's `rowHooksDriver` comes before all three. Every other data
  * source with a driver serves the collections that declare it (`dataSource`),
- * as the admin routes them (`buildRoutedRebaseData`); any other collection
+ * as the admin routes them; any other collection
  * reads the default.
  *
- * A driver is read through `buildRebaseData` with no collection resolver,
- * which keeps the wire's own values (ISO dates, a belongsTo as its foreign
- * key); `useData()` is the admin's view model and is never the source here.
+ * A driver is read through `buildSdkData`, which keeps the wire's own values
+ * (ISO dates, a belongsTo as its foreign key); `useData()` is the admin's view
+ * model and is never the source here.
  * One layer for the life of the `<Rebase>` while its sources stay the same
  * instances, so inline `dataSources` do not rebuild it on every render.
  *
@@ -83,7 +83,7 @@ export function useBuildSdkDataLayer({ client, dataSources, rowHooksDriver, reso
         return flat;
     };
     const fromDriver = (driver: DataDriver) =>
-        flatOf(driver, () => wrapAsSdkData(buildRebaseData(driver, { resolveDataPath })));
+        flatOf(driver, () => buildSdkData(driver, { resolveDataPath }));
 
     const withDrivers = dataSources.flatMap((d) => d.driver ? [{ key: d.key, driver: d.driver }] : []);
     const defaultDriver = withDrivers.find((d) => d.key === DEFAULT_DATA_SOURCE_KEY)?.driver;
@@ -110,7 +110,7 @@ export function useBuildSdkDataLayer({ client, dataSources, rowHooksDriver, reso
         const defaultData = flatOf(defaultSource.source, defaultSource.data);
         const data = routed.length === 0
             ? defaultData
-            : buildRoutedRebaseData<FlatData>({
+            : buildRoutedSdkData<FlatData>({
                 defaultData,
                 sources: Object.fromEntries(routed.map((d) => [d.key, fromDriver(d.driver)])),
                 resolveKey: (slugOrPath) => dataSourceKeyOf(resolveCollection(slugOrPath))

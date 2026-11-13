@@ -1,4 +1,4 @@
-import { buildSdkData } from "../src/data/buildRebaseData";
+import { buildSdkData } from "../src/data/sdk-data";
 import { DataDriver, RebaseClientError, RebaseSdkData, SDKTableClient, WriteOptions } from "@rebasepro/types";
 
 /**

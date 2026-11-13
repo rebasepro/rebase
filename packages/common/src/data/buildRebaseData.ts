@@ -1,55 +1,15 @@
-import { toDriverAggregate, toDriverAggregateGroup } from "@rebasepro/types";
-import { TableAccessor, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKTableClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateGroup, type RefreshOptions, type ComputedSortField, type FieldPath, type ByIdReadOptions, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, type FilteredWriteParams, type WhereFor, type BatchOperation, type BatchResult, type RestoreOptions, type TrashClient, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
+import { TableAccessor, Entity, EntityValues, FindParams, FindResponse, LogicalCondition, RebaseData, SDKTableClient, type AggregateParams, type RefreshOptions, type ComputedSortField, type ByIdReadOptions, type SearchMatch, WhereFilterOp, WhereValueFor, isUnsupported, DataDriver } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
-import { cursorToStartAfter, decodeCursor, reconcileCursorOrder } from "./cursor";
-import { mergeIncludeSpecs } from "./include-spec";
 import { etagOf } from "./row-etag";
 import { QueryBuilder } from "./query_builder";
-import { collectAllPages, paginateFind, resolveFindWindow } from "./paginate";
-import { normalizeOrderBy } from "./sort-dialect";
-import { deserializeFilter } from "./filter-dialect";
+import { createDriverTableRows, type DriverRowPage, type DriverTableRows } from "./driver-rows";
 import { buildCompositeId, PrimaryKeyInfo } from "../util/identity";
 
 /**
- * What a client says when its data source cannot subscribe.
- *
- * Named rather than inlined so the sentence a caller sees does not depend on
- * which of the two adapters below happened to build the client.
+ * What the admin's accessor (`RebaseData`) is told about a table it builds
+ * `Entity` view models for — see {@link buildRebaseData} (over a driver) and
+ * {@link wrapAsEntityData} (over an SDK client).
  */
-const noRealtime = (slug: string): string =>
-    `Realtime is not available for "${slug}": its data source does not support subscriptions.`;
-
-/** What a client says when its data source cannot count. */
-const noCount = (slug: string): string =>
-    `Counting is not available for "${slug}": its data source does not support it.`;
-
-/**
- * The key an aggregate comes back under — `@rebasepro/types`' derivation,
- * which the REST parser and the HTTP client use too.
- */
-export { aggregateAlias } from "@rebasepro/types";
-
-/**
- * What a client says when its data source cannot aggregate.
- *
- * A stub rather than a fallback that fetches and reduces in JavaScript: that
- * would be wrong under a `limit` and unaffordable without one, and it would look
- * like it had worked.
- */
-/** What a client says when its data source cannot read a collection's trash. */
-const noTrash = (slug: string): string =>
-    `The trash is not available for "${slug}": its data source cannot read soft-deleted rows.`;
-
-/** What `softDelete: true` names the field a delete stamps; a restore clears it. */
-const DEFAULT_SOFT_DELETE_FIELD = "deletedAt";
-
-const noAggregate = (slug: string): string =>
-    `Aggregates are not available for "${slug}": its data source does not implement them.`;
-
-/** What a client says when its data source has no materialized views to refresh. */
-const noRefresh = (slug: string): string =>
-    `"${slug}" cannot be refreshed: its data source has no materialized views.`;
-
 export interface EntityDataOptions {
     /**
      * The key columns a row of `slug` is addressed by. `undefined` or empty:
@@ -194,415 +154,76 @@ function rowsToEntities<M extends Record<string, unknown>>(
     return rows.map(row => rowToEntity<M>(row, slug, primaryKeys, toViewModel));
 }
 
-function createDriverAccessor<M extends Record<string, unknown> = Record<string, unknown>>(
-    driver: DataDriver,
+/**
+ * The admin's accessor over a table's driver rows: each row becomes an
+ * `Entity`, values on their way in pass `toStored`. Reads, writes, paging,
+ * counting and subscriptions are the rows' own ({@link createDriverTableRows}),
+ * the same the SDK is built on.
+ */
+function entityAccessorOverRows<M extends Record<string, unknown> = Record<string, unknown>>(
+    rows: DriverTableRows<M>,
     slug: string,
     getPks: () => PrimaryKeyInfo[] = () => [],
     toViewModel?: (values: Record<string, unknown>) => Record<string, unknown>,
-    /**
-     * Where the driver stores `slug` — see `EntityDataOptions.resolveDataPath`.
-     * Asked on every call, not once: the collections it is derived from
-     * register after this accessor is built, and can change while it lives.
-     */
-    storedPath: () => string = () => slug,
     /** Values on their way to the driver — see `createStoredValuesConverter`. */
     toStored: <V extends Record<string, unknown>>(values: V) => V = (values) => values
 ): TableAccessor<M> {
-    /**
-     * One page of the collection, and its count. `withDeleted: "only"` reads
-     * the trash (see `trash` below) through the same pipeline, so a trashed
-     * page is paged, counted and shaped exactly as a live one.
-     */
-    async function findRows(params?: FindParams<M>, withDeleted?: "only"): Promise<FindResponse<M>> {
-        // Ensure filters are in canonical [op, value] format even if passed as PostgREST strings
-        const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
-        const window = resolveFindWindow(params);
-        const { offset, driverOffset } = window;
-        // A vector search nobody bounded reads the nearest
-        // DEFAULT_VECTOR_LIST_LIMIT rows, as it does over HTTP — not 50
-        // rows ordered by distance. The `page` stride stays the plain one,
-        // as the HTTP parser's does.
-        const limit = params?.limit === undefined && params?.vectorSearch
-            ? DEFAULT_VECTOR_LIST_LIMIT
-            : window.limit;
-
-        // Keyset paging, through the same codec and the same driver
-        // comparison the HTTP route uses. The in-process accessor is a
-        // transport like any other: a walk that seeked differently here
-        // than over the wire would be a difference the types cannot see.
-        const cursor = params?.after ? decodeCursor(params.after) : undefined;
-        const sort = cursor
-            ? reconcileCursorOrder(cursor, normalizeOrderBy(params?.orderBy))
-            : normalizeOrderBy(params?.orderBy);
-        // A cursor issued for an unsorted read carries an empty sort; the
-        // HTTP route hands the driver none at all, and so does this.
-        const orderBy = sort && sort.length > 0 ? sort : undefined;
-        const startAfter = cursor ? cursorToStartAfter(cursor) : undefined;
-
-        // One relation shape, whatever the call looks like.
-        //
-        // This used to fork on `include`: asking for one ran the REST
-        // pipeline, which inlines a relation as the target's own columns;
-        // not asking ran the driver's own fetch, which eagerly loaded
-        // *every* relation and put a `{ __type: "relation" }` envelope
-        // where the foreign key was. The same method answered in two
-        // shapes, the generated types described only one, and a column
-        // typed `string` arrived as an object.
-        //
-        // The REST pipeline is the published contract — the shape the HTTP
-        // API serves for this same query, and what `RestFetchService`
-        // documents — so every read goes through it when the driver has
-        // one. Drivers without one (every browser driver, and so the
-        // admin's own path through `buildRebaseData`) are untouched.
-        //
-        // One row past the page, when seeking — and when not counting.
-        //
-        // `hasMore` on an offset page is `offset + rows.length < total`, and
-        // under a cursor that arithmetic is simply false: every seeked page
-        // runs at offset 0, so it compares one page against the whole
-        // collection and says "more" forever. Without a count there is
-        // nothing to compare against at all. Asking for `limit + 1` and
-        // looking at whether the extra row arrived is the answer both have —
-        // and it costs nothing, where the count it replaces is a second
-        // query over every matching row.
-        //
-        // Counted only where the HTTP listing counts (`RestApiGenerator.readPage`).
-        // A distinct read collapses rows the count would count one by one,
-        // so its total described a different set from the one served, and
-        // `hasMore` — derived from it — offered pages that did not exist.
-        // A vector search with a threshold is a distance computed for every
-        // row of the table, beside a page an index serves in a millisecond.
-        const seeking = startAfter !== undefined;
-        const counting = driver.count !== undefined
-            && params?.count !== "none"
-            && params?.distinct !== true
-            && params?.vectorSearch?.threshold === undefined;
-        const probing = seeking || !counting;
-        const probeLimit = probing ? limit + 1 : limit;
-
-        // The page and its count in one transaction where the driver can
-        // run them so — see `DataDriver.readTogether`.
-        const read = async (reader: DataDriver) => {
-            const fetchService = reader.restFetchService;
-            const fetched = fetchService
-                ? await fetchService.fetchCollectionForRest(
-                    storedPath(),
-                    {
-                        filter,
-                        // Without this the group was dropped and the read ran
-                        // unfiltered — every row the caller's policies allow,
-                        // in place of the ones they asked for.
-                        logical: params?.logical,
-                        limit: probeLimit,
-                        // A cursor and an offset describe the same window two
-                        // incompatible ways; seeking wins and the offset is not
-                        // sent, or the page would start `offset` rows past
-                        // where the cursor pointed.
-                        offset: seeking ? undefined : driverOffset,
-                        startAfter,
-                        orderBy,
-                        searchString: params?.searchString,
-                        searchExplain: params?.searchExplain,
-                        // Left out, `.vectorSearch(…).find()` in a function
-                        // or a cron read the newest rows in id order, with
-                        // no `_distance` and no error.
-                        vectorSearch: params?.vectorSearch,
-                        fields: params?.fields,
-                        distinct: params?.distinct,
-                        ...(withDeleted ? { withDeleted } : {})
-                    },
-                    params?.include
-                )
-                : await reader.fetchCollection<M>({
-                    path: storedPath(),
-                    limit: probeLimit,
-                    offset: seeking ? undefined : driverOffset,
-                    startAfter,
-                    filter,
-                    logical: params?.logical,
-                    orderBy,
-                    searchString: params?.searchString,
-                    searchExplain: params?.searchExplain,
-                    vectorSearch: params?.vectorSearch,
-                    include: params?.include,
-                    fields: params?.fields,
-                    distinct: params?.distinct,
-                    ...(withDeleted ? { withDeleted } : {})
-                });
-            // The same narrowing the rows were read with. Counting only by
-            // `filter` reported the whole collection beside a narrowed
-            // page, and `hasMore` was derived from it — so the list offered
-            // a next page that did not exist.
-            const counted = counting && reader.count
-                ? await reader.count({
-                    path: storedPath(),
-                    filter,
-                    logical: params?.logical,
-                    searchString: params?.searchString,
-                    vectorSearch: params?.vectorSearch,
-                    ...(withDeleted ? { withDeleted } : {})
-                })
-                : undefined;
-            return { fetched, counted };
-        };
-        // One read without a count: nothing to keep on one snapshot with it.
-        const { fetched, counted } = counting && driver.readTogether
-            ? await driver.readTogether(read)
-            : await read(driver);
-
-        // The probe row is evidence, not data — it is never served.
-        const rows = probing ? fetched.slice(0, limit) : fetched;
-
-        // Without a count, the rows up to the end of this page: all a
-        // driver that cannot count has ever been able to report.
-        const total = counted ?? rows.length + offset;
-        const hasMore = probing ? fetched.length > limit : offset + rows.length < total;
-
-        // The cursor for the *next* page, from the last row served. Issued
-        // by the driver, which is the only layer that knows which columns
-        // address a row; absent where it cannot describe one, and the
-        // caller then pages by offset.
-        const last = rows[rows.length - 1] as Record<string, unknown> | undefined;
-        const nextCursor = (hasMore && last && driver.restFetchService?.cursorFor)
-            ? driver.restFetchService.cursorFor(storedPath(), last, orderBy)
-            : undefined;
-
-        return {
-            data: rowsToEntities<M>(rows, slug, getPks(), toViewModel),
-            meta: { total, limit, offset, hasMore, ...(nextCursor && { nextCursor }) }
-        };
-    }
-
-    async function countRows(params?: FindParams<M>, withDeleted?: "only"): Promise<number> {
-        if (!driver.count) throw new Error(noCount(slug));
-        const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
-        // Every narrowing `find()` applies has to apply here too, or
-        // the count describes a different query than the one it is
-        // reported against.
-        return driver.count({
-            path: storedPath(),
-            filter,
-            logical: params?.logical,
-            searchString: params?.searchString,
-            // A threshold drops rows, so it narrows the count as it
-            // narrows the read — as `GET /count` does.
-            vectorSearch: params?.vectorSearch,
-            ...(withDeleted ? { withDeleted } : {})
-        });
-    }
+    const page = (res: DriverRowPage<M>): FindResponse<M> => ({
+        data: rowsToEntities<M>(res.data, slug, getPks(), toViewModel),
+        meta: res.meta
+    });
+    const entity = (row: M): Entity<M> => rowToEntity<M>(row, slug, getPks(), toViewModel);
 
     const accessor: TableAccessor<M> = {
-        find(params?: FindParams<M>): Promise<FindResponse<M>> {
-            return findRows(params);
-        },
+        find: async (params?: FindParams<M>) => page(await rows.find(params)),
 
         async findById(id: string | number, options?: ByIdReadOptions): Promise<Entity<M> | undefined> {
-            // Same contract as `find` above: one row read the same way the
-            // collection read is, so `find()[0]` and `findById()` agree.
-            const fetchService = driver.restFetchService;
-            const row = fetchService
-                ? await fetchService.fetchOneForRest(storedPath(), id, options?.include)
-                : await driver.fetchOne<M>({ path: storedPath(), id: id });
-            return row ? rowToEntity<M>(row, slug, getPks(), toViewModel) : undefined;
+            const row = await rows.findById(id, options);
+            return row ? entity(row) : undefined;
         },
 
-        // Present only when the driver's fetch service implements it — the SDK
-        // wrapper turns an absent one into a stub that names the capability.
-        aggregate: driver.restFetchService?.aggregate
-            ? async (params: AggregateParams<M>): Promise<AggregateResult> => {
-                // Paged the way the REST route pages it: one group past the
-                // `limit`, so `meta.hasMore` is known rather than guessed from a
-                // page that happened to come back full. No default limit here —
-                // an in-process caller that names none gets every group, as it
-                // always did — so `meta` is only for a call that named one.
-                const grouped = (params.groupBy?.length ?? 0) > 0;
-                const limit = grouped ? params.limit : undefined;
-                const rows: AggregateResult = await driver.restFetchService!.aggregate!(storedPath(), {
-                    aggregates: params.select.map(select => select.where
-                        ? { ...toDriverAggregate(select), filter: deserializeFilter(select.where as Record<string, unknown>) }
-                        : toDriverAggregate(select)),
-                    groupBy: params.groupBy?.map(group => toDriverAggregateGroup(group as string | AggregateGroup)),
-                    filter: params.where
-                        ? deserializeFilter(params.where as Record<string, unknown>)
-                        : undefined,
-                    logical: params.logical,
-                    searchString: params.searchString,
-                    limit: limit !== undefined ? limit + 1 : params.limit,
-                    offset: params.offset,
-                    // The sort the HTTP route forwards. Dropped here, an
-                    // in-process `aggregate({ orderBy: ["sum_total", "desc"] })`
-                    // came back in group-key order instead.
-                    orderBy: normalizeOrderBy(params.orderBy)
-                });
-                if (limit === undefined) return rows;
-                const page: AggregateResult = rows.slice(0, limit);
-                const meta: AggregateMeta = { limit, offset: params.offset ?? 0, hasMore: rows.length > limit };
-                Object.defineProperty(page, "meta", { value: meta, enumerable: false });
-                return page;
-            }
+        aggregate: rows.aggregate,
+
+        refresh: rows.refresh,
+
+        create: async (data: Partial<EntityValues<M>>, id?: string | number) => entity(await rows.create(toStored(data), id)),
+
+        createMany: rows.createMany
+            ? async (data, options) => (await rows.createMany!(data.map(row => toStored(row)), options)).map(entity)
             : undefined,
 
-        refresh: driver.refreshView
-            ? (options?: RefreshOptions) => driver.refreshView!(storedPath(), options)
+        update: async (id: string | number, data: Partial<EntityValues<M>>) => entity(await rows.update(id, toStored(data))),
+
+        delete: (id: string | number) => rows.delete(id),
+
+        updateMany: rows.updateMany
+            ? async (updates) => (await rows.updateMany!(updates)).map(entity)
             : undefined,
 
-        async create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>> {
-            const row = await driver.save<M>({
-                path: storedPath(),
-                values: toStored(data),
-                id: id,
-                status: "new"
-            });
-            return rowToEntity<M>(row, slug, getPks(), toViewModel);
-        },
+        deleteMany: rows.deleteMany,
 
-        createMany: driver.saveMany
-            ? async (
-                data: Partial<EntityValues<M>>[],
-                options?: { upsert?: boolean; onConflict?: readonly string[]; where?: WhereFor<M>; ignoreDuplicates?: boolean }
-            ): Promise<Entity<M>[]> => {
-                const rows = await driver.saveMany!<M>({
-                    path: storedPath(),
-                    rows: data.map(row => toStored(row)),
-                    upsert: options?.upsert,
-                    // Dropped here, an `upsert` on a natural key silently
-                    // became an upsert on the primary key — which for a serial
-                    // id is a plain insert, so the re-runnable import the
-                    // option exists for duplicated every row instead.
-                    onConflict: options?.onConflict,
-                    ...(options?.where ? { conflictWhere: deserializeFilter(options.where as Record<string, unknown>) } : {}),
-                    ...(options?.ignoreDuplicates ? { ignoreDuplicates: true } : {})
-                });
-                return rowsToEntities<M>(rows, slug, getPks(), toViewModel);
-            }
+        updateWhere: rows.updateWhere
+            ? async (query, data) => (await rows.updateWhere!(query, data)).map(entity)
             : undefined,
 
-        async update(id: string | number, data: Partial<EntityValues<M>>): Promise<Entity<M>> {
-            const row = await driver.save<M>({
-                path: storedPath(),
-                values: toStored(data),
-                id: id,
-                status: "existing"
-            });
-            return rowToEntity<M>(row, slug, getPks(), toViewModel);
-        },
+        deleteWhere: rows.deleteWhere,
 
-        async delete(id: string | number): Promise<void> {
-            // The address only. A server driver reads the row it deletes; the
-            // `values: {}` this used to send was recorded by history as the
-            // deleted row, and was all a `beforeDelete` had to judge.
-            return driver.delete({ row: { id, path: storedPath() } });
-        },
+        count: rows.count,
 
-        // Present only when the driver is: exposing these unconditionally and
-        // looping single writes underneath would give a caller neither the
-        // atomicity nor the single round trip they reached for a batch to get,
-        // while looking exactly like it had.
-        updateMany: driver.updateMany
-            ? async (updates: { id: string | number; data: Partial<EntityValues<M>> }[]): Promise<Entity<M>[]> => {
-                const rows = await driver.updateMany!<M>({
-                    path: storedPath(),
-                    updates: updates.map(u => ({ id: u.id,
-values: u.data })),
-                });
-                return rowsToEntities<M>(rows, slug, getPks(), toViewModel);
-            }
-            : undefined,
-
-        deleteMany: driver.deleteMany
-            ? async (ids: (string | number)[]): Promise<void> => {
-                await driver.deleteMany!<M>({ path: storedPath(),
-ids });
-            }
-            : undefined,
-
-        updateWhere: driver.updateWhere
-            ? async (query: FilteredWriteParams<M>, data: Partial<EntityValues<M>>): Promise<Entity<M>[]> => {
-                const rows = await driver.updateWhere!<M>({
-                    path: storedPath(),
-                    filter: query.where ? deserializeFilter(query.where as Record<string, unknown>) : undefined,
-                    logical: query.logical,
-                    values: data
-                });
-                return rowsToEntities<M>(rows, slug, getPks(), toViewModel);
-            }
-            : undefined,
-
-        deleteWhere: driver.deleteWhere
-            ? (query: FilteredWriteParams<M>): Promise<number> => driver.deleteWhere!<M>({
-                path: storedPath(),
-                filter: query.where ? deserializeFilter(query.where as Record<string, unknown>) : undefined,
-                logical: query.logical
-            })
-            : undefined,
-
-        count: driver.count ? (params?: FindParams<M>) => countRows(params) : undefined,
-
-        // `?deleted=only` and `?hard=true`, in-process. A restore is an
-        // ordinary `update` (the soft-delete field back to `null`), which the
-        // driver already lets reach a trashed row, so it is not here.
         trash: {
-            find: (params?: FindParams<M>) => findRows(params, "only"),
-            count: (params?: FindParams<M>) => countRows(params, "only"),
-            purge: (id: string | number) => driver.delete({ row: { id, path: storedPath() }, hard: true }),
-            purgeMany: driver.deleteMany
-                ? async (ids: (string | number)[]): Promise<void> => {
-                    await driver.deleteMany!<M>({ path: storedPath(), ids, hard: true });
-                }
-                : undefined
+            find: async (params?: FindParams<M>) => page(await rows.trash.find(params)),
+            count: rows.trash.count,
+            purge: rows.trash.purge,
+            purgeMany: rows.trash.purgeMany
         },
 
-        listen: driver.listenCollection
-            ? (params: FindParams<M> | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void) => {
-                const { limit, offset, driverOffset } = resolveFindWindow(params);
-                return driver.listenCollection!<M>({
-                    path: storedPath(),
-                    limit,
-                    offset: driverOffset,
-                    filter: params?.where,
-                    logical: params?.logical,
-                    orderBy: normalizeOrderBy(params?.orderBy),
-                    searchString: params?.searchString,
-                    searchExplain: params?.searchExplain,
-                    // Forwarded so the SERVER can refuse it. `realtimeService`
-                    // rejects a subscription carrying `vectorSearch` — a
-                    // subscription is re-run on every matching write and
-                    // nothing there computes distances — and the docs promise
-                    // that refusal. Both producers hand-list their fields and
-                    // both omitted this one, so the guard could not fire and
-                    // `.vectorSearch(…).listen()` returned an ordinary
-                    // `id DESC` listing with no `_distance` and no error.
-                    vectorSearch: params?.vectorSearch,
-                    onUpdate: (entities) => {
-                        onUpdate({
-                            data: entities.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug, getPks(), toViewModel)),
-                            meta: {
-                                // No count is issued on this path, so the total
-                                // is unknown; the lower bound is the rows in
-                                // hand plus the ones paged past to reach them.
-                                // Reporting `entities.length` claimed a read at
-                                // offset 100 had found a collection of two.
-                                total: offset + entities.length,
-                                limit,
-                                offset,
-                                hasMore: entities.length >= limit
-                            }
-                        });
-                    },
-                    onError
-                });
-            } : undefined,
+        listen: rows.listen
+            ? (params, onUpdate, onError) => rows.listen!(params, (res) => onUpdate(page(res)), onError)
+            : undefined,
 
-        listenById: driver.listenOne
-            ? (id: string | number, onUpdate: (entity: Entity<M> | undefined) => void, onError?: (error: Error) => void, options?: ByIdReadOptions) => {
-                return driver.listenOne!<M>({
-                    path: storedPath(),
-                    id: id,
-                    include: options?.include,
-                    onUpdate: (entity) => onUpdate(entity ? rowToEntity<M>(entity, slug, getPks(), toViewModel) : undefined),
-                    onError
-                });
-            } : undefined,
+        listenById: rows.listenById
+            ? (id, onUpdate, onError, options) => rows.listenById!(id, (row) => onUpdate(row ? entity(row) : undefined), onError, options)
+            : undefined,
 
         // Fluent Query Builder
         where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown) {
@@ -719,12 +340,11 @@ export function buildRebaseData(driver: DataDriver, options?: EntityDataOptions)
     function getAccessor(slug: string): TableAccessor {
         let accessor = cache.get(slug);
         if (!accessor) {
-            accessor = createDriverAccessor(
-                driver,
+            accessor = entityAccessorOverRows(
+                createDriverTableRows(driver, slug, { storedPath: () => options?.resolveDataPath?.(slug) ?? slug }),
                 slug,
                 () => primaryKeysFor(slug),
                 viewModelFor(slug),
-                () => options?.resolveDataPath?.(slug) ?? slug,
                 storedValuesFor(slug)
             );
             cache.set(slug, accessor);
@@ -748,475 +368,6 @@ export function buildRebaseData(driver: DataDriver, options?: EntityDataOptions)
             return getAccessor(options?.resolveAccessor?.(prop) ?? toSnakeCase(prop));
         }
     });
-}
-
-// =============================================================================
-// SDK data — flat rows (symmetric with the frontend SDK client)
-// =============================================================================
-
-/**
- * Unwrap a Entity back into the flat row it was built from. `rowToEntity` keeps
- * the row untouched under `.values` and derives `.id` alongside it, so dropping
- * the wrapper is the whole operation — the address was never part of the row.
- */
-function entityToRow<M extends Record<string, unknown>>(entity: Entity<M>): M {
-    return entity.values as M;
-}
-
-/**
- * Fluent query builder for the flat SDK data layer. Mirrors {@link QueryBuilder}
- * but resolves to `FindResult<M>` (flat rows) instead of Entity-wrapped
- * `FindResponse<M>`.
- */
-class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown>> implements SDKQueryBuilderInterface<M> {
-    private params: FindParams = { where: {} };
-
-    constructor(private client: SDKTableClient<M>) {}
-
-    where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): this;
-    /** A relation path (`author.name`) or a JSON path (`metadata->>tier`). */
-    where(column: NonColumnFieldPath, operator: WhereFilterOp, value: unknown): this;
-    where(logicalCondition: LogicalCondition): this;
-    where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown): this {
-        if (typeof columnOrCondition === "object" && columnOrCondition !== null && "type" in columnOrCondition) {
-            // A second group narrows rather than replaces — see the SDK
-            // builder in `@rebasepro/client`, which had the same defect.
-            const next = columnOrCondition as LogicalCondition;
-            this.params.logical = this.params.logical
-                ? { type: "and", conditions: [this.params.logical, next] }
-                : next;
-            return this;
-        }
-        if (!this.params.where) this.params.where = {};
-        const column = columnOrCondition as string;
-        const condition: [WhereFilterOp, unknown] = [operator!, value];
-        const existing = this.params.where[column];
-        if (existing === undefined) {
-            this.params.where[column] = condition;
-        } else if (Array.isArray(existing) && existing.length > 0 && Array.isArray(existing[0])) {
-            (this.params.where[column] as [WhereFilterOp, unknown][]).push(condition);
-        } else {
-            let firstCondition: [WhereFilterOp, unknown];
-            if (Array.isArray(existing) && existing.length === 2 && typeof existing[0] === "string") {
-                firstCondition = existing as [WhereFilterOp, unknown];
-            } else {
-                firstCondition = ["==", existing];
-            }
-            this.params.where[column] = [firstCondition, condition];
-        }
-        return this;
-    }
-
-    /** Called again, this adds a tie-breaker rather than replacing the sort. */
-    orderBy(
-        column: FieldPath<M> | ComputedSortField | RelationAggregateSort,
-        direction: "asc" | "desc" = "asc",
-        nulls?: NullsPlacement
-    ): this {
-        const existing = normalizeOrderBy(this.params.orderBy) ?? [];
-        const key = sortKeyToString(column);
-        this.params.orderBy = [...existing, (nulls
-            ? [key, direction, nulls]
-            : [key, direction]) as OrderByTuple];
-        return this;
-    }
-
-    limit(count: number): this { this.params.limit = count; return this; }
-    offset(count: number): this { this.params.offset = count; return this; }
-    search(searchString: string, options?: { explain?: boolean }): this { this.params.searchString = searchString; if (options?.explain !== undefined) this.params.searchExplain = options.explain; return this; }
-    vectorSearch(
-        property: string,
-        vector: number[],
-        options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
-    ): this {
-        this.params.vectorSearch = {
-            property,
-            vector,
-            ...(options?.distance !== undefined && { distance: options.distance }),
-            ...(options?.threshold !== undefined && { threshold: options.threshold })
-        };
-        return this;
-    }
-    /**
-     * Load relations. Merges rather than replaces, so `.include("author")` then
-     * `.include({ comments: { limit: 5 } })` asks for both — a builder call that
-     * silently discarded an earlier one is the same defect `where` had.
-     */
-    include(...relations: (string | IncludeSpec)[]): this {
-        this.params.include = mergeIncludeSpecs(this.params.include, relations);
-        return this;
-    }
-
-    fields(...columns: (FieldPath<M> | string)[]): this {
-        this.params.fields = [...(this.params.fields ?? []), ...columns as string[]];
-        return this;
-    }
-
-    distinct(enabled = true): this { this.params.distinct = enabled; return this; }
-
-    after(cursor: string): this { this.params.after = cursor; return this; }
-
-    async find(): Promise<FindResult<M>> {
-        return this.client.find(this.params as FindParams<M>);
-    }
-
-    /** Aggregate the matching rows. See {@link SDKTableClient.aggregate}. */
-    async aggregate(
-        params: Omit<AggregateParams<M>, "where" | "logical" | "searchString">
-    ): Promise<AggregateResult> {
-        return this.client.aggregate({
-            ...params,
-            where: this.params.where as AggregateParams<M>["where"],
-            logical: this.params.logical as AggregateParams<M>["logical"],
-            searchString: this.params.searchString
-        });
-    }
-
-    /**
-     * Page through everything this query matches, one row at a time.
-     *
-     * `.limit()` on the builder becomes the page size, so the ceiling on a
-     * single `find()` is not a ceiling on what the query can read.
-     */
-    iterate(options?: PageWalkOptions<M>): AsyncIterableIterator<M> {
-        return this.client.iterate({
-            ...(this.params as FindParams<M>),
-            ...(this.params.limit !== undefined && { pageSize: this.params.limit }),
-            ...options
-        } as IterateParams<M>);
-    }
-
-    /** Collect everything this query matches into one array. */
-    findAll(options?: PageWalkOptions<M> & { maxRows?: number }): Promise<M[]> {
-        return this.client.findAll({
-            ...(this.params as FindParams<M>),
-            ...(this.params.limit !== undefined && { pageSize: this.params.limit }),
-            ...options
-        } as FindAllParams<M>);
-    }
-
-    /**
-     * Count the records matching this query.
-     *
-     * This used to answer `0` when the client had no `count` — a number, from a
-     * source that had not counted anything, indistinguishable from an empty
-     * collection. It now does what the client does, which on a source that
-     * cannot count is throw and say so.
-     */
-    async count(): Promise<number> {
-        return this.client.count(this.params as FindParams<M>);
-    }
-
-    listen(onUpdate: (data: FindResult<M>) => void, onError?: (error: Error) => void): () => void {
-        return this.client.listen(this.params as FindParams<M>, onUpdate, onError);
-    }
-}
-
-/**
- * Refuse a write option this door cannot honour, by name, before anything is
- * written.
- *
- * The in-process accessor implements the same `SDKTableClient` as the HTTP
- * client, whose `ifMatch` is "Honoured on `update` and `delete`" — and its
- * writes took no options at all, so `rebase.data.posts.update(id, data, {
- * ifMatch: staleEtag })` overwrote the row and resolved. A precondition the
- * caller wrote, dropped without a word, is the worst thing a door can do with
- * it. The driver's `save` has no precondition and no idempotency store to hand
- * these to, so they are refused rather than ignored. An `undefined` value is no
- * option, as it is over HTTP: `etagOf(row)` is `undefined` for a row that
- * carries no version, and that means "write unconditionally".
- */
-function refuseUnhonouredWriteOptions(method: string, slug: string, options?: WriteOptions): void {
-    const unsupported = (["ifMatch", "idempotencyKey"] as const).filter((key) => options?.[key]);
-    if (unsupported.length === 0) return;
-    throw new RebaseClientError(
-        `${method}() on "${slug}" in-process (context.data, rebase.data) cannot honour ` +
-        `${unsupported.join(" or ")}: this door has no ` +
-        `${unsupported.includes("ifMatch") ? "precondition check" : "idempotency store"}, and ignoring ` +
-        "the option would write as though it had been checked. Drop it here, or send the write through " +
-        "the HTTP client, which honours it.",
-        { code: "UNSUPPORTED_OPTION", details: { method, options: unsupported } }
-    );
-}
-
-/**
- * Wrap a Entity-shaped {@link TableAccessor} into a flat
- * {@link SDKTableClient}. Every returned record is unwrapped to a flat row
- * so the backend SDK is byte-for-byte the same shape as the frontend client.
- */
-function toSdkTableClient<M extends Record<string, unknown>>(
-    snap: TableAccessor<M>,
-    slug = "table"
-): SDKTableClient<M> {
-    const client: SDKTableClient<M> = {
-        async find(params?: FindParams<M>): Promise<FindResult<M>> {
-            const res = await snap.find(params);
-            return { data: res.data.map(entityToRow), meta: res.meta };
-        },
-        // Pagination is shared with the HTTP client rather than reimplemented:
-        // both transports satisfy the same `SDKTableClient`, so a walk that
-        // behaved differently in-process than over the wire would be a bug the
-        // type system could not see.
-        iterate(params?: IterateParams<M>) {
-            return paginateFind<M>((p) => client.find(p), params, slug);
-        },
-        findAll(params?: FindAllParams<M>) {
-            return collectAllPages<M>((p) => client.find(p), params, slug);
-        },
-        async findById(id: string | number, options?: ByIdReadOptions): Promise<M | undefined> {
-            const s = await snap.findById(id, options);
-            return s ? entityToRow(s) : undefined;
-        },
-        async get(id: string | number): Promise<M> {
-            // The same contract server-side as in the browser SDK, deliberately:
-            // a callback, a cron and an app all read a row by id, and the shape
-            // of "it is not there" should not depend on which one is asking.
-            const s = await snap.findById(id);
-            if (!s) {
-                throw new RebaseApiError(
-                    `No record with id ${JSON.stringify(String(id))} in "${slug}".`,
-                    { status: 404, code: "NOT_FOUND" }
-                );
-            }
-            return entityToRow(s);
-        },
-        async create(data: Partial<M>, id?: string | number, options?: WriteOptions): Promise<M> {
-            refuseUnhonouredWriteOptions("create", slug, options);
-            return entityToRow(await snap.create(data as Partial<EntityValues<M>>, id));
-        },
-        async createMany(
-            data: Partial<M>[],
-            options?: { upsert?: boolean; onConflict?: readonly string[]; where?: WhereFor<M>; ignoreDuplicates?: boolean } & WriteOptions
-        ): Promise<M[]> {
-            refuseUnhonouredWriteOptions("createMany", slug, options);
-            if (!Array.isArray(data)) {
-                throw new RebaseClientError("createMany expects an array of records.", { code: "INVALID_BULK_BODY" });
-            }
-            if (data.length === 0) return [];
-            if (!snap.createMany) {
-                throw new Error(
-                    "Bulk writes are not supported by this collection's data source. " +
-                    "Fall back to create() per record."
-                );
-            }
-            const rows = await snap.createMany(data as Partial<EntityValues<M>>[], {
-                upsert: options?.upsert,
-                onConflict: options?.onConflict,
-                where: options?.where,
-                ignoreDuplicates: options?.ignoreDuplicates
-            });
-            return rows.map(entityToRow);
-        },
-        /**
-         * One row through the bulk path, because the bulk path is where the
-         * conflict target lives.
-         *
-         * `TableAccessor` has no single-row upsert and adding one would
-         * mean a second way to say the same thing to the same driver method —
-         * `saveMany` already takes `upsert` and `onConflict`, and a batch of
-         * one is exactly an upsert of one.
-         */
-        async upsert(data: Partial<M>, options?: UpsertOptions<M>): Promise<M> {
-            refuseUnhonouredWriteOptions("upsert", slug, options);
-            if (!snap.createMany) {
-                throw new Error(
-                    "Upsert is not supported by this collection's data source: it needs a bulk write, " +
-                    "which this driver does not implement. Fall back to create() or update()."
-                );
-            }
-            const rows = await snap.createMany(
-                [data as Partial<EntityValues<M>>],
-                { upsert: true, onConflict: options?.onConflict, where: options?.where, ignoreDuplicates: options?.ignoreDuplicates }
-            );
-            const row = rows[0];
-            // Without a conflict rule a row always comes back; with one, a
-            // stored row the rule kept is the `undefined` the overload types.
-            if (!row && !options?.where && !options?.ignoreDuplicates) throw new Error(`Upsert into "${slug}" returned no row.`);
-            return (row ? entityToRow(row) : undefined) as M;
-        },
-        async update(id: string | number, data: Partial<M> | UpdateValues<Partial<M>>, options?: WriteOptions): Promise<M> {
-            refuseUnhonouredWriteOptions("update", slug, options);
-            return entityToRow(await snap.update(id, data as Partial<EntityValues<M>>));
-        },
-        async updateMany(
-            updates: { id: string | number; data: Partial<M> | UpdateValues<Partial<M>> }[],
-            options?: WriteOptions
-        ): Promise<M[]> {
-            refuseUnhonouredWriteOptions("updateMany", slug, options);
-            if (!Array.isArray(updates)) {
-                throw new RebaseClientError("updateMany expects an array of { id, data } entries.", { code: "INVALID_BULK_BODY" });
-            }
-            if (updates.length === 0) return [];
-            if (!snap.updateMany) {
-                throw new Error(
-                    "Bulk updates are not supported by this collection's data source. " +
-                    "Fall back to update() per record."
-                );
-            }
-            const rows = await snap.updateMany(
-                updates.map(u => ({ id: u.id,
-data: u.data as Partial<EntityValues<M>> }))
-            );
-            return rows.map(entityToRow);
-        },
-        async delete(id: string | number, options?: WriteOptions): Promise<void> {
-            refuseUnhonouredWriteOptions("delete", slug, options);
-            return snap.delete(id);
-        },
-        async updateWhere(query: FilteredWriteParams<M>, data: Partial<M> | UpdateValues<Partial<M>>, options?: WriteOptions): Promise<M[]> {
-            refuseUnhonouredWriteOptions("updateWhere", slug, options);
-            if (!snap.updateWhere) {
-                throw new Error(
-                    "Filtered updates are not supported by this collection's data source. " +
-                    "Read the rows, then updateMany() them."
-                );
-            }
-            return (await snap.updateWhere(query, data as Partial<EntityValues<M>>)).map(entityToRow);
-        },
-        async deleteWhere(query: FilteredWriteParams<M>, options?: WriteOptions): Promise<number> {
-            refuseUnhonouredWriteOptions("deleteWhere", slug, options);
-            if (!snap.deleteWhere) {
-                throw new Error(
-                    "Filtered deletes are not supported by this collection's data source. " +
-                    "Read the rows, then deleteMany() their ids."
-                );
-            }
-            return snap.deleteWhere(query);
-        },
-        async deleteMany(ids: (string | number)[], options?: WriteOptions): Promise<void> {
-            refuseUnhonouredWriteOptions("deleteMany", slug, options);
-            if (!Array.isArray(ids)) {
-                throw new RebaseClientError("deleteMany expects an array of ids.", { code: "INVALID_BULK_BODY" });
-            }
-            if (ids.length === 0) return;
-            if (!snap.deleteMany) {
-                throw new Error(
-                    "Bulk deletes are not supported by this collection's data source. " +
-                    "Fall back to delete() per record."
-                );
-            }
-            await snap.deleteMany(ids);
-        },
-        // The three are non-optional on `SDKTableClient`: where the
-        // underlying accessor cannot serve one, a stub says so when called
-        // rather than being absent. `isUnsupported()` is how an adapter asks
-        // the capability question — see `toEntityAccessor` below, which has to.
-        count: snap.count
-            ? (params?: FindParams<M>) => snap.count!(params)
-            : unsupportedMethod(noCount(slug)),
-        listen: snap.listen
-            ? (params: FindParams<M> | undefined, onUpdate: (r: FindResult<M>) => void, onError?: (e: Error) => void) =>
-                snap.listen!(params, (res) => onUpdate({ data: res.data.map(entityToRow), meta: res.meta }), onError)
-            : unsupportedMethod(noRealtime(slug)),
-        listenById: snap.listenById
-            ? (id: string | number, onUpdate: (r: M | undefined) => void, onError?: (e: Error) => void, options?: ByIdReadOptions) =>
-                snap.listenById!(id, (s) => onUpdate(s ? entityToRow(s) : undefined), onError, options)
-            : unsupportedMethod(noRealtime(slug)),
-        listenCount: snap.listenCount
-            ? (params: FindParams<M> | undefined, onCount: (total: number) => void, onError?: (e: Error) => void) =>
-                snap.listenCount!(params, onCount, onError)
-            : unsupportedMethod(noRealtime(slug)),
-        where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown) {
-            const builder = new SdkQueryBuilder<M>(client);
-            if (typeof columnOrCondition === "object") {
-                return builder.where(columnOrCondition);
-            }
-            return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValueFor<WhereFilterOp, M[keyof M & string]>);
-        },
-        orderBy: (
-            column: FieldPath<M> | ComputedSortField | RelationAggregateSort,
-            direction?: "asc" | "desc",
-            nulls?: NullsPlacement
-        ) => new SdkQueryBuilder<M>(client).orderBy(column, direction, nulls),
-        limit: (count: number) => new SdkQueryBuilder<M>(client).limit(count),
-        offset: (count: number) => new SdkQueryBuilder<M>(client).offset(count),
-        search: (searchString: string) => new SdkQueryBuilder<M>(client).search(searchString),
-        vectorSearch: (
-            property: string,
-            vector: number[],
-            options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
-        ) => new SdkQueryBuilder<M>(client).vectorSearch(property, vector, options),
-        include: (...relations: (string | IncludeSpec)[]) => new SdkQueryBuilder<M>(client).include(...relations),
-        fields: (...columns: (FieldPath<M> | string)[]) => new SdkQueryBuilder<M>(client).fields(...columns),
-        distinct: (enabled?: boolean) => new SdkQueryBuilder<M>(client).distinct(enabled),
-        after: (cursor: string) => new SdkQueryBuilder<M>(client).after(cursor),
-        aggregate: snap.aggregate
-            ? (params: AggregateParams<M>) => snap.aggregate!(params)
-            : unsupportedMethod(noAggregate(slug)),
-        refresh: snap.refresh
-            ? (options?: RefreshOptions) => snap.refresh!(options)
-            : unsupportedMethod(noRefresh(slug)),
-        trash: toSdkTrashClient(snap, slug, () => client)
-    };
-    return client;
-}
-
-/**
- * {@link SDKTableClient.trash} over an accessor's
- * {@link TableAccessor.trash}: the same API the browser client has. A
- * restore is the client's own `update`/`updateMany` setting the soft-delete
- * field to `null`, so it keeps their refusals and their answer.
- */
-function toSdkTrashClient<M extends Record<string, unknown>>(
-    snap: TableAccessor<M>,
-    slug: string,
-    client: () => SDKTableClient<M>
-): TrashClient<M> {
-    const trash = snap.trash;
-    if (!trash) {
-        return {
-            find: unsupportedMethod(noTrash(slug)),
-            count: unsupportedMethod(noTrash(slug)),
-            restore: unsupportedMethod(noTrash(slug)),
-            restoreMany: unsupportedMethod(noTrash(slug)),
-            purge: unsupportedMethod(noTrash(slug)),
-            purgeMany: unsupportedMethod(noTrash(slug))
-        };
-    }
-    const field = (options?: RestoreOptions<M>): string => options?.field ?? DEFAULT_SOFT_DELETE_FIELD;
-    return {
-        async find(params?: FindParams<M>): Promise<FindResult<M>> {
-            const res = await trash.find(params);
-            return { data: res.data.map(entityToRow), meta: res.meta };
-        },
-        count: (params?: FindParams<M>) => trash.count(params),
-        restore: (id: string | number, options?: RestoreOptions<M>) =>
-            client().update(id, { [field(options)]: null } as Partial<M>, writeOptionsOf(options)),
-        restoreMany(ids: (string | number)[], options?: RestoreOptions<M>) {
-            if (!Array.isArray(ids)) {
-                return Promise.reject(new RebaseClientError(
-                    "trash.restoreMany expects an array of ids.", { code: "INVALID_BULK_BODY" }
-                ));
-            }
-            const data = { [field(options)]: null } as Partial<M>;
-            return client().updateMany(ids.map((id) => ({ id, data })), writeOptionsOf(options));
-        },
-        async purge(id: string | number, options?: WriteOptions): Promise<void> {
-            refuseUnhonouredWriteOptions("trash.purge", slug, options);
-            await trash.purge(id);
-        },
-        async purgeMany(ids: (string | number)[], options?: WriteOptions): Promise<void> {
-            refuseUnhonouredWriteOptions("trash.purgeMany", slug, options);
-            if (!Array.isArray(ids)) {
-                throw new RebaseClientError("trash.purgeMany expects an array of ids.", { code: "INVALID_BULK_BODY" });
-            }
-            if (ids.length === 0) return;
-            if (!trash.purgeMany) {
-                throw new Error(
-                    "Bulk deletes are not supported by this collection's data source. " +
-                    "Fall back to trash.purge() per record."
-                );
-            }
-            await trash.purgeMany(ids);
-        }
-    };
-}
-
-/** A {@link RestoreOptions} without its `field`: the write options it carries. */
-function writeOptionsOf<M extends Record<string, unknown>>(options?: RestoreOptions<M>): WriteOptions | undefined {
-    if (!options) return undefined;
-    const { field: _field, ...rest } = options;
-    return rest;
 }
 
 /**
@@ -1408,107 +559,5 @@ export function wrapAsEntityData(sdkData: { table(slug: string): SDKTableClient 
             if (prop === "then" || prop === "toJSON" || prop === "$$typeof") return undefined;
             return getAccessor(toSnakeCase(prop));
         }
-    });
-}
-
-/**
- * Wrap a Entity-shaped {@link RebaseData} into a flat {@link RebaseSdkData}.
- *
- * Every collection accessor is adapted to return flat rows. Use this to derive
- * the flat SDK data layer (`context.data`) from an existing Entity data layer
- * — e.g. the admin routes its Entity data via `useData()` and exposes the
- * same routing as flat `context.data` for callbacks by wrapping it here.
- *
- * `DB` is the generated `Database` the result is typed from. One object serves
- * every `Database` — each accessor is resolved by name when it is read — so it
- * describes the result and changes nothing it does. Only an explicit type
- * argument sets it (`NoInfer`): inferred from where the result is assigned, it
- * would be whatever that place declares — an untyped `Promise<RebaseSdkData>`
- * made it `RebaseSdkData | PromiseLike<RebaseSdkData>`. Untyped by default.
- */
-export function wrapAsSdkData<DB = unknown>(
-    /** Only the by-slug accessor is read; every {@link RebaseData} has one. */
-    entityData: { table(slug: string): TableAccessor },
-    options?: Pick<EntityDataOptions, "resolveAccessor"> & {
-        /** What `data.batch()` runs: the driver's `batchWrite`. Absent, it refuses with `BATCH_UNSUPPORTED`. */
-        batchWrite?: DataDriver["batchWrite"];
-    }
-): RebaseSdkData<NoInfer<DB>> {
-    const cache = new Map<string, SDKTableClient>();
-
-    function getAccessor(slug: string): SDKTableClient {
-        let accessor = cache.get(slug);
-        if (!accessor) {
-            accessor = toSdkTableClient(entityData.table(slug), slug);
-            cache.set(slug, accessor);
-        }
-        return accessor;
-    }
-
-    const slugOf = (accessor: string): string => options?.resolveAccessor?.(accessor) ?? toSnakeCase(accessor);
-
-    // `client.batch()` in-process: the same operations, each collection
-    // named by its accessor and sent as its slug.
-    const batch = async (operations: BatchOperation[]): Promise<BatchResult> => {
-        if (!Array.isArray(operations)) {
-            throw new RebaseClientError("batch expects an array of operations.", { code: "INVALID_BULK_BODY" });
-        }
-        if (operations.length === 0) return { data: [], meta: { operations: 0 } };
-        if (!options?.batchWrite) {
-            throw new RebaseClientError("This data source cannot write a batch atomically.", { code: "BATCH_UNSUPPORTED" });
-        }
-        const data = await options.batchWrite({
-            operations: operations.map(operation => ({
-                op: operation.op,
-                path: slugOf(operation.table),
-                ...("id" in operation ? { id: operation.id } : {}),
-                ...("values" in operation ? { values: operation.values as Record<string, unknown> } : {}),
-                ...(operation.op === "upsert" && operation.onConflict ? { onConflict: operation.onConflict } : {}),
-                ...(operation.ref ? { ref: operation.ref } : {})
-            }))
-        });
-        return { data, meta: { operations: operations.length } };
-    };
-
-    const target = { table: getAccessor, batch } as RebaseSdkData<DB>;
-
-    return new Proxy(target, {
-        get(_target, prop: string | symbol) {
-            if (prop === "table") return getAccessor;
-            if (prop === "batch") return batch;
-            if (typeof prop === "symbol") return undefined;
-            if (prop === "then" || prop === "toJSON" || prop === "$$typeof") return undefined;
-            return getAccessor(slugOf(prop));
-        }
-    });
-}
-
-/**
- * Build a flat {@link RebaseSdkData} from a `DataDriver`.
- *
- * This is the developer-facing SDK data layer used by backend framework
- * callbacks & scripts (`context.data` / `rebase.dataAsAdmin`). It returns flat rows —
- * identical in shape to the frontend SDK client, down to how a relation is
- * served: a foreign key stays a foreign key, and a relation named in `include`
- * arrives as the target's own columns. The `{ __type: "relation" }` envelope is
- * the admin's view-model and never reaches here.
- *
- * The admin uses {@link buildRebaseData} (Entity) over its own driver.
- *
- * `options.resolveAccessor` names the slug a property is (see
- * `createAccessorSlugResolver`); absent, `data.myNotes` is `my_notes`.
- *
- * `DB` types the result from a generated `Database` — `buildSdkData<Database>(driver)`
- * is the plane `context.data` is in a project that registered it. It describes
- * the object and changes nothing it does, and only an explicit type argument
- * sets it (see {@link wrapAsSdkData}); untyped by default.
- */
-export function buildSdkData<DB = unknown>(
-    driver: DataDriver,
-    options?: Pick<EntityDataOptions, "resolveAccessor">
-): RebaseSdkData<NoInfer<DB>> {
-    return wrapAsSdkData<DB>(buildRebaseData(driver), {
-        ...options,
-        ...(driver.batchWrite ? { batchWrite: props => driver.batchWrite!(props) } : {})
     });
 }

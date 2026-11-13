@@ -1,5 +1,5 @@
 import type { DataDriver, SDKTableClient } from "@rebasepro/types";
-import { buildSdkData } from "../../src/data/buildRebaseData";
+import { buildSdkData } from "../../src/data/sdk-data";
 
 const notUsed = async (): Promise<never> => {
     throw new Error("not used by this test");

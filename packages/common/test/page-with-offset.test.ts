@@ -1,4 +1,4 @@
-import { buildSdkData } from "../src/data/buildRebaseData";
+import { buildSdkData } from "../src/data/sdk-data";
 import { resolveFindWindow } from "../src/data/paginate";
 import { DataDriver, FetchCollectionProps, RebaseSdkData, SDKTableClient } from "@rebasepro/types";
 

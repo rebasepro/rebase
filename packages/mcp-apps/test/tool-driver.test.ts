@@ -26,7 +26,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { col, defineTable, rel, type FetchCollectionProps } from "@rebasepro/types";
 import { type CollectionConfig, EntityRelation } from "@rebasepro/cms-types";
-import { buildRebaseData, compileTables, wrapAsSdkData } from "@rebasepro/common";
+import { buildSdkData, compileTables } from "@rebasepro/common";
 import type { ToolResult } from "@rebasepro/cms/mcp-view";
 import {
     DEFAULT_ACTIONS,
@@ -111,7 +111,7 @@ function driverWith(answer: (name: string, args: Record<string, unknown>) => Too
     });
     // What an app's row hooks read and write: the confirming driver through
     // the flat layer, rows as the wire has them.
-    const flat = wrapAsSdkData(buildRebaseData(confirmingDriver));
+    const flat = buildSdkData(confirmingDriver);
     return { driver, flat, calls, changes };
 }
 

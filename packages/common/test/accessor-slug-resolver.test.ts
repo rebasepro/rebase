@@ -1,4 +1,5 @@
-import { buildRebaseData, buildSdkData } from "../src/data/buildRebaseData";
+import { buildRebaseData } from "../src/data/buildRebaseData";
+import { buildSdkData } from "../src/data/sdk-data";
 import { buildRoutedRebaseData } from "../src/data/buildRoutedRebaseData";
 import { createAccessorSlugResolver, toTableAccessor } from "../src/data/table-accessor";
 import { DataDriver, RebaseSdkData, SDKTableClient } from "@rebasepro/types";

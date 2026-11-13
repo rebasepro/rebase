@@ -1,4 +1,5 @@
-import { buildRebaseData, buildSdkData, wrapAsSdkData, wrapAsEntityData } from "../src/data/buildRebaseData";
+import { buildRebaseData, wrapAsEntityData } from "../src/data/buildRebaseData";
+import { buildSdkData } from "../src/data/sdk-data";
 import { TableAccessor, DataDriver, RebaseData, RebaseSdkData, SDKTableClient } from "@rebasepro/types";
 
 /**
@@ -96,10 +97,10 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
         expect(flat.id).toBe(snap.id);
     });
 
-    it("wrapAsSdkData ∘ buildRebaseData is flat; wrapAsEntityData round-trips back", async () => {
+    it("buildSdkData is flat; wrapAsEntityData over it is the admin's view model", async () => {
         const driver = createMockDriver();
 
-        const flat = (await sdk(wrapAsSdkData(buildRebaseData(driver)), "products").find()).data[0];
+        const flat = (await sdk(buildSdkData(driver), "products").find()).data[0];
         expect(flat.name).toBe("Widget");
         expect(flat).not.toHaveProperty("values");
 

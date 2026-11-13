@@ -1,6 +1,6 @@
-import { buildRebaseData, buildSdkData, wrapAsEntityData, wrapAsSdkData } from "../src/data/buildRebaseData";
-import { DataDriver, RebaseSdkData, SDKTableClient, isUnsupported } from "@rebasepro/types";
-import { inertDriver } from "./helpers/inert-driver";
+import { wrapAsEntityData } from "../src/data/buildRebaseData";
+import { buildSdkData } from "../src/data/sdk-data";
+import { DataDriver, RebaseSdkData, SDKTableClient } from "@rebasepro/types";
 
 /**
  * `trash` on the in-process accessor — `context.data.<slug>.trash` in a
@@ -154,24 +154,14 @@ describe("context.data.<slug>.trash", () => {
         expect(calls).toHaveLength(0);
     });
 
-    it("survives the admin boundary both ways", async () => {
+    it("survives the admin boundary", async () => {
         const { driver, calls } = recordingDriver();
-        const posts = sdk(wrapAsSdkData(wrapAsEntityData(buildSdkData(driver))), "posts");
+        const trash = wrapAsEntityData(buildSdkData(driver)).table("posts").trash;
 
-        await posts.trash.find();
-        await posts.trash.purge("p1");
+        expect((await trash?.find())?.data[0]).toMatchObject({ id: "p1", path: "posts" });
+        await trash?.purge("p1");
 
         expect(calls.find((c) => c.method === "fetchCollection")?.props).toMatchObject({ withDeleted: "only" });
         expect(calls.find((c) => c.method === "delete")?.props).toMatchObject({ hard: true });
-    });
-
-    it("is a stub that throws where the data source has no trash", async () => {
-        const bare = {
-            table: () => ({ ...buildRebaseData(inertDriver()).table("posts"), trash: undefined })
-        };
-        const posts = sdk(wrapAsSdkData(bare), "posts");
-
-        expect(isUnsupported(posts.trash.find)).toBe(true);
-        await expect(Promise.resolve().then(() => posts.trash.purge("p1"))).rejects.toThrow(/trash/i);
     });
 });

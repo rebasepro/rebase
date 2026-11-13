@@ -44,7 +44,7 @@ import {
     type TableDescriptor,
     type TableHooks
 } from "@rebasepro/types";
-import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, createAccessorSlugResolver, policyTableFromDescriptor, tableEffectiveRules, warnOnTableDdl } from "@rebasepro/common";
+import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedSdkData, createAccessorSlugResolver, policyTableFromDescriptor, tableEffectiveRules, warnOnTableDdl } from "@rebasepro/common";
 import { randomBytes } from "node:crypto";
 import type { Server } from "node:http";
 import nodePath from "node:path";
@@ -3074,7 +3074,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         dataSourcesByKey[driverKey] = buildSdkData(scopedDelegate, { resolveAccessor });
     }
 
-    const serverData = buildRoutedRebaseData({
+    const serverData = buildRoutedSdkData({
         defaultData,
         sources: dataSourcesByKey,
         resolveKey: (slugOrPath: string) => keyForCollectionPath(slugOrPath),

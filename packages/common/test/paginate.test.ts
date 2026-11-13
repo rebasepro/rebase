@@ -1,4 +1,4 @@
-import { buildSdkData } from "../src/data/buildRebaseData";
+import { buildSdkData } from "../src/data/sdk-data";
 import { decodeCursor, encodeCursor } from "../src/data/cursor";
 import { paginateFind, RebasePaginationError } from "../src/data/paginate";
 import {
