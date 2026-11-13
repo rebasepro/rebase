@@ -10,7 +10,7 @@
  * after a pause in which the queue drains.
  */
 import type { CollectionConfig } from "@rebasepro/types";
-import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
+import { ensureTables, type Queryable } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
 const posts: CollectionConfig = {
@@ -55,7 +55,7 @@ describe("boot schema changes and table locks", () => {
 
     it("sends a change to an existing table under a lock_timeout", async () => {
         const { client, ran } = db();
-        await ensureCollectionTables(client, compileSet([posts]), undefined, { databaseExtensions: [], lockTimeoutMs: 1000 });
+        await ensureTables(client, compileSet([posts]), undefined, { databaseExtensions: [], lockTimeoutMs: 1000 });
 
         expect(addTitle(ran)).toEqual([
             "SET LOCAL lock_timeout = '1000ms';\nALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;"
@@ -65,7 +65,7 @@ describe("boot schema changes and table locks", () => {
     it("retries a lock timeout until the holder lets go", async () => {
         jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
         const { client, ran } = db((text, n) => (/"title"/.test(text) && n <= 2 ? lockTimeout() : undefined));
-        const pending = ensureCollectionTables(client, compileSet([posts]), undefined, { databaseExtensions: [], lockTimeoutMs: 1000 });
+        const pending = ensureTables(client, compileSet([posts]), undefined, { databaseExtensions: [], lockTimeoutMs: 1000 });
         await jest.runAllTimersAsync();
         const outcome = await pending;
 
@@ -76,7 +76,7 @@ describe("boot schema changes and table locks", () => {
     it("fails the boot, saying why, when the lock is held throughout", async () => {
         jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
         const { client, ran } = db(text => (/"title"/.test(text) ? lockTimeout() : undefined));
-        const pending = ensureCollectionTables(client, compileSet([posts]), undefined, { databaseExtensions: [], lockTimeoutMs: 1000 });
+        const pending = ensureTables(client, compileSet([posts]), undefined, { databaseExtensions: [], lockTimeoutMs: 1000 });
         const settled = pending.then(() => undefined, (err: Error) => err);
         await jest.runAllTimersAsync();
         const error = await settled;
@@ -88,7 +88,7 @@ describe("boot schema changes and table locks", () => {
     it("leaves statements as they were without a lock budget", async () => {
         // The live schema editor applies changes somebody confirmed, and waits.
         const { client, ran } = db();
-        await ensureCollectionTables(client, compileSet([posts]), undefined, { databaseExtensions: [] });
+        await ensureTables(client, compileSet([posts]), undefined, { databaseExtensions: [] });
 
         expect(addTitle(ran)).toEqual(["ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;"]);
     });
@@ -96,7 +96,7 @@ describe("boot schema changes and table locks", () => {
     it("sends each statement on its own to a handle that takes one per query", async () => {
         const refusal = Object.assign(new Error("cannot insert multiple commands into a prepared statement"), { code: "42601" });
         const { client, ran } = db(text => (/^SET LOCAL/.test(text) ? refusal : undefined));
-        const outcome = await ensureCollectionTables(client, compileSet([posts]), undefined, { databaseExtensions: [], lockTimeoutMs: 1000 });
+        const outcome = await ensureTables(client, compileSet([posts]), undefined, { databaseExtensions: [], lockTimeoutMs: 1000 });
 
         expect(addTitle(ran)).toEqual([
             "SET LOCAL lock_timeout = '1000ms';\nALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;",

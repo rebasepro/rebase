@@ -1,7 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig, SecurityRule } from "@rebasepro/types";
 import { describeRulesDropped, ensureCollectionPolicies } from "../src/schema/ensure-collection-policies";
-import type { Queryable } from "../src/schema/ensure-collection-tables";
+import type { Queryable } from "../src/schema/ensure-tables";
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
 import { compileSet } from "./helpers/plan-tables";
 

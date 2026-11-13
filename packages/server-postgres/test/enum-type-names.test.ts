@@ -19,10 +19,10 @@ import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import {
-    ensureCollectionTables,
-    planCollectionSchemaEnsure,
+    ensureTables,
+    planTableSchemaEnsure,
     type ExistingSchema
-} from "../src/schema/ensure-collection-tables";
+} from "../src/schema/ensure-tables";
 import { compileSet, planCollections } from "./helpers/plan-tables";
 
 /** `customer_subscription_billing_events_payment_processor_status_code` is 66 bytes. */
@@ -51,7 +51,7 @@ describe("an enum type whose derived name is longer than 63 bytes", () => {
             enumValues: new Map([[`public.${TRUNCATED}`, ["pending", "settled"]]]),
             constraints: new Set()
         };
-        const plan = planCollectionSchemaEnsure(compileSet([billingEvents(["pending", "settled", "refunded"])]), existing);
+        const plan = planTableSchemaEnsure(compileSet([billingEvents(["pending", "settled", "refunded"])]), existing);
         const enumActions = plan.actions.filter(a => a.kind === "create-enum" || a.kind === "add-enum-value");
         expect(enumActions.map(a => a.kind)).toEqual(["add-enum-value"]);
         expect(enumActions[0].sql).toContain("ADD VALUE IF NOT EXISTS 'refunded'");
@@ -60,8 +60,8 @@ describe("an enum type whose derived name is longer than 63 bytes", () => {
     it("gains a label added after the first boot", async () => {
         const db = new PGlite();
         try {
-            await ensureCollectionTables(asQueryable(db), compileSet([billingEvents(["pending", "settled"])]));
-            const second = await ensureCollectionTables(
+            await ensureTables(asQueryable(db), compileSet([billingEvents(["pending", "settled"])]));
+            const second = await ensureTables(
                 asQueryable(db), compileSet([billingEvents(["pending", "settled", "refunded"])]));
             expect(second.failures).toEqual([]);
 

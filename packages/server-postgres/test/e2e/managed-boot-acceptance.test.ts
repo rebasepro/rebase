@@ -9,7 +9,7 @@
  * reach that database (it lives inside the cluster), so the runtime must bring
  * the schema up itself — both halves:
  *
- *   1. the collection TABLES  (`ensureCollectionTables`), and
+ *   1. the collection TABLES  (`ensureTables`), and
  *   2. their RLS POLICIES     (`ensureCollectionPolicies`).
  *
  * Before this, only tables were ever wired in — and even that was dropped by
@@ -32,7 +32,7 @@ import { pgTable, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
-import { ensureCollectionTables, type Queryable } from "../../src/schema/ensure-collection-tables.js";
+import { ensureTables, type Queryable } from "../../src/schema/ensure-tables.js";
 import { ensureCollectionPolicies } from "../../src/schema/ensure-collection-policies.js";
 import { ensureAuthTablesExist } from "../../src/auth/ensure-tables.js";
 import {
@@ -123,7 +123,7 @@ const ordersCollection: CollectionConfig = {
 const collections = [tiersCollection, customersCollection, secretsCollection, ordersCollection];
 
 // Drizzle tables for the registry the driver reads through. Names must match
-// what `ensureCollectionTables` creates (snake_case of the property keys).
+// what `ensureTables` creates (snake_case of the property keys).
 const tiersTable = pgTable("tiers", { id: varchar("id").primaryKey(), label: varchar("label") });
 const customersTable = pgTable("customers", {
     id: varchar("id").primaryKey(),
@@ -186,7 +186,7 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
         await ensureAuthTablesExist(db);
 
         // 2. Tables (boot phase 1). Additive create of the collection tables.
-        await ensureCollectionTables(queryable, compileSet(collections));
+        await ensureTables(queryable, compileSet(collections));
 
         // 3. The restricted user role authenticated requests run as, with DML
         //    grants on the tables just created (what initializeDriver does).
@@ -361,7 +361,7 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
     it("is idempotent: a second boot changes nothing and still serves", async () => {
         // Both phases, as a restart would run them — the table pass must plan no
         // work at all the second time, or every boot would churn the schema.
-        const tablesAgain = await ensureCollectionTables(queryable, compileSet(collections));
+        const tablesAgain = await ensureTables(queryable, compileSet(collections));
         expect(tablesAgain.actions).toEqual([]);
         expect(tablesAgain.failures).toEqual([]);
 

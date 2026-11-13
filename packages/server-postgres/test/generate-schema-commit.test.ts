@@ -24,7 +24,7 @@ import {
     DEFAULT_COMMIT_PATHS,
     classifyEditedTables as classifyCompiledTables
 } from "../src/schema/generate-schema-commit";
-import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
+import { planTableSchemaEnsure } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 import { compiledFromLegacy } from "./helpers/edited-tables";
 
@@ -53,7 +53,7 @@ const collection = (slug: string, properties: PostgresProperties = {}): Collecti
 const str = (over: Partial<StringProperty> = {}): StringProperty => ({ type: "string", name: "S", ...over });
 
 const planOf = (collections: CollectionConfig[]) =>
-    planCollectionSchemaEnsure(compileSet(collections), { tables: new Map(), enums: new Set() }).statements;
+    planTableSchemaEnsure(compileSet(collections), { tables: new Map(), enums: new Set() }).statements;
 
 describe("additiveStatements — the delta between two ensure plans", () => {
     it("a new collection brings its CREATE TABLE", () => {

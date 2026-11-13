@@ -34,7 +34,7 @@
  *   * `push` — `generatePostgresDdl` plus the two files Atlas is not shown,
  *     `generatePostgresSearchDdl` and `generatePostgresVectorDdl`; together,
  *     what `rebase db push` writes — and
- *   * `boot` — `planCollectionSchemaEnsure` / `planCollectionPolicies`, what the
+ *   * `boot` — `planTableSchemaEnsure` / `planCollectionPolicies`, what the
  *     managed runtime applies at boot against an empty database
  *
  * — and every identifier either one names is listed with the producers that name
@@ -364,8 +364,8 @@ async function renderFixture(fixture: FixtureInput): Promise<Rendered> {
         planRelationalColumns,
         planJunctionTables
     } = await import(`${ROOT}/packages/server-postgres/src/schema/generate-postgres-ddl-logic.ts`);
-    const { planCollectionSchemaEnsure } =
-        await import(`${ROOT}/packages/server-postgres/src/schema/ensure-collection-tables.ts`);
+    const { planTableSchemaEnsure } =
+        await import(`${ROOT}/packages/server-postgres/src/schema/ensure-tables.ts`);
     const { planSchema } = await import(`${ROOT}/packages/server-postgres/src/schema/plan/plan-schema.ts`);
     const { renderViewsDdl } = await import(`${ROOT}/packages/server-postgres/src/schema/plan/render-ddl.ts`);
 
@@ -403,7 +403,7 @@ async function renderFixture(fixture: FixtureInput): Promise<Rendered> {
     // Boot, against a database with nothing in it — the managed first-deploy
     // case, and the only starting state where boot emits its full surface.
     const emptyDb = { tables: new Map(), enums: new Set(), constraints: new Set() };
-    for (const action of planCollectionSchemaEnsure(fixture, emptyDb, {
+    for (const action of planTableSchemaEnsure(fixture, emptyDb, {
         databaseExtensions: FIXTURE_DATABASE_EXTENSIONS
     }).actions) {
         readStatement(surface, "boot", action.sql);
@@ -420,7 +420,7 @@ async function renderFixture(fixture: FixtureInput): Promise<Rendered> {
         for (const statement of plan.policyStatements) readStatement(surface, "boot", statement);
     }
     // Views are applied at boot from the same plan, by the same renderer
-    // `views.sql` is written with (`ensureCollectionTables`).
+    // `views.sql` is written with (`ensureTables`).
     const bootPlan = planSchema(fixture, { databaseExtensions: FIXTURE_DATABASE_EXTENSIONS });
     for (const statement of viewStatementsOf(renderViewsDdl(bootPlan) as string)) {
         readStatement(surface, "boot", statement);
@@ -497,7 +497,7 @@ export async function render(): Promise<string> {
         "# collections and must describe the same database.",
         "#",
         "# One documented exception: `schema` lines are push-only. Boot does create",
-        "# its schemas, but in the applier (ensure-collection-tables.ts, the",
+        "# its schemas, but in the applier (ensure-tables.ts, the",
         "# `CREATE SCHEMA IF NOT EXISTS` before the plan runs) rather than in the",
         "# plan this renders. Any OTHER push-only or boot-only line is a defect.",
         "#",

@@ -22,7 +22,7 @@ import {
     MAX_INDEXABLE_VECTOR_DIMENSIONS
 } from "../src/schema/vector-index";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
-import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
+import { planTableSchemaEnsure } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
 const collection = (properties: Record<string, unknown>, extra: Record<string, unknown> = {}): CollectionConfig =>
@@ -194,7 +194,7 @@ describe("the two producers describe the same index", () => {
     it("boot plans the same names, in the concurrent form, against a live table", () => {
         // Live, because that is what the concurrent form is for. On a table the
         // same plan creates, boot plans the plain form — see the case below.
-        const ensure = planCollectionSchemaEnsure(compileSet([c]), {
+        const ensure = planTableSchemaEnsure(compileSet([c]), {
             tables: new Map([["public.documents", new Set(["id"])]]),
             enums: new Set()
         });
@@ -210,7 +210,7 @@ describe("the two producers describe the same index", () => {
     });
 
     it("boot plans the plain form on a table it is creating", () => {
-        const ensure = planCollectionSchemaEnsure(compileSet([c]), { tables: new Map(), enums: new Set() });
+        const ensure = planTableSchemaEnsure(compileSet([c]), { tables: new Map(), enums: new Set() });
         const indexSql = ensure.actions
             .filter(a => a.kind === "create-index")
             .map(a => a.sql);
@@ -224,7 +224,7 @@ describe("the two producers describe the same index", () => {
 
     it("boot reports a skipped column instead of planning an index for it", () => {
         const wide = collection({ embedding: vector({ dimensions: 4096 }) });
-        const ensure = planCollectionSchemaEnsure(compileSet([wide]), { tables: new Map(), enums: new Set() });
+        const ensure = planTableSchemaEnsure(compileSet([wide]), { tables: new Map(), enums: new Set() });
         expect(ensure.actions.filter(a => a.kind === "create-index" && a.sql.includes("hnsw"))).toEqual([]);
         expect(ensure.vectorIndexSkipped).toHaveLength(1);
         expect(ensure.vectorIndexSkipped[0].column).toBe("embedding");

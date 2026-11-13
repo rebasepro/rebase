@@ -22,7 +22,7 @@
  */
 import { describe, it, expect } from "@jest/globals";
 import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
-import { planCollectionSchemaEnsure, type ExistingSchema } from "../src/schema/ensure-collection-tables";
+import { planTableSchemaEnsure, type ExistingSchema } from "../src/schema/ensure-tables";
 import {
     buildSearchColumnSpec,
     searchColumnStamps,
@@ -74,7 +74,7 @@ describe("`mode` does not describe the column", () => {
     });
 
     it("is therefore not drift, so a live collection can switch with a deploy", () => {
-        const plan = planCollectionSchemaEnsure(compileSet([hybrid as CollectionConfig]), existing(stampOf(fts)));
+        const plan = planTableSchemaEnsure(compileSet([hybrid as CollectionConfig]), existing(stampOf(fts)));
 
         expect(plan.searchDrift).toEqual([]);
         expect(plan.actions.filter(a => a.kind === "add-column")).toEqual([]);
@@ -84,7 +84,7 @@ describe("`mode` does not describe the column", () => {
         // The contrast is what makes the test above mean something: if `mode`
         // were silently ignored by the planner rather than genuinely
         // column-neutral, both cases would come back clean.
-        const plan = planCollectionSchemaEnsure(compileSet([folded as CollectionConfig]), existing(stampOf(fts)));
+        const plan = planTableSchemaEnsure(compileSet([folded as CollectionConfig]), existing(stampOf(fts)));
 
         expect(plan.searchDrift).toHaveLength(1);
         expect(plan.searchDrift[0].rebuild[0])

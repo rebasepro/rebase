@@ -30,7 +30,7 @@ import {
     generatePostgresVectorDdl,
     vectorExcludePatterns
 } from "../src/schema/generate-postgres-ddl-logic";
-import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
+import { planTableSchemaEnsure } from "../src/schema/ensure-tables";
 import {
     buildTableVectorColumnSpecs,
     buildTableVectorIndexPlan,
@@ -317,7 +317,7 @@ describe("boot provisions what the push provisions", () => {
     const optedIn = { databaseExtensions: ["vector"] } as const;
 
     it("installs pgvector at boot too — the managed runtime never runs a push", () => {
-        const actions = planCollectionSchemaEnsure(compileSet(collections), emptyDb, optedIn).actions;
+        const actions = planTableSchemaEnsure(compileSet(collections), emptyDb, optedIn).actions;
         expect(actions.some(a =>
             a.kind === "create-extension" && /CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;/.test(a.sql)
         )).toBe(true);
@@ -329,14 +329,14 @@ describe("boot provisions what the push provisions", () => {
      * of them honoured would make the schema depend on which command ran first.
      */
     it("refuses at boot exactly where the push refuses — no declaration, no install", () => {
-        const planned = planCollectionSchemaEnsure(compileSet(collections), emptyDb).actions
+        const planned = planTableSchemaEnsure(compileSet(collections), emptyDb).actions
             .filter(a => a.kind === "create-extension" && a.sql.includes(" vector"));
         expect(planned).toEqual([]);
         expect(generatePostgresVectorDdl(compileSet(collections))).not.toMatch(/CREATE\s+EXTENSION/i);
     });
 
     it("plans the extension before the table that needs the type", () => {
-        const actions = planCollectionSchemaEnsure(compileSet(collections), emptyDb, optedIn).actions;
+        const actions = planTableSchemaEnsure(compileSet(collections), emptyDb, optedIn).actions;
         const extension = actions.findIndex(a => a.kind === "create-extension" && a.sql.includes("vector"));
         const table = actions.findIndex(a => a.kind === "create-table");
         expect(extension).toBeGreaterThanOrEqual(0);
@@ -348,7 +348,7 @@ describe("boot provisions what the push provisions", () => {
             collection,
             { ...collection, slug: "other_observations", table: "other_observations" } as CollectionConfig
         ];
-        const planned = planCollectionSchemaEnsure(compileSet(two), emptyDb, optedIn).actions
+        const planned = planTableSchemaEnsure(compileSet(two), emptyDb, optedIn).actions
             .filter(a => a.kind === "create-extension" && a.sql.includes("vector"));
         expect(planned).toHaveLength(1);
     });
@@ -358,7 +358,7 @@ describe("boot provisions what the push provisions", () => {
         // install pgvector, and Rebase installs it only where the schema needs
         // it. A project that names it and stores no embeddings gets nothing.
         for (const options of [undefined, optedIn]) {
-            const planned = planCollectionSchemaEnsure(compileSet(noVectors), emptyDb, options).actions
+            const planned = planTableSchemaEnsure(compileSet(noVectors), emptyDb, options).actions
                 .filter(a => a.kind === "create-extension" && a.sql.includes(" vector"));
             expect(planned).toEqual([]);
         }
@@ -373,7 +373,7 @@ describe("boot provisions what the push provisions", () => {
             // a plain one needs none. See `buildSearchColumnSpec`.
             search: { fields: ["title"], unaccent: true }
         }];
-        const planned = planCollectionSchemaEnsure(compileSet(searchable), emptyDb).actions
+        const planned = planTableSchemaEnsure(compileSet(searchable), emptyDb).actions
             .filter(a => a.kind === "create-extension");
         expect(planned.length).toBeGreaterThan(0);
         expect(planned.every(a => !a.sql.includes(" vector"))).toBe(true);
@@ -381,7 +381,7 @@ describe("boot provisions what the push provisions", () => {
 
     it("names the same column both producers name", () => {
         const [spec] = buildTableVectorColumnSpecs(compileSet([collection])[0].descriptor);
-        const boot = planCollectionSchemaEnsure(compileSet(collections), emptyDb).actions
+        const boot = planTableSchemaEnsure(compileSet(collections), emptyDb).actions
             .find(a => a.sql.includes(`"${spec.column}"`) && a.sql.includes("ADD COLUMN"));
         expect(boot).toBeDefined();
         expect(generatePostgresVectorDdl(compileSet(collections))).toContain(`"${spec.column}" VECTOR(${spec.dimensions})`);

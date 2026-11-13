@@ -11,7 +11,7 @@
  */
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
-import { ensureCollectionTables } from "../src/schema/ensure-collection-tables";
+import { ensureTables } from "../src/schema/ensure-tables";
 import { checkCollectionsVsDatabase } from "../src/schema/doctor";
 import { compileSet } from "./helpers/plan-tables";
 
@@ -53,7 +53,7 @@ const URL = "postgres://doctor.test/db";
 
 async function provision(collections: CollectionConfig[]): Promise<PGlite> {
     const db = mockDb!;
-    const outcome = await ensureCollectionTables({
+    const outcome = await ensureTables({
         query: async <T = unknown>(sql: string) => ({ rows: (await db.query<T>(sql)).rows })
     }, compileSet(collections));
     expect(outcome.failures).toEqual([]);

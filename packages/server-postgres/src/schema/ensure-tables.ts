@@ -98,7 +98,7 @@ export interface EnsureOptions extends DiffOptions {
      * Explicit rather than read from the resource registry in here, because the
      * planner is pure and several callers plan against fixtures: reaching for a
      * process-wide registry would make the plan depend on whatever some other
-     * module happened to import. `ensureCollectionTables` is the boundary that
+     * module happened to import. `ensureTables` is the boundary that
      * reads the world.
      */
     databaseExtensions?: readonly string[];
@@ -114,7 +114,7 @@ export interface EnsureOptions extends DiffOptions {
      * Apply the statements that build tables this run creates — and the enum
      * types they use — in transactions of up to {@link NEW_TABLE_BATCH}
      * statements instead of one autocommit each. The boot sets it; see
-     * `ensureCollectionTables`.
+     * `ensureTables`.
      */
     batchNewTables?: boolean;
     /**
@@ -180,7 +180,7 @@ function schemaOf(table: TableDescriptor): string {
  * NOT NULL after a push and nullable after a boot among them, on the one path
  * with no developer in the loop.
  */
-export function planCollectionSchemaEnsure(
+export function planTableSchemaEnsure(
     tables: readonly CompiledTable[],
     existing: ExistingSchema,
     options: EnsureOptions = {}
@@ -548,7 +548,7 @@ function searchDriftMessage(drift: SearchColumnDrift[]): string {
  * Read what the database looks like, for the schemas a set of tables lives
  * in.
  *
- * The same read `ensureCollectionTables` does at boot, exposed on its own for
+ * The same read `ensureTables` does at boot, exposed on its own for
  * the callers that want to *plan* against a real database without changing it —
  * the live schema editor, which has to tell somebody what a change would do
  * before they agree to it.
@@ -580,7 +580,7 @@ export async function readSchemaFactsFor(
  * cannot be added, say) should not roll back the tables that were created fine.
  * The error is surfaced with the statement that caused it.
  */
-export async function ensureCollectionTables(
+export async function ensureTables(
     client: Queryable,
     tables: readonly CompiledTable[],
     log?: (message: string) => void,

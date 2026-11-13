@@ -12,7 +12,7 @@
 import { declaredDatabaseExtensions, type CompiledTable } from "@rebasepro/types";
 import { planSchema } from "./plan/plan-schema";
 import type { EnumPlan } from "./plan/types";
-import { readExistingSchema, type Queryable } from "./ensure-collection-tables";
+import { readExistingSchema, type Queryable } from "./ensure-tables";
 
 export interface KeptEnumLabels {
     /** `schema.type`, as the catalogue names it. */

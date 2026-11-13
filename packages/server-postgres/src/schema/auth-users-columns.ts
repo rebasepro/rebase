@@ -6,7 +6,7 @@
  * Three different code paths create `rebase.users`, and before this module they
  * disagreed about it:
  *
- * | column           | `db push` (generator) | `ensureAuthTablesExist` | `ensureCollectionTables` |
+ * | column           | `db push` (generator) | `ensureAuthTablesExist` | `ensureTables` |
  * |------------------|-----------------------|-------------------------|--------------------------|
  * | `email`          | `TEXT UNIQUE NOT NULL`| `TEXT NOT NULL` + CHECK | `TEXT` (nullable)        |
  * | `roles`          | `TEXT[]`              | `NOT NULL DEFAULT '{}'` | nullable, no default     |

@@ -28,7 +28,7 @@ import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/type
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { diffPlanAgainstCatalogue, type ExistingSchema } from "../src/schema/plan/diff-plan";
-import { ensureCollectionTables, planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
+import { ensureTables, planTableSchemaEnsure } from "../src/schema/ensure-tables";
 import { compileSet, planCollections } from "./helpers/plan-tables";
 
 const notes: PostgresCollectionConfig = {
@@ -118,7 +118,7 @@ describe("planning the indexes of a table that already exists", () => {
     });
 
     it("keeps them actions for the live schema editor, which applies statements as text", () => {
-        const result = planCollectionSchemaEnsure(compileSet([notes]), liveCatalogue([notes]));
+        const result = planTableSchemaEnsure(compileSet([notes]), liveCatalogue([notes]));
         const actions = result.actions.filter(a => a.kind === "create-index").map(a => a.sql);
         expect(actions).toHaveLength(4);
         expect(actions.every(sql => /CONCURRENTLY IF NOT EXISTS/.test(sql))).toBe(true);
@@ -159,14 +159,14 @@ describe("building them on a database that already exists", () => {
             await db.exec(`UPDATE pg_index SET indisvalid = false WHERE indexrelid = 'public."${title}"'::regclass`);
             expect((await indexesOf(db))[title]).toBe(false);
 
-            const outcome = await ensureCollectionTables(asQueryable(db), compileSet([plainNotes]), undefined, { databaseExtensions: [] });
+            const outcome = await ensureTables(asQueryable(db), compileSet([plainNotes]), undefined, { databaseExtensions: [] });
 
             expect(outcome.deferredIndexes).toEqual([expect.objectContaining({ indexName: title, invalid: true })]);
             expect(outcome.indexBuilds?.built).toEqual([`public.${title}`]);
             expect(await indexesOf(db)).toEqual(Object.fromEntries(names.map(name => [name, true])));
 
             // From then on there is nothing to do.
-            const again = await ensureCollectionTables(asQueryable(db), compileSet([plainNotes]), undefined, { databaseExtensions: [] });
+            const again = await ensureTables(asQueryable(db), compileSet([plainNotes]), undefined, { databaseExtensions: [] });
             expect(again.deferredIndexes).toEqual([]);
             expect(again.actions).toEqual([]);
         } finally {
@@ -180,7 +180,7 @@ describe("building them on a database that already exists", () => {
             const gin = names.find(name => name.endsWith("_gin"))!;
             await db.exec(`UPDATE pg_index SET indisvalid = false WHERE indexrelid = 'public."${gin}"'::regclass`);
 
-            const outcome = await ensureCollectionTables(asQueryable(db), compileSet([plainNotes]), undefined, { databaseExtensions: [] });
+            const outcome = await ensureTables(asQueryable(db), compileSet([plainNotes]), undefined, { databaseExtensions: [] });
 
             expect(outcome.indexBuilds?.built).toEqual([`public.${gin}`]);
             expect((await indexesOf(db))[gin]).toBe(true);
@@ -194,7 +194,7 @@ describe("building them on a database that already exists", () => {
         try {
             for (const name of names) await db.exec(`DROP INDEX public."${name}"`);
 
-            const outcome = await ensureCollectionTables(asQueryable(db), compileSet([plainNotes]), undefined, {
+            const outcome = await ensureTables(asQueryable(db), compileSet([plainNotes]), undefined, {
                 databaseExtensions: [], deferIndexBuilds: true
             });
 
@@ -218,7 +218,7 @@ describe("building them on a database that already exists", () => {
             await db.exec(`DROP INDEX public."${slug}"`);
             await db.exec("UPDATE public.notes SET slug = 'same'");
 
-            await expect(ensureCollectionTables(asQueryable(db), compileSet([plainNotes]), undefined, {
+            await expect(ensureTables(asQueryable(db), compileSet([plainNotes]), undefined, {
                 databaseExtensions: [], deferIndexBuilds: true
             })).rejects.toThrow(new RegExp(`${slug}[\\s\\S]*could not create unique index`));
         } finally {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import type { CollectionConfig } from "@rebasepro/types";
 import { columnTypeDriftMessage, typeFamily, typesAgree } from "./column-type-drift";
-import { planCollectionSchemaEnsure, type ExistingSchema } from "./ensure-collection-tables";
+import { planTableSchemaEnsure, type ExistingSchema } from "./ensure-tables";
 import { compileSet } from "../../test/helpers/plan-tables";
 
 describe("reducing a type to its family", () => {
@@ -121,7 +121,7 @@ describe("a numeric that declares its precision", () => {
                 price: { name: "Price", type: "number", precision: 10, scale: 2 }
             }
         };
-        const plan = planCollectionSchemaEnsure(compileSet([products]), {
+        const plan = planTableSchemaEnsure(compileSet([products]), {
             tables: new Map([["public.products", new Set(["id", "price"])]]),
             enums: new Set(),
             columnTypes: new Map([
@@ -157,7 +157,7 @@ describe("the plan reporting a drifted column", () => {
     });
 
     it("names the column, both types, and plans nothing", () => {
-        const plan = planCollectionSchemaEnsure(compileSet([observations]), asDeployed());
+        const plan = planTableSchemaEnsure(compileSet([observations]), asDeployed());
 
         expect(plan.columnTypeDrift).toHaveLength(1);
         expect(plan.columnTypeDrift[0]).toMatchObject({
@@ -174,11 +174,11 @@ describe("the plan reporting a drifted column", () => {
         const agreeing = asDeployed();
         agreeing.columnTypes!.set("public.listing_observations.description_embedding", "jsonb");
 
-        expect(planCollectionSchemaEnsure(compileSet([observations]), agreeing).columnTypeDrift).toEqual([]);
+        expect(planTableSchemaEnsure(compileSet([observations]), agreeing).columnTypeDrift).toEqual([]);
     });
 
     it("says nothing about a column it is creating, which cannot have drifted", () => {
-        const plan = planCollectionSchemaEnsure(compileSet([observations]), {
+        const plan = planTableSchemaEnsure(compileSet([observations]), {
             tables: new Map(),
             enums: new Set()
         });
@@ -189,7 +189,7 @@ describe("the plan reporting a drifted column", () => {
         // `columnTypes` absent means "unknown", and unknown must not report.
         const blind = asDeployed();
         delete blind.columnTypes;
-        expect(planCollectionSchemaEnsure(compileSet([observations]), blind).columnTypeDrift).toEqual([]);
+        expect(planTableSchemaEnsure(compileSet([observations]), blind).columnTypeDrift).toEqual([]);
     });
 
     it("hands the operator a statement they can run", () => {

@@ -18,7 +18,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
 
-import { ensureCollectionTables } from "../src/schema/ensure-collection-tables";
+import { ensureTables } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
 const queryable = (db: PGlite) => ({
@@ -57,7 +57,7 @@ describe("boot on a table whose declared key has no default", () => {
 
     it("gives an `isId: \"uuid\"` key its default, so a row with no key can be created", async () => {
         await db.exec('CREATE TABLE "public"."tickets" ("id" UUID PRIMARY KEY, "title" TEXT);');
-        const outcome = await ensureCollectionTables(queryable(db), compileSet([collectionWithKey("uuid")]));
+        const outcome = await ensureTables(queryable(db), compileSet([collectionWithKey("uuid")]));
         expect(outcome.failures).toEqual([]);
         expect(await keyDefault(db)).toBe("gen_random_uuid()");
         await db.exec("INSERT INTO \"public\".\"tickets\" (\"title\") VALUES ('first');");
@@ -67,14 +67,14 @@ describe("boot on a table whose declared key has no default", () => {
 
     it("leaves a SQL strategy's key alone: its function may not exist yet", async () => {
         await db.exec('CREATE TABLE "public"."tickets" ("id" TEXT PRIMARY KEY, "title" TEXT);');
-        const outcome = await ensureCollectionTables(queryable(db), compileSet([collectionWithKey("sql`make_ticket_id()`")]));
+        const outcome = await ensureTables(queryable(db), compileSet([collectionWithKey("sql`make_ticket_id()`")]));
         expect(outcome.failures).toEqual([]);
         expect(await keyDefault(db)).toBeNull();
     });
 
     it("leaves a manual key alone: the caller sends it", async () => {
         await db.exec('CREATE TABLE "public"."tickets" ("id" TEXT PRIMARY KEY, "title" TEXT);');
-        const outcome = await ensureCollectionTables(queryable(db), compileSet([collectionWithKey("manual")]));
+        const outcome = await ensureTables(queryable(db), compileSet([collectionWithKey("manual")]));
         expect(outcome.failures).toEqual([]);
         expect(await keyDefault(db)).toBeNull();
     });

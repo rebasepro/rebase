@@ -13,7 +13,7 @@
 import { declaredDatabaseExtensions, type CompiledTable } from "@rebasepro/types";
 import { planSchema } from "./plan/plan-schema";
 import { diffPlanAgainstCatalogue, type LegacyForeignKey } from "./plan/diff-plan";
-import { readExistingSchema, type Queryable } from "./ensure-collection-tables";
+import { readExistingSchema, type Queryable } from "./ensure-tables";
 
 export interface LegacyRename extends LegacyForeignKey {
     /** `ALTER TABLE … RENAME COLUMN …;` */

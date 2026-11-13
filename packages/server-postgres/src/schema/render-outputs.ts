@@ -28,7 +28,7 @@ import {
     triggerExcludePatterns,
     vectorExcludePatterns
 } from "./generate-postgres-ddl-logic";
-import { planCollectionSchemaEnsure, type ExistingSchema } from "./ensure-collection-tables";
+import { planTableSchemaEnsure, type ExistingSchema } from "./ensure-tables";
 import { planSchema } from "./plan/plan-schema";
 
 /**
@@ -151,7 +151,7 @@ export interface RenderSchemaOutputsOptions {
  *   `triggers.sql`, `views.sql`: the files written beside it.
  * - `schema.generated.ts` / `schema.generated.no-policies.ts`: the Drizzle schema.
  * - `atlas-excludes.json`: the patterns that keep Atlas off the carved-out objects.
- * - `boot-ensure.json`: `planCollectionSchemaEnsure` against an empty database.
+ * - `boot-ensure.json`: `planTableSchemaEnsure` against an empty database.
  * - `boot-policies.adminRole-*.adminRequestRole-*.json`: `planCollectionPolicies`
  *   for the four role-availability combinations.
  * - `relational-columns.json`, `junction-tables.json`: the legacy-column slices.
@@ -195,7 +195,7 @@ export function renderSchemaOutputs(
             vector: vectorExcludePatterns(sorted),
             triggers: triggerExcludePatterns(sorted)
         }));
-        emit("boot-ensure.json", () => toStableJson(planCollectionSchemaEnsure(sorted, emptyDatabase(), { databaseExtensions })));
+        emit("boot-ensure.json", () => toStableJson(planTableSchemaEnsure(sorted, emptyDatabase(), { databaseExtensions })));
         for (const adminRoleAvailable of [false, true]) {
             for (const adminRequestRoleAvailable of [false, true]) {
                 emit(

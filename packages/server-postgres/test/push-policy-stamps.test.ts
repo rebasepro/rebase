@@ -3,7 +3,7 @@ import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { applyPoliciesFile, stampableTables } from "../src/cli-push";
 import { ensureCollectionPolicies, policyStampSql } from "../src/schema/ensure-collection-policies";
 import { generatePostgresPoliciesDdl, planCollectionPolicies } from "../src/schema/generate-postgres-ddl-logic";
-import type { Queryable } from "../src/schema/ensure-collection-tables";
+import type { Queryable } from "../src/schema/ensure-tables";
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
 import { compileSet } from "./helpers/plan-tables";
 

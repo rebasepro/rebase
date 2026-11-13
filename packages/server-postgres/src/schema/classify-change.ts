@@ -3,7 +3,7 @@
  *
  * The live schema editor may only make changes the boot-time ensure path can
  * actually carry out, because that is the one mechanism that changes a schema
- * (see `ensure-collection-tables.ts`). Its vocabulary is small and deliberately
+ * (see `ensure-tables.ts`). Its vocabulary is small and deliberately
  * so: create a table, add a column, create an enum *type*, create an index, add
  * a foreign key, and rename a column via the legacy-name path. There is no
  * `ALTER COLUMN TYPE` and no `DROP` of anything.

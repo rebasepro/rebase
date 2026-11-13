@@ -12,7 +12,7 @@
  * on the first boot after an upgrade that adds one to every `belongsTo` in the
  * project, that is every large table at once. So these are planned apart
  * (`DeferredIndexBuild`) and built here, after the boot, one at a time. A
- * UNIQUE one is the exception: `ensureCollectionTables` builds it here too, but
+ * UNIQUE one is the exception: `ensureTables` builds it here too, but
  * before it returns.
  *
  * ## The build

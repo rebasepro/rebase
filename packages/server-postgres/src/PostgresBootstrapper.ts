@@ -2207,7 +2207,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
             driverResult?: InitializedDriver,
             log?: (message: string) => void
         ): Promise<{ applied: number }> {
-            const { ensureCollectionTables } = await import("./schema/ensure-collection-tables");
+            const { ensureTables } = await import("./schema/ensure-tables");
             // Runs through the drizzle handle the driver already bootstrapped
             // with, so it uses exactly the connection and privileges that were
             // proven to work. Every statement is DDL or a catalogue read with no
@@ -2220,7 +2220,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
             // serving processes of such a deployment provision nothing. It is
             // a migration job: building inline is what it is for.
             const provisionOnly = ["1", "true"].includes((process.env.REBASE_PROVISION_ONLY ?? "").trim().toLowerCase());
-            const plan = await ensureCollectionTables(
+            const plan = await ensureTables(
                 queryable,
                 tables,
                 log,

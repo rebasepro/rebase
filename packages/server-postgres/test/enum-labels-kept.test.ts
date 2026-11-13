@@ -6,7 +6,7 @@
  */
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
-import type { Queryable } from "../src/schema/ensure-collection-tables";
+import type { Queryable } from "../src/schema/ensure-tables";
 import { findKeptEnumLabels, formatKeptEnumLabelsNotice, keptEnumLabels } from "../src/schema/enum-labels-kept";
 import { compileSet } from "./helpers/plan-tables";
 

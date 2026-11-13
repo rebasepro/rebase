@@ -76,7 +76,7 @@ import { ColumnOrigins, fieldsOfResult, withoutUnreadableColumns } from "./secur
 import { viewRowsName } from "./schema/plan/view-names";
 import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
-import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
+import { readSchemaFactsFor, type Queryable } from "./schema/ensure-tables";
 import { readReconcileFacts } from "./schema/reconcile-schema";
 import { onOwnSession, openSqlCursorOnPool, readWithinBudget, refuseOversizedRows, RESET_SESSION_STATEMENTS, runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
 import { PgNotifyListener } from "./services/pg-notify-listener";

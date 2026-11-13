@@ -13,7 +13,7 @@
  */
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
-import { ensureCollectionTables } from "../src/schema/ensure-collection-tables";
+import { ensureTables } from "../src/schema/ensure-tables";
 import { checkCollectionsVsDatabase } from "../src/schema/doctor";
 import { compileSet } from "./helpers/plan-tables";
 
@@ -65,7 +65,7 @@ describe("the doctor on a collection outside public with a many-to-many", () => 
 
     it("finds the junction boot created, in public", async () => {
         const db = mockDb!;
-        const outcome = await ensureCollectionTables({
+        const outcome = await ensureTables({
             query: async <T = unknown>(sql: string) => ({ rows: (await db.query<T>(sql)).rows })
         }, compileSet([contacts, tags]));
         expect(outcome.failures).toEqual([]);
@@ -81,7 +81,7 @@ describe("the doctor on a collection outside public with a many-to-many", () => 
 
     it("still reports the junction when it is absent", async () => {
         const db = mockDb!;
-        await ensureCollectionTables({
+        await ensureTables({
             query: async <T = unknown>(sql: string) => ({ rows: (await db.query<T>(sql)).rows })
         }, compileSet([contacts, tags]));
         await db.exec('DROP TABLE "public"."contacts_tags";');

@@ -22,7 +22,7 @@ import * as path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { loadTableSchema } from "../src/schema/load-tables";
-import { ensureCollectionTables } from "../src/schema/ensure-collection-tables";
+import { ensureTables } from "../src/schema/ensure-tables";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { readCatalogueSchema } from "../src/schema/catalogue-schema";
 import { describeSchemaDifference, diffGeneratedSchemaAgainstCatalogue } from "../src/schema/generated-schema-diff";
@@ -120,9 +120,9 @@ describe("doctor and boot agree about schema drift", () => {
         // The table as it was, with a row in it, then boot's additive ensure
         // for the renamed property — which adds `contact_email` and leaves
         // `email` alone, as the boot of `rebase dev` does.
-        expect((await ensureCollectionTables(mockDb, compileSet([authorsBefore]))).failures).toEqual([]);
+        expect((await ensureTables(mockDb, compileSet([authorsBefore]))).failures).toEqual([]);
         await mockDb.exec(`INSERT INTO "public"."authors" (id, name, email) VALUES (gen_random_uuid(), 'Ada', 'ada@example.com')`);
-        expect((await ensureCollectionTables(mockDb, compileSet([authorsAfter]))).failures).toEqual([]);
+        expect((await ensureTables(mockDb, compileSet([authorsAfter]))).failures).toEqual([]);
     });
 
     afterEach(async () => {

@@ -2,7 +2,7 @@
  * The three emitters, column by column, on every property option there is.
  *
  * `getDrizzleColumn`, `getSqlColumnType` (with the `CREATE TABLE` and
- * `planRelationalColumns` around it) and `planCollectionSchemaEnsure` each read
+ * `planRelationalColumns` around it) and `planTableSchemaEnsure` each read
  * a `Property` and each produce a column. They are three renderings of one
  * decision, and the audit that prompted this file found twelve open
  * disagreements between them — a required link that was NOT NULL down one path
@@ -32,7 +32,7 @@ import type { CollectionConfig, Property } from "@rebasepro/types";
 import { getTableName, getTableVarName } from "@rebasepro/common";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
-import { planCollectionSchemaEnsure, type ExistingSchema } from "../src/schema/ensure-collection-tables";
+import { planTableSchemaEnsure, type ExistingSchema } from "../src/schema/ensure-tables";
 import { resolveColumnName } from "../src/schema/column-plan-helpers";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { everything } from "./fixtures/property-matrix-collections";
@@ -233,7 +233,7 @@ const ddlColumns = (ddl: string): Map<string, Map<string, ColumnFacts>> => {
 
 /** The same map, assembled from an ensure plan's statements. */
 const ensureColumns = (
-    plan: ReturnType<typeof planCollectionSchemaEnsure>
+    plan: ReturnType<typeof planTableSchemaEnsure>
 ): Map<string, Map<string, ColumnFacts>> => {
     const tables = new Map<string, Map<string, ColumnFacts>>();
     const columnsFor = (key: string): Map<string, ColumnFacts> => {
@@ -287,12 +287,12 @@ const emptyDb = (): ExistingSchema => ({
 describe("the three emitters agree, column by column", () => {
     let drizzle: string;
     let ddl: string;
-    let ensure: ReturnType<typeof planCollectionSchemaEnsure>;
+    let ensure: ReturnType<typeof planTableSchemaEnsure>;
 
     beforeAll(() => {
         drizzle = generateSchema(compileSet(everything));
         ddl = generatePostgresDdl(compileSet(everything));
-        ensure = planCollectionSchemaEnsure(compileSet(everything), emptyDb(), { databaseExtensions: ["vector"] });
+        ensure = planTableSchemaEnsure(compileSet(everything), emptyDb(), { databaseExtensions: ["vector"] });
     });
 
     it("on the type, nullability, default, key, uniqueness and foreign key of every property's column", () => {

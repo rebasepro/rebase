@@ -33,7 +33,7 @@ import type { CompiledTable, SchemaReconcileColumn, SchemaReconcilePlan } from "
 
 import { planSchema } from "./plan/plan-schema";
 import { diffPlanAgainstCatalogue, type ExistingSchema } from "./plan/diff-plan";
-import { readSchemaFactsFor, type Queryable } from "./ensure-collection-tables";
+import { readSchemaFactsFor, type Queryable } from "./ensure-tables";
 import type { TablePlan } from "./plan/types";
 
 export interface ReconcileOptions {

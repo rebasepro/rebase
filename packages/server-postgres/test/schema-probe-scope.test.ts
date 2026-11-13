@@ -9,7 +9,7 @@
  */
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig, PostgresProperties } from "@rebasepro/types";
-import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
+import { ensureTables, type Queryable } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
 describe("the schema read's row probe", () => {
@@ -34,18 +34,18 @@ describe("the schema read's row probe", () => {
                 }
             };
             const probes = () => ran.filter(text => /EXISTS\(SELECT 1 FROM/.test(text));
-            await ensureCollectionTables(queryable, compileSet([notes({}), tags]));
+            await ensureTables(queryable, compileSet([notes({}), tags]));
             // An adopted table nobody declared, holding rows.
             await pg.exec(`CREATE TABLE public.legacy_archive (id int); INSERT INTO public.legacy_archive VALUES (1);
                            INSERT INTO public.notes (body) VALUES ('kept');`);
 
             ran.length = 0;
-            const settled = await ensureCollectionTables(queryable, compileSet([notes({}), tags]));
+            const settled = await ensureTables(queryable, compileSet([notes({}), tags]));
             expect(settled.actions).toEqual([]);
             expect(probes()).toEqual([]);
 
             ran.length = 0;
-            const changed = await ensureCollectionTables(queryable, compileSet([
+            const changed = await ensureTables(queryable, compileSet([
                 notes({ title: { type: "string", validation: { required: true } } }),
                 tags
             ]));

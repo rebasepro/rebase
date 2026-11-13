@@ -6,7 +6,7 @@
  * Rebase used to compile a field definition into a column in three places:
  * `getDrizzleColumn` (`schema.generated.ts`), `getSqlColumnType` plus the
  * `CREATE TABLE` walk around it (`schema.sql`, what `db push` applies) and
- * `planCollectionSchemaEnsure` (what a managed tenant gets at boot, where no
+ * `planTableSchemaEnsure` (what a managed tenant gets at boot, where no
  * `db push` ever runs). Three `switch (prop.type)` statements, three readings
  * of `relations`, of `enum`, of `search`, of `validation.unique`. The audit
  * that produced this module counted twelve open disagreements between them and

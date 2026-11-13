@@ -4,7 +4,7 @@
  * A table holding `inet`, `interval`, `timestamp`, a range and an `inet[]` is
  * created in one database, generated from it (`rebase schema introspect`'s
  * generator), and the generated definitions are then pushed into a fresh
- * database (`schema.sql`), booted over (`ensureCollectionTables`, which plans
+ * database (`schema.sql`), booted over (`ensureTables`, which plans
  * nothing on the pushed tables and nothing more on a second boot), rendered as
  * a Drizzle file that compiles, and round-tripped through the runtime's codec
  * and catalogue-built table — every value passing through as the driver
@@ -22,7 +22,7 @@ import { col, defineTable, type AnyTableDef, type AnyViewDef } from "@rebasepro/
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
 import { renderDrizzleSchema } from "../src/schema/plan/render-drizzle";
-import { ensureCollectionTables, readExistingSchema } from "../src/schema/ensure-collection-tables";
+import { ensureTables, readExistingSchema } from "../src/schema/ensure-tables";
 import { diffPlanAgainstCatalogue } from "../src/schema/plan/diff-plan";
 import { readSchemaMetadata } from "../src/schema/introspect-db-queries";
 import { generateSchemaModules } from "../src/schema/introspect-db-logic";
@@ -123,11 +123,11 @@ describe("col.custom(): generated from a database, pushed, booted and served", (
 
     it("is pushed, then a boot finds nothing to do, twice; and a database whose type differs is reported", async () => {
         await target.exec(ddlOf(defs));
-        const first = await ensureCollectionTables(queryable(target), compileSchema(defs), undefined, { databaseExtensions: [] });
+        const first = await ensureTables(queryable(target), compileSchema(defs), undefined, { databaseExtensions: [] });
         expect(first.failures).toEqual([]);
         expect(first.actions.map(action => `${action.kind} ${action.target}`)).toEqual([]);
         expect(first.columnTypeDrift).toEqual([]);
-        const second = await ensureCollectionTables(queryable(target), compileSchema(defs), undefined, { databaseExtensions: [] });
+        const second = await ensureTables(queryable(target), compileSchema(defs), undefined, { databaseExtensions: [] });
         expect(second.actions).toEqual([]);
 
         // The same table, declared with another range type: reported, never altered.
@@ -143,7 +143,7 @@ describe("col.custom(): generated from a database, pushed, booted and served", (
 
     it("is created by a boot from nothing, as ADD COLUMN on an existing table", async () => {
         await target.exec("CREATE TABLE public.sessions (id uuid PRIMARY KEY DEFAULT gen_random_uuid());");
-        const booted = await ensureCollectionTables(queryable(target), compileSchema(defs), undefined, { databaseExtensions: [] });
+        const booted = await ensureTables(queryable(target), compileSchema(defs), undefined, { databaseExtensions: [] });
         expect(booted.failures).toEqual([]);
         const { rows } = await target.query<{ column_name: string; formatted: string }>(
             "SELECT a.attname AS column_name, format_type(a.atttypid, a.atttypmod) AS formatted FROM pg_attribute a " +
@@ -152,7 +152,7 @@ describe("col.custom(): generated from a database, pushed, booted and served", (
             ["id", "uuid"], ["address", "inet"], ["lasted", "interval"], ["started", "timestamp(3) without time zone"],
             ["seats", "int4range"], ["hops", "inet[]"]
         ]);
-        const again = await ensureCollectionTables(queryable(target), compileSchema(defs), undefined, { databaseExtensions: [] });
+        const again = await ensureTables(queryable(target), compileSchema(defs), undefined, { databaseExtensions: [] });
         expect(again.actions).toEqual([]);
     });
 

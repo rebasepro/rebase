@@ -36,7 +36,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper } from "../../src/PostgresBootstrapper.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
-import { ensureCollectionTables, type Queryable } from "../../src/schema/ensure-collection-tables.js";
+import { ensureTables, type Queryable } from "../../src/schema/ensure-tables.js";
 import { compileSet } from "../helpers/plan-tables";
 
 // ── The project's collections ────────────────────────────────────────────────
@@ -127,11 +127,11 @@ describe("Two data sources, one routed collection (E2E)", () => {
 
         // Provisioning, exactly as boot does it: each source is handed only the
         // collections routed to it.
-        await ensureCollectionTables(
+        await ensureTables(
             queryableFor(defaultConn.pool),
             compileSet([postsCollection, tagsCollection])
         );
-        await ensureCollectionTables(
+        await ensureTables(
             queryableFor(analyticsConn.pool),
             compileSet([eventsCollection])
         );
@@ -220,7 +220,7 @@ describe("Two data sources, one routed collection (E2E)", () => {
         const probe = new pg.Client({ connectionString: orderingUrl });
         await probe.connect();
         try {
-            await ensureCollectionTables(queryableFor(conn.pool), compileSet([eventsCollection]));
+            await ensureTables(queryableFor(conn.pool), compileSet([eventsCollection]));
 
             const before = await probe.query(
                 "SELECT to_regprocedure('rebase.roles()') IS NOT NULL AS present"

@@ -23,7 +23,7 @@
  */
 import { CollectionConfig } from "@rebasepro/types";
 import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
-import { planCollectionSchemaEnsure, type ExistingSchema } from "../src/schema/ensure-collection-tables";
+import { planTableSchemaEnsure, type ExistingSchema } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
 const categories: CollectionConfig = {
@@ -80,7 +80,7 @@ describe("legacy foreign-key column detection", () => {
     });
 
     it("renames a junction column that still has the old spelling", () => {
-        const plan = planCollectionSchemaEnsure(compileSet(collections), dbWithJunction(["categorie_id", "product_id"]));
+        const plan = planTableSchemaEnsure(compileSet(collections), dbWithJunction(["categorie_id", "product_id"]));
 
         expect(plan.legacyForeignKeys).toEqual([
             { table: "public.categories_products", expected: "category_id", legacy: "categorie_id" }
@@ -100,7 +100,7 @@ describe("legacy foreign-key column detection", () => {
 
     it("renames before it adds any foreign key that polices the column", () => {
         // A constraint naming a column that has not been renamed yet would fail.
-        const plan = planCollectionSchemaEnsure(compileSet(collections), dbWithJunction(["categorie_id", "product_id"]));
+        const plan = planTableSchemaEnsure(compileSet(collections), dbWithJunction(["categorie_id", "product_id"]));
         const rename = plan.actions.findIndex(a => a.kind === "rename-column");
         const firstConstraint = plan.actions.findIndex(a => a.kind === "add-constraint");
 
@@ -109,14 +109,14 @@ describe("legacy foreign-key column detection", () => {
     });
 
     it("says nothing when the junction already has the current spelling", () => {
-        const plan = planCollectionSchemaEnsure(compileSet(collections), dbWithJunction(["category_id", "product_id"]));
+        const plan = planTableSchemaEnsure(compileSet(collections), dbWithJunction(["category_id", "product_id"]));
         expect(plan.legacyForeignKeys).toEqual([]);
     });
 
     it("says nothing when both spellings are present", () => {
         // Migrated by hand, or the old column deliberately left behind. The
         // relation reads a column that exists, so there is nothing to say.
-        const plan = planCollectionSchemaEnsure(
+        const plan = planTableSchemaEnsure(
             compileSet(collections),
             dbWithJunction(["category_id", "categorie_id", "product_id"])
         );
@@ -125,7 +125,7 @@ describe("legacy foreign-key column detection", () => {
 
     it("says nothing for a junction it is creating from scratch", () => {
         // No junction table at all: nothing to strand.
-        const plan = planCollectionSchemaEnsure(compileSet(collections), {
+        const plan = planTableSchemaEnsure(compileSet(collections), {
             tables: new Map([
                 ["public.products", new Set(["id", "title"])],
                 ["public.categories", new Set(["id", "name"])]
@@ -140,7 +140,7 @@ describe("legacy foreign-key column detection", () => {
         // `products` gives `product_id` under both rules. Even with the old
         // column absent it must not appear — otherwise every m2m in every
         // project would warn.
-        const plan = planCollectionSchemaEnsure(compileSet(collections), dbWithJunction(["categorie_id"]));
+        const plan = planTableSchemaEnsure(compileSet(collections), dbWithJunction(["categorie_id"]));
         expect(plan.legacyForeignKeys.map(l => l.expected)).toEqual(["category_id"]);
         // `product_id` is simply missing, so it is created the ordinary way.
         expect(plan.statements.some(s => s.includes('ADD COLUMN IF NOT EXISTS "product_id"'))).toBe(true);
@@ -170,7 +170,7 @@ describe("legacy foreign-key column detection", () => {
             }
         };
 
-        const plan = planCollectionSchemaEnsure(compileSet([pinned, categories]), dbWithJunction(["categorie_id", "product_id"]));
+        const plan = planTableSchemaEnsure(compileSet([pinned, categories]), dbWithJunction(["categorie_id", "product_id"]));
         expect(plan.legacyForeignKeys).toEqual([]);
     });
 
@@ -205,7 +205,7 @@ describe("legacy foreign-key column detection", () => {
             }
         };
 
-        const plan = planCollectionSchemaEnsure(compileSet([renamed, categories]), dbWithJunction(["categorie_id", "product_id"]));
+        const plan = planTableSchemaEnsure(compileSet([renamed, categories]), dbWithJunction(["categorie_id", "product_id"]));
 
         expect(plan.legacyForeignKeys).toEqual([]);
         // The author's column is genuinely missing, so it is created — not

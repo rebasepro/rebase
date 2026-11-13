@@ -3,7 +3,7 @@
  *
  * ## Why this exists
  *
- * {@link ensureCollectionTables} creates the collection *tables* a managed
+ * {@link ensureTables} creates the collection *tables* a managed
  * runtime boots against, but a table with row-level security disabled and no
  * policies is not servable: authenticated requests run as the restricted
  * `rebase_user` role, so a read with no `SELECT` policy returns nothing (a
@@ -64,7 +64,7 @@ import { REBASE_ADMIN_ROLE, type CompiledTable } from "@rebasepro/types";
 import { ADMIN_REQUEST_POLICY_SUFFIX, toPostgresIdentifier } from "@rebasepro/utils";
 import { planCollectionPolicies, type CollectionPolicyPlan } from "./generate-postgres-ddl-logic";
 import { isGeneratedPolicyName } from "../security/policy-drift";
-import { describeDriverError, type Queryable } from "./ensure-collection-tables";
+import { describeDriverError, type Queryable } from "./ensure-tables";
 import { assertSafeIdentifier } from "./plan/diff-plan";
 import { quoteSqlLiteral } from "./generate-postgres-ddl-logic";
 import { revokeUserRoleSql } from "../security/rls-enforcement";

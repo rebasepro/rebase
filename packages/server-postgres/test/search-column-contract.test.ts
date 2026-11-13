@@ -21,7 +21,7 @@ import {
 } from "../src/schema/generate-postgres-ddl-logic";
 import { findGeneratedColumnConflicts, parseColumnMutations } from "../src/schema/generated-column-conflicts";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
-import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
+import { planTableSchemaEnsure } from "../src/schema/ensure-tables";
 import { buildSearchColumnSpec } from "../src/schema/search-column";
 import { planColumnTypeFor } from "./helpers/plan-column";
 import { compileSet } from "./helpers/plan-tables";
@@ -71,7 +71,7 @@ describe("every generator renders the same search column", () => {
     });
 
     it("the boot-time ensure adds the same column definition", () => {
-        const plan = planCollectionSchemaEnsure(compileSet(collections), emptySchema);
+        const plan = planTableSchemaEnsure(compileSet(collections), emptySchema);
         const addSearch = plan.actions.find(a => a.kind === "add-column" && a.target.endsWith("search_vector"));
         expect(addSearch).toBeDefined();
         expect(addSearch!.sql).toContain(`tsvector GENERATED ALWAYS AS (${spec.expression}) STORED`);
@@ -79,7 +79,7 @@ describe("every generator renders the same search column", () => {
 
     it("the DDL generator and the ensure agree on the index", async () => {
         const ddl = await generatePostgresDdl(compileSet(collections), { includePolicies: false });
-        const plan = planCollectionSchemaEnsure(compileSet(collections), emptySchema);
+        const plan = planTableSchemaEnsure(compileSet(collections), emptySchema);
         const index = plan.actions.find(a => a.kind === "create-index");
 
         expect(ddl).toContain(`USING GIN ("search_vector")`);
@@ -105,7 +105,7 @@ describe("the helper functions exist before anything that calls them", () => {
     });
 
     it("the ensure plans them before the column that calls them", () => {
-        const kinds = planCollectionSchemaEnsure(compileSet(collections), emptySchema).actions.map(a => a.kind);
+        const kinds = planTableSchemaEnsure(compileSet(collections), emptySchema).actions.map(a => a.kind);
         const lastFunction = kinds.lastIndexOf("create-function");
         const firstColumn = kinds.indexOf("add-column");
         expect(lastFunction).toBeGreaterThan(-1);
@@ -113,7 +113,7 @@ describe("the helper functions exist before anything that calls them", () => {
     });
 
     it("the ensure plans the extension before the functions", () => {
-        const kinds = planCollectionSchemaEnsure(compileSet(collections), emptySchema).actions.map(a => a.kind);
+        const kinds = planTableSchemaEnsure(compileSet(collections), emptySchema).actions.map(a => a.kind);
         expect(kinds.indexOf("create-extension")).toBeLessThan(kinds.indexOf("create-function"));
     });
 
@@ -129,20 +129,20 @@ describe("the helper functions exist before anything that calls them", () => {
             enums: new Set<string>(),
             constraints: new Set<string>()
         };
-        const plan = planCollectionSchemaEnsure(compileSet(collections), live);
+        const plan = planTableSchemaEnsure(compileSet(collections), live);
         const index = plan.actions.find(a => a.kind === "create-index")!;
         expect(index.sql).toContain("CREATE INDEX CONCURRENTLY");
     });
 
     it("builds plainly on a table it is creating in the same pass", () => {
-        const plan = planCollectionSchemaEnsure(compileSet(collections), emptySchema);
+        const plan = planTableSchemaEnsure(compileSet(collections), emptySchema);
         const index = plan.actions.find(a => a.kind === "create-index")!;
         expect(index.sql).toContain("CREATE INDEX IF NOT EXISTS");
         expect(index.sql).not.toContain("CONCURRENTLY");
     });
 
     it("the ensure plans the index after the column it indexes", () => {
-        const kinds = planCollectionSchemaEnsure(compileSet(collections), emptySchema).actions.map(a => a.kind);
+        const kinds = planTableSchemaEnsure(compileSet(collections), emptySchema).actions.map(a => a.kind);
         expect(kinds.lastIndexOf("add-column")).toBeLessThan(kinds.indexOf("create-index"));
     });
 });
@@ -188,7 +188,7 @@ describe("a collection that has not opted in is untouched", () => {
     });
 
     it("plans no search action at boot", () => {
-        const kinds = planCollectionSchemaEnsure(compileSet(plain), emptySchema).actions.map(a => a.kind);
+        const kinds = planTableSchemaEnsure(compileSet(plain), emptySchema).actions.map(a => a.kind);
         expect(kinds).not.toContain("create-function");
         expect(kinds).not.toContain("create-extension");
         expect(kinds).not.toContain("create-index");

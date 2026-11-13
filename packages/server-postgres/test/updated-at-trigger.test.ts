@@ -22,10 +22,10 @@ import {
     generatePostgresTriggersDdl
 } from "../src/schema/generate-postgres-ddl-logic";
 import {
-    ensureCollectionTables,
+    ensureTables,
     readExistingSchema,
-    planCollectionSchemaEnsure
-} from "../src/schema/ensure-collection-tables";
+    planTableSchemaEnsure
+} from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
 const posts: CollectionConfig = {
@@ -101,7 +101,7 @@ describe("`autoValue: \"on_update\"` is a database trigger", () => {
     it("is installed by the boot-time ensure, and only once", async () => {
         const client = queryable(db);
 
-        const first = await ensureCollectionTables(client, compileSet([posts]));
+        const first = await ensureTables(client, compileSet([posts]));
         expect(first.failures).toEqual([]);
         expect(first.actions.filter(a => a.kind === "create-trigger").length).toBeGreaterThan(0);
 
@@ -117,7 +117,7 @@ describe("`autoValue: \"on_update\"` is a database trigger", () => {
         // every boot. A trigger re-issued each time would work and would report
         // a change on a database that has none.
         const existing = await readExistingSchema(client, ["public"]);
-        const again = planCollectionSchemaEnsure(compileSet([posts]), existing);
+        const again = planTableSchemaEnsure(compileSet([posts]), existing);
         expect(again.actions.filter(a => a.kind === "create-trigger")).toEqual([]);
     });
 });
@@ -167,7 +167,7 @@ describe("a junction payload's `on_update` column", () => {
 
     it("gets the same touch trigger from the boot as from `triggers.sql`", () => {
         const push = triggerNames(generatePostgresTriggersDdl(compileSet(collections)).split(";"));
-        const boot = triggerNames(planCollectionSchemaEnsure(compileSet(collections), emptyDb).actions
+        const boot = triggerNames(planTableSchemaEnsure(compileSet(collections), emptyDb).actions
             .filter(action => action.kind === "create-trigger")
             .map(action => action.sql));
 
@@ -179,7 +179,7 @@ describe("a junction payload's `on_update` column", () => {
         const db = new PGlite();
         await db.waitReady;
         try {
-            const result = await ensureCollectionTables(queryable(db), compileSet(collections));
+            const result = await ensureTables(queryable(db), compileSet(collections));
             expect(result.failures).toEqual([]);
 
             await db.exec(`INSERT INTO "public"."players" ("handle") VALUES ('ada');`);
@@ -194,7 +194,7 @@ describe("a junction payload's `on_update` column", () => {
             expect(new Date(rows.rows[0].changed_at).getUTCFullYear()).toBeGreaterThan(2000);
 
             // And, like every other trigger, planned once.
-            const again = planCollectionSchemaEnsure(compileSet(collections), await readExistingSchema(queryable(db), ["public"]));
+            const again = planTableSchemaEnsure(compileSet(collections), await readExistingSchema(queryable(db), ["public"]));
             expect(again.actions.filter(action => action.kind === "create-trigger")).toEqual([]);
         } finally {
             await db.close();

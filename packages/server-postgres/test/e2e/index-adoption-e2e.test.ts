@@ -20,7 +20,7 @@ import pg from "pg";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
-import { ensureCollectionTables } from "../../src/schema/ensure-collection-tables.js";
+import { ensureTables } from "../../src/schema/ensure-tables.js";
 import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logic.js";
 import { buildDeferredIndexes, poolIndexBuildSession } from "../../src/schema/deferred-index-build.js";
 import { pushIndexAdoptions } from "../../src/schema/push-index-adoption.js";
@@ -48,7 +48,7 @@ const queryable = (pool: pg.Pool) => ({
 });
 
 async function boot(pool: pg.Pool) {
-    const outcome = await ensureCollectionTables(queryable(pool), compileSet([events]), undefined, {
+    const outcome = await ensureTables(queryable(pool), compileSet([events]), undefined, {
         deferIndexBuilds: true,
         lockTimeoutMs: 1_000,
         batchNewTables: true,

@@ -22,7 +22,7 @@ import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
 import { renderDrizzleSchema } from "../src/schema/plan/render-drizzle";
 import type { ColumnPlan, SchemaPlan, TablePlan } from "../src/schema/plan/types";
-import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
+import { ensureTables, type Queryable } from "../src/schema/ensure-tables";
 import { withPinnedPlannerWorld } from "../src/schema/render-outputs";
 import { assertWritableColumns } from "../src/services/collection-helpers";
 import { readCatalogueSchema } from "../src/schema/catalogue-schema";
@@ -124,9 +124,9 @@ describe("table features: the whole fixture", () => {
 
     it("boots: the boot planner creates every table, and a second boot plans nothing", async () => {
         await db.exec("CREATE SCHEMA IF NOT EXISTS \"rebase\";");
-        const first = await ensureCollectionTables(queryable(db), compileSchema(TABLE_FEATURES), undefined, { databaseExtensions: [] });
+        const first = await ensureTables(queryable(db), compileSchema(TABLE_FEATURES), undefined, { databaseExtensions: [] });
         expect(first.failures).toEqual([]);
-        const second = await ensureCollectionTables(queryable(db), compileSchema(TABLE_FEATURES), undefined, { databaseExtensions: [] });
+        const second = await ensureTables(queryable(db), compileSchema(TABLE_FEATURES), undefined, { databaseExtensions: [] });
         expect(second.failures).toEqual([]);
         expect(second.actions.map(action => `${action.kind} ${action.target}`)).toEqual([]);
     });

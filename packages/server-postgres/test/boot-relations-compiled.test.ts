@@ -18,7 +18,7 @@ import { col, defineTable, rel } from "@rebasepro/types";
 import { compileSchema } from "@rebasepro/common";
 import { createPostgresBootstrapper } from "../src/PostgresBootstrapper";
 import { ensureAppRole } from "../src/security/rls-enforcement";
-import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
+import { ensureTables, type Queryable } from "../src/schema/ensure-tables";
 import { unreadDriver } from "./helpers/spg-a-driver";
 
 const people = defineTable("people", {
@@ -119,7 +119,7 @@ describe("boot provisions related tables from compiled tables", () => {
 
         // A second boot: nothing to create, no policy to rewrite.
         const queryable: Queryable = { query: async (text, values) => ({ rows: (await pg.query(text, values)).rows }) };
-        const again = await ensureCollectionTables(queryable, tables);
+        const again = await ensureTables(queryable, tables);
         expect(again.actions).toEqual([]);
         expect((await bootstrapper.ensureCollectionPolicies!(tables, driverResult)).applied).toBe(0);
     });

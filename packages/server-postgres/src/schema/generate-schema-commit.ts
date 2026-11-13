@@ -44,11 +44,11 @@ import {
 } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import {
-    planCollectionSchemaEnsure,
+    planTableSchemaEnsure,
     type EnsureOptions,
     type ExistingSchema,
     type WithheldConstraint
-} from "./ensure-collection-tables";
+} from "./ensure-tables";
 import { classifyTableChanges, defaultChangeStatements, type ClassifiedChanges, type SchemaFacts } from "./classify-change";
 
 /**
@@ -155,8 +155,8 @@ export function additiveStatements(
     existing: ExistingSchema = nothing(),
     options: EnsureOptions = {}
 ): string[] {
-    const previous = new Set(planCollectionSchemaEnsure(before, existing, options).statements);
-    return planCollectionSchemaEnsure(after, existing, options).statements
+    const previous = new Set(planTableSchemaEnsure(before, existing, options).statements);
+    return planTableSchemaEnsure(after, existing, options).statements
         .filter(statement => !previous.has(statement));
 }
 
@@ -265,8 +265,8 @@ export async function generateSchemaCommit(input: SchemaCommitInput): Promise<Sc
     // planner is pure, so a second call is only wasted work rather than a
     // correctness problem, but this runs on every `/plan` — every change the
     // panel reviews — and again on `/apply`.
-    const previous = planCollectionSchemaEnsure(beforeTables(), existing, options);
-    const next = planCollectionSchemaEnsure(after(), existing, options);
+    const previous = planTableSchemaEnsure(beforeTables(), existing, options);
+    const next = planTableSchemaEnsure(after(), existing, options);
     const already = new Set(previous.statements);
     const statements = next.statements.filter(statement => !already.has(statement));
     // A changed or dropped DEFAULT, which the additive ensure never makes and

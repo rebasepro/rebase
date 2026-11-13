@@ -27,7 +27,7 @@
 import { declaredDatabaseExtensions, type CompiledTable } from "@rebasepro/types";
 import { databaseOwnsDefault } from "@rebasepro/common";
 import { planSchema } from "./plan/plan-schema";
-import type { Queryable } from "./ensure-collection-tables";
+import type { Queryable } from "./ensure-tables";
 
 /** A column whose DEFAULT the tables leave to the database. */
 export interface DatabaseOwnedDefaultColumn {

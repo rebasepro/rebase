@@ -2,7 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { CollectionConfig } from "@rebasepro/types";
 import { planCollectionPolicies } from "../src/schema/generate-postgres-ddl-logic";
 import { ensureCollectionPolicies, lockCollectionTables } from "../src/schema/ensure-collection-policies";
-import type { Queryable } from "../src/schema/ensure-collection-tables";
+import type { Queryable } from "../src/schema/ensure-tables";
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
 import { compileSet } from "./helpers/plan-tables";
 

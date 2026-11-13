@@ -14,9 +14,9 @@
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
 import {
-    ensureCollectionTables,
+    ensureTables,
     readExistingSchema
-} from "../src/schema/ensure-collection-tables";
+} from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
 const posts: CollectionConfig = {
@@ -73,7 +73,7 @@ describe("tables Rebase does not manage, with names it would not choose", () => 
     });
 
     it("boots: the collections' own tables are created and the others left alone", async () => {
-        const outcome = await ensureCollectionTables(queryable(db), compileSet([posts]));
+        const outcome = await ensureTables(queryable(db), compileSet([posts]));
 
         expect(outcome.failures).toEqual([]);
         const { rows } = await db.query<{ n: number }>(`SELECT count(*)::int AS n FROM "public"."2024_archive";`);

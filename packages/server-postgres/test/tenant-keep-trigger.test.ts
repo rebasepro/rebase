@@ -8,10 +8,10 @@
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
 import {
-    ensureCollectionTables,
+    ensureTables,
     readExistingSchema,
-    planCollectionSchemaEnsure
-} from "../src/schema/ensure-collection-tables";
+    planTableSchemaEnsure
+} from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
 const notes = (bypassRoles?: string[]): CollectionConfig => ({
@@ -47,15 +47,15 @@ describe("tenant immutability is a database trigger", () => {
 
     it("is installed once, and re-created when the bypass roles change", async () => {
         const client = queryable(db);
-        const first = await ensureCollectionTables(client, compileSet([notes()]));
+        const first = await ensureTables(client, compileSet([notes()]));
         expect(first.failures).toEqual([]);
         expect(first.actions.filter(a => a.kind === "create-trigger").map(a => a.sql).join("\n"))
             .toContain("EXECUTE FUNCTION rebase.keep_tenant('org_id', 'admin')");
 
-        const same = planCollectionSchemaEnsure(compileSet([notes()]), await readExistingSchema(client, ["public"]));
+        const same = planTableSchemaEnsure(compileSet([notes()]), await readExistingSchema(client, ["public"]));
         expect(same.actions.filter(a => a.kind === "create-trigger")).toEqual([]);
 
-        const changed = planCollectionSchemaEnsure(compileSet([notes(["admin", "support"])]), await readExistingSchema(client, ["public"]));
+        const changed = planTableSchemaEnsure(compileSet([notes(["admin", "support"])]), await readExistingSchema(client, ["public"]));
         expect(changed.actions.filter(a => a.kind === "create-trigger").map(a => a.sql))
             .toEqual([
                 "DROP TRIGGER IF EXISTS \"notes_keep_tenant\" ON \"public\".\"notes\";",
@@ -64,7 +64,7 @@ describe("tenant immutability is a database trigger", () => {
     });
 
     it("leaves the owner free to move a row", async () => {
-        await ensureCollectionTables(queryable(db), compileSet([notes()]));
+        await ensureTables(queryable(db), compileSet([notes()]));
         await db.exec("INSERT INTO public.notes (org_id, body) VALUES ('a', 'x')");
         await db.exec("UPDATE public.notes SET org_id = 'b'");
         expect((await db.query<{ org_id: string }>("SELECT org_id FROM public.notes")).rows).toEqual([{ org_id: "b" }]);

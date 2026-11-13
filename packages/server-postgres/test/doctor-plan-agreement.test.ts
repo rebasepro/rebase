@@ -18,7 +18,7 @@
  */
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
-import { ensureCollectionTables } from "../src/schema/ensure-collection-tables";
+import { ensureTables } from "../src/schema/ensure-tables";
 import { checkCollectionsVsDatabase, type DoctorIssue } from "../src/schema/doctor";
 import { compileSet } from "./helpers/plan-tables";
 
@@ -96,7 +96,7 @@ describe("the doctor against the database the planner built", () => {
     });
 
     it("finds an enum whose derived name Postgres cut to 63 bytes", async () => {
-        await ensureCollectionTables(mockDb!, compileSet([longThings]));
+        await ensureTables(mockDb!, compileSet([longThings]));
         const issues = await issuesOf([longThings]);
         expect(issues.filter(i => i.category === "missing_enum" || i.category === "enum_value_mismatch")).toEqual([]);
     });
@@ -111,7 +111,7 @@ describe("the doctor against the database the planner built", () => {
                 kind: { type: "string", enum: [{ id: "a", label: "A" }] }
             }
         };
-        await ensureCollectionTables(mockDb!, compileSet([tags]));
+        await ensureTables(mockDb!, compileSet([tags]));
         // The collection's own type is gone; a stranger with its name remains.
         await mockDb!.exec(`
             ALTER TABLE "public"."tags" ALTER COLUMN "kind" TYPE text;
@@ -133,14 +133,14 @@ describe("the doctor against the database the planner built", () => {
                 kind: { type: "string", enum: labels.map(id => ({ id, label: id })) }
             }
         });
-        await ensureCollectionTables(mockDb!, compileSet([tags(["a", "b"])]));
+        await ensureTables(mockDb!, compileSet([tags(["a", "b"])]));
         const issue = (await issuesOf([tags(["a"])])).find(i => i.category === "enum_value_mismatch");
         expect(issue?.fix).not.toMatch(/^Run `rebase db push`/);
         expect(issue?.fix).toContain("DROP TYPE");
     });
 
     it("reports a key whose type no longer matches the collection's", async () => {
-        await ensureCollectionTables(mockDb!, compileSet([categories("increment")]));
+        await ensureTables(mockDb!, compileSet([categories("increment")]));
         const issues = await issuesOf([categories("uuid")]);
         const id = issues.find(i => i.column === "id");
         expect(id).toMatchObject({ category: "type_mismatch", table: "categories", expected: "uuid", actual: "integer" });
@@ -195,12 +195,12 @@ describe("the doctor against the database the planner built", () => {
                 title: { type: "string" }
             }
         };
-        await ensureCollectionTables(mockDb!, compileSet([translations]));
+        await ensureTables(mockDb!, compileSet([translations]));
         expect((await issuesOf([translations])).filter(i => i.severity !== "info")).toEqual([]);
     });
 
     it("reports a table with no primary key at all", async () => {
-        await ensureCollectionTables(mockDb!, compileSet([categories("increment")]));
+        await ensureTables(mockDb!, compileSet([categories("increment")]));
         await mockDb!.exec(`ALTER TABLE "public"."categories" DROP CONSTRAINT "categories_pkey";`);
         const issues = await issuesOf([categories("increment")]);
         const key = issues.find(i => i.category === "primary_key_mismatch");
@@ -209,7 +209,7 @@ describe("the doctor against the database the planner built", () => {
     });
 
     it("compares a junction's key columns against the keys they point at", async () => {
-        await ensureCollectionTables(mockDb!, compileSet([people, categories("increment")]));
+        await ensureTables(mockDb!, compileSet([people, categories("increment")]));
         expect((await issuesOf([people, categories("increment")])).filter(i => i.severity !== "info")).toEqual([]);
 
         await mockDb!.exec(`
@@ -223,7 +223,7 @@ describe("the doctor against the database the planner built", () => {
 
     it("says nothing about a database the planner would leave as it is", async () => {
         const all = [longThings, people, categories("increment")];
-        await ensureCollectionTables(mockDb!, compileSet(all));
+        await ensureTables(mockDb!, compileSet(all));
         expect((await issuesOf(all)).filter(i => i.severity !== "info")).toEqual([]);
     });
 });

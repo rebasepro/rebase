@@ -22,7 +22,7 @@ import { pgTable, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
-import { ensureCollectionTables, type Queryable } from "../../src/schema/ensure-collection-tables.js";
+import { ensureTables, type Queryable } from "../../src/schema/ensure-tables.js";
 import { ensureCollectionPolicies } from "../../src/schema/ensure-collection-policies.js";
 import { ensureAuthTablesExist } from "../../src/auth/ensure-tables.js";
 import {
@@ -85,7 +85,7 @@ describe.each([
         const runSql: RawSqlRunner = async (text) => (await pool.query(text)).rows as Record<string, unknown>[];
 
         await ensureAuthTablesExist(db);
-        await ensureCollectionTables(queryable, compileSet([notesCollection]));
+        await ensureTables(queryable, compileSet([notesCollection]));
         const posture = await detectConnectionPosture(runSql);
         expect(posture.superuser).toBe(false);
         expect(posture.privileged).toBe(true);

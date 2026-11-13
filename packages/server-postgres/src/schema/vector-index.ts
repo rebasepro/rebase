@@ -328,7 +328,7 @@ const vectorIndexPlanFrom = ({ schema, table, columns }: VectorTableSource): Vec
  * `CONCURRENTLY` is deliberately absent, for the same reason it is absent from
  * `searchIndexStatements`: this form is replayed as part of a migration, where
  * a concurrent build is not allowed. The boot-time ensure rewrites it — see
- * `ensureCollectionTables`.
+ * `ensureTables`.
  */
 export const vectorIndexStatement = (spec: VectorIndexSpec): string => {
     const params = spec.parameters.length

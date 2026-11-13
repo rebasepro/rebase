@@ -23,7 +23,7 @@ import {
     generatePostgresPoliciesDdl,
     planCollectionPolicies
 } from "./generate-postgres-ddl-logic";
-import { planCollectionSchemaEnsure, type ExistingSchema } from "./ensure-collection-tables";
+import { planTableSchemaEnsure, type ExistingSchema } from "./ensure-tables";
 import { getTableIncludesFromTables } from "../cli-helpers";
 import { compileSet } from "../../test/helpers/plan-tables";
 
@@ -109,7 +109,7 @@ describe("the boot-time schema ensure", () => {
     const empty = (): ExistingSchema => ({ tables: new Map(), enums: new Set() });
 
     it("creates nothing for collections another engine stores", () => {
-        const plan = planCollectionSchemaEnsure(compileSet(all), empty());
+        const plan = planTableSchemaEnsure(compileSet(all), empty());
 
         expect(plan.actions.map(a => a.target)).toEqual(
             expect.arrayContaining(["public.customers"])

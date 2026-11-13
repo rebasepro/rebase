@@ -21,7 +21,7 @@
 import { declaredDatabaseExtensions, type CompiledTable } from "@rebasepro/types";
 import { planSchema } from "./plan/plan-schema";
 import { diffPlanAgainstCatalogue, type DeferredIndexBuild } from "./plan/diff-plan";
-import { readExistingSchema, type Queryable } from "./ensure-collection-tables";
+import { readExistingSchema, type Queryable } from "./ensure-tables";
 
 /** The derived foreign-key indexes a live table lacks (or holds INVALID) whose columns it already has. */
 export async function missingForeignKeyIndexes(

@@ -270,7 +270,7 @@ export interface DiffOptions {
      * Plan every index a table that already exists needs — declared, search
      * and vector, missing or left INVALID under its name — as a
      * {@link DeferredIndexBuild} rather than an action, as the derived
-     * foreign-key indexes always are. `ensureCollectionTables` sets it: it
+     * foreign-key indexes always are. `ensureTables` sets it: it
      * hands them to `buildDeferredIndexes`, which builds them on a connection
      * of its own with no `statement_timeout`, and drops and rebuilds a husk.
      *
@@ -382,7 +382,7 @@ export interface DeferredIndexBuild {
     invalid: boolean;
     /**
      * A declared `unique: true` index. Not an optimization but the collection
-     * promising two rows cannot share a value, so `ensureCollectionTables`
+     * promising two rows cannot share a value, so `ensureTables`
      * builds it before it returns — never after the server is serving — and
      * fails when it cannot, as it did when this was an action. Absent is false.
      */

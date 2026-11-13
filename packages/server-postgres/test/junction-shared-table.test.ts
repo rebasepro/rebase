@@ -12,7 +12,7 @@
  */
 import type { CollectionConfig } from "@rebasepro/types";
 import { planSchema } from "../src/schema/plan/plan-schema";
-import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
+import { planTableSchemaEnsure } from "../src/schema/ensure-tables";
 import { compileSet, planCollections } from "./helpers/plan-tables";
 
 const tags: CollectionConfig = {
@@ -39,7 +39,7 @@ describe("a junction table two relations resolve to", () => {
         const refusal = /"posts_tags"[\s\S]*"tags"[\s\S]*"featuredTags"[\s\S]*featured_tag_id/;
         expect(() => planCollections([posts, tags])).toThrow(refusal);
         // Boot plans through the same function, so it refuses the same way.
-        expect(() => planCollectionSchemaEnsure(compileSet([posts, tags]), {
+        expect(() => planTableSchemaEnsure(compileSet([posts, tags]), {
             tables: new Map(), enums: new Set(), constraints: new Set()
         })).toThrow(refusal);
     });

@@ -24,11 +24,11 @@ import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
 import { renderDrizzleSchema } from "../src/schema/plan/render-drizzle";
 import type { ColumnPlan, SchemaPlan } from "../src/schema/plan/types";
 import {
-    ensureCollectionTables,
-    planCollectionSchemaEnsure,
+    ensureTables,
+    planTableSchemaEnsure,
     readExistingSchema,
     type ExistingSchema
-} from "../src/schema/ensure-collection-tables";
+} from "../src/schema/ensure-tables";
 import { compileSet, planCollections } from "./helpers/plan-tables";
 
 /** A primary key whose property key and column differ. */
@@ -183,7 +183,7 @@ describe("a foreign key references the target's primary-key column", () => {
     it("applies: boot creates every constraint, with no failure recorded", async () => {
         const db = new PGlite();
         try {
-            const outcome = await ensureCollectionTables(asQueryable(db), compileSet([authors, tags, posts]));
+            const outcome = await ensureTables(asQueryable(db), compileSet([authors, tags, posts]));
             expect(outcome.failures).toEqual([]);
             const fks = await liveForeignKeys(db);
             expect(fks.get("posts.posts_author_id_fkey")).toBe("author_id");
@@ -201,14 +201,14 @@ describe("a foreign key references the target's primary-key column", () => {
         // CONSTRAINT` failed with 42703 and a failed constraint is survivable.
         const db = new PGlite();
         try {
-            const aged = planCollectionSchemaEnsure(compileSet([authors, tags, posts]), emptyDb());
+            const aged = planTableSchemaEnsure(compileSet([authors, tags, posts]), emptyDb());
             for (const action of aged.actions) {
                 if (action.kind !== "add-constraint") await db.exec(action.sql);
             }
             expect((await liveForeignKeys(db)).size).toBe(0);
 
             const existing = await readExistingSchema(asQueryable(db), ["public"]);
-            const next = planCollectionSchemaEnsure(compileSet([authors, tags, posts]), existing);
+            const next = planTableSchemaEnsure(compileSet([authors, tags, posts]), existing);
             expect(next.actions.filter(a => a.kind === "add-constraint").map(a => a.target).sort()).toEqual([
                 "public.posts.posts_author_id_fkey",
                 "public.posts.posts_editor_fkey",
@@ -216,7 +216,7 @@ describe("a foreign key references the target's primary-key column", () => {
                 "public.posts_tags.posts_tags_tag_id_fkey"
             ]);
 
-            const outcome = await ensureCollectionTables(asQueryable(db), compileSet([authors, tags, posts]));
+            const outcome = await ensureTables(asQueryable(db), compileSet([authors, tags, posts]));
             expect(outcome.failures).toEqual([]);
             expect((await liveForeignKeys(db)).size).toBe(4);
         } finally {
@@ -263,7 +263,7 @@ describe("a column pointing at a key has the key's own type", () => {
     it("applies: boot creates every constraint, with no failure recorded", async () => {
         const db = new PGlite();
         try {
-            const outcome = await ensureCollectionTables(
+            const outcome = await ensureTables(
                 asQueryable(db), compileSet([uuidOrgs, bigOrgs, serialOrgs, codeOrgs, members]));
             expect(outcome.failures).toEqual([]);
             const fks = await liveForeignKeys(db);
@@ -312,7 +312,7 @@ describe("a column pointing at a key has the key's own type", () => {
                 'PRIMARY KEY ("seat_id", "org_id"));'
             );
             const existing = await readExistingSchema(asQueryable(db), ["public"]);
-            const next = planCollectionSchemaEnsure(compileSet([uuidOrgs, seats]), existing);
+            const next = planTableSchemaEnsure(compileSet([uuidOrgs, seats]), existing);
             expect(next.columnTypeDrift).toEqual([
                 { table: "public.orgs_seats", column: "org_id", declared: "UUID", actual: "text" },
                 { table: "public.seats", column: "org_id", declared: "UUID", actual: "text" }

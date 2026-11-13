@@ -40,7 +40,7 @@ import { createRebaseClient } from "@rebasepro/client";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderDrizzleSchema } from "../src/schema/plan/render-drizzle";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
-import { ensureCollectionTables } from "../src/schema/ensure-collection-tables";
+import { ensureTables } from "../src/schema/ensure-tables";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -225,7 +225,7 @@ describe("the quickstart's `products` table, read from the page", () => {
 
     it("takes a row over REST and through the SDK after boot creates the table", async () => {
         const collection = quickstartCollection();
-        await ensureCollectionTables(queryable(db), compiled([collection]));
+        await ensureTables(queryable(db), compiled([collection]));
         await createProducts(db, collection);
     });
 
@@ -256,7 +256,7 @@ describe("the quickstart's `products` table, read from the page", () => {
                 "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now()
             );
         `);
-        const outcome = await ensureCollectionTables(queryable(db), compiled([collection]));
+        const outcome = await ensureTables(queryable(db), compiled([collection]));
         expect(outcome.failures).toEqual([]);
         await createProducts(db, collection);
     });

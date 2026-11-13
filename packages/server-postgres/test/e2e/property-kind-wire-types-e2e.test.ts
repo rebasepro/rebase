@@ -11,7 +11,7 @@
  * through a real column.
  *
  * So this test does exactly that comparison. It provisions the table from the
- * collection config (the runtime's own `ensureCollectionTables`, so the SQL
+ * collection config (the runtime's own `ensureTables`, so the SQL
  * types are the ones a real boot produces), writes one row, reads it back
  * through the REST read path, and compares `typeof` — after the JSON trip a
  * client's response makes — against the TypeScript type `@rebasepro/codegen`
@@ -37,7 +37,7 @@ import { compileTables } from "@rebasepro/common";
 import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
-import { ensureCollectionTables, type Queryable } from "../../src/schema/ensure-collection-tables.js";
+import { ensureTables, type Queryable } from "../../src/schema/ensure-tables.js";
 import { introspectSchema } from "../../src/schema/introspect-runtime.js";
 import { buildDrizzleTablesFromSchema } from "../../src/schema/dynamic-tables.js";
 import { patchPgNumericToNumber } from "../../src/utils/pg-numeric-number-patch.js";
@@ -122,7 +122,7 @@ describe("property kinds: the wire value has the generated type (E2E)", () => {
         };
 
         // The runtime's own provisioning, so the column types are a real boot's.
-        await ensureCollectionTables(queryable, compileSet([wireTypes]));
+        await ensureTables(queryable, compileSet([wireTypes]));
 
         const live = await introspectSchema(pool, "public");
         const built = buildDrizzleTablesFromSchema(live.tablesMap, "public");

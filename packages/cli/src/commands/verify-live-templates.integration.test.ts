@@ -22,7 +22,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { ensureAppRole } from "@rebasepro/server-postgres";
 import { RLS_BOOTSTRAP_SQL } from "../../../server-postgres/src/schema/rls-bootstrap-sql";
-import { ensureCollectionTables } from "../../../server-postgres/src/schema/ensure-collection-tables";
+import { ensureTables } from "../../../server-postgres/src/schema/ensure-tables";
 import { ensureCollectionPolicies } from "../../../server-postgres/src/schema/ensure-collection-policies";
 
 import { MANAGED_SERVER_MAX_CONNECTIONS } from "../dev-db/constraints";
@@ -86,7 +86,7 @@ describe.each<TemplatePreset>(["blog", "ecommerce", "blank"])("a fresh %s scaffo
         try {
             const queryable = { query: <T>(text: string) => client.query(text).then(result => ({ rows: result.rows as T[] })) };
             await client.query(RLS_BOOTSTRAP_SQL);
-            await ensureCollectionTables(queryable, collections);
+            await ensureTables(queryable, collections);
             await ensureAppRole(async (text) => (await client.query<Record<string, unknown>>(text)).rows, ["public", "rebase", "auth"]);
             const applied = await ensureCollectionPolicies(queryable, collections);
             expect(applied.failures).toEqual([]);

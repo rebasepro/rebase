@@ -6,7 +6,7 @@
  */
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
-import type { Queryable } from "../src/schema/ensure-collection-tables";
+import type { Queryable } from "../src/schema/ensure-tables";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import {
     databaseOwnedDefaultColumns,

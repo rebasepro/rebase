@@ -48,7 +48,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, PGVECTOR_IMAGE, type PgContainer } from "./pg-setup.js";
 import { ensureAuthTablesExist } from "../../src/auth/ensure-tables.js";
-import { ensureCollectionTables } from "../../src/schema/ensure-collection-tables.js";
+import { ensureTables } from "../../src/schema/ensure-tables.js";
 import { ensureCollectionPolicies } from "../../src/schema/ensure-collection-policies.js";
 import { ensureAppRole } from "../../src/security/rls-enforcement.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
@@ -203,7 +203,7 @@ describe.each(snapshots)("upgrading a project left by $name", (snapshot) => {
         await ensureAuthTablesExist(drizzle(pool));
         await pool.end();
 
-        await ensureCollectionTables(client, compileSet(collections));
+        await ensureTables(client, compileSet(collections));
         await ensureCollectionPolicies(client, compileSet(collections));
     }, 300_000);
 
@@ -219,7 +219,7 @@ describe.each(snapshots)("upgrading a project left by $name", (snapshot) => {
         // forever. That is a real shape — a constraint name past Postgres's
         // 63-byte limit is stored truncated and never matches the derived name
         // it is compared against.
-        const second = await ensureCollectionTables(client, compileSet(collections));
+        const second = await ensureTables(client, compileSet(collections));
 
         // Index creations and helper functions included. They used to be
         // excluded because the planner emitted them on every boot and let

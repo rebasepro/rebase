@@ -1,6 +1,6 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { ensureCollectionPolicies } from "../src/schema/ensure-collection-policies";
-import type { Queryable } from "../src/schema/ensure-collection-tables";
+import type { Queryable } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
 /**
