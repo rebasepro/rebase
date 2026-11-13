@@ -64,13 +64,14 @@ test.describe("Studio: a presentation change is a UI preference", () => {
         // The schema editor lists the tables; picking one opens its editor.
         await page.goto("/schema");
         await page.getByRole("main").getByRole("button", { name: "Tags", exact: true }).click();
-        const nameInput = page.getByLabel("Name", { exact: true });
+        // The Studio's editor names the table inline, above its tabs.
+        const nameInput = page.getByRole("textbox", { name: "Collection name" });
         await expect(nameInput).toBeVisible({ timeout: 15000 });
-        await page.waitForTimeout(500); // the form hydrates after the dialog animates in
+        await page.waitForTimeout(500); // the form hydrates after the editor mounts
         await nameInput.fill(RENAMED);
         await expect(nameInput).toHaveValue(RENAMED);
 
-        const save = page.getByRole("button", { name: "Update collection" });
+        const save = page.getByRole("button", { name: "Update", exact: true });
         await expect(save).toBeEnabled();
         const written = page.waitForResponse(response =>
             response.url().includes(`/api/admin/ui-config/workspace/${SLUG}`) && response.request().method() === "PUT");
