@@ -574,7 +574,7 @@ describe("introspection mode (no backend/schema)", () => {
         const withRegistry: BackendBootstrapper = {
             ...bootstrapper(fixture),
             async initializeDriver(): Promise<InitializedDriver> {
-                return { driver: stubDriver(), tables: fixture.tables, collectionRegistry: registry, internals: {} };
+                return { driver: stubDriver(), tables: fixture.tables, tableRegistry: registry, internals: {} };
             }
         };
         await initializeRebaseBackend({

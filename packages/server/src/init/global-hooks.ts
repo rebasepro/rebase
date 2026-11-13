@@ -19,12 +19,12 @@ export function handGlobalHooksTo(
     driverResult: InitializedDriver,
     hooks: TableHooks
 ): void {
-    const registry = driverResult.collectionRegistry;
+    const registry = driverResult.tableRegistry;
     if (!registry?.setGlobalHooks) {
         throw new Error(
             `hooks: data source "${driverId}" returned no registry that accepts global hooks, so the ones ` +
             "exported from backend/hooks.ts (`initializeRebaseBackend({ hooks })`) would not run on any of its " +
-            "tables. Return a `collectionRegistry` implementing `setGlobalHooks` from the adapter's " +
+            "tables. Return a `tableRegistry` implementing `setGlobalHooks` from the adapter's " +
             "`initializeDriver`, or move the hooks onto each table's `hooks`."
         );
     }

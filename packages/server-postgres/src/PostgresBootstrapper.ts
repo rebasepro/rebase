@@ -1885,7 +1885,7 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
     return {
         driver,
         realtimeProvider: realtimeService,
-        collectionRegistry: registry,
+        tableRegistry: registry,
         // Only set in baas mode — tells the server which tables the database
         // turned out to have.
         tables: introspectedDescriptors,

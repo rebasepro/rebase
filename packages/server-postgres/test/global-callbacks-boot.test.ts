@@ -67,7 +67,7 @@ function bootstrapperOver(pglite: PGlite): { bootstrapper: BackendBootstrapper; 
         type: "postgres",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collectionRegistry: registry, internals: { driver } };
+            return { driver, tableRegistry: registry, internals: { driver } };
         }
     };
     return { bootstrapper, driver };

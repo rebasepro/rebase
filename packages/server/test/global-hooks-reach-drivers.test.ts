@@ -58,7 +58,7 @@ function adapter(options: { type?: string; registry?: HookRegistry | null; intro
                 internals: {},
                 driver: options.driverRegistry ? Object.assign(fakeDataDriver(), { registry: options.driverRegistry }) : fakeDataDriver(),
                 ...(options.introspected ? { tables: options.introspected } : {}),
-                ...(registry ? { collectionRegistry: registry } : {})
+                ...(registry ? { tableRegistry: registry } : {})
             };
         },
         async ensureTableSchema() {

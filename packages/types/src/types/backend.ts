@@ -511,7 +511,7 @@ export interface RealtimeCounts {
 
 /**
  * The table registry a data driver builds for itself and returns on
- * `InitializedDriver.collectionRegistry`: the compiled tables it serves, by
+ * `InitializedDriver.tableRegistry`: the compiled tables it serves, by
  * slug. The backend hands it the global hooks and later table hooks through
  * it; it never holds a collection.
  *
@@ -1282,7 +1282,7 @@ export interface BackendInstance extends BackendLifecycle {
     realtimeProvider: RealtimeProvider;
 
     /** The driver's table registry. */
-    collectionRegistry: TableRegistryInterface;
+    tableRegistry: TableRegistryInterface;
 
     /**
      * The underlying database connection
@@ -1674,7 +1674,7 @@ export interface InitializedDriver {
     realtimeProvider?: RealtimeProvider;
 
     /** The driver's table registry: what the backend hands global and table hooks to. */
-    collectionRegistry?: TableRegistryInterface;
+    tableRegistry?: TableRegistryInterface;
 
     /**
      * The descriptors of the tables the driver derived from the live database
