@@ -760,14 +760,15 @@ export interface AuthAdapter {
      * A chosen `password` is held to the password policy unless the body says
      * `skipPasswordPolicy: true` and `options.mayWaivePasswordPolicy` is set.
      *
+     * The auth table's own hooks (`onCreateUser`) are the adapter's to know: the
+     * built-in adapter is configured with them (`authTableHooks`).
+     *
      * @param values - Raw request body from the client.
-     * @param collectionAuth - The parsed `AuthCollectionConfig` from the collection (if `auth` is an object).
      * @param options - What the door knows about its caller.
      * @returns Processed values ready for `driver.save()`, plus metadata for the post-save step.
      */
     prepareUserCreation?(
         values: Record<string, unknown>,
-        collectionAuth?: unknown,
         options?: UserCreationOptions
     ): Promise<UserCreationPrepareResult>;
 
@@ -791,12 +792,8 @@ export interface AuthAdapter {
      * the hook accepts.
      *
      * If not implemented, validation is skipped — the pre-existing behaviour.
-     *
-     * @param collectionAuth - The parsed `AuthCollectionConfig` from the collection (if `auth` is an object).
      */
-    describeUserCreationContract?(
-        collectionAuth?: unknown
-    ): UserCreationWriteContract;
+    describeUserCreationContract?(): UserCreationWriteContract;
 
     /**
      * Finalize a user creation after the entity has been persisted.

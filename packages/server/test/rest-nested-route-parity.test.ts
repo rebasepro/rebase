@@ -276,8 +276,7 @@ describe("a nested count", () => {
         expect(res.status).toBe(200);
         expect(calls).toEqual([["count", expect.objectContaining({
             path: "blog_posts/1/comments",
-            withDeleted: "only",
-            collection: expect.objectContaining({ slug: "comments" })
+            withDeleted: "only"
         })]]);
     });
 });

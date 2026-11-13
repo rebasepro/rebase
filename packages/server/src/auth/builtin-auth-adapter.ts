@@ -414,7 +414,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         // The adapter serves one auth table, whose hooks it was built with
         // (`authTableHooks`); the per-call argument the data doors pass (the
         // lowered table's `auth`) names the same table and is not read.
-        async prepareUserCreation(values, _loweredAuth, options) {
+        async prepareUserCreation(values, options) {
             return prepareAdminUserValues(values, {
                 authRepo: authRepository,
                 emailService,

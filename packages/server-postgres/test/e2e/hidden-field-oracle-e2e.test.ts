@@ -183,7 +183,7 @@ describe("a private column answers as a field that does not exist (E2E)", () => 
             c.set("driver", await driver.withAuth(EDITOR));
             await next();
         });
-        app.route("/api/data", new RestApiGenerator({ descriptors: TABLES, collections: ALL }, driver).generateRoutes());
+        app.route("/api/data", new RestApiGenerator({ descriptors: TABLES }, driver).generateRoutes());
     }, 120_000);
 
     afterAll(async () => {

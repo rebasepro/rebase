@@ -286,7 +286,7 @@ export { assertNestedWriteAllowed } from "./api/rest/nested-write-access";
 export type { NestedWriteHop, NestedWriteKind } from "./api/rest/nested-write-access";
 // A create on the auth table is a user creation, whichever door it comes
 // through; the socket creates users through the same two steps REST does.
-export { assertNoUserUpsert, assertUserCreationBodyValid, createUserThroughAuthTable, isAuthTable, type UserTable } from "./api/rest/auth-table-writes";
+export { assertNoUserUpsert, assertUserCreationBodyValid, createUserThroughAuthTable, isAuthTable } from "./api/rest/auth-table-writes";
 // The seam between what the REST layer decides (the table's descriptor) and
 // what the data driver is handed (its lowered collection), until slice B-R7.
 export type { RestTables, ServedTable, TableLookup } from "./api/rest/served-table";

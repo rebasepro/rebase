@@ -1,5 +1,5 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono";
-import { AuthAdapter, DataDriver, JUNCTION_PIVOT_KEY, getCollectionDataPath, scopeGrants, type CollectionConfig, type RelationDescriptor, type RowPrecondition, type TableDescriptor, type UserCreationFinalizeResult, type UserCreationPrepareResult } from "@rebasepro/types";
+import { AuthAdapter, DataDriver, JUNCTION_PIVOT_KEY, scopeGrants, type RelationDescriptor, type RowPrecondition, type TableDescriptor, type UserCreationFinalizeResult, type UserCreationPrepareResult } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
 import { hostEnv } from "../../utils/host";
@@ -172,20 +172,9 @@ export interface RowAddress {
      * one, which the driver resolves and scopes to its parent row.
      */
     path: string;
-    /**
-     * Set for a nested path, whose table the driver resolves from the path
-     * itself: the driver is then handed no collection beside it.
-     */
-    nested?: true;
     /** What a 404 calls the address. */
     name: string;
 }
-
-/** What the driver is handed beside an address's path: the table's collection, or nothing for a nested path. */
-function driverCollectionOf(address: RowAddress): CollectionConfig | undefined {
-    return address.nested ? undefined : address.served.driverCollection;
-}
-
 /**
  * The link columns of the junction a relation of `owner` reaches through, as
  * a table, or `undefined` when it is not a `manyToMany` carrying `pivot`
@@ -438,10 +427,9 @@ export class RestApiGenerator {
                     return driver.batchWrite!({
                         operations: operations.map((operation: ParsedBatchOperation) => ({
                             op: operation.op,
-                            path: getCollectionDataPath(bySlug.get(operation.table)!.driverCollection),
+                            path: operation.table,
                             id: operation.id,
                             values: operation.values,
-                            collection: bySlug.get(operation.table)?.driverCollection,
                             onConflict: operation.onConflict,
                             ref: operation.ref
                         }))
@@ -920,7 +908,6 @@ export class RestApiGenerator {
         const written = await driver.saveMany!({
             path,
             rows: prepared.map(creation => creation.values),
-            collection: served.driverCollection
         });
         const deliveries = await completeUserCreations(adapter, prepared, written);
         return {
@@ -1076,7 +1063,6 @@ export class RestApiGenerator {
             const row = await driver.fetchOne({
                 path: address.path,
                 id,
-                collection: driverCollectionOf(address),
                 withDeleted
             });
             return row ? { row, etag: await rowETag(row, address.served.table) } : undefined;
@@ -1188,7 +1174,6 @@ export class RestApiGenerator {
         const created = await createUserThroughAuthTable(this.authAdapter, served, body, requestViewer(c), values => driver.save({
             path,
             values,
-            collection: driverCollectionOf(address),
             status: "new"
         }));
         if (created) {
@@ -1204,7 +1189,6 @@ export class RestApiGenerator {
             const entity = await driver.save({
                 path,
                 values: body,
-                collection: driverCollectionOf(address),
                 status: "new",
                 // An upsert only when a target was named. Left off, this is
                 // the plain insert it has always been, and a duplicate key
@@ -1266,7 +1250,6 @@ export class RestApiGenerator {
                 path,
                 id,
                 values,
-                collection: driverCollectionOf(address),
                 status: "existing",
                 ...(precondition ? { precondition } : {})
             });
@@ -1334,7 +1317,6 @@ export class RestApiGenerator {
             const existing = await driver.fetchOne({
                 path: address.path,
                 id,
-                collection: driverCollectionOf(address),
                 withDeleted
             });
             if (!existing) throw this.entityNotFound(address.name, id);
@@ -1406,7 +1388,6 @@ export class RestApiGenerator {
                     id,
                     path
                 },
-                collection: driverCollectionOf(address)
             }));
             return null;
         }, () => new Response(null, { status: 204 }));
@@ -1489,9 +1470,6 @@ export class RestApiGenerator {
     private createTableRoutes(served: ServedTable): void {
         const table = served.table;
         const basePath = `/${table.slug}`;
-        // What the driver is handed for this table; every decision reads `table`.
-        const driverCollection = served.driverCollection;
-
         // This table's rows at their own address. The nested routes reach the
         // same rows through a parent, and read and write them through the
         // same methods.
@@ -1580,7 +1558,7 @@ export class RestApiGenerator {
             const queryOptions = this.parseQuery(queryDict, { table, c });
             const driver = this.getScopedDriver(c);
 
-            const read = await RestApiGenerator.readRow(driver, ownRow(getCollectionDataPath(driverCollection)), String(id), queryOptions);
+            const read = await RestApiGenerator.readRow(driver, ownRow(table.slug), String(id), queryOptions);
             if (!read) {
                 throw this.entityNotFound(table.slug, String(id));
             }
@@ -1728,7 +1706,6 @@ export class RestApiGenerator {
                 const written = await driver.saveMany!({
                     path,
                     rows,
-                    collection: driverCollection,
                     upsert: body.upsert === true,
                     onConflict,
                     ...(conflictWhere ? { conflictWhere } : {}),
@@ -1770,7 +1747,7 @@ export class RestApiGenerator {
                     throw ApiError.badRequest("This collection's data source does not support filtered updates.", "BULK_UNSUPPORTED");
                 }
                 return this.runIdempotent(c, body, async () => {
-                    const written = await driver.updateWhere!({ path, filter, logical, values: data, collection: driverCollection });
+                    const written = await driver.updateWhere!({ path, filter, logical, values: data });
                     return {
                         data: written.map((row) => this.formatResponse(row)),
                         meta: { written: written.length }
@@ -1820,7 +1797,6 @@ export class RestApiGenerator {
                         id: entry.id as string | number,
                         values: values[index]
                     })),
-                    collection: driverCollection
                 });
                 return {
                     data: written.map((row) => this.formatResponse(row)),
@@ -1860,7 +1836,6 @@ export class RestApiGenerator {
                         path,
                         filter,
                         logical,
-                        collection: driverCollection
                     });
                     return { meta: { deleted } };
                 }, (result) => this.respondBulk(c, result, table));
@@ -1889,7 +1864,6 @@ export class RestApiGenerator {
                     hard: parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM)),
                     path,
                     ids: ids as (string | number)[],
-                    collection: driverCollection
                 }));
                 return { meta: { deleted: ids.length } };
             }, (result) => c.json(result));
@@ -1909,7 +1883,7 @@ export class RestApiGenerator {
             this.enforceApiKeyPermission(c, table.slug);
             const driver = this.getScopedDriver(c);
             const body = await parseJsonBody(c);
-            return this.updateRow(c, driver, ownRow(getCollectionDataPath(driverCollection)), String(c.req.param("id")), body);
+            return this.updateRow(c, driver, ownRow(table.slug), String(c.req.param("id")), body);
         };
 
         /**
@@ -1957,7 +1931,7 @@ export class RestApiGenerator {
         this.router.delete(`${basePath}/:id`, async (c) => {
             this.enforceApiKeyPermission(c, table.slug);
             const driver = this.getScopedDriver(c);
-            return this.deleteRow(c, driver, ownRow(getCollectionDataPath(driverCollection)), String(c.req.param("id")));
+            return this.deleteRow(c, driver, ownRow(table.slug), String(c.req.param("id")));
         });
     }
 
@@ -2018,13 +1992,11 @@ id };
         };
 
         // The row a nested path addresses, written through the same methods as
-        // the root routes. No `driverCollection`: the driver resolves the
-        // collection from the path, which is also what scopes the row to its
-        // parent.
+        // the root routes. The driver resolves the table from the path, which is
+        // also what scopes the row to its parent.
         const nestedRow = (nested: NestedPath): RowAddress => ({
             served: nested.chain[nested.chain.length - 1],
             path: nested.path,
-            nested: true,
             name: nested.path
         });
 
@@ -2321,7 +2293,7 @@ id };
                     queryOptions.include
                 )
                 : await RestApiGenerator.fetchRawCollection(
-                    reader, served.driverCollection, { ...queryOptions, limit: probeLimit }, searchString, searchExplain, path, startAfter
+                    reader, served, { ...queryOptions, limit: probeLimit }, searchString, searchExplain, path, startAfter
                 );
             const total = counting
                 ? await RestApiGenerator.countRawEntities(reader, served, queryOptions, searchString, path)
@@ -2383,7 +2355,7 @@ id };
      */
     static async fetchRawCollection(
         driver: DataDriver,
-        collection: CollectionConfig,
+        served: ServedTable,
         queryOptions: QueryOptions,
         searchString?: string,
         searchExplain?: boolean,
@@ -2391,8 +2363,7 @@ id };
         startAfter?: Record<string, unknown>
     ) {
         const entities = await driver.fetchCollection({
-            path: collectionPath ?? getCollectionDataPath(collection),
-            collection,
+            path: collectionPath ?? served.table.slug,
             filter: queryOptions.where,
             include: queryOptions.include,
             fields: queryOptions.fields,
@@ -2438,8 +2409,7 @@ id };
         collectionPath?: string
     ): Promise<number> {
         return driver.count ? await driver.count({
-            path: collectionPath ?? getCollectionDataPath(served.driverCollection),
-            collection: served.driverCollection,
+            path: collectionPath ?? served.table.slug,
             filter: queryOptions.where,
             // Counted as well as fetched, or `total` describes a different set
             // of rows from the one that was served. `vectorSearch` was the

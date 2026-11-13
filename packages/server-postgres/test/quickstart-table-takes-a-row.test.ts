@@ -165,7 +165,7 @@ function doors(db: PGlite, collection: CollectionConfig) {
         c.set("driver", await driver.withAuth(ADMIN));
         await next();
     });
-    app.route("/api/data", new RestApiGenerator({ descriptors: compiled([collection]).map(table => table.descriptor), collections: [collection] }, driver).generateRoutes());
+    app.route("/api/data", new RestApiGenerator({ descriptors: compiled([collection]).map(table => table.descriptor) }, driver).generateRoutes());
 
     const client = createRebaseClient({
         baseUrl: "http://quickstart.test",

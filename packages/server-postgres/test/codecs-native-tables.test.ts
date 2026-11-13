@@ -80,7 +80,7 @@ beforeAll(async () => {
         c.set("driver", driver);
         await next();
     });
-    app.route("/api/data", new RestApiGenerator({ descriptors: compiled.map(table => table.descriptor), collections: [collection] }, driver).generateRoutes());
+    app.route("/api/data", new RestApiGenerator({ descriptors: compiled.map(table => table.descriptor) }, driver).generateRoutes());
 });
 
 afterAll(async () => {

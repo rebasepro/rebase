@@ -290,8 +290,7 @@ export function createHistoryRoutes(params: {
     historyService: HistoryService;
     /**
      * The tables served now — a live schema edit included: their descriptors
-     * say which keep history and who may see which column; their collections
-     * are what the data driver is handed for a revert (until slice B-R7).
+     * say which keep history and who may see which column.
      */
     tables: () => RestTables;
     /**
@@ -306,12 +305,11 @@ export function createHistoryRoutes(params: {
 
     /** The served table at this slug, with history on; a 404 or a 400 otherwise. */
     const historyTable = (slug: string): ServedTable => {
-        const { descriptors, collections } = params.tables();
+        const { descriptors, served } = params.tables();
         const table = descriptors.find(candidate => candidate.slug === slug);
-        const driverCollection = collections.find(candidate => candidate.slug === slug);
-        if (!table || !driverCollection) throw ApiError.notFound(`Table '${slug}' not found`);
+        if (!table || (served !== undefined && !served.includes(slug))) throw ApiError.notFound(`Table '${slug}' not found`);
         if (!table.history) throw ApiError.badRequest(`History is not enabled for table '${slug}'`);
-        return { table, driverCollection };
+        return { table };
     };
     const router = new Hono<HonoEnv>();
     router.onError(errorHandler);
@@ -373,7 +371,7 @@ export function createHistoryRoutes(params: {
         // entry is stored in, which is what a revert compares it against.
         const row = scoped.restFetchService
             ? await scoped.restFetchService.fetchOneForRest(slug, id, undefined, undefined, { withDeleted: true }) ?? undefined
-            : await scoped.fetchOne({ path: slug, id, collection: served.driverCollection, withDeleted: true });
+            : await scoped.fetchOne({ path: slug, id, withDeleted: true });
         if (!row) {
             throw ApiError.notFound(`No row with id '${id}' in table '${slug}'`);
         }
@@ -492,7 +490,6 @@ export function createHistoryRoutes(params: {
             path,
             id: String(id),
             values,
-            collection: served.driverCollection,
             status: "existing"
         });
 

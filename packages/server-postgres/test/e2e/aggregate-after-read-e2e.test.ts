@@ -99,7 +99,7 @@ describe("aggregates on a collection afterRead masks (E2E)", () => {
             c.set("driver", await driver.withAuth(ADMIN));
             await next();
         });
-        app.route("/api/data", new RestApiGenerator({ descriptors: compiled.map(table => table.descriptor), collections }, driver).generateRoutes());
+        app.route("/api/data", new RestApiGenerator({ descriptors: compiled.map(table => table.descriptor) }, driver).generateRoutes());
     }, 120_000);
 
     afterAll(async () => {

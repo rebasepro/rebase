@@ -2905,14 +2905,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         if (historyConfigResult && historyConfigResult.historyService) {
             const historyRoutes = createHistoryRoutes({
                 historyService: historyConfigResult.historyService,
-                tables: () => ({ descriptors: tableRegistry.list(), collections: collectionRegistry.getCollections() }),
+                tables: () => ({ descriptors: tableRegistry.list() }),
                 driver: defaultDriver
             });
             dataRouter.route("/", historyRoutes);
         }
 
         const restGenerator = new RestApiGenerator(
-            { descriptors: tableRegistry.list(), collections: serverCollections },
+            { descriptors: tableRegistry.list(), served: serverCollections.map(collection => collection.slug) },
             defaultDriver,
             authAdapter,
             undefined,
@@ -2985,7 +2985,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         ));
         if (restRoutes) {
             restRoutes.replace(new RestApiGenerator(
-                { descriptors: tableRegistry.list(), collections: serverCollections },
+                { descriptors: tableRegistry.list(), served: serverCollections.map(collection => collection.slug) },
                 defaultDriver,
                 authAdapter,
                 undefined,

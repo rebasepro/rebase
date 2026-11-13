@@ -662,7 +662,7 @@ describe("a socket write to the auth collection", () => {
 
         // The session is an administrator's, so the socket lets it waive the
         // password policy, as REST does.
-        expect(userAdmin.prepareUserCreation).toHaveBeenCalledWith({ email: " Ann@Example.COM " }, { enabled: true }, { mayWaivePasswordPolicy: true });
+        expect(userAdmin.prepareUserCreation).toHaveBeenCalledWith({ email: " Ann@Example.COM " }, { mayWaivePasswordPolicy: true });
         expect(writes).toEqual([expect.objectContaining({
             path: "users", status: "new", values: { email: "ann@example.com", passwordHash: "hashed:generated" }
         })]);

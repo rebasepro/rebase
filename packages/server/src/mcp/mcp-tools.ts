@@ -231,18 +231,17 @@ function servedSchema(ctx: McpToolContext): { view: SchemaView; tables: readonly
 /**
  * A table a call names, resolved: its descriptor as the caller is served it
  * (redacted), and the table as REST's readers and writers take it — the
- * unredacted descriptor every check reads, with what the driver is handed.
+ * unredacted descriptor every check reads.
  */
 interface ResolvedTable {
     descriptor: TableDescriptor;
     served: ServedTable;
 }
 
-/** The table behind a slug as REST's readers and writers take it, when a driver serves it. */
+/** The table behind a slug as REST's readers and writers take it, when the backend serves it. */
 function servedOf(ctx: McpToolContext, slug: string): ServedTable | undefined {
     const table = ctx.tables.find(candidate => candidate.slug === slug);
-    const driverCollection = ctx.driverCollection(slug);
-    return table && driverCollection ? { table, driverCollection } : undefined;
+    return table ? { table } : undefined;
 }
 
 /** A relation's target, by slug: what REST's aggregate and query checks resolve. */
@@ -408,7 +407,6 @@ async function createUser(
     const driver = await scopedDriver(ctx);
     const created = await createUserThroughAuthTable(adapter, served, body, viewerOf(ctx), values => driver.save({
         path: served.table.slug,
-        collection: served.driverCollection,
         values,
         id: args.id ? String(args.id) : undefined,
         status: "new"
@@ -500,7 +498,7 @@ async function assertRowExists(
     withDeleted?: true
 ): Promise<void> {
     const { served } = resolved;
-    const existing = await driver.fetchOne({ path: served.table.slug, id, collection: served.driverCollection, withDeleted });
+    const existing = await driver.fetchOne({ path: served.table.slug, id, withDeleted });
     if (!existing) throw notFound(resolved, id);
 }
 
@@ -1408,7 +1406,6 @@ const TOOLS: McpToolDefinition[] = [
             const driver = await scopedDriver(ctx);
             const saved = await driver.save({
                 path: served.table.slug,
-                collection: served.driverCollection,
                 values,
                 id: args.id ? String(args.id) : undefined,
                 status: "new"
@@ -1453,7 +1450,6 @@ const TOOLS: McpToolDefinition[] = [
             }]);
             const saved = await driver.save({
                 path: served.table.slug,
-                collection: served.driverCollection,
                 values,
                 id,
                 status: "existing"
@@ -1494,7 +1490,6 @@ const TOOLS: McpToolDefinition[] = [
             // `afterUserDelete` runs.
             await deletingAuthTableUsers(ctx.authAdapter, served.table, [id], () => driver.delete({
                 row: { id, path: served.table.slug },
-                collection: served.driverCollection
             }));
             logger.info("[mcp] Row deleted", {
                 table: descriptor.slug, id, uid: ctx.caller.uid, clientId: ctx.caller.clientId

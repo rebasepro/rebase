@@ -18,7 +18,7 @@ import { WebSocketServer, WebSocket, type RawData } from "ws";
 import type { Server, IncomingMessage } from "http";
 import type { Duplex } from "stream";
 import { inspect } from "util";
-import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, assertNoFieldOpsOnCreate, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, assertNoUserUpsert, assertUserCreationBodyValid, createUserThroughAuthTable, isAuthTable, type NestedWriteKind, type UserTable } from "@rebasepro/server";
+import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, assertNoFieldOpsOnCreate, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, assertNoUserUpsert, assertUserCreationBodyValid, createUserThroughAuthTable, isAuthTable, type NestedWriteKind, type ServedTable } from "@rebasepro/server";
 import { logger, getAccessModel, decideImpersonation, isDatabaseUnreachable, DATABASE_UNAVAILABLE_MESSAGE, type ImpersonationCredential } from "@rebasepro/server";
 
 /**
@@ -431,24 +431,6 @@ export const PUBLIC_TYPES = new Set([
     "DELETE",
     "CHECK_UNIQUE_FIELD"
 ]);
-
-/**
- * The auth settings the auth adapter is handed for the auth table: its
- * `roles`, `scopes` and `personalKeys` (descriptor), and its `onCreateUser` /
- * `onResetPassword` hooks (compiled) — what `defineAuthTable`'s `auth` declares.
- */
-function authConfigOf(table: RuntimeTable): Record<string, unknown> {
-    const declared = table.descriptor.auth;
-    const hooks = table.compiled.auth;
-    return {
-        enabled: true,
-        ...(declared?.roles !== undefined ? { roles: declared.roles } : {}),
-        ...(declared?.scopes !== undefined ? { scopes: declared.scopes } : {}),
-        ...(declared?.personalKeys !== undefined ? { personalKeys: declared.personalKeys } : {}),
-        ...(hooks?.onCreateUser !== undefined ? { onCreateUser: hooks.onCreateUser } : {}),
-        ...(hooks?.onResetPassword !== undefined ? { onResetPassword: hooks.onResetPassword } : {})
-    };
-}
 
 /**
  * Refuse a path whose collection — its first segment, for a nested path — this
@@ -1508,7 +1490,7 @@ roles: verifiedUser.roles }
                 };
 
                 /** The auth table at `path`, or `undefined` for any other. */
-                const authCollectionAt = (path: unknown): UserTable | undefined => {
+                const authCollectionAt = (path: unknown): ServedTable | undefined => {
                     if (typeof path !== "string") return undefined;
                     let served: RuntimeTable | undefined;
                     try {
@@ -1517,7 +1499,7 @@ roles: verifiedUser.roles }
                         return undefined;
                     }
                     return served && isAuthTable(served.descriptor)
-                        ? { table: served.descriptor, authConfig: authConfigOf(served) }
+                        ? { table: served.descriptor }
                         : undefined;
                 };
                 /**

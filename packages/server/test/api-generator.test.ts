@@ -608,7 +608,6 @@ name: "Original Name" })
             expect(mockPrepare).toHaveBeenCalledWith(
                 expect.objectContaining({ email: "original@example.com",
 name: "Original Name" }),
-                { enabled: true }, // the auth table's settings as lowered for the adapter
                 // No caller set on this request, so nobody to waive the policy.
                 { mayWaivePasswordPolicy: false }
             );

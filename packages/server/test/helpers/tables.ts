@@ -145,15 +145,9 @@ export function descriptorOf(fixture: Pick<FixtureTables, "descriptors">, slug: 
     return found;
 }
 
-/**
- * One legacy fixture collection as the REST layer's seam holds a served table:
- * its descriptor, and the collection it was lowered into for the driver.
- */
+/** One legacy fixture collection as the REST layer holds a served table: its descriptor. */
 export function servedTableFrom(collection: LegacyCollectionConfig | LegacyAnyCollectionConfig): ServedTable {
-    const fixture = tablesFromCollections([collection]);
-    const driverCollection = fixture.collections.find(candidate => candidate.slug === collection.slug);
-    if (!driverCollection) throw new Error(`The fixture has no table "${collection.slug}".`);
-    return { table: descriptorOf(fixture, collection.slug), driverCollection };
+    return { table: descriptorOf(tablesFromCollections([collection]), collection.slug) };
 }
 
 /** The descriptor one legacy fixture collection compiles to. */

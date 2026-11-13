@@ -16,9 +16,8 @@
  * step, exactly as it was: the rows are then written like any table's.
  *
  * Whether a table is the auth table is read from its descriptor. The auth
- * adapter is still handed the auth settings in their lowered form
- * (`ServedTable.driverCollection.auth`, with the `onCreateUser` hook it runs),
- * as the data driver is handed the collection — the one seam slice B-R7 cuts.
+ * adapter runs the auth table's hooks it was configured with
+ * (`authTableHooks`); nothing here hands it settings of its own.
  */
 import { hasAdminRole } from "@rebasepro/types";
 import type {
@@ -37,24 +36,6 @@ import type { ServedTable } from "./served-table";
 /** Whether `table` is the auth table — its rows are the users. */
 export function isAuthTable(table: TableDescriptor): boolean {
     return table.auth !== undefined;
-}
-
-/**
- * The auth table a user write goes through: a {@link ServedTable} (the REST
- * routes, whose auth settings are read off the driver's collection — the seam
- * B-R7 cuts, see `served-table.ts`), or the table with its auth settings
- * already in hand (the Postgres socket, which holds compiled tables only).
- */
-export type UserTable = ServedTable | { readonly table: TableDescriptor; readonly authConfig: unknown };
-
-/**
- * The auth settings the adapter is handed (`roles`, `scopes`, `personalKeys`
- * and the `onCreateUser` / `onResetPassword` hooks it runs).
- */
-function adapterAuthConfig(served: UserTable): unknown {
-    if ("authConfig" in served) return served.authConfig;
-    const auth = served.driverCollection.auth;
-    return typeof auth === "object" ? auth : undefined;
 }
 
 /** An adapter that performs user creation (`prepareUserCreation`). */
@@ -115,12 +96,12 @@ export function assertNoUserUpsert(
  */
 export function assertUserCreationBodyValid(
     adapter: AuthAdapter | undefined,
-    served: UserTable,
+    served: ServedTable,
     body: Record<string, unknown>,
     viewer: FieldViewer,
     rowIndex?: number
 ): void {
-    const contract = adapter?.describeUserCreationContract?.(adapterAuthConfig(served));
+    const contract = adapter?.describeUserCreationContract?.();
     if (!contract?.validate) return;
     assertKnownWriteFields(body, served.table, { extraKnownFields: contract.extraFields, viewer, rowIndex });
     assertWriteValuesValid(body, served.table, { rowIndex });
@@ -142,16 +123,15 @@ export function assertUserCreationBodyValid(
  */
 export async function prepareUserCreations(
     adapter: UserCreatingAdapter,
-    served: UserTable,
+    served: ServedTable,
     bodies: readonly Record<string, unknown>[],
     caller: FieldViewer,
     nameRows = false
 ): Promise<UserCreationPrepareResult[]> {
-    const auth = adapterAuthConfig(served);
     const options: UserCreationOptions = { mayWaivePasswordPolicy: hasAdminRole(caller.roles) };
     const prepare = async (body: Record<string, unknown>, index: number) => {
         try {
-            return await adapter.prepareUserCreation(body, auth, options);
+            return await adapter.prepareUserCreation(body, options);
         } catch (error) {
             throw nameRows ? withRowIndex(error, index) : error;
         }
@@ -161,7 +141,7 @@ export async function prepareUserCreations(
     // libuv's thread pool), and a 1,000-row bulk did that one after another
     // for about half a minute. As many as the pool runs at once, and no more,
     // so the hashing does not queue every file and DNS call behind it.
-    if (adapter.describeUserCreationContract?.(auth)?.independent && bodies.length > 1) {
+    if (adapter.describeUserCreationContract?.()?.independent && bodies.length > 1) {
         return mapInOrder(bodies, threadPoolWidth(), prepare);
     }
     const prepared: UserCreationPrepareResult[] = [];
@@ -250,7 +230,7 @@ export async function completeUserCreations(
  */
 export async function createUserThroughAuthTable(
     adapter: AuthAdapter | undefined,
-    served: UserTable,
+    served: ServedTable,
     body: Record<string, unknown>,
     caller: FieldViewer,
     save: (values: Record<string, unknown>) => Promise<Record<string, unknown>>
