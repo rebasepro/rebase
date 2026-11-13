@@ -462,7 +462,7 @@ export function isDatabaseAdapter(db: unknown): db is DatabaseAdapter {
  * capability nobody remembers to list is dropped in silence — no type error,
  * because every one of them is optional, and no runtime error either, because
  * the caller's own fallback for "driver does not implement this" is to skip.
- * That is not hypothetical: `ensureCollectionSchema` was missing from both
+ * That is not hypothetical: `ensureTableSchema` was missing from both
  * wrappers for months, so every managed tenant booted with no collection tables
  * and 500'd on every data route. `bootstrapper-forwarding.test.ts` now asserts
  * both wrappers pass through the whole optional surface.
@@ -482,9 +482,9 @@ export function wrapDatabaseAdapter(dbAdapter: DatabaseAdapter): BackendBootstra
         verifyConnection: dbAdapter.verifyConnection
             ? (driverResult) => dbAdapter.verifyConnection!(driverResult)
             : undefined,
-        ensureCollectionSchema: dbAdapter.ensureCollectionSchema
+        ensureTableSchema: dbAdapter.ensureTableSchema
             ? (collections, driverResult, log) =>
-                dbAdapter.ensureCollectionSchema!(collections, driverResult, log)
+                dbAdapter.ensureTableSchema!(collections, driverResult, log)
             : undefined,
         ensureTablePolicies: dbAdapter.ensureTablePolicies
             ? (collections, driverResult, log) =>

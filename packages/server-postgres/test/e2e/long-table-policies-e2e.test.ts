@@ -69,7 +69,7 @@ async function boot(url: string, beforePolicies?: (observer: pg.Client) => Promi
             dataSourceKey: "(default)",
             realtime: { subscribe: false, provision: false }
         });
-        await bootstrapper.ensureCollectionSchema!(tablesFromCollections([collection]).tables, driverResult);
+        await bootstrapper.ensureTableSchema!(tablesFromCollections([collection]).tables, driverResult);
         await bootstrapper.ensureRlsRuntime!(driverResult);
         await beforePolicies?.(observer);
         await bootstrapper.ensureTablePolicies!(tablesFromCollections([collection]).tables, driverResult);

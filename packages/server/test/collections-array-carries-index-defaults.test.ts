@@ -86,7 +86,7 @@ function recordingBootstrapper(provisioned: (readonly CompiledTable[])[]): Backe
         async initializeDriver(): Promise<InitializedDriver> {
             return { driver: driver(), collections: undefined, internals: {}, realtimeProvider: inertRealtimeProvider() };
         },
-        async ensureCollectionSchema() {
+        async ensureTableSchema() {
             return { applied: 0 };
         },
         async ensureTablePolicies(tables: readonly CompiledTable[]) {

@@ -110,7 +110,7 @@ function bootstrapper(rec: Recorded, options: { id?: string; isDefault?: boolean
             const authRepository = { getUserRoleIds: async (uid: string) => (uid === "admin-1" ? ["admin"] : []) };
             return { userService: authRepository, authRepository };
         },
-        async ensureCollectionSchema() {
+        async ensureTableSchema() {
             rec.schemaCalls++;
             return { applied: 0 };
         },

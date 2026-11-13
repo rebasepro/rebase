@@ -264,7 +264,7 @@ describe("behind PgBouncer in transaction mode, with a hot standby (E2E)", () =>
         try {
             // A later boot's ensure: the table exists, so the index is built in
             // the background once the policies step is done.
-            await adapter.ensureCollectionSchema!(tablesFromCollections([notes]).tables);
+            await adapter.ensureTableSchema!(tablesFromCollections([notes]).tables);
             await adapter.ensureTablePolicies!(tablesFromCollections([notes]).tables);
             await waitFor(async () => (await query<{ valid: boolean }>(primaryUrl,
                 "SELECT i.indisvalid AS valid FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE c.relname = $1",

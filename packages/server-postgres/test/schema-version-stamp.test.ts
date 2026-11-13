@@ -86,7 +86,7 @@ function recordingBootstrapper(id: string, isDefault: boolean, stamped: string[]
             return { driver, collections: undefined, internals: {} };
         },
         ...(isDefault ? { async initializeAuth() { return { userService: repo, authRepository: repo }; } } : {}),
-        async ensureCollectionSchema() { return { applied: 0 }; },
+        async ensureTableSchema() { return { applied: 0 }; },
         async ensureTablePolicies() { return { applied: 0 }; },
         async readCollectionsSchemaVersion() { return null; },
         async stampCollectionsSchemaVersion(version: string) { stamped.push(version); }

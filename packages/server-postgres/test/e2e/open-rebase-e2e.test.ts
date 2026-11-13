@@ -105,7 +105,7 @@ async function provision(url: string, collections: LegacyCollectionConfig[], opt
             collections, tables: tablesFromCollections(collections).tables,
             realtime: { subscribe: false, provision: false }
         });
-        await bootstrapper.ensureCollectionSchema!(tablesFromCollections(collections).tables, driverResult);
+        await bootstrapper.ensureTableSchema!(tablesFromCollections(collections).tables, driverResult);
         await bootstrapper.ensureRlsRuntime!(driverResult);
         await bootstrapper.ensureTablePolicies!(tablesFromCollections(collections).tables, driverResult);
         await bootstrapper.finalizeSecurityPosture!(driverResult);

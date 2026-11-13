@@ -43,8 +43,8 @@ function recordingAdapter(recorder: Recorder, over: Partial<DatabaseAdapter> = {
             recorder.initConfig = config;
             return { internals: {}, driver: fakeDataDriver() };
         },
-        async ensureCollectionSchema() {
-            recorder.order.push("ensureCollectionSchema");
+        async ensureTableSchema() {
+            recorder.order.push("ensureTableSchema");
             recorder.schemaCalls++;
             return { applied: 1 };
         },
@@ -104,7 +104,7 @@ describe("initializeRebaseBackend provisions the collection schema", () => {
         const rec = recorder();
         await boot(recordingAdapter(rec));
 
-        expect(rec.order.indexOf("ensureCollectionSchema")).toBeLessThan(rec.order.indexOf("initializeDriver"));
+        expect(rec.order.indexOf("ensureTableSchema")).toBeLessThan(rec.order.indexOf("initializeDriver"));
     });
 
     it("applies policies AFTER auth initializes", async () => {
@@ -163,7 +163,7 @@ describe("initializeRebaseBackend provisions the collection schema", () => {
         // legitimate shape, not a broken one.
         const rec = recorder();
         const schemaless = recordingAdapter(rec);
-        delete schemaless.ensureCollectionSchema;
+        delete schemaless.ensureTableSchema;
         delete schemaless.ensureTablePolicies;
 
         await expect(boot(schemaless)).resolves.not.toThrow();

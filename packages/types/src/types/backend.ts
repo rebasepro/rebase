@@ -1579,7 +1579,7 @@ export interface BackendBootstrapper {
      * the caller treats a throw as fatal.
      *
      * `driverResult` is optional for the same reason as
-     * {@link ensureCollectionSchema}: this runs before `initializeDriver`, so an
+     * {@link ensureTableSchema}: this runs before `initializeDriver`, so an
      * adapter that was constructed with its own connection has to fall back to
      * it.
      */
@@ -1606,7 +1606,7 @@ export interface BackendBootstrapper {
      * `undefined` — dereferencing it unconditionally works for managed tenants
      * and breaks every app that builds its own adapter.
      */
-    ensureCollectionSchema?(
+    ensureTableSchema?(
         tables: readonly CompiledTable[],
         driverResult?: InitializedDriver,
         log?: (message: string) => void
@@ -1614,7 +1614,7 @@ export interface BackendBootstrapper {
 
     /**
      * Apply the collections' row-level-security policies, additively and
-     * idempotently — the companion to {@link ensureCollectionSchema}.
+     * idempotently — the companion to {@link ensureTableSchema}.
      *
      * That method creates the tables; a table with RLS disabled and no policies
      * is not servable, because authenticated requests run as a restricted role:
@@ -1687,7 +1687,7 @@ export interface BackendBootstrapper {
      * Record the collections schema version this process just applied.
      *
      * Called only by the process that provisions, and only after both
-     * {@link ensureCollectionSchema} and {@link ensureTablePolicies} have
+     * {@link ensureTableSchema} and {@link ensureTablePolicies} have
      * run — a stamp written before the policies would claim a schema that is
      * only half in place, and the half that is missing is the one that fails
      * without an error.

@@ -68,7 +68,7 @@ export interface ProvisionTarget {
     bootstrapper: Pick<
         BackendBootstrapper,
         | "verifyConnection"
-        | "ensureCollectionSchema"
+        | "ensureTableSchema"
         | "ensureTablePolicies"
         | "ensureRlsRuntime"
         | "readCollectionsSchemaVersion"
@@ -280,7 +280,7 @@ reason };
     if (tables.length === 0) {
         return skip("no tables are stored by this data source.");
     }
-    if (!target.bootstrapper.ensureCollectionSchema) {
+    if (!target.bootstrapper.ensureTableSchema) {
         // What is missing is the method on the ADAPTER — the only object boot
         // ever sees — which is not the same as the driver package lacking the
         // code. Three unrelated causes collapse into this symptom: a schemaless
@@ -297,7 +297,7 @@ reason };
         );
     }
 
-    const { applied } = await target.bootstrapper.ensureCollectionSchema(
+    const { applied } = await target.bootstrapper.ensureTableSchema(
         compiledFor(tables, compiledOf),
         target.driverResult as InitializedDriver,
         message => logger.debug(`schema: ${message}`)
@@ -318,7 +318,7 @@ applied };
 export type CompiledTableOf = (slug: string) => CompiledTable | undefined;
 
 /**
- * What the driver's provisioning calls (`ensureCollectionSchema`,
+ * What the driver's provisioning calls (`ensureTableSchema`,
  * `ensureTablePolicies`) are handed for these tables: the compiled
  * tables themselves — the driver plans from them before it opens, so it can
  * look nothing up.
@@ -471,7 +471,7 @@ export function provisionTargetFor(
  *
  * The default keeps the pre-init handle the bundle path supplies; every other
  * source is provisioned through its own adapter's connection, which is the
- * contract `ensureCollectionSchema` already honours when handed no result.
+ * contract `ensureTableSchema` already honours when handed no result.
  */
 export function provisionTargetsFor(
     bootstrappers: BackendBootstrapper[],

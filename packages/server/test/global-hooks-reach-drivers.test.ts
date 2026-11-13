@@ -59,7 +59,7 @@ function adapter(options: { type?: string; registry?: CollectionRegistry | null;
                 ...(registry ? { collectionRegistry: registry } : {})
             };
         },
-        async ensureCollectionSchema() {
+        async ensureTableSchema() {
             return { applied: 0 };
         },
         async initializeAuth() {

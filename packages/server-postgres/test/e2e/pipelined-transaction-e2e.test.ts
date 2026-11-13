@@ -81,7 +81,7 @@ async function provision(url: string): Promise<void> {
     try {
         const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
         const driverResult = await bootstrapper.initializeDriver({ collections: [notes], tables: tablesFromCollections([notes]).tables, realtime: { subscribe: false, provision: false } });
-        await bootstrapper.ensureCollectionSchema!(tablesFromCollections([notes]).tables, driverResult);
+        await bootstrapper.ensureTableSchema!(tablesFromCollections([notes]).tables, driverResult);
         await bootstrapper.ensureRlsRuntime!(driverResult);
         await bootstrapper.ensureTablePolicies!(tablesFromCollections([notes]).tables, driverResult);
         await bootstrapper.finalizeSecurityPosture!(driverResult);

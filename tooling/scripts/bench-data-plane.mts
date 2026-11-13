@@ -190,7 +190,7 @@ const benchUrl = urlFor(adminUrl, DB_NAME);
     try {
         const bootstrapper = createPostgresBootstrapper({ connectionString: benchUrl, connection: conn.db });
         const driverResult = await bootstrapper.initializeDriver({ collections, tables, realtime: { subscribe: false, provision: false } });
-        await bootstrapper.ensureCollectionSchema!(collections, driverResult);
+        await bootstrapper.ensureTableSchema!(collections, driverResult);
         await bootstrapper.ensureRlsRuntime!(driverResult);
         await bootstrapper.ensureTablePolicies!(collections, driverResult);
         await bootstrapper.finalizeSecurityPosture!(driverResult);

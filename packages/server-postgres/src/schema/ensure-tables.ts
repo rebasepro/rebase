@@ -644,7 +644,7 @@ export async function ensureTables(
     // was generated cannot be honoured by an additive plan, and serving the old
     // index while the config describes a new one is the silent failure this
     // check exists to end. Refusing is the loud half — boot is fatal on purpose
-    // (see `ensureCollectionSchema` in the server's boot) and the message
+    // (see `ensureTableSchema` in the server's boot) and the message
     // carries the exact statements that resolve it.
     if (plan.searchDrift.length > 0) {
         throw new Error(searchDriftMessage(plan.searchDrift));

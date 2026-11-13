@@ -15,7 +15,7 @@ import { fakeDataDriver } from "./helpers/server-a-fakes";
  * is not a runtime error either. The whole failure surfaces three layers away as
  * data routes 500ing on relations that were never created.
  *
- * That is exactly what happened. `ensureCollectionSchema` was absent from both
+ * That is exactly what happened. `ensureTableSchema` was absent from both
  * wrappers, so boot-time table creation was dead on the real adapter path from
  * the day it shipped; the fix restored it in `driver.ts` and left `init.ts`
  * still dropping it. A test naming one method would have missed that. This one
@@ -37,7 +37,7 @@ const CAPABILITIES = [
     "initializeHistory",
     "initializeWebsockets",
     "verifyConnection",
-    "ensureCollectionSchema",
+    "ensureTableSchema",
     "ensureTablePolicies",
     "ensureRlsRuntime",
     "finalizeSecurityPosture",
@@ -73,7 +73,7 @@ function fullyCapableAdapter(): DatabaseAdapter {
         initializeHistory: async () => undefined,
         initializeWebsockets: () => undefined,
         verifyConnection: async () => undefined,
-        ensureCollectionSchema: async () => ({ applied: 0 }),
+        ensureTableSchema: async () => ({ applied: 0 }),
         ensureTablePolicies: async () => ({ applied: 0 }),
         ensureRlsRuntime: async () => undefined,
         finalizeSecurityPosture: async () => undefined,
@@ -160,7 +160,7 @@ describe.each(WRAPPERS)("%s", (_name, wrap) => {
         const calls: string[] = [];
         const adapter: DatabaseAdapter = {
             ...fullyCapableAdapter(),
-            ensureCollectionSchema: async (collections: unknown[]) => {
+            ensureTableSchema: async (collections: unknown[]) => {
                 calls.push(`schema:${collections.length}`);
                 return { applied: 0 };
             },
@@ -171,7 +171,7 @@ describe.each(WRAPPERS)("%s", (_name, wrap) => {
         };
 
         const wrapped = wrap(adapter);
-        void wrapped.ensureCollectionSchema?.([{}, {}], initialized(), () => undefined);
+        void wrapped.ensureTableSchema?.([{}, {}], initialized(), () => undefined);
         void wrapped.ensureTablePolicies?.([{}], initialized(), () => undefined);
 
         expect(calls).toEqual(["schema:2", "policies:1"]);

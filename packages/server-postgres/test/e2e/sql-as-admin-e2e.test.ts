@@ -73,7 +73,7 @@ describe("sqlAsAdmin (E2E)", () => {
         try {
             const bootstrapper = createPostgresBootstrapper({ connectionString: container.connectionString, connection: conn.db });
             const driverResult = await bootstrapper.initializeDriver({ collections: [tickets], tables: tablesFromCollections([tickets]).tables, realtime: { subscribe: false, provision: false } });
-            await bootstrapper.ensureCollectionSchema!(tablesFromCollections([tickets]).tables, driverResult);
+            await bootstrapper.ensureTableSchema!(tablesFromCollections([tickets]).tables, driverResult);
             await bootstrapper.ensureRlsRuntime!(driverResult);
             await bootstrapper.ensureTablePolicies!(tablesFromCollections([tickets]).tables, driverResult);
             await bootstrapper.finalizeSecurityPosture!(driverResult);

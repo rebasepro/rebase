@@ -10,7 +10,7 @@ import { adapterToBootstrapper } from "./driver";
  *
  * Regression guard for a real, shipped-but-dead feature: boot-time table
  * creation existed on the bootstrapper, but this wrapper listed the methods it
- * forwarded explicitly and did not list `ensureCollectionSchema`. So on the
+ * forwarded explicitly and did not list `ensureTableSchema`. So on the
  * only path that reaches it — `initializeDataSource` → here — the runtime saw
  * no method and skipped, and every managed tenant came up 500ing every data
  * route. `ensureTablePolicies` (the RLS half) would fail the same way.
@@ -28,18 +28,18 @@ function baseAdapter(): DatabaseAdapter {
 }
 
 describe("adapterToBootstrapper", () => {
-    it("forwards ensureCollectionSchema through to the adapter", async () => {
-        const ensureCollectionSchema = jest.fn(async () => ({ applied: 3 }));
+    it("forwards ensureTableSchema through to the adapter", async () => {
+        const ensureTableSchema = jest.fn(async () => ({ applied: 3 }));
         const bootstrapper = adapterToBootstrapper(
-            { ...baseAdapter(), ensureCollectionSchema },
+            { ...baseAdapter(), ensureTableSchema },
             "default",
             true
         );
 
-        expect(typeof bootstrapper.ensureCollectionSchema).toBe("function");
-        const out = await bootstrapper.ensureCollectionSchema!([{}], driverResult);
+        expect(typeof bootstrapper.ensureTableSchema).toBe("function");
+        const out = await bootstrapper.ensureTableSchema!([{}], driverResult);
         expect(out).toEqual({ applied: 3 });
-        expect(ensureCollectionSchema).toHaveBeenCalledTimes(1);
+        expect(ensureTableSchema).toHaveBeenCalledTimes(1);
     });
 
     it("forwards ensureTablePolicies through to the adapter", async () => {
@@ -58,7 +58,7 @@ describe("adapterToBootstrapper", () => {
 
     it("leaves both undefined when the adapter implements neither (schemaless driver)", () => {
         const bootstrapper = adapterToBootstrapper(baseAdapter(), "default", true);
-        expect(bootstrapper.ensureCollectionSchema).toBeUndefined();
+        expect(bootstrapper.ensureTableSchema).toBeUndefined();
         expect(bootstrapper.ensureTablePolicies).toBeUndefined();
     });
 });

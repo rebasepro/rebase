@@ -11,7 +11,7 @@ import { tablesFromCollections } from "./helpers/tables";
 /**
  * `createPostgresAdapter` must surface the boot-time schema/RLS provisioning the
  * bootstrapper implements. The adapter wraps the bootstrapper and re-declares
- * the methods it exposes; when it omitted `ensureCollectionSchema` /
+ * the methods it exposes; when it omitted `ensureTableSchema` /
  * `ensureTablePolicies`, the runtime booted a managed tenant with no tables
  * (500 on every data route) or no policies (401 on every read). The bootstrapper
  * has always implemented both — this pins that the adapter does not drop them.
@@ -23,11 +23,11 @@ describe("createPostgresAdapter forwards the schema-provisioning methods", () =>
 
     it("exposes both provisioning methods when the bootstrapper does", () => {
         const bootstrapper = createPostgresBootstrapper(config);
-        expect(typeof bootstrapper.ensureCollectionSchema).toBe("function");
+        expect(typeof bootstrapper.ensureTableSchema).toBe("function");
         expect(typeof bootstrapper.ensureTablePolicies).toBe("function");
 
         const adapter = createPostgresAdapter(config);
-        expect(typeof adapter.ensureCollectionSchema).toBe("function");
+        expect(typeof adapter.ensureTableSchema).toBe("function");
         expect(typeof adapter.ensureTablePolicies).toBe("function");
     });
 
@@ -47,14 +47,14 @@ describe("createPostgresAdapter forwards the schema-provisioning methods", () =>
         const driverResult: InitializedDriver = { driver: driverStand().driver };
         const log = jest.fn();
 
-        let ensureCollectionSchema: jest.Mock;
+        let ensureTableSchema: jest.Mock;
         let ensureTablePolicies: jest.Mock;
 
         function stubBootstrapper(over: Partial<BackendBootstrapper> = {}) {
             const bootstrapper: BackendBootstrapper = {
                 type: "postgres",
                 initializeDriver: jest.fn(),
-                ensureCollectionSchema,
+                ensureTableSchema,
                 ensureTablePolicies,
                 ...over
             };
@@ -62,7 +62,7 @@ describe("createPostgresAdapter forwards the schema-provisioning methods", () =>
         }
 
         beforeEach(() => {
-            ensureCollectionSchema = jest.fn().mockResolvedValue({ applied: 3 });
+            ensureTableSchema = jest.fn().mockResolvedValue({ applied: 3 });
             ensureTablePolicies = jest.fn().mockResolvedValue({ applied: 7 });
         });
 
@@ -70,14 +70,14 @@ describe("createPostgresAdapter forwards the schema-provisioning methods", () =>
             jest.restoreAllMocks();
         });
 
-        it("hands ensureCollectionSchema every argument and returns its result", async () => {
+        it("hands ensureTableSchema every argument and returns its result", async () => {
             stubBootstrapper();
 
             const result = await createPostgresAdapter(config)
-                .ensureCollectionSchema!(collections, driverResult, log);
+                .ensureTableSchema!(collections, driverResult, log);
 
-            expect(ensureCollectionSchema).toHaveBeenCalledTimes(1);
-            expect(ensureCollectionSchema).toHaveBeenCalledWith(collections, driverResult, log);
+            expect(ensureTableSchema).toHaveBeenCalledTimes(1);
+            expect(ensureTableSchema).toHaveBeenCalledWith(collections, driverResult, log);
             expect(result).toEqual({ applied: 3 });
         });
 
@@ -97,13 +97,13 @@ describe("createPostgresAdapter forwards the schema-provisioning methods", () =>
             // manufacture a no-op: a caller checks for the method's presence to
             // decide whether boot provisioning is available at all.
             stubBootstrapper({
-                ensureCollectionSchema: undefined,
+                ensureTableSchema: undefined,
                 ensureTablePolicies: undefined
             });
 
             const adapter = createPostgresAdapter(config);
 
-            expect(adapter.ensureCollectionSchema).toBeUndefined();
+            expect(adapter.ensureTableSchema).toBeUndefined();
             expect(adapter.ensureTablePolicies).toBeUndefined();
         });
 

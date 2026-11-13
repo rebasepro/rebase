@@ -57,9 +57,9 @@ export function createPostgresAdapter(pgConfig: PostgresDriverConfig): DatabaseA
             ? (driverResult) => bootstrapper.verifyConnection!(driverResult)
             : undefined,
 
-        ensureCollectionSchema: bootstrapper.ensureCollectionSchema
+        ensureTableSchema: bootstrapper.ensureTableSchema
             ? (collections, driverResult, log) =>
-                bootstrapper.ensureCollectionSchema!(collections, driverResult, log)
+                bootstrapper.ensureTableSchema!(collections, driverResult, log)
             : undefined,
 
         // Same rule, and it bit at once: the method existed on the bootstrapper,

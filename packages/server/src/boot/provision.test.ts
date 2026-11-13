@@ -43,7 +43,7 @@ function target(over: Partial<ProvisionTarget> = {}): ProvisionTarget {
         driverPackage: "@rebasepro/server-postgres",
         engine: "postgres",
         bootstrapper: {
-            ensureCollectionSchema: jest.fn(async () => ({ applied: 0 })),
+            ensureTableSchema: jest.fn(async () => ({ applied: 0 })),
             ensureTablePolicies: jest.fn(async () => ({ applied: 0 }))
         },
         ...over
@@ -132,7 +132,7 @@ describe("provisionTableSchema — the path that does the work", () => {
 
         const outcome = await provisionTableSchema(
             [posts], lowered,
-            target({ bootstrapper: { ensureCollectionSchema: ensure } }),
+            target({ bootstrapper: { ensureTableSchema: ensure } }),
             { env: {} }
         );
 
@@ -206,7 +206,7 @@ describe("the driver result the schema hooks pass", () => {
         await provisionTableSchema(
             [posts], lowered,
             target({
-                bootstrapper: { ensureCollectionSchema: ensure },
+                bootstrapper: { ensureTableSchema: ensure },
                 driverResult: { driver: fakeDataDriver(), internals: { db } }
             }),
             { env: {} }
@@ -252,7 +252,7 @@ describe("the driver result the schema hooks pass", () => {
         const outcome = await provisionTableSchema(
             [posts], lowered,
             target({
-                bootstrapper: { ensureCollectionSchema: ensure },
+                bootstrapper: { ensureTableSchema: ensure },
                 driverResult: undefined
             }),
             { env: {} }
@@ -334,7 +334,7 @@ describe("provisioning ownership", () => {
 
         const outcome = await provisionTableSchema([posts], lowered, t, { provision: false });
 
-        expect(t.bootstrapper.ensureCollectionSchema).not.toHaveBeenCalled();
+        expect(t.bootstrapper.ensureTableSchema).not.toHaveBeenCalled();
         expect(outcome.status).toBe("skipped");
         expect(loggedAtDefaultLevel()).toContain("another process in this deployment owns it");
     });
@@ -354,7 +354,7 @@ describe("provisioning ownership", () => {
 
         await provisionTableSchema([posts], lowered, t, { env: {} });
 
-        expect(t.bootstrapper.ensureCollectionSchema).toHaveBeenCalled();
+        expect(t.bootstrapper.ensureTableSchema).toHaveBeenCalled();
     });
 
     it("names the reason it is given, so a backend that provisions nothing does not blame another process", async () => {

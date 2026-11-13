@@ -332,9 +332,9 @@ export function adapterToBootstrapper(
         // shape did) left the schema-ensure feature dead on the real adapter
         // path — `boot.ts` saw no method and skipped, so every data route 500'd
         // on a missing relation with only a "driver does not implement" warning.
-        ensureCollectionSchema: adapter.ensureCollectionSchema
+        ensureTableSchema: adapter.ensureTableSchema
             ? (collections, driverResult, log) =>
-                adapter.ensureCollectionSchema!(collections, driverResult, log)
+                adapter.ensureTableSchema!(collections, driverResult, log)
             : undefined,
         ensureTablePolicies: adapter.ensureTablePolicies
             ? (collections, driverResult, log) =>

@@ -149,7 +149,7 @@ function bootstrapper(name: string, db: PGlite): BackendBootstrapper {
         async initializeAuth() {
             return { userService: repo, authRepository: repo };
         },
-        async ensureCollectionSchema() {
+        async ensureTableSchema() {
             return { applied: 0 };
         },
         async ensureTablePolicies() {

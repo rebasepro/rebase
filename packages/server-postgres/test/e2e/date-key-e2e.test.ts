@@ -48,7 +48,7 @@ describe("a date in a composite key (E2E)", () => {
         try {
             const bootstrapper = createPostgresBootstrapper({ connectionString: container.connectionString, connection: conn.db });
             const driverResult = await bootstrapper.initializeDriver({ collections: [scores], tables: tablesFromCollections([scores]).tables, realtime: { subscribe: false, provision: false } });
-            await bootstrapper.ensureCollectionSchema!(tablesFromCollections([scores]).tables, driverResult);
+            await bootstrapper.ensureTableSchema!(tablesFromCollections([scores]).tables, driverResult);
             await bootstrapper.ensureRlsRuntime!(driverResult);
             await bootstrapper.ensureTablePolicies!(tablesFromCollections([scores]).tables, driverResult);
             await bootstrapper.finalizeSecurityPosture!(driverResult);

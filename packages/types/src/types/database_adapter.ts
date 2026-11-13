@@ -119,7 +119,7 @@ export interface DatabaseAdapter {
 
     /**
      * Bring the database's collection tables up to date, additively — the boot
-     * companion to `db push`. See `BackendBootstrapper.ensureCollectionSchema`
+     * companion to `db push`. See `BackendBootstrapper.ensureTableSchema`
      * for the contract (create-only; never drop, narrow, or rewrite).
      *
      * Optional, and MUST be forwarded by any wrapper that turns this adapter
@@ -135,7 +135,7 @@ export interface DatabaseAdapter {
      * it was constructed with. An adapter that dereferences `driverResult`
      * unconditionally works for managed tenants and breaks every self-built one.
      */
-    ensureCollectionSchema?(
+    ensureTableSchema?(
         tables: readonly CompiledTable[],
         driverResult?: InitializedDriver,
         log?: (message: string) => void,
@@ -147,7 +147,7 @@ export interface DatabaseAdapter {
      * policy half of `db push`. Idempotent; see
      * `BackendBootstrapper.ensureTablePolicies`.
      *
-     * Same forwarding requirement as `ensureCollectionSchema`: without the
+     * Same forwarding requirement as `ensureTableSchema`: without the
      * policies, tables exist but every user-context read is denied (a public
      * collection answers 401).
      */

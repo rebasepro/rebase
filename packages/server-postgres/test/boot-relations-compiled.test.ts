@@ -1,7 +1,7 @@
 /**
  * Boot provisions tables with relations from the compiled tables it is handed.
  *
- * The boot appliers (`ensureCollectionSchema`, `ensureTablePolicies` on
+ * The boot appliers (`ensureTableSchema`, `ensureTablePolicies` on
  * the bootstrapper) used to be handed the server's lowered collections and lift
  * them back into tables. The lift refuses every relation of a lowered
  * collection ("the relation its target … is not one of the tables being
@@ -94,7 +94,7 @@ describe("boot provisions related tables from compiled tables", () => {
             }
         };
 
-        const schema = await bootstrapper.ensureCollectionSchema!(tables, driverResult);
+        const schema = await bootstrapper.ensureTableSchema!(tables, driverResult);
         expect(schema.applied).toBeGreaterThan(0);
 
         const runSql = async (text: string) => (await pg.query<Record<string, unknown>>(text)).rows;

@@ -55,7 +55,7 @@ function singularizeForKey(name: string): string {
  * relation reading nothing. No error, no missing table: the failure is silent,
  * which is the only reason this function still exists.
  *
- * `ensureCollectionSchema` calls it to recognise that shape and say so.
+ * `ensureTableSchema` calls it to recognise that shape and say so.
  * Returns the same string as `generateForeignKeyName` for every regular plural,
  * so a caller can compare the two and act only when they differ.
  */

@@ -2202,7 +2202,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
          * same connection (and therefore the same privileges) the driver already
          * proved it can bootstrap with.
          */
-        async ensureCollectionSchema(
+        async ensureTableSchema(
             tables: readonly CompiledTable[],
             driverResult?: InitializedDriver,
             log?: (message: string) => void
@@ -2262,7 +2262,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
          * `securityRules` compiled to `CREATE POLICY` — so a freshly provisioned
          * database serves data instead of denying every user-context read.
          *
-         * The companion to {@link ensureCollectionSchema}: that creates the
+         * The companion to {@link ensureTableSchema}: that creates the
          * tables, this makes them servable. Boot runs it *after* auth
          * initialization, because the generated policies call `rebase.uid()` /
          * `rebase.roles()`, and `CREATE POLICY` validates those functions exist.
