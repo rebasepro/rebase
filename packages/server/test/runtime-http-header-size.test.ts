@@ -27,22 +27,36 @@ const listener: RequestListener = (req, res) => {
     res.end(String(req.url?.length ?? 0));
 };
 
-async function statusFor(server: Server, url: string): Promise<number> {
+/**
+ * The response status, or `"reset"` when the connection was reset before one
+ * was read. Node answers an oversized header with a 431 and destroys the
+ * socket at once; when the client is still sending the rest of a 33 KB request
+ * line (a loaded machine is slow to), the client's kernel sees the reset and
+ * drops the unread 431 — so a refusal reaches the client as either. Both are
+ * the server refusing the request before any route ran.
+ */
+async function statusFor(server: Server, url: string): Promise<number | "reset"> {
     await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
     const { port } = server.address() as AddressInfo;
     try {
-        return await new Promise<number>((resolve, reject) => {
+        return await new Promise<number | "reset">((resolve, reject) => {
             const req = request({ host: "127.0.0.1", port, path: url, method: "GET" }, (res) => {
                 res.resume();
                 res.on("end", () => resolve(res.statusCode ?? 0));
             });
-            req.on("error", reject);
+            req.on("error", (error: NodeJS.ErrnoException) => {
+                if (error.code === "ECONNRESET" || error.code === "EPIPE") resolve("reset");
+                else reject(error);
+            });
             req.end();
         });
     } finally {
         await new Promise<void>(resolve => server.close(() => resolve()));
     }
 }
+
+/** Refused before any route ran: a 431, or the reset that can stand in for it. */
+const REFUSED = [431, "reset"];
 
 describe("the runtime's HTTP server", () => {
     it("answers a 1,536-dimension vector search in the URL", async () => {
@@ -52,11 +66,11 @@ describe("the runtime's HTTP server", () => {
     });
 
     it("where Node's own default refuses it — which is what this is guarding against", async () => {
-        expect(await statusFor(createServer(listener), vectorSearchUrl(1536))).toBe(431);
+        expect(REFUSED).toContain(await statusFor(createServer(listener), vectorSearchUrl(1536)));
     });
 
     it("still has a ceiling", async () => {
-        expect(await statusFor(createRuntimeHttpServer(listener), `/x?q=${"a".repeat(RUNTIME_MAX_HEADER_SIZE)}`)).toBe(431);
+        expect(REFUSED).toContain(await statusFor(createRuntimeHttpServer(listener), `/x?q=${"a".repeat(RUNTIME_MAX_HEADER_SIZE)}`));
     });
 
     it("is the server the runtime boots, on both its paths", () => {
