@@ -114,8 +114,10 @@ export type RestCodec = "number" | "timestamp" | "date" | "time" | "passthrough"
 /**
  * What REST does to a column's value before serving it (see {@link RestCodec}).
  *
- * Only numbers and temporal values are re-rendered; a document, a list, bytes
- * and a vector are served as the driver returns them. A foreign key is a
+ * Only numbers and temporal values are re-rendered; a document, bytes and a
+ * vector are served as the driver returns them. A native array column is
+ * `passthrough` as a whole: the REST row renders its items one by one, each by
+ * its item type's codec (`restCodecOf({ type: arrayElementType(column.type) })`). A foreign key is a
  * column like any other: a `bigint` key is served as a number. Replaces the
  * `property.type === "number" | "date"` reads of the REST row codec.
  *

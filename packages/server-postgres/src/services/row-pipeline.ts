@@ -1,5 +1,5 @@
 import { INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, type ColumnDescriptor } from "@rebasepro/types";
-import { canReadColumn, hasColumnAccessRules, restrictedKeys, restCodecOf } from "@rebasepro/common";
+import { arrayElementType, canReadColumn, hasColumnAccessRules, restrictedKeys, restCodecOf, type RestCodec } from "@rebasepro/common";
 import type { RelationDescriptor, TableDescriptor } from "@rebasepro/types";
 import { currentFieldViewer } from "./field-viewer";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
@@ -136,16 +136,46 @@ function restRowPlan(table: TableDescriptor): RestRowPlan {
     return plan;
 }
 
-/** The renderer of one column's values, or `null` for values served as they arrived. */
-function restScalarStep(column: ColumnDescriptor | undefined): ((value: unknown) => unknown) | null {
-    if (!column) return null;
-    switch (restCodecOf(column)) {
+/** The renderer of one value of a REST codec, or `null` for values served as they arrived. */
+function restCodecStep(codec: RestCodec): ((value: unknown) => unknown) | null {
+    switch (codec) {
         case "number": return coerceDeclaredNumber;
         case "timestamp":
         case "date":
         case "time": return toRestDate;
         case "passthrough": return null;
     }
+}
+
+/**
+ * A native array rendered item by item: each item as a scalar column of the
+ * item's type is rendered, a `null` item kept `null`.
+ *
+ * The driver parses the array literal but hands each item over as Postgres
+ * wrote it — a `numeric[]` item as text, a `timestamptz[]` item as the
+ * Postgres literal — so without this an array served the very values its
+ * scalar column of the same type does not. Anything that is not an array (a
+ * `null` column) is served as it arrived.
+ */
+function restArrayItems(value: unknown, item: (value: unknown) => unknown): unknown {
+    if (!Array.isArray(value)) return value;
+    return value.map(entry => entry === null || entry === undefined
+        ? null
+        : Array.isArray(entry) ? restArrayItems(entry, item) : item(entry));
+}
+
+/**
+ * The renderer of one column's values, or `null` for values served as they
+ * arrived. A native array takes its item type's renderer, applied per item.
+ */
+function restScalarStep(column: ColumnDescriptor | undefined): ((value: unknown) => unknown) | null {
+    if (!column) return null;
+    const element = arrayElementType(column.type);
+    if (element) {
+        const item = restCodecStep(restCodecOf({ type: element }));
+        return item ? (value: unknown) => restArrayItems(value, item) : null;
+    }
+    return restCodecStep(restCodecOf(column));
 }
 
 function restKeyStep(table: RuntimeTable, key: string): RestKeyStep {
@@ -155,9 +185,10 @@ function restKeyStep(table: RuntimeTable, key: string): RestKeyStep {
 }
 
 /**
- * One scalar, as REST serves it: numeric columns as numbers, temporal ones as
- * RFC 3339, everything else — and a key the table does not declare — exactly
- * as the database returned it.
+ * One column value, as REST serves it: numeric columns as numbers, temporal
+ * ones as RFC 3339, a native array's items as a column of the item type,
+ * everything else — and a key the table does not declare — exactly as the
+ * database returned it.
  */
 export function toRestScalar(value: unknown, column: ColumnDescriptor | undefined): unknown {
     const step = restScalarStep(column);

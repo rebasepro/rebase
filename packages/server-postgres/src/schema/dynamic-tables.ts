@@ -57,6 +57,7 @@ import {
 
 import { getTableColumns, relations, sql, type Relation, type Relations } from "drizzle-orm";
 import { toWireKey } from "@rebasepro/utils";
+import { patchPgArrayNullSafety } from "../utils/pg-array-null-patch";
 
 import type { TableColumn, TableMeta } from "./introspect-db-logic";
 
@@ -299,6 +300,9 @@ export function buildDrizzleTablesFromSchema(
         );
     }
 
+    // Drizzle's array mapping turns a null item into `0` / `"NULL"` and fails
+    // on a null array; every table the runtime reads through is built here.
+    patchPgArrayNullSafety(tables);
     return tables;
 }
 

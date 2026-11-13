@@ -30,6 +30,9 @@ import { tableIndexStatement } from "../src/schema/table-index";
 import { serializeColumnToServer } from "../src/data-transformer";
 import { toRestScalar } from "../src/services/row-pipeline";
 import { columnAt, runtimeTableOfDef } from "./helpers/codec-columns";
+import { buildTableRegistry } from "../src/model/build-registry";
+import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { RealtimeService } from "../src/services/realtimeService";
 import { drizzle } from "drizzle-orm/pglite";
 import {
     TABLE_FEATURES, audits, bugs, memberTags, members, codes, counters, days, grades, handles, initials, keyed, lists, pairs, people, prices, slugs, switches, tallies, tasks, tickets
@@ -360,18 +363,86 @@ describe("table features: `<item>.array()` of every scalar element type", () => 
             for (const key of Object.keys(written)) {
                 read[key] = toRestScalar(row[key], columnAt(runtime, key));
             }
-            // As REST serves a native array: the items as the driver returns
-            // them. NOTE: unlike the scalar column of the same type, a
-            // `numeric[]` item stays text and a `timestamptz[]` item the
-            // Postgres literal — `toRestScalar` renders no array element.
-            expect(read).toEqual({
-                ...written,
-                amounts: ["1.50", "2.25"],
-                instants: [expect.stringMatching(/^2026-01-02 \d{2}:00:00\+\d{2}$/)]
-            });
+            // As REST serves a native array: each item as the scalar column
+            // of the item type is served — a `numeric[]` item a number (the
+            // driver hands it over as "1.50"), a `timestamptz[]` item RFC 3339
+            // (the driver hands over the Postgres literal) — so what was
+            // written reads back unchanged.
+            expect(read).toEqual(written);
         } finally {
             await db.close();
         }
+    });
+
+    describe("through the driver: REST read, write-back and filters", () => {
+        let db: PGlite;
+        let driver: PostgresBackendDriver;
+        let realtime: RealtimeService;
+
+        beforeEach(async () => {
+            db = new PGlite();
+            await db.waitReady;
+            await db.exec(ddlOf([lists]));
+            const compiled = compileSchema([lists]);
+            const catalogue = await readCatalogueSchema({ client: queryable(db), tables: compiled.map(t => t.descriptor), defaultSchema: "public" });
+            const registry = buildTableRegistry({ compiledTables: compiled, tables: catalogue.tables, relations: catalogue.relations });
+            const orm = drizzle(db, { schema: { ...catalogue.tables, ...catalogue.relations } });
+            realtime = new RealtimeService(orm, registry);
+            driver = new PostgresBackendDriver(orm, realtime, registry);
+            realtime.setDataDriver(driver);
+        });
+
+        afterEach(async () => {
+            await realtime.destroy();
+            await db.close();
+        });
+
+        const served = {
+            ids: ["a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", null],
+            counts: [1, null, 9007199254740991],
+            amounts: [1.5, null, 2.25],
+            ratios: [0.5],
+            labels: ["green", null],
+            words: ["it's", null],
+            flags: [true, null, false],
+            days: ["2026-01-02", null],
+            instants: ["2026-01-02T10:00:00.000Z", null],
+            times: ["09:30:00", null]
+        };
+
+        it("serves every item decoded, nulls kept, and takes the served row back unchanged", async () => {
+            // Written as the Postgres literals the driver itself hands back.
+            const raw = await db.query<{ id: string }>(`INSERT INTO lists (ids, counts, amounts, ratios, labels, words, flags, days, instants, times) VALUES (
+                ARRAY['a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', NULL]::uuid[], ARRAY[1, NULL, 9007199254740991]::bigint[],
+                ARRAY[1.5, NULL, 2.25]::numeric(8,2)[], ARRAY[0.5]::double precision[], ARRAY['green', NULL]::lists_labels[],
+                ARRAY['it''s', NULL]::text[], ARRAY[true, NULL, false]::boolean[], ARRAY['2026-01-02', NULL]::date[],
+                ARRAY['2026-01-02 11:00:00+01', NULL]::timestamptz[], ARRAY['09:30:00', NULL]::time[]
+            ) RETURNING id`);
+            const id = raw.rows[0].id;
+
+            const first = await driver.restFetchService.fetchOneForRest("lists", id);
+            expect(first).toMatchObject(served);
+            // The SPI reads the same walk.
+            expect(await driver.fetchOne({ path: "lists", id })).toEqual(first);
+
+            // Write the served row back as it was read: the stored arrays do not move.
+            const { id: _id, ...values } = first ?? {};
+            await driver.save({ path: "lists", id, status: "existing", values });
+            expect(await driver.restFetchService.fetchOneForRest("lists", id)).toEqual(first);
+            expect((await db.query(`SELECT amounts::text, instants::text FROM lists WHERE id = '${id}'`)).rows)
+                .toEqual([{ amounts: "{1.50,NULL,2.25}", instants: expect.stringMatching(/^\{"2026-01-02 \d{2}:00:00\+\d{2}",NULL\}$/) }]);
+        });
+
+        it("filters an array column by the values it serves", async () => {
+            const saved = await driver.save({ path: "lists", status: "new", values: { amounts: [1.5, 2.25], instants: ["2026-01-02T10:00:00.000Z"], days: ["2026-01-02"] } });
+            await driver.save({ path: "lists", status: "new", values: { amounts: [3], instants: ["2026-03-04T10:00:00.000Z"], days: ["2026-03-04"] } });
+            const ids = async (filter: Record<string, [string, unknown]>) =>
+                (await driver.restFetchService.fetchCollectionForRest("lists", { filter })).map(row => row.id);
+            expect(await ids({ amounts: ["array-contains", 1.5] })).toEqual([saved.id]);
+            expect(await ids({ amounts: ["array-contains-any", [2.25, 9]] })).toEqual([saved.id]);
+            expect(await ids({ instants: ["array-contains", "2026-01-02T10:00:00.000Z"] })).toEqual([saved.id]);
+            expect(await ids({ days: ["array-contains-all", ["2026-01-02"]] })).toEqual([saved.id]);
+        });
     });
 });
 

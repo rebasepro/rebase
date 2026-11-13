@@ -41,7 +41,6 @@ import { createAuthSchema } from "./schema/auth-schema";
 import { expectationOf, findUnusableAuthTables, unusableAuthTablesError, usersExpectation } from "./auth/verify-auth-tables";
 import { HistoryService } from "./history/HistoryService";
 import { ensureHistoryIndexes, ensureHistoryTableExists, historyUnavailableReason, readHistoryTableState } from "./history/ensure-history-table";
-import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
 import { patchPgNumericToNumber } from "./utils/pg-numeric-number-patch";
 import { compileIntrospectedTables, introspectSchema } from "./schema/introspect-runtime";
 import { introspectTables } from "./schema/introspect-tables";
@@ -880,11 +879,9 @@ export async function openPostgresDriver(
         relations: schemaRelations
     });
 
-    // Patch Drizzle's PgArray columns to handle NULL values safely.
-    // Drizzle's mapFromDriverValue crashes with "value.map is not a function"
-    // when a native array column (text[], integer[], etc.) contains NULL.
+    // Array columns are made null-safe where the tables are built
+    // (`buildDrizzleTablesFromSchema`).
     if (schemaTables) {
-        patchPgArrayNullSafety(schemaTables as Record<string, unknown>);
         // A `number` property is a `numeric` column unless it declared
         // itself integral, and Postgres sends `numeric` as text. Cast it
         // back here, where every read path goes through.
@@ -1766,7 +1763,6 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
             tables: own,
             defaultSchema: pgConfig.introspectionSchema ?? "public"
         });
-        patchPgArrayNullSafety(catalogue.tables);
         patchPgNumericToNumber(catalogue.tables);
         const next = buildTableRegistry({ compiledTables: compiled, tables: catalogue.tables, relations: catalogue.relations });
         if (catalogue.missing.length > 0) {
