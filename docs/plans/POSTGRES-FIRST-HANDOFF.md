@@ -157,6 +157,32 @@ All committed on the branch (≈150 commits OSS, 12 in `saas`). Details per slic
 
 ## 6. What is running right now, and what is next
 
+> **STATUS UPDATE — 2026-11-14, about 01:00 CET. This block supersedes the lists below where
+> they disagree.**
+> Everything short of the release is DONE and committed:
+> - The fix pass landed (schema endpoint and every admin surface resolve the caller through
+>   the auth adapter; `via` through an unserved table is closed; the build guard never inlines
+>   a backend file and refuses a plugin that overrides it; writes through a declared junction —
+>   body, nested routes, socket — obey its rules) and was reviewed (`reviews/security-look-5.md`:
+>   nothing above low; its two lows are fixed too).
+> - The migration codemod's eleven open items landed (`## FINAL-FIX-CODEMOD` in the notes).
+> - Full re-verification on a clean snapshot is GREEN at commit 9fe0e2a577
+>   (`~/.rebase-audits/pgfirst/full-verify-2.md`): 52/52 static gates, 13/14 build gates (the
+>   one red is the unbumped version pins), 22/22 unit packages, all four e2e lanes, the control
+>   plane's suites. The three small fixes after it (f79f14fdbb, 715dfa2004, 778e5222b5) were
+>   verified by their builder's own suite and e2e runs.
+> - All NINE real projects build, boot and pass their tests on their copies ("Phase 2" in
+>   `~/.rebase-audits/pgfirst/migrate-real.md`), the hybrid Postgres + Firestore one included.
+> - Docs: English final (incl. a new page `upgrading/0-30-to-0-31-by-hand.mdx`), the five
+>   locales regenerated, every docs and locale gate green (last commits 57971806c8,
+>   714d5a01af, 4bb874d220).
+> - The public demo still runs commit 9726335d50 (before the fix pass); redeploying it is a
+>   separate, explicit request.
+> WHAT IS LEFT: section 7 steps 5 and 6 only — the final report, then the release and rollout
+> under section 9 (Francesco's go; needs a fresh usage budget; never start it without enough
+> budget to finish the chain). In section 7, steps 1–4 are done.
+
+
 **The live list is the "CURRENT STATE" block at the top of `~/.rebase-audits/pgfirst/PLAN.md`**
 (results of every slice; newest lines just above the text "(superseded line follows)"). As of
 2026-11-13 14:30 CET (real clock):
