@@ -345,8 +345,16 @@ export function planFrontendWiring(plan: PlanContext, frontendDir: string, hasEx
             note(plan, undefined, `${relativeToRoot(plan, tsconfig)} does not set \`resolveJsonModule\`; the type check needs it for \`import uiConfig from "./cms/ui-config.json"\` (Vite itself imports JSON as is).`);
         }
     }
-    if (fs.existsSync(appFile)) {
-        const text = fs.readFileSync(appFile, "utf8");
+    const mountStep = (file: string) => plan.manualSteps.push({
+        title: "Mount the table customizations",
+        detail: "The admin panel no longer takes `collections`: it projects every table from the backend and layers the customizations over it. Replace the `virtual:rebase-collections` import and the `collections` prop of `<RebaseCMS>`." +
+            (wireUiConfig ? " Pass `uiConfig` too: in development the collection editor saves presentation to src/cms/ui-config.json, and without the prop it is lost on reload and never ships." : ""),
+        snippet: `${importLine}\n\n<RebaseCMS\n    ${props.join("\n    ")}\n    {/* …the other props you pass */}\n/>`,
+        file: relativeToRoot(plan, file)
+    });
+    const mountsCollections = (text: string) => text.includes("virtual:rebase-collections") || /<RebaseCMS[\s\S]*?collections=/.test(text);
+    if (fs.existsSync(appFile) && (appText.includes(SCAFFOLD_COLLECTIONS_IMPORT) || mountsCollections(appText))) {
+        const text = appText;
         const importCount = text.split(SCAFFOLD_COLLECTIONS_IMPORT).length - 1;
         const propCount = text.split(SCAFFOLD_COLLECTIONS_PROP).length - 1;
         if (importCount === 1 && propCount === 1 && !/\bcollections\b/.test(text.replace(SCAFFOLD_COLLECTIONS_IMPORT, "").replace(SCAFFOLD_COLLECTIONS_PROP, ""))) {
@@ -356,14 +364,15 @@ export function planFrontendWiring(plan: PlanContext, frontendDir: string, hasEx
                 .replace(SCAFFOLD_COLLECTIONS_IMPORT, importLine)
                 .replace(SCAFFOLD_COLLECTIONS_PROP, props.join(`\n${indent}`));
             planFile(plan, appFile, next, "App.tsx (mount the customizations)");
-        } else if (text.includes("virtual:rebase-collections") || /<RebaseCMS[\s\S]*?collections=/.test(text)) {
-            plan.manualSteps.push({
-                title: "Mount the table customizations",
-                detail: "The admin panel no longer takes `collections`: it projects every table from the backend and layers the customizations over it. Replace the `virtual:rebase-collections` import and the `collections` prop of `<RebaseCMS>`." +
-                    (wireUiConfig ? " Pass `uiConfig` too: in development the collection editor saves presentation to src/cms/ui-config.json, and without the prop it is lost on reload and never ships." : ""),
-                snippet: `${importLine}\n\n<RebaseCMS\n    ${props.join("\n    ")}\n    {/* …the other props you pass */}\n/>`,
-                file: relativeToRoot(plan, appFile)
-            });
+        } else {
+            mountStep(appFile);
+        }
+    } else {
+        // The panel is mounted somewhere other than src/App.tsx (an `AdminApp.tsx`, a
+        // route module): name every source file that still imports the collections
+        // module or passes `collections` to <RebaseCMS>, or nothing tells the author.
+        for (const file of frontendSourceFiles(path.join(frontendDir, "src"))) {
+            if (mountsCollections(fs.readFileSync(file, "utf8"))) mountStep(file);
         }
     }
 
@@ -384,6 +393,21 @@ export function planFrontendWiring(plan: PlanContext, frontendDir: string, hasEx
             });
         }
     }
+}
+
+/** The frontend's own .ts/.tsx sources (no declaration files, no node_modules, not the generated cms/). */
+function frontendSourceFiles(dir: string): string[] {
+    if (!fs.existsSync(dir)) return [];
+    const out: string[] = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+            if (entry.name !== "node_modules" && entry.name !== "cms") out.push(...frontendSourceFiles(full));
+        } else if (/\.tsx?$/.test(entry.name) && !entry.name.endsWith(".d.ts")) {
+            out.push(full);
+        }
+    }
+    return out.sort();
 }
 
 /**

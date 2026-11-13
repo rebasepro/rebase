@@ -451,6 +451,18 @@ describe("modes", () => {
         expect(report.files.map(file => file.path)).not.toContain("frontend/src/App.tsx");
     }, 120_000);
 
+    it("names the file that mounts the panel when it is not App.tsx", async () => {
+        const dir = materialize("blog");
+        const app = path.join(dir, "frontend", "src", "App.tsx");
+        fs.writeFileSync(path.join(dir, "frontend", "src", "AdminApp.tsx"), fs.readFileSync(app, "utf8").replace("export function App", "export function AdminApp"));
+        fs.writeFileSync(app, "import { AdminApp } from \"./AdminApp\";\n\nexport function App() {\n    return <AdminApp />;\n}\n");
+        const report = await run(dir, { dryRun: true });
+        const steps = report.manualSteps.filter(entry => entry.title === "Mount the table customizations");
+        expect(steps.map(step => step.file)).toEqual(["frontend/src/AdminApp.tsx"]);
+        expect(steps[0].snippet).toContain("tableCustomizations={tableCustomizations}");
+        expect(report.files.map(file => file.path)).not.toContain("frontend/src/App.tsx");
+    }, 120_000);
+
     it("prints the backend guard as a manual step, with the exact lines, when the Vite config is not the scaffold's", async () => {
         const dir = materialize("blog");
         const vite = path.join(dir, "frontend", "vite.config.ts");
