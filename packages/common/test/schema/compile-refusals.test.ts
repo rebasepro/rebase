@@ -484,6 +484,26 @@ describe("compileTables — refusals", () => {
                 message: expect.stringContaining("two many-to-many relations resolve to the junction table \"posts_tags\" with different key columns")
             }]);
         });
+
+        it("refuses a many-to-many whose two junction columns derive one name", () => {
+            // A link from a table to itself named after it: the source key is
+            // the singular slug, the target key the singular relation name.
+            const tracks: AnyTableDef = rawTable("tracks", {
+                columns: { id: id() },
+                relations: { track: rel.manyToMany(() => tracks) },
+                rls: "admin-only"
+            });
+            expect(problemsOf([tracks])).toEqual([{
+                table: "tracks", key: "track",
+                message: expect.stringContaining("both junction columns of \"tracks_tracks\" are named \"track_id\"")
+            }]);
+            const named: AnyTableDef = rawTable("tracks", {
+                columns: { id: id() },
+                relations: { track: rel.manyToMany(() => named, { targetKey: "related_track_id" }) },
+                rls: "admin-only"
+            });
+            expect(problemsOf([named])).toEqual([]);
+        });
     });
 
     describe("columns", () => {

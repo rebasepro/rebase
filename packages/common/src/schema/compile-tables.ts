@@ -533,6 +533,17 @@ function compileOne(
                 const through = deriveJunctionTable(entry.table, target.table, relation.through);
                 const sourceKey = deriveJunctionSourceKey(entry.slug, relation.sourceKey);
                 const targetKey = deriveJunctionTargetKey(relationName, relation.targetKey);
+                if (sourceKey === targetKey) {
+                    // Both defaults are derived independently — the source's
+                    // singular slug and the relation's name — so a link from a
+                    // table to itself named after the table (`tracks.track`)
+                    // derives one column twice, which no CREATE TABLE takes.
+                    refuse(
+                        `both junction columns of "${through}" are named "${sourceKey}": one column cannot hold both ` +
+                        `ends of the link. Name the target's apart, e.g. \`targetKey: "related_${sourceKey}"\`.`,
+                        relationName
+                    );
+                }
                 const pivot: ColumnDescriptor[] = [];
                 for (const [key, builder] of Object.entries(relation.pivot ?? {})) {
                     if (!isColumnBuilder(builder)) {
