@@ -2796,7 +2796,7 @@ onError });
      * we need to re-register everything to resume receiving updates.
      */
     private resubscribeAll(): void {
-        this.connectionDebug(`[WS] Re-subscribing: ${this.collectionSubscriptions.size} collection(s), ${this.singleSubscriptions.size} row(ies)`);
+        this.connectionDebug(`[WS] Re-subscribing: ${this.collectionSubscriptions.size} table subscription(s), ${this.singleSubscriptions.size} row(ies)`);
 
         // A registration still in flight here had its subscribe sent on this
         // socket already, while it was authenticating: the close clears the
