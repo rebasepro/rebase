@@ -36,6 +36,10 @@
 -- own tables, policies, functions and grants are byte-identical; the
 -- additions are framework tables boot now provisions (`rebase.cron_claims`,
 -- `rebase.cron_job_state`, `rebase.cron_logs`, `rebase.ui_preferences`).
+-- Re-recorded 2026-11-13 against feat/postgres-first-baas@0812d4735c,
+-- PostgreSQL 18.6, after the template's columns were re-spelled the Drizzle
+-- way (45323f117c): the dump is byte-identical to the 2026-11-12 recording —
+-- the same 20 tables, policies, functions, grants and roles.
 
 -- Boot creates these; they are cluster objects, so `pg_dump` of one database
 -- does not carry them.

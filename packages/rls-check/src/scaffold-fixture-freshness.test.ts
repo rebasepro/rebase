@@ -52,7 +52,13 @@ const TEMPLATE = path.join(__dirname, "../../cli/templates/template/backend/sche
 // table, policy, function and grant is byte-identical to the 11-11 recording;
 // boot now also provisions `rebase.cron_*` and `rebase.ui_preferences`, which
 // moved the scaffold baseline's table count from 16 to 20 and no finding.
-const RECORDED = "3e3209c091ef45eb";
+// Moved 2026-11-13, re-recorded: the template's columns are spelled the
+// Drizzle way (`.generatedByDefaultAsIdentity()`, `col.timestamp({
+// withTimezone: true })`, `col.text({ enum }).array()` — 45323f117c).
+// `scaffold.sql` was dumped again from a boot of these tables on PostgreSQL
+// 18.6 and is byte-identical to the 11-12 recording below its header (every
+// table, policy, function, grant and role), so EXPECTED_BASELINE is unchanged.
+const RECORDED = "2b2d4868898533f4";
 
 describe("the recorded scaffold fixture", () => {
     it("was recorded from the template the CLI still ships", () => {
