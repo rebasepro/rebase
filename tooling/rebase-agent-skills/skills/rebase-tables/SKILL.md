@@ -361,9 +361,14 @@ Builders: `json.string()`, `json.number()`, `json.boolean()`, `json.date()`,
 `.onUpdateUser()` / `.userId()` (strings). Fields are optional unless
 `.required()`.
 
-Today a document is an object or an array at the top, `json.oneOf()` is only
-an array item, and `json.unknown()` is only an array item; the compiler refuses
-the other placements by name.
+A document's top may be an object, an array, a scalar or a `json.oneOf`;
+`json.oneOf` and `json.unknown()` may sit at any depth. The API (REST, MCP,
+socket) checks every shape on write. On arrays, `.validate({ minItems,
+maxItems, uniqueItems })`; on an array of objects, `.validate({ uniqueBy:
+["sku"] })` refuses two items sharing a value in a named field (`unique_by`).
+Stamps work at any depth (object fields, array items, a `oneOf` variant): on a
+create missing objects on the way are created; on an update only `onUpdate*`
+fields are stamped, and only inside a document the update sends.
 
 ## Relations
 
@@ -376,11 +381,19 @@ each other in either import order, with no type annotation.
 |---|---|---|---|
 | `rel.belongsTo` | on **this** table | one row | `localKey`, `notNull`, `unique`, `onDelete`, `onUpdate`, `index`, `constraint` |
 | `rel.hasOne` | on the **target**, unique | one row | `foreignKey`, `sourceKey` |
-| `rel.hasMany` | on the **target** | many rows | `foreignKey`, `sourceKey` |
+| `rel.hasMany` | on the **target** | many rows | `foreignKey`, `sourceKey`, `orderBy` |
 | `rel.manyToMany` | in a **junction table** Rebase creates | many rows | `through`, `sourceKey`, `targetKey`, `pivot`, `onDelete` |
 | `rel.via` | where `steps` say | one or many | `steps` (required), `cardinality` |
 
 Every kind also takes `access: { read?, write? }` and `private: true`.
+
+`rel.hasMany(target, { orderBy: [["published_at", "desc"]] })` is the order
+related rows come back in when the caller names none — for an include, a
+relation read and a nested listing (`/api/data/authors/1/posts`). A caller's
+`orderBy` replaces it (it does not extend it); the target's key ascending
+always ends it; a per-parent include `limit` keeps the first rows of it.
+Relation names in `include`, filters and sorts are exact: write the key in
+`relations`.
 
 ```ts
 // backend/schema/posts.ts
@@ -492,9 +505,13 @@ export const articles = defineTable("articles", {
 });
 ```
 
-Rule forms: owner (`ownerField`), `access: "public" | "authenticated"` (with an
-optional `condition` / `check`), structured (`condition: policy.…`), raw SQL
-(`using` / `withCheck`), roles only. Every table also gets the admin baseline
+Rule forms: owner (`ownerField`), `access: "public" | "authenticated" |
+"registered"` (with an optional `condition` / `check`; `"registered"` excludes
+anonymous guests — prefer it with anonymous sign-in), structured
+(`condition: policy.…`), raw SQL (`using` / `withCheck`), roles only. Mixing
+forms in one rule (`access` + `ownerField`, `ownerField` + `condition`,
+`condition` + `using`, …) or an invalid `access` / `mode` / `operation` /
+`roles` value is refused at compile. Every table also gets the admin baseline
 policies unless `defaultPolicies: false`. The full rule reference, `policy.*`
 helpers and what fails closed are in `rebase-security`; roles and the auth side
 are in `rebase-auth`.
@@ -563,8 +580,10 @@ pair that keeps another table's totals in sync through `context.data`.
 - Work that leaves the database (e-mail, a webhook) does not belong in a hook
   body: enqueue a job instead (see `rebase-cron-jobs` / the jobs docs); a job
   enqueued from a hook commits with the write.
-- `afterRead` masks what a caller receives; a value a caller must never see is
-  better withheld with `.private()` or `.access({ read })`.
+- `afterRead` masks what a caller receives — responses, realtime frames, MCP
+  results, history snapshots, and rows embedded by `include` or a relation
+  (masked with the **target** table's `afterRead`). A value a caller must never
+  see is better withheld with `.private()` or `.access({ read })`.
 - Several concerns on one table: `hooks: composeTableHooks(auditTrail, slugify)`
   with `composeTableHooks` from `@rebasepro/common`.
 - Hooks for **every** table: `export const hooks: TableHooks = { … }` from

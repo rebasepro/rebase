@@ -329,10 +329,14 @@ One container can serve several apps at different paths. Declare them in
 404s — a blank page with nothing in the logs. `rebase build` passes the value as
 `REBASE_APP_BASE`:
 
-```ts
+```ts no-verify
 // admin/vite.config.ts
+import { rebaseBackendGuard } from "@rebasepro/app/vitePlugin";
+
 export default defineConfig({
-    base: process.env.REBASE_APP_BASE ?? "/"
+    base: process.env.REBASE_APP_BASE ?? "/",
+    // Required beside a backend/: `rebase build` refuses a frontend without it.
+    plugins: [react(), rebaseBackendGuard()]
 });
 ```
 

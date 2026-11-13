@@ -138,7 +138,7 @@ the tables the first migration would create.
 
 | Command | Description | When to Use |
 |---------|-------------|-------------|
-| `rebase verify` | Compile the tables; report what the server would refuse | After every edit, CI |
+| `rebase verify` | Compile the tables; report what the server would refuse; check `frontend/src/cms` against them (`cms-*`) | After every edit, CI |
 | `rebase schema generate` | `backend/schema` → Drizzle schema | Always first step |
 | `rebase schema introspect` | DB → `defineTable` files in `backend/schema` | Adopting an existing database |
 | `rebase db push` | Apply schema directly to DB | Development |
@@ -146,7 +146,7 @@ the tables the first migration would create.
 | `rebase db migrate` | Run pending migrations | Production deploy |
 | `rebase db backup` | Snapshot before a risky change | Before destructive pushes |
 | `rebase doctor` | Report table ↔ database drift | Debugging, CI |
-| `rebase migrate collections-to-tables` | Move a project from `config/collections` to `backend/schema` | Once, on upgrade |
+| `rebase migrate collections-to-tables` | Move a project from `config/collections` to `backend/schema`; read its "Review before deploying" section, then `rebase db push --dry-run` and `rebase doctor --policies` must show no difference | Once, on upgrade |
 
 ## Common Scenarios
 

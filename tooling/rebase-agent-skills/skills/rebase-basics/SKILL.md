@@ -262,14 +262,16 @@ for `psql`:
 ```typescript
 // backend/scripts/x.ts: the backend workspace is the one that can import the driver.
 import { openRebase } from "@rebasepro/server-postgres";
-import { lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 import { users, posts, defaultRls } from "../schema";
+import { hooks } from "../hooks";
 
-// `openRebase` still takes the tables in the server's internal form; a later
-// release takes the defineTable results directly. `rebase console` needs none of this.
-const collections = lowerTables([users, posts], { defaultRls });
+// The tables compiled (hooks included), and the global hooks backend/hooks.ts
+// exports, so a script write runs what a server write runs.
+// `rebase console` loads both for you.
+const tables = compileSchema([users, posts], { defaultRls });
 
-const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
+const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, tables, hooks });
 const { data: latest } = await rebase.dataAsAdmin.posts.find({ limit: 10 });
 
 // The same data as one user sees it, under row-level security.

@@ -30,7 +30,10 @@ task before you start:
   Server hooks are `hooks: { … }` on the table and `.transform()` on a column.
   How a table looks in the CMS is a separate file, `frontend/src/cms/<table>.tsx`,
   written with `customizeTable<typeof table>("slug", { … })` from
-  `@rebasepro/cms`, which imports the table as a type only. Read
+  `@rebasepro/cms`, which imports the table as a type only (a value import of
+  `backend/` fails the build: `rebaseBackendGuard()` in the frontend's Vite
+  config). Columns are spelled as Drizzle's `pg-core` spells them
+  (`col.varchar({ length })`, `col.timestamp({ withTimezone: true })`). Read
   `packages/types/src/schema/` (`columns.ts`, `relations.ts`, `table.ts`) before
   writing anything unusual; `app/backend/schema/` and `app/frontend/src/cms/`
   are the worked examples.

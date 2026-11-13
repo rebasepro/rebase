@@ -277,7 +277,7 @@ Each section takes:
 |---|---|---|
 | `entityActions` | `(string \| TableEntityAction)[]` | Actions on a record. An object, or the key of one registered on `<RebaseCMS entityActions>`. See [Entity actions](/docs/frontend/entity-actions/). |
 | `disableDefaultActions` | `("edit" \| "copy" \| "delete")[]` | Built-in actions this table does not offer. |
-| `resetPasswordAction` | `false \| TableEntityAction` | The auth table only (`defineAuthTable`): `false` removes the built-in reset-password action, an action replaces it (offered whatever the auth adapter supports: its backend is yours). Ignored, with a warning, on any other table. |
+| `resetPasswordAction` | `false \| TableEntityAction` | <span class="since-badge" data-since="0.31">Since 0.31</span> The auth table only (`defineAuthTable`): `false` removes the built-in reset-password action, an action replaces it (offered whatever the auth adapter supports: its backend is yours). Ignored, with a warning, on any other table. |
 | `entityViews` | `(string \| TableEntityView)[]` | Extra tabs on a record. See [Entity views](/docs/frontend/entity-views/). |
 | `Actions` | `Component[]` | Components rendered in the collection's toolbar. |
 | `components` | `TableComponentOverrides` | Collection-scoped component overrides, each `{ Component, wrap? }`. See [Component overrides](/docs/frontend/component-overrides/#collection-level-component-overrides). |

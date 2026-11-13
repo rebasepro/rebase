@@ -110,6 +110,12 @@ Takes an optional list of app names; with none, every app in the manifest is bui
 | `--workspace` | | Run every workspace's own `build` script instead of bundling |
 | `--help` | `-h` | Show build command help |
 
+A frontend whose `vite.config.ts` does not use `rebaseBackendGuard()` (from
+`@rebasepro/app/vitePlugin`) is refused: the guard fails the build when any
+frontend module resolves into `backend/`, which would ship server code to the
+browser. The frontend imports `backend/` as types only (`import type`).
+`frontend/src/cms/ui-config.json` goes into the bundle as `entry.uiConfig`.
+
 > **IMPORTANT FOR AGENTS:** "Build for production" means the default (bundle) path. `--workspace` runs each workspace's own build script and produces **no** bundle, so `rebase start` will have nothing to run. A project with no `rebase.json`, or one whose backend has been ejected, falls back to that path automatically.
 
 ```bash
@@ -284,7 +290,7 @@ rebase auth reset-password user@example.com MyNewPass!
 | Command | Description |
 |---------|-------------|
 | `rebase doctor` | Detect three-way schema drift between the tables in `backend/schema`, the Drizzle schema, and live DB. `--policies` also audits the RLS policies (the CI-gate form) |
-| `rebase verify` | Offline checks that the tables are safe to ship: they compile, `rls` coverage of per-user tables, migration freshness (it does not read `frontend/src/cms`: a `customizeTable` mistake is a type error, or a throw when the module loads). `--live` also checks DATABASE_URL (migrations applied, the rls-check audit); `--json`, `--quiet`. Exits 1 on an error, not on a warning |
+| `rebase verify` | Offline checks that the tables are safe to ship: they compile, `rls` coverage of per-user tables, migration freshness, and `frontend/src/cms` read statically against the tables (`cms-unknown-table`, `cms-unknown-field`, `cms-hidden-required`, `cms-duplicate-customization`, `cms-not-static`, `cms-ui-config-not-mounted`, `cms-backend-guard-missing`). `--live` also checks DATABASE_URL (migrations applied, the rls-check audit); `--json`, `--quiet`. Exits 1 on an error, not on a warning |
 | `rebase status` | Show every declared resource (databases, buckets, topics, queues, crons, functions) and whether the variables it reads are set. `--json` for scripts |
 | `rebase resources` | List the resources this project declares, declared and implicit. `--write` regenerates the committed resource graph; `--check` fails when it is stale, and `--check --json` is the CI form (error envelope, exit 1) |
 

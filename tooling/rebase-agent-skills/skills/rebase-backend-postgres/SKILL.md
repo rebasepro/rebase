@@ -384,22 +384,23 @@ import {
     openRebase,
     postgresDriverConfigFromEnv
 } from "@rebasepro/server-postgres";
-import { lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 import { users, posts, defaultRls } from "../schema";
 
-// `openRebase` and `openPostgresDriver` still take the tables in the server's
-// internal form; a later release takes the defineTable results directly.
-const collections = lowerTables([users, posts], { defaultRls });
+// `openRebase` and `openPostgresDriver` take the tables compiled: each
+// descriptor with its hooks, which is what the driver runs on.
+const tables = compileSchema([users, posts], { defaultRls });
 
 // The shortcut: dataAsAdmin, sql, withAuth(user), close(). No DDL, no env reads.
 // Typed by the Database `rebase generate-sdk --register` registers, or openRebase<Database>(…).
-const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
+// Pass `hooks` (backend/hooks.ts) so a script write runs the global hooks too.
+const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, tables });
 await rebase.close();
 
 // One step down, assembling your own boot: no DDL, no part in realtime.
 const { db, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
 const pgConfig = postgresDriverConfigFromEnv({ connection: db, connectionString });
-const { driver, internals } = await openPostgresDriver(pgConfig, { collections, provision: false, realtime: false });
+const { driver, internals } = await openPostgresDriver(pgConfig, { tables, provision: false, realtime: false });
 ```
 
 `internals` is typed (`PostgresDriverInternals`: `db`, `readDb`, `registry`,

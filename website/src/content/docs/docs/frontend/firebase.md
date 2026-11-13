@@ -156,6 +156,8 @@ relation tabs or filters Firestore cannot run.
 
 ## Editing it in the collection editor
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 In development the [collection editor](/docs/studio/#collection-editor) edits
 Firestore collections too: a save rewrites the collection's
 `defineFirestoreCollection({...})` call in `frontend/src/cms` in place,

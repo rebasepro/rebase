@@ -108,6 +108,8 @@ const MOUNTS = new Map([
     ["packages/server/src/backup/backup-routes.ts#router", "/api/admin/backups"],
     ["packages/server/src/storage/maintenance-routes.ts#router", "/api/admin/storage"],
     ["packages/server/src/api/schema-editor-routes.ts#router", "/api/admin/schema-editor"],
+    // The frontend source editor, routed inside the schema editor at `/frontend`.
+    ["packages/server/src/api/frontend-source-routes.ts#router", "/api/admin/schema-editor/frontend"],
     ["packages/server/src/api/live-schema-routes.ts#router", "/api/admin/schema"],
     ["packages/server/src/ui-config/ui-config-routes.ts#router", "/api/admin/ui-config"],
     ["packages/server/src/api/logs-routes.ts#app", "/api/admin/logs"],

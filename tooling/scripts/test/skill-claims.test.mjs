@@ -4,7 +4,7 @@
  * `rebase-collections` offered `isId: "cuid"` as "Auto-generated CUID" while
  * config load refuses it, so an agent following the skill wrote a collection
  * whose first boot failed. Each test feeds the rule a fixture tree in exactly
- * that shape: the refusal in a stand-in `validate-config.ts`, the offer in a
+ * that shape: the refusal in a stand-in migration lift, the offer in a
  * skill, a page or the scaffold's instructions.
  *
  * Run: node --test tooling/scripts/test/
@@ -17,14 +17,14 @@ import path from "node:path";
 
 import { checkIdStrategies, refusedIdStrategies } from "../docs-verify/check-skill-claims.mjs";
 
-const VALIDATE = "packages/server/src/collections/validate-config.ts";
+const VALIDATE = "packages/common/src/migrate/lift-collection.ts";
 const REFUSING =
-    "for (const [key, property] of ids) {\n" +
-    "    if (property.isId === \"cuid\") {\n" +
-    "        collect.error(`${at}.properties.${key}.isId`, \"no cuid() function\");\n" +
+    "if (typeof isId === \"string\") {\n" +
+    "    if (isId === \"cuid\") {\n" +
+    "        this.refuse(key, \"no cuid() function\");\n" +
     "    }\n" +
-    "    if (property.isId === \"increment\" && property.columnType !== undefined) {\n" +
-    "        collect.warn(`${at}`, \"width ignored\");\n" +
+    "    if (isId === \"increment\" && columnType !== undefined) {\n" +
+    "        this.note(key, \"width ignored\");\n" +
     "    }\n" +
     "}\n";
 

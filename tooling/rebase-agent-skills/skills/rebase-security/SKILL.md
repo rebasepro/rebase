@@ -381,13 +381,20 @@ does.
 
 ### Rule forms
 
-A rule is one of these. Mixing two in one rule is a type error.
+A rule is one of these. Mixing two in one rule is a type error **and** a
+compile error (casts and plain JavaScript are caught): `access` beside
+`ownerField` / `using` / `withCheck`; `ownerField` beside `using` / `withCheck`
+/ `condition` / `check`; `condition` / `check` beside `using` / `withCheck`.
+An `access`, `mode`, `operation(s)` or `roles` value outside its list is
+refused too (a misspelt `"restrictive"` never compiles as permissive). Every
+clause of a rule is ANDed.
 
 | Form | Example | `USING` (which rows) | `WITH CHECK` (what may be written) |
 |---|---|---|---|
 | Owner | `{ ownerField: "authorId" }` | the column equals the caller's id | the same |
 | Public | `{ access: "public" }` | every row | every row |
-| Signed in | `{ access: "authenticated" }` | every row, for a signed-in caller | the same |
+| Signed in | `{ access: "authenticated" }` | every row, for a signed-in caller (guests included) | the same |
+| Signed in with an account | `{ access: "registered" }` | every row, for a signed-in caller who is not an anonymous guest | the same |
 | Access + condition | `{ access: "public", condition: { status: "published" } }` | the condition (gated by the access test) | `check`, else the condition |
 | Access + check | `{ access: "authenticated", check: { state: "open" } }` | the access test | the check |
 | Structured | `{ condition: policy.rolesOverlap(["moderator"]) }` | the condition | `check`, else the condition |
@@ -481,7 +488,13 @@ RLS decides *which rows*; it does not redact a column. Hiding a phone number
 from non-admins on rows they may otherwise see is what `afterRead` is for —
 and better still, a column no caller should receive is `.private()` or
 `.access({ read: ["support"] })` on the column, which removes it before any
-hook runs and keeps it out of filters too.
+hook runs and keeps it out of filters too — on every door, including an
+in-process read through `context.data` on a caller's behalf, which the driver
+refuses (`FIELD_NOT_READABLE`) when it filters, sorts, projects, includes or
+aggregates on a column the caller cannot read. `afterRead` masks rows
+everywhere they leave: responses, realtime frames, rows embedded by `include`
+or a relation (the target table's `afterRead`, one level deep), MCP results,
+and history snapshots (history is served as reads).
 
 **A client-direct engine** is the other case the database does not enforce:
 `@rebasepro/firebase` talks to Firestore from the browser; Rebase policies and
@@ -745,6 +758,9 @@ Use this checklist when setting up security for a Rebase project:
 - [ ] **Service key is set** — `auth.serviceKey` with ≥ 32 chars for server-to-server auth
 - [ ] **Default role holds no admin-plane scope** — `auth.defaultRole` may not be `"admin"` or a declared role with any admin-plane scope (startup error)
 - [ ] **Every table states its `rls`** — `"admin-only"` until decided; owner tables use `ownerField` with `.onCreateUser()` on the column; `rebase verify` flags per-user tables whose rules let a role read every row
+- [ ] **`"registered"`, not `"authenticated"`, where guests must not pass** — with anonymous sign-in on, `access: "authenticated"` admits guests; `access: "registered"` (`policy.registered()`) does not
+- [ ] **A migrated project's rule changes were reviewed** — `rebase migrate collections-to-tables` lists rules whose policy now grants something different under "Review before deploying" (a bare `access: "authenticated"` granted nothing on 0.30 and admits every signed-in caller now); then `rebase db push --dry-run` and `rebase doctor --policies` show no difference
+- [ ] **The frontend cannot import server code** — `rebaseBackendGuard()` in `frontend/vite.config.ts`; `import type` only from `backend/`
 - [ ] **Hooks enforce what RLS cannot** — global hooks (`backend/hooks.ts`) and table `hooks` redact and validate on every data path. Deciding *who may see a row* is RLS's job
 - [ ] **Sensitive fields are masked** — `afterRead` masks PII for non-admin users
 - [ ] **Ownership is enforced** — an `ownerField` rule, and `.onCreateUser()` so the server stamps the owner on create

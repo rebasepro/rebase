@@ -28,12 +28,18 @@ rebase migrate collections-to-tables --dry-run
 #    byte-identical to what config/collections generated, or every file is put back.
 rebase migrate collections-to-tables
 
-# 3. After the manual steps (below), check again while config/ is still there.
-rebase migrate collections-to-tables --check
+# 3. Read "Review before deploying: these rules change meaning" (printed last).
+
+# 4. After the manual steps (below), check again while config/ is still there.
+rebase migrate collections-to-tables --check      # --accept-rule-changes once step 3 is reviewed
+
+# 5. Against the project's database: neither should report a difference.
+rebase db push --dry-run     # "No changes: the database already matches these tables."
+rebase doctor --policies     # no policy drift
 ```
 
 `--json` prints one JSON document instead (files, refusals, notes, manual
-steps, the SQL check), which is the form to parse. `--skip-sdk-calls` leaves
+steps, the SQL check, `ruleChanges`), which is the form to parse. `--skip-sdk-calls` leaves
 the project's SDK calls alone (step 2 otherwise runs `rebase migrate sdk-calls`
 as part of the migration). An optional positional argument names the project
 directory.
@@ -50,6 +56,33 @@ config/collections**), it prints the `git rm` line that removes `config/`.
 `config/` is never deleted by the codemod. Show the line to the human, or run
 it once the manual steps are done and `--check` passes.
 
+## Review before deploying: rules that change meaning
+
+The SQL check proves the files were converted faithfully, not that a rule still
+means what it did: the 0.30 compiler read only the first of `condition` /
+`using` / `access: "public"` / `ownerField` and knew no other `access` value.
+Every rule listed under **Review before deploying** is carried as written and
+keeps its policy name, but grants something different:
+
+| Rule | 0.30 | Now |
+|---|---|---|
+| bare `access: "authenticated"` (no `roles`) | granted nothing | every signed-in caller, guests included — **widens** |
+| `access` + `check`, no `condition`, on select / update / delete / all | no existing row | every existing row to those callers — **widens** |
+| `access: "authenticated"` + `condition` | anyone matching | signed-in callers matching — narrows |
+| `access: "authenticated"` + `check` on insert | anyone | signed-in callers — narrows |
+
+Show each listed rule to the human and ask: keep it, write
+`access: "registered"` (signed-in callers with an account, no guests), or
+remove it (to keep granting nothing). `--check` exits 1 (status
+`rule-changes`) while such rules exist; pass `--accept-rule-changes` only after
+the human reviewed them. Never pass it on your own judgement.
+
+Rules that combine clauses the `SecurityRule` type excludes (`access` beside
+`ownerField` / `using` / `withCheck`; `ownerField` beside `using` / `withCheck`
+/ `condition` / `check`; `condition` / `check` beside `using` / `withCheck`),
+or that carry an invalid `access` / `mode` / `operation(s)` / `roles`, are
+**refused**: fix them in `config/collections` and run again.
+
 ## What it writes
 
 | File | From |
@@ -58,6 +91,8 @@ it once the manual steps are done and `--check` passes.
 | `backend/schema/index.ts` | every table, and `defaultRls` when `config/collections` had `defaultSecurityRules` |
 | `frontend/src/cms/<table>.tsx` | `customizeTable(...)`, only for a collection whose presentation (`admin` block, labels, enum colours, custom fields) was not the default |
 | `frontend/src/cms/<name>.ts` | `defineFirestoreCollection(...)`, for `engine: "firestore"` collections |
+| `frontend/src/cms/ui-config.json` | `{ "tables": {} }` when missing, passed to `<RebaseCMS uiConfig>` where it rewrites the scaffold's mount |
+| `frontend/vite.config.ts` | `rebaseBackendGuard()` added to a scaffold's plugins (a manual step otherwise); `rebase build` refuses a frontend without it |
 | `backend/resources.ts`, `backend/storage.ts`, `backend/generated/register.ts` | their `config/` counterparts |
 | `rebase.json`, `package.json`, `pnpm-workspace.yaml`, `backend/tsconfig.json` | without the config package |
 
@@ -98,8 +133,14 @@ meet:
   still says what was meant.
 - **Point backend/tsconfig.json at the backend only**, **Add @rebasepro/server
   to the backend** — package wiring.
+- **Add `rebaseBackendGuard()`** — when `vite.config.ts` is not the scaffold's:
+  `import { rebaseBackendGuard } from "@rebasepro/app/vitePlugin"` and add
+  `rebaseBackendGuard()` to `plugins`. Value imports of `backend/` must become
+  `import type`.
 - **Regenerate the typed SDK** — `rebase generate-sdk`; generated SDK files are
   never rewritten by the codemod.
+- **Refresh the project's agent skills** — `rebase skills install --agent <found>`
+  (`--force` for edited files), when the project holds installed skills.
 - **Files of config/ nothing moved** — move whatever is still used before
   deleting `config/`.
 
@@ -166,6 +207,9 @@ carrying its own name) and keeps anything you wrote or edited.
 ## Verify
 
 After the manual steps: `rebase migrate collections-to-tables --check`
-(SQL still identical), `rebase verify` (the tables compile), the project's own
+(SQL still identical; rule changes reviewed), `rebase db push --dry-run` and
+`rebase doctor --policies` against the database (no change, no drift),
+`rebase verify` (the tables compile, and `frontend/src/cms` matches them —
+including `cms-backend-guard-missing` and `cms-ui-config-not-mounted`), the project's own
 typecheck and tests, then `pnpm dev` and open the panel — every table should be
 listed, with the customizations applied.

@@ -439,15 +439,21 @@ function checkScaffoldPaths(root, findings) {
 }
 
 /**
- * The `isId` strategies config load refuses, read out of `validate-config.ts`:
- * every `property.isId === "<x>"` test whose block opens with `collect.error(`.
+ * The `isId` strategies the migration refuses, read out of the lift
+ * (`lift-collection.ts`, which `rebase migrate collections-to-tables` runs on a
+ * 0.30 collection): every `isId === "<x>"` test whose block opens with
+ * `this.refuse(`. The 0.30 config loader that refused them is gone; the lift
+ * is where a legacy `isId` is judged now.
  */
 export function refusedIdStrategies(root) {
-    const validate = read(root, "packages/server/src/collections/validate-config.ts");
+    const lift = read(root, LIFT);
     return new Set(
-        [...validate.matchAll(/property\.isId\s*===\s*"([^"]+)"\s*\)\s*\{\s*collect\.error\(/g)].map((m) => m[1])
+        [...lift.matchAll(/isId\s*===\s*"([^"]+)"\s*\)\s*\{\s*this\.refuse\(/g)].map((m) => m[1])
     );
 }
+
+/** Where the migration judges a legacy `isId`. */
+const LIFT = "packages/common/src/migrate/lift-collection.ts";
 
 /** The English docs, the skills and the scaffold's agent instructions. */
 const ID_STRATEGY_SURFACES = [
@@ -475,9 +481,9 @@ export function checkIdStrategies(root, findings = []) {
     const refused = refusedIdStrategies(root);
     if (!refused.size) {
         findings.push({
-            file: "packages/server/src/collections/validate-config.ts",
+            file: LIFT,
             message:
-                "no refused `isId` strategy found (`property.isId === \"…\"` then `collect.error(`) — " +
+                "no refused `isId` strategy found (`isId === \"…\"` then `this.refuse(`) — " +
                 "the isId-strategy rule is not running. If the refusal moved, point refusedIdStrategies at it."
         });
         return findings;
@@ -499,9 +505,9 @@ export function checkIdStrategies(root, findings = []) {
                 findings.push({
                     file: `${rel}:${i + 1}`,
                     message:
-                        `offers \`isId: "${strategy}"\`, which config load refuses ` +
-                        "(packages/server/src/collections/validate-config.ts) — a collection written from this " +
-                        "line fails its first boot. Drop it, or say it is refused."
+                        `offers \`isId: "${strategy}"\`, which the migration refuses ` +
+                        `(${LIFT}) — a collection written from this ` +
+                        "line cannot be migrated. Drop it, or say it is refused."
                 });
             }
         });

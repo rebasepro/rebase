@@ -319,6 +319,32 @@ interface CollectionEditorOptions {
 }
 ```
 
+What a save does: schema facts become `TablePatch` edits written into
+`backend/schema/<table>.ts`; presentation becomes UI preferences
+(`frontend/src/cms/ui-config.json` in development, `rebase.ui_preferences` on a
+deployment). The composition order in the panel is: the table as served →
+`tableCustomizations` → `uiConfig` (the JSON file) → workspace preferences →
+the user's own. `rebase build` ships `ui-config.json` in the bundle
+(`entry.uiConfig`), so MCP views and `describe_table` show the same labels,
+order and hidden columns. Keep `uiConfig={uiConfig}` on `<RebaseCMS>`
+(`rebase verify` warns `cms-ui-config-not-mounted` otherwise).
+
+- **Import an existing table**: a table the database has and `backend/schema`
+  does not declare can be adopted from the editor
+  (`GET /api/admin/schema-editor/unmapped-tables`). The file is written from
+  the database's own description; adoption plans no DDL and never lowers the
+  table's RLS posture (RLS off or no policies → `rls: "admin-only"`). A table
+  without a primary key cannot be adopted.
+- **Firestore collections** are editable in development: a save rewrites the
+  `defineFirestoreCollection({...})` call in `frontend/src/cms` in place;
+  read-only in production. Deleting one is a code change (file +
+  `externalCollections` entry).
+- **A file changed on disk** since the editor read it answers 409
+  `SCHEMA_EDIT_STALE_FILE` and writes nothing: reload and redo the edit.
+- A change to a table's rules is enforced in the same live apply, or reported
+  `policies: "deferred" | "failed"` ("Rules saved to source; they take effect
+  on the next deploy.").
+
 ### Navigation Group Mappings
 
 Control how collections and views are grouped in the sidebar and home page:

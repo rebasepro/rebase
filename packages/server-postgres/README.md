@@ -52,7 +52,7 @@ Implements the Rebase `DatabaseAdapter` / `BackendBootstrapper` interfaces for P
 | `createPostgresBootstrapper(config)` | Lower-level `BackendBootstrapper` factory. Used internally by the adapter. |
 | `openPostgresDriver(pgConfig, init)` | Opens the data driver from explicit settings, reading no environment variable; `provision: false` opens it with no DDL. What the adapter runs at boot. New in 0.25. |
 | `postgresDriverConfigFromEnv(config, env?)` | Reads `DATABASE_READ_URL`, `DATABASE_DIRECT_URL` and the `REALTIME_*` variables into a driver config, as the server's boot does. New in 0.25. |
-| `openRebase({ databaseUrl, collections })` | A project's data from a script, a test or a REPL: `dataAsAdmin`, `sql`, `withAuth(user)` and `close()`. No server, no DDL, no environment reads. `rebase console` is built on it. `collections` is the project's tables lowered with `lowerTables` from `@rebasepro/common` — the form it reads until it takes `defineTable` results directly. New in 0.25. |
+| `openRebase({ databaseUrl, tables, hooks })` | A project's data from a script, a test or a REPL: `dataAsAdmin`, `sql`, `withAuth(user)` and `close()`. No server, no DDL, no environment reads. `rebase console` is built on it. `collections` is the project's tables lowered with `lowerTables` from `@rebasepro/common` — the form it reads until it takes `defineTable` results directly. New in 0.25. |
 | `createPostgresDatabaseConnection(url, schema?, poolConfig?)` | Creates a production-grade pooled Drizzle connection. Returns `{ db, pool, connectionString }`. |
 | `createDirectDatabaseConnection(url, schema?, poolConfig?)` | Non-pooled connection for LISTEN/NOTIFY and advisory locks (bypasses PgBouncer). |
 | `createReadReplicaConnection(url, schema?, poolConfig?)` | Read-only connection for routing reads to replicas. |
@@ -104,10 +104,12 @@ process.on("SIGTERM", async () => {
 ## From a script
 
 ```typescript
+import { compileSchema } from "@rebasepro/common";
 import { openRebase } from "@rebasepro/server-postgres";
+import { posts, users, defaultRls } from "../schema";
 
-// `collections`: lowerTables([...the tables backend/schema/index.ts exports], { defaultRls })
-const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
+const tables = compileSchema([users, posts], { defaultRls });
+const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, tables });
 const { data } = await rebase.dataAsAdmin.posts.find({ limit: 10 });
 const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });   // what Ada's RLS lets her see
 await rebase.close();
