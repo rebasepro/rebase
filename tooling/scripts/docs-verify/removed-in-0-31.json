@@ -508,6 +508,12 @@
             "name": "collection",
             "export": false,
             "reason": "The data layer's by-slug accessor, `client.data.collection(slug)` (and `rebase.data.collection(slug)` on the server), renamed `table(slug)` in 0.31. The data layer is a type alias, which the API surface records without members, so the diff cannot see it."
+        },
+        {
+            "package": "@rebasepro/cms-types",
+            "name": "defineCollection",
+            "export": true,
+            "reason": "0.30's collection authoring helper, removed in 0.31 (moved-symbols.json: defineTable + customizeTable; defineLegacyCollection from @rebasepro/common/migrate for 0.30 fixtures). @rebasepro/cms-types is not a runtime-provided package, so the API surface does not track it and the diff cannot see the removal."
         }
     ]
 }
