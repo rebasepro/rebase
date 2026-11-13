@@ -20,9 +20,7 @@ import { nestAdminCollectionKeys, nestAdminPropertyKeys } from "@rebasepro/cms-t
 import type { AdminCollection, FirestoreCollectionPatch, FirestorePatchValue, Properties, Property } from "@rebasepro/cms-types";
 import { SplitEditError } from "./split_edit_error";
 import { sameValue } from "./split_edit";
-
-/** The call a Firestore collection is declared with. */
-export const FIRESTORE_COLLECTION_CALLEE = "defineFirestoreCollection";
+import { FIRESTORE_COLLECTION_CALLEE } from "./firestore_callee";
 
 /**
  * The frontend source editor's wire (`POST /admin/schema-editor/frontend/apply`):

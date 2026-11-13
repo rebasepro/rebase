@@ -19,7 +19,7 @@ import { LiveSchemaError, type SchemaEditProblem } from "./liveSchemaClient";
 import type { SplitEdit } from "./split_edit";
 import { SplitEditError } from "./split_edit_error";
 import { useDetachRulesConfirmation } from "./useDetachRulesConfirmation";
-import { FIRESTORE_COLLECTION_CALLEE } from "./firestore_edit";
+import { FIRESTORE_COLLECTION_CALLEE } from "./firestore_callee";
 
 /**
  * What the backend said about its schema editor, and how sure we are.
