@@ -1,0 +1,127 @@
+---
+sourceHash: 4b6454ad4316209d
+slug: es/docs/upgrading/0-30-to-0-31-by-hand
+title: Qué cambiaron los proyectos a mano para 0.31
+sidebar_label: Ediciones manuales en 0.31
+description: "Las modificaciones que necesitaron proyectos reales tras rebase migrate collections-to-tables: los mínimos del toolchain de un proyecto anterior a 0.30, código de administración con forma de fila, relaciones renombradas en include, objetos de colección modificados en tiempo de ejecución, llamadas al SDK que ningún comprobador de tipos detecta y control de acceso al almacenamiento."
+---
+
+# Qué cambiaron los proyectos a mano para 0.31
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Nueve proyectos existentes se migraron a 0.31 con `rebase migrate collections-to-tables`, en copias, y luego se instalaron, se verificaron sus tipos, se compilaron, se iniciaron en una base de datos desechable y se probaron. El codemod hizo la mayor parte del trabajo, y los errores que tuvo se corrigieron en él. Esta página enumera lo que aún se hizo a mano: las ediciones que obligaron el comprobador de tipos, la compilación o las pruebas, y que ninguna sección de la [guía de actualización](/docs/upgrading/0-30-to-0-31/) menciona por sí sola. Léala después de los pasos manuales del codemod, antes de desplegar.
+
+## Un proyecto en una versión anterior a 0.30
+
+Aplique primero los cambios de código de cada guía entre su versión y la 0.30 ([Actualización](/docs/upgrading/)). El codemod carga un `config/` de 0.20–0.29 y su comprobación SQL pasa, pero no realiza los cambios de código que describen esas guías. El que afectó a todos los proyectos antiguos es [`{ row, id }` por `{ entity }`](/docs/upgrading/0-27-to-0-29/#104-row-level-callbacks-get--row-id--for--entity) en el código de administración, detallado a continuación.
+
+Los paquetes de 0.31 también requieren un conjunto de herramientas (toolchain) que un proyecto anclado a una versión más antigua podría no tener. Estas son las dependencias de pares (peer dependencies) y los motores (engines) de los paquetes publicados:
+
+| Elemento | 0.31 necesita | Requerido por |
+|---|---|---|
+| Node | `>=22.22.0` | `engines` de `@rebasepro/server` y la CLI |
+| TypeScript | `^6.0.0` | `@rebasepro/app` |
+| React, React DOM | `^19.2.7` | `@rebasepro/cms`, `app`, `ui`, `forms`, `cms-types` |
+| React Router | `^8.3.0` (`react-router-dom` ya no existe) | `@rebasepro/cms`, `app`, `studio` |
+| Vite | `^8.0.0`, con `@vitejs/plugin-react` 6 y `vite-plugin-svgr` 5 tal como utiliza el scaffold | `@rebasepro/app` (peer opcional) |
+| Hono | `^4.13.5` | `@rebasepro/server` |
+| `nodemailer`, `ts-morph`, `google-auth-library`, el cliente AWS S3 | `^9.1.1`, exactamente `28.0.0`, `^10.7.0`, `^3.1068.0`, cuando se utilicen | `@rebasepro/server` (peers opcionales) |
+
+`@rebasepro/server` depende de `@hono/node-server` 2: una entrada en `overrides` que lo fije a 1.x rompe el servidor. React Router 8 movió `RouterProvider` y eliminó el paquete DOM:
+
+```diff tsx no-verify
+-import { createBrowserRouter, RouterProvider } from "react-router-dom";
++import { createBrowserRouter } from "react-router";
++import { RouterProvider } from "react-router/dom";
+```
+
+TypeScript 6 ya no infiere lo que los archivos `tsconfig.json` más antiguos dejaban implícito:
+
+- Un programa de backend que incluya `../config/**` necesita `"rootDir": ".."` (reporta TS5011 sin esto). La salida de compilación permanece donde estaba, `dist/backend/src/…`, que es lo que ejecuta el script de inicio.
+- `"moduleResolution": "node"` (node10) está en desuso: escriba `"bundler"`.
+- Una importación con efectos secundarios (side-effect import) de un paquete sin tipos (`import "@fontsource/inter"`) es un error (TS2882). Declárelo una vez, en un `.d.ts` que el programa incluya: `declare module "@fontsource/*";`.
+
+Vite 8 compila con Rolldown: siga la propia guía de migración de Vite para su configuración. Las dos modificaciones que necesitaron los proyectos migrados: se rechaza un `build.target` escrito en mayúsculas (`"ES2022"`), escriba `"es2022"`; y se eliminó el bloque `esbuild`, trasladando lo que configuraba a las propias opciones de Vite 8.
+
+## El código de administración lee `{ row, id }`, no `({ entity })`
+
+Las vistas personalizadas, las acciones de entidad, los resolvedores de visualización (display resolvers) y los campos adicionales reciben la fila y su id. Una función que desestructura `({ entity })` lee `undefined`, y donde no está tipada (código trasladado a una personalización, un tipo de prop flexible) ninguna comprobación de tipos lo indicará.
+
+| Código | Recibe |
+|---|---|
+| El `Builder` de una vista de entidad (`EntityCustomViewParams`) | `row`, `id`, `formContext` |
+| `onClick`, `isEnabled`, `disabledReason` de una acción de entidad (`EntityActionClickProps`) | `row`, `id`, `path` |
+| Un resolvedor `display` | `row`, `context` |
+| El `Builder` / `value` de un campo adicional | `row`, `id`, `context` |
+
+```diff tsx
+-display: { subtitle: ({ entity }) => entity.values.company },
++display: { subtitle: ({ row }) => String(row.company ?? "") },
+```
+
+El codemod reescribe los manejadores cuyo cuerpo solo lee `entity` como `entity.values.x`, `entity.values` o `entity.id` (a `row.x`, `row`, `id`) y enumera todos los demás, con archivo y línea, en un solo paso. `formContext.entityId` es `id`. La tabla completa de cambios de nombre se encuentra en la [sección 104 de la guía de 0.27 → 0.29](/docs/upgrading/0-27-to-0-29/#104-row-level-callbacks-get--row-id--for--entity).
+
+## Una clave `belongsTo` es una columna, y una relación puede renombrarse
+
+Una propiedad de relación en 0.30 no tenía una propiedad para su clave foránea. Una tabla de 0.31 declara la clave como una columna propia, en la posición que tenía (`companyId: col.uuid()`), junto a la relación (`company: rel.belongsTo(() => companies)`). El código o las pruebas que lean las columnas de la tabla, o verifiquen mediante aserciones que ninguna columna posee la clave, la encontrarán allí ahora.
+
+Una colección de 0.30 también podía exponer la clave bajo la propia clave de la relación: una propiedad de relación `talent_id` cuya columna de clave es `talent_id`. Una tabla mantiene separados una columna y una relación, por lo que la columna conserva la clave (sigue conteniendo el id) y el codemod renombra la relación a `<key>Relation`, con una nota. La personalización adopta el nuevo nombre. El código que incluía la relación, no:
+
+```diff ts
+-const { data } = await client.data.table("applications").find({ include: ["*"] });
+-const talent = data[0].talent_id;             // the related row, on 0.30
++const { data } = await client.data.table("applications").find({ include: ["talent_idRelation"] });
++const talent = data[0].talent_idRelation;     // the related row; talent_id is the id
+```
+
+Incluir la clave antigua devuelve un `400 UNKNOWN_RELATION`, por lo que cualquier llamada que haya pasado por alto fallará de forma explícita. La nota del codemod enumera cada relación que renombró; busque en su código cada clave antigua utilizada en `include`. Consulte [Relaciones](/docs/collections/relations/#belongsto--the-key-is-on-this-table).
+
+## Los objetos de colección modificados en tiempo de ejecución pasan a la personalización
+
+El código en `App.tsx` que hacía push sobre los objetos de colección antes de pasarlos a `<RebaseCMS>` (una acción de la barra de herramientas, una pestaña de registro, una acción de entidad agregada a una colección buscada por slug) no tiene nada que modificar en 0.31: el panel construye sus colecciones a partir de las tablas que sirve el servidor, y una personalización está congelada. Declare lo mismo en el `customizeTable` de la tabla:
+
+```diff tsx
+-const jobs = collections.find(c => c.slug === "jobs");
+-jobs.entityViews = [...(jobs.entityViews ?? []), applicantsView];
+-jobs.Actions = [ImportJobsButton];
++export const jobsCms = customizeTable<typeof jobs>("jobs", {
++    entityViews: [applicantsView],
++    Actions: [ImportJobsButton],
++});
+```
+
+Un contenedor (wrapper) que tomaba cada colección y devolvía copias modificadas (`adminCollections(collections)`) pasa a aplicarse sobre las personalizaciones, propagando las mismas opciones en cada una. Lo que leía de la definición de una columna (por ejemplo, un `url: true` en una propiedad) una personalización no puede verlo: enumere esos campos en el frontend. Consulte [`customizeTable`](/docs/frontend/customize-table/).
+
+## Llamadas al SDK que ningún comprobador de tipos detecta
+
+En 0.31, `data.collection` no es una función: el objeto de datos lo interpreta como el descriptor de acceso de una tabla llamada `collection`, por lo que `data.collection("rooms")` lanza un `TypeError` al ejecutarse. El comprobador de tipos solo detecta la llamada cuando el receptor tiene el tipo del SDK. No la detecta en:
+
+- un receptor con tipo `any` (`(rebase as any).dataAsAdmin`, un parámetro `data` sin tipar);
+- un tipo estructural que su proyecto declare sobre el SDK (`{ data: { collection(path: string): … } }`);
+- dobles de prueba (test doubles) (`{ dataAsAdmin: { collection: () => fake } }`) y aserciones sobre el texto fuente;
+- una guarda como `typeof data.collection !== "function"`, que en 0.31 toma silenciosamente la otra rama.
+
+El codemod reescribe las llamadas que puede atribuir y las enumera bajo **"Rewritten by name — review"**: un receptor que termine en `dataAsAdmin`, o en `data` con un nombre literal de tabla, el miembro `collection` de un tipo contenido en un espacio `data` / `dataAsAdmin`, y los dobles de prueba. Todo lo demás queda bajo **"Left unchanged — check each"**, y una guarda requiere un paso manual. Revise ambas listas y luego busque lo que quede:
+
+```bash
+grep -rnE "\.collection\(|collection\s*:|typeof [A-Za-z_.]+\.collection" \
+  --include="*.ts" --include="*.tsx" --exclude-dir=node_modules --exclude-dir=dist .
+```
+
+Cada coincidencia que no pertenezca al SDK de Firebase o Firestore pasa a ser `.table(` (el miembro `collection:` de un doble de prueba pasa a ser `table:`). El código fuera de la raíz del proyecto (un sitio que empaqueta el cliente desde otro repositorio, una copia integrada de `@rebasepro/client`) nunca es leído por el codemod: ejecute `rebase migrate sdk-calls <dir>` en él, o la misma búsqueda, y luego vuelva a compilar la copia integrada.
+
+## Sus módulos en `config/` y el control de acceso al almacenamiento
+
+Sus propios módulos en `config/` pueden permanecer ([sección 109](/docs/upgrading/0-30-to-0-31/#109-there-is-no-config-package)). Un módulo que solo importaban las colecciones, cuyos fragmentos ahora se integran directamente en las tablas, se incluye en la línea `git rm` mostrada; los archivos de compilación, Dockerfiles y scripts de despliegue que aún compilen el paquete config por su nombre se enumeran como un paso, y el codemod no los modifica.
+
+0.31 lee `storageAuthorize` únicamente desde `backend/storage.ts`. Cuando `config/index.ts` lo reexportaba desde un módulo con otro nombre, el codemod escribe `backend/storage.ts` reexportándolo desde allí; cuando el archivo index lo define o renombra directamente, un paso lo indica. Realice ese paso antes de desplegar: sin ese archivo, el almacenamiento se sirve sin ningún control de acceso y el inicio del servidor solo muestra una advertencia ("Storage is configured WITHOUT any access-control model").
+
+```diff ts
++// backend/storage.ts
++export { storageAuthorize } from "../config/storage-authorize";
+```
+
+## Lo que `rebase verify` puede reportar que 0.30 también tenía
+
+La mayoría de los proyectos migrados obtuvieron errores `cms-hidden-required`: un campo que la personalización mantiene fuera del formulario (`readOnly`, `hiddenInForm`) cuya columna es `NOT NULL` sin valor predeterminado, por lo que crear ese registro desde el panel falla. 0.30 fallaba de la misma manera (una propiedad `readOnly` y `required`); 0.31 lo notifica explícitamente. Para cada uno, marque el campo como `filledByServer` si un hook o stamp lo completa al crear, o hágalo editable.

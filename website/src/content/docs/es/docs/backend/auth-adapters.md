@@ -1,19 +1,19 @@
 ---
-sourceHash: a51fa349a77447e7
+sourceHash: 294751194daf2945
 title: Adaptadores de autenticación personalizados
 sidebar_label: Adaptadores de autenticación personalizados
 description: Reemplaza la autenticación integrada de Rebase con Clerk, Firebase Auth o tu propio proveedor de identidad implementando el contrato AuthAdapter.
 ---
 
-Rebase incluye su propio sistema de autenticación — [configúralo aquí](/docs/backend/authentication/). Esta página aborda el otro caso: un proveedor de identidad que ya utilizas o por el que ya pagas.
+Rebase incluye su propia autenticación — [configúrala aquí](/docs/backend/authentication/). Esta página cubre el otro caso: un proveedor de identidad que ya utilizas o por el que ya pagas.
 
 ## Adaptadores de autenticación personalizados
 
-Rebase permite el reemplazo completo del sistema de autenticación integrado mediante una arquitectura de autenticación conectable (pluggable). Esto desacopla la verificación de autenticación de la base de datos y de las capas REST/WebSocket, lo que permite una integración fluida con proveedores externos como **Clerk**, **Auth0**, **Firebase Auth** o servicios de identidad JWT personalizados.
+Rebase permite el reemplazo completo del sistema de autenticación integrado a través de una arquitectura de autenticación modular y conectable. Esto desacopla la verificación de autenticación de la base de datos y de las capas REST/WebSocket, permitiendo una integración fluida con proveedores externos como **Clerk**, **Auth0**, **Firebase Auth** o servicios de identidad JWT personalizados.
 
 ### El contrato AuthAdapter
 
-Puedes implementar la interfaz `AuthAdapter` directamente para obtener un control total. La interfaz, de forma resumida (la definición completa, con los hooks opcionales de administración de usuarios y `transformAuthResponse`, es `AuthAdapter` en `@rebasepro/types`):
+Puedes implementar la interfaz `AuthAdapter` directamente para un control total. La interfaz, abreviada (la definición completa, con los hooks opcionales de administración de usuarios y `transformAuthResponse`, es `AuthAdapter` en `@rebasepro/types`):
 
 ```typescript
 import { Hono } from "hono";
@@ -74,9 +74,17 @@ export interface AuthAdapter {
 }
 ```
 
-### El payload de AuthenticatedUser
+### El adaptador decide quién realiza la llamada en todas partes
 
-Independientemente del proveedor de autenticación externo elegido, tu adaptador debe resolver las verificaciones de token exitosas en un objeto `AuthenticatedUser` uniforme. El RLS Scope Injector de Rebase asigna estos valores directamente a variables de sesión de PostgreSQL dentro de las transacciones:
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+`verifyRequest` es el único lugar donde el backend pregunta quién envió una solicitud. Las rutas de datos y funciones lo consultan, al igual que `GET /api/schema/tables`, el documento de OpenAPI en `/api/docs` y cada superficie de administración bajo `/api/admin` (preferencias de la interfaz de usuario, edición de esquemas en vivo, el editor de esquemas, cron, registros, copias de seguridad y el resto). Una clave de API (`rk_`) o un token de plataforma (`rpt_`) todavía son resueltos por Rebase antes de consultar al adaptador. Una credencial que el adaptador no reconozca resulta en un error `401`, nunca se interpreta como nadie; una solicitud sin credenciales es nadie, ante lo cual el endpoint del esquema y el documento responden `401` (a menos que esté configurado `schemaTables.public`) y las superficies de administración siempre responden `401`. Los roles que devuelve el adaptador determinan cómo se describe al emisor de la llamada y si una superficie de administración lo admite (`403` cuando carece de su alcance o scope). Si un adaptador lanza una excepción, se toma como el rechazo del emisor, nunca como un `500`. Consulta [Esquema](/docs/backend/endpoints/#schema).
+
+Antes de la versión 0.31, el endpoint del esquema, el documento y las superficies de administración solo verificaban el JWT del framework, por lo que un backend con su propio adaptador les respondía con `500` y su panel de administración no se cargaba.
+
+### El payload del usuario autenticado
+
+Independientemente del proveedor de autenticación externo elegido, tu adaptador debe resolver las verificaciones de token exitosas en un objeto `AuthenticatedUser` uniforme. El inyector de alcance RLS (RLS Scope Injector) de Rebase mapea estos valores directamente a variables de sesión de PostgreSQL dentro de las transacciones:
 
 ```typescript
 export interface AuthenticatedUser {
@@ -97,7 +105,7 @@ export interface AuthenticatedUser {
 
 ### Integración rápida mediante `createCustomAuthAdapter`
 
-Para escenarios estándar (como validar JWTs de un servicio de terceros), puedes usar la utilidad `createCustomAuthAdapter`. Esta utilidad gestiona los valores predeterminados de las capacidades e implementa la validación de tokens de WebSocket de forma predeterminada envolviendo tu implementación de `verifyRequest`.
+Para escenarios estándar (como validar JWTs de un servicio de terceros), puedes utilizar la utilidad `createCustomAuthAdapter`. Esta utilidad gestiona los valores predeterminados de las capacidades e implementa la validación de tokens de WebSocket de forma inmediata envolviendo tu implementación de `verifyRequest`.
 
 #### Ejemplo: Integración con Clerk
 
@@ -157,7 +165,7 @@ const backend = await initializeRebaseBackend({
 
 #### Ejemplo: Integración con Firebase Auth
 
-Para verificar los tokens de Firebase Auth utilizando los certificados públicos de Firebase:
+Para verificar tokens de Firebase Auth utilizando los certificados públicos de Firebase:
 
 ```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
@@ -207,25 +215,19 @@ const backend = await initializeRebaseBackend({
 
 #### La parte del cliente
 
-El adaptador verifica el token del proveedor; el cliente se encarga de enviarlo. Proporciona al
-cliente de Rebase un getter para este token, una sola vez:
+El adaptador verifica el token del proveedor; el cliente es quien debe enviarlo. Configura un getter en el cliente de Rebase para obtenerlo, una sola vez:
 
 ```typescript
 client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
 ```
 
-Con Firebase Auth el getter es
-`() => auth.currentUser?.getIdToken() ?? Promise.resolve(null)`. El cliente
-lo consulta para cada solicitud HTTP y cada vez que el socket en tiempo real
-se autentica, de modo que las consultas en vivo (live queries) se ejecutan con el mismo usuario que las llamadas REST. En el
-panel de administración, establécelo en el cliente que pasas a `<Rebase client>`. Consulta
-[Tu propio proveedor de autenticación](/docs/sdk/your-own-auth-provider/).
+Con Firebase Auth, el getter es `() => auth.currentUser?.getIdToken() ?? Promise.resolve(null)`. El cliente lo consulta en cada solicitud HTTP y cada vez que el socket de tiempo real se autentica, de modo que las consultas en tiempo real (live queries) se ejecutan con el mismo usuario que las llamadas REST. En el panel de administración, establécelo en el cliente que pases a `<Rebase client>`. Consulta [Tu propio proveedor de autenticación](/docs/sdk/your-own-auth-provider/).
 
 ---
 
 ### Montaje de rutas de autenticación y acciones del panel
 
-Si tu proveedor de autenticación personalizado requiere montar endpoints de redirección (como rutas de callback de OAuth o flujos de inicio de sesión de SAML), implementa el método `createAuthRoutes` en tu adaptador:
+Si tu proveedor de autenticación personalizado requiere montar endpoints de redirección (como rutas de callback de OAuth o flujos de inicio de sesión SAML), implementa el método `createAuthRoutes` en tu adaptador:
 
 ```typescript
 const myOauthAdapter: AuthAdapter = {
@@ -265,10 +267,10 @@ const myOauthAdapter: AuthAdapter = {
 };
 ```
 
-Si deseas permitir operaciones CRUD de usuarios directamente dentro del panel, implementa el helper `userManagement` dentro de las opciones del adaptador, el cual proporciona hooks para `listUsers`, `getUserById`, `createUser`, `updateUser`, `deleteUser`, `getUserRoles` y `setUserRoles`.
+Si deseas permitir operaciones CRUD de usuarios directamente dentro del panel, implementa el asistente `userManagement` dentro de las opciones del adaptador, el cual proporciona hooks para `listUsers`, `getUserById`, `createUser`, `updateUser`, `deleteUser`, `getUserRoles` y `setUserRoles`.
 
-## Siguientes pasos
+## Próximos pasos
 
 - **[Autenticación](/docs/backend/authentication/)** — configuración del proveedor integrado
-- **[Endpoints y tokens](/docs/backend/auth-endpoints/)** — las rutas que debe satisfacer un adaptador
-- **[Reglas de seguridad (RLS)](/docs/collections/security-rules/)** — para qué se utilizan los claims que devuelve un adaptador
+- **[Endpoints y tokens](/docs/backend/auth-endpoints/)** — las rutas que un adaptador debe satisfacer
+- **[Reglas de seguridad (RLS)](/docs/collections/security-rules/)** — para qué se utilizan las declaraciones (claims) que devuelve un adaptador

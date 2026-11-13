@@ -1,8 +1,8 @@
 ---
-sourceHash: 98d9c2872375ef18
+sourceHash: 78c09101b46f0864
 title: Generazione dello schema
 sidebar_label: Generazione dello schema
-description: Genera schemi Drizzle ORM dalle tabelle in backend/schema, crea migrazioni SQL, esegui l'introspezione di un database esistente in file defineTable e mantieni il tuo database sincronizzato con la CLI di Rebase.
+description: Genera schemi Drizzle ORM dalle tabelle in backend/schema, crea migrazioni SQL, esegui l'introspezione di un database esistente in file defineTable e mantieni il tuo database sincronizzato con la Rebase CLI.
 ---
 
 ## Panoramica
@@ -17,32 +17,32 @@ le trasforma attraverso una pipeline deterministica:
 Tables (backend/schema) → Drizzle Schema → SQL Migrations → PostgreSQL
 ```
 
-Questa pagina illustra tutti i comandi CLI coinvolti in tale pipeline.
+Questa pagina tratta tutti i comandi della CLI coinvolti in questa pipeline.
 
-## La pipeline
+## La Pipeline
 
-### 1. Tabelle → Schema Drizzle
+### 1. Tabelle → Drizzle Schema
 
 <span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Le tabelle esportate da `backend/schema/index.ts` descrivono colonne, tipi, relazioni,
-enum e la sicurezza a livello di riga (row-level security). Ciascuno dei comandi seguenti le legge tramite il loader
-da cui si avvia il backend, quindi uno schema che non compila — una tabella senza
-`rls`, `"inherit"` senza `defaultRls`, un `defineTable` non esportato
-dall'index — interrompe il comando con un `SchemaDefinitionError` indicando ciascun problema,
-e non viene scritto nulla. Il comando `schema generate` genera a partire da esse un file di
-schema Drizzle ORM.
+enum e sicurezza a livello di riga (row-level security). Ciascuno dei comandi seguenti le legge attraverso il loader
+con cui viene avviato il backend; per questo motivo, uno schema che non compila — una tabella priva di
+`rls`, `"inherit"` senza `defaultRls`, un `defineTable` non esportato dall'index —
+blocca il comando con un `SchemaDefinitionError` che segnala ogni problema,
+e nulla viene scritto. Il comando `schema generate` produce un file di schema
+Drizzle ORM a partire da esse.
 
 Ogni comando che legge lo schema accetta `--schema-dir <dir>` per i progetti
 che conservano le tabelle altrove; il valore predefinito è `backend/schema`, oppure la
-chiave `tables` dell'app backend in `rebase.json`. Il flag pre-0.31 `--collections` / `-c`
+chiave `tables` dell'app di backend in `rebase.json`. Il flag precedente alla versione 0.31, `--collections` / `-c`,
 viene rifiutato con un messaggio che indica il codemod
-([`rebase migrate collections-to-tables`](#rebase-migrate)), e lo stesso vale per un
-progetto che contiene ancora `config/collections`.
+([`rebase migrate collections-to-tables`](#rebase-migrate)), e lo stesso accade per i
+progetti che contengono ancora `config/collections`.
 
-### 2. Schema Drizzle → Migrazioni
+### 2. Drizzle Schema → Migrazioni
 
-A partire dallo schema Drizzle generato, `db generate` calcola le differenze (diff) rispetto alle migrazioni già presenti in `backend/drizzle/migrations/`, rieseguite su un database temporaneo (scratch database), e produce file di migrazione SQL provvisti di timestamp. Non legge mai il tuo database: una colonna già aggiunta all'avvio o tramite `db push` risulterà comunque come `ADD COLUMN`.
+A partire dallo schema Drizzle generato, `db generate` calcola le differenze (diff) rispetto alle migrazioni già presenti in `backend/drizzle/migrations/`, riprodotte su un database temporaneo di appoggio, e produce file di migrazione SQL con timestamp. Non legge mai il tuo database: una colonna già aggiunta all'avvio o tramite `db push` risulterà comunque come `ADD COLUMN`.
 
 ### 3. Migrazioni → PostgreSQL
 
@@ -62,17 +62,17 @@ rebase schema generate
 
 **Cosa fa:**
 - Legge le tabelle esportate da `backend/schema/index.ts`
-- Genera `backend/src/schema.generated.ts` con le definizioni delle tabelle, le enum e le relazioni Drizzle
+- Genera `backend/src/schema.generated.ts` contenente le definizioni delle tabelle Drizzle, gli enum e le relazioni
 
 **Opzioni:**
 
 | Flag | Descrizione |
 |------|-------------|
-| `--schema-dir` | La directory dello schema (predefinita: `backend/schema`); i percorsi relativi vengono risolti a partire dal punto in cui esegui il comando |
-| `--output, -o` | Percorso di output per il file di schema generato; i percorsi relativi vengono risolti a partire dal punto in cui esegui il comando |
-| `--watch, -w` | Controlla le modifiche e rigenera automaticamente |
+| `--schema-dir` | La directory dello schema (predefinito: `backend/schema`); i percorsi relativi vengono risolti a partire da dove si esegue il comando |
+| `--output, -o` | Percorso di output per il file di schema generato; i percorsi relativi vengono risolti a partire da dove si esegue il comando |
+| `--watch, -w` | Monitora le modifiche e rigenera automaticamente |
 
-La **modalità watch** è utile durante lo sviluppo — modifica il file di una tabella e lo schema si rigenera all'istante:
+La **modalità watch** è utile durante lo sviluppo — modifica un file di tabella e lo schema si rigenererà all'istante:
 
 ```bash
 rebase schema generate --watch
@@ -83,108 +83,107 @@ rebase schema generate --watch
 Verifica se lo schema generato corrisponde ancora alle tabelle:
 
 ```bash
-rebase schema stale          # report, and exit 1 if anything is stale
-rebase schema stale --fix    # regenerate the file instead
+rebase schema stale          # genera un report ed esce con codice 1 se qualcosa non è aggiornato
+rebase schema stale --fix    # rigenera direttamente il file
 ```
 
 **Cosa fa:**
-- Esegue il rendering di ciò che generano le tabelle in `backend/schema/` e lo confronta, dichiarazione per dichiarazione, con `backend/src/schema.generated.ts`
-- Segnala ciascuna differenza — una tabella mancante, una colonna con tipo modificato, un'etichetta enum rimossa o chiavi esterne denominate secondo le convenzioni di una versione precedente — ed esce con codice diverso da zero
-- Con `--fix`, rigenera il file invece di limitarsi a segnalare le differenze
+- Esegue il rendering di quanto generato dalle tabelle in `backend/schema/` e lo confronta, dichiarazione per dichiarazione, con `backend/src/schema.generated.ts`
+- Segnala ogni discrepanza — una tabella mancante, una colonna con un tipo diverso, un'etichetta enum rimossa o chiavi esterne nominate secondo le modalità ricavate da una release precedente — ed esce con un codice diverso da zero
+- Con `--fix`, rigenera il file invece di mostrare solo il report
 
-`rebase dev` mantiene il file aggiornato autonomamente, quindi questo è il controllo ideale per una build
-o uno step di CI. Accetta `--schema-dir` e `--output` esattamente come
-`rebase schema generate`.
+`rebase dev` mantiene il file aggiornato autonomamente, quindi questo controllo è pensato per un passaggio di build
+o di CI. Accetta `--schema-dir` e `--output` esattamente come `rebase schema generate`.
 
 ### `rebase schema reconcile`
 
 <span class="since-badge" data-since="0.31">Da 0.31</span>
 
-Rimuovi i vincoli e cancella ciò che l'avvio (boot) non gestisce, dopo aver esaminato il piano:
+Rilassa e rimuovi ciò che la procedura di avvio non tocca, dopo aver esaminato il piano d'azione:
 
 ```bash
-rebase schema reconcile                         # relax NOT NULL on columns made nullable or removed
-rebase schema reconcile --drop voice_cache.wav  # and drop a column no table declares
+rebase schema reconcile                         # rilassa i vincoli NOT NULL sulle colonne rese nullable o rimosse
+rebase schema reconcile --drop voice_cache.wav  # ed elimina una colonna non dichiarata da nessuna tabella
 ```
 
 **Cosa fa:**
-- Richiede al backend in esecuzione di pianificare le modifiche rispetto al proprio database. Questo corrisponde al backend a cui puntano `.env` e il link cloud, quindi funziona su Rebase Cloud, dove nient'altro può raggiungere il database.
-- Pianifica un `DROP NOT NULL` per ogni colonna che una tabella dichiara nullable ma che il database richiede ancora come obbligatoria.
-- Elenca ogni colonna non dichiarata da alcuna tabella. Una colonna `NOT NULL` senza valore predefinito blocca qualsiasi inserimento, quindi viene anch'essa resa nullable (relaxed), preservandone i dati. Rimuove solo le colonne specificate con `--drop <table>.<column>` e mostra quante righe contengono un valore in ciascuna di esse.
-- Applica le modifiche dopo aver digitato `yes`. Il server esegue il piano solo se corrisponde al digest di quello visualizzato; pertanto, se nel frattempo il database o le tabelle sono cambiati, l'operazione viene rifiutata ed è necessario riesaminarla. `--yes` salta la richiesta di conferma.
+- Chiede al backend in esecuzione di pianificare l'operazione sul proprio database. È il backend a cui puntano il file `.env` e il cloud link, pertanto funziona anche su Rebase Cloud, dove nient'altro ha accesso diretto al database.
+- Pianifica `DROP NOT NULL` per ogni colonna che una tabella dichiara nullable ma che il database richiede ancora come obbligatoria.
+- Elenca ogni colonna non dichiarata da alcuna tabella. Una colonna `NOT NULL` priva di valore predefinito bloccherebbe ogni inserimento, quindi viene rilassata a sua volta, mantenendone i dati. Rimuove esclusivamente le colonne indicate con `--drop <table>.<column>`, mostrando quante righe contengono un valore per ciascuna di esse.
+- Applica le modifiche solo dopo aver digitato `yes`. Il server esegue il piano unicamente a fronte del digest di quello mostrato; se nel frattempo il database o le tabelle sono cambiati, l'operazione viene rifiutata e sarà necessario esaminarlo di nuovo. Il flag `--yes` ignora la richiesta di conferma.
 
-Il boot si limita esclusivamente ad aggiungere, quindi dopo aver rimosso una colonna dal relativo `defineTable`, la colonna rimane nel database insieme ai suoi dati. Una colonna `NOT NULL` priva di default provocherebbe il fallimento di ogni inserimento, e il log del boot suggerisce questo comando: senza `--drop` per conservare i dati, oppure con esso per rimuovere la colonna. Distribuisci (deploy) prima la modifica alla tabella, poiché reconcile pianifica rispetto a ciò che il backend sta eseguendo. Richiede `REBASE_SERVICE_KEY` in `.env`. In locale, `rebase db push` copre la stessa esigenza tramite il suo controllo sulle modifiche distruttive (destructive-change gate).
+L'avvio si limita ad aggiungere elementi, quindi dopo aver rimosso una colonna dal rispettivo `defineTable` essa rimane all'interno del database, insieme ai suoi dati. Una colonna `NOT NULL` senza default causerebbe il fallimento di ogni operazione di inserimento, e il log di avvio indicherà l'uso di questo comando: senza `--drop` per mantenere i dati, con l'opzione per eliminare la colonna. Effettua prima il deploy della modifica alla tabella, poiché la riconciliazione pianifica a partire da ciò che il backend sta eseguendo. Richiede `REBASE_SERVICE_KEY` in `.env`. In locale, `rebase db push` copre la stessa esigenza tramite il controllo di sicurezza per le modifiche distruttive.
 
 ### `rebase schema introspect`
 
 <span class="since-badge" data-since="0.31">Da 0.31</span>
 
-Genera file `defineTable` a partire da un database PostgreSQL esistente:
+Crea i file `defineTable` a partire da un database PostgreSQL esistente:
 
 ```bash
 rebase schema introspect
 ```
 
 **Cosa fa:**
-- Si connette al database di questo progetto, quello mostrato da `rebase db url` (se si tratta di quello gestito, viene avviato se necessario); `--database-url` ne indica un altro, e `--docker` utilizza quello di compose
-- Legge ogni tabella, colonna, tipo, chiave esterna e policy, e genera
+- Si connette al database del progetto, ovvero quello stampato da `rebase db url` (se si tratta di quello gestito, viene avviato se necessario); `--database-url` ne indica uno differente, mentre `--docker` fa uso di quello configurato tramite compose
+- Legge ogni tabella, colonna, tipo, foreign key e policy, generando
   `backend/schema/<table>.ts` — un `defineTable` per tabella — e il file
-  `backend/schema/index.ts` che le esporta (unendole a un index già
+  `backend/schema/index.ts` che le esporta (integrandosi in un indice già
   esistente)
-- Dichiara ogni colonna con il rispettivo tipo Postgres: `col.uuid()`, `col.varchar({ length })`,
-  `col.numeric({ precision, scale })`, un'enum con le relative etichette e il vero nome del tipo
-  (un `pgEnum` quando il tipo è condiviso), un array come `<item>.array()`,
-  `col.vector({ dimensions })`, chiavi identity e serial, valori predefiniti — scritti
-  nella sintassi di Drizzle. Un tipo non riconosciuto da alcun builder diventa
-  `col.custom({ dataType: "<sql type>" })`, che Rebase restituisce esattamente come
-  ricevuto dal driver; `db generate` e `db push` lo rifiuteranno finché il planner
-  non sarà in grado di gestirlo
-- Dichiara la colonna di chiave esterna, il `belongsTo` su di essa e il relativo
-  `hasMany` inverso sulla destinazione; una tabella di giunzione diventa un `manyToMany`, con le proprie
-  colonne nel `pivot`
-- Legge le policy di sicurezza a livello di riga (RLS) di ciascuna tabella nel rispettivo `rls`: nome,
-  comando, modalità, lista `TO`, `USING` e `WITH CHECK`. Le policy
-  `<table>_default_*` aggiunte automaticamente da Rebase vengono escluse, affinché il successivo `db push`
-  ricrei ciascuna policy esattamente com'era. Una tabella con RLS abilitata ma senza policy viene
-  scritta come `rls: "admin-only"`
-- Legge ogni espressione (lo `USING` di una policy, un CHECK, un default di colonna) all'interno
-  del `search_path` utilizzato dal server, ovvero `public`; pertanto, una funzione nello schema `rebase`
-  viene scritta come `rebase.roles()`
-- Converte un CHECK interpretabile (`total >= 0`) nel `.validate()` della colonna,
-  mantenendo il vincolo vero e proprio nel database, dove il push successivo
+- Dichiara ciascuna colonna con il suo tipo Postgres: `col.uuid()`, `col.varchar({ length })`,
+  `col.numeric({ precision, scale })`, un enum con le relative etichette e il nome effettivo del tipo
+  (un `pgEnum` nel caso in cui il tipo sia condiviso), un array nella forma `<item>.array()`,
+  `col.vector({ dimensions })`, chiavi identity e serial, valori di default — secondo la sintassi
+  utilizzata da Drizzle. I tipi non riconosciuti da alcun builder diventano
+  `col.custom({ dataType: "<sql type>" })`, gestiti da Rebase così come
+  vengono restituiti dal driver; `db generate` e `db push` li rifiuteranno finché il planner
+  non sarà in grado di gestirli
+- Dichiara la colonna foreign-key, la relazione `belongsTo` su di essa e la corrispondente
+  `hasMany` inversa sulla destinazione; una tabella di giunzione diventa una `manyToMany`, dove le
+  colonne proprietarie costituiscono il `pivot`
+- Legge le policy di row-level security di ciascuna tabella inserendole nella proprietà `rls`: nome,
+  comando, modalità, lista `TO`, clausole `USING` e `WITH CHECK`. Le policy
+  `<table>_default_*` introdotte automaticamente da Rebase vengono escluse, così che il successivo
+  `db push` possa ricreare ciascuna policy esattamente com'era. Una tabella con row-level security attiva
+  ma senza alcuna policy viene configurata come `rls: "admin-only"`
+- Legge ogni espressione (la clausola `USING` di una policy, un CHECK, il default di una colonna) nel contesto del
+  `search_path` impiegato dal server, ovvero `public`, in modo tale che una funzione presente nello schema `rebase`
+  venga scritta come `rebase.roles()`
+- Converte un CHECK interpretabile (`total >= 0`) nel metodo `.validate()` della colonna,
+  mantenendo il vincolo vero e proprio all'interno del database, dove il push successivo
   continuerà a conservarlo
-- Inserisce ciò che non è stato possibile interpretare con certezza in un commento all'inizio del file
-  della tabella e sul terminale — un insieme chiuso di stringhe su una colonna di testo, una
-  colonna generata la cui espressione non è stata letta, un tipo personalizzato — descrivendo le
-  conseguenze di un eventuale push
-- Con `--data-inference`, campiona fino a 100 righe per tabella e scrive le informazioni relative alla
-  presentazione — titoli, icone, board, ordinamenti, opzioni dei campi — in
-  `frontend/src/cms/<table>.tsx` come `customizeTable`, purché il frontend del
-  progetto dipenda da `@rebasepro/cms`. Un progetto headless non ne riceve alcuna
-- Se eseguito su un database non attivo, mostra lo stesso banner di
-  `db push`, una sola volta, senza creare nulla. Mostra la directory di output come
+- Inserisce ciò che non è stato possibile interpretare con esattezza all'interno di un commento in cima al file
+  della tabella e sul terminale — un set chiuso di stringhe su una colonna di testo, una
+  colonna generata la cui espressione non è stata letta, un tipo personalizzato — descrivendo come
+  un push interverrebbe su di esso
+- Con l'opzione `--data-inference`, esamina un campione fino a 100 righe per tabella ed estrae le impostazioni
+  di presentazione — titoli, icone, board, ordinamenti, opzioni dei campi — inserendole in
+  `frontend/src/cms/<table>.tsx` sotto forma di `customizeTable`, qualora il frontend
+  del progetto dipenda da `@rebasepro/cms`. Un progetto headless ne sarà privo
+- Se eseguito a fronte di un database non attivo, mostra lo stesso banner di `db push`,
+  una sola volta, senza creare nulla. Stampa la directory di output come
   percorso assoluto
 
 **Opzioni:**
 
 | Flag | Descrizione |
 |------|-------------|
-| `--schema-dir` | Dove scrivere i file delle tabelle (predefinito: `backend/schema`). `--output` è stato rimosso |
+| `--schema-dir` | Cartella in cui scrivere i file delle tabelle (predefinito: `backend/schema`). `--output` è stato rimosso |
 | `--schema` | Lo schema Postgres da leggere (predefinito: `public`) |
-| `--force, -f` | Sovrascrive i file delle tabelle già esistenti; in sua assenza, i file esistenti vengono saltati |
-| `--database-url` | Legge questo database anziché quello del progetto |
+| `--force, -f` | Sovrascrive i file delle tabelle già esistenti; senza questa opzione, un file esistente viene ignorato |
+| `--database-url` | Legge questo database anziché quello configurato per il progetto |
 | `--docker` | Legge il database compose, avviandolo se necessario |
-| `--data-inference` / `--no-data-inference` | Campiona fino a 100 righe per tabella per rilevare formati, vincoli e impostazioni del pannello, oppure legge solo la struttura. In assenza di entrambi i flag viene richiesta conferma interattiva; senza terminale, legge solo la struttura |
+| `--data-inference` / `--no-data-inference` | Esamina fino a 100 righe per tabella per rilevare formati, vincoli e impostazioni del pannello, oppure legge esclusivamente la struttura. In assenza di entrambi i flag richiede conferma interattiva; in un ambiente senza terminale legge solo la struttura |
 
-Questo comando è utile quando si adotta Rebase su un database esistente: esegui prima
-l'introspezione e poi modifica le tabelle generate. Una tabella con row-level security disattivata viene
-scritta come qualsiasi altra, con il suo `rls`; il push attiverà l'RLS e la
-dry run lo segnalerà. Un backend in esecuzione senza alcun `backend/schema`
-serve invece direttamente il database — consulta [Solo backend](/docs/getting-started/headless/).
+Questa procedura è utile per adottare Rebase su un database preesistente — prima si esegue l'introspezione,
+quindi si modificano le tabelle generate. Una tabella priva di row-level security viene
+scritta come qualsiasi altra, con il relativo blocco `rls`; il push provvederà ad attivare l'RLS, informando
+l'utente durante il dry run. Un backend eseguito interamente senza `backend/schema` opererà
+interagendo direttamente con il database — consulta [Backend only](/docs/getting-started/headless/).
 
 ### `rebase db push`
 
-Invia le modifiche allo schema direttamente al database senza file di migrazione:
+Applica le modifiche allo schema direttamente al database senza passare per i file di migrazione:
 
 ```bash
 rebase db push
@@ -193,206 +192,202 @@ rebase db push
 **Cosa fa:**
 - Legge lo schema Drizzle generato
 - Applica le modifiche direttamente al database (CREATE, ALTER, DROP)
-- Esegue prima una simulazione (dry-run) del piano e si interrompe prima di qualsiasi operazione distruttiva per i dati:
-  una tabella, colonna, schema, vista o tipo rimossi, un `TRUNCATE`, o una modifica del tipo di
-  colonna che potrebbe comportare perdita di valori (`timestamptz` → `date`, `numeric` → `integer`),
-  o una modifica alla chiave primaria — `(id)` → `(id, locale)` assegna a ogni riga un nuovo id,
-  quindi link, chiavi esterne e id memorizzati altrove smetteranno di trovare la rispettiva riga.
-  Si arresta inoltre
-  prima della rimozione di un vincolo CHECK o EXCLUDE presente nel database: nessuna riga
-  va perduta, ma da quel momento in poi il database accetterà le righe che prima rifiutava.
-  Richiede conferma su terminale, dove Ctrl-C o Ctrl-D corrispondono a "no", e rifiuta
-  l'operazione altrimenti; `--allow-destructive` la applica comunque. Anche `--yes` lo fa
-  in questa versione, con un avviso di deprecazione; a partire dalla prossima versione autorizzerà
-  solo push che non distruggono dati. Un push che
-  si arresta in questa fase rimuove il database temporaneo `<db>_dev_diff` prima di uscire
-- Attiva la sicurezza a livello di riga (RLS) per ogni tabella dichiarata, comprese le tabelle di giunzione, subito dopo
-  la modifica dello schema e prima di qualsiasi passaggio che potrebbe fallire, in modo che un push interrotto a metà lasci la nuova tabella
-  in uno stato che rifiuta ogni richiesta anziché lasciarla aperta a tutti
-- Applica le policy RLS risultanti dalla compilazione di `rls` delle tue tabelle e **rimuove le policy sostituite da un push precedente**
-- Mantiene inalterato ogni
-  vincolo CHECK ed EXCLUDE su una tabella dichiarata. Poiché una tabella non
-  può dichiararli, essi costituiscono regole proprie del database, scritte manualmente
-  o ereditate da un database adottato tramite `schema introspect`; per rimuoverne uno, eliminalo
-  manualmente (`ALTER TABLE … DROP CONSTRAINT …`). Anche i trigger e le funzioni creati da te
-  non vengono toccati
-- Verifica con corrispondenza
-  esatta il nome di ogni elemento preservato, inclusi eventuali `.`, `[`, `]`
-  o `*`
+- Esegue prima una simulazione (dry-run) del piano e si arresta davanti a qualsiasi operazione distruttiva per i dati:
+  l'eliminazione di una tabella, colonna, schema, vista o tipo, un `TRUNCATE`, una modifica del tipo di
+  colonna che potrebbe causare perdita di valori (`timestamptz` → `date`, `numeric` → `integer`),
+  oppure una modifica alla chiave primaria — `(id)` → `(id, locale)` assegna a ogni riga un nuovo id,
+  impedendo a link, chiavi esterne e id memorizzati altrove di individuare la riga corrispondente.
+  Si arresta inoltre prima della rimozione di un vincolo CHECK o EXCLUDE presente nel database:
+  nessuna riga andrà persa, ma da quel momento in poi il database accetterà righe che prima avrebbe rifiutato.
+  Nel terminale viene richiesta conferma interattiva (dove Ctrl-C o Ctrl-D equivalgono a rifiutare), e l'operazione
+  viene bloccata in caso contrario; `--allow-destructive` la applica forzatamente. In questa release
+  anche `--yes` produce lo stesso effetto, accompagnato da un avviso di deprecazione; a partire dalla prossima versione,
+  esso approverà esclusivamente push che non distruggono dati. Un push che si interrompe in questa fase
+  rimuove il rispettivo database temporaneo `<db>_dev_diff` prima di uscire
+- Attiva la row-level security per ogni tabella dichiarata, comprese le tabelle di giunzione, subito dopo
+  la modifica dello schema e prima di qualsiasi operazione a rischio di errore, cosicché un push interrotto
+  a metà lasci la nuova tabella in uno stato che blocca ogni richiesta anziché lasciarla aperta a tutti
+- Applica le policy RLS derivate dalla compilazione del parametro `rls` delle tabelle, e **rimuove le policy superate da un push precedente**
+- Mantiene intatto qualsiasi vincolo
+  CHECK ed EXCLUDE presente su una tabella dichiarata. Una tabella
+  non può dichiarare nessuno dei due elementi, che rappresentano quindi regole interne del database, scritte
+  manualmente o ereditate da un database acquisito con `schema introspect`; per eliminarne uno, occorre rimuoverlo
+  manualmente (`ALTER TABLE … DROP CONSTRAINT …`). Nemmeno i trigger e le funzioni scritte dall'utente vengono toccati
+- Corrisponde esattamente al nome di ciascun elemento che lascia invariato,
+  compresi eventuali caratteri `.`, `[`, `]` o `*` in esso presenti
 - Crea qualsiasi
-  [indice di chiave esterna derivato da Rebase](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
-  mancante in una tabella esistente **prima** della pianificazione, tramite
-  `CREATE INDEX CONCURRENTLY`, affinché le operazioni di scrittura sulla tabella proseguano durante la creazione;
-  Atlas lo troverà quindi già presente. `--dry-run` elenca questi indici senza crearli
-- Appone un marcatore (stamp)
-  alle policy applicate nello stesso modo in cui fa il boot del server, affinché il primo avvio dopo un
-  push non le ricrei da capo ma le lasci invariate
-- `--dry-run`
-  elenca le modifiche alla row-level security previste dal push, nella sezione "Planned
-  row-level security changes": le tabelle su cui viene attivata l'RLS e ciascuna
-  policy creata, sostituita o eliminata, determinate secondo i passaggi del
-  push stesso. Mostra "No changes" solo quando né lo schema né
-  la row-level security necessitano di modifiche. Laddove il marcatore di una policy non corrisponda alla
-  sua regola, o ne sia sprovvista (una creata da `db migrate`, una scritta manualmente), la dry
-  run la ricrea a partire dalla regola con un altro nome, all'interno di una transazione di cui
-  esegue il rollback, e confronta ciò che Postgres ha memorizzato: se il risultato coincide,
-  non c'è alcuna modifica. Di conseguenza, una regola reimportata da `schema introspect` come SQL non pianifica nulla,
-  e lo stesso vale per le policy applicate da `db migrate`. Solo quelle impossibili da confrontare (ad esempio se il
-  lock sulla tabella non viene concesso entro due secondi) vengono elencate a parte. Il push
-  stesso stampa una sola riga riepilogativa con il conteggio delle modifiche
-- Mostra ciascuna
-  istruzione applicata da Atlas una sola volta. Atlas si connette senza SSL a un database situato su questa
-  macchina (`localhost`, `127.x`, `::1`) il cui URL non specifica alcun `sslmode`, come fa l'app,
-  anziché fallire con `SSL is not enabled on the server`; un URL che
-  specifica `sslmode`, o un altro host, viene inoltrato esattamente come scritto. Un'esecuzione di Atlas
-  che fallisce prima della pianificazione non lascia residui del database `<db>_dev_diff`
-- `--dry-run`
-  non scrive nulla nei file di progetto: `src/schema.generated.ts` rimane intatto,
-  e le copie `drizzle/*.sql` committate da una versione precedente vengono elencate, non
-  eliminate. Solo l'input del piano viene scritto in `.rebase/sql/`, che non viene committato
-- **Non** crea file di migrazione
+  [indice su chiave esterna derivato da Rebase](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
+  che risulti mancante in una tabella esistente **prima** della fase di pianificazione, tramite
+  `CREATE INDEX CONCURRENTLY`, così che le operazioni di scrittura sulla tabella possano proseguire durante la creazione;
+  Atlas lo troverà quindi già disponibile. L'opzione `--dry-run` mostra questi elementi senza creare alcunché
+- Applica un contrassegno (stamp) alle policy implementate esattamente come farebbe la fase di avvio del server,
+  in modo che il primo avvio successivo al push non debba ricrearle da capo
+- L'opzione `--dry-run`
+  elenca le modifiche di row-level security che il push andrebbe ad applicare, sotto la sezione "Planned
+  row-level security changes": le tabelle su cui l'RLS verrebbe abilitato e ogni singola
+  policy creata, sostituita o eliminata, determinate secondo la logica dei singoli passaggi del push.
+  Riporta "No changes" solo quando né lo schema né la
+  row-level security richiedono modifiche. Nel caso in cui lo stamp di una policy non corrisponda alla rispettiva
+  regola, o qualora ne sia sprovvista (es. creata da `db migrate` o scritta a mano), il dry run
+  la ricrea a partire dalla regola assegnandole un altro nome, all'interno di una transazione sottoposta a rollback,
+  e confronta il risultato memorizzato da Postgres: se l'esito coincide, viene considerata invariata.
+  Pertanto, una regola reimportata da `schema introspect` come SQL non pianifica alcuna modifica, e lo stesso vale
+  per le policy applicate tramite `db migrate`. Soltanto quelle che non è stato possibile confrontare (ad esempio
+  a causa del mancato ottenimento del lock sulla tabella entro due secondi) vengono elencate separatamente. Il push
+  effettivo si limita a stampare una riga che riassume il numero di modifiche
+- Mostra ciascuna istruzione
+  applicata da Atlas una sola volta. Atlas si connette senza SSL ai database in esecuzione sulla macchina
+  locale (`localhost`, `127.x`, `::1`) il cui URL non specifica `sslmode`, analogamente a quanto fa l'applicazione,
+  anziché fallire con l'errore `SSL is not enabled on the server`; un URL che
+  indica esplicitamente `sslmode`, o relativo a un altro host, viene gestito senza modifiche. Un'esecuzione di Atlas
+  che si interrompe prima della pianificazione non lascia alcun database residuo del tipo `<db>_dev_diff`
+- L'opzione `--dry-run`
+  non modifica alcun file del progetto: `src/schema.generated.ts` rimane intatto,
+  e le copie dei file `drizzle/*.sql` committate con versioni precedenti vengono menzionate ma non
+  eliminate. Soltanto i parametri di input del piano vengono scritti in `.rebase/sql/`, cartella non soggetta a commit
+- **Non** genera file di migrazione
 
-**Quanto tempo richiede.** La quasi totalità del tempo di un push è dovuta al calcolo del piano da parte di Atlas:
-Atlas genera lo schema desiderato in un database temporaneo e ne calcola il diff rispetto a quello
-reale, e tale costo aumenta più che proporzionalmente rispetto al numero di tabelle — su un portatile a riposo
-circa 0,25 s per piano con 11 tabelle, 0,9 s con 111 e 5,5 s con 411. Un push che
-non apporta modifiche pianifica una sola volta; uno che introduce modifiche pianifica due volte (la simulazione
-letta dal destructive-change gate, seguita dall'applicazione effettiva). Pertanto, un push su uno schema con
-400 o più tabelle richiede decine di secondi, e anche di più su macchine lente o sovraccariche.
-Questo tempo dipende da Atlas, non dal tuo database: i passaggi accessori — generazione
-dell'SQL, lock RLS, ricerca, trigger, policy, ruoli — richiedono solo pochi secondi per
-dimensioni simili, su un'unica connessione al tuo database.
+**Tempistiche di esecuzione.** La quasi totalità del tempo impiegato da un push è dedicata al calcolo del piano da parte di Atlas:
+esso compila lo schema desiderato all'interno di un database temporaneo e ne calcola il diff rispetto a quello
+reale, con un costo computazionale che cresce più che proporzionalmente rispetto al numero di tabelle — su un normale portatile,
+circa 0,25 s per piano con 11 tabelle, 0,9 s con 111 tabelle e 5,5 s con 411 tabelle. Un push che
+non apporta modifiche pianifica una sola volta; un push con modifiche pianifica due volte (la simulazione
+letta dal controllo sulle modifiche distruttive, seguita dall'applicazione effettiva). Di conseguenza, su uno schema con
+400 o più tabelle il push richiederà decine di secondi, e anche di più su una macchina lenta o sotto carico.
+Tale intervallo dipende unicamente da Atlas e non dal database: i passaggi accessori — la generazione del codice
+SQL, il lock RLS, le funzionalità di ricerca, i trigger, le policy e il ruolo — richiedono solo pochi secondi per
+dimensioni simili, operando su una singola connessione verso il database.
 
-**I file generati durante il processo**, tutti salvati in `.rebase/sql/` all'interno della directory
-backend. `db push` e `db generate` creano tutti e cinque i file a partire dalle tue tabelle
-a ogni esecuzione, prima di leggerne alcuno, quindi una copia committata non verrebbe
-utilizzata da nulla. La directory include il proprio `.gitignore` e non va mai committata.
+**I file generati durante il processo**, tutti posizionati in `.rebase/sql/` all'interno della cartella di backend.
+`db push` e `db generate` creano tutti e cinque i file a partire dalle tabelle a ogni
+esecuzione, prima di leggerli, per cui una copia committata non verrebbe mai utilizzata.
+La cartella include un proprio file `.gitignore` e non va mai aggiunta al version control.
 
 | File | Contenuto |
 |------|-----------|
-| `schema.sql` | Tabelle, colonne, vincoli e indici — lo stato desiderato da Atlas, e l'unico su cui calcola il diff |
-| `policies.sql` | Le policy RLS a cui compila `rls` delle tue tabelle |
-| `search.sql` | Le funzioni di ricerca full-text e le colonne generate, per le tabelle con un blocco `search` |
-| `vector.sql` | Le estensioni pgvector e gli indici ANN |
-| `triggers.sql` | `rebase.set_updated_at()` e i trigger `BEFORE UPDATE` alla base di `.onUpdateNow()` |
+| `schema.sql` | Tabelle, colonne, vincoli e indici — lo stato desiderato secondo Atlas, e l'unico su cui viene calcolato il diff |
+| `policies.sql` | Le policy RLS derivate dalla compilazione dell'`rls` delle tue tabelle |
+| `search.sql` | Funzioni di ricerca full-text e colonne generate, per le tabelle dotate di blocco `search` |
+| `vector.sql` | Estensioni pgvector e indici ANN |
+| `triggers.sql` | La funzione `rebase.set_updated_at()` e i trigger `BEFORE UPDATE` alla base di `.onUpdateNow()` |
 
-Atlas gestisce il primo e nient'altro, quindi `db push` e l'allineamento dello schema
-al boot applicano autonomamente gli altri quattro. Un deployment **basato solo su migrazioni** — ovvero
-che esegue `db migrate` e mai `db push` — deve includere manualmente questi quattro elementi in
-una migrazione; `db generate` lo segnala quando una modifica non è visibile ad Atlas.
+Atlas si occupa esclusivamente del primo file; per questa ragione `db push` e la routine di
+verifica dello schema all'avvio applicano autonomamente gli altri quattro file. Una distribuzione di tipo **migration-only** — ovvero
+basata unicamente su `db migrate` e mai su `db push` — richiede di integrare a mano questi quattro componenti
+all'interno di una migrazione; `db generate` segnalerà quando una modifica non risulta visibile ad Atlas.
 
-Nei progetti in cui questi file erano stati committati in `drizzle/` con una versione precedente,
-tali copie verranno eliminate alla prima esecuzione, e il comando indicherà ciascun file eliminato
-per consentirne il commit della rimozione. Vengono eliminati solo i file che iniziano con l'intestazione
-del generatore. I file scritti manualmente vengono preservati, così come `drizzle/migrations/`.
+Nei progetti in cui questi file erano stati committati sotto `drizzle/` con una versione precedente,
+le rispettive copie verranno eliminate alla prima esecuzione: il comando elencherà ciascun file eliminato affinché
+si possa procedere al commit della rimozione. Vengono rimossi esclusivamente i file che iniziano con l'intestazione
+del generatore. I file scritti manualmente non vengono toccati, così come la cartella `drizzle/migrations/`.
 
-:::note[La modifica di una regola di sicurezza rinomina la relativa policy]
-Una regola senza un `name` esplicito viene compilata come `<table>_<op>_<hash>`, dove l'hash rappresenta la semantica della regola — pertanto, *modificare* una regola (anziché aggiungerne una) genera una policy con un nuovo nome, lasciando invariata quella precedente.
+:::note[La modifica di una regola di sicurezza comporta la ridenominazione della relativa policy]
+Una regola priva di un `name` esplicito viene compilata come `<table>_<op>_<hash>`, dove l'hash rappresenta la semantica della regola — per questo motivo, la *modifica* di una regola esistente (anziché l'aggiunta di una nuova) genera una policy con un nuovo nome, lasciando presente quella precedente.
 
-Questo in passato comportava criticità importanti: Postgres unisce le policy `PERMISSIVE` tramite operatore logico OR, quindi una policy obsoleta come `USING (rebase.uid() IS NOT NULL)` continuava a concedere l'accesso a tutto, indipendentemente da quanto restrittiva fosse la sua sostituta. L'inasprimento di una regola non sortiva alcun effetto e il push segnalava un esito positivo.
+Questo in passato costituiva un problema critico: Postgres combina le policy `PERMISSIVE` tramite operatore OR, pertanto una vecchia policy `USING (rebase.uid() IS NOT NULL)` continuava a concedere l'accesso completo indipendentemente da quanto restrittiva fosse la sua sostituta. Rendere più rigida una regola non sortiva alcun effetto pratico, e il push confermava erroneamente il successo dell'operazione.
 
-`db push` ora gestisce questa riconciliazione: elimina le policy generate che non corrispondono più ad alcuna regola e segnala — senza eliminarle — le policy con nomi personalizzati non descritte dalle tue tabelle, poiché indistinguibili da istruzioni SQL scritte deliberatamente.
+`db push` ora risolve questa situazione: rimuove le policy generate che non corrispondono più ad alcuna regola e segnala — senza rimuoverle — le policy con nome personalizzato non descritte all'interno delle tabelle, poiché indistinguibili da codice SQL inserito intenzionalmente a mano.
 
-Per verificare un database su cui è stato eseguito un push prima dell'introduzione di questa funzionalità, esegui `rebase doctor --policies`. Può fungere da gate di CI: restituisce un codice di uscita diverso da zero in caso di disallineamento (drift), nonché nell'eventualità in cui non sia stato possibile eseguire il controllo — assenza di `DATABASE_URL`, percorso `--schema-dir` non valido, autorizzazioni di lettura su `pg_policies` non concesse al ruolo CI. Un controllo non eseguito non equivale a un controllo superato.
+Per analizzare un database aggiornato tramite push prima dell'introduzione di questa funzionalità, esegui `rebase doctor --policies`. Può essere utilizzato come gate in CI: termina con codice diverso da zero in caso di disallineamento (drift), così come nell'eventualità in cui non sia stato possibile completare il controllo — assenza di `DATABASE_URL`, percorso `--schema-dir` non valido o permessi insufficienti per la lettura di `pg_policies` da parte dell'utente di CI. Se la verifica non può essere eseguita, il controllo non è da considerarsi superato.
 
-`doctor` e `db push` distinguono le due tipologie di elementi orfani. Una policy con nome generato è stata sostituita e verrà eliminata al push successivo. Qualsiasi altro nome è stato impostato manualmente o da un altro strumento ed è tuttora in vigore: descrivilo nell'`rls` della relativa tabella per mantenerlo (la vista RLS di Studio lo importa), oppure eliminalo manualmente se obsoleto.
+`doctor` e `db push` distinguono le due tipologie di policy orfane. Una policy con nome generato automaticamente è da considerarsi obsoleta e verrà rimossa al push successivo. Qualsiasi altro nome fa riferimento a policy scritte manualmente o create da altri strumenti, che restano pertanto valide: descrivile all'interno dell'`rls` della rispettiva tabella per preservarle (la vista RLS di Studio ne consente l'importazione), oppure eliminale manualmente qualora non siano più necessarie.
 :::
 
 :::caution
-`db push` modifica direttamente il database. Usalo solo in fase di sviluppo. Per l'ambiente di produzione, usa `db generate` + `db migrate` per creare file di migrazione revisionabili.
+`db push` altera la struttura del database in modo diretto. Utilizzalo esclusivamente in fase di sviluppo. Per gli ambienti di produzione, usa `db generate` abbinato a `db migrate` per creare file di migrazione tracciabili ed esaminabili.
 :::
 
 ### `rebase db generate`
 
-Genera file di migrazione SQL a partire dalle modifiche allo schema:
+Genera file di migrazione SQL a partire dalle modifiche apportate allo schema:
 
 ```bash
 rebase db generate
 ```
 
 **Cosa fa:**
-- Confronta lo schema Drizzle con lo stato creato dalle migrazioni in `drizzle/migrations/`, anziché con il database
-- Produce file di migrazione SQL provvisti di timestamp in `backend/drizzle/migrations/`
-- I file possono essere revisionati, modificati e tracciati nel controllo versione
-- Elenca ogni
-  istruzione nella nuova migrazione che distrugge dati, impiegando lo stesso controllo eseguito da `db push`
-  prima dell'applicazione: tabelle, colonne, schemi, viste o tipi eliminati, un
-  `TRUNCATE`, modifiche al tipo di colonna che comportano perdita di valori, modifiche alla
-  chiave primaria o l'eliminazione di vincoli CHECK o EXCLUDE presenti nel database. Scrive
-  comunque il file ed esce con codice 0, segnalando un avviso senza interrompere il processo.
-- Conclude indicando i
-  passaggi successivi: `rebase db migrate` e, nel caso della prima migrazione di un progetto,
-  l'opzione `--baseline <version>` necessaria per i database già inizializzati al boot. Alle
-  migrazioni successive non viene indicata la riga di baseline, poiché impostare la baseline su una migrazione distruttiva
-  ne salterebbe il `DROP`, mentre un'esecuzione che non produce alcuna migrazione si limita a indicarlo.
+- Confronta lo schema Drizzle con lo stato determinato dalle migrazioni presenti in `drizzle/migrations/`, anziché con il database reale
+- Crea file di migrazione SQL provvisti di timestamp all'interno di `backend/drizzle/migrations/`
+- Tali file possono essere esaminati, modificati e versionati tramite Git
+- Segnala ciascuna
+  istruzione della nuova migrazione che comporta la perdita di dati, impiegando lo stesso controllo effettuato
+  da `db push` prima dell'applicazione: l'eliminazione di una tabella, colonna, schema, vista o tipo, un'istruzione
+  `TRUNCATE`, modifiche di tipo di colonna con possibile perdita di valori, modifiche alla chiave primaria,
+  oppure la rimozione di un vincolo CHECK o EXCLUDE salvato nel database. Il comando
+  genera comunque il file e termina con codice 0, limitandosi a emettere un avviso senza bloccare l'operazione.
+- Conclude indicando
+  i passaggi successivi: l'esecuzione di `rebase db migrate` e, nel caso della prima migrazione del progetto,
+  l'uso dell'opzione `--baseline <version>` necessaria per i database già inizializzati dalla routine di avvio. Le
+  migrazioni successive non riporteranno l'indicazione del baseline, poiché baselining di una migrazione distruttiva
+  salterebbe la relativa istruzione `DROP`; un'esecuzione che non genera alcuna migrazione si limiterà a notificarlo.
 
-**Un vincolo CHECK aggiunto da una tua migrazione viene rimosso da quella successiva.** `db generate`
-confronta i file di migrazione, non il database, e Atlas non consente di escludere un
-oggetto da questo diff. Pertanto, un vincolo CHECK o EXCLUDE inserito a mano in
-una migrazione, e non dichiarabile da alcuna tabella, verrà riproposto come
-`ALTER TABLE … DROP CONSTRAINT …` nella successiva migrazione generata, accorpato
-nella stessa istruzione della modifica effettiva. Il report sopra menzionato segnala tale rimozione quando
-il database contiene già il vincolo; non lo elimina automaticamente dal
-file. Rimuovi la clausola prima di eseguire `rebase db migrate`, oppure lascia che
-`rebase db migrate --refuse-destructive` ne blocchi l'esecuzione. `db push` esamina il
-database e preserva il vincolo.
+**I vincoli CHECK aggiunti manualmente in una migrazione vengono rimossi da quella successiva.** Il comando `db generate`
+confronta i file di migrazione e non il database; Atlas non dispone di meccanismi per escludere singoli oggetti
+da tale confronto. Di conseguenza, un vincolo CHECK o EXCLUDE inserito manualmente
+all'interno di una migrazione, e che nessuna tabella è in grado di dichiarare, verrà riproposto come
+`ALTER TABLE … DROP CONSTRAINT …` nella migrazione generata successivamente, accorpato
+nella stessa istruzione della modifica reale. Il report menzionato sopra evidenzierà tale eliminazione qualora
+il vincolo risulti già presente nel database, senza tuttavia rimuoverlo dal file.
+Sarà necessario eliminare manualmente la clausola prima di procedere con `rebase db migrate`, o lasciare che
+`rebase db migrate --refuse-destructive` ne blocchi l'esecuzione. `db push`, al contrario, legge direttamente il
+database e mantiene intatto il vincolo.
 
-Le migrazioni generate sono semplici file SQL — puoi ispezionarli e modificarli prima di applicarli.
+Le migrazioni generate sono normali file SQL: possono essere ispezionate e ritoccate prima di essere applicate.
 
 ### `rebase db migrate`
 
-Esegui tutte le migrazioni in sospeso:
+Esegue tutte le migrazioni non ancora applicate:
 
 ```bash
 rebase db migrate
 ```
 
 **Cosa fa:**
-- Cerca le migrazioni non ancora applicate in `drizzle/migrations/`
+- Esegue la scansione di `drizzle/migrations/` alla ricerca di migrazioni pendenti
 - Le applica in ordine sequenziale al database
-- Traccia quali migrazioni sono già state applicate
-- Appone un marcatore (stamp)
-  alle policy di row-level security nello stesso modo in cui fanno `db push` e il boot del server, affinché
-  il primo avvio dopo una migrazione le lasci intatte anziché ricrearle da capo. Poiché una migrazione
-  è stata generata in base alle tabelle dell'epoca, una policy riceve il marcatore solo quando coincide
-  esattamente con quanto prodotto dalla regola attuale: la migrazione la ricrea
-  a partire dalla regola con un altro nome, in una transazione sottoposta a rollback, e
-  confronta ciò che Postgres ha memorizzato, proprio come fa `db push --dry-run`. Una policy che
-  differisce non riceve il marcatore, e all'avvio successivo la relativa tabella verrà riapplicata
+- Registra quali migrazioni sono state applicate con successo
+- Applica un contrassegno
+  alle policy di row-level security secondo la medesima modalità di `db push` e dell'avvio del server,
+  facendo sì che il primo avvio successivo alla migrazione le mantenga inalterate anziché ricrearle tutte.
+  Poiché una migrazione è stata generata a partire dallo stato delle tabelle all'epoca della sua creazione, una policy
+  riceve il contrassegno unicamente se coincide in modo esatto con quanto prodotto dalla sua regola attuale: migrate la
+  ricrea dalla regola con un nome alternativo all'interno di una transazione con rollback,
+  confrontando l'output presente su Postgres esattamente come fa `db push --dry-run`. Una policy
+  non coincidente non riceverà il contrassegno, e all'avvio successivo la relativa tabella verrà riapplicata
 
 `--refuse-destructive`
-forza il rifiuto dell'operazione. Esegue prima una dry-run delle migrazioni in sospeso. Se una qualsiasi
-istruzione comporta perdita di dati, secondo lo stesso criterio usato da `db push` e `db generate`,
-elenca tali istruzioni ed esce con codice 1. Non applica alcunché, nemmeno i file
-precedenti a tale istruzione. In assenza di questo flag, `db migrate` agisce come di consueto e
-applica ogni file in sospeso:
+fa sì che il comando blocchi l'operazione in caso di rischi. Esegue innanzitutto una simulazione delle migrazioni pendenti. Qualora una
+qualsiasi istruzione comporti la perdita di dati, basandosi sulle medesime verifiche di `db push` e `db generate`,
+mostrerà l'elenco delle istruzioni interessate ed uscirà con codice 1. Nessuna modifica verrà applicata, compresi
+i file precedenti all'istruzione critica. Senza questo flag, `db migrate` opera come di consueto
+applicando tutti i file in sospeso:
 
 ```bash
 rebase db migrate --refuse-destructive
 ```
 
-Una migrazione che ricostruisce una colonna di ricerca ne richiede prima l'eliminazione, quindi questo flag rifiuterà
-anche tale migrazione. Esamina l'elenco visualizzato, quindi esegui `rebase db migrate`
+Una migrazione che ricostruisce una colonna di ricerca ne richiede preventivamente la rimozione; pertanto, questo flag
+bloccherà anche tale operazione. Esamina l'elenco mostrato, quindi avvia `rebase db migrate`
 senza il flag per procedere all'applicazione.
 
-#### Creare una baseline per un database già avviato da Rebase
+#### Esecuzione del baseline su un database già avviato da Rebase
 
-Ogni avvio di Rebase verifica e allinea lo schema, e `rebase db push` lo applica direttamente. Di conseguenza, un database che abbia eseguito l'uno o l'altro possiede già le tabelle e i tipi che la prima migrazione tenterebbe di creare, causando il blocco di `rebase db migrate` con l'errore `pq: type "posts_status" already exists (42710)`.
+Ciascun avvio di Rebase assicura la presenza dello schema, e `rebase db push` lo applica direttamente. Per questo motivo, un database sul quale sia stata eseguita una di queste procedure presenterà già le tabelle e i tipi previsti dalla prima migrazione, causando l'interruzione di `rebase db migrate` con l'errore `pq: type "posts_status" already exists (42710)`.
 
-La migrazione non presenta anomalie: il database è stato semplicemente inizializzato in un altro modo. Registra lo stato attuale del database e poi procedi con la migrazione standard:
+La migrazione non presenta anomalie: il database è stato semplicemente predisposto tramite una procedura diversa. Registra lo stato attuale del database per poi proseguire con la normale procedura di migrazione:
 
 ```bash
 rebase db migrate --baseline 20260906101530
 rebase db migrate
 ```
 
-La versione corrisponde al prefisso numerico del file di migrazione che descrive lo stato *attuale* del database. Quella specifica migrazione e tutte le precedenti vengono registrate come già applicate; le successive verranno eseguite normalmente. Su un database vergine su cui non è mai stato effettuato un boot, non occorre alcuna baseline: è possibile migrare immediatamente.
+La versione corrisponde al prefisso numerico del file di migrazione che rispecchia ciò che si trova *attualmente* all'interno del database. Tale migrazione e tutte quelle precedenti verranno registrate come già applicate; le successive verranno invece eseguite normalmente. Su un database vergine, non inizializzato da precedenti avvii, il baseline non è necessario: è possibile eseguire direttamente la migrazione.
 
-La stessa situazione si ripresenta nel normale ciclo di sviluppo: modificando una tabella mentre `rebase dev` è in esecuzione, il boot aggiunge la colonna prima che `rebase db generate` scriva la migrazione corrispondente, bloccando `rebase db migrate` con l'errore `column … already exists (42701)`. Crea la baseline per tale migrazione allo stesso modo. `--baseline` funziona anche su database che contengono già uno storico di migrazioni: contrassegna come applicate tutte le migrazioni fino alla versione indicata tramite `atlas migrate set`, notificando l'operazione, oppure segnala che non c'è nulla da registrare se la cronologia ha già raggiunto tale versione. L'indicazione di una versione non presente tra i file di `drizzle/migrations` viene respinta prima dell'esecuzione, mostrando l'elenco delle versioni disponibili.
+La stessa situazione può presentarsi successivamente nel normale flusso di lavoro: modificando una tabella mentre `rebase dev` è in esecuzione, la fase di avvio aggiungerà la colonna prima che `rebase db generate` possa generare la relativa migrazione, causando il blocco di `rebase db migrate` con l'errore `column … already exists (42701)`. In tal caso è sufficiente registrare il baseline per tale migrazione allo stesso modo. L'opzione `--baseline` opera correttamente anche su database che già tengono traccia delle migrazioni: marca tutti gli elementi fino alla versione indicata come applicati tramite `atlas migrate set`, notificandolo all'utente, oppure segnala che non vi è nulla da aggiornare qualora lo storico contenga già tale versione. Se viene indicata una versione non presente in `drizzle/migrations`, il comando terminerà prima dell'esecuzione mostrando l'elenco delle versioni disponibili.
 
 ### `rebase db branch`
 
-Branching del database per lo sviluppo in parallelo:
+Gestione dei branch del database per lo sviluppo in parallelo:
 
 ```bash
 rebase db branch create feature_auth
@@ -404,74 +399,74 @@ rebase db branch info feature_auth
 rebase db branch delete feature_auth
 ```
 
-I comandi `rebase db branch switch` (e `switch --off`) e `rebase db branch prune`
-sono stati introdotti di recente. `create`, `list`, `info` e `delete` sono disponibili dalla versione 0.17.
+I comandi `rebase db branch switch` (e `switch --off`) assieme a `rebase db branch prune`
+sono stati introdotti di recente. `create`, `list`, `info` e `delete` sono disponibili a partire dalla versione 0.17.
 
-Ogni branch è una copia completa del database creata tramite `CREATE DATABASE ... TEMPLATE`,
-pertanto richiede un server PostgreSQL reale e occupa lo stesso spazio su disco dell'originale.
+Ciascun branch è una copia integrale del database generata mediante `CREATE DATABASE ... TEMPLATE`,
+richiede pertanto un'istanza reale di PostgreSQL e occupa sul disco lo stesso spazio della sorgente.
 
 ### `rebase doctor`
 
-Rileva il disallineamento a tre vie (drift) tra le tue tabelle, lo schema Drizzle generato e il database PostgreSQL attivo:
+Rileva il disallineamento a tre vie (drift) tra le tabelle definite, lo schema Drizzle generato e il database PostgreSQL live:
 
 ```bash
 rebase doctor
 ```
 
-**Elementi verificati:**
+**Cosa controlla:**
 - Tabelle ↔ Schema generato — sono sincronizzati?
 - Schema generato ↔ Database — ci sono modifiche non applicate?
-- Tabelle ↔ Database — ci sono disallineamenti imprevisti?
+- Tabelle ↔ Database — sono presenti disallineamenti imprevisti?
 
-Esegui `doctor` ogni volta che riscontri incongruenze. Identifica con precisione l'origine del problema.
+Esegui `doctor` ogni volta che si verificano anomalie di sincronizzazione. Permette di identificare con precisione la causa del disallineamento.
 
-Il confronto con il database include la stessa verifica svolta dal boot prima di segnalare discrepanze tra `schema.generated.ts` e il database, eseguita tramite il medesimo codice. Di conseguenza, ogni differenza segnalata dal boot compare anche nel report, con le stesse indicazioni: una colonna NOT NULL da un lato e nullable dall'altro, o una colonna presente nel database ma assente nel file (il boot non esegue mai cancellazioni, quindi una proprietà rinominata lascia indietro la vecchia colonna). Ognuna di esse costituisce un avviso, e la correzione suggerita indica `rebase db push`.
+Il confronto con il database include le stesse verifiche che la procedura di avvio esegue prima di segnalare che `schema.generated.ts` e il database non coincidono, condividendo la stessa base di codice. Di conseguenza, tutti gli avvisi mostrati all'avvio sono inclusi nel report, con la medesima formulazione: una colonna definita NOT NULL da un lato e nullable dall'altro, o una colonna presente nel database ma assente nel file (l'avvio non elimina mai elementi, pertanto la ridenominazione di una proprietà lascia la vecchia colonna nel database). Ciascuna discrepanza viene notificata come avviso (warning), indicando `rebase db push` come soluzione.
 
-Il confronto con il database interroga il database del progetto, risolto secondo la logica di `rebase db url` — in un'installazione iniziale, quello gestito, che viene avviato da `doctor`. Qualora non sia possibile risolverne alcuno, questa fase viene contrassegnata come **saltata** (skipped) anziché superata, e il comando non restituirà mai "All schemas are in sync": un controllo non eseguito non garantisce la conformità dello stato.
+Il controllo del database fa riferimento all'istanza del progetto risolta nel modo mostrato da `rebase db url` — in un ambiente appena inizializzato corrisponde a quella gestita, avviata direttamente da `doctor`. Qualora non sia possibile raggiungere alcuna istanza, tale fase verrà contrassegnata come **skipped** anziché come superata, e il report non restituirà il messaggio finale "All schemas are in sync" — un controllo non eseguito non equivale a una verifica con esito positivo.
 
-Inoltre, segnala ogni tabella priva di un [blocco `search`](/docs/backend/search) contenente più di circa 10.000 righe. Una ricerca su di esse — tramite la casella di ricerca dell'admin, `.search()`, `?searchString=` — viene eseguita come `ILIKE '%term%'` sulle colonne di testo, operazione non ottimizzabile da alcun indice; ogni ricerca comporta quindi la scansione dell'intera tabella, e il conteggio richiede un'ulteriore scansione completa (circa un terzo di secondo su 100.000 righe, con tempi crescenti). Il conteggio delle righe si basa sulla stima interna di Postgres, pertanto il controllo non effettua scansioni. Si tratta di un suggerimento: non influisce sul codice di uscita e non crea indici automatici.
+Segnala inoltre tutte le tabelle prive di blocco [`search`](/docs/backend/search) contenenti più di circa 10.000 righe. Una ricerca su di esse — tramite casella di ricerca del pannello di amministrazione, `.search()`, o parametro `?searchString=` — viene eseguita come `ILIKE '%term%'` sulle colonne di testo, operazione che non può sfruttare indici e che richiede quindi la scansione dell'intera tabella, ripetuta ulteriormente per il calcolo del totale (circa un terzo di secondo con 100.000 righe, crescendo con l'aumentare dei dati). Il numero di righe si basa sulle stime fornite da Postgres, senza richiedere una scansione completa. L'avviso ha valore puramente informativo: non modifica il codice di uscita del comando e non provvede a creare indici automatici.
 
-Segnala inoltre una **tabella di giunzione orfana**: una tabella in `public` strutturata come giunzione many-to-many non dichiarata da alcuna tabella. Tale struttura prevede due colonne che costituiscono insieme la chiave primaria, ciascuna con vincolo di chiave esterna verso una tabella dichiarata. La ridenominazione o l'eliminazione di un `manyToMany` lascia indietro la vecchia tabella di giunzione, poiché push e boot si limitano alla creazione di tabelle, e le righe di collegamento continuano a risiedere al suo interno. La nota ha valore puramente informativo e non modifica il codice di uscita. La soluzione consiste nell'istruzione `DROP TABLE`, che `doctor` mostra senza mai eseguirla automaticamente.
+Identifica infine eventuali **giunzioni orfane**: tabelle nello schema `public` strutturate come relazioni many-to-many non dichiarate da alcuna tabella. Tale struttura consiste in due colonne che costituiscono assieme la chiave primaria, ciascuna foreign key verso una tabella dichiarata. Ridenominare o cancellare una relazione `manyToMany` lascia intatta la vecchia tabella di giunzione, dato che push e avvio operano solo creando elementi, mantenendo le righe di collegamento precedentemente salvate. La segnalazione è a scopo informativo e non altera il codice di uscita. La correzione suggerita è l'istruzione `DROP TABLE`, che `doctor` si limita a mostrare senza mai eseguirla.
 
 ### `rebase generate-sdk`
 
 <span class="since-badge" data-since="0.31">Da 0.31</span>
 
-Genera un SDK tipizzato a partire dalle tue tabelle:
+Genera un SDK tipizzato a partire dalle tabelle:
 
 ```bash
 rebase generate-sdk
 ```
 
 **Cosa fa:**
-- Legge le tabelle esportate da `backend/schema/index.ts`, tramite il loader utilizzato all'avvio del backend, garantendo che l'SDK descriva con esattezza le tabelle effettivamente servite; la presenza di uno schema non compilabile blocca l'operazione
-- Genera i tipi TypeScript per ciascuna tabella in `generated/sdk/`
-- Produce un file `database.types.ts` da utilizzare con `createRebaseClient<Database>()`: il tipo `Database`, `TableName` (l'unione di tutti gli slug) e `tablesDictionary` / `TablesDictionary`, la mappa che associa ciascun accessor al relativo slug
+- Legge le tabelle esportate da `backend/schema/index.ts` attraverso il loader utilizzato per l'avvio del backend, garantendo che l'SDK descriva in modo fedele le tabelle gestite; uno schema che non compila interrompe l'esecuzione
+- Genera i tipi TypeScript per ogni tabella all'interno di `generated/sdk/`
+- Crea un file `database.types.ts` utilizzabile con `createRebaseClient<Database>()`: il tipo `Database`, `TableName` (l'unione di tutti gli slug), e `tablesDictionary` / `TablesDictionary`, ovvero la mappa tra accessor e slug
 
 `rebase dev` esegue automaticamente questo comando all'avvio e a ogni salvataggio all'interno di
-`backend/schema/`. Puoi eseguirlo manualmente in ambienti CI, all'interno di un repository privo
-di tabelle proprie (vedi `--from` di seguito), o ovunque `rebase dev` non sia attivo.
+`backend/schema/`. Può essere eseguito manualmente in CI, all'interno di repository privi di
+tabelle locali (vedere il parametro `--from` più sotto), o in contesti in cui `rebase dev` non sia attivo.
 
 **Opzioni:**
 
 | Flag | Descrizione |
 |------|-------------|
-| `--schema-dir` | La directory dello schema (predefinita: `backend/schema`, oppure la chiave `tables` in `rebase.json`); i percorsi relativi vengono risolti rispetto alla posizione di esecuzione |
-| `-o`, `--output` | Directory di destinazione per l'SDK generato (predefinita: `generated/sdk/`) |
+| `--schema-dir` | La directory dello schema (predefinito: `backend/schema`, o la chiave `tables` in `rebase.json`); i percorsi relativi vengono risolti a partire da dove si esegue il comando |
+| `-o`, `--output` | Cartella di output per l'SDK generato (predefinito: `generated/sdk/`) |
 | `--from <link\|url>` | Legge lo schema da un progetto in esecuzione anziché dal codice sorgente locale. `link` fa riferimento al progetto collegato a questo checkout. |
 | `--token` | Token Bearer per l'endpoint di contratto (predefinito: `$REBASE_SERVICE_KEY` dall'ambiente della shell; `.env` non viene letto) |
-| `--register` | Tipizza anche i dati lato server: genera i tipi e la dichiarazione `Register` in `backend/generated/`, salvandola in `rebase.json` — vedi [Dati lato server tipizzati](/docs/backend/typed-server-data/) |
+| `--register` | Tipizza anche i dati lato server: scrive i tipi e una dichiarazione `Register` in `backend/generated/`, salvando l'impostazione in `rebase.json` — consulta [Dati tipizzati lato server](/docs/backend/typed-server-data/) |
 
-L'opzione `--from` consente ai repository privi di definizioni di tabelle — un
-frontend separato, una seconda applicazione web, un'app mobile — di generare un client tipizzato a partire
-dal progetto remoto di riferimento: legge le `tables` restituite da
-`/api/meta/contract` del backend in esecuzione. `REBASE_SERVICE_KEY` viene inviata esclusivamente al progetto a cui
-è collegato il checkout locale; specifica `--token` per qualsiasi altro host. La chiave presente in
-`.env` appartiene al tuo backend locale e non viene mai trasmessa.
-In caso di rifiuto, il messaggio indicherà la causa specifica: un `--token` non valido, una chiave shell respinta,
-una chiave non inviata a un host non collegato, una chiave presente solo in `.env`, oppure l'assenza totale di credenziali.
+`--from` consente a repository che non includono la definizione delle tabelle — ad esempio frontend separati,
+applicazioni web secondarie o app mobile — di generare un client tipizzato connettendosi al progetto
+di riferimento: legge la sezione `tables` dell'endpoint `/api/meta/contract` del backend in esecuzione.
+`REBASE_SERVICE_KEY` viene inoltrata esclusivamente al progetto collegato a questo checkout;
+è necessario specificare esplicitamente `--token` per qualsiasi altro host. La chiave impostata
+in `.env` appartiene al backend locale e non viene mai trasmessa.
+In caso di rifiuto, il messaggio indicherà la causa specifica: `--token` non valido, chiave della shell non valida,
+chiave non inviata poiché destinata a un host non associato, chiave definita unicamente in `.env`, oppure assenza totale di chiavi.
 
-**Utilizzo dopo la generazione:**
+**Esempio di utilizzo post-generazione:**
 
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
@@ -482,75 +477,75 @@ const client = createRebaseClient<Database>({
     tables: tablesDictionary,
 });
 
-// Full type safety and autocomplete
+// Piena sicurezza dei tipi e autocompletamento
 const { data } = await client.data.products.find();
 ```
 
-I nomi dei campi nei tipi generati corrispondono a quelli esposti dall'API. Il nome di trasporto (wire name) di un
-campo corrisponde alla chiave della colonna, e l'API adotta uniformemente la convenzione camelCase: l'introspezione
-genera una colonna `created_at` come `createdAt: col.timestamp({ withTimezone: true })`, il cui nome SQL
-è la versione snake_case della chiave, e la espone come `row.createdAt`. La colonna
-stessa rimane invariata. L'*accessor* della tabella viene convertito nel nome di una proprietà
-con lo stesso criterio (`my-notes` → `client.data.myNotes`), che `tablesDictionary`
-rimappa poi al rispettivo slug.
+I nomi dei campi all'interno dei tipi generati coincidono con quelli restituiti dalle API. Il nome
+utilizzato sulla rete corrisponde alla chiave della colonna, e le API adottano uniformemente il camelCase: l'introspezione
+converte una colonna `created_at` in `createdAt: col.timestamp({ withTimezone: true })`, il cui identificatore SQL
+è la versione snake_case della chiave, e la restituisce come `row.createdAt`. La colonna
+non subisce modifiche nel database. L'*accessor* della tabella viene convertito
+in nome di proprietà seguendo la medesima convenzione (`my-notes` → `client.data.myNotes`),
+che viene poi ricondotto allo slug originale tramite `tablesDictionary`.
 
 ### `rebase migrate`
 
 <span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `rebase migrate collections-to-tables [dir]` trasferisce `config/collections` in
-`backend/schema` (un `defineTable` per collezione, ciascuna colonna definita in modo esplicito
-nella posizione originaria secondo la sintassi Drizzle, e `index.ts` con
+`backend/schema` (un `defineTable` per collezione, con ogni colonna definita esplicitamente
+nella posizione originaria secondo la sintassi Drizzle, e il file `index.ts` corredato di
 `defaultRls`) e in `frontend/src/cms` (un `customizeTable` per ogni collezione personalizzata,
-i file `defineFirestoreCollection`, `ui-config.json`), genera
+i file `defineFirestoreCollection` e `ui-config.json`), genera
 `backend/resources.ts`, `backend/storage.ts` e `backend/generated/register.ts`,
-aggiunge `rebaseBackendGuard()` al file `vite.config.ts` dell'applicazione, quindi esegue
-`rebase migrate sdk-calls`, che converte `.collection(` in `.table(`, applica le
-altre modifiche di ridenominazione dell'SDK, aggiorna le sorgenti delle regole `existsIn` / `membership` nel codice
-e sposta le importazioni dei costrutti trasferiti ad altri package nella 0.31 (i tipi
-e gli helper del pannello di amministrazione in `@rebasepro/cms-types`, le funzioni di migrazione in
-`@rebasepro/common/migrate` — vedi [l'elenco completo](/docs/upgrading/0-30-to-0-31-imports/)),
-aggiungendo i nuovi package alle dipendenze ("Dependencies added": eseguire
-`pnpm install`). Aggiorna ogni pacchetto `@rebasepro` alla versione 0.31 prima dell'esecuzione.
-Ogni esecuzione riesamina il risultato: il codice SQL generato — DDL, policy, search,
-vector, trigger, viste, schema Drizzle — deve coincidere byte per byte, pena il ripristino
-di tutti i file. Gli elementi non convertibili vengono segnalati indicando file e riga, e
-le operazioni a carico dell'utente vengono mostrate come passaggi manuali numerati, terminando con
-`rebase skills install` qualora il progetto contenga agent skills. I moduli personali presenti in
-`config/` rimangono intatti; l'esecuzione indica il comando `git rm` per i file sostituiti.
+inserisce `rebaseBackendGuard()` nel file `vite.config.ts` dell'ambiente, quindi esegue
+`rebase migrate sdk-calls`, che trasforma `.collection(` in `.table(`, applica le
+ulteriori ridenominazioni dell'SDK e adegua le sorgenti delle regole `existsIn` / `membership` nel codice,
+aggiornando inoltre gli import dei moduli trasferiti in altri pacchetti con la versione 0.31
+([l'elenco completo](/docs/upgrading/0-30-to-0-31-imports/)), aggiungendo i pacchetti alle dipendenze
+del modulo chiamante ("Dependencies added": eseguire `pnpm install`). Aggiorna tutti i pacchetti `@rebasepro` alla versione 0.31 prima di procedere.
+A ogni esecuzione il risultato viene verificato: il codice SQL risultante — DDL, policy, search,
+vector, trigger, viste e lo schema Drizzle — deve risultare identico byte per byte, in caso contrario tutti
+i file vengono ripristinati allo stato iniziale. Gli elementi non convertibili vengono segnalati con indicazione di file e riga,
+mentre le operazioni lasciate alla gestione manuale vengono elencate come passaggi numerati, terminando con
+`rebase skills install` qualora il progetto contenga skill per agenti. I moduli personali presenti in
+`config/` non vengono rimossi; al termine verrà visualizzato il comando `git rm` per i file sostituiti. Gestisce
+inoltre le collezioni Firestore create a livello di funzione, gli alias di percorso, i pannelli montati
+esternamente ad `App.tsx` e tutte le app statiche prive di guard ([elenco dettagliato](/docs/upgrading/0-30-to-0-31/#108-tables-in-backendschema-replace-configcollections--run-the-codemod-first)).
+Una volta eseguito il comando `git rm`, `--check` restituirà `already-migrated`.
 
 | Flag | Effetto |
 |---|---|
-| `--dry-run` | Mostra i file, le operazioni non consentite, le note e i passaggi manuali senza scrivere nulla. Consigliato come primo passaggio. |
-| `--check` | Su un progetto già migrato: verifica che `backend/schema` generi ancora lo stesso codice SQL. Restituisce codice 1 mostrando il diff o in caso di variazione semantica di una regola. |
-| `--accept-rule-changes` | Da usare con `--check`: conferma che le regole elencate in "Review before deploying" sono state verificate. |
-| `--json` / `--force` / `--skip-sdk-calls` | Output del report in formato JSON (con `ruleChanges`); esecuzione su un git tree con modifiche non committate o su file già modificati; non modifica il codice sorgente. |
+| `--dry-run` | Mostra l'elenco dei file, le operazioni non consentite, le note e i passaggi manuali senza scrivere modifiche. È il comando da cui iniziare. |
+| `--check` | Da usare su un progetto già migrato: verifica che `backend/schema` continui a produrre lo stesso codice SQL. Termina con codice 1 mostrando il diff, o quando una regola cambia significato. |
+| `--accept-rule-changes` | Da abbinare a `--check`: conferma l'avvenuta revisione delle regole elencate nella sezione "Review before deploying". |
+| `--json` / `--force` / `--skip-sdk-calls` | Restituisce il report in formato JSON (comprensivo di `ruleChanges`); consente l'esecuzione su un tree con modifiche non committate o su file già editati; non modifica il codice sorgente. |
 
-Esamina due sezioni specifiche nell'output dell'SDK: **"Rewritten by name — review"** (chiamate su
-un ricevitore non tipizzato, riscritte in base al nome) e **"Left unchanged — check each"**
-(chiamate la cui appartenenza all'SDK non è stata accertata: rinomina manualmente quelle pertinenti per evitare errori a runtime).
+Esamina i due elenchi forniti nell'output relativo all'SDK: **"Rewritten by name — review"** (receiver non tipizzati,
+data slot, test double) e **"Left unchanged — check each"** (procedi a rinominare gli elementi appartenenti all'SDK;
+[una ricerca](/docs/upgrading/0-30-to-0-31-by-hand/#sdk-calls-no-type-checker-sees) aiuta a individuare i restanti).
 
-La verifica del codice SQL garantisce la fedeltà della conversione, ma non che le regole mantengano
-il medesimo significato originario. La sezione finale dell'output, **"Review before deploying: these rules change meaning"**,
-elenca ogni regola la cui policy attribuisce ora permessi differenti
-— una regola generica `access: "authenticated"` non concedeva nulla, mentre ora autorizza qualsiasi
-utente autenticato ([i quattro scenari](/docs/upgrading/0-30-to-0-31/#review-before-deploying-these-rules-change-meaning)).
-Verifica infine sul database: `rebase db push --dry-run` dovrebbe restituire "No
+La verifica del codice SQL assicura l'accuratezza formale della conversione, ma non che una regola mantenga invariato il proprio comportamento.
+L'ultima sezione dell'output, **"Review before deploying: these rules change meaning"**, elenca tutte le regole
+la cui policy accorda ora permessi differenti — una clausola isolata `access: "authenticated"` in precedenza non concedeva
+alcun accesso, mentre ora consente l'accesso a qualsiasi utente autenticato ([le quattro casistiche](/docs/upgrading/0-30-to-0-31/#review-before-deploying-these-rules-change-meaning)).
+Verifica infine a fronte del database: `rebase db push --dry-run` dovrebbe restituire "No
 changes: the database already matches these tables.", e
-`rebase doctor --policies` non dovrebbe mostrare alcun disallineamento (drift).
+`rebase doctor --policies` non dovrebbe mostrare alcun disallineamento.
 
 ## Flusso di lavoro per lo sviluppo
 
 <span class="since-badge" data-since="0.31">Da 0.31</span>
 
-Il flusso di lavoro a iterazione rapida per lo sviluppo:
+Il flusso di lavoro per iterare rapidamente in fase di sviluppo:
 
 ```bash
-# 1. Edit a table in backend/schema/
-# 2. Generate the Drizzle schema
+# 1. Modifica una tabella in backend/schema/
+# 2. Genera lo schema Drizzle
 rebase schema generate
 
-# 3. Push directly to dev database
+# 3. Esegui il push diretto al database di sviluppo
 rebase db push
 ```
 
@@ -558,23 +553,23 @@ rebase db push
 
 <span class="since-badge" data-since="0.31">Da 0.31</span>
 
-Il flusso di lavoro sicuro e revisionabile per la produzione:
+Il flusso di lavoro sicuro e tracciabile consigliato per la produzione:
 
 ```bash
-# 1. Edit a table in backend/schema/
-# 2. Generate the Drizzle schema
+# 1. Modifica una tabella in backend/schema/
+# 2. Genera lo schema Drizzle
 rebase schema generate
 
-# 3. Generate SQL migration files
+# 3. Genera i file di migrazione SQL
 rebase db generate
 
-# 4. Review the generated SQL in backend/drizzle/migrations/
-# 5. Commit the migration to version control
+# 4. Esamina il codice SQL generato in backend/drizzle/migrations/
+# 5. Esegui il commit della migrazione nel version control
 git add backend/drizzle/migrations/
 
-# 6. Apply in production
-#    A database Rebase has already booted needs a baseline the first time —
-#    see "Baselining a database Rebase has already booted" above.
+# 6. Applica in produzione
+#    Un database già avviato da Rebase richiede l'impostazione di un baseline la prima volta —
+#    consulta "Esecuzione del baseline su un database già avviato da Rebase" più sopra.
 rebase db migrate
 ```
 
@@ -583,16 +578,16 @@ rebase db migrate
 | Sintomo | Soluzione |
 |---------|-----------|
 | `Could not detect an active database plugin` | Installa `@rebasepro/server-postgres` in `backend/package.json` |
-| Il file di schema non si aggiorna | Verifica che il percorso `--schema-dir` (o la chiave `tables` in `rebase.json`) punti alla directory corretta |
-| La migrazione mostra modifiche impreviste | Esegui `rebase doctor` per identificare eventuali disallineamenti |
-| `db push` fallisce in produzione | Usa `db generate` + `db migrate` in alternativa |
-| Una migrazione non deve eliminare dati in CI o produzione | `rebase db migrate --refuse-destructive` esce con codice 1 senza applicare nulla se un'istruzione in sospeso è distruttiva per i dati |
-| `db migrate` fallisce con `already exists (42710)` | L'avvio o `db push` hanno già predisposto lo schema — imposta la baseline con `rebase db migrate --baseline <version>` |
-| `db migrate` fallisce con `column … already exists (42701)` | `rebase dev` ha inserito la colonna all'avvio — imposta la baseline per tale migrazione seguendo la stessa procedura |
-| `db push` sul database gestito fallisce con `Error: EOF` | Atlas ha perso la connessione mantenuta attiva da `rebase dev`. Riprova; se l'errore persiste, arresta prima `rebase dev` |
+| Il file di schema non si aggiorna | Verifica che il percorso `--schema-dir` (o la chiave `tables` in `rebase.json`) punti alla cartella corretta |
+| La migrazione evidenzia modifiche inattese | Esegui `rebase doctor` per identificare la natura del disallineamento |
+| `db push` fallisce in produzione | Utilizza invece la combinazione `db generate` + `db migrate` |
+| Una migrazione non deve eliminare dati in CI o produzione | `rebase db migrate --refuse-destructive` esce con codice 1 senza applicare modifiche se un'istruzione pendente elimina dati |
+| `db migrate` fallisce con `already exists (42710)` | L'avvio o `db push` hanno già predisposto lo schema — registralo mediante `rebase db migrate --baseline <version>` |
+| `db migrate` fallisce con `column … already exists (42701)` | `rebase dev` ha aggiunto la colonna durante l'avvio — applica il baseline alla migrazione nello stesso modo |
+| `db push` fallisce sul database gestito con `Error: EOF` | Atlas ha perso la connessione occupata dall'istanza attiva di `rebase dev`. Riprova ad eseguire il comando; se l'errore persiste, arresta preventivamente `rebase dev` |
 
 ## Passaggi successivi
 
 - **[Tabelle](/docs/schema/)** — Definisci il tuo modello dati
-- **[Riferimento CLI](/docs/cli)** — Tutti i comandi CLI
-- **[SDK tipizzato](/docs/sdk)** — Usa l'SDK generato
+- **[Riferimento CLI](/docs/cli)** — Tutti i comandi della CLI
+- **[SDK tipizzato](/docs/sdk)** — Utilizza l'SDK generato

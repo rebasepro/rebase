@@ -1,0 +1,127 @@
+---
+sourceHash: 4b6454ad4316209d
+slug: fr/docs/upgrading/0-30-to-0-31-by-hand
+title: Ce que les projets ont modifié manuellement pour la 0.31
+sidebar_label: Modifications manuelles 0.31
+description: "Les modifications nécessaires sur des projets réels après rebase migrate collections-to-tables : prérequis d'outillage pour les projets antérieurs à la 0.30, code d'administration au format ligne, relations renommées dans include, objets collection modifiés à l'exécution, appels SDK invisibles pour le vérificateur de types et contrôle d'accès au stockage."
+---
+
+# Ce que les projets ont modifié manuellement pour la 0.31
+
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+Neuf projets existants ont été migrés vers la version 0.31 à l'aide de `rebase migrate collections-to-tables`, sur des copies, puis installés, vérifiés au niveau des types, compilés, démarrés sur une base de données temporaire et testés. Le codemod a effectué la majeure partie du travail, et ce qu'il n'avait pas géré correctement a été corrigé en son sein. Cette page répertorie ce qui a tout de même été fait à la main : les modifications imposées par le vérificateur de types, le build ou les tests, et qu'aucune section du [guide de mise à niveau](/docs/upgrading/0-30-to-0-31/) ne mentionne à elle seule. Lisez-la après les étapes manuelles du codemod, avant de déployer.
+
+## Un projet sur une version antérieure à la 0.30
+
+Appliquez d'abord les modifications de code de chaque guide entre votre version et la 0.30 ([Mise à niveau](/docs/upgrading/)). Le codemod charge un dossier `config/` en version 0.20–0.29, et sa vérification SQL réussit, mais il n'effectue pas les modifications de code décrites dans ces guides. Celle qui a touché tous les anciens projets est [`{ row, id }` au lieu de `{ entity }`](/docs/upgrading/0-27-to-0-29/#104-row-level-callbacks-get--row-id--for--entity) dans le code d'administration, détaillée ci-dessous.
+
+Les paquets de la version 0.31 requièrent également une chaîne d'outils (toolchain) qu'un projet figé sur une version antérieure peut ne pas avoir. Voici les dépendances paires (peer dependencies) et les moteurs (engines) des paquets publiés :
+
+| Élément | Prérequis 0.31 | Requis par |
+|---|---|---|
+| Node | `>=22.22.0` | `engines` de `@rebasepro/server` et du CLI |
+| TypeScript | `^6.0.0` | `@rebasepro/app` |
+| React, React DOM | `^19.2.7` | `@rebasepro/cms`, `app`, `ui`, `forms`, `cms-types` |
+| React Router | `^8.3.0` (`react-router-dom` n'existe plus) | `@rebasepro/cms`, `app`, `studio` |
+| Vite | `^8.0.0`, avec `@vitejs/plugin-react` 6 et `vite-plugin-svgr` 5 tels qu'utilisés par le scaffold | `@rebasepro/app` (peer optionnelle) |
+| Hono | `^4.13.5` | `@rebasepro/server` |
+| `nodemailer`, `ts-morph`, `google-auth-library`, le client AWS S3 | `^9.1.1`, exactement `28.0.0`, `^10.7.0`, `^3.1068.0`, lorsque vous les utilisez | `@rebasepro/server` (peers optionnelles) |
+
+`@rebasepro/server` dépend de `@hono/node-server` 2 : une entrée `overrides` qui le fige en 1.x casse le serveur. React Router 8 a déplacé `RouterProvider` et supprimé le paquet DOM :
+
+```diff tsx no-verify
+-import { createBrowserRouter, RouterProvider } from "react-router-dom";
++import { createBrowserRouter } from "react-router";
++import { RouterProvider } from "react-router/dom";
+```
+
+TypeScript 6 n'infère plus ce que les anciens fichiers `tsconfig.json` laissaient implicite :
+
+- Un programme backend qui inclut `../config/**` nécessite `"rootDir": ".."` (sans cela, il signale TS5011). Les fichiers générés restent au même endroit, `dist/backend/src/…`, ce que le script de démarrage exécute.
+- `"moduleResolution": "node"` (node10) est déprécié : écrivez `"bundler"`.
+- Un import à effets de bord (side-effect import) d'un paquet sans types (`import "@fontsource/inter"`) constitue une erreur (TS2882). Déclarez-le une seule fois, dans un fichier `.d.ts` inclus par le programme : `declare module "@fontsource/*";`.
+
+Vite 8 compile avec Rolldown : suivez le propre guide de migration de Vite pour votre configuration. Les deux modifications dont les projets migrés ont eu besoin : un `build.target` écrit en majuscules (`"ES2022"`) est refusé, écrivez `"es2022"` ; et le bloc `esbuild` a disparu, ce qu'il configurait ayant été déplacé dans les options propres à Vite 8.
+
+## Le code d'administration lit `{ row, id }`, et non `({ entity })`
+
+Les vues personnalisées, les actions d'entité, les résolveurs d'affichage (`display`) et les champs additionnels reçoivent la ligne et son identifiant. Une fonction qui déstructure `({ entity })` lit `undefined`, et lorsqu'elle n'est pas typée (code intégré dans une personnalisation, typage lâche de prop), aucun contrôle de type ne le signale.
+
+| Code | Reçoit |
+|---|---|
+| Le `Builder` d'une vue d'entité (`EntityCustomViewParams`) | `row`, `id`, `formContext` |
+| Les propriétés `onClick`, `isEnabled`, `disabledReason` d'une action d'entité (`EntityActionClickProps`) | `row`, `id`, `path` |
+| Un résolveur `display` | `row`, `context` |
+| Le `Builder` / `value` d'un champ additionnel | `row`, `id`, `context` |
+
+```diff tsx
+-display: { subtitle: ({ entity }) => entity.values.company },
++display: { subtitle: ({ row }) => String(row.company ?? "") },
+```
+
+Le codemod réécrit les fonctions dont le corps ne lit `entity` que sous la forme `entity.values.x`, `entity.values` ou `entity.id` (en `row.x`, `row`, `id`) et répertorie toutes les autres, avec le fichier et la ligne, en une seule étape. `formContext.entityId` devient `id`. La liste complète des renommages figure à la [section 104 du guide 0.27 → 0.29](/docs/upgrading/0-27-to-0-29/#104-row-level-callbacks-get--row-id--for--entity).
+
+## Une clé `belongsTo` est une colonne, et une relation peut être renommée
+
+Une propriété de relation en 0.30 ne possédait pas de propriété pour sa clé étrangère. Une table 0.31 déclare la clé comme une colonne à part entière, à l'emplacement qu'elle occupait (`companyId: col.uuid()`), aux côtés de la relation (`company: rel.belongsTo(() => companies)`). Le code ou les tests qui lisent les colonnes de la table, ou qui vérifient qu'aucune colonne ne possède la clé, la trouvent désormais là.
+
+Une collection 0.30 pouvait également exposer la clé sous la clé même de la relation — une propriété de relation `talent_id` dont la colonne de clé est `talent_id`. Une table sépare strictement colonne et relation, la colonne conserve donc la clé (elle contient toujours l'identifiant) et le codemod renomme la relation en `<key>Relation`, avec une note explicative. La personnalisation suit ce renommage. En revanche, le code qui incluait la relation ne le fait pas automatiquement :
+
+```diff ts
+-const { data } = await client.data.table("applications").find({ include: ["*"] });
+-const talent = data[0].talent_id;             // the related row, on 0.30
++const { data } = await client.data.table("applications").find({ include: ["talent_idRelation"] });
++const talent = data[0].talent_idRelation;     // the related row; talent_id is the id
+```
+
+Inclure l'ancienne clé déclenche une erreur `400 UNKNOWN_RELATION`, de sorte qu'un appelant oublié échouera explicitement. La note du codemod liste chaque relation renommée ; recherchez dans votre code chaque ancienne clé utilisée dans `include`. Voir [Relations](/docs/collections/relations/#belongsto--the-key-is-on-this-table).
+
+## Les objets collection modifiés au runtime sont déplacés dans la personnalisation
+
+Le code dans `App.tsx` qui modifiait les objets collection avant de les transmettre à `<RebaseCMS>` (par exemple par `push`) — une action de barre d'outils, un onglet d'enregistrement, une action d'entité ajoutée à une collection trouvée par son slug — ne peut plus opérer ainsi en 0.31 : le panneau d'administration construit ses collections à partir des tables fournies par le serveur, et une personnalisation est figée. Déclarez ces éléments dans le `customizeTable` de la table :
+
+```diff tsx
+-const jobs = collections.find(c => c.slug === "jobs");
+-jobs.entityViews = [...(jobs.entityViews ?? []), applicantsView];
+-jobs.Actions = [ImportJobsButton];
++export const jobsCms = customizeTable<typeof jobs>("jobs", {
++    entityViews: [applicantsView],
++    Actions: [ImportJobsButton],
++});
+```
+
+Une fonction d'encapsulation (wrapper) qui prenait chaque collection et renvoyait des copies modifiées (`adminCollections(collections)`) s'applique désormais aux personnalisations, en propageant les mêmes options sur chacune. Ce qu'elle lisait depuis la définition d'une colonne (par exemple un `url: true` sur une propriété) n'est plus accessible à une personnalisation : déclarez ces champs dans le frontend. Voir [`customizeTable`](/docs/frontend/customize-table/).
+
+## Appels SDK invisibles pour le vérificateur de types
+
+En 0.31, `data.collection` n'est plus une fonction : l'objet de données le lit comme l'accesseur d'une table nommée `collection`, de sorte que `data.collection("rooms")` lève une `TypeError` à l'exécution. Le vérificateur de types n'intercepte l'appel que lorsque le récepteur possède le type du SDK. Il ne le détecte pas sur :
+
+- un récepteur typé `any` (`(rebase as any).dataAsAdmin`, un paramètre `data` non typé) ;
+- un type structurel que votre projet déclare par-dessus le SDK (`{ data: { collection(path: string): … } }`) ;
+- des doublures de test (`{ dataAsAdmin: { collection: () => fake } }`) et des assertions sur le code source ;
+- un guard tel que `typeof data.collection !== "function"`, qui emprunte silencieusement l'autre branche en 0.31.
+
+Le codemod réécrit les appels qu'il parvient à identifier et les liste sous **« Rewritten by name — review »** : un récepteur se terminant par `dataAsAdmin`, ou par `data` avec un nom de table littéral, le membre `collection` d'un type contenu dans un emplacement `data` / `dataAsAdmin`, ainsi que les doublures de test. Tout le reste se trouve sous **« Left unchanged — check each »**, et les guards nécessitent une intervention manuelle. Consultez les deux listes, puis recherchez ce qu'il reste :
+
+```bash
+grep -rnE "\.collection\(|collection\s*:|typeof [A-Za-z_.]+\.collection" \
+  --include="*.ts" --include="*.tsx" --exclude-dir=node_modules --exclude-dir=dist .
+```
+
+Chaque résultat qui ne concerne pas le SDK Firebase ou Firestore devient `.table(` (le membre `collection:` d'une doublure devient `table:`). Le code situé en dehors de la racine du projet — un site qui empaquette le client depuis un autre dépôt, une copie vendored de `@rebasepro/client` — n'est jamais analysé par le codemod : exécutez `rebase migrate sdk-calls <dir>` dessus, ou effectuez la même recherche, puis recompilez la copie vendored.
+
+## Vos modules `config/` et le contrôle d'accès au stockage
+
+Vos propres modules dans `config/` peuvent être conservés ([section 109](/docs/upgrading/0-30-to-0-31/#109-there-is-no-config-package)). Un module qui n'était importé que par les collections, et dont les fragments sont désormais intégrés directement dans les tables, figure dans la ligne `git rm` affichée ; les fichiers de build, les Dockerfiles et les scripts de déploiement qui compilent encore le paquet config par son nom sont listés en tant qu'étape, et le codemod ne les modifie pas.
+
+La version 0.31 ne lit `storageAuthorize` que depuis `backend/storage.ts`. Lorsque `config/index.ts` le réexportait depuis un module portant un autre nom, le codemod écrit `backend/storage.ts` en le réexportant depuis cet emplacement ; lorsque l'index le définit ou le renomme directement, une étape le signale. Effectuez cette étape avant de déployer : sans ce fichier, le stockage est servi sans aucun contrôle d'accès, et le démarrage n'émet qu'un avertissement (« Storage is configured WITHOUT any access-control model »).
+
+```diff ts
++// backend/storage.ts
++export { storageAuthorize } from "../config/storage-authorize";
+```
+
+## Ce que `rebase verify` peut signaler et qui existait déjà en 0.30
+
+La plupart des projets migrés ont rencontré des erreurs `cms-hidden-required` : un champ que la personnalisation exclut du formulaire (`readOnly`, `hiddenInForm`) alors que sa colonne est `NOT NULL` sans valeur par défaut, ce qui fait échouer la création de cet enregistrement depuis le panneau d'administration. La 0.30 échouait de la même manière (une propriété `readOnly` et `required`) ; la 0.31 le signale explicitement. Pour chacun de ces champs, marquez-le comme `filledByServer` lorsqu'un hook ou un stamp le renseigne lors de la création, ou rendez-le modifiable.
