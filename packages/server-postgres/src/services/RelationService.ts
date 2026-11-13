@@ -1,5 +1,5 @@
 import { and, eq, getTableColumns, inArray, lte, or, sql, SQL } from "drizzle-orm";
-import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
+import { alias, AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../interfaces";
 import type { FilterValues, OrderByTuple, RelationDescriptor } from "@rebasepro/types";
 import { joinConditions, type JoinStep } from "@rebasepro/types";
@@ -280,9 +280,40 @@ function rowOf(row: Record<string, unknown>, table: string): Record<string, unkn
     return (row[table] as Record<string, unknown> | undefined) || row;
 }
 
-/** The last table a `via` chain reaches: the target's, as the chain names it. */
-function viaEndTable(relation: RelationOfKind<"via">): string {
-    return relation.steps[relation.steps.length - 1].table;
+/**
+ * The alias a `via` read joins its source (the parent) table under. See
+ * {@link ViaJoinPath}.
+ */
+const VIA_SOURCE = "__via_src";
+
+/** The alias of the `index`-th intermediate step of a `via` read. */
+function viaStepAlias(index: number): string {
+    return `__via_j${index}`;
+}
+
+/**
+ * A `via` relation's steps, resolved for one read: the source table the
+ * statement selects FROM, the joins in order, and the table the last step
+ * reaches.
+ *
+ * A chain may name one table more than once — a `via` from a table to
+ * itself, or `categories → categories → categories` for grandchildren — and a
+ * statement that joins a table twice under its own name is refused ("table
+ * name specified more than once"). So every table but the last is aliased:
+ * the source as {@link VIA_SOURCE}, each intermediate step by its position.
+ * The last step stays under its own name, because it is the target, and every
+ * condition the loaders AND in — the include's `where`, the target's soft
+ * delete and `beforeQuery` — is built against the target's catalogue table and
+ * has to bind to it.
+ */
+interface ViaJoinPath {
+    /** The parent table, aliased {@link VIA_SOURCE}: key conditions on the parent are built on it. */
+    source: PgTable;
+    joins: { table: PgTable; condition: SQL }[];
+    /** The last step's table, under its own name: the target rows. */
+    end: PgTable;
+    /** The key a joined select returns the target's row under. */
+    endName: string;
 }
 
 export class RelationService {
@@ -319,6 +350,30 @@ export class RelationService {
             targetPks,
             targetIdField: targetTable[targetPks[0].fieldName as keyof typeof targetTable] as AnyPgColumn
         };
+    }
+
+    /**
+     * Resolve a `via` relation's steps from `parentTable`, aliasing every
+     * table a step may revisit. See {@link ViaJoinPath}.
+     */
+    private viaJoinPath(parentTable: PgTable, relation: RelationOfKind<"via">): ViaJoinPath {
+        const source: PgTable = alias(parentTable, VIA_SOURCE);
+        const joins: { table: PgTable; condition: SQL }[] = [];
+        let current = source;
+        relation.steps.forEach((join, index) => {
+            const table = this.registry.getPgTable(join.table);
+            if (!table) {
+                throw new Error(`Join table not found: ${join.table}`);
+            }
+            const joinTable: PgTable = index === relation.steps.length - 1 ? table : alias(table, viaStepAlias(index));
+            const step = joinStepCondition(current, joinTable, join);
+            if ("missing" in step) {
+                throw new Error(`Join columns not found: ${step.missing}`);
+            }
+            joins.push({ table: joinTable, condition: step.condition });
+            current = joinTable;
+        });
+        return { source, joins, end: current, endName: relation.steps[relation.steps.length - 1].table };
     }
 
     /**
@@ -631,29 +686,17 @@ export class RelationService {
         const relatedNarrowing = await this.narrowTargetRead(parent, relation, parentId);
 
         if (relation.kind === "via") {
-            let query = this.db.select().from(parentTable).$dynamic();
-            let currentTable = parentTable;
-
-            for (const join of relation.steps) {
-                const joinTable = this.registry.getPgTable(join.table);
-                if (!joinTable) {
-                    throw new Error(`Join table not found: ${join.table}`);
-                }
-
-                const step = joinStepCondition(currentTable, joinTable, join);
-                if ("missing" in step) {
-                    throw new Error(`Join columns not found: ${step.missing}`);
-                }
-
-                query = applyDynamicJoin(query, joinTable, step.condition);
-                currentTable = joinTable;
-            }
+            const path = this.viaJoinPath(parentTable, relation);
+            let query = path.joins.reduce(
+                (joined, { table, condition }) => applyDynamicJoin(joined, table, condition),
+                this.db.select().from(path.source).$dynamic()
+            );
 
             // The parent row by every key column — a condition on the first
             // column alone reads the related rows of every parent that shares
             // it — and the target's own soft delete beside its scope.
             query = query.where(narrowed(
-                rowIdentityCondition(parentTable, parentPks, parentId, parent.slug),
+                rowIdentityCondition(path.source, parentPks, parentId, parent.slug),
                 andSoftDelete(relatedNarrowing, target, targetTable)
             ));
 
@@ -662,11 +705,10 @@ export class RelationService {
             }
 
             const results = await query;
-            const targetTableName = viaEndTable(relation);
 
             const rows: RelatedRow<M>[] = [];
             for (const row of results as Array<Record<string, unknown>>) {
-                rows.push(this.toRelatedRow<M>(rowOf(row, targetTableName), target, targetPks, render));
+                rows.push(this.toRelatedRow<M>(rowOf(row, path.endName), target, targetPks, render));
             }
 
             return rows;
@@ -908,37 +950,20 @@ export class RelationService {
         );
 
         if (relation.kind === "via") {
-            let query = this.db.select().from(parentTable).$dynamic();
-            let currentTable = parentTable;
-
-            for (const join of relation.steps) {
-                const joinTable = this.registry.getPgTable(join.table);
-                if (!joinTable) {
-                    throw new Error(`Join table not found: ${join.table}`);
-                }
-
-                const step = joinStepCondition(currentTable, joinTable, join);
-                if ("missing" in step) {
-                    throw new Error(`Join columns not found: ${step.missing}`);
-                }
-
-                query = applyDynamicJoin(query, joinTable, step.condition);
-                currentTable = joinTable;
-            }
-
+            const path = this.viaJoinPath(parentTable, relation);
             // Match every parent at once, each by its whole key.
-            query = query.where(narrowed(this.parentKeyCondition(parentTable, parentPks, parentIds), narrowTarget));
-
-            const results = await query;
-            const targetTableName = viaEndTable(relation);
+            const results = await path.joins.reduce(
+                (joined, { table, condition }) => applyDynamicJoin(joined, table, condition),
+                this.db.select().from(path.source).$dynamic()
+            ).where(narrowed(this.parentKeyCondition(path.source, parentPks, parentIds), narrowTarget));
             const resultMap = new Map<string, RelatedRow<Record<string, unknown>>>();
 
             // Group by the parent's address — the same token the caller looks
             // results up by, derived the same way on both sides.
             for (const row of results as Array<Record<string, unknown>>) {
                 resultMap.set(
-                    buildCompositeId(rowOf(row, parent.descriptor.table), parentPks),
-                    this.toRelatedRow(rowOf(row, targetTableName), target, targetPks, render)
+                    buildCompositeId(rowOf(row, VIA_SOURCE), parentPks),
+                    this.toRelatedRow(rowOf(row, path.endName), target, targetPks, render)
                 );
             }
 
@@ -1120,24 +1145,13 @@ export class RelationService {
         );
 
         if (relation.kind === "via") {
-            const joins: { table: PgTable; condition: SQL }[] = [];
-            let currentTable = parentTable;
-
-            for (const join of relation.steps) {
-                const joinTable = this.registry.getPgTable(join.table);
-                if (!joinTable) throw new Error(`Join table not found: ${join.table}`);
-
-                const step = joinStepCondition(currentTable, joinTable, join);
-                if ("missing" in step) throw new Error(`Join columns not found: ${step.missing}`);
-
-                joins.push({ table: joinTable, condition: step.condition });
-                currentTable = joinTable;
-            }
+            const path = this.viaJoinPath(parentTable, relation);
+            const source = path.source;
             const throughPath = <Q>(query: Q): Q =>
-                joins.reduce((joined, { table, condition }) => applyDynamicJoin(joined, table, condition), query);
+                path.joins.reduce((joined, { table, condition }) => applyDynamicJoin(joined, table, condition), query);
 
-            const scope = narrowed(this.parentKeyCondition(parentTable, parentPks, parentIds), narrowTarget);
-            const endTable = currentTable;
+            const scope = narrowed(this.parentKeyCondition(source, parentPks, parentIds), narrowTarget);
+            const endTable = path.end;
             const targetKeys = targetPks.map(pk => endTable[pk.fieldName as keyof typeof endTable] as AnyPgColumn);
             const order = relatedRowOrder(endTable, targetKeys, window?.orderBy);
 
@@ -1145,27 +1159,26 @@ export class RelationService {
             if (window?.limit !== undefined) {
                 // Ranked over distinct (parent, target) pairs: two paths to
                 // one target are one related row, and share a rank.
-                const parentKeys = parentPks.map(pk => parentTable[pk.fieldName as keyof typeof parentTable] as AnyPgColumn);
+                const parentKeys = parentPks.map(pk => source[pk.fieldName as keyof typeof source] as AnyPgColumn);
                 const keys = [...parentKeys, ...targetKeys];
                 const ranked = throughPath(
-                    this.db.selectDistinct(rankedKeyFields(keys, parentKeys, order, window.totals ? targetKeys : undefined)).from(parentTable).$dynamic()
+                    this.db.selectDistinct(rankedKeyFields(keys, parentKeys, order, window.totals ? targetKeys : undefined)).from(source).$dynamic()
                 ).where(scope).as(RANKED);
-                results = await throughPath(this.db.select().from(parentTable).$dynamic())
+                results = await throughPath(this.db.select().from(source).$dynamic())
                     .innerJoin(ranked, and(...keys.map((key, i) => eq(key, ranked[`k${i}`])))!)
                     .where(lte(ranked.rank, window.limit))
                     .orderBy(ranked.rank);
             } else {
-                const query = throughPath(this.db.select().from(parentTable).$dynamic()).where(scope);
+                const query = throughPath(this.db.select().from(source).$dynamic()).where(scope);
                 results = window?.orderBy?.length ? await query.orderBy(...order) : await query;
             }
-            const targetTableName = viaEndTable(relation);
             const resultMap = new Map<string, RelatedRow<Record<string, unknown>>[]>();
 
             for (const row of results as Array<Record<string, unknown>>) {
-                const parentId = buildCompositeId(rowOf(row, parent.descriptor.table), parentPks);
+                const parentId = buildCompositeId(rowOf(row, VIA_SOURCE), parentPks);
                 recordTotal(window, parentId, row);
                 const arr = resultMap.get(parentId) || [];
-                arr.push(this.toRelatedRow(rowOf(row, targetTableName), target, targetPks, render));
+                arr.push(this.toRelatedRow(rowOf(row, path.endName), target, targetPks, render));
                 resultMap.set(parentId, arr);
             }
 
