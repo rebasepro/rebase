@@ -261,8 +261,10 @@ describe("the migration lift notes every legacy rule whose policy now grants som
     });
 
     it("`access` with only a `check`, on an operation that reads rows: no existing row before, every row now", () => {
-        expect(meaningNotes([{ operation: "update", access: "public", check: { status: "open" } }])[0].reason)
+        expect(meaningNotes([{ operation: "update", access: "authenticated", check: { status: "open" } }])[0].reason)
             .toContain("granted no existing row");
+        // Under `public` the previous USING was `true`, as it is now: nothing changed.
+        expect(meaningNotes([{ operation: "update", access: "public", check: { status: "open" } }])).toEqual([]);
         expect(meaningNotes([{ operations: ["all"], access: "authenticated", check: { status: "open" } }])).toHaveLength(1);
         // Inserting under `public` meant the same before and now.
         expect(meaningNotes([{ operation: "insert", access: "public", check: { status: "open" } }])).toEqual([]);
@@ -281,6 +283,13 @@ describe("the migration lift notes every legacy rule whose policy now grants som
             { operation: "delete", roles: ["admin"] },
             { operation: "select", access: "authenticated", roles: ["editor"] }
         ])).toEqual([]);
+    });
+
+    it("a restrictive role gate with a bare `access`: denied the role holders, now lets the signed-in ones through", () => {
+        const [note] = meaningNotes([{ mode: "restrictive", operations: ["select"], access: "authenticated", roles: ["suspended"] }]);
+        expect(note.reason).toContain("restrictive");
+        expect(note.reason).toContain("\"suspended\"");
+        expect(note.reason).toContain("drop `access`");
     });
 
     it("notes a default rule too", () => {
