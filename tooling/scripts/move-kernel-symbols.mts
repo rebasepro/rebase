@@ -27,6 +27,17 @@
  *   (some names stay, some move), `export { … } from` re-exports and `import("…").X`
  *   type references are all handled; a name that joins a package the file already
  *   imports from is merged into that import.
+ * - `as` (optional, on a symbol): rename on move. The import names the new
+ *   name, and every reference to the old local name in the file is renamed with
+ *   it (`import type { CollectionConfig } from "@rebasepro/types"` + `x:
+ *   CollectionConfig` → `import type { LegacyCollectionConfig } from
+ *   "@rebasepro/common/migrate"` + `x: LegacyCollectionConfig`). An aliased
+ *   import keeps its alias (`CollectionConfig as CC` → `LegacyCollectionConfig
+ *   as CC`). A file that declares a local of the old name, or uses it in a
+ *   shorthand property, is reported and left for a hand edit.
+ * - `specifier` (optional, on a symbol): the specifier importers outside the
+ *   target's own package `src` write, when it is not the package's bare name —
+ *   a subpath such as `@rebasepro/common/migrate`.
  * - `files`: physical moves, done first (a file already at its destination is left
  *   alone, so a run is repeatable). Relative imports in a moved file, and relative
  *   imports OF a moved file, are recomputed: same package → relative path, another
@@ -37,10 +48,25 @@
  * docs (`website/src/content/docs/docs/**`) and the agent skills
  * (`tooling/rebase-agent-skills/**`), so published examples keep compiling.
  *
- * Run: node --import tsx tooling/scripts/move-kernel-symbols.mts <map.json> [--dry-run] [--only <path-prefix>]…
+ * Run: node --import tsx tooling/scripts/move-kernel-symbols.mts <map.json> [--dry-run] [--only <path-prefix>]… [--test-files] [--skip-dirty]
+ *
+ * - `--test-files`: rewrite only test code — files under a `test/`, `tests/`,
+ *   `__tests__/` or `__fixtures__/` directory, `*.test.ts(x)` / `*.spec.ts(x)`
+ *   files, and `*.type-test.ts` files (docs fences are skipped).
+ * - `--skip-dirty`: leave alone, and list, every file that would change but
+ *   already differs from HEAD (another author's uncommitted edit lives in it).
+ *   Re-run in passes until that list is empty or stable.
+ * - `--patch-from-head <out.patch> [--files <list.txt>]`: write nothing to the
+ *   tree; instead apply the rewrite to each file's HEAD content and write the
+ *   result as a patch against HEAD — the rewrite alone, whatever else the
+ *   working copy holds, ready for a private-index commit. `--files` limits it
+ *   to the repo-relative paths listed one per line.
+ *
  * Prints every file it changed (or would change).
  */
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -54,6 +80,10 @@ export interface SymbolMove {
     from: string;
     /** Repo-relative path of the declaring module after the move. */
     to: string;
+    /** The symbol's name after the move, when it is renamed on the way. */
+    as?: string;
+    /** The specifier importers outside `to`'s own package `src` write (a subpath), instead of the bare package name. */
+    specifier?: string;
 }
 
 export interface MoveMap {
@@ -97,6 +127,29 @@ function specifierFor(importer: string, target: string, viaIndexDir: boolean): s
         return bareName(target);
     }
     return bareName(target);
+}
+
+/** The specifier `importer` uses to reach a moved symbol's new home. */
+function moveSpecifier(importer: string, move: SymbolMove): string {
+    const a = packageOf(importer);
+    const b = packageOf(move.to);
+    const sameSrc = a && b && a.name === b.name && a.area === b.area;
+    return move.specifier && !sameSrc ? move.specifier : specifierFor(importer, move.to, false);
+}
+
+/** A test file or fixture: what `--test-files` limits a run to. */
+export function isTestCode(file: string): boolean {
+    return /(^|\/)(test|tests|__tests__|__fixtures__)\//.test(file) || /\.(test|spec)\.tsx?$/.test(file) || /\.type-test\.tsx?$/.test(file);
+}
+
+/** Whether a file differs from HEAD: someone's uncommitted edit lives in it. */
+function isDirty(file: string): boolean {
+    try {
+        execFileSync("git", ["-c", "core.fsmonitor=false", "diff", "HEAD", "--quiet", "--", file], { cwd: ROOT, stdio: "ignore" });
+        return false;
+    } catch {
+        return true;
+    }
 }
 
 function walk(dir: string, accept: (name: string) => boolean, out: string[]): void {
@@ -198,6 +251,18 @@ function editsFor(ctx: Context, text: string, here: string, written: string, kin
         return specifierFor(here, now, target.viaIndexDir);
     };
 
+    /** Local names renamed by an `as` move: old local name → new name. */
+    const renames = new Map<string, string>();
+    /** An import/export element, with a renamed symbol's new name. */
+    const renamedElement = (element: ts.ImportSpecifier | ts.ExportSpecifier, move: SymbolMove): string => {
+        if (!move.as) return element.getText();
+        const typePrefix = element.isTypeOnly ? "type " : "";
+        if (element.propertyName) return `${typePrefix}${move.as} as ${element.name.text}`;
+        // `export { X } from` re-exports under the new name; an import renames its references.
+        if (ts.isImportSpecifier(element)) renames.set(element.name.text, move.as);
+        return `${typePrefix}${move.as}`;
+    };
+
     // Existing, untouched named imports, for merging: `${spec}|${typeOnly}` → declaration.
     const mergeable = new Map<string, ts.ImportDeclaration>();
     const pending = new Map<ts.ImportDeclaration, Group[]>();
@@ -249,7 +314,7 @@ function editsFor(ctx: Context, text: string, here: string, written: string, kin
                 moved = true;
             } else if (move) {
                 moved = true;
-                groupFor(specifierFor(here, move.to, false), typeOnly).elements.push(element.getText());
+                groupFor(moveSpecifier(here, move), typeOnly).elements.push(renamedElement(element, move));
             } else stay.push(element.getText());
         }
         if (!moved && newStay === spec) {
@@ -305,17 +370,73 @@ function editsFor(ctx: Context, text: string, here: string, written: string, kin
             const first = ts.isIdentifier(node.qualifier) ? node.qualifier : node.qualifier.left;
             if (target && ts.isIdentifier(first)) {
                 const move = moveOf(first.text, target);
-                const spec = move ? specifierFor(here, move.to, false) : staySpec(literal.text, target);
+                const spec = move ? moveSpecifier(here, move) : staySpec(literal.text, target);
                 if (spec !== literal.text) {
                     const q = quoteOf(literal.getText());
                     edits.push({ start: literal.getStart(), end: literal.getEnd(), text: `${q}${spec}${q}` });
                 }
+                if (move?.as) edits.push({ start: first.getStart(), end: first.getEnd(), text: move.as });
             }
         }
         ts.forEachChild(node, visit);
     };
     visit(source);
+    if (renames.size > 0) {
+        const refusal = renameReferences(source, renames, edits);
+        if (refusal) {
+            console.warn(`  ! ${here}: ${refusal} — left for a hand edit`);
+            return [];
+        }
+    }
     return edits;
+}
+
+/**
+ * Rename every reference to a renamed import's local name. Property names,
+ * member names and qualified-name tails are not references; a local
+ * declaration of the same name (which would shadow the import somewhere) and
+ * a shorthand property (whose key would change with it) refuse the file.
+ */
+function renameReferences(source: ts.SourceFile, renames: Map<string, string>, edits: Edit[]): string | undefined {
+    let refusal: string | undefined;
+    const isNameSlot = (node: ts.Identifier): boolean => {
+        const parent = node.parent;
+        if (ts.isPropertyAccessExpression(parent) && parent.name === node) return true;
+        if (ts.isQualifiedName(parent) && parent.right === node) return true;
+        if ((ts.isPropertyAssignment(parent) || ts.isPropertySignature(parent) || ts.isPropertyDeclaration(parent) ||
+            ts.isMethodSignature(parent) || ts.isMethodDeclaration(parent) || ts.isGetAccessor(parent) ||
+            ts.isSetAccessor(parent) || ts.isEnumMember(parent)) && parent.name === node) return true;
+        if (ts.isBindingElement(parent) && parent.propertyName === node) return true;
+        if (ts.isImportSpecifier(parent) || ts.isExportSpecifier(parent) || ts.isImportClause(parent) || ts.isNamespaceImport(parent)) return true;
+        if (ts.isImportTypeNode(parent)) return true;
+        if (ts.isJsxAttribute(parent)) return true;
+        return false;
+    };
+    const isDeclarationName = (node: ts.Identifier): boolean => {
+        const parent = node.parent;
+        return (ts.isVariableDeclaration(parent) || ts.isFunctionDeclaration(parent) || ts.isClassDeclaration(parent) ||
+            ts.isInterfaceDeclaration(parent) || ts.isTypeAliasDeclaration(parent) || ts.isParameter(parent) ||
+            ts.isTypeParameterDeclaration(parent) || ts.isEnumDeclaration(parent) ||
+            (ts.isBindingElement(parent) && parent.name === node)) && "name" in parent && parent.name === node;
+    };
+    const visit = (node: ts.Node): void => {
+        if (refusal) return;
+        if (ts.isImportTypeNode(node)) return;
+        if (ts.isIdentifier(node)) {
+            const next = renames.get(node.text);
+            if (next && !isNameSlot(node)) {
+                if (isDeclarationName(node)) refusal = `declares a local "${node.text}"`;
+                else if (ts.isShorthandPropertyAssignment(node.parent)) refusal = `uses "${node.text}" as a shorthand property`;
+                else edits.push({ start: node.getStart(), end: node.getEnd(), text: next });
+            }
+        }
+        ts.forEachChild(node, visit);
+    };
+    for (const statement of source.statements) {
+        if (ts.isImportDeclaration(statement)) continue;
+        visit(statement);
+    }
+    return refusal;
 }
 
 function applyEdits(text: string, edits: Edit[]): string {
@@ -335,7 +456,48 @@ function rewriteDoc(ctx: Context, text: string, file: string): string {
     });
 }
 
-export function runMove(map: MoveMap, options: { dryRun?: boolean; only?: string[] } = {}): string[] {
+export interface MoveOptions {
+    dryRun?: boolean;
+    only?: string[];
+    /** Rewrite only test code (see {@link isTestCode}); docs fences are skipped. */
+    testFiles?: boolean;
+    /** Leave files that already differ from HEAD alone, and list them in `skipped`. */
+    skipDirty?: boolean;
+    /** Filled with the files `skipDirty` left alone. */
+    skipped?: string[];
+    /** Read each file's HEAD content and return the rewrite as a patch instead of writing the tree. */
+    patchFromHead?: { files?: Set<string>; patch: string[] };
+}
+
+function headText(file: string): string | undefined {
+    try {
+        return execFileSync("git", ["-c", "core.fsmonitor=false", "show", `HEAD:${file}`], { cwd: ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+    } catch {
+        return undefined;
+    }
+}
+
+/** A unified diff of `file` from `before` to `after`, with repo-relative `a/`/`b/` paths. */
+function patchOf(file: string, before: string, after: string): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "move-kernel-symbols-"));
+    try {
+        fs.writeFileSync(path.join(dir, "a"), before);
+        fs.writeFileSync(path.join(dir, "b"), after);
+        let out = "";
+        try {
+            execFileSync("git", ["diff", "--no-index", "--", path.join(dir, "a"), path.join(dir, "b")], { encoding: "utf8" });
+        } catch (error) {
+            const stdout = error instanceof Error && "stdout" in error ? error.stdout : undefined;
+            out = typeof stdout === "string" ? stdout : "";
+        }
+        const body = out.slice(out.indexOf("\n@@") + 1);
+        return `diff --git a/${file} b/${file}\n--- a/${file}\n+++ b/${file}\n${body}`;
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+}
+
+export function runMove(map: MoveMap, options: MoveOptions = {}): string[] {
     const files = new Map(Object.entries(map.files ?? {}));
     const filesBack = new Map([...files].map(([a, b]) => [b, a]));
     const byName = new Map<string, SymbolMove[]>();
@@ -361,7 +523,8 @@ export function runMove(map: MoveMap, options: { dryRun?: boolean; only?: string
         byName, byPackage, files, filesBack,
         exists: (file) => fs.existsSync(path.join(ROOT, file)) || filesBack.has(file)
     };
-    const inScope = (file: string) => !options.only || options.only.some(prefix => file.startsWith(prefix));
+    const inScope = (file: string) => (!options.only || options.only.some(prefix => file.startsWith(prefix))) &&
+        (!options.testFiles || isTestCode(file));
     const changed: string[] = [];
 
     const sources: string[] = [];
@@ -369,19 +532,31 @@ export function runMove(map: MoveMap, options: { dryRun?: boolean; only?: string
     for (const abs of sources) {
         const here = rel(abs);
         if (!inScope(here)) continue;
+        const fromHead = options.patchFromHead;
+        if (fromHead?.files && !fromHead.files.has(here)) continue;
         const written = filesBack.get(here) ?? here;
-        const text = fs.readFileSync(abs, "utf8");
+        const text = fromHead ? headText(here) : fs.readFileSync(abs, "utf8");
+        if (text === undefined) continue;
         // Cheap filter: a file that names no moved symbol, no moved file and was not moved itself.
         if (written === here && !(map.symbols ?? []).some(m => text.includes(m.name)) &&
             ![...files.keys()].some(f => text.includes(path.basename(f).replace(/\.(ts|tsx)$/, "")))) continue;
         const edits = editsFor(ctx, text, here, written, here.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
         if (edits.length === 0) continue;
+        if (fromHead) {
+            fromHead.patch.push(patchOf(here, text, applyEdits(text, edits)));
+            changed.push(here);
+            continue;
+        }
+        if (options.skipDirty && isDirty(here)) {
+            options.skipped?.push(here);
+            continue;
+        }
         changed.push(here);
         if (!options.dryRun) fs.writeFileSync(abs, applyEdits(text, edits));
     }
 
     const docs: string[] = [];
-    for (const dir of DOC_DIRS) walk(path.join(ROOT, dir), name => /\.(md|mdx)$/.test(name), docs);
+    if (!options.testFiles && !options.patchFromHead) for (const dir of DOC_DIRS) walk(path.join(ROOT, dir), name => /\.(md|mdx)$/.test(name), docs);
     for (const abs of docs) {
         const here = rel(abs);
         if (!inScope(here)) continue;
@@ -397,15 +572,34 @@ export function runMove(map: MoveMap, options: { dryRun?: boolean; only?: string
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
     const args = process.argv.slice(2);
-    const mapPath = args.find(a => !a.startsWith("--") && args[args.indexOf(a) - 1] !== "--only");
+    const valued = new Set(["--only", "--patch-from-head", "--files"]);
+    const mapPath = args.find((a, i) => !a.startsWith("--") && !valued.has(args[i - 1]));
     if (!mapPath) {
-        console.error("usage: move-kernel-symbols.mts <map.json> [--dry-run] [--only <path-prefix>]…");
+        console.error("usage: move-kernel-symbols.mts <map.json> [--dry-run] [--only <path-prefix>]… [--test-files] [--skip-dirty] [--patch-from-head <out.patch> [--files <list.txt>]]");
         process.exit(2);
     }
     const only: string[] = [];
     args.forEach((a, i) => { if (a === "--only" && args[i + 1]) only.push(args[i + 1]); });
     const map: MoveMap = JSON.parse(fs.readFileSync(path.resolve(mapPath), "utf8"));
-    const changed = runMove(map, { dryRun: args.includes("--dry-run"), only: only.length > 0 ? only : undefined });
-    for (const file of changed) console.log(`  ${args.includes("--dry-run") ? "would rewrite" : "rewrote"} ${file}`);
-    console.log(`${changed.length} file(s)`);
+    const skipped: string[] = [];
+    const patchOut = args[args.indexOf("--patch-from-head") + 1];
+    const filesList = args.includes("--files") ? args[args.indexOf("--files") + 1] : undefined;
+    const patchFromHead = args.includes("--patch-from-head")
+        ? {
+            patch: [] as string[],
+            ...(filesList ? { files: new Set(fs.readFileSync(path.resolve(filesList), "utf8").split("\n").map(line => line.trim()).filter(Boolean)) } : {})
+        }
+        : undefined;
+    const changed = runMove(map, {
+        patchFromHead,
+        dryRun: args.includes("--dry-run"),
+        only: only.length > 0 ? only : undefined,
+        testFiles: args.includes("--test-files"),
+        skipDirty: args.includes("--skip-dirty"),
+        skipped
+    });
+    if (patchFromHead) fs.writeFileSync(path.resolve(patchOut), patchFromHead.patch.join(""));
+    for (const file of changed) console.log(`  ${patchFromHead ? "patched (from HEAD)" : args.includes("--dry-run") ? "would rewrite" : "rewrote"} ${file}`);
+    for (const file of skipped) console.log(`  skipped (uncommitted changes) ${file}`);
+    console.log(`${changed.length} file(s)${skipped.length > 0 ? `, ${skipped.length} skipped` : ""}`);
 }
