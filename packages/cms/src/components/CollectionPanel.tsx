@@ -168,11 +168,11 @@ export type CollectionPanelOptions = {
      *   are filled from, earlier ones first. A place none of them fills
      *   stays empty.
      *
-     * For this panel it wins over `propertiesOrder`, the column order the
-     * user saved, `listProperties` and what the cards infer. Column widths
-     * the user drags still persist; the order is yours, so columns are not
-     * dragged. A property hidden from collections stays hidden, and a
-     * custom view is handed the whole collection.
+     * For this panel it wins over the table's `fieldOrder` and `listFields`
+     * (`customizeTable`), the column order the user saved, and what the cards
+     * infer. Column widths the user drags still persist; the order is yours,
+     * so columns are not dragged. A field customized `hidden` stays hidden,
+     * and a custom view is handed the whole collection.
      */
     fields?: string[];
 

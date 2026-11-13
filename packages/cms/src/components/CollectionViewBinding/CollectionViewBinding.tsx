@@ -88,11 +88,11 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
      * image, subtitle, status, date, relation chips, the list's columns — are
      * filled from, earlier ones first; a place none of them fills stays empty.
      *
-     * Over `propertiesOrder`, the order the user saved, `listProperties` and
-     * what the cards infer, for this view only. Column widths the user drags
-     * still persist; the column order is the caller's, so columns are not
-     * dragged. A property hidden from collections stays hidden, and a custom
-     * view is handed the whole collection.
+     * Over the table's `fieldOrder` and `listFields` (`customizeTable`), the
+     * order the user saved, and what the cards infer, for this view only.
+     * Column widths the user drags still persist; the column order is the
+     * caller's, so columns are not dragged. A field customized `hidden` stays
+     * hidden, and a custom view is handed the whole collection.
      */
     fields?: string[];
 

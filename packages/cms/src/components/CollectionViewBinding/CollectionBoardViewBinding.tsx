@@ -106,7 +106,7 @@ export function CollectionBoardViewBinding<M extends Record<string, unknown> = R
         // Check if the property actually exists in the collection
         const property = getPropertyInPath(collection.properties, rawOrderProperty);
         if (!property) {
-            console.warn(`orderProperty "${rawOrderProperty}" is defined but does not exist in the collection properties. Treating as unconfigured.`);
+            console.warn(`The board's order field "${rawOrderProperty}" (\`kanban.orderField\` in customizeTable) is not a field of "${collection.slug}". Treating the board as unordered.`);
             return undefined;
         }
         return rawOrderProperty;
