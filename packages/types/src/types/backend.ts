@@ -1667,7 +1667,7 @@ export interface BackendBootstrapper {
      * Read the collections schema version this database was last provisioned
      * from, or `null` when nothing has ever stamped it.
      *
-     * The companion to {@link stampCollectionsSchemaVersion}: one process writes
+     * The companion to {@link stampTablesSchemaVersion}: one process writes
      * what it applied, every other process compares itself to it. This is what
      * lets a split deployment — several processes over one database, only one of
      * which provisions — notice that a unit is serving against a schema it was
@@ -1679,7 +1679,7 @@ export interface BackendBootstrapper {
      * provisioned before the stamp existed reads this way, and so does every
      * fresh one until its first provisioning boot finishes.
      */
-    readCollectionsSchemaVersion?(
+    readTablesSchemaVersion?(
         driverResult?: InitializedDriver
     ): Promise<string | null>;
 
@@ -1692,7 +1692,7 @@ export interface BackendBootstrapper {
      * only half in place, and the half that is missing is the one that fails
      * without an error.
      */
-    stampCollectionsSchemaVersion?(
+    stampTablesSchemaVersion?(
         version: string,
         driverResult?: InitializedDriver
     ): Promise<void>;

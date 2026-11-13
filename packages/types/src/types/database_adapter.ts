@@ -193,7 +193,7 @@ export interface DatabaseAdapter {
      * it turns the check off, and a check that is off looks exactly like a check
      * that passed.
      */
-    readCollectionsSchemaVersion?(
+    readTablesSchemaVersion?(
         driverResult?: InitializedDriver,
     ): Promise<string | null>;
 
@@ -204,7 +204,7 @@ export interface DatabaseAdapter {
      * the policies are in place — a stamp written earlier would claim a schema
      * that a half-finished boot never finished creating.
      */
-    stampCollectionsSchemaVersion?(
+    stampTablesSchemaVersion?(
         version: string,
         driverResult?: InitializedDriver,
     ): Promise<void>;

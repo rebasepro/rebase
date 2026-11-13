@@ -2414,21 +2414,21 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
          * Read what the last provisioning boot recorded, or `null`.
          *
          * The meta schema is `rebase` rather than the auth stamp's — see
-         * `schema/collections-schema-version.ts` for why the two can differ.
+         * `schema/tables-schema-version.ts` for why the two can differ.
          */
-        async readCollectionsSchemaVersion(driverResult?: InitializedDriver): Promise<string | null> {
+        async readTablesSchemaVersion(driverResult?: InitializedDriver): Promise<string | null> {
             const db = provisioningDb(driverResult);
             if (!db) return null;
-            const { readCollectionsSchemaVersion } = await import("./schema/collections-schema-version");
-            return readCollectionsSchemaVersion(db, SCHEMA_META_SCHEMA);
+            const { readTablesSchemaVersion } = await import("./schema/tables-schema-version");
+            return readTablesSchemaVersion(db, SCHEMA_META_SCHEMA);
         },
 
         /** Record what this process just applied. Only the provisioning process calls this. */
-        async stampCollectionsSchemaVersion(version: string, driverResult?: InitializedDriver): Promise<void> {
+        async stampTablesSchemaVersion(version: string, driverResult?: InitializedDriver): Promise<void> {
             const db = provisioningDb(driverResult);
             if (!db) return;
-            const { stampCollectionsSchemaVersion } = await import("./schema/collections-schema-version");
-            await stampCollectionsSchemaVersion(db, SCHEMA_META_SCHEMA, version);
+            const { stampTablesSchemaVersion } = await import("./schema/tables-schema-version");
+            await stampTablesSchemaVersion(db, SCHEMA_META_SCHEMA, version);
         },
 
         /**

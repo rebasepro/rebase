@@ -1395,9 +1395,9 @@ async function stampSchemaVersion(databaseUrl: string, schemaDir: string): Promi
     try {
         const { drizzle } = await import("drizzle-orm/node-postgres");
         const { defaultDatabaseSchemaVersion, loadTableSchema } = await import("./schema/load-tables");
-        const { stampCollectionsSchemaVersion, SCHEMA_META_SCHEMA } = await import("./schema/collections-schema-version");
+        const { stampTablesSchemaVersion, SCHEMA_META_SCHEMA } = await import("./schema/tables-schema-version");
         const version = defaultDatabaseSchemaVersion(await loadTableSchema(schemaDir));
-        await withAppClient(databaseUrl, client => stampCollectionsSchemaVersion(drizzle(client), SCHEMA_META_SCHEMA, version));
+        await withAppClient(databaseUrl, client => stampTablesSchemaVersion(drizzle(client), SCHEMA_META_SCHEMA, version));
         out(chalk.gray(`  ✓ Stamped the schema version (${version}), so every process can check itself against this database.`));
     } catch (err) {
         outWarn(chalk.yellow(`  ⚠️  Could not record the schema version: ${err instanceof Error ? err.message : String(err)}`));

@@ -71,8 +71,8 @@ export interface ProvisionTarget {
         | "ensureTableSchema"
         | "ensureTablePolicies"
         | "ensureRlsRuntime"
-        | "readCollectionsSchemaVersion"
-        | "stampCollectionsSchemaVersion"
+        | "readTablesSchemaVersion"
+        | "stampTablesSchemaVersion"
     >;
     /** The data-source key this target provisions for. `(default)` for the primary. */
     key?: string;

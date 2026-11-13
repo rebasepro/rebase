@@ -61,7 +61,7 @@ describe("createPostgresAdapter forwards the bootstrapper's capabilities", () =>
         // checked.
         const adapter = createPostgresAdapter(CONFIG);
 
-        expect(hasFunction(adapter, "readCollectionsSchemaVersion")).toBe(true);
-        expect(hasFunction(adapter, "stampCollectionsSchemaVersion")).toBe(true);
+        expect(hasFunction(adapter, "readTablesSchemaVersion")).toBe(true);
+        expect(hasFunction(adapter, "stampTablesSchemaVersion")).toBe(true);
     });
 });

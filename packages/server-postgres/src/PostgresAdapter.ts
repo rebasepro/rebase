@@ -86,12 +86,12 @@ export function createPostgresAdapter(pgConfig: PostgresDriverConfig): DatabaseA
         // it a unit is serving against a schema it was not built for — and a
         // check that is off looks exactly like a check that passed. This one was
         // in fact dropped on the first attempt, and the e2e caught it.
-        readCollectionsSchemaVersion: bootstrapper.readCollectionsSchemaVersion
-            ? (driverResult) => bootstrapper.readCollectionsSchemaVersion!(driverResult)
+        readTablesSchemaVersion: bootstrapper.readTablesSchemaVersion
+            ? (driverResult) => bootstrapper.readTablesSchemaVersion!(driverResult)
             : undefined,
 
-        stampCollectionsSchemaVersion: bootstrapper.stampCollectionsSchemaVersion
-            ? (version, driverResult) => bootstrapper.stampCollectionsSchemaVersion!(version, driverResult)
+        stampTablesSchemaVersion: bootstrapper.stampTablesSchemaVersion
+            ? (version, driverResult) => bootstrapper.stampTablesSchemaVersion!(version, driverResult)
             : undefined,
 
         getAdmin(driverResult) {

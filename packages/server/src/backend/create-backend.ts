@@ -496,11 +496,11 @@ export function wrapDatabaseAdapter(dbAdapter: DatabaseAdapter): BackendBootstra
         finalizeSecurityPosture: dbAdapter.finalizeSecurityPosture
             ? (driverResult) => dbAdapter.finalizeSecurityPosture!(driverResult)
             : undefined,
-        readCollectionsSchemaVersion: dbAdapter.readCollectionsSchemaVersion
-            ? (driverResult) => dbAdapter.readCollectionsSchemaVersion!(driverResult)
+        readTablesSchemaVersion: dbAdapter.readTablesSchemaVersion
+            ? (driverResult) => dbAdapter.readTablesSchemaVersion!(driverResult)
             : undefined,
-        stampCollectionsSchemaVersion: dbAdapter.stampCollectionsSchemaVersion
-            ? (version, driverResult) => dbAdapter.stampCollectionsSchemaVersion!(version, driverResult)
+        stampTablesSchemaVersion: dbAdapter.stampTablesSchemaVersion
+            ? (version, driverResult) => dbAdapter.stampTablesSchemaVersion!(version, driverResult)
             : undefined,
         getAdmin: dbAdapter.getAdmin
     };
@@ -1208,11 +1208,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         provisioned: schemaOutcome.status === "applied" && policyOutcome.status === "applied",
         introspecting: introspectCollections,
         policy: resolveSchemaMismatchPolicy(),
-        read: provisionTarget.bootstrapper.readCollectionsSchemaVersion
-            ? () => provisionTarget.bootstrapper.readCollectionsSchemaVersion!(provisionTarget.driverResult)
+        read: provisionTarget.bootstrapper.readTablesSchemaVersion
+            ? () => provisionTarget.bootstrapper.readTablesSchemaVersion!(provisionTarget.driverResult)
             : undefined,
-        stamp: provisionTarget.bootstrapper.stampCollectionsSchemaVersion
-            ? version => provisionTarget.bootstrapper.stampCollectionsSchemaVersion!(version, provisionTarget.driverResult)
+        stamp: provisionTarget.bootstrapper.stampTablesSchemaVersion
+            ? version => provisionTarget.bootstrapper.stampTablesSchemaVersion!(version, provisionTarget.driverResult)
             : undefined
     });
 

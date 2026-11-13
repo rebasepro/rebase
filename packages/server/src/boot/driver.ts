@@ -346,11 +346,11 @@ export function adapterToBootstrapper(
         finalizeSecurityPosture: adapter.finalizeSecurityPosture
             ? (driverResult) => adapter.finalizeSecurityPosture!(driverResult)
             : undefined,
-        readCollectionsSchemaVersion: adapter.readCollectionsSchemaVersion
-            ? (driverResult) => adapter.readCollectionsSchemaVersion!(driverResult)
+        readTablesSchemaVersion: adapter.readTablesSchemaVersion
+            ? (driverResult) => adapter.readTablesSchemaVersion!(driverResult)
             : undefined,
-        stampCollectionsSchemaVersion: adapter.stampCollectionsSchemaVersion
-            ? (version, driverResult) => adapter.stampCollectionsSchemaVersion!(version, driverResult)
+        stampTablesSchemaVersion: adapter.stampTablesSchemaVersion
+            ? (version, driverResult) => adapter.stampTablesSchemaVersion!(version, driverResult)
             : undefined,
         getAdmin: adapter.getAdmin
     };

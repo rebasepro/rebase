@@ -26,7 +26,7 @@ import { isTableDef, isViewDef, type BackendBootstrapper, type DataDriver, type 
 import { createRebaseBackend } from "@rebasepro/server";
 
 import { defaultDatabaseSchemaVersion, loadTableSchema } from "../src/schema/load-tables";
-import { readCollectionsSchemaVersion, SCHEMA_META_SCHEMA, stampCollectionsSchemaVersion } from "../src/schema/collections-schema-version";
+import { readTablesSchemaVersion, SCHEMA_META_SCHEMA, stampTablesSchemaVersion } from "../src/schema/tables-schema-version";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-schema-stamp-"));
 const schemaDir = path.join(root, "backend", "schema");
@@ -88,8 +88,8 @@ function recordingBootstrapper(id: string, isDefault: boolean, stamped: string[]
         ...(isDefault ? { async initializeAuth() { return { userService: repo, authRepository: repo }; } } : {}),
         async ensureTableSchema() { return { applied: 0 }; },
         async ensureTablePolicies() { return { applied: 0 }; },
-        async readCollectionsSchemaVersion() { return null; },
-        async stampCollectionsSchemaVersion(version: string) { stamped.push(version); }
+        async readTablesSchemaVersion() { return null; },
+        async stampTablesSchemaVersion(version: string) { stamped.push(version); }
     };
 }
 
@@ -122,10 +122,10 @@ describe("the schema version stamp", () => {
         try {
             await db.exec(`CREATE ROLE ${REBASE_USER_ROLE} NOLOGIN`);
             const orm = drizzle(db);
-            await stampCollectionsSchemaVersion(orm, SCHEMA_META_SCHEMA, "v1:0123456789abcdef");
+            await stampTablesSchemaVersion(orm, SCHEMA_META_SCHEMA, "v1:0123456789abcdef");
             const version = defaultDatabaseSchemaVersion(await loadTableSchema(schemaDir));
-            await stampCollectionsSchemaVersion(orm, SCHEMA_META_SCHEMA, version);
-            expect(await readCollectionsSchemaVersion(orm, SCHEMA_META_SCHEMA)).toBe(version);
+            await stampTablesSchemaVersion(orm, SCHEMA_META_SCHEMA, version);
+            expect(await readTablesSchemaVersion(orm, SCHEMA_META_SCHEMA)).toBe(version);
         } finally {
             await db.close();
         }

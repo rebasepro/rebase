@@ -41,8 +41,8 @@ const CAPABILITIES = [
     "ensureTablePolicies",
     "ensureRlsRuntime",
     "finalizeSecurityPosture",
-    "readCollectionsSchemaVersion",
-    "stampCollectionsSchemaVersion",
+    "readTablesSchemaVersion",
+    "stampTablesSchemaVersion",
     "getAdmin"
 ] as const;
 
@@ -77,8 +77,8 @@ function fullyCapableAdapter(): DatabaseAdapter {
         ensureTablePolicies: async () => ({ applied: 0 }),
         ensureRlsRuntime: async () => undefined,
         finalizeSecurityPosture: async () => undefined,
-        readCollectionsSchemaVersion: async () => null,
-        stampCollectionsSchemaVersion: async () => undefined,
+        readTablesSchemaVersion: async () => null,
+        stampTablesSchemaVersion: async () => undefined,
         getAdmin: () => undefined
     };
     return { ...minimalAdapter(), ...capabilities };

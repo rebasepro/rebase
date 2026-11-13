@@ -59,7 +59,7 @@ export interface SchemaMetaQueryable {
  * `null` instead of a thrown 42P01 — the overwhelmingly common case on a fresh
  * database is that neither exists yet, and that is not news.
  */
-export async function readCollectionsSchemaVersion(
+export async function readTablesSchemaVersion(
     db: SchemaMetaQueryable | NodePgDatabase,
     metaSchema: string
 ): Promise<string | null> {
@@ -89,7 +89,7 @@ export async function readCollectionsSchemaVersion(
  * arranges; it is tolerated here for the same reason it is elsewhere in the boot
  * path, and the caller treats any failure as a warning rather than a fatal.
  */
-export async function stampCollectionsSchemaVersion(
+export async function stampTablesSchemaVersion(
     db: SchemaMetaQueryable | NodePgDatabase,
     metaSchema: string,
     version: string
