@@ -32,6 +32,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { importIsHistorical, loadRemovedNames } from "./docs-verify/history.mjs";
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const RED = "\x1b[0;31m", GREEN = "\x1b[0;32m", DIM = "\x1b[2m", NC = "\x1b[0m";
 
@@ -53,6 +55,15 @@ const DOC_ROOTS = ["tooling/rebase-agent-skills/skills", "docs", "website/src/co
  * has to name a deleted symbol to explain its deletion is doing its job.
  */
 const HISTORICAL = [/CHANGELOG\.md$/i, /\/audits\//];
+
+/**
+ * An upgrade page for an EARLIER version may import what a later release
+ * removed, and only that: the same rule `verify:docs` applies to history
+ * (`docs-verify/history.mjs`, fed by `removed-in-<release>.json`). The
+ * 0.17 → 0.18 guide names `isRelationRequired` from `@rebasepro/common`, which
+ * was right for 0.18 and is gone in 0.31; any other unknown name there still fails.
+ */
+const REMOVED = loadRemovedNames();
 
 const baseline = path.join(ROOT, "contracts", "server.api.txt");
 if (!fs.existsSync(baseline)) {
@@ -97,7 +108,10 @@ for (const rel of files) {
             name = name.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0].trim();
             // A wrapped or commented import list; not a name.
             if (!name || name.startsWith("//") || !/^[A-Za-z_$][\w$]*$/.test(name)) continue;
-            if (!known.has(name)) problems.push({ rel, name, pkg: m[2] });
+            if (known.has(name)) continue;
+            const line = text.slice(0, m.index).split("\n").length;
+            if (importIsHistorical(ROOT, rel, line, m[2], name, REMOVED)) continue;
+            problems.push({ rel, name, pkg: m[2] });
         }
     }
 }
