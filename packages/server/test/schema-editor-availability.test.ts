@@ -325,5 +325,32 @@ describe("the two schema-editor statuses agree", () => {
         expect((await status(app)).code).toBe("SCHEMA_EDITOR_PRODUCTION");
         expect((await liveStatus(app)).code).toBe("SCHEMA_EDITOR_PRODUCTION");
     }, BOOTS_A_BACKEND);
+
+    // The fixture lives in the OS temp directory, outside any git repository:
+    // the editor loads, and only the repository to commit into is missing.
+    // `/apply` used to answer that with the `ts-morph` message.
+    it("names the missing git repository, not ts-morph, when the schema is in none", async () => {
+        const app = await boot({
+            schemaDir: collectionsDir,
+            bootstrappers: [planningBootstrapper()]
+        });
+
+        const live = await liveStatus(app);
+        expect(live.code).toBe("SCHEMA_EDITING_NO_REPOSITORY");
+        expect(live.canPlan).toBe(true);
+
+        const res = await app.request("/api/admin/schema/apply", {
+            method: "POST",
+            headers: { "content-type": "application/json", authorization: `Bearer ${await adminToken()}` },
+            body: JSON.stringify({ patches: [{ op: "setOption", table: "posts", option: "description", value: "Renamed" }] })
+        });
+        expect(res.status).toBe(501);
+        const { error } = await res.json() as { error: { code: string; message: string } };
+        expect(error.code).toBe("SCHEMA_EDITING_NO_REPOSITORY");
+        expect(error.message).toContain(collectionsDir);
+        expect(error.message).toMatch(/git init/);
+        expect(error.message).toMatch(/liveSchema\.repository/);
+        expect(error.message).not.toMatch(/ts-morph/);
+    }, BOOTS_A_BACKEND);
 });
 

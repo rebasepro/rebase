@@ -97,7 +97,7 @@ import { resolveStorageAccessControl } from "../storage/policies";
 import { loadOpenApiGenerator, mountOpenApiDocs, type OpenApiGenerator } from "../init/docs";
 import { createHealthCheck } from "../init/health";
 import { createShutdown } from "../init/shutdown";
-import { createLiveSchemaRoutes, readAccountIdentity } from "../api/live-schema-routes";
+import { createLiveSchemaRoutes, noRepositoryOff, readAccountIdentity } from "../api/live-schema-routes";
 import { uiConfigBounds } from "../ui-config/ui-config-bounds";
 import { deprecatedAlias } from "../api/mount";
 import {
@@ -2273,7 +2273,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 //
                 // With a repository the source-only editor's reasons do not
                 // apply — that path never uses it — so only its own does.
-                sourceEditingOff: remoteRepo ? remoteEditingOff : schemaEditorOff,
+                // Without either, a local `schemaDir` outside any git
+                // repository is the reason `writeSource` is unset below.
+                sourceEditingOff: remoteRepo
+                    ? remoteEditingOff
+                    : schemaEditorOff ?? (schemaDir && !repositoryRoot ? noRepositoryOff(schemaDir) : undefined),
                 // A backend that provisions nothing does not change its schema
                 // from the panel either: the change is committed as source and
                 // reaches the database through whatever applies the rest.

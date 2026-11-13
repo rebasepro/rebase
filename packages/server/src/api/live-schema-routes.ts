@@ -190,6 +190,26 @@ export interface LiveSchemaRoutesConfig {
     resolveAuthorIdentity?: (uid: string) => Promise<AccountIdentity | null>;
 }
 
+/**
+ * Why `/apply` is off for a project whose `backend/schema` is on this machine
+ * but in no git repository — the {@link LiveSchemaRoutesConfig.sourceEditingOff}
+ * for that case.
+ *
+ * Every apply is committed, so with no working tree there is nowhere to write
+ * the change. Said as such, and with the way out: without it the route fell
+ * back to the `ts-morph` message, which sent the reader to install a
+ * dependency that was already there. The repository is looked up once at boot,
+ * so a `git init` takes effect on the next start.
+ */
+export function noRepositoryOff(schemaDir: string): { code: string; message: string } {
+    return {
+        code: "SCHEMA_EDITING_NO_REPOSITORY",
+        message: `${schemaDir} is not inside a git repository, and live schema editing commits every ` +
+            "change it applies. Run `git init` in the project and restart the server (the repository is " +
+            "found at boot), or set `liveSchema.repository` to commit to a hosted repository instead."
+    };
+}
+
 /** What a commit's author line is made of. */
 export interface AccountIdentity {
     displayName?: string | null;
