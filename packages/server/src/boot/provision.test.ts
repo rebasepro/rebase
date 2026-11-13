@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
-import type { InitializedDriver } from "@rebasepro/types";
+import type { CompiledTable, InitializedDriver } from "@rebasepro/types";
 import { fakeBootstrapper, fakeDataDriver } from "../../test/helpers/server-b-fakes";
 import { plainTable, servedTablesFor } from "../../test/helpers/tables";
 
@@ -197,7 +197,7 @@ describe("the driver result the schema hooks pass", () => {
         const db = drizzleHandle();
         let received: unknown;
 
-        const ensure = jest.fn(async (_collections: unknown[], driverResult?: InitializedDriver) => {
+        const ensure = jest.fn(async (_tables: readonly CompiledTable[], driverResult?: InitializedDriver) => {
             // Exactly what the driver does; throws on the pre-fix shape.
             received = await queryThroughInternals(driverResult);
             return { applied: 1 };
@@ -220,7 +220,7 @@ describe("the driver result the schema hooks pass", () => {
         const db = drizzleHandle();
         let received: unknown;
 
-        const ensure = jest.fn(async (_collections: unknown[], driverResult?: InitializedDriver) => {
+        const ensure = jest.fn(async (_tables: readonly CompiledTable[], driverResult?: InitializedDriver) => {
             received = await queryThroughInternals(driverResult);
             return { applied: 4 };
         });
@@ -244,7 +244,7 @@ describe("the driver result the schema hooks pass", () => {
     // entirely, leaving those deployments with no tables at all.
     it("still calls the hook when no pre-init result exists", async () => {
         let sawArgument: unknown = "never called";
-        const ensure = jest.fn(async (_collections: unknown[], driverResult: unknown) => {
+        const ensure = jest.fn(async (_tables: readonly CompiledTable[], driverResult: unknown) => {
             sawArgument = driverResult;
             return { applied: 3 };
         });

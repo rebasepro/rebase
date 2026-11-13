@@ -16,6 +16,7 @@ import { errorHandler } from "../src/api/errors";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import { configureJwt, generateAccessToken, verifyAccessToken } from "../src/auth/jwt";
 import { MemoryAuthStore } from "./helpers/memory-auth-store";
+import { honoRouter } from "./helpers/hono-router";
 
 jest.mock("../src/utils/logger", () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), child: jest.fn().mockReturnThis() }
@@ -37,7 +38,7 @@ function world() {
     const adapter = createBuiltinAuthAdapter({ authRepository: store.repo(), allowRegistration: true, authHooks: HOOKS });
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
-    app.route("/auth", adapter.createAuthRoutes() as Hono<HonoEnv>);
+    app.route("/auth", honoRouter(adapter.createAuthRoutes?.()));
     app.get("/data", async (c) => {
         const user = await adapter.verifyRequest(c.req.raw);
         return user ? c.json({ uid: user.uid }) : c.json({ error: "unauthenticated" }, 401);
@@ -170,7 +171,7 @@ describe("the address a session records", () => {
         const store = new MemoryAuthStore();
         const adapter = createBuiltinAuthAdapter({ authRepository: store.repo(), allowRegistration: true, authHooks: HOOKS });
         const app = new Hono<HonoEnv>();
-        app.route("/auth", adapter.createAuthRoutes() as Hono<HonoEnv>);
+        app.route("/auth", honoRouter(adapter.createAuthRoutes?.()));
         await app.request("/auth/register", {
             method: "POST",
             headers: { "Content-Type": "application/json", "X-Forwarded-For": "10.9.8.7, 203.0.113.5" },
@@ -185,7 +186,7 @@ describe("the address a session records", () => {
             const store = new MemoryAuthStore();
             const adapter = createBuiltinAuthAdapter({ authRepository: store.repo(), allowRegistration: true, authHooks: HOOKS });
             const app = new Hono<HonoEnv>();
-            app.route("/auth", adapter.createAuthRoutes() as Hono<HonoEnv>);
+            app.route("/auth", honoRouter(adapter.createAuthRoutes?.()));
             await app.request("/auth/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "X-Forwarded-For": "10.9.8.7, 203.0.113.5" },

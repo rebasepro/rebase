@@ -96,7 +96,7 @@ describe("Storage routes (sub-router integration)", () => {
     beforeEach(async () => {
         configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-routes-test-"));
-        controller = new LocalStorageController({ basePath: tempDir });
+        controller = new LocalStorageController({ type: "local", basePath: tempDir });
 
         // Upload a test file so we have something to serve
         const content = Buffer.from("Hello test file");
@@ -328,8 +328,8 @@ describe("Storage routes — multi-backend routing (registry)", () => {
         secondaryDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-secondary-"));
 
         const registry = DefaultStorageRegistry.create({
-            "(default)": new LocalStorageController({ basePath: defaultDir }),
-            secondary: new LocalStorageController({ basePath: secondaryDir })
+            "(default)": new LocalStorageController({ type: "local", basePath: defaultDir }),
+            secondary: new LocalStorageController({ type: "local", basePath: secondaryDir })
         });
 
         app = new Hono<HonoEnv>();
@@ -544,7 +544,7 @@ describe("Storage routes — scoped download token under AuthAdapter", () => {
     beforeEach(async () => {
         configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-token-adapter-"));
-        controller = new LocalStorageController({ basePath: tempDir });
+        controller = new LocalStorageController({ type: "local", basePath: tempDir });
 
         await controller.putObject({
             file: new File([Buffer.from("secret image bytes")], "logo.png", { type: "image/png" }),
@@ -627,8 +627,8 @@ describe("Storage routes — download tokens are scoped to a storage source", ()
         defaultDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-src-default-"));
         mediaDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-src-media-"));
 
-        const defaultController = new LocalStorageController({ basePath: defaultDir });
-        const mediaController = new LocalStorageController({ basePath: mediaDir });
+        const defaultController = new LocalStorageController({ type: "local", basePath: defaultDir });
+        const mediaController = new LocalStorageController({ type: "local", basePath: mediaDir });
 
         // The same key in both sources, holding different bytes — which is the
         // whole point: these are two objects that share a name.

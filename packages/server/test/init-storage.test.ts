@@ -218,7 +218,7 @@ describe("initializeStorage", () => {
         // A custom StorageController is the caller's own object; it is not a
         // config to be second-guessed.
         const { LocalStorageController } = await import("../src/storage/LocalStorageController");
-        const controller = new LocalStorageController({ basePath: tempDir });
+        const controller = new LocalStorageController({ type: "local", basePath: tempDir });
 
         const { storageController } = await initializeStorage(controller, true);
 

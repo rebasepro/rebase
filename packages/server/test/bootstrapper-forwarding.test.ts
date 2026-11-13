@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import type { BackendBootstrapper, DatabaseAdapter, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CompiledTable, DatabaseAdapter, InitializedDriver } from "@rebasepro/types";
 import { adapterToBootstrapper } from "../src/boot/driver";
 import { wrapDatabaseAdapter } from "../src/backend/create-backend";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { plainTable, servedTablesFor } from "./helpers/tables";
 
 /**
  * Neither wrapper may drop a capability the adapter implements.
@@ -160,19 +161,19 @@ describe.each(WRAPPERS)("%s", (_name, wrap) => {
         const calls: string[] = [];
         const adapter: DatabaseAdapter = {
             ...fullyCapableAdapter(),
-            ensureTableSchema: async (collections: unknown[]) => {
-                calls.push(`schema:${collections.length}`);
+            ensureTableSchema: async (tables: readonly CompiledTable[]) => {
+                calls.push(`schema:${tables.length}`);
                 return { applied: 0 };
             },
-            ensureTablePolicies: async (collections: unknown[]) => {
-                calls.push(`policies:${collections.length}`);
+            ensureTablePolicies: async (tables: readonly CompiledTable[]) => {
+                calls.push(`policies:${tables.length}`);
                 return { applied: 0 };
             }
         };
 
         const wrapped = wrap(adapter);
-        void wrapped.ensureTableSchema?.([{}, {}], initialized(), () => undefined);
-        void wrapped.ensureTablePolicies?.([{}], initialized(), () => undefined);
+        void wrapped.ensureTableSchema?.(servedTablesFor([plainTable("posts"), plainTable("tags")]).tables, initialized(), () => undefined);
+        void wrapped.ensureTablePolicies?.(servedTablesFor([plainTable("posts")]).tables, initialized(), () => undefined);
 
         expect(calls).toEqual(["schema:2", "policies:1"]);
     });

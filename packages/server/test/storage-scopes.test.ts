@@ -34,7 +34,7 @@ describe("storage scopes", () => {
     beforeEach(async () => {
         configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-storage-scopes-"));
-        controller = new LocalStorageController({ basePath: tempDir });
+        controller = new LocalStorageController({ type: "local", basePath: tempDir });
         await controller.putObject({
             file: new File([Buffer.from("hello")], "a.txt", { type: "text/plain" }),
             key: "docs/a.txt"

@@ -130,7 +130,7 @@ describe("storage routes: the authorize hook and the object agree", () => {
         configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         seen = [];
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-storage-keys-"));
-        controller = new LocalStorageController({ basePath: tempDir });
+        controller = new LocalStorageController({ type: "local", basePath: tempDir });
 
         await controller.putObject({
             file: new File([Buffer.from("bob private data")], "notes.txt", { type: "text/plain" }),
@@ -350,7 +350,7 @@ describe("TUS writes the key it authorized", () => {
         configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         seen = [];
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-tus-keys-"));
-        controller = new LocalStorageController({ basePath: tempDir });
+        controller = new LocalStorageController({ type: "local", basePath: tempDir });
         await controller.putObject({
             file: new File([Buffer.from("bob private data")], "notes.txt", { type: "text/plain" }),
             key: "users/bob/notes.txt"

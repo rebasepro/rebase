@@ -14,6 +14,7 @@ import { errorHandler } from "../src/api/errors";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { MemoryAuthStore } from "./helpers/memory-auth-store";
+import { honoRouter } from "./helpers/hono-router";
 
 jest.mock("../src/utils/logger", () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), child: jest.fn().mockReturnThis() }
@@ -26,8 +27,8 @@ describe("a malformed JSON body", () => {
     const adapter = createBuiltinAuthAdapter({ authRepository: store.repo(), allowRegistration: true, enableMagicLink: true, enableEmailOtp: true });
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
-    app.route("/auth", adapter.createAuthRoutes() as Hono<HonoEnv>);
-    app.route("/admin", adapter.createAdminRoutes!() as Hono<HonoEnv>);
+    app.route("/auth", honoRouter(adapter.createAuthRoutes?.()));
+    app.route("/admin", honoRouter(adapter.createAdminRoutes?.()));
 
     const routes = [
         "/auth/login", "/auth/register", "/auth/forgot-password", "/auth/reset-password",

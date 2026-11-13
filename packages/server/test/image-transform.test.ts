@@ -213,7 +213,7 @@ describe("GET /file/* transforms", () => {
     beforeEach(async () => {
         configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-transform-"));
-        const controller = new LocalStorageController({ basePath: tempDir });
+        const controller = new LocalStorageController({ type: "local", basePath: tempDir });
 
         const sharp = (await import("sharp")).default;
         const bytes = await sharp({

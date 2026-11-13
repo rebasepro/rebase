@@ -67,35 +67,35 @@ describe("createDevEmailSink", () => {
 
     it("joins multiple recipients for display", async () => {
         const sink = createDevEmailSink();
-        await sink.sendEmail({ to: ["a@x.com", "b@x.com"], subject: "s", text: "t" });
+        await sink.sendEmail({ to: ["a@x.com", "b@x.com"], subject: "s", html: "<p>t</p>", text: "t" });
         expect(sink.list()[0].to).toBe("a@x.com, b@x.com");
     });
 
     it("lists most recent first", async () => {
         const sink = createDevEmailSink();
-        await sink.sendEmail({ to: "a@x.com", subject: "first", text: "t" });
-        await sink.sendEmail({ to: "a@x.com", subject: "second", text: "t" });
+        await sink.sendEmail({ to: "a@x.com", subject: "first", html: "<p>t</p>", text: "t" });
+        await sink.sendEmail({ to: "a@x.com", subject: "second", html: "<p>t</p>", text: "t" });
         expect(sink.list().map(m => m.subject)).toEqual(["second", "first"]);
     });
 
     it("is a ring buffer, not a mailbox — the oldest falls off", async () => {
         const sink = createDevEmailSink({ capacity: 2 });
         for (const subject of ["one", "two", "three"]) {
-            await sink.sendEmail({ to: "a@x.com", subject, text: "t" });
+            await sink.sendEmail({ to: "a@x.com", subject, html: "<p>t</p>", text: "t" });
         }
         expect(sink.list().map(m => m.subject)).toEqual(["three", "two"]);
     });
 
     it("clears", async () => {
         const sink = createDevEmailSink();
-        await sink.sendEmail({ to: "a@x.com", subject: "s", text: "t" });
+        await sink.sendEmail({ to: "a@x.com", subject: "s", html: "<p>t</p>", text: "t" });
         sink.clear();
         expect(sink.list()).toEqual([]);
     });
 
     it("hands out copies, so a caller cannot mutate the buffer", async () => {
         const sink = createDevEmailSink();
-        await sink.sendEmail({ to: "a@x.com", subject: "s", text: "t" });
+        await sink.sendEmail({ to: "a@x.com", subject: "s", html: "<p>t</p>", text: "t" });
         sink.list().length = 0;
         expect(sink.list()).toHaveLength(1);
     });
@@ -144,8 +144,8 @@ describe("resolveEmailOptions — when the sink is used", () => {
     it("each boot gets its own buffer", async () => {
         const a = resolveEmailOptions(env(DEV))!;
         const b = resolveEmailOptions(env(DEV))!;
-        const first = await a.sendEmail!({ to: "a@x.com", subject: "only in a", text: "t" });
-        const second = await b.sendEmail!({ to: "b@x.com", subject: "only in b", text: "t" });
+        const first = await a.sendEmail!({ to: "a@x.com", subject: "only in a", html: "<p>t</p>", text: "t" });
+        const second = await b.sendEmail!({ to: "b@x.com", subject: "only in b", html: "<p>t</p>", text: "t" });
 
         // Nothing shared: b's sink never saw a's message. Asserted through the
         // public surface rather than by reaching into either closure — the ids

@@ -170,8 +170,9 @@ describe("nothing happens when the change is refused", () => {
             plan: plan(),
             repository: repo,
             apply: async () => undefined
-        }).catch(e => e as DirtyWorkingTreeError);
+        }).catch((e: unknown) => e);
 
+        if (!(err instanceof DirtyWorkingTreeError)) throw new Error(`expected a DirtyWorkingTreeError, got ${String(err)}`);
         expect(err.paths).toEqual(["backend/src/schema.generated.ts"]);
         expect(err.message).not.toContain("README.md");
     });

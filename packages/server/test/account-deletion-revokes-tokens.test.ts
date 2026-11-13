@@ -25,6 +25,7 @@ import { configureJwt, generateAccessToken, verifyAccessToken } from "../src/aut
 import { judgeAccessToken } from "../src/auth/token-revocation";
 import { createRequireAuth } from "../src/auth/middleware";
 import { MemoryAuthStore } from "./helpers/memory-auth-store";
+import { honoRouter } from "./helpers/hono-router";
 
 jest.mock("../src/utils/logger", () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), child: jest.fn().mockReturnThis() }
@@ -42,8 +43,8 @@ function world() {
     const adapter = createBuiltinAuthAdapter({ authRepository: store.repo(), allowRegistration: true, authHooks: HOOKS });
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
-    app.route("/auth", adapter.createAuthRoutes() as Hono<HonoEnv>);
-    app.route("/admin", adapter.createAdminRoutes!() as Hono<HonoEnv>);
+    app.route("/auth", honoRouter(adapter.createAuthRoutes?.()));
+    app.route("/admin", honoRouter(adapter.createAdminRoutes?.()));
     // The data plane: whatever the adapter says the request is.
     app.get("/data", async (c) => {
         const user = await adapter.verifyRequest(c.req.raw);

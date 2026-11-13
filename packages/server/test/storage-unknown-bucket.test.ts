@@ -65,7 +65,7 @@ describe("a bucket this deployment does not serve", () => {
         app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.route("/api/storage", createStorageRoutes({
-            controller: new LocalStorageController({ basePath: storageDir }),
+            controller: new LocalStorageController({ type: "local", basePath: storageDir }),
             requireAuth: false
         }));
     });
@@ -215,7 +215,7 @@ describe("a write naming a bucket an object store does not serve", () => {
             multi.onError(errorHandler);
             multi.route("/api/storage", createStorageRoutes({
                 registry: DefaultStorageRegistry.create({
-                    "(default)": new LocalStorageController({ basePath: localDir }),
+                    "(default)": new LocalStorageController({ type: "local", basePath: localDir }),
                     media: s3()
                 }),
                 requireAuth: false
@@ -254,7 +254,7 @@ describe("knownBuckets", () => {
             await fs.promises.mkdir(path.join(dir, "media"));
             await fs.promises.writeFile(path.join(dir, "loose.txt"), "not a bucket");
 
-            const controller = new LocalStorageController({ basePath: dir });
+            const controller = new LocalStorageController({ type: "local", basePath: dir });
             expect(controller.knownBuckets().sort()).toEqual(["default", "media"]);
         } finally {
             await fs.promises.rm(dir, { recursive: true, force: true });
@@ -262,7 +262,7 @@ describe("knownBuckets", () => {
     });
 
     it("local reports `default` before anything has been written", () => {
-        const controller = new LocalStorageController({ basePath: path.join(os.tmpdir(), "rebase-nothing-here") });
+        const controller = new LocalStorageController({ type: "local", basePath: path.join(os.tmpdir(), "rebase-nothing-here") });
         expect(controller.knownBuckets()).toEqual(["default"]);
     });
 

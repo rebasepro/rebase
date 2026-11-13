@@ -64,8 +64,8 @@ describe("TUS authorizes the storage source it writes to", () => {
         assetsDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-tus-assets-"));
 
         const registry = DefaultStorageRegistry.create({
-            "(default)": new LocalStorageController({ basePath: defaultDir }),
-            assets: new LocalStorageController({ basePath: assetsDir })
+            "(default)": new LocalStorageController({ type: "local", basePath: defaultDir }),
+            assets: new LocalStorageController({ type: "local", basePath: assetsDir })
         });
 
         app = new Hono<HonoEnv>();
@@ -147,7 +147,7 @@ describe("TUS authorizes the storage source it writes to", () => {
         app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.route("/api/storage", createStorageRoutes({
-            controller: new LocalStorageController({ basePath: defaultDir }),
+            controller: new LocalStorageController({ type: "local", basePath: defaultDir }),
             requireAuth: false,
             authorize: async (ctx: StorageAuthorizeContext) => {
                 seen.push(ctx.storageId);
@@ -187,8 +187,8 @@ describe("TUS authorizes the storage source it writes to", () => {
         app.onError(errorHandler);
         app.route("/api/storage", createStorageRoutes({
             registry: DefaultStorageRegistry.create({
-                "(default)": new LocalStorageController({ basePath: defaultDir }),
-                assets: new LocalStorageController({ basePath: assetsDir })
+                "(default)": new LocalStorageController({ type: "local", basePath: defaultDir }),
+                assets: new LocalStorageController({ type: "local", basePath: assetsDir })
             }),
             requireAuth: false,
             authorize: async (ctx: StorageAuthorizeContext) => {

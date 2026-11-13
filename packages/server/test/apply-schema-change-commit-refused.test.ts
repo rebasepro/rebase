@@ -62,6 +62,17 @@ describe("a commit git refuses", () => {
     let root: string;
     afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
+    /** The error `promise` rejects with; fails the case if it resolves. */
+    const rejection = async (promise: Promise<unknown>): Promise<Error> => {
+        try {
+            await promise;
+        } catch (error) {
+            if (error instanceof Error) return error;
+            throw error;
+        }
+        throw new Error("expected the apply to be refused");
+    };
+
     const attempt = (applied: string[]) => applySchemaChange({
         plan: plan(),
         repository: createLocalGitRepository({ root, author: { name: "Ada", email: "ada@example.com" } }),
@@ -89,7 +100,7 @@ describe("a commit git refuses", () => {
     it("names the git subcommand and carries what the hook said", async () => {
         root = makeRepo("#!/bin/sh\necho \"lint-staged: prettier --check failed\" >&2\nexit 1\n");
 
-        const err = await attempt([]).catch((e: unknown) => e as Error);
+        const err = await rejection(attempt([]));
 
         expect(err.message).toMatch(/git commit failed/);
         expect(err.message).not.toMatch(/git -c failed/);
@@ -100,7 +111,7 @@ describe("a commit git refuses", () => {
         root = makeRepo("#!/bin/sh\necho \"hook says no\" >&2\nexit 1\n");
 
         await attempt([]).catch(() => undefined);
-        const retry = await attempt([]).catch((e: unknown) => e as Error);
+        const retry = await rejection(attempt([]));
 
         expect(retry.name).not.toBe("DirtyWorkingTreeError");
         expect(retry.message).toContain("hook says no");

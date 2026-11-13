@@ -89,7 +89,7 @@ async function until(check: () => boolean): Promise<void> {
     for (let i = 0; i < 400 && !check(); i++) await new Promise(r => setTimeout(r, 5));
 }
 
-const mail = (i: number) => ({ to: `user${i}@example.com`, subject: `Hello ${i}`, text: "hello" });
+const mail = (i: number) => ({ to: `user${i}@example.com`, subject: `Hello ${i}`, html: "<p>hello</p>", text: "hello" });
 
 describe("SMTPEmailService connections", () => {
     let smtp: FakeSmtp;

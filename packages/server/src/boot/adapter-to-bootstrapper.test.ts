@@ -2,6 +2,10 @@ import { describe, expect, it, jest } from "@jest/globals";
 import type { DatabaseAdapter, InitializedDriver } from "@rebasepro/types";
 
 import { adapterToBootstrapper } from "./driver";
+import { plainTable, servedTablesFor } from "../../test/helpers/tables";
+
+/** One compiled table: what the boot hands a schema hook. */
+const POSTS = servedTablesFor([plainTable("posts")]).tables;
 
 /**
  * The wrapper that turns a driver's `DatabaseAdapter` into the
@@ -37,7 +41,7 @@ describe("adapterToBootstrapper", () => {
         );
 
         expect(typeof bootstrapper.ensureTableSchema).toBe("function");
-        const out = await bootstrapper.ensureTableSchema!([{}], driverResult);
+        const out = await bootstrapper.ensureTableSchema!(POSTS, driverResult);
         expect(out).toEqual({ applied: 3 });
         expect(ensureTableSchema).toHaveBeenCalledTimes(1);
     });
@@ -51,7 +55,7 @@ describe("adapterToBootstrapper", () => {
         );
 
         expect(typeof bootstrapper.ensureTablePolicies).toBe("function");
-        const out = await bootstrapper.ensureTablePolicies!([{}], driverResult);
+        const out = await bootstrapper.ensureTablePolicies!(POSTS, driverResult);
         expect(out).toEqual({ applied: 5 });
         expect(ensureTablePolicies).toHaveBeenCalledTimes(1);
     });

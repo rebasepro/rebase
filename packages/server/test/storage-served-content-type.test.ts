@@ -89,7 +89,7 @@ describe("GET /file/* never serves the uploader's claim as a renderable type", (
     beforeEach(async () => {
         configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-served-type-"));
-        controller = new LocalStorageController({ basePath: tempDir });
+        controller = new LocalStorageController({ type: "local", basePath: tempDir });
 
         app = new Hono<HonoEnv>();
         app.onError(errorHandler);

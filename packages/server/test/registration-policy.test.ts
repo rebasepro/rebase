@@ -51,6 +51,7 @@ jest.mock("../src/auth/rate-limiter", () => {
 });
 
 import { hashPassword, verifyPassword, validatePasswordStrength } from "../src/auth/password";
+import { honoRouter } from "./helpers/hono-router";
 
 const TEST_SECRET = "registration-policy-secret-key-that-is-definitely-32-chars!!";
 
@@ -214,7 +215,7 @@ function build(scenario: Scenario) {
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     // Mounted exactly as init.ts mounts it.
-    app.route("/auth", adapter.createAuthRoutes()!);
+    app.route("/auth", honoRouter(adapter.createAuthRoutes?.()));
 
     return { adapter, app, repo };
 }
@@ -497,7 +498,7 @@ describe("the first-user check", () => {
         const adapter = createBuiltinAuthAdapter({ authRepository: repo, allowRegistration: true, oauthProviders: [fakeProvider] });
         const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
-        app.route("/auth", adapter.createAuthRoutes()!);
+        app.route("/auth", honoRouter(adapter.createAuthRoutes?.()));
         const post = (path: string, body: unknown) => app.request(path, {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -575,7 +576,7 @@ describe("the user-presence checks", () => {
         });
         const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
-        app.route("/auth", adapter.createAuthRoutes()!);
+        app.route("/auth", honoRouter(adapter.createAuthRoutes?.()));
 
         const capabilities = await adapter.getCapabilities();
         const response = await register(app);
@@ -612,7 +613,7 @@ describe("the user-presence checks", () => {
             const adapter = createBuiltinAuthAdapter({ authRepository: repo, allowRegistration: false });
             const app = new Hono<HonoEnv>();
             app.onError(errorHandler);
-            app.route("/auth", adapter.createAuthRoutes()!);
+            app.route("/auth", honoRouter(adapter.createAuthRoutes?.()));
 
             const response = await register(app);
 

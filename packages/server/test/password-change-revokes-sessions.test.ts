@@ -13,6 +13,7 @@ import { mockEmailService } from "./helpers/server-b-fakes";
 import type { AuthHooks } from "../src/auth/auth-hooks";
 import type { AuthRepository, UserData } from "../src/auth/interfaces";
 import { configureJwt, generateAccessToken, generateRefreshToken, getRefreshTokenExpiry, hashRefreshToken } from "../src/auth/jwt";
+import { honoRouter } from "./helpers/hono-router";
 
 /**
  * Setting a password on an existing account ends every session it holds.
@@ -246,8 +247,8 @@ async function buildWorld(watermark: boolean, config: Partial<BuiltinAuthAdapter
     });
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
-    app.route("/auth", adapter.createAuthRoutes!()!);
-    app.route("/admin", adapter.createAdminRoutes!()!);
+    app.route("/auth", honoRouter(adapter.createAuthRoutes?.()));
+    app.route("/admin", honoRouter(adapter.createAdminRoutes?.()));
 
     const adminToken = await generateAccessToken(ADMIN, ["admin"]);
     const asAdmin = (method: string, url: string, body?: unknown) => Promise.resolve(app.request(url, {

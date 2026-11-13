@@ -42,7 +42,7 @@ describe("storagePublicRead with no hook and no policies", () => {
     beforeEach(async () => {
         configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-storage-public-"));
-        controller = new LocalStorageController({ basePath: tempDir });
+        controller = new LocalStorageController({ type: "local", basePath: tempDir });
         await controller.putObject({
             file: new File([Buffer.from("the site's own image")], "logo.png", { type: "image/png" }),
             key: "assets/logo.png"

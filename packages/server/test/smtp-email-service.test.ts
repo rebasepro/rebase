@@ -194,7 +194,7 @@ describe("SMTPEmailService", () => {
                 port: 587
             }
         });
-        const mail = { to: "a@example.com", subject: "s", text: "t" };
+        const mail = { to: "a@example.com", subject: "s", html: "<p>t</p>", text: "t" };
 
         const results = await Promise.allSettled([service.send(mail), service.send(mail), service.send(mail)]);
 
@@ -216,7 +216,7 @@ describe("SMTPEmailService", () => {
                 port: 587
             }
         });
-        const mail = { to: "a@example.com", subject: "s", text: "t" };
+        const mail = { to: "a@example.com", subject: "s", html: "<p>t</p>", text: "t" };
 
         await expect(service.send(mail)).rejects.toThrow(/transport exploded/);
         await expect(service.send(mail)).resolves.toBeDefined();
@@ -225,7 +225,7 @@ describe("SMTPEmailService", () => {
 
     describe("the connection pool", () => {
         const smtp = { host: "smtp.example.com", port: 587 };
-        const mail = { to: "a@example.com", subject: "s", text: "t" };
+        const mail = { to: "a@example.com", subject: "s", html: "<p>t</p>", text: "t" };
 
         afterEach(() => {
             jest.useRealTimers();

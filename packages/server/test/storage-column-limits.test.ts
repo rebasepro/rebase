@@ -130,7 +130,7 @@ describe("POST /upload enforces the destination column's limits", () => {
         app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.route("/api/storage", createStorageRoutes({
-            controller: new LocalStorageController({ basePath: tempDir }),
+            controller: new LocalStorageController({ type: "local", basePath: tempDir }),
             requireAuth: false,
             uploadConstraints: createUploadConstraintResolver([posts])
         }));
@@ -251,7 +251,7 @@ describe("POST /tus enforces the same limits, before the first chunk", () => {
         app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.route("/api/storage", createStorageRoutes({
-            controller: new LocalStorageController({ basePath: tempDir }),
+            controller: new LocalStorageController({ type: "local", basePath: tempDir }),
             requireAuth: false,
             uploadConstraints: createUploadConstraintResolver([posts])
         }));

@@ -81,7 +81,7 @@ describe("LocalStorageController — the containment check does not move with th
         root = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-bucket-"));
         storageDir = path.join(root, "storage");
         await fs.promises.mkdir(storageDir);
-        controller = new LocalStorageController({ basePath: storageDir });
+        controller = new LocalStorageController({ type: "local", basePath: storageDir });
     });
 
     afterEach(async () => {
@@ -155,7 +155,7 @@ describe("storage routes refuse a traversing bucket at every entry point", () =>
         app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.route("/api/storage", createStorageRoutes({
-            controller: new LocalStorageController({ basePath: storageDir }),
+            controller: new LocalStorageController({ type: "local", basePath: storageDir }),
             requireAuth: false
         }));
     });

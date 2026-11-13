@@ -18,6 +18,7 @@ import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import { configureJwt } from "../src/auth/jwt";
 import { oauthCodeFlowSchema } from "../src/auth/oauth-code-flow";
 import { MemoryAuthStore } from "./helpers/memory-auth-store";
+import { honoRouter } from "./helpers/hono-router";
 
 jest.mock("../src/utils/logger", () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), child: jest.fn().mockReturnThis() }
@@ -45,7 +46,7 @@ function world() {
     });
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
-    app.route("/auth", adapter.createAuthRoutes() as Hono<HonoEnv>);
+    app.route("/auth", honoRouter(adapter.createAuthRoutes?.()));
     const call = async (method: string, path: string, body?: unknown, token?: string) => {
         const res = await app.request(path, {
             method,

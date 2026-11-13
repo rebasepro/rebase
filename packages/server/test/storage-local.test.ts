@@ -11,7 +11,7 @@ describe("LocalStorageController", () => {
     beforeEach(async () => {
         // Create a temporary directory for tests
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-storage-test-"));
-        controller = new LocalStorageController({
+        controller = new LocalStorageController({ type: "local",
             basePath: tempDir
         });
     });
@@ -275,7 +275,7 @@ force: true });
 
         it("should reject file exceeding max size", () => {
             // Create a controller with small max size
-            const smallController = new LocalStorageController({
+            const smallController = new LocalStorageController({ type: "local",
                 basePath: tempDir,
                 maxFileSize: 10 // 10 bytes
             });
@@ -289,7 +289,7 @@ force: true });
         });
 
         it("should reject disallowed file types", () => {
-            const controllerWithTypes = new LocalStorageController({
+            const controllerWithTypes = new LocalStorageController({ type: "local",
                 basePath: tempDir,
                 allowedMimeTypes: ["image/png", "image/jpeg"]
             });

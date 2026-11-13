@@ -115,7 +115,7 @@ describe("GET /file/* — ranges over the wire", () => {
     beforeEach(async () => {
         configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-range-"));
-        controller = new LocalStorageController({ basePath: tempDir });
+        controller = new LocalStorageController({ type: "local", basePath: tempDir });
         await controller.putObject({
             file: new File([Buffer.from(BODY)], "clip.bin", { type: "application/octet-stream" }),
             key: "media/clip.bin"
@@ -201,7 +201,7 @@ describe("GET/HEAD /file/* — the size a player needs before it seeks", () => {
     beforeEach(async () => {
         configureJwt({ secret: "test-secret-key-for-jwt-testing-1234567890" });
         tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-head-"));
-        const controller = new LocalStorageController({ basePath: tempDir });
+        const controller = new LocalStorageController({ type: "local", basePath: tempDir });
         await controller.putObject({
             file: new File([Buffer.from(BODY)], "clip.bin", { type: "application/octet-stream" }),
             key: "media/clip.bin"

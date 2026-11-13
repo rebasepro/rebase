@@ -15,6 +15,7 @@ import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { oauthCodeFlowSchema } from "../src/auth/oauth-code-flow";
 import { MemoryAuthStore } from "./helpers/memory-auth-store";
+import { honoRouter } from "./helpers/hono-router";
 
 jest.mock("../src/utils/logger", () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), child: jest.fn().mockReturnThis() }
@@ -42,8 +43,8 @@ async function world() {
     });
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
-    app.route("/auth", adapter.createAuthRoutes() as Hono<HonoEnv>);
-    app.route("/admin", adapter.createAdminRoutes!() as Hono<HonoEnv>);
+    app.route("/auth", honoRouter(adapter.createAuthRoutes?.()));
+    app.route("/admin", honoRouter(adapter.createAdminRoutes?.()));
     app.get("/data", async (c) => (await adapter.verifyRequest(c.req.raw)) ? c.json({ ok: true }) : c.json({}, 401));
     const call = async (method: string, path: string, body?: unknown, token?: string) => {
         const res = await app.request(path, {
