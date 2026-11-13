@@ -9,7 +9,7 @@ import { sdkClient } from "./helpers/inert-driver";
  * decodes it, but `FindParams["where"]` admits only `[op, value]` tuples, so
  * it is handed over as what an untyped caller would send.
  */
-const encodedWhere = (where: Record<string, string>): FindParams["where"] => where as FindParams["where"];
+const encodedWhere = (where: unknown): FindParams["where"] => where as FindParams["where"];
 
 /**
  * `RebaseData`'s dynamic index signature is a union of a collection accessor
