@@ -214,12 +214,62 @@ export function referencedPaths(code: string, id: string): string[] {
         for (const match of code.matchAll(/@(?:import|use|forward)\s+(?:url\(\s*)?(["']?)([^"')\s;]+)\1/g)) out.push(match[2]);
         for (const match of code.matchAll(/url\(\s*(["']?)([^"')]+?)\1\s*\)/g)) out.push(match[2]);
     } else if (code.includes("import.meta.url")) {
-        for (const match of code.matchAll(/\bnew\s+URL\s*\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1\s*,\s*import\.meta\.url\s*\)/g)) {
+        // Comments are read as blanks, as Vite reads them (it matches on the
+        // code with comments and literals stripped): `new URL(/* x */ "…",
+        // import.meta.url)` is an asset to it, so it is one here.
+        const uncommented = withoutComments(code);
+        for (const match of uncommented.matchAll(/\bnew\s+URL\s*\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1\s*,\s*import\.meta\.url\s*(?:,\s*)?\)/g)) {
             if (match[1] === "`" && match[2].includes("${")) continue;
-            out.push(match[2]);
+            out.push(literalValue(match[2]));
         }
     }
     return [...new Set(out.map(spec => spec.trim()).filter(spec => spec !== "" && !/^(?:[a-z][a-z0-9+.-]*:|#|\/\/)/i.test(spec)))];
+}
+
+/**
+ * The code with every comment replaced by spaces of the same length, strings
+ * and template literals left as they are.
+ */
+function withoutComments(code: string): string {
+    let out = "";
+    let i = 0;
+    while (i < code.length) {
+        const char = code[i];
+        const next = code[i + 1];
+        if (char === "/" && next === "*") {
+            const end = code.indexOf("*/", i + 2);
+            const stop = end < 0 ? code.length : end + 2;
+            out += code.slice(i, stop).replace(/[^\n]/g, " ");
+            i = stop;
+        } else if (char === "/" && next === "/") {
+            const end = code.indexOf("\n", i);
+            const stop = end < 0 ? code.length : end;
+            out += " ".repeat(stop - i);
+            i = stop;
+        } else if (char === "\"" || char === "'" || char === "`") {
+            let j = i + 1;
+            while (j < code.length && code[j] !== char) j += code[j] === "\\" ? 2 : 1;
+            out += code.slice(i, j + 1);
+            i = j + 1;
+        } else {
+            out += char;
+            i++;
+        }
+    }
+    return out;
+}
+
+/**
+ * What a string literal's body says: its escapes read (`..\/x` is `../x`) and
+ * a backslash taken as the separator a file URL reads it as.
+ */
+function literalValue(body: string): string {
+    return body
+        .replace(/\\u\{([0-9a-f]+)\}|\\u([0-9a-f]{4})|\\x([0-9a-f]{2})|\\(.)/gi, (_all, braced: string | undefined, four: string | undefined, two: string | undefined, other: string | undefined) => {
+            const hex = braced ?? four ?? two;
+            return hex !== undefined ? String.fromCodePoint(parseInt(hex, 16)) : (other ?? "");
+        })
+        .replace(/\\/g, "/");
 }
 
 /** Every `src` / `href` (and each `srcset` candidate) an HTML document names. */

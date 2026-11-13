@@ -82,15 +82,26 @@ const NON_IMPORT_FORMS: [string, string, "imports" | "references", string][] = [
     ["worker-query", "frontend/src/work.ts", "imports", "backend/schema/posts.ts"],
     ["worker-new-url", "frontend/src/work.ts", "imports", "backend/schema/posts.ts"],
     ["worker-backend-file", "frontend/src/main.ts", "references", "backend/schema/posts.ts"],
-    ["html-asset", "frontend/index.html", "references", "backend/data/large.json"]
+    ["html-asset", "frontend/index.html", "references", "backend/data/large.json"],
+    // SEC-FIX-3: spellings Vite still reads as an asset reference — comments
+    // inside the call, an escaped literal, single quotes.
+    ["new-url-comment", "frontend/src/main.ts", "references", "backend/schema/posts.ts"],
+    ["new-url-escaped", "frontend/src/main.ts", "references", "backend/schema/posts.ts"],
+    ["new-url-single-quote", "frontend/src/main.ts", "references", "backend/schema/posts.ts"]
 ];
 
 /**
- * Forms the bundler does not follow: `createRequire(…)(path)` and `import(variable)`
+ * Forms the bundler does not follow: `createRequire(…)(path)`, `import(variable)`,
+ * a computed `new URL(…)` and `import.meta.resolve(…)`
  * put no backend code in the bundle (the control proves it), so there is
  * nothing to refuse. In a browser they fail at runtime.
  */
-const NON_SHIPPING_FORMS = ["create-require", "dynamic-variable"];
+const NON_SHIPPING_FORMS = [
+    "create-require", "dynamic-variable",
+    // SEC-FIX-3: `new URL` over a concatenation or a variable, and
+    // `import.meta.resolve`, are not assets to Vite: nothing is copied.
+    "new-url-concat", "new-url-variable", "meta-resolve"
+];
 
 describe("rebaseBackendGuard in a real build", () => {
     it("outside-project: a module outside the project that reaches backend/ is refused when the file loads", () => {

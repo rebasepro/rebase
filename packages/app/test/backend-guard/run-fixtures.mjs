@@ -69,7 +69,14 @@ const FORMS = {
     "worker-query": { main: "import W from \"./work.ts?worker\";\nnew W();", files: { "frontend/src/work.ts": "import { posts } from \"../../backend/schema/posts\";\nconsole.log(posts);\n" } },
     "worker-new-url": { main: "new Worker(new URL(\"./work.ts\", import.meta.url), { type: \"module\" });", files: { "frontend/src/work.ts": "import { posts } from \"../../backend/schema/posts\";\nconsole.log(posts);\n" } },
     "worker-backend-file": "new Worker(new URL(\"../../backend/schema/posts.ts\", import.meta.url), { type: \"module\" });",
-    "html-asset": { main: "console.log(1);", files: { "frontend/index.html": "<!doctype html><html><body><img src=\"../backend/data/large.json\"><script type=\"module\" src=\"/src/main.ts\"></script></body></html>" } }
+    "html-asset": { main: "console.log(1);", files: { "frontend/index.html": "<!doctype html><html><body><img src=\"../backend/data/large.json\"><script type=\"module\" src=\"/src/main.ts\"></script></body></html>" } },
+    // SEC-FIX-3: unusual spellings of `new URL(…)` and `import.meta.resolve`.
+    "new-url-concat": "console.log(new URL(\"../../backend/schema/\" + \"posts.ts\", import.meta.url).href);",
+    "new-url-variable": "const target = \"../../backend/schema/posts.ts\";\nconsole.log(new URL(target, import.meta.url).href);",
+    "new-url-comment": "console.log(new URL(/* a comment */ \"../../backend/schema/posts.ts\" /* another */, import.meta.url).href);",
+    "new-url-escaped": "console.log(new URL(\"..\\/..\\/backend\\/schema\\/posts.ts\", import.meta.url).href);",
+    "new-url-single-quote": "console.log(new URL('../../backend/schema/posts.ts', import.meta.url).href);",
+    "meta-resolve": "console.log(import.meta.resolve(\"../../backend/schema/posts.ts\"));"
 };
 
 /** A project that builds clean with the guard on: a type import, a `?raw` text file, CSS, a JSON file. */
