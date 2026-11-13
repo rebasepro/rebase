@@ -35,7 +35,6 @@ export function registryServing(collection: LegacyCollectionConfig, table?: PgTa
     jest.spyOn(registry, "getCollectionByPath").mockReturnValue(collection);
     jest.spyOn(registry, "getCollections").mockReturnValue([]);
     jest.spyOn(registry, "getPgTable").mockReturnValue(table);
-    jest.spyOn(registry, "getGlobalCallbacks").mockReturnValue(undefined);
     return registry;
 }
 

@@ -15,7 +15,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import { col, defineTable, type TableHooks } from "@rebasepro/types";
-import { compileSchema, composeTableHooks, lowerTables } from "@rebasepro/common";
+import { compileSchema, composeTableHooks } from "@rebasepro/common";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { buildTableRegistry } from "../src/model/build-registry";
@@ -147,11 +147,9 @@ async function scenario(place: (a: TableHooks, b: TableHooks) => { table: Return
         const { table, global } = place(a, b);
         const registry = buildTableRegistry({
             compiledTables: compileSchema([table]),
-            collections: lowerTables([table]),
             tables: { notes: notesTable }
         });
         if (global) registry.setGlobalHooks(global);
-        const collection = registry.getCollectionByPath("notes");
         const orm = drizzle(db, { schema: { notes: notesTable } });
         const driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 
@@ -160,24 +158,24 @@ async function scenario(place: (a: TableHooks, b: TableHooks) => { table: Return
 
         const results = {
             created: await outcome(() => driver.save({
-                path: "notes", status: "new", collection,
+                path: "notes", status: "new",
                 values: { title: "Hello", tenant: "t1", status: "published" }
             })),
             updated: await outcome(async () => driver.save({
-                path: "notes", status: "existing", collection, id: await ids("goes"),
+                path: "notes", status: "existing", id: await ids("goes"),
                 values: { title: "goes", status: "published" }
             })),
             failed: await outcome(() => driver.save({
-                path: "notes", status: "new", collection,
+                path: "notes", status: "new",
                 values: { title: "Too long", tenant: "t1", status: "published", code: "toolong" }
             })),
-            listed: await outcome(() => driver.fetchCollection({ path: "notes", collection, limit: 10 })),
-            counted: await outcome(() => driver.count({ path: "notes", collection })),
-            one: await outcome(async () => driver.fetchOne({ path: "notes", collection, id: await ids("keep-a") })),
-            hidden: await outcome(async () => driver.fetchOne({ path: "notes", collection, id: await ids("hidden") })),
-            vetoedByA: await outcome(async () => driver.delete({ row: { id: await ids("keep-a"), path: "notes" }, collection })),
-            vetoedByB: await outcome(async () => driver.delete({ row: { id: await ids("keep-b"), path: "notes" }, collection })),
-            deleted: await outcome(async () => driver.delete({ row: { id: await ids("goes!"), path: "notes" }, collection }))
+            listed: await outcome(() => driver.fetchCollection({ path: "notes", limit: 10 })),
+            counted: await outcome(() => driver.count({ path: "notes" })),
+            one: await outcome(async () => driver.fetchOne({ path: "notes", id: await ids("keep-a") })),
+            hidden: await outcome(async () => driver.fetchOne({ path: "notes", id: await ids("hidden") })),
+            vetoedByA: await outcome(async () => driver.delete({ row: { id: await ids("keep-a"), path: "notes" } })),
+            vetoedByB: await outcome(async () => driver.delete({ row: { id: await ids("keep-b"), path: "notes" } })),
+            deleted: await outcome(async () => driver.delete({ row: { id: await ids("goes!"), path: "notes" } }))
         };
         const stored = (await db.query("SELECT id, title, slug, tenant, status, code FROM notes ORDER BY id")).rows;
         return { results, log, table: stored };

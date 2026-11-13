@@ -33,7 +33,7 @@ import { buildTableRegistry } from "./model/build-registry";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { PostgresTableRegistry } from "./model/PostgresTableRegistry";
 import { createEmailService, type EmailConfig, type EmailService, logger } from "@rebasepro/server";
-import { compileDescribedTables, getTableName as getCollectionTableName, sqlRows } from "@rebasepro/common";
+import { compileDescribedTables, declaredSchemaOf, sqlRows } from "@rebasepro/common";
 import { ensureAuthTablesExist } from "./auth/ensure-tables";
 import { assertAuthSchemaCompatible, probeAuthSchema, resolveAuthSchema } from "./auth/schema-version";
 import { AuthSchemaTables, PostgresAuthRepository, UserService } from "./auth/services";
@@ -54,6 +54,7 @@ import { provisionTriggerCdc, removeTriggerCdc, settleInstalledCapture, type Cdc
 import { provisionWalPublication, reportUnpublishedTables, walCaptureBlocker } from "./services/cdc/wal-cdc";
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
 import { tableKeyColumns } from "./services/cdc/identity-columns";
+import type { RuntimeTable } from "./model/runtime-table";
 import { createChannelBus, resolveChannelBusSetting } from "./services/channel-bus";
 import { declaredDatabaseRls, declaredRlsPolicyShape, isChannelBusInstance, isPostgresCollectionConfig } from "@rebasepro/types";
 import { configureUnknownFilterFields, type UnknownFilterFieldsMode } from "./utils/drizzle-conditions";
@@ -235,39 +236,6 @@ import type { OpenIndexBuildSession, ScheduledIndexBuild } from "./schema/deferr
  * rest of boot, so the server is listening by then.
  */
 const DEFERRED_INDEX_BUILD_DELAY_MS = 5_000;
-
-/**
- * Which table name the boot-time drift check should look for, for one collection.
- *
- * A declared `table` IS the table name, not a hint to be second-guessed. This
- * used to ask the registry whether it had indexed the declared name and fall
- * back to the SLUG when it had not — but "the registry does not know this table"
- * is exactly the condition the drift check exists to report, so the fallback
- * fired precisely when it was most harmful.
- *
- * A collection with `slug: "usage-daily", table: "usage_daily"` was reported as
- * missing table `usage-daily`: a name that does not exist, should never exist,
- * and that nobody can find by looking. Worse, the remediation the caller prints
- * says to run `rebase db push` — which would then CREATE that invented table
- * beside the correct one, the same "second copy" hazard the misplaced-schema
- * branch further down exists to prevent. Seen in production, where a correctly
- * migrated database reported drift on every boot.
- *
- * The slug is used only when nothing was declared, which is the config shape
- * where the slug genuinely is the table name.
- *
- * Exported for its own test: the caller needs a live pool and a real database,
- * and this is the part that was wrong.
- */
-export function resolveDriftCheckName(
-    col: CollectionConfig,
-    registeredTableNames: string[]
-): string {
-    const declaredTable = isRelationalCollectionConfig(col) ? col.table : undefined;
-    return declaredTable
-        ?? registeredTableNames.find((k) => k === col.slug)
-        ?? col.slug;
-}
 
 /**
  * The relations the boot's drift check looks for a collection's table among.
@@ -885,7 +853,6 @@ export async function openPostgresDriver(
         }
     }
 
-    const activeCollections = introspectedCollections ?? collections;
     const schemaTables = introspectedTables ?? ownTables;
     const schemaRelations = introspectedRelations ?? ownRelations;
 
@@ -912,7 +879,6 @@ export async function openPostgresDriver(
     // labels; Postgres does), and nothing reads the registry's enum map.
     const registry = buildTableRegistry({
         compiledTables: introspectedCompiled ?? declaredTables ?? [],
-        collections: activeCollections,
         tables: schemaTables,
         relations: schemaRelations
     });
@@ -960,10 +926,11 @@ export async function openPostgresDriver(
     // In BaaS mode the registry holds what THIS database was introspected
     // for, so every registered collection is already this source's.
     const introspectedHere = Boolean(introspectedCollections);
-    const collectionsOnThisSource = (): CollectionConfig[] => {
-        const all = registry.getCollections() as CollectionConfig[];
+    const tablesOnThisSource = (): readonly RuntimeTable[] => {
+        const all = registry.tables();
         if (introspectedHere) return all;
-        return all.filter(c => c.dataSource === sourceKey || (!c.dataSource && sourceKey === DEFAULT_DATA_SOURCE_KEY));
+        return all.filter(table => table.descriptor.database === sourceKey
+            || (!table.descriptor.database && sourceKey === DEFAULT_DATA_SOURCE_KEY));
     };
 
     // Create services
@@ -1122,8 +1089,8 @@ export async function openPostgresDriver(
         // that is worth knowing before reading the drift report below.
         await warnOnRoleSchemaCollision(runSql);
 
-        const collectionSchemas = registry.getCollections()
-            .map((c) => (c as { schema?: string }).schema)
+        const collectionSchemas = registry.tables()
+            .map(({ descriptor }) => declaredSchemaOf(descriptor))
             .filter((s): s is string => typeof s === "string");
         // `auth` is deliberately absent: the RLS helpers moved into
         // `rebase`, and granting USAGE on a schema Rebase does not
@@ -1283,9 +1250,8 @@ export async function openPostgresDriver(
                 }
 
                 for (const role of rls.roles) {
-                    const ungrantable = await findUngrantableTables(runSql, collectionsOnThisSource()
-                        .map((c) => ({ schema: (c as { schema?: string }).schema ?? "public", table: getCollectionTableName(c) }))
-                        .filter((t) => Boolean(t.table)), role);
+                    const ungrantable = await findUngrantableTables(runSql, tablesOnThisSource()
+                        .map(({ descriptor }) => ({ schema: descriptor.schema, table: descriptor.table })), role);
                     if (ungrantable.length === 0) continue;
                     logger.warn(
                         `⚠️ RLS enforcement: requests run as "${role}", which holds no privilege on ` +
@@ -1450,13 +1416,13 @@ export async function openPostgresDriver(
         // Each table is captured with the columns its rows are addressed
         // by, and a change carries those and nothing else — any login can
         // LISTEN. See `buildCdcFunctionSql`.
-        const cdcTables: CdcTableRef[] = collectionsOnThisSource()
+        const cdcTables: CdcTableRef[] = tablesOnThisSource()
             // A view has no rows of its own to capture: its tables' do.
-            .filter((c) => !(isPostgresCollectionConfig(c) && c.view))
-            .map((c) => ({
-                schema: (c as { schema?: string }).schema ?? "public",
-                table: getCollectionTableName(c),
-                identityColumns: tableKeyColumns(registry.requireTable(c.slug)).map((k) => k.columnName)
+            .filter((served) => served.descriptor.kind !== "view")
+            .map((served) => ({
+                schema: served.descriptor.schema,
+                table: served.descriptor.table,
+                identityColumns: tableKeyColumns(served).map((k) => k.columnName)
             }))
             .filter((t) => Boolean(t.table) && registry.hasPgTable(t.table));
         // Junction tables back no collection, so the list above misses
@@ -1468,7 +1434,7 @@ export async function openPostgresDriver(
         // lives in, and asking a second database to instrument it
         // produced one "Could not attach change-capture trigger"
         // warning per junction on every boot.
-        const ownSlugs = new Set(collectionsOnThisSource().map(c => c.slug));
+        const ownSlugs = new Set(tablesOnThisSource().map(served => served.slug));
         for (const link of collectJunctionLinks(registry)) {
             if (!ownSlugs.has(link.parentSlug)) continue;
             // A junction row is addressed by the two ids that name
@@ -1654,8 +1620,8 @@ export async function openPostgresDriver(
     // One-directional: only checks collections → DB (extra DB tables
     // that aren't mapped to collections are perfectly fine).
     try {
-        const registeredCollections = collectionsOnThisSource();
-        if (registeredCollections.length > 0) {
+        const servedTables = tablesOnThisSource();
+        if (servedTables.length > 0) {
             const result = await schemaAwareDb.execute(sql.raw(DRIFT_CHECK_RELATIONS_SQL));
             const tablesByName = new Map<string, string[]>();
             for (const row of result.rows as Array<{ table_name: string; table_schema: string }>) {
@@ -1669,22 +1635,24 @@ export async function openPostgresDriver(
                 )
             );
             const missing: Array<{ slug: string; table: string; foundIn: string[] }> = [];
-            for (const col of registeredCollections) {
+            for (const { descriptor } of servedTables) {
                 // Auth owns its table and creates it later in this same
                 // boot (initializeAuth → ensureAuthTablesExist), so it is
                 // legitimately absent right now. Reporting it as drift
                 // tells the user to `db:push` a table that is about to
                 // exist — and on an introspected database, one that the
                 // database was never supposed to hold.
-                if ((col as { auth?: { enabled?: boolean } }).auth?.enabled) continue;
+                if (descriptor.auth !== undefined) continue;
 
-                const schemaName = "schema" in col && col.schema ? col.schema : "public";
-                const checkName = resolveDriftCheckName(col, registry.getPgTableNames());
+                const schemaName = descriptor.schema;
+                // The table the descriptor names: compiling states it, by
+                // default from the slug.
+                const checkName = descriptor.table;
                 const fullCheckName = schemaName === "public" ? checkName : `${schemaName}.${checkName}`;
                 if (!dbTables.has(fullCheckName)) {
                     // Report what was actually looked up: an unqualified
                     // "users" sends people hunting for public.users.
-                    missing.push({ slug: col.slug,
+                    missing.push({ slug: descriptor.slug,
 table: fullCheckName,
 foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
                 }
@@ -2468,8 +2436,8 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
                 return (res.rows ?? []) as Record<string, unknown>[];
             };
 
-            const collectionSchemas = registry.getCollections()
-                .map((c) => (c as { schema?: string }).schema)
+            const collectionSchemas = registry.tables()
+                .map(({ descriptor }) => declaredSchemaOf(descriptor))
                 .filter((s): s is string => typeof s === "string");
             const managedSchemas = ["public", "rebase", ...collectionSchemas];
 

@@ -1,6 +1,6 @@
 import { col, defineTable, json, sql } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
-import { compileSchema, lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { buildTableRegistry } from "../src/model/build-registry";
 import { RealtimeService } from "../src/services/realtimeService";
@@ -78,7 +78,7 @@ const projects = defineTable("projects", {
 });
 
 const defs = [posts, signed, edited, translations, projects];
-const registry = buildTableRegistry({ compiledTables: compileSchema(defs), collections: lowerTables(defs) });
+const registry = buildTableRegistry({ compiledTables: compileSchema(defs) });
 
 describe("the write path over defineTable tables", () => {
     let saveSpy: jest.SpyInstance;
@@ -95,7 +95,6 @@ describe("the write path over defineTable tables", () => {
         return driver;
     };
     const written = (): Record<string, unknown> => saveSpy.mock.calls[0][1] as Record<string, unknown>;
-    const collectionOf = (slug: string) => registry.get(slug);
     const user = { uid: "user-9", roles: [] } as User;
 
     beforeEach(() => {
@@ -104,25 +103,25 @@ describe("the write path over defineTable tables", () => {
 
     describe("defaults", () => {
         it("applies .default(), drops a null sent for .dbDefault(), and leaves .default(sql`…`) to the database", async () => {
-            await setup(user).save({ path: "posts", values: { title: "Hi", region: null }, collection: collectionOf("posts"), status: "new" });
+            await setup(user).save({ path: "posts", values: { title: "Hi", region: null },  status: "new" });
             expect(written().active).toBe(true);
             expect("region" in written()).toBe(false);
             expect("slug" in written()).toBe(false);
         });
 
         it("keeps a .dbDefault() value the caller sent, and their explicit null for a .default() column", async () => {
-            await setup(user).save({ path: "posts", values: { region: "eu", active: null }, collection: collectionOf("posts"), status: "new" });
+            await setup(user).save({ path: "posts", values: { region: "eu", active: null },  status: "new" });
             expect(written().region).toBe("eu");
             expect(written().active).toBeNull();
         });
 
         it("fills a JSON document from its fields' defaults, merged under what was sent", async () => {
-            await setup(user).save({ path: "posts", values: { prefs: { notify: false } }, collection: collectionOf("posts"), status: "new" });
+            await setup(user).save({ path: "posts", values: { prefs: { notify: false } },  status: "new" });
             expect(written().prefs).toEqual({ notify: false, theme: "dark" });
         });
 
         it("applies no default on an update", async () => {
-            await setup(user).save({ path: "posts", id: "1", values: { title: "x" }, collection: collectionOf("posts"), status: "existing" });
+            await setup(user).save({ path: "posts", id: "1", values: { title: "x" },  status: "existing" });
             expect("active" in written()).toBe(false);
             expect("prefs" in written()).toBe(false);
         });
@@ -134,7 +133,7 @@ describe("the write path over defineTable tables", () => {
             await setup(user).save({
                 path: "posts",
                 values: { title: "Hi", createdBy: "someone-else", updatedBy: "someone-else" },
-                collection: collectionOf("posts"),
+               
                 status: "new"
             });
             expect(written().createdAt).toBeInstanceOf(Date);
@@ -150,7 +149,7 @@ describe("the write path over defineTable tables", () => {
                 path: "posts",
                 id: "1",
                 values: { title: "x", createdBy: "someone-else", createdAt: "2020-01-01" },
-                collection: collectionOf("posts"),
+               
                 status: "existing"
             });
             expect("createdBy" in written()).toBe(false);
@@ -160,30 +159,30 @@ describe("the write path over defineTable tables", () => {
         });
 
         it("writes null user stamps when nobody is acting and the columns allow it", async () => {
-            await setup().save({ path: "posts", values: { title: "Hi" }, collection: collectionOf("posts"), status: "new" });
+            await setup().save({ path: "posts", values: { title: "Hi" },  status: "new" });
             expect(written().createdBy).toBeNull();
             expect(written().updatedBy).toBeNull();
         });
 
         it("refuses an anonymous create into a .notNull() .onCreateUser() column, naming the modifiers", async () => {
-            const refused = setup().save({ path: "signed", values: { note: "x" }, collection: collectionOf("signed"), status: "new" });
+            const refused = setup().save({ path: "signed", values: { note: "x" },  status: "new" });
             await expect(refused).rejects.toMatchObject({ statusCode: 400, code: "VALIDATION_CONSTRAINT" });
-            await expect(setup().save({ path: "signed", values: { note: "x" }, collection: collectionOf("signed"), status: "new" }))
+            await expect(setup().save({ path: "signed", values: { note: "x" },  status: "new" }))
                 .rejects.toThrow(/`\.onCreateUser\(\)`.*`\.notNull\(\)`/);
             expect(saveSpy).not.toHaveBeenCalled();
         });
 
         it("lets an anonymous update through a .notNull() .onCreateUser() column, and refuses one through .onUpdateUser()", async () => {
-            await setup().save({ path: "signed", id: "1", values: { note: "x" }, collection: collectionOf("signed"), status: "existing" });
+            await setup().save({ path: "signed", id: "1", values: { note: "x" },  status: "existing" });
             expect(saveSpy).toHaveBeenCalled();
-            await expect(setup().save({ path: "edited", id: "1", values: { note: "x" }, collection: collectionOf("edited"), status: "existing" }))
+            await expect(setup().save({ path: "edited", id: "1", values: { note: "x" },  status: "existing" }))
                 .rejects.toMatchObject({ statusCode: 400, code: "VALIDATION_CONSTRAINT" });
         });
     });
 
     describe("stamps inside a JSON document", () => {
         it("creates the document on a create with its time and user stamps", async () => {
-            await setup(user).save({ path: "posts", values: { title: "Hi" }, collection: collectionOf("posts"), status: "new" });
+            await setup(user).save({ path: "posts", values: { title: "Hi" },  status: "new" });
             const audit = written().audit as Record<string, unknown>;
             expect(audit.firstAt).toBeInstanceOf(Date);
             expect(audit.lastAt).toBeInstanceOf(Date);
@@ -196,7 +195,7 @@ describe("the write path over defineTable tables", () => {
                 path: "posts",
                 id: "1",
                 values: { audit: { firstAt: "2020-01-01", by: "creator", note: "n" } },
-                collection: collectionOf("posts"),
+               
                 status: "existing"
             });
             const audit = written().audit as Record<string, unknown>;
@@ -205,7 +204,7 @@ describe("the write path over defineTable tables", () => {
         });
 
         it("leaves a document an update does not send alone", async () => {
-            await setup(user).save({ path: "posts", id: "1", values: { title: "x" }, collection: collectionOf("posts"), status: "existing" });
+            await setup(user).save({ path: "posts", id: "1", values: { title: "x" },  status: "existing" });
             expect("audit" in written()).toBe(false);
         });
     });
@@ -216,7 +215,7 @@ describe("the write path over defineTable tables", () => {
                 path: "translations",
                 id: "7:::en",
                 values: { locale: "fr", title: "x" },
-                collection: collectionOf("translations"),
+               
                 status: "existing"
             })).rejects.toMatchObject({ statusCode: 400, code: "KEY_IMMUTABLE" });
             expect(saveSpy).not.toHaveBeenCalled();
@@ -227,7 +226,7 @@ describe("the write path over defineTable tables", () => {
                 path: "translations",
                 id: "7:::en",
                 values: { companyId: 7, locale: "en", title: "x" },
-                collection: collectionOf("translations"),
+               
                 status: "existing"
             });
             expect(saveSpy).toHaveBeenCalled();
@@ -238,7 +237,7 @@ describe("the write path over defineTable tables", () => {
         const member = { uid: "user-9", roles: [], claims: { org_id: "acme" } } as User;
 
         it("stamps the caller's tenant on a create that names none", async () => {
-            await setup(member).save({ path: "projects", values: { name: "p" }, collection: collectionOf("projects"), status: "new" });
+            await setup(member).save({ path: "projects", values: { name: "p" },  status: "new" });
             expect(written().orgId).toBe("acme");
         });
 
@@ -246,7 +245,7 @@ describe("the write path over defineTable tables", () => {
             await expect(setup(member).save({
                 path: "projects",
                 values: { name: "p", orgId: "globex" },
-                collection: collectionOf("projects"),
+               
                 status: "new"
             })).rejects.toMatchObject({ statusCode: 400, code: "TENANT_MISMATCH" });
         });
@@ -259,7 +258,7 @@ describe("the write path over defineTable tables", () => {
                 path: "projects",
                 id: "1",
                 values: { orgId: "globex" },
-                collection: collectionOf("projects"),
+               
                 status: "existing"
             })).rejects.toMatchObject({ statusCode: 400, code: "TENANT_IMMUTABLE" });
             expect(saveSpy).not.toHaveBeenCalled();

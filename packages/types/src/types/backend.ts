@@ -1,6 +1,7 @@
 import type { CollectionConfig, FilterValues, WhereFilterOp } from "./collections";
 import type { TableHooks } from "../schema/hooks";
 import type { CompiledTable } from "../schema/compiled";
+import type { TableDescriptor } from "../schema/descriptor";
 import type { OrderByTuple } from "./filter-operators";
 import type { LogicalCondition } from "../controllers/data";
 import type { AuthAdapter } from "./auth_adapter";
@@ -539,6 +540,33 @@ export interface CollectionRegistryInterface {
      * that runs no hooks still type-checks, but a project that declares global
      * hooks over a registry without it is refused at boot — hooks that never
      * run look exactly like hooks that passed.
+     */
+    setGlobalHooks?(hooks: TableHooks): void;
+
+    /**
+     * Replace one table's own hooks after boot (`backend.setTableHooks`).
+     * Returns whether this registry serves the table.
+     */
+    setTableHooks?(slug: string, hooks: TableHooks): boolean;
+}
+
+/**
+ * The table registry a data driver builds for itself and returns on
+ * `InitializedDriver.collectionRegistry`: the compiled tables it serves, by
+ * slug. The backend hands it the global hooks and later table hooks through
+ * it; it never holds a collection.
+ *
+ * @group Backend
+ */
+export interface TableRegistryInterface {
+    /** The table served at `/api/data/<slug>`, or `undefined`. */
+    getTable(slug: string): { readonly descriptor: TableDescriptor } | undefined;
+
+    /**
+     * Take the global table hooks declared on `initializeRebaseBackend({ hooks })`.
+     * Optional so a registry for a driver that runs no hooks still
+     * type-checks; a project declaring global hooks over a registry without
+     * it is refused at boot.
      */
     setGlobalHooks?(hooks: TableHooks): void;
 
@@ -1714,8 +1742,8 @@ export interface InitializedDriver {
     /** The realtime service, if the driver created one during init. */
     realtimeProvider?: RealtimeProvider;
 
-    /** A collection registry to register schema / tables into. */
-    collectionRegistry?: CollectionRegistryInterface;
+    /** The driver's table registry: what the backend hands global and table hooks to. */
+    collectionRegistry?: TableRegistryInterface;
 
     /**
      * Collections the driver derived from the live database schema.

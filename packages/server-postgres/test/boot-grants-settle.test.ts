@@ -181,7 +181,7 @@ describe("the boot's final posture check", () => {
                     db,
                     driver: { rlsUserRole: "rebase_user" },
                     realtimeService: { rlsUserRole: "rebase_user" },
-                    registry: { getCollections: () => [] }
+                    registry: { tables: () => [] }
                 }
             });
             expect(ran.filter(text => WRITES.test(text))).toEqual([]);

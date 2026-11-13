@@ -1,8 +1,6 @@
-import { CollectionRegistry, resolveCollectionRelations, getTableName } from "@rebasepro/common";
-import { type CollectionConfig, type CompiledTable, type TableHooks } from "@rebasepro/types";
+import type { CompiledTable, TableHooks, TableRegistryInterface } from "@rebasepro/types";
 import { PgEnum, PgTable } from "drizzle-orm/pg-core";
 import { Relations } from "drizzle-orm";
-import { CollectionRegistryInterface } from "../interfaces";
 import { buildRuntimeTable, withCatalogueTable, type RuntimeTable } from "./runtime-table";
 
 /**
@@ -13,16 +11,11 @@ import { buildRuntimeTable, withCatalogueTable, type RuntimeTable } from "./runt
  * enums and relations read back from this database (junction tables
  * included, which have no runtime table of their own).
  *
- * Every entry also carries the collection its table was lowered into (the
- * inherited `CollectionRegistry` half): the subsystems not yet moved onto
- * runtime tables read it. Both are filled from the same compile, so they
- * cannot disagree about which tables exist; `buildTableRegistry` refuses an
- * entry that has one without the other.
- *
- * From a call site that holds a slug, or a lowered collection:
- * `registry.requireTable(slug)` / `registry.requireTable(collection.slug)`.
+ * Tables only: nothing here holds a collection. From a call site that holds
+ * a slug: `registry.requireTable(slug)`; that holds a data path (a slug, a
+ * table name, or `authors/1/posts`): `registry.tableAt(path)`.
  */
-export class PostgresTableRegistry extends CollectionRegistry implements CollectionRegistryInterface {
+export class PostgresTableRegistry implements TableRegistryInterface {
 
     private readonly runtimeTables = new Map<string, RuntimeTable>();
     /** {@link tables}, built once per change: callers cache on its identity. */
@@ -190,17 +183,6 @@ export class PostgresTableRegistry extends CollectionRegistry implements Collect
         return Array.from(this.pgTables.keys());
     }
 
-    /**
-     * Collections assigned to a data source whose table this database does
-     * not hold.
-     */
-    getCollectionsWithoutTables(dataSourceKey = "(default)"): CollectionConfig[] {
-        const collections = this.getCollections().filter(
-            c => c.dataSource === dataSourceKey || (!c.dataSource && dataSourceKey === "(default)")
-        );
-        return collections.filter(c => !this.pgTables.has(getTableName(c)));
-    }
-
     registerEnums(enums: Record<string, PgEnum<[string, ...string[]]>>): void {
         Object.entries(enums).forEach(([name, value]) => this.enums.set(name, value));
     }
@@ -239,21 +221,4 @@ export class PostgresTableRegistry extends CollectionRegistry implements Collect
         }
         return result;
     }
-
-    /**
-     * Get the available Drizzle relation keys for a given collection path.
-     * Maps from the collection's relation property names to the Drizzle relation names
-     * defined in the schema.
-     */
-    getRelationKeysForCollection(collectionPath: string): string[] {
-        const collection = this.getCollectionByPath(collectionPath);
-        if (!collection) return [];
-        // Resolved, not authored. `relationName` is optional at the authoring
-        // surface and defaults to the property key or the target's slug, so
-        // reading the raw field dropped every relation that relied on the
-        // default — and never saw relations declared inline on a property at
-        // all, since those are not in the `relations` array.
-        return Object.keys(resolveCollectionRelations(collection));
-    }
-
 }

@@ -7,7 +7,6 @@
 
 import {
     Entity,
-    CollectionConfig,
     FilterValues,
     WhereFilterOp,
     DatabaseConnection,
@@ -21,7 +20,7 @@ import {
     CollectionSubscriptionConfig,
     SingleSubscriptionConfig,
     RealtimeProvider,
-    CollectionRegistryInterface,
+    TableRegistryInterface,
     DataTransformer,
     BackendConfig,
     BackendInstance,
@@ -77,7 +76,7 @@ export type {
     CollectionSubscriptionConfig,
     SingleSubscriptionConfig,
     RealtimeProvider,
-    CollectionRegistryInterface,
+    TableRegistryInterface,
     DataTransformer,
     BackendConfig,
     BackendInstance,

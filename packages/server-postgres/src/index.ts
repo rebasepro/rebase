@@ -29,7 +29,6 @@ export * from "./services/BranchService";
 export { diffDatabaseBranch, mergeDatabaseBranch, DEFAULT_BRANCH_DIFF_SAMPLE_LIMIT, DEFAULT_BRANCH_DIFF_MAX_ROWS } from "./branching/branch-diff";
 export * from "./backup";
 export {
-    resolveDriftCheckName,
     describeSchemaDriftCause,
     resolveSourceUrls,
     isScaffoldedLocalDatabase,

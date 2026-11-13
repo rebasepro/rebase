@@ -175,43 +175,57 @@ function withRelationTargets(...roots: LegacyCollectionConfig[]): LegacyCollecti
 }
 
 /**
- * A registry whose collection registration also registers the table each
- * fixture collection compiles to — the one way a test builds a registry from
- * legacy collection literals. The collections are registered as given, so the
- * subsystems still reading them see exactly the fixture; the subsystems moved
- * onto runtime tables read what the fixture compiles to.
+ * A registry built from legacy fixture collections — the one way a test builds
+ * a registry from collection literals. Each fixture collection given (to the
+ * constructor, {@link registerMultiple} or {@link register}) is compiled, with
+ * its relation targets, and its table registered: the driver reads tables only.
  *
- * A suite that never registers its fixtures — it stubs `getCollectionByPath`
- * and hands collections straight to the services — gets the table compiled on
- * first ask, from the collection that lookup answers (with its relation
- * targets). The production registry has no such path: there a table that was
- * not handed over is an error.
+ * The fixtures are remembered, by slug, for the suites that still look a
+ * fixture up by name ({@link getCollectionByPath}, {@link getCollections}) or
+ * stub that lookup. A suite that never registers its fixtures — it stubs
+ * `getCollectionByPath` and hands paths straight to the services — gets the
+ * table compiled on first ask, from the collection that lookup answers (with
+ * its relation targets). The production registry has no such path: there a
+ * table that was not handed over is an error.
  */
 export class FixtureTableRegistry extends PostgresTableRegistry {
-    /** Unset while the base constructor runs — it registers what it is handed before this class's fields exist. */
-    private readonly constructed: boolean = true;
+    private readonly fixtures = new Map<string, CollectionConfig>();
 
-    constructor(...args: ConstructorParameters<typeof PostgresTableRegistry>) {
-        super(...args);
-        const [collections] = args;
-        if (collections && collections.length > 0) this.registerTables(compileFixtures(withRelationTargets(...collections), {}).tables);
+    constructor(collections?: readonly CollectionConfig[]) {
+        super();
+        if (collections && collections.length > 0) this.registerMultiple([...collections]);
     }
 
-    registerMultiple(collections: LegacyCollectionConfig[]): boolean {
-        const changed = super.registerMultiple(collections);
-        if (this.constructed && collections.length > 0) {
-            this.registerTables(compileFixtures(withRelationTargets(...collections), {}).tables);
+    /** Register fixture collections: their compiled tables (and their relation targets'). */
+    registerMultiple(collections: CollectionConfig[]): boolean {
+        if (collections.length === 0) return false;
+        for (const collection of collections) this.fixtures.set(collection.slug, collection);
+        this.registerTables(compileFixtures(withRelationTargets(...collections), {}).tables);
+        return true;
+    }
+
+    /** Register one fixture collection: its compiled table (and its relation targets'). */
+    register(collection: CollectionConfig): void {
+        this.registerMultiple([collection]);
+    }
+
+    /** The fixture registered under this slug (or table name), for suites that look one up. */
+    getCollectionByPath(path: string): CollectionConfig | undefined {
+        const bySlug = this.fixtures.get(path) ?? (path.includes("-") ? this.fixtures.get(path.replace(/-/g, "_")) : undefined);
+        if (bySlug) return bySlug;
+        for (const collection of this.fixtures.values()) {
+            if (("table" in collection ? collection.table : undefined) === path) return collection;
         }
-        return changed;
+        return undefined;
     }
 
-    register(collection: LegacyCollectionConfig, rawCollection?: LegacyCollectionConfig): void {
-        super.register(collection, rawCollection);
-        this.registerTables(compileFixtures(withRelationTargets(collection), {}).tables);
+    /** Every fixture registered, in registration order. */
+    getCollections(): CollectionConfig[] {
+        return [...this.fixtures.values()];
     }
 
     /** Tables compiled on first ask, by the collection object they were compiled from. */
-    private readonly compiledOnAsk = new WeakMap<LegacyCollectionConfig, RuntimeTable>();
+    private readonly compiledOnAsk = new WeakMap<CollectionConfig, RuntimeTable>();
 
     getTable(slug: string): RuntimeTable | undefined {
         const registered = super.getTable(slug);

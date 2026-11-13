@@ -104,7 +104,7 @@ describe("boot keeps a table it could not lock withheld from the user role", () 
                 db,
                 driver: { rlsUserRole: "rebase_user" },
                 realtimeService: { rlsUserRole: "rebase_user" },
-                registry: { getCollections: () => collections }
+                registry: { tables: () => compileSet(collections).map(compiled => ({ descriptor: compiled.descriptor })) }
             }
         };
         const runSql = async (text: string) => (await pg.query<Record<string, unknown>>(text)).rows;

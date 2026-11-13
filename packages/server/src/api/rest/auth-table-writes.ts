@@ -40,11 +40,19 @@ export function isAuthTable(table: TableDescriptor): boolean {
 }
 
 /**
- * The auth settings the adapter is handed: the lowered auth table's, with the
- * `onCreateUser` hook it runs. Read off the driver's collection, the seam B-R7
- * cuts (see `served-table.ts`).
+ * The auth table a user write goes through: a {@link ServedTable} (the REST
+ * routes, whose auth settings are read off the driver's collection — the seam
+ * B-R7 cuts, see `served-table.ts`), or the table with its auth settings
+ * already in hand (the Postgres socket, which holds compiled tables only).
  */
-function adapterAuthConfig(served: ServedTable): unknown {
+export type UserTable = ServedTable | { readonly table: TableDescriptor; readonly authConfig: unknown };
+
+/**
+ * The auth settings the adapter is handed (`roles`, `scopes`, `personalKeys`
+ * and the `onCreateUser` / `onResetPassword` hooks it runs).
+ */
+function adapterAuthConfig(served: UserTable): unknown {
+    if ("authConfig" in served) return served.authConfig;
     const auth = served.driverCollection.auth;
     return typeof auth === "object" ? auth : undefined;
 }
@@ -107,7 +115,7 @@ export function assertNoUserUpsert(
  */
 export function assertUserCreationBodyValid(
     adapter: AuthAdapter | undefined,
-    served: ServedTable,
+    served: UserTable,
     body: Record<string, unknown>,
     viewer: FieldViewer,
     rowIndex?: number
@@ -134,7 +142,7 @@ export function assertUserCreationBodyValid(
  */
 export async function prepareUserCreations(
     adapter: UserCreatingAdapter,
-    served: ServedTable,
+    served: UserTable,
     bodies: readonly Record<string, unknown>[],
     caller: FieldViewer,
     nameRows = false
@@ -242,7 +250,7 @@ export async function completeUserCreations(
  */
 export async function createUserThroughAuthTable(
     adapter: AuthAdapter | undefined,
-    served: ServedTable,
+    served: UserTable,
     body: Record<string, unknown>,
     caller: FieldViewer,
     save: (values: Record<string, unknown>) => Promise<Record<string, unknown>>

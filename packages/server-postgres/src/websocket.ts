@@ -5,7 +5,8 @@ import { effectiveSqlRole, sqlRoleRanAs } from "./PostgresBackendDriver";
 import { assertReadRequestReadable } from "./services/read-field-access";
 import { isNestedPath, resolveNestedPath } from "./services/nested-path";
 import type { PostgresTableRegistry } from "./model/PostgresTableRegistry";
-import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeProvider, RealtimeSocketOptions, WebSocketMessage } from "@rebasepro/types";
+import type { RuntimeTable } from "./model/runtime-table";
+import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeProvider, RealtimeSocketOptions, WebSocketMessage } from "@rebasepro/types";
 import type { SqlScriptResult } from "@rebasepro/types";
 import { deserializeFilter, redactSqlLiterals, relationOf, UnknownFilterOperatorError } from "@rebasepro/common";
 import { budgetSendBuffers, reapSilentSockets, terminateIfBacklogged } from "./services/socket-liveness";
@@ -17,7 +18,7 @@ import { WebSocketServer, WebSocket, type RawData } from "ws";
 import type { Server, IncomingMessage } from "http";
 import type { Duplex } from "stream";
 import { inspect } from "util";
-import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, assertNoFieldOpsOnCreate, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, assertNoUserUpsert, assertUserCreationBodyValid, createUserThroughAuthTable, isAuthTable, type NestedWriteKind, type ServedTable } from "@rebasepro/server";
+import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, assertNoFieldOpsOnCreate, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, assertNoUserUpsert, assertUserCreationBodyValid, createUserThroughAuthTable, isAuthTable, type NestedWriteKind, type UserTable } from "@rebasepro/server";
 import { logger, getAccessModel, decideImpersonation, isDatabaseUnreachable, DATABASE_UNAVAILABLE_MESSAGE, type ImpersonationCredential } from "@rebasepro/server";
 
 /**
@@ -430,6 +431,24 @@ export const PUBLIC_TYPES = new Set([
     "DELETE",
     "CHECK_UNIQUE_FIELD"
 ]);
+
+/**
+ * The auth settings the auth adapter is handed for the auth table: its
+ * `roles`, `scopes` and `personalKeys` (descriptor), and its `onCreateUser` /
+ * `onResetPassword` hooks (compiled) — what `defineAuthTable`'s `auth` declares.
+ */
+function authConfigOf(table: RuntimeTable): Record<string, unknown> {
+    const declared = table.descriptor.auth;
+    const hooks = table.compiled.auth;
+    return {
+        enabled: true,
+        ...(declared?.roles !== undefined ? { roles: declared.roles } : {}),
+        ...(declared?.scopes !== undefined ? { scopes: declared.scopes } : {}),
+        ...(declared?.personalKeys !== undefined ? { personalKeys: declared.personalKeys } : {}),
+        ...(hooks?.onCreateUser !== undefined ? { onCreateUser: hooks.onCreateUser } : {}),
+        ...(hooks?.onResetPassword !== undefined ? { onResetPassword: hooks.onResetPassword } : {})
+    };
+}
 
 /**
  * Refuse a path whose collection — its first segment, for a nested path — this
@@ -1489,16 +1508,17 @@ roles: verifiedUser.roles }
                 };
 
                 /** The auth table at `path`, or `undefined` for any other. */
-                const authCollectionAt = (path: unknown): ServedTable | undefined => {
+                const authCollectionAt = (path: unknown): UserTable | undefined => {
                     if (typeof path !== "string") return undefined;
-                    let collection;
+                    let served: RuntimeTable | undefined;
                     try {
-                        collection = driver.registry?.getCollectionByPath(path);
+                        served = driver.registry?.tableAt(path);
                     } catch {
                         return undefined;
                     }
-                    const table = collection && driver.registry?.getTable(collection.slug)?.descriptor;
-                    return collection && table && isAuthTable(table) ? { table, driverCollection: collection } : undefined;
+                    return served && isAuthTable(served.descriptor)
+                        ? { table: served.descriptor, authConfig: authConfigOf(served) }
+                        : undefined;
                 };
                 /**
                  * The auth collection's rows are the users, so a write to one
