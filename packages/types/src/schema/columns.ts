@@ -1160,7 +1160,7 @@ function customSqlType(sqlType: string): string {
     const trimmed = typeof sqlType === "string" ? sqlType.trim() : "";
     if (trimmed.length === 0) throw new Error("`col.custom()` takes the Postgres type, e.g. `col.custom({ dataType: \"inet\" })`.");
     if (/;|--|\/\*/.test(trimmed)) {
-        throw new Error(`\`col.custom(${JSON.stringify(sqlType)})\`: a type name holds no \`;\` and no comment.`);
+        throw new Error(`\`col.custom({ dataType: ${JSON.stringify(sqlType)} })\`: a type name holds no \`;\` and no comment.`);
     }
     return trimmed;
 }

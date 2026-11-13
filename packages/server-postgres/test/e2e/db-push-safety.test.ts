@@ -59,8 +59,8 @@ function pricesTableTs(opts: { precision: number; scale: number; nicknameMax: nu
 export const prices = defineTable("prices", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
-        nickname: col.varchar(${opts.nicknameMax}),
-        rating: col.numeric(${opts.precision}, ${opts.scale})${opts.ratingRequired ? ".notNull()" : ""}
+        nickname: col.varchar({ length: ${opts.nicknameMax} }),
+        rating: col.numeric({ precision: ${opts.precision}, scale: ${opts.scale} })${opts.ratingRequired ? ".notNull()" : ""}
     },
     rls: "admin-only",
     search: { fields: [{ path: "nickname", weight: "A" }] }

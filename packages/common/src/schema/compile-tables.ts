@@ -470,7 +470,7 @@ function compileOne(
                     if (owner !== undefined) {
                         refuse(
                             `the relation derives the foreign-key column "${localKey}", served as "${localField}", and the ${owner} ` +
-                            `already has that key. Declare the column yourself (\`${localField}: col…\` with \`.column("${localKey}")\` ` +
+                            `already has that key. Declare the column yourself (\`${localField}: col.…("${localKey}")\`, the SQL name as the builder's first argument, ` +
                             "binds it), or give the relation another `localKey`.",
                             relationName
                         );

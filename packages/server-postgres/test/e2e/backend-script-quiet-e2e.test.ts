@@ -32,7 +32,7 @@ const driverEntry = path.join(packageRoot, "src/index.ts");
 const typesEntry = path.resolve(packageRoot, "../types/src/index.ts");
 
 /** The script's one table, as a project's backend/schema declares it. */
-const POSTS_TABLE = "defineTable(\"posts\", { columns: { id: col.integer().primaryKey().identity(), title: col.text() }, rls: \"admin-only\" })";
+const POSTS_TABLE = "defineTable(\"posts\", { columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), title: col.text() }, rls: \"admin-only\" })";
 
 /** The documented script: build, read, `fetch`, print one JSON line, shut down. */
 function scriptSource(provision: boolean): string {

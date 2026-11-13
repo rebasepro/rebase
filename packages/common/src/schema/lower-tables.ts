@@ -834,7 +834,7 @@ function lowerColumn(key: string, def: ColumnDef, ctx: ColumnContext): PostgresP
             if (problem !== undefined) {
                 return refuse(
                     at,
-                    `is \`col.custom(${JSON.stringify(type.sqlType)})\`, and that type name ${problem}. It is written into DDL ` +
+                    `is \`col.custom({ dataType: ${JSON.stringify(type.sqlType)} })\`, and that type name ${problem}. It is written into DDL ` +
                     "verbatim, so it must be a Postgres type as `format_type` prints it — `inet`, `timestamp(3) without time " +
                     "zone`, `geometry(Point, 4326)`, `inet[]` — and nothing after it."
                 );

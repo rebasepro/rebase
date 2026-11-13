@@ -109,7 +109,7 @@ describe("compileTables — refusals", () => {
 
         it("refuses a key with no snake_case form", () => {
             expect(problemsOf([table("t", { id: id(), _: col.text() })])).toContainEqual({
-                table: "t", key: "_", message: expect.stringContaining("has no snake_case form to name a SQL column with. Give it one: `.column(\"…\")`")
+                table: "t", key: "_", message: expect.stringContaining("has no snake_case form to name a SQL column with. Give it one as the builder's first argument: `col.text(\"…\")`")
             });
         });
 

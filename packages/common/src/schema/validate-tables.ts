@@ -51,7 +51,7 @@ export function checkColumnDef(
     const kind = def.type.kind;
 
     if (sqlColumn.length === 0) {
-        refuse(`the key "${key}" has no snake_case form to name a SQL column with. Give it one: \`.column("…")\`.`);
+        refuse(`the key "${key}" has no snake_case form to name a SQL column with. Give it one as the builder's first argument: \`col.text("…")\`.`);
     }
     if (def.generatedAs !== undefined) {
         if (def.default !== undefined) {

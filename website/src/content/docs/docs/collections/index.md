@@ -87,7 +87,7 @@ alone (`Status`, `Analysis`, `Address`).
 | a text column with `{ enum: [...] }`, a number column with `.oneOf([...])` | select | one option per value |
 | a text or uuid column with `.userId()` | user picker | the value is the user's id |
 | `col.enum([...])`, a `pgEnum` column | select, drawn as a coloured chip | one colour per value, seeded by the value itself |
-| `col.smallint()` … `col.bigserial()` | number input | whole numbers only |
+| `col.smallint()` … `col.bigserial({ mode: "number" })` | number input | whole numbers only |
 | `col.real()`, `col.doublePrecision()`, `col.numeric({ precision, scale })` | number input | |
 | `col.boolean()` | switch | |
 | `col.timestamp({ withTimezone: true })` | date and time picker | |

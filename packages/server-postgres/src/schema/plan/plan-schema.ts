@@ -324,7 +324,7 @@ export const pgTypeOf = (type: ColumnType, site: DefinedColumnSite): PgType => {
             const problem = customSqlTypeProblem(type.sqlType);
             if (problem !== undefined) {
                 throw new Error(
-                    `Column "${site.column}" of "${site.owner}" is \`col.custom(${JSON.stringify(type.sqlType)})\`, ` +
+                    `Column "${site.column}" of "${site.owner}" is \`col.custom({ dataType: ${JSON.stringify(type.sqlType)} })\`, ` +
                     `and that type name ${problem}. Write the Postgres type as \`format_type\` prints it.`
                 );
             }

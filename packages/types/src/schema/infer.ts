@@ -323,7 +323,7 @@ type TableEntryOf<T> = T extends SchemaTableLike ? {
  * included row is `Record<string, unknown>`, `Relations` names the relations
  * but not the table each reaches (so a nested `include` is unchecked), a
  * `via`'s cardinality is either unless the type carries it, and a `via` is not
- * offered as a write. A key column bound with `.column("author_id")` under a
+ * offered as a write. A key column named `"author_id"` by its builder (`col.uuid("author_id")`) under a
  * key other than the derived one (`authorId`) is not recognised as the link's.
  * The generated SDK is the exact source for all of these.
  *
