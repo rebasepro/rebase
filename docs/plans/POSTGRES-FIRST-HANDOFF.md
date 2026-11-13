@@ -158,73 +158,84 @@ All committed on the branch (≈150 commits OSS, 12 in `saas`). Details per slic
 ## 6. What is running right now, and what is next
 
 **The live list is the "CURRENT STATE" block at the top of `~/.rebase-audits/pgfirst/PLAN.md`**
-(agent ids, results of every slice, the queue). The newest lines are just above the text
-"(superseded line follows)". As of 2026-11-13 09:20 CET (real clock):
+(results of every slice; newest lines just above the text "(superseded line follows)"). As of
+2026-11-13 14:30 CET (real clock):
 
-- **All code is done and committed.** Stage A and Stage B; one read shape and one write shape
-  (the backend serves and accepts wire rows only); the SDK is built on rows; the CMS view
-  model, its value classes and the `Entity` accessor live in `@rebasepro/cms-types`; the
-  kernel exports no view-model or legacy type (the frozen copy in `@rebasepro/common/migrate`
-  is the one exception; `registerDataSourceCapabilities` stays on purpose); history entries
-  come back in write order.
-- **Reviews done, every finding fixed with tests:** security review 1 (6) → final security
-  review (1 high, 1 medium, 3 low) → delta review (2 medium new on the branch, 3 low) →
-  re-check (1 medium, 2 low). Parity review: nothing blocks a release, no capability lost;
-  its three should-fix items are closed. Part II F is filled from it; Part II G holds every
-  decision. NOT yet re-reviewed: the last security fix itself (the rule "a relation is
-  readable only if the caller may read every column its join reads") — give it a short fresh
-  review before any release.
-- **Gates:** every static and build gate is green at the final commit except the three that
-  wait on translations (`verify:docs:strict`, `check:templates --released-as 0.31.0`,
-  `check:generated` — locale pages only). API surface, removed names and every ratchet are
-  banked (decreases only; bundle budgets banked with reasons).
-- **Migration:** the codemod was run on copies of all eleven real projects
-  (`~/.rebase-audits/pgfirst/migrate-real.md`, copies in `~/.rebase-audits/pgfirst/real/`):
-  ten migrate (0–17 grouped manual steps), one dormant project needs hand fixes first.
-- **Docs:** English docs, CHANGELOG, upgrade guide, skills are final and their gates green.
-- **Running:** **FULL-VERIFY** (everything CI runs on a clean snapshot `wt-verify`: static,
-  build gates, every unit suite, four e2e lanes, built-dist provisioning-off, corpus, saas
-  suites; report `~/.rebase-audits/pgfirst/full-verify.md`; LEDGER `## FULL-VERIFY`) and the
-  **translations** (background shell; log `~/.rebase-audits/pgfirst/tmp/coord/translate-run.log`,
-  it ends with a line `exit N`; about 70 s a page, 645 pages; re-running the same command is
-  safe and incremental — see section 7 step 2 for the command).
+- **All code is done.** Full verification was GREEN at commit 9726335d50 (every static and
+  build gate, every unit suite, the four e2e lanes, built-dist provisioning-off, the control
+  plane's suites) except the gates that wait on translations.
+- **After that commit, only migration-codemod fixes landed** (found by running real projects):
+  baebff5c98, 394c7cd7f1, 556ac1cd0d, 390fc197f9, a9291b9fbc, 422232c6b8, 3b67dd3a8c,
+  25a5ab4d80, 0f4cb1d038, 382aea014c — each with a red→green test; the codemod suite and the
+  full CLI suite were green when they landed. The CLI lanes must be re-run once more before a
+  release (step 3 below).
+- **Reviews:** four security rounds, every finding fixed; a last short look at the final fix
+  found three LOW items, not yet fixed (`reviews/security-look-4.md`). Parity review: nothing
+  lost; Part II F is filled.
+- **The public demo runs this branch** (Francesco asked for it explicitly): Cloud Run revision
+  `rebase-demo-00027-vpv`, from commit 9726335d50, verified live. Everything about it, incl. the
+  rollback point: `~/.rebase-audits/pgfirst/DEMO-DEPLOY.md`. No other rollout was authorized.
+- **Real projects on 0.31 (copies in `~/.rebase-audits/pgfirst/real/`, record: "Phase 2" in
+  `~/.rebase-audits/pgfirst/migrate-real.md`):** eight of nine build, boot on a throwaway
+  Postgres and pass their own tests — each "ready with caveats" listed there. The ninth (the
+  hybrid Postgres + Firestore project) has its backend proven and its frontend building, but
+  51 frontend and 84 functions type errors remain, two of them runtime breaks; its entry in
+  `migrate-real.md` ends with the exact next steps.
+- **Running:** only the translation run (background shell; logs
+  `~/.rebase-audits/pgfirst/tmp/coord/translate-run*.log`, the newest ends with `exit N` when
+  done; re-running is incremental — command in step 1 below).
+- A one-shot wake-up is scheduled in the session for Sun 15 Nov 08:10 CET (after the usage
+  reset). It dies if the app restarts: this file is then the way back in.
 
 ## 7. What is left, in order
 
-1. **FULL-VERIFY's findings**: anything red beyond the three locale gates → one fix agent,
-   then re-run only the affected lane on a fresh snapshot.
-2. **Translations**: when the log ends with `exit 0`, read it for `❌` lines; re-run once more
-   (English changed while it ran):
-   `cd website && GEMINI_API_KEY="$(sed -n 's/^[[:space:]]*GEMINI_API_KEY[[:space:]]*=[[:space:]]*//p' /Users/francesco/rebase/website/.env | head -1)" node scripts/translate_docs.mjs`
-   (the key is read from the primary checkout's `website/.env` into the process environment
-   only — never copy, edit or print that file); then `pnpm verify:docs:strict`,
-   `pnpm check:templates --released-as 0.31.0`, `pnpm check:generated`,
-   `pnpm check:untranslated`; commit every file under
-   `website/src/content/docs/{es,de,fr,it,pt}/` in one `docs(i18n): …` commit (they include
-   five CHANGELOG mirrors a generator rewrote).
-3. **Short security review of the last fix** (fresh agent, read-only, ~30 minutes): commits
-   15af2f7924, 2335c845a8, 061e2d1f1a — report beside `reviews/security-recheck.md`.
-4. **Migration phase 2** (fresh agent; copies only until the release): per real project finish
-   the manual steps in its copy, typecheck and build against the packed 0.31 packages, boot
-   on a throwaway Postgres. The diff becomes that project's migration commit at rollout.
+1. **Translations**: when the newest log ends with `exit 0`, read it for `❌` lines, re-run once
+   (`cd website && GEMINI_API_KEY="$(sed -n 's/^[[:space:]]*GEMINI_API_KEY[[:space:]]*=[[:space:]]*//p' /Users/francesco/rebase/website/.env | head -1)" node scripts/translate_docs.mjs`
+   — the key goes into the process environment only; never copy, edit or print that file),
+   then `pnpm verify:docs:strict`, `pnpm check:templates --released-as 0.31.0`,
+   `pnpm check:generated`, `pnpm check:schema-sample`, `pnpm check:untranslated`,
+   `pnpm check:locale-staleness`; commit every file under
+   `website/src/content/docs/{es,de,fr,it,pt}/` and `tooling/scripts/locale-sources.json` in one
+   `docs(i18n): …` commit.
+2. **FINAL-FIX** (one builder; the list is complete in `PLAN.md`, search "FINAL-FIX"):
+   a. PRODUCT, first: `GET /api/schema/tables` checks only the framework JWT and never asks a
+      project's own auth adapter → 500 for a project with custom auth, and the 0.31 panel loads
+      its tables from that route (found on the hybrid project; data routes are fine).
+   b. Security lows L-1..L-3 of `reviews/security-look-4.md` (a `via` through a withheld or
+      unknown table must fail closed; the build guard must never inline a small backend file;
+      a many-to-many write through a declared junction must honour its link-column write rules).
+   c. Should a project that had a `storageAuthorize` and boots without one be refused instead of
+      warned? (decide; found on one project).
+   d. Codemod: the three open defects from the hybrid project (Firestore references outside the
+      converted literal keep `path` and `defineFirestoreCollection` throws at import; a component
+      path in a shared module resolved one level off; a view filter computed with `new Date()`
+      frozen at run time) and the automation candidates listed per project in `migrate-real.md`
+      (test doubles and untyped receivers calling `.collection(`, `({ entity })` → `{ row, id }`
+      in custom views/actions/resolvers, unused `config/` modules in the printed `git rm` line,
+      `migrate --check` after the `git rm`, missing dependency for a generated customization).
+   e. Docs: an upgrade section for projects below 0.30 (peer floors, TypeScript 6 `rootDir` /
+      `moduleResolution`), `({ entity })` → `{ row, id }`, a belongsTo's key is a declared
+      column, `include: ["*"]` readers under renamed relations; CHANGELOG lines for every codemod
+      fix above and for 9cee87feed (bulk updates over a direct data source).
+3. **Re-verify once** after FINAL-FIX on a clean snapshot: `./tooling/scripts/verify-quality.sh`
+   (all lanes), re-bank the API surface only if it moved, saas suites.
+4. **Finish the ninth project's copy** (steps at the end of its entry in `migrate-real.md`).
 5. Delete this handoff file; final report to Francesco (section 10 is its skeleton).
-6. **Release and rollout** — only under section 9. Add 0.31.0 to `DRIVER_SKEW` right after
-   the npm release.
-7. Optional, else tell Francesco: wire names that still say "collection" (driver method
-   names, socket frames, upload fields, offline queue keys); the three in-process SDK quirks
-   pinned by tests (no search `_matches` / etag in process, `listenCount` unavailable in
-   process, `.search()` ignores `{ explain }`); building `@rebasepro/cms-types` as preserved
-   modules to win back the admin's bundle size (eager set 1338 → 1414 kB); a browser test for
-   `imageResize`; `examples/sdk-demo` unused eslint devDependencies.
+6. **Release and rollout** — only under section 9. Add 0.31.0 to `DRIVER_SKEW` right after the
+   npm release. Per project at rollout: the copy's diff is the migration commit; then a schema
+   push DRY RUN against the live database and `rebase doctor --policies` before anything is
+   applied (expect a policy diff from the 0.29.3+ policy form, not from the migration).
+7. Optional, else tell Francesco: see section 10.
 
 ## 8. Known red or open right now
 
-- The three locale gates (see section 6) until the translations are committed.
-- The version is **not** bumped (the release script bumps); `check:templates` /
-  `check:template-pins` need `--released-as 0.31.0` until the tag exists.
-- `DRIVER_SKEW` is empty until 0.31.0 exists.
-- Not proven: the hosted MCP connector against a live tenant (needs the saas stack running);
-  `db push` / restore on a database whose policies have drifted.
+- The locale gates until the translations are committed.
+- Product: the schema endpoint and custom auth adapters (2a above) — blocks the hybrid
+  project's rollout and any project with its own auth; should be fixed before a release.
+- Three low security items (2b). The version is not bumped; `DRIVER_SKEW` is empty until
+  0.31.0 exists.
+- Not proven anywhere: equality of each project's LIVE database with the migrated schema (a
+  dry run at rollout); the hosted MCP connector against a live tenant.
 
 ## 9. Release and rollout — gates (all required, in this order)
 
@@ -284,6 +295,14 @@ All committed on the branch (≈150 commits OSS, 12 in `saas`). Details per slic
 - A project's own hooks keep 0.30's rules: `.readOnly()`, `access.write` and `.private()` are
   API-boundary rules and are not enforced on in-process writes.
 - The admin's eager bundle grew about 6% (cause known; the bigger fix is a later slice).
-- Usage: weekly limit at 85% on Fri 09:00 CET; about 1% per agent-hour; it resets
-  Sun 2026-11-15 08:00 CET. At 88%: launch nothing new. Phase 2, the last short security
-  review and the release fall after the reset.
+- Real projects: eight of nine proven on copies, each with rollout-day caveats (custom
+  Dockerfile entries, a vendored pipeline, a game built from a parent repo that still calls the
+  old SDK name, required read-only columns the new verify step flags, old tests asserting the
+  previous shape). Rolling out is per-project work, plus a dry run against each live database.
+- The demo's boot log shows one schema drift older than this work (`product_locales.locale`:
+  enum in the schema, text in the database); aligning it is a schema push on the demo database.
+- Duplicating a row does not copy the extra values stored on its many-to-many links (also 0.30).
+- Three in-process SDK quirks pinned by tests; wire names that still say "collection"; the
+  admin's eager bundle grew ~6%; `imageResize` has no browser test.
+- Usage: weekly limit at 91% on Fri 14:30 CET; it resets Sun 2026-11-15 08:00 CET. Nothing more
+  is launched before the reset.
