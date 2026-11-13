@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, eq, getTableColumns, inArray, sql, type SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { ApiError, logger } from "@rebasepro/server";
 import { JUNCTION_PIVOT_KEY, soleJoinCondition, type ColumnDescriptor, type JoinStep } from "@rebasepro/types";
@@ -86,12 +86,21 @@ export interface VisibleTargets {
 const misconfigured = (label: string, detail: string): ApiError =>
     relationMisconfigured(label, detail);
 
-function column(table: PgTable, name: string | undefined, label: string, role: string): AnyPgColumn {
-    const col = name ? table[name as keyof typeof table] as AnyPgColumn : undefined;
-    if (!col) {
+function column(table: PgTable, name: string | undefined, label: string, role: string): { key: string; column: AnyPgColumn } {
+    // A `via` step names the junction's SQL column (`post_id`); a table the
+    // schema declares keys its columns by their key (`postId`). Looked up by
+    // key only, a `via` through a declared table with snake_case columns was
+    // refused as "no source column" on every write.
+    const columns = getTableColumns(table);
+    const found = name === undefined
+        ? undefined
+        : name in columns
+            ? { key: name, column: columns[name] }
+            : Object.entries(columns).map(([key, candidate]) => ({ key, column: candidate })).find(entry => entry.column.name === name);
+    if (!found) {
         throw misconfigured(label, `no ${role} column '${name ?? "?"}' on the junction table`);
     }
-    return col;
+    return found;
 }
 
 /** The junction a `manyToMany` names outright (`through`). */
@@ -105,12 +114,14 @@ export function bindThroughJunction(
     if (!table) {
         throw misconfigured(label, `no table '${through.table}' in the registry`);
     }
+    const parent = column(table, through.sourceKey, label, "source");
+    const target = column(table, through.targetKey, label, "target");
     return {
         table,
-        parentColumn: column(table, through.sourceKey, label, "source"),
-        targetColumn: column(table, through.targetKey, label, "target"),
-        parentKey: through.sourceKey,
-        targetKey: through.targetKey,
+        parentColumn: parent.column,
+        targetColumn: target.column,
+        parentKey: parent.key,
+        targetKey: target.key,
         label,
         payload: through.pivot
     };
@@ -187,12 +198,14 @@ export function bindJoinPathJunction(
         );
     }
 
+    const parent = column(table, parentColumnName, label, "source");
+    const target = column(table, targetColumnName, label, "target");
     return {
         table,
-        parentColumn: column(table, parentColumnName, label, "source"),
-        targetColumn: column(table, targetColumnName, label, "target"),
-        parentKey: parentColumnName,
-        targetKey: targetColumnName,
+        parentColumn: parent.column,
+        targetColumn: target.column,
+        parentKey: parent.key,
+        targetKey: target.key,
         label,
         // A `via` reaches through a table it did not declare, so there is no
         // `pivot` to read and nothing to write beyond the keys.
