@@ -88,6 +88,7 @@ export const eventsCms = customizeTable<typeof events>("events", {
             conditions: {
                 disabled: { "==": [{ "var": "values.isFree" }, true] },
                 required: { "!=": [{ "var": "values.isFree" }, true] },
+                min: 0,
                 disabledMessage: "Free events have no price",
                 clearOnDisabled: true,
             },

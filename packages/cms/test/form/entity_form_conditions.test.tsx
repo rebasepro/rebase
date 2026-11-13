@@ -11,8 +11,8 @@
  * a required field kept out of the form with `conditions.hidden` blocked every
  * save with nothing on screen to fix.
  *
- * The two documented examples are read out of the page itself, so the docs
- * cannot teach a rule the form does not apply.
+ * The documented example is read out of the page itself, so the docs cannot
+ * teach a rule the form does not apply.
  */
 import React from "react";
 import { readFileSync } from "node:fs";
@@ -20,7 +20,9 @@ import path from "node:path";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen } from "@testing-library/react";
 import type { Entity, PostgresProperties, PostgresProperty } from "@rebasepro/types";
-import type { AdminCollection, EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
+import type { AdminCollection, EntityCustomViewParams, FormContext, TableCustomizationOptions } from "@rebasepro/cms-types";
+import { col, defineTable } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
 
 class ResizeObserverStub {
     observe() {}
@@ -49,6 +51,10 @@ import { EntityForm } from "../../src/form/EntityForm";
 import { getInitialEntityValues } from "../../src/form/form_utils";
 import { rowOf, saving } from "../helpers/form_rows";
 import { fakeAuthController, fakeCustomization, fakeUser } from "../helpers/fakes";
+import { collectionsFromTables } from "../../src/tables/project_table";
+import { applyTableCustomization } from "../../src/tables/apply_customization";
+import { customizeTable } from "../../src/tables/customize_table";
+import { registeredCollection } from "../../src/hooks/navigation/registered_collection";
 
 type Row = Record<string, unknown>;
 
@@ -83,47 +89,92 @@ async function submit(properties: PostgresProperties, values: Row, status: "new"
 }
 
 /**
- * The `price: { … }` property of the fence under `heading` in the docs page,
- * evaluated. The fences are object-literal fragments in plain JavaScript.
+ * The `customizeTable(...)` of the docs page's "Conditional fields" example,
+ * evaluated and folded over an `events` table with the columns it names. The
+ * options are an object literal in plain JavaScript.
  */
-function documentedPrice(heading: string): PostgresProperty {
+function documentedEvents(): AdminCollection {
     const page = readFileSync(
         path.resolve(__dirname, "../../../../website/src/content/docs/docs/collections/validation-and-conditions.mdx"),
         "utf8"
     );
-    const section = page.slice(page.indexOf(heading));
-    const fence = section.match(/```typescript\n([\s\S]*?)```/);
-    if (!fence) throw new Error(`No example under '${heading}'`);
-    const body = fence[1].trim();
-    if (!body.startsWith("price:")) throw new Error(`The example under '${heading}' no longer declares 'price'`);
+    const section = page.slice(page.indexOf("## Conditional fields"));
+    const fence = section.match(/```tsx\n([\s\S]*?)```/);
+    if (!fence) throw new Error("No example under '## Conditional fields'");
+    const call = fence[1].match(/customizeTable<typeof events>\("events", (\{[\s\S]*\})\);/);
+    if (!call) throw new Error("The example under '## Conditional fields' no longer customizes the events table");
     // eslint-disable-next-line no-new-func
-    const price: PostgresProperty = new Function(`return ({ ${body} });`)().price;
-    return price;
+    const options: TableCustomizationOptions = new Function(`return (${call[1]});`)();
+    const events = defineTable("events", {
+        rls: "admin-only",
+        columns: {
+            id: col.uuid().primaryKey().defaultRandom(),
+            isFree: col.boolean(),
+            price: col.numeric(),
+            seats: col.integer()
+        }
+    });
+    const [projected] = collectionsFromTables(compileTables([events]));
+    return registeredCollection(applyTableCustomization(projected, customizeTable("events", options)));
 }
 
-describe("the documented examples are what the form checks", () => {
+function documentedProperty(key: string): PostgresProperty {
+    const property = documentedEvents().properties[key];
+    if (!property) throw new Error(`The documented example no longer customizes '${key}'`);
+    return property;
+}
 
-    it("JSON Logic conditions: a price below the conditional min is refused unless the item is free", async () => {
-        const price = documentedPrice("### 1. JSON Logic Conditions");
-        const refused = await submit({ is_free: { type: "boolean" }, price }, { is_free: false, price: -5 });
+describe("the documented example is what the form checks", () => {
+
+    it("JSON Logic conditions: a price below the conditional min is refused unless the event is free", async () => {
+        const price = documentedProperty("price");
+        const refused = await submit({ isFree: { type: "boolean" }, price }, { isFree: false, price: -5 });
         expect(refused.onSubmit).not.toHaveBeenCalled();
         expect(refused.errors.price).toBeTruthy();
 
-        const missing = await submit({ is_free: { type: "boolean" }, price }, { is_free: false, price: null });
+        const missing = await submit({ isFree: { type: "boolean" }, price }, { isFree: false, price: null });
         expect(missing.onSubmit).not.toHaveBeenCalled();
         expect(missing.errors.price).toBe("Required");
 
-        const free = await submit({ is_free: { type: "boolean" }, price }, { is_free: true, price: null });
+        const free = await submit({ isFree: { type: "boolean" }, price }, { isFree: true, price: null });
         expect(free.onSubmit).toHaveBeenCalledTimes(1);
     });
 
-    it("Property builders: a dynamicProps validation is checked on save", async () => {
-        const price = documentedPrice("### 2. Property Builders");
-        const refused = await submit({ is_free: { type: "boolean" }, price }, { is_free: false, price: -5 });
+    it("dynamicProps: seats are disabled for a free event and for anyone but an admin", () => {
+        const seats = documentedProperty("seats");
+        const disabled = (values: Row, roles: string[]): unknown => {
+            if (!seats.dynamicProps) throw new Error("The documented seats field has no dynamicProps");
+            const resolved = seats.dynamicProps({
+                values,
+                previousValues: values,
+                propertyValue: values.seats,
+                path: "events",
+                id: "1",
+                authController: fakeAuthController({ user: fakeUser("u1", { roles }) })
+            });
+            return resolved.admin?.disabled;
+        };
+        expect(disabled({ isFree: false }, ["admin"])).toBe(false);
+        expect(disabled({ isFree: true }, ["admin"])).toBe(true);
+        expect(disabled({ isFree: false }, ["editor"])).toBe(true);
+    });
+});
+
+describe("dynamicProps on save", () => {
+
+    it("a dynamicProps validation is checked on save", async () => {
+        const price: PostgresProperty = {
+            type: "number",
+            name: "Price",
+            dynamicProps: ({ values }) => ({
+                validation: values.isFree ? {} : { required: true, min: 0 }
+            })
+        };
+        const refused = await submit({ isFree: { type: "boolean" }, price }, { isFree: false, price: -5 });
         expect(refused.onSubmit).not.toHaveBeenCalled();
         expect(refused.errors.price).toBeTruthy();
 
-        const free = await submit({ is_free: { type: "boolean" }, price }, { is_free: true, price: -5 });
+        const free = await submit({ isFree: { type: "boolean" }, price }, { isFree: true, price: -5 });
         expect(free.onSubmit).toHaveBeenCalledTimes(1);
     });
 });
