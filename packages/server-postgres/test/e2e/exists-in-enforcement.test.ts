@@ -27,7 +27,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { sql as drizzleSql } from "drizzle-orm";
-import { policy, type CollectionConfig, type PolicyExpression } from "@rebasepro/types";
+import { policy, type PolicyExpression } from "@rebasepro/types";
+import { type LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { policyToPostgres } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { RLS_BOOTSTRAP_SQL } from "../../src/schema/rls-bootstrap-sql.js";
@@ -59,15 +60,15 @@ const DOCUMENTS = [
 /** u3 belongs to nothing — the case a tautology cannot distinguish from u1. */
 const USERS = ["u1", "u2", "u3"];
 
-const documentsCollection: CollectionConfig = {
+const documentsCollection: LegacyCollectionConfig = {
     slug: "documents", name: "Documents", table: "documents", properties: {}
 };
 
-const teamMembersCollection: CollectionConfig = {
+const teamMembersCollection: LegacyCollectionConfig = {
     slug: "teamMembers", name: "Team members", table: "team_members", properties: {}
 };
 
-const resolveCollection = (slug: string): CollectionConfig | undefined =>
+const resolveCollection = (slug: string): LegacyCollectionConfig | undefined =>
     slug === "teamMembers" ? teamMembersCollection : undefined;
 
 /** "Documents on a team the caller belongs to." */

@@ -29,7 +29,8 @@ import {
     tableJunctionRules,
     type CompiledRulePolicy
 } from "@rebasepro/common";
-import type { CollectionConfig, SecurityRule } from "@rebasepro/types";
+import type { SecurityRule } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { loadPlanCorpus, withPinnedPlannerWorld, type PlanCorpus } from "./helpers/plan-corpus";
 import { INPUT_ADJUSTMENTS, compileSet, lowerSet } from "./helpers/plan-tables";
@@ -67,7 +68,7 @@ describe("the policy compiler reads compiled tables as it read lowered collectio
                 const lowered = lowerSet(set.collections);
                 const descriptors = compileSet(set.collections).map(table => table.descriptor);
                 const resolveTable = policyTableResolver(descriptors);
-                const resolveCollection = (slug: string): CollectionConfig | undefined =>
+                const resolveCollection = (slug: string): LegacyCollectionConfig | undefined =>
                     lowered.find(c => c.slug === slug) ?? lowered.find(c => getTableName(c) === slug);
                 for (const descriptor of descriptors) {
                     if (descriptor.kind === "view") continue;
@@ -94,7 +95,7 @@ describe("the policy compiler reads compiled tables as it read lowered collectio
                 const lowered = lowerSet(set.collections);
                 const descriptors = compileSet(set.collections).map(table => table.descriptor);
                 const resolveTable = policyTableResolver(descriptors);
-                const resolveCollection = (slug: string): CollectionConfig | undefined =>
+                const resolveCollection = (slug: string): LegacyCollectionConfig | undefined =>
                     lowered.find(c => c.slug === slug) ?? lowered.find(c => getTableName(c) === slug);
                 const specs = resolveJunctionSpecs(lowered);
                 const junctions = resolveTableJunctions(descriptors);

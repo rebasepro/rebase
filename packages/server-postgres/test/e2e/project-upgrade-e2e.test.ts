@@ -44,7 +44,7 @@ import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, text } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, PGVECTOR_IMAGE, type PgContainer } from "./pg-setup.js";
 import { ensureAuthTablesExist } from "../../src/auth/ensure-tables.js";
@@ -69,7 +69,7 @@ const MINIMUM_SNAPSHOTS = 1;
 interface Snapshot {
     name: string;
     manifest: { frameworkVersion: string; authSchemaVersion: number; seededRows: Record<string, number> };
-    collections: CollectionConfig[];
+    collections: LegacyCollectionConfig[];
     /** Table (schema-qualified unless public) → the columns that release declared. */
     generatedSchema: Record<string, string[]>;
     sql: string;
@@ -95,7 +95,7 @@ const snapshots: Snapshot[] = readdirSync(SNAPSHOT_DIR)
  * the thunk here keeps the snapshot declarative — the alternative is recording
  * executable code, which would age into something that cannot be loaded at all.
  */
-function rehydrate(collections: CollectionConfig[]): CollectionConfig[] {
+function rehydrate(collections: LegacyCollectionConfig[]): LegacyCollectionConfig[] {
     const bySlug = new Map(collections.map(c => [c.slug, c]));
     for (const collection of collections) {
         for (const prop of Object.values(collection.properties ?? {}) as Record<string, unknown>[]) {
@@ -123,7 +123,7 @@ describe("project snapshot inventory", () => {
 describe.each(snapshots)("upgrading a project left by $name", (snapshot) => {
     let container: PgContainer;
     let client: pg.Client;
-    let collections: CollectionConfig[];
+    let collections: LegacyCollectionConfig[];
 
     /** Row counts per table, read from the aged database before the upgrade. */
     let before: Map<string, number>;

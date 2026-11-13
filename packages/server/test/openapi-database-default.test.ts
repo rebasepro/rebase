@@ -4,11 +4,11 @@
  */
 import { buildTableInputSchema } from "../src/api/openapi-generator";
 import { tableFrom } from "./helpers/tables";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 describe("openapi create body and databaseDefault", () => {
     it("lists a required column the database fills as optional", () => {
-        const collection: CollectionConfig = {
+        const collection: LegacyCollectionConfig = {
             slug: "tickets", name: "Tickets", table: "tickets",
             properties: {
                 title: { type: "string", validation: { required: true } },

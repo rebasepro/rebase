@@ -1,7 +1,8 @@
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
-import { CollectionConfig, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
+import { DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { fakeRealtimeSocket, type FakeRealtimeSocket, fakeDataDriver } from "./helpers/spg-c-socket";
 import { recordingDb, type RecordedStatement } from "./helpers/spg-c-db";
 
@@ -29,7 +30,7 @@ jest.mock("../src/services/dataService", () => ({
 // --- Mock Classes ---
 type MockWebSocket = FakeRealtimeSocket;
 
-const mockPostsCollection: CollectionConfig = {
+const mockPostsCollection: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",

@@ -25,7 +25,7 @@
 import { describe, it, expect, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { buildCollectionFromTableMetadata } from "@rebasepro/common";
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import type { LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -113,7 +113,7 @@ describe("importing a table's policies and compiling them back", () => {
         const metadata = await driverOver(source).fetchTableMetadata("orders");
         const imported = buildCollectionFromTableMetadata("orders", metadata);
 
-        const collection: PostgresCollectionConfig = {
+        const collection: LegacyPostgresCollectionConfig = {
             name: imported.name,
             slug: imported.slug,
             table: imported.table,

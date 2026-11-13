@@ -14,7 +14,8 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
-import type { CollectionCallbacks, CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionCallbacks, LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -30,7 +31,7 @@ let hookRuns = 0;
 let refusals: string[] = [];
 let logId = 0;
 
-const callbacks: CollectionCallbacks = {
+const callbacks: LegacyCollectionCallbacks = {
     // "Record who read what": a write the docs say an afterRead may not make.
     afterRead: async ({ row, context }) => {
         hookRuns++;
@@ -43,12 +44,12 @@ const callbacks: CollectionCallbacks = {
     }
 };
 
-const widgets: CollectionConfig = {
+const widgets: LegacyCollectionConfig = {
     name: "Widgets", slug: "widgets", table: "widgets",
     properties: { id: { name: "ID", type: "string", isId: "manual" }, name: { name: "Name", type: "string" } },
     callbacks
 };
-const readLog: CollectionConfig = {
+const readLog: LegacyCollectionConfig = {
     name: "Read log", slug: "read_log", table: "read_log",
     properties: { id: { name: "ID", type: "string", isId: "manual" }, widget: { name: "Widget", type: "string" } }
 };

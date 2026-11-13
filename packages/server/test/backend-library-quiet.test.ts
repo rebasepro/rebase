@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { Hono } from "hono";
 import { createServer } from "node:http";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver, RealtimeProvider } from "@rebasepro/types";
+import type { BackendBootstrapper, DataDriver, InitializedDriver, RealtimeProvider } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { RebaseBackendOptions } from "../src/backend/options";
 
 import { createRebaseBackend, initializeRebaseBackend, logger, type HonoEnv, type RebaseBackend } from "../src/index";
@@ -26,7 +27,7 @@ import { tablesFrom } from "./helpers/tables";
  * mounts it, so it is said when it is mounted.
  */
 
-function collection(slug: string): CollectionConfig {
+function collection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,

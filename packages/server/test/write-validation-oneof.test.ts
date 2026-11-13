@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { assertWriteValuesValid, type WriteViolation } from "../src/api/rest/write-validation";
 import { tableFrom } from "./helpers/tables";
 
@@ -8,7 +8,7 @@ import { tableFrom } from "./helpers/tables";
  * were checked, so a heading capped at 10 characters stored 40 and a price
  * with `min: 0` stored -5.
  */
-const pages: CollectionConfig = {
+const pages: LegacyCollectionConfig = {
     slug: "pages",
     name: "Pages",
     table: "pages",

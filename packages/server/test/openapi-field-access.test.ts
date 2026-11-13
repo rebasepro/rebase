@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
 import { openApiDocument, schemaOf } from "./helpers/server-b-g1-openapi";
@@ -20,7 +20,7 @@ import { tablesFromCollections } from "./helpers/tables";
  * which got both wrong for a write-only field.
  */
 
-const staff: CollectionConfig = {
+const staff: LegacyCollectionConfig = {
     slug: "staff",
     name: "Staff",
     singularName: "Member",

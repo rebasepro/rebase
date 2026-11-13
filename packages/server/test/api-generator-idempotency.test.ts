@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import type { CollectionConfig, DeleteManyProps, SaveManyProps, SaveProps } from "@rebasepro/types";
+import type { DeleteManyProps, SaveManyProps, SaveProps } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { HonoEnv } from "../src/api/types";
 import { tablesFromCollections } from "./helpers/tables";
@@ -158,7 +159,7 @@ describe("create with an Idempotency-Key", () => {
             }
         });
 
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "posts", name: "Posts", singularName: "Post", properties: { title: { type: "string" }, draft: { type: "boolean" } }
         }];
 
@@ -412,7 +413,7 @@ describe("createMany with an Idempotency-Key", () => {
             }
         });
 
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "posts", name: "Posts", singularName: "Post", properties: { title: { type: "string" } }
         }];
 

@@ -8,8 +8,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
 import path from "node:path";
-import type { DatabaseAdmin, PostgresCollectionConfig, SchemaChange, SchemaChangeFile, SchemaChangePlan, TablePatch } from "@rebasepro/types";
-import type { CompiledTable } from "@rebasepro/types";
+import type { LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
+import type { CompiledTable, DatabaseAdmin, SchemaChange, SchemaChangeFile, SchemaChangePlan, TablePatch } from "@rebasepro/types";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createLiveSchemaRoutes, type PreviewedSource } from "../src/api/live-schema-routes";
@@ -27,7 +27,7 @@ const REMOVAL: SchemaChange = {
     kept: "column products.sku kept"
 };
 
-const products: PostgresCollectionConfig = {
+const products: LegacyPostgresCollectionConfig = {
     slug: "products", name: "Products",
     properties: { title: { type: "string" }, sku: { type: "string" } }
 };

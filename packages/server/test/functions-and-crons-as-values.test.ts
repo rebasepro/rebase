@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { Hono } from "hono";
 import { createServer } from "node:http";
 import path from "node:path";
-import { declaredResources, resetDeclaredResources, type BackendBootstrapper, type CollectionConfig, type CronJobDefinition, type DataDriver, type InitializedDriver } from "@rebasepro/types";
+import { declaredResources, resetDeclaredResources, type BackendBootstrapper, type CronJobDefinition, type DataDriver, type InitializedDriver } from "@rebasepro/types";
+import { type LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { declareCrons, defineCron, defineFunction, initializeRebaseBackend, loadCrons, loadFunctions } from "../src/index";
 import { _resetRebaseMock } from "../src/singleton";
@@ -36,7 +37,7 @@ const CRONS_DIR = path.join(__dirname, "fixtures", "crons");
 const SERVICE_KEY = "values-test-service-key-0123456789abcdef!";
 const asService = { headers: { authorization: `Bearer ${SERVICE_KEY}` } };
 
-function collection(slug: string): CollectionConfig {
+function collection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,

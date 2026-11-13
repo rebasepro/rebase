@@ -26,7 +26,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createServer } from "node:http";
 import pg from "pg";
 import { Hono } from "hono";
-import type { CollectionConfig, DataDriver, PostgresCollectionConfig } from "@rebasepro/types";
+import type { DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
@@ -84,21 +85,21 @@ const begins = (statements: string[]) => statements.filter(s => /^begin/i.test(s
 
 // ── collections ────────────────────────────────────────────────────────────
 
-const authorsCollection: PostgresCollectionConfig = {
+const authorsCollection: LegacyPostgresCollectionConfig = {
     name: "Authors", slug: "authors", table: "authors",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" }
     }
 };
-const tagsCollection: PostgresCollectionConfig = {
+const tagsCollection: LegacyPostgresCollectionConfig = {
     name: "Tags", slug: "tags", table: "tags",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" }
     }
 };
-const commentsCollection: PostgresCollectionConfig = {
+const commentsCollection: LegacyPostgresCollectionConfig = {
     name: "Comments", slug: "comments", table: "comments",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -112,7 +113,7 @@ const commentsCollection: PostgresCollectionConfig = {
  */
 let holdFirstSave: Promise<void> | undefined;
 
-const postsCollection: PostgresCollectionConfig = {
+const postsCollection: LegacyPostgresCollectionConfig = {
     name: "Posts", slug: "posts", table: "posts", history: true,
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -141,7 +142,7 @@ commentsCollection.properties.post = {
 };
 
 /** Rows only their owner can see: the RLS-invisible case. */
-const notesCollection: PostgresCollectionConfig = {
+const notesCollection: LegacyPostgresCollectionConfig = {
     name: "Notes", slug: "notes", table: "notes",
     securityRules: [
         { name: "owner_select", operation: "select", ownerField: "ownerId" },
@@ -157,7 +158,7 @@ const notesCollection: PostgresCollectionConfig = {
 };
 
 /** A child collection whose `beforeQuery` hides some rows from everybody. */
-const tasksCollection: PostgresCollectionConfig = {
+const tasksCollection: LegacyPostgresCollectionConfig = {
     name: "Tasks", slug: "tasks", table: "tasks",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -168,7 +169,7 @@ const tasksCollection: PostgresCollectionConfig = {
         beforeQuery: () => ({ filter: { hidden: ["==", false] } })
     }
 };
-const projectsCollection: PostgresCollectionConfig = {
+const projectsCollection: LegacyPostgresCollectionConfig = {
     name: "Projects", slug: "projects", table: "projects",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -181,14 +182,14 @@ tasksCollection.properties.project = {
 };
 
 /** A many-to-many whose links carry columns of their own. */
-const membersCollection: PostgresCollectionConfig = {
+const membersCollection: LegacyPostgresCollectionConfig = {
     name: "Members", slug: "members", table: "members",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string" }
     }
 };
-const teamsCollection: PostgresCollectionConfig = {
+const teamsCollection: LegacyPostgresCollectionConfig = {
     name: "Teams", slug: "teams", table: "teams",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -215,7 +216,7 @@ const teamsCollection: PostgresCollectionConfig = {
  * serves — so that the INSERT's own row and a read of the row can be compared
  * byte for byte.
  */
-const eventsCollection: PostgresCollectionConfig = {
+const eventsCollection: LegacyPostgresCollectionConfig = {
     name: "Events", slug: "events", table: "events",
     softDelete: true,
     search: { fields: ["title"] },
@@ -236,7 +237,7 @@ const eventsCollection: PostgresCollectionConfig = {
 };
 
 /** A row anyone may add and nobody may read back: an insert-only policy. */
-const dropboxCollection: PostgresCollectionConfig = {
+const dropboxCollection: LegacyPostgresCollectionConfig = {
     name: "Dropbox", slug: "dropbox", table: "dropbox",
     securityRules: [{ name: "anyone_inserts", operation: "insert", access: "public" }],
     properties: {
@@ -246,7 +247,7 @@ const dropboxCollection: PostgresCollectionConfig = {
 };
 
 /** Anyone may write a letter to anyone; only its addressee reads it. */
-const lettersCollection: PostgresCollectionConfig = {
+const lettersCollection: LegacyPostgresCollectionConfig = {
     name: "Letters", slug: "letters", table: "letters",
     securityRules: [
         { name: "anyone_writes", operation: "insert", access: "public" },
@@ -260,7 +261,7 @@ const lettersCollection: PostgresCollectionConfig = {
 };
 
 /** A field only admins may read: the read back is projected per viewer. */
-const badgesCollection: PostgresCollectionConfig = {
+const badgesCollection: LegacyPostgresCollectionConfig = {
     name: "Badges", slug: "badges", table: "badges",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -271,7 +272,7 @@ const badgesCollection: PostgresCollectionConfig = {
 
 /** How long `drafts`' `beforeSave` awaits, when a test sets it: a hook calling something slow. */
 let draftHookMs = 0;
-const draftsCollection: PostgresCollectionConfig = {
+const draftsCollection: LegacyPostgresCollectionConfig = {
     name: "Drafts", slug: "drafts", table: "drafts",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -285,7 +286,7 @@ const draftsCollection: PostgresCollectionConfig = {
     }
 };
 
-const collections: CollectionConfig[] = [
+const collections: LegacyCollectionConfig[] = [
     authorsCollection, tagsCollection, commentsCollection, postsCollection, notesCollection, tasksCollection, projectsCollection,
     membersCollection, teamsCollection, eventsCollection, dropboxCollection, lettersCollection, badgesCollection, draftsCollection
 ];

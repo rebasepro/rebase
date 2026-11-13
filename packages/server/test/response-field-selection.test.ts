@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { projectResponseFields } from "../src/api/rest/write-validation";
 import { tableFrom } from "./helpers/tables";
@@ -16,7 +16,7 @@ import { tableFrom } from "./helpers/tables";
  * reader believes they narrowed the response and cannot see that they did not.
  */
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -94,11 +94,11 @@ describe("response field selection", () => {
     });
 
     it("returns every relation under `include=*`", () => {
-        const authors: CollectionConfig = {
+        const authors: LegacyCollectionConfig = {
             slug: "authors", name: "Authors", table: "authors",
             properties: { id: { name: "ID", type: "string", isId: true } }
         };
-        const postsWithAuthor: CollectionConfig = {
+        const postsWithAuthor: LegacyCollectionConfig = {
             ...posts,
             properties: {
                 ...posts.properties,
@@ -115,7 +115,7 @@ describe("response field selection", () => {
     it("checks nothing against a collection that declares no properties", () => {
         // Same reasoning `assertKnownWriteFields` applies: "no declared fields"
         // is not the claim "no fields are allowed".
-        const bare: CollectionConfig = { slug: "raw", name: "Raw", table: "raw", properties: {} };
+        const bare: LegacyCollectionConfig = { slug: "raw", name: "Raw", table: "raw", properties: {} };
 
         const [projected] = projectResponseFields([row()], ["title"], tableFrom(bare));
 
@@ -138,7 +138,7 @@ describe("response field selection", () => {
  * the layer right beside this one already knows collections that have no `id`
  * column at all: `assertKnownWriteFields` has a dedicated error for them.
  */
-const memberships: CollectionConfig = {
+const memberships: LegacyCollectionConfig = {
     slug: "memberships",
     name: "Memberships",
     table: "memberships",
@@ -150,7 +150,7 @@ const memberships: CollectionConfig = {
     }
 };
 
-const articles: CollectionConfig = {
+const articles: LegacyCollectionConfig = {
     slug: "articles",
     name: "Articles",
     table: "articles",

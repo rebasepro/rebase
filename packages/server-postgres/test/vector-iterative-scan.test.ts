@@ -20,7 +20,7 @@ import path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, serial, text, vector } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { FetchService } from "../src/services/FetchService";
@@ -37,7 +37,7 @@ const { vector: pgvector } = require(path.resolve(__dirname, "../../cli/node_mod
 const DIM = 16;
 const ROWS = 20_000;
 
-const items: CollectionConfig = {
+const items: LegacyCollectionConfig = {
     slug: "items", name: "Items", table: "items",
     properties: {
         id: { type: "number", isId: "increment" },

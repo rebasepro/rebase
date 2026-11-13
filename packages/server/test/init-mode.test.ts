@@ -2,7 +2,8 @@ import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals
 import { Hono } from "hono";
 import { createServer } from "node:http";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver, TableDescriptor } from "@rebasepro/types";
+import type { BackendBootstrapper, DataDriver, InitializedDriver, TableDescriptor } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
@@ -20,7 +21,7 @@ import { tablesFrom } from "./helpers/tables";
  * it. What it answers, and to whom, lives in `schema-editor-availability.test.ts`.
  */
 
-function collection(slug: string): CollectionConfig {
+function collection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,
@@ -58,7 +59,7 @@ function stubDriver(): DataDriver {
  * @param reports what initializeDriver reports back on `collections`:
  *   an array = "I introspected and found these"; undefined = "I cannot introspect".
  */
-function fakeBootstrapper(reports: CollectionConfig[] | undefined): BackendBootstrapper {
+function fakeBootstrapper(reports: LegacyCollectionConfig[] | undefined): BackendBootstrapper {
     return {
         type: "fake",
         isDefault: true,

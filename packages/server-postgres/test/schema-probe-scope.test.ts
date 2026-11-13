@@ -8,16 +8,16 @@
  * changes nothing never consults.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig, PostgresProperties } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresProperties } from "@rebasepro/common/migrate";
 import { ensureTables, type Queryable } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
 describe("the schema read's row probe", () => {
-    const notes = (properties: PostgresProperties): CollectionConfig => ({
+    const notes = (properties: LegacyPostgresProperties): LegacyCollectionConfig => ({
         slug: "notes", table: "notes", name: "Notes",
         properties: { id: { type: "string", isId: "uuid" }, body: { type: "string" }, ...properties }
     });
-    const tags: CollectionConfig = {
+    const tags: LegacyCollectionConfig = {
         slug: "tags", table: "tags", name: "Tags",
         properties: { id: { type: "string", isId: "uuid" }, name: { type: "string" } }
     };

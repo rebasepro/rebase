@@ -9,7 +9,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { CollectionConfig, NumberProperty } from "@rebasepro/types";
+import { LegacyCollectionConfig, LegacyNumberProperty } from "@rebasepro/common/migrate";
 import { planColumnDefinitionFor } from "./helpers/plan-column";
 import { computePropertyPriority, PropertyOrderingContext } from "../src/schema/introspect-db-logic";
 
@@ -65,12 +65,12 @@ describe("SQL IDENTITY keyword integrity", () => {
         // definition an auto-increment id actually compiles to: that is the
         // string Postgres has to accept, and it is where a botched rename
         // would land.
-        const increments: CollectionConfig = {
+        const increments: LegacyCollectionConfig = {
             slug: "items",
             name: "Items",
             properties: {
                 id: { type: "number",
-                    isId: "increment" } as NumberProperty
+                    isId: "increment" } as LegacyNumberProperty
             }
         };
         expect(planColumnDefinitionFor([increments], "items", "id"))

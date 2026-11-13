@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
 import { createRebaseClient } from "@rebasepro/client";
-import type { BatchWriteOperation, CollectionConfig, DataDriver, SaveProps } from "@rebasepro/types";
+import type { BatchWriteOperation, DataDriver, SaveProps } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
@@ -25,7 +26,7 @@ import { tablesFromCollections } from "./helpers/tables";
  * where it matters (a plain INSERT of an existing key raises 23505).
  */
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -35,7 +36,7 @@ const posts: CollectionConfig = {
     }
 };
 
-const orderItems: CollectionConfig = {
+const orderItems: LegacyCollectionConfig = {
     slug: "order_items",
     name: "Order items",
     table: "order_items",
@@ -55,7 +56,7 @@ interface Harness {
 }
 
 function createHarness(
-    collections: CollectionConfig[] = [posts],
+    collections: LegacyCollectionConfig[] = [posts],
     dictionary?: Record<string, string>
 ): Harness {
     const saves: SaveProps[] = [];

@@ -27,7 +27,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { boolean, pgTable, varchar } from "drizzle-orm/pg-core";
 import { createServer, type Server } from "node:http";
 import { WebSocket as NodeWebSocket } from "ws";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
@@ -46,7 +46,7 @@ const ghostsTable = pgTable("ghosts", {
     id: varchar("id").primaryKey()
 });
 
-const contractsCollection: CollectionConfig = {
+const contractsCollection: LegacyCollectionConfig = {
     slug: "contracts",
     name: "Contracts",
     table: "contracts",
@@ -73,7 +73,7 @@ const contractsCollection: CollectionConfig = {
     }
 };
 
-const ghostsCollection: CollectionConfig = {
+const ghostsCollection: LegacyCollectionConfig = {
     slug: "ghosts",
     name: "Ghosts",
     table: "ghosts",

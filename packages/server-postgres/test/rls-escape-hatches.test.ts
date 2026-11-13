@@ -6,7 +6,8 @@
  */
 import { PGlite } from "@electric-sql/pglite";
 import { compileRulePolicies, getEffectiveSecurityRules, revokeInternalTableSql } from "@rebasepro/common";
-import { resetDeclaredResources, database, type CollectionConfig } from "@rebasepro/types";
+import { resetDeclaredResources, database } from "@rebasepro/types";
+import { type LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import {
     assertRecordedRequestRoles,
     authContextStatement,
@@ -53,7 +54,7 @@ async function appDatabase(): Promise<PGlite> {
 describe("the admin-request companions (rebase_admin_request)", () => {
     afterEach(() => resetDeclaredResources());
 
-    const tasks: CollectionConfig = {
+    const tasks: LegacyCollectionConfig = {
         name: "Tasks", slug: "tasks", table: "tasks",
         properties: {
             id: { name: "ID", type: "number", isId: "increment" },
@@ -110,7 +111,7 @@ describe("the admin-request companions (rebase_admin_request)", () => {
     it("drop the companion of every policy that no longer earns one, wherever policies are written", async () => {
         const { generatePostgresPoliciesDdl } = await import("../src/schema/generate-postgres-ddl-logic");
         const { adminRequestPolicyName } = await import("@rebasepro/utils");
-        const narrowed: CollectionConfig = {
+        const narrowed: LegacyCollectionConfig = {
             ...tasks,
             securityRules: [
                 { name: "owner_select", operation: "select", ownerField: "ownerId" },
@@ -349,7 +350,7 @@ describe("inheritRoles", () => {
 describe("the policy settings, declared on the database", () => {
     afterEach(() => resetDeclaredResources());
 
-    const posts: CollectionConfig = {
+    const posts: LegacyCollectionConfig = {
         name: "Posts", slug: "posts", table: "posts",
         properties: { id: { name: "ID", type: "string", isId: true } },
         securityRules: [{ operation: "select", access: "public" }]
@@ -378,7 +379,7 @@ describe("the policy settings, declared on the database", () => {
     it("drop the injected baseline everywhere with defaultPolicies: false, unless a collection says otherwise", () => {
         database({ rls: { defaultPolicies: false } });
         expect(getEffectiveSecurityRules(posts).some((r) => r.name?.endsWith("_default_admin_read"))).toBe(false);
-        const keeps = { ...posts, disableDefaultPolicies: false } as CollectionConfig;
+        const keeps = { ...posts, disableDefaultPolicies: false } as LegacyCollectionConfig;
         expect(getEffectiveSecurityRules(keeps).some((r) => r.name?.endsWith("_default_admin_read"))).toBe(true);
     });
 
@@ -410,7 +411,7 @@ describe("the policy settings, declared on the database", () => {
 describe("the server-or-admin policies (rls.adminPolicies)", () => {
     afterEach(() => resetDeclaredResources());
 
-    const tasks: CollectionConfig = {
+    const tasks: LegacyCollectionConfig = {
         name: "Tasks", slug: "tasks", table: "tasks",
         properties: {
             id: { name: "ID", type: "number", isId: "increment" },

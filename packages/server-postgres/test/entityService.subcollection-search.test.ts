@@ -1,6 +1,6 @@
 import { DataService } from "../src/services/dataService";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { arrayRowsFor, recordingDb, type RecordedQuery } from "./helpers/spg-b-recording-db";
@@ -52,7 +52,7 @@ const viewsTable = pgTable("views", {
     postId: integer("post_id")
 });
 
-const tagsCollection: CollectionConfig = {
+const tagsCollection: LegacyCollectionConfig = {
     slug: "tags",
     name: "Tags",
     table: "tags",
@@ -72,7 +72,7 @@ const tagsCollection: CollectionConfig = {
     ]
 };
 
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -113,7 +113,7 @@ const postsCollection: CollectionConfig = {
     ]
 };
 
-const authorsCollection: CollectionConfig = {
+const authorsCollection: LegacyCollectionConfig = {
     slug: "authors",
     name: "Authors",
     table: "authors",
@@ -134,7 +134,7 @@ const authorsCollection: CollectionConfig = {
     ]
 };
 
-const commentsCollection: CollectionConfig = {
+const commentsCollection: LegacyCollectionConfig = {
     slug: "comments",
     name: "Comments",
     table: "comments",
@@ -154,7 +154,7 @@ const commentsCollection: CollectionConfig = {
     ]
 };
 
-const viewsCollection: CollectionConfig = {
+const viewsCollection: LegacyCollectionConfig = {
     slug: "views",
     name: "Views",
     table: "views",
@@ -165,7 +165,7 @@ const viewsCollection: CollectionConfig = {
     relations: []
 };
 
-const collectionsBySlug: Record<string, CollectionConfig> = {
+const collectionsBySlug: Record<string, LegacyCollectionConfig> = {
     tags: tagsCollection,
     posts: postsCollection,
     authors: authorsCollection,

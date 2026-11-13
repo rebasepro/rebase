@@ -12,7 +12,7 @@
  * generated `tsvector` shared by every caller. `checkSearchFieldsAreReadable` in
  * `validate-config.ts` refuses that combination at boot instead.
  */
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { pgTable, PgDialect, serial, text, integer } from "drizzle-orm/pg-core";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 import { withFieldViewer } from "../src/services/field-viewer";
@@ -28,7 +28,7 @@ const staff = pgTable("staff", {
     age: integer("age")
 });
 
-const collection: CollectionConfig = {
+const collection: LegacyCollectionConfig = {
     slug: "staff",
     name: "Staff",
     table: "staff",

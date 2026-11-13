@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
 import { tablesFromCollections } from "./helpers/tables";
@@ -15,7 +15,7 @@ import { tablesFromCollections } from "./helpers/tables";
  * sat restorable in the table, and had no way to purge it or list the trash.
  */
 
-const notes: CollectionConfig = {
+const notes: LegacyCollectionConfig = {
     slug: "notes", name: "Notes", singularName: "Note", table: "notes",
     softDelete: true,
     properties: {
@@ -27,7 +27,7 @@ const notes: CollectionConfig = {
     }
 };
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     slug: "tags", name: "Tags", singularName: "Tag", table: "tags",
     properties: { id: { name: "ID", type: "string", isId: true }, name: { name: "Name", type: "string" } }
 };

@@ -16,7 +16,7 @@ import { pgTable, varchar } from "drizzle-orm/pg-core";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
@@ -28,7 +28,7 @@ const itemsTable = pgTable("items", { id: varchar("id").primaryKey(), status: va
 
 /** Every row any read served, through the hook every read passes. */
 let rowsServed = 0;
-const itemsCollection: CollectionConfig = {
+const itemsCollection: LegacyCollectionConfig = {
     slug: "items",
     name: "Items",
     table: "items",

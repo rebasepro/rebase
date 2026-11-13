@@ -21,7 +21,7 @@
  *  - the name is the one a declared plain index on the column derives, so the
  *    two are one object, and it is frozen.
  */
-import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
@@ -29,7 +29,7 @@ import { buildCollectionIndexSpecs, foreignKeyIndexSpec, FOREIGN_KEY_INDEX_REASO
 import { resolveColumnName } from "../src/schema/column-plan-helpers";
 import { compileSet, planCollections } from "./helpers/plan-tables";
 
-const authors: CollectionConfig = {
+const authors: LegacyCollectionConfig = {
     slug: "authors", table: "authors", name: "Authors",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -41,17 +41,17 @@ const authors: CollectionConfig = {
     }
 };
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     slug: "tags", table: "tags", name: "Tags",
     properties: { id: { type: "number", isId: "increment" }, name: { type: "string" } }
 };
 
-const companies: CollectionConfig = {
+const companies: LegacyCollectionConfig = {
     slug: "companies", table: "companies", name: "Companies",
     properties: { id: { type: "number", isId: "increment" }, name: { type: "string" } }
 };
 
-const posts: PostgresCollectionConfig = {
+const posts: LegacyPostgresCollectionConfig = {
     slug: "posts", table: "posts", name: "Posts",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -72,7 +72,7 @@ const posts: PostgresCollectionConfig = {
     }
 };
 
-const profiles: CollectionConfig = {
+const profiles: LegacyCollectionConfig = {
     slug: "profiles", table: "profiles", name: "Profiles",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -83,7 +83,7 @@ const profiles: CollectionConfig = {
 const collections = [authors, tags, companies, posts, profiles];
 
 /** `table → index columns` for every derived foreign-key index in the plan. */
-const derivedIndexes = (all: CollectionConfig[]): Record<string, string[]> => {
+const derivedIndexes = (all: LegacyCollectionConfig[]): Record<string, string[]> => {
     const out: Record<string, string[]> = {};
     for (const table of planCollections(all).tables) {
         const derived = table.indexes.filter(spec => spec.derived === "foreign-key");
@@ -92,7 +92,7 @@ const derivedIndexes = (all: CollectionConfig[]): Record<string, string[]> => {
     return out;
 };
 
-const tableIndexes = (all: CollectionConfig[], table: string) =>
+const tableIndexes = (all: LegacyCollectionConfig[], table: string) =>
     planCollections(all).tables.find(t => t.table === table)!.indexes;
 
 describe("which columns get a foreign-key index", () => {
@@ -126,7 +126,7 @@ describe("which columns get a foreign-key index", () => {
     });
 
     it("drops the index — and keeps the constraint — when the relation says `index: false`", () => {
-        const optedOut: CollectionConfig = {
+        const optedOut: LegacyCollectionConfig = {
             ...posts,
             properties: {
                 ...posts.properties,
@@ -145,7 +145,7 @@ describe("which columns get a foreign-key index", () => {
 });
 
 describe("never a second index doing one job", () => {
-    const withPosts = (override: Partial<PostgresCollectionConfig>): CollectionConfig[] =>
+    const withPosts = (override: Partial<LegacyPostgresCollectionConfig>): LegacyCollectionConfig[] =>
         [authors, tags, companies, { ...posts, ...override }, profiles];
 
     it("defers to a declared index on the column — the same name, one object", () => {
@@ -195,7 +195,7 @@ describe("never a second index doing one job", () => {
     it("defers to the primary key when the column leads it, and not when it follows", () => {
         // A translation keyed by (id, locale) whose `id` is also the link to
         // its parent: `<table>_pkey` serves lookups by `id`.
-        const translations: CollectionConfig = {
+        const translations: LegacyCollectionConfig = {
             slug: "company_translations", table: "company_translations", name: "Translations",
             properties: {
                 id: { type: "number", isId: true },
@@ -205,7 +205,7 @@ describe("never a second index doing one job", () => {
         };
         expect(tableIndexes([companies, translations], "company_translations")).toEqual([]);
 
-        const reversed: CollectionConfig = {
+        const reversed: LegacyCollectionConfig = {
             ...translations,
             properties: {
                 locale: { type: "string", isId: true },
@@ -217,11 +217,11 @@ describe("never a second index doing one job", () => {
     });
 
     it("defers to the tenant index when the tenant is the link", () => {
-        const orgs: CollectionConfig = {
+        const orgs: LegacyCollectionConfig = {
             slug: "orgs", table: "orgs", name: "Orgs",
             properties: { id: { type: "string", isId: "uuid" } }
         };
-        const docs: CollectionConfig = {
+        const docs: LegacyCollectionConfig = {
             slug: "docs", table: "docs", name: "Docs",
             tenant: { field: "org", from: { claim: "org_id" } },
             properties: {
@@ -292,7 +292,7 @@ describe("rendered by both db push files", () => {
  * of a many-to-many.
  */
 describe("the reads it is for", () => {
-    const blogPosts: CollectionConfig = {
+    const blogPosts: LegacyCollectionConfig = {
         slug: "posts", table: "posts", name: "Posts",
         properties: {
             id: { type: "number", isId: "increment" },
@@ -300,7 +300,7 @@ describe("the reads it is for", () => {
             tags: { type: "relation", relation: { kind: "manyToMany", target: () => tags } }
         }
     };
-    const comments: CollectionConfig = {
+    const comments: LegacyCollectionConfig = {
         slug: "comments", table: "comments", name: "Comments",
         properties: {
             id: { type: "number", isId: "increment" },

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { col, defineTable, rel } from "@rebasepro/types";
-import type { AnyTableDef, CollectionConfig, JoinStep, Relation } from "@rebasepro/types";
+import type { AnyTableDef, JoinStep } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyRelation } from "@rebasepro/common/migrate";
 
 import { compileTables } from "../../src/schema/compile-tables";
 import {
@@ -44,7 +45,7 @@ const TABLES: readonly [slug: string, table: string][] = [
 
 const RELATION_NAMES = ["author", "tags", "children", "favouriteTags", "URLs", "addresses", "status"];
 
-const collection = (slug: string, table: string): CollectionConfig => ({
+const collection = (slug: string, table: string): LegacyCollectionConfig => ({
     slug, name: slug, table,
     properties: { id: { type: "string", isId: "uuid" } }
 });
@@ -79,7 +80,7 @@ describe("derived names agree with the legacy pipeline", () => {
     it("a hasOne / hasMany foreign key, from the source slug", () => {
         for (const [slug, table] of TABLES) {
             for (const kind of ["hasOne", "hasMany"] as const) {
-                const relation: Relation = { kind, relationName: "things", target: () => collection("things", "things") };
+                const relation: LegacyRelation = { kind, relationName: "things", target: () => collection("things", "things") };
                 const legacy = resolveRelation(relation, collection(slug, table));
                 if (legacy.kind !== "hasOne" && legacy.kind !== "hasMany") throw new Error("kind");
                 expect([slug, deriveTargetForeignKey(slug, undefined)]).toEqual([slug, legacy.foreignKeyOnTarget]);

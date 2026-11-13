@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { createServer } from "node:http";
-import { col, defineTable, type DatabaseAdapter, type PostgresCollectionConfig, type TableDescriptor, type TableHooks } from "@rebasepro/types";
+import { col, defineTable, type DatabaseAdapter, type TableDescriptor, type TableHooks } from "@rebasepro/types";
+import { type LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { jest } from "@jest/globals";
 import { CollectionRegistry, createCallContext } from "@rebasepro/common";
 
@@ -46,7 +47,7 @@ class DriverTableHooks {
     }
 }
 
-function adapter(options: { type?: string; registry?: CollectionRegistry | null; introspected?: PostgresCollectionConfig[]; tables?: TableDescriptor[]; driverRegistry?: DriverTableHooks } = {}): DatabaseAdapter {
+function adapter(options: { type?: string; registry?: CollectionRegistry | null; introspected?: LegacyPostgresCollectionConfig[]; tables?: TableDescriptor[]; driverRegistry?: DriverTableHooks } = {}): DatabaseAdapter {
     const registry = options.registry === undefined ? new HookRegistry() : options.registry;
     return {
         type: options.type ?? "postgres",
@@ -134,7 +135,7 @@ describe("global hooks", () => {
     });
 
     it("reach a driver that serves introspected tables — whose own descriptors the driver hands them", async () => {
-        const introspectedLeads: PostgresCollectionConfig = {
+        const introspectedLeads: LegacyPostgresCollectionConfig = {
             name: "leads",
             slug: "leads",
             table: "leads",
@@ -149,7 +150,7 @@ describe("global hooks", () => {
     });
 
     it("refuse to boot when a driver serves an introspected table without its descriptor — a hook would have none to receive", async () => {
-        const introspectedLeads: PostgresCollectionConfig = {
+        const introspectedLeads: LegacyPostgresCollectionConfig = {
             name: "leads",
             slug: "leads",
             table: "leads",

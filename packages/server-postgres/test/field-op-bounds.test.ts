@@ -25,7 +25,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { doublePrecision, integer, jsonb, pgTable, serial, text, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -62,7 +62,7 @@ const products = {
             validation: { min: 1, max: 3 }
         }
     }
-} as CollectionConfig;
+} as LegacyCollectionConfig;
 
 let db: PGlite;
 let driver: PostgresBackendDriver;

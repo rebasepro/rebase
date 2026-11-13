@@ -13,12 +13,12 @@
 
 import { Hono } from "hono";
 import { createHistoryRoutes, type HistoryService } from "../src/history/history-routes";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { tablesFromCollections } from "./helpers/tables";
 
-const staff: CollectionConfig = {
+const staff: LegacyCollectionConfig = {
     name: "staff",
     slug: "staff",
     history: true,

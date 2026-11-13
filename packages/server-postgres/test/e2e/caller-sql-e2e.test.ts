@@ -14,13 +14,13 @@
  * Requires Docker.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
 import { tablesFromCollections } from "../helpers/tables.js";
 
-const songs: CollectionConfig = {
+const songs: LegacyCollectionConfig = {
     name: "Songs",
     slug: "songs",
     table: "songs",
@@ -36,7 +36,7 @@ const songs: CollectionConfig = {
     }
 };
 
-const notes: CollectionConfig = {
+const notes: LegacyCollectionConfig = {
     name: "Notes",
     slug: "notes",
     table: "notes",
@@ -49,7 +49,7 @@ const notes: CollectionConfig = {
     }
 };
 
-const people: CollectionConfig = {
+const people: LegacyCollectionConfig = {
     name: "People",
     slug: "people",
     table: "people",
@@ -62,7 +62,7 @@ const people: CollectionConfig = {
     }
 };
 
-async function provision(url: string, collections: CollectionConfig[]): Promise<void> {
+async function provision(url: string, collections: LegacyCollectionConfig[]): Promise<void> {
     const conn = createPostgresDatabaseConnection(url);
     try {
         const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });

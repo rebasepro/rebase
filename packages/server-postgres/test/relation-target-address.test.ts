@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { toFlatRow } from "../src/services/row-pipeline";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -18,7 +18,7 @@ describe("relation ref target — addressed by the whole key", () => {
     const registry = new FixtureTableRegistry();
 
     // Composite-keyed target: a seat identified by (row, number).
-    const seatsCollection: CollectionConfig = {
+    const seatsCollection: LegacyCollectionConfig = {
         slug: "seats",
         name: "Seats",
         table: "seats",
@@ -32,7 +32,7 @@ isId: true },
         }
     };
 
-    const bookingsCollection: CollectionConfig = {
+    const bookingsCollection: LegacyCollectionConfig = {
         slug: "bookings",
         name: "Bookings",
         table: "bookings",
@@ -60,7 +60,7 @@ isId: "increment" },
     // into through a cast. Named differently from the import it wraps: this
     // local only exists to bind `registry`, and sharing the name makes it call
     // itself — which is a stack overflow, not a test failure anyone can read.
-    const flatten = (row: Record<string, unknown>, collection: CollectionConfig) =>
+    const flatten = (row: Record<string, unknown>, collection: LegacyCollectionConfig) =>
         toFlatRow(row, collection, registry);
 
     it("joins a composite target key into the ref address", () => {
@@ -79,13 +79,13 @@ occupant: "Ada" }
         // No `isId`, no drizzle-declared primary, no `id` column. Reading
         // `targetPks[0].fieldName` here was a TypeError that failed the whole
         // parent fetch; a first-column guess is wrong-ish, but it returns rows.
-        const keylessCollection: CollectionConfig = {
+        const keylessCollection: LegacyCollectionConfig = {
             slug: "notes",
             name: "Notes",
             table: "notes",
             properties: { body: { type: "string" } }
         };
-        const keylessBooking: CollectionConfig = {
+        const keylessBooking: LegacyCollectionConfig = {
             ...bookingsCollection,
             relations: [
                 {

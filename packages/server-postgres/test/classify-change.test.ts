@@ -17,7 +17,7 @@
  * the database has to be told the change *might* diverge, because for all it
  * knows it will.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import {
     summarizeChanges,
     type ChangeVerdict,
@@ -30,7 +30,7 @@ import { compiledFromLegacy } from "./helpers/edited-tables";
 const classifyEditedTables = (before: Parameters<typeof compiledFromLegacy>[0], after: Parameters<typeof compiledFromLegacy>[0], facts?: Parameters<typeof classifyCompiledTables>[2]) =>
     classifyCompiledTables(compiledFromLegacy(before), compiledFromLegacy(after), facts);
 
-const collection = (slug: string, properties: Record<string, unknown>): CollectionConfig =>
+const collection = (slug: string, properties: Record<string, unknown>): LegacyCollectionConfig =>
     ({
         slug,
         name: slug,
@@ -59,13 +59,13 @@ const database = (options: {
 });
 
 /** The single change a one-change diff produced. */
-const only = (before: CollectionConfig[], after: CollectionConfig[], facts?: SchemaFacts) => {
+const only = (before: LegacyCollectionConfig[], after: LegacyCollectionConfig[], facts?: SchemaFacts) => {
     const result = classifyEditedTables(before, after, facts);
     expect(result.changes).toHaveLength(1);
     return result.changes[0];
 };
 
-const verdictOf = (before: CollectionConfig[], after: CollectionConfig[]): ChangeVerdict =>
+const verdictOf = (before: LegacyCollectionConfig[], after: LegacyCollectionConfig[]): ChangeVerdict =>
     classifyEditedTables(before, after).verdict;
 
 describe("no change", () => {
@@ -355,7 +355,7 @@ describe("moving a collection to another table", () => {
         ...collection("posts", { title: str() }),
         table,
         ...(schema ? { schema } : {})
-    }) as CollectionConfig;
+    }) as LegacyCollectionConfig;
 
     it("is a change the ensure path cannot make", () => {
         const change = only([at("posts")], [at("articles")]);

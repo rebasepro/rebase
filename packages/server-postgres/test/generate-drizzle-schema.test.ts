@@ -1,4 +1,4 @@
-import { CollectionConfig, StringProperty } from "@rebasepro/types";
+import { LegacyCollectionConfig, LegacyStringProperty } from "@rebasepro/common/migrate";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import ts from "typescript";
 import { col, defineTable, rel } from "@rebasepro/types";
@@ -18,7 +18,7 @@ describe("generateDrizzleSchema", () => {
     };
 
     it("should generate a simple table with basic types", async () => {
-        const collections: CollectionConfig[] = [
+        const collections: LegacyCollectionConfig[] = [
             {
                 slug: "products",
                 table: "products",
@@ -43,7 +43,7 @@ validation: { required: true } },
     });
 
     it("should generate a one-to-many relation correctly", async () => {
-        const usersCollection: CollectionConfig = {
+        const usersCollection: LegacyCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -51,7 +51,7 @@ validation: { required: true } },
                 name: { type: "string" }
             }
         };
-        const postsCollection: CollectionConfig = {
+        const postsCollection: LegacyCollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -109,7 +109,7 @@ validation: { required: true } },
     });
 
     it("should generate a many-to-many relation with a junction table", async () => {
-        const postsCollection: CollectionConfig = {
+        const postsCollection: LegacyCollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -130,7 +130,7 @@ validation: { required: true } },
                 }
             ]
         };
-        const tagsCollection: CollectionConfig = {
+        const tagsCollection: LegacyCollectionConfig = {
             slug: "tags",
             table: "tags",
             name: "Tags",
@@ -168,14 +168,14 @@ validation: { required: true } },
         // derived policies) hardcodes `public`. RLS was enabled and policies
         // created on `public.post_editors`; the rows went to `rebase`. The three
         // generators have to agree, and public is what the other two say.
-        const usersCollection: CollectionConfig = {
+        const usersCollection: LegacyCollectionConfig = {
             slug: "users",
             table: "users",
             schema: "rebase",
             name: "Users",
             properties: { email: { type: "string" } }
         };
-        const postsCollection: CollectionConfig = {
+        const postsCollection: LegacyCollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -212,7 +212,7 @@ validation: { required: true } },
             // `varchar` is the bounded choice you have to ask for by name, and
             // `text` is what a property that says nothing actually compiles to.
             it("should default to text if no columnType or isId is specified", async () => {
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "texts",
 table: "texts",
 name: "Texts",
@@ -223,7 +223,7 @@ properties: { t_default: { type: "string" } }
             });
 
             it("should respect explicit columnType overrides", async () => {
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "texts",
                     table: "texts",
                     name: "Texts",
@@ -252,7 +252,7 @@ columnType: "varchar" }
             });
 
             it("takes the column width from validation.max", async () => {
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "texts",
                     table: "texts",
                     name: "Texts",
@@ -274,7 +274,7 @@ validation: { max: 40 } }
                 // a property that says nothing and a property that says "render me
                 // as markdown" produce the identical column.
                 // `admin` is the CMS's augmentation of a property, outside this package's types — which is the point: the column must not read it.
-                const build = (extra: { admin?: { markdown?: boolean; multiline?: boolean } }): CollectionConfig[] => ([{
+                const build = (extra: { admin?: { markdown?: boolean; multiline?: boolean } }): LegacyCollectionConfig[] => ([{
                     slug: "notes",
                     name: "Notes",
                     table: "notes",
@@ -300,7 +300,7 @@ validation: { max: 40 } }
                 // property produced a capped column down one path and an uncapped
                 // one down the other. FK and junction column types follow the key
                 // they reference — relations.test.ts covers those.
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "authors", name: "Authors", table: "authors",
                     properties: {
                         id: { name: "ID", type: "string", isId: true },
@@ -315,7 +315,7 @@ validation: { max: 40 } }
             });
 
             it("should prioritize isId='uuid' over the default text", async () => {
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "texts",
 table: "texts",
 name: "Texts",
@@ -327,7 +327,7 @@ isId: "uuid" } }
             });
 
             it("should combine isId=true with columnType overrides", async () => {
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "texts",
 table: "texts",
 name: "Texts",
@@ -340,7 +340,7 @@ columnType: "text" } }
             });
 
             it("should respect validation.unique along with columnType", async () => {
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "texts",
 table: "texts",
 name: "Texts",
@@ -355,7 +355,7 @@ validation: { unique: true } } }
 
         describe("Number Property", () => {
             it("should default to numeric for normal numbers", async () => {
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "nums",
 table: "nums",
 name: "Nums",
@@ -366,7 +366,7 @@ properties: { n_def: { type: "number" } }
             });
 
             it("should default to integer if validation.integer is true", async () => {
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "nums",
 table: "nums",
 name: "Nums",
@@ -378,7 +378,7 @@ validation: { integer: true } } }
             });
 
             it("should default to integer if isId is true", async () => {
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "nums",
 table: "nums",
 name: "Nums",
@@ -390,7 +390,7 @@ isId: true } }
             });
 
             it("should respect exact columnType overrides and replace baseType", async () => {
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "numbers",
                     table: "numbers",
                     name: "Numbers",
@@ -439,7 +439,7 @@ columnType: "bigserial" }
                 // directly: a generated bigint column must carry a `mode`. A
                 // bare `bigint("x")` is a type error at the call site, so a
                 // generated schema containing one cannot be built.
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "counters",
                     table: "counters",
                     name: "Counters",
@@ -452,7 +452,7 @@ columnType: "bigserial" }
             });
 
             it("gives an increment id the same INTEGER identity the DDL gives it, whatever columnType says", async () => {
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "nums",
 table: "nums",
 name: "Nums",
@@ -475,7 +475,7 @@ columnType: "bigint" } }
             });
 
             it("should combine validation.unique with columnType override", async () => {
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "nums",
 table: "nums",
 name: "Nums",
@@ -490,7 +490,7 @@ validation: { unique: true } } }
 
         describe("Date Property", () => {
             it("should default to timestamp with timezone", async () => {
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "dates",
 table: "dates",
 name: "Dates",
@@ -501,7 +501,7 @@ properties: { d_def: { type: "date" } }
             });
 
             it("should respect date and time columnType overrides", async () => {
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "dates",
                     table: "dates",
                     name: "Dates",
@@ -525,7 +525,7 @@ columnType: "timestamp" }
 
         describe("Map & Array Properties", () => {
             it("should default to jsonb", async () => {
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "json_data",
 table: "json_data",
 name: "JSON Data",
@@ -540,7 +540,7 @@ properties: {
             });
 
             it("should respect json columnType overrides", async () => {
-                const collections: CollectionConfig[] = [{
+                const collections: LegacyCollectionConfig[] = [{
                     slug: "json_data",
                     table: "json_data",
                     name: "JSON Data",
@@ -575,7 +575,7 @@ columnType: "jsonb" }
             // emit a `using:` and a `withCheck:` somewhere in the file. Searching
             // the whole output for either clause therefore passes even if the
             // `for: "all"` policy emitted neither.
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "notes",
                 table: "notes",
                 name: "Notes",
@@ -601,7 +601,7 @@ ownerField: "user_id" }
         });
 
         it("should generate SELECT policy with only USING clause", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "notes",
                 table: "notes",
                 name: "Notes",
@@ -628,7 +628,7 @@ ownerField: "user_id" }
         });
 
         it("should generate INSERT policy with only WITH CHECK clause", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "notes",
                 table: "notes",
                 name: "Notes",
@@ -653,7 +653,7 @@ ownerField: "user_id" }
         });
 
         it("should generate public access policy", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "articles",
                 table: "articles",
                 name: "Articles",
@@ -670,7 +670,7 @@ access: "public" }
         });
 
         it("should generate roles-only policy", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "admin_data",
                 table: "admin_data",
                 name: "Admin Data",
@@ -686,7 +686,7 @@ roles: ["admin"] }
         });
 
         it("should safely handle complex sub-string roles overlapping like 'view' and 'viewer'", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "finance_data",
                 table: "finance_data",
                 name: "Finance Data",
@@ -704,7 +704,7 @@ roles: ["view"] } // Should not match 'viewer'
         });
 
         it("should securely handle multiple allowed roles", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "multi_role",
                 table: "multi_role",
                 name: "Multi Role",
@@ -720,7 +720,7 @@ roles: ["admin", "editor", "super-admin"] }
         });
 
         it("should combine roles with access: public", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "reports",
                 table: "reports",
                 name: "Reports",
@@ -738,7 +738,7 @@ access: "public" }
         });
 
         it("should combine roles with ownerField", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "docs",
                 table: "docs",
                 name: "Docs",
@@ -761,7 +761,7 @@ ownerField: "user_id" }
         });
 
         it("should generate restrictive policy", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "orders",
                 table: "orders",
                 name: "Orders",
@@ -782,7 +782,7 @@ using: "{is_locked} = false" }
         });
 
         it("should generate raw SQL using clause with column references", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "posts",
                 table: "posts",
                 name: "Posts",
@@ -801,7 +801,7 @@ using: "{published_at} > now() - interval '30 days'" }
         });
 
         it("should generate raw SQL withCheck clause", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "items",
                 table: "items",
                 name: "Items",
@@ -827,7 +827,7 @@ using: "{published_at} > now() - interval '30 days'" }
         });
 
         it("should use custom policy names when provided", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "data",
                 table: "data",
                 name: "Data",
@@ -844,7 +844,7 @@ access: "public" }
         });
 
         it("should generate multiple policies for the same table", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "notes",
                 table: "notes",
                 name: "Notes",
@@ -880,7 +880,7 @@ using: "{is_locked} = false" }
         });
 
         it("should enable RLS on every table even without any security rules", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "public_data",
                 table: "public_data",
                 name: "Public Data",
@@ -900,7 +900,7 @@ using: "{is_locked} = false" }
         });
 
         it("should enable RLS on tables that do have security rules", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "secure_data",
                 table: "secure_data",
                 name: "Secure Data",
@@ -917,7 +917,7 @@ access: "public" }
         });
 
         it("should fall back to deny-all (sql`false`) when no USING clause can be generated", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "deny_test",
                 table: "deny_test",
                 name: "Deny Test",
@@ -937,7 +937,7 @@ access: "public" }
 // V2 improvements tests
 describe("generateDrizzleSchema V2 improvements", () => {
     it("should generate role-based security rule", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "admin_data",
             table: "admin_data",
             name: "Admin Data",
@@ -951,7 +951,7 @@ roles: ["admin"] }
         expect(result).toContain("string_to_array(rebase.roles(), ',') && ARRAY['admin']");
     });
     it("should generate multiple policies from operations array", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "notes",
             table: "notes",
             name: "Notes",
@@ -973,7 +973,7 @@ ownerField: "user_id" }
         expect(result).toContain('for: "update"');
     });
     it("should auto-generate names with operation suffix for operations array", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "items",
             table: "items",
             name: "Items",
@@ -988,7 +988,7 @@ access: "public" }
         expect(result).toContain('for: "delete"');
     });
     it("should not append operation suffix when operations array has single element", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "items",
             table: "items",
             name: "Items",
@@ -1005,7 +1005,7 @@ access: "public" }
         expect(result).not.toContain('pgPolicy("my_policy_select"');
     });
     it("should generate correct clauses per operation in operations array", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "notes",
             table: "notes",
             name: "Notes",
@@ -1030,7 +1030,7 @@ ownerField: "user_id" }
         expect(insertPolicy).not.toContain("using:");
     });
     it("operations array takes precedence over singular operation", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "items",
             table: "items",
             name: "Items",
@@ -1050,7 +1050,7 @@ access: "public" }
         expect(result).not.toContain('pgPolicy("test_delete"');
     });
     it("should handle roles combined with using true for unfiltered access", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "reports",
             table: "reports",
             name: "Reports",
@@ -1066,7 +1066,7 @@ using: "true" }
         expect(result).toContain("(true) AND (string_to_array(rebase.roles(), ',') && ARRAY['admin'])");
     });
     it("should use pgRoles instead of default 'public' when specified", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "tenant_data",
             table: "tenant_data",
             name: "Tenant Data",
@@ -1085,7 +1085,7 @@ pgRoles: ["app_role", "service_role"] }
         expect(authorPolicy).not.toContain('to: ["public"]');
     });
     it("should default to 'public' pgRole when pgRoles is not specified", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "default_data",
             table: "default_data",
             name: "Default Data",
@@ -1102,7 +1102,7 @@ access: "public" }
 
 describe("generateDrizzleSchema Deterministic Policies", () => {
     it("should generate the same policy name hash for identically configured rules", async () => {
-        const collections1: CollectionConfig[] = [{
+        const collections1: LegacyCollectionConfig[] = [{
             slug: "test1",
             table: "test_hash",
             name: "Test",
@@ -1113,7 +1113,7 @@ roles: ["admin", "user"] }
             ]
         }];
 
-        const collections2: CollectionConfig[] = [{
+        const collections2: LegacyCollectionConfig[] = [{
             slug: "test2",
             table: "test_hash", // Same table name
             name: "Test",
@@ -1137,7 +1137,7 @@ roles: ["admin", "user"] }
     });
 
     it("should generate the exact same SQL output regardless of array order in configuration", async () => {
-        const collectionsUnsorted: CollectionConfig[] = [{
+        const collectionsUnsorted: LegacyCollectionConfig[] = [{
             slug: "test_order",
             table: "test_order",
             name: "Test",
@@ -1151,7 +1151,7 @@ roles: ["admin", "user"] }
             ]
         }];
 
-        const collectionsSorted: CollectionConfig[] = [{
+        const collectionsSorted: LegacyCollectionConfig[] = [{
             slug: "test_order",
             table: "test_order",
             name: "Test",
@@ -1192,13 +1192,13 @@ roles: ["admin", "user"] }
     // project whose filename order differed from its slug order was reported
     // stale forever, and the fix it printed rewrote the file unchanged.
     it("should generate the exact same schema regardless of the order of the collections", async () => {
-        const articles: CollectionConfig = {
+        const articles: LegacyCollectionConfig = {
             slug: "articles",
             table: "articles",
             name: "Articles",
             properties: { title: { type: "string" } }
         };
-        const authors: CollectionConfig = {
+        const authors: LegacyCollectionConfig = {
             slug: "authors",
             table: "authors",
             name: "Authors",
@@ -1220,7 +1220,7 @@ describe("generateDrizzleSchema ID Generation", () => {
     };
 
     it("should generate a UUID primary key when isId is 'uuid'", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "items",
             table: "items",
             name: "Items",
@@ -1240,7 +1240,7 @@ isId: "uuid" }
     // with a column default, identity is a column property — so a name
     // promising `serial` would send a reader looking for the wrong thing.
     it("should generate an identity primary key when isId is 'increment'", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "tickets",
             table: "tickets",
             name: "Tickets",
@@ -1256,7 +1256,7 @@ isId: "increment" }
     });
 
     it("should generate a custom SQL primary key when isId is a sql string", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "events",
             table: "events",
             name: "Events",
@@ -1272,7 +1272,7 @@ isId: "sql`gen_random_uuid()`" }
     });
 
     it("should generate a normal text primary key when isId is simply true", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "users",
             table: "users",
             name: "Users",
@@ -1300,7 +1300,7 @@ describe("generateDrizzleSchema columnName support", () => {
     };
 
     it("should use explicit columnName as the SQL column name instead of deriving from the property key", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "billing",
             table: "company_billing_config",
             name: "Billing",
@@ -1331,7 +1331,7 @@ describe("generateDrizzleSchema columnName support", () => {
     });
 
     it("should fall back to toSnakeCase when columnName is not set (manually-authored collections)", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "products",
             table: "products",
             name: "Products",
@@ -1352,7 +1352,7 @@ describe("generateDrizzleSchema columnName support", () => {
     });
 
     it("should handle mixed properties — some with columnName, some without", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "config",
             table: "app_config",
             name: "Config",
@@ -1381,7 +1381,7 @@ describe("generateDrizzleSchema columnName support", () => {
     });
 
     it("should use columnName for all property types, not just strings", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "metrics",
             table: "metrics",
             name: "Metrics",
@@ -1420,7 +1420,7 @@ describe("generateDrizzleSchema columnName support", () => {
 
     it("should reproduce and prevent the medmot bug: digit+letter column names", async () => {
         // This is the exact scenario from the medmot project that caused the production failure
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "company_billing_config",
             table: "company_billing_config",
             name: "Company Billing Config",
@@ -1481,7 +1481,7 @@ name: "Company ID" }
     describe("generateDrizzleSchema autoValue date properties", () => {
 
         it("should add .default(sql`now()`) for on_create autoValue", async () => {
-            const collections: CollectionConfig[] = [
+            const collections: LegacyCollectionConfig[] = [
                 {
                     slug: "articles",
                     table: "articles",
@@ -1507,7 +1507,7 @@ name: "Company ID" }
         });
 
         it("should add .default(sql`now()`) for on_update autoValue (INSERT default only)", async () => {
-            const collections: CollectionConfig[] = [
+            const collections: LegacyCollectionConfig[] = [
                 {
                     slug: "articles",
                     table: "articles",
@@ -1532,7 +1532,7 @@ name: "Company ID" }
         });
 
         it("should not modify date columns without autoValue", async () => {
-            const collections: CollectionConfig[] = [
+            const collections: LegacyCollectionConfig[] = [
                 {
                     slug: "events",
                     table: "events",
@@ -1552,7 +1552,7 @@ name: "Company ID" }
         });
 
         it("should handle both on_create and on_update in the same collection", async () => {
-            const collections: CollectionConfig[] = [
+            const collections: LegacyCollectionConfig[] = [
                 {
                     slug: "posts",
                     table: "posts",
@@ -1582,7 +1582,7 @@ name: "Company ID" }
         });
 
         it("should handle on_create with date columnType", async () => {
-            const collections: CollectionConfig[] = [
+            const collections: LegacyCollectionConfig[] = [
                 {
                     slug: "logs",
                     table: "logs",
@@ -1632,7 +1632,7 @@ describe("the generated schema parses for names Postgres allows", () => {
     }
 
     it("for an enum value containing an apostrophe", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "people",
             table: "people",
             name: "People",
@@ -1648,7 +1648,7 @@ describe("the generated schema parses for names Postgres allows", () => {
     });
 
     it("for column names that are not JavaScript identifiers", async () => {
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "things",
             table: "things",
             name: "Things",
@@ -1667,14 +1667,14 @@ describe("the generated schema parses for names Postgres allows", () => {
     });
 
     it("for a relation whose foreign key is not a JavaScript identifier", async () => {
-        const authors: CollectionConfig = {
+        const authors: LegacyCollectionConfig = {
             slug: "authors",
             table: "authors",
             name: "Authors",
             properties: { id: { type: "string", isId: "uuid" } }
         };
 
-        const posts: CollectionConfig = {
+        const posts: LegacyCollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -1713,7 +1713,7 @@ describe("names that are legal in Postgres and not in JavaScript", () => {
         compilerOptions: { target: ts.ScriptTarget.ES2022 }
     }).diagnostics ?? [];
 
-    const id: StringProperty = { name: "ID", type: "string", isId: "uuid" };
+    const id: LegacyStringProperty = { name: "ID", type: "string", isId: "uuid" };
 
     it("a search column containing a hyphen still generates a file that parses", async () => {
         const out = await generateSchema(compileSet([{

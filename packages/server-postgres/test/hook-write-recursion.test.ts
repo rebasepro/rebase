@@ -16,7 +16,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -31,7 +32,7 @@ const stepsTable = pgTable("steps", { id: serial("id").primaryKey(), n: integer(
 
 let hookRuns = 0;
 
-const orders: CollectionConfig = {
+const orders: LegacyCollectionConfig = {
     name: "Orders", slug: "orders", table: "orders",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -48,7 +49,7 @@ const orders: CollectionConfig = {
 };
 
 /** A chain that ends: each step creates the next until `n` reaches the limit. */
-const steps: CollectionConfig = {
+const steps: LegacyCollectionConfig = {
     name: "Steps", slug: "steps", table: "steps",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },

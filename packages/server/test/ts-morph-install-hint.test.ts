@@ -3,7 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 /**
  * The `ts-morph` hint works where it is printed, and is printed only where the
@@ -92,7 +93,7 @@ describe("the install command, typed from the project root", () => {
 
 const JWT_SECRET = "ts-morph-hint-test-secret-0123456789abcdef";
 
-const POSTS: CollectionConfig = { name: "Posts", slug: "posts", table: "posts", properties: { id: { name: "ID", type: "string", isId: "uuid" } } };
+const POSTS: LegacyCollectionConfig = { name: "Posts", slug: "posts", table: "posts", properties: { id: { name: "ID", type: "string", isId: "uuid" } } };
 
 /** A driver that can scope by user (Postgres' `withAuth`, not on `DataDriver` itself). */
 type ScopableDriver = DataDriver & { withAuth(user: ScopeIdentity): Promise<DataDriver> };

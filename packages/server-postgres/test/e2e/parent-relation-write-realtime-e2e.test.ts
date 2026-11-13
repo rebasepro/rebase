@@ -15,7 +15,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
@@ -26,12 +26,12 @@ const postsTable = pgTable("posts", { id: varchar("id").primaryKey(), title: var
 const tagsTable = pgTable("tags", { id: varchar("id").primaryKey(), label: varchar("label") });
 const postsTagsTable = pgTable("posts_tags", { post_id: varchar("post_id"), tag_id: varchar("tag_id") });
 
-const tagsCollection: CollectionConfig = {
+const tagsCollection: LegacyCollectionConfig = {
     name: "Tags", slug: "tags", table: "tags",
     properties: { id: { name: "ID", type: "string", isId: true }, label: { name: "Label", type: "string" } }
 };
 
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     name: "Posts", slug: "posts", table: "posts",
     properties: { id: { name: "ID", type: "string", isId: true }, title: { name: "Title", type: "string" } },
     relations: [{

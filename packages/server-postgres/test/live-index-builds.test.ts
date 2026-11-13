@@ -24,14 +24,14 @@
  * `test/e2e/live-index-build-e2e.test.ts`.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { diffPlanAgainstCatalogue, type ExistingSchema } from "../src/schema/plan/diff-plan";
 import { ensureTables, planTableSchemaEnsure } from "../src/schema/ensure-tables";
 import { compileSet, planCollections } from "./helpers/plan-tables";
 
-const notes: PostgresCollectionConfig = {
+const notes: LegacyPostgresCollectionConfig = {
     slug: "notes",
     table: "notes",
     name: "Notes",
@@ -49,7 +49,7 @@ const notes: PostgresCollectionConfig = {
 };
 
 /** `notes` without the vector column, which PGlite cannot store without pgvector. */
-const plainNotes: CollectionConfig = {
+const plainNotes: LegacyCollectionConfig = {
     ...notes,
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
@@ -59,7 +59,7 @@ const plainNotes: CollectionConfig = {
 };
 
 /** A catalogue holding every table and column the plan wants, and no index. */
-function liveCatalogue(collections: CollectionConfig[]): ExistingSchema {
+function liveCatalogue(collections: LegacyCollectionConfig[]): ExistingSchema {
     const plan = planCollections(collections, { databaseExtensions: [] });
     const tables = new Map<string, Set<string>>();
     for (const table of plan.tables) {

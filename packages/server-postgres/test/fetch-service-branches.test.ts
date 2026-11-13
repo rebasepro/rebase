@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { integer, pgTable, text, vector } from "drizzle-orm/pg-core";
 import { FetchService } from "../src/services/FetchService";
 import { RelationService } from "../src/services/RelationService";
@@ -36,7 +36,7 @@ describe("FetchService — read-shape branches", () => {
     registry.registerPgTable(pgTable("authors", { id: integer("id").primaryKey(), name: text("name") }), "authors");
     registry.registerPgTable(pgTable("tags", { id: integer("id").primaryKey(), name: text("name") }), "tags");
 
-    const tagsCollection: CollectionConfig = {
+    const tagsCollection: LegacyCollectionConfig = {
         slug: "tags",
         name: "Tags",
         table: "tags",
@@ -47,7 +47,7 @@ isId: true },
         }
     };
 
-    const authorsCollection: CollectionConfig = {
+    const authorsCollection: LegacyCollectionConfig = {
         slug: "authors",
         name: "Authors",
         table: "authors",
@@ -61,7 +61,7 @@ isId: true },
     // One relation of each shape the junction branch has to tell apart: a
     // many-to-many that goes through `posts_tags`, and an owning belongsTo
     // that goes through nothing at all.
-    const postsCollection: CollectionConfig = {
+    const postsCollection: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",

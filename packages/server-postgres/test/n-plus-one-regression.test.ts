@@ -14,7 +14,7 @@
 import { RelationService } from "../src/services/RelationService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { relationOfTable } from "./helpers/relation-descriptors";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { arrayRowsFor, recordingDb, type RecordedQuery } from "./helpers/spg-b-recording-db";
@@ -24,7 +24,7 @@ const authorsTable = pgTable("authors", { id: integer("id").primaryKey(), name: 
 const postsTable = pgTable("posts", { id: integer("id").primaryKey(), title: text("title"), authorId: integer("author_id") });
 
 // ─── Collections ──────────────────────────────────────────────────
-const authorsCollection: CollectionConfig = {
+const authorsCollection: LegacyCollectionConfig = {
     slug: "authors",
     name: "Authors",
     table: "authors",
@@ -34,7 +34,7 @@ const authorsCollection: CollectionConfig = {
     }
 };
 
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",

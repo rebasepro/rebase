@@ -14,7 +14,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { integer, jsonb, pgTable, serial } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -37,7 +37,7 @@ const docs = {
         views: { name: "Views", type: "number" },
         schema: { name: "Schema", type: "map" }
     }
-} as CollectionConfig;
+} as LegacyCollectionConfig;
 
 let db: PGlite;
 

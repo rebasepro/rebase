@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, primaryKey, serial, timestamp, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -38,7 +38,7 @@ const tagsTable = pgTable("tags", {
     icon: varchar("icon")
 }, (table) => [primaryKey({ columns: [table.ns, table.name] })]);
 
-const docs: CollectionConfig = {
+const docs: LegacyCollectionConfig = {
     name: "Docs",
     slug: "docs",
     table: "docs",
@@ -61,7 +61,7 @@ const docs: CollectionConfig = {
 };
 
 /** The tables a storage scan reads, from fixture collections, with the driver seam that names them. */
-function scanSources(collections: CollectionConfig[]) {
+function scanSources(collections: LegacyCollectionConfig[]) {
     const fixture = tablesFromCollections(collections);
     return {
         tables: fixture.tables,
@@ -69,7 +69,7 @@ function scanSources(collections: CollectionConfig[]) {
     };
 }
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     name: "Tags",
     slug: "tags",
     table: "tags",

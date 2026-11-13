@@ -16,7 +16,8 @@ import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
-import type { AggregateParams, AggregateRow, CollectionConfig, DataDriver, SDKTableClient } from "@rebasepro/types";
+import type { AggregateParams, AggregateRow, DataDriver, SDKTableClient } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { buildSdkData } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { tablesFromCollections } from "../helpers/tables.js";
@@ -36,7 +37,7 @@ const ordersTable = pgTable("orders", {
     total: integer("total")
 });
 
-const orders: CollectionConfig = {
+const orders: LegacyCollectionConfig = {
     name: "Orders", slug: "orders", table: "orders",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },

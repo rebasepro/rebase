@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { loadOpenApiGenerator, mountOpenApiDocs } from "./docs";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../api/types";
 import { tablesFromCollections } from "../../test/helpers/tables";
 import { createRequireAuth, requireAdmin } from "../auth/middleware";
@@ -14,7 +14,7 @@ import { createRequireAuth, requireAdmin } from "../auth/middleware";
  * API Explorer fetches exactly that path — answered 404 for every project on the
  * platform, permanently. Nothing distinguished that from a project with no API.
  */
-const collections: CollectionConfig[] = [
+const collections: LegacyCollectionConfig[] = [
     { name: "posts", slug: "posts", properties: {} }
 ];
 

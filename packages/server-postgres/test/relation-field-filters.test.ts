@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { integer, pgTable, PgDialect, primaryKey, serial, timestamp, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, FilterValues } from "@rebasepro/types";
+import type { FilterValues } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ApiError } from "@rebasepro/server";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -60,7 +61,7 @@ const agenciesTable = pgTable("agencies", {
     name: varchar("name").notNull()
 });
 
-const applicationsCollection: CollectionConfig = {
+const applicationsCollection: LegacyCollectionConfig = {
     slug: "talent_applications",
     name: "Applications",
     properties: {
@@ -69,7 +70,7 @@ const applicationsCollection: CollectionConfig = {
     }
 };
 
-const skillsCollection: CollectionConfig = {
+const skillsCollection: LegacyCollectionConfig = {
     slug: "skills",
     name: "Skills",
     properties: {
@@ -78,13 +79,13 @@ const skillsCollection: CollectionConfig = {
     }
 };
 
-const agenciesCollection: CollectionConfig = {
+const agenciesCollection: LegacyCollectionConfig = {
     slug: "agencies",
     name: "Agencies",
     properties: { name: { name: "Name", type: "string" } }
 };
 
-const talentsCollection: CollectionConfig = {
+const talentsCollection: LegacyCollectionConfig = {
     slug: "talents",
     name: "Talents",
     properties: {

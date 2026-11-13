@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -32,7 +32,7 @@ const friendshipsTable = pgTable("friendships", {
     games: integer("games")
 });
 
-function people(withFriendPeople = false): CollectionConfig {
+function people(withFriendPeople = false): LegacyCollectionConfig {
     return {
         name: "People", slug: "people", table: "people",
         properties: {
@@ -70,7 +70,7 @@ function people(withFriendPeople = false): CollectionConfig {
     };
 }
 
-function friendships(): CollectionConfig {
+function friendships(): LegacyCollectionConfig {
     return {
         name: "Friendships", slug: "friendships", table: "friendships",
         properties: {

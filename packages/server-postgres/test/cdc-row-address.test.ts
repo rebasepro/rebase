@@ -12,7 +12,7 @@
  * address entirely.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -41,7 +41,7 @@ class MockWebSocket implements RealtimeClientSocket {
     public terminate = jest.fn();
 }
 
-const members: CollectionConfig = {
+const members: LegacyCollectionConfig = {
     slug: "members",
     name: "Members",
     table: "members",
@@ -52,7 +52,7 @@ const members: CollectionConfig = {
     }
 };
 
-const docs: CollectionConfig = {
+const docs: LegacyCollectionConfig = {
     slug: "docs",
     name: "Docs",
     table: "docs",

@@ -25,9 +25,11 @@ import {
     SIMULATE_API_KEY_ID_HEADER,
     SIMULATE_ROLE_HEADER,
     SIMULATE_USER_ID_HEADER,
-    SIMULATED_CONTEXT_HEADER,
-    type CollectionConfig
+    SIMULATED_CONTEXT_HEADER
 } from "@rebasepro/types";
+import {
+    type LegacyCollectionConfig
+} from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { tablesFrom } from "../helpers/tables.js";
@@ -42,7 +44,7 @@ import type { AuthRepository } from "../../../server/src/auth/interfaces.js";
 const JWT_SECRET = "rls-simulator-e2e-secret-that-is-long-enough-0123456789";
 const SERVICE_KEY = "rls-simulator-e2e-service-key-0123456789abcdef";
 
-const ticketsCollection: CollectionConfig = {
+const ticketsCollection: LegacyCollectionConfig = {
     name: "Tickets",
     slug: "tickets",
     table: "tickets",
@@ -59,7 +61,7 @@ const ticketsCollection: CollectionConfig = {
 };
 
 /** No rules of its own: the default policies admit administrators only. */
-const secretsCollection: CollectionConfig = {
+const secretsCollection: LegacyCollectionConfig = {
     name: "Secrets",
     slug: "secrets",
     table: "secrets",

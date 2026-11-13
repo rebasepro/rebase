@@ -1,6 +1,6 @@
-import { computeSchemaVersion, LEGACY_SCHEMA_VERSION_PREFIX, type CollectionConfig, type TableDescriptor } from "@rebasepro/types";
+import { computeSchemaVersion, LEGACY_SCHEMA_VERSION_PREFIX, type TableDescriptor } from "@rebasepro/types";
 import { compileTables } from "@rebasepro/common";
-import { collectionsToTableDefs } from "@rebasepro/common/migrate";
+import { collectionsToTableDefs, type LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { missingExtensionIssues, schemaStampIssues } from "../src/schema/doctor";
 
 /**
@@ -18,7 +18,7 @@ import { missingExtensionIssues, schemaStampIssues } from "../src/schema/doctor"
  * different set — a colleague's branch, an older deploy — makes every other
  * line of this report a description of somebody else's schema.
  */
-const withVector: CollectionConfig[] = [{
+const withVector: LegacyCollectionConfig[] = [{
     slug: "docs",
     name: "Docs",
     table: "docs",
@@ -28,7 +28,7 @@ const withVector: CollectionConfig[] = [{
     }
 }];
 
-const withoutVector: CollectionConfig[] = [{
+const withoutVector: LegacyCollectionConfig[] = [{
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -36,7 +36,7 @@ const withoutVector: CollectionConfig[] = [{
 }];
 
 /** The tables as the stamp sees them: compiled descriptors, the way `loadTableSchema` returns them. */
-const descriptorsOf = (collections: CollectionConfig[]): TableDescriptor[] =>
+const descriptorsOf = (collections: LegacyCollectionConfig[]): TableDescriptor[] =>
     compileTables(collectionsToTableDefs(collections).tables);
 
 describe("missing extensions", () => {

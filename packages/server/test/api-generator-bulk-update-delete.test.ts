@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import type { CollectionConfig, DataDriver, DeleteManyProps, SaveProps, UpdateManyProps } from "@rebasepro/types";
+import type { DataDriver, DeleteManyProps, SaveProps, UpdateManyProps } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { HonoEnv } from "../src/api/types";
 import { tablesFromCollections } from "./helpers/tables";
@@ -43,7 +44,7 @@ describe("bulk update and delete routes", () => {
             ...overrides
         });
 
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "posts", name: "Posts", singularName: "Post",
             properties: { title: { name: "Title", type: "string" } }
         }];

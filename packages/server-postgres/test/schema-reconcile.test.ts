@@ -12,7 +12,7 @@
  * Postgres then accepts.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { readReconcileFacts, reconcileDigest } from "../src/schema/reconcile-schema";
 import { compileSet } from "./helpers/plan-tables";
 
@@ -24,7 +24,7 @@ const queryable = (db: PGlite) => ({
 });
 
 /** The collection after the move: `wav` optional, `legacy_blob` gone from it. */
-const voiceCache: CollectionConfig = {
+const voiceCache: LegacyCollectionConfig = {
     name: "Voice cache",
     slug: "voice_cache",
     table: "voice_cache",

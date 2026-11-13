@@ -19,7 +19,7 @@
 import { createServer } from "node:http";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import pg from "pg";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { defaultUsersCollection } from "@rebasepro/common";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
@@ -29,7 +29,7 @@ import type { HonoEnv } from "../../../server/src/api/types.js";
 import { Hono } from "hono";
 import { tablesFrom, tablesFromCollections } from "../helpers/tables.js";
 
-const tickets: CollectionConfig = {
+const tickets: LegacyCollectionConfig = {
     name: "Tickets",
     slug: "tickets",
     table: "tickets",

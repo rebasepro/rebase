@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { pgTable, text } from "drizzle-orm/pg-core";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -22,7 +22,7 @@ import { recordingDb, shapedRows } from "./helpers/spg-c-db";
 describe("realtime updates — the key columns ride along", () => {
     type MockWebSocket = FakeRealtimeSocket;
 
-    const skuItemsCollection: CollectionConfig = {
+    const skuItemsCollection: LegacyCollectionConfig = {
         slug: "sku_items",
         name: "SKU Items",
         table: "sku_items",
@@ -34,7 +34,7 @@ isId: true },
     };
 
     // No isId, no registered table: keys cannot be resolved for this one.
-    const notesCollection: CollectionConfig = {
+    const notesCollection: LegacyCollectionConfig = {
         slug: "notes",
         name: "Notes",
         table: "notes",

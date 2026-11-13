@@ -14,14 +14,14 @@
  * parameter added to a dozen signatures is a parameter forgotten on the
  * thirteenth. These tests establish it the way the driver does.
  */
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { toFlatRow, toRestRow, stripUnreadable, canReadRelation } from "../src/services/row-pipeline";
 import { withFieldViewer, currentFieldViewer } from "../src/services/field-viewer";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { belongsTo, manyToMany } from "./helpers/relation-descriptors";
 
-const staff: CollectionConfig = {
+const staff: LegacyCollectionConfig = {
     name: "Staff",
     slug: "staff",
     properties: {
@@ -39,7 +39,7 @@ const staff: CollectionConfig = {
     }
 };
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     name: "Posts",
     slug: "posts",
     properties: {
@@ -60,7 +60,7 @@ function makeRegistry(): PostgresTableRegistry {
 
 const registry = makeRegistry();
 /** The table descriptor the strip reads, for a registered fixture. */
-const described = (collection: CollectionConfig) => registry.requireTable(collection.slug).descriptor;
+const described = (collection: LegacyCollectionConfig) => registry.requireTable(collection.slug).descriptor;
 const row = () => ({ id: 1, name: "Ada", salary: 90_000, rating: 5, passwordHash: "salt:hash" });
 
 describe("the REST row", () => {
@@ -187,12 +187,12 @@ describe("`_count`, the totals of counted relations", () => {
      * the rows. A relation property the caller may not read is withheld whole,
      * and its total says as much about it as its rows: it goes with them.
      */
-    const reviews: CollectionConfig = {
+    const reviews: LegacyCollectionConfig = {
         name: "Reviews",
         slug: "reviews",
         properties: { id: { name: "Id", type: "number", isId: "increment" } }
     };
-    const team: CollectionConfig = {
+    const team: LegacyCollectionConfig = {
         name: "Teams",
         slug: "teams",
         properties: {
@@ -267,7 +267,7 @@ describe("a withheld to-one relation", () => {
      * names the salary band exactly as `band: { id: 7 }` does. Withholding the
      * relation and serving the column beside it withheld nothing.
      */
-    const bands: CollectionConfig = {
+    const bands: LegacyCollectionConfig = {
         name: "Bands",
         slug: "bands",
         properties: {
@@ -276,7 +276,7 @@ describe("a withheld to-one relation", () => {
         }
     };
 
-    const people: CollectionConfig = {
+    const people: LegacyCollectionConfig = {
         name: "People",
         slug: "people",
         properties: {

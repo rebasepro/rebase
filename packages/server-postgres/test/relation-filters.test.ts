@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { integer, pgTable, PgDialect, primaryKey, serial, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, FilterValues } from "@rebasepro/types";
+import type { FilterValues } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ApiError } from "@rebasepro/server";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -56,10 +57,10 @@ const categoriesTable = pgTable("categories", {
     parentId: integer("parent_id")
 });
 
-const tagsCollection = { slug: "tags", name: "Tags", properties: {} } as CollectionConfig;
-const commentsCollection = { slug: "comments", name: "Comments", properties: {} } as CollectionConfig;
+const tagsCollection = { slug: "tags", name: "Tags", properties: {} } as LegacyCollectionConfig;
+const commentsCollection = { slug: "comments", name: "Comments", properties: {} } as LegacyCollectionConfig;
 
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     properties: {
@@ -85,7 +86,7 @@ const postsCollection: CollectionConfig = {
     }
 };
 
-const categoriesCollection: CollectionConfig = {
+const categoriesCollection: LegacyCollectionConfig = {
     slug: "categories",
     name: "Categories",
     properties: {
@@ -441,7 +442,7 @@ describe("filtering by a relation with no column on this row", () => {
         });
 
         it("still fails closed for a `via` relation, which has no inverse", () => {
-            const viaCollection: CollectionConfig = {
+            const viaCollection: LegacyCollectionConfig = {
                 slug: "posts",
                 name: "Posts",
                 properties: {

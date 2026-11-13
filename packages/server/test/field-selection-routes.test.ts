@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { mockDataDriver } from "./helpers/server-a-fakes";
 import { tablesFromCollections } from "./helpers/tables";
 
@@ -20,7 +20,7 @@ import { tablesFromCollections } from "./helpers/tables";
  * the route family the parameter was not wired into.
  */
 
-const post: CollectionConfig = {
+const post: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     singularName: "Post",
@@ -32,7 +32,7 @@ const post: CollectionConfig = {
     }
 };
 
-const author: CollectionConfig = {
+const author: LegacyCollectionConfig = {
     slug: "authors",
     name: "Authors",
     singularName: "Author",

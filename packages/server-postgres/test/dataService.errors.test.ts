@@ -1,6 +1,6 @@
 import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 const collectionRegistry = new FixtureTableRegistry();
@@ -53,7 +53,7 @@ dataType: "number" },
         _def: { tableName: "test_table" }
     };
 
-    const testCollection: CollectionConfig = {
+    const testCollection: LegacyCollectionConfig = {
         slug: "test",
         name: "Test Collection",
         table: "test_table",
@@ -153,7 +153,7 @@ primary: true },
                 name: { name: "name" },
                 _def: { tableName: "uuid_table" }
             };
-            const uuidCollection: CollectionConfig = {
+            const uuidCollection: LegacyCollectionConfig = {
                 slug: "uuidthings",
                 name: "UUID things",
                 table: "uuid_table",
@@ -162,7 +162,7 @@ primary: true },
 isId: "uuid" },
                     name: { type: "string" }
                 }
-            } as CollectionConfig;
+            } as LegacyCollectionConfig;
 
             jest.spyOn(collectionRegistry, "getCollectionByPath").mockImplementation(path =>
                 (path === "uuidthings" || path === "uuid_table") ? uuidCollection : undefined);

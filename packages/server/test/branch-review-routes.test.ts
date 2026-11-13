@@ -2,7 +2,8 @@ import { describe, expect, it, afterEach } from "@jest/globals";
 import { Hono } from "hono";
 import path from "node:path";
 import { createServer } from "node:http";
-import type { BackendBootstrapper, BranchDiff, BranchDiffOptions, BranchMergeOptions, BranchMergeResult, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, BranchDiff, BranchDiffOptions, BranchMergeOptions, BranchMergeResult, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 
@@ -92,8 +93,8 @@ async function boot(options: { canDiff?: boolean; roles?: Record<string, { scope
             return { userService: authRepository, authRepository };
         }
     };
-    const jobs: CollectionConfig = { name: "jobs", slug: "jobs", table: "jobs", properties: { id: { name: "ID", type: "string", isId: "uuid" } } };
-    const users: CollectionConfig[] = options.roles ? [{
+    const jobs: LegacyCollectionConfig = { name: "jobs", slug: "jobs", table: "jobs", properties: { id: { name: "ID", type: "string", isId: "uuid" } } };
+    const users: LegacyCollectionConfig[] = options.roles ? [{
         name: "Users", slug: "users", table: "users", auth: { enabled: true, roles: options.roles },
         properties: { id: { name: "ID", type: "string", isId: "uuid" }, email: { name: "Email", type: "string" } }
     }] : [];

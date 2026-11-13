@@ -7,7 +7,7 @@
  * up so a test can keep asserting about a single column without rebuilding a
  * whole file and grepping it.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { planSchema } from "../../src/schema/plan/plan-schema";
 import { renderColumnDefinition, renderPgType } from "../../src/schema/plan/render-ddl";
 import type { ColumnPlan } from "../../src/schema/plan/types";
@@ -18,7 +18,7 @@ import { planCollections } from "./plan-tables";
  * inverse relation, whose column lives on the target table.
  */
 export const planColumnFor = (
-    collections: CollectionConfig[],
+    collections: LegacyCollectionConfig[],
     slug: string,
     propName: string
 ): ColumnPlan | undefined => {
@@ -30,7 +30,7 @@ export const planColumnFor = (
 
 /** The Postgres type that column is declared with — `TEXT`, `JSONB`, `VECTOR(3)`. */
 export const planColumnTypeFor = (
-    collections: CollectionConfig[],
+    collections: LegacyCollectionConfig[],
     slug: string,
     propName: string
 ): string | undefined => {
@@ -40,7 +40,7 @@ export const planColumnTypeFor = (
 
 /** Everything after the column name, as `CREATE TABLE` writes it. */
 export const planColumnDefinitionFor = (
-    collections: CollectionConfig[],
+    collections: LegacyCollectionConfig[],
     slug: string,
     propName: string
 ): string | undefined => {

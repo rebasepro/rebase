@@ -10,12 +10,12 @@
  * (`posts.tags` and `tags.posts`) are the legitimate way to share a junction,
  * and they name the same two columns.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { planTableSchemaEnsure } from "../src/schema/ensure-tables";
 import { compileSet, planCollections } from "./helpers/plan-tables";
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     slug: "tags",
     table: "tags",
     name: "Tags",
@@ -26,7 +26,7 @@ const toTags = { kind: "manyToMany", target: () => tags } as const;
 
 describe("a junction table two relations resolve to", () => {
     it("is refused when they name different key columns, naming both relations", () => {
-        const posts: CollectionConfig = {
+        const posts: LegacyCollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -45,7 +45,7 @@ describe("a junction table two relations resolve to", () => {
     });
 
     it("is refused for a self-referencing pair too", () => {
-        const people: CollectionConfig = {
+        const people: LegacyCollectionConfig = {
             slug: "people",
             table: "people",
             name: "People",
@@ -59,7 +59,7 @@ describe("a junction table two relations resolve to", () => {
     });
 
     it("is shared by the two sides of one link", () => {
-        const posts: CollectionConfig = {
+        const posts: LegacyCollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -68,7 +68,7 @@ describe("a junction table two relations resolve to", () => {
                 tags: { name: "Tags", type: "relation", relation: toTags }
             }
         };
-        const taggedTags: CollectionConfig = {
+        const taggedTags: LegacyCollectionConfig = {
             ...tags,
             properties: {
                 ...tags.properties,
@@ -81,7 +81,7 @@ describe("a junction table two relations resolve to", () => {
     });
 
     it("is not shared once the second relation names its own", () => {
-        const posts: CollectionConfig = {
+        const posts: LegacyCollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",

@@ -1,4 +1,4 @@
-import { CollectionConfig, PostgresCollectionConfig, PostgresProperty } from "@rebasepro/types";
+import { LegacyCollectionConfig, LegacyPostgresCollectionConfig, LegacyPostgresProperty } from "@rebasepro/common/migrate";
 import { generatePostgresDdl, generatePostgresPoliciesDdl, planRelationalColumns } from "../src/schema/generate-postgres-ddl-logic";
 import { compileSet } from "./helpers/plan-tables";
 
@@ -12,7 +12,7 @@ describe("generatePostgresDdl", () => {
     };
 
     it("should generate a simple table with basic types", async () => {
-        const collections: CollectionConfig[] = [
+        const collections: LegacyCollectionConfig[] = [
             {
                 slug: "products",
                 table: "products",
@@ -37,7 +37,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate custom schemas", async () => {
-        const collections: PostgresCollectionConfig[] = [
+        const collections: LegacyPostgresCollectionConfig[] = [
             {
                 slug: "products",
                 table: "products",
@@ -55,7 +55,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate enum types", async () => {
-        const collections: CollectionConfig[] = [
+        const collections: LegacyCollectionConfig[] = [
             {
                 slug: "orders",
                 table: "orders",
@@ -75,7 +75,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate one-to-many relation foreign keys", async () => {
-        const usersCollection: CollectionConfig = {
+        const usersCollection: LegacyCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -83,7 +83,7 @@ describe("generatePostgresDdl", () => {
                 name: { type: "string" }
             }
         };
-        const postsCollection: CollectionConfig = {
+        const postsCollection: LegacyCollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -114,13 +114,13 @@ describe("generatePostgresDdl", () => {
     // made `onDelete`, a field nobody has to write, turn every parent delete
     // into a silent cascade.
     it("defaults a required belongsTo to ON DELETE RESTRICT, not CASCADE", async () => {
-        const usersCollection: CollectionConfig = {
+        const usersCollection: LegacyCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
             properties: { name: { type: "string" } }
         };
-        const postsCollection: CollectionConfig = {
+        const postsCollection: LegacyCollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -148,13 +148,13 @@ describe("generatePostgresDdl", () => {
     // The desired state boot-ensure diffs the live database against has to
     // carry the same default, or every boot plans a constraint rewrite.
     it("plans the same RESTRICT default for a required belongsTo", () => {
-        const usersCollection: CollectionConfig = {
+        const usersCollection: LegacyCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
             properties: { name: { type: "string" } }
         };
-        const postsCollection: CollectionConfig = {
+        const postsCollection: LegacyCollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -181,22 +181,22 @@ describe("generatePostgresDdl", () => {
     // one property type and "delete the children" on the other, with only the
     // first documented.
     it("gives a reference property the same ON DELETE rule as belongsTo", async () => {
-        const usersCollection: CollectionConfig = {
+        const usersCollection: LegacyCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
             properties: { name: { type: "string" } }
         };
-        const postsCollection: CollectionConfig = {
+        const postsCollection: LegacyCollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",
             properties: {
                 title: { type: "string" },
                 // Outside the type on purpose: Postgres properties are typed without `reference`, yet the planner still reads one as a foreign key.
-                author: { type: "reference", path: "users", validation: { required: true } } as unknown as PostgresProperty,
+                author: { type: "reference", path: "users", validation: { required: true } } as unknown as LegacyPostgresProperty,
                 // As above.
-                editor: { type: "reference", path: "users" } as unknown as PostgresProperty
+                editor: { type: "reference", path: "users" } as unknown as LegacyPostgresProperty
             }
         };
 
@@ -214,7 +214,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate many-to-many junction tables", async () => {
-        const postsCollection: CollectionConfig = {
+        const postsCollection: LegacyCollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -235,7 +235,7 @@ describe("generatePostgresDdl", () => {
                 }
             ]
         };
-        const tagsCollection: CollectionConfig = {
+        const tagsCollection: LegacyCollectionConfig = {
             slug: "tags",
             table: "tags",
             name: "Tags",
@@ -256,13 +256,13 @@ describe("generatePostgresDdl", () => {
     });
 
     it("locks junction tables by default and derives their policies", async () => {
-        const tagsCollection: CollectionConfig = {
+        const tagsCollection: LegacyCollectionConfig = {
             slug: "tags",
             table: "tags",
             name: "Tags",
             properties: { name: { type: "string" } }
         };
-        const postsCollection: CollectionConfig = {
+        const postsCollection: LegacyCollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -278,7 +278,7 @@ describe("generatePostgresDdl", () => {
                     through: { table: "posts_to_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
                 }
             ]
-        } as CollectionConfig;
+        } as LegacyCollectionConfig;
 
         const result = await generatePostgresDdl(compileSet([postsCollection, tagsCollection]));
         const cleanResult = cleanDdl(result);
@@ -303,13 +303,13 @@ describe("generatePostgresDdl", () => {
     });
 
     it("emits junction policies in the policies-only DDL as well", async () => {
-        const tagsCollection: CollectionConfig = {
+        const tagsCollection: LegacyCollectionConfig = {
             slug: "tags",
             table: "tags",
             name: "Tags",
             properties: { name: { type: "string" } }
         };
-        const postsCollection: CollectionConfig = {
+        const postsCollection: LegacyCollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -335,7 +335,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate column default values", async () => {
-        const collections: CollectionConfig[] = [
+        const collections: LegacyCollectionConfig[] = [
             {
                 slug: "users_uuid",
                 table: "users_uuid",
@@ -374,7 +374,7 @@ describe("generatePostgresDdl", () => {
         // default on Postgres and the first insert relying on it failed with
         // `function cuid() does not exist`. Refused where the property has a
         // name instead.
-        const collections: CollectionConfig[] = [
+        const collections: LegacyCollectionConfig[] = [
             {
                 slug: "users_cuid",
                 table: "users_cuid",
@@ -390,7 +390,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate RLS policies with ownerField and roles", async () => {
-        const collections: PostgresCollectionConfig[] = [
+        const collections: LegacyPostgresCollectionConfig[] = [
             {
                 slug: "posts",
                 table: "posts",
@@ -423,7 +423,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate advanced column types, constraints, and default values", async () => {
-        const collections: CollectionConfig[] = [
+        const collections: LegacyCollectionConfig[] = [
             {
                 slug: "items",
                 table: "items",
@@ -478,7 +478,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate RLS policies with restrictive mode, multiple operations, and custom using/check clauses", async () => {
-        const collections: PostgresCollectionConfig[] = [
+        const collections: LegacyPostgresCollectionConfig[] = [
             {
                 slug: "documents",
                 table: "documents",

@@ -23,7 +23,8 @@ import type { AddressInfo } from "node:net";
 import pg from "pg";
 import { Hono } from "hono";
 import { getRequestListener } from "@hono/node-server";
-import type { CollectionConfig, DataDriver, User } from "@rebasepro/types";
+import type { DataDriver, User } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { createRebaseClient } from "@rebasepro/client";
 
 import { startPgContainer, stopPgContainer, PGVECTOR_IMAGE, type PgContainer } from "./pg-setup.js";
@@ -39,7 +40,7 @@ import { tablesFrom, tablesFromCollections } from "../helpers/tables.js";
 
 const DIMS = 1536;
 
-const docs: CollectionConfig = {
+const docs: LegacyCollectionConfig = {
     name: "Docs", slug: "docs", table: "docs",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },

@@ -24,7 +24,8 @@ import { pgTable, varchar } from "drizzle-orm/pg-core";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
-import type { AuthAdapter, CollectionConfig } from "@rebasepro/types";
+import type { AuthAdapter } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 // From the file itself: the public entry point exports `configureJwt` only.
 import { configureJwt, generateAccessToken } from "../../../server/src/auth/jwt";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
@@ -46,7 +47,7 @@ const lobbyTable = pgTable("lobby", {
 });
 
 /** Readable by guests and nobody else: what `rebase.is_anonymous()` grants. */
-const lobbyCollection: CollectionConfig = {
+const lobbyCollection: LegacyCollectionConfig = {
     slug: "lobby",
     name: "Lobby",
     table: "lobby",
@@ -56,7 +57,7 @@ const lobbyCollection: CollectionConfig = {
     }
 };
 
-const briefingsCollection: CollectionConfig = {
+const briefingsCollection: LegacyCollectionConfig = {
     slug: "briefings",
     name: "Briefings",
     table: "briefings",

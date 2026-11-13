@@ -14,10 +14,10 @@
  * no longer admit (bare enum ids, a property type nothing defines), because
  * they are the shapes the generator was hardened against.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 /** Loosely written fixture data, handed to the generator as the collections it is. */
-const loose = (data: unknown[]): CollectionConfig[] => data.map(entry => entry as CollectionConfig);
+const loose = (data: unknown[]): LegacyCollectionConfig[] => data.map(entry => entry as LegacyCollectionConfig);
 
 const authorsCollection = {
     name: "Authors",
@@ -31,7 +31,7 @@ const authorsCollection = {
     }
 };
 
-function relationFixtures(): Record<string, () => CollectionConfig[]> {
+function relationFixtures(): Record<string, () => LegacyCollectionConfig[]> {
     const authorsNumeric = { slug: "authors", name: "authors", engine: "postgres", properties: { id: { type: "number", isId: "increment" } } };
     const authorsUuid = { slug: "authors", name: "authors", engine: "postgres", properties: { id: { type: "string", isId: "uuid" } } };
     return {
@@ -102,7 +102,7 @@ function relationFixtures(): Record<string, () => CollectionConfig[]> {
     };
 }
 
-function rowInsertUpdateFixtures(): Record<string, () => CollectionConfig[]> {
+function rowInsertUpdateFixtures(): Record<string, () => LegacyCollectionConfig[]> {
     const authors = { slug: "authors", name: "authors", properties: { id: { type: "number", isId: "increment" } } };
     const posts = {
         slug: "posts", name: "posts",
@@ -137,7 +137,7 @@ function rowInsertUpdateFixtures(): Record<string, () => CollectionConfig[]> {
     };
 }
 
-function excludedFixtures(): Record<string, () => CollectionConfig[]> {
+function excludedFixtures(): Record<string, () => LegacyCollectionConfig[]> {
     const owners = { slug: "owners", name: "owners", properties: { id: { name: "ID", type: "string", isId: "uuid" } } };
     const vault = {
         slug: "vault", name: "vault",
@@ -163,7 +163,7 @@ function excludedFixtures(): Record<string, () => CollectionConfig[]> {
     return { "exclude-from-api": () => loose([vault, owners]) };
 }
 
-function includeGraph(): CollectionConfig[] {
+function includeGraph(): LegacyCollectionConfig[] {
     const authors = {
         slug: "authors", name: "authors",
         properties: { id: { type: "string", isId: "uuid" }, name: { type: "string", validation: { required: true } } }
@@ -188,7 +188,7 @@ function includeGraph(): CollectionConfig[] {
     return loose([authors, comments, posts]);
 }
 
-function writeTypesGraph(): CollectionConfig[] {
+function writeTypesGraph(): LegacyCollectionConfig[] {
     const profiles = { slug: "profiles", name: "profiles", properties: { id: { type: "number", isId: "increment" } } };
     const comments: Record<string, unknown> = { slug: "comments", name: "comments" };
     const posts = {
@@ -257,7 +257,7 @@ function writeTypesGraph(): CollectionConfig[] {
  * (the lift caches per collection object, and the generator must not depend
  * on a previous run).
  */
-export const LEGACY_FIXTURES: Record<string, () => CollectionConfig[]> = {
+export const LEGACY_FIXTURES: Record<string, () => LegacyCollectionConfig[]> = {
     "authors": () => loose([authorsCollection]),
     "basic-types": () => loose([{
         slug: "types_collection", name: "types_collection",

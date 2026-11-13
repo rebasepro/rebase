@@ -1,4 +1,5 @@
-import { DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type CollectionConfig } from "@rebasepro/types";
+import { DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
+import { type LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { Hono } from "hono";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
@@ -27,12 +28,12 @@ import { tablesFromCollections } from "./helpers/tables";
  * 200, but one built against the wrong number now gets a 400 instead of a
  * quietly shortened page.
  */
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     slug: "tags", name: "Tags", singularName: "Tag", table: "tags",
     properties: { id: { name: "ID", type: "string", isId: true }, name: { name: "Name", type: "string" } }
 };
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts", name: "Posts", singularName: "Post", table: "posts",
     properties: {
         id: { name: "ID", type: "string", isId: true },

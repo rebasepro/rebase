@@ -19,7 +19,7 @@
  * are deployment decisions, so none of them is taken here. Being loud about the
  * gap is not a decision — it is the difference between a refusal and a lie.
  */
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { pgTable, serial, text, vector } from "drizzle-orm/pg-core";
 import { ApiError } from "@rebasepro/server";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
@@ -87,7 +87,7 @@ describe("the vector property named by a request", () => {
 });
 
 describe("a database without pgvector", () => {
-    const withVector: CollectionConfig = {
+    const withVector: LegacyCollectionConfig = {
         slug: "docs",
         table: "docs",
         name: "Docs",
@@ -187,7 +187,7 @@ describe("a database without pgvector", () => {
 });
 
 describe("a realtime subscription that asks for a vector search", () => {
-    const collection: CollectionConfig = {
+    const collection: LegacyCollectionConfig = {
         slug: "docs",
         name: "Docs",
         table: "docs",

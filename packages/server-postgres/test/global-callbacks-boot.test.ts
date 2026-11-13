@@ -18,7 +18,8 @@ import { createServer } from "node:http";
 import { PGlite } from "@electric-sql/pglite";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver, TableHooks } from "@rebasepro/types";
+import type { BackendBootstrapper, InitializedDriver, TableHooks } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { initializeRebaseBackend, _resetRebaseMock } from "@rebasepro/server";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
@@ -34,7 +35,7 @@ const notesTable = pgTable("notes", {
     tenant: varchar("tenant")
 });
 
-function notes(): CollectionConfig {
+function notes(): LegacyCollectionConfig {
     return {
         name: "Notes",
         slug: "notes",

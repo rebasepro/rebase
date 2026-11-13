@@ -9,7 +9,8 @@
  * select overwrote each other.
  */
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig, DriverAggregate } from "@rebasepro/types";
+import type { DriverAggregate } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { aggregateAlias } from "@rebasepro/types";
 import { ApiError } from "@rebasepro/server";
 import { integer, interval, numeric, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
@@ -27,7 +28,7 @@ const songs = pgTable("songs", {
     released: timestamp("released")
 });
 
-const songsCollection: CollectionConfig = {
+const songsCollection: LegacyCollectionConfig = {
     slug: "songs",
     name: "Songs",
     table: "songs",

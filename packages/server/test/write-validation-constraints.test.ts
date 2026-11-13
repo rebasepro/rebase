@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { assertKnownWriteFields, assertWriteValuesValid, type WriteViolation } from "../src/api/rest/write-validation";
 import { tableFrom } from "./helpers/tables";
 
@@ -30,7 +30,7 @@ const details = (error: { details?: unknown }): ConstraintDetails => error.detai
  * that a convenience flag has no business disabling.
  */
 describe("excludeFromApi is independent of strictWrites", () => {
-    const users = (strictWrites?: boolean): CollectionConfig => ({
+    const users = (strictWrites?: boolean): LegacyCollectionConfig => ({
         slug: "users",
         name: "Users",
         table: "users",
@@ -74,7 +74,7 @@ describe("excludeFromApi is independent of strictWrites", () => {
  * literally, so the slashes became characters and the flag became a letter.
  */
 describe("matches parity with the form", () => {
-    const codes = (matches: string | RegExp): CollectionConfig => ({
+    const codes = (matches: string | RegExp): LegacyCollectionConfig => ({
         slug: "codes",
         name: "Codes",
         table: "codes",
@@ -101,7 +101,7 @@ describe("matches parity with the form", () => {
 });
 
 describe("enum membership", () => {
-    const posts: CollectionConfig = {
+    const posts: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",
@@ -152,7 +152,7 @@ describe("enum membership", () => {
 });
 
 describe("email and url", () => {
-    const contacts: CollectionConfig = {
+    const contacts: LegacyCollectionConfig = {
         slug: "contacts",
         name: "Contacts",
         table: "contacts",
@@ -186,14 +186,14 @@ describe("email and url", () => {
 });
 
 describe("required on create", () => {
-    const authors: CollectionConfig = {
+    const authors: LegacyCollectionConfig = {
         slug: "authors",
         name: "Authors",
         table: "authors",
         properties: { id: { type: "number", isId: "increment" } }
     };
 
-    const posts: CollectionConfig = {
+    const posts: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",
@@ -235,7 +235,7 @@ describe("required on create", () => {
                 ...posts.properties,
                 code: { type: "string", validation: { required: true }, databaseDefault: true }
             }
-        } as CollectionConfig;
+        } as LegacyCollectionConfig;
         expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, tableFrom(withCode), { status: "new" })).not.toThrow();
         expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1, code: null }, tableFrom(withCode), { status: "new" })).not.toThrow();
 
@@ -243,7 +243,7 @@ describe("required on create", () => {
         const withoutFlag = {
             ...posts,
             properties: { ...posts.properties, code: { type: "string", validation: { required: true } } }
-        } as CollectionConfig;
+        } as LegacyCollectionConfig;
         const error = thrown(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, tableFrom(withoutFlag), { status: "new" }));
         expect(details(error).violations?.[0]).toMatchObject({ field: "code", code: "required" });
 
@@ -280,7 +280,7 @@ describe("required on create", () => {
         //
         // There is no way to know which fields a hook fills, so the check steps
         // aside entirely and `NOT NULL` is the backstop.
-        const withHook: CollectionConfig = {
+        const withHook: LegacyCollectionConfig = {
             ...posts,
             properties: {
                 ...posts.properties,
@@ -290,18 +290,18 @@ describe("required on create", () => {
             callbacks: {
                 beforeSave: ({ values }: { values: Record<string, unknown> }) => values
             }
-        } as CollectionConfig;
+        } as LegacyCollectionConfig;
 
         expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, tableFrom(withHook), { status: "new" })).not.toThrow();
 
         // The same collection without the hook still answers at the boundary.
-        const { callbacks: _dropped, ...withoutHook } = withHook as CollectionConfig & { callbacks?: unknown };
-        const error = thrown(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, tableFrom(withoutHook as CollectionConfig), { status: "new" }));
+        const { callbacks: _dropped, ...withoutHook } = withHook as LegacyCollectionConfig & { callbacks?: unknown };
+        const error = thrown(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, tableFrom(withoutHook as LegacyCollectionConfig), { status: "new" }));
         expect(details(error).violations?.[0]).toMatchObject({ field: "slug", code: "required" });
     });
 
     it("uses the author's own requiredMessage when there is one", () => {
-        const collection: CollectionConfig = {
+        const collection: LegacyCollectionConfig = {
             slug: "t", name: "T", table: "t",
             properties: { name: { type: "string", validation: { required: true, requiredMessage: "Every widget needs a name." } } }
         };
@@ -314,7 +314,7 @@ describe("required on create", () => {
 // refused like a missing value. The form already writes NULL for a cleared
 // field; an API caller sending `""` stored an empty required title.
 describe("an empty string on a required string", () => {
-    const posts: CollectionConfig = {
+    const posts: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",
@@ -363,14 +363,14 @@ describe("an empty string on a required string", () => {
         const withHook = {
             ...posts,
             callbacks: { beforeSave: ({ values }: { values: Record<string, unknown> }) => values }
-        } as CollectionConfig;
+        } as LegacyCollectionConfig;
         expect(() => assertWriteValuesValid({ title: "" }, tableFrom(withHook), { status: "new" })).not.toThrow();
         expect(() => assertWriteValuesValid({ title: "" }, tableFrom(withHook), { status: "existing" })).not.toThrow();
     });
 });
 
 describe("the 400 carries structured violations alongside the message list", () => {
-    const products: CollectionConfig = {
+    const products: LegacyCollectionConfig = {
         slug: "products",
         name: "Products",
         table: "products",
@@ -395,7 +395,7 @@ describe("the 400 carries structured violations alongside the message list", () 
     });
 
     it("dots the field through a map, so a nested input can be marked", () => {
-        const collection: CollectionConfig = {
+        const collection: LegacyCollectionConfig = {
             slug: "orders", name: "Orders", table: "orders",
             properties: {
                 address: {

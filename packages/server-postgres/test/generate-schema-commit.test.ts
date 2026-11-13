@@ -15,7 +15,7 @@
  * ensure path will not produce is a commit that makes the repository lie about
  * the database.
  */
-import type { CollectionConfig, PostgresProperties, StringProperty } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresProperties, LegacyStringProperty } from "@rebasepro/common/migrate";
 import {
     generateSchemaCommit as generateCompiledCommit,
     additiveStatements,
@@ -37,10 +37,10 @@ const generateSchemaCommit = (input: Omit<Parameters<typeof generateCompiledComm
     generateCompiledCommit({ ...input, before: compiledFromLegacy(input.before), after: compiledFromLegacy(input.after) });
 
 /** `additiveStatements` over the fixtures compiled, as the editor's input is. */
-const additiveStatementsOf = (before: CollectionConfig[], after: CollectionConfig[]): string[] =>
+const additiveStatementsOf = (before: LegacyCollectionConfig[], after: LegacyCollectionConfig[]): string[] =>
     additiveStatements(compiledFromLegacy(before), compiledFromLegacy(after));
 
-const collection = (slug: string, properties: PostgresProperties = {}): CollectionConfig =>
+const collection = (slug: string, properties: LegacyPostgresProperties = {}): LegacyCollectionConfig =>
     ({
         slug,
         name: slug,
@@ -50,9 +50,9 @@ const collection = (slug: string, properties: PostgresProperties = {}): Collecti
         }
     });
 
-const str = (over: Partial<StringProperty> = {}): StringProperty => ({ type: "string", name: "S", ...over });
+const str = (over: Partial<LegacyStringProperty> = {}): LegacyStringProperty => ({ type: "string", name: "S", ...over });
 
-const planOf = (collections: CollectionConfig[]) =>
+const planOf = (collections: LegacyCollectionConfig[]) =>
     planTableSchemaEnsure(compileSet(collections), { tables: new Map(), enums: new Set() }).statements;
 
 describe("additiveStatements — the delta between two ensure plans", () => {
@@ -86,7 +86,7 @@ describe("additiveStatements — the delta between two ensure plans", () => {
     });
 
     describe("round trip: before ∪ delta === after", () => {
-        const cases: Array<[string, CollectionConfig[], CollectionConfig[]]> = [
+        const cases: Array<[string, LegacyCollectionConfig[], LegacyCollectionConfig[]]> = [
             ["a first collection", [], [collection("posts", { title: str() })]],
             ["a second collection", [collection("posts")], [collection("posts"), collection("tags")]],
             ["a new property", [collection("posts")], [collection("posts", { subtitle: str() })]],
@@ -185,7 +185,7 @@ describe("generateSchemaCommit", () => {
 });
 
 describe("refusing a change the ensure path will not produce", () => {
-    const refuse = async (before: CollectionConfig[], after: CollectionConfig[]) => {
+    const refuse = async (before: LegacyCollectionConfig[], after: LegacyCollectionConfig[]) => {
         await expect(generateSchemaCommit({ before, after })).rejects.toThrow(SchemaCommitError);
         return generateSchemaCommit({ before, after }).catch(err => err as SchemaCommitError);
     };
@@ -223,7 +223,7 @@ describe("refusing a change the ensure path will not produce", () => {
 });
 
 describe("commitMessage", () => {
-    const message = (before: CollectionConfig[], after: CollectionConfig[]) =>
+    const message = (before: LegacyCollectionConfig[], after: LegacyCollectionConfig[]) =>
         commitMessage(classifyEditedTables(before, after));
 
     it("names a single new collection", () => {

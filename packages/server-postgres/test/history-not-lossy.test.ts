@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { HistoryService } from "../src/history/HistoryService";
 import { historyUnavailableReason } from "../src/history/ensure-history-table";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -118,7 +118,7 @@ describe("history is not lossy", () => {
 
     describe("PostgresBackendDriver", () => {
         const registry = new FixtureTableRegistry();
-        const posts: CollectionConfig = {
+        const posts: LegacyCollectionConfig = {
             slug: "posts",
             name: "Posts",
             table: "posts",

@@ -16,7 +16,8 @@
  */
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { Server } from "http";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 let mockWssInstance: { on: jest.Mock } | null = null;
 
@@ -39,7 +40,7 @@ import { fakeAuthAdapter, fakeDataDriver, fakeSocketRealtime, fakeRealtimeSocket
 import { registryOf } from "./helpers/spg-c-registry";
 import { unusedDb } from "./helpers/spg-c-db";
 
-const staff: CollectionConfig = {
+const staff: LegacyCollectionConfig = {
     name: "Staff",
     slug: "staff",
     table: "staff",
@@ -55,7 +56,7 @@ const staff: CollectionConfig = {
  * A collection whose rows reach `staff` through a relation, so an `include`
  * reads `staff`'s columns — and a vector only HR may read.
  */
-const depts: CollectionConfig = {
+const depts: LegacyCollectionConfig = {
     name: "Depts",
     slug: "depts",
     table: "depts",

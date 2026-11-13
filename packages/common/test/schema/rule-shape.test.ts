@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
-import { TABLE_BRAND, col, policy, type AnyTableDef, type CollectionConfig, type PostgresCollectionConfig, type SecurityRule } from "@rebasepro/types";
+import { TABLE_BRAND, col, policy, type AnyTableDef, type SecurityRule } from "@rebasepro/types";
+import { type LegacyCollectionConfig, type LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { getPolicyNameHash, isNewShapeRule } from "@rebasepro/utils";
 
 import { compileTables } from "../../src/schema/compile-tables";
@@ -43,7 +44,7 @@ function problemsOf(rules: SecurityRule[]): SchemaDefinitionProblem[] {
     return [];
 }
 
-const docs: CollectionConfig = {
+const docs: LegacyCollectionConfig = {
     slug: "docs",
     name: "Docs",
     table: "docs",
@@ -176,7 +177,7 @@ describe("S-1: the policy compiler is total — no clause is dropped for another
 });
 
 describe("S-1: the migration lift refuses a legacy rule it would widen", () => {
-    const legacy = (rules: SecurityRule[]): PostgresCollectionConfig => ({
+    const legacy = (rules: SecurityRule[]): LegacyPostgresCollectionConfig => ({
         slug: "notes",
         name: "Notes",
         table: "notes",
@@ -229,7 +230,7 @@ describe("S-1: the migration lift refuses a legacy rule it would widen", () => {
 });
 
 describe("the migration lift notes every legacy rule whose policy now grants something different", () => {
-    const legacy = (rules: SecurityRule[]): PostgresCollectionConfig => ({
+    const legacy = (rules: SecurityRule[]): LegacyPostgresCollectionConfig => ({
         slug: "notes",
         name: "Notes",
         table: "notes",

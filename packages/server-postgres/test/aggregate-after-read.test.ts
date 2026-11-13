@@ -10,7 +10,7 @@
  * door is driven here to prove it reaches the refusal.
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ApiError } from "@rebasepro/server";
 
 import { AuthenticatedPostgresBackendDriver, PostgresBackendDriver } from "../src/PostgresBackendDriver";
@@ -23,20 +23,20 @@ import { quietRealtime, testUser } from "./helpers/spg-a-driver";
 
 const mask = ({ row }: { row: Record<string, unknown> }) => ({ ...row, email: "***" });
 
-const plain: CollectionConfig = {
+const plain: LegacyCollectionConfig = {
     slug: "orders",
     name: "Orders",
     table: "orders",
     properties: { total: { type: "number" }, status: { type: "string" } }
 };
-const masked: CollectionConfig = {
+const masked: LegacyCollectionConfig = {
     slug: "customers",
     name: "Customers",
     table: "customers",
     properties: { email: { type: "string" }, salary: { type: "number" } },
     callbacks: { afterRead: mask }
 };
-const propertyMasked: CollectionConfig = {
+const propertyMasked: LegacyCollectionConfig = {
     slug: "staff",
     name: "Staff",
     table: "staff",

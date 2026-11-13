@@ -38,7 +38,8 @@ import { fileURLToPath } from "node:url";
 import { execa } from "execa";
 import pg from "pg";
 import { Hono } from "hono";
-import { isSQLAdmin, type CollectionConfig, type DataDriver, type DatabaseAdmin, type SecurityRule, type SQLAdmin, type User } from "@rebasepro/types";
+import { isSQLAdmin, type DataDriver, type DatabaseAdmin, type SecurityRule, type SQLAdmin, type User } from "@rebasepro/types";
+import { type LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
@@ -108,7 +109,7 @@ const ownerRules: SecurityRule[] = [
     { name: "owner_delete", operation: "delete", ownerField: "ownerId" }
 ];
 
-const notes: CollectionConfig = {
+const notes: LegacyCollectionConfig = {
     name: "Notes",
     slug: "notes",
     table: "notes",

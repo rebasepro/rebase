@@ -2,7 +2,8 @@ import { jest } from "@jest/globals";
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 import { tablesFromCollections } from "./helpers/tables";
 
@@ -24,7 +25,7 @@ import { tablesFromCollections } from "./helpers/tables";
  * one alone just moves the disagreement.
  */
 
-const post: CollectionConfig = {
+const post: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     singularName: "Post",
@@ -36,7 +37,7 @@ const post: CollectionConfig = {
     }
 };
 
-const author: CollectionConfig = {
+const author: LegacyCollectionConfig = {
     slug: "authors",
     name: "Authors",
     singularName: "Author",

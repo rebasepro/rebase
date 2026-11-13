@@ -15,7 +15,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, DataDriver, User } from "@rebasepro/types";
+import type { DataDriver, User } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -31,7 +32,7 @@ const staffTable = pgTable("staff", {
     passwordHash: varchar("password_hash")
 });
 
-function staffCollection(): CollectionConfig {
+function staffCollection(): LegacyCollectionConfig {
     return {
         name: "Staff",
         slug: "staff",
@@ -206,7 +207,7 @@ describe("a withheld relation, on the driver's reads", () => {
         bandId: integer("band_id")
     });
 
-    function bands(): CollectionConfig {
+    function bands(): LegacyCollectionConfig {
         return {
             name: "Bands", slug: "bands", table: "bands",
             properties: {
@@ -216,7 +217,7 @@ describe("a withheld relation, on the driver's reads", () => {
         };
     }
 
-    function people(): CollectionConfig {
+    function people(): LegacyCollectionConfig {
         return {
             name: "People", slug: "people", table: "people",
             properties: {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { col, defineTable, rel } from "@rebasepro/types";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { compileTables } from "../src/schema/compile-tables";
 import { collectionsToTableDefs } from "../src/migrate";
@@ -100,7 +100,7 @@ describe("restrictedKeys / apiHiddenKeys", () => {
 });
 
 describe("access agrees with field-access on every lifted fixture", () => {
-    const fixtures: CollectionConfig[] = ALL;
+    const fixtures: LegacyCollectionConfig[] = ALL;
     const { tables, defaultRls } = collectionsToTableDefs(fixtures);
     const descriptors = compileTables(tables, defaultRls ? { defaultRls } : {});
     const viewers = [undefined, { roles: [] }, { roles: ["user"] }, { roles: ["editor"] }, { roles: ["admin"] }];

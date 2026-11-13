@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ensureTablePolicies } from "../src/schema/ensure-policies";
 import type { Queryable } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
@@ -17,7 +17,7 @@ import { compileSet } from "./helpers/plan-tables";
  * all. So the reconciliation has to happen here too.
  */
 describe("ensureTablePolicies drops orphaned generated policies", () => {
-    const customers: CollectionConfig = {
+    const customers: LegacyCollectionConfig = {
         name: "Customers", slug: "customers", table: "customers", schema: "public",
         properties: {
             id: { name: "ID", type: "string", isId: true },

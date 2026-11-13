@@ -1,7 +1,8 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { Hono } from "hono";
 import { serializeLogicalCondition } from "@rebasepro/common";
-import type { CollectionConfig, DataDriver, FilterCondition, WhereFilterOp } from "@rebasepro/types";
+import type { DataDriver, FilterCondition, WhereFilterOp } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import type { HonoEnv } from "../src/api/types";
@@ -28,7 +29,7 @@ import { tablesFromCollections } from "./helpers/tables";
  * group describes a different set of rows from the `data` beside it.
  */
 
-const authors: CollectionConfig = {
+const authors: LegacyCollectionConfig = {
     name: "Authors",
     slug: "authors",
     table: "authors",

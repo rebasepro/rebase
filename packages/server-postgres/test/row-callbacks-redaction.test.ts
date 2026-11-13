@@ -3,7 +3,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { RealtimeService } from "../src/services/realtimeService";
 import { DataService } from "../src/services/dataService";
-import type { CollectionCallbacks, CollectionConfig, TableHooks } from "@rebasepro/types";
+import type { TableHooks } from "@rebasepro/types";
+import type { LegacyCollectionCallbacks, LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { registryOf } from "./helpers/spg-c-registry";
 
 /**
@@ -36,13 +37,13 @@ const maskEmail = (email: string): string => {
 };
 
 /** A representative per-collection redactor, wired in as a real callback. */
-const redactCustomer: CollectionCallbacks<CustomerValues>["afterRead"] = ({ row }) => ({
+const redactCustomer: LegacyCollectionCallbacks<CustomerValues>["afterRead"] = ({ row }) => ({
     ...row,
     email: maskEmail(row.email as string),
     phone: "***"
 });
 
-const customersCollection: CollectionConfig = {
+const customersCollection: LegacyCollectionConfig = {
     slug: "customers",
     name: "Customers",
     table: "customers",
@@ -72,7 +73,7 @@ function dataServiceOf(driver: PostgresBackendDriver): DataService {
  * only thing between the fixture and the assertion is the afterRead pipeline.
  */
 function buildDriver(
-    collection: CollectionConfig | undefined,
+    collection: LegacyCollectionConfig | undefined,
     rows: Record<string, unknown>[],
     globalHooks?: TableHooks
 ) {
@@ -134,7 +135,7 @@ describe("CollectionCallbacks.afterRead PII redaction on the rebase.data path", 
     it("returns rows unchanged when the collection defines no afterRead", async () => {
         // Guards the other direction: masking must come from the callback, not
         // from something the driver does to every row.
-        const plain = { slug: "customers", name: "C", table: "customers", properties: {} } as CollectionConfig;
+        const plain = { slug: "customers", name: "C", table: "customers", properties: {} } as LegacyCollectionConfig;
         const driver = buildDriver(plain, [RAW_CUSTOMER]);
 
         const rows = await driver.fetchCollection({ path: "customers" });
@@ -153,7 +154,7 @@ describe("CollectionCallbacks.afterRead PII redaction on the rebase.data path", 
                 return { ...values, trail: "global" };
             }
         };
-        const collection: CollectionConfig = {
+        const collection: LegacyCollectionConfig = {
             slug: "customers",
             name: "Customers",
             table: "customers",
@@ -189,7 +190,7 @@ describe("an afterRead that returns nothing", () => {
         jest.clearAllMocks();
     });
 
-    const plain: CollectionConfig = {
+    const plain: LegacyCollectionConfig = {
         slug: "customers",
         name: "Customers",
         table: "customers",

@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
 import { tablesFromCollections } from "./helpers/tables";
 
@@ -18,14 +18,14 @@ import { tablesFromCollections } from "./helpers/tables";
  * 404. Somebody checks whether the row exists, finds it in psql, concludes the
  * API is broken, and spends the afternoon in the wrong file.
  */
-const lines: CollectionConfig = {
+const lines: LegacyCollectionConfig = {
     slug: "order_lines",
     name: "Order lines",
     table: "order_lines",
     properties: { id: { name: "ID", type: "string", isId: "uuid" } }
 };
 
-const orders: CollectionConfig = {
+const orders: LegacyCollectionConfig = {
     slug: "orders",
     name: "Orders",
     table: "orders",

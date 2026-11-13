@@ -16,7 +16,8 @@
  */
 import type { McpAppCompilerSource as McpRouteConfigAppCompiler } from "../../src/mcp/mcp-apps";
 import { Hono } from "hono";
-import type { AuthAdapter, CollectionConfig, DataDriver, TableDescriptor } from "@rebasepro/types";
+import type { AuthAdapter, DataDriver, TableDescriptor } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { compileTables, lowerTables, type AnySchemaDef } from "@rebasepro/common";
 import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 import { generateAccessToken } from "../../src/auth/jwt";
@@ -158,7 +159,7 @@ export function memoryStore(): OAuthStore {
  * holds them for the same tables: lifted to definitions (the temporary
  * bridge for fixtures) and compiled. What the MCP tools describe and show.
  */
-export function tablesOf(collections: readonly CollectionConfig[]): TableDescriptor[] {
+export function tablesOf(collections: readonly LegacyCollectionConfig[]): TableDescriptor[] {
     const { tables, defaultRls } = collectionsToTableDefs(collections);
     return compileTables(tables, defaultRls ? { defaultRls } : {});
 }
@@ -168,13 +169,13 @@ export function tablesOf(collections: readonly CollectionConfig[]): TableDescrip
  * registry holds and the tables lowered for the data path, from one compile.
  * Spread into {@link buildApp}'s options.
  */
-export function schemaOf(defs: readonly AnySchemaDef[]): { tables: TableDescriptor[]; collections: CollectionConfig[] } {
+export function schemaOf(defs: readonly AnySchemaDef[]): { tables: TableDescriptor[]; collections: LegacyCollectionConfig[] } {
     const tables = compileTables(defs);
     const collections = lowerTables(defs, { describe: slug => tables.find(table => table.slug === slug) });
     return { tables, collections };
 }
 
-export const COLLECTIONS: CollectionConfig[] = [{
+export const COLLECTIONS: LegacyCollectionConfig[] = [{
     slug: "candidates",
     name: "Candidates",
     properties: {
@@ -231,7 +232,7 @@ export interface HarnessOptions {
     appCompiler?: McpRouteConfigAppCompiler;
     allowDynamicRegistration?: boolean;
     driver?: DataDriver;
-    collections?: CollectionConfig[];
+    collections?: LegacyCollectionConfig[];
     /** The descriptors the tools read. Those of `collections` when absent. */
     tables?: TableDescriptor[];
     identity?: McpGrantIdentity;

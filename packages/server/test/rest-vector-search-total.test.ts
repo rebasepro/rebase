@@ -30,11 +30,11 @@ import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
 import { DataDriver } from "../../types/src/controllers/data_driver";
-import { CollectionConfig } from "../../types/src/types/collections";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { VectorSearchParams } from "../../types/src/controllers/data_driver";
 import { tablesFromCollections } from "./helpers/tables";
 
-const collections: CollectionConfig[] = [
+const collections: LegacyCollectionConfig[] = [
     { slug: "docs", name: "Docs", singularName: "Doc", properties: {} }
 ];
 

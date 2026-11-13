@@ -5,7 +5,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createServer } from "node:http";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 import type { RebaseAuthConfig } from "../src/backend/options";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
@@ -57,7 +58,7 @@ function apiKeyRow(token: string, admin: boolean): Record<string, unknown> {
     };
 }
 
-function collection(slug: string): CollectionConfig {
+function collection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,

@@ -8,11 +8,11 @@
  * dollar-quoted function bodies full of `;` and `--`, and `ADD COLUMN IF NOT
  * EXISTS` for the columns Atlas is never shown.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { findUnmigratedSchema, replayMigrationTables } from "../src/schema/migration-freshness";
 import { compileSet } from "./helpers/plan-tables";
 
-const notes: CollectionConfig = {
+const notes: LegacyCollectionConfig = {
     slug: "notes",
     table: "notes",
     name: "Notes",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { FetchService } from "../src/services/FetchService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -32,7 +32,7 @@ const postsTable = pgTable("posts", {
 });
 
 // Declared lazily so the two collections can name each other.
-const authorsCollection: CollectionConfig = {
+const authorsCollection: LegacyCollectionConfig = {
     slug: "authors",
     name: "Authors",
     table: "authors",
@@ -51,7 +51,7 @@ const authorsCollection: CollectionConfig = {
     ]
 };
 
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",

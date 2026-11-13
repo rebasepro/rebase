@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionCallbacks, CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionCallbacks, LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { composeCallbacks, createCallContext } from "../src/index";
 
@@ -9,17 +9,17 @@ import { composeCallbacks, createCallContext } from "../src/index";
  * calling it — no driver, no database, no boot.
  */
 describe("callback helpers from @rebasepro/server", () => {
-    const posts: CollectionConfig = {
+    const posts: LegacyCollectionConfig = {
         name: "Posts",
         slug: "posts",
         table: "posts",
         properties: { title: { name: "Title", type: "string" }, slug: { name: "Slug", type: "string" } }
     };
 
-    const slugFromTitle: CollectionCallbacks = {
+    const slugFromTitle: LegacyCollectionCallbacks = {
         beforeSave: ({ values }) => ({ slug: String(values.title).toLowerCase().replace(/\s+/g, "-") })
     };
-    const requireTitle: CollectionCallbacks = {
+    const requireTitle: LegacyCollectionCallbacks = {
         beforeSave: ({ values }) => {
             if (!values.title) throw new Error("A post needs a title.");
             return values;
@@ -43,7 +43,7 @@ describe("callback helpers from @rebasepro/server", () => {
     });
 
     it("names the context field a hook used and the test did not provide", async () => {
-        const notify: CollectionCallbacks = {
+        const notify: LegacyCollectionCallbacks = {
             afterSave: async ({ context, id }) => {
                 await context.client.functions!.invoke("notify", { id });
             }

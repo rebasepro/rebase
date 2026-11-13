@@ -7,7 +7,8 @@
  * next boot (`ensureTablePolicies`). The audit trail is the feature, and
  * it recorded the opposite of what happened.
  */
-import type { CollectionConfig, SecurityRule } from "@rebasepro/types";
+import type { SecurityRule } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { classifyEditedTables as classifyCompiledTables, commitMessage, generateSchemaCommit as generateCompiledCommit } from "../src/schema/generate-schema-commit";
 import { compiledFromLegacy } from "./helpers/edited-tables";
 
@@ -19,7 +20,7 @@ const classifyEditedTables = (before: Parameters<typeof compiledFromLegacy>[0], 
 const generateSchemaCommit = (input: Omit<Parameters<typeof generateCompiledCommit>[0], "before" | "after"> & { before: Parameters<typeof compiledFromLegacy>[0]; after: Parameters<typeof compiledFromLegacy>[0] }) =>
     generateCompiledCommit({ ...input, before: compiledFromLegacy(input.before), after: compiledFromLegacy(input.after) });
 
-const posts = (securityRules: SecurityRule[]): CollectionConfig => ({
+const posts = (securityRules: SecurityRule[]): LegacyCollectionConfig => ({
     slug: "posts",
     name: "Posts",
     table: "posts",

@@ -12,7 +12,7 @@
  * The equivalence asserted here is the point — not the escaping mechanics but
  * the invariant that both generators carry the same SQL, whatever is in it.
  */
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { generatePolicyStatements } from "../src/schema/generate-postgres-ddl-logic";
 import { compileSet } from "./helpers/plan-tables";
@@ -33,7 +33,7 @@ const emittedClauses = (schema: string): string[] => {
     return out;
 };
 
-const collectionWith = (using: string): CollectionConfig => ({
+const collectionWith = (using: string): LegacyCollectionConfig => ({
     slug: "docs",
     table: "docs",
     name: "Docs",

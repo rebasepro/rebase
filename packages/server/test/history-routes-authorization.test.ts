@@ -30,7 +30,8 @@
 import { Hono } from "hono";
 import { createHistoryRoutes, type HistoryService } from "../src/history/history-routes";
 import type { BackendCollectionRegistry } from "../src/collections/BackendCollectionRegistry";
-import type { ApiKeyMasked, CollectionConfig } from "@rebasepro/types";
+import type { ApiKeyMasked } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { tablesFromCollections } from "./helpers/tables";
@@ -55,7 +56,7 @@ function apiKey(scopes: string[]): ApiKeyMasked {
     };
 }
 
-function collection(slug: string, history = true): CollectionConfig {
+function collection(slug: string, history = true): LegacyCollectionConfig {
     return {
         name: slug,
         slug,

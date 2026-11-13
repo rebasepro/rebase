@@ -3,7 +3,7 @@
  * name, and a registry that answers `getPgTable` from a fixed map.
  */
 import type { PgTable } from "drizzle-orm/pg-core";
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import type { LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./tables";
 
@@ -12,7 +12,7 @@ import { FixtureTableRegistry } from "./tables";
  * (a relation's `target`, a scope's parent). `name` defaults to the slug and
  * `properties` to none.
  */
-export function namedCollection(slug: string, extra: Partial<PostgresCollectionConfig> = {}): PostgresCollectionConfig {
+export function namedCollection(slug: string, extra: Partial<LegacyPostgresCollectionConfig> = {}): LegacyPostgresCollectionConfig {
     return {
         slug,
         name: slug,

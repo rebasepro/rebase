@@ -10,13 +10,13 @@
  */
 import { buildTableInputSchema } from "../src/api/openapi-generator";
 import { descriptorOf, tablesFromCollections } from "./helpers/tables";
-import { CollectionConfig } from "../../types/src/types/collections";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
-const profiles: CollectionConfig = { slug: "profiles", name: "Profiles", table: "profiles", properties: { id: { name: "ID", type: "number", isId: "increment" } } };
-const tags: CollectionConfig = { slug: "tags", name: "Tags", table: "tags", properties: { id: { name: "ID", type: "string", isId: "uuid" } } };
-const authors: CollectionConfig = { slug: "authors", name: "Authors", table: "authors", properties: { id: { name: "ID", type: "number", isId: "increment" } } };
+const profiles: LegacyCollectionConfig = { slug: "profiles", name: "Profiles", table: "profiles", properties: { id: { name: "ID", type: "number", isId: "increment" } } };
+const tags: LegacyCollectionConfig = { slug: "tags", name: "Tags", table: "tags", properties: { id: { name: "ID", type: "string", isId: "uuid" } } };
+const authors: LegacyCollectionConfig = { slug: "authors", name: "Authors", table: "authors", properties: { id: { name: "ID", type: "number", isId: "increment" } } };
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts", name: "Posts", table: "posts",
     properties: {
         id: { type: "string", isId: "uuid" },

@@ -14,7 +14,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, text, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
@@ -27,7 +27,7 @@ const ticketsTable = pgTable("tickets", {
     code: text("code").notNull()
 });
 
-const tickets: CollectionConfig = {
+const tickets: LegacyCollectionConfig = {
     name: "Tickets", slug: "tickets", table: "tickets",
     properties: {
         id: { type: "string", isId: true },

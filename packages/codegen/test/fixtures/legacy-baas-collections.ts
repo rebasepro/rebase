@@ -3,10 +3,10 @@
  * before that fixture moved to `defineTable`: the legacy half of its parity
  * proof (see `legacy-collections.ts`).
  */
-import { defineCollection } from "@rebasepro/common";
-import type { AnyCollectionConfig } from "@rebasepro/types";
+import { defineLegacyCollection } from "@rebasepro/common/migrate";
+import type { LegacyAnyCollectionConfig } from "@rebasepro/common/migrate";
 
-export const authors = defineCollection({
+export const authors = defineLegacyCollection({
     name: "Authors",
     slug: "authors",
     table: "authors",
@@ -20,12 +20,12 @@ export const authors = defineCollection({
         posts: {
             name: "Posts",
             type: "relation",
-            relation: { kind: "hasMany", target: (): AnyCollectionConfig => posts, foreignKeyOnTarget: "author_id" }
+            relation: { kind: "hasMany", target: (): LegacyAnyCollectionConfig => posts, foreignKeyOnTarget: "author_id" }
         },
         profile: {
             name: "Profile",
             type: "relation",
-            relation: { kind: "hasOne", target: (): AnyCollectionConfig => profiles, foreignKeyOnTarget: "author_id" }
+            relation: { kind: "hasOne", target: (): LegacyAnyCollectionConfig => profiles, foreignKeyOnTarget: "author_id" }
         },
         // A single-hop to-one `via`: the target holds the key, so it is writable.
         profileVia: {
@@ -34,14 +34,14 @@ export const authors = defineCollection({
             relation: {
                 kind: "via",
                 cardinality: "one",
-                target: (): AnyCollectionConfig => profiles,
+                target: (): LegacyAnyCollectionConfig => profiles,
                 joinPath: [{ table: "profiles", on: { from: "id", to: "author_id" } }]
             }
         }
     }
 });
 
-export const profiles = defineCollection({
+export const profiles = defineLegacyCollection({
     name: "Profiles",
     slug: "profiles",
     table: "profiles",
@@ -51,7 +51,7 @@ export const profiles = defineCollection({
     }
 });
 
-export const tags = defineCollection({
+export const tags = defineLegacyCollection({
     name: "Tags",
     slug: "tags",
     table: "tags",
@@ -61,7 +61,7 @@ export const tags = defineCollection({
     }
 });
 
-export const posts = defineCollection({
+export const posts = defineLegacyCollection({
     name: "Posts",
     slug: "posts",
     table: "posts",
@@ -77,7 +77,7 @@ export const posts = defineCollection({
         author: {
             name: "Author",
             type: "relation",
-            relation: { kind: "belongsTo", target: (): AnyCollectionConfig => authors, localKey: "author_id" }
+            relation: { kind: "belongsTo", target: (): LegacyAnyCollectionConfig => authors, localKey: "author_id" }
         },
         tags: {
             name: "Tags",
@@ -105,7 +105,7 @@ export const posts = defineCollection({
     }
 });
 
-export const orderItems = defineCollection({
+export const orderItems = defineLegacyCollection({
     name: "Order items",
     slug: "order_items",
     table: "order_items",
@@ -116,7 +116,7 @@ export const orderItems = defineCollection({
     }
 });
 
-export const myNotes = defineCollection({
+export const myNotes = defineLegacyCollection({
     name: "My notes",
     slug: "my-notes",
     table: "my_notes",
@@ -132,7 +132,7 @@ export const myNotes = defineCollection({
  * and one nobody may write (their foreign key goes with them), and a multi-hop
  * `via`, which is read-only.
  */
-export const comments = defineCollection({
+export const comments = defineLegacyCollection({
     name: "Comments",
     slug: "comments",
     table: "comments",
@@ -143,19 +143,19 @@ export const comments = defineCollection({
             name: "Post",
             type: "relation",
             validation: { required: true },
-            relation: { kind: "belongsTo", target: (): AnyCollectionConfig => posts, localKey: "post_id" }
+            relation: { kind: "belongsTo", target: (): LegacyAnyCollectionConfig => posts, localKey: "post_id" }
         },
         moderator: {
             name: "Moderator",
             type: "relation",
             excludeFromApi: true,
-            relation: { kind: "belongsTo", target: (): AnyCollectionConfig => authors, localKey: "moderator_id" }
+            relation: { kind: "belongsTo", target: (): LegacyAnyCollectionConfig => authors, localKey: "moderator_id" }
         },
         reviewer: {
             name: "Reviewer",
             type: "relation",
             access: { write: [] },
-            relation: { kind: "belongsTo", target: (): AnyCollectionConfig => authors, localKey: "reviewer_id" }
+            relation: { kind: "belongsTo", target: (): LegacyAnyCollectionConfig => authors, localKey: "reviewer_id" }
         },
         postTags: {
             name: "Post tags",
@@ -163,7 +163,7 @@ export const comments = defineCollection({
             relation: {
                 kind: "via",
                 cardinality: "many",
-                target: (): AnyCollectionConfig => tags,
+                target: (): LegacyAnyCollectionConfig => tags,
                 joinPath: [
                     { table: "posts", on: { from: "post_id", to: "id" } },
                     { table: "posts_tags", on: { from: "id", to: "posts_id" } },

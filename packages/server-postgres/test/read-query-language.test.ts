@@ -1,4 +1,5 @@
-import type { CollectionConfig, LogicalCondition } from "@rebasepro/types";
+import type { LogicalCondition } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql, type SQL } from "drizzle-orm";
 import { PgDialect, integer, pgTable, text, vector } from "drizzle-orm/pg-core";
@@ -28,14 +29,14 @@ describe("the read query language", () => {
         authors: textTable("authors", ["id", "name"])
     };
 
-    const authorsCollection: CollectionConfig = {
+    const authorsCollection: LegacyCollectionConfig = {
         slug: "authors",
         name: "Authors",
         table: "authors",
         properties: { id: { type: "number", isId: true }, name: { type: "string" } }
     };
 
-    const commentsCollection: CollectionConfig = {
+    const commentsCollection: LegacyCollectionConfig = {
         slug: "comments",
         name: "Comments",
         table: "comments",
@@ -47,7 +48,7 @@ describe("the read query language", () => {
         }
     };
 
-    const postsCollection: CollectionConfig = {
+    const postsCollection: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",

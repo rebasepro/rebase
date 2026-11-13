@@ -20,14 +20,15 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
-import type { CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import type { InitializedDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper } from "../../src/PostgresBootstrapper.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import type { RealtimeService } from "../../src/services/realtimeService.js";
 
-const ordersCollection: CollectionConfig = {
+const ordersCollection: LegacyCollectionConfig = {
     name: "Orders",
     slug: "orders",
     table: "orders",

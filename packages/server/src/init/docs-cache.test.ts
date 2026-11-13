@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../api/types";
 import { createRequireAuth, requireAdmin } from "../auth/middleware";
 
@@ -27,10 +27,10 @@ jest.mock("../api/openapi-generator", () => {
 import { loadOpenApiGenerator, mountOpenApiDocs } from "./docs";
 import { tablesFromCollections } from "../../test/helpers/tables";
 
-const posts: CollectionConfig[] = [{ name: "posts", slug: "posts", properties: { title: { name: "Title", type: "string" } } }];
-const tags: CollectionConfig[] = [{ name: "tags", slug: "tags", properties: { label: { name: "Label", type: "string" } } }];
+const posts: LegacyCollectionConfig[] = [{ name: "posts", slug: "posts", properties: { title: { name: "Title", type: "string" } } }];
+const tags: LegacyCollectionConfig[] = [{ name: "tags", slug: "tags", properties: { label: { name: "Label", type: "string" } } }];
 
-async function mounted(collections: CollectionConfig[]): Promise<Hono<HonoEnv>> {
+async function mounted(collections: LegacyCollectionConfig[]): Promise<Hono<HonoEnv>> {
     const app = new Hono<HonoEnv>();
     mountOpenApiDocs(app, "/api", {
         enableSwagger: true,

@@ -21,7 +21,7 @@
  * touches a table, which the last two tests check.
  */
 import { describe, it, expect } from "@jest/globals";
-import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { planTableSchemaEnsure, type ExistingSchema } from "../src/schema/ensure-tables";
 import {
     buildSearchColumnSpec,
@@ -32,7 +32,7 @@ import {
 } from "../src/schema/search-column";
 import { compileSet } from "./helpers/plan-tables";
 
-const talents = (search: PostgresCollectionConfig["search"]): PostgresCollectionConfig => ({
+const talents = (search: LegacyPostgresCollectionConfig["search"]): LegacyPostgresCollectionConfig => ({
     slug: "talents",
     table: "talents",
     name: "Talents",
@@ -51,8 +51,8 @@ const hybrid = talents({ language: "spanish", mode: "hybrid", fields: ["full_nam
 /** For contrast: the change that genuinely *is* a column rebuild. */
 const folded = talents({ language: "spanish", unaccent: true, fields: ["full_name", "headline"] });
 
-const specOf = (c: CollectionConfig) => buildSearchColumnSpec(c)!;
-const stampOf = (c: CollectionConfig) => searchColumnStamps(specOf(c))[0].fingerprint;
+const specOf = (c: LegacyCollectionConfig) => buildSearchColumnSpec(c)!;
+const stampOf = (c: LegacyCollectionConfig) => searchColumnStamps(specOf(c))[0].fingerprint;
 
 /** A database that already has the table and a column built from `stamp`. */
 const existing = (stamp: string): ExistingSchema => ({
@@ -74,7 +74,7 @@ describe("`mode` does not describe the column", () => {
     });
 
     it("is therefore not drift, so a live collection can switch with a deploy", () => {
-        const plan = planTableSchemaEnsure(compileSet([hybrid as CollectionConfig]), existing(stampOf(fts)));
+        const plan = planTableSchemaEnsure(compileSet([hybrid as LegacyCollectionConfig]), existing(stampOf(fts)));
 
         expect(plan.searchDrift).toEqual([]);
         expect(plan.actions.filter(a => a.kind === "add-column")).toEqual([]);
@@ -84,7 +84,7 @@ describe("`mode` does not describe the column", () => {
         // The contrast is what makes the test above mean something: if `mode`
         // were silently ignored by the planner rather than genuinely
         // column-neutral, both cases would come back clean.
-        const plan = planTableSchemaEnsure(compileSet([folded as CollectionConfig]), existing(stampOf(fts)));
+        const plan = planTableSchemaEnsure(compileSet([folded as LegacyCollectionConfig]), existing(stampOf(fts)));
 
         expect(plan.searchDrift).toHaveLength(1);
         expect(plan.searchDrift[0].rebuild[0])

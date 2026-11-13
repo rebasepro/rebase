@@ -1,7 +1,8 @@
 import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
 import { createServer } from "node:http";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver, RebaseServerClient } from "@rebasepro/types";
+import type { BackendBootstrapper, DataDriver, InitializedDriver, RebaseServerClient } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 
 import { initializeRebaseBackend } from "../src/init";
@@ -39,7 +40,7 @@ import { tablesFrom } from "./helpers/tables";
  * the privilege of this accessor must be a decision, not a diff.
  */
 
-function collection(slug: string): CollectionConfig {
+function collection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,

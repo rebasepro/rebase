@@ -1,11 +1,11 @@
-import { CollectionConfig, Relation } from "@rebasepro/types";
+import { LegacyCollectionConfig, LegacyRelation } from "@rebasepro/common/migrate";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { resolveRelation } from "@rebasepro/common";
 import { col, defineTable, rel } from "@rebasepro/types";
 import { compileSchema } from "@rebasepro/common";
 import { compileSet } from "./helpers/plan-tables";
 
-const mockAuthorCollection: CollectionConfig = {
+const mockAuthorCollection: LegacyCollectionConfig = {
     name: "Author",
     slug: "author",
     table: "authors",
@@ -19,7 +19,7 @@ const mockAuthorCollection: CollectionConfig = {
     }
 };
 
-const mockPostCollection: CollectionConfig = {
+const mockPostCollection: LegacyCollectionConfig = {
     name: "Post",
     slug: "posts",
     table: "posts",
@@ -36,7 +36,7 @@ const mockPostCollection: CollectionConfig = {
     }
 };
 
-const mockTagCollection: CollectionConfig = {
+const mockTagCollection: LegacyCollectionConfig = {
     name: "Tag",
     slug: "tags",
     table: "tags",
@@ -53,7 +53,7 @@ const mockTagCollection: CollectionConfig = {
 describe("resolveRelation", () => {
 
     it("should generate a default relationName if not provided", () => {
-        const relation: Partial<Relation> = {
+        const relation: Partial<LegacyRelation> = {
             kind: "belongsTo",
             target: () => mockPostCollection,
             };
@@ -64,7 +64,7 @@ describe("resolveRelation", () => {
     // --- Belongs-To (cardinality: 'one', direction: 'owning') ---
     describe("Belongs-To (one-to-one/many-to-one)", () => {
         it("should generate default localKey for a simple belongs-to relation", () => {
-            const relation: Partial<Relation> = {
+            const relation: Partial<LegacyRelation> = {
                 kind: "belongsTo",
                 relationName: "post",
                 target: () => mockPostCollection,
@@ -74,7 +74,7 @@ describe("resolveRelation", () => {
         });
 
         it("should use provided `localKey` for a belongs-to relation", () => {
-            const relation: Partial<Relation> = {
+            const relation: Partial<LegacyRelation> = {
                 kind: "belongsTo",
                 relationName: "post",
                 target: () => mockPostCollection,
@@ -88,7 +88,7 @@ describe("resolveRelation", () => {
     // --- Inverse One-to-One (cardinality: 'one', direction: 'inverse') ---
     describe("Inverse One-to-One", () => {
         it("should generate default foreignKeyOnTarget for an inverse one-to-one relation", () => {
-            const relation: Partial<Relation> = {
+            const relation: Partial<LegacyRelation> = {
                 kind: "hasOne",
                 relationName: "profile",
                 target: () => mockPostCollection,
@@ -98,7 +98,7 @@ describe("resolveRelation", () => {
         });
 
         it("should use provided `foreignKeyOnTarget` for an inverse one-to-one relation", () => {
-            const relation: Partial<Relation> = {
+            const relation: Partial<LegacyRelation> = {
                 kind: "hasOne",
                 relationName: "profile",
                 target: () => mockPostCollection,
@@ -118,7 +118,7 @@ describe("resolveRelation", () => {
             // resolved relation — via a `...relation` spread, say — would let
             // downstream consumers pair against a name the generator never used,
             // and Drizzle silently drops relations whose two sides disagree.
-            const relation: Relation = {
+            const relation: LegacyRelation = {
                 kind: "hasOne",
                 relationName: "profile",
                 target: () => mockPostCollection,
@@ -138,7 +138,7 @@ describe("resolveRelation", () => {
             // relation "posts" must not point it at `posts_id`. The body used to
             // declare `hasOne`, so the hasMany branch's own default was never
             // reached and the two kinds could drift apart unnoticed.
-            const relation: Partial<Relation> = {
+            const relation: Partial<LegacyRelation> = {
                 kind: "hasMany",
                 relationName: "posts",
                 target: () => mockPostCollection,
@@ -150,7 +150,7 @@ describe("resolveRelation", () => {
         });
 
         it("should use provided `foreignKeyOnTarget` for a has-many relation", () => {
-            const relation: Partial<Relation> = {
+            const relation: Partial<LegacyRelation> = {
                 kind: "hasMany",
                 relationName: "posts",
                 target: () => mockPostCollection,
@@ -164,7 +164,7 @@ describe("resolveRelation", () => {
     // --- Many-To-Many (cardinality: 'many', through) ---
     describe("Many-To-Many", () => {
         it("should use provided `through` for a many-to-many relation", () => {
-            const relation: Partial<Relation> = {
+            const relation: Partial<LegacyRelation> = {
                 kind: "manyToMany",
                 relationName: "tags",
                 target: () => mockTagCollection,
@@ -198,7 +198,7 @@ describe("resolveRelation", () => {
             // exhaustive and an unrecognised kind throws. The old body declared
             // `hasOne`, i.e. it exercised the classified path it was written to
             // rule out.
-            const relation: Relation = {
+            const relation: LegacyRelation = {
                 kind: "many",
                 relationName: "posts",
                 target: () => mockPostCollection
@@ -207,7 +207,7 @@ describe("resolveRelation", () => {
         });
 
         it("should handle 'one' with 'owning' direction", () => {
-            const relation: Partial<Relation> = {
+            const relation: Partial<LegacyRelation> = {
                 kind: "belongsTo",
                 relationName: "author",
                 target: () => mockAuthorCollection,
@@ -234,7 +234,7 @@ describe("Comprehensive Relations Test Suite", () => {
 
     describe("Many-to-Many Relations", () => {
         it("should handle many-to-many with a through table", async () => {
-            const authorsCollection: CollectionConfig = {
+            const authorsCollection: LegacyCollectionConfig = {
                 slug: "authors",
                 table: "authors",
                 name: "Authors",
@@ -244,7 +244,7 @@ describe("Comprehensive Relations Test Suite", () => {
                 }
             };
 
-            const booksCollection: CollectionConfig = {
+            const booksCollection: LegacyCollectionConfig = {
                 slug: "books",
                 table: "books",
                 name: "Books",
@@ -264,7 +264,7 @@ describe("Comprehensive Relations Test Suite", () => {
         });
 
         it("should handle a 4-table many-to-many chain with joinPath", async () => {
-            const usersCollection: CollectionConfig = {
+            const usersCollection: LegacyCollectionConfig = {
                 slug: "users",
                 table: "users",
                 name: "Users",
@@ -274,14 +274,14 @@ describe("Comprehensive Relations Test Suite", () => {
                 }
             };
 
-            const rolesCollection: CollectionConfig = {
+            const rolesCollection: LegacyCollectionConfig = {
                 slug: "roles",
                 table: "roles",
                 name: "Roles",
                 properties: { name: { type: "string" } }
             };
 
-            const permissionsCollection: CollectionConfig = {
+            const permissionsCollection: LegacyCollectionConfig = {
                 slug: "permissions",
                 table: "permissions",
                 name: "Permissions",
@@ -311,7 +311,7 @@ describe("Comprehensive Relations Test Suite", () => {
 
     describe("Owning Relations", () => {
         it("should generate owning one-to-one relations", async () => {
-            const authorsCollection: CollectionConfig = {
+            const authorsCollection: LegacyCollectionConfig = {
                 slug: "authors",
                 table: "authors",
                 name: "Authors",
@@ -321,7 +321,7 @@ describe("Comprehensive Relations Test Suite", () => {
                 }
             };
 
-            const profilesCollection: CollectionConfig = {
+            const profilesCollection: LegacyCollectionConfig = {
                 slug: "profiles",
                 table: "profiles",
                 name: "Profiles",
@@ -347,7 +347,7 @@ describe("Comprehensive Relations Test Suite", () => {
         });
 
         it("should generate owning one-to-many relations", async () => {
-            const categoriesCollection: CollectionConfig = {
+            const categoriesCollection: LegacyCollectionConfig = {
                 slug: "categories",
                 table: "categories",
                 name: "Categories",
@@ -356,7 +356,7 @@ describe("Comprehensive Relations Test Suite", () => {
                 }
             };
 
-            const postsCollection: CollectionConfig = {
+            const postsCollection: LegacyCollectionConfig = {
                 slug: "posts",
                 table: "posts",
                 name: "Posts",
@@ -378,7 +378,7 @@ describe("Comprehensive Relations Test Suite", () => {
 
     describe("Mixed Relation Types", () => {
         it("should handle collections with multiple relations", async () => {
-            const authorsCollection: CollectionConfig = {
+            const authorsCollection: LegacyCollectionConfig = {
                 slug: "authors",
                 table: "authors",
                 name: "Authors",
@@ -388,7 +388,7 @@ describe("Comprehensive Relations Test Suite", () => {
                 }
             };
 
-            const publishersCollection: CollectionConfig = {
+            const publishersCollection: LegacyCollectionConfig = {
                 slug: "publishers",
                 table: "publishers",
                 name: "Publishers",
@@ -397,7 +397,7 @@ describe("Comprehensive Relations Test Suite", () => {
                 }
             };
 
-            const booksCollection: CollectionConfig = {
+            const booksCollection: LegacyCollectionConfig = {
                 slug: "books",
                 table: "books",
                 name: "Books",
@@ -422,7 +422,7 @@ describe("Comprehensive Relations Test Suite", () => {
 
     describe("Complex Multi-Column Relations", () => {
         it("should handle multi-column foreign keys", async () => {
-            const ordersCollection: CollectionConfig = {
+            const ordersCollection: LegacyCollectionConfig = {
                 slug: "orders",
                 table: "orders",
                 name: "Orders",
@@ -434,7 +434,7 @@ validation: { integer: true } },
                 }
             };
 
-            const customersCollection: CollectionConfig = {
+            const customersCollection: LegacyCollectionConfig = {
                 slug: "customers",
                 table: "customers",
                 name: "Customers",
@@ -473,7 +473,7 @@ validation: { integer: true } },
 
     describe("Edge Cases and Production Scenarios", () => {
         it("should handle self-referencing many-to-many", async () => {
-            const usersCollection: CollectionConfig = {
+            const usersCollection: LegacyCollectionConfig = {
                 slug: "users",
                 table: "users",
                 name: "Users",
@@ -493,7 +493,7 @@ validation: { integer: true } },
         });
 
         it("should handle mixed ID types in relations", async () => {
-            const productsCollection: CollectionConfig = {
+            const productsCollection: LegacyCollectionConfig = {
                 slug: "products",
                 table: "products",
                 name: "Products",
@@ -505,7 +505,7 @@ isId: true },
                 }
             };
 
-            const categoriesCollection: CollectionConfig = {
+            const categoriesCollection: LegacyCollectionConfig = {
                 slug: "categories",
                 table: "categories",
                 name: "Categories",
@@ -525,7 +525,7 @@ isId: true },
         });
 
         it("should handle circular references", async () => {
-            const aCollection: CollectionConfig = {
+            const aCollection: LegacyCollectionConfig = {
                 slug: "a_entities",
                 table: "a_entities",
                 name: "A Entities",
@@ -535,7 +535,7 @@ isId: true },
                 }
             };
 
-            const bCollection: CollectionConfig = {
+            const bCollection: LegacyCollectionConfig = {
                 slug: "b_entities",
                 table: "b_entities",
                 name: "B Entities",
@@ -583,7 +583,7 @@ describe("Shared relationName regression", () => {
     };
 
     it("should emit identical relationName for one-to-many owning + inverse pair", async () => {
-        const companiesCollection: CollectionConfig = {
+        const companiesCollection: LegacyCollectionConfig = {
             slug: "companies",
             table: "companies",
             name: "Companies",
@@ -600,7 +600,7 @@ describe("Shared relationName regression", () => {
             ]
         };
 
-        const jobsCollection: CollectionConfig = {
+        const jobsCollection: LegacyCollectionConfig = {
             slug: "jobs",
             table: "jobs",
             name: "Jobs",
@@ -633,7 +633,7 @@ describe("Shared relationName regression", () => {
     });
 
     it("emits the FK-less side of a one-to-one with its own columns, under the owning side's relationName", async () => {
-        const usersCollection: CollectionConfig = {
+        const usersCollection: LegacyCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -650,7 +650,7 @@ describe("Shared relationName regression", () => {
             ]
         };
 
-        const profilesCollection: CollectionConfig = {
+        const profilesCollection: LegacyCollectionConfig = {
             slug: "profiles",
             table: "profiles",
             name: "Profiles",
@@ -692,7 +692,7 @@ describe("Shared relationName regression", () => {
     });
 
     it("keeps two hasOne relations to the same target apart", async () => {
-        const companiesCollection: CollectionConfig = {
+        const companiesCollection: LegacyCollectionConfig = {
             slug: "companies",
             table: "companies",
             name: "Companies",
@@ -703,7 +703,7 @@ describe("Shared relationName regression", () => {
             ]
         };
 
-        const billingCollection: CollectionConfig = {
+        const billingCollection: LegacyCollectionConfig = {
             slug: "billing_configs",
             table: "billing_configs",
             name: "Billing configs",
@@ -734,7 +734,7 @@ describe("Shared relationName regression", () => {
     });
 
     it("emits a self-referencing hasOne beside its belongsTo", async () => {
-        const employeesCollection: CollectionConfig = {
+        const employeesCollection: LegacyCollectionConfig = {
             slug: "employees",
             table: "employees",
             name: "Employees",
@@ -757,7 +757,7 @@ describe("Shared relationName regression", () => {
     });
 
     it("joins a hasOne on its sourceKey", async () => {
-        const companiesCollection: CollectionConfig = {
+        const companiesCollection: LegacyCollectionConfig = {
             slug: "companies",
             table: "companies",
             name: "Companies",
@@ -767,7 +767,7 @@ describe("Shared relationName regression", () => {
             ]
         };
 
-        const billingCollection: CollectionConfig = {
+        const billingCollection: LegacyCollectionConfig = {
             slug: "billing_configs",
             table: "billing_configs",
             name: "Billing configs",
@@ -786,7 +786,7 @@ describe("Shared relationName regression", () => {
     });
 
     it("should emit different shared names for multiple relations between same tables", async () => {
-        const companiesCollection: CollectionConfig = {
+        const companiesCollection: LegacyCollectionConfig = {
             slug: "companies",
             table: "companies",
             name: "Companies",
@@ -807,7 +807,7 @@ describe("Shared relationName regression", () => {
             ]
         };
 
-        const peopleCollection: CollectionConfig = {
+        const peopleCollection: LegacyCollectionConfig = {
             slug: "people",
             table: "people",
             name: "People",
@@ -873,7 +873,7 @@ describe("Duplicate relation deduplication regression", () => {
         //   - Explicit relation: { relationName: "company", localKey: "company_id", ... }
         //   - Property:          { company_id: { type: "relation", relationName: "company" } }
         // Both reference the same FK `company_id`, but under different keys.
-        const companiesCollection: CollectionConfig = {
+        const companiesCollection: LegacyCollectionConfig = {
             slug: "companies",
             table: "companies",
             name: "Companies",
@@ -890,7 +890,7 @@ describe("Duplicate relation deduplication regression", () => {
             ]
         };
 
-        const jobsCollection: CollectionConfig = {
+        const jobsCollection: LegacyCollectionConfig = {
             slug: "jobs",
             table: "jobs",
             name: "Jobs",
@@ -936,7 +936,7 @@ describe("Duplicate relation deduplication regression", () => {
     it("should not create aliases when relation key contains underscores", async () => {
         // Verify that resolving a collection with a snake_case relation name
         // does NOT produce slug-variant alias entries in the generated schema
-        const parentCollection: CollectionConfig = {
+        const parentCollection: LegacyCollectionConfig = {
             slug: "departments",
             table: "departments",
             name: "Departments",
@@ -953,7 +953,7 @@ describe("Duplicate relation deduplication regression", () => {
             ]
         };
 
-        const memberCollection: CollectionConfig = {
+        const memberCollection: LegacyCollectionConfig = {
             slug: "team-members",
             table: "team_members",
             name: "Team Members",
@@ -998,7 +998,7 @@ describe("Duplicate relation deduplication regression", () => {
 
     it("should handle multiple different relations to the same target without duplicates", async () => {
         // Two separate FKs from one table to the same target table
-        const usersCollection: CollectionConfig = {
+        const usersCollection: LegacyCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -1006,7 +1006,7 @@ describe("Duplicate relation deduplication regression", () => {
             relations: []
         };
 
-        const messagesCollection: CollectionConfig = {
+        const messagesCollection: LegacyCollectionConfig = {
             slug: "messages",
             table: "messages",
             name: "Messages",
@@ -1084,7 +1084,7 @@ describe("columnName vs property key deduplication regression", () => {
         // The inverse relation on clients uses foreignKeyOnTarget: "client_id" (raw column).
         // Without the fix, the synthetic loop would emit a broken second relation
         // using engagements.client_id (which doesn't exist as a Drizzle property).
-        const clientsCollection: CollectionConfig = {
+        const clientsCollection: LegacyCollectionConfig = {
             slug: "clients",
             table: "clients",
             name: "Clients",
@@ -1102,7 +1102,7 @@ describe("columnName vs property key deduplication regression", () => {
             ]
         };
 
-        const engagementsCollection: CollectionConfig = {
+        const engagementsCollection: LegacyCollectionConfig = {
             slug: "engagements",
             table: "engagements",
             name: "Engagements",
@@ -1145,7 +1145,7 @@ describe("columnName vs property key deduplication regression", () => {
     });
 
     it("should produce matching relation names on both sides when columnName differs from property key", async () => {
-        const clientsCollection: CollectionConfig = {
+        const clientsCollection: LegacyCollectionConfig = {
             slug: "clients",
             table: "clients",
             name: "Clients",
@@ -1163,7 +1163,7 @@ describe("columnName vs property key deduplication regression", () => {
             ]
         };
 
-        const engagementsCollection: CollectionConfig = {
+        const engagementsCollection: LegacyCollectionConfig = {
             slug: "engagements",
             table: "engagements",
             name: "Engagements",
@@ -1210,7 +1210,7 @@ describe("columnName vs property key deduplication regression", () => {
 
     it("should correctly handle inverse one-to-one with columnName on target", async () => {
         // One-to-one: user has a profile, profile has userId with columnName: "user_id"
-        const usersCollection: CollectionConfig = {
+        const usersCollection: LegacyCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -1228,7 +1228,7 @@ describe("columnName vs property key deduplication regression", () => {
             ]
         };
 
-        const profilesCollection: CollectionConfig = {
+        const profilesCollection: LegacyCollectionConfig = {
             slug: "profiles",
             table: "profiles",
             name: "Profiles",
@@ -1273,7 +1273,7 @@ describe("columnName vs property key deduplication regression", () => {
     it("should still emit synthetic relations when no explicit owning relation exists", async () => {
         // When a collection has a FK column but no explicit owning relation defined,
         // the synthetic loop should still create the missing relation.
-        const categoriesCollection: CollectionConfig = {
+        const categoriesCollection: LegacyCollectionConfig = {
             slug: "categories",
             table: "categories",
             name: "Categories",
@@ -1291,7 +1291,7 @@ describe("columnName vs property key deduplication regression", () => {
             ]
         };
 
-        const productsCollection: CollectionConfig = {
+        const productsCollection: LegacyCollectionConfig = {
             slug: "products",
             table: "products",
             name: "Products",

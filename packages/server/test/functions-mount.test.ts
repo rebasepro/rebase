@@ -3,7 +3,8 @@ import { Hono } from "hono";
 import fs from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
@@ -22,7 +23,7 @@ import { tablesFrom } from "./helpers/tables";
  * whole router.
  */
 
-function collection(slug: string): CollectionConfig {
+function collection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,

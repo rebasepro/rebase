@@ -13,7 +13,8 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, User } from "@rebasepro/types";
+import type { User } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { testUser } from "./helpers/spg-a-driver";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
@@ -32,7 +33,7 @@ const docsTable = pgTable("docs", {
 /** When set, a `beforeSave` that tries to rewrite the creator. */
 let hookRewritesCreator: boolean;
 
-function docsCollection(): CollectionConfig {
+function docsCollection(): LegacyCollectionConfig {
     return {
         name: "Docs",
         slug: "docs",

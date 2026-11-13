@@ -4,16 +4,18 @@ import { pathToFileURL } from "url";
 import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 import { col, defineTable } from "@rebasepro/types";
 import type {
-    AnyCollectionConfig,
     AnyTableDef,
     AnyViewDef,
-    CollectionConfig,
     CompiledTable,
     DefaultRls,
     PostgresCollectionConfig,
     SecurityRule,
     TableDescriptor
 } from "@rebasepro/types";
+import type {
+    LegacyAnyCollectionConfig,
+    LegacyCollectionConfig
+} from "@rebasepro/common/migrate";
 import { compileSchemaDefs } from "../../src/schema/load-schema";
 import type { DriverCollectionOf } from "../../src/schema/driver-seam";
 import type { ServedTable } from "../../src/api/rest/served-table";
@@ -43,10 +45,10 @@ export interface LiftedTables {
  * ```
  */
 export function tablesFrom(
-    collections: readonly (CollectionConfig | AnyCollectionConfig)[],
+    collections: readonly (LegacyCollectionConfig | LegacyAnyCollectionConfig)[],
     options: { defaultSecurityRules?: readonly SecurityRule[] } = {}
 ): LiftedTables {
-    const narrowed: CollectionConfig[] = collections.map(collection => collection);
+    const narrowed: LegacyCollectionConfig[] = collections.map(collection => collection);
     const { tables, defaultRls } = collectionsToTableDefs(narrowed, options);
     return defaultRls ? { tables, defaultRls } : { tables };
 }
@@ -60,6 +62,7 @@ export function tablesFrom(
 export interface FixtureTables {
     tables: CompiledTable[];
     descriptors: TableDescriptor[];
+    /** The definitions lowered back into collections (the kernel's runtime input; gone with the lowering). */
     collections: PostgresCollectionConfig[];
 }
 
@@ -69,7 +72,7 @@ export interface FixtureTables {
  * or a document from them rather than booting a backend.
  */
 export function tablesFromCollections(
-    collections: readonly (CollectionConfig | AnyCollectionConfig)[],
+    collections: readonly (LegacyCollectionConfig | LegacyAnyCollectionConfig)[],
     options: { defaultSecurityRules?: readonly SecurityRule[] } = {}
 ): FixtureTables {
     const { tables, defaultRls } = tablesFrom(withRelationTargets(collections), options);
@@ -77,7 +80,7 @@ export function tablesFromCollections(
 }
 
 /** The target of a legacy relation thunk, or `undefined` when it throws or is not a collection. */
-function relationTargetOf(target: unknown): CollectionConfig | undefined {
+function relationTargetOf(target: unknown): LegacyCollectionConfig | undefined {
     if (typeof target !== "function") return undefined;
     try {
         const resolved: unknown = target();
@@ -92,7 +95,7 @@ function relationTargetOf(target: unknown): CollectionConfig | undefined {
  * they do not list (transitively): a table compiles only beside the tables
  * its relations target, and a fixture usually names just the one under test.
  */
-function withRelationTargets(collections: readonly (CollectionConfig | AnyCollectionConfig)[]): (CollectionConfig | AnyCollectionConfig)[] {
+function withRelationTargets(collections: readonly (LegacyCollectionConfig | LegacyAnyCollectionConfig)[]): (LegacyCollectionConfig | LegacyAnyCollectionConfig)[] {
     const out = [...collections];
     const seen = new Set(out.map(collection => collection.slug));
     for (let index = 0; index < out.length; index++) {
@@ -129,7 +132,7 @@ export function compileTables(defs: readonly (AnyTableDef | AnyViewDef)[], defau
  * descriptor by slug, for its relations' targets.
  */
 export function queryAccessFor(
-    collections: readonly (CollectionConfig | AnyCollectionConfig)[]
+    collections: readonly (LegacyCollectionConfig | LegacyAnyCollectionConfig)[]
 ): { table: TableDescriptor; lookup: (slug: string) => TableDescriptor | undefined } {
     const fixture = tablesFromCollections(collections);
     return { table: descriptorOf(fixture, collections[0].slug), lookup: slug => fixture.descriptors.find(table => table.slug === slug) };
@@ -146,7 +149,7 @@ export function descriptorOf(fixture: Pick<FixtureTables, "descriptors">, slug: 
  * One legacy fixture collection as the REST layer's seam holds a served table:
  * its descriptor, and the collection it was lowered into for the driver.
  */
-export function servedTableFrom(collection: CollectionConfig | AnyCollectionConfig): ServedTable {
+export function servedTableFrom(collection: LegacyCollectionConfig | LegacyAnyCollectionConfig): ServedTable {
     const fixture = tablesFromCollections([collection]);
     const driverCollection = fixture.collections.find(candidate => candidate.slug === collection.slug);
     if (!driverCollection) throw new Error(`The fixture has no table "${collection.slug}".`);
@@ -154,7 +157,7 @@ export function servedTableFrom(collection: CollectionConfig | AnyCollectionConf
 }
 
 /** The descriptor one legacy fixture collection compiles to. */
-export function tableFrom(collection: CollectionConfig | AnyCollectionConfig): TableDescriptor {
+export function tableFrom(collection: LegacyCollectionConfig | LegacyAnyCollectionConfig): TableDescriptor {
     return descriptorOf(tablesFromCollections([collection]), collection.slug);
 }
 
@@ -163,7 +166,7 @@ export function tableFrom(collection: CollectionConfig | AnyCollectionConfig): T
  * a legacy collection: a slug and a `properties` map. The lift checks the
  * rest, property by property, and refuses what it cannot convert.
  */
-export function isFixtureCollection(value: unknown): value is CollectionConfig {
+export function isFixtureCollection(value: unknown): value is LegacyCollectionConfig {
     return typeof value === "object" && value !== null
         && "slug" in value && typeof value.slug === "string"
         && "properties" in value && typeof value.properties === "object" && value.properties !== null;
@@ -180,9 +183,9 @@ export async function tablesFromLegacyDirectory(dir: string): Promise<LiftedTabl
         .filter(file => (file.endsWith(".ts") || file.endsWith(".js")) && !file.startsWith(".")
             && !file.includes(".test.") && !file.endsWith(".d.ts") && file !== "index.ts" && file !== "index.js")
         .sort();
-    const collections: CollectionConfig[] = [];
+    const collections: LegacyCollectionConfig[] = [];
     for (const file of files) {
-        const mod: { default?: CollectionConfig } = await import(pathToFileURL(path.join(dir, file)).href);
+        const mod: { default?: LegacyCollectionConfig } = await import(pathToFileURL(path.join(dir, file)).href);
         if (mod.default) collections.push(mod.default);
     }
     let defaultSecurityRules: SecurityRule[] | undefined;
@@ -210,7 +213,7 @@ export function servedTablesFor(
     defaultRls?: DefaultRls
 ): { tables: CompiledTable[]; driverCollection: DriverCollectionOf } {
     const { tables, collections } = compileSchemaDefs(defs, defaultRls);
-    const bySlug = new Map<string, CollectionConfig>(collections.map(collection => [collection.slug, collection]));
+    const bySlug = new Map<string, LegacyCollectionConfig>(collections.map(collection => [collection.slug, collection]));
     return { tables, driverCollection: slug => bySlug.get(slug) };
 }
 

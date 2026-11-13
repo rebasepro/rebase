@@ -14,7 +14,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, text, serial, customType } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { buildSearchColumnSpec } from "../src/schema/search-column";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -23,7 +23,7 @@ import { FetchService } from "../src/services/FetchService";
 import type { PgColumnBuilderBase } from "drizzle-orm/pg-core";
 import { compileSet } from "./helpers/plan-tables";
 
-const posts: PostgresCollectionConfig = {
+const posts: LegacyPostgresCollectionConfig = {
     slug: "posts",
     table: "posts",
     name: "Posts",
@@ -43,7 +43,7 @@ let service: FetchService;
 beforeAll(async () => {
     db = new PGlite();
     await db.waitReady;
-    const collection = posts as CollectionConfig;
+    const collection = posts as LegacyCollectionConfig;
     await db.exec(await generatePostgresDdl(compileSet([collection]), { includePolicies: false }));
     await db.query(`INSERT INTO posts (title, content) VALUES ($1, $2), ($3, $4)`, [
         "Admin panels for Postgres", "Generated from the schema you already have.",

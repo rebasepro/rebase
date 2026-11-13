@@ -12,7 +12,7 @@
  * `pg.Pool` the doctor opens.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ensureTables } from "../src/schema/ensure-tables";
 import { checkCollectionsVsDatabase } from "../src/schema/doctor";
 import { compileSet } from "./helpers/plan-tables";
@@ -30,7 +30,7 @@ jest.mock("pg", () => {
     return { Pool };
 });
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     slug: "tags",
     table: "tags",
     name: "Tags",
@@ -40,7 +40,7 @@ const tags: CollectionConfig = {
     }
 };
 
-const contacts: CollectionConfig = {
+const contacts: LegacyCollectionConfig = {
     slug: "contacts",
     table: "contacts",
     name: "Contacts",

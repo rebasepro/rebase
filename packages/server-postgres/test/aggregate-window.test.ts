@@ -11,7 +11,7 @@
  * well-formed query that answers the wrong question.
  */
 import { describe, expect, it, jest } from "@jest/globals";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ApiError } from "@rebasepro/server";
 import { numeric, pgTable, serial, text } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/pg-proxy";
@@ -26,7 +26,7 @@ const orders = pgTable("orders", {
     total: numeric("total")
 });
 
-const ordersCollection: CollectionConfig = {
+const ordersCollection: LegacyCollectionConfig = {
     slug: "orders",
     name: "Orders",
     table: "orders",

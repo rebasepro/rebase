@@ -6,7 +6,7 @@
  * as the request role, is in `test/e2e/caller-sql-e2e.test.ts`.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import {
     ensureTables,
     readExistingSchema,
@@ -14,7 +14,7 @@ import {
 } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
-const notes = (bypassRoles?: string[]): CollectionConfig => ({
+const notes = (bypassRoles?: string[]): LegacyCollectionConfig => ({
     slug: "notes",
     table: "notes",
     name: "Notes",

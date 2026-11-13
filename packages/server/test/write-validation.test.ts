@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { assertKnownWriteFields, assertWriteValuesValid } from "../src/api/rest/write-validation";
 import { tableFrom } from "./helpers/tables";
 
@@ -11,7 +11,7 @@ import { tableFrom } from "./helpers/tables";
  * `server-postgres` for the evidence.
  */
 describe("assertKnownWriteFields", () => {
-    const posts: CollectionConfig = {
+    const posts: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",
@@ -32,7 +32,7 @@ relationName: "author" }
         ]
     };
 
-    const authors: CollectionConfig = {
+    const authors: LegacyCollectionConfig = {
         slug: "authors",
         name: "Authors",
         table: "authors",
@@ -41,7 +41,7 @@ isId: "increment" } }
     };
 
     // Keyed on `sku`: there is no `id` column for `create(data, id)` to fill.
-    const skuItems: CollectionConfig = {
+    const skuItems: LegacyCollectionConfig = {
         slug: "sku_items",
         name: "SKU Items",
         table: "sku_items",
@@ -65,7 +65,7 @@ isId: true },
      * chose.
      */
     describe("columns excluded from the API", () => {
-        const users: CollectionConfig = {
+        const users: LegacyCollectionConfig = {
             slug: "users",
             name: "Users",
             table: "users",
@@ -151,7 +151,7 @@ title: "Hello" }, tableFrom(posts))).not.toThrow();
         // and so be checked against nothing. A table always declares its
         // columns — this one its implicit `id` — so a write naming any other
         // is a write naming a column the table does not have.
-        const opaque: CollectionConfig = { slug: "opaque",
+        const opaque: LegacyCollectionConfig = { slug: "opaque",
 name: "Opaque",
 table: "opaque",
 properties: {} };
@@ -188,7 +188,7 @@ strictWrites: false }))).not.toThrow();
  * `price: { type: "number", validation: { min: 0 } }`, took `-5000` with a 201.
  */
 describe("assertWriteValuesValid", () => {
-    const products: CollectionConfig = {
+    const products: LegacyCollectionConfig = {
         slug: "products",
         name: "Products",
         table: "products",
@@ -319,7 +319,7 @@ slug: "no" }, tableFrom(products)))
     });
 
     it("survives a `matches` the config author wrote wrong", () => {
-        const broken: CollectionConfig = {
+        const broken: LegacyCollectionConfig = {
             slug: "broken",
             name: "Broken",
             table: "broken",
@@ -334,7 +334,7 @@ validation: { matches: "([unclosed" } } }
     it("does not let a `g`-flagged pattern accept and reject the same value in turn", () => {
         // A stateful RegExp keeps `lastIndex` between calls, so row 2 of a bulk
         // write would be judged by where row 1's match happened to end.
-        const collection: CollectionConfig = {
+        const collection: LegacyCollectionConfig = {
             slug: "codes",
             name: "Codes",
             table: "codes",

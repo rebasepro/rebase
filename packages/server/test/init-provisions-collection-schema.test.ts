@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { createServer } from "node:http";
-import type { CollectionConfig, DatabaseAdapter, DatabaseAdapterInitConfig } from "@rebasepro/types";
+import type { DatabaseAdapter, DatabaseAdapterInitConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
@@ -23,7 +24,7 @@ import { compileSchemaDefs } from "../src/schema/load-schema";
  * and still be true for both.
  */
 
-const collection = (slug: string): CollectionConfig =>
+const collection = (slug: string): LegacyCollectionConfig =>
     ({ slug, name: slug, table: slug, properties: { id: { name: "ID", type: "string", isId: "uuid" } } });
 
 interface Recorder {

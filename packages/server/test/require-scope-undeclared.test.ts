@@ -17,7 +17,8 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
 import { randomUUID } from "node:crypto";
 import { Hono, type MiddlewareHandler } from "hono";
-import type { AuthCollectionConfig, CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { DataDriver } from "@rebasepro/types";
+import type { LegacyAuthCollectionConfig, LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { createRebaseBackend, requireAuth, requireScope, type HonoEnv, type RebaseBackend } from "../src/index";
 import { defineFunction, requireScope as functionRequireScope } from "../src/functions";
 import { _resetRebaseMock } from "../src/singleton";
@@ -57,7 +58,7 @@ describe.each(GUARDS)("requireScope from %s, at registration", (_from, guard) =>
 
 // ── On a backend: declared, or not ───────────────────────────────────────
 
-function collection(slug: string, auth?: AuthCollectionConfig): CollectionConfig {
+function collection(slug: string, auth?: LegacyAuthCollectionConfig): LegacyCollectionConfig {
     return {
         name: slug,
         slug,

@@ -25,7 +25,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
-import type { CollectionCallbacks, CollectionConfig, StringProperty } from "@rebasepro/types";
+import type { LegacyCollectionCallbacks, LegacyCollectionConfig, LegacyStringProperty } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
@@ -64,7 +64,7 @@ async function count(sqlText: string, params: unknown[] = []): Promise<number> {
     return (await observer.query(sqlText, params)).rows[0].c as number;
 }
 
-const widgetCallbacks: CollectionCallbacks = {
+const widgetCallbacks: LegacyCollectionCallbacks = {
     afterSave: async () => {
         if (plan.enqueue) {
             seen.enqueued = await queue.enqueue(plan.enqueue.task, { hello: 1 }, { idempotencyKey: plan.enqueue.idempotencyKey });
@@ -111,7 +111,7 @@ describe("a write's hand-offs share its transaction (E2E)", () => {
         expect(historyTable.inTransaction).toBe(true);
 
         const registry = new FixtureTableRegistry();
-        const prop = (name: string): StringProperty => ({ name, type: "string" });
+        const prop = (name: string): LegacyStringProperty => ({ name, type: "string" });
         registry.registerMultiple([
             { slug: "widgets", name: "W", table: "widgets", properties: { id: { ...prop("ID"), isId: true }, name: prop("N") }, callbacks: widgetCallbacks },
             { slug: "notes", name: "N", table: "notes", history: true, properties: { id: { ...prop("ID"), isId: true }, body: prop("B") } }

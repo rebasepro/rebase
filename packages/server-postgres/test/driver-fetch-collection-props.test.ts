@@ -16,7 +16,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -36,7 +36,7 @@ const docsRelations = relations(docsTable, ({ one }) => ({
     owner: one(ownersTable, { fields: [docsTable.ownerId], references: [ownersTable.id] })
 }));
 
-function owners(): CollectionConfig {
+function owners(): LegacyCollectionConfig {
     return {
         name: "Owners", slug: "owners", table: "owners",
         properties: {
@@ -47,7 +47,7 @@ function owners(): CollectionConfig {
     };
 }
 
-function docs(): CollectionConfig {
+function docs(): LegacyCollectionConfig {
     return {
         name: "Docs", slug: "docs", table: "docs",
         softDelete: true,

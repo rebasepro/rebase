@@ -1,5 +1,5 @@
 import { DataService } from "../src/services/dataService";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb, shapedRows } from "./helpers/spg-c-db";
@@ -27,7 +27,7 @@ describe("DataService - rows carry columns, not addresses", () => {
     const mockMemberships = textTable("memberships", ["tenant_id", "user_id", "role"]);
     const mockEvents = textTable("events", ["event_id", "id", "name"]);
 
-    const productsCollection: CollectionConfig = {
+    const productsCollection: LegacyCollectionConfig = {
         slug: "products",
         name: "Products",
         table: "products",
@@ -39,7 +39,7 @@ isId: "increment" },
         }
     };
 
-    const skuItemsCollection: CollectionConfig = {
+    const skuItemsCollection: LegacyCollectionConfig = {
         slug: "sku_items",
         name: "SKU Items",
         table: "sku_items",
@@ -50,7 +50,7 @@ isId: true },
         }
     };
 
-    const membershipsCollection: CollectionConfig = {
+    const membershipsCollection: LegacyCollectionConfig = {
         slug: "memberships",
         name: "Memberships",
         table: "memberships",
@@ -65,7 +65,7 @@ isId: true },
 
     // `event_id` is the key; `id` is an ordinary column that happens to share
     // the name the address used to be written under.
-    const eventsCollection: CollectionConfig = {
+    const eventsCollection: LegacyCollectionConfig = {
         slug: "events",
         name: "Events",
         table: "events",

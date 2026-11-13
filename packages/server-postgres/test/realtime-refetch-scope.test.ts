@@ -16,7 +16,8 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
-import type { CollectionCallbacks, CollectionConfig, DataDriver, RebaseServerClient } from "@rebasepro/types";
+import type { DataDriver, RebaseServerClient } from "@rebasepro/types";
+import type { LegacyCollectionCallbacks, LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { rebase } from "@rebasepro/server";
 
 import { runInBackendScope } from "../../server/src/backend/scope";
@@ -32,7 +33,7 @@ const widgetsTable = pgTable("widgets", { id: varchar("id").primaryKey(), name: 
 /** What the hook's imported `rebase` reached, one entry per row read. */
 let seen: string[] = [];
 
-const callbacks: CollectionCallbacks = {
+const callbacks: LegacyCollectionCallbacks = {
     afterRead: async ({ row }) => {
         try {
             const [answer] = await rebase.sql("SELECT 'which backend' AS name");
@@ -44,7 +45,7 @@ const callbacks: CollectionCallbacks = {
     }
 };
 
-const widgets: CollectionConfig = {
+const widgets: LegacyCollectionConfig = {
     name: "Widgets", slug: "widgets", table: "widgets",
     properties: { id: { name: "ID", type: "string", isId: "manual" }, name: { name: "Name", type: "string" } },
     callbacks

@@ -73,7 +73,7 @@ import {
     type PlanCorpus,
     type PlanCorpusOptions
 } from "./helpers/plan-corpus";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 const UPDATE = process.env.UPDATE_PLAN_GOLDEN === "1";
 
@@ -101,7 +101,7 @@ beforeAll(async () => {
  * collections themselves; `PLAN_GOLDEN_ALLOWED_DIFFERENCES` lists, with the
  * reason, every recorded output the lifted set does not reproduce.
  */
-const render = (collections: CollectionConfig[], options: PlanCorpusOptions): Record<string, string> =>
+const render = (collections: LegacyCollectionConfig[], options: PlanCorpusOptions): Record<string, string> =>
     renderAllOutputs(compileSet(collections), options);
 
 const allowed = (setId: string, output: string): boolean =>

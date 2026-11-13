@@ -19,14 +19,13 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { compileTables, toTableAccessor, type AnySchemaDef } from "@rebasepro/common";
-import { collectionsToTableDefs } from "@rebasepro/common/migrate";
+import { collectionsToTableDefs, type LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { generateTypedefs } from "@rebasepro/codegen";
 import {
     isPostgresCollectionConfig,
     isRelationDef,
     isTableDef,
     isViewDef,
-    type CollectionConfig,
     type SecurityRule,
     type TableDescriptor
 } from "@rebasepro/types";
@@ -47,7 +46,7 @@ function sdkGoldenPath(set: PlanCorpusSet): string {
  * cannot say, stripped before converting — with the keys each takes out of the
  * SDK.
  */
-const INPUT_ADJUSTMENTS: { set: string; reason: string; apply: (collections: CollectionConfig[]) => void; removed: { table: string; keys: string[] }[] }[] = [
+const INPUT_ADJUSTMENTS: { set: string; reason: string; apply: (collections: LegacyCollectionConfig[]) => void; removed: { table: string; keys: string[] }[] }[] = [
     {
         set: "property-matrix",
         reason: "`arrs.ofTuple` declares a tuple, which no JSON shape can say; without its `of` it is typed as it was (`Array<unknown>`).",
@@ -72,7 +71,7 @@ const INPUT_ADJUSTMENTS: { set: string; reason: string; apply: (collections: Col
 ];
 
 /** The directory's `defaultSecurityRules`, as the loader leaves them (see `helpers/plan-tables.ts`). */
-function sharedDefaultRules(collections: readonly CollectionConfig[]): readonly SecurityRule[] | undefined {
+function sharedDefaultRules(collections: readonly LegacyCollectionConfig[]): readonly SecurityRule[] | undefined {
     if (collections.some(collection => !collection.securityRules?.length)) return undefined;
     const counts = new Map<readonly SecurityRule[], number>();
     for (const collection of collections) {
@@ -87,7 +86,7 @@ function sharedDefaultRules(collections: readonly CollectionConfig[]): readonly 
  * A set as descriptors: lifted, compiled with the relation targets the lift
  * converted on the side (a relation must resolve), and those left out again.
  */
-function descriptorsOf(collections: readonly CollectionConfig[]): TableDescriptor[] {
+function descriptorsOf(collections: readonly LegacyCollectionConfig[]): TableDescriptor[] {
     const defaultSecurityRules = sharedDefaultRules(collections);
     const { tables, defaultRls } = collectionsToTableDefs(collections, defaultSecurityRules ? { defaultSecurityRules } : {});
     const all: AnySchemaDef[] = [...tables];

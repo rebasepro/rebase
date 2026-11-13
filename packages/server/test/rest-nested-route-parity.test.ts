@@ -5,7 +5,7 @@ import { errorHandler } from "../src/api/errors";
 import { rowETag } from "../src/api/rest/etag";
 import type { HonoEnv } from "../src/api/types";
 import type { DataDriver } from "../../types/src/controllers/data_driver";
-import type { CollectionConfig } from "../../types/src/types/collections";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { tablesFromCollections, tableFrom } from "./helpers/tables";
 
 /**
@@ -20,7 +20,7 @@ import { tablesFromCollections, tableFrom } from "./helpers/tables";
  * may not write, and read fields it may not read.
  */
 
-const comments: CollectionConfig = {
+const comments: LegacyCollectionConfig = {
     slug: "comments",
     name: "Comments",
     singularName: "Comment",
@@ -36,7 +36,7 @@ const comments: CollectionConfig = {
 };
 
 /** Its table is not its slug, so the driver's three spellings are all distinct. */
-const blogPosts: CollectionConfig = {
+const blogPosts: LegacyCollectionConfig = {
     slug: "blog_posts",
     name: "Blog posts",
     singularName: "Blog post",
@@ -295,7 +295,7 @@ describe("a nested count", () => {
  * the same links.
  */
 describe("a write through a parent's relation", () => {
-    const members: CollectionConfig = {
+    const members: LegacyCollectionConfig = {
         slug: "members",
         name: "Members",
         table: "members",
@@ -311,7 +311,7 @@ describe("a write through a parent's relation", () => {
         }
     };
 
-    const bands: CollectionConfig = {
+    const bands: LegacyCollectionConfig = {
         slug: "bands",
         name: "Bands",
         table: "bands",
@@ -322,7 +322,7 @@ describe("a write through a parent's relation", () => {
         }
     };
 
-    const tags: CollectionConfig = {
+    const tags: LegacyCollectionConfig = {
         slug: "tags",
         name: "Tags",
         table: "tags",
@@ -332,7 +332,7 @@ describe("a write through a parent's relation", () => {
         }
     };
 
-    const posts: CollectionConfig = {
+    const posts: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",

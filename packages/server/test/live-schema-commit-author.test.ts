@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
-import type { AuthAdapter, AuthUserData, PostgresCollectionConfig, SchemaChangePlan, SchemaEditingAdmin, SQLAdmin, UserManagementAdapter } from "@rebasepro/types";
+import type { AuthAdapter, AuthUserData, SchemaChangePlan, SchemaEditingAdmin, SQLAdmin, UserManagementAdapter } from "@rebasepro/types";
+import type { LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
@@ -33,7 +34,7 @@ const admin: SchemaEditingAdmin & Pick<SQLAdmin, "executeSql"> = {
     executeSql: async () => []
 };
 
-const tags: PostgresCollectionConfig = { slug: "tags", name: "Tags", table: "tags", properties: { name: { type: "string" } } };
+const tags: LegacyPostgresCollectionConfig = { slug: "tags", name: "Tags", table: "tags", properties: { name: { type: "string" } } };
 
 function apply(over: Partial<LiveSchemaRoutesConfig>, user: HonoEnv["Variables"]["user"] = TOKEN_USER) {
     const authors: ({ name: string; email: string } | undefined)[] = [];

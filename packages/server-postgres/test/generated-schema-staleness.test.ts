@@ -20,7 +20,7 @@
  * The wide question would flag every formatting change as a fatal staleness and
  * make the check impossible to leave switched on.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
 import {
     compareGeneratedDeclarations,
@@ -32,18 +32,18 @@ import { findLegacyForeignKeyNames, findMissingGeneratedNames } from "../src/sch
 import { compileSet } from "./helpers/plan-tables";
 
 /** The fixtures as the check reads them: compiled descriptors. */
-const described = (collections: CollectionConfig[]) => compileSet(collections).map(table => table.descriptor);
+const described = (collections: LegacyCollectionConfig[]) => compileSet(collections).map(table => table.descriptor);
 
 // ── Collections ──────────────────────────────────────────────────────────────
 
-const categories: CollectionConfig = {
+const categories: LegacyCollectionConfig = {
     slug: "categories",
     table: "categories",
     name: "Categories",
     properties: { id: { name: "ID", type: "string", isId: "uuid" }, name: { type: "string" } }
 };
 
-const products: CollectionConfig = {
+const products: LegacyCollectionConfig = {
     slug: "products",
     table: "products",
     name: "Products",
@@ -58,14 +58,14 @@ const products: CollectionConfig = {
 };
 
 /** A pair whose derived names do NOT move — the common case, and the false-positive risk. */
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     slug: "tags",
     table: "tags",
     name: "Tags",
     properties: { id: { name: "ID", type: "string", isId: "uuid" } }
 };
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     table: "posts",
     name: "Posts",
@@ -144,7 +144,7 @@ export const postsTags = pgTable("posts_tags", {
         // An explicit `targetColumn` is the documented opt-out — the rename note
         // says so — and honouring it is the difference between a check that can
         // stay on and one that has to be muted.
-        const pinned: CollectionConfig = {
+        const pinned: LegacyCollectionConfig = {
             ...products,
             properties: {
                 ...products.properties,
@@ -188,7 +188,7 @@ export const categoriesProducts = pgTable("categories_products", {
  */
 describe("findMissingGeneratedNames", () => {
     /** A `belongsTo`, whose derived column lives on the source table. */
-    const authors: CollectionConfig = {
+    const authors: LegacyCollectionConfig = {
         slug: "authors",
         table: "authors",
         name: "Authors",
@@ -198,7 +198,7 @@ describe("findMissingGeneratedNames", () => {
         properties: { id: { name: "ID", type: "string", isId: "uuid" } }
     };
 
-    const articles: CollectionConfig = {
+    const articles: LegacyCollectionConfig = {
         slug: "articles",
         table: "articles",
         name: "Articles",

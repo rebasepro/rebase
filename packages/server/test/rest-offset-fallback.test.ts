@@ -20,10 +20,10 @@ import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import type { DataDriver, FetchCollectionProps } from "../../types/src/controllers/data_driver";
-import type { CollectionConfig } from "../../types/src/types/collections";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { tablesFromCollections } from "./helpers/tables";
 
-const collections: CollectionConfig[] = [
+const collections: LegacyCollectionConfig[] = [
     { slug: "posts", name: "Posts", singularName: "Post", properties: {} }
 ];
 

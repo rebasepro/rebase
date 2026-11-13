@@ -26,7 +26,7 @@ jest.mock("../src/services/dataService", () => ({
 
 import http from "http";
 import WebSocket from "ws";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { createRoutedRealtimeService } from "../../server/src/services/routed-realtime-service";
 import { createPostgresWebSocket } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
@@ -35,7 +35,7 @@ import { FixtureTableRegistry } from "./helpers/tables";
 import { fakeCallContextDriver, fakeAuthAdapter, fakeDataDriver } from "./helpers/spg-c-socket";
 import { recordingDb } from "./helpers/spg-c-db";
 
-const collection = (slug: string): CollectionConfig => ({
+const collection = (slug: string): LegacyCollectionConfig => ({
     slug,
     name: slug,
     table: slug,

@@ -9,12 +9,12 @@
  * `policy-shapes-new.recorded.json` from the release that introduced them,
  * and `policy-new-shapes.test.ts` runs them against Postgres.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 export const ORG_A = "6f1c2a52-6a0e-4f3c-9a59-2a6f1d0c7a01";
 export const ORG_B = "9b2d3e61-1c4f-4a77-8d10-5e3a9c2b4f02";
 
-export const NEW_POLICY_SHAPE_COLLECTIONS: CollectionConfig[] = [
+export const NEW_POLICY_SHAPE_COLLECTIONS: LegacyCollectionConfig[] = [
     // The spec's §4.1 example, verbatim: anonymous reads published rows,
     // an editor reads and writes everything, only an admin deletes.
     {

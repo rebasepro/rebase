@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { RestApiGenerator, DEFAULT_MAX_BULK_ROWS } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import type { CollectionConfig, DataDriver, SaveManyProps } from "@rebasepro/types";
+import type { DataDriver, SaveManyProps } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { mockDataDriver } from "./helpers/server-a-fakes";
 import type { HonoEnv } from "../src/api/types";
 import { tablesFromCollections } from "./helpers/tables";
@@ -13,7 +14,7 @@ function buildApp(driverOverrides: Pick<DataDriver, "saveMany"> = {}, maxBulkRow
         ...driverOverrides
     });
 
-    const collections: CollectionConfig[] = [
+    const collections: LegacyCollectionConfig[] = [
         { slug: "products", name: "Products", singularName: "Product", properties: { title: { name: "Title", type: "string" } } }
     ];
 

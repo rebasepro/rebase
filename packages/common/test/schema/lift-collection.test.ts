@@ -4,20 +4,22 @@ import {
     isViewDef,
     type AnyTableDef,
     type AnyViewDef,
-    type CollectionConfig,
     type ColumnDef,
-    type PostgresCollectionConfig,
-    type PostgresProperty,
     type SecurityRule
 } from "@rebasepro/types";
+import {
+    type LegacyCollectionConfig,
+    type LegacyPostgresCollectionConfig,
+    type LegacyPostgresProperty
+} from "@rebasepro/common/migrate";
 
 import { collectionToTableDef, collectionsToTableDefs, type LegacyVectorIndexConfig, type LiftNote } from "../../src/migrate";
 import { isSchemaDefinitionError } from "../../src/schema/errors";
 import { createCallContext } from "../../src/data/call-context";
 
-const uuidKey: PostgresProperty = { type: "string", isId: "uuid" };
+const uuidKey: LegacyPostgresProperty = { type: "string", isId: "uuid" };
 
-function collection(slug: string, properties: PostgresCollectionConfig["properties"], extra: Partial<PostgresCollectionConfig> = {}): PostgresCollectionConfig {
+function collection(slug: string, properties: LegacyPostgresCollectionConfig["properties"], extra: Partial<LegacyPostgresCollectionConfig> = {}): LegacyPostgresCollectionConfig {
     return { slug, name: slug, table: slug, properties, ...extra };
 }
 
@@ -26,7 +28,7 @@ function columnsOf(def: AnyTableDef | AnyViewDef): Record<string, ColumnDef> {
     return Object.fromEntries(Object.entries(def.config.columns).map(([key, builder]) => [key, builder.def]));
 }
 
-function liftOne(properties: PostgresCollectionConfig["properties"]): { columns: Record<string, ColumnDef>; notes: LiftNote[] } {
+function liftOne(properties: LegacyPostgresCollectionConfig["properties"]): { columns: Record<string, ColumnDef>; notes: LiftNote[] } {
     const { table, notCarried } = collectionToTableDef(collection("t", { id: uuidKey, ...properties }));
     return { columns: columnsOf(table), notes: notCarried.filter(note => note.field !== "name" || note.key !== undefined) };
 }
@@ -45,7 +47,7 @@ function refusal(run: () => unknown): string[] {
 }
 
 describe("collectionToTableDef — columns", () => {
-    it.each<[string, PostgresProperty, Partial<ColumnDef>]>([
+    it.each<[string, LegacyPostgresProperty, Partial<ColumnDef>]>([
         ["text", { type: "string" }, {}],
         ["required + unique", { type: "string", validation: { required: true, unique: true } }, { notNull: true, unique: true }],
         ["enum", { type: "string", enum: ["a", "b"] }, { type: { kind: "enum", values: ["a", "b"] } }],
@@ -111,7 +113,7 @@ describe("collectionToTableDef — columns", () => {
     });
 
     it("lifts the key strategies", () => {
-        const lift = (property: PostgresProperty): ColumnDef => columnsOf(collectionToTableDef(collection("t", { id: property })).table).id;
+        const lift = (property: LegacyPostgresProperty): ColumnDef => columnsOf(collectionToTableDef(collection("t", { id: property })).table).id;
         expect(lift({ type: "string", isId: "uuid" })).toEqual(def({ type: { kind: "uuid" }, primaryKey: true, notNull: true, default: { kind: "random-uuid" } }));
         expect(lift({ type: "number", isId: "increment" })).toEqual(def({ type: { kind: "integer" }, primaryKey: true, notNull: true, default: { kind: "identity" } }));
         expect(lift({ type: "string", isId: "sql`gen_id()`" })).toEqual(def({ primaryKey: true, notNull: true, default: { kind: "sql", expression: "gen_id()" } }));
@@ -142,7 +144,7 @@ describe("collectionToTableDef — columns", () => {
 
     it("notes what it does not carry", () => {
         const processFile = async (file: File) => file;
-        const property: PostgresProperty = {
+        const property: LegacyPostgresProperty = {
             type: "string",
             name: "Label",
             enum: [{ id: "a", label: "Ay", color: "redLight" }],
@@ -289,7 +291,7 @@ describe("collectionToTableDef — relations", () => {
     });
 
     it("renames a relation whose foreign key is served under its own key", () => {
-        const employees: PostgresCollectionConfig = collection("employees", {
+        const employees: LegacyPostgresCollectionConfig = collection("employees", {
             id: { type: "number", isId: "increment" },
             reportsTo: { type: "relation", relation: { kind: "belongsTo", target: () => employees, localKey: "reports_to" } }
         });
@@ -466,9 +468,9 @@ describe("collectionToTableDef — table keys", () => {
 
 describe("collectionToTableDef — refusals", () => {
     const authors = collection("authors", { id: uuidKey });
-    const firestore: CollectionConfig = { slug: "fs", name: "fs", engine: "firestore", properties: {} };
+    const firestore: LegacyCollectionConfig = { slug: "fs", name: "fs", engine: "firestore", properties: {} };
 
-    it.each<[string, () => CollectionConfig[], RegExp]>([
+    it.each<[string, () => LegacyCollectionConfig[], RegExp]>([
         ["a Firestore collection", () => [firestore], /^fs: is a firestore collection/],
         ["databaseId", () => [collection("t", { id: uuidKey }, { databaseId: "x" })], /sets `databaseId`/],
         ["a schema-prefixed table", () => [collection("t", { id: uuidKey }, { table: "s.t" })], /schema prefix/],

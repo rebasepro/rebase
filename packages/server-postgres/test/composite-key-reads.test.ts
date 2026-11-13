@@ -18,7 +18,8 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, primaryKey, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, OrderByTuple } from "@rebasepro/types";
+import type { OrderByTuple } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { cursorToStartAfter, decodeCursor } from "@rebasepro/common";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
@@ -36,7 +37,7 @@ const membersTable = pgTable("members", {
 /** The rows each `beforeDelete` was shown, in order. */
 let judged: Record<string, unknown>[] = [];
 
-const members: CollectionConfig = {
+const members: LegacyCollectionConfig = {
     name: "Members",
     slug: "members",
     table: "members",

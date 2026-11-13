@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
 import { SQL, StringChunk } from "drizzle-orm";
 import { integer, PgColumn, pgTable, serial, varchar } from "drizzle-orm/pg-core";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { FetchService } from "../src/services/FetchService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -40,10 +40,10 @@ describe("orderBy on an owning relation resolves through localKey", () => {
         createdBy: integer("created_by")
     });
 
-    const profilesCollection: CollectionConfig = { slug: "user_profiles", name: "Profiles", table: "user_profiles", properties: {} };
-    const usersCollection: CollectionConfig = { slug: "users", name: "Users", table: "users", properties: {} };
+    const profilesCollection: LegacyCollectionConfig = { slug: "user_profiles", name: "Profiles", table: "user_profiles", properties: {} };
+    const usersCollection: LegacyCollectionConfig = { slug: "users", name: "Users", table: "users", properties: {} };
 
-    const postsCollection: CollectionConfig = {
+    const postsCollection: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",
@@ -65,7 +65,7 @@ describe("orderBy on an owning relation resolves through localKey", () => {
     };
 
     const service = new FetchService(recordingDb().db, new FixtureTableRegistry([postsCollection]));
-    const resolve = (orderBy: string, collection?: CollectionConfig): PgColumn | undefined => {
+    const resolve = (orderBy: string, collection?: LegacyCollectionConfig): PgColumn | undefined => {
         const column = callPrivate(service, "resolveOrderByField", postsTable, orderBy, collection);
         return column instanceof PgColumn ? column : undefined;
     };

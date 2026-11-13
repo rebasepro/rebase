@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ApiError } from "@rebasepro/server";
 import {
     configureUnknownFilterFields,
@@ -36,9 +36,9 @@ const accountsTable = pgTable("accounts", {
     ownerUid: integer("owner_uid")
 });
 
-const target = (slug: string) => () => ({ slug, name: slug, properties: {} } as CollectionConfig);
+const target = (slug: string) => () => ({ slug, name: slug, properties: {} } as LegacyCollectionConfig);
 
-const accountsCollection: CollectionConfig = {
+const accountsCollection: LegacyCollectionConfig = {
     slug: "accounts",
     name: "Accounts",
     properties: {

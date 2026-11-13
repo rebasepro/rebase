@@ -1,9 +1,9 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { assertWriteValuesValid, type WriteViolation } from "../src/api/rest/write-validation";
 import { tableFrom } from "./helpers/tables";
 
 /** A latitude of 200 is not a place; it was stored as one. */
-const places: CollectionConfig = {
+const places: LegacyCollectionConfig = {
     slug: "places",
     name: "Places",
     table: "places",

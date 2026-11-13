@@ -15,7 +15,7 @@
  * omission — they compare what ensure plans against what the generator writes.
  */
 import { PGlite } from "@electric-sql/pglite";
-import { CollectionConfig, PostgresProperty, Properties } from "@rebasepro/types";
+import { LegacyCollectionConfig, LegacyPostgresProperty, LegacyProperties } from "@rebasepro/common/migrate";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import {
     planTableSchemaEnsure,
@@ -24,7 +24,7 @@ import {
 } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
-const authors: CollectionConfig = {
+const authors: LegacyCollectionConfig = {
     slug: "authors",
     table: "authors",
     name: "Authors",
@@ -34,7 +34,7 @@ const authors: CollectionConfig = {
     }
 };
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     slug: "tags",
     table: "tags",
     name: "Tags",
@@ -50,7 +50,7 @@ const tags: CollectionConfig = {
  * `is_anonymous` and `tokens_valid_after` are deliberately absent here — they
  * are auth's, not the developer's, and both creators must still produce them.
  */
-const users: CollectionConfig = {
+const users: LegacyCollectionConfig = {
     slug: "users",
     table: "users",
     schema: "rebase",
@@ -67,7 +67,7 @@ const users: CollectionConfig = {
     }
 };
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     table: "posts",
     name: "Posts",
@@ -95,7 +95,7 @@ const posts: CollectionConfig = {
  * four required links in the audit's diff were nullable on the managed path —
  * the one with no developer in the loop.
  */
-const profiles: CollectionConfig = {
+const profiles: LegacyCollectionConfig = {
     slug: "profiles",
     table: "profiles",
     name: "Profiles",
@@ -109,7 +109,7 @@ const profiles: CollectionConfig = {
         },
         // The other spelling of a foreign key, on the same terms.
         // Outside the type on purpose: Postgres properties are typed without `reference`, yet the planner still reads one as a foreign key.
-        primaryTag: { type: "reference", path: "tags", validation: { required: true } } as unknown as PostgresProperty
+        primaryTag: { type: "reference", path: "tags", validation: { required: true } } as unknown as LegacyPostgresProperty
     }
 };
 
@@ -415,12 +415,12 @@ describe("boot-ensure agrees with db push", () => {
     // `ADD COLUMN <type>` got wrong, dropping the default and then either
     // omitting the NOT NULL or applying it to rows that have no value.
     describe("a `through.properties` junction, applied to a live database", () => {
-        const orgs: CollectionConfig = {
+        const orgs: LegacyCollectionConfig = {
             slug: "orgs", table: "orgs", name: "Orgs",
             properties: { id: { type: "string", isId: "uuid" }, name: { type: "string" } }
         };
 
-        const withPayload = (properties: Properties): CollectionConfig => ({
+        const withPayload = (properties: LegacyProperties): LegacyCollectionConfig => ({
             slug: "people", table: "people", name: "People",
             properties: {
                 id: { type: "string", isId: "uuid" },
@@ -442,7 +442,7 @@ describe("boot-ensure agrees with db push", () => {
             }
         });
 
-        const rolePayload: Properties = {
+        const rolePayload: LegacyProperties = {
             role: {
                 type: "string",
                 enum: [{ id: "owner", label: "owner" }, { id: "member", label: "member" }],
@@ -565,7 +565,7 @@ describe("boot-ensure agrees with db push", () => {
  * column alone and never added the second.
  */
 describe("a composite primary key, applied to a live database", () => {
-    const companies: CollectionConfig = {
+    const companies: LegacyCollectionConfig = {
         slug: "companies", table: "companies", name: "Companies",
         properties: {
             id: { type: "number", isId: "increment" },
@@ -575,7 +575,7 @@ describe("a composite primary key, applied to a live database", () => {
 
     // A translation keyed by its parent's id and a locale, where the id is also
     // the foreign key to the parent.
-    const translations: CollectionConfig = {
+    const translations: LegacyCollectionConfig = {
         slug: "company_translations", table: "company_translations", name: "Company translations",
         properties: {
             id: { type: "number", isId: true },

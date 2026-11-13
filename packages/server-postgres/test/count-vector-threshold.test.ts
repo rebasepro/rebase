@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import { pgTable, serial, varchar, vector } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/pg-proxy";
-import type { CollectionConfig, FilterValues } from "@rebasepro/types";
+import type { FilterValues } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ApiError } from "@rebasepro/server";
 
 import { FetchService } from "../src/services/FetchService";
@@ -30,7 +31,7 @@ const docsTable = pgTable("docs", {
     embedding: vector("embedding", { dimensions: 3 })
 });
 
-const docsCollection: CollectionConfig = {
+const docsCollection: LegacyCollectionConfig = {
     slug: "docs",
     name: "Docs",
     table: "docs",

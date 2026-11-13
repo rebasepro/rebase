@@ -12,14 +12,14 @@
  * PGlite because the point is the SQL Postgres accepts for those names.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import {
     ensureTables,
     readExistingSchema
 } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     table: "posts",
     name: "Posts",

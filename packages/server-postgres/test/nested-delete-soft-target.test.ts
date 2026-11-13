@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { integer, pgTable, primaryKey, serial, timestamp, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -44,7 +44,7 @@ const postsLabelsTable = pgTable("posts_labels", {
     label_id: integer("label_id").notNull()
 }, (t) => [primaryKey({ columns: [t.post_id, t.label_id] })]);
 
-function posts(): CollectionConfig {
+function posts(): LegacyCollectionConfig {
     return {
         name: "Posts", slug: "posts", table: "posts",
         properties: {
@@ -57,7 +57,7 @@ function posts(): CollectionConfig {
     };
 }
 
-function tags(): CollectionConfig {
+function tags(): LegacyCollectionConfig {
     return {
         name: "Tags", slug: "tags", table: "tags", softDelete: true, history: true,
         properties: {
@@ -68,14 +68,14 @@ function tags(): CollectionConfig {
     };
 }
 
-function labels(): CollectionConfig {
+function labels(): LegacyCollectionConfig {
     return {
         name: "Labels", slug: "labels", table: "labels",
         properties: { id: { name: "ID", type: "number", isId: "increment" }, name: { name: "Name", type: "string" } }
     };
 }
 
-function comments(): CollectionConfig {
+function comments(): LegacyCollectionConfig {
     return {
         name: "Comments", slug: "comments", table: "comments", softDelete: true,
         properties: {

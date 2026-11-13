@@ -1,5 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig, SecurityRule } from "@rebasepro/types";
+import type { SecurityRule } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { describeRulesDropped, ensureTablePolicies } from "../src/schema/ensure-policies";
 import type { Queryable } from "../src/schema/ensure-tables";
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
@@ -19,7 +20,7 @@ import { compileSet } from "./helpers/plan-tables";
  * names each policy so the boot can warn.
  */
 
-const posts = (securityRules?: SecurityRule[]): CollectionConfig => ({
+const posts = (securityRules?: SecurityRule[]): LegacyCollectionConfig => ({
     name: "Posts", slug: "posts", table: "posts", schema: "public",
     properties: { id: { name: "ID", type: "string", isId: true }, author_id: { name: "A", type: "string" } },
     ...(securityRules ? { securityRules } : {})

@@ -12,18 +12,19 @@ import {
     relationalCollections
 } from "@rebasepro/common";
 import {
-    collectionsToTableDefs
+    collectionsToTableDefs,
+    isLegacyPostgresCollection,
+    type LegacyCollectionConfig,
+    type LegacyPostgresCollectionConfig,
+    type LegacyPostgresProperties
 } from "@rebasepro/common/migrate";
-import {
-    isPostgresCollectionConfig,
-    type AnyTableDef,
-    type AnyViewDef,
-    type CollectionConfig,
-    type CompiledTable,
-    type DefaultRls,
-    type PostgresCollectionConfig,
-    type PostgresProperties,
-    type SecurityRule
+import type {
+    AnyTableDef,
+    AnyViewDef,
+    CompiledTable,
+    DefaultRls,
+    PostgresCollectionConfig,
+    SecurityRule
 } from "@rebasepro/types";
 import { planSchema } from "../../src/schema/plan/plan-schema";
 import type { PlanOptions, SchemaPlan } from "../../src/schema/plan/types";
@@ -34,7 +35,7 @@ import type { PlanOptions, SchemaPlan } from "../../src/schema/plan/types";
  * depends on it. Applied once, in place, before anything is planned (the
  * relation cache is per collection object).
  */
-export const INPUT_ADJUSTMENTS: { set: string; reason: string; apply: (collections: CollectionConfig[]) => void }[] = [
+export const INPUT_ADJUSTMENTS: { set: string; reason: string; apply: (collections: LegacyCollectionConfig[]) => void }[] = [
     {
         set: "property-matrix",
         reason: "`arrs.ofTuple` declares a tuple (`of: [string, number]`), which no JSON shape of the table model can say. " +
@@ -52,7 +53,7 @@ export const INPUT_ADJUSTMENTS: { set: string; reason: string; apply: (collectio
             "or Drizzle relation, so removing it (and the property addressing it) changes no planned byte.",
         apply: collections => {
             const authors = collections.find(c => c.slug === "authors");
-            if (!authors || !isPostgresCollectionConfig(authors)) return;
+            if (!authors || !isLegacyPostgresCollection(authors)) return;
             delete authors.properties.commentsVia;
             authors.relations = authors.relations?.filter(relation => relation.relationName !== "commentsVia");
         }
@@ -64,7 +65,7 @@ export const INPUT_ADJUSTMENTS: { set: string; reason: string; apply: (collectio
  * rules array several collections share by reference (the loader assigns the
  * same array to every collection that declares none).
  */
-export function sharedDefaultRules(collections: readonly CollectionConfig[]): readonly SecurityRule[] | undefined {
+export function sharedDefaultRules(collections: readonly LegacyCollectionConfig[]): readonly SecurityRule[] | undefined {
     // Where the loader applied defaults, no collection is left without rules;
     // an in-memory fixture sharing a constant between some collections is not
     // a directory with defaults.
@@ -79,7 +80,7 @@ export function sharedDefaultRules(collections: readonly CollectionConfig[]): re
 }
 
 /** A legacy set as table definitions, with the `defaultRls` its directory defaults lift to. */
-export function liftSet(collections: readonly CollectionConfig[]): { defs: (AnyTableDef | AnyViewDef)[]; defaultRls?: DefaultRls } {
+export function liftSet(collections: readonly LegacyCollectionConfig[]): { defs: (AnyTableDef | AnyViewDef)[]; defaultRls?: DefaultRls } {
     const defaultSecurityRules = sharedDefaultRules(collections);
     const { tables, defaultRls } = collectionsToTableDefs(collections, defaultSecurityRules ? { defaultSecurityRules } : {});
     return defaultRls ? { defs: tables, defaultRls } : { defs: tables };
@@ -99,7 +100,7 @@ export function liftSet(collections: readonly CollectionConfig[]): { defs: (AnyT
  * - the {@link INPUT_ADJUSTMENTS} (legacy shapes no planned byte depends on)
  *   are applied wherever their collections appear.
  */
-export function compileSet(collections: readonly CollectionConfig[]): CompiledTable[] {
+export function compileSet(collections: readonly LegacyCollectionConfig[]): CompiledTable[] {
     const postgres = relationalCollections(collections);
     for (const adjustment of INPUT_ADJUSTMENTS) adjustment.apply(postgres);
     const { defs, defaultRls } = liftSet(withRelationTargets(postgres));
@@ -114,8 +115,8 @@ export function compileSet(collections: readonly CollectionConfig[]): CompiledTa
  * table and the others' relations reach the variant); the lift resolves a
  * target by identity, so the copies point at each other.
  */
-function withRelationTargets(collections: readonly CollectionConfig[]): CollectionConfig[] {
-    const members = new Map<string, CollectionConfig>();
+function withRelationTargets(collections: readonly LegacyCollectionConfig[]): LegacyCollectionConfig[] {
+    const members = new Map<string, LegacyCollectionConfig>();
     const queue = [...collections];
     for (let index = 0; index < queue.length; index++) {
         const collection = queue[index];
@@ -123,14 +124,14 @@ function withRelationTargets(collections: readonly CollectionConfig[]): Collecti
         members.set(collection.slug, collection);
         for (const relation of relationsOf(collection)) queue.push(relation.target());
     }
-    const copies = new Map<string, CollectionConfig>();
-    const rebound = (target: CollectionConfig): CollectionConfig => copies.get(target.slug) ?? target;
+    const copies = new Map<string, LegacyCollectionConfig>();
+    const rebound = (target: LegacyCollectionConfig): LegacyCollectionConfig => copies.get(target.slug) ?? target;
     for (const [slug, collection] of members) {
-        if (!isPostgresCollectionConfig(collection)) {
+        if (!isLegacyPostgresCollection(collection)) {
             copies.set(slug, collection);
             continue;
         }
-        const properties: PostgresProperties = {};
+        const properties: LegacyPostgresProperties = {};
         for (const [key, property] of Object.entries(collection.properties ?? {})) {
             if (property.type === "relation" && property.relation) {
                 const target = property.relation.target;
@@ -139,7 +140,7 @@ function withRelationTargets(collections: readonly CollectionConfig[]): Collecti
                 properties[key] = property;
             }
         }
-        const copy: PostgresCollectionConfig = { ...collection, properties };
+        const copy: LegacyPostgresCollectionConfig = { ...collection, properties };
         if (collection.relations) {
             copy.relations = collection.relations.map(relation => {
                 const target = relation.target;
@@ -152,8 +153,8 @@ function withRelationTargets(collections: readonly CollectionConfig[]): Collecti
 }
 
 /** Every relation a collection declares: its `relations` and its inline relation properties. */
-function relationsOf(collection: CollectionConfig): { target: () => CollectionConfig }[] {
-    if (!isPostgresCollectionConfig(collection)) return [];
+function relationsOf(collection: LegacyCollectionConfig): { target: () => LegacyCollectionConfig }[] {
+    if (!isLegacyPostgresCollection(collection)) return [];
     const inline = Object.values(collection.properties ?? {})
         .flatMap(property => (property.type === "relation" && property.relation ? [property.relation] : []));
     return [...(collection.relations ?? []), ...inline];
@@ -163,12 +164,12 @@ function relationsOf(collection: CollectionConfig): { target: () => CollectionCo
  * A legacy set planned: lifted, compiled, and handed to `planSchema` — the
  * one door a test with collection literals plans through.
  */
-export function planCollections(collections: readonly CollectionConfig[], options?: PlanOptions): SchemaPlan {
+export function planCollections(collections: readonly LegacyCollectionConfig[], options?: PlanOptions): SchemaPlan {
     return planSchema(compileSet(collections), options);
 }
 
 /** A legacy set lifted and lowered back: the collections the legacy planner input was. */
-export function lowerSet(collections: readonly CollectionConfig[]): PostgresCollectionConfig[] {
+export function lowerSet(collections: readonly LegacyCollectionConfig[]): PostgresCollectionConfig[] {
     const { defs, defaultRls } = liftSet(collections);
     return lowerTables(defs, defaultRls ? { defaultRls } : {});
 }

@@ -1,5 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
-import { CollectionConfig, policy, type SecurityRule } from "@rebasepro/types";
+import { policy, type SecurityRule } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ensureTablePolicies } from "../src/schema/ensure-policies";
 import type { Queryable } from "../src/schema/ensure-tables";
 import { generatePostgresPoliciesDdl } from "../src/schema/generate-postgres-ddl-logic";
@@ -32,7 +33,7 @@ const policiesOf = async (pg: PGlite, table: string): Promise<StoredPolicy[]> =>
     )).rows;
 
 describe("a restrictive rule whose policy cannot be created", () => {
-    const docs = (gate: string): CollectionConfig => ({
+    const docs = (gate: string): LegacyCollectionConfig => ({
         name: "Docs", slug: "docs", table: "docs",
         properties: { id: { type: "string", isId: true }, org_id: { type: "string" } },
         securityRules: [
@@ -84,7 +85,7 @@ describe("a policy whose name Postgres stores cut to 63 bytes", () => {
     // 48 bytes: the unnamed multi-operation rule's `<table>_select_<hash>_0`
     // is 65 bytes, stored as `<table>_select_<hash>` — the generated shape.
     const name = "a".repeat(48);
-    const longs: CollectionConfig = {
+    const longs: LegacyCollectionConfig = {
         name: "Longs", slug: "longs", table: name,
         properties: { id: { type: "string", isId: true }, org_id: { type: "string" } },
         securityRules: [
@@ -134,7 +135,7 @@ describe("two rules whose policies Postgres would store under one name", () => {
 
 describe("rules whose compiled SQL Postgres used to refuse", () => {
     it("creates a raw clause ending in a line comment, and an empty role list", async () => {
-        const notes: CollectionConfig = {
+        const notes: LegacyCollectionConfig = {
             name: "Notes", slug: "notes", table: "notes",
             properties: { id: { type: "string", isId: true }, owner_id: { type: "string" } },
             securityRules: [

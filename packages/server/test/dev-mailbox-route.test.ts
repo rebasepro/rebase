@@ -18,7 +18,8 @@ import { describe, expect, it, afterEach, beforeEach, jest } from "@jest/globals
 import { Hono } from "hono";
 import { createServer } from "node:http";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, InitializedDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { initializeRebaseBackend } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
@@ -35,7 +36,7 @@ import { tablesFrom } from "./helpers/tables";
 const JWT_SECRET = "dev-mailbox-route-test-secret-1234567890";
 const CRONS_DIR = path.join(__dirname, "fixtures", "crons");
 
-function collection(slug: string): CollectionConfig {
+function collection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,

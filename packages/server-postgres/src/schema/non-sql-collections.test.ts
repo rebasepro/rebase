@@ -15,7 +15,7 @@
  * auto-approved `db push`.
  */
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import {
@@ -27,7 +27,7 @@ import { planTableSchemaEnsure, type ExistingSchema } from "./ensure-tables";
 import { getTableIncludesFromTables } from "../cli-helpers";
 import { compileSet } from "../../test/helpers/plan-tables";
 
-const sqlCollection: CollectionConfig = {
+const sqlCollection: LegacyCollectionConfig = {
     name: "Customers",
     slug: "customers",
     properties: {
@@ -37,7 +37,7 @@ const sqlCollection: CollectionConfig = {
     securityRules: [{ operation: "select", using: "true" }]
 };
 
-const firestoreCollection: CollectionConfig = {
+const firestoreCollection: LegacyCollectionConfig = {
     name: "Exercises",
     slug: "exercises",
     engine: "firestore",
@@ -54,7 +54,7 @@ const firestoreCollection: CollectionConfig = {
 };
 
 /** Routed by `engine` alone — no `dataSource` to read. */
-const engineOnlyCollection: CollectionConfig = {
+const engineOnlyCollection: LegacyCollectionConfig = {
     name: "Events",
     slug: "events",
     engine: "firestore",
@@ -62,7 +62,7 @@ const engineOnlyCollection: CollectionConfig = {
 };
 
 /** Routed by `dataSource` alone — no `engine` field to read. */
-const dataSourceOnlyCollection: CollectionConfig = {
+const dataSourceOnlyCollection: LegacyCollectionConfig = {
     name: "Articles",
     slug: "articles",
     dataSource: "firestore",

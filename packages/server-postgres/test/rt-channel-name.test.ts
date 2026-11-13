@@ -1,7 +1,7 @@
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { WebSocket } from "ws";
 import { recordingDb } from "./helpers/spg-c-db";
 import { fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
@@ -23,7 +23,7 @@ function mockWebSocket(): MockWebSocket {
     return ws;
 }
 
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",

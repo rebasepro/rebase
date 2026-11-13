@@ -2,7 +2,8 @@ import { describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
 import { createRebaseClient, type FindParams } from "@rebasepro/client";
 import { buildSdkData, cond, encodeCursor, or } from "@rebasepro/common";
-import { DEFAULT_LIST_LIMIT, type CollectionConfig, type DataDriver } from "@rebasepro/types";
+import { DEFAULT_LIST_LIMIT, type DataDriver } from "@rebasepro/types";
+import { type LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
@@ -30,7 +31,7 @@ import { tablesFromCollections } from "./helpers/tables";
  * each driver was asked: the page read (options and include) and the count.
  */
 
-const authors: CollectionConfig = {
+const authors: LegacyCollectionConfig = {
     slug: "authors", name: "Authors", table: "authors",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -38,7 +39,7 @@ const authors: CollectionConfig = {
     }
 };
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts", name: "Posts", table: "posts",
     properties: {
         id: { type: "number", isId: "increment" },

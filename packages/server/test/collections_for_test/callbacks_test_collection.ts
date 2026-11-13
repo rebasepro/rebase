@@ -1,7 +1,7 @@
-import { CollectionConfig, BeforeSaveProps, AfterSaveProps, AfterSaveErrorProps, AfterReadProps, BeforeDeleteProps, AfterDeleteProps, PostgresCollectionConfig } from "@rebasepro/types";
-import { logger } from "../../utils/logger";
+import { LegacyCollectionConfig, LegacyBeforeSaveProps, LegacyAfterSaveProps, LegacyAfterSaveErrorProps, LegacyAfterReadProps, LegacyBeforeDeleteProps, LegacyAfterDeleteProps, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
+import { logger } from "../../src/utils/logger";
 
-export const callbacksTestCollection: PostgresCollectionConfig = {
+export const callbacksTestCollection: LegacyPostgresCollectionConfig = {
     name: "Callback Tests",
     slug: "callback_tests",
     table: "callback_tests",
@@ -26,7 +26,7 @@ export const callbacksTestCollection: PostgresCollectionConfig = {
         }
     },
     callbacks: {
-        beforeSave: (props: BeforeSaveProps) => {
+        beforeSave: (props: LegacyBeforeSaveProps) => {
             logger.info("🔥 [BACKEND_CALLBACK] beforeSave Triggered!", { detail: props });
             return {
                 ...props.values,
@@ -34,24 +34,24 @@ export const callbacksTestCollection: PostgresCollectionConfig = {
                 name: props.values.name + " (PreSaved)" // Modifying value before save
             };
         },
-        afterSave: (props: AfterSaveProps) => {
+        afterSave: (props: LegacyAfterSaveProps) => {
             logger.info("🔥 [BACKEND_CALLBACK] afterSave Triggered!", { detail: props });
             // This usually triggers other side effects (emails, notifications), log for now
         },
-        afterSaveError: (props: AfterSaveErrorProps) => {
+        afterSaveError: (props: LegacyAfterSaveErrorProps) => {
             logger.error("🔥 [BACKEND_CALLBACK] afterSaveError Triggered!", { detail: props });
         },
-        afterRead: (props: AfterReadProps) => {
+        afterRead: (props: LegacyAfterReadProps) => {
             logger.info("🔥 [BACKEND_CALLBACK] afterRead Triggered!", { detail: props });
             return {
                 ...props.row,
                 hasFetchTriggered: true
             };
         },
-        beforeDelete: (props: BeforeDeleteProps) => {
+        beforeDelete: (props: LegacyBeforeDeleteProps) => {
             logger.info("🔥 [BACKEND_CALLBACK] beforeDelete Triggered!", { detail: props });
         },
-        afterDelete: (props: AfterDeleteProps) => {
+        afterDelete: (props: LegacyAfterDeleteProps) => {
             logger.info("🔥 [BACKEND_CALLBACK] afterDelete Triggered!", { detail: props });
         }
     }

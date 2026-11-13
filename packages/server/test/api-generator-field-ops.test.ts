@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import { hasFieldOps, parseFieldOp, splitFieldOps } from "../src/api/rest/field-ops";
-import type { CollectionConfig, FetchOneProps, SaveManyProps, SaveProps, UpdateManyProps } from "@rebasepro/types";
+import type { FetchOneProps, SaveManyProps, SaveProps, UpdateManyProps } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 /** What a harness records of each write: the values that reached the driver. */
@@ -24,7 +25,7 @@ import { tableFrom, tablesFromCollections } from "./helpers/tables";
  * `packages/server-postgres/test/field-op-sql.test.ts`.
  */
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     singularName: "Post",
@@ -207,7 +208,7 @@ describe("field operations against the property's declared rules", () => {
      * checked. An operation went around every `enum`, `max` and `min` the
      * collection declares, while the same change sent as a value was a 400.
      */
-    const products: CollectionConfig = {
+    const products: LegacyCollectionConfig = {
         slug: "products",
         name: "Products",
         singularName: "Product",

@@ -22,7 +22,8 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import pg from "pg";
 import { pgTable, uuid, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper } from "../../src/PostgresBootstrapper.js";
@@ -40,7 +41,7 @@ const ordersTable = pgTable("orders", {
     title: varchar("title")
 });
 
-const ordersCollection: CollectionConfig = {
+const ordersCollection: LegacyCollectionConfig = {
     name: "Orders",
     slug: "orders",
     table: "orders",

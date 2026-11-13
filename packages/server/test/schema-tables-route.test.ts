@@ -13,10 +13,12 @@ import {
     type BackendBootstrapper,
     type DataDriver,
     type InitializedDriver,
-    type PostgresCollectionConfig,
     type TableDescriptor,
     type TableHooks
 } from "@rebasepro/types";
+import {
+    type LegacyPostgresCollectionConfig
+} from "@rebasepro/common/migrate";
 import { createRebaseClient } from "@rebasepro/client";
 import { lowerTables, tableDefsFromDescriptors } from "@rebasepro/common";
 import type { HonoEnv } from "../src/api/types";
@@ -494,7 +496,7 @@ describe("ETag and 304", () => {
 
 /** What an introspecting driver reports: the collections it serves and their descriptors. */
 interface Introspected {
-    collections: PostgresCollectionConfig[];
+    collections: LegacyPostgresCollectionConfig[];
     tables: TableDescriptor[];
 }
 

@@ -17,7 +17,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import type { CollectionConfig, OrderByTuple } from "@rebasepro/types";
+import type { OrderByTuple } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { cursorToStartAfter, decodeCursor } from "@rebasepro/common";
 
 import { readCatalogueSchema } from "../src/schema/catalogue-schema";
@@ -28,7 +29,7 @@ import { DataService } from "../src/services/dataService";
 import { RelationService } from "../src/services/RelationService";
 import { DrizzleClient } from "../src/interfaces";
 
-const companies: CollectionConfig = {
+const companies: LegacyCollectionConfig = {
     slug: "companies",
     table: "companies",
     name: "Companies",
@@ -42,7 +43,7 @@ const companies: CollectionConfig = {
  * Notes on one translation, reached from it by a `via` whose step joins on both
  * key columns — the link the boot check recommends into a composite key.
  */
-const notes: CollectionConfig = {
+const notes: LegacyCollectionConfig = {
     slug: "translation_notes",
     table: "translation_notes",
     name: "Translation notes",
@@ -55,7 +56,7 @@ const notes: CollectionConfig = {
     }
 };
 
-const translations: CollectionConfig = {
+const translations: LegacyCollectionConfig = {
     slug: "company_translation",
     table: "company_translation",
     name: "Company translations",

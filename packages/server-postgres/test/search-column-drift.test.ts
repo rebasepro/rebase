@@ -15,7 +15,8 @@
  * would report drift on wording, and this comparison decides whether a boot
  * refuses.
  */
-import type { CollectionConfig, PostgresCollectionConfig, SearchConfig } from "@rebasepro/types";
+import type { SearchConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import {
     planTableSchemaEnsure,
     ensureTables,
@@ -26,7 +27,7 @@ import { generatePostgresSearchDdl } from "../src/schema/generate-postgres-ddl-l
 import { buildSearchColumnSpec, searchColumnStamps } from "../src/schema/search-column";
 import { compileSet } from "./helpers/plan-tables";
 
-const talents = (fields: SearchConfig["fields"], extra: Partial<PostgresCollectionConfig["search"]> = {}): PostgresCollectionConfig => ({
+const talents = (fields: SearchConfig["fields"], extra: Partial<LegacyPostgresCollectionConfig["search"]> = {}): LegacyPostgresCollectionConfig => ({
     slug: "talents",
     table: "talents",
     name: "Talents",
@@ -35,13 +36,13 @@ const talents = (fields: SearchConfig["fields"], extra: Partial<PostgresCollecti
         full_name: { type: "string" },
         headline: { type: "string" }
     },
-    search: { fields, ...extra } as PostgresCollectionConfig["search"]
+    search: { fields, ...extra } as LegacyPostgresCollectionConfig["search"]
 });
 
 const before = talents(["full_name"]);
 const after = talents(["full_name", "headline"]);
 
-const stampOf = (collection: CollectionConfig): string =>
+const stampOf = (collection: LegacyCollectionConfig): string =>
     searchColumnStamps(buildSearchColumnSpec(collection)!)[0].fingerprint;
 
 /** A database that already has the table, the column, and a given stamp. */

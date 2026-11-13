@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach } from "@jest/globals";
 import { Hono } from "hono";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { initializeRebaseBackend } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
@@ -32,7 +32,7 @@ const bootstrapper = fakeBootstrapper({ driver: stubDriver }, {
     }
 });
 
-const collection = (slug: string, extra: Partial<CollectionConfig> = {}): CollectionConfig => ({
+const collection = (slug: string, extra: Partial<LegacyCollectionConfig> = {}): LegacyCollectionConfig => ({
     name: slug, slug, table: slug, singularName: slug.slice(0, -1),
     properties: { id: { name: "ID", type: "string", isId: "uuid" } },
     ...extra

@@ -3,20 +3,20 @@
  * Postgres keeps 63 bytes of each name. Distinct in full, one after truncation:
  * the push failed with `type "…" already exists` and nothing said why.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { planCollections } from "./helpers/plan-tables";
 
 const LONG = "a_table_with_a_really_long_name_that_goes_on_and_on_and_on_forever"; // 66 bytes
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     slug: "tags",
     table: "tags",
     name: "Tags",
     properties: { id: { type: "string", isId: "uuid" } }
 };
 
-const longOne = (withEnum: boolean): CollectionConfig => ({
+const longOne = (withEnum: boolean): LegacyCollectionConfig => ({
     slug: "long_one",
     table: LONG,
     name: "Long",
@@ -32,7 +32,7 @@ describe("derived names that collide only after Postgres truncates them", () => 
     });
 
     it("refuses two tables that share their first 63 bytes", () => {
-        const twin = { ...longOne(false), slug: "long_two", table: `${LONG}_two` } as CollectionConfig;
+        const twin = { ...longOne(false), slug: "long_two", table: `${LONG}_two` } as LegacyCollectionConfig;
         expect(() => planCollections([longOne(false), twin])).toThrow(/both become/);
     });
 

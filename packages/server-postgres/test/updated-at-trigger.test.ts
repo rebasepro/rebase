@@ -16,7 +16,7 @@
  * on `NEW`, `TG_ARGV`, and the `BEFORE UPDATE` timing are all server behaviour.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import {
     generatePostgresDdl,
     generatePostgresTriggersDdl
@@ -28,7 +28,7 @@ import {
 } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     table: "posts",
     name: "Posts",
@@ -132,13 +132,13 @@ describe("`autoValue: \"on_update\"` is a database trigger", () => {
  * contract as push-only until this was fixed.
  */
 describe("a junction payload's `on_update` column", () => {
-    const players: CollectionConfig = {
+    const players: LegacyCollectionConfig = {
         slug: "players",
         table: "players",
         name: "Players",
         properties: { id: { type: "number", isId: "increment" }, handle: { type: "string" } }
     };
-    const teams: CollectionConfig = {
+    const teams: LegacyCollectionConfig = {
         slug: "teams",
         table: "teams",
         name: "Teams",

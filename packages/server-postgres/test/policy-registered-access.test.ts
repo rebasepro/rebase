@@ -14,7 +14,8 @@ import { afterAll, beforeAll, describe, expect, it } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { sql as drizzleSql } from "drizzle-orm";
-import { adminRequestRoleFor, type CollectionConfig, type SecurityRule } from "@rebasepro/types";
+import { adminRequestRoleFor, type SecurityRule } from "@rebasepro/types";
+import { type LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { compileRulePolicies } from "@rebasepro/common";
 
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
@@ -32,7 +33,7 @@ const IDENTITY: RequestIdentity = {
 const rowsOf = (result: unknown): Record<string, unknown>[] =>
     typeof result === "object" && result !== null && "rows" in result && Array.isArray(result.rows) ? result.rows : [];
 
-function table(name: string): CollectionConfig {
+function table(name: string): LegacyCollectionConfig {
     return { slug: name, table: name, name, properties: { id: { type: "string" }, body: { type: "string" } } };
 }
 

@@ -1,5 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { planTablePolicies } from "../src/schema/generate-postgres-ddl-logic";
 import { ensureTablePolicies, lockTables } from "../src/schema/ensure-policies";
 import type { Queryable } from "../src/schema/ensure-tables";
@@ -15,13 +15,13 @@ import { compileSet } from "./helpers/plan-tables";
  * real container in `test/e2e/managed-boot-acceptance.test.ts`.
  */
 
-const tiers: CollectionConfig = {
+const tiers: LegacyCollectionConfig = {
     name: "Tiers", slug: "tiers", table: "tiers", schema: "public",
     properties: { id: { name: "ID", type: "string", isId: true }, label: { name: "L", type: "string" } },
     securityRules: [{ operation: "select", access: "public" }]
 };
 
-const customers: CollectionConfig = {
+const customers: LegacyCollectionConfig = {
     name: "Customers", slug: "customers", table: "customers", schema: "public",
     properties: {
         id: { name: "ID", type: "string", isId: true },
@@ -44,10 +44,10 @@ describe("planTablePolicies", () => {
     });
 
     it("includes junction tables — boot creates them, so it must police them too", () => {
-        const tags: CollectionConfig = {
+        const tags: LegacyCollectionConfig = {
             slug: "tags", table: "tags", name: "Tags", properties: { name: { type: "string" } }
         };
-        const posts: CollectionConfig = {
+        const posts: LegacyCollectionConfig = {
             slug: "posts", table: "posts", name: "Posts",
             properties: { title: { type: "string" } },
             relations: [{
@@ -194,7 +194,7 @@ describe("ensureTablePolicies", () => {
          * and boot refused to start, over a table it could have closed.
          */
         it("closes a mixed-case table by its exact name", async () => {
-            const users: CollectionConfig = {
+            const users: LegacyCollectionConfig = {
                 name: "Users", slug: "users", table: "User", schema: "public",
                 properties: { id: { name: "ID", type: "string", isId: true } },
                 securityRules: [{ operation: "select", access: "public" }]

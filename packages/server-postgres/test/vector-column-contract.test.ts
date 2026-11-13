@@ -24,7 +24,7 @@
  * everything vector-shaped in the file Rebase applies, and the same names on
  * both sides so the exclude list and the DDL cannot drift apart.
  */
-import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import {
     generatePostgresDdl,
     generatePostgresVectorDdl,
@@ -38,7 +38,7 @@ import {
 } from "../src/schema/vector-index";
 import { compileSet } from "./helpers/plan-tables";
 
-const collection: PostgresCollectionConfig = {
+const collection: LegacyPostgresCollectionConfig = {
     slug: "listing_observations",
     table: "listing_observations",
     name: "Listing observations",
@@ -54,10 +54,10 @@ const collection: PostgresCollectionConfig = {
     }
 };
 
-const collections: CollectionConfig[] = [collection];
+const collections: LegacyCollectionConfig[] = [collection];
 const indexName = vectorIndexNames(buildTableVectorIndexPlan(compileSet([collection])[0].descriptor))[0];
 
-const noVectors: CollectionConfig[] = [{
+const noVectors: LegacyCollectionConfig[] = [{
     slug: "posts",
     table: "posts",
     name: "Posts",
@@ -185,7 +185,7 @@ describe("the file Rebase applies", () => {
      * `MAX_INDEXABLE_VECTOR_DIMENSIONS`.
      */
     it("still adds the column for a vector too wide to index", () => {
-        const wide: CollectionConfig[] = [{
+        const wide: LegacyCollectionConfig[] = [{
             ...collection,
             properties: {
                 ...collection.properties,
@@ -203,7 +203,7 @@ describe("the file Rebase applies", () => {
     });
 
     it("adds the column for a property that opted out of indexing", () => {
-        const unindexed: CollectionConfig[] = [{
+        const unindexed: LegacyCollectionConfig[] = [{
             ...collection,
             properties: {
                 ...collection.properties,
@@ -241,7 +241,7 @@ describe("the file Rebase applies", () => {
     });
 
     it("carries the column's own constraints, since Atlas no longer can", () => {
-        const constrained: CollectionConfig[] = [{
+        const constrained: LegacyCollectionConfig[] = [{
             ...collection,
             properties: {
                 ...collection.properties,
@@ -282,7 +282,7 @@ describe("vectorExcludePatterns — what Atlas is told to keep its hands off", (
     });
 
     it("covers a column that has no index of its own", () => {
-        const unindexed: CollectionConfig[] = [{
+        const unindexed: LegacyCollectionConfig[] = [{
             ...collection,
             properties: {
                 ...collection.properties,
@@ -344,9 +344,9 @@ describe("boot provisions what the push provisions", () => {
     });
 
     it("plans it once, however many collections declare a vector", () => {
-        const two: CollectionConfig[] = [
+        const two: LegacyCollectionConfig[] = [
             collection,
-            { ...collection, slug: "other_observations", table: "other_observations" } as CollectionConfig
+            { ...collection, slug: "other_observations", table: "other_observations" } as LegacyCollectionConfig
         ];
         const planned = planTableSchemaEnsure(compileSet(two), emptyDb, optedIn).actions
             .filter(a => a.kind === "create-extension" && a.sql.includes("vector"));
@@ -367,7 +367,7 @@ describe("boot provisions what the push provisions", () => {
     it("still installs the search extensions unasked — those need no permission", () => {
         // pg_trgm and unaccent are contrib modules present in every Postgres
         // distribution, so there is no image, grant or allow-list to check.
-        const searchable: CollectionConfig[] = [{
+        const searchable: LegacyCollectionConfig[] = [{
             ...collection,
             // `unaccent` is what makes a search block need an extension at all;
             // a plain one needs none. See `buildSearchColumnSpec`.

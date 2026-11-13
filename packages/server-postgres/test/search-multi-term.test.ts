@@ -13,7 +13,7 @@
  * terms — which is what `websearch_to_tsquery` already does for a collection
  * that did declare the block, so the two paths now answer the same question.
  */
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { pgTable, PgDialect, text, uuid } from "drizzle-orm/pg-core";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 import { tablesFromCollections } from "./helpers/tables";
@@ -25,7 +25,7 @@ const customers = pgTable("customers", {
     email: text("email")
 });
 
-const collection: CollectionConfig = {
+const collection: LegacyCollectionConfig = {
     slug: "customers",
     name: "Customers",
     table: "customers",
@@ -87,7 +87,7 @@ describe("the ILIKE fallback across several fields", () => {
     });
 
     it("matches nothing when the collection has no searchable column", () => {
-        const idOnly: CollectionConfig = {
+        const idOnly: LegacyCollectionConfig = {
             ...collection,
             properties: { id: { type: "string", isId: "uuid" } }
         };

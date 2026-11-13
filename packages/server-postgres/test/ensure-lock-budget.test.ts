@@ -9,11 +9,11 @@
  * existing table carries `SET LOCAL lock_timeout`, and a timeout is retried
  * after a pause in which the queue drains.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ensureTables, type Queryable } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     table: "posts",
     name: "Posts",

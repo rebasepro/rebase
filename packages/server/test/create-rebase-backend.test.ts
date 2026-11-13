@@ -7,10 +7,12 @@ import {
     declaredResources,
     resetDeclaredResources,
     type BackendBootstrapper,
-    type CollectionConfig,
     type DataDriver,
     type InitializedDriver
 } from "@rebasepro/types";
+import {
+    type LegacyCollectionConfig
+} from "@rebasepro/common/migrate";
 
 import {
     createRebaseBackend,
@@ -41,7 +43,7 @@ import { tablesFrom } from "./helpers/tables";
 
 const JWT_SECRET = "create-backend-test-secret-0123456789abcdef";
 
-function collection(slug: string, extra: { dataSource?: string } = {}): CollectionConfig {
+function collection(slug: string, extra: { dataSource?: string } = {}): LegacyCollectionConfig {
     return {
         name: slug,
         slug,

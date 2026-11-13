@@ -12,14 +12,14 @@
  * time, so every failure ends exactly as it always did.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig, PostgresProperties } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresProperties } from "@rebasepro/common/migrate";
 import { ensureTables, type Queryable } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
-function makeCollections(n: number): CollectionConfig[] {
-    const cols: CollectionConfig[] = [];
+function makeCollections(n: number): LegacyCollectionConfig[] {
+    const cols: LegacyCollectionConfig[] = [];
     for (let i = 0; i < n; i++) {
-        const props: PostgresProperties = {
+        const props: LegacyPostgresProperties = {
             id: { type: "string", isId: "uuid" },
             title: { type: "string", validation: { required: true } },
             status: { type: "string", enum: { draft: "Draft", published: "Published" } },

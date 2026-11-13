@@ -22,10 +22,10 @@ import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import { logger } from "../src/utils/logger";
 import { DataDriver } from "../../types/src/controllers/data_driver";
-import { CollectionConfig } from "../../types/src/types/collections";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { tablesFromCollections } from "./helpers/tables";
 
-const collections: CollectionConfig[] = [
+const collections: LegacyCollectionConfig[] = [
     { slug: "posts", name: "Posts", singularName: "Post", properties: {} }
 ];
 

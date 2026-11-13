@@ -14,7 +14,8 @@
  * what changed in the catalogue is held to what the plan said, item by item.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig, PostgresCollectionConfig, SecurityOperation, SecurityRule } from "@rebasepro/types";
+import type { SecurityOperation, SecurityRule } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { applyPoliciesFile, stampableTables } from "../src/cli-push";
 import { lockTables, policyStampSql } from "../src/schema/ensure-policies";
 import { generatePostgresPoliciesDdl, planTablePolicies } from "../src/schema/generate-postgres-ddl-logic";
@@ -25,7 +26,7 @@ import { compileSet } from "./helpers/plan-tables";
 
 const OWNER = "owner_id = current_setting('app.uid', true)";
 
-const collection = (table: string, extra: Partial<PostgresCollectionConfig> = {}): CollectionConfig => ({
+const collection = (table: string, extra: Partial<LegacyPostgresCollectionConfig> = {}): LegacyCollectionConfig => ({
     name: table, slug: table, table, schema: "public",
     properties: { id: { name: "ID", type: "string", isId: true }, owner_id: { name: "Owner", type: "string" } },
     ...extra
@@ -98,7 +99,7 @@ async function catalogue(db: PGlite): Promise<Catalogue> {
 }
 
 /** What `rebase db push` does after Atlas, to row-level security, in its order. */
-async function push(client: Queryable, collections: CollectionConfig[]): Promise<void> {
+async function push(client: Queryable, collections: LegacyCollectionConfig[]): Promise<void> {
     await lockTables(client, compileSet(collections));
     const policiesSql = generatePostgresPoliciesDdl(compileSet(collections));
     const statements = stampableTables(planTablePolicies(compileSet(collections)), policiesSql)
@@ -147,7 +148,7 @@ describe("the push's row-level security plan", () => {
         await db.close();
     });
 
-    const collections = (itemsCondition: string): CollectionConfig[] => [
+    const collections = (itemsCondition: string): LegacyCollectionConfig[] => [
         collection("orders", { securityRules: [ordersRule] }),
         collection("notes", { securityRules: [{ operation: "select", access: "public" }] }),
         collection("tags"),

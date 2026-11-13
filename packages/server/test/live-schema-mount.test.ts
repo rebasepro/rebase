@@ -21,7 +21,8 @@ import { describe, it, expect } from "@jest/globals";
  */
 import { Hono } from "hono";
 import { createServer } from "node:http";
-import type { BackendBootstrapper, CollectionConfig } from "@rebasepro/types";
+import type { BackendBootstrapper } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import * as os from "os";
@@ -32,7 +33,7 @@ import { tablesFrom } from "./helpers/tables";
 
 const JWT_SECRET = "live-schema-mount-test-secret-1234567890";
 
-function collection(slug: string): CollectionConfig {
+function collection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,

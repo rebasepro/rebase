@@ -15,7 +15,7 @@
 import { createServer } from "node:http";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Hono } from "hono";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
@@ -29,7 +29,7 @@ import { tablesFrom } from "../helpers/tables.js";
 const JWT_SECRET = "user-profile-e2e-secret-that-is-long-enough-0123456789";
 const SERVICE_KEY = "user-profile-e2e-service-key-0123456789abcdef";
 
-const notes: CollectionConfig = {
+const notes: LegacyCollectionConfig = {
     name: "Notes",
     slug: "notes",
     table: "notes",

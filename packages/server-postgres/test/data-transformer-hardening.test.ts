@@ -7,16 +7,16 @@ import {
 } from "../src/data-transformer";
 import { liftedColumnOf, runtimeTableOf } from "./helpers/codec-columns";
 import { pgTable, varchar, type AnyPgColumn } from "drizzle-orm/pg-core";
-import type { PostgresCollectionConfig, PostgresProperties } from "@rebasepro/types";
+import type { LegacyPostgresCollectionConfig, LegacyPostgresProperties } from "@rebasepro/common/migrate";
 
 // ─────────────────────────────────────────────────────────────
 // Fixture helpers
 // ─────────────────────────────────────────────────────────────
 function makeCollection(
     slug: string,
-    properties: PostgresCollectionConfig["properties"],
-    relations?: PostgresCollectionConfig["relations"]
-): PostgresCollectionConfig {
+    properties: LegacyPostgresCollectionConfig["properties"],
+    relations?: LegacyPostgresCollectionConfig["relations"]
+): LegacyPostgresCollectionConfig {
     return {
         name: slug,
         slug,
@@ -29,7 +29,7 @@ function makeCollection(
 // serializeDataToServer — typed return (Issue #7 regression)
 // ─────────────────────────────────────────────────────────────
 describe("serializeDataToServer typed return", () => {
-    const properties: PostgresProperties = {
+    const properties: LegacyPostgresProperties = {
         title: { type: "string",
 name: "Title" },
         count: { type: "number",
@@ -425,7 +425,7 @@ authorId: null }, runtimeTableOf(collection)
 // ─────────────────────────────────────────────────────────────
 describe("structural dunder guard", () => {
     it("scalarData never contains any __ prefixed keys", () => {
-        const properties: PostgresProperties = {
+        const properties: LegacyPostgresProperties = {
             title: { type: "string",
 name: "Title" },
             count: { type: "number",
@@ -451,7 +451,7 @@ active: true },
 name: "Label" }
         });
 
-        const properties: PostgresProperties = {
+        const properties: LegacyPostgresProperties = {
             title: { type: "string",
 name: "Title" },
             tag: {

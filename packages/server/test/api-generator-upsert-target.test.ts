@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import { declaredUniqueTargets, resolveConflictTarget } from "../src/api/rest/conflict-target";
-import type { CollectionConfig, SaveManyProps, SaveProps } from "@rebasepro/types";
+import type { SaveManyProps, SaveProps } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { HonoEnv } from "../src/api/types";
 import { tablesFromCollections, tableFrom } from "./helpers/tables";
@@ -24,7 +25,7 @@ import { tablesFromCollections, tableFrom } from "./helpers/tables";
  * database but in no config is one `db push` from being dropped.
  */
 
-const users: CollectionConfig = {
+const users: LegacyCollectionConfig = {
     slug: "users",
     name: "Users",
     singularName: "User",

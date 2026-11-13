@@ -25,7 +25,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { ensureTables, readExistingSchema } from "../../src/schema/ensure-tables.js";
@@ -34,15 +34,15 @@ import { buildDeferredIndexes, poolIndexBuildSession } from "../../src/schema/de
 import { planTableSchemaEnsure } from "../../src/schema/ensure-tables.js";
 import { compileSet } from "../helpers/plan-tables";
 
-const authors: CollectionConfig = {
+const authors: LegacyCollectionConfig = {
     slug: "authors", table: "authors", name: "Authors",
     properties: { id: { type: "number", isId: "increment" }, name: { type: "string" } }
 };
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     slug: "tags", table: "tags", name: "Tags",
     properties: { id: { type: "number", isId: "increment" }, name: { type: "string" } }
 };
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts", table: "posts", name: "Posts",
     properties: {
         id: { type: "number", isId: "increment" },

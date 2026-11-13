@@ -28,7 +28,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createServer } from "node:http";
 import pg from "pg";
 import { Hono } from "hono";
-import type { CollectionConfig, DataDriver, User } from "@rebasepro/types";
+import type { DataDriver, User } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
@@ -107,7 +108,7 @@ pg.Client.prototype.query = function capture(this: pg.Client, ...args: unknown[]
 
 // ── collections ─────────────────────────────────────────────────────────────
 
-const companies: CollectionConfig = {
+const companies: LegacyCollectionConfig = {
     name: "Companies", slug: "companies", table: "companies",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -115,7 +116,7 @@ const companies: CollectionConfig = {
     }
 };
 
-const authors: CollectionConfig = {
+const authors: LegacyCollectionConfig = {
     name: "Authors", slug: "authors", table: "authors",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -132,7 +133,7 @@ const authors: CollectionConfig = {
     }
 };
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     name: "Tags", slug: "tags", table: "tags",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -140,7 +141,7 @@ const tags: CollectionConfig = {
     }
 };
 
-const comments: CollectionConfig = {
+const comments: LegacyCollectionConfig = {
     name: "Comments", slug: "comments", table: "comments",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -150,7 +151,7 @@ const comments: CollectionConfig = {
     }
 };
 
-const postDetails: CollectionConfig = {
+const postDetails: LegacyCollectionConfig = {
     name: "Post details", slug: "post_details", table: "post_details",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -159,7 +160,7 @@ const postDetails: CollectionConfig = {
     }
 };
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     name: "Posts", slug: "posts", table: "posts",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -188,7 +189,7 @@ const posts: CollectionConfig = {
 
 // A wide to-many pair for the per-relation `limit`: 2,000 messages and 300
 // labels under every thread.
-const labels: CollectionConfig = {
+const labels: LegacyCollectionConfig = {
     name: "Labels", slug: "labels", table: "labels",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -196,7 +197,7 @@ const labels: CollectionConfig = {
     }
 };
 
-const messages: CollectionConfig = {
+const messages: LegacyCollectionConfig = {
     name: "Messages", slug: "messages", table: "messages",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -206,7 +207,7 @@ const messages: CollectionConfig = {
     }
 };
 
-const threads: CollectionConfig = {
+const threads: LegacyCollectionConfig = {
     name: "Threads", slug: "threads", table: "threads",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },

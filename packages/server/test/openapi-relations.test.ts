@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
 import { openApiDocument, operationOf } from "./helpers/server-b-g1-openapi";
@@ -17,7 +17,7 @@ import { tablesFromCollections } from "./helpers/tables";
  * the spec.
  */
 describe("OpenAPI subcollection routes", () => {
-    const tags: CollectionConfig = {
+    const tags: LegacyCollectionConfig = {
         slug: "tags",
         name: "Tags",
         singularName: "Tag",
@@ -27,7 +27,7 @@ isId: true },
 name: { type: "string" } }
     };
 
-    const comments: CollectionConfig = {
+    const comments: LegacyCollectionConfig = {
         slug: "comments",
         name: "Comments",
         singularName: "Comment",
@@ -37,7 +37,7 @@ isId: true },
 body: { type: "string" } }
     };
 
-    const users: CollectionConfig = {
+    const users: LegacyCollectionConfig = {
         slug: "users",
         name: "Users",
         singularName: "User",
@@ -46,7 +46,7 @@ body: { type: "string" } }
 isId: true } }
     };
 
-    const posts: CollectionConfig = {
+    const posts: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         singularName: "Post",

@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { parseQueryOptions } from "../src/api/rest/query-parser";
 import { assertNoHiddenAggregateNames, assertReadableFields, requestViewer } from "../src/api/rest/field-access-query";
 import { ApiError } from "../src/api/errors";
@@ -17,7 +17,7 @@ import { queryAccessFor, tableFrom } from "./helpers/tables";
  * answers a genuine typo with "unknown field".
  */
 
-const staff: CollectionConfig = {
+const staff: LegacyCollectionConfig = {
     slug: "staff",
     name: "Staff",
     table: "staff",
@@ -139,13 +139,13 @@ describe("the foreign key of a withheld to-one relation", () => {
      * strip withholds both; the query side has to refuse both, or `?bandId=7`
      * answers "which staff sit in band 7" for a caller who may not see a band.
      */
-    const bands: CollectionConfig = {
+    const bands: LegacyCollectionConfig = {
         slug: "bands",
         name: "Bands",
         table: "bands",
         properties: { id: { type: "number", isId: "increment" } }
     };
-    const banded: CollectionConfig = {
+    const banded: LegacyCollectionConfig = {
         ...staff,
         properties: {
             ...staff.properties,
@@ -195,7 +195,7 @@ describe("a vector search", () => {
      * `vector_threshold` alone answers "is it within r of this point". So the
      * searched property is a field the query reads, like a sort key.
      */
-    const docs: CollectionConfig = {
+    const docs: LegacyCollectionConfig = {
         slug: "docs",
         name: "Docs",
         table: "docs",
@@ -245,7 +245,7 @@ describe("a relation an include loads", () => {
      * on `staff` itself is refused. The rule is the target's, so it is judged
      * against the target, at every level of the tree.
      */
-    const withManager: CollectionConfig = {
+    const withManager: LegacyCollectionConfig = {
         ...staff,
         properties: {
             ...staff.properties,
@@ -255,7 +255,7 @@ describe("a relation an include loads", () => {
             }
         }
     };
-    const departments: CollectionConfig = {
+    const departments: LegacyCollectionConfig = {
         slug: "departments",
         name: "Departments",
         table: "departments",

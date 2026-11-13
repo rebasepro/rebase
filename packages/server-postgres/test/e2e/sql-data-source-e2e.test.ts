@@ -14,7 +14,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { database } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
@@ -27,14 +27,14 @@ import { tablesFromCollections, tablesFrom } from "../helpers/tables.js";
 
 const analytics = database("analytics");
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     name: "Posts",
     slug: "posts",
     table: "posts",
     properties: { id: { name: "ID", type: "string", isId: "uuid" } }
 };
 
-const pageViews: CollectionConfig = {
+const pageViews: LegacyCollectionConfig = {
     name: "Page views",
     slug: "page_views",
     table: "page_views",

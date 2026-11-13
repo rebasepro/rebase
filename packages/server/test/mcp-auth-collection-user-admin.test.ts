@@ -15,7 +15,8 @@
  * The real built-in adapter over a fake repository, and the real MCP routes.
  */
 import { describe, it, expect, jest } from "@jest/globals";
-import type { CompiledAuthHooks, CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { CompiledAuthHooks, DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { configureJwt } from "../src/auth/jwt";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import type { AuthHooks } from "../src/auth/auth-hooks";
@@ -25,7 +26,7 @@ import { fakeDataDriver, mockAuthRepository } from "./helpers/server-b-fakes";
 
 configureJwt({ secret: JWT_SECRET, accessExpiresIn: "1h" });
 
-const users: CollectionConfig = {
+const users: LegacyCollectionConfig = {
     slug: "users",
     name: "Users",
     table: "users",
@@ -37,7 +38,7 @@ const users: CollectionConfig = {
     }
 };
 
-const candidates: CollectionConfig = {
+const candidates: LegacyCollectionConfig = {
     slug: "candidates",
     name: "Candidates",
     properties: { email: { name: "Email", type: "string" } }
@@ -51,7 +52,7 @@ function harness(options: {
     emails?: Record<string, string>;
     /** Handed the harness's event log, so a hook can record when it ran. */
     hooks?: (order: string[]) => AuthHooks;
-    collection?: CollectionConfig;
+    collection?: LegacyCollectionConfig;
     /** The auth table's compiled `onCreateUser` / `onResetPassword`, as the adapter is built with them. */
     authTableHooks?: CompiledAuthHooks;
 }) {
@@ -233,7 +234,7 @@ describe("create_row on the auth collection", () => {
             temporaryPassword: "hook-chosen",
             invitationSent: true
         }));
-        const hooked: CollectionConfig = { ...users, auth: { enabled: true, onCreateUser } };
+        const hooked: LegacyCollectionConfig = { ...users, auth: { enabled: true, onCreateUser } };
         const { call, writes } = harness({ admins: ["admin-1"], collection: hooked, authTableHooks: { onCreateUser } });
 
         const result = await call("create_row", {

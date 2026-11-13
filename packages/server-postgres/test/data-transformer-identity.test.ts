@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { getTableColumns } from "drizzle-orm";
 import { pgTable, text, type PgTable } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/pg-proxy";
@@ -40,7 +40,7 @@ describe("parseDataFromServer — inverse relations are addressed by key columns
         return { db, filteredBy };
     };
 
-    const attendeesCollection: CollectionConfig = {
+    const attendeesCollection: LegacyCollectionConfig = {
         slug: "attendees",
         name: "Attendees",
         table: "attendees",
@@ -52,7 +52,7 @@ isId: "increment" },
     };
 
     // Composite-keyed target: a seat identified by (row, number).
-    const seatsCollection: CollectionConfig = {
+    const seatsCollection: LegacyCollectionConfig = {
         slug: "seats",
         name: "Seats",
         table: "seats",
@@ -66,7 +66,7 @@ isId: true },
     };
 
     // `sku` is the key; `id` is an ordinary column holding an external ref.
-    const eventsCollection: CollectionConfig = {
+    const eventsCollection: LegacyCollectionConfig = {
         slug: "events",
         name: "Events",
         table: "events",
@@ -88,7 +88,7 @@ isId: true },
 
     // Its own slug: a table is served under one slug, and the registry
     // compiles the table that slug names.
-    const eventsWithSeats: CollectionConfig = {
+    const eventsWithSeats: LegacyCollectionConfig = {
         ...eventsCollection,
         slug: "events_with_seats",
         properties: {

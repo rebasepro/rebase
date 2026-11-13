@@ -14,7 +14,7 @@
  * value, so there the constraint is withheld — and reported.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import {
     ensureTables,
     planTableSchemaEnsure,
@@ -23,7 +23,7 @@ import {
 } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
-const people = (extra: CollectionConfig["properties"] = {}): CollectionConfig => ({
+const people = (extra: LegacyCollectionConfig["properties"] = {}): LegacyCollectionConfig => ({
     slug: "people",
     table: "people",
     name: "People",
@@ -47,7 +47,7 @@ const existingPeople = (populated: boolean | undefined): ExistingSchema => ({
     populatedTables: populated === undefined ? undefined : new Set(populated ? ["public.people"] : [])
 });
 
-const addColumnSql = (existing: ExistingSchema, collection: CollectionConfig, column: string): string => {
+const addColumnSql = (existing: ExistingSchema, collection: LegacyCollectionConfig, column: string): string => {
     const plan = planTableSchemaEnsure(compileSet([collection]), existing);
     const action = plan.actions.find(a => a.kind === "add-column" && a.target === `public.people.${column}`);
     if (!action) throw new Error(`no add-column for ${column}`);

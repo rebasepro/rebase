@@ -21,7 +21,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { ensureTables } from "../../src/schema/ensure-tables.js";
@@ -29,7 +29,7 @@ import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logi
 import { buildDeferredIndexes, poolIndexBuildSession } from "../../src/schema/deferred-index-build.js";
 import { compileSet } from "../helpers/plan-tables";
 
-const articles: CollectionConfig = {
+const articles: LegacyCollectionConfig = {
     slug: "articles", table: "articles", name: "Articles",
     properties: {
         id: { type: "number", isId: "increment" },

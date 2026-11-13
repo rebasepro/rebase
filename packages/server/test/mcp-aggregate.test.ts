@@ -11,12 +11,13 @@
 import { ApiError } from "../src/api/errors";
 import { MCP_TOOLS } from "../src/mcp/mcp-tools";
 import { configureJwt } from "../src/auth/jwt";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { buildApp, stubDriver, connectedClient, rpc, JWT_SECRET } from "./helpers/mcp-harness";
 
 configureJwt({ secret: JWT_SECRET, accessExpiresIn: "1h" });
 
-const ORDERS: CollectionConfig[] = [{
+const ORDERS: LegacyCollectionConfig[] = [{
     slug: "orders",
     name: "Orders",
     properties: {

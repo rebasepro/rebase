@@ -18,7 +18,8 @@ import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { boolean, pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, User } from "@rebasepro/types";
+import type { User } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -44,7 +45,7 @@ let seen: { status?: string; previousTitle?: unknown }[];
 /** What history recorded, in order. */
 let recorded: { tableName: string; id: string; action: string }[];
 
-function docsCollection(): CollectionConfig {
+function docsCollection(): LegacyCollectionConfig {
     return {
         name: "Docs",
         slug: "docs",

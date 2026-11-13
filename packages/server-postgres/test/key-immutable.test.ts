@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -29,7 +29,7 @@ const tagsTable = pgTable("tags", {
 /** What `afterSave` was told, in order. */
 let saved: string[];
 
-function tagsCollection(beforeSave?: (values: Record<string, unknown>) => Record<string, unknown>): CollectionConfig {
+function tagsCollection(beforeSave?: (values: Record<string, unknown>) => Record<string, unknown>): LegacyCollectionConfig {
     return {
         name: "Tags",
         slug: "tags",
@@ -49,7 +49,7 @@ function tagsCollection(beforeSave?: (values: Record<string, unknown>) => Record
 
 let db: PGlite;
 
-function driverOver(collection: CollectionConfig): PostgresBackendDriver {
+function driverOver(collection: LegacyCollectionConfig): PostgresBackendDriver {
     const registry = new FixtureTableRegistry();
     registry.registerMultiple([collection]);
     registry.registerPgTable(tagsTable, "tags");

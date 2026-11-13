@@ -14,11 +14,11 @@
  * whose table name sorts first, which is the order `db push` already used for
  * files named after their tables.
  */
-import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { planCollections } from "./helpers/plan-tables";
 
-const people: PostgresCollectionConfig = {
+const people: LegacyPostgresCollectionConfig = {
     slug: "people",
     table: "people",
     name: "People",
@@ -28,7 +28,7 @@ const people: PostgresCollectionConfig = {
     }
 };
 
-const categories: CollectionConfig = {
+const categories: LegacyCollectionConfig = {
     slug: "categories",
     table: "categories",
     name: "Categories",
@@ -38,7 +38,7 @@ const categories: CollectionConfig = {
     }
 };
 
-const junctionOf = (collections: CollectionConfig[]) => {
+const junctionOf = (collections: LegacyCollectionConfig[]) => {
     const junction = planCollections(collections).tables.find(t => t.kind === "junction");
     if (!junction) throw new Error("no junction planned");
     return { primaryKey: junction.primaryKey, columns: junction.columns.map(c => `${c.column} ${c.type.kind}`) };
@@ -56,17 +56,17 @@ describe("a junction both ends declare", () => {
 
 describe("a junction one end declares", () => {
     it("keeps the declaring side as the source, as it always was", () => {
-        const onlyPeople: PostgresCollectionConfig = {
+        const onlyPeople: LegacyPostgresCollectionConfig = {
             ...people,
             properties: { ...people.properties }
         };
-        const plainCategories: CollectionConfig = {
+        const plainCategories: LegacyCollectionConfig = {
             slug: "categories",
             table: "categories",
             name: "Categories",
             properties: { id: { type: "number", isId: "increment" } }
         };
-        const declared: CollectionConfig = {
+        const declared: LegacyCollectionConfig = {
             ...onlyPeople,
             properties: {
                 id: { type: "string", isId: "uuid" },

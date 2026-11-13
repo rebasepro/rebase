@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import { rowETag, versionColumn } from "../src/api/rest/etag";
-import type { CollectionConfig, DeleteProps, FetchOneProps, IncludeSpec, RestFetchService, SaveProps } from "@rebasepro/types";
+import type { DeleteProps, FetchOneProps, IncludeSpec, RestFetchService, SaveProps } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { HonoEnv } from "../src/api/types";
 import { descriptorOf, tablesFromCollections } from "./helpers/tables";
@@ -31,7 +32,7 @@ import { descriptorOf, tablesFromCollections } from "./helpers/tables";
 const docsTable = () => descriptorOf(tablesFromCollections([docs, notes]), "docs");
 const notesTable = () => descriptorOf(tablesFromCollections([docs, notes]), "notes");
 
-const docs: CollectionConfig = {
+const docs: LegacyCollectionConfig = {
     slug: "docs",
     name: "Docs",
     singularName: "Doc",
@@ -53,7 +54,7 @@ const docs: CollectionConfig = {
 };
 
 /** No version column: the tag has to come from the row itself. */
-const notes: CollectionConfig = {
+const notes: LegacyCollectionConfig = {
     slug: "notes",
     name: "Notes",
     singularName: "Note",
@@ -65,7 +66,7 @@ const notes: CollectionConfig = {
     }
 };
 
-const collections: Record<string, CollectionConfig> = { docs, notes };
+const collections: Record<string, LegacyCollectionConfig> = { docs, notes };
 
 type Stored = Record<string, unknown>;
 type ReadOptions = { fields?: string[]; withDeleted?: boolean | "only" };

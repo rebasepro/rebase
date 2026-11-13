@@ -11,7 +11,7 @@ import { loadTables } from "../src/schema/load-tables";
 import { compileSet } from "./helpers/plan-tables";
 import { checkPolicyDrift, hasDrift } from "../src/security/policy-drift";
 import { validatePolicyPgRoles } from "../src/security/rls-enforcement";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 // Factories rather than automocks: importing the real modules drags in the
 // generators and `pg`, and none of them is what is under test here.
@@ -39,7 +39,7 @@ const collections = [{
     table: "products",
     name: "Products",
     properties: { name: { type: "string" } }
-}] as CollectionConfig[];
+}] as LegacyCollectionConfig[];
 
 const emptyDrift = { missing: [],
 orphaned: [],

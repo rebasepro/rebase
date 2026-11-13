@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import path from "node:path";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
 import { openApiDocument, schemaOf, type JsonSchema, type OpenApiDocument } from "./helpers/server-b-g1-openapi";
@@ -13,7 +13,7 @@ import { tablesFrom, tablesFromCollections } from "./helpers/tables";
 import { compileLoadedSchema, loadBackendSchema } from "../src/schema/load-schema";
 
 /** The SDK generator reads compiled descriptors: the same collections, lifted and compiled. */
-const descriptorsOf = (collections: CollectionConfig[]) => {
+const descriptorsOf = (collections: LegacyCollectionConfig[]) => {
     const { tables, defaultRls } = tablesFrom(collections);
     return compileTables(tables, defaultRls ? { defaultRls } : {});
 };
@@ -36,7 +36,7 @@ const descriptorsOf = (collections: CollectionConfig[]) => {
  * derived rather than declared, and a `manyToMany`.
  */
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     slug: "tags",
     name: "Tags",
     singularName: "Tag",
@@ -47,7 +47,7 @@ const tags: CollectionConfig = {
     }
 };
 
-const authors: CollectionConfig = {
+const authors: LegacyCollectionConfig = {
     slug: "authors",
     name: "Authors",
     singularName: "Author",
@@ -58,7 +58,7 @@ const authors: CollectionConfig = {
     }
 };
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     singularName: "Post",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import {
     planTableSchemaEnsure,
     ensureTables,
@@ -8,7 +8,7 @@ import {
 } from "./ensure-tables";
 import { compileSet } from "../../test/helpers/plan-tables";
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     name: "Posts",
     slug: "posts",
     properties: {
@@ -118,7 +118,7 @@ describe("planning an additive schema ensure", () => {
     // with `column "author_id" does not exist`. The answer is to emit the key
     // too, from the same planner `db push` uses.
 
-    const authors: CollectionConfig = {
+    const authors: LegacyCollectionConfig = {
         name: "Authors",
         slug: "authors",
         properties: {
@@ -135,9 +135,9 @@ describe("planning an additive schema ensure", () => {
             ...posts.properties,
             author: { name: "Author", type: "reference", path: "authors" }
         }
-    } as unknown as CollectionConfig;
+    } as unknown as LegacyCollectionConfig;
 
-    const tags: CollectionConfig = {
+    const tags: LegacyCollectionConfig = {
         name: "Tags",
         slug: "tags",
         properties: {
@@ -146,7 +146,7 @@ describe("planning an additive schema ensure", () => {
         }
     };
 
-    const postsWithTags: CollectionConfig = {
+    const postsWithTags: LegacyCollectionConfig = {
         ...posts,
         properties: {
             ...posts.properties,
@@ -228,7 +228,7 @@ describe("planning an additive schema ensure", () => {
  * refusals beside them.
  */
 describe("constraints the configuration asks for", () => {
-    const required: CollectionConfig = {
+    const required: LegacyCollectionConfig = {
         name: "Authors",
         slug: "authors",
         properties: {
@@ -237,7 +237,7 @@ describe("constraints the configuration asks for", () => {
         }
     };
 
-    const optional: CollectionConfig = {
+    const optional: LegacyCollectionConfig = {
         ...required,
         properties: {
             ...required.properties,
@@ -667,12 +667,12 @@ describe("reporting a statement that failed", () => {
  * the database is not keeping.
  */
 describe("an index that will not build", () => {
-    const indexed: CollectionConfig = {
+    const indexed: LegacyCollectionConfig = {
         ...posts,
         indexes: [{ on: ["title"], reason: "title lookups" }]
     };
 
-    const uniquely: CollectionConfig = {
+    const uniquely: LegacyCollectionConfig = {
         ...posts,
         indexes: [{ on: ["title"], unique: true, reason: "one post per title" }]
     };
@@ -763,7 +763,7 @@ describe("a connection that turns out to be inside a transaction", () => {
             }
         };
 
-        const indexed: CollectionConfig = {
+        const indexed: LegacyCollectionConfig = {
             ...posts,
             indexes: [{ on: ["title"], reason: "title lookups" }]
         };
@@ -798,7 +798,7 @@ describe("a connection that turns out to be inside a transaction", () => {
  * right fix nearly always, and destructive exactly once.
  */
 describe("a required column no property declares any more", () => {
-    const renamed: CollectionConfig = {
+    const renamed: LegacyCollectionConfig = {
         name: "Posts",
         slug: "posts",
         properties: {
@@ -849,11 +849,11 @@ describe("a required column no property declares any more", () => {
     });
 
     it("does not mistake a foreign key for an orphan — relation columns are derived, not declared", () => {
-        const authors: CollectionConfig = {
+        const authors: LegacyCollectionConfig = {
             name: "Authors", slug: "authors",
             properties: { id: { name: "ID", type: "number", isId: "increment" } }
         };
-        const withRelation: CollectionConfig = {
+        const withRelation: LegacyCollectionConfig = {
             name: "Posts", slug: "posts",
             properties: {
                 id: { name: "ID", type: "string", isId: "uuid" },

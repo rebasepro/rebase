@@ -1,6 +1,7 @@
 import { describe, it, expect, jest } from "@jest/globals";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import type { CollectionConfig, SDKTableClient } from "@rebasepro/types";
+import type { SDKTableClient } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { spiedDrizzle } from "./helpers/spg-a-db";
 import { quietRealtime, registryServing, testUser } from "./helpers/spg-a-driver";
 
@@ -14,7 +15,7 @@ import { quietRealtime, registryServing, testUser } from "./helpers/spg-a-driver
  * happened to be `my_notes`: stored in `notes`, the typed accessor found nothing.
  */
 
-const myNotes: CollectionConfig = { slug: "my-notes", table: "notes", name: "Notes", properties: {} };
+const myNotes: LegacyCollectionConfig = { slug: "my-notes", table: "notes", name: "Notes", properties: {} };
 
 function buildDriver() {
     const registry = registryServing(myNotes);

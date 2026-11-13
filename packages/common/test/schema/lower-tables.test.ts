@@ -8,13 +8,15 @@ import {
     rel,
     type AnyTableDef,
     type AnyViewDef,
-    type PostgresCollectionConfig,
     type RebaseCallContext,
     type SecurityRule,
     type TableDescriptor,
     pgEnum,
     sql
 } from "@rebasepro/types";
+import {
+    type LegacyPostgresCollectionConfig
+} from "@rebasepro/common/migrate";
 
 import {
     lowerTables as lowerWithDefinitions,
@@ -55,7 +57,7 @@ function lowerColumn(column: Parameters<typeof defineTable>[1]["columns"][string
     return lowered.properties.c;
 }
 
-function only(defs: (AnyTableDef | AnyViewDef)[], options: Parameters<typeof lowerTables>[1] = {}): PostgresCollectionConfig {
+function only(defs: (AnyTableDef | AnyViewDef)[], options: Parameters<typeof lowerTables>[1] = {}): LegacyPostgresCollectionConfig {
     return lowerTables(defs, options)[0];
 }
 

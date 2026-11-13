@@ -8,7 +8,7 @@
  * then `db push --dry-run`, against a real Postgres).
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { serialSequenceName } from "../src/schema/introspect-db-storage";
 import { reconstructSearchBlock } from "../src/schema/introspect-db-search";
 import { readSchemaMetadata } from "../src/schema/introspect-db-queries";
@@ -37,7 +37,7 @@ describe("against a real catalogue", () => {
     });
 
     it("reads a search block back from the column it built, checked against its stamp", async () => {
-        const posts: CollectionConfig = {
+        const posts: LegacyCollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",

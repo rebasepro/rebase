@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { FetchService } from "../src/services/FetchService";
 import { RelationService } from "../src/services/RelationService";
@@ -25,7 +25,7 @@ describe("REST joinPath relations — parent ids come from the row's key columns
     registry.registerPgTable(pgTable("memberships", { tenant_id: integer("tenant_id"), user_id: integer("user_id") }), "memberships");
     registry.registerPgTable(pgTable("warehouses", { id: integer("id").primaryKey(), city: text("city") }), "warehouses");
 
-    const warehousesCollection: CollectionConfig = {
+    const warehousesCollection: LegacyCollectionConfig = {
         slug: "warehouses",
         name: "Warehouses",
         table: "warehouses",
@@ -37,7 +37,7 @@ isId: true },
     };
 
     // Key is `sku`, not `id` — the case the old parse could not survive.
-    const skuItemsCollection: CollectionConfig = {
+    const skuItemsCollection: LegacyCollectionConfig = {
         slug: "sku_items",
         name: "SKU Items",
         table: "sku_items",
@@ -72,7 +72,7 @@ isId: true },
         ]
     };
 
-    const membershipsCollection: CollectionConfig = {
+    const membershipsCollection: LegacyCollectionConfig = {
         slug: "memberships",
         name: "Memberships",
         table: "memberships",

@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { assertWriteValuesValid, type WriteViolation } from "../src/api/rest/write-validation";
 import { tableFrom } from "./helpers/tables";
 
@@ -7,7 +7,7 @@ import { tableFrom } from "./helpers/tables";
  * value, and Postgres answered a fraction with 22P02, rendered as
  * `Invalid data format in "products".` with no field named.
  */
-const products: CollectionConfig = {
+const products: LegacyCollectionConfig = {
     slug: "products",
     name: "Products",
     table: "products",

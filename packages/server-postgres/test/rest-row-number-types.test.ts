@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { toRestRow } from "../src/services/row-pipeline";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -15,7 +15,7 @@ import { FixtureTableRegistry } from "./helpers/tables";
 describe("REST row — declared number properties keep their declared type", () => {
     const registry = new FixtureTableRegistry();
 
-    const categoriesCollection: CollectionConfig = {
+    const categoriesCollection: LegacyCollectionConfig = {
         slug: "categories",
         name: "Categories",
         table: "categories",
@@ -26,7 +26,7 @@ describe("REST row — declared number properties keep their declared type", () 
         }
     };
 
-    const productsCollection: CollectionConfig = {
+    const productsCollection: LegacyCollectionConfig = {
         slug: "products",
         name: "Products",
         table: "products",
@@ -92,7 +92,7 @@ describe("REST row — declared number properties keep their declared type", () 
     });
 
     it("applies to the columns of an inlined relation target", () => {
-        const withRelation: CollectionConfig = {
+        const withRelation: LegacyCollectionConfig = {
             ...productsCollection,
             relations: [
                 {
@@ -102,7 +102,7 @@ describe("REST row — declared number properties keep their declared type", () 
                     target: () => categoriesCollection
                 }
             ]
-        } as CollectionConfig;
+        } as LegacyCollectionConfig;
 
         const row = toRestRow(
             {

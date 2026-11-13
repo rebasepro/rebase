@@ -25,14 +25,14 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { RealtimeService, type SubscriptionAuthContext } from "../src/services/realtimeService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { fakeDataDriver, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 import { recordingDb, type RecordedStatement } from "./helpers/spg-c-db";
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",

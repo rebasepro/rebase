@@ -31,7 +31,7 @@ jest.mock("../src/services/dataService", () => ({
 
 import http from "http";
 import WebSocket, { WebSocketServer } from "ws";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { createPostgresWebSocket } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -40,7 +40,7 @@ import { MAX_PROCESS_BUFFERED_BYTES, MAX_SOCKET_BUFFERED_BYTES, processSendBudge
 import { fakeDataDriver, fakeCallContextDriver } from "./helpers/spg-c-socket";
 import { recordingDb } from "./helpers/spg-c-db";
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     name: "posts",
     table: "posts",

@@ -4,7 +4,8 @@ import fs from "node:fs";
 import { createServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, CompiledTable, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CompiledTable, InitializedDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
@@ -26,7 +27,7 @@ import { SCHEMA_FILES } from "./helpers/schema-source-fixture";
 
 const JWT_SECRET = "live-schema-bundle-test-secret-1234567890";
 
-function collection(slug: string): CollectionConfig {
+function collection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,
@@ -38,7 +39,7 @@ function collection(slug: string): CollectionConfig {
 const executed: string[] = [];
 
 /** What the fake planner renders for a collection set. */
-function generatedFrom(collections: CollectionConfig[]): string {
+function generatedFrom(collections: LegacyCollectionConfig[]): string {
     const tables = collections.map(c => [c.slug, Object.keys(c.properties ?? {}).sort()]);
     return `export const tables = ${JSON.stringify(tables)};\n`;
 }

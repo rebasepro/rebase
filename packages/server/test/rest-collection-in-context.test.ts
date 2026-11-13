@@ -4,7 +4,8 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
-import type { CollectionConfig, DataDriver, RestFetchService } from "@rebasepro/types";
+import type { DataDriver, RestFetchService } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { tablesFromCollections } from "./helpers/tables";
 
 /**
@@ -20,7 +21,7 @@ import { tablesFromCollections } from "./helpers/tables";
  * operator. And validated against the collections this backend serves, so the
  * field is a real slug rather than whatever a caller typed into the URL.
  */
-const orders: CollectionConfig = {
+const orders: LegacyCollectionConfig = {
     slug: "orders",
     name: "Orders",
     table: "orders",

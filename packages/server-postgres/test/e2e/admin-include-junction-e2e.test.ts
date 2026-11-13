@@ -31,7 +31,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createServer } from "node:http";
 import pg from "pg";
 import { Hono } from "hono";
-import type { CollectionConfig, DataDriver, FindParams, PostgresProperty, SecurityRule } from "@rebasepro/types";
+import type { DataDriver, FindParams, SecurityRule } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresProperty } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
@@ -49,9 +50,9 @@ const ownerRules: SecurityRule[] = [
     { name: "owner_delete", operation: "delete", ownerField: "ownerId" }
 ];
 
-const ownerIdProperty: PostgresProperty = { name: "Owner", type: "string", columnName: "owner_id", validation: { required: true } };
+const ownerIdProperty: LegacyPostgresProperty = { name: "Owner", type: "string", columnName: "owner_id", validation: { required: true } };
 
-const companiesCollection: CollectionConfig = {
+const companiesCollection: LegacyCollectionConfig = {
     name: "Companies",
     slug: "companies",
     table: "companies",
@@ -64,7 +65,7 @@ const companiesCollection: CollectionConfig = {
 };
 
 // The relation is declared on this side only, as in prospector.
-const segmentsCollection: CollectionConfig = {
+const segmentsCollection: LegacyCollectionConfig = {
     name: "Segments",
     slug: "segments",
     table: "segments",

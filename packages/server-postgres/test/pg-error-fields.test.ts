@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { pgErrorToFriendlyMessage, pgFieldViolations, sanitizeErrorForClient, type PostgresError } from "../src/utils/pg-error-utils";
 
 /**
@@ -9,7 +9,7 @@ import { pgErrorToFriendlyMessage, pgFieldViolations, sanitizeErrorForClient, ty
  * all, on the most common data error there is.
  */
 describe("pg errors name the field, not the column", () => {
-    const posts: CollectionConfig = {
+    const posts: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",

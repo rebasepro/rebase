@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { relationOfTable } from "./helpers/relation-descriptors";
 import { RelationService } from "../src/services/RelationService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -23,7 +23,7 @@ import { textTable } from "./helpers/spg-c-tables";
 describe("hasMany/hasOne — sourceKey", () => {
     const registry = new FixtureTableRegistry();
 
-    const applications: CollectionConfig = {
+    const applications: LegacyCollectionConfig = {
         slug: "talent_applications",
         name: "Applications",
         table: "talent_applications",
@@ -34,7 +34,7 @@ describe("hasMany/hasOne — sourceKey", () => {
         }
     };
 
-    const talents: CollectionConfig = {
+    const talents: LegacyCollectionConfig = {
         slug: "talents",
         name: "Talents",
         table: "talents",
@@ -192,7 +192,7 @@ describe("hasMany/hasOne — sourceKey", () => {
     });
 
     it("costs no extra statement when the link joins on the row id", async () => {
-        const plain: CollectionConfig = {
+        const plain: LegacyCollectionConfig = {
             ...talents,
             properties: {
                 ...talents.properties,
@@ -226,7 +226,7 @@ describe("hasMany/hasOne — sourceKey", () => {
         // common case through the source-key resolver and forgetting to parse
         // compares "7" against 7 and returns nothing — no error, no rows, and
         // nothing in the query to suggest why.
-        const plain: CollectionConfig = {
+        const plain: LegacyCollectionConfig = {
             ...talents,
             properties: {
                 ...talents.properties,

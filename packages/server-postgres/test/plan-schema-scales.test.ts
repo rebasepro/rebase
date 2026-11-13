@@ -9,16 +9,16 @@
  * time. Counted here rather than timed, so the test cannot flake: how many
  * times the planner asks a relation for its target.
  */
-import type { CollectionConfig, PostgresProperties } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresProperties } from "@rebasepro/common/migrate";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { planCollections } from "./helpers/plan-tables";
 
 /** `n` collections, each with a hasMany to the next (the foreign key on the target's table). */
-function chain(n: number): { collections: CollectionConfig[]; targetCalls: () => number } {
+function chain(n: number): { collections: LegacyCollectionConfig[]; targetCalls: () => number } {
     let calls = 0;
-    const cols: CollectionConfig[] = [];
+    const cols: LegacyCollectionConfig[] = [];
     for (let i = 0; i < n; i++) {
-        const props: PostgresProperties = {
+        const props: LegacyPostgresProperties = {
             id: { type: "string", isId: "uuid" },
             title: { type: "string" },
             parent_id: { type: "string" }

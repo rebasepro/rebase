@@ -16,7 +16,7 @@
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { recordingDb } from "./helpers/spg-c-db";
 import { fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 
@@ -36,7 +36,7 @@ jest.mock("../src/services/dataService", () => ({
 
 type MockWebSocket = FakeRealtimeSocket;
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -47,7 +47,7 @@ const posts: CollectionConfig = {
     }
 };
 
-const authors: CollectionConfig = {
+const authors: LegacyCollectionConfig = {
     slug: "authors",
     name: "Authors",
     table: "authors",

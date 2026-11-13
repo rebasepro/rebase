@@ -11,7 +11,8 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, User, CollectionCallbacks } from "@rebasepro/types";
+import type { User } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyCollectionCallbacks } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -40,13 +41,13 @@ const postsTagsTable = pgTable("posts_tags", {
 });
 
 /** Scoped by the caller's tenant claim, when they have one. */
-const tenantScope: NonNullable<CollectionCallbacks["beforeQuery"]> = ({ context }) => {
+const tenantScope: NonNullable<LegacyCollectionCallbacks["beforeQuery"]> = ({ context }) => {
     const tenant = context.user?.claims?.tenant;
     if (typeof tenant !== "string") return;
     return { filter: { tenant: ["==", tenant] } };
 };
 
-function owners(): CollectionConfig {
+function owners(): LegacyCollectionConfig {
     return {
         name: "Owners", slug: "owners", table: "owners",
         properties: {
@@ -60,7 +61,7 @@ function owners(): CollectionConfig {
     };
 }
 
-function docs(): CollectionConfig {
+function docs(): LegacyCollectionConfig {
     return {
         name: "Docs", slug: "docs", table: "docs",
         softDelete: true,
@@ -74,7 +75,7 @@ function docs(): CollectionConfig {
     };
 }
 
-function posts(): CollectionConfig {
+function posts(): LegacyCollectionConfig {
     return {
         name: "Posts", slug: "posts", table: "posts",
         properties: {
@@ -101,7 +102,7 @@ function posts(): CollectionConfig {
     };
 }
 
-function tags(): CollectionConfig {
+function tags(): LegacyCollectionConfig {
     return {
         name: "Tags", slug: "tags", table: "tags",
         softDelete: true,

@@ -2,7 +2,7 @@ import { RealtimeService } from "../src/services/realtimeService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { parseCdcPayload, type CdcChangeEvent } from "../src/services/cdc/CdcListener";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { spiedDrizzle, transactionalDrizzle } from "./helpers/spg-a-db";
@@ -34,7 +34,7 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",

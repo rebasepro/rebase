@@ -5,20 +5,20 @@
  * changes.
  */
 import { describe, it, expect } from "@jest/globals";
-import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderViewsDdl, viewCreateStatements } from "../src/schema/plan/render-ddl";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { compileSet, planCollections } from "./helpers/plan-tables";
 
-const songs: CollectionConfig = {
+const songs: LegacyCollectionConfig = {
     slug: "songs", name: "Songs", table: "songs",
     securityRules: [{ operation: "select", roles: ["admin"] }],
     properties: { id: { type: "number", name: "Id", isId: "increment" }, artist: { type: "string", name: "Artist" } }
 };
 
-const view = (slug: string, query: string, materialized = false, roles?: string[]): CollectionConfig => ({
+const view = (slug: string, query: string, materialized = false, roles?: string[]): LegacyCollectionConfig => ({
     slug, name: slug, table: slug,
     view: { query, materialized, ...(roles ? { roles } : {}) },
     properties: { artist: { type: "string", name: "Artist", isId: true } }
@@ -61,7 +61,7 @@ describe("view plans", () => {
     });
 
     it("puts a materialized view's declared indexes on its stored rows", () => {
-        const indexed: CollectionConfig = {
+        const indexed: LegacyCollectionConfig = {
             slug: "top_artists", name: "top_artists", table: "top_artists",
             view: { query: "SELECT artist, count(*) AS plays FROM songs GROUP BY artist", materialized: true },
             indexes: [{ on: ["plays"], reason: "rank by plays" }],
@@ -107,12 +107,12 @@ describe("view plans", () => {
 // relations, which see views in the catalogue; it plans no constraint and no
 // generated relation.
 describe("links into a view collection", () => {
-    const byArtist: PostgresCollectionConfig = {
+    const byArtist: LegacyPostgresCollectionConfig = {
         slug: "by_artist", name: "By artist", table: "by_artist",
         view: { query: "SELECT artist, count(*)::int AS songs FROM songs GROUP BY artist" },
         properties: { artist: { type: "string", name: "Artist", isId: true }, songs: { type: "number", name: "Songs" } }
     };
-    const linked: PostgresCollectionConfig = {
+    const linked: LegacyPostgresCollectionConfig = {
         slug: "tracks", name: "Tracks", table: "tracks",
         properties: {
             id: { type: "number", name: "Id", isId: "increment" },

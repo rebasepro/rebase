@@ -13,11 +13,12 @@
  */
 import { lowerTables, type LoweredCollection } from "@rebasepro/common";
 import { collectionsToTableDefs } from "@rebasepro/common/migrate";
-import type { CollectionConfig, SecurityRule } from "@rebasepro/types";
+import type { SecurityRule } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { loadPlanCorpus, type PlanCorpus } from "./helpers/plan-corpus";
 
-function sharedDefaultRules(collections: readonly CollectionConfig[]): readonly SecurityRule[] | undefined {
+function sharedDefaultRules(collections: readonly LegacyCollectionConfig[]): readonly SecurityRule[] | undefined {
     if (collections.some(collection => !collection.securityRules?.length)) return undefined;
     const counts = new Map<readonly SecurityRule[], number>();
     for (const collection of collections) {
@@ -28,7 +29,7 @@ function sharedDefaultRules(collections: readonly CollectionConfig[]): readonly 
     return undefined;
 }
 
-function lowered(collections: readonly CollectionConfig[]): LoweredCollection[] {
+function lowered(collections: readonly LegacyCollectionConfig[]): LoweredCollection[] {
     const defaultSecurityRules = sharedDefaultRules(collections);
     const { tables, defaultRls } = collectionsToTableDefs(collections, defaultSecurityRules ? { defaultSecurityRules } : {});
     return lowerTables(tables, defaultRls ? { defaultRls } : {});
@@ -71,7 +72,7 @@ describe("the planner plans a lowered column from its definition", () => {
             } catch {
                 continue; // a set the lift adjusts first; plan-golden covers it
             }
-            const members = new Set<CollectionConfig>(collections);
+            const members = new Set<LegacyCollectionConfig>(collections);
             for (const collection of collections) {
                 for (const relation of collection.relations ?? []) {
                     const target = relation.target();

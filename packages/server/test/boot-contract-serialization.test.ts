@@ -1,4 +1,5 @@
-import type { CollectionConfig, TableHooks } from "@rebasepro/types";
+import type { TableHooks } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import {
     col,
     computeSchemaVersion,
@@ -19,7 +20,7 @@ import { compileTables } from "@rebasepro/common";
  * worse than an error.
  */
 
-function authorsCollection(): CollectionConfig {
+function authorsCollection(): LegacyCollectionConfig {
     return {
         name: "Authors",
         slug: "authors",
@@ -30,7 +31,7 @@ function authorsCollection(): CollectionConfig {
     };
 }
 
-function postsCollection(authors: CollectionConfig): CollectionConfig {
+function postsCollection(authors: LegacyCollectionConfig): LegacyCollectionConfig {
     return {
         name: "Posts",
         slug: "posts",
@@ -65,7 +66,7 @@ describe("collection contract serialization", () => {
         // The link is nested under `relation` now; the serializer walks by key
         // so it rebuilds the thunk wherever it sits.
         const relation = (restoredPosts.properties as Record<string, {
-            relation?: { target?: () => CollectionConfig | undefined };
+            relation?: { target?: () => LegacyCollectionConfig | undefined };
         }>).author.relation!;
 
         expect(typeof relation.target).toBe("function");
@@ -81,7 +82,7 @@ describe("collection contract serialization", () => {
         const restored = deserializeCollections(wire);
 
         const relation = (restored[0].properties as Record<string, {
-            relation?: { target?: () => CollectionConfig | undefined };
+            relation?: { target?: () => LegacyCollectionConfig | undefined };
         }>).author.relation!;
 
         expect(typeof relation.target).toBe("function");
@@ -89,7 +90,7 @@ describe("collection contract serialization", () => {
     });
 
     it("drops functions that are not relation targets", () => {
-        const collection: CollectionConfig = {
+        const collection: LegacyCollectionConfig = {
             name: "Widgets",
             slug: "widgets",
             properties: { id: { name: "ID", type: "string", isId: "uuid" } },
@@ -106,7 +107,7 @@ describe("collection contract serialization", () => {
     it("does not hang on a collection that references itself", () => {
         // A key the type does not declare: the walk serializes whatever a
         // collection object carries, which is where a cycle can hide.
-        const self: CollectionConfig & { parent?: unknown } = { name: "Node", slug: "nodes", properties: {} };
+        const self: LegacyCollectionConfig & { parent?: unknown } = { name: "Node", slug: "nodes", properties: {} };
         self.parent = self;
 
         const serialized = serializeCollections([self]);

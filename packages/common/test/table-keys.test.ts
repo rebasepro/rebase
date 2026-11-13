@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { col, defineTable } from "@rebasepro/types";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { compileTables } from "../src/schema/compile-tables";
 import { collectionsToTableDefs } from "../src/migrate";
@@ -91,7 +91,7 @@ describe("keyAddressInfo", () => {
 });
 
 describe("keys agree with the declared `isId` tier on every lifted fixture", () => {
-    const fixtures: CollectionConfig[] = ALL;
+    const fixtures: LegacyCollectionConfig[] = ALL;
     const { tables, defaultRls } = collectionsToTableDefs(fixtures);
     const descriptors = compileTables(tables, defaultRls ? { defaultRls } : {});
 

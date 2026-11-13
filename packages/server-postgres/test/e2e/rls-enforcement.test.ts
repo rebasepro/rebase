@@ -33,7 +33,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
-import type { CollectionCallbacks, CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionCallbacks, LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
@@ -48,7 +48,7 @@ import {
 import { testUser } from "./test-user.js";
 
 // Per-owner rules for BOTH read and write — the multi-tenant shape.
-const tasksCollection: CollectionConfig = {
+const tasksCollection: LegacyCollectionConfig = {
     name: "Tasks",
     slug: "tasks",
     table: "tasks",
@@ -70,14 +70,14 @@ const secretsTable = pgTable("secrets", {
     id: varchar("id").primaryKey(),
     value: varchar("value")
 });
-const secretsCollection: CollectionConfig = {
+const secretsCollection: LegacyCollectionConfig = {
     name: "Secrets", slug: "secrets", table: "secrets",
     properties: { id: { name: "ID", type: "string", isId: true }, value: { name: "V", type: "string" } }
 };
 
 // Carries the injected default-read policy shape (null-server-or-admin).
 const docsTable = pgTable("docs", { id: varchar("id").primaryKey(), owner_id: varchar("owner_id") });
-const docsCollection: CollectionConfig = {
+const docsCollection: LegacyCollectionConfig = {
     name: "Docs", slug: "docs", table: "docs",
     properties: { id: { name: "ID", type: "string", isId: true }, owner_id: { name: "O", type: "string" } }
 };
@@ -97,12 +97,12 @@ const noticeTopicsTable = pgTable("notice_topics", {
     topic_id: varchar("topic_id")
 });
 
-const topicsCollection: CollectionConfig = {
+const topicsCollection: LegacyCollectionConfig = {
     name: "Topics", slug: "topics", table: "topics",
     properties: { id: { name: "ID", type: "string", isId: true }, label: { name: "Label", type: "string" } }
 };
 
-const noticesCollection: CollectionConfig = {
+const noticesCollection: LegacyCollectionConfig = {
     name: "Notices", slug: "notices", table: "notices",
     properties: { id: { name: "ID", type: "string", isId: true }, body: { name: "Body", type: "string" } },
     relations: [
@@ -437,7 +437,7 @@ describe("Unified RLS enforcement (E2E)", () => {
     it("scopes context.data to the caller when a callback runs on a user request", async () => {
         const seen: Array<{ trigger: string; visible: string[] }> = [];
 
-        const withCallback: CollectionConfig = {
+        const withCallback: LegacyCollectionConfig = {
             ...tasksCollection,
             callbacks: {
                 afterSave: async ({ context }) => {
@@ -491,7 +491,7 @@ describe("Unified RLS enforcement (E2E)", () => {
         if (!registered) throw new Error("tasks is registered in beforeAll");
         // The registered config, seen as the hook slot this test swaps for one
         // read: `callbacks` is readonly on the config type, not on the object.
-        const tasks: { callbacks?: CollectionCallbacks } = registered;
+        const tasks: { callbacks?: LegacyCollectionCallbacks } = registered;
         const previous = tasks.callbacks;
         const seen: string[][] = [];
         tasks.callbacks = {

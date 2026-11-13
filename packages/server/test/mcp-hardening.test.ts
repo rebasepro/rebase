@@ -11,7 +11,8 @@
  * there is nothing asserting that a correct request succeeds — that is the
  * other file's job — and everything asserting that something does not happen.
  */
-import { DEFAULT_LIST_LIMIT, RebaseApiError, type CollectionConfig, type PostgresProperty } from "@rebasepro/types";
+import { DEFAULT_LIST_LIMIT, RebaseApiError } from "@rebasepro/types";
+import { type LegacyCollectionConfig, type LegacyPostgresProperty } from "@rebasepro/common/migrate";
 import { ApiError } from "../src/api/errors";
 import { parseQueryOptions } from "../src/api/rest/query-parser";
 import { MCP_TOOLS } from "../src/mcp/mcp-tools";
@@ -714,8 +715,8 @@ describe("the mutating tools apply the field write rules", () => {
     // REST routes and the socket's SAVE check them; these two tools took `values`
     // straight to `driver.save`, so a recruiter refused `PATCH { rating: 5 }`
     // could set it by asking the model to.
-    const teams: CollectionConfig = { slug: "teams", name: "Teams", properties: { name: { type: "string", name: "Name" } } };
-    const guarded: CollectionConfig[] = [{
+    const teams: LegacyCollectionConfig = { slug: "teams", name: "Teams", properties: { name: { type: "string", name: "Name" } } };
+    const guarded: LegacyCollectionConfig[] = [{
         slug: "candidates",
         name: "Candidates",
         properties: {
@@ -828,7 +829,7 @@ describe("query_table applies the field read rules to what it filters and sorts 
     // `where: { salary: [">", 100000] }` returns the rows whose hidden salary is
     // above 100k, and bisecting the bound reads it out one call at a time — the
     // exact oracle `GET /api/data/...?salary=gt.100000` answers 400 for.
-    const guarded: CollectionConfig[] = [{
+    const guarded: LegacyCollectionConfig[] = [{
         slug: "candidates",
         name: "Candidates",
         properties: {
@@ -1336,7 +1337,7 @@ describe("list_tables names the tables; describe_table gives one's schema", () =
         return { raw, result: body.result, text: body.result.content[0].text };
     }
 
-    async function describeCollection(name: string, collections?: CollectionConfig[]): Promise<Described> {
+    async function describeCollection(name: string, collections?: LegacyCollectionConfig[]): Promise<Described> {
         const { app } = buildApp(collections ? { collections } : {});
         const { accessToken } = await connectedClient(app);
         const { result, text } = await callOn(app, accessToken, "describe_table", { table: name });
@@ -1344,10 +1345,10 @@ describe("list_tables names the tables; describe_table gives one's schema", () =
         return answerIn<Described>(text);
     }
 
-    const field = (i: number): PostgresProperty => i % 3 === 0
+    const field = (i: number): LegacyPostgresProperty => i % 3 === 0
         ? { type: "number", name: `Field ${i}`, description: `What field ${i} holds` }
         : { type: "string", name: `Field ${i}`, description: `What field ${i} holds` };
-    const synthetic = (n: number) => Array.from({ length: n }, (_, c): CollectionConfig => ({
+    const synthetic = (n: number) => Array.from({ length: n }, (_, c): LegacyCollectionConfig => ({
         slug: `collection_${c}`,
         name: `Collection ${c}`,
         description: `Synthetic collection ${c}`,
@@ -1440,8 +1441,8 @@ describe("list_tables names the tables; describe_table gives one's schema", () =
     // appeared nowhere. The description is the schema REST's OpenAPI document
     // publishes for the same collection.
     it("says what a write must carry: required fields, enum values, the foreign key, the trash", async () => {
-        const authors: CollectionConfig = { slug: "authors", name: "Authors", properties: { name: { type: "string", name: "Name" } } };
-        const posts: CollectionConfig = {
+        const authors: LegacyCollectionConfig = { slug: "authors", name: "Authors", properties: { name: { type: "string", name: "Name" } } };
+        const posts: LegacyCollectionConfig = {
             slug: "posts",
             name: "Posts",
             softDelete: { field: "deleted_at" },

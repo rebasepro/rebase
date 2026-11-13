@@ -28,7 +28,8 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, DataDriver, ListenCollectionProps, User } from "@rebasepro/types";
+import type { DataDriver, ListenCollectionProps, User } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
@@ -42,7 +43,7 @@ const tasksTable = pgTable("tasks", {
     owner_id: varchar("owner_id")
 });
 
-const tasksCollection: CollectionConfig = {
+const tasksCollection: LegacyCollectionConfig = {
     slug: "tasks",
     name: "Tasks",
     table: "tasks",
@@ -71,7 +72,7 @@ const defer = (): Deferred => {
  */
 let hold: { reached: Deferred; release: Deferred } | undefined;
 
-const notesCollection: CollectionConfig = {
+const notesCollection: LegacyCollectionConfig = {
     slug: "notes",
     name: "Notes",
     table: "notes",

@@ -20,7 +20,8 @@
  */
 import { describe, it, expect } from "@jest/globals";
 import { pgTable, text, PgDialect } from "drizzle-orm/pg-core";
-import type { CollectionConfig, Property, TableDescriptor } from "@rebasepro/types";
+import type { TableDescriptor } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyProperty } from "@rebasepro/common/migrate";
 import { apiHiddenFieldNames, canReadField, defaultUsersCollection, queryableFieldNames, restrictedFieldNames, type FieldViewer } from "@rebasepro/common";
 
 import { stripUnreadable } from "../src/services/row-pipeline";
@@ -29,13 +30,13 @@ import { assertReadRequestReadable } from "../src/services/read-field-access";
 import { DrizzleConditionBuilder, listedColumnKeys } from "../src/utils/drizzle-conditions";
 import { FixtureTableRegistry } from "./helpers/tables";
 
-const bands: CollectionConfig = {
+const bands: LegacyCollectionConfig = {
     name: "Bands", slug: "bands", table: "bands",
     properties: { id: { name: "Id", type: "number", isId: "increment" }, label: { name: "Label", type: "string" } }
 };
 
 /** field-access-read / field-access-driver-read: role rule, write-only rule, private with a column name. */
-const staff: CollectionConfig = {
+const staff: LegacyCollectionConfig = {
     name: "Staff", slug: "staff", table: "staff",
     properties: {
         id: { name: "Id", type: "number", isId: "increment" },
@@ -49,7 +50,7 @@ const staff: CollectionConfig = {
 };
 
 /** field-access-search: a role-restricted text column, a private one, a uuid key and an enum. */
-const notes: CollectionConfig = {
+const notes: LegacyCollectionConfig = {
     name: "Notes", slug: "notes", table: "notes",
     properties: {
         id: { name: "Id", type: "string", isId: "uuid" },
@@ -61,7 +62,7 @@ const notes: CollectionConfig = {
 };
 
 /** field-access-read "a withheld to-one relation": the relation takes its foreign key. */
-const people: CollectionConfig = {
+const people: LegacyCollectionConfig = {
     name: "People", slug: "people", table: "people",
     properties: {
         id: { name: "Id", type: "number", isId: "increment" },
@@ -78,7 +79,7 @@ const people: CollectionConfig = {
 };
 
 /** field-access-read "`_count`": a to-many relation restricted by role. */
-const teams: CollectionConfig = {
+const teams: LegacyCollectionConfig = {
     name: "Teams", slug: "teams", table: "teams",
     properties: {
         id: { name: "Id", type: "number", isId: "increment" },
@@ -90,11 +91,11 @@ const teams: CollectionConfig = {
     }
 };
 
-const corpus: CollectionConfig[] = [staff, notes, people, teams, defaultUsersCollection];
+const corpus: LegacyCollectionConfig[] = [staff, notes, people, teams, defaultUsersCollection];
 
 const registry = new FixtureTableRegistry();
 registry.registerMultiple([bands, ...corpus]);
-const described = (collection: CollectionConfig): TableDescriptor => registry.requireTable(collection.slug).descriptor;
+const described = (collection: LegacyCollectionConfig): TableDescriptor => registry.requireTable(collection.slug).descriptor;
 
 const VIEWERS: { label: string; viewer: FieldViewer | undefined }[] = [
     { label: "the trusted server plane", viewer: undefined },
@@ -106,11 +107,11 @@ const VIEWERS: { label: string; viewer: FieldViewer | undefined }[] = [
 const CALLERS = VIEWERS.filter(({ viewer }) => viewer !== undefined);
 
 /** Every name a caller could write for a field of this table, in either model's spelling. */
-function everyName(collection: CollectionConfig, table: TableDescriptor): string[] {
+function everyName(collection: LegacyCollectionConfig, table: TableDescriptor): string[] {
     const names = new Set<string>();
     for (const [key, property] of Object.entries(collection.properties ?? {})) {
         names.add(key);
-        if ((property as Property).columnName) names.add(String((property as Property).columnName));
+        if ((property as LegacyProperty).columnName) names.add(String((property as LegacyProperty).columnName));
     }
     for (const column of table.columns) {
         names.add(column.key);
@@ -160,7 +161,7 @@ describe.each(corpus.map(collection => [collection.slug, collection] as const))(
 
     describe.each(VIEWERS.map(v => [v.label, v.viewer] as const))("search, for %s", (_label, viewer) => {
         it("searches no column the legacy search skipped", () => {
-            const properties = (collection.properties ?? {}) as Record<string, Property>;
+            const properties = (collection.properties ?? {}) as Record<string, LegacyProperty>;
             const legacySearched = new Set(Object.entries(properties)
                 .filter(([, p]) => p.type === "string" && !p.enum && p.isId !== "uuid" && canReadField(p, viewer))
                 // By SQL name: the column the legacy property read.

@@ -2,7 +2,8 @@ import { describe, expect, it, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
 import { generateKeyPairSync, type KeyObject } from "node:crypto";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { initializeRebaseBackend } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
@@ -70,7 +71,7 @@ async function platformToken(overrides: Record<string, unknown> = {}, key: KeyOb
     return `rpt_${await signJwt(claims, key, { algorithm: "ES256" })}`;
 }
 
-function collection(slug: string): CollectionConfig {
+function collection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,

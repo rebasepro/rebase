@@ -15,12 +15,12 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import { logger } from "../src/utils/logger";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
 import { tablesFromCollections } from "./helpers/tables";
 
-const collections: CollectionConfig[] = [
+const collections: LegacyCollectionConfig[] = [
     { slug: "users", name: "Users", singularName: "User", properties: {} },
     { slug: "posts", name: "Posts", singularName: "Post", properties: {} }
 ];

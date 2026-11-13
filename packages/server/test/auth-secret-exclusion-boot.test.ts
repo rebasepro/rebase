@@ -1,7 +1,8 @@
 import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
 import { createServer } from "node:http";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver, StringProperty } from "@rebasepro/types";
+import type { BackendBootstrapper, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyStringProperty } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 
@@ -31,7 +32,7 @@ import { tablesFrom } from "./helpers/tables";
  * property is built apart from the collection literal: a collection file that
  * loads that package carries exactly this object.
  */
-function hiddenColumn(name: string): StringProperty {
+function hiddenColumn(name: string): LegacyStringProperty {
     const property = {
         name,
         type: "string" as const,
@@ -41,7 +42,7 @@ function hiddenColumn(name: string): StringProperty {
 }
 
 /** The shape that leaked: a redeclared users collection with admin hints only. */
-function redeclaredUsersCollection(): CollectionConfig {
+function redeclaredUsersCollection(): LegacyCollectionConfig {
     return {
         name: "Usuarios",
         slug: "users",
@@ -69,12 +70,12 @@ function stubDriver(): DataDriver {
  * objects would show them carrying the flag a driver never saw, which is
  * exactly the illusion that let this ship. A copy is what a registry takes.
  */
-function capturingBootstrapper(seen: CollectionConfig[][]): BackendBootstrapper {
+function capturingBootstrapper(seen: LegacyCollectionConfig[][]): BackendBootstrapper {
     return {
         type: "fake",
         isDefault: true,
-        async initializeDriver({ collections }: { collections: CollectionConfig[] }): Promise<InitializedDriver> {
-            seen.push(JSON.parse(JSON.stringify(collections)) as CollectionConfig[]);
+        async initializeDriver({ collections }: { collections: LegacyCollectionConfig[] }): Promise<InitializedDriver> {
+            seen.push(JSON.parse(JSON.stringify(collections)) as LegacyCollectionConfig[]);
             return {
                 driver: stubDriver(),
                 collections: undefined,
@@ -99,7 +100,7 @@ describe("auth secret exclusion at boot", () => {
 
     it("excludes the secrets before any driver reads the collections", async () => {
         jest.spyOn(console, "warn").mockImplementation(() => {});
-        const seen: CollectionConfig[][] = [];
+        const seen: LegacyCollectionConfig[][] = [];
 
         await initializeRebaseBackend({
             app: new Hono<HonoEnv>(),

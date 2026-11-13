@@ -1,6 +1,6 @@
 import { getDevDatabaseUrl, getTableExcludes, getTableIncludesFromTables } from "../src/cli-helpers";
 import { tablesFromCollections } from "./helpers/tables";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
@@ -183,7 +183,7 @@ describe("CLI Helpers — Extended", () => {
         // whole collections → includes → excludes chain runs. `--exclude` is the
         // only thing keeping `db push` from dropping tables Rebase doesn't own,
         // so "some table went missing from the exclude list" has to fail here.
-        const collections: CollectionConfig[] = [
+        const collections: LegacyCollectionConfig[] = [
             {
                 slug: "users",
                 table: "users",
@@ -224,7 +224,7 @@ describe("CLI Helpers — Extended", () => {
         });
 
         it("should handle collection with custom schema", async () => {
-            const collections: CollectionConfig[] = [
+            const collections: LegacyCollectionConfig[] = [
                 {
                     slug: "orders",
                     table: "orders",
@@ -239,7 +239,7 @@ describe("CLI Helpers — Extended", () => {
         });
 
         it("should deduplicate table names", async () => {
-            const collections: CollectionConfig[] = [
+            const collections: LegacyCollectionConfig[] = [
                 {
                     slug: "users",
                     table: "users",
@@ -261,14 +261,14 @@ describe("CLI Helpers — Extended", () => {
         });
 
         it("should include junction tables from many-to-many relations", async () => {
-            const tagsCollection: CollectionConfig = {
+            const tagsCollection: LegacyCollectionConfig = {
                 slug: "tags",
                 table: "tags",
                 name: "Tags",
                 properties: { name: { type: "string" } },
             };
 
-            const postsCollection: CollectionConfig = {
+            const postsCollection: LegacyCollectionConfig = {
                 slug: "posts",
                 table: "posts",
                 name: "Posts",
@@ -294,7 +294,7 @@ describe("CLI Helpers — Extended", () => {
         });
 
         it("should include a junction in public, where it is created, whatever schema its endpoints are in", async () => {
-            const categoriesCollection: CollectionConfig = {
+            const categoriesCollection: LegacyCollectionConfig = {
                 slug: "categories",
                 table: "categories",
                 name: "Categories",
@@ -302,7 +302,7 @@ describe("CLI Helpers — Extended", () => {
                 properties: { name: { type: "string" } },
             };
 
-            const productsCollection: CollectionConfig = {
+            const productsCollection: LegacyCollectionConfig = {
                 slug: "products",
                 table: "products",
                 name: "Products",
@@ -344,7 +344,7 @@ describe("CLI Helpers — Extended", () => {
         });
 
         it("should handle collection without explicit table (uses slug)", async () => {
-            const collections: CollectionConfig[] = [
+            const collections: LegacyCollectionConfig[] = [
                 {
                     slug: "customers",
                     name: "Customers",

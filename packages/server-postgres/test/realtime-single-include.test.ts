@@ -22,21 +22,21 @@ jest.mock("../src/services/dataService", () => ({
     }))
 }));
 
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { RealtimeService, type SubscriptionAuthContext } from "../src/services/realtimeService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { fakeCallContextDriver, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 import { recordingDb } from "./helpers/spg-c-db";
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     slug: "tags",
     name: "Tags",
     table: "tags",
     properties: { id: { type: "number", isId: true }, name: { type: "string" } }
 };
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -134,11 +134,11 @@ describe("a single-row subscription with an include", () => {
     });
 
     it("is refused, like a list's, when its include filters on a field the subscriber may not read", async () => {
-        const guardedTags: CollectionConfig = {
+        const guardedTags: LegacyCollectionConfig = {
             ...tags,
             properties: { ...tags.properties, secret: { type: "string", access: { read: ["admin"] } } }
         };
-        const guardedPosts: CollectionConfig = {
+        const guardedPosts: LegacyCollectionConfig = {
             ...posts,
             properties: { ...posts.properties, tags: { type: "relation", relation: { kind: "manyToMany", target: () => guardedTags } } }
         };

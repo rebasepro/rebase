@@ -24,7 +24,7 @@ import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { printIndexModule, printTableModule, printTableSource } from "@rebasepro/common";
 import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 import { logger } from "@rebasepro/server";
@@ -42,7 +42,7 @@ import { tablesFromCollections } from "../helpers/tables.js";
  * source: the directory is outside the workspace, and is loaded both in this
  * process and by a spawned driver.
  */
-function writeSchemaDir(collections: CollectionConfig[]): string {
+function writeSchemaDir(collections: LegacyCollectionConfig[]): string {
     const backend = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-console-")), "backend");
     const schema = path.join(backend, "schema");
     fs.mkdirSync(schema, { recursive: true });
@@ -56,7 +56,7 @@ function writeSchemaDir(collections: CollectionConfig[]): string {
     return schema;
 }
 
-const notesCollection: CollectionConfig = {
+const notesCollection: LegacyCollectionConfig = {
     name: "Notes",
     slug: "notes",
     table: "notes",
@@ -74,7 +74,7 @@ const notesCollection: CollectionConfig = {
 };
 
 /** An audited collection: every write leaves an entry in `rebase.entity_history`. */
-const ledgerCollection: CollectionConfig = {
+const ledgerCollection: LegacyCollectionConfig = {
     name: "Ledger",
     slug: "ledger",
     table: "ledger",
@@ -97,7 +97,7 @@ const ledgerCollection: CollectionConfig = {
  * RLS runtime and policies, the restricted role — and, with `history`, the
  * history table and its function.
  */
-async function provision(url: string, collections: CollectionConfig[], options: { history: boolean }): Promise<void> {
+async function provision(url: string, collections: LegacyCollectionConfig[], options: { history: boolean }): Promise<void> {
     const conn = createPostgresDatabaseConnection(url);
     try {
         const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
@@ -807,7 +807,7 @@ describe("openRebase (E2E)", () => {
             await unaudited.connect();
             await unaudited.query("INSERT INTO public.ledger (owner_id, amount) VALUES ('ada', 1)");
             before = await catalogue(unaudited);
-            const hooked: CollectionConfig = {
+            const hooked: LegacyCollectionConfig = {
                 ...ledgerCollection,
                 callbacks: {
                     beforeSave: ({ values }) => { ran.push("beforeSave"); return values; },

@@ -1,6 +1,6 @@
 import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 
@@ -103,7 +103,7 @@ describe("DataService - Relation Types Tests", () => {
     };
 
     // Collection definitions for testing different relation types
-    const customersCollection: CollectionConfig = {
+    const customersCollection: LegacyCollectionConfig = {
         slug: "customers",
         name: "Customers",
         table: "customers",
@@ -133,7 +133,7 @@ relationName: "profile" }
         idField: "id"
     };
 
-    const ordersCollection: CollectionConfig = {
+    const ordersCollection: LegacyCollectionConfig = {
         slug: "orders",
         name: "Orders",
         table: "orders",
@@ -166,7 +166,7 @@ relationName: "products" }
         idField: "id"
     };
 
-    const productsCollection: CollectionConfig = {
+    const productsCollection: LegacyCollectionConfig = {
         slug: "products",
         name: "Products",
         table: "products",
@@ -178,7 +178,7 @@ relationName: "products" }
         idField: "id"
     };
 
-    const userProfilesCollection: CollectionConfig = {
+    const userProfilesCollection: LegacyCollectionConfig = {
         slug: "user_profiles",
         name: "User Profiles",
         table: "user_profiles",
@@ -626,7 +626,7 @@ __type: "relation" }
         // This is the Post -> Author relationship
 
         describe("ONE + owning + joinPath", () => {
-            const postsWithAuthorViaJoinPath: CollectionConfig = {
+            const postsWithAuthorViaJoinPath: LegacyCollectionConfig = {
                 slug: "posts_jp",
                 name: "Posts with JoinPath",
                 table: "posts",
@@ -790,7 +790,7 @@ name: "John Doe" }]);
         });
 
         describe("ONE + inverse + joinPath", () => {
-            const authorsWithProfileViaJoinPath: CollectionConfig = {
+            const authorsWithProfileViaJoinPath: LegacyCollectionConfig = {
                 slug: "authors_jp",
                 name: "Authors with Profile via JoinPath",
                 table: "authors",
@@ -870,7 +870,7 @@ name: "Jane Author" }]);
             // A to-one chain of more than one step has no single key to set:
             // the writer re-pointed the target at the first step's column. It
             // is read-only, refused before anything is read or written.
-            const postsWithTwoHopProfile: CollectionConfig = {
+            const postsWithTwoHopProfile: LegacyCollectionConfig = {
                 slug: "posts_two_hop",
                 name: "Posts with a two-hop profile",
                 table: "posts",
@@ -944,7 +944,7 @@ product_id: 2 }
         });
 
         describe("MANY + owning + joinPath", () => {
-            const postsWithTagsViaJoinPath: CollectionConfig = {
+            const postsWithTagsViaJoinPath: LegacyCollectionConfig = {
                 slug: "posts_tags_jp",
                 name: "Posts with Tags via JoinPath",
                 table: "posts",
@@ -1057,7 +1057,7 @@ name: "Big Customer" }]);
         });
 
         describe("MANY + inverse + through", () => {
-            const productsWithOrdersInverse: CollectionConfig = {
+            const productsWithOrdersInverse: LegacyCollectionConfig = {
                 slug: "products_orders",
                 name: "Products with Orders Inverse",
                 table: "products",
@@ -1127,7 +1127,7 @@ name: "Popular Product" }]);
         });
 
         describe("MANY + inverse + joinPath", () => {
-            const tagsWithPostsViaJoinPath: CollectionConfig = {
+            const tagsWithPostsViaJoinPath: LegacyCollectionConfig = {
                 slug: "tags_posts_jp",
                 name: "Tags with Posts via JoinPath",
                 table: "tags",

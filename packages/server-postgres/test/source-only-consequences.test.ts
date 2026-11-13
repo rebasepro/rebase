@@ -12,7 +12,7 @@
  * 23502. The write was not committed either, so the next apply on any
  * collection met it as somebody else's work — 409, forever.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { SchemaFacts } from "../src/schema/classify-change";
 import { classifyEditedTables as classifyCompiledTables, generateSchemaCommit as generateCompiledCommit } from "../src/schema/generate-schema-commit";
 import { compiledFromLegacy } from "./helpers/edited-tables";
@@ -25,7 +25,7 @@ const classifyEditedTables = (before: Parameters<typeof compiledFromLegacy>[0], 
 const generateSchemaCommit = (input: Omit<Parameters<typeof generateCompiledCommit>[0], "before" | "after"> & { before: Parameters<typeof compiledFromLegacy>[0]; after: Parameters<typeof compiledFromLegacy>[0] }) =>
     generateCompiledCommit({ ...input, before: compiledFromLegacy(input.before), after: compiledFromLegacy(input.after) });
 
-const products = (properties: Record<string, unknown>): CollectionConfig => ({
+const products = (properties: Record<string, unknown>): LegacyCollectionConfig => ({
     slug: "products",
     name: "Products",
     table: "products",
@@ -42,7 +42,7 @@ const facts = (notNull: string[] = [], defaults: string[] = []): SchemaFacts & {
     enumValues: new Map()
 });
 
-const blocking = (before: CollectionConfig, after: CollectionConfig, f?: SchemaFacts) =>
+const blocking = (before: LegacyCollectionConfig, after: LegacyCollectionConfig, f?: SchemaFacts) =>
     classifyEditedTables([before], [after], f).changes.filter(c => c.verdict !== "safe");
 
 describe("what an Edit source only leaves behind", () => {

@@ -12,9 +12,9 @@
  * poisoning the set the agreement tests walk. Those are exported on their own
  * and deliberately left out of {@link everything}.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
-const C = (c: unknown): CollectionConfig => c as CollectionConfig;
+const C = (c: unknown): LegacyCollectionConfig => c as LegacyCollectionConfig;
 
 // ───────────────────────── A. string sub-options ─────────────────────────
 export const strProps = C({
@@ -197,7 +197,7 @@ export const refs = C({
 });
 
 // ───────────────────────── I. relations ─────────────────────────
-export const authors: CollectionConfig = C({
+export const authors: LegacyCollectionConfig = C({
     slug: "authors", table: "authors", name: "Authors",
     properties: {
         id: { type: "string", isId: "uuid" },
@@ -212,7 +212,7 @@ export const authors: CollectionConfig = C({
         { kind: "via", relationName: "commentsVia", target: () => comments, path: [{ to: () => posts, foreignKeyOnTarget: "author_id" }, { to: () => comments, foreignKeyOnTarget: "post_id" }] }
     ]
 });
-export const profiles: CollectionConfig = C({
+export const profiles: LegacyCollectionConfig = C({
     slug: "profiles", table: "profiles", name: "Profiles",
     properties: {
         id: { type: "string", isId: "uuid" },
@@ -223,7 +223,7 @@ export const profiles: CollectionConfig = C({
         { kind: "belongsTo", relationName: "author", target: () => authors, localKey: "author_id" }
     ]
 });
-export const posts: CollectionConfig = C({
+export const posts: LegacyCollectionConfig = C({
     slug: "posts", table: "posts", name: "Posts",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -242,7 +242,7 @@ export const posts: CollectionConfig = C({
         { kind: "manyToMany", relationName: "tags", target: () => tags, through: { table: "post_tags", sourceColumn: "post_id", targetColumn: "tag_id" }, onDelete: "restrict" }
     ]
 });
-export const comments: CollectionConfig = C({
+export const comments: LegacyCollectionConfig = C({
     slug: "comments", table: "comments", name: "Comments",
     properties: {
         id: { type: "string", isId: "uuid" },
@@ -255,7 +255,7 @@ export const comments: CollectionConfig = C({
         { kind: "belongsTo", relationName: "post", target: () => posts, localKey: "post_id", onDelete: "cascade" }
     ]
 });
-export const tags: CollectionConfig = C({
+export const tags: LegacyCollectionConfig = C({
     slug: "tags", table: "tags", name: "Tags",
     properties: {
         id: { type: "string", isId: "uuid" },
@@ -274,7 +274,7 @@ export const tags: CollectionConfig = C({
 // nullable number, and a date with `autoValue: "on_update"` (which puts a
 // trigger on a table no collection declares). Declared from BOTH sides, with
 // the payload written once — the shape the docs recommend.
-export const orgs: CollectionConfig = C({
+export const orgs: LegacyCollectionConfig = C({
     slug: "orgs", table: "orgs", name: "Orgs",
     properties: {
         id: { type: "string", isId: "uuid" },
@@ -305,7 +305,7 @@ export const orgs: CollectionConfig = C({
         }
     ]
 });
-export const people: CollectionConfig = C({
+export const people: LegacyCollectionConfig = C({
     slug: "people", table: "people", name: "People",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -325,7 +325,7 @@ export const people: CollectionConfig = C({
 });
 
 // Relation with no explicit localKey (derived) and a relation property carrying columnName
-export const derivedFk: CollectionConfig = C({
+export const derivedFk: LegacyCollectionConfig = C({
     slug: "derived_fk", table: "derived_fk", name: "x",
     properties: {
         id: { type: "string", isId: "uuid" },
@@ -484,7 +484,7 @@ export const membershipTenanted = C({
     }
 });
 
-export const groups: Record<string, CollectionConfig[]> = {
+export const groups: Record<string, LegacyCollectionConfig[]> = {
     strProps: [strProps],
     strIds: [strIdTrue, strIdManual, strIdSql, strIdSqlBare, strIdUuidReqUnique, strIdUuidVarchar, noIdAtAll, idNamedButNotFlagged, idNumberNamedButNotFlagged],
     numProps: [numProps],
@@ -514,10 +514,10 @@ export const groups: Record<string, CollectionConfig[]> = {
  * {@link emptyEnum}, {@link emptyEnumNumber}, {@link strIdCuid}, {@link strIdIncrement},
  * {@link numIdUuid}, {@link linkIntoComposite}.
  */
-export const everything: CollectionConfig[] = Array.from(new Set(Object.values(groups).flat()));
+export const everything: LegacyCollectionConfig[] = Array.from(new Set(Object.values(groups).flat()));
 
 /** The configurations every emitter refuses, with what each one is testing. */
-export const refused: { collection: CollectionConfig; because: RegExp }[] = [
+export const refused: { collection: LegacyCollectionConfig; because: RegExp }[] = [
     { collection: emptyEnum, because: /empty `enum`/ },
     { collection: emptyEnumNumber, because: /empty `enum`/ },
     { collection: strIdCuid, because: /cuid/ },

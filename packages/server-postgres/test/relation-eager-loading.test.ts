@@ -1,6 +1,6 @@
 import { DataService } from "../src/services/dataService";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb, shapedRows } from "./helpers/spg-c-db";
@@ -22,7 +22,7 @@ describe("DataService - relation eager loading (admin N+1 guard)", () => {
     const mockCustomersTable = pgTable("customers", { id: integer("id"), name: text("name") });
     const mockUserProfilesTable = pgTable("user_profiles", { id: integer("id"), userId: integer("user_id"), bio: text("bio") });
 
-    const customersCollection: CollectionConfig = {
+    const customersCollection: LegacyCollectionConfig = {
         slug: "customers",
         name: "Customers",
         table: "customers",
@@ -32,7 +32,7 @@ describe("DataService - relation eager loading (admin N+1 guard)", () => {
         }
     };
 
-    const userProfilesCollection: CollectionConfig = {
+    const userProfilesCollection: LegacyCollectionConfig = {
         slug: "user_profiles",
         name: "User Profiles",
         table: "user_profiles",

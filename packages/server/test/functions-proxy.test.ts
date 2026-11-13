@@ -4,7 +4,8 @@ import { serve } from "@hono/node-server";
 import type { AddressInfo } from "node:net";
 import { createServer } from "node:http";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, InitializedDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
@@ -49,7 +50,7 @@ const JWT_SECRET = "functions-proxy-test-secret-1234567890";
 /** One deployment, one key: what the api process presents for its own calls, and what the functions process admits. */
 const SERVICE_KEY = "functions-proxy-service-key-0123456789abcdef";
 
-function collection(slug: string): CollectionConfig {
+function collection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,

@@ -1,6 +1,7 @@
 import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { Hono } from "hono";
-import type { AuthAdapter, CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { AuthAdapter, DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
@@ -32,7 +33,7 @@ function creationAdapter(members: Partial<AuthAdapter>): AuthAdapter {
  * routes so the wiring is exercised, not just the helper.
  */
 describe("auth-collection creates still reject unknown fields", () => {
-    const users: CollectionConfig = {
+    const users: LegacyCollectionConfig = {
         slug: "users",
         name: "Users",
         table: "users",

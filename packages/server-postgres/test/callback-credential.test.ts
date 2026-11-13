@@ -17,7 +17,8 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, serial, varchar } from "drizzle-orm/pg-core";
-import type { CallerCredential, CollectionConfig, RebaseCallContext, User } from "@rebasepro/types";
+import type { CallerCredential, RebaseCallContext, User } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -36,8 +37,8 @@ function record(hook: string, context: RebaseCallContext): void {
     seen[hook] = context.credential ?? "absent";
 }
 
-function notesCollection(): CollectionConfig {
-    const collection: CollectionConfig = {
+function notesCollection(): LegacyCollectionConfig {
+    const collection: LegacyCollectionConfig = {
         name: "Notes",
         slug: "notes",
         table: "notes",

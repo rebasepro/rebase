@@ -29,10 +29,12 @@ import { pathToFileURL } from "node:url";
 import {
     isPostgresCollectionConfig,
     resolveResourceRefs,
-    type CollectionConfig,
     type CompiledTable,
     type SecurityRule
 } from "@rebasepro/types";
+import {
+    type LegacyCollectionConfig
+} from "@rebasepro/common/migrate";
 
 import {
     PLANNER_ENV_VARIABLES,
@@ -77,7 +79,7 @@ export interface PlanCorpusOptions {
 export interface PlanCorpusSet {
     /** Also the golden directory's name. */
     id: string;
-    collections: CollectionConfig[];
+    collections: LegacyCollectionConfig[];
     options: PlanCorpusOptions;
     /** The golden root this set is recorded under — {@link PLAN_GOLDEN_DIR} unless stated. */
     goldenRoot?: string;
@@ -86,7 +88,7 @@ export interface PlanCorpusSet {
 /** A configuration the planner must refuse, and the message it must refuse it with. */
 export interface PlanRefusal {
     id: string;
-    collections: CollectionConfig[];
+    collections: LegacyCollectionConfig[];
     messagePattern: RegExp;
 }
 
@@ -95,7 +97,7 @@ export interface PlanRefusal {
  * longer admit, because projects in the field still hold them), handed to the
  * planner as the collections it is.
  */
-const asCollections = (data: unknown[]): CollectionConfig[] => data.map(entry => entry as CollectionConfig);
+const asCollections = (data: unknown[]): LegacyCollectionConfig[] => data.map(entry => entry as LegacyCollectionConfig);
 
 // ── The deterministic world ──────────────────────────────────────────────────
 
@@ -195,8 +197,8 @@ const isSecurityRuleList = (value: unknown): value is SecurityRule[] => Array.is
  * import or exports no collection — a set silently missing a collection would
  * record a golden for a different schema.
  */
-async function readCollectionDirectory(dir: string): Promise<CollectionConfig[]> {
-    const collections: CollectionConfig[] = [];
+async function readCollectionDirectory(dir: string): Promise<LegacyCollectionConfig[]> {
+    const collections: LegacyCollectionConfig[] = [];
     for (const file of fs.readdirSync(dir).filter(isCollectionModule)) {
         const mod: Record<string, unknown> = await import(pathToFileURL(path.join(dir, file)).href);
         const collection: unknown = mod.default;
@@ -204,7 +206,7 @@ async function readCollectionDirectory(dir: string): Promise<CollectionConfig[]>
             throw new Error(`${path.join(dir, file)} default-exports no collection`);
         }
         // A plain object authored as a collection: what the runtime loader accepted.
-        collections.push(resolveResourceRefs(collection as CollectionConfig));
+        collections.push(resolveResourceRefs(collection as LegacyCollectionConfig));
     }
     const index = ["index.ts", "index.js"].map(name => path.join(dir, name)).find(candidate => fs.existsSync(candidate));
     if (index) {

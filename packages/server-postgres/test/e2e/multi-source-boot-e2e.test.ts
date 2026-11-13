@@ -31,7 +31,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import pg from "pg";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper } from "../../src/PostgresBootstrapper.js";
@@ -45,7 +45,7 @@ import { compileSet } from "../helpers/plan-tables";
 // `posts_tags` — the junction is what produced the CDC warning, because nothing
 // maps it to a collection and it was collected from the whole registry.
 // `events` is the one routed elsewhere.
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     name: "Posts",
     slug: "posts",
     table: "posts",
@@ -55,7 +55,7 @@ const postsCollection: CollectionConfig = {
     }
 };
 
-const tagsCollection: CollectionConfig = {
+const tagsCollection: LegacyCollectionConfig = {
     name: "Tags",
     slug: "tags",
     table: "tags",
@@ -73,7 +73,7 @@ const tagsCollection: CollectionConfig = {
     ]
 };
 
-const eventsCollection: CollectionConfig = {
+const eventsCollection: LegacyCollectionConfig = {
     name: "Events",
     slug: "events",
     table: "events",

@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { registryOf } from "./helpers/spg-c-registry";
 import { unusedDb } from "./helpers/spg-c-db";
 
@@ -14,7 +14,7 @@ import { unusedDb } from "./helpers/spg-c-db";
  */
 describe("REST afterRead — masking reaches embedded relations", () => {
 
-    const authorsCollection: CollectionConfig = {
+    const authorsCollection: LegacyCollectionConfig = {
         slug: "authors",
         name: "Authors",
         table: "authors",
@@ -30,7 +30,7 @@ email: "***" })
         }
     };
 
-    const postsCollection: CollectionConfig = {
+    const postsCollection: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",

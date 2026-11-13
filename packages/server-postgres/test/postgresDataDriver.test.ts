@@ -4,11 +4,12 @@ import { AuthenticatedPostgresBackendDriver, PostgresBackendDriver } from "../sr
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
-import { isSQLAdmin, type PostgresCollectionConfig, type RebaseServerClient, type User } from "@rebasepro/types";
+import { isSQLAdmin, type RebaseServerClient, type User } from "@rebasepro/types";
+import { type LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { recordingDb, type RecordedQuery } from "./helpers/spg-b-recording-db";
 import { tableMetadata, testUser } from "./helpers/spg-b-fixtures";
 
-const collection = (slug: string, extra: Partial<PostgresCollectionConfig> = {}): PostgresCollectionConfig => ({
+const collection = (slug: string, extra: Partial<LegacyPostgresCollectionConfig> = {}): LegacyPostgresCollectionConfig => ({
     slug,
     name: slug,
     properties: {},
@@ -62,12 +63,12 @@ describe("PostgresBackendDriver", () => {
             const [l, d] = e.split("@");
             return l && d ? `${l[0]}***@${d}` : e;
         };
-        const masking = (slug: string, extra: Partial<PostgresCollectionConfig> = {}) => collection(slug, {
+        const masking = (slug: string, extra: Partial<LegacyPostgresCollectionConfig> = {}) => collection(slug, {
             callbacks: { afterRead: ({ row }) => ({ ...row, email: maskEmail(row.email) }) },
             ...extra
         });
 
-        function buildDriver(collections: PostgresCollectionConfig[]) {
+        function buildDriver(collections: LegacyPostgresCollectionConfig[]) {
             const driver = new PostgresBackendDriver(rec.db, realtime, new FixtureTableRegistry(collections));
             return { driver, fetch: driver.dataService.getFetchService() };
         }

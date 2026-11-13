@@ -23,7 +23,7 @@ import { RelationWriteService } from "../src/services/RelationWriteService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { relationOfTable } from "./helpers/relation-descriptors";
-import { CollectionConfig, Relation, RelationProperty } from "@rebasepro/types";
+import { LegacyCollectionConfig, LegacyRelation, LegacyRelationProperty } from "@rebasepro/common/migrate";
 import { resolveCollectionRelations, resolveRelation } from "@rebasepro/common";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
@@ -36,12 +36,12 @@ const mockAuthorsTable = pgTable("authors", { id: integer("id"), name: text("nam
 
 /** A relation as the services read it: resolved from the collection. */
 /** A relation as the services read it: the descriptor the collection's table compiles to. */
-const link = (collection: CollectionConfig, key: string) =>
+const link = (collection: LegacyCollectionConfig, key: string) =>
     relationOfTable(new FixtureTableRegistry([collection]), collection.slug, key);
 
 // ─── Mock Collections ─────────────────────────────────────────────────
 
-const tagsCollection: CollectionConfig = {
+const tagsCollection: LegacyCollectionConfig = {
     slug: "tags",
     name: "Tags",
     table: "tags",
@@ -51,7 +51,7 @@ const tagsCollection: CollectionConfig = {
     }
 };
 
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -62,7 +62,7 @@ const postsCollection: CollectionConfig = {
     }
 };
 
-const authorsCollection: CollectionConfig = {
+const authorsCollection: LegacyCollectionConfig = {
     slug: "authors",
     name: "Authors",
     table: "authors",
@@ -74,7 +74,7 @@ const authorsCollection: CollectionConfig = {
 };
 
 // Inverse M2M: tags → posts (from tag's perspective)
-const tagsWithInversePosts: CollectionConfig = {
+const tagsWithInversePosts: LegacyCollectionConfig = {
     slug: "tags_inv",
     name: "Tags (inverse)",
     table: "tags",
@@ -382,20 +382,20 @@ describe("updateRelationsUsingJoins: M2M through junction writes", () => {
 
 describe("resolveRelation: auto-inferred junction table naming", () => {
     it("should produce sorted junction table name: posts + tags → posts_tags", () => {
-        const source: CollectionConfig = {
+        const source: LegacyCollectionConfig = {
             slug: "posts",
             name: "Posts",
             table: "posts",
             properties: {}
         };
-        const target: CollectionConfig = {
+        const target: LegacyCollectionConfig = {
             slug: "tags",
             name: "Tags",
             table: "tags",
             properties: {}
         };
 
-        const relation: Relation = {
+        const relation: LegacyRelation = {
             kind: "manyToMany",
             relationName: "tags",
             target: () => target,
@@ -410,20 +410,20 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
     });
 
     it("should sort alphabetically: articles + tags → articles_tags (not tags_articles)", () => {
-        const source: CollectionConfig = {
+        const source: LegacyCollectionConfig = {
             slug: "tags",
             name: "Tags",
             table: "tags",
             properties: {}
         };
-        const target: CollectionConfig = {
+        const target: LegacyCollectionConfig = {
             slug: "articles",
             name: "Articles",
             table: "articles",
             properties: {}
         };
 
-        const relation: Relation = {
+        const relation: LegacyRelation = {
             kind: "manyToMany",
             relationName: "articles",
             target: () => target,
@@ -437,20 +437,20 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
     });
 
     it("should handle underscore-containing slugs: blog_posts + labels → blog_posts_labels", () => {
-        const source: CollectionConfig = {
+        const source: LegacyCollectionConfig = {
             slug: "blog-posts",
             name: "Blog Posts",
             table: "blog_posts",
             properties: {}
         };
-        const target: CollectionConfig = {
+        const target: LegacyCollectionConfig = {
             slug: "labels",
             name: "Labels",
             table: "labels",
             properties: {}
         };
 
-        const relation: Relation = {
+        const relation: LegacyRelation = {
             kind: "manyToMany",
             relationName: "labels",
             target: () => target,
@@ -464,20 +464,20 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
     });
 
     it("should generate correct source and target columns", () => {
-        const source: CollectionConfig = {
+        const source: LegacyCollectionConfig = {
             slug: "posts",
             name: "Posts",
             table: "posts",
             properties: {}
         };
-        const target: CollectionConfig = {
+        const target: LegacyCollectionConfig = {
             slug: "tags",
             name: "Tags",
             table: "tags",
             properties: {}
         };
 
-        const relation: Relation = {
+        const relation: LegacyRelation = {
             kind: "manyToMany",
             relationName: "tags",
             target: () => target,
@@ -494,20 +494,20 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
     });
 
     it("should preserve explicit through config and not overwrite it", () => {
-        const source: CollectionConfig = {
+        const source: LegacyCollectionConfig = {
             slug: "posts",
             name: "Posts",
             table: "posts",
             properties: {}
         };
-        const target: CollectionConfig = {
+        const target: LegacyCollectionConfig = {
             slug: "tags",
             name: "Tags",
             table: "tags",
             properties: {}
         };
 
-        const relation: Relation = {
+        const relation: LegacyRelation = {
             kind: "manyToMany",
             relationName: "tags",
             target: () => target,
@@ -528,14 +528,14 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
     });
 
     it("should handle self-referencing M2M: users + users → users_users", () => {
-        const usersCollection: CollectionConfig = {
+        const usersCollection: LegacyCollectionConfig = {
             slug: "users",
             name: "Users",
             table: "users",
             properties: {}
         };
 
-        const relation: Relation = {
+        const relation: LegacyRelation = {
             kind: "manyToMany",
             relationName: "friends",
             target: () => usersCollection,
@@ -550,20 +550,20 @@ describe("resolveRelation: auto-inferred junction table naming", () => {
     });
 
     it("should NOT add through config for joinPath-based relations", () => {
-        const source: CollectionConfig = {
+        const source: LegacyCollectionConfig = {
             slug: "users",
             name: "Users",
             table: "users",
             properties: {}
         };
-        const target: CollectionConfig = {
+        const target: LegacyCollectionConfig = {
             slug: "permissions",
             name: "Permissions",
             table: "permissions",
             properties: {}
         };
 
-        const relation: Relation = {
+        const relation: LegacyRelation = {
             kind: "via",
             relationName: "permissions",
             target: () => target,
@@ -596,7 +596,7 @@ describe("batchFetchRelatedEntities: owning direction (FK-based)", () => {
     const mockClientsTable = pgTable("clients", { id: text("id"), name: text("name"), email: text("email") });
     const mockTasksTable = pgTable("tasks", { id: text("id"), clientId: text("client_id"), title: text("title") });
 
-    const clientsCollection: CollectionConfig = {
+    const clientsCollection: LegacyCollectionConfig = {
         slug: "clients",
         name: "Clients",
         table: "clients",
@@ -608,7 +608,7 @@ isId: "uuid" },
         }
     };
 
-    const tasksCollection: CollectionConfig = {
+    const tasksCollection: LegacyCollectionConfig = {
         slug: "tasks",
         name: "Tasks",
         table: "tasks",

@@ -25,7 +25,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import type { CollectionConfig, QueryNarrowing, User } from "@rebasepro/types";
+import type { QueryNarrowing, User } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { testUser } from "./helpers/spg-a-driver";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
@@ -64,7 +65,7 @@ let returnInstead: (() => QueryNarrowing) | undefined;
 /** Every `operation` the hook was invoked with, in order. */
 let operations: string[];
 
-function ownersCollection(): CollectionConfig {
+function ownersCollection(): LegacyCollectionConfig {
     return {
         name: "Owners",
         slug: "owners",
@@ -81,7 +82,7 @@ function ownersCollection(): CollectionConfig {
     };
 }
 
-function docsCollection(): CollectionConfig {
+function docsCollection(): LegacyCollectionConfig {
     return {
         name: "Docs",
         slug: "docs",

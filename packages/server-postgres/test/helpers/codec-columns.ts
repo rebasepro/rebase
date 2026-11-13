@@ -1,4 +1,5 @@
-import { col, defineTable, type AnyColumn, type AnyTableDef, type AnyViewDef, type CollectionConfig, type ColumnDescriptor, type PostgresProperty } from "@rebasepro/types";
+import { col, defineTable, type AnyColumn, type AnyTableDef, type AnyViewDef, type ColumnDescriptor } from "@rebasepro/types";
+import { type LegacyCollectionConfig, type LegacyPostgresProperty } from "@rebasepro/common/migrate";
 import { compileSchema } from "@rebasepro/common";
 import { buildRuntimeTable, type RuntimeTable } from "../../src/model/runtime-table";
 import { FixtureTableRegistry } from "./tables";
@@ -37,12 +38,12 @@ export function columnOf(builder: AnyColumn): ColumnDescriptor {
  * `FixtureTableRegistry`, with its relation targets). `others` are compiled
  * beside it, for fixtures whose relations point at them.
  */
-export function runtimeTableOf(collection: CollectionConfig, ...others: CollectionConfig[]): RuntimeTable {
+export function runtimeTableOf(collection: LegacyCollectionConfig, ...others: LegacyCollectionConfig[]): RuntimeTable {
     return new FixtureTableRegistry([collection, ...others]).requireTable(collection.slug);
 }
 
 /** The column a legacy property compiles to, as the `value` column of a one-property collection. */
-export function liftedColumnOf(property: PostgresProperty): ColumnDescriptor {
+export function liftedColumnOf(property: LegacyPostgresProperty): ColumnDescriptor {
     const column = runtimeTableOf({
         slug: "codec_probe",
         name: "Codec probe",

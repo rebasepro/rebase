@@ -12,30 +12,32 @@
  * ignores is listed beside the test, not here.
  */
 import type {
-    CollectionCallbacks,
-    PostgresCollectionConfig,
-    PostgresProperty,
-    PropertyCallbacks,
     SecurityRule
 } from "@rebasepro/types";
+import type {
+    LegacyCollectionCallbacks,
+    LegacyPostgresCollectionConfig,
+    LegacyPostgresProperty,
+    LegacyPropertyCallbacks
+} from "@rebasepro/common/migrate";
 
 /** A `columnType` the planner reads and the legacy union never named (`smallint`, `smallserial`). */
-export function withColumnType<P extends PostgresProperty>(property: P, columnType: string): P {
+export function withColumnType<P extends LegacyPostgresProperty>(property: P, columnType: string): P {
     Reflect.set(property, "columnType", columnType);
     return property;
 }
 
 /** A date default as the string the planner reads, which the legacy `Date` type cannot hold for a `time`. */
-export function withDateDefault<P extends PostgresProperty>(property: P, value: string): P {
+export function withDateDefault<P extends LegacyPostgresProperty>(property: P, value: string): P {
     Reflect.set(property, "defaultValue", value);
     return property;
 }
 
-export const readCallbacks: CollectionCallbacks = {
+export const readCallbacks: LegacyCollectionCallbacks = {
     afterRead: ({ row }) => ({ ...row, masked: true })
 };
 
-export const trimCallbacks: PropertyCallbacks = {
+export const trimCallbacks: LegacyPropertyCallbacks = {
     beforeSave: ({ value }) => (typeof value === "string" ? value.trim() : value)
 };
 
@@ -44,7 +46,7 @@ export const DOCUMENT_RULES: SecurityRule[] = [
     { name: "documents_owner_write", operations: ["insert", "update", "delete"], ownerField: "ownerId" }
 ];
 
-export const tags: PostgresCollectionConfig = {
+export const tags: LegacyPostgresCollectionConfig = {
     slug: "tags",
     name: "tags",
     table: "tags",
@@ -54,7 +56,7 @@ export const tags: PostgresCollectionConfig = {
     }
 };
 
-export const authors: PostgresCollectionConfig = {
+export const authors: LegacyPostgresCollectionConfig = {
     slug: "authors",
     name: "authors",
     table: "authors",
@@ -71,7 +73,7 @@ export const authors: PostgresCollectionConfig = {
     ]
 };
 
-export const profiles: PostgresCollectionConfig = {
+export const profiles: LegacyPostgresCollectionConfig = {
     slug: "profiles",
     name: "profiles",
     table: "profiles",
@@ -85,7 +87,7 @@ export const profiles: PostgresCollectionConfig = {
     ]
 };
 
-export const posts: PostgresCollectionConfig = {
+export const posts: LegacyPostgresCollectionConfig = {
     slug: "posts",
     name: "posts",
     table: "posts",
@@ -129,7 +131,7 @@ export const posts: PostgresCollectionConfig = {
 };
 
 /** Every column kind and option, on one table. */
-export const everything: PostgresCollectionConfig = {
+export const everything: LegacyPostgresCollectionConfig = {
     slug: "everything",
     name: "everything",
     table: "everything",
@@ -178,8 +180,8 @@ export const everything: PostgresCollectionConfig = {
         // ── numbers
         salary: { type: "number", access: { read: ["hr"], write: [] } },
         count: { type: "number", validation: { integer: true, min: 0 } },
-        small: withColumnType<PostgresProperty>({ type: "number" }, "smallint"),
-        smallSerial: withColumnType<PostgresProperty>({ type: "number" }, "smallserial"),
+        small: withColumnType<LegacyPostgresProperty>({ type: "number" }, "smallint"),
+        smallSerial: withColumnType<LegacyPostgresProperty>({ type: "number" }, "smallserial"),
         big: { type: "number", columnType: "bigint" },
         ser: { type: "number", columnType: "serial" },
         bigSer: { type: "number", columnType: "bigserial" },
@@ -193,8 +195,8 @@ export const everything: PostgresCollectionConfig = {
         // ── boolean
         active: { type: "boolean", defaultValue: true, validation: { required: true } },
         // ── dates
-        day: withDateDefault<PostgresProperty>({ type: "date", columnType: "date" }, "2024-12-25"),
-        at: withDateDefault<PostgresProperty>({ type: "date", columnType: "time" }, "09:00"),
+        day: withDateDefault<LegacyPostgresProperty>({ type: "date", columnType: "date" }, "2024-12-25"),
+        at: withDateDefault<LegacyPostgresProperty>({ type: "date", columnType: "time" }, "09:00"),
         createdAt: { type: "date", autoValue: "on_create" },
         updatedAt: { type: "date", autoValue: "on_update", validation: { required: true } },
         windowed: { type: "date", validation: { min: new Date("2020-01-01T00:00:00.000Z"), max: new Date("2030-01-01T00:00:00.000Z") } },
@@ -256,7 +258,7 @@ export const everything: PostgresCollectionConfig = {
 };
 
 /** No key: the planner's implicit `id`. */
-export const notes: PostgresCollectionConfig = {
+export const notes: LegacyPostgresCollectionConfig = {
     slug: "notes",
     name: "notes",
     table: "notes",
@@ -264,7 +266,7 @@ export const notes: PostgresCollectionConfig = {
 };
 
 /** A composite key, in declaration order. */
-export const translations: PostgresCollectionConfig = {
+export const translations: LegacyPostgresCollectionConfig = {
     slug: "translations",
     name: "translations",
     table: "translations",
@@ -276,7 +278,7 @@ export const translations: PostgresCollectionConfig = {
 };
 
 /** The auth table. */
-export const users: PostgresCollectionConfig = {
+export const users: LegacyPostgresCollectionConfig = {
     slug: "users",
     name: "users",
     table: "users",
@@ -292,7 +294,7 @@ export const users: PostgresCollectionConfig = {
 };
 
 /** A materialized view. */
-export const postTitles: PostgresCollectionConfig = {
+export const postTitles: LegacyPostgresCollectionConfig = {
     slug: "post_titles",
     name: "post_titles",
     table: "post_titles",
@@ -305,7 +307,7 @@ export const postTitles: PostgresCollectionConfig = {
 };
 
 /** Every collection-level field the planner reads. */
-export const documents: PostgresCollectionConfig = {
+export const documents: LegacyPostgresCollectionConfig = {
     slug: "documents",
     name: "documents",
     table: "documents_table",
@@ -343,4 +345,4 @@ export const documents: PostgresCollectionConfig = {
     callbacks: readCallbacks
 };
 
-export const ALL: PostgresCollectionConfig[] = [tags, authors, profiles, posts, everything, notes, translations, users, postTitles, documents];
+export const ALL: LegacyPostgresCollectionConfig[] = [tags, authors, profiles, posts, everything, notes, translations, users, postTitles, documents];

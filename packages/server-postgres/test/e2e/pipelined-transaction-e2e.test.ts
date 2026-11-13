@@ -27,7 +27,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import pg from "pg";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
@@ -35,7 +35,7 @@ import { runPipelinedTransaction, pipelineTarget } from "../../src/pipelined-tra
 import { authContextStatement, REBASE_USER_ROLE } from "../../src/security/rls-enforcement.js";
 import { tablesFromCollections } from "../helpers/tables.js";
 
-const notes: CollectionConfig = {
+const notes: LegacyCollectionConfig = {
     name: "Notes",
     slug: "notes",
     table: "notes",

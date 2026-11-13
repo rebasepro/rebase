@@ -5,12 +5,12 @@
  * accepting the removed value. These are the labels the push now names.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { Queryable } from "../src/schema/ensure-tables";
 import { findKeptEnumLabels, formatKeptEnumLabelsNotice, keptEnumLabels } from "../src/schema/enum-labels-kept";
 import { compileSet } from "./helpers/plan-tables";
 
-const people = (labels: string[]): CollectionConfig => ({
+const people = (labels: string[]): LegacyCollectionConfig => ({
     slug: "people",
     table: "people",
     name: "People",

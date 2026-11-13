@@ -2,7 +2,8 @@ import { jest } from "@jest/globals";
 import { Hono } from "hono";
 import { RestApiGenerator } from "./api-generator";
 import { errorHandler } from "../errors";
-import type { DataDriver, CollectionConfig, FetchCollectionProps } from "@rebasepro/types";
+import type { DataDriver, FetchCollectionProps } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../types";
 import { tablesFromCollections } from "../../../test/helpers/tables";
 
@@ -21,7 +22,7 @@ function createMockDriver(overrides?: Partial<DataDriver>): DataDriver {
     };
 }
 
-function createTestCollection(slug: string): CollectionConfig {
+function createTestCollection(slug: string): LegacyCollectionConfig {
     return {
         slug,
         name: slug.charAt(0).toUpperCase() + slug.slice(1),
@@ -33,7 +34,7 @@ function createTestCollection(slug: string): CollectionConfig {
  * Wraps generated routes in a parent Hono app that injects the driver
  * into context — replicating what auth middleware does in production.
  */
-function createApp(collections: CollectionConfig[], driver: DataDriver): Hono<HonoEnv> {
+function createApp(collections: LegacyCollectionConfig[], driver: DataDriver): Hono<HonoEnv> {
     const parent = new Hono<HonoEnv>();
     parent.use("/*", async (c, next) => {
         c.set("driver", driver);
@@ -46,7 +47,7 @@ function createApp(collections: CollectionConfig[], driver: DataDriver): Hono<Ho
 
 describe("RestApiGenerator - Count Endpoint", () => {
     let driver: DataDriver;
-    let collection: CollectionConfig;
+    let collection: LegacyCollectionConfig;
 
     beforeEach(() => {
         driver = createMockDriver({
@@ -109,7 +110,7 @@ describe("RestApiGenerator - Count Endpoint", () => {
         // Three call sites issue a count in this file; two forwarded the group
         // and this one did not, so `GET /authors/1/posts/count?or=(…)` reported
         // the unnarrowed total beside a narrowed list.
-        const authors: CollectionConfig = {
+        const authors: LegacyCollectionConfig = {
             slug: "authors",
             name: "Authors",
             properties: {
@@ -165,7 +166,7 @@ describe("RestApiGenerator - Count Endpoint", () => {
  * the response carries that number, and in the page's own transaction.
  */
 describe("RestApiGenerator - the list's count", () => {
-    let collection: CollectionConfig;
+    let collection: LegacyCollectionConfig;
     const page = (n: number) => Array.from({ length: n }, (_, i) => ({ id: i + 1 }));
 
     beforeEach(() => {

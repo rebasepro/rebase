@@ -8,17 +8,17 @@
  * on a column it already has, and nothing else.
  */
 import { PGlite } from "@electric-sql/pglite";
-import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { ensureTables, type Queryable } from "../src/schema/ensure-tables";
 import { missingForeignKeyIndexes } from "../src/schema/push-index-prebuild";
 import { compileSet } from "./helpers/plan-tables";
 
-const authors: CollectionConfig = {
+const authors: LegacyCollectionConfig = {
     slug: "authors", table: "authors", name: "Authors",
     properties: { id: { type: "number", isId: "increment" }, name: { type: "string" } }
 };
 
-const posts: PostgresCollectionConfig = {
+const posts: LegacyPostgresCollectionConfig = {
     slug: "posts", table: "posts", name: "Posts",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -98,7 +98,7 @@ describe("missingForeignKeyIndexes", () => {
     it("leaves a declared index alone — only the derived ones are the push's to build ahead", async () => {
         const { db, queryable } = await database();
         try {
-            const indexed: CollectionConfig = { ...posts, indexes: [{ on: ["title"], reason: "list by title" }] };
+            const indexed: LegacyCollectionConfig = { ...posts, indexes: [{ on: ["title"], reason: "list by title" }] };
             await ensureTables(queryable, compileSet([authors, indexed]));
             const { rows } = await db.query<{ name: string }>(
                 "SELECT indexname AS name FROM pg_indexes WHERE tablename = 'posts' AND indexname LIKE 'posts_title_ix_%'"

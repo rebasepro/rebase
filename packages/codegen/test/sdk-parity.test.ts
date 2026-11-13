@@ -2,7 +2,8 @@ import { describe, it, expect, jest } from "@jest/globals";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { isSchemaDefinitionError } from "@rebasepro/common";
-import type { AnyCollectionConfig, CollectionConfig, TableDescriptor } from "@rebasepro/types";
+import type { TableDescriptor } from "@rebasepro/types";
+import type { LegacyAnyCollectionConfig, LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { generateTypedefs } from "../src/generate-types";
 import { toTableAccessor } from "../src/utils";
 import { LEGACY_FIXTURES } from "./fixtures/legacy-collections";
@@ -28,12 +29,12 @@ import { compareSdk, unexplainedDifferences, type SdkDifference } from "./helper
  */
 const GOLDEN_DIR = path.resolve(__dirname, "fixtures", "sdk-golden");
 
-const SETS: Record<string, () => CollectionConfig[]> = {
+const SETS: Record<string, () => LegacyCollectionConfig[]> = {
     ...LEGACY_FIXTURES,
     // `defineCollection` results each carry their own row type, which a bare
     // `CollectionConfig` (invariant in it) does not accept.
     "baas-typed-sdk": () => {
-        const schema: AnyCollectionConfig[] = baasCollections;
+        const schema: LegacyAnyCollectionConfig[] = baasCollections;
         return schema;
     }
 };
@@ -89,7 +90,7 @@ const REFUSED: Record<string, { pattern: RegExp; reason: string }> = {
  * foreign-key *column* instead, and a relation follows its column — covered
  * over `defineTable`. Every other line of the set is still held to the golden.
  */
-const ADJUSTED: Record<string, { reason: string; apply: (collections: CollectionConfig[]) => void; removed: { table: string; keys: string[] }[] }> = {
+const ADJUSTED: Record<string, { reason: string; apply: (collections: LegacyCollectionConfig[]) => void; removed: { table: string; keys: string[] }[] }> = {
     "baas-typed-sdk": {
         reason: "`comments.moderator` (excludeFromApi) and `comments.reviewer` (access.write: []) close a relation property",
         apply: collections => dropProperties(collections, "comments", ["moderator", "reviewer"]),
@@ -102,7 +103,7 @@ const ADJUSTED: Record<string, { reason: string; apply: (collections: Collection
     },
 };
 
-function dropProperties(collections: CollectionConfig[], slug: string, keys: string[]): void {
+function dropProperties(collections: LegacyCollectionConfig[], slug: string, keys: string[]): void {
     const collection = collections.find(candidate => candidate.slug === slug);
     if (!collection?.properties) throw new Error(`No collection "${slug}" to adjust.`);
     for (const key of keys) delete collection.properties[key];

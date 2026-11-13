@@ -6,20 +6,20 @@
  * and runs them before Atlas plans.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
 import { ensureTables, type Queryable } from "../src/schema/ensure-tables";
 import { legacyForeignKeyRenames } from "../src/schema/push-legacy-renames";
 import { compileSet } from "./helpers/plan-tables";
 
-const categories: CollectionConfig = {
+const categories: LegacyCollectionConfig = {
     slug: "categories",
     table: "categories",
     name: "Categories",
     properties: { id: { type: "string", isId: "uuid" }, name: { type: "string" } }
 };
 
-const products: CollectionConfig = {
+const products: LegacyCollectionConfig = {
     slug: "products",
     table: "products",
     name: "Products",

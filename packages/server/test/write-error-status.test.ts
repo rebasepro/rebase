@@ -4,7 +4,7 @@ import { ApiError, errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
 import type { DataDriver } from "../../types/src/controllers/data_driver";
-import type { CollectionConfig } from "../../types/src/types/collections";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { tablesFromCollections } from "./helpers/tables";
 
 /**
@@ -29,7 +29,7 @@ function harness(save: () => Promise<Record<string, unknown>>) {
         async fetchOne() { return { id: 1, title: "existing" }; }
     });
 
-    const collections: CollectionConfig[] = [{
+    const collections: LegacyCollectionConfig[] = [{
         slug: "posts", name: "Posts", singularName: "Post", properties: { title: { type: "string" } }
     }];
 

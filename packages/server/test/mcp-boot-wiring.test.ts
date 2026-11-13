@@ -12,7 +12,8 @@
  * OAuth authorization server nobody decided to run.
  */
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { initializeRebaseBackend } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import type { ScopeIdentity } from "../src/auth/rls-scope";
@@ -60,7 +61,7 @@ function bootstrapperFor(driver: DataDriver, authRepository: object = {}): Backe
     });
 }
 
-const COLLECTION: CollectionConfig = {
+const COLLECTION: LegacyCollectionConfig = {
     slug: "candidates",
     name: "Candidates",
     properties: { name: { type: "string", name: "Name" } }
@@ -70,7 +71,7 @@ async function boot(options: {
     mcp?: boolean;
     publicUrl?: string | undefined;
     driver?: DataDriver;
-    collections?: CollectionConfig[];
+    collections?: LegacyCollectionConfig[];
     authRepository?: object;
 } = {}): Promise<Hono<HonoEnv>> {
     const app = new Hono<HonoEnv>();
@@ -243,7 +244,7 @@ describe("when it does mount", () => {
         // The row exists: the tool reads it before deleting, as REST does.
         driver.fetchOne = async () => ({ id: "admin-1" });
         driver.delete = async (props: unknown) => { deleted.push(props); };
-        const users: CollectionConfig = {
+        const users: LegacyCollectionConfig = {
             slug: "users",
             name: "Users",
             auth: { enabled: true },

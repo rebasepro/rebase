@@ -15,7 +15,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -32,7 +32,7 @@ const postsTable = pgTable("posts", {
 /** How many times `beforeDelete` was asked. */
 let beforeDeleteCalls: number;
 
-function postsCollection(): CollectionConfig {
+function postsCollection(): LegacyCollectionConfig {
     return {
         name: "Posts",
         slug: "posts",

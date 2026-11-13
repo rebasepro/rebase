@@ -12,7 +12,7 @@ import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, text, uuid, customType, jsonb } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { PostgresCollectionConfig, CollectionConfig } from "@rebasepro/types";
+import { LegacyPostgresCollectionConfig, LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
 import { FixtureTableRegistry } from "../helpers/tables";
@@ -21,7 +21,7 @@ import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logi
 import { buildSearchColumnSpec } from "../../src/schema/search-column.js";
 import { compileSet } from "../helpers/plan-tables";
 
-const searched: PostgresCollectionConfig = {
+const searched: LegacyPostgresCollectionConfig = {
     slug: "talents",
     table: "talents",
     name: "Talents",
@@ -38,7 +38,7 @@ const searched: PostgresCollectionConfig = {
 };
 
 /** The same shape without the block — the control for "nothing changed". */
-const plain: PostgresCollectionConfig = {
+const plain: LegacyPostgresCollectionConfig = {
     slug: "notes",
     table: "notes",
     name: "Notes",
@@ -49,7 +49,7 @@ const plain: PostgresCollectionConfig = {
 };
 
 /** Same shape again, with `fuzzy` on — the trigram half of the score. */
-const fuzzied: PostgresCollectionConfig = {
+const fuzzied: LegacyPostgresCollectionConfig = {
     slug: "fuzzies",
     table: "fuzzies",
     name: "Fuzzies",
@@ -96,7 +96,7 @@ describe("search through the driver", () => {
         await admin.connect();
 
         const ddl = await generatePostgresDdl(
-            compileSet([searched as CollectionConfig, plain as CollectionConfig, fuzzied as CollectionConfig]),
+            compileSet([searched as LegacyCollectionConfig, plain as LegacyCollectionConfig, fuzzied as LegacyCollectionConfig]),
             { includePolicies: false }
         );
         await admin.query(ddl);
@@ -116,14 +116,14 @@ describe("search through the driver", () => {
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const registry = new FixtureTableRegistry();
-        registry.registerMultiple([searched as CollectionConfig, plain as CollectionConfig]);
+        registry.registerMultiple([searched as LegacyCollectionConfig, plain as LegacyCollectionConfig]);
         registry.registerPgTable(talentsTable, "talents");
         registry.registerPgTable(notesTable, "notes");
 
         fetchService = new FetchService(drizzle(pool), registry);
 
         const fuzzyRegistry = new FixtureTableRegistry();
-        fuzzyRegistry.registerMultiple([fuzzied as CollectionConfig]);
+        fuzzyRegistry.registerMultiple([fuzzied as LegacyCollectionConfig]);
         fuzzyRegistry.registerPgTable(fuzziesTable, "fuzzies");
         fuzzyService = new FetchService(drizzle(pool), fuzzyRegistry);
     }, 180_000);

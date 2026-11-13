@@ -20,7 +20,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { sql } from "drizzle-orm";
 import { pgTable, text, uuid } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -158,7 +158,7 @@ describe("an authenticated read on the driver", () => {
     let theirs: string;
 
     const notesTable = pgTable("notes", { id: uuid("id").primaryKey(), ownerId: text("owner_id"), title: text("title") });
-    const notes: CollectionConfig = {
+    const notes: LegacyCollectionConfig = {
         name: "Notes",
         slug: "notes",
         table: "notes",

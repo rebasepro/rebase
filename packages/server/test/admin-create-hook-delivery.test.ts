@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from "@jest/globals";
 import { Hono } from "hono";
-import type { AuthCollectionConfig, CollectionConfig, EmailSendOptions, EmailService, SaveProps } from "@rebasepro/types";
+import type { EmailSendOptions, EmailService, SaveProps } from "@rebasepro/types";
+import type { LegacyAuthCollectionConfig, LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import type { AuthHooks } from "../src/auth/auth-hooks";
@@ -100,7 +101,7 @@ async function harness(kind: HookKind, scenario: Scenario) {
 
     const values = (body: Record<string, unknown>) => ({ email: body.email, passwordHash: "hash-set-by-hook" });
 
-    let collectionAuthConfig: AuthCollectionConfig | undefined;
+    let collectionAuthConfig: LegacyAuthCollectionConfig | undefined;
     let authHooks: AuthHooks | undefined;
     if (kind === "collection auth.onCreateUser") {
         collectionAuthConfig = {
@@ -130,7 +131,7 @@ async function harness(kind: HookKind, scenario: Scenario) {
     const driver = fakeDataDriver({
         save: async ({ values: row }: SaveProps) => ({ id: "rest-door-user", ...row })
     });
-    const usersCollection: CollectionConfig = {
+    const usersCollection: LegacyCollectionConfig = {
         slug: "users",
         name: "Users",
         singularName: "User",

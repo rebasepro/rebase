@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { columnTypeDriftMessage, typeFamily, typesAgree } from "./column-type-drift";
 import { planTableSchemaEnsure, type ExistingSchema } from "./ensure-tables";
 import { compileSet } from "../../test/helpers/plan-tables";
@@ -113,7 +113,7 @@ describe("a numeric that declares its precision", () => {
     });
 
     it("is reported by the plan against an unbounded column", () => {
-        const products: CollectionConfig = {
+        const products: LegacyCollectionConfig = {
             name: "Products",
             slug: "products",
             properties: {
@@ -137,7 +137,7 @@ describe("a numeric that declares its precision", () => {
 });
 
 describe("the plan reporting a drifted column", () => {
-    const observations: CollectionConfig = {
+    const observations: LegacyCollectionConfig = {
         name: "Listing observations",
         slug: "listing_observations",
         properties: {

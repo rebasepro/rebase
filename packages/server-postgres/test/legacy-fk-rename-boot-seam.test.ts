@@ -23,7 +23,7 @@
  * the two have opposite fixes — wait for the rename, or edit the relation.
  */
 import { pgTable, text } from "drizzle-orm/pg-core";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
 
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -32,7 +32,7 @@ import { findRelationDefects, assertRelationsResolve } from "../src/model/valida
 
 // ── The collections, as 0.13 reads them ──────────────────────────────────────
 
-const categories: CollectionConfig = {
+const categories: LegacyCollectionConfig = {
     slug: "categories",
     table: "categories",
     name: "Categories",
@@ -45,7 +45,7 @@ const categories: CollectionConfig = {
  * plural. `belongsTo` derives from the relation name, which is normally already
  * singular.
  */
-const products: CollectionConfig = {
+const products: LegacyCollectionConfig = {
     slug: "products",
     table: "products",
     name: "Products",

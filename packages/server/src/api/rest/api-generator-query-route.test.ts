@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { encodeCursor } from "@rebasepro/common";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { RestApiGenerator } from "./api-generator";
 import { errorHandler } from "../errors";
 import type { HonoEnv } from "../types";
@@ -21,7 +22,7 @@ import { tablesFromCollections } from "../../../test/helpers/tables";
  * in either is a parameter the two routes read differently.
  */
 
-const authors: CollectionConfig = {
+const authors: LegacyCollectionConfig = {
     slug: "authors", name: "Authors", table: "authors",
     properties: {
         id: { type: "number", isId: "increment" },
@@ -30,7 +31,7 @@ const authors: CollectionConfig = {
     }
 };
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts", name: "Posts", table: "posts",
     properties: {
         id: { type: "number", isId: "increment" },

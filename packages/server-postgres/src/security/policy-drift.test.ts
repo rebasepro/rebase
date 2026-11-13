@@ -1,11 +1,11 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { checkPolicyDrift, parseExpectedPolicies, formatPolicyDrift, hasDrift, dropOrphanedPolicies, isGeneratedPolicyName, type PolicyRef, type Queryable } from "./policy-drift";
 import { generatePostgresPoliciesDdl } from "../schema/generate-postgres-ddl-logic";
 import { compileSet } from "../../test/helpers/plan-tables";
 
-function collection(slug: string): CollectionConfig {
+function collection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,
@@ -20,7 +20,7 @@ function collection(slug: string): CollectionConfig {
 }
 
 /** A collection whose write rule is declared RESTRICTIVE, so the DDL says `AS RESTRICTIVE`. */
-function restrictiveCollection(slug: string): CollectionConfig {
+function restrictiveCollection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,
@@ -368,7 +368,7 @@ describe("checkPolicyDrift", () => {
     });
 
     it("still expects the default policies a collection without securityRules generates", async () => {
-        const bare: CollectionConfig = { name: "x", slug: "x", table: "x", schema: "public", properties: {} };
+        const bare: LegacyCollectionConfig = { name: "x", slug: "x", table: "x", schema: "public", properties: {} };
 
         const drift = await checkPolicyDrift(dbWith([]), compileSet([bare]));
 

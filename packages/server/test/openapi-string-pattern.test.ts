@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
 import { openApiDocument, type JsonSchema } from "./helpers/server-b-g1-openapi";
@@ -13,7 +13,7 @@ import { tablesFromCollections } from "./helpers/tables";
  * — slashes a value had to contain — and a client generated from the spec
  * refused every value the server accepts.
  */
-const codes: CollectionConfig = {
+const codes: LegacyCollectionConfig = {
     slug: "codes", name: "Codes", singularName: "Code", table: "codes",
     properties: {
         id: { name: "ID", type: "string", isId: true },

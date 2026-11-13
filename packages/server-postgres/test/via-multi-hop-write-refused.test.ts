@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PersistService } from "../src/services/PersistService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -18,10 +18,10 @@ import { unusedDb } from "./helpers/spg-c-db";
  * a 400 RELATION_NOT_WRITABLE, before anything is read or written: this
  * service has no database at all, so reaching one would be a different error.
  */
-const tags: CollectionConfig = { slug: "tags", name: "Tags", table: "tags", properties: { id: { type: "string", isId: true } } };
-const badges: CollectionConfig = { slug: "badges", name: "Badges", table: "badges", properties: { id: { type: "string", isId: true } } };
+const tags: LegacyCollectionConfig = { slug: "tags", name: "Tags", table: "tags", properties: { id: { type: "string", isId: true } } };
+const badges: LegacyCollectionConfig = { slug: "badges", name: "Badges", table: "badges", properties: { id: { type: "string", isId: true } } };
 
-const users: CollectionConfig = {
+const users: LegacyCollectionConfig = {
     slug: "users",
     name: "Users",
     table: "users",

@@ -1,7 +1,7 @@
 import { DataService } from "../src/services/dataService";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { integer, PgDialect, pgTable, text } from "drizzle-orm/pg-core";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { is, Param, SQL } from "drizzle-orm";
@@ -32,7 +32,7 @@ const mockItemsTable = pgTable("items", { id: integer("id"), name: text("name"),
 // Collection definitions
 // ---------------------------------------------------------------------------
 
-const projectUsersCollection: CollectionConfig = {
+const projectUsersCollection: LegacyCollectionConfig = {
     slug: "project_users",
     name: "Project Users",
     table: "project_users",
@@ -44,7 +44,7 @@ const projectUsersCollection: CollectionConfig = {
     }
 };
 
-const itemsCollection: CollectionConfig = {
+const itemsCollection: LegacyCollectionConfig = {
     slug: "items",
     name: "Items",
     table: "items",

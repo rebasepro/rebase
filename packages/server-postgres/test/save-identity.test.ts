@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -24,7 +24,7 @@ describe("PostgresBackendDriver.save — the address is derived", () => {
     const registry = new FixtureTableRegistry();
 
 
-    const productsCollection: CollectionConfig = {
+    const productsCollection: LegacyCollectionConfig = {
         slug: "products",
         name: "Products",
         table: "products",
@@ -35,7 +35,7 @@ isId: "increment" },
         }
     };
 
-    const skuItemsCollection: CollectionConfig = {
+    const skuItemsCollection: LegacyCollectionConfig = {
         slug: "sku_items",
         name: "SKU Items",
         table: "sku_items",
@@ -46,7 +46,7 @@ isId: true },
         }
     };
 
-    const membershipsCollection: CollectionConfig = {
+    const membershipsCollection: LegacyCollectionConfig = {
         slug: "memberships",
         name: "Memberships",
         table: "memberships",
@@ -185,7 +185,7 @@ label: "Widget" });
             path: "sku_items",
             values: { label: "Widget" },
             collection: { ...skuItemsCollection,
-history: true } as CollectionConfig,
+history: true } as LegacyCollectionConfig,
             status: "new"
         });
 

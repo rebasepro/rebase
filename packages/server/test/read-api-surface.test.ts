@@ -5,7 +5,7 @@ import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
 import { encodeCursor } from "@rebasepro/common";
 import type { DataDriver } from "@rebasepro/types";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { tablesFromCollections } from "./helpers/tables";
 
 /**
@@ -33,7 +33,7 @@ describe("the REST read surface", () => {
     let fetchOneForRest: jest.Mock;
     let cursorFor: jest.Mock;
 
-    const posts: CollectionConfig = {
+    const posts: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         singularName: "Post",

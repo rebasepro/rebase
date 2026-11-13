@@ -1,5 +1,5 @@
 import { resolveDriftCheckName } from "../src/PostgresBootstrapper";
-import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 
 /**
  * Which table the boot-time drift check goes looking for.
@@ -22,7 +22,7 @@ describe("resolveDriftCheckName", () => {
         properties: {}
     };
 
-    const relational = (over: Partial<PostgresCollectionConfig>): CollectionConfig =>
+    const relational = (over: Partial<LegacyPostgresCollectionConfig>): LegacyCollectionConfig =>
         ({ slug: "daily_usage", ...base, ...over });
 
     it("uses the declared table even when the registry has never heard of it", () => {
@@ -66,7 +66,7 @@ table: "usage_daily" }), ["usage-daily"])
         // names nothing, so it must not sit in the acceptable set: that is what
         // the production bug reported, and an acceptable set that always
         // included the slug would have watched it go by.
-        const cases: Array<{ col: CollectionConfig; registered: string[] }> = [
+        const cases: Array<{ col: LegacyCollectionConfig; registered: string[] }> = [
             { col: relational({ slug: "usage-daily",
 table: "usage_daily" }),
 registered: [] },
@@ -81,7 +81,7 @@ registered: [] }
 
         for (const { col, registered } of cases) {
             const resolved = resolveDriftCheckName(col, registered);
-            const declared = (col as PostgresCollectionConfig).table;
+            const declared = (col as LegacyPostgresCollectionConfig).table;
             const acceptable = declared ? [declared] : [...registered, col.slug];
             expect(acceptable).toContain(resolved);
         }

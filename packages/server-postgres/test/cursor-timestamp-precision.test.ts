@@ -16,7 +16,8 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, OrderByTuple } from "@rebasepro/types";
+import type { OrderByTuple } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { cursorToStartAfter, decodeCursor } from "@rebasepro/common";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
@@ -30,7 +31,7 @@ const eventsTable = pgTable("events", {
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
 });
 
-const events: CollectionConfig = {
+const events: LegacyCollectionConfig = {
     name: "Events",
     slug: "events",
     table: "events",

@@ -19,7 +19,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { ensureTables, type Queryable } from "../../src/schema/ensure-tables.js";
@@ -39,7 +39,7 @@ import { RealtimeService } from "../../src/services/realtimeService.js";
 import { testUser } from "./test-user.js";
 import { compileSet } from "../helpers/plan-tables";
 
-const notesCollection: CollectionConfig = {
+const notesCollection: LegacyCollectionConfig = {
     name: "Notes",
     slug: "notes",
     table: "notes",

@@ -20,7 +20,8 @@
  * Asserted on the compiled SQL rather than on returned rows, because a dropped
  * condition produces a perfectly well-formed query — just a wider one.
  */
-import { CollectionConfig, LogicalCondition } from "@rebasepro/types";
+import { LogicalCondition } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { pgTable, serial, text, vector } from "drizzle-orm/pg-core";
 import { FetchService } from "../src/services/FetchService";
 import { RealtimeService } from "../src/services/realtimeService";
@@ -51,7 +52,7 @@ const docs = pgTable("docs", {
     embedding: vector("embedding", { dimensions: 3 })
 });
 
-const docsCollection: CollectionConfig = {
+const docsCollection: LegacyCollectionConfig = {
     slug: "docs",
     name: "Docs",
     table: "docs",

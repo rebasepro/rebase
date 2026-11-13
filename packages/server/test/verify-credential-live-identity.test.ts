@@ -18,7 +18,8 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import {
     createJwtService,
     createRebaseBackend,
@@ -36,7 +37,7 @@ import { tablesFrom } from "./helpers/tables";
 const JWT_SECRET = "verify-credential-live-identity-secret-0123456789";
 const SERVICE_KEY = "verify-credential-service-key-0123456789abcdefgh";
 
-const widgets: CollectionConfig = {
+const widgets: LegacyCollectionConfig = {
     name: "widgets",
     slug: "widgets",
     table: "widgets",

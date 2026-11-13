@@ -23,7 +23,7 @@ import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { jsonb, pgTable, text, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -40,7 +40,7 @@ const itemsTable = pgTable("items", {
     words: jsonb("words")
 });
 
-const items: CollectionConfig = {
+const items: LegacyCollectionConfig = {
     name: "Items",
     slug: "items",
     table: "items",
@@ -51,7 +51,7 @@ const items: CollectionConfig = {
         scores: { name: "Scores", type: "array", of: { type: "number" } },
         words: { name: "Words", type: "array", of: { type: "string" } }
     }
-} as CollectionConfig;
+} as LegacyCollectionConfig;
 
 let db: PGlite;
 let driver: PostgresBackendDriver;

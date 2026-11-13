@@ -22,7 +22,8 @@ import { pgTable, varchar } from "drizzle-orm/pg-core";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
-import type { AuthAdapter, CollectionConfig, EmailSendOptions } from "@rebasepro/types";
+import type { AuthAdapter, EmailSendOptions } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { ensureAuthTablesExist } from "../../src/auth/ensure-tables.js";
 import { PostgresAuthRepository } from "../../src/auth/services.js";
@@ -51,7 +52,7 @@ const notesTable = pgTable("notes", {
     body: varchar("body")
 });
 
-const notesCollection: CollectionConfig = {
+const notesCollection: LegacyCollectionConfig = {
     slug: "notes",
     name: "Notes",
     table: "notes",

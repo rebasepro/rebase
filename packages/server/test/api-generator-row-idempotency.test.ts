@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import type { CollectionConfig, DeleteProps, FetchOneProps, SaveProps } from "@rebasepro/types";
+import type { DeleteProps, FetchOneProps, SaveProps } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { HonoEnv } from "../src/api/types";
 import { tablesFromCollections } from "./helpers/tables";
@@ -73,7 +74,7 @@ function createKeyStore() {
     };
 }
 
-const comments: CollectionConfig = {
+const comments: LegacyCollectionConfig = {
     slug: "comments",
     name: "Comments",
     singularName: "Comment",
@@ -85,7 +86,7 @@ const comments: CollectionConfig = {
     }
 };
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     singularName: "Post",

@@ -26,7 +26,8 @@ import { errorHandler } from "../src/api/errors";
 import type { ApiKeyStore } from "../src/auth/api-keys/api-key-store";
 import type { ApiKey } from "../src/auth/api-keys/api-key-types";
 import type { HonoEnv } from "../src/api/types";
-import type { CollectionConfig, DataDriver, RelationProperty } from "@rebasepro/types";
+import type { DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyRelationProperty } from "@rebasepro/common/migrate";
 import { createServer } from "node:http";
 import { fakeApiKeyStore, fakeAuthRepository, fakeUser, maskedApiKey } from "./helpers/server-a-g1-fakes";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
@@ -278,13 +279,13 @@ describe("subcollection data scopes", () => {
         };
     }
 
-    function createTestCollection(slug: string, properties: Record<string, RelationProperty> = {}): CollectionConfig {
+    function createTestCollection(slug: string, properties: Record<string, LegacyRelationProperty> = {}): LegacyCollectionConfig {
         return { slug,
 name: slug,
 properties };
     }
 
-    const hasMany = (target: () => CollectionConfig, foreignKeyOnTarget: string): RelationProperty =>
+    const hasMany = (target: () => LegacyCollectionConfig, foreignKeyOnTarget: string): LegacyRelationProperty =>
         ({ type: "relation", relation: { kind: "hasMany", target, foreignKeyOnTarget } });
 
     function createApp(scopes: string[]): { app: Hono<HonoEnv>; driver: DataDriver } {

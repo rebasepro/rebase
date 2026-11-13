@@ -28,7 +28,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { boolean, pgTable, varchar } from "drizzle-orm/pg-core";
 import { createServer, type Server } from "node:http";
 import { WebSocket as NodeWebSocket } from "ws";
-import type { CollectionConfig, RebaseSdkData } from "@rebasepro/types";
+import type { RebaseSdkData } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
@@ -50,7 +51,7 @@ const contractsTable = pgTable("contracts", {
 /** What the delete callbacks were handed, in order. */
 let seen: { stage: "beforeDelete" | "afterDelete"; id: string | number; row: Record<string, unknown> }[] = [];
 
-const contractsCollection: CollectionConfig = {
+const contractsCollection: LegacyCollectionConfig = {
     slug: "contracts",
     name: "Contracts",
     table: "contracts",

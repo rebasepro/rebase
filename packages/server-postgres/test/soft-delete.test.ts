@@ -1,4 +1,5 @@
-import { col, defineTable, type AnyColumn, type AnyTableDef, type CollectionConfig } from "@rebasepro/types";
+import { col, defineTable, type AnyColumn, type AnyTableDef } from "@rebasepro/types";
+import { type LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { compileSchema } from "@rebasepro/common";
 import { buildRuntimeTable, type RuntimeTable } from "../src/model/runtime-table";
 import { isNotNull, isNull } from "drizzle-orm";
@@ -149,7 +150,7 @@ describe("softDeleteCondition", () => {
 describe("PostgresBackendDriver.delete — soft delete", () => {
     const registry = new FixtureTableRegistry();
 
-    const posts: CollectionConfig = {
+    const posts: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",
@@ -159,9 +160,9 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
             title: { type: "string" },
             deletedAt: { type: "date" }
         }
-    } as CollectionConfig;
+    } as LegacyCollectionConfig;
 
-    const plain: CollectionConfig = {
+    const plain: LegacyCollectionConfig = {
         slug: "notes",
         name: "Notes",
         table: "notes",

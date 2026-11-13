@@ -17,7 +17,7 @@
  * `pg.Pool` the doctor opens.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ensureTables } from "../src/schema/ensure-tables";
 import { checkCollectionsVsDatabase, type DoctorIssue } from "../src/schema/doctor";
 import { compileSet } from "./helpers/plan-tables";
@@ -37,7 +37,7 @@ jest.mock("pg", () => {
 
 const LONG_COLUMN = "a_status_column_with_quite_a_long_name_that_keeps_going_on";
 
-const longThings: CollectionConfig = {
+const longThings: LegacyCollectionConfig = {
     slug: "long_things",
     table: "long_things_tbl",
     name: "Long things",
@@ -47,7 +47,7 @@ const longThings: CollectionConfig = {
     }
 };
 
-const categories = (isId: "increment" | "uuid"): CollectionConfig => ({
+const categories = (isId: "increment" | "uuid"): LegacyCollectionConfig => ({
     slug: "categories",
     table: "categories",
     name: "Categories",
@@ -57,7 +57,7 @@ const categories = (isId: "increment" | "uuid"): CollectionConfig => ({
     }
 });
 
-const people: CollectionConfig = {
+const people: LegacyCollectionConfig = {
     slug: "people",
     table: "people",
     name: "People",
@@ -68,7 +68,7 @@ const people: CollectionConfig = {
 };
 
 /** A collection over a table keyed on two columns, as introspection used to write it. */
-const orderLines: CollectionConfig = {
+const orderLines: LegacyCollectionConfig = {
     slug: "order_lines",
     table: "order_lines",
     name: "Order lines",
@@ -80,7 +80,7 @@ const orderLines: CollectionConfig = {
 };
 
 const DATABASE_URL = "postgres://doctor.test/db";
-const issuesOf = async (collections: CollectionConfig[]): Promise<DoctorIssue[]> =>
+const issuesOf = async (collections: LegacyCollectionConfig[]): Promise<DoctorIssue[]> =>
     (await checkCollectionsVsDatabase(compileSet(collections), DATABASE_URL)).issues;
 
 describe("the doctor against the database the planner built", () => {
@@ -102,7 +102,7 @@ describe("the doctor against the database the planner built", () => {
     });
 
     it("does not take a same-named enum in another schema for this one", async () => {
-        const tags: CollectionConfig = {
+        const tags: LegacyCollectionConfig = {
             slug: "tags",
             table: "tags",
             name: "Tags",
@@ -124,7 +124,7 @@ describe("the doctor against the database the planner built", () => {
     });
 
     it("does not send a removed enum label back to `rebase db push`, which cannot remove it", async () => {
-        const tags = (labels: string[]): CollectionConfig => ({
+        const tags = (labels: string[]): LegacyCollectionConfig => ({
             slug: "tags",
             table: "tags",
             name: "Tags",
@@ -173,7 +173,7 @@ describe("the doctor against the database the planner built", () => {
         expect(key?.fix).toContain('Mark only the properties for columns "order_id", "line_no" with `isId`');
 
         // Marked, the collection reads the table by the key it has.
-        const marked: CollectionConfig = {
+        const marked: LegacyCollectionConfig = {
             ...orderLines,
             properties: {
                 ...orderLines.properties,
@@ -185,7 +185,7 @@ describe("the doctor against the database the planner built", () => {
     });
 
     it("finds a composite-keyed table the boot ensure created in sync", async () => {
-        const translations: CollectionConfig = {
+        const translations: LegacyCollectionConfig = {
             slug: "translations",
             table: "translations",
             name: "Translations",

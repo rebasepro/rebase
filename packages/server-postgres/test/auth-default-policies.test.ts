@@ -1,4 +1,4 @@
-import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { generatePostgresPoliciesDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { getEffectiveSecurityRules, getInjectedSecurityRules } from "@rebasepro/common";
 import { compileSet } from "./helpers/plan-tables";
@@ -7,7 +7,7 @@ describe("auth collection default RLS policies", () => {
     const adminWrite = "string_to_array(rebase.roles(), ',') && ARRAY['admin']";
 
     it("injects admin write policies (permissive grant + restrictive gate) when an auth collection has no security rules", () => {
-        const collection: PostgresCollectionConfig = {
+        const collection: LegacyPostgresCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -32,7 +32,7 @@ describe("auth collection default RLS policies", () => {
     });
 
     it("keeps an author's permissive owner write rule but the restrictive gate still blocks non-admins", () => {
-        const collection: PostgresCollectionConfig = {
+        const collection: LegacyPostgresCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -68,7 +68,7 @@ describe("auth collection default RLS policies", () => {
     });
 
     it("injects a self-read policy on auth collections (id = rebase.uid())", () => {
-        const collection: PostgresCollectionConfig = {
+        const collection: LegacyPostgresCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -99,7 +99,7 @@ describe("auth collection default RLS policies", () => {
      * more people write". It is not part of the opt-out.
      */
     it("keeps the restrictive admin-write gate when defaults are disabled", () => {
-        const collection: PostgresCollectionConfig = {
+        const collection: LegacyPostgresCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -121,7 +121,7 @@ describe("auth collection default RLS policies", () => {
 
     it("drops everything for a NON-auth collection that opts out", () => {
         // No privileged columns, nothing to gate: the opt-out is total.
-        const collection: PostgresCollectionConfig = {
+        const collection: LegacyPostgresCollectionConfig = {
             slug: "products",
             table: "products",
             name: "Products",
@@ -136,7 +136,7 @@ describe("auth collection default RLS policies", () => {
         // A policy in the database the author never wrote and cannot find in
         // `getInjectedSecurityRules` is exactly the surprise that function
         // exists to prevent.
-        const collection: PostgresCollectionConfig = {
+        const collection: LegacyPostgresCollectionConfig = {
             slug: "users",
             table: "users",
             name: "Users",
@@ -149,7 +149,7 @@ describe("auth collection default RLS policies", () => {
     });
 
     it("locks non-auth collections by default: server-or-admin read + write baselines", () => {
-        const collection: CollectionConfig = {
+        const collection: LegacyCollectionConfig = {
             slug: "products",
             table: "products",
             name: "Products",

@@ -21,7 +21,7 @@
  * column object that reports `varchar` from `getSQLType()` but is an instance of
  * nothing this module imported is exactly what the second copy hands over.
  */
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { pgTable, PgDialect, uuid, varchar, text } from "drizzle-orm/pg-core";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 import type { PgTable } from "drizzle-orm/pg-core";
@@ -34,7 +34,7 @@ const users = pgTable("users", {
     bio: text("bio")
 });
 
-const collection: CollectionConfig = {
+const collection: LegacyCollectionConfig = {
     slug: "users",
     name: "Users",
     table: "users",

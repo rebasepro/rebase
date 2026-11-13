@@ -20,7 +20,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper } from "../../src/PostgresBootstrapper.js";
@@ -94,7 +94,7 @@ const ALLOWED: Record<string, string[]> = {
     "rebase.legacy_users": ["id"]
 };
 
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     name: "Posts",
     slug: "posts",
     table: "posts",
@@ -105,7 +105,7 @@ const postsCollection: CollectionConfig = {
     }
 };
 
-const tagsCollection: CollectionConfig = {
+const tagsCollection: LegacyCollectionConfig = {
     name: "Tags",
     slug: "tags",
     table: "tags",

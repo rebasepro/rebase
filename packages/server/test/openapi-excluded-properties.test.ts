@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import path from "node:path";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
 import { compileLoadedSchema, loadBackendSchema } from "../src/schema/load-schema";
@@ -27,7 +27,7 @@ import { tablesFromCollections } from "./helpers/tables";
  * came to survive here.
  */
 
-const vaults: CollectionConfig = {
+const vaults: LegacyCollectionConfig = {
     slug: "vaults", name: "Vaults", singularName: "Vault", table: "vaults",
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
@@ -100,11 +100,11 @@ describe("relation properties", () => {
     // `Post` than the SDK's `Row` for the same config. Filters are the one place
     // the old exclusion still holds: a relation is not a column to compare
     // against.
-    const authors: CollectionConfig = {
+    const authors: LegacyCollectionConfig = {
         slug: "authors", name: "Authors", singularName: "Author", table: "authors",
         properties: { id: { type: "string", isId: "uuid" }, name: { type: "string" } }
     };
-    const posts: CollectionConfig = {
+    const posts: LegacyCollectionConfig = {
         slug: "posts", name: "Posts", singularName: "Post", table: "posts",
         properties: {
             id: { type: "string", isId: "uuid" },

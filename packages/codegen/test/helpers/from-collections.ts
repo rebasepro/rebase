@@ -1,6 +1,6 @@
 import { compileTables, type AnySchemaDef } from "@rebasepro/common";
-import { collectionsToTableDefs, type LiftOptions } from "@rebasepro/common/migrate";
-import { isRelationDef, isTableDef, isViewDef, type CollectionConfig, type TableDescriptor } from "@rebasepro/types";
+import { collectionsToTableDefs, type LiftOptions, type LegacyCollectionConfig } from "@rebasepro/common/migrate";
+import { isRelationDef, isTableDef, isViewDef, type TableDescriptor } from "@rebasepro/types";
 
 /**
  * Legacy collections as the descriptors the generator reads: lifted with
@@ -13,7 +13,7 @@ import { isRelationDef, isTableDef, isViewDef, type CollectionConfig, type Table
  * relation into one of the others reaches a slug outside the run, as a
  * collection pointing outside the set always has.
  */
-export function descriptorsFromCollections(collections: readonly CollectionConfig[], options: LiftOptions = {}): TableDescriptor[] {
+export function descriptorsFromCollections(collections: readonly LegacyCollectionConfig[], options: LiftOptions = {}): TableDescriptor[] {
     const { tables, defaultRls } = collectionsToTableDefs(collections, options);
     const all: AnySchemaDef[] = [...tables];
     for (let index = 0; index < all.length; index++) {

@@ -21,7 +21,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
@@ -61,7 +61,7 @@ const bylinesTable = pgTable("bylines", {
     postId: varchar("post_id")
 });
 
-const tagsCollection: CollectionConfig = {
+const tagsCollection: LegacyCollectionConfig = {
     name: "Tags", slug: "tags", table: "tags",
     properties: {
         id: { name: "ID", type: "string", isId: true },
@@ -92,14 +92,14 @@ const tagsCollection: CollectionConfig = {
     ]
 };
 
-const bylinesCollection: CollectionConfig = {
+const bylinesCollection: LegacyCollectionConfig = {
     name: "Bylines", slug: "bylines", table: "bylines",
     properties: {
         id: { name: "ID", type: "string", isId: true }
     }
 };
 
-const authorsCollection: CollectionConfig = {
+const authorsCollection: LegacyCollectionConfig = {
     name: "Authors", slug: "authors", table: "authors",
     properties: {
         id: { name: "ID", type: "string", isId: true },
@@ -151,7 +151,7 @@ const authorsCollection: CollectionConfig = {
     ]
 };
 
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     name: "Posts", slug: "posts", table: "posts",
     properties: {
         id: { name: "ID", type: "string", isId: true },

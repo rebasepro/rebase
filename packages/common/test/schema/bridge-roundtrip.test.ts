@@ -23,7 +23,7 @@
  * plan-equivalence suite covers the other spellings, through the planner.
  */
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 
 import { collectionsToTableDefs } from "../../src/migrate";
 import { lowerTables } from "../../src/schema/lower-tables";
@@ -62,7 +62,7 @@ function canonical(value: unknown, path: string[] = []): unknown {
 }
 
 /** A legacy collection with modulo 1 applied. */
-function withoutPresentation(collection: CollectionConfig): Record<string, unknown> {
+function withoutPresentation(collection: LegacyCollectionConfig): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(collection)) {
         if (UI_COLLECTION_FIELDS.includes(key)) continue;
@@ -79,7 +79,7 @@ function withoutPresentation(collection: CollectionConfig): Record<string, unkno
     return out;
 }
 
-function roundTrip(collections: readonly CollectionConfig[]): { lowered: PostgresCollectionConfig[]; notes: ReturnType<typeof collectionsToTableDefs>["notCarried"] } {
+function roundTrip(collections: readonly LegacyCollectionConfig[]): { lowered: LegacyPostgresCollectionConfig[]; notes: ReturnType<typeof collectionsToTableDefs>["notCarried"] } {
     const { tables, defaultRls, notCarried } = collectionsToTableDefs(collections);
     return { lowered: lowerTables(tables, defaultRls ? { defaultRls } : {}), notes: notCarried };
 }
@@ -123,7 +123,7 @@ describe("bridge round trip: lowerTables(collectionsToTableDefs(c)) is c", () =>
 
     it("strips presentation into notCarried, field by field, and carries the rest", () => {
         // `notes` is the target of no relation, so it is converted once.
-        const decorated: PostgresCollectionConfig = {
+        const decorated: LegacyPostgresCollectionConfig = {
             ...notes,
             singularName: "Note",
             properties: {

@@ -23,15 +23,15 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import type { LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { ensureTables, type Queryable } from "../../src/schema/ensure-tables.js";
 import { compileSet } from "../helpers/plan-tables";
 
 /** Enough collections, columns and enums that a plan has many steps to lose. */
-function collections(): PostgresCollectionConfig[] {
-    const make = (slug: string): PostgresCollectionConfig => ({
+function collections(): LegacyPostgresCollectionConfig[] {
+    const make = (slug: string): LegacyPostgresCollectionConfig => ({
         name: slug,
         slug,
         table: slug,

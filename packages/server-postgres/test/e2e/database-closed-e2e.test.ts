@@ -22,7 +22,7 @@ import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
 import pg from "pg";
 import { Hono } from "hono";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
@@ -35,7 +35,7 @@ import { tablesFrom } from "../helpers/tables.js";
 
 const JWT_SECRET = "database-closed-e2e-secret-that-is-long-enough-0123456789";
 
-const notesCollection: CollectionConfig = {
+const notesCollection: LegacyCollectionConfig = {
     name: "Notes",
     slug: "notes",
     table: "notes",

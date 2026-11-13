@@ -28,7 +28,8 @@ import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
 import pg from "pg";
 import { Hono } from "hono";
-import { IMPERSONATE_HEADER, type CollectionConfig } from "@rebasepro/types";
+import { IMPERSONATE_HEADER } from "@rebasepro/types";
+import { type LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
@@ -43,7 +44,7 @@ import { tablesFrom } from "../helpers/tables.js";
 const JWT_SECRET = "impersonation-e2e-secret-that-is-long-enough-0123456789";
 const SERVICE_KEY = "impersonation-e2e-service-key-0123456789abcdef";
 
-const notesCollection: CollectionConfig = {
+const notesCollection: LegacyCollectionConfig = {
     name: "Notes",
     slug: "notes",
     table: "notes",

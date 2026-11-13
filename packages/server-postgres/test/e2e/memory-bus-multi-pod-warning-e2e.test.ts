@@ -16,7 +16,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { logger } from "@rebasepro/server";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
@@ -24,7 +24,7 @@ import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js"
 import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     name: "Posts",
     slug: "posts",
     table: "posts",

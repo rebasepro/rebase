@@ -23,7 +23,8 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import pg from "pg";
-import type { CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import type { InitializedDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper } from "../../src/PostgresBootstrapper.js";
@@ -34,7 +35,7 @@ import { ensureTables, type Queryable } from "../../src/schema/ensure-tables.js"
 import { compileSet } from "../helpers/plan-tables";
 import { tablesFromCollections } from "../helpers/tables.js";
 
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     name: "Posts",
     slug: "posts",
     table: "posts",
@@ -48,7 +49,7 @@ const postsCollection: CollectionConfig = {
     securityRules: [{ operation: "select", access: "public" }]
 };
 
-const eventsCollection: CollectionConfig = {
+const eventsCollection: LegacyCollectionConfig = {
     name: "Events",
     slug: "events",
     table: "events",

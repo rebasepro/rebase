@@ -16,7 +16,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { ensureTables } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
@@ -25,7 +25,7 @@ const queryable = (db: PGlite) => ({
     query: async <T = unknown>(sql: string) => ({ rows: (await db.query<T>(sql)).rows })
 });
 
-const collectionWithKey = (isId: string): CollectionConfig => ({
+const collectionWithKey = (isId: string): LegacyCollectionConfig => ({
     slug: "tickets",
     table: "tickets",
     name: "Tickets",
@@ -33,7 +33,7 @@ const collectionWithKey = (isId: string): CollectionConfig => ({
         id: { type: "string", isId },
         title: { type: "string" }
     }
-}) as CollectionConfig;
+}) as LegacyCollectionConfig;
 
 async function keyDefault(db: PGlite): Promise<string | null> {
     const result = await db.query<{ column_default: string | null }>(

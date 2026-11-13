@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { integer, pgTable, serial, varchar, vector } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { FetchService } from "../src/services/FetchService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -30,7 +30,7 @@ const postsTable = pgTable("posts", {
     embedding: vector("embedding", { dimensions: 3 })
 });
 
-const authorsCollection: CollectionConfig = {
+const authorsCollection: LegacyCollectionConfig = {
     slug: "authors",
     name: "Authors",
     table: "authors",
@@ -49,7 +49,7 @@ const authorsCollection: CollectionConfig = {
     ]
 };
 
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",

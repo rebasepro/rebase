@@ -56,7 +56,8 @@ jest.mock("@rebasepro/server", () => ({
     isAuthTable: require("../../server/src/api/rest/auth-table-writes").isAuthTable
 }));
 
-import type { AuthAdapter, CollectionConfig, SaveProps } from "@rebasepro/types";
+import type { AuthAdapter, SaveProps } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { createPostgresWebSocket, type SocketDataDriver } from "../src/websocket";
 import { fakeAuthAdapter, fakeDataDriver, fakeSocketRealtime } from "./helpers/spg-c-socket";
 import { registryOf } from "./helpers/spg-c-registry";
@@ -82,7 +83,7 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
     let saved: unknown[];
 
     /** The collection the *registry* answers with — the authoritative one. */
-    const usersCollection: CollectionConfig = {
+    const usersCollection: LegacyCollectionConfig = {
         slug: "users",
         name: "Users",
         table: "users",
@@ -95,7 +96,7 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
     };
 
     /** A collection with a required field, for the create-time check. */
-    const profilesCollection: CollectionConfig = {
+    const profilesCollection: LegacyCollectionConfig = {
         slug: "profiles",
         name: "Profiles",
         table: "profiles",
@@ -107,13 +108,13 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
     };
 
     /** Docs, and the owners they are written through: `owners/1/docs`. */
-    const docsCollection: CollectionConfig = {
+    const docsCollection: LegacyCollectionConfig = {
         slug: "docs",
         name: "Docs",
         table: "docs",
         properties: { id: { name: "ID", type: "number", isId: true }, title: { name: "Title", type: "string" } }
     };
-    const ownersCollection: CollectionConfig = {
+    const ownersCollection: LegacyCollectionConfig = {
         slug: "owners",
         name: "Owners",
         table: "owners",
@@ -337,7 +338,7 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
  * this door.
  */
 describe("a socket write through a parent's relation", () => {
-    const members: CollectionConfig = {
+    const members: LegacyCollectionConfig = {
         slug: "members", name: "Members", table: "members",
         properties: {
             id: { name: "ID", type: "number", isId: "increment" },
@@ -345,7 +346,7 @@ describe("a socket write through a parent's relation", () => {
             band: { name: "Band", type: "relation", access: { write: ["hr"] }, relation: { kind: "belongsTo", target: () => bands, localKey: "band_id" } }
         }
     };
-    const bands: CollectionConfig = {
+    const bands: LegacyCollectionConfig = {
         slug: "bands", name: "Bands", table: "bands",
         properties: {
             id: { name: "ID", type: "number", isId: "increment" },
@@ -353,11 +354,11 @@ describe("a socket write through a parent's relation", () => {
             members: { name: "Members", type: "relation", relation: { kind: "hasMany", target: () => members, foreignKeyOnTarget: "band_id" } }
         }
     };
-    const tags: CollectionConfig = {
+    const tags: LegacyCollectionConfig = {
         slug: "tags", name: "Tags", table: "tags",
         properties: { id: { name: "ID", type: "number", isId: "increment" }, name: { name: "Name", type: "string" } }
     };
-    const posts: CollectionConfig = {
+    const posts: LegacyCollectionConfig = {
         slug: "posts", name: "Posts", table: "posts",
         properties: {
             id: { name: "ID", type: "number", isId: "increment" },
@@ -540,7 +541,7 @@ describe("a socket write through a parent's relation, declared with defineTable"
  * and an email is stored the way sign-in looks it up.
  */
 describe("a socket write to the auth collection", () => {
-    const users: CollectionConfig = {
+    const users: LegacyCollectionConfig = {
         slug: "users", name: "Users", table: "users", auth: { enabled: true },
         properties: {
             id: { name: "ID", type: "string", isId: "uuid" },

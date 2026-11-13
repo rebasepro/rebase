@@ -25,7 +25,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createServer } from "node:http";
 import pg from "pg";
 import { Hono } from "hono";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresAdapter, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
@@ -35,7 +35,7 @@ import { authContextStatement } from "../../src/security/rls-enforcement.js";
 import { resolveRlsSettings } from "../../src/security/rls-settings.js";
 import { tablesFromCollections, tablesFrom } from "../helpers/tables.js";
 
-const songs: CollectionConfig = {
+const songs: LegacyCollectionConfig = {
     name: "Songs",
     slug: "songs",
     table: "songs",
@@ -49,7 +49,7 @@ const songs: CollectionConfig = {
 };
 
 /** The same, with a RESTRICTIVE rule: a gate every caller passes through, admins included. */
-const drafts: CollectionConfig = {
+const drafts: LegacyCollectionConfig = {
     name: "Drafts",
     slug: "drafts",
     table: "drafts",

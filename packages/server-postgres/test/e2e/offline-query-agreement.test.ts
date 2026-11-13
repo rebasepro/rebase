@@ -25,7 +25,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, varchar, integer, boolean } from "drizzle-orm/pg-core";
-import type { CollectionConfig, FilterValues, WhereFilterOp } from "@rebasepro/types";
+import type { FilterValues, WhereFilterOp } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 // Not on the client's public surface — imported from source, like the
 // evaluator it is checking.
 import { runLocalQuery, isExactlyEvaluable, isLocallySortable } from "../../../client/src/offline-query.js";
@@ -47,7 +48,7 @@ const itemsTable = pgTable("items", {
     active: boolean("active")
 });
 
-const itemsCollection: CollectionConfig = {
+const itemsCollection: LegacyCollectionConfig = {
     name: "Items", slug: "items", table: "items",
     properties: {
         id: { name: "ID", type: "string", isId: true },

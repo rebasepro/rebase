@@ -19,7 +19,7 @@ import { describe, it, beforeAll, afterAll, expect } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
@@ -50,7 +50,7 @@ const trashTable = pgTable("trash_notes", {
     deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "string" })
 });
 
-const trashCollection: CollectionConfig = {
+const trashCollection: LegacyCollectionConfig = {
     name: "Trash notes", slug: "trash_notes", table: "trash_notes",
     softDelete: true,
     properties: {
@@ -60,7 +60,7 @@ const trashCollection: CollectionConfig = {
     }
 };
 
-const notesCollection: CollectionConfig = {
+const notesCollection: LegacyCollectionConfig = {
     name: "Notes", slug: "notes", table: "notes",
     properties: {
         id: { name: "ID", type: "string", isId: true },

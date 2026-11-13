@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { pgTable, text } from "drizzle-orm/pg-core";
 import { deriveRowAddress } from "../src/services/collection-helpers";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -20,7 +20,7 @@ describe("deriveRowAddress", () => {
     const table = (name: string, columns: string[]) =>
         pgTable(name, Object.fromEntries(columns.map(column => [column, text(column)])));
 
-    const productsCollection: CollectionConfig = {
+    const productsCollection: LegacyCollectionConfig = {
         slug: "products",
         name: "Products",
         table: "products",
@@ -31,7 +31,7 @@ isId: "increment" },
         }
     };
 
-    const skuItemsCollection: CollectionConfig = {
+    const skuItemsCollection: LegacyCollectionConfig = {
         slug: "sku_items",
         name: "SKU Items",
         table: "sku_items",
@@ -42,7 +42,7 @@ isId: true },
         }
     };
 
-    const membershipsCollection: CollectionConfig = {
+    const membershipsCollection: LegacyCollectionConfig = {
         slug: "memberships",
         name: "Memberships",
         table: "memberships",
@@ -57,7 +57,7 @@ isId: true },
 
     // `event_id` is the key; `id` is an ordinary column that happens to share
     // the name the address used to be written under.
-    const eventsCollection: CollectionConfig = {
+    const eventsCollection: LegacyCollectionConfig = {
         slug: "events",
         name: "Events",
         table: "events",
@@ -69,7 +69,7 @@ isId: true },
         }
     };
 
-    const unregisteredCollection: CollectionConfig = {
+    const unregisteredCollection: LegacyCollectionConfig = {
         slug: "ghosts",
         name: "Ghosts",
         table: "ghosts",

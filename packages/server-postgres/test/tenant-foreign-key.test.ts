@@ -17,13 +17,13 @@
  * rendered — so the column stayed nullable.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
 import type { ColumnPlan, SchemaPlan } from "../src/schema/plan/types";
 import { planCollections } from "./helpers/plan-tables";
 
-const orgs: CollectionConfig = {
+const orgs: LegacyCollectionConfig = {
     slug: "orgs",
     table: "orgs",
     name: "Orgs",
@@ -45,7 +45,7 @@ const rendered = (plan: SchemaPlan, table: string, column: string): ColumnPlan |
 
 describe("the tenant link", () => {
     it("restricts a parent's delete rather than setting a NOT NULL column to NULL", () => {
-        const projects: CollectionConfig = {
+        const projects: LegacyCollectionConfig = {
             slug: "projects", table: "projects", name: "Projects", tenant: tenantOn("org"),
             properties: { id: { name: "ID", type: "string", isId: "uuid" }, org: orgLink }
         };
@@ -56,7 +56,7 @@ describe("the tenant link", () => {
     });
 
     it("keeps an `onDelete` the author wrote", () => {
-        const projects: CollectionConfig = {
+        const projects: LegacyCollectionConfig = {
             slug: "projects", table: "projects", name: "Projects", tenant: tenantOn("org"),
             properties: {
                 id: { name: "ID", type: "string", isId: "uuid" },
@@ -67,7 +67,7 @@ describe("the tenant link", () => {
     });
 
     it("applies to a `reference` used as the tenant too", () => {
-        const projects: CollectionConfig = {
+        const projects: LegacyCollectionConfig = {
             slug: "projects", table: "projects", name: "Projects", tenant: tenantOn("org"),
             properties: {
                 id: { name: "ID", type: "string", isId: "uuid" },
@@ -78,7 +78,7 @@ describe("the tenant link", () => {
     });
 
     it("makes the column NOT NULL when a property declared after the relation owns it", () => {
-        const projects: CollectionConfig = {
+        const projects: LegacyCollectionConfig = {
             slug: "projects", table: "projects", name: "Projects", tenant: tenantOn("org"),
             properties: {
                 id: { name: "ID", type: "string", isId: "uuid" },
@@ -93,7 +93,7 @@ describe("the tenant link", () => {
     });
 
     it("holds on a live database: the delete is refused by the foreign key", async () => {
-        const projects: CollectionConfig = {
+        const projects: LegacyCollectionConfig = {
             slug: "projects", table: "projects", name: "Projects", tenant: tenantOn("org"),
             properties: { id: { name: "ID", type: "string", isId: "uuid" }, org: orgLink }
         };
@@ -115,7 +115,7 @@ describe("the tenant link", () => {
 
 describe("a link whose column a declared property owns", () => {
     it("restricts when the property is required and the relation says nothing", () => {
-        const projects: CollectionConfig = {
+        const projects: LegacyCollectionConfig = {
             slug: "projects", table: "projects", name: "Projects",
             properties: {
                 id: { name: "ID", type: "string", isId: "uuid" },
@@ -127,7 +127,7 @@ describe("a link whose column a declared property owns", () => {
     });
 
     it("still sets NULL when nothing makes the column required", () => {
-        const projects: CollectionConfig = {
+        const projects: LegacyCollectionConfig = {
             slug: "projects", table: "projects", name: "Projects",
             properties: { id: { name: "ID", type: "string", isId: "uuid" }, org: orgLink }
         };

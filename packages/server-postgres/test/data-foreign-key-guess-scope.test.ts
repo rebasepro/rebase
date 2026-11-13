@@ -17,7 +17,7 @@ import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { PgDialect, pgTable, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -33,7 +33,7 @@ const staffTable = pgTable("staff", {
     managerId: varchar("manager_id")
 });
 
-const staff: CollectionConfig = {
+const staff: LegacyCollectionConfig = {
     name: "Staff",
     slug: "staff",
     table: "staff",

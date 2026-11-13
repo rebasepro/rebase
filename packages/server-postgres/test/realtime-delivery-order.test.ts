@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { pgTable, text } from "drizzle-orm/pg-core";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -47,7 +47,7 @@ describe("Postgres realtime delivery order", () => {
 
     type MockWebSocket = FakeRealtimeSocket;
 
-    const notesCollection: CollectionConfig = {
+    const notesCollection: LegacyCollectionConfig = {
         slug: "notes",
         name: "Notes",
         table: "notes",

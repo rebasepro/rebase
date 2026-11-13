@@ -4,7 +4,7 @@ import { DataService } from "../src/services/dataService";
 import type { RealtimeService } from "../src/services/realtimeService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { RebaseApiError } from "@rebasepro/types";
-import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { transactionalDrizzle } from "./helpers/spg-a-db";
 import { quietRealtime, registryServing, testUser } from "./helpers/spg-a-driver";
 
@@ -49,7 +49,7 @@ function buildDb() {
 /** The realtime service the last `buildDriver` wired in. */
 let realtime: RealtimeService;
 
-function buildDriver(collection: CollectionConfig, db: NodePgDatabase) {
+function buildDriver(collection: LegacyCollectionConfig, db: NodePgDatabase) {
     const registry = registryServing(collection);
     realtime = quietRealtime(db, registry);
     return new PostgresBackendDriver(db, realtime, registry);
@@ -70,7 +70,7 @@ function stubDataService() {
     jest.spyOn(DataService.prototype, "fetchOneForRest").mockResolvedValue(SAVED_ROW);
 }
 
-const articles = (callbacks: PostgresCollectionConfig["callbacks"]): PostgresCollectionConfig => ({
+const articles = (callbacks: LegacyPostgresCollectionConfig["callbacks"]): LegacyPostgresCollectionConfig => ({
     slug: "articles",
     name: "Articles",
     table: "articles",

@@ -12,7 +12,7 @@
  * a guarantee, and what will notice if someone later re-derives the expression
  * in one place "just for this case".
  */
-import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import {
     generatePostgresDdl,
     generatePostgresSearchDdl,
@@ -26,7 +26,7 @@ import { buildSearchColumnSpec } from "../src/schema/search-column";
 import { planColumnTypeFor } from "./helpers/plan-column";
 import { compileSet } from "./helpers/plan-tables";
 
-const collection: PostgresCollectionConfig = {
+const collection: LegacyPostgresCollectionConfig = {
     slug: "talents",
     table: "talents",
     name: "Talents",
@@ -47,7 +47,7 @@ const collection: PostgresCollectionConfig = {
     }
 };
 
-const collections: CollectionConfig[] = [collection];
+const collections: LegacyCollectionConfig[] = [collection];
 const spec = buildSearchColumnSpec(collection)!;
 
 const emptySchema = { tables: new Map<string, Set<string>>(), enums: new Set<string>(), constraints: new Set<string>() };
@@ -168,7 +168,7 @@ describe("the spec's classification matches the physical column type", () => {
 });
 
 describe("a collection that has not opted in is untouched", () => {
-    const plain: CollectionConfig[] = [{
+    const plain: LegacyCollectionConfig[] = [{
         slug: "posts",
         table: "posts",
         name: "Posts",
@@ -247,7 +247,7 @@ describe("what Atlas is allowed to read", () => {
     });
 
     it("writes nothing when no collection opted in", () => {
-        const noSearch: CollectionConfig[] = [{
+        const noSearch: LegacyCollectionConfig[] = [{
             slug: "posts",
             table: "posts",
             name: "Posts",
@@ -298,7 +298,7 @@ describe("searchExcludePatterns — what Atlas is told to keep its hands off", (
     });
 
     it("names the fuzzy column and its index too, when one is configured", () => {
-        const fuzzy: PostgresCollectionConfig = {
+        const fuzzy: LegacyPostgresCollectionConfig = {
             ...collection,
             search: { ...collection.search!, fuzzy: true }
         };
@@ -361,6 +361,6 @@ describe("searchColumnDependencies", () => {
     });
 
     it("leaves a project with no search block alone", () => {
-        expect(searchColumnDependencies(compileSet([{ ...collection, search: undefined } as CollectionConfig]))).toEqual([]);
+        expect(searchColumnDependencies(compileSet([{ ...collection, search: undefined } as LegacyCollectionConfig]))).toEqual([]);
     });
 });

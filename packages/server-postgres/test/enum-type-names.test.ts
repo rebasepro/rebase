@@ -16,7 +16,7 @@
  *   renaming either.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import {
     ensureTables,
@@ -26,7 +26,7 @@ import {
 import { compileSet, planCollections } from "./helpers/plan-tables";
 
 /** `customer_subscription_billing_events_payment_processor_status_code` is 66 bytes. */
-const billingEvents = (labels: string[]): CollectionConfig => ({
+const billingEvents = (labels: string[]): LegacyCollectionConfig => ({
     slug: "customer_subscription_billing_events",
     table: "customer_subscription_billing_events",
     name: "Billing events",
@@ -79,7 +79,7 @@ describe("an enum type whose derived name is longer than 63 bytes", () => {
 });
 
 describe("two columns whose enum types derive the same name", () => {
-    const orders: CollectionConfig = {
+    const orders: LegacyCollectionConfig = {
         slug: "orders",
         table: "orders",
         name: "Orders",
@@ -88,7 +88,7 @@ describe("two columns whose enum types derive the same name", () => {
             itemStatus: { name: "Item status", type: "string", enum: ["pending", "shipped"] }
         }
     };
-    const orderItems: CollectionConfig = {
+    const orderItems: LegacyCollectionConfig = {
         slug: "orders_item",
         table: "orders_item",
         name: "Order items",
@@ -105,7 +105,7 @@ describe("two columns whose enum types derive the same name", () => {
     });
 
     it("are refused when only the truncated names coincide", () => {
-        const long = (slug: string, column: string): CollectionConfig => ({
+        const long = (slug: string, column: string): LegacyCollectionConfig => ({
             slug,
             table: slug,
             name: slug,
@@ -126,7 +126,7 @@ describe("two columns whose enum types derive the same name", () => {
     // second one — so there is no second declaration left to share with.)
 
     it("are not a collision in two different schemas", () => {
-        const archived: CollectionConfig = { ...orderItems, slug: "archived_items", schema: "archive" };
+        const archived: LegacyCollectionConfig = { ...orderItems, slug: "archived_items", schema: "archive" };
         const plan = planCollections([orders, archived]);
         expect(plan.enums.map(e => e.qualified).sort())
             .toEqual(["archive.orders_item_status", "public.orders_item_status"]);

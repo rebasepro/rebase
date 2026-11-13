@@ -14,14 +14,14 @@
 import { Hono } from "hono";
 import { createHistoryRoutes, type HistoryService } from "../src/history/history-routes";
 import type { BackendCollectionRegistry } from "../src/collections/BackendCollectionRegistry";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { tablesFromCollections } from "./helpers/tables";
 
 type Registry = Pick<BackendCollectionRegistry, "getCollections">;
 
-function collection(slug: string, history = true): CollectionConfig {
+function collection(slug: string, history = true): LegacyCollectionConfig {
     return {
         name: slug,
         slug,
@@ -164,8 +164,8 @@ describe("GET /:slug/:id/history serves relations as references", () => {
         };
         // The table declares each key the entry holds: a key it has no column
         // or relation for is withheld from the list outright.
-        const authors: CollectionConfig = { name: "authors", slug: "authors", properties: { id: { type: "number", isId: "increment" } } };
-        const posts: CollectionConfig = {
+        const authors: LegacyCollectionConfig = { name: "authors", slug: "authors", properties: { id: { type: "number", isId: "increment" } } };
+        const posts: LegacyCollectionConfig = {
             name: "posts",
             slug: "posts",
             history: true,
@@ -202,8 +202,8 @@ describe("GET /:slug/:id/history serves relations as references", () => {
 // one answered 400 VALIDATION_UNKNOWN_FIELDS. It now writes the row's columns,
 // drops the rest, and names what it dropped.
 describe("reverting an entry that holds keys the row has no column for", () => {
-    const authors: CollectionConfig = { name: "authors", slug: "authors", properties: { id: { type: "number", isId: "increment" } } };
-    const posts: CollectionConfig = {
+    const authors: LegacyCollectionConfig = { name: "authors", slug: "authors", properties: { id: { type: "number", isId: "increment" } } };
+    const posts: LegacyCollectionConfig = {
         name: "posts",
         slug: "posts",
         history: true,

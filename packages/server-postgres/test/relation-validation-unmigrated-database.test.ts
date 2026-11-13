@@ -1,5 +1,5 @@
 import { pgTable, text } from "drizzle-orm/pg-core";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -38,13 +38,13 @@ const categories_products = pgTable("categories_products", {
 const products = pgTable("products", { id: text("id").primaryKey() });
 const categories = pgTable("categories", { id: text("id").primaryKey() });
 
-const categoriesCollection: CollectionConfig = {
+const categoriesCollection: LegacyCollectionConfig = {
     slug: "categories", name: "categories", table: "categories",
     properties: { id: { type: "string", isId: true } }
 };
 
 // The config after the upgrade: correct, and newer than the database.
-const productsCollection: CollectionConfig = {
+const productsCollection: LegacyCollectionConfig = {
     slug: "products", name: "products", table: "products",
     properties: { id: { type: "string", isId: true } },
     relations: [{

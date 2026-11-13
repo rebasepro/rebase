@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import type { CollectionConfig, DeleteManyProps } from "@rebasepro/types";
+import type { DeleteManyProps } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { maskedApiKey } from "./helpers/server-a-g1-fakes";
 import type { HonoEnv } from "../src/api/types";
@@ -35,7 +36,7 @@ describe("API key scopes on bulk delete", () => {
             }
         });
 
-        const collections: CollectionConfig[] = [{
+        const collections: LegacyCollectionConfig[] = [{
             slug: "posts", name: "Posts", singularName: "Post",
             properties: { title: { name: "Title", type: "string" } }
         }];

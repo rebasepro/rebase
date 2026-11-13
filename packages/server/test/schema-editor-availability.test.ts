@@ -3,7 +3,8 @@ import { Hono } from "hono";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, SchemaChangePlan } from "@rebasepro/types";
+import type { BackendBootstrapper, SchemaChangePlan } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
@@ -33,7 +34,7 @@ import { writeSchemaFixture } from "./helpers/schema-source-fixture";
 
 const JWT_SECRET = "schema-editor-availability-test-secret-1234567890";
 
-function collection(slug: string): CollectionConfig {
+function collection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,
@@ -44,7 +45,7 @@ function collection(slug: string): CollectionConfig {
     };
 }
 
-function reportingBootstrapper(reports: CollectionConfig[] | undefined): BackendBootstrapper {
+function reportingBootstrapper(reports: LegacyCollectionConfig[] | undefined): BackendBootstrapper {
     // A driver that introspects reports what it found, described.
     const tables = reports ? compileTables(tablesFrom(reports).tables) : undefined;
     return fakeBootstrapper({ collections: reports, ...(tables ? { tables } : {}) }, {

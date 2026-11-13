@@ -15,7 +15,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ApiError } from "@rebasepro/server";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
@@ -27,7 +27,7 @@ const orgsTable = pgTable("orgs", { id: serial("id").primaryKey(), name: varchar
 const projectsTable = pgTable("projects", { id: serial("id").primaryKey(), orgId: integer("org_id") });
 const notesTable = pgTable("notes", { id: serial("id").primaryKey(), orgId: integer("org_id") });
 
-const orgs: CollectionConfig = {
+const orgs: LegacyCollectionConfig = {
     name: "Orgs",
     slug: "orgs",
     table: "orgs",

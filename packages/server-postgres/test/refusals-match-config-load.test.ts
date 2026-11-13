@@ -25,14 +25,14 @@
  */
 import { compileTables, isSchemaDefinitionError, lowerTables, type SchemaDefinitionProblem } from "@rebasepro/common";
 import { collectionsToTableDefs } from "@rebasepro/common/migrate";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { refused } from "./fixtures/property-matrix-collections";
 import { everything } from "./fixtures/property-matrix-collections";
 import { planCollections, PLAN_REFUSAL_ALLOWED_MESSAGES } from "./helpers/plan-tables";
 
 /** Every problem loading these collections as tables reports: lifted, compiled and lowered as the loader does. */
-function loadProblems(collections: CollectionConfig[]): readonly SchemaDefinitionProblem[] {
+function loadProblems(collections: LegacyCollectionConfig[]): readonly SchemaDefinitionProblem[] {
     try {
         const { tables, defaultRls } = collectionsToTableDefs(collections);
         const options = defaultRls !== undefined ? { defaultRls } : {};

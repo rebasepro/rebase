@@ -3,7 +3,8 @@ import { Hono } from "hono";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import type { BackendBootstrapper, CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { initializeRebaseBackend } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
@@ -19,7 +20,7 @@ import { tablesFrom } from "./helpers/tables";
  * worker only claims the tasks it has a handler for.
  */
 
-function collection(slug: string): CollectionConfig {
+function collection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,

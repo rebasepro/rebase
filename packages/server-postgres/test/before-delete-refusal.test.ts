@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { DataService } from "../src/services/dataService";
-import type { BeforeDeleteProps, CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import type { LegacyBeforeDeleteProps, LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { transactionalDrizzle } from "./helpers/spg-a-db";
 import { quietRealtime, registryServing } from "./helpers/spg-a-driver";
 
@@ -28,13 +28,13 @@ type CallbackError = {
     details?: { stage?: string; path?: string };
 };
 
-function buildDriver(collection: CollectionConfig) {
+function buildDriver(collection: LegacyCollectionConfig) {
     const { db } = transactionalDrizzle();
     const registry = registryServing(collection);
     return new PostgresBackendDriver(db, quietRealtime(db, registry), registry);
 }
 
-const articles = (callbacks: PostgresCollectionConfig["callbacks"]): PostgresCollectionConfig => ({
+const articles = (callbacks: LegacyPostgresCollectionConfig["callbacks"]): LegacyPostgresCollectionConfig => ({
     slug: "articles",
     name: "Articles",
     table: "articles",
@@ -42,7 +42,7 @@ const articles = (callbacks: PostgresCollectionConfig["callbacks"]): PostgresCol
     callbacks
 });
 
-const deleteProps = (collection: CollectionConfig) => ({
+const deleteProps = (collection: LegacyCollectionConfig) => ({
     row: { id: "a1", path: "articles" },
     collection
 });
@@ -122,7 +122,7 @@ describe("beforeDelete returning false", () => {
         // A caller that still sends `values` — every published client's socket
         // DELETE does — describing the row as a draft. The row is published,
         // and the veto is on that.
-        const beforeDelete = jest.fn<(props: BeforeDeleteProps) => boolean>(({ row }) => row.status !== "published");
+        const beforeDelete = jest.fn<(props: LegacyBeforeDeleteProps) => boolean>(({ row }) => row.status !== "published");
         const collection = articles({ beforeDelete });
         const driver = buildDriver(collection);
 
@@ -137,7 +137,7 @@ describe("beforeDelete returning false", () => {
 
     it("answers 404 for a row that is not there, before any callback runs", async () => {
         jest.spyOn(DataService.prototype, "fetchOneForRest").mockResolvedValue(null);
-        const beforeDelete = jest.fn<(props: BeforeDeleteProps) => boolean>();
+        const beforeDelete = jest.fn<(props: LegacyBeforeDeleteProps) => boolean>();
         const collection = articles({ beforeDelete });
         const driver = buildDriver(collection);
 

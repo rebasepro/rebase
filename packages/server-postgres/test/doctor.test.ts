@@ -1,9 +1,8 @@
-import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { checkCollectionsVsSchema, checkCollectionsVsSdk, expectedDataType, renderReport, runDoctor } from "../src/schema/doctor";
 import { generateTypedefs } from "@rebasepro/codegen";
 import { compileTables } from "@rebasepro/common";
-import { collectionsToTableDefs } from "@rebasepro/common/migrate";
+import { collectionsToTableDefs, LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { loadTableSchema } from "../src/schema/load-tables";
 import * as fs from "fs";
 import * as path from "path";
@@ -34,7 +33,7 @@ describe("Rebase Schema Doctor", () => {
         };
 
         it("should detect missing schema file", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "products",
                 table: "products",
                 name: "Products",
@@ -49,7 +48,7 @@ describe("Rebase Schema Doctor", () => {
         });
 
         it("should pass when schema matches collections", async () => {
-            const collections: CollectionConfig[] = [{
+            const collections: LegacyCollectionConfig[] = [{
                 slug: "products",
                 table: "products",
                 name: "Products",
@@ -73,14 +72,14 @@ describe("Rebase Schema Doctor", () => {
         });
 
         it("should detect stale schema when collections have changed", async () => {
-            const originalCollections: CollectionConfig[] = [{
+            const originalCollections: LegacyCollectionConfig[] = [{
                 slug: "products",
                 table: "products",
                 name: "Products",
                 properties: { name: { type: "string" } }
             }];
 
-            const updatedCollections: CollectionConfig[] = [{
+            const updatedCollections: LegacyCollectionConfig[] = [{
                 slug: "products",
                 table: "products",
                 name: "Products",
@@ -123,7 +122,7 @@ describe("Rebase Schema Doctor", () => {
     });
 
     describe("report generation", () => {
-        const collections: PostgresCollectionConfig[] = [{
+        const collections: LegacyPostgresCollectionConfig[] = [{
             slug: "products",
             table: "products",
             name: "Products",
@@ -361,13 +360,13 @@ errors: 0 }
     // freshly generated — and the fix they printed rewrote it in the order it
     // was already in. The generators sort themselves now.
     describe("staleness checks are independent of collection order", () => {
-        const articles: CollectionConfig = {
+        const articles: LegacyCollectionConfig = {
             slug: "articles",
             table: "articles",
             name: "Articles",
             properties: { title: { type: "string" } }
         };
-        const authors: CollectionConfig = {
+        const authors: LegacyCollectionConfig = {
             // `authors.ts` sorts before `blogPosts.ts` as a filename, while
             // `articles` sorts before `authors` as a slug.
             slug: "authors",

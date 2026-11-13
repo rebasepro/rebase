@@ -17,7 +17,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { ensureTables } from "../../src/schema/ensure-tables.js";
@@ -26,7 +26,7 @@ import { buildDeferredIndexes, poolIndexBuildSession } from "../../src/schema/de
 import { pushIndexAdoptions } from "../../src/schema/push-index-adoption.js";
 import { compileSet } from "../helpers/plan-tables";
 
-const events: CollectionConfig = {
+const events: LegacyCollectionConfig = {
     slug: "events", table: "events", name: "Events",
     properties: {
         id: { type: "number", isId: "increment" },

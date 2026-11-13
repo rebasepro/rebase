@@ -11,10 +11,8 @@ import {
 } from "@rebasepro/common/migrate";
 import { isTableDef, isViewDef } from "@rebasepro/types";
 import type {
-    AnyCollectionConfig,
     AnyTableDef,
     AnyViewDef,
-    CollectionConfig,
     CompiledTable,
     DefaultRls,
     PostgresCollectionConfig,
@@ -22,6 +20,10 @@ import type {
     TableDescriptor,
     TableHooks
 } from "@rebasepro/types";
+import type {
+    LegacyAnyCollectionConfig,
+    LegacyCollectionConfig
+} from "@rebasepro/common/migrate";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry";
 import type { RuntimeTable } from "../../src/model/runtime-table";
 
@@ -51,10 +53,10 @@ export interface LiftedTables {
  * ```
  */
 export function tablesFrom(
-    collections: readonly (CollectionConfig | AnyCollectionConfig)[],
+    collections: readonly (LegacyCollectionConfig | LegacyAnyCollectionConfig)[],
     options: { defaultSecurityRules?: readonly SecurityRule[] } = {}
 ): LiftedTables {
-    const narrowed: CollectionConfig[] = collections.map(collection => collection);
+    const narrowed: LegacyCollectionConfig[] = collections.map(collection => collection);
     const { tables, defaultRls } = collectionsToTableDefs(narrowed, options);
     return defaultRls ? { tables, defaultRls } : { tables };
 }
@@ -77,7 +79,7 @@ export interface FixtureTables {
  * fixture as `defineTable`.
  */
 export function tablesFromCollections(
-    collections: readonly (CollectionConfig | AnyCollectionConfig)[],
+    collections: readonly (LegacyCollectionConfig | LegacyAnyCollectionConfig)[],
     options: { defaultSecurityRules?: readonly SecurityRule[] } = {}
 ): FixtureTables {
     const { defs, defaultRls, tables } = compileFixtures(collections, options);
@@ -93,7 +95,7 @@ export function tablesFromCollections(
  * whose targets are factories building a new object per call would never end.)
  */
 function compileFixtures(
-    collections: readonly (CollectionConfig | AnyCollectionConfig)[],
+    collections: readonly (LegacyCollectionConfig | LegacyAnyCollectionConfig)[],
     options: { defaultSecurityRules?: readonly SecurityRule[] }
 ): { defs: (AnyTableDef | AnyViewDef)[]; defaultRls?: DefaultRls; tables: CompiledTable[] } {
     const { tables: defs, defaultRls } = tablesFrom(withCanonicalTargets(collections), options);
@@ -124,22 +126,22 @@ function compileFixtures(
  * factories — `target: () => docs()` — building a new object per call, and the
  * lift converts each target object once: a factory pair would convert forever.
  */
-function withCanonicalTargets(collections: readonly (CollectionConfig | AnyCollectionConfig)[]): CollectionConfig[] {
-    const given: CollectionConfig[] = collections.map(collection => collection);
-    const bySlug = new Map<string, CollectionConfig>();
-    const canonical = (target: CollectionConfig): CollectionConfig => bySlug.get(target.slug) ?? target;
-    const retarget = <R extends { target: () => CollectionConfig }>(relation: R): R => {
+function withCanonicalTargets(collections: readonly (LegacyCollectionConfig | LegacyAnyCollectionConfig)[]): LegacyCollectionConfig[] {
+    const given: LegacyCollectionConfig[] = collections.map(collection => collection);
+    const bySlug = new Map<string, LegacyCollectionConfig>();
+    const canonical = (target: LegacyCollectionConfig): LegacyCollectionConfig => bySlug.get(target.slug) ?? target;
+    const retarget = <R extends { target: () => LegacyCollectionConfig }>(relation: R): R => {
         const target = relation.target();
         return { ...relation, target: () => canonical(target) };
     };
     const copies = given.map(collection => {
-        const copy: CollectionConfig = { ...collection };
+        const copy: LegacyCollectionConfig = { ...collection };
         if (!bySlug.has(copy.slug)) bySlug.set(copy.slug, copy);
         return copy;
     });
     for (const copy of copies) {
         if ("relations" in copy && copy.relations) copy.relations = copy.relations.map(retarget);
-        const properties: CollectionConfig["properties"] = {};
+        const properties: LegacyCollectionConfig["properties"] = {};
         for (const [key, property] of Object.entries(copy.properties ?? {})) {
             properties[key] = property.type === "relation" && property.relation
                 ? { ...property, relation: retarget(property.relation) }
@@ -156,8 +158,8 @@ function withCanonicalTargets(collections: readonly (CollectionConfig | AnyColle
  * set whose relations point outside it. A target object whose slug one of the
  * set already has is the fixture's second copy of that table and is left out.
  */
-function withRelationTargets(...roots: CollectionConfig[]): CollectionConfig[] {
-    const seen = new Map<string, CollectionConfig>(roots.map(root => [root.slug, root]));
+function withRelationTargets(...roots: LegacyCollectionConfig[]): LegacyCollectionConfig[] {
+    const seen = new Map<string, LegacyCollectionConfig>(roots.map(root => [root.slug, root]));
     const queue = [...roots];
     while (queue.length > 0) {
         const next = queue.shift();
@@ -195,7 +197,7 @@ export class FixtureTableRegistry extends PostgresTableRegistry {
         if (collections && collections.length > 0) this.registerTables(compileFixtures(withRelationTargets(...collections), {}).tables);
     }
 
-    registerMultiple(collections: CollectionConfig[]): boolean {
+    registerMultiple(collections: LegacyCollectionConfig[]): boolean {
         const changed = super.registerMultiple(collections);
         if (this.constructed && collections.length > 0) {
             this.registerTables(compileFixtures(withRelationTargets(...collections), {}).tables);
@@ -203,13 +205,13 @@ export class FixtureTableRegistry extends PostgresTableRegistry {
         return changed;
     }
 
-    register(collection: CollectionConfig, rawCollection?: CollectionConfig): void {
+    register(collection: LegacyCollectionConfig, rawCollection?: LegacyCollectionConfig): void {
         super.register(collection, rawCollection);
         this.registerTables(compileFixtures(withRelationTargets(collection), {}).tables);
     }
 
     /** Tables compiled on first ask, by the collection object they were compiled from. */
-    private readonly compiledOnAsk = new WeakMap<CollectionConfig, RuntimeTable>();
+    private readonly compiledOnAsk = new WeakMap<LegacyCollectionConfig, RuntimeTable>();
 
     getTable(slug: string): RuntimeTable | undefined {
         const registered = super.getTable(slug);

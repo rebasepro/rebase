@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
 import { tablesFromCollections } from "./helpers/tables";
@@ -136,7 +136,7 @@ function openApiProblems(doc: Json): string[] {
     return problems;
 }
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     slug: "tags", name: "Tags", singularName: "Tag", table: "tags",
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
@@ -145,7 +145,7 @@ const tags: CollectionConfig = {
 };
 
 /** A name with no ASCII letters in it, and a to-many relation. */
-const orders: CollectionConfig = {
+const orders: LegacyCollectionConfig = {
     slug: "orders", name: "Заказы", singularName: "Заказ", table: "orders",
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
@@ -155,7 +155,7 @@ const orders: CollectionConfig = {
 };
 
 /** Columns whose names the listing already spends, and a secret. */
-const plans: CollectionConfig = {
+const plans: LegacyCollectionConfig = {
     slug: "plans", name: "Plans", singularName: "Plan", table: "plans",
     properties: {
         sku: { name: "SKU", type: "string", isId: "manual" },

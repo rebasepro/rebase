@@ -16,11 +16,11 @@
  * last two tests.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ensureTables, type Queryable } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
-const authors: CollectionConfig = {
+const authors: LegacyCollectionConfig = {
     slug: "authors",
     table: "authors",
     name: "Authors",
@@ -31,7 +31,7 @@ const authors: CollectionConfig = {
 };
 
 /** Shaped like the example app's `posts`: a search block, declared indexes, an `on_update` stamp. */
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     table: "posts",
     name: "Posts",

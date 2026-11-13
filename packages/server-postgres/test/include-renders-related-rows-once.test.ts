@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { integer, pgTable, varchar } from "drizzle-orm/pg-core";
 import { RelationService } from "../src/services/RelationService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -28,7 +28,7 @@ describe("the include loader renders a related row once", () => {
         postId: integer("post_id")
     });
 
-    const commentsCollection: CollectionConfig = {
+    const commentsCollection: LegacyCollectionConfig = {
         slug: "comments", name: "Comments", table: "comments",
         properties: {
             id: { type: "number", isId: "increment" },
@@ -37,7 +37,7 @@ describe("the include loader renders a related row once", () => {
         }
     };
 
-    const postsCollection: CollectionConfig = {
+    const postsCollection: LegacyCollectionConfig = {
         slug: "posts", name: "Posts", table: "posts",
         properties: {
             id: { type: "number", isId: "increment" },

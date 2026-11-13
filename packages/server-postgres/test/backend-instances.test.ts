@@ -28,7 +28,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { Hono } from "hono";
 import { WebSocket } from "ws";
 import { REBASE_USER_ROLE } from "@rebasepro/common";
-import type { AccessModel, BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { AccessModel, BackendBootstrapper, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import {
     configureAccess,
     configureJwt,
@@ -65,18 +66,18 @@ const ACCOUNTS: Record<string, string[]> = {
     "user-1": []
 };
 
-function collection(slug: string, extra: Record<string, unknown> = {}): CollectionConfig {
+function collection(slug: string, extra: Record<string, unknown> = {}): LegacyCollectionConfig {
     return {
         name: slug,
         slug,
         table: slug,
         properties: { id: { name: "ID", type: "string", isId: "uuid" } },
         ...extra
-    } as unknown as CollectionConfig;
+    } as unknown as LegacyCollectionConfig;
 }
 
 /** The users collection, declaring the app's roles: A's grants `ops` the log reader, B's declares no role at all. */
-function users(roles: AccessModel["roles"]): CollectionConfig {
+function users(roles: AccessModel["roles"]): LegacyCollectionConfig {
     return collection("users", { auth: { enabled: true, roles } });
 }
 
@@ -200,7 +201,7 @@ async function database(name: string): Promise<PGlite> {
 
 const storageDir = mkdtempSync(path.join(tmpdir(), "rebase-instances-"));
 
-async function instance(name: "A" | "B", collections: CollectionConfig[], userLimit = 1000): Promise<Instance> {
+async function instance(name: "A" | "B", collections: LegacyCollectionConfig[], userLimit = 1000): Promise<Instance> {
     const db = await database(name);
     const rateLimitStore = new MemoryRateLimitStore(RATE_WINDOW_MS);
     const backend = await createRebaseBackend({

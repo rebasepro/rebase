@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
@@ -17,7 +17,7 @@ import { renderDrizzleSchema } from "../src/schema/plan/render-drizzle";
 import { diffPlanAgainstCatalogue } from "../src/schema/plan/diff-plan";
 import { planCollections } from "./helpers/plan-tables";
 
-const coupons = (databaseDefault: true | `sql\`${string}\``): CollectionConfig => ({
+const coupons = (databaseDefault: true | `sql\`${string}\``): LegacyCollectionConfig => ({
     name: "Coupons",
     slug: "coupons",
     table: "coupons",
@@ -35,7 +35,7 @@ afterEach(async () => {
     db = undefined;
 });
 
-const codeColumn = (collection: CollectionConfig) =>
+const codeColumn = (collection: LegacyCollectionConfig) =>
     planCollections([collection]).tables.find((t) => t.table === "coupons")?.columns.find((c) => c.column === "code");
 
 describe("databaseDefault as SQL", () => {

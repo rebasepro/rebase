@@ -13,7 +13,8 @@ import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, serial, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, User } from "@rebasepro/types";
+import type { User } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -29,7 +30,7 @@ const notesTable = pgTable("notes", {
     title: varchar("title")
 });
 
-const notes: CollectionConfig = {
+const notes: LegacyCollectionConfig = {
     name: "Notes",
     slug: "notes",
     table: "notes",

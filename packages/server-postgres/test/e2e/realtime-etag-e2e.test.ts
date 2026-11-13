@@ -21,7 +21,7 @@ import { Hono } from "hono";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { tablesFromCollections } from "../helpers/tables.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
@@ -48,7 +48,7 @@ const docsTable = pgTable("docs", {
     updated_at: timestamp("updated_at", { withTimezone: true, mode: "string" })
 });
 
-const peopleCollection: CollectionConfig = {
+const peopleCollection: LegacyCollectionConfig = {
     slug: "people",
     name: "People",
     table: "people",
@@ -63,7 +63,7 @@ const peopleCollection: CollectionConfig = {
  * is a date, so a door that hashed the admin view model (`{ __type: "date" }`)
  * rather than the REST row would hand out a tag no write matches.
  */
-const notesCollection: CollectionConfig = {
+const notesCollection: LegacyCollectionConfig = {
     slug: "notes",
     name: "Notes",
     table: "notes",
@@ -81,7 +81,7 @@ const notesCollection: CollectionConfig = {
 };
 
 /** Versioned by an `on_update` date: the tag is that column's value. */
-const docsCollection: CollectionConfig = {
+const docsCollection: LegacyCollectionConfig = {
     slug: "docs",
     name: "Docs",
     table: "docs",

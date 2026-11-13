@@ -22,7 +22,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createServer } from "node:http";
 import pg from "pg";
 import { Hono } from "hono";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresAdapter, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
@@ -35,13 +35,13 @@ import { checkPolicyDrift, dropOrphanedPolicies, dropStaleAdminRequestCompanions
 import { compileSet } from "../helpers/plan-tables";
 import { tablesFromCollections, tablesFrom } from "../helpers/tables.js";
 
-const properties: CollectionConfig["properties"] = {
+const properties: LegacyCollectionConfig["properties"] = {
     id: { name: "ID", type: "number", isId: "increment" },
     ownerId: { name: "Owner", type: "string", columnName: "owner_id" }
 };
 
 /** Two admin-only rules every admin passes: one named, one not. */
-const before: CollectionConfig = {
+const before: LegacyCollectionConfig = {
     name: "Notes", slug: "notes", table: "notes",
     disableDefaultPolicies: true,
     securityRules: [
@@ -53,7 +53,7 @@ const before: CollectionConfig = {
 };
 
 /** The named rule narrowed to admin AND owner; the unnamed delete rule removed. */
-const after: CollectionConfig = {
+const after: LegacyCollectionConfig = {
     ...before,
     securityRules: [
         { name: "owner_select", operation: "select", ownerField: "ownerId" },
@@ -62,14 +62,14 @@ const after: CollectionConfig = {
 };
 
 /** A named single-operation rule every admin passes… */
-const opsBefore: CollectionConfig = {
+const opsBefore: LegacyCollectionConfig = {
     name: "Ops", slug: "ops", table: "ops",
     disableDefaultPolicies: true,
     securityRules: [{ name: "admins", operation: "select", roles: ["admin"] }],
     properties
 };
 /** …moved to another operation under the same name: its policy keeps its name, and so would its companion. */
-const opsAfter: CollectionConfig = { ...opsBefore, securityRules: [{ name: "admins", operation: "delete", roles: ["admin"] }] };
+const opsAfter: LegacyCollectionConfig = { ...opsBefore, securityRules: [{ name: "admins", operation: "delete", roles: ["admin"] }] };
 
 const JWT_SECRET = "stale-companion-e2e-secret-that-is-long-enough-0123";
 const SERVICE_KEY = "stale-companion-e2e-service-key-0123456789abcdef";
@@ -80,7 +80,7 @@ describe("a companion follows its rule (E2E)", () => {
     let rebase: OpenedRebase;
     const backends: Array<Awaited<ReturnType<typeof initializeRebaseBackend>>> = [];
 
-    async function boot(collections: CollectionConfig, provision = true, others: CollectionConfig[] = [opsBefore]): Promise<void> {
+    async function boot(collections: LegacyCollectionConfig, provision = true, others: LegacyCollectionConfig[] = [opsBefore]): Promise<void> {
         backends.push(await initializeRebaseBackend({
             app: new Hono<HonoEnv>(),
             server: createServer(),
@@ -93,14 +93,14 @@ describe("a companion follows its rule (E2E)", () => {
     }
 
     /** What `db push` does with policies: `policies.sql`, then its orphan cleanup. */
-    async function push(collections: CollectionConfig): Promise<void> {
+    async function push(collections: LegacyCollectionConfig): Promise<void> {
         await rebase.sql(generatePostgresPoliciesDdl(compileSet([collections])));
         const drift = await checkPolicyDrift(connection.pool, compileSet([collections]), { adminRoleAvailable: true });
         await dropOrphanedPolicies(connection.pool, drift, compileSet([collections]));
     }
 
     /** What `db migrate` does: replay `policies.sql`, then sweep stale companions. */
-    async function migrate(collections: CollectionConfig): Promise<void> {
+    async function migrate(collections: LegacyCollectionConfig): Promise<void> {
         await rebase.sql(generatePostgresPoliciesDdl(compileSet([collections])));
         await dropStaleAdminRequestCompanions(connection.pool, compileSet([collections]), { adminRoleAvailable: true });
     }

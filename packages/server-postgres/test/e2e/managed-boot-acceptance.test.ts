@@ -29,7 +29,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { ensureTables, type Queryable } from "../../src/schema/ensure-tables.js";
@@ -53,7 +53,7 @@ import { compileSet } from "../helpers/plan-tables";
 // `tiers` is world-readable (a pricing table); `customers` is per-owner (each
 // user sees and writes only their own rows); `secrets` declares no rules at all
 // and must therefore be locked to everyone but the server/admin context.
-const tiersCollection: CollectionConfig = {
+const tiersCollection: LegacyCollectionConfig = {
     name: "Tiers",
     slug: "tiers",
     table: "tiers",
@@ -65,7 +65,7 @@ const tiersCollection: CollectionConfig = {
     securityRules: [{ operation: "select", access: "public" }]
 };
 
-const customersCollection: CollectionConfig = {
+const customersCollection: LegacyCollectionConfig = {
     name: "Customers",
     slug: "customers",
     table: "customers",
@@ -78,7 +78,7 @@ const customersCollection: CollectionConfig = {
     securityRules: [{ operation: "all", ownerField: "owner_id" }]
 };
 
-const secretsCollection: CollectionConfig = {
+const secretsCollection: LegacyCollectionConfig = {
     name: "Secrets",
     slug: "secrets",
     table: "secrets",
@@ -95,7 +95,7 @@ const secretsCollection: CollectionConfig = {
 // a managed tenant got an `orders` table with no `customer_id` (every insert
 // 400ed) and no `orders_tiers` at all. Fixtures without a single relation are
 // exactly why that shipped, so this one has both.
-const ordersCollection: CollectionConfig = {
+const ordersCollection: LegacyCollectionConfig = {
     name: "Orders",
     slug: "orders",
     table: "orders",
@@ -146,7 +146,7 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
     let queryable: Queryable;
 
     const asUser = (uid: string) => driver.withAuth(testUser(uid, []));
-    const countAs = async (uid: string, path: string, collection: CollectionConfig) =>
+    const countAs = async (uid: string, path: string, collection: LegacyCollectionConfig) =>
         (await asUser(uid)).count({ path, collection });
     const rawCount = async (table: string, where = ""): Promise<number> => {
         const r = await admin.query(`SELECT count(*)::int AS c FROM public.${table} ${where}`);

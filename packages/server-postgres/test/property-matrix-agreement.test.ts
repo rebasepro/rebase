@@ -28,7 +28,7 @@
  * only to enumerate the columns; every fact below is read back out of a
  * generated file or a planned statement.
  */
-import type { CollectionConfig, Property } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyProperty } from "@rebasepro/common/migrate";
 import { getTableName, getTableVarName } from "@rebasepro/common";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
@@ -58,14 +58,14 @@ const NO_COLUMN: ColumnFacts = {
 
 // ── Shared lookups ───────────────────────────────────────────────────────────
 
-const qualifiedOf = (collection: CollectionConfig): string => {
+const qualifiedOf = (collection: LegacyCollectionConfig): string => {
     const table = getTableName(collection);
     const schema = (collection as { schema?: string }).schema ?? "public";
     return `${schema}.${table.includes(".") ? table.split(".").pop() : table}`;
 };
 
 /** Drizzle table variable → the `schema.table` it creates. */
-const tableVars = new Map<string, CollectionConfig>(
+const tableVars = new Map<string, LegacyCollectionConfig>(
     everything.map(c => [getTableVarName(getTableName(c)), c])
 );
 
@@ -119,7 +119,7 @@ const drizzleReference = (target: string): string => {
     const [varName, field] = target.split(".");
     const collection = tableVars.get(varName);
     if (!collection) throw new Error(`the matrix test cannot resolve the table variable \`${varName}\``);
-    const property = collection.properties?.[field] as Property | undefined;
+    const property = collection.properties?.[field] as LegacyProperty | undefined;
     return `${qualifiedOf(collection)}.${resolveColumnName(field, property)}`;
 };
 

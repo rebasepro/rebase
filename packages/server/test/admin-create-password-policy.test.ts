@@ -17,7 +17,8 @@
 import { describe, it, expect, beforeAll, afterEach } from "@jest/globals";
 import { Hono } from "hono";
 import { EMPTY_ACCESS_MODEL } from "@rebasepro/types";
-import type { CollectionConfig, SaveManyProps, SaveProps } from "@rebasepro/types";
+import type { SaveManyProps, SaveProps } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import type { AuthHooks } from "../src/auth/auth-hooks";
@@ -79,7 +80,7 @@ function harness(hooks?: AuthHooks) {
             return rows.map((row, index) => ({ id: `bulk-${index}`, ...row }));
         }
     });
-    const usersCollection: CollectionConfig = {
+    const usersCollection: LegacyCollectionConfig = {
         slug: "users",
         name: "Users",
         table: "users",

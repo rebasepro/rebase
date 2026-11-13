@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { RelationService } from "../src/services/RelationService";
 import { RelationWriteService } from "../src/services/RelationWriteService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -32,7 +32,7 @@ describe("relation writes accept rows or bare keys", () => {
 
 
     // A string-keyed target: the shape whose failure was silent.
-    const tagsCollection: CollectionConfig = {
+    const tagsCollection: LegacyCollectionConfig = {
         slug: "tags",
         name: "Tags",
         table: "tags",
@@ -42,7 +42,7 @@ describe("relation writes accept rows or bare keys", () => {
         }
     };
 
-    const postsCollection: CollectionConfig = {
+    const postsCollection: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",

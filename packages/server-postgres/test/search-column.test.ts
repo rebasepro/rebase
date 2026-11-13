@@ -1,4 +1,5 @@
-import { col, defineTable, type CollectionConfig, type PostgresCollectionConfig, type SearchConfig } from "@rebasepro/types";
+import { col, defineTable, type SearchConfig } from "@rebasepro/types";
+import { type LegacyCollectionConfig, type LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { compileSchema, lowerTables } from "@rebasepro/common";
 import {
     buildSearchColumnSpec,
@@ -10,7 +11,7 @@ import {
     SearchConfigError
 } from "../src/schema/search-column";
 
-const talents = (search: PostgresCollectionConfig["search"]): PostgresCollectionConfig => ({
+const talents = (search: LegacyPostgresCollectionConfig["search"]): LegacyPostgresCollectionConfig => ({
     slug: "talents",
     table: "talents",
     name: "Talents",

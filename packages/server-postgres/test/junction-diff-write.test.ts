@@ -1,5 +1,5 @@
 import { jest } from "@jest/globals";
-import type { CollectionConfig, ManyToManyRelation } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyManyToManyRelation } from "@rebasepro/common/migrate";
 import { pgTable, text } from "drizzle-orm/pg-core";
 import { RelationWriteService } from "../src/services/RelationWriteService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -38,7 +38,7 @@ describe("junction writes diff rather than replace", () => {
     registry.registerPgTable(tagsTable, "tags");
     registry.registerPgTable(postsTagsTable, "posts_tags");
 
-    const tagsCollection: CollectionConfig = {
+    const tagsCollection: LegacyCollectionConfig = {
         slug: "tags",
         name: "Tags",
         table: "tags",
@@ -48,14 +48,14 @@ describe("junction writes diff rather than replace", () => {
         }
     };
 
-    const tagsRelation: ManyToManyRelation = {
+    const tagsRelation: LegacyManyToManyRelation = {
         kind: "manyToMany",
         relationName: "tags",
         target: () => tagsCollection,
         through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
     };
 
-    const postsCollection: CollectionConfig = {
+    const postsCollection: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",
@@ -71,7 +71,7 @@ describe("junction writes diff rather than replace", () => {
      * A registry serving `postsCollection` with `relation` in place of its one
      * relation, over the same tables.
      */
-    const registryWith = (relation: ManyToManyRelation): PostgresTableRegistry => {
+    const registryWith = (relation: LegacyManyToManyRelation): PostgresTableRegistry => {
         const other = new FixtureTableRegistry([{ ...postsCollection, relations: [relation] }, tagsCollection]);
         other.registerPgTable(postsTable, "posts");
         other.registerPgTable(tagsTable, "tags");

@@ -17,7 +17,8 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { boolean, pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, User } from "@rebasepro/types";
+import type { User } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { testUser } from "./helpers/spg-a-driver";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
@@ -37,7 +38,7 @@ const docsTable = pgTable("docs", {
 /** What each `beforeSave` was told, in order. */
 let seen: { status?: string; id?: unknown }[];
 
-function docsCollection(): CollectionConfig {
+function docsCollection(): LegacyCollectionConfig {
     return {
         name: "Docs",
         slug: "docs",

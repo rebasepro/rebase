@@ -33,7 +33,7 @@ import * as path from "node:path";
 import ts from "typescript";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { everything, groups } from "./fixtures/property-matrix-collections";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { compileSet } from "./helpers/plan-tables";
 
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
@@ -80,7 +80,7 @@ describe("the generated Drizzle schema compiles", () => {
     // the bug the import list had: `uuid` was imported because *some other*
     // collection declared `isId: "uuid"`, so a project with only
     // `columnType: "uuid"` was the broken one.
-    const isolated: [string, CollectionConfig[]][] = [
+    const isolated: [string, LegacyCollectionConfig[]][] = [
         ["uuidOnly", groups.uuidOnly],
         ["smallintOnly", groups.smallintOnly],
         ["relations", groups.relations],

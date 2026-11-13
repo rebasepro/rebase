@@ -500,8 +500,7 @@
         "packages/server-postgres/src/index.ts",
         "packages/server-postgres/src/open-rebase.ts",
         "packages/server-postgres/src/interfaces.ts",
-        "packages/server-postgres/src/types.ts",
-        "packages/server/src/api/collections_for_test/**"
+        "packages/server-postgres/src/types.ts"
       ],
       "focus": "Missing or invalid env fails closed at boot with an actionable message. Two instances behind a load balancer: what is per-instance that must be shared. SIGTERM mid-request, mid-job, mid-migration. Pool exhaustion. PII and secrets in logs and error bodies; stack traces in production. Static and host-routed apps: traversal, Host spoofing, SPA fallback swallowing API 404s, cache headers, collisions with /api. Rate limiting and trusted proxies, CORS, security headers, body limits and Hono middleware order. Backups and PITR restore for real. Booting an older stamped schema.",
       "audits": [

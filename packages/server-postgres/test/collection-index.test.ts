@@ -13,7 +13,8 @@
  *  - `isRebaseIndexName` cannot match any other producer's names, since it is
  *    what decides whether `db push` may drop an index.
  */
-import { CollectionConfig, col, defineTable, rel, type CollectionIndex, type PostgresCollectionConfig } from "@rebasepro/types";
+import { col, defineTable, rel } from "@rebasepro/types";
+import { LegacyCollectionConfig, type LegacyCollectionIndex, type LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { compileSchema, lowerTables } from "@rebasepro/common";
 import {
     buildCollectionIndexSpecs,
@@ -32,7 +33,7 @@ import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { resolveColumnName } from "../src/schema/column-plan-helpers";
 import { compileSet } from "./helpers/plan-tables";
 
-const posts = (indexes: CollectionIndex[], extra: Partial<PostgresCollectionConfig> = {}): PostgresCollectionConfig =>
+const posts = (indexes: LegacyCollectionIndex[], extra: Partial<LegacyPostgresCollectionConfig> = {}): LegacyPostgresCollectionConfig =>
     ({
         slug: "posts",
         name: "Posts",
@@ -51,8 +52,8 @@ const posts = (indexes: CollectionIndex[], extra: Partial<PostgresCollectionConf
         ...extra
     });
 
-const specs = (c: CollectionConfig) => buildCollectionIndexSpecs(c, resolveColumnName);
-const one = (indexes: CollectionIndex[]) => specs(posts(indexes))[0];
+const specs = (c: LegacyCollectionConfig) => buildCollectionIndexSpecs(c, resolveColumnName);
+const one = (indexes: LegacyCollectionIndex[]) => specs(posts(indexes))[0];
 
 describe("resolution", () => {
     it("resolves property keys to column names", () => {
@@ -87,7 +88,7 @@ describe("resolution", () => {
 });
 
 describe("the derived name", () => {
-    const nameOf = (indexes: CollectionIndex[]) => one(indexes).indexName;
+    const nameOf = (indexes: LegacyCollectionIndex[]) => one(indexes).indexName;
 
     it("is <table>_<columns>_ix_<hash>, and _ux_ when unique", () => {
         expect(nameOf([{ on: ["status"], reason: "r" }])).toMatch(/^posts_status_ix_[0-9a-f]{7}$/);
@@ -177,7 +178,7 @@ describe("the derived name", () => {
 });
 
 describe("rendering", () => {
-    const sqlOf = (indexes: CollectionIndex[]) => collectionIndexStatement(one(indexes));
+    const sqlOf = (indexes: LegacyCollectionIndex[]) => collectionIndexStatement(one(indexes));
 
     it("emits a plain btree with no USING clause", () => {
         expect(sqlOf([{ on: ["status"], reason: "r" }]))
@@ -222,7 +223,7 @@ describe("rendering", () => {
 describe("refusals", () => {
     // Deliberately invalid: each refusal feeds a shape `CollectionIndex` does not admit, to the validator that refuses it.
     const rejects = (indexes: unknown[], pattern: RegExp) =>
-        expect(() => specs(posts(indexes as CollectionIndex[]))).toThrow(pattern);
+        expect(() => specs(posts(indexes as LegacyCollectionIndex[]))).toThrow(pattern);
 
     it("names the collection and the array position", () => {
         try {
@@ -271,7 +272,7 @@ describe("refusals", () => {
 describe("the plan and the generated DDL", () => {
     it("sorts by schema, table and name so the artifact does not depend on load order", () => {
         const a = posts([{ on: ["views"], reason: "r" }]);
-        const b = { ...posts([{ on: ["status"], reason: "r" }]), slug: "articles", table: "articles" } as CollectionConfig;
+        const b = { ...posts([{ on: ["status"], reason: "r" }]), slug: "articles", table: "articles" } as LegacyCollectionConfig;
         const forward = sortIndexSpecs([...specs(a), ...specs(b)]).map(s => s.table);
         const backward = sortIndexSpecs([...specs(b), ...specs(a)]).map(s => s.table);
         expect(forward).toEqual(backward);
@@ -279,7 +280,7 @@ describe("the plan and the generated DDL", () => {
     });
 
     it("reaches schema.sql, and before the foreign keys that may depend on it", async () => {
-        const ddl = await generatePostgresDdl(compileSet([posts([{ on: ["status"], reason: "dashboard filter" }])] as CollectionConfig[]));
+        const ddl = await generatePostgresDdl(compileSet([posts([{ on: ["status"], reason: "dashboard filter" }])] as LegacyCollectionConfig[]));
         expect(ddl).toContain("CREATE INDEX \"posts_status_ix_");
         const indexAt = ddl.indexOf("-- Indexes");
         const fkAt = ddl.indexOf("-- Foreign Key Constraints");
@@ -288,7 +289,7 @@ describe("the plan and the generated DDL", () => {
 
     it("emits nothing for a collection that declares none", () => {
         expect(specs(posts([]))).toEqual([]);
-        const bare: CollectionConfig = { slug: "posts", name: "Posts", table: "posts", properties: { id: { type: "string", isId: true } } };
+        const bare: LegacyCollectionConfig = { slug: "posts", name: "Posts", table: "posts", properties: { id: { type: "string", isId: true } } };
         expect(specs(bare)).toEqual([]);
     });
 });
@@ -303,11 +304,11 @@ describe("the plan and the generated DDL", () => {
  * plans a DROP for. Same names as the other two emitters, from the same specs.
  */
 describe("the generated Drizzle schema", () => {
-    const generated = (indexes: CollectionIndex[], extra: Partial<PostgresCollectionConfig> = {}) =>
+    const generated = (indexes: LegacyCollectionIndex[], extra: Partial<LegacyPostgresCollectionConfig> = {}) =>
         generateSchema(compileSet([posts(indexes, extra)]));
 
     it("declares each index under the name the other two emitters use", async () => {
-        const declared: CollectionIndex[] = [
+        const declared: LegacyCollectionIndex[] = [
             { on: ["status"], reason: "dashboard filter" },
             { on: ["email"], unique: true, reason: "one account per email" }
         ];

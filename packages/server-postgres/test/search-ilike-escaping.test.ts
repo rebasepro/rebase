@@ -18,7 +18,7 @@
  * which hardened the offline evaluator against the same pattern shape and noted
  * that on a driver the same expression "occupies a server thread instead".
  */
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { SQL } from "drizzle-orm";
 import { pgTable, PgDialect, serial, text } from "drizzle-orm/pg-core";
 import { DrizzleConditionBuilder, escapeLikePattern } from "../src/utils/drizzle-conditions";
@@ -31,7 +31,7 @@ const docs = pgTable("docs", {
     title: text("title")
 });
 
-const collection: CollectionConfig = {
+const collection: LegacyCollectionConfig = {
     slug: "docs",
     name: "Docs",
     table: "docs",

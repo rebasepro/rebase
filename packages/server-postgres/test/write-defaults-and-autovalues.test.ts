@@ -1,4 +1,5 @@
-import { CollectionConfig, User } from "@rebasepro/types";
+import { User } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -17,7 +18,7 @@ import { unusedDb } from "./helpers/spg-c-db";
 describe("PostgresBackendDriver.save — defaults and autoValues", () => {
     const registry = new FixtureTableRegistry();
 
-    const posts: CollectionConfig = {
+    const posts: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",
@@ -34,7 +35,7 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
         }
     };
 
-    const settings: CollectionConfig = {
+    const settings: LegacyCollectionConfig = {
         slug: "settings",
         name: "Settings",
         table: "settings",
@@ -50,7 +51,7 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
         }
     };
 
-    const audited: CollectionConfig = {
+    const audited: LegacyCollectionConfig = {
         slug: "audited",
         name: "Audited",
         table: "audited",

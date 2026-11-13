@@ -4,7 +4,8 @@
  * outward calls are spied instead of sent.
  */
 import type { PgTable } from "drizzle-orm/pg-core";
-import type { CollectionConfig, DataDriver, SQLAdmin, User } from "@rebasepro/types";
+import type { DataDriver, SQLAdmin, User } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./tables";
 import { RealtimeService } from "../../src/services/realtimeService";
@@ -29,7 +30,7 @@ export function testUser(uid = "u1", roles: string[] = [], extra: Partial<User> 
  * collections, has no global callbacks, and serves `table` (when given) for
  * any table name.
  */
-export function registryServing(collection: CollectionConfig, table?: PgTable): PostgresTableRegistry {
+export function registryServing(collection: LegacyCollectionConfig, table?: PgTable): PostgresTableRegistry {
     const registry = new FixtureTableRegistry();
     jest.spyOn(registry, "getCollectionByPath").mockReturnValue(collection);
     jest.spyOn(registry, "getCollections").mockReturnValue([]);

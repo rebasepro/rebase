@@ -13,11 +13,11 @@
  * first-class developer surface — this pins it to the truth.
  */
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
-import type { CollectionConfig } from "../../types/src/types/collections";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { openApiDocument, schemaOf } from "./helpers/server-b-g1-openapi";
 import { tablesFromCollections } from "./helpers/tables";
 
-const collection: CollectionConfig = {
+const collection: LegacyCollectionConfig = {
     slug: "users", name: "Users", singularName: "User", table: "users",
     properties: {
         name: { name: "Name", type: "string", validation: { required: true } },

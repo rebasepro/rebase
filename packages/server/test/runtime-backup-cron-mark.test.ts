@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, CronJobDefinition, DataDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CronJobDefinition, DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { initializeRebaseBackend } from "../src/index";
 import { cronJobsFrom } from "../src/cron/cron-loader";
@@ -26,7 +27,7 @@ function backupDefinition(): CronJobDefinition {
     return definition;
 }
 
-function collection(slug: string): CollectionConfig {
+function collection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,

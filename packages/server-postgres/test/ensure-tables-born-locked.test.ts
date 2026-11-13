@@ -14,12 +14,12 @@
  * after the tables exist, and every table it created is RLS-on anyway.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ensureTables, planTableSchemaEnsure, type Queryable } from "../src/schema/ensure-tables";
 import type { ExistingSchema } from "../src/schema/plan/diff-plan";
 import { compileSet } from "./helpers/plan-tables";
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     slug: "tags",
     table: "tags",
     name: "Tags",
@@ -29,7 +29,7 @@ const tags: CollectionConfig = {
     }
 };
 
-const secrets: CollectionConfig = {
+const secrets: LegacyCollectionConfig = {
     slug: "secrets",
     table: "secrets",
     name: "Secrets",

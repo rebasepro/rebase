@@ -19,7 +19,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import pg from "pg";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
@@ -27,7 +27,7 @@ import { ensureTables, type Queryable } from "../../src/schema/ensure-tables.js"
 import { compileSet } from "../helpers/plan-tables";
 import { tablesFromCollections } from "../helpers/tables.js";
 
-const songs: CollectionConfig = {
+const songs: LegacyCollectionConfig = {
     name: "Songs",
     slug: "songs",
     table: "songs",
@@ -43,7 +43,7 @@ const songs: CollectionConfig = {
     }
 };
 
-const artists = (query = "SELECT lower(artist) AS artist, count(*)::int AS songs FROM songs GROUP BY 1"): CollectionConfig => ({
+const artists = (query = "SELECT lower(artist) AS artist, count(*)::int AS songs FROM songs GROUP BY 1"): LegacyCollectionConfig => ({
     name: "Artists",
     slug: "artists",
     table: "artist_stats",
@@ -54,7 +54,7 @@ const artists = (query = "SELECT lower(artist) AS artist, count(*)::int AS songs
     }
 });
 
-const langs = (roles?: string[]): CollectionConfig => ({
+const langs = (roles?: string[]): LegacyCollectionConfig => ({
     name: "Languages",
     slug: "langs",
     table: "lang_stats",
@@ -65,7 +65,7 @@ const langs = (roles?: string[]): CollectionConfig => ({
     }
 });
 
-async function provision(url: string, collections: CollectionConfig[]): Promise<void> {
+async function provision(url: string, collections: LegacyCollectionConfig[]): Promise<void> {
     const conn = createPostgresDatabaseConnection(url);
     try {
         const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
@@ -209,7 +209,7 @@ describe("view collections (E2E)", () => {
     it("refuses to replace a table with a view", async () => {
         const client = queryable(admin);
         await admin.query("CREATE TABLE public.occupied (id int primary key)");
-        const occupying = { ...artists(), slug: "occupying", table: "occupied" } as CollectionConfig;
+        const occupying = { ...artists(), slug: "occupying", table: "occupied" } as LegacyCollectionConfig;
         await expect(ensureTables(client, compileSet([songs, occupying]))).rejects.toThrow(/will not replace public\.occupied/);
         expect((await admin.query("SELECT to_regclass('public.occupied')::text AS t")).rows[0].t).toBe("occupied");
     });

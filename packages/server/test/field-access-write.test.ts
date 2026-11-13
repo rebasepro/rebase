@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { assertKnownWriteFields, assertWriteRequestValid } from "../src/api/rest/write-validation";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { ApiError, errorHandler } from "../src/api/errors";
@@ -23,7 +23,7 @@ import { tablesFromCollections, tableFrom } from "./helpers/tables";
  * parsing English.
  */
 
-const staff: CollectionConfig = {
+const staff: LegacyCollectionConfig = {
     slug: "staff",
     name: "Staff",
     table: "staff",
@@ -158,7 +158,7 @@ describe("a field operation on a field the caller cannot read", () => {
      * rule never objected. The read side refuses a filter on the same field;
      * this is the write door's half of that rule.
      */
-    const posts: CollectionConfig = {
+    const posts: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",
@@ -228,7 +228,7 @@ describe("strictWrites: false", () => {
      * says "this config does not list every column"; it says nothing about who
      * may write the columns it *does* list.
      */
-    const loose: CollectionConfig = { ...staff, strictWrites: false };
+    const loose: LegacyCollectionConfig = { ...staff, strictWrites: false };
 
     it("still refuses a field the caller cannot write", () => {
         expect(thrown(() => assertKnownWriteFields({ salary: 1 }, tableFrom(loose), { viewer: clerk })).code)
@@ -252,19 +252,19 @@ describe("the foreign key of a to-one relation", () => {
      * spelling the write the way the row is served — and the read side already
      * treats the two as one field.
      */
-    const bands: CollectionConfig = {
+    const bands: LegacyCollectionConfig = {
         slug: "bands",
         name: "Bands",
         table: "bands",
         properties: { id: { type: "number", isId: "increment" } }
     };
-    const offices: CollectionConfig = {
+    const offices: LegacyCollectionConfig = {
         slug: "offices",
         name: "Offices",
         table: "offices",
         properties: { id: { type: "number", isId: "increment" } }
     };
-    const banded: CollectionConfig = {
+    const banded: LegacyCollectionConfig = {
         ...staff,
         properties: {
             ...staff.properties,
@@ -280,7 +280,7 @@ describe("the foreign key of a to-one relation", () => {
             }
         }
     };
-    const loose: CollectionConfig = { ...banded, strictWrites: false };
+    const loose: LegacyCollectionConfig = { ...banded, strictWrites: false };
 
     it.each(["bandId", "band_id"])("refuses `%s` from a caller who may not write the relation", (key) => {
         for (const collection of [banded, loose]) {

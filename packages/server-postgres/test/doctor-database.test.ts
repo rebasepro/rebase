@@ -2,7 +2,8 @@
  * `rebase doctor --database`: which tables it treats as Rebase's, and how it
  * prints what the preflight found.
  */
-import type { CollectionConfig, TableDescriptor } from "@rebasepro/types";
+import type { TableDescriptor } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { compileTables } from "@rebasepro/common";
 import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 import { managedTablesOf, preflightSchemasOf, preflightStatus, renderPreflightFindings } from "../src/schema/doctor-database";
@@ -11,13 +12,13 @@ import type { PreflightFinding } from "../src/security/database-preflight";
 // eslint-disable-next-line no-control-regex
 const plain = (lines: string[]): string => lines.join("\n").replace(/\u001b\[[0-9;]*m/g, "");
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     slug: "tags",
     name: "Tags",
     properties: { id: { name: "ID", type: "string", isId: "uuid" } }
 };
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "blog_posts",
     table: "posts",
     schema: "content",
@@ -38,7 +39,7 @@ const posts: CollectionConfig = {
 };
 
 /** The fixtures as the doctor reads them: compiled descriptors, in the order given. */
-const described = (collections: CollectionConfig[]): TableDescriptor[] => compileTables(collectionsToTableDefs(collections).tables);
+const described = (collections: LegacyCollectionConfig[]): TableDescriptor[] => compileTables(collectionsToTableDefs(collections).tables);
 
 describe("managedTablesOf", () => {
     it("lists each table in its schema, and the junctions", () => {

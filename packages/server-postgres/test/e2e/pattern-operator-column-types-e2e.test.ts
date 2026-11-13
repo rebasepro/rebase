@@ -24,7 +24,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { customType, integer, pgEnum, pgTable, text, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, FilterValues } from "@rebasepro/types";
+import type { FilterValues } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
@@ -61,7 +62,7 @@ const catalogueBuiltPosts = pgTable("posts", {
     authorId: varchar("author_id")
 });
 
-const authors: CollectionConfig = {
+const authors: LegacyCollectionConfig = {
     slug: "authors", name: "Authors", table: "authors",
     properties: {
         id: { type: "string", isId: true },
@@ -69,7 +70,7 @@ const authors: CollectionConfig = {
     }
 };
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts", name: "Posts", table: "posts",
     properties: {
         id: { type: "string", isId: true },

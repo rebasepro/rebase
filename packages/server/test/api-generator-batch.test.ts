@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import { resolveBatchRefs } from "../src/api/rest/batch";
-import type { BatchWriteOperation, BatchWriteProps, CollectionConfig } from "@rebasepro/types";
+import type { BatchWriteOperation, BatchWriteProps } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { HonoEnv } from "../src/api/types";
 import { tablesFromCollections } from "./helpers/tables";
@@ -23,7 +24,7 @@ import { tablesFromCollections } from "./helpers/tables";
  * that a key is honoured, and that `$ref` resolves backwards and only backwards.
  */
 
-const orders: CollectionConfig = {
+const orders: LegacyCollectionConfig = {
     slug: "orders",
     name: "Orders",
     singularName: "Order",
@@ -35,7 +36,7 @@ const orders: CollectionConfig = {
     }
 };
 
-const items: CollectionConfig = {
+const items: LegacyCollectionConfig = {
     slug: "order_items",
     name: "Order items",
     singularName: "Order item",
@@ -49,7 +50,7 @@ const items: CollectionConfig = {
 };
 
 /** A collection with a required field, for the create-time checks. */
-const customers: CollectionConfig = {
+const customers: LegacyCollectionConfig = {
     slug: "customers",
     name: "Customers",
     singularName: "Customer",

@@ -27,7 +27,7 @@ import {
 } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { compileSet } from "./helpers/plan-tables";
@@ -38,7 +38,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
 
 /** The generated module's `tables` and `relations`, merged the way a project passes them to drizzle. */
-async function loadGeneratedSchema(collections: CollectionConfig[]): Promise<Record<string, unknown>> {
+async function loadGeneratedSchema(collections: LegacyCollectionConfig[]): Promise<Record<string, unknown>> {
     const source = await generateSchema(compileSet(collections));
     const dir = fs.mkdtempSync(path.join(PACKAGE_ROOT, ".schema-relations-"));
     try {
@@ -81,13 +81,13 @@ function withSql(schema: Record<string, unknown>, table: string, relation: strin
 
 describe("the generated relations, evaluated by drizzle", () => {
     it("resolves a hasOne whose target declares nothing back", async () => {
-        const billing: CollectionConfig = {
+        const billing: LegacyCollectionConfig = {
             slug: "billing_configs",
             table: "billing_configs",
             name: "Billing configs",
             properties: { company_id: { type: "string" } }
         };
-        const companies: CollectionConfig = {
+        const companies: LegacyCollectionConfig = {
             slug: "companies",
             table: "companies",
             name: "Companies",
@@ -107,7 +107,7 @@ describe("the generated relations, evaluated by drizzle", () => {
     }, 60_000);
 
     it("resolves two hasOne relations to the same target, each on its own column", async () => {
-        const billing: CollectionConfig = {
+        const billing: LegacyCollectionConfig = {
             slug: "billing_configs",
             table: "billing_configs",
             name: "Billing configs",
@@ -116,7 +116,7 @@ describe("the generated relations, evaluated by drizzle", () => {
                 backupCompany: { type: "relation", relation: { kind: "belongsTo", target: () => companies, localKey: "backup_company_id" } }
             }
         };
-        const companies: CollectionConfig = {
+        const companies: LegacyCollectionConfig = {
             slug: "companies",
             table: "companies",
             name: "Companies",
@@ -140,7 +140,7 @@ describe("the generated relations, evaluated by drizzle", () => {
     }, 60_000);
 
     it("resolves a self-referencing hasOne beside its belongsTo", async () => {
-        const employees: CollectionConfig = {
+        const employees: LegacyCollectionConfig = {
             slug: "employees",
             table: "employees",
             name: "Employees",

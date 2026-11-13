@@ -20,7 +20,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { loadTableSchema } from "../src/schema/load-tables";
 import { ensureTables } from "../src/schema/ensure-tables";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
@@ -52,7 +52,7 @@ jest.mock("../src/schema/load-tables", () => ({
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
 const URL = "postgres://doctor.test/db";
 
-const authorsBefore: CollectionConfig = {
+const authorsBefore: LegacyCollectionConfig = {
     slug: "authors",
     table: "authors",
     name: "Authors",
@@ -64,7 +64,7 @@ const authorsBefore: CollectionConfig = {
 };
 
 /** `email` renamed to `contactEmail`, and made required. */
-const authorsAfter: PostgresCollectionConfig = {
+const authorsAfter: LegacyPostgresCollectionConfig = {
     slug: "authors",
     table: "authors",
     name: "Authors",
@@ -89,7 +89,7 @@ function writeGeneratedSchema(source: string): { dir: string; file: string } {
     return { dir, file };
 }
 
-async function generatedTables(collections: CollectionConfig[]): Promise<Record<string, unknown>> {
+async function generatedTables(collections: LegacyCollectionConfig[]): Promise<Record<string, unknown>> {
     const { dir, file } = writeGeneratedSchema(await generateSchema(compileSet(collections)));
     try {
         const module: unknown = await import(file);
@@ -101,7 +101,7 @@ async function generatedTables(collections: CollectionConfig[]): Promise<Record<
 }
 
 /** What boot computes before it warns: its own two calls, with its own arguments. */
-async function bootDifferences(collections: CollectionConfig[], generated: Record<string, unknown>) {
+async function bootDifferences(collections: LegacyCollectionConfig[], generated: Record<string, unknown>) {
     const tables = compileSet(collections).map(table => table.descriptor);
     const catalogue = await readCatalogueSchema({ client: mockDb!, tables, defaultSchema: "public" });
     return diffGeneratedSchemaAgainstCatalogue({ generated, catalogue: catalogue.meta, tables });

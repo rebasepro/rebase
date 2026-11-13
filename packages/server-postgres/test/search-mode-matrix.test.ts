@@ -45,7 +45,7 @@ import { unaccent } from "@electric-sql/pglite/contrib/unaccent";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, text, serial, customType } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { buildSearchColumnSpec } from "../src/schema/search-column";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -64,7 +64,7 @@ const ROWS: [string, string][] = [
     ["Beatriz Núñez", "ISO 9001 Quality"]
 ];
 
-type Variant = { slug: string; search?: PostgresCollectionConfig["search"] };
+type Variant = { slug: string; search?: LegacyPostgresCollectionConfig["search"] };
 
 const VARIANTS: Variant[] = [
     { slug: "plain" },
@@ -79,7 +79,7 @@ const VARIANTS: Variant[] = [
     { slug: "hybrid_no_unaccent", search: { language: "spanish", mode: "hybrid", fields: ["name", "cert"] } }
 ];
 
-const collectionFor = (v: Variant): PostgresCollectionConfig => ({
+const collectionFor = (v: Variant): LegacyPostgresCollectionConfig => ({
     slug: v.slug,
     table: v.slug,
     name: v.slug,
@@ -106,7 +106,7 @@ beforeAll(async () => {
     db = new PGlite({ extensions: { pg_trgm, unaccent } });
     await db.waitReady;
 
-    const collections = VARIANTS.map(v => collectionFor(v) as CollectionConfig);
+    const collections = VARIANTS.map(v => collectionFor(v) as LegacyCollectionConfig);
     await db.exec(await generatePostgresDdl(compileSet(collections), { includePolicies: false }));
 
     for (const v of VARIANTS) {
@@ -117,7 +117,7 @@ beforeAll(async () => {
 
     const orm = drizzle(db);
     for (const v of VARIANTS) {
-        const collection = collectionFor(v) as CollectionConfig;
+        const collection = collectionFor(v) as LegacyCollectionConfig;
         const spec = v.search ? buildSearchColumnSpec(collection) : undefined;
         const columns: Record<string, PgColumnBuilderBase> = {
             id: serial("id").primaryKey(),

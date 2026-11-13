@@ -18,7 +18,7 @@
  *   overflows at 2^31.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
 import { renderDrizzleSchema } from "../src/schema/plan/render-drizzle";
@@ -32,7 +32,7 @@ import {
 import { compileSet, planCollections } from "./helpers/plan-tables";
 
 /** A primary key whose property key and column differ. */
-const authors: CollectionConfig = {
+const authors: LegacyCollectionConfig = {
     slug: "authors",
     table: "authors",
     name: "Authors",
@@ -42,7 +42,7 @@ const authors: CollectionConfig = {
     }
 };
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     slug: "tags",
     table: "tags",
     name: "Tags",
@@ -53,7 +53,7 @@ const tags: CollectionConfig = {
 };
 
 /** Every way a column comes to point at a key: belongsTo, reference, and a junction. */
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     table: "posts",
     name: "Posts",
@@ -67,25 +67,25 @@ const posts: CollectionConfig = {
 };
 
 /** Keys whose type is stated by `columnType`, not by the id strategy. */
-const uuidOrgs: CollectionConfig = {
+const uuidOrgs: LegacyCollectionConfig = {
     slug: "orgs",
     table: "orgs",
     name: "Orgs",
     properties: { id: { name: "ID", type: "string", isId: true, columnType: "uuid" } }
 };
-const bigOrgs: CollectionConfig = {
+const bigOrgs: LegacyCollectionConfig = {
     slug: "big_orgs",
     table: "big_orgs",
     name: "Big orgs",
     properties: { id: { name: "ID", type: "number", isId: true, columnType: "bigint" } }
 };
-const serialOrgs: CollectionConfig = {
+const serialOrgs: LegacyCollectionConfig = {
     slug: "serial_orgs",
     table: "serial_orgs",
     name: "Serial orgs",
     properties: { id: { name: "ID", type: "number", isId: true, columnType: "bigserial" } }
 };
-const codeOrgs: CollectionConfig = {
+const codeOrgs: LegacyCollectionConfig = {
     slug: "code_orgs",
     table: "code_orgs",
     name: "Code orgs",
@@ -93,7 +93,7 @@ const codeOrgs: CollectionConfig = {
         code: { name: "Code", type: "string", isId: true, columnType: "varchar", validation: { max: 12 } }
     }
 };
-const members: CollectionConfig = {
+const members: LegacyCollectionConfig = {
     slug: "members",
     table: "members",
     name: "Members",
@@ -241,13 +241,13 @@ describe("a column pointing at a key has the key's own type", () => {
     });
 
     it("keeps an identity key's INTEGER, whatever its `columnType` says", () => {
-        const counters: CollectionConfig = {
+        const counters: LegacyCollectionConfig = {
             slug: "counters",
             table: "counters",
             name: "Counters",
             properties: { id: { name: "ID", type: "number", isId: "increment", columnType: "bigint" } }
         };
-        const hits: CollectionConfig = {
+        const hits: LegacyCollectionConfig = {
             slug: "hits",
             table: "hits",
             name: "Hits",
@@ -293,7 +293,7 @@ describe("a column pointing at a key has the key's own type", () => {
         // (42804). Boot never changes an existing column's type, so the
         // constraint still cannot be added — but it is said, with the statement
         // that fixes it, instead of failing the same way on every boot.
-        const seats: CollectionConfig = {
+        const seats: LegacyCollectionConfig = {
             slug: "seats",
             table: "seats",
             name: "Seats",

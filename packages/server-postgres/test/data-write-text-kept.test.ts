@@ -15,7 +15,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { integer, jsonb, numeric, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -34,7 +34,7 @@ const peopleTable = pgTable("people", {
     seenAt: timestamp("seen_at", { withTimezone: true, mode: "string" })
 });
 
-const people: CollectionConfig = {
+const people: LegacyCollectionConfig = {
     name: "People",
     slug: "people",
     table: "people",
@@ -47,7 +47,7 @@ const people: CollectionConfig = {
         price: { name: "Price", type: "number" },
         seenAt: { name: "Seen", type: "date", columnName: "seen_at" }
     }
-} as CollectionConfig;
+} as LegacyCollectionConfig;
 
 let db: PGlite;
 let driver: PostgresBackendDriver;

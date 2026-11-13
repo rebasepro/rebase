@@ -1,5 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
-import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { applyPoliciesFile, stampableTables } from "../src/cli-push";
 import { ensureTablePolicies, policyStampSql } from "../src/schema/ensure-policies";
 import { generatePostgresPoliciesDdl, planTablePolicies } from "../src/schema/generate-postgres-ddl-logic";
@@ -18,13 +18,13 @@ import { compileSet } from "./helpers/plan-tables";
  * push now stamps what it creates, the way the boot does.
  */
 
-const tiers: PostgresCollectionConfig = {
+const tiers: LegacyPostgresCollectionConfig = {
     name: "Tiers", slug: "tiers", table: "tiers", schema: "public",
     properties: { id: { name: "ID", type: "string", isId: true }, label: { name: "L", type: "string" } },
     securityRules: [{ operation: "select", access: "public" }]
 };
 
-const customers: CollectionConfig = {
+const customers: LegacyCollectionConfig = {
     name: "Customers", slug: "customers", table: "customers", schema: "public",
     properties: {
         id: { name: "ID", type: "string", isId: true },
@@ -57,7 +57,7 @@ async function database(): Promise<{ db: PGlite; queryable: Queryable; ran: stri
 }
 
 /** What `db push` does: the generated file, and the stamps for what it creates. */
-async function push(queryable: Queryable, collections: CollectionConfig[], searchPath: string | undefined) {
+async function push(queryable: Queryable, collections: LegacyCollectionConfig[], searchPath: string | undefined) {
     const policiesSql = generatePostgresPoliciesDdl(compileSet(collections));
     const statements = stampableTables(planTablePolicies(compileSet(collections)), policiesSql)
         .map(plan => policyStampSql(plan))

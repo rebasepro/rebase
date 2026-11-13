@@ -26,7 +26,8 @@ import { Table } from "drizzle-orm";
 import { RelationService } from "../src/services/RelationService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
-import type { CollectionConfig, RelationDescriptor } from "@rebasepro/types";
+import type { RelationDescriptor } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { relationOfTable } from "./helpers/relation-descriptors";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
@@ -77,7 +78,7 @@ dataType: "number" },
 
 // ─── Mock Collections ─────────────────────────────────────────────────
 
-const tagsCollection: CollectionConfig = {
+const tagsCollection: LegacyCollectionConfig = {
     slug: "tags",
     name: "Tags",
     table: "tags",
@@ -88,7 +89,7 @@ const tagsCollection: CollectionConfig = {
     idField: "id"
 };
 
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -113,7 +114,7 @@ relationName: "tags" }
     idField: "id"
 };
 
-const authorsCollection: CollectionConfig = {
+const authorsCollection: LegacyCollectionConfig = {
     slug: "authors",
     name: "Authors",
     table: "authors",
@@ -125,7 +126,7 @@ const authorsCollection: CollectionConfig = {
 };
 
 // Inverse M2M: tags → posts (from tag's perspective, "which posts use this tag?")
-const tagsWithInversePosts: CollectionConfig = {
+const tagsWithInversePosts: LegacyCollectionConfig = {
     slug: "tags_inv",
     name: "Tags (inverse)",
     table: "tags",
@@ -154,7 +155,7 @@ relationName: "posts" }
 };
 
 // JoinPath-based M2M: authors → posts via author_posts
-const authorsWithJoinPath: CollectionConfig = {
+const authorsWithJoinPath: LegacyCollectionConfig = {
     slug: "authors_jp",
     name: "Authors (joinPath)",
     table: "authors",
@@ -220,7 +221,7 @@ function generateJunctionRows(
  * The relation as `FetchService` hands it over: the descriptor the
  * collection's table compiles to, every key spelled out.
  */
-function resolved(collection: CollectionConfig, relationName: string): RelationDescriptor {
+function resolved(collection: LegacyCollectionConfig, relationName: string): RelationDescriptor {
     return relationOfTable(new FixtureTableRegistry([collection]), collection.slug, relationName);
 }
 

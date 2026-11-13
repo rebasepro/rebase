@@ -1,4 +1,5 @@
-import { CollectionConfig, PostgresProperty, col } from "@rebasepro/types";
+import { col } from "@rebasepro/types";
+import { LegacyCollectionConfig, LegacyPostgresProperty } from "@rebasepro/common/migrate";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { planSchema } from "../src/schema/plan/plan-schema";
@@ -17,7 +18,7 @@ import { compileSet, planCollections } from "./helpers/plan-tables";
  * answered 201 and stored nothing, forever.
  */
 describe("geopoint columns", () => {
-    const places: CollectionConfig = {
+    const places: LegacyCollectionConfig = {
         slug: "places",
         table: "places",
         name: "Places",
@@ -74,12 +75,12 @@ lng: 2.17 }, location, "location"))
      * the switch had simply forgotten.
      */
     it("refuses to generate a table for a property type nobody mapped", () => {
-        const odd: CollectionConfig = {
+        const odd: LegacyCollectionConfig = {
             slug: "odd",
             table: "odd",
             name: "Odd",
             // Deliberately invalid: a property type no engine maps, which the planner must refuse.
-            properties: { thing: { type: "quaternion" } as unknown as PostgresProperty }
+            properties: { thing: { type: "quaternion" } as unknown as LegacyPostgresProperty }
         };
 
         // Once, in the planner, before any renderer is reached.
@@ -89,7 +90,7 @@ lng: 2.17 }, location, "location"))
 
     it("still emits no column for a relation that lives on the other table", () => {
         // The legitimate `null`: an inverse relation is a column on the target.
-        const authors: CollectionConfig = {
+        const authors: LegacyCollectionConfig = {
             slug: "authors",
             table: "authors",
             name: "Authors",

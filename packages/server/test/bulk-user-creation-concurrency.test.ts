@@ -14,12 +14,13 @@
  * once, which does not flake on a loaded machine.
  */
 import { describe, it, expect } from "@jest/globals";
-import type { CollectionConfig, UserCreationPrepareResult, UserCreationWriteContract } from "@rebasepro/types";
+import type { UserCreationPrepareResult, UserCreationWriteContract } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { prepareUserCreations, type UserCreatingAdapter } from "../src/api/rest/auth-table-writes";
 import { servedTableFrom } from "./helpers/tables";
 import { testAuthAdapter } from "./helpers/server-a-g3-auth-adapter";
 
-const usersCollection: CollectionConfig = { slug: "users", name: "Users", auth: true, properties: {} };
+const usersCollection: LegacyCollectionConfig = { slug: "users", name: "Users", auth: true, properties: {} };
 
 function countingAdapter(contract: UserCreationWriteContract | undefined) {
     let inFlight = 0;

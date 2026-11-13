@@ -17,9 +17,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
 import path from "node:path";
-import type { DatabaseAdmin, PostgresCollectionConfig, SchemaChangePlan, TablePatch } from "@rebasepro/types";
+import type { LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { EMPTY_ACCESS_MODEL } from "@rebasepro/types";
-import type { CompiledTable } from "@rebasepro/types";
+import type { CompiledTable, DatabaseAdmin, SchemaChangePlan, TablePatch } from "@rebasepro/types";
 import { HonoEnv } from "../src/api/types";
 import { compileSchemaDefs } from "../src/schema/load-schema";
 import { errorHandler } from "../src/api/errors";
@@ -29,7 +29,7 @@ import type { SchemaEditRepository } from "../src/schema-edit/apply-schema-chang
 import { configureAccess } from "../src/auth/access";
 import { writeSchemaFixture } from "./helpers/schema-source-fixture";
 
-const collection = (slug: string): PostgresCollectionConfig => ({ slug, name: slug, properties: { id: { type: "string", isId: "uuid" } } });
+const collection = (slug: string): LegacyPostgresCollectionConfig => ({ slug, name: slug, properties: { id: { type: "string", isId: "uuid" } } });
 
 const okPlan = (over: Partial<SchemaChangePlan> = {}): SchemaChangePlan => ({
     files: [{ path: "backend/src/schema.generated.ts", contents: "export const tables = {};" }],

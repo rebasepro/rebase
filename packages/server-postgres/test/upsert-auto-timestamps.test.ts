@@ -1,5 +1,5 @@
 import { pgTable, text } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { recordingDb, shapedRows, type RecordedStatement } from "./helpers/spg-c-db";
 import { DataService } from "../src/services/dataService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -23,7 +23,7 @@ describe("upsert and on_create timestamps", () => {
         updatedAt: text("updated_at")
     });
 
-    const products: CollectionConfig = {
+    const products: LegacyCollectionConfig = {
         slug: "products",
         name: "Products",
         table: "products",

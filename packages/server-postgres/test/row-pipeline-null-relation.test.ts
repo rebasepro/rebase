@@ -15,12 +15,12 @@
  * while the path that actually serves it is untested. The dead method is gone
  * and the assertion now runs against `toRestRow`, which is what production uses.
  */
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { toRestRow } from "../src/services/row-pipeline";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 
-const authorsCollection: CollectionConfig = {
+const authorsCollection: LegacyCollectionConfig = {
     slug: "authors",
     name: "Authors",
     table: "authors",
@@ -30,7 +30,7 @@ const authorsCollection: CollectionConfig = {
     }
 };
 
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",

@@ -4,7 +4,8 @@ import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import { parseAggregateSelect, parseGroupBy } from "../src/api/rest/query-parser";
 import { encodeCursor } from "@rebasepro/common";
-import type { CollectionConfig, RestFetchService } from "@rebasepro/types";
+import type { RestFetchService } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
 import { tablesFromCollections } from "./helpers/tables";
@@ -25,7 +26,7 @@ import { tablesFromCollections } from "./helpers/tables";
  * number, not a slow query — and that a driver which cannot do this says so.
  */
 
-const orders: CollectionConfig = {
+const orders: LegacyCollectionConfig = {
     slug: "orders",
     name: "Orders",
     singularName: "Order",

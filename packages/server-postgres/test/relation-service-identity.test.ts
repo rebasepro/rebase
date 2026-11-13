@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { hasMany, relationOfTable } from "./helpers/relation-descriptors";
 import { RelationService } from "../src/services/RelationService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -19,10 +19,10 @@ describe("RelationService — related rows are addressed by the whole key", () =
     const registry = new FixtureTableRegistry();
 
     /** A relation as the service reads it: the descriptor the table compiled to. */
-    const link = (collection: CollectionConfig, key: string) => relationOfTable(registry, collection.slug, key);
+    const link = (collection: LegacyCollectionConfig, key: string) => relationOfTable(registry, collection.slug, key);
 
     // Composite-keyed target: a seat identified by (row, number).
-    const seatsCollection: CollectionConfig = {
+    const seatsCollection: LegacyCollectionConfig = {
         slug: "seats",
         name: "Seats",
         table: "seats",
@@ -35,7 +35,7 @@ isId: true },
         }
     };
 
-    const bookingsCollection: CollectionConfig = {
+    const bookingsCollection: LegacyCollectionConfig = {
         slug: "bookings",
         name: "Bookings",
         table: "bookings",
@@ -93,7 +93,7 @@ seat_number: 12 });
     describe("batching parents that share their first key column", () => {
         // `bookings` keyed on (tenant_id, ref): two bookings of the same tenant
         // differ only in the second column.
-        const tenantBookings: CollectionConfig = {
+        const tenantBookings: LegacyCollectionConfig = {
             slug: "tenant_bookings",
             name: "Tenant Bookings",
             table: "tenant_bookings",
@@ -154,7 +154,7 @@ booking_ref: "B" }
     describe("relations that cannot name a composite-keyed parent", () => {
         // `foreignKeyOnTarget` is one column; `seats.booking_id` cannot hold the
         // two values that identify a (tenant_id, ref) booking.
-        const viaSingleFk: CollectionConfig = {
+        const viaSingleFk: LegacyCollectionConfig = {
             slug: "tenant_bookings",
             name: "Tenant Bookings",
             table: "tenant_bookings",
@@ -197,7 +197,7 @@ isId: true },
 
     it("addresses a single-key target by that key, unchanged", async () => {
         // The ordinary case has to keep working: one key, one value, no separator.
-        const guestsCollection: CollectionConfig = {
+        const guestsCollection: LegacyCollectionConfig = {
             slug: "guests",
             name: "Guests",
             table: "guests",
@@ -207,7 +207,7 @@ isId: "increment" },
                 booking_id: { type: "number" }
             }
         };
-        const withGuests: CollectionConfig = {
+        const withGuests: LegacyCollectionConfig = {
             ...bookingsCollection,
             properties: {
                 id: { type: "number",

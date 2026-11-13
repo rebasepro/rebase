@@ -22,10 +22,8 @@ import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import type { AuthHooks } from "../src/auth/auth-hooks";
 import type { EmailService } from "../src/email";
 import type {
-    AuthCollectionConfig,
     BatchWriteProps,
     CompiledAuthHooks,
-    CollectionConfig,
     DeleteManyProps,
     DeleteProps,
     FetchCollectionProps,
@@ -34,12 +32,16 @@ import type {
     SaveProps,
     UpdateManyProps
 } from "@rebasepro/types";
+import type {
+    LegacyAuthCollectionConfig,
+    LegacyCollectionConfig
+} from "@rebasepro/common/migrate";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
 import { tablesFromCollections } from "./helpers/tables";
 
 /** The default `users` collection, with the auth settings a test gives it. */
-const usersCollection = (auth: AuthCollectionConfig): CollectionConfig => ({
+const usersCollection = (auth: LegacyAuthCollectionConfig): LegacyCollectionConfig => ({
     slug: "users",
     name: "Users",
     table: "users",
@@ -55,7 +57,7 @@ const usersCollection = (auth: AuthCollectionConfig): CollectionConfig => ({
 
 const users = usersCollection({ enabled: true });
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -73,7 +75,7 @@ function harness(options: {
     emails?: Record<string, string>;
     hooks?: AuthHooks;
     caller?: string;
-    collections?: CollectionConfig[];
+    collections?: LegacyCollectionConfig[];
     /** The auth table's compiled `onCreateUser` / `onResetPassword`, as the adapter is built with them. */
     authTableHooks?: CompiledAuthHooks;
     /** An email service that can send, so a created user is invited. */
@@ -188,7 +190,7 @@ describe("deleting a user through the data API", () => {
     });
 
     it("removing a user from a many-to-many is an unlink, not a user deletion", async () => {
-        const teams: CollectionConfig = {
+        const teams: LegacyCollectionConfig = {
             slug: "teams",
             name: "Teams",
             table: "teams",

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { eq, SQL } from "drizzle-orm";
 import { integer, pgTable, PgDialect, PgTable, primaryKey, serial, varchar, text } from "drizzle-orm/pg-core";
-import { CollectionConfig, EntityRelation, type JoinStep, WhereFilterOp } from "@rebasepro/types";
+import { EntityRelation, type JoinStep, WhereFilterOp } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { manyToMany, via } from "./helpers/relation-descriptors";
 import { resolveRelation } from "@rebasepro/common";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -1157,7 +1158,7 @@ describe("DrizzleConditionBuilder - join path scope with alternatives", () => {
     const peopleCollection = namedCollection("people", { table: "people" });
     const friendshipsCollection = namedCollection("friendships", { table: "friendships" });
 
-    const scope = (target: CollectionConfig, targetTable: typeof people | typeof friendships, joinPath: unknown[]) =>
+    const scope = (target: LegacyCollectionConfig, targetTable: typeof people | typeof friendships, joinPath: unknown[]) =>
         renderSql(DrizzleConditionBuilder.buildRelationScopeCondition(
             via("friends", target.slug, "many", joinPath as JoinStep[]),
             () => ({ table: people, key: [{ column: people.id, value: 2 }] }),

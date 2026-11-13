@@ -29,7 +29,8 @@ import { describe, expect, it, beforeAll, afterAll } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { sql as drizzleSql } from "drizzle-orm";
-import type { CollectionConfig, PostgresPolicy } from "@rebasepro/types";
+import type { PostgresPolicy } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { compileRulePolicies, policyToSecurityRule } from "@rebasepro/common";
 
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
@@ -168,7 +169,7 @@ async function importedFromDatabase(db: PGlite): Promise<string[]> {
     const statements = live.rows.flatMap(row => {
         const roles = Array.isArray(row.roles) ? row.roles : row.roles.replace(/[{}]/g, "").split(",");
         const rule = policyToSecurityRule({ ...row, roles });
-        const table: CollectionConfig = { slug: row.tablename, table: row.tablename, name: row.tablename, properties: {} };
+        const table: LegacyCollectionConfig = { slug: row.tablename, table: row.tablename, name: row.tablename, properties: {} };
         return compileRulePolicies(table, rule).map(p =>
             `CREATE POLICY "${p.name}" ON "public"."${row.tablename}" AS ${p.mode.toUpperCase()} ` +
             `FOR ${p.operation.toUpperCase()} TO ${p.roles.map(r => `"${r}"`).join(", ")}` +

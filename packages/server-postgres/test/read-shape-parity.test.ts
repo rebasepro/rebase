@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { RelationService } from "../src/services/RelationService";
 import { FetchService } from "../src/services/FetchService";
 import { toRestRow } from "../src/services/row-pipeline";
@@ -33,7 +33,7 @@ describe("read-shape parity across the entry points", () => {
     const postsTable = textTable("posts", ["id", "title", "published_at", "author_id"]);
     const authorsTable = textTable("authors", ["id", "name", "joined_at"]);
 
-    const authorsCollection: CollectionConfig = {
+    const authorsCollection: LegacyCollectionConfig = {
         slug: "authors",
         name: "Authors",
         table: "authors",
@@ -44,7 +44,7 @@ describe("read-shape parity across the entry points", () => {
         }
     };
 
-    const postsCollection: CollectionConfig = {
+    const postsCollection: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",

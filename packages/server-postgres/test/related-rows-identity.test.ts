@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { FetchService } from "../src/services/FetchService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -22,7 +22,7 @@ import { recordingDb, shapedRows } from "./helpers/spg-c-db";
 describe("related rows via path — the target's columns, and only those", () => {
     const registry = new FixtureTableRegistry();
 
-    const commentsCollection: CollectionConfig = {
+    const commentsCollection: LegacyCollectionConfig = {
         slug: "comments",
         name: "Comments",
         table: "comments",
@@ -33,7 +33,7 @@ isId: "increment" },
         }
     };
 
-    const postsCollection: CollectionConfig = {
+    const postsCollection: LegacyCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",

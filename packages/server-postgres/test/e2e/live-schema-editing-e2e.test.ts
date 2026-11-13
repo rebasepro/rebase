@@ -33,9 +33,9 @@ import { RealtimeService } from "../../src/services/realtimeService.js";
 // code that is not the code under test.
 import { applySchemaChange } from "../../../server/src/schema-edit/apply-schema-change.js";
 import { createLocalGitRepository } from "../../../server/src/schema-edit/local-git-repository.js";
-import type { CollectionConfig, PostgresProperties, PostgresProperty } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyPostgresProperties, LegacyPostgresProperty } from "@rebasepro/common/migrate";
 
-const posts = (properties: PostgresProperties): CollectionConfig => ({
+const posts = (properties: LegacyPostgresProperties): LegacyCollectionConfig => ({
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -171,7 +171,7 @@ describe("live schema editing, end to end", () => {
 
     it("creates a whole new table, with its constraints intact", async () => {
         const before = [posts({ subtitle: { name: "Subtitle", type: "string" } })];
-        const tags: CollectionConfig = {
+        const tags: LegacyCollectionConfig = {
             slug: "tags",
             name: "Tags",
             table: "tags",
@@ -235,7 +235,7 @@ describe("live schema editing, end to end", () => {
      * thing while the database disagrees is the exact failure being tested for.
      */
     describe("constraints the configuration asks for", () => {
-        const enumProperty = (values: string[]): PostgresProperty => ({
+        const enumProperty = (values: string[]): LegacyPostgresProperty => ({
             name: "Status",
             type: "string",
             enum: values.map(id => ({ id, label: id }))
@@ -251,7 +251,7 @@ describe("live schema editing, end to end", () => {
             return rows.map(row => row.value);
         };
 
-        const applyThrough = async (before: CollectionConfig[], after: CollectionConfig[]) => {
+        const applyThrough = async (before: LegacyCollectionConfig[], after: LegacyCollectionConfig[]) => {
             const plan = await driver.admin.planSchemaChange!(compiledFromLegacy(before), compiledFromLegacy(after));
             return applySchemaChange({
                 plan,
@@ -289,7 +289,7 @@ describe("live schema editing, end to end", () => {
 
         it("adds a required column NOT NULL when the table is empty", async () => {
             await admin.query(`CREATE TABLE public.empty_authors (id VARCHAR(255) PRIMARY KEY);`);
-            const authors = (properties: PostgresProperties): CollectionConfig => ({
+            const authors = (properties: LegacyPostgresProperties): LegacyCollectionConfig => ({
                 slug: "empty_authors",
                 name: "Authors",
                 table: "empty_authors",
@@ -334,7 +334,7 @@ describe("live schema editing, end to end", () => {
             );
             await admin.query(`INSERT INTO public.strict (id, label) VALUES ('1', 'set');`);
 
-            const strict = (required: boolean): CollectionConfig => ({
+            const strict = (required: boolean): LegacyCollectionConfig => ({
                 slug: "strict",
                 name: "Strict",
                 table: "strict",
@@ -365,7 +365,7 @@ describe("live schema editing, end to end", () => {
             await admin.query(
                 `CREATE TABLE public.tightening (id VARCHAR(255) PRIMARY KEY, code VARCHAR(255));`
             );
-            const tightening = (required: boolean): CollectionConfig => ({
+            const tightening = (required: boolean): LegacyCollectionConfig => ({
                 slug: "tightening",
                 name: "Tightening",
                 table: "tightening",

@@ -17,7 +17,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, integer, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
@@ -31,7 +31,7 @@ const postsTable = pgTable("posts", {
     id: integer("id").primaryKey(),
     title: varchar("title")
 });
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     name: "Posts",
     slug: "posts",
     table: "posts",
@@ -51,7 +51,7 @@ const postsTagsTable = pgTable("posts_tags", {
     post_id: integer("post_id"),
     tag_id: integer("tag_id")
 });
-const tagsCollection: CollectionConfig = {
+const tagsCollection: LegacyCollectionConfig = {
     name: "Tags",
     slug: "tags",
     table: "tags",

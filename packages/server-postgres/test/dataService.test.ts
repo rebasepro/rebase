@@ -1,6 +1,6 @@
 import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 
@@ -61,8 +61,8 @@ const mockProjectUsersTable = {
 };
 
 // --- Correctly typed Mock Entity Collections ---
-let authorsCollection: CollectionConfig;
-const tagsCollection: CollectionConfig = {
+let authorsCollection: LegacyCollectionConfig;
+const tagsCollection: LegacyCollectionConfig = {
     slug: "tags",
     name: "Tags",
     table: "tags",
@@ -73,7 +73,7 @@ const tagsCollection: CollectionConfig = {
     idField: "id"
 };
 
-const projectUsersCollection: CollectionConfig = {
+const projectUsersCollection: LegacyCollectionConfig = {
     slug: "project_users",
     name: "Project Users",
     table: "project_users",
@@ -85,7 +85,7 @@ const projectUsersCollection: CollectionConfig = {
     primaryKeys: ["project_id", "id"]
 };
 
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -478,7 +478,7 @@ dataType: "number" },
     };
 
     // Complex collection definitions
-    const usersCollection: CollectionConfig = {
+    const usersCollection: LegacyCollectionConfig = {
         slug: "users",
         name: "Users",
         table: "users",
@@ -499,7 +499,7 @@ relationName: "companies" }
         idField: "id"
     };
 
-    const companiesCollection: CollectionConfig = {
+    const companiesCollection: LegacyCollectionConfig = {
         slug: "companies",
         name: "Companies",
         table: "companies",
@@ -528,7 +528,7 @@ relationName: "projects" }
         idField: "id"
     };
 
-    const projectsCollection: CollectionConfig = {
+    const projectsCollection: LegacyCollectionConfig = {
         slug: "projects",
         name: "Projects",
         table: "projects",
@@ -572,7 +572,7 @@ relationName: "tags" }
         idField: "id"
     };
 
-    const tasksCollection: CollectionConfig = {
+    const tasksCollection: LegacyCollectionConfig = {
         slug: "tasks",
         name: "Tasks",
         table: "tasks",
@@ -601,7 +601,7 @@ relationName: "assignee" }
         idField: "id"
     };
 
-    const tagsCollection: CollectionConfig = {
+    const tagsCollection: LegacyCollectionConfig = {
         slug: "tags",
         name: "Tags",
         table: "tags",
@@ -612,7 +612,7 @@ relationName: "assignee" }
         idField: "id"
     };
 
-    const categoriesCollection: CollectionConfig = {
+    const categoriesCollection: LegacyCollectionConfig = {
         slug: "categories",
         name: "Categories",
         table: "categories",
@@ -712,7 +712,7 @@ name: "Test User" };
             // Create a collection with string ID type
             // Without the relations: their targets point back at the
             // number-keyed `usersCollection`, which would be a second "users".
-            const stringIdCollection: CollectionConfig = {
+            const stringIdCollection: LegacyCollectionConfig = {
                 slug: "users",
                 name: "Users",
                 table: "users",

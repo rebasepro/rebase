@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig, TableDescriptor } from "@rebasepro/types";
+import type { TableDescriptor } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { introspectedDescriptors } from "../src/schema/introspected-tables";
 
@@ -17,7 +18,7 @@ const descriptor = (slug: string, keys: string[] = ["id"]): TableDescriptor => (
     rls: { posture: "rules", rules: [], defaultPolicies: false }
 });
 
-const collection = (slug: string): CollectionConfig => ({ slug, name: slug, properties: {} });
+const collection = (slug: string): LegacyCollectionConfig => ({ slug, name: slug, properties: {} });
 
 describe("introspectedDescriptors", () => {
     it("takes every driver's descriptors as they are", () => {

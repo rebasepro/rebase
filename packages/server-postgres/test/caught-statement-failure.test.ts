@@ -24,7 +24,8 @@ import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
-import type { CollectionCallbacks, CollectionConfig, DataDriver, RebaseSdkData } from "@rebasepro/types";
+import type { DataDriver, RebaseSdkData } from "@rebasepro/types";
+import type { LegacyCollectionCallbacks, LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -54,12 +55,12 @@ const bestEffort = async (data: Sdk) => {
     }
 };
 
-const callbacks: CollectionCallbacks = {
+const callbacks: LegacyCollectionCallbacks = {
     afterSave: async ({ context }) => bestEffort(context.data),
     afterDelete: async ({ context }) => bestEffort(context.data)
 };
 
-const orders: CollectionConfig = {
+const orders: LegacyCollectionConfig = {
     name: "Orders", slug: "orders", table: "orders",
     properties: {
         id: { name: "ID", type: "string", isId: "manual" },
@@ -67,7 +68,7 @@ const orders: CollectionConfig = {
     },
     callbacks
 };
-const customers: CollectionConfig = {
+const customers: LegacyCollectionConfig = {
     name: "Customers", slug: "customers", table: "customers",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -75,7 +76,7 @@ const customers: CollectionConfig = {
         orders: { name: "Orders", type: "number" }
     }
 };
-const audit: CollectionConfig = {
+const audit: LegacyCollectionConfig = {
     name: "Audit", slug: "audit", table: "audit",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
@@ -83,14 +84,14 @@ const audit: CollectionConfig = {
     }
 };
 
-const docs: CollectionConfig = {
+const docs: LegacyCollectionConfig = {
     name: "Docs", slug: "docs", table: "docs",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         title: { name: "Title", type: "string" }
     }
 };
-const owners: CollectionConfig = {
+const owners: LegacyCollectionConfig = {
     name: "Owners", slug: "owners", table: "owners",
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },

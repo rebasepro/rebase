@@ -4,7 +4,8 @@ import fs from "fs";
 import { createServer } from "node:http";
 import os from "os";
 import path from "path";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, InitializedDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { reportBootFailure } from "../src/boot/boot";
 import { bootEnvExtension } from "../src/boot/env";
@@ -44,7 +45,7 @@ const BROKEN = "throw new Error(\"Cannot find module './lines.json'\");\n";
 const HELPER = "module.exports = { helper: () => 1 };\n";
 const DATA = "module.exports = { default: { lines: [] } };\n";
 
-function collection(slug: string): CollectionConfig {
+function collection(slug: string): LegacyCollectionConfig {
     return {
         name: slug,
         slug,

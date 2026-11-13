@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -23,7 +23,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 const commentsTable = pgTable("comments", { id: serial("id").primaryKey(), body: varchar("body"), parentId: integer("parent_id") });
 
-function comments(): CollectionConfig {
+function comments(): LegacyCollectionConfig {
     return {
         name: "Comments", slug: "comments", table: "comments",
         properties: {

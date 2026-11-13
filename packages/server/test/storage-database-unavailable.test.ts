@@ -14,14 +14,15 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { createRebaseBackend, errorHandler, type HonoEnv, type RebaseBackend } from "../src/index";
 import { _resetRebaseMock } from "../src/singleton";
 import { MemoryAuthStore } from "./helpers/memory-auth-store";
 import { fakeBootstrapper, fakeDataDriver, fakeRealtimeProvider } from "./helpers/server-b-fakes";
 import { tablesFrom } from "./helpers/tables";
 
-const widgets: CollectionConfig = {
+const widgets: LegacyCollectionConfig = {
     name: "widgets",
     slug: "widgets",
     table: "widgets",

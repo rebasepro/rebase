@@ -18,19 +18,19 @@
 import { PGlite } from "@electric-sql/pglite";
 import type { SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { createPostgresBootstrapper } from "../src/PostgresBootstrapper";
 import { ensureAppRole } from "../src/security/rls-enforcement";
 import { unreadDriver } from "./helpers/spg-a-driver";
 import { compileSet } from "./helpers/plan-tables";
 
-const tiers: CollectionConfig = {
+const tiers: LegacyCollectionConfig = {
     name: "Tiers", slug: "tiers", table: "tiers", schema: "public",
     properties: { id: { name: "ID", type: "string", isId: true }, label: { name: "L", type: "string" } },
     securityRules: [{ operation: "select", access: "public" }]
 };
 
-const customers: CollectionConfig = {
+const customers: LegacyCollectionConfig = {
     name: "Customers", slug: "customers", table: "customers", schema: "public",
     properties: { id: { name: "ID", type: "string", isId: true }, name: { name: "N", type: "string" } },
     securityRules: [{ operation: "select", roles: ["admin"] }]

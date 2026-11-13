@@ -16,7 +16,7 @@ import { describe, expect, it, beforeAll, afterAll } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { eq, getTableColumns } from "drizzle-orm";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { buildBaasSchema, readCatalogueSchema, type CatalogueSchema } from "../src/schema/catalogue-schema";
 import { introspectSchema, lowerIntrospectedTables, type Queryable } from "../src/schema/introspect-runtime";
@@ -32,7 +32,7 @@ import { namedCollection } from "./helpers/spg-a-fixtures";
 
 // ── The project, as its author wrote it ──────────────────────────────────────
 
-const authors: CollectionConfig = {
+const authors: LegacyCollectionConfig = {
     slug: "authors",
     table: "authors",
     name: "Authors",
@@ -54,7 +54,7 @@ const authors: CollectionConfig = {
     }
 };
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     slug: "tags",
     table: "tags",
     name: "Tags",
@@ -64,7 +64,7 @@ const tags: CollectionConfig = {
     }
 };
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     table: "posts",
     name: "Posts",
@@ -359,7 +359,7 @@ describe("a write against the catalogue, with a stale schema.generated.ts", () =
     });
 
     /** The collection, with a property the committed schema file predates. */
-    const notes: CollectionConfig = {
+    const notes: LegacyCollectionConfig = {
         slug: "notes",
         table: "notes",
         name: "Notes",
@@ -394,7 +394,7 @@ describe("a write against the catalogue, with a stale schema.generated.ts", () =
     });
 
     it("names the field when a write uses the column name instead", async () => {
-        const withColumn: CollectionConfig = {
+        const withColumn: LegacyCollectionConfig = {
             ...notes,
             properties: {
                 ...notes.properties,

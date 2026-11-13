@@ -1,7 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
-import type { CollectionConfig } from "../../types/src/types/collections";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
 import { openApiDocument, operationOf } from "./helpers/server-b-g1-openapi";
 import { tablesFromCollections } from "./helpers/tables";
@@ -18,7 +18,7 @@ import { tablesFromCollections } from "./helpers/tables";
  * REST generator actually registers and asks the spec about each. Asserting the
  * one path by name would pin today's omission and not the next one.
  */
-const collection: CollectionConfig = {
+const collection: LegacyCollectionConfig = {
     slug: "users", name: "Users", singularName: "User", table: "users",
     properties: {
         name: { name: "Name", type: "string", validation: { required: true } },

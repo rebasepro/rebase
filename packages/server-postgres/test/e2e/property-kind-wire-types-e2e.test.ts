@@ -31,7 +31,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { generateTypedefs } from "@rebasepro/codegen";
 import { compileTables } from "@rebasepro/common";
 import { collectionsToTableDefs } from "@rebasepro/common/migrate";
@@ -47,7 +47,7 @@ import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { compileSet } from "../helpers/plan-tables";
 
-const wireTypes: CollectionConfig = {
+const wireTypes: LegacyCollectionConfig = {
     name: "Wire Types",
     slug: "wire-types",
     table: "wire_types",

@@ -1,7 +1,8 @@
 import { describe, expect, it, beforeEach, jest } from "@jest/globals";
 import { AnyPgColumn, integer, pgTable, PgDialect, primaryKey, serial, timestamp, varchar } from "drizzle-orm/pg-core";
 import { SQL } from "drizzle-orm";
-import { CollectionConfig, encodeRelationAggregateSort, parseRelationAggregateSort } from "@rebasepro/types";
+import { encodeRelationAggregateSort, parseRelationAggregateSort } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ApiError } from "@rebasepro/server";
 import { FetchService } from "../src/services/FetchService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -58,7 +59,7 @@ const talentsSkillsTable = pgTable("talents_skills", {
     pk: primaryKey({ columns: [table.talent_id, table.skill_id] })
 }));
 
-const applicationsCollection: CollectionConfig = {
+const applicationsCollection: LegacyCollectionConfig = {
     slug: "talent_applications",
     name: "Applications",
     properties: {
@@ -67,13 +68,13 @@ const applicationsCollection: CollectionConfig = {
     }
 };
 
-const skillsCollection: CollectionConfig = {
+const skillsCollection: LegacyCollectionConfig = {
     slug: "skills",
     name: "Skills",
     properties: { level: { name: "Level", type: "number" } }
 };
 
-const talentsCollection: CollectionConfig = {
+const talentsCollection: LegacyCollectionConfig = {
     slug: "talents",
     name: "Talents",
     properties: {

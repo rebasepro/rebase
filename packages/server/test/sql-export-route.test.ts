@@ -2,7 +2,8 @@ import { describe, expect, it, afterEach } from "@jest/globals";
 import { Hono } from "hono";
 import { createHash } from "node:crypto";
 import path from "node:path";
-import type { CollectionConfig, DataDriver, SqlCursor } from "@rebasepro/types";
+import type { DataDriver, SqlCursor } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { initializeRebaseBackend } from "../src/init";
 import { generateAccessToken } from "../src/auth/jwt";
@@ -91,7 +92,7 @@ function stubDriver(withCursor: boolean): DataDriver {
 
 const started: Array<() => void> = [];
 
-const JOBS: CollectionConfig = { name: "jobs", slug: "jobs", table: "jobs", properties: { id: { name: "ID", type: "string", isId: "uuid" } } };
+const JOBS: LegacyCollectionConfig = { name: "jobs", slug: "jobs", table: "jobs", properties: { id: { name: "ID", type: "string", isId: "uuid" } } };
 
 async function boot(options: { withCursor?: boolean } = {}): Promise<Hono<HonoEnv>> {
     const bootstrapper = fakeBootstrapper({ driver: stubDriver(options.withCursor ?? true) }, {

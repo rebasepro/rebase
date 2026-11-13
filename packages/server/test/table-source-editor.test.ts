@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import fs from "node:fs";
 import path from "node:path";
 import { getGeneratedPolicyNames } from "@rebasepro/common";
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import type { LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 
 import { TableSourceEditor, TableSourceEditError } from "../src/api/table-source-editor";
 import { SCHEMA_FILES, readSchemaFile, writeSchemaFixture } from "./helpers/schema-source-fixture";
@@ -128,7 +128,7 @@ describe("relations", () => {
 });
 
 describe("rls", () => {
-    const policyNames = (collections: PostgresCollectionConfig[]) =>
+    const policyNames = (collections: LegacyPostgresCollectionConfig[]) =>
         [...getGeneratedPolicyNames(collections.find(collection => collection.slug === "posts")!)].sort();
 
     it("replaces one rule and leaves every other rule's text — and its policy's name — as it was", async () => {

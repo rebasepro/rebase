@@ -20,7 +20,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import type { CollectionConfig, CompiledTable } from "@rebasepro/types";
+import type { CompiledTable } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import {
     isSchemaDefinitionError,
     compileSchema,
@@ -75,7 +76,7 @@ const generatedFiles = async (tables: CompiledTable[]): Promise<Record<string, s
 
 describe("a backend/schema directory, loaded", () => {
     // The fixture's collections are data; the lift is the codemod's own conversion.
-    const lifted = collectionsToTableDefs(FIXTURE.map(entry => entry as CollectionConfig));
+    const lifted = collectionsToTableDefs(FIXTURE.map(entry => entry as LegacyCollectionConfig));
 
     /** The lifted fixture as files, the index exporting them in REVERSE slug order. */
     const writeFixture = (): string => {

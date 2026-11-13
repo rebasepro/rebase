@@ -14,7 +14,8 @@
  */
 import { describe, it, expect, jest } from "@jest/globals";
 import { Hono } from "hono";
-import type { AuthAdapter, AuthenticatedUser, CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { AuthAdapter, AuthenticatedUser, DataDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { ScopeIdentity } from "../src/auth/rls-scope";
 import { fakeAuthAdapter } from "./helpers/server-b-g1-auth-adapter";
 import type { HonoEnv } from "../src/api/types";
@@ -38,7 +39,7 @@ const adapter: AuthAdapter = fakeAuthAdapter({
     resolveUser: async (uid: string) => people[uid] ?? null
 });
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",

@@ -10,13 +10,13 @@
  */
 import { describe, it, expect, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
 import { planCollections } from "./helpers/plan-tables";
 
-const events: CollectionConfig = {
+const events: LegacyCollectionConfig = {
     name: "Events",
     slug: "events",
     table: "events",
@@ -35,7 +35,7 @@ afterEach(async () => {
     db = undefined;
 });
 
-async function applied(collection: CollectionConfig): Promise<PGlite> {
+async function applied(collection: LegacyCollectionConfig): Promise<PGlite> {
     const ddl = renderPostgresDdl(planCollections([collection]), { includePolicies: false });
     db = new PGlite();
     await db.waitReady;

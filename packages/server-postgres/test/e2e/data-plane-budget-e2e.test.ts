@@ -36,7 +36,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import pg from "pg";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
@@ -53,7 +53,7 @@ const ownerRules = [
     { name: "admin_all", operations: ["select", "insert", "update", "delete"], roles: ["admin"] }
 ] as const;
 
-const projects: CollectionConfig = {
+const projects: LegacyCollectionConfig = {
     name: "Projects", slug: "projects", table: "projects",
     securityRules: ownerRules,
     properties: {
@@ -65,7 +65,7 @@ const projects: CollectionConfig = {
     indexes: [{ on: ["ownerId"], reason: "the owner policy" }]
 };
 
-const tasks: CollectionConfig = {
+const tasks: LegacyCollectionConfig = {
     name: "Tasks", slug: "tasks", table: "tasks",
     securityRules: ownerRules,
     properties: {
@@ -85,7 +85,7 @@ const tasks: CollectionConfig = {
     ]
 };
 
-const daily: CollectionConfig = {
+const daily: LegacyCollectionConfig = {
     name: "Daily", slug: "daily", table: "daily",
     securityRules: [{ name: "admin_all", operations: ["select", "insert", "update", "delete"], roles: ["admin"] }],
     properties: {

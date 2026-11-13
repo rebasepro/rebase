@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import type { CollectionConfig, FetchOneProps, SaveManyProps, SaveProps, UpdateManyProps } from "@rebasepro/types";
+import type { FetchOneProps, SaveManyProps, SaveProps, UpdateManyProps } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { HonoEnv } from "../src/api/types";
 import { tablesFromCollections } from "./helpers/tables";
@@ -21,7 +22,7 @@ import { tablesFromCollections } from "./helpers/tables";
  * table by some natural key to learn what it had just written.
  */
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     singularName: "Post",
@@ -33,7 +34,7 @@ const posts: CollectionConfig = {
 };
 
 /** Two key columns, so the composite answer is exercised rather than assumed. */
-const memberships: CollectionConfig = {
+const memberships: LegacyCollectionConfig = {
     slug: "memberships",
     name: "Memberships",
     singularName: "Membership",

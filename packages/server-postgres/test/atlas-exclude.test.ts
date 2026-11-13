@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { atlasExcludePattern, atlasExcludeSegment, excludePatternParts } from "../src/schema/atlas-exclude";
 import { getForeignIndexExcludes, getTableExcludes } from "../src/cli-helpers";
 import { searchExcludePatterns, triggerExcludePatterns, vectorExcludePatterns } from "../src/schema/generate-postgres-ddl-logic";
@@ -109,7 +109,7 @@ describe("each exclude list, for a name that is not a glob as it stands", () => 
 
     // No `.` here: a collection's `table: "a.b"` names schema `a`, table `b`.
     const ODD_TABLE = "odd name [v1]*";
-    const oddTable: CollectionConfig = {
+    const oddTable: LegacyCollectionConfig = {
         slug: "odd",
         table: ODD_TABLE,
         name: "Odd",

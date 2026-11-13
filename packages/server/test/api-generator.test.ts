@@ -1,25 +1,26 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import type { AuthAdapter, CollectionConfig, RelationProperty } from "@rebasepro/types";
+import type { AuthAdapter } from "@rebasepro/types";
+import type { LegacyCollectionConfig, LegacyRelationProperty } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 import { mockDataDriver, type MockDataDriver } from "./helpers/server-a-fakes";
 import { tablesFromCollections } from "./helpers/tables";
 
 describe("RestApiGenerator", () => {
     let mockDriver: MockDataDriver;
-    let mockCollections: CollectionConfig[];
+    let mockCollections: LegacyCollectionConfig[];
 
     beforeEach(() => {
         mockDriver = mockDataDriver({ admin: {} });
 
-        const hasMany = (target: () => CollectionConfig, foreignKeyOnTarget: string): RelationProperty => ({
+        const hasMany = (target: () => LegacyCollectionConfig, foreignKeyOnTarget: string): LegacyRelationProperty => ({
             type: "relation",
             relation: { kind: "hasMany", target, foreignKeyOnTarget }
         });
-        const comments: CollectionConfig = { slug: "comments", name: "Comments", singularName: "Comment", properties: {} };
-        const books: CollectionConfig = { slug: "books", name: "Books", singularName: "Book", properties: {} };
-        const posts: CollectionConfig = {
+        const comments: LegacyCollectionConfig = { slug: "comments", name: "Comments", singularName: "Comment", properties: {} };
+        const books: LegacyCollectionConfig = { slug: "books", name: "Books", singularName: "Book", properties: {} };
+        const posts: LegacyCollectionConfig = {
             slug: "posts",
             name: "Posts",
             singularName: "Post",
@@ -31,7 +32,7 @@ describe("RestApiGenerator", () => {
         // The parent of every nested path below. A nested path is resolved
         // through the relations its parent declares, so the parent has to be a
         // collection that declares them: an unknown one is a 404.
-        const authors: CollectionConfig = {
+        const authors: LegacyCollectionConfig = {
             slug: "authors",
             name: "Authors",
             singularName: "Author",
@@ -571,7 +572,7 @@ passwordHash: "custom-hash" },
                 await next();
             });
 
-            const authCollections: CollectionConfig[] = [
+            const authCollections: LegacyCollectionConfig[] = [
                 {
                     slug: "users",
                     name: "Users",
@@ -650,7 +651,7 @@ passwordHash: "hash" },
                 await next();
             });
 
-            const authCollections: CollectionConfig[] = [
+            const authCollections: LegacyCollectionConfig[] = [
                 {
                     slug: "users",
                     name: "Users",
@@ -716,7 +717,7 @@ describe("RestApiGenerator — update verbs", () => {
             c.set("driver", mockDriver);
             await next();
         });
-        const collections: CollectionConfig[] = [{ slug: "users", name: "Users", singularName: "User", properties: { name: { name: "Name", type: "string" } } }];
+        const collections: LegacyCollectionConfig[] = [{ slug: "users", name: "Users", singularName: "User", properties: { name: { name: "Name", type: "string" } } }];
         a.route("/api", new RestApiGenerator(tablesFromCollections(collections), mockDriver).generateRoutes());
         return a;
     }

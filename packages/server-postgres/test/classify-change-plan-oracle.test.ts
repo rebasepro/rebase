@@ -21,7 +21,7 @@
  *
  * To see the oracle fail, make `classifyTable` ignore one column attribute.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { SchemaFacts } from "../src/schema/classify-change";
 import { classifyEditedTables as classifyCompiledTables, generateSchemaCommit as generateCompiledCommit } from "../src/schema/generate-schema-commit";
 import { planSchema } from "../src/schema/plan/plan-schema";
@@ -49,7 +49,7 @@ const num = (over: Props = {}) => ({ type: "number", name: "N", ...over });
  * here and are given a thunk into the same set when the set is built, so the
  * planner resolves them exactly as it would a project's.
  */
-function world(sides: { posts?: Props; authors?: Props; postsExtra?: Props }): CollectionConfig[] {
+function world(sides: { posts?: Props; authors?: Props; postsExtra?: Props }): LegacyCollectionConfig[] {
     const set: Record<string, Record<string, unknown>> = {
         authors: {
             slug: "authors", name: "Authors", table: "authors",
@@ -83,12 +83,12 @@ function world(sides: { posts?: Props; authors?: Props; postsExtra?: Props }): C
 }
 
 /** One of `world`'s entries, checked to be a collection rather than asserted to be one. */
-function asCollection(entry: Record<string, unknown>): CollectionConfig {
+function asCollection(entry: Record<string, unknown>): LegacyCollectionConfig {
     if (!isCollectionShaped(entry)) throw new Error(`not a collection: ${JSON.stringify(entry)}`);
     return entry;
 }
 
-function isCollectionShaped(entry: Record<string, unknown>): entry is Record<string, unknown> & CollectionConfig {
+function isCollectionShaped(entry: Record<string, unknown>): entry is Record<string, unknown> & LegacyCollectionConfig {
     return typeof entry.slug === "string"
         && typeof entry.name === "string"
         && typeof entry.properties === "object" && entry.properties !== null;

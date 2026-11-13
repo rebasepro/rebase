@@ -19,7 +19,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { REBASE_USER_ROLE } from "@rebasepro/common";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { database as declareDatabase } from "@rebasepro/types";
 import { createRebaseBackend, type RebaseBackend } from "@rebasepro/server";
 import { tablesFrom } from "./helpers/tables";
@@ -71,7 +72,7 @@ function bootstrapper(id: string, isDefault: boolean, driver: DataDriver): Backe
     };
 }
 
-const collection = (slug: string, dataSource?: string): CollectionConfig => ({
+const collection = (slug: string, dataSource?: string): LegacyCollectionConfig => ({
     name: slug,
     slug,
     table: slug,

@@ -1,5 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
-import { CollectionConfig, SecurityRule } from "@rebasepro/types";
+import { SecurityRule } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ensureTablePolicies } from "../src/schema/ensure-policies";
 import type { Queryable } from "../src/schema/ensure-tables";
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
@@ -20,13 +21,13 @@ import { compileSet } from "./helpers/plan-tables";
  * switched off, a policy some other tool wrote without a stamp.
  */
 
-const tiers = (rule: SecurityRule = { operation: "select", access: "public" }): CollectionConfig => ({
+const tiers = (rule: SecurityRule = { operation: "select", access: "public" }): LegacyCollectionConfig => ({
     name: "Tiers", slug: "tiers", table: "tiers", schema: "public",
     properties: { id: { name: "ID", type: "string", isId: true }, label: { name: "L", type: "string" } },
     securityRules: [rule]
 });
 
-const customers: CollectionConfig = {
+const customers: LegacyCollectionConfig = {
     name: "Customers", slug: "customers", table: "customers", schema: "public",
     properties: {
         id: { name: "ID", type: "string", isId: true },
@@ -145,7 +146,7 @@ describe("everything a boot used to repair, it still repairs", () => {
     /** Applied once; then `tamper`; then a boot, whose DDL is returned. */
     async function afterTampering(
         tamper: (h: Harness, names: Record<string, string[]>) => Promise<void>,
-        collections: CollectionConfig[] = [tiers(), customers]
+        collections: LegacyCollectionConfig[] = [tiers(), customers]
     ) {
         const h = await harness();
         await ensureTablePolicies(h.queryable, compileSet([tiers(), customers]));

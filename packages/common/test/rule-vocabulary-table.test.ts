@@ -8,7 +8,8 @@
  * frozen old spelling. And a legacy collection that still says `collection`
  * is lifted to a table that says `table`.
  */
-import { policy, type CollectionConfig, type PolicyExpression, type SecurityRule, type TenantSource } from "@rebasepro/types";
+import { policy, type PolicyExpression, type SecurityRule, type TenantSource } from "@rebasepro/types";
+import { type LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { getPolicyNameHash, getPolicyNamesForRule, newShapeHashInput } from "@rebasepro/utils";
 import { collectionToTableDef, liftRuleSpelling, liftTenantSourceSpelling } from "../src/migrate";
 import { policyToPostgres } from "../src/util/policy";
@@ -89,7 +90,7 @@ describe("lifting a legacy collection respells its rules and tenancy", () => {
     });
 
     it("lifts a whole legacy collection into a table that says `table`", () => {
-        const collection: CollectionConfig = {
+        const collection: LegacyCollectionConfig = {
             name: "Docs", slug: "docs", table: "docs",
             properties: {
                 id: { name: "ID", type: "string", isId: "uuid" },

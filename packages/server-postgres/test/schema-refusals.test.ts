@@ -23,7 +23,7 @@ import {
     strEnumRec,
     numEnumRec
 } from "./fixtures/property-matrix-collections";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { compileSet, PLAN_REFUSAL_ALLOWED_MESSAGES } from "./helpers/plan-tables";
 
 const emptyDb = (): ExistingSchema => ({ tables: new Map(), enums: new Set(), constraints: new Set() });
@@ -73,7 +73,7 @@ describe("the record form of an enum is read, not thrown on", () => {
     // the recommended form threw `p.enum.map is not a function` — at boot, on a
     // managed tenant, fatally. The other two emitters read both forms, which is
     // exactly why nobody noticed.
-    const collections: CollectionConfig[] = [strEnumRec, numEnumRec];
+    const collections: LegacyCollectionConfig[] = [strEnumRec, numEnumRec];
 
     it("by boot-ensure, which is where it crashed", () => {
         const plan = planTableSchemaEnsure(compileSet(collections), emptyDb());

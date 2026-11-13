@@ -21,12 +21,12 @@
  * values stay, and the column's indexes and constraints travel with it. The
  * collision is still reported, so the log explains why a column changed name.
  */
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
 import { planTableSchemaEnsure, type ExistingSchema } from "../src/schema/ensure-tables";
 import { compileSet } from "./helpers/plan-tables";
 
-const categories: CollectionConfig = {
+const categories: LegacyCollectionConfig = {
     slug: "categories",
     table: "categories",
     name: "Categories",
@@ -43,7 +43,7 @@ const categories: CollectionConfig = {
  * `belongsTo` derives from the relation name, which is normally singular and
  * so unaffected.
  */
-const products: CollectionConfig = {
+const products: LegacyCollectionConfig = {
     slug: "products",
     table: "products",
     name: "Products",
@@ -150,7 +150,7 @@ describe("legacy foreign-key column detection", () => {
         // An explicit `through` is not derived, so the rule change cannot have
         // moved it — and note the name chosen here IS the legacy spelling,
         // which is exactly how an affected project is meant to pin it.
-        const pinned: CollectionConfig = {
+        const pinned: LegacyCollectionConfig = {
             ...products,
             properties: {
                 ...products.properties,
@@ -185,7 +185,7 @@ describe("legacy foreign-key column detection", () => {
      * database whose owner has already told us what the column is called.
      */
     it("stays quiet when an author-named column is missing and the old one is not", () => {
-        const renamed: CollectionConfig = {
+        const renamed: LegacyCollectionConfig = {
             ...products,
             properties: {
                 ...products.properties,

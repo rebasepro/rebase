@@ -6,12 +6,12 @@ import {
     serializeDataToServer
 } from "../src/data-transformer";
 import { liftedColumnOf, runtimeTableOf } from "./helpers/codec-columns";
-import type { Property, PostgresProperties, CollectionConfig, PostgresCollectionConfig, PostgresProperty } from "@rebasepro/types";
+import type { LegacyProperty, LegacyPostgresProperties, LegacyCollectionConfig, LegacyPostgresCollectionConfig, LegacyPostgresProperty } from "@rebasepro/common/migrate";
 
 // ─────────────────────────────────────────────────────────────
 // Fixture helpers
 // ─────────────────────────────────────────────────────────────
-function makeCollection(slug: string, properties: PostgresCollectionConfig["properties"]): PostgresCollectionConfig {
+function makeCollection(slug: string, properties: LegacyPostgresCollectionConfig["properties"]): LegacyPostgresCollectionConfig {
     return {
         name: slug,
         slug,
@@ -22,19 +22,19 @@ function makeCollection(slug: string, properties: PostgresCollectionConfig["prop
 // ─────────────────────────────────────────────────────────────
 // Property fixtures
 // ─────────────────────────────────────────────────────────────
-const arrayOfStringsProp: PostgresProperty = {
+const arrayOfStringsProp: LegacyPostgresProperty = {
     type: "array",
     name: "Tags",
     of: { type: "string", name: "Tag" }
 };
 
-const arrayOfNumbersProp: PostgresProperty = {
+const arrayOfNumbersProp: LegacyPostgresProperty = {
     type: "array",
     name: "Scores",
     of: { type: "number", name: "Score" }
 };
 
-const arrayOfMapsProp: PostgresProperty = {
+const arrayOfMapsProp: LegacyPostgresProperty = {
     type: "array",
     name: "Addresses",
     of: {
@@ -47,21 +47,21 @@ const arrayOfMapsProp: PostgresProperty = {
     }
 };
 
-const arrayOneOfProp: PostgresProperty = {
+const arrayOneOfProp: LegacyPostgresProperty = {
     type: "array",
     name: "Blocks",
     oneOf: {
         typeField: "type",
         valueField: "value",
         properties: {
-            text: { type: "string", name: "Text" } as Property,
-            number: { type: "number", name: "Number" } as Property
+            text: { type: "string", name: "Text" } as LegacyProperty,
+            number: { type: "number", name: "Number" } as LegacyProperty
         }
     }
 };
 
 // A bare array property without `of` or `oneOf`
-const bareArrayProp: PostgresProperty = {
+const bareArrayProp: LegacyPostgresProperty = {
     type: "array",
     name: "RawArray"
 };
@@ -247,19 +247,19 @@ describe("parseColumnFromServer — array null safety", () => {
 // 3. serializeDataToServer — entity with null array fields
 // ─────────────────────────────────────────────────────────────
 describe("serializeDataToServer — entity with null array fields", () => {
-    const tagsProperty: PostgresProperty = {
+    const tagsProperty: LegacyPostgresProperty = {
         type: "array",
         name: "Tags",
         of: { type: "string", name: "Tag" }
     };
 
-    const categoriesProperty: PostgresProperty = {
+    const categoriesProperty: LegacyPostgresProperty = {
         type: "array",
         name: "Categories",
         of: { type: "string", name: "Category" }
     };
 
-    const metadataProperty: PostgresProperty = {
+    const metadataProperty: LegacyPostgresProperty = {
         type: "map",
         name: "Metadata",
         properties: {
@@ -267,11 +267,11 @@ describe("serializeDataToServer — entity with null array fields", () => {
                 type: "array",
                 name: "Labels",
                 of: { type: "string", name: "Label" }
-            } as Property
+            } as LegacyProperty
         }
     };
 
-    const properties: PostgresProperties = {
+    const properties: LegacyPostgresProperties = {
         tags: tagsProperty
     };
 
@@ -306,7 +306,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
 
     // ── Multiple array fields, mixed null / populated ──
     it("handles entity with multiple array fields, some null, some populated", () => {
-        const multiProperties: PostgresProperties = {
+        const multiProperties: LegacyPostgresProperties = {
             tags: tagsProperty,
             categories: categoriesProperty
         };
@@ -321,7 +321,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
 
     // ── Nested map containing null array ──
     it("handles entity with nested map containing array field that is null", () => {
-        const nestedProperties: PostgresProperties = {
+        const nestedProperties: LegacyPostgresProperties = {
             metadata: metadataProperty
         };
 
@@ -335,7 +335,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
 
     // ── All array fields null ──
     it("handles entity with only array fields, all null — scalarData should have all null values", () => {
-        const allArrayProperties: PostgresProperties = {
+        const allArrayProperties: LegacyPostgresProperties = {
             tags: tagsProperty,
             categories: categoriesProperty
         };

@@ -11,12 +11,12 @@
  * These tests pin the guarantee at every exit of the row pipeline, including
  * relation targets, since a secret only has to leak through one overlooked path.
  */
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { toFlatRow, toRestRow } from "../src/services/row-pipeline";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 
-const usersCollection: CollectionConfig = {
+const usersCollection: LegacyCollectionConfig = {
     name: "Users",
     slug: "users",
     properties: {
@@ -102,7 +102,7 @@ describe("excludeFromApi", () => {
      * `.listen()` frame while REST looked clean.
      */
     describe("relation targets", () => {
-        const postsCollection: CollectionConfig = {
+        const postsCollection: LegacyCollectionConfig = {
             name: "Posts",
             slug: "posts",
             properties: {
@@ -157,7 +157,7 @@ describe("excludeFromApi", () => {
         });
 
         it("strips them from every element of a to-many relation", () => {
-            const authorsCollection: CollectionConfig = {
+            const authorsCollection: LegacyCollectionConfig = {
                 name: "Articles",
                 slug: "articles",
                 properties: {
@@ -182,7 +182,7 @@ describe("excludeFromApi", () => {
     });
 
     it("leaves collections without the flag untouched", () => {
-        const posts: CollectionConfig = {
+        const posts: LegacyCollectionConfig = {
             name: "Posts",
             slug: "posts",
             properties: {

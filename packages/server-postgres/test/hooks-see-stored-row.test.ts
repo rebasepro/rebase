@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { driverStand } from "./helpers/spg-b-driver-stand";
 import { registryOf } from "./helpers/spg-c-registry";
 
@@ -25,7 +25,7 @@ describe("hooks and history see the stored row, not afterRead's view of it", () 
 
     let seen: { stage: string; values?: Record<string, unknown>; previousValues?: Record<string, unknown>; row?: Record<string, unknown> }[];
 
-    const customers: CollectionConfig = {
+    const customers: LegacyCollectionConfig = {
         slug: "customers",
         name: "Customers",
         table: "customers",
@@ -47,7 +47,7 @@ describe("hooks and history see the stored row, not afterRead's view of it", () 
                 seen.push({ stage: "afterDelete", row: { ...row } });
             }
         }
-    } as CollectionConfig;
+    } as LegacyCollectionConfig;
 
     const stand = () => {
         const { driver, recordHistory, notifyUpdate } = driverStand(registryOf(customers));
@@ -97,7 +97,7 @@ describe("hooks and history see the stored row, not afterRead's view of it", () 
                     return row;
                 }
             }
-        } as CollectionConfig;
+        } as LegacyCollectionConfig;
         const response = await driver.save({ path: "customers", id: "1", values: { title: "new" }, collection: inPlace, status: "existing" });
         expect(response.email).toBe("********");
         expect(recordHistory.mock.calls[0][0].values).toEqual(STORED);

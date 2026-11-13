@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { jsonb, pgTable, serial, varchar } from "drizzle-orm/pg-core";
-import type { CollectionCallbacks, CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionCallbacks, LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -39,7 +39,7 @@ const lines = (): LineItem[] => [
 ];
 
 /** Drop the empty lines, and the draft note — the shape a real hook has. */
-const collectionHook: CollectionCallbacks = {
+const collectionHook: LegacyCollectionCallbacks = {
     beforeSave: ({ values }) => ({
         ...values,
         lineItems: (values.lineItems as LineItem[]).filter(line => line.qty > 0),
@@ -47,7 +47,7 @@ const collectionHook: CollectionCallbacks = {
     })
 };
 
-function orders(options: { callbacks?: CollectionCallbacks; propertyHook?: boolean } = {}): CollectionConfig {
+function orders(options: { callbacks?: LegacyCollectionCallbacks; propertyHook?: boolean } = {}): LegacyCollectionConfig {
     return {
         name: "Orders",
         slug: "orders",
@@ -72,12 +72,12 @@ function orders(options: { callbacks?: CollectionCallbacks; propertyHook?: boole
             meta: { name: "Meta", type: "map", properties: { channel: { name: "Channel", type: "string" }, draftNote: { name: "Note", type: "string" } } }
         },
         ...(options.callbacks && { callbacks: options.callbacks })
-    } as CollectionConfig;
+    } as LegacyCollectionConfig;
 }
 
 let db: PGlite;
 
-function driverOver(pglite: PGlite, collection: CollectionConfig): PostgresBackendDriver {
+function driverOver(pglite: PGlite, collection: LegacyCollectionConfig): PostgresBackendDriver {
     const registry = new FixtureTableRegistry();
     registry.registerMultiple([collection]);
     registry.registerPgTable(ordersTable, "orders");

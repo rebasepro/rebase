@@ -21,7 +21,7 @@ import * as path from "node:path";
 import ts from "typescript";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderDrizzleSchema } from "../src/schema/plan/render-drizzle";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
@@ -60,7 +60,7 @@ const loadGenerated = (source: string): GeneratedModule => {
 
 /** A database built from `schema.sql`, queried through the generated file. */
 const queryThroughGenerated = async (
-    collections: CollectionConfig[],
+    collections: LegacyCollectionConfig[],
     run: (db: ReturnType<typeof drizzle>) => Promise<unknown>
 ): Promise<void> => {
     const plan = planCollections(collections);
@@ -77,11 +77,11 @@ const queryThroughGenerated = async (
 
 describe("the generated junction relations", () => {
     it("pair both declared sides of a many-to-many", async () => {
-        const tags: CollectionConfig = {
+        const tags: LegacyCollectionConfig = {
             slug: "tags", table: "tags", name: "Tags",
             properties: { id: { name: "ID", type: "string", isId: "uuid" }, name: { name: "Name", type: "string" } }
         };
-        const posts: CollectionConfig = {
+        const posts: LegacyCollectionConfig = {
             slug: "posts", table: "posts", name: "Posts",
             properties: {
                 id: { name: "ID", type: "string", isId: "uuid" },
@@ -99,11 +99,11 @@ describe("the generated junction relations", () => {
     }, 60_000);
 
     it("pair a many-to-many nobody declares back", async () => {
-        const tags: CollectionConfig = {
+        const tags: LegacyCollectionConfig = {
             slug: "tags", table: "tags", name: "Tags",
             properties: { id: { name: "ID", type: "string", isId: "uuid" } }
         };
-        const posts: CollectionConfig = {
+        const posts: LegacyCollectionConfig = {
             slug: "posts", table: "posts", name: "Posts",
             properties: {
                 id: { name: "ID", type: "string", isId: "uuid" },
@@ -117,7 +117,7 @@ describe("the generated junction relations", () => {
     }, 60_000);
 
     it("load for a self-referencing many-to-many", async () => {
-        const people: CollectionConfig = {
+        const people: LegacyCollectionConfig = {
             slug: "people", table: "people", name: "People",
             properties: { id: { name: "ID", type: "string", isId: "uuid" } }
         };

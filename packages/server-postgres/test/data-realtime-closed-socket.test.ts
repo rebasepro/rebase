@@ -15,7 +15,7 @@
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
-import { CollectionConfig } from "@rebasepro/types";
+import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { WebSocket } from "ws";
 import type { RealtimeClientSocket } from "../src/services/realtimeService";
 import { transactionalDrizzle } from "./helpers/spg-a-db";
@@ -37,7 +37,7 @@ class MockWebSocket implements RealtimeClientSocket {
     public terminate = jest.fn();
 }
 
-const postsCollection: CollectionConfig = {
+const postsCollection: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",

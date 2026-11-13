@@ -14,12 +14,13 @@
  * replaced, never by re-recording everything with the compiler under test —
  * that would compare the new output with itself.
  */
-import { ANONYMOUS_USER_ID, policy, type CollectionConfig } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, policy } from "@rebasepro/types";
+import { type LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 const ORG_A = "6f1c2a52-6a0e-4f3c-9a59-2a6f1d0c7a01";
 const ORG_B = "9b2d3e61-1c4f-4a77-8d10-5e3a9c2b4f02";
 
-const tags: CollectionConfig = {
+const tags: LegacyCollectionConfig = {
     name: "Tags", slug: "tags", table: "tags",
     properties: {
         id: { name: "ID", type: "string", isId: true },
@@ -31,7 +32,7 @@ const tags: CollectionConfig = {
     ]
 };
 
-const memberships: CollectionConfig = {
+const memberships: LegacyCollectionConfig = {
     name: "Memberships", slug: "memberships", table: "memberships",
     properties: {
         id: { name: "ID", type: "string", isId: true },
@@ -41,7 +42,7 @@ const memberships: CollectionConfig = {
     securityRules: [{ operation: "select", ownerField: "userId" }]
 };
 
-export const POLICY_SHAPE_COLLECTIONS: CollectionConfig[] = [
+export const POLICY_SHAPE_COLLECTIONS: LegacyCollectionConfig[] = [
     // Nothing declared: the injected server-or-admin baseline alone.
     {
         name: "Docs", slug: "docs", table: "docs",

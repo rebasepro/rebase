@@ -74,13 +74,13 @@ jest.mock("../src/services/dataService", () => ({
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { transactionalDrizzle } from "./helpers/spg-a-db";
 import { openSocket, type OpenSocket } from "./helpers/spg-a-socket";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PgNotifyListener } from "../src/services/pg-notify-listener";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 
-const posts: CollectionConfig = {
+const posts: LegacyCollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",

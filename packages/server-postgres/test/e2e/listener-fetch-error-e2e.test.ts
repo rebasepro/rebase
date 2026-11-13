@@ -20,7 +20,8 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
-import { RebaseApiError, type CollectionConfig, type DataDriver, type User } from "@rebasepro/types";
+import { RebaseApiError, type DataDriver, type User } from "@rebasepro/types";
+import { type LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
@@ -38,7 +39,7 @@ const contractSealed = new RebaseApiError("This contract is sealed.", { status: 
 /** Readable until sealed, so the listener loads and a refetch then fails. */
 let sealed = false;
 
-const contractsCollection: CollectionConfig = {
+const contractsCollection: LegacyCollectionConfig = {
     slug: "contracts",
     name: "Contracts",
     table: "contracts",

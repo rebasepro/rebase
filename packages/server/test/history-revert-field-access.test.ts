@@ -24,18 +24,18 @@
 import { Hono } from "hono";
 import { createHistoryRoutes, type HistoryService } from "../src/history/history-routes";
 import type { BackendCollectionRegistry } from "../src/collections/BackendCollectionRegistry";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { tablesFromCollections } from "./helpers/tables";
 
-const customers: CollectionConfig = {
+const customers: LegacyCollectionConfig = {
     name: "customers",
     slug: "customers",
     properties: { id: { name: "ID", type: "string", isId: "uuid" } }
 };
 
-const orders: CollectionConfig = {
+const orders: LegacyCollectionConfig = {
     name: "orders",
     slug: "orders",
     history: true,

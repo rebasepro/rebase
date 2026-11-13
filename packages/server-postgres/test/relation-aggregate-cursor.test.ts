@@ -18,7 +18,8 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, OrderByTuple } from "@rebasepro/types";
+import type { OrderByTuple } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { cursorToStartAfter, decodeCursor } from "@rebasepro/common";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
@@ -37,7 +38,7 @@ const applicationsTable = pgTable("talent_applications", {
     talentId: integer("talent_id")
 });
 
-const applications: CollectionConfig = {
+const applications: LegacyCollectionConfig = {
     slug: "talent_applications",
     name: "Applications",
     table: "talent_applications",
@@ -47,7 +48,7 @@ const applications: CollectionConfig = {
     }
 };
 
-const talents: CollectionConfig = {
+const talents: LegacyCollectionConfig = {
     slug: "talents",
     name: "Talents",
     table: "talents",

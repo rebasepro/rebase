@@ -13,13 +13,13 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
-import { PostgresCollectionConfig, CollectionConfig } from "@rebasepro/types";
+import { LegacyPostgresCollectionConfig, LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup";
 import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logic";
 import { buildSearchColumnSpec } from "../../src/schema/search-column";
 import { compileSet } from "../helpers/plan-tables";
 
-const talents: PostgresCollectionConfig = {
+const talents: LegacyPostgresCollectionConfig = {
     slug: "talents",
     table: "talents",
     name: "Talents",
@@ -59,7 +59,7 @@ describe("opt-in full-text search, end to end", () => {
         await client.connect();
 
         // Exactly what `rebase db push` would write — no hand-edits.
-        const ddl = await generatePostgresDdl(compileSet([talents as CollectionConfig]), { includePolicies: false });
+        const ddl = await generatePostgresDdl(compileSet([talents as LegacyCollectionConfig]), { includePolicies: false });
         await client.query(ddl);
 
         await client.query(`
@@ -219,7 +219,7 @@ describe("opt-in full-text search, end to end", () => {
 
 describe("a collection that did not opt in", () => {
     it("produces DDL with no search objects at all", async () => {
-        const plain: CollectionConfig = {
+        const plain: LegacyCollectionConfig = {
             slug: "posts",
             table: "posts",
             name: "Posts",

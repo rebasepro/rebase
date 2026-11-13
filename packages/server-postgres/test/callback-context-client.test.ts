@@ -22,7 +22,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionCallbacks, CollectionConfig, InitializedDriver, RebaseCallContext } from "@rebasepro/types";
+import type { BackendBootstrapper, InitializedDriver, RebaseCallContext } from "@rebasepro/types";
+import type { LegacyCollectionCallbacks, LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { initializeRebaseBackend, rebase, _resetRebaseMock, type HonoEnv } from "@rebasepro/server";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
@@ -64,7 +65,7 @@ let seen: RebaseCallContext[];
 /** Whether the callback below reaches for `context.client` — most never do. */
 let readsClient: boolean;
 
-const callbacks: CollectionCallbacks = {
+const callbacks: LegacyCollectionCallbacks = {
     beforeSave: async ({ values, context }) => {
         seen.push(context);
         // The accessor a callback's queries are meant to use, on the write's
@@ -75,7 +76,7 @@ const callbacks: CollectionCallbacks = {
     }
 };
 
-function widgets(): CollectionConfig {
+function widgets(): LegacyCollectionConfig {
     return {
         name: "Widgets",
         slug: "widgets",

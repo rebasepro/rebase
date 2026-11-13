@@ -23,7 +23,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig, RelationKind } from "@rebasepro/types";
+import type { RelationKind } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { getCopyValues } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
@@ -66,7 +67,7 @@ const badgesTable = pgTable("badges", {
 const awardsTable = pgTable("awards", { id: varchar("id").primaryKey(), label: varchar("label") });
 const authorsAwardsTable = pgTable("authors_awards", { author_id: varchar("author_id"), award_id: varchar("award_id") });
 
-const simple = (slug: string, extra: Record<string, unknown> = {}): CollectionConfig => ({
+const simple = (slug: string, extra: Record<string, unknown> = {}): LegacyCollectionConfig => ({
     name: slug, slug, table: slug,
     properties: {
         id: { name: "ID", type: "string", isId: true },
@@ -132,7 +133,7 @@ const RELATION_PROPERTIES: Record<string, { kind: RelationKind; relation: Record
  */
 const ALL_KINDS: RelationKind[] = ["belongsTo", "hasOne", "hasMany", "manyToMany", "via"];
 
-const authorsCollection: CollectionConfig = {
+const authorsCollection: LegacyCollectionConfig = {
     name: "Authors", slug: "authors", table: "authors",
     properties: {
         id: { name: "ID", type: "string", isId: true },
