@@ -98,6 +98,14 @@ const NON_IMPORT_FORMS: [string, string, "imports" | "references", string][] = [
 const FOREIGN_REFERENCE_FORMS = ["outside-new-url", "node-modules-new-url"];
 
 /**
+ * FINAL-FIX-PRODUCT L-2: a backend file under the inline limit, named in a
+ * spelling the scans do not read. Vite inlined it as a `data:` URL, which the
+ * generateBundle net never saw; the guard now has it emitted, and the net
+ * refuses it. The control ships it inlined.
+ */
+const SMALL_INLINED_FORMS = ["html-poster-small", "html-unquoted-small", "html-meta-small", "css-image-set-small"];
+
+/**
  * Forms the bundler does not follow: `createRequire(…)(path)`, `import(variable)`,
  * a computed `new URL(…)` and `import.meta.resolve(…)`
  * put no backend code in the bundle (the control proves it), so there is
@@ -143,6 +151,14 @@ describe("rebaseBackendGuard in a real build", () => {
         expect(guarded.ok).toBe(false);
         expect(guarded.error).toContain("[rebase-backend-guard]");
         expect(guarded.error).toContain("backend/data/large.json");
+    });
+
+    it.each(SMALL_INLINED_FORMS)("%s: the control inlines the small backend file, the guarded build is refused", (form) => {
+        const { guarded, control } = report.forms[form];
+        expect(control).toEqual({ ok: true, leaked: true });
+        expect(guarded.ok).toBe(false);
+        expect(guarded.error).toContain("[rebase-backend-guard]");
+        expect(guarded.error).toContain("backend/data/small.png");
     });
 
     it.each(NON_SHIPPING_FORMS)("%s: nothing reaches the bundle, with or without the guard", (form) => {

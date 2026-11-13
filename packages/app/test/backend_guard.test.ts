@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-import { backendImportMessage, bundleOutputSources, fileOfModuleId, findProjectBackendDir, htmlReferencedPaths, isModuleInDir, realPath, referencedPaths } from "../src/backend_guard";
+import { backendImportMessage, bundleOutputSources, fileOfModuleId, findProjectBackendDir, htmlReferencedPaths, isModuleInDir, neverInlineUnder, realPath, referencedPaths } from "../src/backend_guard";
 
 /** The pieces of `rebaseBackendGuard` a build does not show one by one. */
 
@@ -129,5 +129,30 @@ describe("bundleOutputSources (the generateBundle net, SEC-FIX-4 R-3)", () => {
     it("takes a chunk's module ids and an absolute source as they are", () => {
         expect(bundleOutputSources({ type: "chunk", moduleIds: ["/p/a.ts"] }, "/r")).toEqual(["/p/a.ts"]);
         expect(bundleOutputSources({ type: "asset", originalFileNames: ["/p/b.json"] }, "/r")).toEqual(["/p/b.json"]);
+    });
+});
+
+describe("neverInlineUnder (FINAL-FIX-PRODUCT L-2)", () => {
+    const backend = (file: string) => file.startsWith("/p/backend/");
+    const bytes = (n: number) => Buffer.alloc(n);
+
+    it("never inlines a backend file, whatever the project's own setting", () => {
+        for (const own of [undefined, 1_000_000, () => true]) {
+            const limit = neverInlineUnder(own, backend);
+            expect(typeof limit === "function" ? limit("/p/backend/data/small.png", bytes(4)) : limit).toBe(false);
+        }
+    });
+
+    it("decides every other file as the project's setting does", () => {
+        const byNumber = neverInlineUnder(10, backend);
+        const byFunction = neverInlineUnder(file => file.endsWith(".svg") ? false : undefined, backend);
+        const byDefault = neverInlineUnder(undefined, backend);
+        if (typeof byNumber !== "function" || typeof byFunction !== "function" || typeof byDefault !== "function") throw new Error("a function");
+        expect(byNumber("/p/frontend/a.png", bytes(9))).toBe(true);
+        expect(byNumber("/p/frontend/a.png", bytes(10))).toBe(false);
+        expect(byFunction("/p/frontend/a.svg", bytes(1))).toBe(false);
+        expect(byFunction("/p/frontend/a.png", bytes(1))).toBeUndefined();
+        // Absent: Vite's own default limit decides.
+        expect(byDefault("/p/frontend/a.png", bytes(1))).toBeUndefined();
     });
 });

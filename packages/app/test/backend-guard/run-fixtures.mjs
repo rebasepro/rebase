@@ -81,7 +81,14 @@ const FORMS = {
     // by `new URL`; and a dependency inside node_modules does, which only the
     // generateBundle backstop sees.
     "outside-new-url": "import { href } from \"__ROOT__-outside/asset\";\nconsole.log(href);",
-    "node-modules-new-url": "import { href } from \"leaky-pkg\";\nconsole.log(href);"
+    "node-modules-new-url": "import { href } from \"leaky-pkg\";\nconsole.log(href);",
+    // FINAL-FIX-PRODUCT L-2 (security look 4, F-2): a backend file under the
+    // inline limit, named in a spelling the scans do not read. Vite inlined it
+    // as a `data:` URL before the generateBundle net could see an asset.
+    "html-poster-small": { main: "console.log(1);", files: { "frontend/index.html": "<!doctype html><html><body><video poster=\"../backend/data/small.png\"></video><script type=\"module\" src=\"/src/main.ts\"></script></body></html>" } },
+    "html-unquoted-small": { main: "console.log(1);", files: { "frontend/index.html": "<!doctype html><html><body><img src=../backend/data/small.png><script type=\"module\" src=\"/src/main.ts\"></script></body></html>" } },
+    "html-meta-small": { main: "console.log(1);", files: { "frontend/index.html": "<!doctype html><html><head><meta property=\"og:image\" content=\"../backend/data/small.png\"></head><body><script type=\"module\" src=\"/src/main.ts\"></script></body></html>" } },
+    "css-image-set-small": { main: "import \"./leaky.css\";", files: { "frontend/src/leaky.css": "body { background-image: image-set(\"../../backend/data/small.png\" 1x); }\n" } }
 };
 
 /** A project that builds clean with the guard on: a type import, a `?raw` text file, CSS, a JSON file. */
@@ -130,6 +137,7 @@ function project(base, name, form) {
         // Non-module backend files a build could pull in as assets: one under
         // the inline limit's reach, one over it, and a stylesheet.
         "backend/data/large.json": JSON.stringify({ marker: MARKER, padding: "x".repeat(8192) }),
+        "backend/data/small.png": MARKER,
         "backend/theme.css": `.secret::after { content: "${MARKER}"; }\n`
     });
     if (typeof form !== "string") write(root, Object.fromEntries(Object.entries(form.files).map(([rel, text]) => [rel, text.replaceAll("__ROOT__", root)])));

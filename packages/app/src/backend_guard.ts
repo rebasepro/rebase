@@ -343,12 +343,20 @@ function backendGuardPlugin(options: RebaseBackendGuardOptions, inWorker: boolea
         enforce: "pre",
         apply: () => !process.env.VITEST,
         config(userConfig) {
-            if (inWorker) return undefined;
+            // Vite inlines an asset under `assetsInlineLimit` as a `data:` URL
+            // before anything is emitted, so the `generateBundle` net never
+            // sees it — from every spelling no scan reads (an HTML `poster`, an
+            // unquoted `src`, `<meta content>`, a CSS `image-set()`). A file
+            // under the backend is never inlined: it is emitted, and the net
+            // refuses it. Everything else is the project's own setting.
+            const build = { assetsInlineLimit: neverInlineUnder(userConfig.build?.assetsInlineLimit, refuse) };
+            if (inWorker) return { build };
             // A worker is bundled by a build of its own, which runs
             // `worker.plugins` and nothing else: without this, a worker that
             // imports `backend/` ships it whatever the page's build refuses.
             const userWorkerPlugins = userConfig.worker?.plugins;
             return {
+                build,
                 worker: {
                     plugins: () => [...(userWorkerPlugins ? userWorkerPlugins() : []), backendGuardPlugin(options, true)]
                 }
@@ -463,6 +471,24 @@ function backendGuardPlugin(options: RebaseBackendGuardOptions, inWorker: boolea
                 }
             }
         }
+    };
+}
+
+/** Vite's `build.assetsInlineLimit`: a byte limit, or a function that may decide per file. */
+export type AssetsInlineLimit = number | ((filePath: string, content: Buffer) => boolean | undefined);
+
+/**
+ * `build.assetsInlineLimit` that inlines no file `isBackend` claims, and
+ * decides every other file as `limit` (the project's own setting) would: its
+ * function's answer, a number compared as Vite compares it, or — absent —
+ * Vite's default. Module-internal (exported for its test, not from an entry).
+ */
+export function neverInlineUnder(limit: AssetsInlineLimit | undefined, isBackend: (file: string) => boolean): AssetsInlineLimit {
+    return (file, content) => {
+        if (isBackend(file)) return false;
+        if (typeof limit === "function") return limit(file, content);
+        if (typeof limit === "number") return content.length < limit;
+        return undefined;
     };
 }
 
