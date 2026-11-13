@@ -58,7 +58,7 @@ const postsTable = pgTable("posts", {
 const notes = defineTable("notes", {
     columns: {
         id: col.serial().primaryKey(),
-        body: col.varchar()
+        body: col.varchar({ length: 255 })
     },
     rls: "admin-only"
 });
@@ -67,11 +67,11 @@ const notes = defineTable("notes", {
 const authors = defineTable("authors", {
     columns: {
         id: col.serial().primaryKey(),
-        name: col.varchar(),
-        email: col.varchar().private(),
+        name: col.varchar({ length: 255 }),
+        email: col.varchar({ length: 255 }).private(),
         salary: col.integer().access({ read: ["admin"] }),
-        embedding: col.vector(3, { index: false }).private(),
-        style: col.vector(3, { index: false })
+        embedding: col.vector({ dimensions: 3, index: false }).private(),
+        style: col.vector({ dimensions: 3, index: false })
     },
     relations: {
         notes: rel.hasMany(() => notes, { foreignKey: "author_id", private: true }),
@@ -83,8 +83,8 @@ const authors = defineTable("authors", {
 const posts = defineTable("posts", {
     columns: {
         id: col.serial().primaryKey(),
-        title: col.varchar(),
-        draftKey: col.varchar().private()
+        title: col.varchar({ length: 255 }),
+        draftKey: col.varchar({ length: 255 }).private()
     },
     relations: {
         author: rel.belongsTo(() => authors, { localKey: "author_id" })

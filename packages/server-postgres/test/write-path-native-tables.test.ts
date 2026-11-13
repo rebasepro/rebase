@@ -1,4 +1,4 @@
-import { col, defineTable, json } from "@rebasepro/types";
+import { col, defineTable, json, sql } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 import { compileSchema, lowerTables } from "@rebasepro/common";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
@@ -20,9 +20,9 @@ const posts = defineTable("posts", {
         title: col.text(),
         active: col.boolean().default(true),
         region: col.text().dbDefault(),
-        slug: col.text().defaultSql("lower('x')"),
-        createdAt: col.timestamptz().onCreateNow(),
-        updatedAt: col.timestamptz().onUpdateNow(),
+        slug: col.text().default(sql`lower('x')`),
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow(),
+        updatedAt: col.timestamp({ withTimezone: true }).onUpdateNow(),
         createdBy: col.text().onCreateUser(),
         updatedBy: col.text().onUpdateUser(),
         prefs: col.jsonb(json.object({

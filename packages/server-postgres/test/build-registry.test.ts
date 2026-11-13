@@ -20,7 +20,7 @@ describe("buildTableRegistry", () => {
         rls: "admin-only"
     });
     const products = defineTable("products", {
-        columns: { id: col.serial().primaryKey(), name: col.text(), skuRef: col.text().column("sku_ref") },
+        columns: { id: col.serial().primaryKey(), name: col.text(), skuRef: col.text("sku_ref") },
         relations: { sku: rel.belongsTo(() => skuItems, { localKey: "sku_ref" }) },
         rls: "admin-only"
     });

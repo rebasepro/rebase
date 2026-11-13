@@ -209,12 +209,12 @@ describe("buildTableSearchColumnSpec", () => {
         columns: {
             id: col.uuid().primaryKey().defaultRandom(),
             fullName: col.text(),
-            location: col.varchar(120),
+            location: col.varchar({ length: 120 }),
             leadStatus: col.enum(["new", "won"]),
-            interests: col.array(col.text()),
-            scores: col.array(col.integer()),
+            interests: col.text().array(),
+            scores: col.integer().array(),
             questionnaire: col.jsonb(),
-            seenAt: col.timestamptz()
+            seenAt: col.timestamp({ withTimezone: true })
         },
         ...(search ? { search } : {}),
         rls: "admin-only"

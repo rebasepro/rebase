@@ -45,7 +45,7 @@ const contacts = defineTable("contacts", {
         salary: col.integer().access({ read: ["admin"] }),
         // Served to everyone, written by no API caller.
         code: col.text().readOnly(),
-        ownerId: col.text().column("owner_id"),
+        ownerId: col.text("owner_id"),
         shared: col.boolean()
     },
     history: true,

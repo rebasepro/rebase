@@ -49,8 +49,8 @@ const postsTable = pgTable("posts", {
 
 const authors = defineTable("authors", {
     columns: {
-        id: col.varchar().primaryKey(),
-        name: col.varchar()
+        id: col.varchar({ length: 255 }).primaryKey(),
+        name: col.varchar({ length: 255 })
     },
     rls: "admin-only"
 });
@@ -58,14 +58,14 @@ const authors = defineTable("authors", {
 /** A date, a belongsTo and soft delete: the three shapes REST and the view model spell differently. */
 const posts = defineTable("posts", {
     columns: {
-        id: col.varchar().primaryKey(),
-        title: col.varchar(),
-        status: col.varchar(),
+        id: col.varchar({ length: 255 }).primaryKey(),
+        title: col.varchar({ length: 255 }),
+        status: col.varchar({ length: 255 }),
         views: col.integer(),
         featured: col.boolean(),
-        published_at: col.timestamptz(),
+        published_at: col.timestamp({ withTimezone: true }),
         body: col.text(),
-        deleted_at: col.timestamptz()
+        deleted_at: col.timestamp({ withTimezone: true })
     },
     relations: {
         author: rel.belongsTo(() => authors, { localKey: "author_id" })
@@ -81,8 +81,8 @@ const readersTable = pgTable("readers", {
 });
 const readers = defineTable("readers", {
     columns: {
-        id: col.varchar().primaryKey(),
-        email: col.varchar()
+        id: col.varchar({ length: 255 }).primaryKey(),
+        email: col.varchar({ length: 255 })
     },
     hooks: { afterRead: ({ values }) => ({ ...values, email: "***" }) },
     rls: "admin-only"

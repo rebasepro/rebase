@@ -73,7 +73,7 @@ const posts = defineTable("posts", {
                 return value === null || value === undefined ? value : `/${value}`;
             }
         }),
-        authorId: col.integer().column("author_id"),
+        authorId: col.integer("author_id"),
         meta: col.jsonb(json.object({
             seo: json.object({
                 // Two levels down in a document.

@@ -52,10 +52,10 @@ function notes(hooks: TableHooks | undefined) {
     return defineTable("notes", {
         columns: {
             id: col.serial().primaryKey(),
-            title: col.varchar(),
-            slug: col.varchar(),
-            tenant: col.varchar(),
-            status: col.varchar(),
+            title: col.varchar({ length: 255 }),
+            slug: col.varchar({ length: 255 }),
+            tenant: col.varchar({ length: 255 }),
+            status: col.varchar({ length: 255 }),
             code: col.varchar({ length: 3 })
         },
         rls: "admin-only",

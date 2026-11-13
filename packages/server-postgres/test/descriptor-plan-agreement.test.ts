@@ -163,7 +163,7 @@ const categories = defineTable("categories", {
 });
 
 const tags = defineTable("tags", {
-    columns: { id: col.uuid().primaryKey().defaultRandom(), label: col.varchar(40).notNull().unique() },
+    columns: { id: col.uuid().primaryKey().defaultRandom(), label: col.varchar({ length: 40 }).notNull().unique() },
     rls: "inherit"
 });
 
@@ -183,10 +183,10 @@ const posts = defineTable("posts", {
         id: col.uuid().primaryKey().defaultRandom(),
         title: col.text().notNull(),
         status: col.enum(["draft", "published"]).notNull().default("draft"),
-        labels: col.array(col.text()),
+        labels: col.text().array(),
         orgId: col.uuid(),
-        createdAt: col.timestamptz().notNull().onCreateNow(),
-        deletedAt: col.timestamptz(),
+        createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
+        deletedAt: col.timestamp({ withTimezone: true }),
         __order: col.text()
     },
     relations: {

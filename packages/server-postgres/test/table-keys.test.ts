@@ -29,7 +29,7 @@ describe("tableKeys", () => {
 
     it("reads a composite key in declaration order", () => {
         const translations = defineTable("company_translation", {
-            columns: { id: col.integer().primaryKey(), locale: col.varchar().primaryKey(), name: col.text() },
+            columns: { id: col.integer().primaryKey(), locale: col.varchar({ length: 255 }).primaryKey(), name: col.text() },
             rls: "admin-only"
         });
         const pg = pgTable("company_translation", {
@@ -115,7 +115,7 @@ describe("getPrimaryKeys / requirePrimaryKeys — from a call site holding the l
 describe("tableKeyColumns", () => {
     it("maps each key to the SQL column a trigger captures", () => {
         const members = defineTable("members", {
-            columns: { userId: col.uuid().primaryKey(), orgId: col.uuid().column("org_ref").primaryKey() },
+            columns: { userId: col.uuid().primaryKey(), orgId: col.uuid("org_ref").primaryKey() },
             rls: "admin-only"
         });
         expect(tableKeyColumns(runtimeOf(members))).toEqual([

@@ -5,7 +5,7 @@
  * spelling to be equivalent to, so `table-features.test.ts` holds the planner,
  * both renderers, Postgres (PGlite) and the boot planner to them directly.
  */
-import { col, defineTable, rel } from "@rebasepro/types";
+import { col, defineTable, rel, pgEnum, sql } from "@rebasepro/types";
 
 /** `.generatedAs()`: a column Postgres computes from the row. */
 export const people = defineTable("people", {
@@ -13,8 +13,8 @@ export const people = defineTable("people", {
         id: col.uuid().primaryKey().defaultRandom(),
         firstName: col.text().notNull(),
         lastName: col.text().notNull(),
-        fullName: col.text().notNull().generatedAs("first_name || ' ' || last_name"),
-        initials: col.varchar(2).generatedAs("left(first_name, 1) || left(last_name, 1)")
+        fullName: col.text().notNull().generatedAlwaysAs(sql`first_name || ' ' || last_name`),
+        initials: col.varchar({ length: 2 }).generatedAlwaysAs(sql`left(first_name, 1) || left(last_name, 1)`)
     },
     rls: "admin-only"
 });
@@ -22,9 +22,9 @@ export const people = defineTable("people", {
 /** `.identity()` at every width, key or not. */
 export const counters = defineTable("counters", {
     columns: {
-        id: col.bigint().primaryKey().identity(),
-        sequenceNo: col.integer().notNull().identity(),
-        tick: col.smallint().identity(),
+        id: col.bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
+        sequenceNo: col.integer().notNull().generatedByDefaultAsIdentity(),
+        tick: col.smallint().generatedByDefaultAsIdentity(),
         label: col.text()
     },
     rls: "admin-only"
@@ -33,8 +33,8 @@ export const counters = defineTable("counters", {
 /** A smallint identity key, and links into a bigint identity key — one bound, one derived. */
 export const tallies = defineTable("tallies", {
     columns: {
-        code: col.smallint().primaryKey().identity(),
-        counterId: col.bigint().notNull()
+        code: col.smallint().primaryKey().generatedByDefaultAsIdentity(),
+        counterId: col.bigint({ mode: "number" }).notNull()
     },
     relations: {
         counter: rel.belongsTo(() => counters, { localKey: "counter_id" }),
@@ -44,12 +44,12 @@ export const tallies = defineTable("tallies", {
 });
 
 /** One table per scalar key type a table may be keyed by. */
-export const codes = defineTable("codes", { columns: { code: col.varchar(12).primaryKey() }, rls: "admin-only" });
-export const initials = defineTable("initials", { columns: { letter: col.char(1).primaryKey() }, rls: "admin-only" });
+export const codes = defineTable("codes", { columns: { code: col.varchar({ length: 12 }).primaryKey() }, rls: "admin-only" });
+export const initials = defineTable("initials", { columns: { letter: col.char({ length: 1 }).primaryKey() }, rls: "admin-only" });
 export const grades = defineTable("grades", { columns: { grade: col.enum(["a", "b", "c"]).primaryKey() }, rls: "admin-only" });
 export const days = defineTable("days", { columns: { day: col.date().primaryKey() }, rls: "admin-only" });
 export const switches = defineTable("switches", { columns: { enabled: col.boolean().primaryKey() }, rls: "admin-only" });
-export const prices = defineTable("prices", { columns: { amount: col.numeric(10, 2).primaryKey() }, rls: "admin-only" });
+export const prices = defineTable("prices", { columns: { amount: col.numeric({ precision: 10, scale: 2 }).primaryKey() }, rls: "admin-only" });
 export const tickets = defineTable("tickets", { columns: { id: col.serial().primaryKey() }, rls: "admin-only" });
 export const slugs = defineTable("slugs", { columns: { slug: col.text().primaryKey() }, rls: "admin-only" });
 
@@ -83,31 +83,33 @@ export const keyed = defineTable("keyed", {
 export const lists = defineTable("lists", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
-        ids: col.array(col.uuid()),
-        counts: col.array(col.bigint()),
-        smalls: col.array(col.smallint()),
-        numbers: col.array(col.integer()),
-        amounts: col.array(col.numeric(8, 2)),
-        ratios: col.array(col.doublePrecision()),
-        labels: col.array(col.enum(["red", "green", "blue"])),
-        codes: col.array(col.varchar(5)),
-        words: col.array(col.text()),
-        flags: col.array(col.boolean()),
-        days: col.array(col.date()),
-        instants: col.array(col.timestamptz()),
-        times: col.array(col.time())
+        ids: col.uuid().array(),
+        counts: col.bigint({ mode: "number" }).array(),
+        smalls: col.smallint().array(),
+        numbers: col.integer().array(),
+        amounts: col.numeric({ precision: 8, scale: 2 }).array(),
+        ratios: col.doublePrecision().array(),
+        labels: col.enum(["red", "green", "blue"]).array(),
+        codes: col.varchar({ length: 5 }).array(),
+        words: col.text().array(),
+        flags: col.boolean().array(),
+        days: col.date().array(),
+        instants: col.timestamp({ withTimezone: true }).array(),
+        times: col.time().array()
     },
     rls: "admin-only"
 });
 
 const PRIORITIES = ["low", "normal", "high"] as const;
 
+const priorityEnum = pgEnum("priority", PRIORITIES);
+
 /** `col.enum(values, { name })`: one shared type, used by several columns of several tables. */
 export const tasks = defineTable("tasks", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
-        priority: col.enum(PRIORITIES, { name: "priority" }).notNull().default("normal"),
-        escalatedTo: col.enum(PRIORITIES, { name: "priority" })
+        priority: priorityEnum().notNull().default("normal"),
+        escalatedTo: priorityEnum()
     },
     rls: "admin-only"
 });
@@ -115,8 +117,8 @@ export const tasks = defineTable("tasks", {
 export const bugs = defineTable("bugs", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
-        priority: col.enum(PRIORITIES, { name: "priority" }),
-        history: col.array(col.enum(PRIORITIES, { name: "priority" })),
+        priority: priorityEnum(),
+        history: priorityEnum().array(),
         state: col.enum(["open", "closed"])
     },
     rls: "admin-only"
@@ -126,8 +128,8 @@ export const bugs = defineTable("bugs", {
 export const handles = defineTable("handles", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
-        handle: col.varchar(40).notNull().validate({ max: 20 }),
-        country: col.char(2).validate({ min: 2, max: 3 })
+        handle: col.varchar({ length: 40 }).notNull().validate({ max: 20 }),
+        country: col.char({ length: 2 }).validate({ min: 2, max: 3 })
     },
     // `reason` is optional on a table's index.
     indexes: [{ columns: ["country", "handle"] }],
@@ -156,7 +158,7 @@ export const audits = defineTable("audits", {
  * at another integer width than the key it points at — the shape a database
  * grown over years holds (`integer` into `bigint`).
  */
-export const members = defineTable("members", { columns: { id: col.bigint().primaryKey().identity() }, rls: "admin-only" });
+export const members = defineTable("members", { columns: { id: col.bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity() }, rls: "admin-only" });
 export const memberTags = defineTable("member_tags", {
     columns: {
         memberId: col.integer().primaryKey(),

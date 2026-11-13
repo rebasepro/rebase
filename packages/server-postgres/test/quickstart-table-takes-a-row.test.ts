@@ -233,16 +233,16 @@ describe("the quickstart's `products` table, read from the page", () => {
         // The table an earlier Rebase created for the same file: `id TEXT
         // PRIMARY KEY` and nothing to fill it. Boot never alters a column, but
         // a DEFAULT binds only future writes, so it is the one change it makes.
-        const { defineTable, col } = schemaBuilders;
+        const { defineTable, col, sql } = schemaBuilders;
         const collection = lowered(defineTable("products", {
             columns: {
                 // The planner's implicit key: what a key-less collection got.
-                id: col.text().primaryKey().defaultSql("gen_random_uuid()::text"),
+                id: col.text().primaryKey().default(sql`gen_random_uuid()::text`),
                 name: col.text().notNull(),
                 price: col.numeric().notNull(),
                 description: col.text(),
                 active: col.boolean().default(true),
-                createdAt: col.timestamptz().onCreateNow()
+                createdAt: col.timestamp({ withTimezone: true }).onCreateNow()
             },
             rls: "inherit"
         }));

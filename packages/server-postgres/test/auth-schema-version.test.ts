@@ -81,9 +81,9 @@ describe("authUidSqlType", () => {
     });
 
     it("is INTEGER for the integer family, given or generated", () => {
-        expect(authUidSqlType(usersTable(col.integer().primaryKey().identity()))).toBe("INTEGER");
+        expect(authUidSqlType(usersTable(col.integer().primaryKey().generatedByDefaultAsIdentity()))).toBe("INTEGER");
         expect(authUidSqlType(usersTable(col.integer().primaryKey()))).toBe("INTEGER");
-        expect(authUidSqlType(usersTable(col.bigserial().primaryKey()))).toBe("INTEGER");
+        expect(authUidSqlType(usersTable(col.bigserial({ mode: "number" }).primaryKey()))).toBe("INTEGER");
     });
 
     it("is TEXT for a text key, and with no auth table", () => {

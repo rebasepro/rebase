@@ -75,8 +75,8 @@ const docsTable = pgTable("docs", {
 
 const PEOPLE = defineTable("people", {
     columns: {
-        id: col.varchar().primaryKey(),
-        name: col.varchar()
+        id: col.varchar({ length: 255 }).primaryKey(),
+        name: col.varchar({ length: 255 })
     },
     rls: "admin-only"
 });
@@ -92,11 +92,11 @@ const hookLog: string[] = [];
  */
 const DOCS = defineTable("docs", {
     columns: {
-        id: col.varchar().primaryKey(),
-        title: col.varchar(),
-        due: col.timestamptz(),
-        created_at: col.timestamptz().onCreateNow(),
-        deletedAt: col.timestamptz()
+        id: col.varchar({ length: 255 }).primaryKey(),
+        title: col.varchar({ length: 255 }),
+        due: col.timestamp({ withTimezone: true }),
+        created_at: col.timestamp({ withTimezone: true }).onCreateNow(),
+        deletedAt: col.timestamp({ withTimezone: true })
     },
     relations: {
         author: rel.belongsTo(() => PEOPLE)

@@ -51,21 +51,21 @@ function runtimeOf(def: AnyTableDef): RuntimeTable {
 }
 
 const plainPosts = defineTable("posts", {
-    columns: { id: col.integer().primaryKey().identity(), deletedAt: col.timestamptz() },
+    columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), deletedAt: col.timestamp({ withTimezone: true }) },
     rls: "admin-only"
 });
 const offPosts = defineTable("posts", {
-    columns: { id: col.integer().primaryKey().identity(), deletedAt: col.timestamptz() },
+    columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), deletedAt: col.timestamp({ withTimezone: true }) },
     softDelete: false,
     rls: "admin-only"
 });
 const softPosts = defineTable("posts", {
-    columns: { id: col.integer().primaryKey().identity(), deletedAt: col.timestamptz() },
+    columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), deletedAt: col.timestamp({ withTimezone: true }) },
     softDelete: true,
     rls: "admin-only"
 });
 const removedOnPosts = (removedOn: AnyColumn) => defineTable("posts", {
-    columns: { id: col.integer().primaryKey().identity(), removedOn },
+    columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), removedOn },
     softDelete: { field: "removedOn" },
     rls: "admin-only"
 });
@@ -85,12 +85,12 @@ describe("resolveSoftDelete", () => {
     });
 
     it("takes a named field, and the SQL name its column declares", () => {
-        const table = runtimeOf(removedOnPosts(col.timestamptz().column("removed_on_ts")));
+        const table = runtimeOf(removedOnPosts(col.timestamp("removed_on_ts", { withTimezone: true })));
         expect(resolveSoftDelete(table)).toEqual({ field: "removedOn", columnName: "removed_on_ts" });
     });
 
     it("reads the derived SQL name of a named field with no .column()", () => {
-        const table = runtimeOf(removedOnPosts(col.timestamptz()));
+        const table = runtimeOf(removedOnPosts(col.timestamp({ withTimezone: true })));
         expect(resolveSoftDelete(table)?.columnName).toBe("removed_on");
     });
 });

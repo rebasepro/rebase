@@ -34,9 +34,9 @@ const users = defineAuthTable("users", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         email: col.text(),
-        displayName: col.text().column("display_name"),
+        displayName: col.text("display_name"),
         // Secrets by name: the compiler marks them private.
-        passwordHash: col.text().column("password_hash")
+        passwordHash: col.text("password_hash")
     },
     rls: "admin-only"
 });
@@ -55,9 +55,9 @@ const staff = defineTable("staff", {
         id: col.serial().primaryKey(),
         name: col.text(),
         notes: col.text().access({ read: ["hr"] }),
-        apiKey: col.text().column("api_key").private(),
-        bandId: col.integer().column("band_id"),
-        leadBandId: col.integer().column("lead_band_id")
+        apiKey: col.text("api_key").private(),
+        bandId: col.integer("band_id"),
+        leadBandId: col.integer("lead_band_id")
     },
     relations: {
         band: rel.belongsTo(() => bands, { localKey: "band_id", access: { read: ["hr"] } })

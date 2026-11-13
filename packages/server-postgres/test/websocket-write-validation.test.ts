@@ -473,7 +473,7 @@ describe("a socket write through a parent's relation, declared with defineTable"
         rls: "admin-only"
     });
     const membersT = defineTable("members", {
-        columns: { id: col.serial().primaryKey(), name: col.text(), bandId: col.integer().column("band_id") },
+        columns: { id: col.serial().primaryKey(), name: col.text(), bandId: col.integer("band_id") },
         relations: { band: rel.belongsTo(() => bandsT, { localKey: "band_id", access: { write: ["hr"] } }) },
         rls: "admin-only"
     });

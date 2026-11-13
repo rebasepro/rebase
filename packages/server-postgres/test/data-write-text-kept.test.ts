@@ -107,7 +107,7 @@ describe("the coercions a column type asks for", () => {
     });
 
     it("normalizes a date's text, and only a date's", () => {
-        const date = columnOf(col.timestamptz());
+        const date = columnOf(col.timestamp({ withTimezone: true }));
         const text = columnOf(col.text());
         expect(serializeColumnToServer("2024-01-01T00:00:00Z", date)).toBe("2024-01-01T00:00:00.000Z");
         expect(serializeColumnToServer("2024-01-01T00:00:00Z", text)).toBe("2024-01-01T00:00:00Z");

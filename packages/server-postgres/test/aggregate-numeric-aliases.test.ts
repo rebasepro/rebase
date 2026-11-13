@@ -26,11 +26,11 @@ import { runtimeTableOfDef } from "./helpers/codec-columns";
 const properties = runtimeTableOfDef(defineTable("products", {
     columns: {
         id: col.integer().primaryKey(),
-        price: col.numeric(10, 2),
-        quantity: col.bigint(),
+        price: col.numeric({ precision: 10, scale: 2 }),
+        quantity: col.bigint({ mode: "number" }),
         sku: col.text(),
-        name: col.varchar(),
-        createdAt: col.timestamptz()
+        name: col.varchar({ length: 255 }),
+        createdAt: col.timestamp({ withTimezone: true })
     },
     rls: "admin-only"
 })).columnsByKey;

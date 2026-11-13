@@ -39,7 +39,7 @@ const people = defineTable("people", {
 const counters = defineTable("counters", {
     columns: {
         id: col.uuid().primaryKey(),
-        kind: col.text().oneOf(["a", "b"]),
+        kind: col.text({ enum: ["a", "b"] }),
         value: col.numeric()
     },
     rls: "admin-only"

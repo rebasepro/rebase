@@ -131,8 +131,8 @@ describe("serializeColumnToServer", () => {
 
     // ── Native array column ──
     describe("array column", () => {
-        const strings = columnOf(col.array(col.text()));
-        const numbers = columnOf(col.array(col.numeric()));
+        const strings = columnOf(col.text().array());
+        const numbers = columnOf(col.numeric().array());
 
         it("should serialize array elements through their element type", () => {
             expect(serializeColumnToServer(["a", "b", "c"], strings)).toEqual(["a", "b", "c"]);
@@ -196,7 +196,7 @@ describe("serializeColumnToServer", () => {
 
     // ── Vector column ──
     describe("vector column", () => {
-        const vector = columnOf(col.vector(3));
+        const vector = columnOf(col.vector({ dimensions: 3 }));
 
         it("should serialize a Vector envelope to a flat array", () => {
             const vectorVal = { __type: "Vector",
@@ -241,7 +241,7 @@ value: [1.5, -2.0, 3.14] };
     // ── A type Rebase does not create ──
     describe("custom column", () => {
         it("passes the value through as sent", () => {
-            const inet = columnOf(col.custom("inet"));
+            const inet = columnOf(col.custom({ dataType: "inet" }));
             expect(serializeColumnToServer("10.0.0.1", inet)).toBe("10.0.0.1");
             expect(serializeColumnToServer("data:application/octet-stream;base64,AQID", inet))
                 .toBe("data:application/octet-stream;base64,AQID");

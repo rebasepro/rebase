@@ -158,7 +158,7 @@ describe("configuration errors are refused, not ignored", () => {
         // A JavaScript config is not held to the `VectorMetric` union.
         const index: VectorIndexOptions = JSON.parse("{\"metric\":\"manhattan\"}");
         const [compiled] = compileSchema([defineTable("documents", {
-            columns: { id: col.text().primaryKey(), embedding: col.vector(3, { index }) },
+            columns: { id: col.text().primaryKey(), embedding: col.vector({ dimensions: 3, index }) },
             rls: "admin-only"
         })]);
         expect(() => buildTableVectorIndexPlan(compiled.descriptor)).toThrow(VectorIndexConfigError);
@@ -241,10 +241,10 @@ describe("buildTableVectorIndexPlan / buildTableVectorColumnSpecs", () => {
     const documents = defineTable("documents", {
         columns: {
             id: col.text().primaryKey(),
-            embedding: col.vector(3, { index: { method: "hnsw", metric: ["cosine", "ip"], m: 8 } }).notNull(),
-            summaryEmbedding: col.vector(3).unique(),
-            wide: col.vector(MAX_INDEXABLE_VECTOR_DIMENSIONS + 1),
-            unindexed: col.vector(3, { index: false })
+            embedding: col.vector({ dimensions: 3, index: { method: "hnsw", metric: ["cosine", "ip"], m: 8 } }).notNull(),
+            summaryEmbedding: col.vector({ dimensions: 3 }).unique(),
+            wide: col.vector({ dimensions: MAX_INDEXABLE_VECTOR_DIMENSIONS + 1 }),
+            unindexed: col.vector({ dimensions: 3, index: false })
         },
         rls: "admin-only"
     });

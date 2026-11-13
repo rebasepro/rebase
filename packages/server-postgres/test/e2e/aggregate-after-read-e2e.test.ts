@@ -37,13 +37,13 @@ const ordersTable = pgTable("orders", {
 });
 
 const customers = defineTable("customers", {
-    columns: { id: col.serial().primaryKey(), email: col.varchar(), salary: col.integer() },
+    columns: { id: col.serial().primaryKey(), email: col.varchar({ length: 255 }), salary: col.integer() },
     hooks: { afterRead: ({ values }) => ({ ...values, email: "***", salary: null }) },
     rls: "admin-only"
 });
 
 const orders = defineTable("orders", {
-    columns: { id: col.serial().primaryKey(), status: col.varchar(), total: col.integer() },
+    columns: { id: col.serial().primaryKey(), status: col.varchar({ length: 255 }), total: col.integer() },
     rls: "admin-only"
 });
 

@@ -369,8 +369,8 @@ describe("buildTableIndexSpecs", () => {
             id: col.serial().primaryKey(),
             title: col.text(),
             status: col.text(),
-            tags: col.array(col.text()),
-            createdAt: col.timestamptz().column("created_at")
+            tags: col.text().array(),
+            createdAt: col.timestamp("created_at", { withTimezone: true })
         },
         relations: { author: rel.belongsTo(() => authors) },
         indexes: [
