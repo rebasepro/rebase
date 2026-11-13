@@ -158,11 +158,20 @@ export const authors = defineTable("authors", {
 `foreignKey` is the SQL column on the target, and defaults to
 `<this table's slug in the singular>_id`: on `authors`, `author_id`.
 
-`hasMany` also declares an `orderBy` option — the order related rows would come
-back in when the caller names none — but the schema compiler does not accept it
-yet: a table that sets it is refused (`has-many-order-by`) by boot,
-`rebase db generate` and `db push`. Until then, related rows come back in the
-order the caller asks for with `include`'s own `orderBy`.
+`hasMany` takes an `orderBy`: the order related rows come back in when the
+caller names none. It is one sort key or several, each
+`[column, "asc" | "desc", nulls?]`, naming the target's columns:
+
+```ts
+posts: rel.hasMany(() => posts, { foreignKey: "author_id", orderBy: [["published_at", "desc"]] }),
+```
+
+The declared order applies to an include, a single-parent relation read and a
+nested listing (`/api/data/authors/1/posts`) whenever the caller names no
+order. A caller's `orderBy` replaces it rather than extending it. The target's
+key ascending always ends the order, so pages are stable. A per-parent include
+`limit` keeps the first rows of that order, and a nested listing pages on it,
+with an offset or a cursor.
 
 ### Joining on a natural key
 

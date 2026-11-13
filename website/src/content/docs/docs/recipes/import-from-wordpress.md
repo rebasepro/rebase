@@ -12,13 +12,13 @@ column names to your own table's.
 
 A [script](/docs/backend/scripts/) reads the WordPress REST API and upserts each
 post by its slug, so running it again updates rather than duplicates. It opens
-the project with the `collections` list the [Scripts](/docs/backend/scripts/#openrebase)
+the project with the compiled `tables` the [Scripts](/docs/backend/scripts/#openrebase)
 page builds in `backend/scripts/tables.ts`:
 
 ```typescript
 // backend/scripts/import-wordpress.ts
 import { openRebase } from "@rebasepro/server-postgres";
-import { collections } from "./tables";
+import { tables } from "./tables";
 
 type WpPost = {
     slug: string;
@@ -32,7 +32,7 @@ type WpPost = {
 const WP = "https://blog.example.com/wp-json/wp/v2/posts";
 const STATUS: Record<string, string> = { publish: "published", future: "scheduled", draft: "draft", pending: "review" };
 
-const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
+const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, tables });
 const posts = rebase.dataAsAdmin.table<Record<string, unknown>>("posts");
 
 for (let page = 1; ; page++) {

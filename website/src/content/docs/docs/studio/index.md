@@ -58,14 +58,33 @@ A visual editor for a table and how the panel shows it. A save is split in two:
 
 A slug, SQL table or database change is refused as a migration. A table whose
 rules come from `defaultRls` asks before taking rules of its own. A caller
-served redacted rules gets a read-only editor, and a Firestore collection is
-read-only here: it is defined in the frontend. A save the server cannot
+served redacted rules gets a read-only editor. A save the server cannot
 compile lists each problem against the field it names, and nothing is written.
 A file changed on disk since the editor read it offers a reload instead of
-overwriting the change. A field whose definition is built in code — a helper,
+overwriting the change (`SCHEMA_EDIT_STALE_FILE`). A field whose definition is built in code — a helper,
 a shared variable — is shown read-only, with the reason. Column order is
 presentation only: reordering never moves a column in the table. It is the
 screenshot at the top of this page.
+
+**Import an existing table.** A table the database has and `backend/schema`
+does not declare is listed under "Import an existing table"; picking one writes
+its `defineTable` file exactly as the database describes it — columns, keys,
+indexes, row-level security — through the `adoptTable` edit. Adoption changes
+nothing in the database: it plans no DDL, and the first policy step re-creates
+an identical policy once to stamp it. The row-level security posture is never
+lowered: a table with RLS off, or with no policies, is adopted as
+`rls: "admin-only"`, and the dialog says so. A table with no primary key cannot
+be adopted. The routes are `GET /api/admin/schema-editor/unmapped-tables` and
+`GET /api/admin/schema-editor/unmapped-tables/:schema/:table`.
+
+**Firestore collections.** In development the collection editor also edits
+Firestore collections: a save rewrites the collection's
+`defineFirestoreCollection({...})` call in `frontend/src/cms` in place, changing
+only what you edited. Functions, custom components, comments and imports stay
+as written; fields defined in code show as read-only. In production Firestore
+collections are read-only in the editor. Creating one, or changing its slug,
+is done in code; to delete one, remove its file and its `externalCollections`
+entry.
 
 The editor is on wherever Studio is mounted — a scaffold's `<RebaseStudio/>` is
 enough, and there is no prop to add. `collectionEditor` tunes it rather than

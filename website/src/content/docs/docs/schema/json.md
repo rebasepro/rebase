@@ -36,7 +36,7 @@ With a shape, the server:
 
 - **validates** each field before a write, with the same rules a column takes;
 - **applies defaults** to fields that are absent on create;
-- **stamps** date fields with `.onCreateNow()` and `.onUpdateNow()`;
+- **stamps** date fields with `.onCreateNow()` / `.onUpdateNow()`, and user fields with `.onCreateUser()` / `.onUpdateUser()`, at any depth;
 - **runs** each field's `.transform()` hooks;
 - **finds the files** a document references (`json.storage()`), so the orphan
   sweep counts them;
@@ -76,11 +76,13 @@ instead.
 | `.required()` | every field | The key must be present in the document. Makes the key non-optional in the type. |
 | `.default(value)` | every field | The value written when the key is absent on create. |
 | `.describe(text)` | every field | What the value is, for OpenAPI and MCP. |
-| `.validate(rules)` | every field | The rules a column of the same kind takes: text rules on `json.string()`, numeric rules on `json.number()`, date bounds on `json.date()`, item counts on `json.array()`. See [Validation](/docs/schema/columns/#validation). |
+| `.validate(rules)` | every field | The rules a column of the same kind takes: text rules on `json.string()`, numeric rules on `json.number()`, date bounds on `json.date()`, item counts, `uniqueItems` and `uniqueBy` on `json.array()`. See [Validation](/docs/schema/columns/#validation). |
 | `.transform({ beforeSave?, afterRead? })` | every field | Field-level hooks, run on the server. `value` is `T \| undefined` unless `.required()` comes first. |
 | `.oneOf(values)` | `json.string()`, `json.number()` | A closed set of accepted values, typed as their union. |
 | `.onCreateNow()` | `json.date()` | The server writes the current time when the row is created. |
 | `.onUpdateNow()` | `json.date()` | The server writes the current time on every write. |
+| `.onCreateUser()` | `json.string()` | The server writes the acting user's id when the row is created, or `null` when nobody is acting. |
+| `.onUpdateUser()` | `json.string()` | The server writes the acting user's id on every write. |
 | `.userId()` | `json.string()` | The value is a user's id: the panel offers a user picker, and a caller who may write the table may look users up to fill it. See [User columns](/docs/schema/columns/#user-columns). |
 
 Fields are optional unless `.required()`. A required key is required in the
@@ -99,6 +101,15 @@ const address = json.object({
 // { street: string; city: string; country: string; notes?: string }
 const shipping = col.jsonb(address);
 ```
+
+### Stamps inside a document
+
+Stamps work at any depth of a JSON column: object fields, each array item, and
+the value of a `oneOf` item whose `type` names the variant. On a create,
+missing objects on the way to a stamp are created. On an update, only the
+`onUpdate*` fields are stamped, and only inside a document the update sends; a
+document it does not send keeps its stored value. A stamp replaces whatever the
+write sent, and a field's `.default()` fills it first.
 
 ## Arrays and typed blocks
 
@@ -132,6 +143,14 @@ type Block =
     | { type: "image"; value: string }
     | { type: "quote"; value: { text: string; author?: string } };
 ```
+
+`json.array(json.object({...})).validate({ uniqueBy: ["sku"] })` refuses two
+items that share a value in a named field (`unique_by`; absent and `null`
+values are not compared, and a `$push` checks the pushed items among
+themselves). `validate({ uniqueItems: true })` refuses two equal items.
+The top of a document may itself be a scalar or a `json.oneOf`, and
+`json.unknown()` is a field of any JSON value; the server checks each shape on
+REST, MCP and socket writes.
 
 `typeField` and `valueField` rename the two keys, for documents that already use
 other names: `json.oneOf({ … }, { typeField: "kind", valueField: "data" })`.

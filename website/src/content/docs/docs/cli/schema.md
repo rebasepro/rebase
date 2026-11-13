@@ -36,7 +36,7 @@ Every command that reads the schema takes `--schema-dir <dir>` for a project
 that keeps its tables somewhere else; the default is `backend/schema`, or the
 `tables` key of the backend app in `rebase.json`. `--collections` / `-c`, the
 pre-0.31 flag, is refused with a message naming the codemod
-([`rebase migrate collections-to-tables`](/docs/cli/#rebase-migrate)), and so is a
+([`rebase migrate collections-to-tables`](#rebase-migrate)), and so is a
 project that still has `config/collections`.
 
 ### 2. Drizzle Schema → Migrations
@@ -273,7 +273,7 @@ nothing. The directory carries its own `.gitignore` and is never committed.
 | `policies.sql` | The RLS policies your tables' `rls` compiles to |
 | `search.sql` | The full-text search functions and generated columns, for tables with a `search` block |
 | `vector.sql` | pgvector extensions and ANN indexes |
-| `triggers.sql` | `rebase.set_updated_at()` and the `BEFORE UPDATE` triggers behind `autoValue: "on_update"` |
+| `triggers.sql` | `rebase.set_updated_at()` and the `BEFORE UPDATE` triggers behind `.onUpdateNow()` |
 
 Atlas manages the first and nothing else, so `db push` and the boot-time schema
 ensure apply the other four themselves. A **migration-only** deployment — one
@@ -493,6 +493,42 @@ is the snake_case of the key, and serves it as `row.createdAt`. The column
 itself is untouched. The table *accessor* is turned into a property name the
 same way (`my-notes` → `client.data.myNotes`), which is what `tablesDictionary`
 maps back to the slug.
+
+### `rebase migrate`
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`rebase migrate collections-to-tables [dir]` moves `config/collections` to
+`backend/schema` (one `defineTable` per collection, every column explicit at
+its original position, in the Drizzle spelling, and `index.ts` with
+`defaultRls`) and `frontend/src/cms` (a `customizeTable` per customized
+collection, `defineFirestoreCollection` files, `ui-config.json`), writes
+`backend/resources.ts`, `backend/storage.ts` and `backend/generated/register.ts`,
+adds `rebaseBackendGuard()` to a scaffold's `vite.config.ts`, then runs
+`rebase migrate sdk-calls`, which rewrites `.collection(` to `.table(`, the
+other SDK renames and the rule sources `existsIn` / `membership` in your code.
+Every run reads the result back: the generated SQL — DDL, policies, search,
+vector, triggers, views, the Drizzle schema — must be byte-identical, or every
+file is put back. What it cannot carry is refused with its file and line, and
+what it leaves to you is printed as numbered manual steps, ending with
+`rebase skills install` when the project holds agent skills. `config/` is never
+deleted; the run prints the `git rm` line.
+
+| Flag | Effect |
+|---|---|
+| `--dry-run` | Print files, refusals, notes and manual steps; write nothing. Start here. |
+| `--check` | On a migrated project: prove `backend/schema` still renders the same SQL. Exits 1 with the diff, or while a rule changes meaning. |
+| `--accept-rule-changes` | With `--check`: the rules under "Review before deploying" were reviewed. |
+| `--json` / `--force` / `--skip-sdk-calls` | The report as JSON (with `ruleChanges`); run on a dirty tree or over edited output; leave your code alone. |
+
+The SQL check proves the conversion faithful, not that a rule still means what
+it did. The last section of the output, **"Review before deploying: these rules
+change meaning"**, lists every rule whose policy now grants something different
+— a bare `access: "authenticated"` granted nothing and admits every signed-in
+caller now ([the four shapes](/docs/upgrading/0-30-to-0-31/#review-before-deploying-these-rules-change-meaning)).
+Then check against your database: `rebase db push --dry-run` should print "No
+changes: the database already matches these tables.", and
+`rebase doctor --policies` no drift.
 
 ## Development Workflow
 

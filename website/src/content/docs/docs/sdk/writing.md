@@ -262,7 +262,7 @@ no `history` and no `tenant`, a batch is a handful of statements rather than
 one per row: `createMany` sends multi-row `INSERT … RETURNING` statements (with
 `upsert`, `INSERT … ON CONFLICT … DO UPDATE`), and `updateMany` one
 `UPDATE … FROM (VALUES …) RETURNING` per run of entries that set the same
-fields. Declared defaults, `autoValue` stamps, `afterRead` and realtime events
+fields. Declared defaults, `.onCreateNow()` / `.onUpdateNow()` stamps, `afterRead` and realtime events
 apply to every row as they do one at a time. If the database refuses the
 batch, it is undone and replayed row by row so the error still names the entry
 that failed. A table that declares one of those hooks keeps the row-by-row

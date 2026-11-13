@@ -114,16 +114,21 @@ dropped by hand.
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 
-A rule is one of these forms. Mixing two in one rule (an `ownerField` with raw
-`using`, say) is a type error, never a policy that silently ignores half of
-what was written.
+A rule is one of these forms. Mixing two in one rule is a type error, and the
+compiler refuses it too, so JavaScript and casts are caught: `access` beside
+`ownerField`, `using` or `withCheck`; `ownerField` beside `using`, `withCheck`,
+`condition` or `check`; `condition` or `check` beside `using` or `withCheck`.
+So is a value outside the list for `access`, `mode`, `operation(s)` or `roles`
+(a misspelt `"restrictive"` is refused, not read as permissive). A rule never
+becomes a policy that silently ignores half of what was written.
 
 | Form | Example | `USING` (which rows) | `WITH CHECK` (what may be written) |
 |---|---|---|---|
 | Owner | `{ ownerField: "authorId" }` | the column equals the caller's id | the same |
 | Public | `{ access: "public" }` | every row | every row |
 | Signed in | `{ access: "authenticated" }` | every row, for a signed-in caller | the same |
-| Access with a condition | `{ access: "public", condition: { status: "published" } }` | the condition (and signed in, for `"authenticated"`) | `check`, else the condition, gated the same way |
+| Signed in with an account | `{ access: "registered" }` | every row, for a signed-in caller who is not a guest | the same |
+| Access with a condition | `{ access: "public", condition: { status: "published" } }` | the condition (and signed in, for `"authenticated"` and `"registered"`) | `check`, else the condition, gated the same way |
 | Access with a check | `{ access: "authenticated", check: { state: "open" } }` | the access test alone | the check, gated by the access test |
 | Structured | `{ condition: policy.rolesOverlap(["moderator"]) }` | the condition | `check`, else the condition |
 | Raw SQL | `{ using: "{published_at} > now() - interval '30 days'" }` | the SQL | `withCheck`, else `using` |
@@ -145,6 +150,14 @@ Every form also takes the shared keys:
 column and read inside a policy through `rebase.roles()`. They are not Postgres
 roles: names like `anon` or `authenticated` belong to `pgRoles`, and in `roles`
 they produce a condition no user meets. Almost every project wants `roles`.
+
+:::note[Rules migrated from 0.30]
+The 0.30 compiler read only one clause of a rule and knew no `access` value but
+`"public"`, so four shapes now grant something different — a bare
+`access: "authenticated"` granted nothing and admits every signed-in caller
+now. `rebase migrate collections-to-tables` lists each one under "Review before
+deploying"; see [the upgrade guide](/docs/upgrading/0-30-to-0-31/#review-before-deploying-these-rules-change-meaning).
+:::
 
 ### Owner
 
@@ -182,8 +195,10 @@ answers 401 to a request with no token. Set `AUTH_REQUIRE=false`
 decide; then an unauthenticated caller reads these rows too.
 
 `{ access: "authenticated" }` is the same with a signed-in test: the caller has
-a session. A guest created by anonymous sign-in has one; see
-[`authenticated()` and `registered()`](#authenticated-and-registered).
+a session. A guest created by anonymous sign-in has one.
+`{ access: "registered" }` also excludes guests; prefer it on a project with
+anonymous sign-in. Both combine with `condition` and `check` like `"public"`.
+See [`authenticated()` and `registered()`](#authenticated-and-registered).
 
 ### Conditions
 
@@ -344,7 +359,8 @@ never `NULL` on a request, and `policy.authenticated()` (like
 
 A **guest** is different: `POST /auth/anonymous` creates a real user row with a
 real session, so a guest passes every test that looks at the id.
-`policy.registered()` is `authenticated()` plus "not a guest". Use it wherever a
+`policy.registered()` (and `access: "registered"`) is `authenticated()` plus
+"not a guest". Use it wherever a
 rule is about a person who could be held responsible — writing a review, joining
 an organization, spending money — and `authenticated()` where a guest is welcome:
 a cart before checkout, a draft before signup.

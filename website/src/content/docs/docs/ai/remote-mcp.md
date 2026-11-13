@@ -54,8 +54,11 @@ to one user, the endpoint declines to mount and says why in the boot log. No
 - **Three tools put your admin panel in front of the person.** In a client that
   renders MCP Apps, such as Claude, they open the admin panel's own views in the
   conversation, drawn from the table descriptors the backend serves to this
-  person — columns, enums, validation, relations — and your project's own
-  panel customizations, where the backend serves its MCP view.
+  person — columns, enums, validation, relations — with the UI preferences the
+  panel composes: the `ui-config.json` the bundle shipped, the workspace's, and
+  the person's own (an API key has none), so labels, column order, hidden
+  columns and enum labels match the panel. Your project's own panel
+  customizations show where the backend serves its MCP view.
   - `show_table` takes `query_table`'s arguments, plus `view`
     (`table`, `list`, `cards` or `kanban`), and opens the table's view: the
     person can search, filter, sort and page, open a row's form, and add rows.
@@ -151,11 +154,13 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   restore. Its description tells the model the delete is permanent only where
   the table has no soft-delete field.
 - **The listing names the tables; `describe_table` gives one's schema.**
-  `list_tables` answers `{ tables: [{ name, description, kind? }] }` — no label:
-  the backend has no presentation — and `describe_table { table }` that table's
+  `list_tables` answers `{ tables: [{ name, description, kind? }] }` — no label —
+  and `describe_table { table }` that table's
   OpenAPI `row` (the columns this caller is served) and `create` (the writable
-  ones) schemas, its served `relations` and `rls` (raw SQL redacted without
-  `schema:read`), plus `softDeleteField` where rows go to a trash. What a
+  ones) schemas, its `primaryKey`, served `relations` and `rls` (raw SQL
+  redacted without `schema:read`), plus `softDeleteField` where rows go to a
+  trash, and the presentation the caller's UI preferences give it: `title`, and
+  per column `label`, `valueLabels`, `hidden`, `hiddenInForm`, `readOnly`. What a
   connection may learn about the schema is decided by the same serializer
   `GET /api/schema/tables` uses. The tool descriptions tell the model to
   describe a table before writing to it. A 200-table project's listing is

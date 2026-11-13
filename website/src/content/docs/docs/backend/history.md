@@ -159,13 +159,32 @@ Returns a list of history entries for a specific entity, ordered by most recent 
 }
 ```
 
+### Entries are served as reads
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+History entries are served the way the row is: field access first, then
+`afterRead` (global, table, column), inside the caller's read-only
+transaction. A column a hook or a `.transform({ afterRead })` masks is masked
+in `values` and `previous_values`; a column the caller's roles cannot read is
+withheld and left out of `changed_fields`; keys of columns the table no longer
+has are withheld. Whoever may read the row now may see its history, and
+`updated_by` is kept. A hook that throws on an old snapshot fails the request
+rather than serve it unmasked, and the history of a hard-deleted row answers
+404 ("No row with id '…' in table '…'").
+
+The Postgres driver does this; a custom driver serves history by implementing
+`DataDriver.serveStoredRows(path, rows)`, and without it the history routes
+answer 501. Before 0.31, entries were served as stored.
+
 ```
 POST /api/data/:slug/:entityId/history/:historyId/revert
 ```
 
 Writes the entry's `values` back to the row through the normal save path, so the
 revert is itself recorded as an `update`. It answers the saved row under `data`
-and `meta.reverted_from`, the entry's id.
+and `meta.reverted_from`, the entry's id. A revert never writes a column the caller
+cannot read: those keep their current value.
 
 Entries written by older versions can hold keys the row has no column for: a
 field an `afterRead` computed (before 0.24, a save recorded the row as

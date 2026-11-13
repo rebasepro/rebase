@@ -349,7 +349,12 @@ A name that is not a relation of the table is a **400
 `UNKNOWN_RELATION`**, at every level. It used to be ignored, which answers 200
 with the field simply missing — indistinguishable from a row that genuinely has
 no related row, so a typo looked exactly like empty data. A path deeper than
-three hops is `INCLUDE_TOO_DEEP`.
+three hops is `INCLUDE_TOO_DEEP`. A name is the relation's exact key in the
+table's `relations`; the slug and snake_case spellings older releases also
+tried are not. Related rows come back in the relation's declared
+[`orderBy`](/docs/collections/relations/) when the request names none, and a
+foreign key a relation generates on a `bigint` or `numeric` column is served
+as a number.
 
 ### Narrowing one relation
 

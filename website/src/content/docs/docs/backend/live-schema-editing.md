@@ -329,6 +329,35 @@ So a failed apply is **not an error**. The response says so:
 }
 ```
 
+## Rules take effect in the same apply
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+A change to a table's `rls` (or a new table) is enforced in the same apply: the
+policies of the changed tables are written to the database right after the DDL,
+and the response says what happened under `policies`:
+
+```json
+{ "policies": { "status": "applied", "tables": ["posts"], "statements": 3 } }
+```
+
+Where policies cannot be written — a backend that may not provision
+(`provision.tables` off) or a driver without the capability — the status is
+`"deferred"`; when writing them fails it is `"failed"`, with the error. Both
+carry the message "Rules saved to source; they take effect on the next
+deploy.", and the panel keeps showing the rules Postgres enforces until then,
+never rules that are not in force.
+
+Hooks edited in source take effect with the apply too: the server runs the
+compiled tables of the edited schema without a restart.
+
+## When the file changed under the edit
+
+An edit is prepared against the files as they are. If one of them changes on
+disk before the edit is applied — an IDE save, another process — the apply
+writes nothing and answers 409 `SCHEMA_EDIT_STALE_FILE`. The collection editor
+offers Reload; make the edit again against the file as it is now.
+
 ## Where this works
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
@@ -494,6 +523,8 @@ working in:
   catalogue it opened with until the process restarts, so a REST write to the
   new column can fail until then. Reads, and the descriptors the panel renders
   from, already have it.
+- A table an apply adds is not served by the Postgres driver until the process
+  restarts.
 
 ## Related
 

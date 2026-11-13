@@ -115,7 +115,7 @@ bundles carry `config/collections` — `defineCollection` objects — and a runt
 that reads only `backend/schema` has nothing to read them with; booting one
 would introspect the database instead of serving the declared tables. The
 refusal names the fix: run
-[`rebase migrate collections-to-tables`](/docs/cli/#rebase-migrate) on the
+[`rebase migrate collections-to-tables`](/docs/cli/schema/#rebase-migrate) on the
 project's source, then rebuild the bundle.
 
 **`runtime.contract`** is the interface between a bundle and the engine; 0.31

@@ -180,7 +180,7 @@ Every key is optional. A key you leave out keeps what the panel derived.
 
 | Option | Type | Effect |
 |---|---|---|
-| `defaultViewMode` | `ViewMode` | The view a visitor lands on: `"list"`, `"table"`, `"cards"`, `"kanban"` or a custom view's key. `"table"` otherwise. |
+| `defaultViewMode` | `ViewMode` | The view a visitor lands on: `"list"`, `"table"`, `"cards"`, `"kanban"` or a custom view's key. `"list"` otherwise. |
 | `enabledViews` | `ViewMode[]` | The views offered in the switcher. |
 | `kanban` | `{ columnField, orderField? }` | The board: the column it groups by and the text column it stores order keys in. See [View modes](/docs/frontend/view-modes/#kanban). |
 | `customViews` | `(string \| TableCustomView)[]` | More ways to render the rows: `{ key, name, Builder }`, or the key of one registered on `<RebaseCMS collectionViews>`. |
@@ -277,6 +277,7 @@ Each section takes:
 |---|---|---|
 | `entityActions` | `(string \| TableEntityAction)[]` | Actions on a record. An object, or the key of one registered on `<RebaseCMS entityActions>`. See [Entity actions](/docs/frontend/entity-actions/). |
 | `disableDefaultActions` | `("edit" \| "copy" \| "delete")[]` | Built-in actions this table does not offer. |
+| `resetPasswordAction` | `false \| TableEntityAction` | The auth table only (`defineAuthTable`): `false` removes the built-in reset-password action, an action replaces it (offered whatever the auth adapter supports: its backend is yours). Ignored, with a warning, on any other table. |
 | `entityViews` | `(string \| TableEntityView)[]` | Extra tabs on a record. See [Entity views](/docs/frontend/entity-views/). |
 | `Actions` | `Component[]` | Components rendered in the collection's toolbar. |
 | `components` | `TableComponentOverrides` | Collection-scoped component overrides, each `{ Component, wrap? }`. See [Component overrides](/docs/frontend/component-overrides/#collection-level-component-overrides). |
@@ -425,6 +426,7 @@ are typed by the document's keys. See [Arrays and JSON](/docs/collections/arrays
 | Option | Type | Effect |
 |---|---|---|
 | `previewFields` | `string[]` | The target's fields shown in the chip for a related row. At most three fit. |
+| `defaultValue` | `EntityRelation \| EntityRelation[]` | The related row(s) a new record's form starts with: `new EntityRelation(id, "<target slug>")`, or a list for a to-many relation. Written only when the form is saved. A column's own default is `.default()` on the column. |
 | `widget` | `"select" \| "dialog"` | How a related row is picked. |
 | `fixedFilter` | `FilterValues` | Offer only rows that pass this filter. |
 | `includeId` | `boolean` | Show the related row's id in previews. |
@@ -469,10 +471,18 @@ hidden columns, enum labels and colours, kanban and query defaults. A schema
 fact never lands there; the [collection editor](/docs/studio/) writes those to
 `backend/schema` instead.
 
+`rebase build` carries `frontend/src/cms/ui-config.json` into the bundle
+(`entry.uiConfig`), so a deployed backend knows it too: `GET /api/admin/ui-config`
+serves it as `shipped` beside the workspace and user layers, and the MCP views
+and `describe_table` fold the same three layers — the file, the workspace, and
+the caller's own (none for an API key) — so an agent sees the labels, order,
+hidden columns and enum labels a person sees in the panel.
+
 `rebase verify` reads every `customizeTable` call in `frontend/src/cms` against
 the tables, without running it: it catches a customization for a table or a
-field that does not exist, a required column the form hides, and a table
-customized twice. See [`rebase verify`](/docs/cli/#rebase-verify).
+field that does not exist, a required column the form hides, a table
+customized twice, a `ui-config.json` no `<RebaseCMS>` is passed, and a Vite
+config without `rebaseBackendGuard()`. See [`rebase verify`](/docs/cli/#rebase-verify).
 
 ## Next steps
 

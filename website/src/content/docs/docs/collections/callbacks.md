@@ -225,7 +225,16 @@ removed what the caller may not read.
 
 It shapes what a caller receives and nothing else: `afterSave`, the delete
 hooks and [history](/docs/backend/history/) get the row as stored, so a value
-masked here is never what an audit records or a revert writes back.
+masked here is never what an audit records or a revert writes back. History
+*serves* its entries through `afterRead` too, so a snapshot shows the value
+masked as the row does.
+
+Rows embedded in another table's response — an `include`, a relation ref's
+values, the rows a realtime frame carries for a relation — are masked one
+level deep with the **target** table's `afterRead`. The order is global, then
+table, then column `.transform({ afterRead })`. A realtime service with no
+driver to run the hooks refuses frames for a table that has them, rather than
+send them unmasked.
 
 ```ts
 import { defineTable, col } from "@rebasepro/server/schema";

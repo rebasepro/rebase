@@ -185,8 +185,8 @@ curl -X POST /api/data/products/bulk -d '{
 ```
 
 The target must carry a uniqueness guarantee the database can match on: the
-primary key (the default when none is named), a property with
-`validation: { unique: true }`, or the columns of a `unique: true`
+primary key (the default when none is named), a column declared
+`.unique()`, or the columns of a `unique: true`
 [index](/docs/backend/indexes/). Anything else is a `400`
 (`INVALID_CONFLICT_TARGET`) listing the targets that do exist — Postgres would
 otherwise answer *there is no unique or exclusion constraint matching the ON
@@ -233,7 +233,7 @@ them with `PATCH`.
 ### `Prefer: return=minimal`
 
 Every write answers with the full row by default, which is what carries the
-things the server decided — a serial id, an `autoValue` stamp, whatever
+things the server decided — a serial id, an `.onCreateNow()` stamp, whatever
 `beforeSave` rewrote. Send `Prefer: return=minimal` when you need none of it:
 
 ```bash

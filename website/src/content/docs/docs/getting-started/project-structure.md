@@ -87,9 +87,14 @@ jobs. `rebase generate-sdk --register` adds `backend/generated/`.
 
 `tsc --noEmit` at the root checks `scripts/`; in `backend/` or `frontend/` it
 checks that workspace. There is no separate `config/` package: the frontend
-imports a table from `backend/schema` as a type only, and a value import of
-anything under `backend/` is refused by `pnpm check:frontend-backend-imports`,
-because it would ship server code to the browser.
+imports a table from `backend/schema` as a type only (`import type`). A value
+import of anything under `backend/` would ship server code — hooks, and the
+secrets they read — to the browser, so `rebaseBackendGuard()` from
+`@rebasepro/app/vitePlugin`, in the scaffold's `frontend/vite.config.ts`, fails
+`vite build` and `vite dev` when anything resolves into `backend/`, naming the
+importer, the import and the file. `rebase build` refuses a frontend without
+it. To add it to an existing project, import it and add `rebaseBackendGuard()`
+to `plugins` in `frontend/vite.config.ts`.
 
 :::note[There is no `backend/src/index.ts`]
 And no `Dockerfile`. A scaffolded project declares `runtime: "managed"` in

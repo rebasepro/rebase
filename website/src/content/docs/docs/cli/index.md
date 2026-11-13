@@ -92,6 +92,11 @@ application image to build yourself. Useful flags:
 | `--no-static` | Do not fold the frontend into the backend bundle (each static app still gets its own bundle) |
 | `--skip-static-build` | Fold the frontend as already built, without running its build command |
 
+A frontend whose Vite config does not use `rebaseBackendGuard()` (from
+`@rebasepro/app/vitePlugin`) is refused: it is what keeps server code out of the
+browser bundle. `frontend/src/cms/ui-config.json` is carried into the bundle as
+`entry.uiConfig`, the workspace presentation a deployed backend serves.
+
 Dependencies are vendored by default so a new instance does not pay a 35–55
 second install. A tree that grows past 2 GB on disk is dropped instead, because
 the upload limit is 1 GB compressed.
@@ -238,33 +243,11 @@ is printed as JSON on stdout and a throw exits `1`. Flags: `--eval`/`-e`,
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 
 One-way moves from a layout this release no longer reads:
-
-```bash
-rebase migrate collections-to-tables [dir]   # config/collections → backend/schema + frontend/src/cms
-rebase migrate sdk-calls [dir]               # data.collection("x") → data.table("x") in your own code
-```
-
-`collections-to-tables` writes one `defineTable` per collection in
-`backend/schema/` (every column explicit, at its original position), its
-`index.ts` with `defaultRls`, a `customizeTable` in `frontend/src/cms/` for a
-collection whose presentation was not the default, `defineFirestoreCollection`
-files, and `backend/resources.ts`, `backend/storage.ts` and
-`backend/generated/register.ts` from `config/`. Then it runs `sdk-calls` over
-your code. Every run reads the result back through the new pipeline: the
-generated SQL — DDL, policies, search, vector, triggers, views, the Drizzle
-schema — must be byte-identical, or every file is put back. What it cannot
-carry exactly is refused with its file and line, and nothing is written; what
-it leaves to you is printed as numbered manual steps. `config/` is never
-deleted — the run prints the `git rm` line. Flags: `--dry-run`, `--check`
-(verify a project already migrated), `--json`, `--force` (a dirty git tree, or
-output files that differ), `--skip-sdk-calls`. The [upgrade
-guide](/docs/upgrading/0-30-to-0-31/#108-tables-in-backendschema-replace-configcollections--run-the-codemod-first) has the details.
-
-`sdk-calls` rewrites `.collection(` to `.table(` and the other SDK renames, and
-the rule sources `existsIn({ collection })` / `membership: { collection }` to
-`table`; it lists every call it left as written. Flags: `--dry-run`, `--json`,
-`--force`. With agent skills installed, the last manual step is the
-`rebase skills install` line that refreshes them.
+`rebase migrate collections-to-tables` (`config/collections` → `backend/schema`
+and `frontend/src/cms`) and `rebase migrate sdk-calls` (`data.collection("x")`
+→ `data.table("x")` in your own code). Their flags, what they write and the
+"Review before deploying" section are on
+[Schema Generation](/docs/cli/schema/#rebase-migrate).
 
 ### `rebase apps init` / `rebase apps config`
 
@@ -464,7 +447,7 @@ AI agent's hooks. Offline by default, and it never changes anything.
 | Table definitions (`schema`) | `backend/schema` does not load or does not compile, through the loader the backend boots from: a relation to a table the index does not export, `rls: "inherit"` with no `defaultRls`, a table with no primary key — one finding per problem. A table with no `rls` is one of them. |
 | RLS coverage (`rls`) | A table with a `user_id`, `owner_id`, `organization_id` or `tenant_id` column whose rules — its own, or the `defaultRls` it inherits — let a role read every row regardless of it. A warning. |
 | Migration freshness (`migrations`) | A table or column the tables declare that no file in `backend/drizzle/migrations` creates, or one they dropped that a migration still creates. Skipped for a project with no migrations yet. |
-| CMS customizations (`cms`) | A `customizeTable(...)` in `frontend/src/cms` (or the `src/cms` of a static app in `rebase.json`) that does not match the tables, read statically — the modules are not run. `cms-unknown-table`: the slug names no table, so the panel ignores it (the closest slug is suggested). `cms-unknown-field`: a key under `fields` is neither a column nor a relation (a column's SQL name is answered with its key). `cms-hidden-required`: a field kept off the form (`hiddenInForm`, `readOnly`, `disabled`) whose column is `NOT NULL` with no default and nothing the server fills, so creating a record from the panel always fails; a warning when a `beforeSave` hook or transform may fill it, and silenced by `filledByServer`. `cms-duplicate-customization`: one slug customized twice. `cms-not-static` (a warning): a call whose slug, options or `fields` are not literals or a same-file `const`, so nothing in it was checked. `cms-ui-config-not-mounted` (a warning): `frontend/src/cms/ui-config.json` exists but `<RebaseCMS>` is not given it as `uiConfig`. A headless project has no `frontend/src/cms` and skips the step. |
+| CMS customizations (`cms`) | A `customizeTable(...)` in `frontend/src/cms` (or the `src/cms` of a static app in `rebase.json`) that does not match the tables, read statically — the modules are not run. `cms-unknown-table`: the slug names no table, so the panel ignores it (the closest slug is suggested). `cms-unknown-field`: a key under `fields` is neither a column nor a relation (a column's SQL name is answered with its key). `cms-hidden-required`: a field kept off the form (`hiddenInForm`, `readOnly`, `disabled`) whose column is `NOT NULL` with no default and nothing the server fills, so creating a record from the panel always fails; a warning when a `beforeSave` hook or transform may fill it, and silenced by `filledByServer`. `cms-duplicate-customization`: one slug customized twice. `cms-not-static` (a warning): a call whose slug, options or `fields` are not literals or a same-file `const`, so nothing in it was checked. `cms-ui-config-not-mounted` (a warning): `frontend/src/cms/ui-config.json` exists but `<RebaseCMS>` is not given it as `uiConfig`. `cms-backend-guard-missing`: the frontend's Vite config does not use `rebaseBackendGuard()`, so `rebase build` would refuse it. A headless project has no `frontend/src/cms` and skips the step. |
 | Live RLS audit (`live`) | With `--live`: the [`rls-check`](/docs/rls-check) catalogue against the project's database, and whether every migration has been applied. The database is resolved as the `db` commands resolve it — `--database-url`, `DATABASE_URL`, `--docker`, otherwise the managed development database. A database that is not configured or does not answer is an error, not a skip: the audit was asked for. A `USING (true)` read policy compiled from an `access: "public"` rule is a warning while the API requires a token (`AUTH_REQUIRE`, on by default) — every signed-in user reads every row — and an error with `AUTH_REQUIRE=false`, where the rows are anonymous. |
 
 `--json` prints one object, `{ ok, schemaDir, steps, findings, summary }`:

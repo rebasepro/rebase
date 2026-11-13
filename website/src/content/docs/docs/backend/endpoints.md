@@ -207,9 +207,16 @@ What a caller is served depends on who it is:
 
 | Caller | Tables | Redacted |
 |---|---|---|
-| A signed-in person (or the service key) | every table | columns and relations their roles fail `access.read` for; `.private()` columns, for everyone; raw SQL in rules, compiled policies, view queries and indexes unless they hold `schema:read` |
+| An administrator, a `schema:read` holder, or the service key | every table, plain views included | `.private()` columns, for everyone |
+| Any other signed-in person, guests included | only the tables a permissive rule reaches for their roles (plus the auth table, and materialized views whose `roles` they hold) | columns and relations their roles fail `access.read` for; `.private()` columns; only the rules that can apply to their roles; relations into tables they are not served; hook flags; raw SQL in rules, compiled policies, view queries and indexes |
 | A credential (API key, MCP or platform token) | the tables its `data:*` scopes name, or all of them with `schema:read` | as above, judged on the scopes it carries |
 | Nobody signed in | none — `401` — unless the backend sets `schemaTables: { public: true }` | then the tables with a public `select` rule, redacted as for the least-privileged caller: no column with an `access.read` list, no raw SQL, no policies |
+
+A person keeps `metadata`, `softDelete`, `tenant`, `history` and `search` on
+the tables they are served. `schemaTables: { persons: "all" }` in the backend
+options describes every table and rule to every signed-in caller; the
+default is `"granted"`. MCP connections are judged as a
+credential, by the same serializer.
 
 A credential holding neither `schema:read` nor a `data:*` scope gets
 `403 SCOPE_MISSING`. A backend with no authentication configured answers

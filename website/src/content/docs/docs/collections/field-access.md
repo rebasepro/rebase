@@ -71,7 +71,10 @@ than about who is calling.
 
 A hook's `context.data` is not that plane. Inside a request it reads with the
 caller's roles, so the field rules apply to what it reads exactly as they apply
-to the request.
+to the request: the driver itself refuses a filter, sort, projection, include,
+vector search, aggregate or uniqueness probe that names a column those roles
+cannot read (`FIELD_NOT_READABLE`), and answers a `.private()` name as it
+answers a typo — the same as REST and the socket.
 
 ## `.private()` and `.readOnly()` are the same mechanism
 
@@ -132,7 +135,7 @@ GET /api/data/staff?salary=gt.100000
 {
   "error": {
     "code": "FIELD_NOT_READABLE",
-    "message": "'salary' is not readable on 'staff' with your roles, so it cannot be used in a filter.",
+    "message": "'salary' is not readable on table 'staff' with your roles, so it cannot be used in a filter.",
     "details": {
       "collection": "staff",
       "fields": ["salary"],
@@ -154,7 +157,7 @@ already public. Hiding the name here would protect nothing and would answer a
 caller's genuine typo with "unknown field", sending them to look for a spelling
 mistake that is not there. **Field names are public; field values are not.**
 
-Except a `.private()` column's. OpenAPI, `list_collections` and the generated
+Except a `.private()` column's. OpenAPI, `describe_table` and the generated
 SDK leave it out, so its name is not public, and "not readable" would confirm it
 exists. A filter, `orderBy`, `fields`, `include`, aggregate `select` or
 `groupBy`, or `vector_search` naming one gets exactly the answer a misspelt name

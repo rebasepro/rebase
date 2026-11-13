@@ -46,7 +46,7 @@ Two names are in scope, and top-level `await` works:
 | Name | What it is |
 |---|---|
 | `rebase` | What [`openRebase`](#openrebase) returns: `dataAsAdmin`, `sql`, `withAuth(user)` and `close()` |
-| `collections` | The project's tables, loaded from `backend/schema` the way `rebase db push` loads them, in the form `openRebase` takes (see [below](#openrebase)) |
+| `tables` | The descriptors of the tables the project serves, loaded from `backend/schema` the way `rebase db push` loads them (`rebase.tables`) |
 
 The console opens the project the way `rebase db push` does: the same `.env`,
 the same database, and the same tables, from `backend/schema`. It also loads
@@ -106,34 +106,34 @@ script under `backend/`, say `backend/scripts/publish-drafts.ts`: the backend
 workspace is the one that depends on `@rebasepro/server-postgres`, and a script
 in the root `scripts/` folder cannot import it.
 
-`openRebase` takes the tables in the form today's data layer reads, which
-`lowerTables` from `@rebasepro/common` produces from your definitions. Put that
-in one module the scripts share, `backend/scripts/tables.ts`, after adding
-`@rebasepro/common` to `backend/package.json`:
+`openRebase` takes the project's tables compiled: `compileSchema` from
+`@rebasepro/common` turns the `defineTable` results into the tables the driver
+runs on, hooks included. Put that in one module the scripts share,
+`backend/scripts/tables.ts`, after adding `@rebasepro/common` to
+`backend/package.json`:
 
 ```typescript no-verify
-import { lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 import * as schema from "../schema";
 
 // Every table the index exports, and the defaultRls its "inherit" tables take.
-export const collections = lowerTables(
+export const tables = compileSchema(
     [schema.users, schema.posts, schema.authors, schema.tags],
     { defaultRls: schema.defaultRls }
 );
 ```
 
-:::caution[This option is moving]
-The `collections` option is the one part of `openRebase` that still speaks the
-model before 0.31. A later release takes the `defineTable` results directly
-and drops `lowerTables`. `rebase console` already loads `backend/schema` for
-you.
-:::
+Pass the global hooks `backend/hooks.ts` exports as `hooks`, and a script's
+writes run them as a server write does; without them, a global `beforeSave`
+that stamps a tenant or writes an audit row runs on no script write. Leave
+`tables` out and `openRebase` reads the tables from the database, as a server
+with no `backend/schema` does. `rebase console` loads both for you.
 
 ```typescript
 import { openRebase } from "@rebasepro/server-postgres";
-import { collections } from "./tables";
+import { tables } from "./tables";
 
-const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
+const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, tables });
 
 const { data: drafts } = await rebase.dataAsAdmin.posts.find({ where: { status: ["==", "draft"] } });
 console.log(`${drafts.length} drafts`);
@@ -157,7 +157,7 @@ DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/publish-drafts.t
 | `dataAsAdmin` | Every table, read and written as the server's service identity (`{ uid: "service", roles: ["admin"] }`): admin, and still evaluated by your RLS policies, exactly like `rebase.dataAsAdmin` in a function |
 | `sql(query, { params })` | Raw SQL on the owner connection, with the same calling convention as `rebase.sql` in a function. It runs on the one data source opened: `{ database }` naming any other is refused |
 | `withAuth(user)` | Resolves to `{ data }`: the tables as that user sees them. Every read and write runs as them, filtered by row-level security, as an HTTP request from that user would be |
-| `collections` | The tables it was opened with |
+| `tables` | The descriptors of the tables it serves: the ones it was given, or the ones the database described |
 | `close()` | Ends the connection pool `openRebase` created. Safe to call twice |
 
 Its options:
@@ -166,10 +166,10 @@ Its options:
 |---|---|
 | `databaseUrl` | The database to open. `openRebase` creates the pool and `close()` ends it |
 | `connection` | A Drizzle connection you already hold (`createPostgresDatabaseConnection(url).db`), instead of `databaseUrl`. It stays yours: `close()` leaves it open |
-| `collections` | The project's tables, lowered (see above). An empty array reads them from the database instead, as a server with no `backend/schema` does, and serves them read-only |
+| `tables` | The project's tables, compiled with `compileSchema` (see above). Absent or empty reads them from the database instead, as a server with no `backend/schema` does, and serves them read-only |
 | `pool` | Pool settings, with `databaseUrl` |
 | `dataSourceKey` | The database these tables are served from. Default `(default)` |
-| `callbacks` | The project's global hooks, in the shape the data layer reads today. The server runs the `hooks` `backend/hooks.ts` exports ahead of every table's own; pass them here and a script write runs them too. `rebase console` does this for you |
+| `hooks` | The project's global hooks: the `hooks` `backend/hooks.ts` exports, which the server runs ahead of every table's own. Pass them here and a script write runs them too. `rebase console` does this for you |
 
 `openRebase` reads no environment variable. The `DATABASE_URL` above is read by
 your script, and settings such as `REBASE_DB_POOL_MAX` or `REALTIME_CDC` change
@@ -203,9 +203,9 @@ admin writes one. (The other tables say `rls: "inherit"` and take the
 
 ```typescript
 import { openRebase } from "@rebasepro/server-postgres";
-import { collections } from "./tables";
+import { tables } from "./tables";
 
-const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
+const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, tables });
 const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
 
 // A signed-in user reads published posts, and no drafts…
@@ -248,11 +248,11 @@ unfiltered. Run `rebase db push`, or boot the server once, first.
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { openRebase, type OpenedRebase } from "@rebasepro/server-postgres";
-import { collections } from "./tables";
+import { tables } from "./tables";
 
 let rebase: OpenedRebase;
 before(async () => {
-    rebase = await openRebase({ databaseUrl: process.env.TEST_DATABASE_URL!, collections });
+    rebase = await openRebase({ databaseUrl: process.env.TEST_DATABASE_URL!, tables });
 });
 after(() => rebase.close());
 
