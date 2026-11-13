@@ -1,0 +1,14 @@
+import type { FirebaseCollectionConfig } from "@rebasepro/types";
+
+/** Store visits, kept in Firestore. */
+const visitsCollection: FirebaseCollectionConfig = {
+    name: "Visits",
+    slug: "visits",
+    engine: "firestore",
+    properties: {
+        when: { name: "When", type: "date" },
+        store: { name: "Store", type: "reference", path: "customers" }
+    }
+};
+
+export default visitsCollection;

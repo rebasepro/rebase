@@ -1,0 +1,14 @@
+import type { FirebaseCollectionConfig } from "@rebasepro/types";
+
+/** One collection per locale: built by a call, there is no literal per collection. */
+export function getPagesCollection(locale: string): FirebaseCollectionConfig {
+    return {
+        name: `Pages (${locale})`,
+        slug: `pages_${locale}`,
+        path: `pages/${locale}/items`,
+        engine: "firestore",
+        properties: {
+            title: { name: "Title", type: "string" }
+        }
+    };
+}

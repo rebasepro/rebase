@@ -1,0 +1,10 @@
+import type { FirebaseCollectionConfig } from "@rebasepro/types";
+import visitsCollection from "./visits";
+import { getPagesCollection } from "./pages";
+
+export const locales = ["en", "de"];
+
+/** Every Firestore collection; the app spreads them into the panel's collections. */
+export function getRemoteCollections(): FirebaseCollectionConfig[] {
+    return [visitsCollection, ...locales.map(locale => getPagesCollection(locale))];
+}

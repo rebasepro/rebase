@@ -52,6 +52,36 @@ export interface LegacyProject {
      * never collections; they are moved like any other module of `config/`.
      */
     helperFiles: string[];
+    /**
+     * Firestore collections the project builds in a module the loader never
+     * read: a file under a subdirectory of `<config>/collections`, or a function
+     * the index exports (`getAllFirestoreCollections()`), which the app spread
+     * into the panel's collections. Empty when there are none.
+     */
+    builtFirestore: BuiltFirestoreCollection[];
+    /** The zero-argument functions that returned Firestore collections, with what each returned. */
+    firestoreBuilders: FirestoreBuilder[];
+}
+
+/** A Firestore collection reached outside the loader's top-level files. */
+export interface BuiltFirestoreCollection {
+    collection: LegacyCollectionConfig;
+    /**
+     * The module whose default export is this collection's object (or one with
+     * its slug), absolute — absent when the collection only exists as what a
+     * call returns (built per locale, say), so no literal of its own exists.
+     */
+    file?: string;
+}
+
+/** An exported zero-argument function that returned Firestore collections. */
+export interface FirestoreBuilder {
+    /** The module that exports it, absolute. */
+    file: string;
+    /** Its export name. */
+    exportName: string;
+    /** The slugs it returned, in order. */
+    slugs: string[];
 }
 
 /** A module importer: the CLI's jiti importer (`createSchemaModuleImporter`), or a stand-in in tests. */
@@ -64,6 +94,79 @@ export function isLegacyCollectionFile(file: string): boolean {
         !file.includes(".test.") &&
         !file.endsWith(".d.ts") &&
         file !== "index.ts" && file !== "index.js" && file !== "index.tsx";
+}
+
+function isFirestoreCollection(value: unknown): value is LegacyCollectionConfig {
+    return isCollection(value) && "engine" in value && value.engine === "firestore";
+}
+
+/** Every module under the subdirectories of `dir`, absolute, sorted. */
+function nestedModules(dir: string): string[] {
+    const out: string[] = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+        if (!entry.isDirectory() || entry.name.startsWith(".") || entry.name === "node_modules") continue;
+        const walk = (current: string): void => {
+            for (const child of fs.readdirSync(current, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+                const full = path.join(current, child.name);
+                if (child.isDirectory()) {
+                    if (!child.name.startsWith(".") && child.name !== "node_modules") walk(full);
+                } else if (/\.(ts|tsx|js)$/.test(child.name) && !child.name.endsWith(".d.ts") && !child.name.includes(".test.")) {
+                    out.push(full);
+                }
+            }
+        };
+        walk(path.join(dir, entry.name));
+    }
+    return out;
+}
+
+/**
+ * Firestore collections the project serves from modules the loader did not
+ * read: the default exports of files in subdirectories of the collections
+ * directory, and what the exported zero-argument functions of those modules
+ * and of the index return (`getAllFirestoreCollections()`). A module that does
+ * not load is skipped: nothing proves it served a collection.
+ */
+async function findBuiltFirestore(collectionsDir: string, indexFile: string | undefined, importModule: ModuleImporter): Promise<{ built: BuiltFirestoreCollection[]; builders: FirestoreBuilder[] }> {
+    const modules = [...(indexFile ? [indexFile] : []), ...nestedModules(collectionsDir)];
+    const byFile = new Map<string, LegacyCollectionConfig>();
+    const loaded: { file: string; mod: Record<string, unknown> }[] = [];
+    for (const file of modules) {
+        try {
+            const mod = await importModule(file);
+            loaded.push({ file, mod });
+            if (file !== indexFile && isFirestoreCollection(mod.default)) byFile.set(file, mod.default);
+        } catch {
+            // Not loadable on its own (a React module, say): nothing it builds can be attributed to it.
+        }
+    }
+    const builders: FirestoreBuilder[] = [];
+    const reached = new Map<string, LegacyCollectionConfig>();
+    for (const collection of byFile.values()) reached.set(collection.slug, collection);
+    for (const { file, mod } of loaded) {
+        for (const [exportName, value] of Object.entries(mod)) {
+            // Only what names itself a collection builder is called: a module of config/ may export anything.
+            if (typeof value !== "function" || value.length !== 0 || !/collection/i.test(exportName) || /^[A-Z]/.test(exportName)) continue;
+            let returned: unknown;
+            try {
+                returned = value();
+            } catch {
+                continue;
+            }
+            const list = Array.isArray(returned) ? returned : [returned];
+            const collections = list.filter(isFirestoreCollection);
+            if (collections.length === 0) continue;
+            builders.push({ file, exportName, slugs: collections.map(collection => collection.slug) });
+            for (const collection of collections) if (!reached.has(collection.slug)) reached.set(collection.slug, collection);
+        }
+    }
+    const fileOf = new Map<string, string>();
+    for (const [file, collection] of byFile) if (!fileOf.has(collection.slug)) fileOf.set(collection.slug, file);
+    const built = [...reached.values()].map(collection => {
+        const file = fileOf.get(collection.slug);
+        return { collection, ...(file ? { file } : {}) };
+    });
+    return { built, builders };
 }
 
 function isSecurityRuleList(value: unknown): value is SecurityRule[] {
@@ -123,6 +226,7 @@ export async function loadLegacyProject(configDir: string, importModule: ModuleI
 
     let defaultSecurityRules: SecurityRule[] | undefined;
     let navigationOrder: LegacyCollectionConfig[] | undefined;
+    const collectionsIndex = ["index.ts", "index.js", "index.tsx"].map(name => path.join(collectionsDir, name)).find(file => fs.existsSync(file));
     for (const name of ["index.ts", "index.js", "index.tsx"]) {
         const indexFile = path.join(collectionsDir, name);
         if (!fs.existsSync(indexFile)) continue;
@@ -170,10 +274,15 @@ export async function loadLegacyProject(configDir: string, importModule: ModuleI
         break;
     }
 
+    const { built: builtFirestore, builders: firestoreBuilders } = await findBuiltFirestore(collectionsDir, collectionsIndex, importModule);
+    const topLevel = new Set(collections.map(entry => entry.collection.slug));
+
     return {
         configDir,
         collectionsDir,
         collections,
+        builtFirestore: builtFirestore.filter(entry => !topLevel.has(entry.collection.slug)),
+        firestoreBuilders,
         ...(defaultSecurityRules ? { defaultSecurityRules } : {}),
         ...(navigationOrder ? { navigationOrder } : {}),
         configIndexExports,

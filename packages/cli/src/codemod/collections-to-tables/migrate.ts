@@ -282,8 +282,55 @@ async function migrateWithShims(options: MigrateOptions, shimDir: ShimDir): Prom
             outcome.frontendFile = relativeToRoot(plan, moved.file);
         }
     }
-    if (firestore.length > 0) {
+    if (firestore.length > 0 || legacy.builtFirestore.length > 0) {
         note(plan, undefined, "Firestore collections are moved and rewritten in place; they have no SQL, so the SQL check does not cover them.");
+    }
+
+    // Firestore collections the project built in modules the loader never read
+    // (a subdirectory, a function the app spread into `collections`).
+    const builtHomes = new Map<string, string>();
+    for (const built of legacy.builtFirestore) {
+        const slug = built.collection.slug;
+        outcomes.set(slug, { slug, file: relativeToRoot(plan, built.file ?? legacy.collectionsDir), kind: "firestore" });
+        if (!cmsDir || !built.file) continue;
+        const sourceFile = addSourceFile(ast, built.file, fs.readFileSync(built.file, "utf8"));
+        const entry: CollectionEntry = { collection: built.collection, file: built.file, sourceFile };
+        // A literal the rewrite cannot read is left to the step below, not refused: the run never read these files before.
+        const trial: PlanContext = { ...plan, files: new Map(), refusals: [], notes: [], manualSteps: [] };
+        const destination = path.join(cmsDir, path.relative(legacy.collectionsDir, built.file));
+        const moved = planFirestoreCollection(trial, entry, cmsDir, destination);
+        if (!moved || trial.refusals.length > 0) continue;
+        for (const [file, planned] of trial.files) plan.files.set(file, planned);
+        plan.notes.push(...trial.notes);
+        external.push(moved);
+        builtHomes.set(slug, moved.file);
+        const outcome = outcomes.get(slug);
+        if (outcome) outcome.frontendFile = relativeToRoot(plan, moved.file);
+    }
+    const shape = "`defineFirestoreCollection({ slug, name, fields, … })` from `@rebasepro/firebase` in frontend/src/cms — `properties` → `fields`, a reference's `path` → `target`, no `engine`, components by value — listed in `externalCollections` and mounted as `<RebaseCMS externalCollections={externalCollections}>`";
+    const describeBuilt = (slugs: string[]): string => {
+        const converted = slugs.filter(slug => builtHomes.has(slug)).map(slug => `${slug} → ${relativeToRoot(plan, builtHomes.get(slug) ?? "")}`);
+        const byHand = slugs.filter(slug => !builtHomes.has(slug));
+        return (converted.length > 0 ? ` Converted (in externalCollections): ${converted.join(", ")}.` : "") +
+            (byHand.length > 0 ? ` No literal of their own the codemod could rewrite (built per call, or several per file) — write each by hand in the target shape: ${byHand.join(", ")}.` : "") +
+            ` Target shape: ${shape}.`;
+    };
+    for (const builder of legacy.firestoreBuilders) {
+        plan.manualSteps.push({
+            title: `Mount the Firestore collections ${builder.exportName}() built`,
+            detail: `\`${builder.exportName}()\` builds ${builder.slugs.length} Firestore collection(s) at run time; the 0.30 loader never read its module, the app spread the result into \`collections\`, which the panel no longer takes.` +
+                describeBuilt(builder.slugs) +
+                ` Replace the call with \`externalCollections\` from ./cms. Its module tree goes with config/collections; where other code still imports it, it was copied as written (0.30 shape) next to that code — keep only what that code reads.`,
+            file: relativeToRoot(plan, builder.file)
+        });
+    }
+    const unbuilt = legacy.builtFirestore.map(built => built.collection.slug).filter(slug => !legacy.firestoreBuilders.some(builder => builder.slugs.includes(slug)));
+    if (unbuilt.length > 0) {
+        plan.manualSteps.push({
+            title: "Mount the Firestore collections of the subdirectories",
+            detail: `Files under subdirectories of config/collections export Firestore collections the 0.30 loader never read (the app imported them).${describeBuilt(unbuilt)} Mount \`externalCollections\` from ./cms where the app passed them.`,
+            file: relativeToRoot(plan, legacy.collectionsDir)
+        });
     }
 
     // The CMS index and the frontend's wiring.

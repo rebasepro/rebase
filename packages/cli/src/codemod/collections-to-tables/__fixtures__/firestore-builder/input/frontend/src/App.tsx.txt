@@ -1,0 +1,15 @@
+import { Rebase } from "@rebasepro/app";
+import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
+import { collections } from "virtual:rebase-collections";
+import { getRemoteCollections } from "../../config/collections/remote";
+
+export function App() {
+    return (
+        <Rebase>
+            <RebaseCMS
+                collections={[...collections, ...getRemoteCollections()]}
+            />
+            <RebaseShell title="Rebase"/>
+        </Rebase>
+    );
+}

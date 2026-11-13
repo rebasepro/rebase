@@ -80,11 +80,12 @@ function printReport(report: MigrationReport): void {
     const firestore = report.collections.filter(outcome => outcome.kind === "firestore");
     const customized = report.collections.filter(outcome => outcome.frontendFile !== undefined && outcome.kind !== "firestore");
     const refused = report.collections.filter(outcome => outcome.kind === "refused");
+    const firestoreByHand = firestore.filter(outcome => outcome.frontendFile === undefined).length;
     console.log("");
     console.log(chalk.bold(`rebase migrate collections-to-tables — ${report.projectRoot}`));
     console.log("");
     if (report.collections.length > 0) {
-        console.log(`  ${report.collections.length} collection(s): ${tables.length} table(s), ${firestore.length} Firestore, ${refused.length} refused; ${customized.length} customization file(s)`);
+        console.log(`  ${report.collections.length} collection(s): ${tables.length} table(s), ${firestore.length} Firestore${firestoreByHand > 0 ? ` (${firestoreByHand} to write by hand, see the steps)` : ""}, ${refused.length} refused; ${customized.length} customization file(s)`);
     }
     if (report.files.length > 0) {
         const changed = report.files.filter(file => file.action !== "unchanged");

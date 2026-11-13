@@ -532,6 +532,44 @@ describe("modes", () => {
     }, 180_000);
 });
 
+/**
+ * Firestore collections a function builds at run time — a module under
+ * `config/collections/<dir>` the app spreads into the panel's collections. The
+ * legacy loader never read such a directory, but the collections were served:
+ * the run must convert the ones that have a literal of their own and name the
+ * rest, never report "0 Firestore" and copy the tree as 0.30 modules silently.
+ */
+describe("Firestore collections built by a function", () => {
+    it("converts the attributable ones and names the rest in a step", async () => {
+        const dir = materialize("firestore-builder");
+        const report = await run(dir);
+        expect(report.refusals).toEqual([]);
+        expect(report.status).toBe("migrated");
+        const firestore = report.collections.filter(outcome => outcome.kind === "firestore");
+        expect(firestore.map(outcome => outcome.slug).sort()).toEqual(["pages_de", "pages_en", "visits"]);
+        expect(firestore.find(outcome => outcome.slug === "visits")?.frontendFile).toBe("frontend/src/cms/remote/visits.ts");
+        expect(firestore.find(outcome => outcome.slug === "pages_en")?.frontendFile).toBeUndefined();
+
+        const visits = fs.readFileSync(path.join(dir, "frontend/src/cms/remote/visits.ts"), "utf8");
+        expect(visits).toContain('import { defineFirestoreCollection } from "@rebasepro/firebase";');
+        expect(visits).toContain("defineFirestoreCollection({");
+        expect(visits).toContain('target: "customers"');
+        expect(visits).not.toContain("engine:");
+        const index = fs.readFileSync(path.join(dir, "frontend/src/cms/index.ts"), "utf8");
+        expect(index).toContain('import visitsCollection from "./remote/visits";');
+        expect(index).toContain("export const externalCollections = [visitsCollection];");
+
+        const step = report.manualSteps.find(candidate => candidate.title.includes("getRemoteCollections()"));
+        expect(step?.file).toBe("config/collections/remote/index.ts");
+        expect(step?.detail).toContain("3 Firestore collection(s)");
+        expect(step?.detail).toContain("visits → frontend/src/cms/remote/visits.ts");
+        expect(step?.detail).toContain("pages_en, pages_de");
+        expect(step?.detail).toContain("defineFirestoreCollection");
+        expect(step?.detail).toContain("externalCollections");
+        expect(step?.detail).toContain("`properties` → `fields`");
+    }, 180_000);
+});
+
 describe("pieces", () => {
     it("keeps only the enum labels and colours that are not derived", () => {
         expect(enumLabelsOf([{ id: "draft", label: "Draft" }, { id: "needs_review", label: "Needs Review" }])).toBeUndefined();

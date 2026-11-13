@@ -124,9 +124,10 @@ function literalEdits(plan: PlanContext, sf: SourceFile, entry: CollectionEntry)
 /**
  * Plan the move of one Firestore collection file.
  *
+ * @param destination where the module goes; `<cmsDir>/<file name>` by default
  * @returns the new module and the identifier its default export can be imported as
  */
-export function planFirestoreCollection(plan: PlanContext, entry: CollectionEntry, cmsDir: string): { file: string; identifier: string } | undefined {
+export function planFirestoreCollection(plan: PlanContext, entry: CollectionEntry, cmsDir: string, destination = path.join(cmsDir, path.basename(entry.file))): { file: string; identifier: string } | undefined {
     const text = entry.sourceFile.getFullText();
     const sf = plan.ast.project.createSourceFile(`/__rebase_migrate__/firestore-${path.basename(entry.file)}`, text, { overwrite: true });
     try {
@@ -153,7 +154,6 @@ export function planFirestoreCollection(plan: PlanContext, entry: CollectionEntr
         edits.push({ start: insertAt, end: insertAt, text: `import { defineFirestoreCollection } from "@rebasepro/firebase";\n` });
         let out = text;
         for (const edit of edits.sort((a, b) => b.start - a.start || b.end - a.end)) out = out.slice(0, edit.start) + edit.text + out.slice(edit.end);
-        const destination = path.join(cmsDir, path.basename(entry.file));
         out = plan.relocator.moveSpecifiersInText(out, entry.file, destination, "frontend");
         planFile(plan, destination, out, `firestore collection ${entry.collection.slug}`);
         const site = findCollectionSite(plan.ast, entry.sourceFile);
