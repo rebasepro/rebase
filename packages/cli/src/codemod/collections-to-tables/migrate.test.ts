@@ -674,7 +674,8 @@ describe("tests that read what config/ loses", () => {
             "",
             "const source = fs.readFileSync(path.join(__dirname, \"..\", \"..\", \"config\", \"collections\", \"posts.ts\"), \"utf8\");",
             "const listed = fs.readdirSync(\"config/collections\");",
-            "export const checked = [collections.length, slugify(\"a\"), source, listed];",
+            "const collectionsDir = path.resolve(__dirname, \"../../config/collections\");",
+            "export const checked = [collections.length, slugify(\"a\"), source, listed, collectionsDir];",
             ""
         ].join("\n"));
         const report = await run(dir, { dryRun: true });
@@ -683,7 +684,7 @@ describe("tests that read what config/ loses", () => {
         expect(imports?.detail).toContain("line 3: `collections` from \"../../config\"");
         expect(imports?.detail).not.toContain("`slugify`");
         const reads = report.manualSteps.find(step => step.title === "Stop reading config/collections in backend/test/collections.test.ts");
-        expect(reads?.detail).toMatch(/^Lines 5, 6:/);
+        expect(reads?.detail).toMatch(/^Lines 5, 6, 7:/);
     }, 120_000);
 });
 

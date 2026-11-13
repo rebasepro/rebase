@@ -887,7 +887,7 @@ export function findLegacyConfigReads(
         const lines: number[] = [];
         let offset = 0;
         for (const line of text.split("\n")) {
-            if (textRead.test(line) && !/\bcollectionsDir\b/.test(line) && !/^\s*(import|export)\b|\bfrom\s*["']|\bimport\s*\(|\brequire\s*\(/.test(line)) lines.push(lineOf(offset));
+            if (textRead.test(line) && !/\bcollectionsDir\s*:/.test(line) && !/^\s*(import|export)\b|\bfrom\s*["']|\bimport\s*\(|\brequire\s*\(/.test(line)) lines.push(lineOf(offset));
             offset += line.length + 1;
         }
         if (lines.length > 0) {
