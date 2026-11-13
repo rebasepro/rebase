@@ -1163,10 +1163,10 @@ async function renameLegacyForeignKeys(databaseUrl: string, schemaDir: string, d
     try {
         const { loadTables } = await import("./schema/load-tables");
         const { legacyForeignKeyRenames } = await import("./schema/push-legacy-renames");
-        const collections = await loadTables(schemaDir);
+        const tables = await loadTables(schemaDir);
         renames = await withAppClient(databaseUrl, client => legacyForeignKeyRenames(
             { query: async (text) => ({ rows: (await client.query(text)).rows }) },
-            collections
+            tables
         ));
     } catch {
         // Not knowing leaves Atlas's plan as it was, and its destructive gate with it.
@@ -1197,10 +1197,10 @@ async function adoptIdenticalIndexes(databaseUrl: string, schemaDir: string, dry
     try {
         const { loadTables } = await import("./schema/load-tables");
         const { pushIndexAdoptions } = await import("./schema/push-index-adoption");
-        const collections = await loadTables(schemaDir);
+        const tables = await loadTables(schemaDir);
         adoptions = await withAppClient(databaseUrl, client => pushIndexAdoptions(
             { query: async (text) => ({ rows: (await client.query(text)).rows }) },
-            collections
+            tables
         ));
     } catch {
         // Not knowing builds the declared indexes as before, beside any twin.
@@ -1227,10 +1227,10 @@ async function reportKeptEnumLabels(databaseUrl: string, schemaDir: string): Pro
     try {
         const { loadTables } = await import("./schema/load-tables");
         const { keptEnumLabels, formatKeptEnumLabelsNotice } = await import("./schema/enum-labels-kept");
-        const collections = await loadTables(schemaDir);
+        const tables = await loadTables(schemaDir);
         const kept = await withAppClient(databaseUrl, client => keptEnumLabels(
             { query: async (text) => ({ rows: (await client.query(text)).rows }) },
-            collections
+            tables
         ));
         if (kept.length > 0) outWarn(chalk.yellow(formatKeptEnumLabelsNotice(kept)));
     } catch {
@@ -1243,10 +1243,10 @@ async function prebuildForeignKeyIndexes(databaseUrl: string, schemaDir: string,
     try {
         const { loadTables } = await import("./schema/load-tables");
         const { missingForeignKeyIndexes } = await import("./schema/push-index-prebuild");
-        const collections = await loadTables(schemaDir);
+        const tables = await loadTables(schemaDir);
         missing = await withAppClient(databaseUrl, client => missingForeignKeyIndexes(
             { query: async (text) => ({ rows: (await client.query(text)).rows }) },
-            collections
+            tables
         ));
     } catch {
         // Not knowing changes nothing that matters: Atlas plans whatever is missing.
@@ -1332,13 +1332,13 @@ async function lockManagedTables(databaseUrl: string, schemaDir: string): Promis
         const { loadTables } = await import("./schema/load-tables");
         const { readRecordedRequestRoles } = await import("./security/rls-enforcement");
         const { cliRlsSettings } = await import("./security/rls-settings");
-        const collections = await loadTables(schemaDir);
+        const tables = await loadTables(schemaDir);
         ({ unsecured, userRole } = await withAppClient(databaseUrl, async client => {
             const runSql = async (text: string) => (await client.query(text)).rows as Record<string, unknown>[];
             const roles = cliRlsSettings(await readRecordedRequestRoles(runSql)).roles;
             const locked = await lockCollectionTables(
                 { query: async (text) => ({ rows: (await client.query(text)).rows }) },
-                collections
+                tables
             );
             return { unsecured: locked.unsecured, userRole: roles.join(", ") };
         }));
@@ -1586,9 +1586,9 @@ async function readAdminPoliciesLive(databaseUrl: string): Promise<boolean> {
 async function dropStaleCompanions(databaseUrl: string, schemaDir: string, adminRoleAvailable: boolean): Promise<void> {
     const { loadTables } = await import("./schema/load-tables");
     const { dropStaleAdminRequestCompanions } = await import("./security/policy-drift");
-    const collections = await loadTables(schemaDir);
+    const tables = await loadTables(schemaDir);
     try {
-        const dropped = await withAppClient(databaseUrl, client => dropStaleAdminRequestCompanions(client, collections, { adminRoleAvailable }));
+        const dropped = await withAppClient(databaseUrl, client => dropStaleAdminRequestCompanions(client, tables, { adminRoleAvailable }));
         for (const p of dropped) out(chalk.gray(`  ✓ Dropped stale admin-request policy "${p.name}" on ${p.schema}.${p.table}`));
     } catch (err) {
         outError(chalk.red(`  ✗ Could not drop stale admin-request policies: ${err instanceof Error ? err.message : String(err)}`));
@@ -1606,11 +1606,11 @@ async function dropStaleCompanions(databaseUrl: string, schemaDir: string, admin
 async function moveAdminPoliciesToPublic(databaseUrl: string, schemaDir: string): Promise<void> {
     const { loadTables } = await import("./schema/load-tables");
     const { moveMigratedAdminPoliciesToPublic } = await import("./schema/migrate-policy-stamps");
-    const collections = await loadTables(schemaDir);
+    const tables = await loadTables(schemaDir);
     try {
         const moved = await withAppClient(databaseUrl, client => moveMigratedAdminPoliciesToPublic(
             { query: async (text, values) => ({ rows: (await client.query(text, values)).rows }) },
-            collections,
+            tables,
             (message) => outWarn(chalk.yellow(`  ⚠️  ${message}`))
         ));
         if (moved > 0) {
@@ -1639,11 +1639,11 @@ async function moveAdminPoliciesToPublic(databaseUrl: string, schemaDir: string)
 async function policiesToPublic(schemaDir: string, policiesSql: string): Promise<string> {
     const { loadTables } = await import("./schema/load-tables");
     const { planCollectionPolicies } = await import("./schema/generate-postgres-ddl-logic");
-    const collections = await loadTables(schemaDir);
-    const fallback = new Map(planCollectionPolicies(collections, { adminRoleAvailable: false })
+    const tables = await loadTables(schemaDir);
+    const fallback = new Map(planCollectionPolicies(tables, { adminRoleAvailable: false })
         .flatMap(plan => plan.policies.map(policy => [`${plan.qualified}.${policy.name}`, policy.statements] as const)));
     let sql = policiesSql;
-    for (const plan of planCollectionPolicies(collections)) {
+    for (const plan of planCollectionPolicies(tables)) {
         for (const policy of plan.policies) {
             if (!policy.adminTarget) continue;
             const replacement = fallback.get(`${plan.qualified}.${policy.name}`) ?? [];
@@ -1663,8 +1663,8 @@ async function policyStamping(databaseUrl: string, schemaDir: string, policiesSq
         // The rule the boot's connections follow: `search_path=public` unless
         // the URL pins one of its own, in which case this connection has it too.
         const { pinSearchPath } = await import("./connection");
-        const collections = await loadTables(schemaDir);
-        const statements = stampableTables(planCollectionPolicies(collections, { adminRoleAvailable }), policiesSql)
+        const tables = await loadTables(schemaDir);
+        const statements = stampableTables(planCollectionPolicies(tables, { adminRoleAvailable }), policiesSql)
             .map(plan => policyStampSql(plan))
             .filter((statement): statement is string => statement !== undefined);
         return { statements, searchPath: pinSearchPath(databaseUrl) === databaseUrl ? undefined : "public" };
@@ -1674,7 +1674,7 @@ async function policyStamping(databaseUrl: string, schemaDir: string, policiesSq
 }
 
 /**
- * `planPolicyPush` for this database and these collections, read under the
+ * `planPolicyPush` for this database and these tables, read under the
  * `search_path` the push stamps policies under, as the lines the dry run
  * prints and the one the push does; `undefined`, having said why, when it
  * cannot be read.
@@ -1688,11 +1688,11 @@ async function readPolicyPushPlan(databaseUrl: string, schemaDir: string): Promi
         const { formatPolicyPushPlan, planPolicyPush, summarizePolicyPushPlan } = await import("./schema/push-policy-plan");
         const { loadTables } = await import("./schema/load-tables");
         const { pinSearchPath } = await import("./connection");
-        const collections = await loadTables(schemaDir);
+        const tables = await loadTables(schemaDir);
         const adminRoleAvailable = await readAdminPoliciesLive(databaseUrl);
         const plan = await withAppClient(databaseUrl, client => planPolicyPush(
             { query: async (text, values) => ({ rows: (await client.query(text, values)).rows }) },
-            collections,
+            tables,
             { searchPath: pinSearchPath(databaseUrl) === databaseUrl ? undefined : "public", adminRoleAvailable }
         ));
         return { ...formatPolicyPushPlan(plan), summary: summarizePolicyPushPlan(plan) };
@@ -1721,11 +1721,11 @@ async function reconcilePolicies(databaseUrl: string, schemaDir: string): Promis
             await import("./security/policy-drift");
         const { loadTables } = await import("./schema/load-tables");
 
-        const collections = await loadTables(schemaDir);
+        const tables = await loadTables(schemaDir);
         const adminRoleAvailable = await readAdminPoliciesLive(databaseUrl);
         await withAppClient(databaseUrl, async client => {
-            const drift = await checkPolicyDrift(client, collections, { adminRoleAvailable });
-            const { dropped, kept } = await dropOrphanedPolicies(client, drift, collections);
+            const drift = await checkPolicyDrift(client, tables, { adminRoleAvailable });
+            const { dropped, kept } = await dropOrphanedPolicies(client, drift, tables);
 
             for (const p of dropped) {
                 out(chalk.gray(`  ✓ Dropped superseded policy "${p.name}" on ${p.schema}.${p.table}`));

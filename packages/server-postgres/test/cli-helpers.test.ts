@@ -1,4 +1,6 @@
-import { getDevDatabaseUrl, getTableIncludesFromCollections } from "../src/cli-helpers";
+import { col, defineTable, rel } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
+import { getDevDatabaseUrl, getTableIncludesFromTables } from "../src/cli-helpers";
 
 describe("CLI Helpers", () => {
     describe("getDevDatabaseUrl", () => {
@@ -18,38 +20,25 @@ describe("CLI Helpers", () => {
         });
     });
 
-    describe("getTableIncludesFromCollections", () => {
-        it("should parse collections and return correct includes array", async () => {
-            const mockCollections = [
-                {
-                    slug: "users",
-                    table: "users",
-                    properties: {
-                        name: { type: "string" }
-                    }
+    describe("getTableIncludesFromTables", () => {
+        it("lists every declared table and the junction of a many-to-many", () => {
+            const users = defineTable("users", {
+                columns: { id: col.uuid().primaryKey(), name: col.text() },
+                rls: "admin-only"
+            });
+            const tags = defineTable("tags", {
+                columns: { id: col.uuid().primaryKey() },
+                rls: "admin-only"
+            });
+            const posts = defineTable("posts", {
+                columns: { id: col.uuid().primaryKey(), title: col.text() },
+                relations: {
+                    tags: rel.manyToMany(() => tags, { through: "posts_to_tags" })
                 },
-                {
-                    slug: "posts",
-                    table: "posts",
-                    properties: {
-                        title: { type: "string" }
-                    },
-                    relations: [
-                        {
-                            kind: "manyToMany",
-                            relationName: "tags",
-                            target: () => ({ table: "tags", slug: "tags" }),
-                            through: {
-                                table: "posts_to_tags",
-                                sourceColumn: "post_id",
-                                targetColumn: "tag_id"
-                            }
-                        }
-                    ]
-                }
-            ];
+                rls: "admin-only"
+            });
 
-            const includes = await getTableIncludesFromCollections(mockCollections);
+            const includes = getTableIncludesFromTables(compileTables([users, posts, tags]));
             expect(includes).toContain("public.users");
             expect(includes).toContain("public.posts");
             expect(includes).toContain("public.posts_to_tags");

@@ -10,7 +10,8 @@ import { COLUMN_TYPES_SQL, type ExistingColumnType } from "./schema/destructive-
 import { UNDECLARABLE_CONSTRAINTS_SQL, undeclaredConstraintExcludes, type ExistingConstraint } from "./schema/undeclarable-constraints";
 import { atlasExcludePattern, excludePatternParts } from "./schema/atlas-exclude";
 import { out, outWarn } from "./cli-output";
-import type { CollectionConfig, CompiledTable } from "@rebasepro/types";
+import type { CompiledTable, TableDescriptor } from "@rebasepro/types";
+import { resolveTableJunctions } from "@rebasepro/common";
 import { moduleDir as __helpersDirname } from "./module-dir";
 import { generatedSqlDir } from "./generated-sql";
 
@@ -313,30 +314,23 @@ export function resolveLocalBin(binName: string): string | null {
     return null;
 }
 
-export async function getTableIncludesFromCollections(allCollections: CollectionConfig[]): Promise<string[]> {
-    const { getTableName, relationalCollections, resolveJunctionSpecs } = await import("@rebasepro/common");
-    const { isPostgresCollectionConfig } = await import("@rebasepro/types");
-
+/**
+ * The tables Atlas may manage: every declared table (a view is Rebase's to
+ * create and drop, `views.sql`, never Atlas's) and every junction, as
+ * `schema.table`.
+ */
+export function getTableIncludesFromTables(descriptors: readonly TableDescriptor[]): string[] {
     // The include list is the inverse of {@link getTableExcludes}: a name on it
-    // is a name Atlas is allowed to drop. A Firestore collection called
-    // `exercises` must not put `public.exercises` here — a real, unrelated table
-    // of that name would lose its protection and be dropped by the next
-    // auto-approved `db push`.
-    const collections = relationalCollections(allCollections);
+    // is a name Atlas is allowed to drop.
     const includes: string[] = [];
-    for (const col of collections) {
-        // A view is Rebase's to create and drop (`views.sql`), never Atlas's.
-        if (isPostgresCollectionConfig(col) && col.view) continue;
-        const tableName = getTableName(col);
-        const schema = isPostgresCollectionConfig(col) && col.schema ? col.schema : "public";
-        if (tableName) {
-            includes.push(`${schema}.${tableName}`);
-        }
+    for (const descriptor of descriptors) {
+        if (descriptor.kind === "view") continue;
+        includes.push(`${descriptor.schema}.${descriptor.table}`);
     }
     // Junctions where they are created — `public`, whatever schema either
     // endpoint is in. Qualifying one with an endpoint's schema left the real
     // junction excluded, invisible to Atlas, and planned for creation again.
-    for (const junction of resolveJunctionSpecs(collections).values()) {
+    for (const junction of resolveTableJunctions(descriptors).values()) {
         includes.push(`${junction.schema}.${junction.table}`);
     }
 
@@ -344,9 +338,7 @@ export async function getTableIncludesFromCollections(allCollections: Collection
 }
 
 export async function getTableIncludes(schemaDir: string): Promise<string[]> {
-    // B-PLAN-2 step 6: the include list from the descriptors.
-    const { lowerCompiledTables } = await import("./schema/lowered-tables");
-    return getTableIncludesFromCollections(lowerCompiledTables(await tablesIn(schemaDir)));
+    return getTableIncludesFromTables((await tablesIn(schemaDir)).map(table => table.descriptor));
 }
 
 /**
@@ -958,21 +950,17 @@ export async function getForeignIndexExcludes(
 }
 
 /**
- * The index names the current collections would create — search, vector and
+ * The index names the current tables would create — search, vector and
  * declared alike. Anything Atlas would emit is by definition not foreign.
  */
 async function managedIndexNames(schemaDir: string): Promise<Set<string>> {
     const tables = await tablesIn(schemaDir);
     const { searchExcludePatterns, vectorExcludePatterns } =
         await import("./schema/generate-postgres-ddl-logic");
-    // B-PLAN-2 step 6: the declared indexes from the descriptors.
-    const { lowerCompiledTables } = await import("./schema/lowered-tables");
-    const collections = lowerCompiledTables(tables);
-    const { resolveColumnName } = await import("./schema/column-plan-helpers");
-    const { buildCollectionIndexPlan } = await import("./schema/collection-index");
+    const { buildTableIndexSpecs } = await import("./schema/collection-index");
 
     const names = new Set<string>(
-        buildCollectionIndexPlan(collections, resolveColumnName).map(spec => spec.indexName)
+        tables.flatMap(table => buildTableIndexSpecs(table.descriptor)).map(spec => spec.indexName)
     );
     // Search and vector objects are excluded from Atlas wholesale by their own
     // patterns; listing them here too is harmless and keeps this the single

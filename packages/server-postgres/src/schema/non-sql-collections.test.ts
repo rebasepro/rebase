@@ -24,7 +24,7 @@ import {
     planCollectionPolicies
 } from "./generate-postgres-ddl-logic";
 import { planCollectionSchemaEnsure, type ExistingSchema } from "./ensure-collection-tables";
-import { getTableIncludesFromCollections } from "../cli-helpers";
+import { getTableIncludesFromTables } from "../cli-helpers";
 import { compileSet } from "../../test/helpers/plan-tables";
 
 const sqlCollection: CollectionConfig = {
@@ -126,7 +126,7 @@ describe("the db push include list", () => {
     it("does not claim a table for a Firestore collection", async () => {
         // Anything absent from this list is *excluded* from the declarative
         // apply, which is what protects it from being dropped.
-        const includes = await getTableIncludesFromCollections(all);
+        const includes = getTableIncludesFromTables(compileSet(all).map(table => table.descriptor));
 
         expect(includes).toEqual(["public.customers"]);
     });

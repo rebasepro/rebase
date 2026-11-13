@@ -1,4 +1,5 @@
-import { getDevDatabaseUrl, getTableExcludes, getTableIncludesFromCollections } from "../src/cli-helpers";
+import { getDevDatabaseUrl, getTableExcludes, getTableIncludesFromTables } from "../src/cli-helpers";
+import { tablesFromCollections } from "./helpers/tables";
 import { CollectionConfig } from "@rebasepro/types";
 import * as fs from "fs";
 import * as path from "path";
@@ -23,6 +24,11 @@ jest.mock("pg", () => ({
         end: mockEnd,
     })),
 }));
+
+
+/** The include list for fixture collections, read off their compiled descriptors. */
+const includesOf = async (collections: Parameters<typeof tablesFromCollections>[0]): Promise<string[]> =>
+    getTableIncludesFromTables(tablesFromCollections(collections).descriptors);
 
 describe("CLI Helpers — Extended", () => {
 
@@ -170,10 +176,10 @@ describe("CLI Helpers — Extended", () => {
 
     // ── getTableExcludes ────────────────────────────────────────────────
 
-    describe("getTableExcludes (via getTableIncludesFromCollections path)", () => {
+    describe("getTableExcludes (via getTableIncludesFromTables path)", () => {
 
         // Only the DB introspection is stubbed: the includes are derived from
-        // real collections by the real `getTableIncludesFromCollections`, so the
+        // real tables by the real `getTableIncludesFromTables`, so the
         // whole collections → includes → excludes chain runs. `--exclude` is the
         // only thing keeping `db push` from dropping tables Rebase doesn't own,
         // so "some table went missing from the exclude list" has to fail here.
@@ -187,7 +193,7 @@ describe("CLI Helpers — Extended", () => {
         ];
 
         const runExcludes = () => getTableExcludes("postgres://x/db", "/collections", {
-            getIncludes: () => getTableIncludesFromCollections(collections),
+            getIncludes: () => includesOf(collections),
             queryExistingTables: async () => ["public.users", "public.sessions", "public.migrations"].map(asTable),
         });
 
@@ -208,12 +214,12 @@ describe("CLI Helpers — Extended", () => {
         });
     });
 
-    // ── getTableIncludesFromCollections ──────────────────────────────────
+    // ── getTableIncludesFromTables ──────────────────────────────────
 
-    describe("getTableIncludesFromCollections", () => {
+    describe("getTableIncludesFromTables", () => {
 
         it("should return empty array for empty collections", async () => {
-            const includes = await getTableIncludesFromCollections([]);
+            const includes = await includesOf([]);
             expect(includes).toEqual([]);
         });
 
@@ -228,7 +234,7 @@ describe("CLI Helpers — Extended", () => {
                 },
             ];
 
-            const includes = await getTableIncludesFromCollections(collections);
+            const includes = await includesOf(collections);
             expect(includes).toContain("sales.orders");
         });
 
@@ -248,7 +254,7 @@ describe("CLI Helpers — Extended", () => {
                 },
             ];
 
-            const includes = await getTableIncludesFromCollections(collections);
+            const includes = await includesOf(collections);
             // "public.users" should appear only once
             const userEntries = includes.filter(i => i === "public.users");
             expect(userEntries).toHaveLength(1);
@@ -281,7 +287,7 @@ describe("CLI Helpers — Extended", () => {
                 ],
             };
 
-            const includes = await getTableIncludesFromCollections([postsCollection, tagsCollection]);
+            const includes = await includesOf([postsCollection, tagsCollection]);
             expect(includes).toContain("public.posts");
             expect(includes).toContain("public.tags");
             expect(includes).toContain("public.posts_to_tags");
@@ -315,7 +321,7 @@ describe("CLI Helpers — Extended", () => {
                 ],
             };
 
-            const includes = await getTableIncludesFromCollections([productsCollection, categoriesCollection]);
+            const includes = await includesOf([productsCollection, categoriesCollection]);
             expect(includes).toContain("public.products");
             expect(includes).toContain("catalog.categories");
             // Junctions live in `public` (`resolveJunctionSpecs`), which is
@@ -346,7 +352,7 @@ describe("CLI Helpers — Extended", () => {
                 },
             ];
 
-            const includes = await getTableIncludesFromCollections(collections);
+            const includes = await includesOf(collections);
             // getTableName falls back to slug → "customers"
             expect(includes).toContain("public.customers");
         });
