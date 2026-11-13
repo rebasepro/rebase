@@ -2,7 +2,7 @@ import { describe, expect, it, jest, afterEach } from "@jest/globals";
 import { logger } from "@rebasepro/server";
 import type { SecurityRule } from "@rebasepro/types";
 
-import { warnOnAnonymousGrants } from "./rls-enforcement";
+import { warnOnAnonymousGrants, type TableRules } from "./rls-enforcement";
 
 /** Capture what the operator would actually see at boot. */
 function captureWarning(fn: () => void): string | null {
@@ -15,20 +15,24 @@ function captureWarning(fn: () => void): string | null {
     }
 }
 
-const collectionWith = (slug: string, using: string): { slug: string; securityRules: SecurityRule[] } => ({
+/** A table's slug and rules, as its descriptor carries them. */
+const tableWith = (slug: string, ...rules: SecurityRule[]): TableRules => ({
     slug,
-    securityRules: [{ name: "authenticated_access", operation: "all", using, withCheck: using }]
+    rls: { posture: "rules", rules, defaultPolicies: true }
 });
+
+const rawRuleTable = (slug: string, using: string): TableRules =>
+    tableWith(slug, { name: "authenticated_access", operation: "all", using, withCheck: using });
 
 afterEach(() => { jest.restoreAllMocks(); });
 
 describe("warnOnAnonymousGrants", () => {
-    // The rule found in a real app, across 8 collections of PII. It reads as
+    // The rule found in a real app, across 8 tables of PII. It reads as
     // "any logged-in user" and grants every anonymous visitor read and write.
     const FROM_THE_WILD = "auth.uid() IS NOT NULL AND auth.uid() != 'anon'";
 
     it("reports both mistakes in the rule from the wild", () => {
-        const warning = captureWarning(() => warnOnAnonymousGrants([collectionWith("talents", FROM_THE_WILD)]));
+        const warning = captureWarning(() => warnOnAnonymousGrants([rawRuleTable("talents", FROM_THE_WILD)]));
 
         // The rule is written in the pre-1.0 spelling and must still be
         // detected; the advice is printed in the current one.
@@ -37,22 +41,22 @@ describe("warnOnAnonymousGrants", () => {
         expect(warning).toContain("policy.authenticated()");
     });
 
-    it("groups by mistake and names every collection it appears on", () => {
+    it("groups by mistake and names every table it appears on", () => {
         const warning = captureWarning(() => warnOnAnonymousGrants(
-            ["talents", "companies", "contact_messages"].map(s => collectionWith(s, FROM_THE_WILD))
+            ["talents", "companies", "contact_messages"].map(s => rawRuleTable(s, FROM_THE_WILD))
         ));
 
         expect(warning).toContain("talents");
         expect(warning).toContain("companies");
         expect(warning).toContain("contact_messages");
-        // Grouped, not repeated once per collection: the same habit across 8
-        // collections should not print the same paragraph 16 times.
+        // Grouped, not repeated once per table: the same habit across 8
+        // tables should not print the same paragraph 16 times.
         expect(warning!.match(/Supabase convention/g)).toHaveLength(1);
         expect(warning).toContain("3 rule(s)");
     });
 
     it("catches the bare tautology, which carries no literal to notice", () => {
-        const warning = captureWarning(() => warnOnAnonymousGrants([collectionWith("talents", "auth.uid() IS NOT NULL")]));
+        const warning = captureWarning(() => warnOnAnonymousGrants([rawRuleTable("talents", "auth.uid() IS NOT NULL")]));
 
         expect(warning).toContain("rebase.uid() IS NOT NULL");
         expect(warning).not.toContain("Supabase convention");
@@ -60,15 +64,15 @@ describe("warnOnAnonymousGrants", () => {
 
     it("says nothing about rules that are actually correct", () => {
         const warning = captureWarning(() => warnOnAnonymousGrants([
-            { slug: "talents", securityRules: [{ name: "own_rows", operation: "all", ownerField: "owner_id" }] },
-            collectionWith("posts", `auth.uid() != 'anonymous'`),
-            { slug: "public_page", securityRules: [{ name: "read", operation: "select", access: "public" }] }
+            tableWith("talents", { name: "own_rows", operation: "all", ownerField: "owner_id" }),
+            rawRuleTable("posts", `auth.uid() != 'anonymous'`),
+            tableWith("public_page", { name: "read", operation: "select", access: "public" })
         ]));
 
         expect(warning).toBeNull();
     });
 
-    it("says nothing when no collection has rules at all", () => {
-        expect(captureWarning(() => warnOnAnonymousGrants([{ slug: "empty" }]))).toBeNull();
+    it("says nothing when no table has rules at all", () => {
+        expect(captureWarning(() => warnOnAnonymousGrants([tableWith("empty")]))).toBeNull();
     });
 });

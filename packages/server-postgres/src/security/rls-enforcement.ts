@@ -1,5 +1,5 @@
 import { sql as drizzleSql, SQL } from "drizzle-orm";
-import { ANONYMOUS_USER_ID, PolicyExpression, SecurityRule } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, PolicyExpression, type TableDescriptor } from "@rebasepro/types";
 import {
     AnonymousGrantRisk,
     findAnonymousGrants,
@@ -265,7 +265,7 @@ export async function detectConnectionPosture(
     schemas?: string[]
 ): Promise<ConnectionPosture> {
     // Identifiers, and they reach SQL as literals in a catalogue comparison —
-    // but they arrive from collection configs, so they are quoted as string
+    // but they arrive from table definitions, so they are quoted as string
     // literals rather than interpolated as names, and a quote inside one is
     // escaped rather than trusted.
     const schemaFilter = schemas?.length
@@ -804,7 +804,7 @@ const isWithheldTable = (c: string, n: string): string =>
  * "Can reach" is what the role can actually do — through a grant to it, to a
  * role it inherits, or to PUBLIC, on the table or on any of its columns —
  * because that, not how the ACL is spelled, is what a request running as it
- * gets. A table with RLS on is somebody's collection by that same rule as the
+ * gets. A table with RLS on is somebody's declared table by that same rule as the
  * sweep's, and is left out.
  */
 export async function findExposedInternalTables(run: RawSqlRunner, schemas: string[], role: string = REBASE_USER_ROLE): Promise<string[]> {
@@ -842,11 +842,11 @@ function mayGrant(kind: "schema" | "table" | "sequence", oid: string, owner: str
 }
 
 /**
- * Tables collections are served from that the user role holds no privilege on
+ * Served tables that the user role holds no privilege on
  * and this connection cannot grant it, because another role owns them.
  *
  * The grant tier passes these over — it could only fail on them — so on a
- * database another application shares, a collection over that application's
+ * database another application shares, a declared table over that application's
  * table boots and then refuses every request with "permission denied". This
  * names them, with the owner who can run the grant. Refusing rather than
  * widening, so the boot warns instead of stopping: the rest of the project
@@ -906,7 +906,7 @@ interface SchemaGrants {
      */
     internalGranted: string[];
     /**
-     * The stored rows of materialized-view collections (`view-names.ts`) the
+     * The stored rows of materialized views (`view-names.ts`) the
      * user role holds a privilege on. Only the owner may read them; the
      * schema-wide grant hands them out like any relation, so they are taken
      * back after it.
@@ -1484,7 +1484,7 @@ export async function ensureAppRoleGrants(run: RawSqlRunner, schemas: string[], 
         if (state.sequences.length > 0) {
             await run(`GRANT USAGE, SELECT ON SEQUENCE ${named(state.sequences)} TO ${role}`);
         }
-        // The stored rows of a materialized-view collection are the owner's
+        // The stored rows of a materialized view are the owner's
         // alone (`view-names.ts`). The grants above name them out; a default
         // privilege, or the schema-wide grant an older release ran, did not.
         for (const rows of state.viewRowsGranted) await run(`REVOKE ALL ON ${s}.${quoteIdent(rows)} FROM ${role}`);
@@ -1500,7 +1500,7 @@ export async function ensureAppRoleGrants(run: RawSqlRunner, schemas: string[], 
         }
 
         // The grants above deliberately cover the whole schema — a project's own
-        // collections may live in `rebase`, and future tables must be reachable
+        // tables may live in `rebase`, and future tables must be reachable
         // or a migration strands the role. Rebase's OWN tables are the exception:
         // refresh tokens, MFA secrets, API keys and the rest carry no RLS and no
         // row an end user should ever address. The grant above leaves them out;
@@ -1671,6 +1671,13 @@ const FOREIGN_CONVENTION_ROLES: Record<string, string> = {
 };
 
 /**
+ * What the rule checks read of a table: its slug, to name it, and its
+ * row-level security, whose `rules` are what the policies are compiled from.
+ * A {@link TableDescriptor} is one.
+ */
+export type TableRules = Pick<TableDescriptor, "slug" | "rls">;
+
+/**
  * Warn about rules that read as "signed-in users only" but admit anonymous
  * callers — `rebase.uid() IS NOT NULL`, or a comparison against another
  * platform's magic user id such as `'anon'`.
@@ -1688,16 +1695,14 @@ const FOREIGN_CONVENTION_ROLES: Record<string, string> = {
  * either — this is the escape hatch whose whole promise is that it means what it
  * says. So: say so, loudly, and leave the rule alone.
  */
-export function warnOnAnonymousGrants(
-    collections: { slug?: string; securityRules?: readonly SecurityRule[] }[]
-): void {
+export function warnOnAnonymousGrants(tables: readonly TableRules[]): void {
     // Grouped by the mistake, not by the rule: one habit typically repeats
-    // across every collection an author wrote, and a per-rule list would repeat
+    // across every table an author wrote, and a per-rule list would repeat
     // the same paragraph dozens of times and get skimmed.
     const byRisk = new Map<string, { risk: AnonymousGrantRisk; sites: string[] }>();
 
-    for (const collection of collections) {
-        for (const rule of collection.securityRules ?? []) {
+    for (const table of tables) {
+        for (const rule of table.rls.rules) {
             const { usingExpr, withCheckExpr } = securityRuleToConditions(rule);
             const risks = [usingExpr, withCheckExpr]
                 .filter((e): e is PolicyExpression => e !== null)
@@ -1705,7 +1710,7 @@ export function warnOnAnonymousGrants(
 
             for (const risk of risks) {
                 const key = `${risk.pattern}:${risk.detail}`;
-                const site = `${collection.slug ?? "(unnamed)"} → "${rule.name ?? "(unnamed rule)"}"`;
+                const site = `${table.slug} → "${rule.name ?? "(unnamed rule)"}"`;
                 const entry = byRisk.get(key) ?? { risk, sites: [] };
                 if (!entry.sites.includes(site)) entry.sites.push(site);
                 byRisk.set(key, entry);
@@ -1728,7 +1733,7 @@ export function warnOnAnonymousGrants(
 }
 
 /**
- * Name the collections whose raw policy SQL still calls the pre-1.0 helpers.
+ * Name the tables whose raw policy SQL still calls the pre-1.0 helpers.
  *
  * The compiler rewrites `auth.uid()` to `rebase.uid()` on the way into the
  * database, so nothing is broken and no policy is wrong — which is exactly why
@@ -1739,20 +1744,18 @@ export function warnOnAnonymousGrants(
  * Only `raw` expressions can carry it. Structured rules (`policy.authUid()`,
  * `policy.rolesOverlap(...)`) compile from the model and were never affected.
  */
-export function warnOnLegacyRlsFunctions(
-    collections: { slug?: string; securityRules?: readonly SecurityRule[] }[]
-): void {
+export function warnOnLegacyRlsFunctions(tables: readonly TableRules[]): void {
     const sites: string[] = [];
 
-    for (const collection of collections) {
-        for (const rule of collection.securityRules ?? []) {
+    for (const table of tables) {
+        for (const rule of table.rls.rules) {
             const { usingExpr, withCheckExpr } = securityRuleToConditions(rule);
             const carriesLegacy = [usingExpr, withCheckExpr]
                 .filter((e): e is PolicyExpression => e !== null)
                 .some(containsLegacyRlsCall);
             if (!carriesLegacy) continue;
 
-            const site = `${collection.slug ?? "(unnamed)"} → "${rule.name ?? "(unnamed rule)"}"`;
+            const site = `${table.slug} → "${rule.name ?? "(unnamed rule)"}"`;
             if (!sites.includes(site)) sites.push(site);
         }
     }
@@ -1802,11 +1805,11 @@ function containsLegacyRlsCall(expr: PolicyExpression): boolean {
  * has `r`'s privileges, which a member only gets by inheriting them, and
  * `rebase_user` is `NOINHERIT`. This used to ask `pg_has_role(…, 'MEMBER')`, so
  * `GRANT authenticated TO rebase_user` — the grant its own hint suggested —
- * passed here and still read every collection as empty.
+ * passed here and still read every table as empty.
  */
 export async function validatePolicyPgRoles(
     run: RawSqlRunner,
-    collections: { slug?: string; securityRules?: readonly { name?: string; pgRoles?: readonly string[] }[] }[],
+    tables: readonly TableRules[],
     /** The role(s) requests actually run as: `rebase_user` (or the `rls.requestRole`
      *  roles) when the connection is privileged enough to switch, otherwise the
      *  connection role itself. With several, a role is usable when any reaches it. */
@@ -1815,11 +1818,11 @@ export async function validatePolicyPgRoles(
     const candidates = typeof requestRoles === "string" ? [requestRoles] : [...requestRoles];
     const requestRole = candidates[0] ?? REBASE_USER_ROLE;
     const wanted = new Map<string, string[]>();
-    for (const collection of collections) {
-        for (const rule of collection.securityRules ?? []) {
+    for (const table of tables) {
+        for (const rule of table.rls.rules) {
             for (const role of rule.pgRoles ?? []) {
                 if (role === "public" || candidates.includes(role)) continue;
-                wanted.set(role, [...(wanted.get(role) ?? []), collection.slug ?? "(unnamed)"]);
+                wanted.set(role, [...(wanted.get(role) ?? []), table.slug]);
             }
         }
     }

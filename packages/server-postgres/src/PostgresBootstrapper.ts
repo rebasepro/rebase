@@ -1330,25 +1330,30 @@ export async function openPostgresDriver(
             );
         }
 
+        // The rules of the tables this database holds, read off their
+        // descriptors.
+        const tablesHere = registry.tables().map(t => t.descriptor)
+            .filter(d => introspectedHere || (d.database ?? DEFAULT_DATA_SOURCE_KEY) === sourceKey);
+
         // Independent of posture: a policy targeting a role the request
-        // never runs as filters every row, so the collection reads as
+        // never runs as filters every row, so the table reads as
         // empty rather than erroring. Applies to both branches — the
         // role that matters is whichever one requests actually use.
         await validatePolicyPgRoles(
             runSql,
-            collectionsOnThisSource(),
+            tablesHere,
             driver.rlsUserRole ? rls.roles : posture.role
         );
 
         // The same habit one surface over, and the dangerous direction:
         // a rule that reads as "signed in only" but is true for every
         // caller grants the data away rather than hiding it.
-        warnOnAnonymousGrants(collectionsOnThisSource());
+        warnOnAnonymousGrants(tablesHere);
 
         // Raw policy SQL written against the pre-1.0 helper schema. It
         // is rewritten on compile, so this is the only place the project
         // is ever told the spelling moved.
-        warnOnLegacyRlsFunctions(collectionsOnThisSource());
+        warnOnLegacyRlsFunctions(tablesHere);
     }
 
     // Ensure branch metadata table exists when branching is available

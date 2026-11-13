@@ -2,7 +2,7 @@
  * Compare the RLS policies a database actually has against the ones the
  * tables describe.
  *
- * Policies live in Postgres; the collection config is only their *source*.
+ * Policies live in Postgres; the table definitions are only their *source*.
  * Nothing reconciled the two, which is how the demo database served empty
  * tables indefinitely: its policies granted `TO authenticated` (a Supabase
  * role name) while requests run as `rebase_user`, so RLS filtered every row.
@@ -55,9 +55,9 @@ export interface PolicyRef {
 }
 
 export interface PolicyDrift {
-    /** Described by the collections, absent from the database. */
+    /** Described by the tables, absent from the database. */
     missing: PolicyRef[];
-    /** In the database, described by no collection — stale pushes live here. */
+    /** In the database, described by no table — stale pushes live here. */
     orphaned: PolicyRef[];
     /** Same policy name, different roles or command. */
     diverged: { expected: PolicyRef; actual: PolicyRef; differences: string[] }[];
@@ -263,7 +263,7 @@ async function readTablesWithRlsOff(
  * Both schema spellings are matched. The helpers moved from `auth` to `rebase`
  * in 1.0, and this check reads policies *as the database stored them*: a
  * database pushed before the move still holds `auth.uid()` until it is
- * recompiled, while everything written since — including raw `securityRules`
+ * recompiled, while everything written since — including raw `rls` rule
  * SQL, which the compiler rewrites on the way in — stores `rebase.uid()`.
  * Matching only the pre-1.0 name made the check blind to every policy a current
  * release could write, which is precisely the set still worth scanning.

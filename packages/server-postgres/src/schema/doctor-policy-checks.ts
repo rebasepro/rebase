@@ -8,7 +8,6 @@
 import path from "path";
 import chalk from "chalk";
 import { loadTables } from "./load-tables";
-import { lowerCompiledTables } from "./lowered-tables";
 import { checkPolicyDrift, formatPolicyDrift, hasDrift } from "../security/policy-drift";
 import { validatePolicyPgRoles, warnOnAnonymousGrants } from "../security/rls-enforcement";
 
@@ -16,11 +15,11 @@ import { validatePolicyPgRoles, warnOnAnonymousGrants } from "../security/rls-en
  * What the RLS checks concluded.
  *
  * `unchecked` exists because "we could not look" and "we looked and it is fine"
- * used to be reported identically: a collections path that did not resolve made
+ * used to be reported identically: a schema path that did not resolve made
  * the loader return `[]` (it warns, it does not throw), `checkPolicyDrift`
  * early-returned an empty diff, and the gate printed
  * `✓ RLS policies match your collections` having compared zero policies against
- * zero collections. Any exception at all — a collection file that throws on
+ * zero tables. Any exception at all — a table file that throws on
  * import, a `pg_policies` read the CI role is not granted, a connection reset —
  * did the same thing through a `warn`, and exited 0.
  */
@@ -38,7 +37,7 @@ export function exitCodeForPolicyGate(status: PolicyCheckStatus): 0 | 1 {
 }
 
 /**
- * Policies actually deployed vs the ones the collections describe, plus policy
+ * Policies actually deployed vs the ones the tables describe, plus policy
  * roles this server could never satisfy.
  *
  * Never reports `ok` for work it did not do — see {@link PolicyCheckStatus}.
@@ -55,14 +54,13 @@ export async function runPolicyChecks(schemaDir: string, databaseUrl?: string): 
     const pool = new Pool({ connectionString: databaseUrl });
     try {
         const tables = await loadTables(resolvedPath);
-        // B-PLAN-2 step 6: the role checks read the rules off the descriptors.
-        const collections = lowerCompiledTables(tables);
+        const descriptors = tables.map(table => table.descriptor);
 
         // Zero tables is not "no drift", it is nothing to compare. The loader
         // returns `[]` for a directory that does not exist, so the commonest
         // way to get here is the right directory from the wrong cwd — which
         // used to render as a green tick.
-        if (collections.length === 0) {
+        if (descriptors.length === 0) {
             console.error(chalk.red(`  ✗ No tables found in ${resolvedPath}`));
             console.error(chalk.gray("    RLS policies were NOT checked. Pass --schema-dir=<dir> if your tables live elsewhere than backend/schema."));
             return "unchecked";
@@ -72,7 +70,7 @@ export async function runPolicyChecks(schemaDir: string, databaseUrl?: string): 
 
         // Prove the connection before anything is ticked.
         //
-        // `validatePolicyPgRoles` returns without a query when no collection
+        // `validatePolicyPgRoles` returns without a query when no table
         // names a `pgRoles` — which is most projects — so it "passed" against a
         // database that was never reached, and the tick printed above an
         // ECONNREFUSED that only surfaced two checks later. Ten lines up, this
@@ -87,9 +85,9 @@ export async function runPolicyChecks(schemaDir: string, databaseUrl?: string): 
         }
 
         // A policy naming a role the server never runs as filters every row, so
-        // the collection reads as empty. Report it without booting a server.
+        // the table reads as empty. Report it without booting a server.
         try {
-            await validatePolicyPgRoles(runSql, collections);
+            await validatePolicyPgRoles(runSql, descriptors);
             console.log(chalk.green("  ✓ Policy roles are usable by this server"));
         } catch (err) {
             problems = true;
@@ -99,7 +97,7 @@ export async function runPolicyChecks(schemaDir: string, databaseUrl?: string): 
 
         // A rule that reads as a lockdown but is true for every caller compiles
         // to a grant. Report it without booting a server.
-        warnOnAnonymousGrants(collections);
+        warnOnAnonymousGrants(descriptors);
 
         // Where a boot on this database writes the server-or-admin policies:
         // `TO public` where its admin switch is not live, and that is no drift.
@@ -110,10 +108,10 @@ export async function runPolicyChecks(schemaDir: string, databaseUrl?: string): 
             console.log(chalk.yellow("  RLS policies: database does not match your tables"));
             console.log(formatPolicyDrift(drift));
         } else {
-            console.log(chalk.green(`  ✓ RLS policies match your tables (${collections.length} table(s) checked)`));
+            console.log(chalk.green(`  ✓ RLS policies match your tables (${descriptors.length} table(s) checked)`));
         }
     } catch (err) {
-        // Fail closed. This catch covers every query and every collection import
+        // Fail closed. This catch covers every query and every table import
         // above, so returning the pre-catch verdict made the documented CI gate
         // green on exactly the runs it exists to catch.
         console.error(chalk.red("  ✗ Could not check RLS policies:"), err instanceof Error ? err.message : String(err));

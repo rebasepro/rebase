@@ -16,7 +16,7 @@
  *    a NOINHERIT member does not, so the collection read as empty.
  */
 import { PGlite } from "@electric-sql/pglite";
-import { ensureAppRoleGrants, findUngrantableTables, validatePolicyPgRoles } from "../src/security/rls-enforcement";
+import { ensureAppRoleGrants, findUngrantableTables, validatePolicyPgRoles, type TableRules } from "../src/security/rls-enforcement";
 
 /** Statements that write the catalogue. */
 const WRITES = /^\s*(GRANT|REVOKE|ALTER|DO\b)/i;
@@ -118,12 +118,14 @@ describe("validatePolicyPgRoles", () => {
     });
     afterEach(async () => { await pg.close(); });
 
-    const collections = [{ slug: "posts", securityRules: [{ pgRoles: ["authenticated"] }] }];
+    const tables: TableRules[] = [
+        { slug: "posts", rls: { posture: "rules", rules: [{ operation: "select", access: "public", pgRoles: ["authenticated"] }], defaultPolicies: true } }
+    ];
 
     it("refuses a role the request role is a member of but does not inherit, and says the grant that works", async () => {
         await pg.exec("GRANT authenticated TO rebase_user WITH INHERIT FALSE");
         const { run } = recorder(pg);
-        await expect(validatePolicyPgRoles(run, collections)).rejects.toThrow(
+        await expect(validatePolicyPgRoles(run, tables)).rejects.toThrow(
             /is a member of it but does not inherit[\s\S]*GRANT authenticated TO rebase_user WITH INHERIT TRUE/
         );
     });
@@ -131,18 +133,18 @@ describe("validatePolicyPgRoles", () => {
     it("accepts the same role once the membership inherits", async () => {
         await pg.exec("GRANT authenticated TO rebase_user WITH INHERIT TRUE");
         const { run } = recorder(pg);
-        await expect(validatePolicyPgRoles(run, collections)).resolves.toBeUndefined();
+        await expect(validatePolicyPgRoles(run, tables)).resolves.toBeUndefined();
     });
 
     it("still explains a role that is not there as another platform's convention", async () => {
         await pg.exec("DROP ROLE authenticated");
         const { run } = recorder(pg);
-        await expect(validatePolicyPgRoles(run, collections)).rejects.toThrow(/is a Supabase convention/);
+        await expect(validatePolicyPgRoles(run, tables)).rejects.toThrow(/is a Supabase convention/);
     });
 
     it("gives the inheriting grant for an existing Supabase role rather than calling it a convention", async () => {
         const { run } = recorder(pg);
-        await expect(validatePolicyPgRoles(run, collections)).rejects.toThrow(
+        await expect(validatePolicyPgRoles(run, tables)).rejects.toThrow(
             /is not a member of it[\s\S]*GRANT authenticated TO rebase_user WITH INHERIT TRUE/
         );
     });
