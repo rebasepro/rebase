@@ -94,7 +94,9 @@ application image to build yourself. Useful flags:
 
 <span class="since-badge" data-since="0.31">Since 0.31</span> A frontend — every static app of `rebase.json` with a Vite config — whose config does not use `rebaseBackendGuard()` (from
 `@rebasepro/app/vitePlugin`) is refused: it is what keeps server code out of the
-browser bundle, and it keeps Vite from inlining a backend file as a `data:` URL. `frontend/src/cms/ui-config.json` is carried into the bundle as
+browser bundle, and it keeps Vite from inlining a backend file as a `data:` URL
+(it fails the build, naming itself, when another plugin replaces its
+`build.assetsInlineLimit`). `frontend/src/cms/ui-config.json` is carried into the bundle as
 `entry.uiConfig`, the workspace presentation a deployed backend serves.
 
 Dependencies are vendored by default so a new instance does not pay a 35–55

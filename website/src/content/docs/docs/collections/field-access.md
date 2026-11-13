@@ -216,8 +216,9 @@ A `manyToMany` whose junction is a table you declared (`through` names a
 `defineTable`) is held to that table's column rules: a write that sets a link
 column `.readOnly()`, `.private()` or closed by `access.write` on the junction
 is refused (`VALIDATION_EXCLUDED_FIELDS` / `FIELD_NOT_WRITABLE`), and so is a
-`_pivot` field the junction closes. A junction Rebase creates has no rules of
-its own.
+`_pivot` field the junction closes. The same holds through the nested routes
+(`POST`, `PATCH` and `DELETE /:table/:id/:relation/:targetId`, and a `_pivot`
+edit) and the WebSocket. A junction Rebase creates has no rules of its own.
 
 `strictWrites: false` on a table only lets a key the table does not declare
 through to the driver. It never relaxes a rule on a declared column, a stamp,
