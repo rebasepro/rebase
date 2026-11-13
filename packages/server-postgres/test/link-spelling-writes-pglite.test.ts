@@ -103,7 +103,8 @@ describe("a link written by name is its key column to the driver", () => {
     });
 
     it("an update cannot move a key bound to a link, by either spelling", async () => {
-        for (const values of [{ user: "u2" }, { userId: "u2" }]) {
+        const spellings: Record<string, unknown>[] = [{ user: "u2" }, { userId: "u2" }];
+        for (const values of spellings) {
             let caught: unknown;
             try {
                 await driver.save({ path: "profiles", id: "u1", values, status: "existing" });

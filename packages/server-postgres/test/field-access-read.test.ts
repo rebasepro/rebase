@@ -15,6 +15,7 @@
  * thirteenth. These tests establish it the way the driver does.
  */
 import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
+import type { ColumnDescriptor, TableDescriptor } from "@rebasepro/types";
 import { toRestRow, stripUnreadable, canReadRelation } from "../src/services/row-pipeline";
 import { withFieldViewer, currentFieldViewer } from "../src/services/field-viewer";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -331,16 +332,18 @@ describe("a relation an include may load (`canReadRelation`)", () => {
     // SEC-FIX-3 D-2: a link is exactly as readable as the key column it is
     // bound to — `?include=sponsor` hands over the value `sponsorId` holds.
     it("withholds a link whose key column the caller cannot read, and never serves one bound to a private key", () => {
-        const keyColumn = (key: string, column: string, rule: { access?: { read: string[] }; private?: true }) => ({
-            ...postsTable.columns[0], key, column, primaryKey: false, ...rule
-        });
-        const table = {
+        const keyColumn = (key: string, column: string, rule: Pick<ColumnDescriptor, "access" | "private">): ColumnDescriptor => {
+            const { primaryKey: _primaryKey, ...template } = postsTable.columns[0];
+            return { ...template, key, column, ...rule };
+        };
+        const boundToPrivateKey = belongsTo("auditor", "staff", "auditor_id", "auditorId");
+        const table: TableDescriptor = {
             ...postsTable,
             columns: [...postsTable.columns, keyColumn("sponsorId", "sponsor_id", { access: { read: ["hr"] } }), keyColumn("auditorId", "auditor_id", { private: true })],
-            relations: [sponsor, belongsTo("auditor", "staff", "auditor_id", "auditorId")]
+            relations: [sponsor, boundToPrivateKey]
         };
         expect(readable(sponsor, ["staff"], table)).toBe(false);
         expect(readable(sponsor, ["hr"], table)).toBe(true);
-        expect(readable(table.relations[1], ["admin"], table)).toBe(false);
+        expect(readable(boundToPrivateKey, ["admin"], table)).toBe(false);
     });
 });
