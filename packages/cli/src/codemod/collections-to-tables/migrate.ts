@@ -325,6 +325,26 @@ async function migrateWithShims(options: MigrateOptions, shimDir: ShimDir): Prom
             plan.refusals.push({ file: relativeToRoot(plan, from), reason: error instanceof Error ? error.message : String(error) });
         }
     }
+    // `storageAuthorize` exported by config/index.ts from a module of another name
+    // (`export { storageAuthorize } from "./storage-authorize"`): 0.30's bundle read
+    // it from config/index, 0.31's reads backend/storage only. Without that file the
+    // access control is silently dropped on deploy — the boot merely warns.
+    const storageTarget = path.join(root, "backend", "storage.ts");
+    if (legacy.configIndexExports.includes("storageAuthorize") && !plan.files.has(storageTarget) && !fs.existsSync(storageTarget)) {
+        const indexFile = path.join(configDir, "index.ts");
+        const source = fs.existsSync(indexFile) ? storageAuthorizeReexport(indexFile, path.dirname(storageTarget)) : undefined;
+        if (source) {
+            planFile(plan, storageTarget, "// The runtime reads `storageAuthorize` from backend/storage (0.30 read it from config/index.ts).\n" +
+                `export { storageAuthorize } from "${source}";\n`, "backend/storage.ts (storageAuthorize, re-exported)");
+            backendWanted.push("storage.ts");
+        } else {
+            plan.manualSteps.push({
+                title: "Move storageAuthorize to backend/storage.ts",
+                detail: "config/index.ts exports `storageAuthorize`, which the 0.30 runtime read from there. 0.31 reads it from `backend/storage.ts` only: without that module, storage access control is gone on deploy (the boot only warns). Export it from backend/storage.ts.",
+                file: relativeToRoot(plan, indexFile)
+            });
+        }
+    }
     const register = path.join(configDir, "generated", "register.ts");
     try {
         if (planMove(plan, register, path.join(root, "backend", "generated", "register.ts"), "backend/generated/register.ts")) {
@@ -585,4 +605,24 @@ function rank(order: readonly LegacyCollectionConfig[], collection: LegacyCollec
 
 function removeCommand(plan: PlanContext, paths: readonly string[]): string {
     return `git rm -r ${paths.filter(file => fs.existsSync(file)).map(file => relativeToRoot(plan, file)).join(" ")}`;
+}
+
+/**
+ * The specifier, relative to `fromDir`, of the module `indexFile` re-exports
+ * `storageAuthorize` from (`export { storageAuthorize } from "./storage-authorize.js"`),
+ * keeping the specifier's extension style. Undefined when the index defines it
+ * itself, renames it, or re-exports it from a package.
+ */
+function storageAuthorizeReexport(indexFile: string, fromDir: string): string | undefined {
+    const text = fs.readFileSync(indexFile, "utf8");
+    for (const match of text.matchAll(/export\s*(?:type\s+)?\{([^}]*)\}\s*from\s*["']([^"']+)["']/g)) {
+        const names = match[1].split(",").map(name => name.trim());
+        const specifier = match[2];
+        if (!names.includes("storageAuthorize") || !specifier.startsWith(".")) continue;
+        const extension = /\.(m?[jt]sx?)$/.exec(specifier)?.[0] ?? "";
+        const stem = path.resolve(path.dirname(indexFile), specifier).replace(/\.(m?[jt]sx?)$/, "");
+        const relative = toPosix(path.relative(fromDir, stem));
+        return `${relative.startsWith(".") ? relative : `./${relative}`}${extension}`;
+    }
+    return undefined;
 }

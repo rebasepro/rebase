@@ -451,6 +451,17 @@ describe("modes", () => {
         expect(report.files.map(file => file.path)).not.toContain("frontend/src/App.tsx");
     }, 120_000);
 
+    it("carries a storageAuthorize that config/index.ts re-exports from another module to backend/storage.ts", async () => {
+        const dir = materialize("blog");
+        const config = path.join(dir, "config");
+        fs.renameSync(path.join(config, "storage.ts"), path.join(config, "storage-authorize.ts"));
+        fs.writeFileSync(path.join(config, "index.ts"), "export { storageAuthorize } from \"./storage-authorize.js\";\n");
+        const report = await run(dir, { dryRun: true });
+        const storage = report.files.find(file => file.path === "backend/storage.ts");
+        expect(storage?.content).toContain(`export { storageAuthorize } from "../config/storage-authorize.js";`);
+        expect(report.manualSteps.map(step => step.title)).not.toContain("Move storageAuthorize to backend/storage.ts");
+    }, 120_000);
+
     it("names the file that mounts the panel when it is not App.tsx", async () => {
         const dir = materialize("blog");
         const app = path.join(dir, "frontend", "src", "App.tsx");
