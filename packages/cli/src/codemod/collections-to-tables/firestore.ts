@@ -231,7 +231,7 @@ export function planFirestoreCollection(plan: PlanContext, entry: CollectionEntr
         const componentImports = new Map<string, string>();
         const taken = new Set(sf.getDescendantsOfKind(plan.ast.tsm.SyntaxKind.Identifier).map(identifier => identifier.getText()));
         for (const literal of sf.getDescendantsOfKind(plan.ast.tsm.SyntaxKind.StringLiteral)) {
-            // `Field: "../X"`, or `Field: "../X" as any` (how 0.30 code got a path past the component type).
+            // `Field: "../X"`, or the same path cast to the any type (how 0.30 code got a path past the component type).
             const written: Node = N.isAsExpression(literal.getParent()) ? literal.getParentOrThrow() : literal;
             const parent = written.getParent();
             if (!N.isPropertyAssignment(parent) || parent.getInitializer() !== written || !COMPONENT_KEYS.has(parent.getName())) continue;
