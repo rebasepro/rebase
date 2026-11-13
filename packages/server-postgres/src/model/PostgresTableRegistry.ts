@@ -153,6 +153,26 @@ export class PostgresTableRegistry implements TableRegistryInterface {
         return this.tableList;
     }
 
+    /**
+     * Serve what `next` holds from now on: its runtime tables, drizzle tables,
+     * enums and relations replace this registry's, in one synchronous step —
+     * every holder of this registry (the driver, its services, the realtime
+     * service, the server's hook wiring) sees the tables before the call or
+     * those after it, never a mixture. The global hooks stay: they belong to
+     * the backend, not to a schema. `next` is built off to the side (by
+     * `buildTableRegistry`, which checks its relations) and not used after.
+     *
+     * What a live schema apply calls once the driver has read the edited
+     * tables back from its catalogue (`refreshTables` on the driver).
+     */
+    replaceWith(next: PostgresTableRegistry): void {
+        refill(this.runtimeTables, next.runtimeTables);
+        refill(this.pgTables, next.pgTables);
+        refill(this.enums, next.enums);
+        refill(this.relations, next.relations);
+        this.tableList = undefined;
+    }
+
     // ── Catalogue tables ────────────────────────────────────────────────────
 
     /**
@@ -181,6 +201,11 @@ export class PostgresTableRegistry implements TableRegistryInterface {
     /** The SQL names of every registered drizzle table. */
     getPgTableNames(): string[] {
         return Array.from(this.pgTables.keys());
+    }
+
+    /** Every registered drizzle table, by SQL name. */
+    getAllPgTables(): Record<string, PgTable> {
+        return Object.fromEntries(this.pgTables.entries());
     }
 
     registerEnums(enums: Record<string, PgEnum<[string, ...string[]]>>): void {
@@ -221,4 +246,10 @@ export class PostgresTableRegistry implements TableRegistryInterface {
         }
         return result;
     }
+}
+
+/** Replace every entry of `target` with those of `source`, keeping the map. */
+function refill<K, V>(target: Map<K, V>, source: ReadonlyMap<K, V>): void {
+    target.clear();
+    for (const [key, value] of source) target.set(key, value);
 }

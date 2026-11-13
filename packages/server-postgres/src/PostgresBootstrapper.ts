@@ -23,11 +23,13 @@ import {
     type RealtimeChannelsConfig,
     type RealtimeSocketOptions,
     type CompiledTable,
-    type TableDescriptor
+    type TableDescriptor,
+    type TableRefreshOutcome
 } from "@rebasepro/types";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
 import { RealtimeService, parseMaxSocketsPerUser, parseMaxSubscriptionsPerSocket, parseRealtimeTuning } from "./services/realtimeService";
 import { buildTableRegistry } from "./model/build-registry";
+import { refreshRelationalSchema } from "./model/refresh-relational-schema";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { PostgresTableRegistry } from "./model/PostgresTableRegistry";
 import { createEmailService, type EmailConfig, type EmailService, logger } from "@rebasepro/server";
@@ -963,7 +965,7 @@ export async function openPostgresDriver(
     // as database targets, not as strings: the primary's URL carries the
     // pinned search_path, so a read URL naming the primary never equalled it
     // and a second pool to the primary was opened and never used.
-    let readDb: import("drizzle-orm/node-postgres").NodePgDatabase<any> | undefined;
+    let readDb: import("drizzle-orm/node-postgres").NodePgDatabase<Record<string, unknown>> | undefined;
     let readRouter: ReadRouter<import("drizzle-orm/node-postgres").NodePgDatabase<any>> | undefined;
     let readPool: import("pg").Pool | undefined;
     if (readUrl && !(primaryUrl && sameDatabaseTarget(readUrl, primaryUrl))) {
@@ -1066,13 +1068,15 @@ export async function openPostgresDriver(
             "or set REBASE_RLS_POLICY_TARGET / REBASE_RLS_ADMIN_POLICIES / REBASE_RLS_DEFAULT_POLICIES."
         );
     }
-    /** The tables this driver serves — collections, junctions — for `grants: "managed"`. */
-    const managedTables = (): ManagedTable[] => registry.getPgTableNames().flatMap((name) => {
-        const table = registry.getPgTable(name);
+    /** The tables a registry serves — collections, junctions — for `grants: "managed"`. */
+    const managedTablesOf = (served: PostgresTableRegistry): ManagedTable[] => served.getPgTableNames().flatMap((name) => {
+        const table = served.getPgTable(name);
         if (!table) return [];
         const config = getTableConfig(table);
         return [{ schema: config.schema ?? "public", table: config.name }];
     });
+    /** The tables this driver serves — collections, junctions — for `grants: "managed"`. */
+    const managedTables = (): ManagedTable[] => managedTablesOf(registry);
     {
         const runSql: RawSqlRunner = async (text) => {
             const res = await schemaAwareDb.execute(sql.raw(text));
@@ -1717,6 +1721,120 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         });
     }
 
+    // ── Live schema apply: serve the edited tables without a restart ──
+    //
+    // Boot reads this source's tables back from the catalogue once, above;
+    // a live apply changes them under a running driver. `refreshTables`
+    // does the same read for the edited schema, builds the registry off to
+    // the side (relations checked, as at boot), provisions what boot
+    // provisions for a table it did not serve (grants, change capture), and
+    // only then swaps the registry and the drizzle relational schema in
+    // one synchronous step.
+    /** This source's descriptors, as JSON: whether an edit changed anything this database stores. */
+    const ownDescriptorsKey = (tables: readonly CompiledTable[]): string => JSON.stringify(
+        tables.map(t => t.descriptor).filter(d => (d.database ?? DEFAULT_DATA_SOURCE_KEY) === sourceKey));
+    let servedOwnKey = ownDescriptorsKey(declaredTables ?? []);
+    /** The refresh running now, which the next one waits for. */
+    let refreshInFlight: Promise<unknown> = Promise.resolve();
+    const refreshTables = async (compiled: readonly CompiledTable[]): Promise<TableRefreshOutcome> => {
+        if (introspectedHere) {
+            return {
+                status: "restart",
+                reason: "This database's tables were derived from its catalogue at boot (no tables were declared), " +
+                    "so the declared schema is served from the next start."
+            };
+        }
+        const run = refreshInFlight.then(() => refreshDeclaredTables(compiled));
+        refreshInFlight = run.catch(() => undefined);
+        return run;
+    };
+    const refreshDeclaredTables = async (compiled: readonly CompiledTable[]): Promise<TableRefreshOutcome> => {
+        const key = ownDescriptorsKey(compiled);
+        if (key === servedOwnKey) {
+            // Nothing this database stores changed (hooks, or another
+            // source's tables): the catalogue tables stay, read at boot.
+            registry.replaceWith(buildTableRegistry({
+                compiledTables: compiled,
+                tables: registry.getAllPgTables(),
+                relations: registry.getAllRelations()
+            }));
+            return { status: "served" };
+        }
+        const own = compiled.map(t => t.descriptor).filter(d => (d.database ?? DEFAULT_DATA_SOURCE_KEY) === sourceKey);
+        const catalogue = await readCatalogueSchema({
+            client: rawClient,
+            tables: own,
+            defaultSchema: pgConfig.introspectionSchema ?? "public"
+        });
+        patchPgArrayNullSafety(catalogue.tables);
+        patchPgNumericToNumber(catalogue.tables);
+        const next = buildTableRegistry({ compiledTables: compiled, tables: catalogue.tables, relations: catalogue.relations });
+        if (catalogue.missing.length > 0) {
+            logger.warn(
+                `[PostgresRegistry] Data source "${sourceKey}" has no table yet for: ${catalogue.missing.join(", ")}. ` +
+                "Their tables will answer \"table not found\" until the schema is provisioned."
+            );
+        }
+
+        // What boot provisions for a table, for the ones this database did
+        // not serve before — before they are served, so the first request
+        // finds them reachable and captured.
+        const servedBefore = new Set(tablesOnThisSource().map(table => table.slug));
+        const added = next.tables().filter(table => table.pg
+            && (table.descriptor.database ?? DEFAULT_DATA_SOURCE_KEY) === sourceKey
+            && !servedBefore.has(table.slug));
+        if (provision && added.length > 0) {
+            const runSql: RawSqlRunner = async (text) => {
+                const res = await schemaAwareDb.execute(sql.raw(text));
+                return (res.rows ?? []) as Record<string, unknown>[];
+            };
+            if (driver.rlsUserRole) {
+                // A table in a schema the role had no usage on, or any new
+                // table under `grants: "managed"`, is unreachable until granted.
+                const schemas = ["public", "rebase", ...next.tables()
+                    .map(({ descriptor }) => declaredSchemaOf(descriptor))
+                    .filter((s): s is string => typeof s === "string")];
+                try {
+                    for (const role of rls.roles) {
+                        await ensureAppRoleGrants(runSql, schemas, { role, mode: rls.grants, managedTables: managedTablesOf(next) });
+                    }
+                } catch (err) {
+                    logger.warn(
+                        `⚠️ RLS enforcement: could not grant ${rls.roles.map((r) => `"${r}"`).join(", ")} on the tables a schema edit ` +
+                        `added (${added.map(t => t.slug).join(", ")}). Requests that touch them will be refused with ` +
+                        `"permission denied" until a boot can: ${err instanceof Error ? err.message : String(err)}`
+                    );
+                }
+            }
+            const captured = added.filter(table => table.descriptor.kind !== "view");
+            if (provisionCdcForTables && captured.length > 0) {
+                try {
+                    await provisionCdcForTables(captured.map(table => ({
+                        schema: table.descriptor.schema,
+                        table: table.descriptor.table,
+                        identityColumns: tableKeyColumns(table).map((k) => k.columnName)
+                    })));
+                } catch (err) {
+                    logger.warn(
+                        `⚠️ [CDC] Could not attach change-capture to the tables a schema edit added ` +
+                        `(${captured.map(t => t.slug).join(", ")}); writes made outside this API won't reach their subscribers until a restart.`,
+                        { detail: err instanceof Error ? err.message : String(err) }
+                    );
+                }
+            }
+        }
+
+        // The swap: synchronous from here to the return.
+        const relational = { ...catalogue.tables, ...catalogue.relations };
+        registry.replaceWith(next);
+        refreshRelationalSchema(schemaAwareDb, relational);
+        if (readDb) refreshRelationalSchema(readDb, relational);
+        realtimeService.refreshTableMaps();
+        servedOwnKey = key;
+        logger.info(`[PostgresRegistry] Data source "${sourceKey}" serves the edited schema: ${next.tables().length} table(s).`);
+        return { status: "served" };
+    };
+
     const internals: PostgresDriverInternals = {
         db: schemaAwareDb,
         readDb,
@@ -1742,6 +1860,7 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         // turned out to have.
         tables: introspectedDescriptors,
         ...(skippedUnprotected && { unprotectedTables: skippedUnprotected }),
+        refreshTables,
         internals
     };
 }

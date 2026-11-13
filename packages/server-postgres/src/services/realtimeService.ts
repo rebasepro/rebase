@@ -3882,6 +3882,18 @@ lastSeen: Date.now() });
         }
     }
 
+    /**
+     * Read the served tables again into the maps a captured change is routed
+     * by (table → served table, junction → the lists it links), after the
+     * registry's tables changed (a live schema apply). Nothing to do while
+     * change capture is off: the maps are built when it starts.
+     */
+    refreshTableMaps(): void {
+        if (!this.cdcTableMap) return;
+        this.cdcTableMap = this.buildCdcTableMap();
+        this.junctionLinkMap = buildJunctionLinkMap(this.registry);
+    }
+
     /** Stop the CDC listener and clear its state. */
     async stopCdc(): Promise<void> {
         this.cdcActive = false;

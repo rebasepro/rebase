@@ -1724,6 +1724,26 @@ export interface InitializedDriver {
      */
     unprotectedTables?: { schema: string; table: string }[];
 
+    /**
+     * Serve these tables from now on, without a restart: what a live schema
+     * apply (`/api/admin/schema/apply`) calls once its DDL has run, with
+     * every compiled table the edited schema holds (hooks included).
+     *
+     * A driver that can MUST re-read the tables it stores from its own
+     * database (a new table, a new or retyped column, a new relation and its
+     * junction), keep the hooks the compiled tables carry, provision whatever
+     * it provisions at boot for a table it did not serve before (change
+     * capture, grants), stop serving a table the list no longer holds, and
+     * swap all of it at once: a request sees the tables before the call or
+     * those after it. A driver whose tables are unchanged by the list (the
+     * edit touched another database's) MUST NOT read its catalogue again.
+     *
+     * Absent on a driver that cannot: the apply then says the change is
+     * applied and served after a restart (`serving` on the result).
+     * Rejecting leaves the driver serving the tables it served before.
+     */
+    refreshTables?(tables: readonly CompiledTable[]): Promise<TableRefreshOutcome>;
+
     /** The underlying database connection (for lifecycle management). */
     connection?: DatabaseConnection;
 
@@ -1734,6 +1754,20 @@ export interface InitializedDriver {
      */
     internals?: unknown;
 }
+
+/**
+ * What a driver did with the tables a live schema apply handed it
+ * ({@link InitializedDriver.refreshTables}).
+ *
+ * - `served` — it serves them now.
+ * - `restart` — it keeps serving the tables it opened with until the process
+ *   restarts; `reason` says why, in a sentence the Studio shows.
+ *
+ * @group Backend
+ */
+export type TableRefreshOutcome =
+    | { status: "served" }
+    | { status: "restart"; reason: string };
 
 /**
  * Result of `BackendBootstrapper.initializeAuth()`.
