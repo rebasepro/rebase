@@ -1,4 +1,5 @@
 import "fake-indexeddb/auto";
+import { IDBFactory } from "fake-indexeddb";
 import { IndexedDBOfflineStore, PendingMutation } from "./offline-store";
 import { OfflineManager } from "./offline";
 import { RebaseApiError } from "./transport";
@@ -414,5 +415,53 @@ describe("a queued write from an older SDK (queue layout 1)", () => {
         await manager.sync();
         manager.dispose();
         expect(sent).toEqual([{ id: "p2", doc: { __type: "relation", id: "kept" } }]);
+    });
+});
+
+describe("a database the previous SDK wrote (layout v2)", () => {
+    /** Open `rebase-offline` at `version` on `factory`, run `seed`, and close it. */
+    function openAt(factory: IDBFactory, version: number, seed: (db: IDBDatabase, tx: IDBTransaction) => void): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const request = factory.open("rebase-offline", version);
+            request.onupgradeneeded = () => {
+                const db = request.result;
+                db.createObjectStore("cache");
+                db.createObjectStore("queue");
+                const tx = request.transaction;
+                if (tx) seed(db, tx);
+            };
+            request.onsuccess = () => { request.result.close(); resolve(); };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    it("drops the cached rows, whose values were tagged, and keeps the queued writes", async () => {
+        const previous = globalThis.indexedDB;
+        const factory = new IDBFactory();
+        globalThis.indexedDB = factory;
+        try {
+            await openAt(factory, 2, (_db, tx) => {
+                tx.objectStore("cache").put(
+                    { value: { id: "p1", place: { __type: "GeoPoint", latitude: 1, longitude: 2 } }, cachedAt: 1 },
+                    "anon|row|posts|p1"
+                );
+                tx.objectStore("queue").put(
+                    { mutationId: "0000000001", collection: "posts", type: "update", id: "p1", data: { title: "offline" }, queuedAt: 1, schemaVersion: 2 },
+                    "anon|0000000001"
+                );
+            });
+
+            const store = new IndexedDBOfflineStore();
+            expect(await store.getCache("anon|row|posts|p1")).toBeUndefined();
+            expect(await store.listCache("anon|")).toEqual([]);
+            const queued = await store.listQueue("anon|");
+            expect(queued.map((op) => op.mutationId)).toEqual(["0000000001"]);
+
+            // The cache works again at the new layout.
+            await store.setCache("anon|row|posts|p1", { value: { id: "p1", place: { latitude: 1, longitude: 2 } }, cachedAt: 2 });
+            expect((await store.getCache("anon|row|posts|p1"))?.value).toEqual({ id: "p1", place: { latitude: 1, longitude: 2 } });
+        } finally {
+            globalThis.indexedDB = previous;
+        }
     });
 });

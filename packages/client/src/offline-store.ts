@@ -261,14 +261,23 @@ export class MemoryOfflineStore implements OfflineStore {
 
 const IDB_NAME = "rebase-offline";
 /**
- * v2 introduced the normalized row cache and string mutation ids. A v1
- * database holds whole-response blobs under keys this version cannot read and
- * queue entries ordered by a numeric `seq` this version no longer writes, so
- * the upgrade drops both stores rather than trying to translate them. Offline
- * support had not shipped in a release when v2 landed, so nothing in the wild
- * loses a queued write to this.
+ * The layout of the database, bumped whenever a store's contents change shape.
+ *
+ * - v2 introduced the normalized row cache and string mutation ids. A v1
+ *   database holds whole-response blobs under keys this version cannot read
+ *   and queue entries ordered by a numeric `seq` this version no longer
+ *   writes, so the upgrade drops both stores rather than trying to translate
+ *   them. Offline support had not shipped in a release when v2 landed, so
+ *   nothing in the wild loses a queued write to this.
+ * - v3: cached rows are the server's wire rows. A v2 cache holds rows the
+ *   previous SDK wrote with the admin's value classes tagged in
+ *   (`{ __type: "GeoPoint" }`, `{ __type: "relation" }`, …), which nothing
+ *   revives any more — rendered, they would show the tags. Cached rows are a
+ *   copy of what the server serves, so the upgrade drops the cache and the
+ *   next read fetches them again. The queue is kept: its entries carry their
+ *   own layout (`QUEUE_SCHEMA_VERSION`) and older ones are converted when read.
  */
-const IDB_VERSION = 2;
+const IDB_VERSION = 3;
 const CACHE_STORE = "cache";
 const QUEUE_STORE = "queue";
 
@@ -348,6 +357,11 @@ export class IndexedDBOfflineStore implements OfflineStore {
                     if (event.oldVersion > 0 && event.oldVersion < 2) {
                         if (db.objectStoreNames.contains(CACHE_STORE)) db.deleteObjectStore(CACHE_STORE);
                         if (db.objectStoreNames.contains(QUEUE_STORE)) db.deleteObjectStore(QUEUE_STORE);
+                    }
+                    // A v2 cache holds rows in the previous SDK's layout (see
+                    // IDB_VERSION). They can be read again; the queue cannot.
+                    if (event.oldVersion === 2 && db.objectStoreNames.contains(CACHE_STORE)) {
+                        db.deleteObjectStore(CACHE_STORE);
                     }
                     if (!db.objectStoreNames.contains(CACHE_STORE)) db.createObjectStore(CACHE_STORE);
                     if (!db.objectStoreNames.contains(QUEUE_STORE)) db.createObjectStore(QUEUE_STORE);
