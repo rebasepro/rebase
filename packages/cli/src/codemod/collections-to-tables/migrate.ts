@@ -542,7 +542,8 @@ async function migrateWithShims(options: MigrateOptions, shimDir: ShimDir): Prom
             ...(options.moduleAliases ? { aliases: options.moduleAliases } : {}),
             schemaDir,
             collectionsDir: legacy.collectionsDir,
-            authFiles
+            authFiles,
+            configManifest: path.join(configDir, "package.json")
         });
         for (const [file, content] of sdk.files) {
             const planned = plan.files.get(file);

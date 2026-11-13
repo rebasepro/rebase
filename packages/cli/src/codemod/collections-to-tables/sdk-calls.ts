@@ -56,7 +56,7 @@ import type { CallExpression, Node, ObjectLiteralExpression, Project, SourceFile
 import type { AstContext, Member, TsMorph } from "./ast";
 import { createAstContext, nodeText, resolveObject, toPosix } from "./ast";
 import { carryHook } from "./hooks";
-import { detectChangedSpellings, detectScriptSpellings, mayNeedImportPass, planDependencies, rewriteMovedImports, type AddedDependency } from "./moved-imports";
+import { detectChangedSpellings, detectScriptSpellings, mayNeedImportPass, packageOf, planDependencies, rewriteMovedImports, type AddedDependency } from "./moved-imports";
 import { own } from "./own";
 import { reindent } from "./print-js";
 import type { ManualStep, Note } from "./types";
@@ -462,6 +462,32 @@ export interface RewriteSdkOptions {
     collectionsDir?: string;
     /** The auth table's module and the collection file it came from (absolute): an `auth.collection` naming either is dropped. */
     authFiles?: readonly string[];
+    /**
+     * The legacy config package's `package.json`. A file the run writes (an override)
+     * that imports a package only that manifest declared — a customization carrying a
+     * `@rebasepro/cms-types` type, an action's icon library — gets it added to its own
+     * package, at the version config/ declared.
+     */
+    configManifest?: string;
+}
+
+/** Every dependency a package.json declares (any dependency field), with its range. */
+function declaredDependencies(text: string | undefined): Map<string, string> {
+    const out = new Map<string, string>();
+    if (text === undefined) return out;
+    let value: unknown;
+    try {
+        value = JSON.parse(text);
+    } catch {
+        return out;
+    }
+    if (typeof value !== "object" || value === null) return out;
+    for (const field of ["dependencies", "devDependencies", "peerDependencies"]) {
+        const deps: unknown = Reflect.get(value, field);
+        if (typeof deps !== "object" || deps === null) continue;
+        for (const [name, range] of Object.entries(deps)) if (typeof range === "string" && !out.has(name)) out.set(name, range);
+    }
+    return out;
 }
 
 /**
@@ -542,8 +568,23 @@ export async function rewriteSdkCalls(root: string, options: RewriteSdkOptions =
             for (const [rule, count] of fileCounts) report.counts[rule] = (report.counts[rule] ?? 0) + count;
         }
     }
+    // Packages only config/ declared, imported by what the run writes (carried code moved out of config/).
+    const configDeclared = options.configManifest ? declaredDependencies(read(options.configManifest)) : new Map<string, string>();
+    if (configDeclared.size > 0) {
+        for (const [file, written] of options.overrides ?? []) {
+            if (!SOURCE.test(file)) continue;
+            const text = out.get(file) ?? written;
+            for (const match of text.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*)["']([^"'.\s][^"'\s]*)["']/g)) {
+                const name = packageOf(match[1]);
+                if (!configDeclared.has(name)) continue;
+                const packages = needed.get(file) ?? new Set<string>();
+                packages.add(name);
+                needed.set(file, packages);
+            }
+        }
+    }
     // The workspace packages: a destination a moved import names becomes a dependency; old CLI flags in scripts are steps.
-    const dependencies = planDependencies(root, needed, read);
+    const dependencies = planDependencies(root, needed, read, configDeclared);
     for (const [file, content] of dependencies.files) out.set(file, content);
     report.dependencies = dependencies.added;
     report.notes.push(...dependencies.notes);

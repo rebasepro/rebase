@@ -575,6 +575,24 @@ describe("a component path written in a shared module", () => {
     }, 120_000);
 });
 
+describe("a package only config/ declared", () => {
+    it("is added to the package that now imports it, when carried code names it", async () => {
+        const dir = materialize("blog");
+        fs.writeFileSync(path.join(dir, "config", "package.json"), JSON.stringify({ name: "blog-config", private: true, type: "module", dependencies: { "@rebasepro/cms-types": "^0.30.1" } }, null, 2) + "\n");
+        const posts = path.join(dir, "config", "collections", "posts.ts");
+        fs.writeFileSync(posts, fs.readFileSync(posts, "utf8")
+            .replace("import { defineCollection } from \"@rebasepro/cms-types\";", "import { defineCollection } from \"@rebasepro/cms-types\";\nimport type { RebaseContext } from \"@rebasepro/cms-types\";")
+            .replace("onClick: ({ id }) => notify(`published ${id}`)", "onClick: ({ id, context }: { id: string; context: RebaseContext }) => notify(`published ${id} by ${String(context.authController.user?.uid)}`)"));
+        const report = await run(dir, { dryRun: true });
+        expect(report.refusals).toEqual([]);
+        const cms = report.files.find(file => file.path === "frontend/src/cms/posts.tsx")?.content ?? "";
+        expect(cms).toContain("RebaseContext");
+        expect(cms).toContain("@rebasepro/cms-types");
+        const manifest = report.files.find(file => file.path === "frontend/package.json")?.content ?? "{}";
+        expect(Object.keys((JSON.parse(manifest) as { dependencies?: Record<string, string> }).dependencies ?? {})).toContain("@rebasepro/cms-types");
+    }, 120_000);
+});
+
 describe("a view filter computed when the config loads", () => {
     it("is carried as its expression, never frozen to the run's clock", async () => {
         const dir = materialize("blog");

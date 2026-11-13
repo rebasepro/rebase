@@ -514,7 +514,13 @@ function rebaseRange(manifest: JsonObject): string | undefined {
  * @param needed source file → the packages its imports now name
  * @param read a file's current text (the migration's planned content first)
  */
-export function planDependencies(root: string, needed: ReadonlyMap<string, ReadonlySet<string>>, read: (file: string) => string | undefined): { files: Map<string, string>; added: AddedDependency[]; manualSteps: ManualStep[]; notes: Note[] } {
+export function planDependencies(
+    root: string,
+    needed: ReadonlyMap<string, ReadonlySet<string>>,
+    read: (file: string) => string | undefined,
+    /** Versions to use for packages the config package declared (carried code moved out of config/). */
+    configVersions: ReadonlyMap<string, string> = new Map()
+): { files: Map<string, string>; added: AddedDependency[]; manualSteps: ManualStep[]; notes: Note[] } {
     const out = { files: new Map<string, string>(), added: [] as AddedDependency[], manualSteps: [] as ManualStep[], notes: [] as Note[] };
     const byManifest = new Map<string, Set<string>>();
     for (const [file, packages] of needed) {
@@ -547,6 +553,30 @@ export function planDependencies(root: string, needed: ReadonlyMap<string, Reado
         const missing = [...packages].filter(name => name !== ownName && !declared(name)).sort();
         if (missing.length === 0) continue;
         const range = rebaseRange(parsed.value) ?? (rootManifest ? rebaseRange(rootManifest.value) : undefined);
+        // A package config/ declared keeps the version config/ gave it.
+        const fromConfig = missing.filter(name => configVersions.has(name) && (!name.startsWith("@rebasepro/") || range === undefined));
+        if (fromConfig.length > 0) {
+            const dependencies = isObject(parsed.value.dependencies) ? { ...parsed.value.dependencies } : {};
+            const keys = Object.keys(dependencies);
+            const sorted = keys.every((name, index) => index === 0 || keys[index - 1].localeCompare(name) <= 0);
+            for (const name of fromConfig) {
+                const version = configVersions.get(name) ?? "";
+                dependencies[name] = version;
+                out.added.push({ file: relative, name, version });
+            }
+            parsed.value = { ...parsed.value, dependencies: sorted ? Object.fromEntries(Object.entries(dependencies).sort(([a], [b]) => a.localeCompare(b))) : dependencies };
+            const indent = /\n([ \t]+)"/.exec(parsed.text)?.[1] ?? "  ";
+            out.files.set(manifest, `${JSON.stringify(parsed.value, null, indent)}${parsed.text.endsWith("\n") ? "\n" : ""}`);
+            out.notes.push({ file: relative, message: `added ${fromConfig.map(name => `${name}@${configVersions.get(name) ?? ""}`).join(", ")} to dependencies: code the run moved out of config/ imports ${fromConfig.length > 1 ? "them" : "it"}, and only config/package.json declared ${fromConfig.length > 1 ? "them" : "it"}. Run your package manager's install.` });
+            out.manualSteps.push({
+                title: `Install the packages added to ${relative}`,
+                detail: `Code the run moved out of config/ (a customization, a helper) imports ${fromConfig.join(", ")}, which only config/package.json declared; the codemod added ${fromConfig.length > 1 ? "them" : "it"} to ${relative} at the version config/ had. Run your package manager's install.`,
+                file: relative
+            });
+            const rest = missing.filter(name => !fromConfig.includes(name));
+            if (rest.length === 0) continue;
+            missing.splice(0, missing.length, ...rest);
+        }
         if (!range) {
             out.manualSteps.push({
                 title: `Add ${missing.join(", ")} to ${relative}`,
