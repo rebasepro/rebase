@@ -17,6 +17,12 @@
  * is refused (503 `TABLE_WITHHELD`) without naming the SQL. The other tables
  * are served. A live refresh holds a table it starts serving to the same.
  *
+ * SEC-FIX-3 tightened "protected": any one policy used to do, so a stray
+ * `USING (true)` in place of the declared policies was served. Now at least one
+ * declared policy must be there by the name provisioning gives it, and no
+ * declared restrictive policy may be missing; a missing permissive policy only
+ * narrows access, so that table is served (with a warning).
+ *
  * Requires Docker.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -51,7 +57,14 @@ const fine = defineTable("fine", {
     relations: { note: rel.belongsTo(() => notes) },
     rls: [{ operation: "select", access: "public" }]
 });
-const TABLES = [notes, shared, fine];
+const gated = defineTable("gated", {
+    columns: { id: col.serial().primaryKey(), body: col.text() },
+    rls: [
+        { operation: "select", access: "public" },
+        { operation: "select", mode: "restrictive", using: "{body} <> 'hidden by the gate'" }
+    ]
+});
+const TABLES = [notes, shared, fine, gated];
 const SECRET = "admin-only secret";
 
 type Row = Record<string, unknown>;
@@ -232,6 +245,51 @@ describe("a declared table the database does not protect is withheld (E2E)", () 
             expect(sharedAnswer.body.data).toEqual([{ id: 1, body: SECRET }]);
         } finally {
             await after.stop();
+        }
+    });
+
+    it("a stray policy in place of the declared ones, or a missing restrictive gate, is no protection; a missing permissive policy only narrows", async () => {
+        const fixing = await boot(true);
+        await fixing.stop();
+        await admin.query("INSERT INTO gated (body) VALUES ('hidden by the gate'), ('open row')");
+        const policiesOf = async (table: string) =>
+            (await admin.query<{ policyname: string; permissive: string }>(`SELECT policyname, permissive FROM pg_policies WHERE tablename = '${table}'`)).rows;
+
+        // shared: its declared policies replaced by one nobody declared.
+        for (const { policyname } of await policiesOf("shared")) await admin.query(`DROP POLICY "${policyname}" ON shared`);
+        await admin.query("CREATE POLICY stray ON shared FOR SELECT USING (true)");
+        // gated: the grant without its gate.
+        const gates = (await policiesOf("gated")).filter(policy => policy.permissive === "RESTRICTIVE");
+        expect(gates.length).toBeGreaterThan(0);
+        for (const { policyname } of gates) await admin.query(`DROP POLICY "${policyname}" ON gated`);
+
+        const withheld = await boot(false);
+        try {
+            expectWithheld(await withheld.get("/shared"), "shared");
+            const gatedAnswer = await withheld.get("/gated");
+            expect(gatedAnswer.status, gatedAnswer.text).toBe(503);
+            expect(gatedAnswer.text).toContain("TABLE_WITHHELD");
+            expect(gatedAnswer.text).not.toContain("hidden by the gate");
+            expect((await withheld.get("/fine")).status).toBe(200);
+        } finally {
+            await withheld.stop();
+        }
+
+        // Back to the declared policies, then one permissive grant of several gone: served.
+        const again = await boot(true);
+        await again.stop();
+        await admin.query("DROP POLICY stray ON shared");
+        const permissive = (await policiesOf("gated")).filter(policy => policy.permissive === "PERMISSIVE");
+        expect(permissive.length).toBeGreaterThan(1);
+        await admin.query(`DROP POLICY "${permissive[0].policyname}" ON gated`);
+        const narrowed = await boot(false);
+        try {
+            const answer = await narrowed.get("/gated");
+            expect(answer.status, answer.text).toBe(200);
+            expect(answer.text).not.toContain("hidden by the gate");
+            expect((await narrowed.get("/shared")).status).toBe(200);
+        } finally {
+            await narrowed.stop();
         }
     });
 });
