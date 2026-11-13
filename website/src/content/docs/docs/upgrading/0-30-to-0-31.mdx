@@ -13,10 +13,15 @@ description: "The breaking changes 0.31 carries for an app on 0.30 — tables in
 
 ### The checklist, per project
 
+0. **Bump every `@rebasepro` package first**, in every workspace package, so the types the codemod reads are 0.31's: `pnpm -r up "@rebasepro/*@0.31.0"`, then `pnpm install`. A project on a release before 0.30 applies the code changes of the guides in between first ([Upgrading](/docs/upgrading/)): the codemod loads a 0.20–0.29 `config/` and its SQL check passes, but that check compares the 0.31 compiler with itself — only step 6, against your database, proves the generated DDL is what your database has.
 1. **Commit, then run the codemod as a dry run:** `rebase migrate collections-to-tables --dry-run`. It prints the files it would write, what it refuses (with file and line), the notes and the manual steps, and writes nothing. Fix what it refuses in `config/` first.
-2. **Run it for real:** `rebase migrate collections-to-tables`. It writes `backend/schema/`, `frontend/src/cms/` (with `ui-config.json`), the `backend/` modules and the project files, adds `rebaseBackendGuard()` to the scaffold's `vite.config.ts`, rewrites your SDK calls, and proves the generated SQL byte-identical — or puts every file back. See [section 108](#108-tables-in-backendschema-replace-configcollections--run-the-codemod-first).
+2. **Run it for real:** `rebase migrate collections-to-tables`. It writes `backend/schema/`, `frontend/src/cms/` (with `ui-config.json`), the `backend/` modules and the project files, adds `rebaseBackendGuard()` to the scaffold's `vite.config.ts`, rewrites your SDK calls, moves the imports of names 0.31 moved to another package ([section 135](#135-rebaseprotypes-and-rebaseprocommon-drop-the-collection-model-from-their-roots)), and proves the generated SQL byte-identical — or puts every file back. See [section 108](#108-tables-in-backendschema-replace-configcollections--run-the-codemod-first).
 3. **Read the last section of its output, "Review before deploying: these rules change meaning"**, and decide each rule it lists ([below](#review-before-deploying-these-rules-change-meaning)).
-4. **Do the manual steps it prints**, in order. Each names its file, and most carry the snippet to write: the `<RebaseCMS>` mount with `tableCustomizations` and `uiConfig` when your `App.tsx` is not the scaffold's, `rebaseBackendGuard()` when your `vite.config.ts` is not ([section 130](#130-rebase-build-refuses-a-frontend-without-rebasebackendguard)), global hooks, and `rebase skills install` when the project holds agent skills ([section 128](#128-the-agent-skill-rebase-collections-is-rebase-tables)).
+4. **Do the manual steps it prints**, in order. Each names its file, and most carry the snippet to write: the `<RebaseCMS>` mount with `tableCustomizations` and `uiConfig` when your `App.tsx` is not the scaffold's, `rebaseBackendGuard()` when your `vite.config.ts` is not ([section 130](#130-rebase-build-refuses-a-frontend-without-rebasebackendguard)), global hooks, an import of a name 0.31 removed ([section 135](#135-rebaseprotypes-and-rebaseprocommon-drop-the-collection-model-from-their-roots)), and `rebase skills install` when the project holds agent skills ([section 128](#128-the-agent-skill-rebase-collections-is-rebase-tables)). Run `pnpm install` when the output lists "Dependencies added". Then read two lists in the SDK part of the output:
+   - **"Rewritten by name — review"**: `.collection(` calls on a receiver with no type (`any`), rewritten because the receiver is named `dataAsAdmin`, or is `.data` with a literal table name. Check each is the SDK.
+   - **"Left unchanged — check each"**: `.collection(` calls the codemod did not prove to be the SDK, such as a call through a type your project declares itself. A call left here that *is* the SDK fails at runtime on 0.31: rename it to `.table(` by hand. Code that tests whether `collection` exists (`typeof data.collection === "function"`) is a manual step: on 0.31 it silently takes the other branch.
+
+   A file committed as build output (a bundled or minified `.js`) is never edited: it is listed, so rebuild it after migrating, and replace a vendored copy of the client with the 0.31 build.
 5. **`rebase generate-sdk`** — the generated module's names changed ([section 115](#115-the-sdk-addresses-a-table-datatableslug)).
 6. **Against your database**, run `rebase db push --dry-run` and expect "No changes: the database already matches these tables.", then `rebase doctor --policies` and expect no policy drift. The codemod's SQL check proves the conversion faithful; these two prove it against the real database, and any policy difference either one lists is a change in who can access what.
 7. **`rebase verify`** — it now also reads `frontend/src/cms`: a customization naming a table or field that does not exist, a required column kept off the form, a missing `rebaseBackendGuard()`, a `ui-config.json` not passed to `<RebaseCMS>`.
@@ -346,17 +351,29 @@ Then turn any value import of `backend/` into `import type`.
 **What changed:** values go through their column's codec on the way out and the column's rules on the way in.
 
 - A `bigint` or `numeric` foreign-key column a relation generates, which Postgres returns as text, is served as a **number** in REST, the SDK and the admin panel. Declared number keys already were.
+- A native array's **items are served as their scalar type is**, in REST, the SDK, the socket and the driver:
+
+  | Column | 0.30 served | 0.31 serves |
+  |---|---|---|
+  | `timestamptz[]` | `["2026-01-02 11:00:00+01"]` | `["2026-01-02T10:00:00.000Z"]` |
+  | `numeric[]` (a driver opened without the boot-time numeric setting: tests, scripts) | `["1.50", "2.25"]` | `[1.5, 2.25]` |
+  | `bigint[]` with a null item | `[1, 0, 3]` | `[1, null, 3]` |
+  | `date[]`, `timestamptz[]` or an enum array with a null item | `["2026-01-02", "NULL"]` | `["2026-01-02", null]` |
+
+  `date[]`, `time[]`, `text[]`, `uuid[]`, `boolean[]`, `integer[]` and `double precision[]` are served as before. What is stored does not change: a row read and saved back stores the same array.
 - A relation named in `include`, a filter or a sort must be its **exact name**. The retries with the slug and the snake_case spelling are gone.
 - A generated column is refused on write, and left out of the OpenAPI input schema.
 - A required field inside a JSON object is enforced; `$inc` and array items on an integer column must be whole numbers.
 
-**What to do:** read foreign keys as numbers where you compared strings, and spell relation names as the table declares them (its `relations` keys). Stop sending generated columns.
+**What to do:** read foreign keys as numbers where you compared strings, parse `timestamptz[]` items as RFC 3339 and treat a null array item as `null`, and spell relation names as the table declares them (its `relations` keys). Stop sending generated columns.
 
 ## 132. History is served as reads
 
 **Who this hits:** readers of history snapshots, and anyone who implements a `DataDriver`.
 
 **What changed:** history entries are served as reads: field access first, then `afterRead` (global, table, column). A column masked by a hook or a `.transform({ afterRead })` is masked in every snapshot, a column the caller cannot read is withheld and left out of `changed_fields`, keys of dropped columns are withheld, and a revert never writes a column the caller cannot read. A hook that throws on an old snapshot fails the request. 0.30 served the stored values raw, so a project with history and masking hooks should upgrade.
+
+An entry holds the row as `GET /api/data/<table>/<id>` reads it with no `include`: plain values, a `belongsTo` as its foreign key. An entry an older version recorded with the admin panel's view model is served, and reverted, as that row: a `{ "__type": "date", "value" }` envelope as its value, a `{ "__type": "relation" }` ref of an owning relation as the foreign key under the key's own name, and any other ref as the related row's key. 0.30 served those refs as written.
 
 A driver serves history through `DataDriver.serveStoredRows(path, rows)`, inside the caller's read-only transaction; the history routes answer 501 for a driver without it, so history is never served unmasked.
 
@@ -382,7 +399,7 @@ A driver serves history through `DataDriver.serveStoredRows(path, rows)`, inside
 | `SchemaEditingAdmin.planSchemaChange(collections, …)` | `planSchemaChange(tables, …)` with `CompiledTable[]`; `EditedSchema.tables` |
 | `buildCollectionFromTableMetadata`, `IntrospectedCollection`, `IntrospectedRelation` | removed: an introspected table is a `TableDescriptor` |
 
-**What to do:** rename. Nothing rewrites these for you.
+**What to do:** rename. `rebase migrate sdk-calls` renames `assertUploadWithinPropertyLimits` and the upload field constants (`UPLOAD_COLLECTION_FIELD` / `UPLOAD_PROPERTY_FIELD` → `UPLOAD_TABLE_FIELD` / `UPLOAD_COLUMN_FIELD`, same values), and lists every other import or option in this table as a numbered manual step.
 
 ## 134. `@rebasepro/server-postgres` exports name tables
 
@@ -393,9 +410,9 @@ A driver serves history through `DataDriver.serveStoredRows(path, rows)`, inside
 | Before | Now |
 |---|---|
 | the class PostgresCollectionRegistry, `getTable(name)`, `registerTable` | `PostgresTableRegistry`, `getPgTable`, `registerPgTable` |
-| `openPostgresDriver(config, { collections })` | `openPostgresDriver(config, { tables })`, `tables` from `compileSchema`; the `collection` props of driver calls are ignored |
+| `openPostgresDriver(config, { collections })` | `openPostgresDriver(config, { tables })`, `tables` from `compileSchema`; driver calls carry no `collection` prop ([section 137](#137-driver-and-backend-interfaces-carry-tables-not-collections)) |
 | adapter / bootstrapper `ensureCollectionSchema`, `ensureCollectionPolicies`, `readCollectionsSchemaVersion`, `stampCollectionsSchemaVersion` | `ensureTableSchema`, `ensureTablePolicies`, `readTablesSchemaVersion`, `stampTablesSchemaVersion`, taking `CompiledTable[]` |
-| `serializePropertyToServer`, `parsePropertyFromServer` | `serializeColumnToServer(value, column)`, `parseColumnFromServer(value, column)` |
+| `serializePropertyToServer`, `parsePropertyFromServer` | `serializeColumnToServer(value, column)`; `parsePropertyFromServer` is removed — a driver read returns the REST row ([section 136](#136-the-postgres-driver-and-the-sockets-one-shot-reads-return-the-rest-row)) |
 | `ensureCollectionTables`, `planCollectionSchemaEnsure`, `planCollectionPolicies`, `CollectionPolicyPlan`, `lockCollectionTables` | `ensureTables`, `planTableSchemaEnsure`, `planTablePolicies`, `TablePolicyPlan`, `lockTables` |
 | `CollectionIndexSpec`, `CollectionIndexConfigError`, `collectionIndexStatements` | `TableIndexSpec`, `TableIndexConfigError`, `tableIndexStatements` |
 | `checkCollectionsVsDatabase` / `…VsSchema` / `…VsSdk`, `columnKeysFromCollections`, `buildDrizzleRelationsFromCollections`, `schemaOfCollection`, `getTableIncludesFromCollections` | `checkTablesVs…`, `columnKeysFromTables`, `buildDrizzleRelationsFromTables`, `schemaOfTable`, `getTableIncludesFromTables` |
@@ -408,8 +425,125 @@ The JSON the planner reports keeps its keys: `SchemaReconcileColumn.collection` 
 
 ## 135. `@rebasepro/types` and `@rebasepro/common` drop the collection model from their roots
 
-**Who this hits:** code that imports the lift, the collection types, or admin-panel helpers from `@rebasepro/types` or `@rebasepro/common`, and custom drivers that implement the registry.
+**Who this hits:** code that imports collection or property types, admin-panel helpers or the lift from `@rebasepro/types` or `@rebasepro/common` — custom fields, custom views, plugins, tests with collection fixtures — and custom drivers that implement the registry.
 
-**What changed:** the migration lift (`collectionsToTableDefs`, `collectionToTableDef`, `LiftNote`, `LiftResult`, `LiftOptions`) moved to `@rebasepro/common/migrate`, beside a frozen copy of the 0.30 collection model (`Legacy…` types) and `defineLegacyCollection`. Fifty helpers only the admin panel uses moved to `@rebasepro/cms-types`, among them `evaluateCondition`, `buildConditionContext`, `canReadCollection`, `canEditEntity`, `resolveProperty`, `resolveProperties`, `getDefaultValuesFor`, `resolveStorageSource`, `CollectionRegistryController` and `FilterPreset`. A driver's registry is a `TableRegistryInterface`: `setGlobalHooks?` and `setTableHooks?` replace `getGlobalCallbacks` / `setGlobalCallbacks?`. `globalHooksAsCallbacks`, `resolveDriftCheckName` and `PENDING_TABLE_FEATURES` are removed.
+**What changed:** the kernel packages describe tables only. What describes a collection as the admin panel draws it lives in `@rebasepro/cms-types`:
 
-**What to do:** change the import path. A test that keeps collection literals as fixtures types them with the `Legacy…` types and lifts them through `@rebasepro/common/migrate`.
+- **Types** that moved from `@rebasepro/types`: `CollectionConfig`, `PostgresCollectionConfig`, `FirebaseCollectionConfig`, `AnyCollectionConfig`, every `…Property` (`StringProperty`, `NumberProperty`, `ArrayProperty`, …) and `Properties`, `CollectionCallbacks` and its hook props, the 0.30 relation kinds and their `Resolved…` forms, `CollectionIndex`, the chip colors (`ColorScheme`, `ColorKey`, …), `FieldAccess`, `EnumValues`.
+- **Helpers** that moved from `@rebasepro/common`: the collection-shaped policy helpers (`policyToPostgres`, `compileRulePolicies`, `getEffectiveSecurityRules`, `getGeneratedPolicyNames`, …), `CollectionRegistry`, `resolveCollectionRelations`, `resolveRelation`, `getTableName`, `findRelation`, `rowToViewModel`, `resolvePrimaryKeys`, the field-access view of a property (`effectiveAccess`, `canReadField`, `canWriteField`), `evaluateCondition`, `canEditEntity`, `resolveProperty`, `getDefaultValuesFor`, `getSubcollections`, `getCopyValues`, `enumToObjectEntries`. A rule compiled from a bare expression uses `compilePolicyExpression(expr)` from `@rebasepro/common`.
+- **`composeCallbacks`** composes a collection's callbacks for the panel and moved to `@rebasepro/cms-types`; `@rebasepro/server` no longer re-exports it. Backend code composes a table's hooks with `composeTableHooks` from `@rebasepro/common`, and the codemod lists a backend import of `composeCallbacks` as a manual step saying so.
+- **`defineCollection`** is removed from `@rebasepro/common` and `@rebasepro/cms-types`: declare the table with `defineTable` in `backend/schema` and customize it with `customizeTable` in `frontend/src/cms`; a Firestore collection is `defineFirestoreCollection` from `@rebasepro/firebase`.
+- **`EntityDataOptions.resolveCollection`** is replaced by `primaryKeysOf`, `viewModelOf`, `storedValuesOf` and `viewModelSourceOf`; `collectionEntityDataOptions(resolveCollection, { resolveDataPath, resolveAccessor })` from `@rebasepro/cms-types` builds them.
+- **The migration lift** (`collectionsToTableDefs`, `collectionToTableDef`, `LiftNote`, `LiftResult`, `LiftOptions`) moved to `@rebasepro/common/migrate`, beside a frozen copy of the 0.30 collection model (`Legacy…` types) and `defineLegacyCollection`.
+- **A driver's registry** is a `TableRegistryInterface`: `setGlobalHooks?` and `setTableHooks?` replace `getGlobalCallbacks` / `setGlobalCallbacks?`. `globalHooksAsCallbacks`, `resolveDriftCheckName` and `PENDING_TABLE_FEATURES` are removed.
+
+**What to do:** `rebase migrate sdk-calls` (part of `collections-to-tables`) moves each import below to its new package — merged into an import of that package the file already has, `import type`, inline `type` and `as` aliases kept — and adds the package to the importing workspace package's dependencies; run `pnpm install` afterwards. An import of a removed name, a namespace import (`import * as`), an `export *`, a dynamic `import()` or a `require()` that uses a moved name is a numbered manual step. A test that keeps collection literals as fixtures types them with the `Legacy…` types and lifts them through `@rebasepro/common/migrate`.
+
+### Imports that moved
+
+{/* moved-imports:start — written by tooling/scripts/docs-verify/moved-imports-guide.mjs from moved-symbols.json; do not edit by hand */}
+
+**From `@rebasepro/common` to `@rebasepro/cms`** (2):
+
+`getRelationTargetPath`, `hasEntityId`.
+
+**From `@rebasepro/common` to `@rebasepro/cms-types`** (83):
+
+`applyDefaultValuesOnCreate`, `AuthContext`, `buildConditionContext`, `canCreateEntity`, `canDeleteEntity`, `canEditEntity`, `canReadCollection`, `canReadField`, `canWriteField`, `checkOperation`, `CheckOperationOptions`, `COLLECTION_PATH_SEPARATOR`, `CollectionRegistry`, `compileRulePolicies`, `composeCallbacks`, `copyCarriesRelation`, `createRelationRefWithData`, `DEFAULT_ONE_OF_TYPE`, `DEFAULT_ONE_OF_VALUE`, `effectiveAccess`, `enumToObjectEntries`, `evaluateCondition`, `fieldKeyForColumn`, `findRelation`, `fullPathToCollectionSegments`, `getArrayResolvedProperties`, `getChildViewDeclaringProperties`, `getChildViewRelationPropertyKeys`, `getCopyValues`, `getDeclaredPrimaryKeys`, `getDefaultValueFor`, `getDefaultValueFortype`, `getDefaultValuesFor`, `getEffectiveSecurityRules`, `getEffectiveSecurityRulesOnce`, `getEntityChildViews`, `getGeneratedPolicyNames`, `getGeneratedPolicyNamesOnce`, `getInjectedSecurityRules`, `getLabelOrConfigFrom`, `getPrimaryKeys`, `getReferenceFrom`, `getRelationFrom`, `getSubcollections`, `getTableName`, `isJunctionBackedRelation`, `isPropertyBuilder`, `LegacyPolicyCompileOptions`, `LegacyRulePolicyCompileOptions`, `legacyTableResolver`, `normalizeToEntityRelation`, `PolicyClauses`, `policyTableFromCollection`, `policyToPostgres`, `registerConditionOperations`, `RelationRefWithData`, `resolveArrayProperties`, `resolveCollectionRelations`, `resolveEnumValues`, `ResolveFilenameStringParams`, `resolvePrimaryKeys`, `resolveProperties`, `resolveProperty`, `resolvePropertyEnum`, `ResolvePropertyProps`, `resolveRelation`, `resolveRelationProperty`, `resolveStorageFilenameString`, `resolveStoragePathString`, `ResolveStoragePathStringParams`, `resolveStorageSource`, `rowToViewModel`, `sanitizeData`, `segmentsToStrippedPath`, `sortProperties`, `stripCollectionPath`, `traverseValueProperty`, `traverseValuesProperties`, `unavailableStorageSource`, `UnknownResolution`, `updateDateAutoValues`, `updateUserAutoValues`, `withDeprecatedAlias`.
+
+**From `@rebasepro/common` to `@rebasepro/common/migrate`** (8):
+
+`collectionsToTableDefs`, `collectionToTableDef`, `LiftNote`, `LiftNoteKind`, `LiftOptions`, `LiftResult`, `liftRuleSpelling`, `liftTenantSourceSpelling`.
+
+**From `@rebasepro/server` to `@rebasepro/cms-types`** (1):
+
+`composeCallbacks`.
+
+**From `@rebasepro/types` to `@rebasepro/cms-types`** (110):
+
+`ADMIN_COLLECTION_KEYS`, `ADMIN_PROPERTY_KEYS`, `AdminCollectionKey`, `AdminPropertyKey`, `AfterDeleteProps`, `AfterReadProps`, `AfterSaveErrorProps`, `AfterSaveProps`, `AnyCollectionConfig`, `ArrayProperty`, `ArrayPropertyValidationSchema`, `AuthCollectionConfig`, `BaseCollectionConfig`, `BaseProperty`, `BeforeDeleteProps`, `BeforeQueryProps`, `BeforeSaveProps`, `BelongsToRelation`, `BinaryProperty`, `BooleanProperty`, `BrinIndex`, `BtreeIndex`, `ChildViewSource`, `CollectionCallbacks`, `CollectionConfig`, `CollectionIndex`, `CollectionRegistryController`, `CollectionView`, `ColorHue`, `ColorKey`, `ColorScheme`, `ColorTone`, `ConditionContext`, `ConditionRule`, `DataType`, `DateProperty`, `DatePropertyValidationSchema`, `EffectiveRoleController`, `EngineProperties`, `EntityChildView`, `EntityReference`, `EntityReferenceProps`, `EntityRelation`, `EnumValueConditions`, `EnumValueConfig`, `EnumValues`, `FieldAccess`, `FileType`, `FilterPreset`, `FirebaseCollectionConfig`, `FirebaseProperties`, `FirebaseProperty`, `GeoPoint`, `GeopointProperty`, `getCollectionDataPath`, `getDeclaredSubcollections`, `GinIndex`, `HasManyRelation`, `HasOneRelation`, `ImageResize`, `IndexKey`, `IndexPredicate`, `InferEntityType`, `InferPropertyType`, `isFirebaseCollectionConfig`, `isPostgresCollectionConfig`, `isRelationalCollectionConfig`, `JsonLogicRule`, `ManyToManyRelation`, `MapProperty`, `McpAppModuleExport`, `nestAdminCollectionKeys`, `nestAdminKeysOf`, `nestAdminPropertyKeys`, `NoSuchKey`, `NumberProperty`, `NumberPropertyValidationSchema`, `PostgresCollectionConfig`, `PostgresProperties`, `PostgresProperty`, `Properties`, `Property`, `PropertyBuilderProps`, `PropertyCallbacks`, `PropertyConditions`, `PropertyTypeNotOnThisEngine`, `PropertyValidationSchema`, `ReferenceProperty`, `Relation`, `RelationBase`, `RelationProperty`, `ResolvedBelongsTo`, `ResolvedHasMany`, `ResolvedHasOne`, `ResolvedManyToMany`, `ResolvedRelation`, `ResolvedRelationBase`, `ResolvedVia`, `SqlExpression`, `StorageConfig`, `StrictProperties`, `StringProperty`, `StringPropertyValidationSchema`, `UnorderedIndexKey`, `UploadedFileContext`, `Vector`, `VectorDistance`, `VectorIndexConfig`, `VectorProperty`, `ViaRelation`.
+
+**Removed, with no successor in another package** (33) — the codemod lists each import as a numbered manual step:
+
+| Name | Was exported by | Write instead |
+|---|---|---|
+| `defineCollection` | `@rebasepro/cms-types` | defineTable (backend/schema) + customizeTable for the panel's presentation; defineFirestoreCollection (@rebasepro/firebase) for Firestore; defineLegacyCollection (@rebasepro/common/migrate) for 0.30 fixtures. |
+| `apiHiddenFieldNames` | `@rebasepro/common` | apiHiddenKeys(descriptor) from @rebasepro/common. |
+| `assertBeforeQueryIsPostgresOnly` | `@rebasepro/common` | Nothing: Postgres is the only server engine. |
+| `buildPropertyCallbacks` | `@rebasepro/common` | Column transforms: col.*().transform(...) on the table definition. |
+| `DEFAULT_STRING_COLUMN_LENGTH` | `@rebasepro/common` | col.varchar({ length }) states the length on the column. |
+| `defaultUsersCollection` | `@rebasepro/common` | defineAuthTable for the user store; AUTH_SECRET_NAMES lists its secrets. |
+| `defineCollection` | `@rebasepro/common` | defineTable (backend/schema); the CMS customizes a table with customizeTable; Firestore uses defineFirestoreCollection; legacy fixtures defineLegacyCollection from @rebasepro/common/migrate. |
+| `EntityCallbackContext` | `@rebasepro/common` | TableHookProps["context"] from @rebasepro/types. |
+| `getJunctionCollectionConfig` | `@rebasepro/common` | junctionPolicyTable(junction) from @rebasepro/common. |
+| `getJunctionSecurityRules` | `@rebasepro/common` | tableJunctionRules(junction) from @rebasepro/common. |
+| `getTenantConfig` | `@rebasepro/common` | tenantOf(descriptor) from @rebasepro/common reads a table's tenancy. |
+| `hasFieldAccessRules` | `@rebasepro/common` | hasColumnAccessRules(descriptor) from @rebasepro/common. |
+| `includableRelationNames` | `@rebasepro/common` | includableRelations(descriptor) from @rebasepro/common. |
+| `JunctionDeclaringSide` | `@rebasepro/common` | TableJunctionSide from @rebasepro/common. |
+| `JunctionEndpoint` | `@rebasepro/common` | TableJunctionEndpoint from @rebasepro/common. |
+| `JunctionSpec` | `@rebasepro/common` | TableJunction from @rebasepro/common. |
+| `queryableFieldNames` | `@rebasepro/common` | queryableColumnKeys(descriptor) from @rebasepro/common. |
+| `resolveJunctionSpecs` | `@rebasepro/common` | resolveTableJunctions(descriptors) from @rebasepro/common. |
+| `resolveStringColumnLength` | `@rebasepro/common` | col.varchar({ length }) states the length on the column. |
+| `restrictedFieldNames` | `@rebasepro/common` | restrictedKeys(descriptor, viewer, kind) from @rebasepro/common. |
+| `vectorPropertyNames` | `@rebasepro/common` | vectorColumnKeys(descriptor) from @rebasepro/common. |
+| `withRelationReferencesOnly` | `@rebasepro/common` | History entries hold the stored (wire) row, which embeds no related row; the history routes serve an older entry's relation refs as keys. Nothing replaces it. |
+| `DataTransformer` | `@rebasepro/types` | Nothing: the Postgres driver's codecs read the column descriptor. |
+| `deserializeCollections` | `@rebasepro/types` | Nothing: GET /api/schema/tables serves table descriptors; collections are not serialized. |
+| `hasForeignKeyOnTarget` | `@rebasepro/types` | Read RelationDescriptor.kind (hasOne \| hasMany). |
+| `InferCollectionConfigType` | `@rebasepro/types` | Infer a table's row with InferRow<typeof table>. |
+| `initTextSearch` | `@rebasepro/types` | DataDriver no longer declares it; the Firestore driver (FirestoreDataDriver) declares its own. |
+| `isManyToMany` | `@rebasepro/types` | Read RelationDescriptor.kind === "manyToMany". |
+| `isSerializedCollectionRef` | `@rebasepro/types` | Nothing: GET /api/schema/tables serves table descriptors; collections are not serialized. |
+| `isToMany` | `@rebasepro/types` | Read RelationDescriptor.kind (hasMany \| manyToMany \| via). |
+| `ResolvedForeignKeyOnTarget` | `@rebasepro/types` | Read RelationDescriptor.kind (hasOne \| hasMany). |
+| `serializeCollections` | `@rebasepro/types` | Nothing: GET /api/schema/tables serves table descriptors; collections are not serialized. |
+| `SerializedCollectionRef` | `@rebasepro/types` | Nothing: GET /api/schema/tables serves table descriptors; collections are not serialized. |
+
+{/* moved-imports:end */}
+
+## 136. The Postgres driver and the socket's one-shot reads return the REST row
+
+**Who this hits:** a function or plugin that reads through `requireDriver(c)` / `getDriver(c)`, code that sends the socket's `FETCH_COLLECTION` / `FETCH_ONE` frames, and code that read `{ __type }` objects from a response.
+
+**What changed:** there is one read shape. `fetchCollection` and `fetchOne` on the Postgres driver — what a function's `requireDriver(c)`, plugins, the socket's one-shot frames, MCP and the RLS simulator read through — return what `GET /api/data/<table>` returns:
+
+| Value | 0.30 driver read | 0.31 |
+|---|---|---|
+| a timestamp | `{ "__type": "date", "value": … }` | an RFC 3339 string |
+| a `belongsTo` | `{ "__type": "relation", "id", "path" }` under the relation's name | the foreign key under its own key (`authorId`) |
+| a related row | every relation loaded by `fetchOne` | only a relation `include` names, as the target's own row |
+| a vector, a `bytea` | `{ "__type": "Vector" }`, a data URL | as REST serves them |
+
+`FetchOneProps` takes `include` (`ListenOneTarget` is removed: use `FetchOneProps`). `rebase.data`, `context.data` and the SDK already returned this shape and are unchanged.
+
+`@rebasepro/client` reads REST bodies and socket frames as plain JSON: a value with a `__type` key is no longer turned into a `Date`, `EntityReference`, `EntityRelation`, `GeoPoint` or `Vector`, and a JSON document that holds a `__type` key is returned as stored.
+
+**What to do:** read the plain row: parse dates from their strings, read a foreign key from its own key, and pass `include` for each relation you read:
+
+```diff ts
+-const article = await requireDriver(c).fetchOne({ path: "articles", id });
+-const authorId = article?.author.id;      // a { __type: "relation" } ref
++const article = await requireDriver(c).fetchOne({ path: "articles", id, include: ["author"] });
++const authorId = article?.authorId;
+```
+
+## 137. Driver and backend interfaces carry tables, not collections
+
+**Who this hits:** a custom `DataDriver`, a database adapter, or a backend you assemble from `@rebasepro/server`'s parts.
+
+**What changed:**
+
+| Before | Now |
+|---|---|
+| the `collection` prop of `DataDriver` calls (fetch, save, delete, count, search, listen) | removed: the driver reads the table it serves by `path` |
+| `checkUniqueField(path, name, value, id, collection)` | `checkUniqueField(path, name, value, id?)` |
+| `scanStoredRows({ path, collection, pageSize })` | `scanStoredRows({ path, pageSize })` |
+| `DataDriver.initTextSearch` | removed |
+| `DatabaseAdapterInitConfig.collections`, `.collectionRegistry` | removed: the adapter is handed `CompiledTable[]` |
+| `BackendServices.collections()` | `services.tables()` |
+| `serializeCollections`, `deserializeCollections`, `isSerializedCollectionRef`, `SerializedCollectionRef` | removed: descriptors are served at `GET /api/schema/tables` |
+| `AuthAdapter.prepareUserCreation(values, collectionAuth, options?)`, `describeUserCreationContract(collectionAuth)` | `prepareUserCreation(values, options?)`, `describeUserCreationContract()` |
+
+**What to do:** drop the arguments and read tables by `path`. The codemod lists `implements DataDriver` as a manual step. See [Embedding the Postgres driver](/docs/backend/embedding-postgres-driver/).
