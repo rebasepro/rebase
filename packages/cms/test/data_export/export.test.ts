@@ -6,6 +6,7 @@ import {
     getEntityJsonExportableData
 } from "../../src/data_export/export/export";
 import { Properties, EntityReference, EntityRelation, GeoPoint, Entity } from "@rebasepro/cms-types";
+import { fakeCollection } from "../helpers/fakes";
 
 describe("Export Utility Functions", () => {
     const mockProperties: Properties = {
@@ -225,8 +226,8 @@ describe("Export Utility Functions", () => {
     describe("relations and geopoints", () => {
         const properties: Properties = {
             title: { type: "string" },
-            author: { type: "relation", relation: { target: "authors", kind: "belongsTo" } },
-            tags: { type: "relation", relation: { target: "tags", kind: "manyToMany" } },
+            author: { type: "relation", relation: { target: () => fakeCollection("authors"), kind: "belongsTo" } },
+            tags: { type: "relation", relation: { target: () => fakeCollection("tags"), kind: "manyToMany" } },
             location: { type: "geopoint" }
         };
         const entities: Entity<any>[] = [{
@@ -292,7 +293,7 @@ describe("Export Utility Functions", () => {
 
         test("a relation nested in an array property is exported as its id", () => {
             const arrayOfRelations: Properties = {
-                tags: { type: "array", of: { type: "relation", relation: { target: "tags", kind: "manyToMany" } } }
+                tags: { type: "array", of: { type: "relation", relation: { target: () => fakeCollection("tags"), kind: "manyToMany" } } }
             };
             const rows: Entity<any>[] = [{ id: 1, path: "posts", values: { tags: [new EntityRelation(3, "tags")] } }];
             expect(getEntityJsonExportableData(rows, undefined, arrayOfRelations, "string"))

@@ -4,7 +4,8 @@
 import React from "react";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { render, waitFor } from "@testing-library/react";
-import type { AuthController, DownloadConfig } from "@rebasepro/types";
+import type { DownloadConfig } from "@rebasepro/types";
+import type { AuthController } from "@rebasepro/cms-types";
 
 /**
  * A thumbnail remembers the URL it last drew, per path, so a remount draws at

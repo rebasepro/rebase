@@ -9,7 +9,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, renderHook } from "@testing-library/react";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, TableCustomizationOptions } from "@rebasepro/cms-types";
 import type { TableDescriptor, UiTablePreferences } from "@rebasepro/types";
 import { col, defineTable } from "@rebasepro/types";
 import { compileTables } from "@rebasepro/common";
@@ -35,7 +35,7 @@ let warn: jest.SpiedFunction<typeof console.warn>;
 beforeEach(() => { warn = jest.spyOn(console, "warn").mockImplementation(() => undefined); });
 afterEach(() => warn.mockRestore());
 
-const compose = (layers: { code?: Parameters<typeof customizeTable>[1]; file?: UiTablePreferences; workspace?: UiTablePreferences }) => {
+const compose = (layers: { code?: TableCustomizationOptions; file?: UiTablePreferences; workspace?: UiTablePreferences }) => {
     const [collection] = composeCollections({
         tables,
         tableCustomizations: layers.code ? [customizeTable("posts", layers.code)] : [],

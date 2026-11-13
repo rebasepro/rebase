@@ -4,7 +4,7 @@
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { useBuildNavigationStateController } from "../../src/hooks/navigation/useBuildNavigationStateController";
 import { RebaseSdkData } from "@rebasepro/types";
-import { AuthController, UrlController, CollectionRegistryController, CollectionRegistry, CollectionConfig } from "@rebasepro/cms-types";
+import { AuthController, UrlController, CollectionRegistryController, CollectionRegistry, CollectionConfig, type AdminCollection } from "@rebasepro/cms-types";
 import { jest } from "@jest/globals";
 import { fakeAuthController, fakeCollectionRegistry, fakeSdkData, fakeUrlController, fakeUser } from "../helpers/fakes";
 
@@ -139,7 +139,9 @@ hideFromNavigation: true } }
     it("should aggregate error states if collections fail", async () => {
         const mockAuthController = fakeAuthController({ user: fakeUser("test") });
 
-        const badBuilder = jest.fn().mockRejectedValue(new Error("Collection builder error"));
+        const badBuilder = jest.fn(async (_props: unknown): Promise<AdminCollection[]> => {
+            throw new Error("Collection builder error");
+        });
 
         // Suppress console.error for this expected error test
         const originalError = console.error;

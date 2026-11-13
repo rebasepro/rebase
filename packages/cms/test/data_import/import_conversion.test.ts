@@ -57,8 +57,8 @@ describe("a value that does not convert is reported, not blanked", () => {
     });
 
     test("vector: an item that is not a number is reported, not zero", () => {
-        expect(convert("1, x, 3", { type: "vector" }).reasons).toEqual(["not_a_vector"]);
-        expect(convert([1, "x"], { type: "vector" }).reasons).toEqual(["not_a_vector"]);
+        expect(convert("1, x, 3", { type: "vector", dimensions: 3 }).reasons).toEqual(["not_a_vector"]);
+        expect(convert([1, "x"], { type: "vector", dimensions: 2 }).reasons).toEqual(["not_a_vector"]);
     });
 
     test("an array item that does not convert reports the cell", () => {
@@ -127,10 +127,10 @@ describe("convertImportData reports every cell it leaves out", () => {
         const mapping = { sku: "sku", price: "price", stock: "stock" };
         const { entities, problems } = convertImportData(auth, navigation, data, undefined, mapping, properties, "TEMP_PATH", {});
 
-        expect(problems).toEqual<ImportConversionProblem[]>([
+        expect(problems).toEqual([
             { row: 1, column: "price", property: "price", expected: "number", value: "N/A", reason: "not_a_number" },
             { row: 3, column: "price", property: "price", expected: "number", value: "-", reason: "not_a_number" }
-        ]);
+        ] satisfies ImportConversionProblem[]);
         expect(entities[1].values).toEqual({ sku: "A2", stock: 4 });
         expect(entities[3].values).toEqual({ sku: "A4", stock: 6 });
         expect(entities[0].values).toEqual({ sku: "A1", price: 10.5, stock: 3 });

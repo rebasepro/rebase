@@ -21,7 +21,8 @@ import type {
     LiveSchemaClient,
     LiveSchemaPlan,
     LiveSchemaResult,
-    LiveSchemaStatus
+    LiveSchemaStatus,
+    ProposedSchemaChange
 } from "../../src/collection_editor/liveSchemaClient";
 
 const SAFE_PLAN: LiveSchemaPlan = {
@@ -67,7 +68,7 @@ const APPLIED: LiveSchemaResult = {
     withheldConstraints: []
 };
 
-const change = { collectionId: "posts", collection: { name: "Posts" } };
+const change: ProposedSchemaChange = { table: "posts", patches: [{ op: "removeColumn", table: "posts", key: "subtitle" }] };
 
 function fakeClient(over: Partial<LiveSchemaClient> = {}): LiveSchemaClient {
     return {
@@ -443,9 +444,9 @@ describe("settling the caller correctly", () => {
             return (
                 <div>
                     <button onClick={() => {
-                        live.reviewChange({ collectionId: "a", collection: {} })
+                        live.reviewChange({ table: "a", patches: [] })
                             .then(() => settled.push("a:resolved"), () => settled.push("a:rejected"));
-                        live.reviewChange({ collectionId: "b", collection: {} })
+                        live.reviewChange({ table: "b", patches: [] })
                             .then(() => settled.push("b:resolved"), () => settled.push("b:rejected"));
                     }}>start</button>
                     {live.dialog}

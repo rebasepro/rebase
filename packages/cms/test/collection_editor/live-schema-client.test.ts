@@ -116,7 +116,8 @@ describe("a refused change", () => {
     });
 
     it("carries the individual changes, so a UI can list them", async () => {
-        const err = await client(stub(refusal)).apply(CHANGE).catch(e => e as LiveSchemaError);
+        const err = await client(stub(refusal)).apply(CHANGE).catch((e: unknown) => e);
+        if (!(err instanceof LiveSchemaError)) throw new Error(`expected a LiveSchemaError, got ${String(err)}`);
         expect(err.code).toBe("SCHEMA_CHANGE_UNAPPLICABLE");
         expect(err.changes).toHaveLength(1);
         expect(err.changes![0].remedy).toContain("migration");
@@ -132,7 +133,8 @@ describe("a refused change", () => {
                     details: { problems: [{ table: "posts", key: "subtitle", message: "a varchar needs a length" }] }
                 }
             }
-        })).plan(CHANGE).catch(e => e as LiveSchemaError);
+        })).plan(CHANGE).catch((e: unknown) => e);
+        if (!(err instanceof LiveSchemaError)) throw new Error(`expected a LiveSchemaError, got ${String(err)}`);
         expect(err.code).toBe("SCHEMA_EDIT_DOES_NOT_COMPILE");
         expect(err.problems).toEqual([{ table: "posts", key: "subtitle", message: "a varchar needs a length" }]);
     });

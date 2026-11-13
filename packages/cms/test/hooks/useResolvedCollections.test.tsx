@@ -5,9 +5,9 @@
 import { configure, renderHook, waitFor } from "@testing-library/react";
 import { useResolvedCollections } from "../../src/hooks/navigation/useResolvedCollections";
 import { RebaseSdkData } from "@rebasepro/types";
-import { AuthController, CollectionRegistryController, CollectionRegistry, CollectionConfig } from "@rebasepro/cms-types";
+import { CollectionRegistry, type AdminCollection } from "@rebasepro/cms-types";
 import { jest } from "@jest/globals";
-import { fakeAuthController, fakeCollectionRegistry, fakeSdkData, fakeUser } from "../helpers/fakes";
+import { fakeAuthController, fakeCollection, fakeCollectionRegistry, fakeSdkData, fakeUser } from "../helpers/fakes";
 
 /**
  * `waitFor` keeps its own 1s budget, which `jest.setTimeout` does not touch.
@@ -35,11 +35,7 @@ describe("useResolvedCollections", () => {
     it("should resolve a static array of collections and register them", async () => {
         const mockAuthController = fakeAuthController({ user: fakeUser("test-user") });
 
-        const mockCollections: CollectionConfig[] = [
-            { id: "test",
-name: "Test Collection",
-path: "test" }
-        ];
+        const mockCollections: AdminCollection[] = [fakeCollection("test", { name: "Test Collection" })];
 
         const { result } = renderHook(() => useResolvedCollections({
             authController: mockAuthController,
@@ -62,13 +58,9 @@ path: "test" }
     it("should resolve an async collection builder", async () => {
         const mockAuthController = fakeAuthController({ user: fakeUser("test-user") });
 
-        const mockCollections: CollectionConfig[] = [
-            { id: "dynamic",
-name: "Dynamic",
-path: "dynamic" }
-        ];
+        const mockCollections: AdminCollection[] = [fakeCollection("dynamic", { name: "Dynamic" })];
 
-        const builder = jest.fn().mockResolvedValue(mockCollections);
+        const builder = jest.fn(async (_props: unknown) => mockCollections);
 
         const { result } = renderHook(() => useResolvedCollections({
             authController: mockAuthController,
@@ -91,14 +83,10 @@ path: "dynamic" }
 
     it("should wait while auth is initially loading before resolving", async () => {
         let authLoading = true;
-        const mockAuthController: Partial<AuthController> & { initialLoading: boolean; user: { uid: string } | null } = {
-            get initialLoading() { return authLoading; },
-            user: null
-        };
+        const mockAuthController = fakeAuthController({ user: null });
+        Object.defineProperty(mockAuthController, "initialLoading", { get: () => authLoading });
 
-        const mockCollections: CollectionConfig[] = [{ id: "test",
-name: "Test",
-path: "test" }];
+        const mockCollections: AdminCollection[] = [fakeCollection("test", { name: "Test" })];
 
         const { result, rerender } = renderHook(() => useResolvedCollections({
             authController: mockAuthController,
@@ -119,7 +107,7 @@ path: "test" }];
 
         // Now mock auth loading finished
         authLoading = false;
-        mockAuthController.user = { uid: "test-user" };
+        mockAuthController.user = fakeUser("test-user");
 
         rerender();
 
@@ -134,7 +122,7 @@ path: "test" }];
     it("should flatten the admin block so navigation sees group and hideFromNavigation", async () => {
         const mockAuthController = fakeAuthController({ user: fakeUser("test-user") });
 
-        const mockCollections: CollectionConfig[] = [
+        const mockCollections: AdminCollection[] = [
             {
                 slug: "products",
                 name: "Products", properties: {},
@@ -163,7 +151,9 @@ hideFromNavigation: true }
     it("should capture errors during resolution", async () => {
         const mockAuthController = fakeAuthController({ user: fakeUser("test-user") });
 
-        const builder = jest.fn().mockRejectedValue(new Error("Failed to load collections"));
+        const builder = jest.fn(async (_props: unknown): Promise<AdminCollection[]> => {
+            throw new Error("Failed to load collections");
+        });
 
         // Suppress console.error for this expected error test
         const originalError = console.error;

@@ -15,7 +15,7 @@ describe("DEFAULT_FIELD_CONFIGS", () => {
         const entries = Object.entries(DEFAULT_FIELD_CONFIGS);
         expect(entries.length).toBeGreaterThan(0);
         for (const [id, config] of entries) {
-            const Field = (config.property as { ui?: { Field?: unknown } })?.admin?.Field;
+            const Field = config.property.admin?.Field;
             expect([id, typeof Field]).toEqual([id, "function"]);
         }
     });
@@ -45,6 +45,6 @@ describe("DEFAULT_FIELD_CONFIGS", () => {
 
     it("still hands a working Field through getFieldConfig's merge", () => {
         const config = getFieldConfig({ type: "map" }, {});
-        expect(typeof (config?.property as { ui?: { Field?: unknown } })?.admin?.Field).toBe("function");
+        expect(typeof config?.property.admin?.Field).toBe("function");
     });
 });

@@ -71,9 +71,9 @@ describe("a relation's target is the composed collection", () => {
     it("for the relation map (`resolveCollectionRelations`)", () => {
         const composed = compose();
         const relations = resolveCollectionRelations(composed.posts);
-        expect(relations.tags.target()).toBe(composed.tags);
-        expect(relations.author.target()).toBe(composed.authors);
-        expect(resolveCollectionRelations(composed.tags).posts.target()).toBe(composed.posts);
+        expect(relations.tags?.target()).toBe(composed.tags);
+        expect(relations.author?.target()).toBe(composed.authors);
+        expect(resolveCollectionRelations(composed.tags).posts?.target()).toBe(composed.posts);
     });
 
     it("for the relation property (pickers, relation previews and cells, RelationSelector, the row codec)", () => {
@@ -81,12 +81,12 @@ describe("a relation's target is the composed collection", () => {
         expect(relationProperty(composed.posts, "tags").relation.target()).toBe(composed.tags);
         expect(relationProperty(composed.posts, "author").relation.target()).toBe(composed.authors);
         // The customization and the workspace's preferences both reach the reader.
-        expect(relationProperty(composed.posts, "author").relation.target()).toMatchObject({
+        expect(relationProperty(composed.posts, "author").relation?.target()).toMatchObject({
             singularName: "Writer",
             icon: "PenLine",
             display: { title: "name" }
         });
-        expect(relationProperty(composed.posts, "tags").relation.target().properties.name).toMatchObject({ name: "Tag Name" });
+        expect(relationProperty(composed.posts, "tags").relation?.target().properties.name).toMatchObject({ name: "Tag Name" });
     });
 
     it("for the record's tabs: a target hidden from entity views gets no tab", () => {

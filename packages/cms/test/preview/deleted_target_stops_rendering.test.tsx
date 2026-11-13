@@ -99,7 +99,7 @@ describe("a preview whose target row is deleted", () => {
     });
 
     it("does the same for a reference", () => {
-        const reference = new EntityReference("42", "authors");
+        const reference = new EntityReference({ id: "42", path: "authors" });
 
         fetchState.entity = author;
         const view = render(<ReferencePreview reference={reference}/>);

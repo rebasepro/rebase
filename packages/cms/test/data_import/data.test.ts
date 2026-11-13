@@ -62,7 +62,7 @@ describe("Data Import Utility Functions", () => {
         });
 
         test("should map vector type from array, string with brackets, or comma separated string", () => {
-            const vectorProp: Property = { type: "vector" };
+            const vectorProp: Property = { type: "vector", dimensions: 2 };
 
             // 1. From object with value field
             const result1 = processValueMapping(mockAuth, { value: [1.2, 3.4] }, mockNavigation, vectorProp);

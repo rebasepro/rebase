@@ -4,7 +4,8 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useResolvedViews } from "../../src/hooks/navigation/useResolvedViews";
 import { RebaseSdkData } from "@rebasepro/types";
-import { AuthController, AppView } from "@rebasepro/cms-types";
+import type { AppView } from "@rebasepro/cms-types";
+import type { User } from "@rebasepro/types";
 import { fakeAuthController, fakeSdkData, fakeUser } from "../helpers/fakes";
 
 describe("useResolvedViews", () => {
@@ -38,16 +39,14 @@ describe("useResolvedViews", () => {
 
     it("should wait while auth is initially loading", async () => {
         let authLoading = true;
-        const mockAuthController: Partial<AuthController> & { initialLoading: boolean; user: { uid: string } | null } = {
-            get initialLoading() { return authLoading; },
-            user: null
-        };
+        const mockAuthController = fakeAuthController({ user: null });
+        Object.defineProperty(mockAuthController, "initialLoading", { get: () => authLoading });
 
         // A builder, not an array: `loading` starts true either way, so the only
         // thing that distinguishes "gated on auth" from "not gated" is whether
         // the builder ran before the user was known. A builder that resolves
         // views per role would otherwise be invoked with a null user.
-        const builder = jest.fn(async () => ([
+        const builder = jest.fn(async (_props: { user: User | null }) => ([
             { name: "My View",
               slug: "my-view",
               view: null! }
@@ -68,7 +67,7 @@ describe("useResolvedViews", () => {
         expect(result.current.loading).toBe(true);
 
         authLoading = false;
-        mockAuthController.user = { uid: "test-user" };
+        mockAuthController.user = fakeUser("test-user");
 
         rerender();
 
@@ -77,7 +76,7 @@ describe("useResolvedViews", () => {
         });
 
         expect(builder).toHaveBeenCalledTimes(1);
-        expect(builder.mock.calls[0][0].user).toEqual({ uid: "test-user" });
+        expect(builder.mock.calls[0][0].user).toEqual(fakeUser("test-user"));
         expect(result.current.views?.map(v => v.slug)).toEqual(["my-view"]);
     });
 });

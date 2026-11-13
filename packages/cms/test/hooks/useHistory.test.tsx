@@ -35,7 +35,7 @@ function respondWith(entries: Revision[]) {
 
 describe("useHistory", () => {
 
-    const fetchMock = jest.fn<(...args: unknown[]) => Promise<Response>>();
+    const fetchMock = jest.fn<Promise<Response>, unknown[]>();
 
     beforeEach(() => {
         fetchMock.mockReset();

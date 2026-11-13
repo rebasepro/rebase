@@ -92,7 +92,7 @@ function panelRecord(panel: SideDialogPanelProps): SidePanelBindingProps | undef
 
 describe("useSidePanel: the 0.28 names still work", () => {
 
-    let warn: ReturnType<typeof jest.spyOn>;
+    let warn: jest.SpiedFunction<typeof console.warn>;
 
     beforeEach(() => {
         panels.length = 0;

@@ -114,7 +114,7 @@ describe("bulk removal from a linked tab", () => {
         await act(async () => {
             render(
                 <MemoryRouter>
-                    <CollectionViewBinding<Tag> slug={"tags"}
+                    <CollectionViewBinding slug={"tags"}
                         name={"Tags"}
                         singularName={"Tag"}
                         path={"posts/7/tags"}

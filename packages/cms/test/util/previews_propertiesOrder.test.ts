@@ -6,10 +6,22 @@ import {
     getEntityTitlePropertyKey
 } from "../../src/util/previews";
 import { resolveCollectionSlotKeys } from "../../src/components/CollectionViewBinding/usePreviewSlots";
-import type { AdminCollection, AuthController, PropertyConfig, CollectionConfig, Property } from "@rebasepro/cms-types";
-import { fakeAuthController, fakeUser } from "../helpers/fakes";
+import type { AdminCollection, AuthController, PropertyConfig, CollectionConfig, Property, RelationProperty } from "@rebasepro/cms-types";
+import { fakeAuthController, fakeCollection, fakeUser } from "../helpers/fakes";
 
 const mockAuthController = fakeAuthController({ user: fakeUser("test") });
+
+/** A `belongsTo` to a projects table, shared by the fixtures below. */
+const projectRelation: RelationProperty = {
+    name: "Project",
+    type: "relation",
+    relation: {
+        kind: "belongsTo",
+        target: () => fakeCollection("projects"),
+        relationName: "project",
+        onDelete: "cascade"
+    }
+};
 
 const fields: Record<string, PropertyConfig> = {};
 
@@ -26,16 +38,7 @@ const databasesCollection: AdminCollection = {
             type: "string",
             isId: "uuid"
         },
-        project: {
-            name: "Project",
-            type: "relation",
-            relation: {
-                kind: "belongsTo",
-                target: () => ({}),
-                relationName: "project",
-                onDelete: "cascade",
-            }
-        },
+        project: projectRelation,
         type: {
             name: "Type",
             type: "string",
@@ -149,7 +152,7 @@ const collectionWithTrailingRelation: AdminCollection = {
             name: "Label",
             type: "string"
         },
-        project: (databasesCollection.properties as Record<string, Property>).project
+        project: projectRelation
     }
 };
 
@@ -258,7 +261,7 @@ describe("getEntityTitlePropertyKey does not pick a storage/image property as ti
     };
 
     it("skips the storage image and picks the next string property as title", () => {
-        const titleKey = getEntityTitlePropertyKey(exercisesCollection, fields);
+        const titleKey = getEntityTitlePropertyKey(exercisesCollection);
         expect(titleKey).toBe("exercise_type");
         expect(titleKey).not.toBe("image");
     });
