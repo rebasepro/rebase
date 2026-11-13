@@ -91,6 +91,13 @@ const NON_IMPORT_FORMS: [string, string, "imports" | "references", string][] = [
 ];
 
 /**
+ * SEC-FIX-4 R-3: a reference is judged by where it lands, whichever module
+ * makes it — a linked workspace package outside the project, a dependency in
+ * node_modules. The control ships the backend asset each time.
+ */
+const FOREIGN_REFERENCE_FORMS = ["outside-new-url", "node-modules-new-url"];
+
+/**
  * Forms the bundler does not follow: `createRequire(…)(path)`, `import(variable)`,
  * a computed `new URL(…)` and `import.meta.resolve(…)`
  * put no backend code in the bundle (the control proves it), so there is
@@ -128,6 +135,14 @@ describe("rebaseBackendGuard in a real build", () => {
         expect(guarded.error).toContain("[rebase-backend-guard]");
         expect(guarded.error).toContain(`${importer} ${how} "`);
         expect(guarded.error).toContain(`which resolves to ${file}`);
+    });
+
+    it.each(FOREIGN_REFERENCE_FORMS)("%s: the control ships the backend asset, the guarded build is refused", (form) => {
+        const { guarded, control } = report.forms[form];
+        expect(control).toEqual({ ok: true, leaked: true });
+        expect(guarded.ok).toBe(false);
+        expect(guarded.error).toContain("[rebase-backend-guard]");
+        expect(guarded.error).toContain("backend/data/large.json");
     });
 
     it.each(NON_SHIPPING_FORMS)("%s: nothing reaches the bundle, with or without the guard", (form) => {

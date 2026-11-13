@@ -76,7 +76,12 @@ const FORMS = {
     "new-url-comment": "console.log(new URL(/* a comment */ \"../../backend/schema/posts.ts\" /* another */, import.meta.url).href);",
     "new-url-escaped": "console.log(new URL(\"..\\/..\\/backend\\/schema\\/posts.ts\", import.meta.url).href);",
     "new-url-single-quote": "console.log(new URL('../../backend/schema/posts.ts', import.meta.url).href);",
-    "meta-resolve": "console.log(import.meta.resolve(\"../../backend/schema/posts.ts\"));"
+    "meta-resolve": "console.log(import.meta.resolve(\"../../backend/schema/posts.ts\"));",
+    // SEC-FIX-4 R-3: a linked package outside the project names the backend
+    // by `new URL`; and a dependency inside node_modules does, which only the
+    // generateBundle backstop sees.
+    "outside-new-url": "import { href } from \"__ROOT__-outside/asset\";\nconsole.log(href);",
+    "node-modules-new-url": "import { href } from \"leaky-pkg\";\nconsole.log(href);"
 };
 
 /** A project that builds clean with the guard on: a type import, a `?raw` text file, CSS, a JSON file. */
@@ -128,7 +133,14 @@ function project(base, name, form) {
         "backend/theme.css": `.secret::after { content: "${MARKER}"; }\n`
     });
     if (typeof form !== "string") write(root, Object.fromEntries(Object.entries(form.files).map(([rel, text]) => [rel, text.replaceAll("__ROOT__", root)])));
-    write(`${root}-outside`, { "lib.ts": `export { posts } from ${JSON.stringify(path.join(root, "backend/schema/posts"))};\n` });
+    write(`${root}-outside`, {
+        "lib.ts": `export { posts } from ${JSON.stringify(path.join(root, "backend/schema/posts"))};\n`,
+        "asset.ts": `export const href = new URL(${JSON.stringify(`../${path.basename(root)}/backend/data/large.json`)}, import.meta.url).href;\n`
+    });
+    write(path.join(root, "frontend/node_modules/leaky-pkg"), {
+        "package.json": JSON.stringify({ name: "leaky-pkg", type: "module", main: "index.js" }),
+        "index.js": "export const href = new URL(\"../../../backend/data/large.json\", import.meta.url).href;\n"
+    });
     // The workspace link pnpm makes for `"rebase-app-backend": "workspace:*"`.
     fs.mkdirSync(path.join(root, "frontend/node_modules"), { recursive: true });
     fs.symlinkSync(path.join(root, "backend"), path.join(root, "frontend/node_modules/rebase-app-backend"), "dir");

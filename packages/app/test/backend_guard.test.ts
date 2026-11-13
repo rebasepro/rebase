@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-import { backendImportMessage, fileOfModuleId, findProjectBackendDir, htmlReferencedPaths, isModuleInDir, realPath, referencedPaths } from "../src/backend_guard";
+import { backendImportMessage, bundleOutputSources, fileOfModuleId, findProjectBackendDir, htmlReferencedPaths, isModuleInDir, realPath, referencedPaths } from "../src/backend_guard";
 
 /** The pieces of `rebaseBackendGuard` a build does not show one by one. */
 
@@ -115,5 +115,19 @@ describe("referencedPaths: what a module names outside its imports", () => {
         expect(message).toContain("frontend/src/main.ts references \"../../backend/a.ts\", which resolves to backend/a.ts");
         expect(message).not.toContain("import type");
         expect(message).toContain("Move the file");
+    });
+});
+
+describe("bundleOutputSources (the generateBundle net, SEC-FIX-4 R-3)", () => {
+    it("reads an asset's sources against the Vite root, as Vite names them, so a backend asset is matched", () => {
+        const root = tree({ "rebase.json": "{}", "backend/data/x.json": "{}", "frontend/package.json": "{}" });
+        const sources = bundleOutputSources({ type: "asset", originalFileNames: ["../backend/data/x.json"] }, path.join(root, "frontend"));
+        expect(sources).toEqual([path.join(root, "backend/data/x.json")]);
+        expect(isModuleInDir(sources[0], path.join(root, "backend"))).toBe(true);
+    });
+
+    it("takes a chunk's module ids and an absolute source as they are", () => {
+        expect(bundleOutputSources({ type: "chunk", moduleIds: ["/p/a.ts"] }, "/r")).toEqual(["/p/a.ts"]);
+        expect(bundleOutputSources({ type: "asset", originalFileNames: ["/p/b.json"] }, "/r")).toEqual(["/p/b.json"]);
     });
 });

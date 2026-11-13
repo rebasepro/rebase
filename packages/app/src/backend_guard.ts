@@ -272,6 +272,21 @@ function literalValue(body: string): string {
         .replace(/\\/g, "/");
 }
 
+/**
+ * The files one output of the build was made from, absolute: a chunk's
+ * modules, or an asset's sources. Vite names an emitted asset's source
+ * relative to its root (`../backend/data/x.json`), so those are read against
+ * the root — taken as they were, the `generateBundle` net never matched an
+ * asset at all.
+ */
+export function bundleOutputSources(
+    output: { type: "chunk"; moduleIds: readonly string[] } | { type: "asset"; originalFileNames: readonly string[] },
+    viteRoot: string
+): string[] {
+    if (output.type === "chunk") return [...output.moduleIds];
+    return output.originalFileNames.map(name => path.isAbsolute(name) ? name : path.resolve(viteRoot, name));
+}
+
 /** Every `src` / `href` (and each `srcset` candidate) an HTML document names. */
 export function htmlReferencedPaths(html: string): string[] {
     const out: string[] = [];
@@ -322,8 +337,6 @@ function backendGuardPlugin(options: RebaseBackendGuardOptions, inWorker: boolea
     /** `transform` also reads the project's own modules (anything outside `node_modules`). */
     const transformFilter: { id: RegExp } = { id: /(?!)/ };
     const refuse = (id: string | undefined): boolean => realBackend !== undefined && id !== undefined && isModuleInDir(id, realBackend);
-    const inProject = (file: string | undefined): file is string => file !== undefined
-        && file.startsWith(projectRoot + path.sep) && !/[\\/]node_modules[\\/]/.test(file);
 
     return {
         name: BACKEND_GUARD_PLUGIN_NAME,
@@ -409,9 +422,11 @@ function backendGuardPlugin(options: RebaseBackendGuardOptions, inWorker: boolea
                 // The paths Vite reads outside the plugin chain: an asset or a
                 // worker's entry by `new URL(…, import.meta.url)`, a stylesheet's
                 // `@import` / `url()`. Resolved as Vite resolves them (aliases
-                // included), then judged by where they land.
+                // included), then judged by where they LAND — whichever module
+                // names them: a linked workspace package outside the project can
+                // name the app's backend as well as the app can.
                 const file = fileOfModuleId(id);
-                if (!inProject(file)) return null;
+                if (file === undefined || /[\\/]node_modules[\\/]/.test(file)) return null;
                 for (const specifier of referencedPaths(code, id)) {
                     const landed = await landing(this, resolveReference, specifier, file);
                     if (landed !== undefined && refuse(landed)) {
@@ -441,8 +456,7 @@ function backendGuardPlugin(options: RebaseBackendGuardOptions, inWorker: boolea
         generateBundle(_outputOptions, bundle) {
             if (realBackend === undefined) return;
             for (const output of Object.values(bundle)) {
-                const sources = output.type === "chunk" ? output.moduleIds : output.originalFileNames;
-                const leaked = sources.find(source => refuse(source));
+                const leaked = bundleOutputSources(output, viteRoot).find(source => refuse(source));
                 if (leaked !== undefined) {
                     this.error(backendImportMessage({ projectRoot, resolved: leaked }) +
                         `\nIt reached the build's output as ${output.fileName}.`);
