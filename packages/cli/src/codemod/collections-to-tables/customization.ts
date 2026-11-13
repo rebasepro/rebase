@@ -41,7 +41,7 @@ import { tableImportPath } from "./backend";
 import { own } from "./own";
 
 /** The keys whose string value is a component path (the Vite plugin's `LAZY_COMPONENT_KEYS`). */
-const COMPONENT_KEYS = new Set(["Field", "Preview", "Builder", "Filter", "Component"]);
+export const COMPONENT_KEYS = new Set(["Field", "Preview", "Builder", "Filter", "Component"]);
 
 /** A customization module being built. */
 interface Builder {

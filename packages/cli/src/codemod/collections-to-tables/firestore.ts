@@ -14,6 +14,7 @@ import path from "node:path";
 import type { Node, ObjectLiteralExpression, SourceFile } from "ts-morph";
 
 import { findCollectionSite, memberOf, resolveObject } from "./ast";
+import { COMPONENT_KEYS } from "./customization";
 import type { CollectionEntry, PlanContext } from "./plan-context";
 import { planFile, refuse } from "./plan-context";
 
@@ -149,16 +150,36 @@ export function planFirestoreCollection(plan: PlanContext, entry: CollectionEntr
                 }
             }
         }
+        // A component named by its module path (`Field: "../../src/X"`, which 0.30's Vite plugin
+        // loaded lazily) is imported by value: 0.31 takes the component itself.
+        const componentImports = new Map<string, string>();
+        const taken = new Set(sf.getDescendantsOfKind(plan.ast.tsm.SyntaxKind.Identifier).map(identifier => identifier.getText()));
+        for (const literal of sf.getDescendantsOfKind(plan.ast.tsm.SyntaxKind.StringLiteral)) {
+            const parent = literal.getParent();
+            if (!N.isPropertyAssignment(parent) || parent.getInitializer() !== literal || !COMPONENT_KEYS.has(parent.getName())) continue;
+            const value = literal.getLiteralValue();
+            if (!value.startsWith("./") && !value.startsWith("../")) continue;
+            let local = componentImports.get(value);
+            if (!local) {
+                const stem = path.basename(value).replace(/\.(tsx?|jsx?)$/, "");
+                const base = stem.split(/[^A-Za-z0-9]+/).filter(Boolean).map(word => word[0].toUpperCase() + word.slice(1)).join("") || "Component";
+                local = base;
+                for (let counter = 2; taken.has(local); counter++) local = `${base}${counter}`;
+                taken.add(local);
+                componentImports.set(value, local);
+            }
+            edits.push({ start: literal.getStart(), end: literal.getEnd(), text: local });
+        }
         const imports = sf.getImportDeclarations();
         const insertAt = imports.length > 0 ? imports[0].getStart() : 0;
-        edits.push({ start: insertAt, end: insertAt, text: `import { defineFirestoreCollection } from "@rebasepro/firebase";\n` });
+        const componentLines = [...componentImports].map(([specifier, local]) => `import ${local} from ${JSON.stringify(specifier)};\n`).join("");
+        edits.push({ start: insertAt, end: insertAt, text: `import { defineFirestoreCollection } from "@rebasepro/firebase";\n${componentLines}` });
         let out = text;
         for (const edit of edits.sort((a, b) => b.start - a.start || b.end - a.end)) out = out.slice(0, edit.start) + edit.text + out.slice(edit.end);
         out = plan.relocator.moveSpecifiersInText(out, entry.file, destination, "frontend");
         planFile(plan, destination, out, `firestore collection ${entry.collection.slug}`);
         const site = findCollectionSite(plan.ast, entry.sourceFile);
         const binding = site.node?.binding;
-        void N;
         return { file: destination, identifier: binding ?? `${entry.collection.slug.replace(/[^A-Za-z0-9]+(.)?/g, (_, next: string | undefined) => (next ?? "").toUpperCase())}Collection` };
     } catch (error) {
         refuse(plan, entry, error instanceof Error ? error.message : String(error));

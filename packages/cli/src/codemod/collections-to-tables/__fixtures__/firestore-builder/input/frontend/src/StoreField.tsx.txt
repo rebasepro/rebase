@@ -1,0 +1,4 @@
+/** The store picker the visits form uses. */
+export default function StoreField() {
+    return null;
+}

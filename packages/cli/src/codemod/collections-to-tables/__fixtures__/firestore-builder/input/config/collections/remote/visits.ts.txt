@@ -7,7 +7,7 @@ const visitsCollection: FirebaseCollectionConfig = {
     engine: "firestore",
     properties: {
         when: { name: "When", type: "date" },
-        store: { name: "Store", type: "reference", path: "customers" }
+        store: { name: "Store", type: "reference", path: "customers", admin: { Field: "../../../frontend/src/StoreField" } }
     }
 };
 
