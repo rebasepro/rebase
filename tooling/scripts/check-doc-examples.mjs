@@ -11,7 +11,7 @@
  * ran. The table model has the same class in new shapes: a table without a
  * primary key, `rls: []`, `defaultPolicies: false` beside `"admin-only"`, a
  * `belongsTo` bound to a column of the wrong type, a varchar whose length
- * contradicts its `max`, a feature the planner cannot lower yet. Every one of
+ * contradicts its `max`, a feature the planner does not support yet. Every one of
  * them typechecks; every one stops `rebase db generate`, `db push` and boot
  * with a `SchemaDefinitionError`.
  *
@@ -101,7 +101,7 @@ if (tables === 0) {
 if (findings.length === 0) {
     console.log(green(
         `✓ Doc examples: ${tables} table(s) and ${customizations} customization(s) across ${results.length} fence(s) ` +
-        `compile, lower and customize${fragments ? ` (${fragments} marked as fragments)` : ""}.`
+        `compile and customize${fragments ? ` (${fragments} marked as fragments)` : ""}.`
     ));
     process.exit(0);
 }
