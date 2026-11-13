@@ -170,10 +170,17 @@ describe("the repository's projects migrate with byte-identical SQL", () => {
     it.each(fs.readdirSync(path.join(REPO, "examples")).filter(name => fs.statSync(path.join(REPO, "examples", name)).isDirectory()))(
         "examples/%s has no legacy layout, and the codemod says so",
         async name => {
-            const report = await migrateCollectionsToTables({ projectRoot: path.join(REPO, "examples", name), dryRun: true, moduleAliases: ALIASES });
-            expect(report.status).toBe("blocked");
-            expect(report.refusals[0].reason).toMatch(/nothing to migrate/);
+            const root = path.join(REPO, "examples", name);
+            const report = await migrateCollectionsToTables({ projectRoot: root, dryRun: true, moduleAliases: ALIASES });
             expect(report.files).toEqual([]);
+            if (fs.existsSync(path.join(root, "backend", "schema"))) {
+                // The end state of a migration: said so, not refused.
+                expect(report.status).toBe("already-migrated");
+                expect(report.refusals).toEqual([]);
+            } else {
+                expect(report.status).toBe("blocked");
+                expect(report.refusals[0].reason).toMatch(/nothing to migrate/);
+            }
         }
     );
 });
