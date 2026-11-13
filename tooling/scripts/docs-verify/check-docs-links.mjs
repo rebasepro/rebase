@@ -100,7 +100,7 @@ function routeOf(file) {
  * the five translated locales were scanned, and that would have reported every
  * accented anchor in them as dead.
  */
-function headingSlug(text) {
+export function headingSlug(text) {
     return text
         .replace(/<[^>]*>/g, "")
         .replace(/`/g, "")

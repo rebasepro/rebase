@@ -1150,7 +1150,7 @@ if (engineFindings.length > 0) {
 const QUOTED_FILES = [
     {
         doc: "website/src/content/docs/docs/getting-started/project-structure.md",
-        fence: '```typescript title="frontend/src/App.tsx"',
+        fence: '```tsx title="frontend/src/App.tsx"',
         file: "packages/cli/templates/template/frontend/src/App.tsx"
     }
 ];
