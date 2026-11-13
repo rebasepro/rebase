@@ -430,7 +430,7 @@ describe("table features: `<item>.array()` of every scalar element type", () => 
             await driver.save({ path: "lists", id, status: "existing", values });
             expect(await driver.restFetchService.fetchOneForRest("lists", id)).toEqual(first);
             expect((await db.query(`SELECT amounts::text, instants::text FROM lists WHERE id = '${id}'`)).rows)
-                .toEqual([{ amounts: "{1.50,NULL,2.25}", instants: expect.stringMatching(/^\{"2026-01-02 \d{2}:00:00\+\d{2}",NULL\}$/) }]);
+                .toEqual([{ amounts: "{1.50,NULL,2.25}", instants: expect.stringMatching(/^\{"2026-01-02 \d{2}:00:00[+-]\d{2}",NULL\}$/) }]);
         });
 
         it("filters an array column by the values it serves", async () => {
