@@ -48,7 +48,9 @@ let tempDir: string;
 let projectDir: string;
 let backend: RunningBackend | undefined;
 let admin: AuthedUser;
-let report: { status?: string; refusals?: unknown[]; verification?: { identical?: boolean }; collections?: { slug: string }[] };
+let report: { status?: string; refusals?: unknown[]; verification?: { identical?: boolean }; collections?: { slug: string }[]; removeCommand?: string };
+/** What the project's `git rm` removed — the step the report names. */
+let removed: string[] = [];
 
 /** Copy the fixture's `<from>` subtree into the project, dropping the `.txt` suffix. */
 function overlay(from: string): void {
@@ -122,8 +124,16 @@ beforeAll(async () => {
         throw new Error(`migrate printed no JSON report (exit ${run.exitCode}):\n${run.stdout}\n${run.stderr}`);
     }
 
-    // What the report says finishes the migration: remove config/.
-    fs.rmSync(path.join(projectDir, "config"), { recursive: true, force: true });
+    // What the report says finishes the migration, run as printed: the
+    // `git rm -r` of what Rebase read. The project's own modules of `config/`
+    // stay — the migrated tables import them.
+    const command = report.removeCommand ?? "";
+    const [git, rm, recursive, ...paths] = command.split(" ");
+    if (git !== "git" || rm !== "rm" || recursive !== "-r" || paths.length === 0) {
+        throw new Error(`migrate reported no \`git rm -r\` line: ${JSON.stringify(report.removeCommand)}`);
+    }
+    removed = paths;
+    await execa("git", ["rm", "-r", "-q", ...paths], { cwd: projectDir, env: gitEnv });
     await execa("pnpm", ["install"], { cwd: projectDir, env });
 }, 900_000);
 
@@ -141,6 +151,17 @@ describe("rebase migrate collections-to-tables, then build, boot and read", () =
         expect((report.collections ?? []).map(c => c.slug).sort()).toEqual(["authors", "posts", "tags", "users"]);
         expect(fs.existsSync(path.join(projectDir, "backend", "schema", "posts.ts"))).toBe(true);
         expect(fs.existsSync(path.join(projectDir, "frontend", "src", "cms", "posts.tsx"))).toBe(true);
+    });
+
+    it("removes only what Rebase read, and keeps the project's own modules the tables import", () => {
+        expect(removed).toEqual(["config/collections", "config/resources.ts", "config/storage.ts"]);
+        for (const file of removed) expect(fs.existsSync(path.join(projectDir, file)), file).toBe(false);
+        for (const kept of ["actions.ts", "form-rules.ts", "slugify.ts", "tag-callbacks.ts"]) {
+            expect(fs.existsSync(path.join(projectDir, "config", kept)), `config/${kept}`).toBe(true);
+        }
+        const schema = (file: string) => fs.readFileSync(path.join(projectDir, "backend", "schema", file), "utf8");
+        expect(schema("posts.ts")).toContain('from "../../config/slugify"');
+        expect(schema("tags.ts")).toContain('from "../../config/tag-callbacks"');
     });
 
     it("builds a bundle from backend/schema", async () => {
