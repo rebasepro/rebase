@@ -16,7 +16,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { compileSchema, compileTables, isSchemaDefinitionError } from "@rebasepro/common";
-import { col, defineTable, rel, type AnyTableDef, pgEnum } from "@rebasepro/types";
+import { col, defineTable, rel, type AnyTableDef, type WhereFilterOp, pgEnum } from "@rebasepro/types";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
@@ -436,7 +436,7 @@ describe("table features: `<item>.array()` of every scalar element type", () => 
         it("filters an array column by the values it serves", async () => {
             const saved = await driver.save({ path: "lists", status: "new", values: { amounts: [1.5, 2.25], instants: ["2026-01-02T10:00:00.000Z"], days: ["2026-01-02"] } });
             await driver.save({ path: "lists", status: "new", values: { amounts: [3], instants: ["2026-03-04T10:00:00.000Z"], days: ["2026-03-04"] } });
-            const ids = async (filter: Record<string, [string, unknown]>) =>
+            const ids = async (filter: Record<string, [WhereFilterOp, unknown]>) =>
                 (await driver.restFetchService.fetchCollectionForRest("lists", { filter })).map(row => row.id);
             expect(await ids({ amounts: ["array-contains", 1.5] })).toEqual([saved.id]);
             expect(await ids({ amounts: ["array-contains-any", [2.25, 9]] })).toEqual([saved.id]);

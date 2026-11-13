@@ -473,7 +473,7 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             expect(service.subscriptions.has("sub-1")).toBe(false);
 
             // Client should be gone
-            expect(service.clients.has("c1")).toBe(false);
+            expect(service["clients"].has("c1")).toBe(false);
 
             // Channel membership should be cleaned up:
             // Broadcasting to the channel should not reach any client
@@ -704,8 +704,8 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             await service.destroy();
 
             // All should be empty
-            expect(service.clients.has("c1")).toBe(false);
-            expect(service.clients.has("c2")).toBe(false);
+            expect(service["clients"].has("c1")).toBe(false);
+            expect(service["clients"].has("c2")).toBe(false);
             expect(service.subscriptions.has("sub-d1")).toBe(false);
             expect(service.subscriptions.size).toBe(0);
         });

@@ -15,7 +15,7 @@
  * collections: every lowered property carried its definition, and every
  * relation target was the collection that table lowered to.)
  */
-import { isColumnBuilder, type AnyTableDef, type AnyViewDef } from "@rebasepro/types";
+import { isColumnBuilder, isTableDef, isViewDef, type AnyTableDef, type AnyViewDef } from "@rebasepro/types";
 
 import { loadPlanCorpus, type PlanCorpus } from "./helpers/plan-corpus";
 import { compileSet, liftSet } from "./helpers/plan-tables";
@@ -71,6 +71,7 @@ describe("the planner plans a compiled column from its definition", () => {
                 for (const [name, relation] of Object.entries(def.config.relations ?? {})) {
                     const target = relation.target();
                     expect(relation.target()).toBe(target);
+                    if (!isTableDef(target) && !isViewDef(target)) throw new Error(`${def.name}.${name} targets something that is not a table`);
                     if (defs.some(candidate => candidate.name === target.name)) {
                         expect({ set: set.id, from: def.name, relation: name, member: members.has(target) })
                             .toEqual({ set: set.id, from: def.name, relation: name, member: true });

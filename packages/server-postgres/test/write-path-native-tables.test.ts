@@ -1,5 +1,6 @@
 import { col, defineTable, json, sql } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
+import { testUser } from "./helpers/spg-b-fixtures";
 import { compileSchema } from "@rebasepro/common";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { buildTableRegistry } from "../src/model/build-registry";
@@ -95,7 +96,7 @@ describe("the write path over defineTable tables", () => {
         return driver;
     };
     const written = (): Record<string, unknown> => saveSpy.mock.calls[0][1] as Record<string, unknown>;
-    const user = { uid: "user-9", roles: [] } as User;
+    const user = testUser({ uid: "user-9", roles: [] });
 
     beforeEach(() => {
         jest.restoreAllMocks();
@@ -229,7 +230,7 @@ describe("the write path over defineTable tables", () => {
     });
 
     describe("tenant stamping", () => {
-        const member = { uid: "user-9", roles: [], claims: { org_id: "acme" } } as User;
+        const member = testUser({ uid: "user-9", roles: [], claims: { org_id: "acme" } });
 
         it("stamps the caller's tenant on a create that names none", async () => {
             await setup(member).save({ path: "projects", values: { name: "p" },  status: "new" });

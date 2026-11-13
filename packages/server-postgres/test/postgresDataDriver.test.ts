@@ -753,7 +753,7 @@ table_name: "users" }])
             const afterSaveSpy = jest.fn();
             registry.setTableHooks("test_coll", { beforeSave: beforeSaveSpy, afterSave: afterSaveSpy });
 
-            jest.spyOn(delegate.dataService, "fetchOneForRest").mockResolvedValue(undefined);
+            jest.spyOn(delegate.dataService, "fetchOneForRest").mockResolvedValue(null);
             jest.spyOn(delegate.dataService, "save").mockResolvedValueOnce(
                 { id: "e1", path: "test_coll", values: { name: "test" } }
             );

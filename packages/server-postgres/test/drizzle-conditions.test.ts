@@ -6,9 +6,17 @@ import { LegacyCollectionConfig, resolveLegacyRelation } from "@rebasepro/common
 import { manyToMany, via } from "./helpers/relation-descriptors";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
-import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
+import { DrizzleConditionBuilder, type DrizzleDynamicQuery } from "../src/utils/drizzle-conditions";
 import { getColumnMeta } from "../src/services/collection-helpers";
 import { namedCollection, registryWithTables } from "./helpers/spg-a-fixtures";
+
+/** A dynamic query that records the builder calls made on it; each returns the query. */
+class RecordedQuery implements DrizzleDynamicQuery {
+    innerJoin = jest.fn((_table: PgTable, _condition: SQL) => this);
+    where = jest.fn((_condition: SQL | undefined) => this);
+    limit = jest.fn((_limit: number) => this);
+    $dynamic = jest.fn(() => this);
+}
 
 // Mock tables for testing
 const mockAuthorsTable = pgTable("authors", {
@@ -222,11 +230,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
         it("should build correct count query for owning many-to-many relation", () => {
             const relation = manyToMany("tags", "tags", { table: "posts_tags", sourceKey: "post_id", targetKey: "tag_id" });
 
-            const mockBaseQuery = {
-                innerJoin: jest.fn().mockReturnThis(),
-                where: jest.fn().mockReturnThis(),
-                $dynamic: jest.fn().mockReturnThis()
-            };
+            const mockBaseQuery = new RecordedQuery();
 
             const result = DrizzleConditionBuilder.buildRelationCountQuery(
                 mockBaseQuery,
@@ -256,11 +260,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
         it("should build correct count query for inverse many-to-many relation", () => {
             const relation = manyToMany("posts", "posts", { table: "posts_tags", sourceKey: "tag_id", targetKey: "post_id" });
 
-            const mockBaseQuery = {
-                innerJoin: jest.fn().mockReturnThis(),
-                where: jest.fn().mockReturnThis(),
-                $dynamic: jest.fn().mockReturnThis()
-            };
+            const mockBaseQuery = new RecordedQuery();
 
             const result = DrizzleConditionBuilder.buildRelationCountQuery(
                 mockBaseQuery,
@@ -290,11 +290,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
         it("should build correct query for owning many-to-many relation with additional filters", () => {
             const relation = manyToMany("tags", "tags", { table: "posts_tags", sourceKey: "post_id", targetKey: "tag_id" });
 
-            const mockBaseQuery = {
-                innerJoin: jest.fn().mockReturnThis(),
-                where: jest.fn().mockReturnThis(),
-                $dynamic: jest.fn().mockReturnThis()
-            };
+            const mockBaseQuery = new RecordedQuery();
 
             const additionalFilters = [eq(mockTagsTable.name, "javascript")];
 
@@ -327,11 +323,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
         it("should build correct query for inverse many-to-many relation with additional filters", () => {
             const relation = manyToMany("posts", "posts", { table: "posts_tags", sourceKey: "tag_id", targetKey: "post_id" });
 
-            const mockBaseQuery = {
-                innerJoin: jest.fn().mockReturnThis(),
-                where: jest.fn().mockReturnThis(),
-                $dynamic: jest.fn().mockReturnThis()
-            };
+            const mockBaseQuery = new RecordedQuery();
 
             const additionalFilters = [eq(mockPostsTable.title, "Test Post")];
 
@@ -955,7 +947,7 @@ describe("DrizzleConditionBuilder - a via is never read through the per-kind bui
     it("refuses one, naming the builder that reads it", () => {
         expect(() => DrizzleConditionBuilder.buildRelationConditions(relation, 7, orders, products, products.id, orders.id, registry))
             .toThrow("is a `via` chain: it is read through `buildRelationScopeCondition`");
-        const query = { innerJoin: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), $dynamic: jest.fn().mockReturnThis() };
+        const query = new RecordedQuery();
         expect(() => DrizzleConditionBuilder.buildRelationCountQuery(query, relation, 7, orders, products, products.id, orders.id, registry))
             .toThrow("is a `via` chain");
     });

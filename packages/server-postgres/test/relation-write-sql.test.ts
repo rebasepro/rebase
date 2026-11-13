@@ -28,7 +28,7 @@ const posts = pgTable("posts", {
 const dialect = new PgDialect();
 
 /** The predicate the clear-existing-links step builds, as the fix writes it. */
-const clearPredicate = (parentId: unknown, keepIds: unknown[]) =>
+const clearPredicate = (parentId: number, keepIds: number[]) =>
     and(eq(posts.author_id, parentId), notInArray(posts.id, keepIds));
 
 describe("hasMany write: clearing links not in the new set", () => {

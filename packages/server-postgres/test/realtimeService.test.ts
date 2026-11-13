@@ -74,10 +74,10 @@ values: { title: "Refetched Entity Title" } });
         it("adds and removes clients safely", () => {
             const ws = fakeRealtimeSocket();
             realtimeService.addClient("client-1", ws);
-            expect(realtimeService.clients.has("client-1")).toBe(true);
+            expect(realtimeService["clients"].has("client-1")).toBe(true);
 
             realtimeService.removeClient("client-1");
-            expect(realtimeService.clients.has("client-1")).toBe(false);
+            expect(realtimeService["clients"].has("client-1")).toBe(false);
         });
 
         it("removes client subscriptions upon disconnect", async () => {
@@ -136,7 +136,7 @@ subscriptionId: "sub-1" }
                 undefined
             );
             const stored = realtimeService.subscriptions.get("sub-1");
-            expect(stored.collectionRequest.limit).toBe(DEFAULT_LIST_LIMIT);
+            expect(stored?.collectionRequest?.limit).toBe(DEFAULT_LIST_LIMIT);
         });
     });
 
@@ -162,7 +162,7 @@ subscriptionId: "sub-1" }
                 undefined
             );
             const stored = realtimeService.subscriptions.get("sub-1");
-            expect(stored.collectionRequest.offset).toBe(20);
+            expect(stored?.collectionRequest?.offset).toBe(20);
         });
 
         it("applies the logical group it was given", async () => {
@@ -191,7 +191,7 @@ subscriptionId: "sub-1" }
                 undefined
             );
             const stored = realtimeService.subscriptions.get("sub-1");
-            expect(stored.collectionRequest.logical).toEqual(logical);
+            expect(stored?.collectionRequest?.logical).toEqual(logical);
         });
     });
 

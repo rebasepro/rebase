@@ -244,7 +244,7 @@ describe("self-referencing relations: on a database", () => {
      */
     const seedTree = async () => {
         const make = async (name: string, parent?: number) =>
-            Number((await driver.save({ path: "categories", status: "new", values: parent ? { name, parent } : { name } })).id);
+            Number((await driver.save<{ name: string; parent?: number }>({ path: "categories", status: "new", values: parent ? { name, parent } : { name } })).id);
         const root = await make("root");
         const left = await make("left", root);
         const right = await make("right", root);

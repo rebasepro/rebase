@@ -7,7 +7,7 @@
  */
 import pg from "pg";
 import { relations } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/node-postgres";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { integer, pgTable, serial, text } from "drizzle-orm/pg-core";
 import { col, defineTable } from "@rebasepro/types";
 import { compileSchema } from "@rebasepro/common";
@@ -18,6 +18,13 @@ const postsV1 = pgTable("posts", { id: serial("id").primaryKey(), title: text("t
 const postsV2 = pgTable("posts", { id: serial("id").primaryKey(), title: text("title"), subtitle: text("subtitle") });
 const notes = pgTable("notes", { id: serial("id").primaryKey(), body: text("body"), postId: integer("post_id") });
 const notesRelations = relations(notes, ({ one }) => ({ post: one(postsV2, { fields: [notes.postId], references: [postsV2.id] }) }));
+
+/** The schema the handle serves after the refresh; drizzle's types only know the one it was opened with. */
+type RefreshedDb = NodePgDatabase<{ posts: typeof postsV2; notes: typeof notes; notesRelations: typeof notesRelations }>;
+const servesNotes = (handle: object): handle is RefreshedDb => {
+    const query: unknown = Reflect.get(handle, "query");
+    return typeof query === "object" && query !== null && "notes" in query;
+};
 
 describe("refreshRelationalSchema", () => {
     // Never connects: nothing here runs a query, only builds one.
@@ -32,6 +39,7 @@ describe("refreshRelationalSchema", () => {
         refreshRelationalSchema(db, { posts: postsV2, notes, notesRelations });
 
         expect(Object.keys(db.query).sort()).toEqual(["notes", "posts"]);
+        if (!servesNotes(db)) throw new Error("the refreshed handle serves no notes");
         expect(db.query.posts.findMany().toSQL().sql).toContain("\"subtitle\"");
         expect(db.query.notes.findMany({ with: { post: true } }).toSQL().sql).toContain("\"posts\"");
         // The same handle and session: whoever held them before holds the new schema.

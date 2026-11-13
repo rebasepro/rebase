@@ -18,7 +18,7 @@ import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals
  */
 
 const fetchCollectionForRest = jest.fn(async (..._args: unknown[]) => [{ id: 1, title: "Row" }]);
-const fetchOneForRest = jest.fn(async (..._args: unknown[]) => ({ id: 1, title: "Row" }));
+const fetchOneForRest = jest.fn(async (..._args: unknown[]): Promise<Record<string, unknown> | null> => ({ id: 1, title: "Row" }));
 const count = jest.fn(async (..._args: unknown[]) => 1);
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({

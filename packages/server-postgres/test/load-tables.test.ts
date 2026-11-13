@@ -76,7 +76,7 @@ const generatedFiles = async (tables: CompiledTable[]): Promise<Record<string, s
 
 describe("a backend/schema directory, loaded", () => {
     // The fixture's collections are data; the lift is the codemod's own conversion.
-    const lifted = collectionsToTableDefs(FIXTURE.map(entry => entry as LegacyCollectionConfig));
+    const lifted = collectionsToTableDefs(FIXTURE.map((entry: unknown) => entry as LegacyCollectionConfig));
 
     /** The lifted fixture as files, the index exporting them in REVERSE slug order. */
     const writeFixture = (): string => {

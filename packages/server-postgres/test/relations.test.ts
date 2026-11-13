@@ -49,12 +49,17 @@ const mockTagCollection: LegacyCollectionConfig = {
     }
 };
 
+/** Fails the case unless the relation resolved to `kind`, and narrows it to that kind. */
+function assertKind<R extends { kind: string }, K extends R["kind"]>(relation: R, kind: K): asserts relation is Extract<R, { kind: K }> {
+    expect(relation.kind).toBe(kind);
+}
+
 describe("resolveRelation", () => {
 
     it("should generate a default relationName if not provided", () => {
-        const relation: Partial<LegacyRelation> = {
+        const relation: LegacyRelation = {
             kind: "belongsTo",
-            target: () => mockPostCollection,
+            target: () => mockPostCollection
             };
         const normalized = resolveLegacyRelation(relation, mockAuthorCollection);
         expect(normalized.relationName).toBe("posts");
@@ -63,23 +68,25 @@ describe("resolveRelation", () => {
     // --- Belongs-To (cardinality: 'one', direction: 'owning') ---
     describe("Belongs-To (one-to-one/many-to-one)", () => {
         it("should generate default localKey for a simple belongs-to relation", () => {
-            const relation: Partial<LegacyRelation> = {
+            const relation: LegacyRelation = {
                 kind: "belongsTo",
                 relationName: "post",
-                target: () => mockPostCollection,
+                target: () => mockPostCollection
                 };
             const normalized = resolveLegacyRelation(relation, mockAuthorCollection);
+            assertKind(normalized, "belongsTo");
             expect(normalized.localKey).toEqual("post_id");
         });
 
         it("should use provided `localKey` for a belongs-to relation", () => {
-            const relation: Partial<LegacyRelation> = {
+            const relation: LegacyRelation = {
                 kind: "belongsTo",
                 relationName: "post",
                 target: () => mockPostCollection,
                 localKey: "custom_post_fk"
             };
             const normalized = resolveLegacyRelation(relation, mockAuthorCollection);
+            assertKind(normalized, "belongsTo");
             expect(normalized.localKey).toEqual("custom_post_fk");
         });
     });
@@ -87,23 +94,25 @@ describe("resolveRelation", () => {
     // --- Inverse One-to-One (cardinality: 'one', direction: 'inverse') ---
     describe("Inverse One-to-One", () => {
         it("should generate default foreignKeyOnTarget for an inverse one-to-one relation", () => {
-            const relation: Partial<LegacyRelation> = {
+            const relation: LegacyRelation = {
                 kind: "hasOne",
                 relationName: "profile",
-                target: () => mockPostCollection,
+                target: () => mockPostCollection
                 };
             const normalized = resolveLegacyRelation(relation, mockAuthorCollection);
+            assertKind(normalized, "hasOne");
             expect(normalized.foreignKeyOnTarget).toEqual("author_id");
         });
 
         it("should use provided `foreignKeyOnTarget` for an inverse one-to-one relation", () => {
-            const relation: Partial<LegacyRelation> = {
+            const relation: LegacyRelation = {
                 kind: "hasOne",
                 relationName: "profile",
                 target: () => mockPostCollection,
                 foreignKeyOnTarget: "custom_author_fk"
             };
             const normalized = resolveLegacyRelation(relation, mockAuthorCollection);
+            assertKind(normalized, "hasOne");
             expect(normalized.foreignKeyOnTarget).toEqual("custom_author_fk");
         });
 
@@ -121,9 +130,11 @@ describe("resolveRelation", () => {
                 kind: "hasOne",
                 relationName: "profile",
                 target: () => mockPostCollection,
+                // @ts-expect-error the retired field, sent on purpose: an old config still reaches the resolver.
                 inverseRelationName: "author_profile"
             };
             const normalized = resolveLegacyRelation(relation, mockAuthorCollection);
+            assertKind(normalized, "hasOne");
             expect(normalized.foreignKeyOnTarget).toEqual("author_id");
             expect(normalized).not.toHaveProperty("inverseRelationName");
         });
@@ -137,25 +148,27 @@ describe("resolveRelation", () => {
             // relation "posts" must not point it at `posts_id`. The body used to
             // declare `hasOne`, so the hasMany branch's own default was never
             // reached and the two kinds could drift apart unnoticed.
-            const relation: Partial<LegacyRelation> = {
+            const relation: LegacyRelation = {
                 kind: "hasMany",
                 relationName: "posts",
-                target: () => mockPostCollection,
+                target: () => mockPostCollection
                 };
             const normalized = resolveLegacyRelation(relation, mockAuthorCollection);
             expect(normalized.kind).toEqual("hasMany");
             expect(normalized.cardinality).toEqual("many");
+            assertKind(normalized, "hasMany");
             expect(normalized.foreignKeyOnTarget).toEqual("author_id");
         });
 
         it("should use provided `foreignKeyOnTarget` for a has-many relation", () => {
-            const relation: Partial<LegacyRelation> = {
+            const relation: LegacyRelation = {
                 kind: "hasMany",
                 relationName: "posts",
                 target: () => mockPostCollection,
                 foreignKeyOnTarget: "writer_id"
             };
             const normalized = resolveLegacyRelation(relation, mockAuthorCollection);
+            assertKind(normalized, "hasMany");
             expect(normalized.foreignKeyOnTarget).toEqual("writer_id");
         });
     });
@@ -163,7 +176,7 @@ describe("resolveRelation", () => {
     // --- Many-To-Many (cardinality: 'many', through) ---
     describe("Many-To-Many", () => {
         it("should use provided `through` for a many-to-many relation", () => {
-            const relation: Partial<LegacyRelation> = {
+            const relation: LegacyRelation = {
                 kind: "manyToMany",
                 relationName: "tags",
                 target: () => mockTagCollection,
@@ -174,6 +187,7 @@ describe("resolveRelation", () => {
                 }
             };
             const normalized = resolveLegacyRelation(relation, mockPostCollection);
+            assertKind(normalized, "manyToMany");
             expect(normalized.through).toEqual({
                 table: "posts_tags",
                 sourceColumn: "post_id",
@@ -198,6 +212,7 @@ describe("resolveRelation", () => {
             // `hasOne`, i.e. it exercised the classified path it was written to
             // rule out.
             const relation: LegacyRelation = {
+                // @ts-expect-error an unclassifiable kind, on purpose: the resolver must refuse it.
                 kind: "many",
                 relationName: "posts",
                 target: () => mockPostCollection
@@ -206,12 +221,13 @@ describe("resolveRelation", () => {
         });
 
         it("should handle 'one' with 'owning' direction", () => {
-            const relation: Partial<LegacyRelation> = {
+            const relation: LegacyRelation = {
                 kind: "belongsTo",
                 relationName: "author",
-                target: () => mockAuthorCollection,
+                target: () => mockAuthorCollection
                 };
             const normalized = resolveLegacyRelation(relation, mockPostCollection);
+            assertKind(normalized, "belongsTo");
             expect(normalized.localKey).toEqual("author_id");
         });
     });

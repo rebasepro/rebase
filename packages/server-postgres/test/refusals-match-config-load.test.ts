@@ -24,7 +24,7 @@
  * compiler the loader runs.
  */
 import { compileTables, isSchemaDefinitionError, type SchemaDefinitionProblem } from "@rebasepro/common";
-import { collectionsToTableDefs } from "@rebasepro/common/migrate";
+import { collectionsToTableDefs, isLegacyPostgresCollection } from "@rebasepro/common/migrate";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { refused } from "./fixtures/property-matrix-collections";
@@ -55,7 +55,7 @@ describe("a configuration the schema planner refuses", () => {
             expect(problems.length).toBeGreaterThan(0);
             // The table is the whole point of the earlier report: it names the
             // table and, for a column-level refusal, the key.
-            const names = [collection.slug, collection.table, collection.name];
+            const names = [collection.slug, isLegacyPostgresCollection(collection) ? collection.table : undefined, collection.name];
             expect(problems.some(problem => names.includes(problem.table))).toBe(true);
         });
     }
@@ -72,7 +72,7 @@ describe("a configuration the schema planner refuses", () => {
         const arrs = everything.find(c => c.slug === "arrs")?.properties.ofTuple;
         if (arrs?.type === "array") delete arrs.of;
         const authors = everything.find(c => c.slug === "authors");
-        if (authors) {
+        if (authors && isLegacyPostgresCollection(authors)) {
             delete authors.properties.commentsVia;
             authors.relations = authors.relations?.filter(relation => relation.relationName !== "commentsVia");
         }

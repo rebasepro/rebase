@@ -133,9 +133,7 @@ describe("a nested write through a via relation", () => {
             parentId: "u-1",
             relationKey: "tags",
             relation: relationOfTable(registry, "users", "tags"),
-            target: registry.requireTable("tags"),
-            parentCollection: users,
-            targetCollection: tags
+            target: registry.requireTable("tags")
         };
         expect(() => assertWritableThrough(hop, "users/u-1/tags")).toThrow(expect.objectContaining({ code: "RELATION_NOT_WRITABLE" }));
     });

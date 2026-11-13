@@ -17,7 +17,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
 import path from "node:path";
-import { PGlite } from "@electric-sql/pglite";
+import { PGlite, type Extension } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, serial, text, vector } from "drizzle-orm/pg-core";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
@@ -30,7 +30,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 // it, and not of this package; resolved from there rather than added here.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { vector: pgvector } = require(path.resolve(__dirname, "../../cli/node_modules/@electric-sql/pglite-pgvector")) as {
-    vector: NonNullable<ConstructorParameters<typeof PGlite>[1]>["extensions"] extends infer E ? E[keyof E] : never;
+    vector: Extension;
 };
 
 const DIM = 16;
