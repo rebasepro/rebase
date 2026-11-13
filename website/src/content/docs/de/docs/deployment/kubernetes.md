@@ -1,15 +1,22 @@
 ---
-sourceHash: 8ca6480a862b6d07
+sourceHash: 00bc3369d6f3db69
 title: Kubernetes
 sidebar_label: Kubernetes
-description: Stellen Sie Rebase mit dem offiziellen Helm-Chart auf einem Kubernetes-Cluster bereit – ein Deployment oder mehrere, ein Migrations-Job für das Schema und statische Apps auf demselben Host.
+description: Deployen Sie Rebase auf einem Kubernetes-Cluster mit dem offiziellen Helm-Chart – ein Deployment oder mehrere, ein Migrations-Job, der das Schema verwaltet, und statische Apps auf demselben Host.
 ---
 
 ## Übersicht
 
-Das offizielle Chart ist das Kubernetes-Pendant zum Docker-Compose-Self-Hosting-Setup. Dieselbe Idee, dasselbe Image, dasselbe Bundle: **Die Runtime ist das Image, Ihr Projekt ist das Bundle und ein Upgrade von Rebase ist eine Änderung des Tags.**
+Das offizielle Chart ist das Kubernetes-Pendant zum Docker-Compose-Setup für
+Self-Hosting. Gleiche Idee, gleiches Image, gleiches Bundle: **Die Runtime ist
+das Image, Ihr Projekt ist das Bundle und ein Upgrade von Rebase ist lediglich
+eine Änderung des Tags.**
 
-Es wird als OCI-Artefakt neben dem Runtime-Image veröffentlicht, und beide tragen dieselbe Version – das Chart, das die Runtime `0.17.3` bereitstellt, *ist* das Chart `0.17.3`, sodass es nur eine Versionsnummer zu verfolgen gilt. Ohne `--version` erhalten Sie die neueste Version; fixieren Sie sie für ein echtes Deployment, genau wie Sie `image.tag` fixieren würden:
+Es wird als OCI-Artefakt neben dem Runtime-Image veröffentlicht, und beide
+tragen dieselbe Version – das Chart, das die Runtime `0.17.3` deployt, *ist*
+Chart `0.17.3`, sodass es nur eine Versionsnummer zu verfolgen gibt. Ohne
+`--version` erhalten Sie die neueste Version; pinnen Sie diese für ein
+produktives Deployment genauso fest, wie Sie `image.tag` pinnen würden:
 
 ```bash
 helm install rebase oci://registry-1.docker.io/rebasepro/rebase \
@@ -22,26 +29,57 @@ helm install rebase oci://registry-1.docker.io/rebasepro/rebase \
   --set image.repository=my-registry/my-app
 ```
 
-Das Chart wird mit deaktivierter Selbstregistrierung ausgeliefert, daher muss ein Release das Konto benennen, mit dem sich sein Betreiber anmeldet – andernfalls startet es mit einer leeren Benutzertabelle und ohne eine Möglichkeit, den ersten authentifizierten Aufrufer zu erzeugen. `config.adminPassword` muss mindestens 12 Zeichen lang sein, und `config.adminEmail` braucht einen Punkt in der Domain: Die Login-Route parst ihren Body mit `z.string().email()`, sodass `admin@localhost` ein Konto ist, bei dem sich niemand anmelden könnte, und die Runtime es nicht anlegt. Beides sind Verweigerungen beim Rendern statt Überraschungen zur Laufzeit – siehe [was das Chart verweigert zu rendern](#was-das-chart-verweigert-zu-rendern). Melden Sie sich an und ändern Sie das Passwort; diese Werte landen in einem Secret.
+Das Chart wird mit deaktivierter Selbstregistrierung ausgeliefert, sodass ein
+Release das Konto benennen muss, mit dem sich der Betreiber anmeldet – andernfalls
+startet es mit einer leeren Benutzertabelle und ohne Möglichkeit, den ersten
+authentifizierten Aufrufer zu erzeugen. `config.adminPassword` muss mindestens
+12 Zeichen lang sein, und `config.adminEmail` benötigt einen Punkt in der
+Domain: Die Login-Route parst ihren Body mit `z.string().email()`, sodass
+`admin@localhost` ein Konto wäre, an dem sich niemand anmelden kann, und die
+Runtime die Initialisierung verweigert. Beides sind Verweigerungen zur
+Render-Zeit statt böser Überraschungen zur Laufzeit – siehe [was das Chart nicht
+rendert](#was-das-chart-nicht-rendert). Melden Sie sich an und ändern Sie
+das Passwort; diese Werte landen in einem Secret.
 
-Verwalten Sie sie stattdessen außerhalb des Charts, indem Sie `existingSecret` auf ein Secret richten, das `REBASE_ADMIN_EMAIL` und `REBASE_ADMIN_PASSWORD` neben `DATABASE_URL` und dem Rest enthält.
+Verwalten Sie diese stattdessen Out-of-Band, indem Sie `existingSecret` auf ein
+Secret verweisen lassen, das `REBASE_ADMIN_EMAIL` und `REBASE_ADMIN_PASSWORD`
+neben `DATABASE_URL` und den übrigen Werten enthält.
 
-Das Chart stellt **nur die Runtime** bereit. Es stellt kein Postgres bereit – verwenden Sie CloudNativePG, eine verwaltete Datenbank oder Ihr eigenes StatefulSet und verweisen Sie mit `config.databaseUrl` darauf. Ein Chart, das auch Ihre Datenbank verwalten würde, wäre auch für Ihre Backups und Ihr Failover verantwortlich, was ein viel größeres Versprechen ist als „die App ausführen“.
+Das Chart deployt **ausschließlich die Runtime**. Es deployt kein Postgres –
+verwenden Sie CloudNativePG, eine Managed Database oder Ihr eigenes StatefulSet
+und lassen Sie `config.databaseUrl` darauf verweisen. Ein Chart, das auch Ihre
+Datenbank verwalten würde, wäre auch für Ihre Backups und Ihr Failover zuständig,
+was ein weitaus größeres Versprechen ist als „die App ausführen“.
 
-> **Reifegrad.** In der CI werden zwei getrennte Dinge geprüft, ein drittes nicht. Das Chart wird gegen Helm v4.2.4 gelintet und gerendert – jede auf dieser Seite dokumentierte Topologie, einschließlich des Installationsbefehls oben, und ein Fall, der jede unten aufgeführte Verweigerung erreicht. Das Runtime-Image, das das Chart bereitstellt, wird gegen ein echtes Postgres gebaut und gestartet, auf beiden Wegen, auf denen ein Bundle ankommen kann. Was **noch nie gelaufen ist, ist das Chart gegen einen Live-Cluster**: Nichts hat diese Manifeste je eingeplant, sodass die Probes, die Reihenfolge des Pre-Install-Migrations-Jobs und der Ingress als YAML korrekt und als Deployment unbewiesen sind. Betrachten Sie es als gut getesteten Ausgangspunkt und nicht als praxiserprobten Standard, und lesen Sie [Self-Hosting](/docs/deployment/self-hosting) für den Pfad, der es ist.
+> **Reifegrad.** Zwei separate Dinge werden in der CI geprüft, ein drittes nicht.
+> Das Chart wird gegen Helm v4.2.4 gelintet und gerendert – jede auf dieser Seite
+> dokumentierte Topologie, einschließlich des obigen Installationsbefehls, sowie
+> Testfälle für jede unten aufgeführte Verweigerung. Das Runtime-Image, das das
+> Chart deployt, wird gebaut und gegen ein echtes Postgres gestartet, und zwar
+> für beide Arten, wie ein Bundle bereitgestellt werden kann. Was **noch nie
+> ausgeführt wurde, ist das Chart auf einem Live-Cluster**: Nichts hat diese
+> Manifeste bisher gescheduled, daher sind die Probes, die Reihenfolge des
+> Pre-Install-Migrations-Jobs und das Ingress als YAML korrekt, aber als
+> tatsächliches Deployment unerprobt. Betrachten Sie es als gut getesteten
+> Ausgangspunkt und nicht als praxiserprobten Produktionsstandard, und lesen Sie
+> [Self-Hosting](/docs/deployment/self-hosting) für den bewährten Weg.
 
-Um stattdessen aus einem Checkout zu arbeiten – einem modifizierten Chart oder einer Air-Gapped-Installation – akzeptiert `helm install rebase ./infra/charts/rebase` dieselben Werte.
+Um stattdessen aus einem lokalen Checkout zu arbeiten – für ein modifiziertes
+Chart oder eine Air-Gapped-Installation – akzeptiert `helm install rebase
+./infra/charts/rebase` dieselben Werte.
 
 ## Ihr Projekt in den Pod bringen
 
 | `bundle.mode` | Wie | Wann |
 |---|---|---|
-| `image` (Standard) | Bauen Sie `FROM rebasepro/server` mit `COPY dist-bundle /bundle` und setzen Sie dann `image.repository` | Fast immer. Ein Artefakt, unveränderlich, keine Runtime-Abhängigkeit von der Erreichbarkeit einer URL |
-| `url` | Standard-Image; die Runtime lädt bei jedem Pod-Start einen Tarball herunter | Eine Control Plane, die Bundles Out-of-Band ausliefert |
+| `image` (Standard) | `FROM rebasepro/server` mit `COPY dist-bundle /bundle` bauen, dann `image.repository` festlegen | Fast immer. Ein einziges Artefakt, unveränderlich (immutable), keine Laufzeitabhängigkeit von der Erreichbarkeit einer URL |
+| `url` | Standard-Image; die Runtime lädt bei jedem Pod-Start einen Tarball herunter | Eine Control Plane, die Bundles Out-of-Band bereitstellt |
 
 ## Ein Prozess oder mehrere
 
-Der Standard ist ein einzelnes Deployment, das alles bedient – dieselbe Struktur, die auch die Compose-Datei ausführt. Das Aufteilen erfordert nur einen Wert:
+Der Standard ist ein einzelnes Deployment, das alles bereitstellt – dieselbe
+Struktur, die auch die Compose-Datei ausführt. Das Aufteilen erfordert nur einen
+Wert:
 
 ```yaml
 split: true
@@ -52,21 +90,31 @@ worker:
   enabled: true
 ```
 
-Das ergibt eine `api`-Ebene, eine `functions`-Ebene und einen `worker`, alle aus demselben Image und demselben Bundle. Siehe [Split Processes](/docs/deployment/split-processes) für Details dazu, was jede Rolle tut und warum Sie sie trennen sollten.
+Das ergibt eine `api`-Ebene, eine `functions`-Ebene und einen `worker`, alle aus
+demselben Image und demselben Bundle. Siehe [Split Processes](/docs/deployment/split-processes)
+für Details dazu, was jede Rolle tut und warum man sie trennen sollte.
 
-Was das Chart gegenüber der manuellen Konfiguration hinzufügt, ist, dass es **die Einstellungen ableitet, deren Fehlerfall Stille ist**, basierend auf den Werten, die Sie bereits angegeben haben:
+Der Vorteil des Charts gegenüber einer manuellen Konfiguration ist, dass es **die
+Einstellungen, deren Fehlermodus stilles Versagen ist**, automatisch aus den
+Werten ableitet, die Sie bereits angegeben haben:
 
-- `REBASE_ROLE` pro Einheit — `all` auf der API, wenn es keine Functions-Einheit gibt, damit sie Ihre Functions weiterhin bedient
-- `REBASE_MIGRATE_ON_BOOT=none` überall, da der Migrations-Job das Schema besitzt
-- `REBASE_CRON_SCHEDULER=false` / `REBASE_JOB_WORKERS=false` auf der API, sobald ein Worker existiert
+- `REBASE_ROLE` pro Einheit – `all` bei der API, wenn keine Functions-Einheit vorhanden ist, damit sie weiterhin Ihre Funktionen bedient
+- `REBASE_MIGRATE_ON_BOOT=none` überall, da der Migrations-Job das Schema verwaltet
+- `REBASE_CRON_SCHEDULER=false` / `REBASE_JOB_WORKERS=false` bei der API, sobald ein Worker existiert
 - `TRUSTED_PROXY_HOPS` auf der Functions-Einheit
-- `REBASE_RATE_LIMIT_STORE=sql`, sobald ein zweiter Prozess HTTP bedient
+- `REBASE_RATE_LIMIT_STORE=sql`, sobald ein zweiter Prozess HTTP-Anfragen bedient
 
-Ein falsches `REBASE_ROLE` bedient kein HTTP, während `/health` weiterhin antwortet, sodass Readiness-Checks erfolgreich sind und jede Anfrage mit einem 404 fehlschlägt. Ein fehlendes `REBASE_MIGRATE_ON_BOOT` führt zu einem CrashLoop, dessen Ursache in einem Protokoll steht, das niemand beobachtet. Das Chart setzt alle diese Werte, und `config.env` kann sie nicht überschreiben.
+Ein falsches `REBASE_ROLE` liefert kein HTTP aus, während `/health` weiterhin
+antwortet, sodass der Readiness-Check erfolgreich ist und jede Anfrage einen
+404-Fehler erzeugt. Ein fehlendes `REBASE_MIGRATE_ON_BOOT` führt zu einem
+CrashLoop, dessen Ursache in einem Log steht, das niemand beobachtet. Das Chart
+setzt alle diese Einstellungen automatisch, und `config.env` kann sie nicht
+überschreiben.
 
-### Trennung von Cron und Job-Ausführung
+### Cron-Scheduling von der Job-Ausführung trennen
 
-Zwei Worker mit entgegengesetzter Zuständigkeit – keine neue Rolle und kein Code:
+Zwei Worker mit gegensätzlichen Zuständigkeiten – keine neue Rolle und kein
+Code:
 
 ```yaml
 worker:
@@ -77,7 +125,10 @@ worker:
 
 ## Das Admin-Panel und jedes andere Frontend
 
-Eine statische App ist dasselbe Runtime-Image, das ein `kind: static`-Bundle startet. Dieser Pfad bricht ab, bevor die Runtime `DATABASE_URL` oder `JWT_SECRET` liest, sodass diese Pods **überhaupt keine Secrets** enthalten.
+Eine statische App verwendet dasselbe Runtime-Image, das ein `kind: static`-Bundle
+bootet. Dieser Pfad bricht die Initialisierung ab, bevor die Runtime
+`DATABASE_URL` oder `JWT_SECRET` liest, sodass diese Pods **überhaupt keine
+Secrets** enthalten.
 
 ```yaml
 staticApps:
@@ -88,37 +139,76 @@ staticApps:
       tag: "1.4.0"
 ```
 
-Der Ingress leitet `/admin` dorthin und `/` an die API weiter, und zwar auf **demselben Host**. Das ist Absicht: Derselbe Origin bedeutet, dass Cookie-Authentifizierung und CORS genau so bleiben, wie sie waren, und die Trennung eine interne Topologie-Entscheidung bleibt, anstatt die öffentliche Oberfläche Ihres Produkts zu verändern. Der Preis dafür ist, dass die Assets für diesen Pfad *gebaut* werden müssen, was die Runtime beim Start überprüft.
+Das Ingress leitet `/admin` dorthin und `/` an die API weiter, auf **demselben
+Host**. Das ist Absicht: Same-Origin bedeutet, dass Cookie-Authentifizierung und
+CORS exakt unverändert bleiben und die Aufteilung eine interne
+Topologie-Entscheidung bleibt, anstatt die öffentliche Schnittstelle Ihres
+Produkts zu verändern. Der Preis dafür ist, dass die Assets für diesen Pfad
+*gebaut* werden müssen, was die Runtime beim Booten prüft.
 
-Das Deployment des Admin-Panels ist dann lediglich die Aktualisierung eines Image-Tags in einem Deployment. Das Backend startet dabei nicht neu.
+Das Deployment des Admin-Panels ist dann lediglich ein Image-Tag-Bump in einem
+einzigen Deployment. Das Backend startet nicht neu.
 
 ## Schema
 
-`migrationJob.enabled` (der Standard) führt einen `pre-install,pre-upgrade`-Job aus, der die Bereitstellung vornimmt und sich beendet, und jeder Pod startet mit `REBASE_MIGRATE_ON_BOOT=none`. Nichts auf dem Request-Pfad besitzt das Collection-Schema, was die sauberste verfügbare Lösung für „genau ein Prozess provisioniert das Schema“ ist – es ist keine Regel mehr, an die man sich erinnern muss. Die Pods halten beim Start weiterhin die eigenen Tabellen des Frameworks (Auth, API-Schlüssel, Jobs, Cron) aktuell; `provision: false` stoppt auch das, rendert keinen Job und überlässt das Schema einem [Provisioning-Lauf](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database) unter Ihrem eigenen Änderungsprozess.
+`migrationJob.enabled` (der Standard) führt einen `pre-install,pre-upgrade`-Job
+aus, der das Provisioning vornimmt und sich beendet, und jeder Pod startet mit
+`REBASE_MIGRATE_ON_BOOT=none`. Nichts im Request-Pfad ist für das Tabellenschema
+verantwortlich, was die sauberste Lösung für das Prinzip „genau ein Prozess
+provisioniert das Schema“ darstellt – es ist keine Regel mehr, an die jemand
+aktiv denken muss. Die Pods halten beim Booten weiterhin die Framework-eigenen
+Tabellen (Auth, API-Schlüssel, Jobs, Cron) aktuell; `provision: false`
+unterbindet auch dies, rendert keinen Job und überlässt das Schema einem
+[Bereitstellungslauf](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database)
+im Rahmen Ihres eigenen Change-Management-Prozesses.
 
-`mode: ensure` erstellt additiv, was fehlt, und ist der einzige Modus, den das Runtime-Image akzeptiert. `push` wird beim Start verweigert: Das Anwenden von Collection-Schema-Änderungen ist destruktiv, und `rebase db push` aus einem Checkout oder einer CI führt die Änderung als Dry Run aus, verweigert destruktive ohne Bestätigung und kann zuvor ein Backup erstellen – nichts davon kann ein Pod, der unbeaufsichtigt startet.
+`mode: ensure` erstellt fehlende Elemente additiv und ist der einzige Modus, den
+das Runtime-Image akzeptiert. `push` wird beim Booten verweigert: Das Anwenden
+von Tabellenschema-Änderungen ist destruktiv, und `rebase db push` aus einem
+Checkout oder der CI testet die Änderung vorab (Dry-Run), verweigert destruktive
+Änderungen ohne Bestätigung und kann zuvor ein Backup erstellen – all das kann ein
+unbeaufsichtigt startender Pod nicht leisten.
 
-## Was das Chart verweigert zu rendern
+## Was das Chart nicht rendert
 
-Jede dieser Konfigurationen erzeugt zur Laufzeit keinen Fehler – das Deployment startet und irgendetwas hört stillschweigend auf zu funktionieren. Stattdessen schlägt `helm install` fehl und benennt den zu ändernden Wert:
+Jede dieser Konfigurationen erzeugt zur Laufzeit keinen Fehler – das Deployment
+startet, aber im Hintergrund funktioniert etwas stillschweigend nicht wie
+erwartet. `helm install` bricht stattdessen mit einem Fehler ab und nennt den
+anzupassenden Wert:
 
 - mehr als ein HTTP-Prozess mit `sharedState.rateLimitStore=memory`
-- `functions.enabled` oder `worker.enabled`, während `split=false` ist
+- `functions.enabled` oder `worker.enabled`, während `split=false` gesetzt ist
 - zwei statische Apps, die denselben Pfad beanspruchen, oder eine, die einen Pfad unter `/api` beansprucht
-- `bundle.mode=image`, während `image.repository` noch das Standard-Runtime-Image ist
+- `bundle.mode=image`, während `image.repository` noch auf das Standard-Runtime-Image verweist
 - `ingress.enabled` ohne Host oder `bundle.mode=url` ohne URL
-- ein unbekannter `migrationJob.mode` oder `sharedState.rateLimitStore`
-- kein `config.adminEmail` bei deaktivierter Selbstregistrierung – ein Release, bei dem sich niemand anmelden kann. Setzen Sie die beiden Admin-Werte oder `config.allowSelfRegistration=true`, im Wissen, dass die erste Person, die das Registrierungsformular erreicht, dessen Administrator wird
-- ein `config.adminPassword` unter 12 Zeichen oder ein `config.adminEmail`, dessen Domain keinen Punkt hat. Die Runtime weigert sich, beides beim Start anzulegen, und hinterlässt dasselbe ausgesperrte Release
+- ein nicht erkannter Wert für `migrationJob.mode` oder `sharedState.rateLimitStore`
+- kein `config.adminEmail` bei deaktivierter Selbstregistrierung – ein Release,
+  an dem sich niemand anmelden kann. Setzen Sie die beiden Admin-Werte oder
+  `config.allowSelfRegistration=true`, wobei zu beachten ist, dass die erste
+  Person, die das Registrierungsformular aufruft, Administrator wird
+- ein `config.adminPassword` mit weniger als 12 Zeichen oder ein
+  `config.adminEmail`, dessen Domain keinen Punkt enthält. Die Runtime weigert
+  sich beim Booten, eines von beiden zu initialisieren, was zum selben
+  ausgesperrten Release führt
 
-## Was das Chart nicht für Sie tun kann
+## Was das Chart nicht für Sie übernehmen kann
 
-**Realtime-Broadcast und Presence über mehrere Replikate hinweg.** Der Standard-Channel-Bus der Runtime liegt im Arbeitsspeicher (in-memory). Bei mehr als einem API-Replikat sieht ein Abonnent auf einem Pod also keine Broadcasts, die auf einem anderen veröffentlicht werden. Die Lösung liegt in der Konfiguration Ihres Projekts, nicht im Chart:
+**Echtzeit-Broadcast und Presence über mehrere Replikate hinweg.** Der
+standardmäßige Channel-Bus der Runtime liegt im Arbeitsspeicher (in-memory). Bei
+mehr als einem API-Replikat sieht ein Abonnent auf einem Pod daher keinen
+Broadcast, der auf einem anderen veröffentlicht wurde. Die Lösung liegt in der
+Konfiguration Ihres Projekts, nicht im Chart:
 
 ```ts
 realtime: { bus: { type: "postgres" } }
 ```
 
-Setzen Sie `sharedState.channelBusConfigured: true`, um zu bestätigen, dass Sie dies getan haben – das Chart nutzt dies nur, um zu entscheiden, ob eine Warnung ausgegeben werden soll. Reguläre Collection-Abonnements sind davon nicht betroffen; diese laufen über Postgres CDC.
+Setzen Sie `sharedState.channelBusConfigured: true`, um zu bestätigen, dass Sie
+dies konfiguriert haben – das Chart verwendet diesen Wert nur, um zu entscheiden,
+ob eine Warnung ausgegeben werden soll. Normale Tabellen-Abonnements sind davon
+nicht betroffen; diese laufen über Postgres CDC.
 
-Der Rest dessen, was ein Prozess für sich behält – lokale Dateien, fortsetzbare Uploads, der Bild-Transformations-Cache, der Logs Explorer – ist zusammen mit der Einstellung, die jeweils für das Teilen sorgt, unter [Mehr als eine Instanz ausführen](/docs/deployment/multiple-instances/) aufgeführt.
+Alles Übrige, was ein Prozess isoliert für sich behält – lokale Dateien,
+fortsetzbare Uploads, der Cache für Bildtransformationen, der Logs Explorer – ist
+zusammen mit der jeweiligen Einstellung zur gemeinsamen Nutzung in [Mehrere
+Instanzen ausführen](/docs/deployment/multiple-instances/) aufgeführt.

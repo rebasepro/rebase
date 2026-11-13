@@ -1,404 +1,421 @@
 ---
-sourceHash: c03791b01fd0329e
+sourceHash: e086faac3624de8d
 title: Indici
 sidebar_label: Indici
-description: Dichiara normali indici Postgres su una collection — btree, GIN e BRIN, parziali, compositi, covering e univoci — e perché quelli scritti a mano tendevano a scomparire.
+description: Dichiara i normali indici Postgres su una tabella — btree, GIN e BRIN, parziali, compositi, covering e univoci — e perché quelli scritti a mano tendevano a scomparire.
 ---
 
-Una collection dichiara gli indici necessari alle sue query nello stesso file delle
-proprietà che coprono:
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+Una tabella dichiara gli indici di cui le sue query hanno bisogno, accanto alle colonne che coprono:
 
-const posts: PostgresCollectionConfig = {
-    slug: "posts",
-    table: "posts",
-    name: "Blog posts",
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        title: { name: "Title", type: "string" },
-        status: { name: "Status", type: "string", enum: { draft: "Draft", published: "Published" } },
-        publish_date: { name: "Publish date", type: "date" }
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const posts = defineTable("posts", {
+    columns: {
+        id:          col.uuid().primaryKey().defaultRandom(),
+        title:       col.text().notNull(),
+        status:      col.enum(["draft", "published"]).notNull().default("draft"),
+        publishDate: col.timestamp({ withTimezone: true }),
     },
     indexes: [
         {
-            on: ["status", { prop: "publish_date", direction: "desc" }],
-            reason: "admin list: filter by status, newest first"
-        }
-    ]
-};
+            columns: ["status", { column: "publishDate", direction: "desc" }],
+            reason: "admin list: filter by status, newest first",
+        },
+    ],
+    rls: "admin-only",
+});
 ```
-
-Solo per Postgres. Su un altro engine la chiave viene rifiutata all'avvio invece di
-essere ignorata silenziosamente.
 
 ## Perché esiste
 
-Il generatore DDL ha sempre emesso istruzioni di indice esattamente per due cose,
-ed entrambe sono strutture appartenenti a una *funzionalità* anziché a query scritte da te: l'indice
-GIN dietro a un [blocco `search`](/docs/backend/search) e l'indice ANN dietro a
-una [proprietà `vector`](/docs/sdk/aggregates-and-search#the-index). Il caso comune — il btree
-dietro a una clausola `where` — non aveva alcuno spazio di dichiarazione.
+Il generatore DDL ha sempre emesso istruzioni di creazione degli indici esattamente per due cose,
+ed entrambe sono strutture appartenenti a una *funzionalità* piuttosto che a query scritte da te: l'indice
+GIN dietro un [blocco `search`](/docs/backend/search), e l'indice ANN dietro
+una [colonna `col.vector()`](/docs/sdk/aggregates-and-search#the-index). Il caso base — il btree
+dietro una clausola `where` — non aveva affatto una sede di dichiarazione.
 
-Quindi l'unico modo per averne uno era scriverlo a mano. E:
+Quindi l'unico modo per averne uno era scriverlo a mano. E inoltre:
 
 :::caution[Se hai indici scritti a mano su una tabella gestita da Rebase]
 `rebase db push` è dichiarativo. Un indice su una tabella gestita che risultava assente
-da `schema.sql` veniva considerato drift, e Atlas pianificava per esso un `DROP INDEX` —
-che non si trova nell'elenco delle istruzioni distruttive, quindi l'applicazione approvata
-automaticamente lo eseguiva senza chiedere. Ogni indice scritto a mano su una tabella
-gestita viveva con i giorni contati.
+da `schema.sql` veniva conteggiato come deriva (drift), e Atlas pianificava un `DROP INDEX` per esso —
+che non è nella lista delle istruzioni distruttive, quindi l'applicazione approvata automaticamente lo
+eseguiva senza chiedere conferma. Ogni indice scritto a mano su una tabella gestita viveva con
+il tempo contato.
 
-Questo problema è risolto dalla regola di ownership riportata di seguito: un indice non creato
-da Rebase viene ora escluso dal diff per nome e mai toccato. Dichiarare gli indici
-scritti a mano rimane comunque lo stato finale migliore — un indice dichiarato viene creato su un
-database pulito e su ogni tenant, mentre uno scritto a mano no — ma nel frattempo nulla
-li eliminerà.
+Questo problema è stato risolto dalla regola di proprietà sottostante: un indice non creato da Rebase ora
+è escluso dal diff in base al nome e non viene mai toccato. Dichiarare gli indici scritti a mano
+è comunque lo stato finale migliore — un indice dichiarato viene creato su un database pulito
+e su ogni tenant, mentre uno scritto a mano no — ma nel frattempo nulla andrà a eliminarli.
 :::
 
 ## La struttura
 
+<span class="since-badge" data-since="0.31">Da 0.31</span>
+
 | Campo | Tipo | Descrizione |
 |-------|------|-------------|
-| `on` | `(string \| IndexKey)[]` | **Obbligatorio.** Le colonne chiave, in ordine. Da 1 a 5 voci. |
-| `reason` | `string` | **Obbligatorio.** Il motivo per cui questo indice esiste, in una sola riga. |
+| `columns` | `(string \| { column, direction?, nulls? })[]` | **Obbligatorio.** Le colonne chiave, in ordine. Da 1 a 5 elementi. |
+| `reason` | `string` | Il motivo per cui questo indice esiste, in una riga. Fortemente raccomandato. |
 | `using` | `"btree" \| "gin" \| "brin"` | Metodo di accesso. Predefinito a `btree`. |
-| `where` | `IndexPredicate` | Rende l'indice parziale — copre solo le righe che soddisfano questa condizione. |
-| `unique` | `boolean` | Solo btree. Una garanzia di univocità composita. |
-| `include` | `string[]` | Solo btree. Colonne payload incluse per scansioni index-only. |
+| `where` | `IndexPredicate` | Rende l'indice parziale — copre solo le righe che corrispondono a questo predicato. |
+| `unique` | `boolean` | Solo btree. Una garanzia di unicità composita. |
+| `include` | `string[]` | Solo btree. Colonne di payload trasportate per scansioni index-only. |
 
-### `on` accetta chiavi di proprietà, mai nomi di colonna
+### `columns` accetta chiavi di colonna, mai nomi SQL
 
-Questo è il punto in cui è facile sbagliare. Una relazione `belongsTo` viene compilata nella sua
-`localKey` risolta, quindi la proprietà `author` corrisponde alla colonna `author_id`:
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-```typescript
-// Correct — `author` is the relation property.
-{ on: ["author"], reason: "an author's posts, and the ON DELETE cascade" }
+Il nome di una relazione `belongsTo` rappresenta la sua colonna foreign-key, quindi la relazione
+`author` corrisponde alla colonna `author_id`:
+
+```ts
+indexes: [
+    // `author` is the relation; its key is the column author_id.
+    { columns: ["author"], reason: "an author's posts, and the ON DELETE cascade" },
+]
 ```
 
-Scrivere `author_id` qui viene rifiutato in fase di build: è una colonna, non una
-proprietà della collection, e `on` nomina proprietà. Postgres non indicizza automaticamente le colonne delle chiavi esterne —
-senza questo indice, sia "elenca i post di questo autore" che la cascata di `ON DELETE`
-eseguono sequential scan.
+Scrivere `author_id` qui viene rifiutato: è un nome di colonna SQL, non una chiave della
+tabella, e `columns` richiede i nomi delle chiavi. Postgres non
+indicizza automaticamente una colonna foreign key — senza questo indice, sia "elenca i post
+di questo autore" che la sequenza a catena di `ON DELETE` si traducono in sequential scan.
 
-Una relazione `hasMany` o molti-a-molti non ha alcuna colonna su questa tabella e
-viene rifiutata, rimandando alla collection che possiede effettivamente la chiave esterna.
+Una relazione `hasMany` o molti-a-molti non ha alcuna colonna su questa tabella e viene
+rifiutata: dichiara l'indice sulla tabella che possiede la foreign key.
 
-### L'ordine è importante, e solo un sottoinsieme iniziale è utilizzabile
+### L'ordine è importante e solo un sottoinsieme iniziale è utilizzabile
 
 Postgres può utilizzare un sottoinsieme iniziale delle colonne chiave, perciò
-`["ownerId", "createdAt"]` serve una query che filtra su `ownerId`, una
-che filtra su entrambi, e **mai** una che filtra unicamente su `createdAt`.
+`["ownerId", "createdAt"]` serve una query che filtra su `ownerId`, e una che
+filtra su entrambi, ma **mai** una che filtra unicamente su `createdAt`.
 
-`direction` e `nulls` sono utili solo quando l'`ORDER BY` di una query
-mescola le direzioni. Un indice solo `DESC` è ridondante rispetto al suo equivalente `ASC` —
-Postgres scansiona un btree all'indietro con la stessa velocità — quindi un singolo indice
-serve sia il filtro *che* l'ordinamento nell'esempio in cima a questa pagina.
+`direction` e `nulls` hanno senso solo quando l'`ORDER BY` di una query mescola
+direzioni diverse. Un indice con solo `DESC` è ridondante rispetto al suo gemello `ASC` — Postgres
+esegue la scansione di un btree all'indietro con la stessa rapidità — quindi un singolo indice soddisfa sia il filtro
+*che* l'ordinamento nell'esempio in cima a questa pagina.
 
-```typescript
-{ on: [{ prop: "createdAt", direction: "desc", nulls: "last" }], reason: "…" }
+```ts
+indexes: [{ columns: [{ column: "createdAt", direction: "desc", nulls: "last" }], reason: "…" }]
 ```
 
-Specificare esplicitamente il default di Postgres non costa nulla: il nome derivato calcola l'hash
-dell'ordine *effettivo*, quindi aggiungere `direction: "asc"` a una colonna che era già
+Scrivere esplicitamente il default di Postgres non ha costi: il nome derivato calcola l'hash
+sull'ordinamento *effettivo*, quindi aggiungere `direction: "asc"` a una colonna che era già
 ascendente non costituisce una ridefinizione e non ricostruisce nulla.
 
-Il limite massimo è di cinque chiavi. Postgres ne consente trentadue; oltre le quattro,
-le colonne finali sono un peso morto a ogni operazione di scrittura, e la dichiarazione è di solito
-il tentativo di rendere una query più veloce per semplice accumulo. Le colonne di payload che non
-vengono cercate appartengono a `include`, che non viene conteggiato ai fini del limite.
+Il limite massimo è di cinque chiavi. Postgres ne ammette trentadue; oltre le quattro, le colonne
+finali sono zavorra a ogni scrittura, e la dichiarazione riflette di solito il desiderio che
+una query diventi più veloce per accumulo. Le colonne di payload che non vengono ricercate devono andare in
+`include`, che non conta ai fini del limite.
 
 ### `where` è strutturato, non SQL
 
-```typescript
-{
-    on: ["publish_date"],
-    where: { prop: "status", op: "=", value: "published" },
-    reason: "public feed: published posts by date"
-}
+```ts
+indexes: [{
+    columns: ["publishDate"],
+    where: { column: "status", op: "=", value: "published" },
+    reason: "public feed: published posts by date",
+}]
 ```
 
-L'indice conterrà quindi solo le righe pubblicate, rimanendo leggero man mano che le bozze si accumulano.
+L'indice conterrà quindi solo le righe pubblicate, rimanendo di dimensioni ridotte man mano che le bozze si accumulano.
 
 Gli operatori sono `=`, `!=`, `<`, `<=`, `>`, `>=`, `in`, `is null` e
 `is not null`, combinati con `and`:
 
-```typescript
-{
-    on: ["assignee"],
+```ts
+indexes: [{
+    columns: ["assignee"],
     where: {
         and: [
-            { prop: "status", op: "in", value: ["open", "in_progress"] },
-            { prop: "archived_at", op: "is null" }
-        ]
+            { column: "status", op: "in", value: ["open", "in_progress"] },
+            { column: "archivedAt", op: "is null" },
+        ],
     },
-    reason: "the open-work queue, which is a fraction of the table"
-}
+    reason: "the open-work queue, which is a fraction of the table",
+}]
 ```
 
-L'operatore `or` è deliberatamente assente. Un predicato OR significa quasi sempre che l'indice
-non dovrebbe affatto essere parziale; se ne hai realmente bisogno, dichiara due indici distinti.
+Non è presente intenzionalmente alcun operatore `or`. Un predicato OR significa quasi sempre che l'indice
+non dovrebbe essere affatto parziale; se ne hai realmente bisogno, dichiara due indici distinti.
 
-Un predicato è una struttura anziché una stringa perché una stringa non potrebbe essere
-verificata rispetto alle proprietà della collection, non potrebbe essere sottoposta a fingerprint senza
-inserire il proprio testo nel nome dell'indice — quindi una riformattazione rinominerebbe
-un indice in produzione — e sarebbe l'unico punto in cui un chiamante cercherebbe di usare una
-classe operatore di un'estensione che il planner non può riprodurre.
+Un predicato è un oggetto strutturato anziché una stringa perché una stringa non potrebbe essere
+validata rispetto alle colonne della tabella, non se ne potrebbe ricavare un'impronta (fingerprint) senza
+incorporarne il testo nel nome dell'indice — quindi riformattarla rinominerebbe un
+indice in produzione — e sarebbe l'unico punto in cui un chiamante potrebbe richiedere una classe
+di operatori di un'estensione che il planner non è in grado di replicare.
 
 ### `unique` è solo per indici compositi
 
-L'univocità su singola colonna si gestisce tramite `validation.unique` sulla proprietà, e
-dichiararla anche qui viene rifiutato anziché accettato come sinonimo.
-`validation.unique` viene compilato in un vincolo `UNIQUE` inline il cui indice sottostante
-viene denominato da Postgres — non da Rebase — come `<table>_<column>_key`.
+L'unicità su singola colonna si ottiene con `.unique()` sulla colonna stessa, e dichiararla anche
+qui viene rifiutato invece di essere accettato come sinonimo. `.unique()` compila in un vincolo
+`UNIQUE` inline il cui indice di supporto viene denominato da Postgres — non da Rebase — come
+`<table>_<column>_key`.
 
-```typescript
-{ on: ["workspaceId", "slug"], unique: true, reason: "one slug per workspace" }
+```ts
+indexes: [{ columns: ["workspaceId", "slug"], unique: true, reason: "one slug per workspace" }]
 ```
 
-### `include` consente un index-only scan
+### `include` consente un'index-only scan
 
-Le colonne payload risiedono nelle pagine foglia: non sono ricercabili, non sono ordinate e
-consentono di risparmiare un recupero dall'heap (heap fetch) al costo di un indice più pesante. Non possono sovrapporsi a quelle di `on`.
+Le colonne di payload risiedono nelle pagine foglia: non sono ricercabili, non sono ordinate e
+risparmiano un fetch sull'heap al prezzo di un indice più pesante. Non possono sovrapporsi a `columns`.
 
-```typescript
-{ on: ["status"], include: ["title"], reason: "the status sidebar counts, without touching the heap" }
+```ts
+indexes: [{ columns: ["status"], include: ["title"], reason: "the status sidebar counts, without touching the heap" }]
 ```
 
 ### `using`
 
-`btree` (il valore predefinito) gestisce uguaglianza, intervalli, `ORDER BY` e univocità.
+`btree` (il default) supporta uguaglianza, intervalli (range), `ORDER BY` e unicità.
 
-`gin` serve per il contenimento su una proprietà `array` o su una `map` JSONB. `brin` è pensato per
-una colonna con ordinamento naturale su una tabella append-only — minuscolo e inutile nel momento in cui
-le righe iniziano ad arrivare fuori ordine. Nessuno dei due supporta un ordinamento, per cui `direction` e
-`nulls` non sono rappresentabili su di essi, anziché essere rifiutati in un secondo momento da Postgres.
+`gin` serve per il contenimento su una colonna array o su una colonna `jsonb`. `brin` è indicato per una
+colonna con ordinamento naturale su una tabella append-only — minuscolo, e inutile nel momento
+in cui le righe cominciano ad arrivare fuori ordine. Nessuno dei due ha un ordinamento, per cui `direction` e
+`nulls` non sono proprio rappresentabili su di essi, anziché venire rifiutati successivamente da Postgres.
 
-`gist` e `hash` non sono supportati: ogni classe operatore gist interessante risiede in
-un'estensione, e gli indici hash non possono essere univoci, compositi né ordinati. Questa
-restrizione è ciò che mantiene l'intero modello conforme al percorso di Atlas — `rebase db push`
-materializza lo stato desiderato in un database temporaneo vuoto (scratch database) rispetto al quale pianificare le modifiche, e
-`CREATE EXTENSION` non può essere inserito in quel file. **La ricerca con trigrammi è gestita da
-[`search:`](/docs/backend/search); ANN è una
-[proprietà `vector`](/docs/sdk/aggregates-and-search#the-index).** Un indice che richiede
+Non ci sono `gist` né `hash`: ogni classe di operatori gist interessante fa parte di
+un'estensione, e gli indici hash non possono essere univoci, compositi o ordinati. Questa
+restrizione è ciò che mantiene l'intero modello compatibile con Atlas — `rebase db push`
+materializza lo stato desiderato in un database di scratch minimale su cui pianificare, e
+`CREATE EXTENSION` non può rientrare in quel file. **La ricerca con trigrammi è
+[`search:`](/docs/backend/search); l'ANN è una
+[colonna `col.vector()`](/docs/sdk/aggregates-and-search#the-index).** Un indice che necessita di
 `gin_trgm_ops` o `vector_cosine_ops` viene rifiutato in fase di build anziché
-emesso per poi fallire successivamente su un database sconosciuto.
+essere generato per poi fallire in seguito su un database mai visto prima.
 
-### `reason` è obbligatorio
+### `reason`
 
-È l'unico campo obbligatorio a non avere un corrispettivo in SQL.
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-Un indice è l'unica cosa che una configurazione di Rebase può dichiarare che comporta un costo continuo nel tempo
-e il cui beneficio è invisibile dalla configurazione stessa. La reason è ciò che viene mostrato
-accanto a "0 scans in 34 days, 412 MB", ovvero l'unico momento in cui chiunque si trova
-nella posizione di decidere se eliminarlo. Senza di essa nessuno può prendere una decisione, quindi nessuno
-lo fa, e la tabella accumula indici per l'intera durata del prodotto.
+È l'unico campo che non ha una controparte SQL ed è facoltativo — ma ti raccomandiamo di scriverlo.
 
-Deliberatamente **non** fa parte dell'identità dell'indice: riformulare una
-giustificazione non ricostruisce mai un indice.
+Un indice è l'unica cosa che uno schema può dichiarare che ha un costo continuo e perenne
+e il cui beneficio non è visibile dalla configurazione. Il motivo indicato è ciò che viene stampato
+accanto a "0 scans in 34 days, 412 MB", che è l'unico momento in cui qualcuno si trova nella
+posizione di decidere se eliminarlo. Senza di esso nessuno può prendere una decisione, perciò nessuno
+lo fa, e la tabella accumula indici per tutta la durata del prodotto.
 
-## Come viene nominata una dichiarazione
+È intenzionalmente **escluso** dall'identità dell'indice — riformulare la
+motivazione non comporta mai la ricostruzione di un indice.
 
-`<table>_<columns>_ix_<7 hex>`, oppure `_ux_` se univoco. Ad esempio
+## Come viene denominata una dichiarazione
+
+`<table>_<columns>_ix_<7 hex>`, oppure `_ux_` quando è univoco. Per esempio
 `posts_status_publish_date_ix_a91c3f4`.
 
-L'hash viene calcolato sulla *semantica* dell'indice — metodo, colonne, ordine, univocità,
-colonne incluse, predicato — e non sul suo SQL renderizzato; pertanto, una modifica al modo in cui
-Rebase formatta il DDL non rinominerà mai nulla nel tuo database.
+L'hash è calcolato sulla *semantica* dell'indice — metodo, colonne, ordine, unicità,
+colonne incluse, predicato — e non sul relativo codice SQL formattato, pertanto una modifica al modo in cui
+Rebase formatta il DDL non rinominerà mai alcunché nel tuo database.
 
-L'hash è fondamentale (load-bearing). `CREATE INDEX IF NOT EXISTS` verifica la corrispondenza sul **nome**,
-non sulla definizione: con un nome descrittivo fisso, modificare una dichiarazione manterrebbe il
-vecchio indice riportando sempre successo. Con l'hash nel nome, una ridefinizione
-costituisce un oggetto diverso, che viene quindi creato mentre quello vecchio viene eliminato.
+L'hash è fondamentale per il funzionamento. `CREATE INDEX IF NOT EXISTS` opera una corrispondenza sul **nome**,
+non sulla definizione: con un nome puramente leggibile, la modifica di una dichiarazione manterrebbe
+il vecchio indice riportando comunque successo. Avendo l'hash all'interno del nome, una ridefinizione
+diventa un oggetto differente, per cui viene creato il nuovo indice e rimosso quello vecchio.
 
-Due conseguenze degne di nota:
+Due conseguenze che vale la pena sottolineare:
 
-- **Modificare una dichiarazione comporta una DROP e una CREATE**, emesse senza fronzoli — senza
-  `CONCURRENTLY` e con un intervallo privo di indice nel mezzo. Ciò va bene su un database
-  di sviluppo; su una tabella di produzione di grandi dimensioni, applica la modifica in una finestra temporale opportuna.
-- Il nome è [un nome derivato congelato](/docs/architecture/schema-as-code). È presente
-  in `contracts/derived-names.txt` e non può cambiare tra una release e l'altra.
+- **Modificare una dichiarazione equivale a una DROP seguita da una CREATE**, eseguite direttamente — senza
+  `CONCURRENTLY`, e con una finestra temporale priva di indice nel mezzo. Operazione trascurabile su un database
+  di sviluppo; su una tabella grande in produzione, applicala in un momento concordato.
+- Il nome è [un nome derivato bloccato (frozen derived name)](/docs/architecture/schema-as-code). Si trova
+  in `contracts/derived-names.txt` e non può cambiare da una release all'altra.
 
-## Di chi è la proprietà di un indice
+## A chi appartiene un indice
 
-`_ix_`/`_ux_` seguito da sette caratteri esadecimali non può entrare in conflitto con nessun altro generatore di nomi qui utilizzato — `_fkey`,
-`_gin`, `_trgm`, `_pkey`, `_key`, le distanze vettoriali, il prefisso `idx_` di auth. Di
-conseguenza, il solo nome determina l'ownership:
+La sequenza `_ix_`/`_ux_` seguita da sette caratteri esadecimali non è accessibile a nessun altro generatore di nomi — `_fkey`,
+`_gin`, `_trgm`, `_pkey`, `_key`, le distanze vettoriali, il prefisso `idx_` di auth. Di conseguenza,
+il nome da solo determina la proprietà:
 
-| L'indice | Nel piano? | Nominato da Rebase? | Cosa succede |
+| L'indice | Nel piano? | Denominato da Rebase? | Cosa succede |
 |---|---|---|---|
 | dichiarato | sì | sì | creato, poi mantenuto |
-| dichiarazione eliminata | no | sì | **eliminato (dropped)**, come previsto |
-| scritto a mano, o da introspezione | no | no | **escluso — mai toccato** |
+| dichiarazione rimossa | no | sì | **eliminato (dropped)**, come previsto |
+| scritto a mano, o da introspezione | no | no | **escluso — non viene mai toccato** |
 
-In nessuno dei due casi è richiesta una conferma interattiva. Eliminare una dichiarazione *dovrebbe* rimuovere l'indice
-in silenzio; ciò che non deve mai essere eliminato è un indice che Rebase non ha creato. È anche
-questo che rende sicuro il round trip di introspezione: gli indici esistenti di un database
-verso cui hai puntato Rebase rimangono esterni finché qualcuno non li dichiara.
+In nessuno dei casi serve una conferma manuale. Rimuovere una dichiarazione *dovrebbe* eliminare l'indice
+in modo silenzioso; ciò che non deve mai essere eliminato è ciò che Rebase non ha creato. Questo è anche
+ciò che rende sicuro il ciclo di introspezione: gli indici preesistenti di un database
+su cui hai puntato Rebase rimangono esterni finché qualcuno non li dichiara.
 
-### Dichiarare un indice che hai già
+### Dichiarare un indice già esistente
 
-Quando dichiari un indice che il database ha già con un altro nome, Rebase adotta quell'indice invece di costruirne una seconda copia. Prima di costruire un indice dichiarato mancante, `rebase db push`, `rebase db migrate` e l'avvio cercano sulla stessa tabella un indice esistente che corrisponda in ogni parte. Una corrispondenza viene rinominata con il nome dichiarato tramite `ALTER INDEX … RENAME TO …`, che modifica il catalogo e non ricostruisce nulla. Da quel momento è l'indice dichiarato: trovato per nome, mantenuto, ed eliminato se la dichiarazione viene rimossa.
+Quando dichiari un indice che il database possiede già con un altro nome, Rebase
+ne assume la gestione anziché crearne un duplicato. Prima di creare un
+indice dichiarato mancante, `rebase db push`, `rebase db migrate` e il processo
+di boot cercano un indice preesistente sulla stessa tabella che corrisponda ad esso in ogni
+sua parte. Se viene trovata una corrispondenza, questa viene rinominata con il nome dichiarato mediante
+`ALTER INDEX … RENAME TO …`, operazione che aggiorna il catalogo e non ricostruisce nulla.
+Da quel momento in poi diventa l'indice dichiarato: individuato tramite nome, conservato ed eliminato se la
+dichiarazione viene rimossa.
 
-Tutte queste parti devono corrispondere:
+Tutte queste parti devono coincidere:
 
 - il metodo di accesso;
 - l'unicità;
-- le colonne chiave, in ordine, ciascuna con la sua direzione e il posizionamento di `NULLS` (la direzione conta solo per `btree`);
+- le colonne chiave, in ordine, ciascuna con la sua direzione e il posizionamento dei `NULLS`
+  (la direzione conta solo per `btree`);
 - le colonne `INCLUDE`;
-- il predicato. Le virgolette, i cast dei letterali e le parentesi di Postgres vengono ignorati; qualsiasi altra differenza significa nessuna corrispondenza.
+- il predicato. I caratteri di quoting, i cast letterali e le parentesi di Postgres vengono ignorati;
+  qualsiasi altra discrepanza impedisce la corrispondenza.
 
-Rebase lascia stare un indice esistente, e costruisce quello dichiarato accanto, quando tale indice differisce in una qualsiasi di queste parti. Lo lascia stare anche quando una chiave è un'espressione, una chiave usa un'operator class o una collation non predefinita, l'indice sostiene un vincolo, l'indice è `INVALID`, oppure ha già un nome Rebase.
+Rebase non tocca un indice preesistente, e compila quello dichiarato al suo fianco,
+quando tale indice differisce in una qualsiasi di queste parti. Lo ignora anche quando una
+chiave è un'espressione, una chiave usa una classe di operatori o una collation non predefinita, l'indice
+è a supporto di un vincolo, l'indice risulta `INVALID`, oppure ha già un
+nome Rebase.
 
-`rebase db generate` scrive ogni indice dichiarato nella migrazione come `CREATE INDEX IF NOT EXISTS`, così l'istruzione riesce quando `rebase db migrate` ha appena rinominato un indice esistente con quel nome.
+`rebase db generate` scrive ciascun indice dichiarato nella migrazione come
+`CREATE INDEX IF NOT EXISTS`, in modo tale che l'istruzione abbia successo nel caso in cui `rebase db migrate`
+abbia appena rinominato un indice preesistente con quel nome.
 
 ## Quando vengono creati
 
-Entrambi i produttori li emettono, il che è importante perché non tutti i deployment
-eseguono `db push`:
+Entrambi i generatori li emettono, aspetto importante dato che non tutti i deployment eseguono
+`db push`:
 
-- **`rebase db push` / `rebase db generate`** li inseriscono in `schema.sql`, seguendo il
-  normale flusso di Atlas — ottenendo così migrazioni, rilevamento del drift e rollback
+- **`rebase db push` / `rebase db generate`** li inseriscono in `schema.sql`, nel consueto
+  flusso di Atlas — beneficiando così di migrazioni, drift detection e rollback
   come qualsiasi altro oggetto.
-- **`rebase schema generate`** li scrive anche in `schema.generated.ts`, in modo che
-  lo schema di Drizzle descriva la stessa tabella presente nel database. Le colonne `INCLUDE`
-  di un covering index sono l'unica eccezione: Drizzle non può esprimerle,
-  e la riga generata include un commento che lo specifica e rimanda a
-  `schema.sql`, che invece le supporta.
-- **L'operazione di verifica dello schema all'avvio (boot-time schema ensure)** li crea
-  anch'essa, alle stesse condizioni degli indici di ricerca e ANN adiacenti. Un tenant di un
-  managed runtime viene provisionato all'avvio e non esegue mai
-  `db push`; senza questo meccanismo si avvierebbe senza nessuno dei suoi indici dichiarati e
-  nulla lo segnalerebbe. Una tabella che l'avvio crea riceve i suoi indici insieme alla
-  tabella. Su una tabella già esistente, l'avvio costruisce un indice mancante dopo che il
-  server è già in servizio, in background, come fa con gli
-  [indici delle chiavi esterne](#cosa-fa-laggiornamento-a-un-database-esistente).
-  Usa `CREATE INDEX CONCURRENTLY` su una connessione propria, così lo
-  `statement_timeout` di 30 s del pool non può annullare una build lunga. Un indice che
-  una build interrotta ha lasciato `INVALID` con il suo nome viene eliminato e ricostruito.
-  `IF NOT EXISTS` confronta il nome, quindi non ne ripara mai uno. Un indice `unique`
-  viene costruito allo stesso modo ma prima che il server entri in servizio, e l'avvio
-  fallisce se non può essere costruito. Servire senza di esso lascerebbe entrare righe duplicate.
+- **`rebase schema generate`** li scrive anche all'interno di `schema.generated.ts`, in modo che
+  lo schema Drizzle descriva la medesima tabella presente nel database. Le colonne `INCLUDE` di un
+  indice covering costituiscono l'unica eccezione: Drizzle non è in grado di esprimerle,
+  e la riga generata include un commento esplicativo che rimanda a
+  `schema.sql`, il quale invece le supporta.
+- **L'ensure dello schema al boot** provvede anch'esso a crearli, alle medesime condizioni degli
+  indici di ricerca e ANN adiacenti. Un tenant su runtime gestito si predispone
+  all'avvio e non esegue mai `db push`; senza questo meccanismo partirebbe senza alcuno dei suoi
+  indici dichiarati e nulla lo segnalerebbe. Una tabella creata dal boot riceve i suoi
+  indici insieme alla tabella stessa. Su una tabella già esistente, il boot crea l'eventuale
+  indice mancante dopo che il server è attivo, in background, nello stesso modo in cui
+  crea gli [indici delle foreign-key](#cosa-comporta-un-aggiornamento-su-un-database-esistente).
+  Utilizza `CREATE INDEX CONCURRENTLY` su una propria connessione dedicata, cosicché il
+  `statement_timeout` di 30 s del pool non possa interrompere una compilazione lunga. Un indice lasciato
+  in stato `INVALID` col proprio nome a causa di una compilazione interrotta viene rimosso e ricostruito.
+  `IF NOT EXISTS` esegue il confronto sul nome, per cui non effettua mai una riparazione. Un indice
+  `unique` viene compilato nello stesso modo ma prima che il server inizi a gestire le richieste, e l'avvio fallisce
+  se non è possibile crearlo. Entrare in servizio senza di esso permetterebbe l'inserimento di righe duplicate.
 
-## Le chiavi esterne sono indicizzate per te
+## Le foreign key vengono indicizzate automaticamente
 
-Postgres crea
-l'indice a cui una chiave esterna *punta* — la chiave primaria della destinazione — e
-mai uno sulla colonna che la *contiene*. Ogni lettura dall'altro lato di un collegamento
-filtra su quella colonna: un include `hasMany` o `hasOne`, un elenco annidato come
-`/authors/5/posts` (la sua pagina e il suo conteggio), il lato inverso di un
-`manyToMany`, e il controllo `ON DELETE` quando una riga genitore viene eliminata. Senza
-un indice, ognuna di queste letture scorre ogni riga della tabella figlia.
+Postgres crea l'indice
+verso cui la foreign key *punta* — la chiave primaria della tabella di destinazione — e mai uno sulla
+colonna che *la contiene*. Ogni lettura dal lato opposto della relazione filtra su
+quella colonna: un include `hasMany` o `hasOne`, una lista nidificata come
+`/authors/5/posts` (la relativa pagina e il conteggio), il lato inverso di una
+relazione `manyToMany`, e il controllo di `ON DELETE` quando una riga genitore viene rimossa. Senza
+un indice, ciascuna di queste operazioni esegue una scansione completa di ogni riga della tabella figlia.
 
-Per questo Rebase deriva un semplice btree per:
+Per questo motivo Rebase ricava un btree standard per:
 
-- il `localKey` di ogni [`belongsTo`](/docs/collections/relations#belongsto--the-key-is-on-this-table)
-  — che è anche la colonna letta da `hasOne` / `hasMany` sul lato opposto;
-- la colonna di destinazione di ogni tabella di giunzione `manyToMany`. La chiave primaria
-  `(source, target)` della giunzione serve già le ricerche per la colonna di origine;
-  il lato inverso del collegamento ha bisogno di questo. Una giunzione è una tabella di
-  Rebase, quindi questo indice non ha alcuna possibilità di esclusione.
+- il `localKey` di ogni [`belongsTo`](/docs/collections/relations/#belongsto--the-key-is-on-this-table)
+  — che è anche la colonna letta dalla controparte `hasOne` / `hasMany`;
+- la colonna di destinazione di ogni tabella di giunzione `manyToMany`. La chiave primaria della giunzione
+  `(source, target)` gestisce già le ricerche tramite la colonna di origine; il lato inverso
+  del collegamento necessita di questa. Essendo la giunzione una tabella gestita da Rebase, per questo caso
+  non è prevista disattivazione.
 
-Misurato su Postgres 18 con cache calda, 1M commenti su 50k post:
+Misurazioni effettuate su Postgres 18 con cache calda, 1M di commenti distribuiti su 50k post:
 
 | La lettura | Senza l'indice | Con l'indice |
 |---|---|---|
-| `include=comments` su una pagina di 25 post (`post_id IN (…)`) | 38 ms | 0,3 ms |
-| `GET /posts/77/comments?limit=25` — la pagina | 28 ms | 0,3 ms |
-| …e il suo `count(*)` | 29 ms | 0,2 ms |
-| eliminare un post (controllo `ON DELETE SET NULL`) | 129 ms | 1,7 ms |
+| `include=comments` su una pagina da 25 post (`post_id IN (…)`) | 38 ms | 0.3 ms |
+| `GET /posts/77/comments?limit=25` — la pagina | 28 ms | 0.3 ms |
+| …e il relativo `count(*)` | 29 ms | 0.2 ms |
+| eliminazione di un post (controllo `ON DELETE SET NULL`) | 129 ms | 1.7 ms |
 
-Nulla viene indicizzato due volte. L'indice derivato viene saltato quando la colonna
-guida già la chiave primaria, ha un `UNIQUE` (`validation.unique` sulla relazione
-o sulla proprietà che possiede la colonna), oppure guida un indice in `indexes:` —
-semplice o composto, purché sia un btree senza `where`. Un indice parziale
-non può servire una ricerca che deve raggiungere ogni riga, e un indice GIN o BRIN
-risponde a una domanda diversa, quindi nessuno dei due conta.
+Nulla viene indicizzato due volte. L'indice derivato viene ignorato se la colonna è già
+a capo della chiave primaria, presenta un vincolo `UNIQUE` (`.unique()` su una colonna associata, o
+`unique: true` sulla relazione), oppure è la colonna principale di un indice in `indexes:` —
+sia esso semplice o composito, purché si tratti di un btree senza clausola `where`. Un indice parziale
+non può soddisfare una ricerca che deve coprire ogni riga, e un indice GIN o BRIN
+risponde a un tipo di interrogazione differente, quindi nessuno dei due viene preso in considerazione.
 
-Il nome è quello che deriva [una dichiarazione](#come-viene-nominata-una-dichiarazione) di un indice
-semplice su quella colonna — `posts_author_id_ix_00ad191` — quindi l'indice derivato e
-`indexes: [{ on: ["author"], … }]` sono un solo oggetto, non due. È un
-[nome derivato congelato](/docs/architecture/schema-as-code) come ogni altro.
+Il nome corrisponde a quello generato da [una dichiarazione](#come-viene-denominata-una-dichiarazione) di un indice
+semplice su tale colonna — `posts_author_id_ix_00ad191` — quindi l'indice derivato
+e `indexes: [{ columns: ["author"], … }]` costituiscono lo stesso oggetto, non due separati. Si tratta di un
+[nome derivato bloccato](/docs/architecture/schema-as-code) come tutti gli altri.
 
-Per mantenere il vincolo ed eliminare l'indice — una tabella con così tante scritture che
-l'indice costa più delle ricerche che serve, o una in cui tieni un indice
-tuo al di fuori di `indexes:` — dillo sulla relazione:
+Per preservare il vincolo ed eliminare l'indice — nel caso di una tabella così soggetta a scritture
+da rendere l'indice più costoso dei vantaggi offerti nelle letture, oppure dove mantieni un indice
+personale al di fuori di `indexes:` — specificalo sulla relazione:
 
-```typescript
-author: {
-    name: "Author",
-    type: "relation",
-    relation: { kind: "belongsTo", target: () => authors, index: false }
+```ts
+relations: {
+    author: rel.belongsTo(() => authors, { index: false }),
 }
 ```
 
-`index` è accettato solo su un `belongsTo`; sugli altri tipi il validatore della
-configurazione lo rifiuta, perché la loro chiave esterna è una colonna sulla destinazione
-(imposta `index` sul `belongsTo` della destinazione) o in una giunzione.
+`index` esiste unicamente su `belongsTo`: per le altre tipologie la foreign key è una
+colonna sulla tabella di destinazione (imposta `index` sulla relazione `belongsTo` della destinazione) o in una tabella di giunzione.
 
-Rebase legge solo le tue collection per decidere questo, mai il database: `db
-push` e l'avvio devono arrivare allo stesso insieme di indici con gli stessi nomi, altrimenti
-il push successivo eliminerebbe ciò che l'avvio ha costruito. Un indice che hai scritto a mano
-sulla stessa colonna, al di fuori di `indexes:`, quindi non viene visto — dichiaralo in
-`indexes:`, oppure imposta `index: false`, per mantenere un solo indice invece di due.
+Rebase esamina solo le tue tabelle per decidere questo aspetto, mai il database: sia `db
+push` che il boot devono ottenere il medesimo insieme di indici con gli stessi identici nomi, altrimenti
+il push successivo eliminerebbe ciò che il boot ha costruito. Un indice creato manualmente sulla
+stessa colonna, al di fuori di `indexes:`, non viene pertanto rilevato — dichiaralo in
+`indexes:`, o imposta `index: false`, per mantenere un solo indice invece di due.
 
-### Cosa fa l'aggiornamento a un database esistente
+### Cosa comporta un aggiornamento su un database esistente
 
-Gli indici sono oggetti nuovi su tabelle che contengono già dati, e le due porte li
-costruiscono in modo diverso:
+Gli indici sono nuovi oggetti su tabelle che contengono già dati, e i due meccanismi
+li costruiscono con modalità differenti:
 
-- **L'avvio non li aspetta.** Su una tabella già esistente, la verifica dello schema
-  lascia fuori dall'avvio gli indici di chiave esterna mancanti e li costruisce
-  dopo che il server è in servizio, uno alla volta, con
-  `CREATE INDEX CONCURRENTLY` su una connessione propria (lo `statement_timeout` di 30 s
-  del pool non si applica). Questo non prende alcun lock su cui letture o scritture
-  debbano attendere. Una tabella che un'altra sessione tiene occupata — la build di
-  un'altra istanza, un `ALTER TABLE` — viene abbandonata entro il budget di lock dell'avvio
-  e ritentata all'avvio successivo. Un indice che una build interrotta ha lasciato `INVALID`
-  (un deploy che ha sostituito il processo a metà build, due istanze in corsa sullo stesso
-  nome) viene eliminato e ricostruito. Ognuno viene registrato nel log all'inizio e alla fine;
-  un fallimento è un avviso, mai un avvio fallito. Una tabella che questo avvio crea riceve
-  i suoi indici insieme alla tabella, prima che qualcosa possa scriverci. Con
-  `REBASE_PROVISION_ONLY` le build vengono eseguite prima che il processo termini, dato
-  che nulla dopo di esso le eseguirebbe.
-- **`rebase db push` li costruisce prima di pianificare**, con lo stesso costruttore e
-  alle stesse condizioni dell'avvio: `CREATE INDEX CONCURRENTLY`, uno alla volta,
-  così letture e scritture proseguono mentre viene eseguito (circa 0,4 s con 1M di righe e 6 s
-  con 10M come build semplice su un SSD di laptop, `maintenance_work_mem` 64 MB; una
-  concorrente impiega di più e non blocca nulla). Atlas trova poi ogni indice
-  già presente e non pianifica nulla per esso. Un indice che non è riuscito a costruire
-  prima — una tabella che un'altra sessione ha tenuto per tutto il budget di lock — viene
-  lasciato ad Atlas, che lo costruisce dentro la transazione del push e quindi blocca le
-  scritture su quella tabella per la durata della build; il push dice quale. Una colonna di
-  chiave esterna che il push stesso aggiunge riceve il suo indice da Atlas insieme alla
-  colonna, prima che contenga qualsiasi cosa. `--dry-run` non costruisce nulla: nomina
-  gli indici che un push reale costruirebbe per primi, e il piano che stampa li elenca,
-  dato che non esistono ancora.
+- **Il boot non attende il loro completamento.** Su una tabella preesistente, la procedura di
+  schema ensure esclude dal boot gli indici di foreign-key mancanti e
+  li crea una volta che il server è già in esecuzione, uno alla volta, con
+  `CREATE INDEX CONCURRENTLY` su una connessione a parte (il valore di 30 s per
+  `statement_timeout` del pool non si applica ad essa). Ciò non impone alcun blocco (lock) su cui letture o scritture
+  debbano restare in attesa. Una tabella occupata da un'altra sessione — il build di un'altra istanza, un
+  `ALTER TABLE` — viene tralasciata non appena esaurito il tempo limite di lock del boot e ritentata
+  all'avvio successivo. Un indice lasciato in stato `INVALID` da una build interrotta (un deploy che
+  ha rimpiazzato il processo a metà operazione, o due istanze in conflitto sullo stesso nome) viene rimosso
+  e ricreato. Ciascuno di essi viene registrato nei log all'inizio e al termine; un eventuale fallimento rappresenta
+  un avviso (warning), mai un mancato avvio. Una tabella creata durante questo boot riceve i suoi indici insieme
+  alla tabella stessa, prima che qualsiasi operazione possa scrivervi. Con `REBASE_PROVISION_ONLY`, le
+  creazioni vengono eseguite prima della terminazione del processo, poiché nessun task successivo le avvierebbe.
+- **`rebase db push` li crea prima di elaborare il piano**, con lo stesso meccanismo e
+  alle medesime condizioni del boot: `CREATE INDEX CONCURRENTLY`, uno per volta,
+  in modo che letture e scritture proseguano durante l'esecuzione (circa 0.4 s per 1M di righe e 6 s per
+  10M con una compilazione normale su SSD per laptop, `maintenance_work_mem` a 64 MB; una
+  creazione concorrente richiede più tempo ma non blocca nulla). Atlas trova quindi ciascun indice
+  già presente e non pianifica alcuna operazione per esso. Un indice che non è stato possibile costruire prima — per
+  via di una tabella rimasta occupata da un'altra sessione per l'intera durata del lock — viene delegato ad Atlas,
+  che lo costruirà all'interno della transazione del push bloccando di conseguenza le scritture su quella
+  tabella per tutta la durata del build; il comando push specificherà di quale indice si tratta. Una colonna foreign-key
+  aggiunta direttamente dal push riceve il suo indice da Atlas assieme alla colonna, prima che vi sia
+  inserito alcun dato. L'opzione `--dry-run` non compila nulla: elenca i nomi degli indici che un vero push
+  costruirebbe per primi, e il piano stampato li mostra, non essendo ancora presenti.
 
 ## Cosa viene rifiutato, e quando
 
-Ognuno di questi casi genera un errore in fase di build, indicando la collection e la posizione
-nell'array — un indice che silenziosamente non esiste è proprio l'anomalia che questa funzionalità
-si propone di eliminare:
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-- una proprietà che non appartiene alla collection, oppure una relazione la cui foreign key
-  si trova sull'altra tabella
-- più di cinque chiavi in `on`, oppure la stessa colonna ripetuta due volte
+Tutti i seguenti casi vengono rifiutati in fase di compilazione dello schema, indicando la tabella e la
+posizione nell'array — un indice che silenziosamente non esiste è proprio il problema
+che questa funzionalità elimina:
+
+- una chiave che non è una colonna né una relazione `belongsTo` della tabella, o una relazione
+  la cui foreign key si trova sull'altra tabella
+- più di cinque chiavi in `columns`, o la medesima colonna ripetuta due volte
 - esattamente le colonne della chiave primaria — `<table>_pkey` le indicizza già
-- una colonna presente sia in `on` che in `include`
-- `unique` su una singola colonna la cui proprietà dichiara già `validation.unique`
-- `direction` o `nulls` con `gin` o `brin`
-- un elenco `in` contenente valori duplicati
-- due dichiarazioni che generano lo stesso nome — rappresentano lo stesso indice, due volte
-- un `reason` vuoto o mancante
+- una colonna presente sia in `columns` che in `include`
+- `unique` su una singola colonna che dichiara già `.unique()`
+- `direction` o `nulls` in combinazione con `gin` o `brin`
+- una lista `in` che ripete lo stesso valore
+- due dichiarazioni che generano il medesimo nome — si tratterebbe del medesimo indice duplicato
+- un valore `reason` vuoto
 
-## Correlati
+## Risorse correlate
 
-- [Search](/docs/backend/search) — ricerca full-text con ranking, che crea il proprio
-  indice GIN su un `tsvector` generato
-- [Vector search](/docs/sdk/aggregates-and-search#vector-search) — l'indice ANN su una
-  colonna embedding, configurato sulla proprietà
+<span class="since-badge" data-since="0.31">Da 0.31</span>
+
+- [Search](/docs/backend/search) — full-text indicizzato con ranking, che costruisce il proprio indice GIN
+  su un `tsvector` generato
+- [Ricerca vettoriale](/docs/sdk/aggregates-and-search#vector-search) — l'indice ANN su una
+  colonna di embedding, configurato su `col.vector()`
 - [Schema as code](/docs/architecture/schema-as-code) — come le dichiarazioni raggiungono
-  il database e cos'è un nome derivato
+  il database, e cos'è un nome derivato
+- [Tabelle](/docs/schema/) — tutte le chiavi di `defineTable`

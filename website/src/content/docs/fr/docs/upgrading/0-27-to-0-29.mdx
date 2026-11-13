@@ -1,0 +1,164 @@
+---
+sourceHash: ebc124bb86c45865
+slug: fr/docs/upgrading/0-27-to-0-29
+title: Migration de 0.27 vers 0.29
+sidebar_label: 0.27 → 0.29
+description: Les changements cassants apportés par la version 0.29 pour une application en 0.27 ou 0.28 — le panneau d'administration transmet désormais à votre code les lignes du serveur au lieu de son Entity interne, ses hooks Entity deviennent internes, et l'identifiant d'enregistrement devient partout `id`.
+---
+
+# Migration de 0.27 → 0.29
+
+Voici les entrées `### Breaking` apportées par la version 0.29 pour une application en 0.27 ou 0.28 ;
+la version 0.28 n'a déclaré aucun changement cassant.
+
+Elles découlent toutes d'un seul changement : tout ce que votre code reçoit du panneau
+d'administration est désormais la **ligne du serveur**, le format que REST,
+`client.data`, le `context.data` du backend et `useRows` retournent déjà. Une ligne correspond
+exactement aux colonnes de l'enregistrement : des dates ISO (`YYYY-MM-DD` pour une colonne de type
+date uniquement), un belongsTo sous sa colonne de clé étrangère (`customerId`), et toute
+relation chargée par l'admin imbriquée sous son nom, tel que le `include` de REST le retourne. L'identifiant
+de l'enregistrement se trouve **à côté** de la ligne, sous forme de chaîne de caractères (`id`). Le code qui modifie
+un enregistrement (un `Field`, `FormContext.values`, `dynamicProps`, les fonctions de nommage de stockage)
+reçoit toujours des valeurs de formulaire, typées pour un éditeur (`Date`, objets relation). L'`Entity`
+`{ id, path, values }` de l'admin devient interne.
+
+Lisez la première section en priorité : c'est la seule pour laquelle aucun compilateur ne vous
+avertira. Le reste concerne des renommages que TypeScript signale pour vous.
+
+---
+
+## 102. `context.data` et `browserCallbacks` côté navigateur transmettent des lignes
+
+Dans le code du navigateur (une action d'entité, un slot, une vue personnalisée, un
+plugin), `context.data` renvoyait auparavant les valeurs du view-model de l'admin : des objets `Date` et
+des objets relation, bien qu'il ait été typé comme des lignes plates. Il retourne désormais les
+lignes promises par son typage, et ses écritures exécutent les `browserCallbacks`
+de la collection tout en rafraîchissant chaque vue de cette collection.
+
+Les `admin.browserCallbacks` (`beforeSave`, `afterSave`, `afterSaveError`,
+`beforeDelete`, `afterDelete`, `afterRead`) reçoivent des lignes sur chaque parcours : le formulaire
+d'enregistrement, les modifications de cellules en ligne, `useRowWrites`, les suppressions et `afterRead`. Toute
+modification sur place apportée par un callback à la ligne qui lui a été fournie est conservée.
+
+Cela compile sans modification mais se comporte ensuite différemment : `values.due.getTime()`
+lève une exception, car `due` est désormais une chaîne de caractères.
+
+**Ce qu'il faut changer :**
+
+```ts
+// before: a Date and a relation object
+beforeSave: ({ values }) => ({ ...values, overdue: values.due < new Date(), customer: values.customer?.id })
+
+// after: an ISO string and the foreign key
+beforeSave: ({ values }) => ({ ...values, overdue: new Date(String(values.due)) < new Date() })
+```
+
+Repérez les emplacements concernés :
+
+```bash
+grep -rnE "browserCallbacks|context\.data\." --include='*.ts' --include='*.tsx' config/ frontend/src/
+```
+
+Le `callbacks.afterRead` d'une propriété est typé avec la `row` qu'il reçoit ; il était
+auparavant typé avec une `entity` qui ne lui était en réalité jamais transmise.
+
+## 103. Les hooks de données `Entity` deviennent internes
+
+`useData`, `useFetch`, `useBatchedFetch`, `useRelationSelector`,
+`saveEntityWithCallbacks` et `deleteEntityWithCallbacks` quittent l'API publique,
+et `useCollection` est supprimé.
+
+**Ce qu'il faut changer :** lisez et écrivez des lignes à l'aide des hooks de lignes ou de `context.data` :
+
+```tsx
+// before
+const { data } = useCollection({ path: "orders", collection: ordersCollection, itemCount: 20 });
+data.map(entity => entity.values.number);
+
+// after
+const { rows } = useRows("orders", { limit: 20 });
+rows.map(row => row.number);
+```
+
+`usePermissions().canEdit` et `canDelete` prennent désormais une ligne. Les constructeurs
+`collections` et `views` de `<RebaseCMS>`, ainsi que le `data` de `useBuildNavigationStateController`,
+reçoivent des lignes : `data: useData()` → `data: useRebaseContext().data`. Consultez
+[Hooks](/docs/hooks/).
+
+## 104. Les callbacks au niveau de la ligne reçoivent `{ row, id }` à la place de `{ entity }`
+
+Chaque callback auquel l'admin transmet un enregistrement reçoit désormais la ligne et, à côté,
+l'identifiant de l'enregistrement :
+
+| Emplacement | Avant | Après |
+|---|---|---|
+| Actions d'entité `onClick`, `isEnabled`, `disabledReason` | `({ entity })` | `({ row, id, path })` |
+| `highlightEntity` / `unhighlightEntity` | `(entity)` | `highlightRow(id)` / `unhighlightRow(id)` |
+| Résolveurs `admin.display` | `({ entity, context })` | `({ row, context })` |
+| `admin.additionalFields` `Builder` / `value` | `({ entity, context })` | `({ row, id, context })` |
+| `admin.exportable.additionalFields[].builder` | `({ entity, context })` | `({ row, context })` |
+| `<Rebase entityLinkBuilder>` | `({ entity })` | `({ row, id, path })` |
+| Vues d'entité, `formView.Builder` | `entity` | `row`, `id` |
+| Slot `entity.row.actions` | `{ entity, entityId }` | `{ row, id }` |
+| `FormContext`, `FieldProps.context` | `entity`, `entityId` | `row`, `id` |
+| `dynamicProps`, stockage `fileName` / `storagePath` | `entityId` | `id` |
+
+**Ce qu'il faut changer :** `entity.values.status` → `row.status`, `entity.id` → `id`.
+Un enregistrement lié chargé par l'admin est imbriqué : `row.customer.name`. `FormContext`
+est déclaré une seule fois, dans `@rebasepro/cms-types`. La variable de chemin de stockage `{id}`
+rejoint `{entityId}`, qui continue de fonctionner. Consultez
+[Actions d'entité](/docs/frontend/entity-actions/).
+
+## 105. La référence à l'enregistrement devient `id`, et la sauvegarde devient `onSaved`
+
+| Emplacement | Avant | Après |
+|---|---|---|
+| `EntityFormPanel` (désormais `RecordForm`) | `entityId=` | `id=` |
+| `useSidePanel().open`, `.replace`, `navigateToEntity` | `{ path, entityId, onUpdate }` | `{ path, id, onSaved }` |
+| `onSaved` (formulaire, panneau latéral) | `{ entity, entityId }` | `{ row, id }` |
+| `OnUpdateParams` | | `OnSavedParams` |
+| `EntityForm`, `EntityFormBinding`, surcharge `Entity.Form` | `entityId`, `entity`, `onEntityChange(entity)` | `id`, `row`, `onRowChange({ row, id })` |
+| Slots `entity.field.*`, `form.*`; `defaultSelectedView` | `entityId` | `id` |
+
+L'URL du panneau latéral reste inchangée, les liens enregistrés s'ouvrent donc toujours. En
+JavaScript pur, un ancien nom est ignoré plutôt que rejeté : `open({ path, entityId })`
+ouvrira un nouveau formulaire vide. Recherchez-le :
+
+```bash
+grep -rnE "entityId|onUpdate" --include='*.ts' --include='*.tsx' --include='*.js' frontend/src/ config/
+```
+
+Renommages additionnels à noter, tous deux fonctionnant toujours avec un avertissement unique :
+`EntityFormPanel` devient `RecordForm`, avec les mêmes props, et un
+`CollectionPanel` désigne sa collection avec `collection` (`path="orders"` →
+`collection="orders"` ; `path` désignant l'emplacement où résident les lignes d'une sous-collection) et trie
+avec `orderBy` (`sort={["placed_at", "desc"]}` → `orderBy="placed_at:desc"`).
+
+## 106. Les vues de collection, actions de collection et la sélection utilisent désormais des lignes et des identifiants
+
+Les vues de collection personnalisées (`admin.customViews`), les `Actions` de collection et les
+slots de barre d'outils reçoivent un `TableController` de lignes, et la sélection se compose de lignes et
+d'identifiants :
+
+| Avant | Après |
+|---|---|
+| `tableController.data`, `.sparseData` | `.rows` avec `.ids`, `.sparseRows` avec `.sparseIds` |
+| `.dataLoading`, `.dataLoadingError` | `.loading`, `.error` |
+| `onEntityClick(entity)` | `onRowClick(row, id)` |
+| `highlightedEntities`, `deletedEntities` | `highlightedIds`, `deletedIds` (chaînes) |
+| `selection.type === "entities"`, `.entities` | `"rows"`, `.rows` et `.ids` |
+| sélection de requête `excluded` | `excludedIds` |
+| `isEntitySelected(entity)` | `isSelected(id)` |
+| `toggleEntitySelection(entity)` | `toggleSelection(row)` |
+| `setSelectedEntities(entities)` | `setSelectedRows(rows)` |
+| `useSelectionController()` | `useSelectionController(collection, path?)` |
+| `const entities = await resolveSelection({ selection, accessor })` | `const { rows, ids } = await resolveSelection({ selection, data: context.data, collection })` |
+| `useSelectionDialog` `onSingleEntitySelected(entity)` | `onSingleRowSelected(row, id)` |
+
+Les surcharges de `CollectionPanel` et `Collection.View` acceptent `onRowClick(row, id)` et
+`highlightedIds`. Une liste de lignes dispose de ses identifiants à côté, aux mêmes positions —
+`tableController.ids[i]` est l'identifiant de `tableController.rows[i]` — de sorte que le code qui
+lisait `String(row.id)` fonctionne sur une collection indexée par n'importe quelle colonne. Les identifiants sont comparés en tant que
+chaînes de caractères, donc `5` et `"5"` représentent le même enregistrement.
+`resolveSelection` résout une sélection cochée et une sélection « tout sélectionner »
+en lignes de même structure. Consultez [Personnalisation de l'admin](/docs/frontend/customizing/).

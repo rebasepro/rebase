@@ -1,11 +1,11 @@
 ---
-sourceHash: 2fdaa4d40da9ecb5
+sourceHash: 82f7615bf6bd44b4
 title: Integrar el driver de Postgres
 sidebar_label: Integrar el driver de Postgres
-description: Abre el driver de datos y el socket de realtime de @rebasepro/server-postgres dentro de Express, Fastify o Node puro, sin el servidor de Rebase — con réplicas de lectura, Drizzle y vaciado de conexiones incluidos.
+description: Abre el driver de datos y el socket en tiempo real de @rebasepro/server-postgres dentro de Express, Fastify o Node puro, sin el servidor de Rebase — réplicas de lectura, Drizzle y drenaje de conexiones incluidos.
 ---
 
-Un paso por debajo de un [servidor personalizado](/docs/backend/custom-server/), `@rebasepro/server-postgres` funciona sin el servidor de Rebase en absoluto. Depende de Drizzle y del `http.Server` de Node, así que puedes abrir el driver de datos y el socket de realtime dentro de Express, Fastify o Node puro. En este nivel ensamblas el backend tú mismo: no hay rutas de autenticación, ni almacenamiento, ni API de administración a menos que las construyas.
+Un paso por debajo de un [servidor personalizado](/docs/backend/custom-server/), `@rebasepro/server-postgres` funciona completamente sin el servidor de Rebase. Depende de Drizzle y de `http.Server` de Node, por lo que puedes abrir el driver de datos y el socket en tiempo real dentro de Express, Fastify o Node puro. En este nivel, tú mismo ensamblas el backend: no hay rutas de autenticación, ni almacenamiento ni API de administración a menos que los construyas.
 
 ## Instalación
 
@@ -15,8 +15,9 @@ npm install @rebasepro/server-postgres @rebasepro/types express pg drizzle-orm
 
 ## Abrir el driver y el socket
 
-`openPostgresDriver`
-y `postgresDriverConfigFromEnv` están exportados.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Se exportan `openPostgresDriver` y `postgresDriverConfigFromEnv`.
 
 ```typescript
 import express from "express";
@@ -28,7 +29,7 @@ import {
     openPostgresDriver,
     postgresDriverConfigFromEnv
 } from "@rebasepro/server-postgres";
-import { collections } from "./collections";
+import { tables } from "./tables";
 
 async function startServer() {
     const app = express();
@@ -45,10 +46,10 @@ async function startServer() {
     // Leave this call out and the driver reads no environment variable at all.
     const pgConfig = postgresDriverConfigFromEnv({ connection: db, connectionString });
 
-    // The collections' tables must already exist: the driver serves them and never creates them.
+    // The tables must already exist: the driver serves them and never creates them.
     // `provision` (default true) is the rest of its DDL: the role requests run as, branch metadata,
     // channel history and change capture. `provision: false` when none of that may run here.
-    const { driver, internals } = await openPostgresDriver(pgConfig, { collections });
+    const { driver, internals } = await openPostgresDriver(pgConfig, { tables });
 
     // The realtime socket. It answers upgrades on `path` only, so a WebSocket
     // server of your own can share the same http.Server.
@@ -115,20 +116,29 @@ async function startServer() {
 startServer();
 ```
 
-`openPostgresDriver` es lo que ejecuta `createPostgresAdapter` cuando arranca el servidor de Rebase, después de que `postgresDriverConfigFromEnv` haya leído el entorno en la configuración. Su segundo argumento indica qué abrir: las `collections`, si al abrir puede ejecutar su propio DDL (`provision`, por defecto `true`) y qué papel desempeña este proceso en el realtime (`realtime: false` para ninguno).
+`./tables` es un módulo tuyo que compila tus `defineTable` con `compileSchema` de `@rebasepro/common`: el descriptor de cada tabla con sus hooks, a partir del cual el driver construye su modelo en tiempo de ejecución ([Scripts](/docs/backend/scripts/#openrebase) toma la misma lista):
 
-No crea ninguna tabla de colección, así que contra una base de datos sin ellas `POST /api/products` responde `500` "Table not found for collection 'products'". Crea primero las tablas. `rebase db push` lo hace desde un proyecto de Rebase cuyo `config/collections` las declara. En este servidor, `await createPostgresAdapter(pgConfig).ensureCollectionSchema?.(collections)` antes de `openPostgresDriver` añade las tablas y columnas que le faltan a la base de datos, como hace el arranque del servidor de Rebase, y no cambia nada de lo que ya existe.
+```typescript
+import { compileSchema } from "@rebasepro/common";
+import { products, orders } from "./schema";
 
-## Conexiones a réplicas de lectura
-Define `readConnectionString` en la configuración del driver, o la variable de entorno `DATABASE_READ_URL`, que el arranque del servidor y `postgresDriverConfigFromEnv` leen en ella, y el driver abre un segundo pool de conexiones contra tu réplica de lectura, bajo `internals.readDb`. Las lecturas van a la réplica; las escrituras se quedan en la primaria.
+export const tables = compileSchema([products, orders]);
+```
+
+`openPostgresDriver` es lo que ejecuta `createPostgresAdapter` cuando arranca el servidor de Rebase, después de que `postgresDriverConfigFromEnv` haya leído el entorno en la configuración. Su segundo argumento indica qué abrir: las `tables`, si la apertura puede ejecutar su propio DDL (`provision`, por defecto `true`) y qué papel toma este proceso en tiempo real (`realtime: false` para ninguno).
+
+No crea ninguna tabla de la aplicación, por lo que contra una base de datos sin ella, `POST /api/products` responderá `500` "Table not found for 'products' (table: products)". Crea las tablas primero. `rebase db push` lo hace desde un proyecto de Rebase cuyo `backend/schema` las declare. En este servidor, `await createPostgresAdapter(pgConfig).ensureTableSchema?.(tables)` antes de `openPostgresDriver` añade las tablas y columnas que le faltan a la base de datos, tal como lo hace el arranque del servidor de Rebase, y no modifica nada de lo existente.
+
+## Conexiones de réplica de lectura
+Define `readConnectionString` en la configuración del driver, o la variable de entorno `DATABASE_READ_URL`, la cual es leída por el arranque del servidor y por `postgresDriverConfigFromEnv`, y el driver abrirá un segundo pool de conexiones contra tu réplica de lectura, bajo `internals.readDb`. Las lecturas van a la réplica; las escrituras permanecen en el primario.
 
 ## Integración con Drizzle
-No tienes que elegir entre Rebase y Drizzle. El driver compila tus esquemas dinámicamente, y `internals.db` es el cliente `NodePgDatabase` de Drizzle, tipado, para SQL sin procesar o constructores de Drizzle con seguridad de tipos junto a los servicios REST de Rebase.
+No tienes que elegir entre Rebase y Drizzle. El driver compila tus esquemas dinámicamente, e `internals.db` es el cliente tipado `NodePgDatabase` de Drizzle, para SQL directo o constructores de Drizzle con seguridad de tipos junto a los servicios REST de Rebase.
 
-## Vaciado ordenado de conexiones
-En entornos serverless u orquestadores (como Kubernetes), terminar los pods puede dejar conexiones rotas. Implementa siempre manejadores de señales que llamen a `internals.realtimeService.stopListening()` (que termina el cliente LISTEN dedicado de pg) y a `pool.end()`, para no dejar escapar ranuras de conexión en tu servidor de base de datos.
+## Drenaje ordenado de conexiones
+En entornos serverless u orquestadores (como Kubernetes), la finalización de pods puede resultar en conexiones rotas. Implementa siempre manejadores de señales que llamen a `internals.realtimeService.stopListening()` (lo que finaliza el cliente dedicado de pg LISTEN) y `pool.end()`, para no dejar conexiones huérfanas en tu servidor de base de datos.
 
 ## Relacionado
 
 - [Integración de servidor personalizado](/docs/backend/custom-server/) — todo el backend de Rebase, construido a partir de piezas públicas en tu propio servidor
-- [Scripts y la consola](/docs/backend/scripts/) — los datos del proyecto desde un script, una prueba o un REPL, sin servidor
+- [Scripts y la consola](/docs/backend/scripts/) — los datos del proyecto desde un script, una prueba o un REPL, sin necesidad de un servidor

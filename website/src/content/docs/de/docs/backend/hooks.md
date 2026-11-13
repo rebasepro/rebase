@@ -1,76 +1,71 @@
 ---
-sourceHash: ba272fed815c24ef
+sourceHash: 81fb68b88d544514
 title: Globale Backend-Hooks
 sidebar_label: Globale Hooks
-description: Wenden Sie querschnittliche Lifecycle-Callbacks auf Serverebene mithilfe von CollectionCallbacks auf jede Collection an.
+description: "Wenden Sie übergreifende Lifecycle-Hooks auf Serverebene auf jede Tabelle an: Exportieren Sie Hooks aus backend/hooks.ts in derselben TableHooks-Struktur, die auch die tabelleneigenen Hooks verwenden."
 ---
 
 ## Übersicht
 
-Rebase bietet zwei Ebenen für Entity-Lifecycle-Callbacks – beide verwenden denselben `CollectionCallbacks`-Typ aus `@rebasepro/types`:
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-- **[Callbacks pro Collection](/docs/collections/callbacks)**: Werden in einzelnen Collection-Konfigurationen definiert. Sie werden nur für diese Collection ausgeführt.
-- **Globale Callbacks**: Werden bei `initializeRebaseBackend({ callbacks })` definiert. Sie werden bei **jeder** Collection und auf jedem Datenpfad ausgelöst (REST-API, WebSocket / Realtime, serverseitiges `rebase.dataAsAdmin`). Der einzige Writer, den sie nicht sehen, ist das Auth-System: Registrierung, OAuth-Anmeldung und die Admin-Benutzerverwaltung schreiben Benutzerzeilen direkt und lösen stattdessen die [Auth-Hooks](/docs/backend/authentication/) (`afterUserCreate`, …) aus.
+Rebase führt Tabellen-Hooks auf zwei Ebenen aus, beide vom Typ `TableHooks` aus
+`@rebasepro/server/schema`:
 
-Verwenden Sie globale Callbacks für:
-- **Row-Scoping** — `beforeQuery` auf jeder Collection, sodass Lesezugriffe eines Mandanten an einer zentralen Stelle statt pro Collection eingegrenzt werden. Nur Postgres: Neben einer MongoDB- oder Firestore-Datenquelle verweigert ein globales `beforeQuery` den Start, anstatt die Lesezugriffe dieser Quelle uneingeschränkt zu lassen. Siehe [`beforeQuery`](/docs/collections/callbacks#beforequery).
-- **PII-Maskierung** — Ausblenden sensibler Felder für Nicht-Admin-Aufrufer über alle Collections hinweg.
+- **[Tabellen-Hooks](/docs/collections/callbacks)**: Der `hooks`-Schlüssel eines `defineTable`. Sie werden nur für diese Tabelle ausgeführt.
+- **Globale Hooks**: Exportiert als `hooks` aus `backend/hooks.ts`. Sie werden bei **jeder** Tabelle auf jedem Datenpfad ausgelöst (REST-API, WebSocket / Realtime, MCP, serverseitiges `rebase.dataAsAdmin`). Der einzige Writer, den sie nicht erfassen, ist das Auth-System: Registrierung (Sign-up), OAuth-Anmeldung und die Benutzerverwaltung des Admins schreiben Benutzerzeilen direkt und führen stattdessen die [Auth-Hooks](/docs/backend/authentication/) (`afterUserCreate`, …) aus.
+
+Verwenden Sie globale Hooks für:
+- **Row-Scoping** — `beforeQuery` auf jeder Tabelle, sodass Lesezugriffe eines Mandanten zentral an einer Stelle statt pro Tabelle eingegrenzt werden. Siehe [`beforeQuery`](/docs/collections/callbacks#beforequery).
+- **PII-Maskierung** — Unkenntlichmachen sensibler Felder für Nicht-Admin-Aufrufer über alle Tabellen hinweg.
 - **Einheitliches Audit-Logging** — Protokollieren jeder Erstellung, Aktualisierung oder Löschung an einem zentralen Ort. Neue Konten aus Registrierung und OAuth gehören nicht dazu; protokollieren Sie diese über `afterUserCreate`.
-- **Querschnittliche Validierung** — Durchsetzen von Invarianten, die mehrere Collections umfassen.
+- **Übergreifende Validierung** — Durchsetzen von Invarianten, die mehrere Tabellen umfassen.
 
 :::note
-**Ausführungsreihenfolge**: Globale Callbacks → Collection-Callbacks → Property-Callbacks.
+**Ausführungsreihenfolge**: globale Hooks → tabelleneigene Hooks → das `.transform()` der Spalten.
 :::
+
+Jeder Hook erhält den Deskriptor der Tabelle, für die er ausgeführt wird, als `table`. Globale Hooks erfordern daher deklarierte Tabellen: Ein Backend, das die Datenbank introspektiert (kein `backend/schema`), verweigert diese beim Booten.
 
 ---
 
 ## Konfiguration
 
-:::note[Wo dies hingehört]
-**Managed Runtime** — `export const callbacks = { … }` aus `config/index.ts`. Die Runtime liest diesen Export beim Start; sonst muss nichts geändert werden.
+:::note[Wo dies platziert wird]
+**Managed Runtime** — `export const hooks = { … }` aus `backend/hooks.ts`. Die Runtime liest diesen Export beim Booten; sonst muss nichts geändert werden. Jeder andere Export aus der Datei wird beim Booten gemeldet und ignoriert.
 
-**Ejected** — Der Schlüssel `callbacks` bei `initializeRebaseBackend({ … })`.
+**Ejected** — Der `hooks`-Schlüssel bei `initializeRebaseBackend({ … })`.
 
-Die vollständige Übersicht finden Sie in der [Backend-Übersicht](/docs/backend/#where-each-option-lives).
+Die vollständige Zuordnung finden Sie in der [Backend-Übersicht](/docs/backend/#where-each-option-lives).
 :::
 
-Übergeben Sie den Schlüssel `callbacks` an `initializeRebaseBackend`:
+```typescript
+// backend/hooks.ts
+import type { TableHooks } from "@rebasepro/server/schema";
 
-```typescript no-verify
-import { initializeRebaseBackend } from "@rebasepro/server";
-
-const instance = await initializeRebaseBackend({
-    // ... other config
-    callbacks: {
-        afterRead({ row, context }) {
-            // Runs after every entity read, across all collections
-            return row;
-        },
-        beforeSave({ values, context }) {
-            // Runs before every entity save
-            return values;
-        }
+export const hooks: TableHooks = {
+    afterRead({ values }) {
+        // Runs after every row read, across all tables
+        return values;
+    },
+    beforeSave({ values }) {
+        // Runs before every save
+        return values;
     }
-});
+};
 ```
 
-`callbacks` nimmt
-ein Set entgegen. Um mehrere Belange getrennt zu halten, schreiben Sie jeden als eigenes Set
-und übergeben `composeCallbacks(tenantScope, auditTrail)`: Sie werden genau so kombiniert wie
-die Ebenen oben. Siehe
-[Callback-Sets kombinieren](/docs/collections/callbacks/#combining-callback-sets).
-Dasselbe gilt für `backend.setCollectionCallbacks(slug, callbacks)`, das die Callbacks ersetzt,
-die eine Collection deklariert hat: Übergeben Sie
-`composeCallbacks(declared, yours)`, um sie zu behalten.
+`hooks` akzeptiert ein einzelnes Set. Um verschiedene Anliegen voneinander zu trennen, schreiben Sie jedes als eigenes Set und übergeben Sie `composeTableHooks(tenantScope, auditTrail)` aus `@rebasepro/common`: Sie kombinieren sich genau wie die oben genannten Schichten. Siehe [Kombinieren von Hook-Sets](/docs/collections/callbacks/#combining-hook-sets).
+Dasselbe gilt für `backend.setTableHooks(slug, hooks)`, welches die von einer Tabelle deklarierten Hooks ersetzt: Übergeben Sie `composeTableHooks(declared, yours)`, um sie beizubehalten.
 
 ---
 
-## `CollectionCallbacks`-Typ
+## `TableHooks`-Typ
 
 ```typescript
-type CollectionCallbacks = {
+type TableHooks = {
     beforeQuery?(props): QueryNarrowing | void;     // Conditions to AND into a read before it is compiled
-    afterRead?(props):   Record<string, unknown>;  // Transform row before returning to caller
+    afterRead?(props):   Record<string, unknown>;  // Transform the row before returning it to the caller
     beforeSave?(props):  Partial<Values>;           // Modify values before writing to DB
     afterSave?(props):   void;                      // After the write, still in the transaction
     afterSaveError?(props): void;                   // Side-effects after a failed save
@@ -79,39 +74,34 @@ type CollectionCallbacks = {
 };
 ```
 
-`beforeQuery` grenzt einen Lesezugriff ein, bevor er kompiliert wird; siehe
+`beforeQuery` grenzt einen Lesevorgang ein, bevor er kompiliert wird; siehe
 [`beforeQuery`](/docs/collections/callbacks#beforequery).
 
-Alle Callbacks können ein `Promise` (asynchron) oder einen einfachen Wert (synchron) zurückgeben.
+Alle Hooks können ein `Promise` (asynchron) oder einen einfachen Wert (synchron) zurückgeben.
 
 ---
 
-## Callback-Props
+## Hook-Props
 
-Jeder Callback erhält ein einzelnes Props-Objekt. Gemeinsame Felder:
+Jeder Hook empfängt ein einzelnes Props-Objekt. Gemeinsame Felder:
 
 | Feld | Typ | Vorhanden in |
 |-------|------|------------|
-| `collection` | `CollectionConfig` | Allen Callbacks |
-| `path` | `string` | Allen Callbacks |
-| `row` | `Record<string, unknown>` | `afterRead`, `beforeDelete`, `afterDelete` |
+| `table` | `TableDescriptor` | Allen Hooks |
+| `path` | `string` | Allen Hooks |
+| `values` | `Record<string, unknown>` | Allen außer `beforeQuery`: die gelesene Zeile (`afterRead`), die gelöscht werdende Zeile (`beforeDelete`, `afterDelete`) oder die geschriebenen Werte (die Save-Hooks) |
 | `id` | `string \| number` | `beforeSave` (optional), `afterSave`, `afterSaveError` (optional), `beforeDelete`, `afterDelete` |
-| `values` | `EntityValues` | `beforeSave`, `afterSave`, `afterSaveError` |
-| `previousValues` | `EntityValues` (optional) | `beforeSave`, `afterSave`, `afterSaveError` |
+| `previousValues` | row (optional) | `beforeSave`, `afterSave`, `afterSaveError` |
 | `status` | `"new" \| "existing" \| "copy"` | `beforeSave`, `afterSave`, `afterSaveError` |
-| `context` | `RebaseCallContext` | Allen Callbacks |
+| `error` | `unknown` | `afterSaveError` |
+| `operation`, `query` | Art des Lesevorgangs, Abfrage des Aufrufers | `beforeQuery` |
+| `context` | `RebaseCallContext` | Allen Hooks |
 
-`context.user` enthält den authentifizierten Benutzer (`uid`, `roles` usw.). Eine Anfrage ohne Token, wo die API sie zulässt, trägt die anonyme Identität `{ uid: "anonymous", roles: ["anon"] }` statt `undefined`.
+`context.user` enthält den authentifizierten Benutzer (`uid`, `roles` usw.). Eine Anfrage ohne Token trägt, sofern die API sie zulässt, die anonyme Identität `{ uid: "anonymous", roles: ["anon"] }` anstelle von `undefined`.
 
-`context.credential` nennt den API-Schlüssel, mit dem ein Schreibzugriff erfolgte: `{ kind, id, name }`, wobei `kind` entweder `"personal"` oder `"service"` ist. Ein persönlicher Schlüssel handelt als sein Eigentümer, sodass `context.user` der Eigentümer ist, egal ob er von Hand gespeichert hat oder ein CI-Job mit seinem Schlüssel geschrieben hat; `context.credential` unterscheidet die beiden. Es ist gesetzt bei der Daten-API, dem Realtime-Socket und `/mcp`, und fehlt bei einer Sitzung, dem Service-Schlüssel, Arbeit im Server-Kontext (`rebase.dataAsAdmin`, Crons) und im Browser. Es trägt nie das Secret.
+`context.credential` benennt den API-Schlüssel, mit dem ein Schreibvorgang durchgeführt wurde: `{ kind, id, name }`, wobei `kind` entweder `"personal"` oder `"service"` ist. Ein persönlicher Schlüssel agiert im Namen seines Besitzers, daher ist `context.user` der Besitzer – unabhängig davon, ob er manuell gespeichert hat oder ein CI-Job mit seinem Schlüssel geschrieben hat; `context.credential` unterscheidet die beiden Fälle. Es ist bei der Daten-API, dem Realtime-Socket und `/mcp` gesetzt und fehlt bei einer Session, dem Service-Schlüssel, Arbeiten im Server-Kontext (`rebase.dataAsAdmin`, Cronjobs) sowie im Browser. Es enthält niemals das Secret.
 
-`collection` ist immer vorhanden. Ein globaler Callback wird für jede Collection ausgelöst, ist also
-die einzige Ebene, die unabhängig von einer bestimmten Collection registriert wird – dennoch wird ihm
-niemals eine fehlende Collection übergeben. Eine Anfrage, die einen Pfad angibt, den die
-Collection-Registry nicht auflösen kann, wird mit `404 NOT_FOUND` abgewiesen, bevor irgendeine Ebene ausgeführt wird.
-Dies ist dieselbe Antwort, die Lese- und Schreibpfade für einen solchen Pfad ohnehin liefern. Die
-Alternative – das Überspringen der Ebene für diese Pfade – würde `afterRead` zu einem
-Redaktionsschritt mit einer stillschweigenden Ausnahme machen, weshalb dies nicht vorgesehen ist.
+`table` ist immer vorhanden. Ein globaler Hook wird für jede Tabelle ausgelöst, ist also die einzige Ebene, die unabhängig von einer bestimmten Tabelle registriert wird – dennoch wird ihm niemals eine fehlende Tabelle übergeben. Eine Anfrage, die einen Pfad angibt, den der Server nicht auflösen kann, wird mit `404 NOT_FOUND` abgelehnt, bevor irgendeine Ebene ausgeführt wird – was dieselbe Antwort ist, die Lese- und Schreibpfade für einen solchen Pfad ohnehin liefern. Die Alternative – das Überspringen der Ebene für solche Pfade – würde `afterRead` zu einem Redaktionsschritt mit einer stillschweigenden Ausnahme machen, weshalb dies nicht angeboten wird.
 
 ---
 
@@ -128,11 +118,11 @@ Redaktionsschritt mit einer stillschweigenden Ausnahme machen, weshalb dies nich
  │ 1. Start PostgreSQL Transaction                             │
  │ 2. Set Config: app.user_id = '<uid>', app.user_roles = ...  │
  │                                                             │
- │ 3. Global Callback: beforeSave     ─┐                       │
- │ 4. Collection Callback: beforeSave ─┘ awaited               │
+ │ 3. Global hook: beforeSave         ─┐                       │
+ │ 4. Table hook: beforeSave          ─┘ awaited               │
  │ 5. Drizzle SQL execution & Postgres RLS evaluation          │
- │ 6. Global Callback: afterSave      ─┐                       │
- │ 7. Collection Callback: afterSave  ─┘ awaited               │
+ │ 6. Global hook: afterSave          ─┐                       │
+ │ 7. Table hook: afterSave           ─┘ awaited               │
  │                                                             │
  │ 8. Commit  ← a throw anywhere in 3–7 rolls the write back   │
  └─────┬───────────────────────────────────────────────────────┘
@@ -145,85 +135,67 @@ Redaktionsschritt mit einer stillschweigenden Ausnahme machen, weshalb dies nich
 
 ---
 
-## Blockierende vs. asynchrone Semantik
+## Blockierende vs. Asynchrone Semantik
 
-**Jeder Callback in der folgenden Liste wird per `await` abgewartet, und alle außer
-`afterSaveError` laufen innerhalb der Transaktion, die den Schreibvorgang ausführt.** Es gibt
-keine „Fire-and-Forget“-Ebene: Die Zeile und alles, was ihre Callbacks getan haben, werden
-zusammen committet oder gar nicht.
+**Jeder Hook in der folgenden Liste wird mit `await` abgewartet, und alle außer `afterSaveError` laufen innerhalb der Transaktion, die den Schreibvorgang ausführt.** Es gibt keine "Fire-and-Forget"-Ebene: Die Zeile und alles, was ihre Hooks getan haben, werden gemeinsam committet oder gar nicht.
 
-- **`beforeSave`, `beforeDelete`** — Wenn der Callback einen Fehler auslöst (throw), wird die Operation mit einem HTTP 400 abgelehnt, der Ihre Nachricht und den Code `CALLBACK_REJECTED` enthält, und der Schreibvorgang in die Datenbank findet niemals statt. Werfen Sie einen `RebaseApiError` aus `@rebasepro/types`, um den Status selbst zu wählen – siehe [Entity-Callbacks](/docs/collections/callbacks#beforesave). Ein `beforeDelete`, das `false` *zurückgibt*, stellt dieselbe Verweigerung ohne Nachricht dar und antwortet mit **403** und diesem Code.
-- **`afterRead`** — Die zurückgegebene Zeile (oder transformierte Zeile) ist das, was der Aufrufer erhält, und zwar nur der Aufrufer: Bei einem Schreibvorgang formt sie die Antwort, während `afterSave`, `beforeDelete`, `afterDelete` und die Historie die Zeile so erhalten, wie sie gespeichert ist — ein maskierter Wert wird nie aufgezeichnet oder in die Spalte zurück revertiert. Ihre Transaktion ist `READ ONLY` – siehe [unten](#afterread-kann-nicht-schreiben).
-- **`afterSave`, `afterDelete`** — Werden *vor* dem Commit ausgeführt und abgewartet. Ein Fehler (throw) an dieser Stelle rollt die Zeile zurück und antwortet ebenfalls mit **400 `CALLBACK_REJECTED`**, wobei `details.stage` den Hook benennt. Sie halten die Transaktion während ihrer Ausführung offen; ein langsamer Hook blockiert somit Sperren (Locks).
-- **`afterSaveError`** — Wird ausgeführt, wenn das Speichern fehlgeschlagen ist, auf dem Rückweg. Bei einem Request läuft er, nachdem die Transaktion des fehlgeschlagenen Schreibvorgangs zurückgerollt wurde, mit einem `context`, dessen Aufrufe jeweils eine eigene Transaktion sind, sodass ein Job, den er einreiht, um den Fehler zu melden, erhalten bleibt. Ein Fehler (throw) aus ihm wird protokolliert; der Aufrufer erhält den eigenen Fehler des Speichervorgangs.
+- **`beforeSave`, `beforeDelete`** — Wenn der Hook einen Fehler wirft, wird die Operation mit einem HTTP 400 abgelehnt, der Ihre Nachricht und den Code `CALLBACK_REJECTED` enthält, und der Schreibvorgang in der Datenbank findet niemals statt. Werfen Sie einen `RebaseApiError` aus `@rebasepro/types`, um den Status selbst zu wählen — siehe [Tabellen-Hooks](/docs/collections/callbacks#beforesave). Ein `beforeDelete`, das `false` *zurückgibt*, ist dieselbe Ablehnung ohne Nachricht und antwortet mit **403** und diesem Code.
+- **`afterRead`** — Die zurückgegebene (oder transformierte) Zeile ist das, was der Aufrufer erhält, und zwar ausschließlich der Aufrufer: Bei einem Schreibvorgang formt sie die Antwort, während `afterSave`, `beforeDelete`, `afterDelete` und der Verlauf die Zeile so erhalten, wie sie gespeichert ist — ein maskierter Wert wird niemals in der Spalte erfasst oder dorthin zurückgesetzt. Seine Transaktion ist `READ ONLY` — siehe [unten](#afterread-kann-nicht-schreiben).
+- **`afterSave`, `afterDelete`** — Werden *vor* dem Commit ausgeführt und abgewartet. Ein Fehler hier rollt die Zeile zurück und liefert denselben Fehler **400 `CALLBACK_REJECTED`**, wobei `details.stage` den Hook benennt. Sie halten die Transaktion während ihrer Ausführung offen, ein langsamer Hook blockiert also mit einem Lock.
+- **`afterSaveError`** — Wird ausgeführt, wenn das Speichern fehlgeschlagen ist, auf dem Rückweg. Bei einer Anfrage läuft er, nachdem die Transaktion des fehlgeschlagenen Schreibvorgangs zurückgerollt wurde, mit einem `context`, bei dem jeder Aufruf eine eigene Transaktion darstellt, sodass ein Job, den er zur Meldung des Fehlers einreiht, erhalten bleibt. Ein von ihm geworfener Fehler wird protokolliert; der Aufrufer erhält den eigentlichen Fehler des Speichervorgangs.
 
-:::caution[Diese Seite besagte früher das Gegenteil]
-Frühere Versionen besagten, dass `afterSave` und `afterDelete` „nach dem Commit der Transaktion ausgeführt werden“
-und „die HTTP-Antwort nicht blockieren“. Beides war nie der Fall. Code, der
-auf Basis dieser Aussage geschrieben wurde – etwa ein Webhook-Aufruf in `afterSave` –, hielt
-eine Datenbanktransaktion für die Dauer eines HTTP-Roundtrips offen
-und rollte die Zeile jedes Mal zurück, wenn die Gegenstelle nicht erreichbar war.
+:::caution[Auf dieser Seite stand früher das Gegenteil]
+In früheren Versionen hieß es, dass `afterSave` und `afterDelete` "nach dem Commit der Transaktion ausgeführt werden" und "die HTTP-Antwort nicht blockieren". Beides war nie der Fall. Code, der basierend auf diesem Satz geschrieben wurde – beispielsweise ein Webhook-Aufruf in `afterSave` –, hielt eine Datenbanktransaktion für die Dauer eines HTTP-Roundtrips offen und rollte die Zeile jedes Mal zurück, wenn die Gegenseite nicht erreichbar war.
 :::
 
 ### Wann `afterSaveError` ausgeführt wird
 
-Er meldet einen Speichervorgang, der **auf Datenbankebene oder danach** fehlgeschlagen ist — ab dem INSERT- oder UPDATE-Statement. Ein Speichervorgang, der vor diesem Punkt abgelehnt wurde, hat die Datenbank nie erreicht, daher wird der Hook darüber nicht informiert.
+Er meldet ein Speichern, das **an der Datenbank oder danach** fehlgeschlagen ist – ab dem INSERT- oder UPDATE-Statement. Ein Speichervorgang, der vor diesem Punkt abgelehnt wurde, hat die Datenbank nie erreicht, sodass der Hook nicht darüber informiert wird.
 
 | Wird ausgeführt | Wird nicht ausgeführt |
 |---|---|
-| Die Datenbank weist das Statement zurück: eine Unique- oder Foreign-Key-Verletzung, ein Check-Constraint oder Trigger, eine Row-Level-Security-Policy (`WRITE_DENIED`) | Eine `beforeSave`-Ablehnung — der Hook, der abgelehnt hat, ist derjenige, der es weiß |
-| `afterRead` oder `afterSave` wirft einen Fehler (der Aufrufer erhält `CALLBACK_REJECTED`) | Eine Anfrage, die vor dem Treiber abgelehnt wurde: Validierung (`VALIDATION_*`), ein Feld, das der Aufrufer nicht schreiben darf, eine fehlende Berechtigung |
-| Der Historie-Eintrag kann nicht aufgezeichnet werden | Eine Zeile, die der Aufrufer nicht adressieren kann (`404`), ein Mandanten-Stempel, den er nicht setzen darf |
-| | Der Commit wird abgelehnt, nachdem der Speichervorgang zurückgekehrt ist: `TRANSACTION_ABORTED` (ein fehlgeschlagenes Statement, das ein Callback abgefangen hat), oder ein aufgeschobener Constraint, der bei `COMMIT` geprüft wird |
-| | Ein Löschvorgang — dafür gibt es kein Gegenstück |
+| Die Datenbank lehnt das Statement ab: Verletzung eines Unique- oder Foreign-Keys, ein Check-Constraint oder Trigger, eine Row-Level-Security-Richtlinie (`WRITE_DENIED`) | Eine Ablehnung durch `beforeSave` — der Hook, der abgelehnt hat, weiß bereits Bescheid |
+| `afterRead` oder `afterSave` wirft einen Fehler (der Aufrufer erhält `CALLBACK_REJECTED`) | Eine vor dem Treiber abgelehnte Anfrage: Validierung (`VALIDATION_*`), ein Feld, das der Aufrufer nicht schreiben darf, fehlende Berechtigung |
+| Der Verlaufseintrag kann nicht erfasst werden | Eine Zeile, die der Aufrufer nicht adressieren kann (`404`), ein Mandanten-Stempel, den er nicht setzen darf |
+| | Der Commit wird abgelehnt, nachdem das Speichern zurückgekehrt ist: `TRANSACTION_ABORTED` (ein fehlgeschlagenes Statement, das ein Hook abgefangen hat) oder ein bei `COMMIT` geprüfter Deferred Constraint |
+| | Ein Löschvorgang — es gibt kein Gegenstück für Deletes |
 
 Bei einem Bulk- oder `_batch`-Schreibvorgang wird er für die Zeile ausgeführt, die fehlgeschlagen ist; die Zeilen davor werden mit dem Batch zurückgerollt und nicht gemeldet.
 
-### Seiteneffekte, die die Transaktion nicht blockieren dürfen
+### Seiteneffekte, die die Transaktion nicht aufhalten dürfen
 
-Alles, was langsam ist oder nicht rückgängig gemacht werden kann, wenn die Transaktion zurückgerollt wird,
-gehört nicht in den Callback-Body:
+Alles, was langsam ist oder nicht rückgängig gemacht werden kann, wenn die Transaktion zurückrollt, gehört nicht in den Hook-Body:
 
-| Anwendungsfall | Stattdessen dies tun |
+| Anwendungsfall | Stattdessen tun |
 |---|---|
-| Drittanbieter aufrufen, E-Mail senden, Datei generieren | [Einen Job einreihen](/docs/backend/jobs). Ein Job, der in einer Transaktion eingereiht wurde, die zurückgerollt wird, wurde nie eingereiht – was genau das gewünschte Verhalten ist. |
-| Anderen Prozessen mitteilen, dass etwas passiert ist | Auf einem [Realtime-Kanal](/docs/backend/realtime) veröffentlichen, nachdem der Schreibvorgang zurückgekehrt ist, nicht aus dem Hook heraus. |
-| Arbeiten in einer [Custom Function](/docs/backend/custom-functions), auf die der Aufrufer nicht warten muss | `waitUntil(c, promise)` aus `@rebasepro/server/functions` — dies läuft nach der Antwort, und der Host wartet darauf, bevor er herunterfährt. |
+| Drittanbieter aufrufen, E-Mails senden, Dateien generieren | [Einen Job in die Warteschlange einreihen](/docs/backend/jobs). Ein Job, der in einer zurückgerollten Transaktion eingereiht wurde, wurde nie eingereiht — genau das gewünschte Verhalten. |
+| Andere Prozesse über ein Ereignis informieren | Nach Rückkehr des Schreibvorgangs auf einem [Realtime-Kanal](/docs/backend/realtime) veröffentlichen, nicht innerhalb des Hooks. |
+| Arbeiten in einer [Custom Function](/docs/backend/custom-functions), auf die der Aufrufer nicht warten muss | `waitUntil(c, promise)` aus `@rebasepro/server/functions` — läuft nach der Antwort, und der Host wartet darauf, bevor er herunterfährt. |
 
-Die Faustregel: Wenn die Arbeit auch dann stattfinden soll, wenn der Schreibvorgang rückgängig gemacht wird,
-ist sie nicht Teil des Schreibvorgangs und gehört daher nicht in den Hook.
+Die Faustregel: Wenn die Arbeit auch dann stattfinden soll, wenn der Schreibvorgang rückgängig gemacht wird, ist sie nicht Teil des Schreibvorgangs und gehört daher nicht in den Hook.
 
 ### `afterRead` kann nicht schreiben
 
-Ein Lesezugriff im Request-Scope öffnet seine Transaktion als `READ ONLY`, ebenso das erneute
-Abrufen (Refetch) einer Realtime-Subscription. `afterRead` läuft darin,
-sodass **kein Schreibvorgang aus diesem Callback erfolgreich sein kann** — weder ein Erstellen
-über `context.data`, noch ein Update, noch ein Aufruf, der in einer aufgerufenen Hilfsfunktion verborgen ist. Postgres weist das
-Statement mit SQLSTATE `25006` ab, und der Aufrufer erhält als Antwort:
+Ein anfragebezogener Lesevorgang öffnet seine Transaktion als `READ ONLY`, ebenso wie das erneute Abrufen (Refetch) einer Realtime-Subscription. `afterRead` läuft darin, sodass **kein Schreibvorgang aus diesem Hook erfolgreich sein kann** — kein Erstellen über `context.data`, kein Aktualisieren und auch kein Schreibvorgang, der in einer aufgerufenen Hilfsfunktion verborgen ist. Postgres lehnt das Statement mit dem SQLSTATE `25006` ab, und der Aufrufer erhält als Antwort:
 
 ```json
-{ "error": { "message": "An `afterRead` callback tried to write. …",
+{ "error": { "message": "An `afterRead` hook tried to write. …",
              "code": "READ_ONLY_TRANSACTION",
              "details": { "dbCode": "25006" } } }
 ```
 
-Das ist ein 409, kein 500: Es bedeutet, dass Ihr Code abgelehnt wird, nicht dass der Server ausfällt.
-Der Read-Only-Modus ist beabsichtigt — ein Lesevorgang, der heimlich schreibt, ist ein Lesevorgang, dessen
-Kosten, Sperren und RLS-Angriffsfläche von niemandem einkalkuliert wurden.
+Dies ist ein 409, kein 500: Ihr Code wird abgelehnt, es handelt sich nicht um ein Serverversagen. Der Read-Only-Modus ist beabsichtigt — ein Lesevorgang, der heimlich schreibt, ist ein Lesevorgang, dessen Kosten, Sperren und RLS-Oberfläche von niemandem einkalkuliert wurden.
 
-Daher **gehört Lese-Auditing nicht in `afterRead`**. Protokollieren Sie den Lesevorgang stattdessen
-außerhalb der Anfrage — über einen Hintergrundjob, der mit dem gespeist wird, was Sie bereits ausgeben, oder
-über eine Custom Function, die das Lesen *und* das Schreiben über zwei separate
-Aufrufe durchführt:
+Daher gehört **Audit-Logging von Lesezugriffen nicht in `afterRead`**. Protokollieren Sie den Lesevorgang stattdessen außerhalb der Anfrage — über einen Hintergrundjob, der von bereits vorhandenen Ereignissen gespeist wird, oder über eine Custom Function, die das Lesen *und* das Schreiben in zwei getrennten Aufrufen durchführt:
 
 ```typescript no-verify
 // ✗ Fails with READ_ONLY_TRANSACTION on every read.
-callbacks: {
-    afterRead: async ({ path, row, context }) => {
+export const hooks: TableHooks = {
+    afterRead: async ({ path, values, context }) => {
         await context.data.read_log.create({ path, uid: context.user?.uid });
-        return row;
+        return values;
     }
-}
+};
 ```
 
 ```typescript
@@ -240,8 +212,7 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
-Schreibseitiges Auditing hat dieses Problem nicht: `afterSave` und `afterDelete` laufen in einer
-Read-Write-Transaktion, und die Audit-Zeile wird zusammen mit der Änderung committet, die sie aufzeichnet.
+Beim schreibseitigen Auditing gibt es dieses Problem nicht: `afterSave` und `afterDelete` laufen in einer Lese-/Schreib-Transaktion, und der Audit-Eintrag wird zusammen mit der protokollierten Änderung committet.
 
 ---
 
@@ -249,76 +220,67 @@ Read-Write-Transaktion, und die Audit-Zeile wird zusammen mit der Änderung comm
 
 ### PII-Maskierung
 
-E-Mail-Adressen für Nicht-Admin-Aufrufer über alle Collections hinweg unkenntlich machen:
+E-Mail-Adressen für Nicht-Admin-Aufrufer über alle Tabellen hinweg unkenntlich machen:
 
-```typescript no-verify
-import { initializeRebaseBackend } from "@rebasepro/server";
+```typescript
+// backend/hooks.ts
+import type { TableHooks } from "@rebasepro/server/schema";
 
-const instance = await initializeRebaseBackend({
-    // ... other config
-    callbacks: {
-        afterRead({ row, context }) {
-            const isAdmin = context.user?.roles?.includes("admin");
-            if (!isAdmin && row.email) {
-                return { ...row, email: "********" };
-            }
-            return row;
+export const hooks: TableHooks = {
+    afterRead({ values, context }) {
+        const isAdmin = context.user?.roles?.includes("admin");
+        if (!isAdmin && values.email) {
+            return { ...values, email: "********" };
         }
+        return values;
     }
-});
+};
 ```
 
 ### Globales Audit-Logging
 
-Jede Löschung über jede Collection hinweg in einer `audit_log`-Tabelle aufzeichnen. Da
-`afterDelete` in der eigenen Transaktion des Löschvorgangs läuft, werden die Audit-Zeile und die
-Löschung zusammen committet — es gibt kein Zeitfenster, in dem das eine ohne das
-andere existiert:
+Jeden Löschvorgang über alle Tabellen hinweg in einer `audit_log`-Tabelle erfassen. Da `afterDelete` in der Transaktion des Löschvorgangs selbst ausgeführt wird, werden der Audit-Eintrag und der Löschvorgang gemeinsam committet – es gibt kein Zeitfenster, in dem das eine ohne das andere existiert:
 
 ```typescript no-verify
-import { initializeRebaseBackend } from "@rebasepro/server";
+// backend/hooks.ts
+import type { TableHooks } from "@rebasepro/server/schema";
 
-const instance = await initializeRebaseBackend({
-    // ... other config
-    callbacks: {
-        async afterDelete({ collection, id, row, context }) {
-            if (collection.slug === "audit_log") return;   // don't audit the audit
-            await context.data.audit_log.create({
-                action: "delete",
-                collection: collection.slug,
-                entity_id: String(id),
-                actor: context.user?.uid ?? "anonymous",
-                // The API key, when the delete was made with one.
-                via_key: context.credential?.name ?? null,
-                snapshot: row
-            });
-        }
+export const hooks: TableHooks = {
+    async afterDelete({ table, id, values, context }) {
+        if (table.slug === "audit_log") return;   // don't audit the audit
+        await context.data.audit_log.create({
+            action: "delete",
+            table: table.slug,
+            entity_id: String(id),
+            actor: context.user?.uid ?? "anonymous",
+            // The API key, when the delete was made with one.
+            via_key: context.credential?.name ?? null,
+            snapshot: values
+        });
     }
-});
+};
 ```
 
-Beachten Sie, was dies bringt und was es kostet: Wenn die Audit-Zeile nicht geschrieben werden kann,
-findet auch die Löschung nicht statt. Für ein Audit-Trail ist das meist genau das, was Sie wollen.
-Wenn dies nicht gewünscht ist, fangen Sie den Fehler im Callback ab und vermerken Sie dies in einem Kommentar.
+Beachten Sie die Vor- und Nachteile: Kann der Audit-Eintrag nicht geschrieben werden, findet auch der Löschvorgang nicht statt. Für einen Audit-Trail ist dies normalerweise das gewünschte Verhalten. Sollte dies nicht der Fall sein, fangen Sie den Fehler im Hook ab und vermerken Sie dies in einem Kommentar.
 
-Die Spalte `via_key` liest `context.credential`, das neu ist: Lassen Sie sie
-bei einer früheren Version weg.
+### Tabellenspezifische Logik
 
-### Collection-spezifische Logik
-
-Globale Callbacks werden für alle Collections ausgelöst. Um Logik auf eine einzelne Collection zu beschränken, prüfen Sie `collection.slug` oder `path`:
+Globale Hooks werden für alle Tabellen ausgelöst. Um Logik auf eine einzelne Tabelle zu beschränken, prüfen Sie `table.slug` oder `path`:
 
 ```typescript
-callbacks: {
-    beforeSave({ collection, values, context }) {
-        if (collection.slug === "orders") {
-            if (!values.total || values.total <= 0) {
+import type { TableHooks } from "@rebasepro/server/schema";
+
+export const hooks: TableHooks = {
+    beforeSave({ table, values }) {
+        if (table.slug === "orders") {
+            const total = values.total;
+            if (typeof total !== "number" || total <= 0) {
                 throw new Error("Order total must be positive");
             }
         }
         return values;
     }
-}
+};
 ```
 
-Für Callbacks, die nur für eine einzelne Collection gelten, sollten Sie stattdessen [Callbacks pro Collection](/docs/collections/callbacks) bevorzugen.
+Für Hooks, die nur für eine einzelne Tabelle gelten, sollten Sie stattdessen [die tabelleneigenen Hooks](/docs/collections/callbacks) bevorzugen.

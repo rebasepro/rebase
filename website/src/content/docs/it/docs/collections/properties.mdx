@@ -1,524 +1,269 @@
 ---
-sourceHash: 51b9f938679ab164
-title: Proprietà
-sidebar_label: Proprietà
-description: I tipi di proprietà definiscono il tipo di dato, la convalida e il rendering dell'interfaccia utente per ciascun campo in una collezione. Rebase supporta i tipi string, number, boolean, date, array, map, reference, relation e geopoint.
+sourceHash: ceb4d7703eefec3a
+title: Campi
+sidebar_label: Campi
+description: "Il campo che il CMS visualizza per ogni tipo di colonna — text, markdown, email, URL, select, multi-select, number, switch, date, file upload, JSON, geopoint, vector, binary — e le opzioni di customizeTable per modificarli."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
 
-## Panoramica
+<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
-Le proprietà definiscono le colonne nella tabella del database e il modo in cui vengono renderizzate nell'interfaccia utente di amministrazione. Ciascuna proprietà ha un `type` che determina:
+Ogni colonna di una tabella corrisponde a un campo nel CMS. La natura del campo
+deriva dalla colonna: il suo tipo, la sua validazione e le sue regole di archiviazione,
+tutte dichiarate in [`backend/schema`](/docs/schema/columns/). L'aspetto del campo
+può essere personalizzato, campo per campo, in [`customizeTable`](/docs/frontend/customize-table/).
 
-- Il **tipo di colonna del database** (tramite la generazione dello schema Drizzle)
-- Il componente per il **campo del form**
-- Il renderer per la **cella della tabella**
-- Le regole di **convalida**
+Questa tabella viene utilizzata negli esempi seguenti:
 
-## Tipi di Proprietà
+```ts
+// backend/schema/products.ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
-| Tipo | Descrizione | Colonna PostgreSQL |
-|------|-------------|-------------------|
-| `string` | Testo, select, markdown, upload di file, URL, email | `text` come impostazione predefinita; `varchar`, `char` o `uuid` con `columnType`; un tipo enum Postgres (`<table>_<column>`) con `enum` |
-| `number` | Intero, decimale, valuta | `integer`, `numeric`, `bigint`, `serial` |
-| `boolean` | Toggle vero/falso | `boolean` |
-| `date` | Data, data e ora, timestamp | `timestamptz` come impostazione predefinita; `date` o `time` con `columnType` |
-| `array` | Elenco ordinato di valori | Un array nativo (`text[]`, `integer[]`, `numeric[]`, `boolean[]`) quando `of` è una singola proprietà string, number o boolean; `jsonb` altrimenti |
-| `map` | Oggetto chiave-valore | `jsonb` |
-| `geopoint` | Coppia latitudine/longitudine | `jsonb` |
-| `reference` | Riferimento incorporato a un'altra entità | Il tipo della chiave primaria di destinazione (memorizza il relativo ID) |
-| `relation` | Relazione con chiave esterna SQL | Utilizza l'array `relations` |
-| `vector` | Embedding, per la ricerca dei vicini più prossimi (nearest-neighbour) | `VECTOR(n)` (pgvector) |
-| `binary` | Byte grezzi, letti e scritti in formato base64 | `bytea` |
-
-## Proprietà Comuni
-
-Tutti i tipi di proprietà condividono queste opzioni:
-
-| Proprietà | Tipo | Descrizione |
-|-----------|------|-------------|
-| `type` | `string` | **Obbligatorio.** Tipo di dato (vedi sopra) |
-| `name` | `string` | Etichetta visualizzata. Il valore predefinito è la chiave della proprietà formattata in modo leggibile — `publishDate` → "Publish Date". Impostalo quando tale derivazione è errata: `"URL"` invece di "Url". |
-| `description` | `string` | Testo di aiuto mostrato sotto il campo |
-| `defaultValue` | `any` | Valore predefinito per le nuove entità. Un valore letterale — una stringa, un numero, un booleano, una data, un id di enum o un documento `map`/`array` memorizzato come JSON — diventa anche il `DEFAULT` della colonna, quindi anche una riga inserita da qualsiasi elemento diverso dal pannello di amministrazione (l'API REST, un seed, `psql`) lo riceve |
-| `databaseDefault` | `boolean \| SqlExpression` | Il database compila la colonna quando un'operazione di creazione la lascia vuota: una colonna `NOT NULL DEFAULT <expression>` come `gen_random_uuid()` o `nextval(…)`. Un campo `required` con questa opzione può essere omesso durante la creazione, sia dal form di amministrazione che dall'API, e un valore `null` inviato in creazione viene demandato al database; rimane obbligatorio in fase di modifica, e il tipo generato `Insert` lo rende opzionale. Fornisci l'espressione nel formato template accettato da `isId`, ``databaseDefault: "sql`gen_random_uuid()`"``, e il pianificatore dello schema la scriverà come `DEFAULT` della colonna, garantendo che `rebase db push` la mantenga. `true` dichiara un `DEFAULT` scritto altrove: il planner non ne scrive alcuno, e `rebase db push` lascia così com'è quello che il database possiede. "Import from table" e `rebase schema introspect` impostano l'espressione che leggono |
-| `validation` | `object` | Regole di convalida |
-| `propertyConfig` | `string` | Chiave di configurazione della proprietà registrata |
-| `columnName` | `string` | Nome esplicito della colonna del database (ignora la conversione in snake_case) |
-| `callbacks` | `PropertyCallbacks` | Hook per le trasformazioni `afterRead` e `beforeSave` |
-| `excludeFromApi` | `boolean` | Non menzionare mai questa colonna nell'API, in entrambe le direzioni — utile per l'hash di una password o un token di verifica. Il valore viene comunque scritto, ed è leggibile lato server solo tramite `rebase.sql()`; viene rimosso da ogni riga servita dall'API, per qualsiasi chiamante inclusi amministratori, service key e letture con `rebase.dataAsAdmin`, ed è assente dai tipi generati `Row`, `Insert` e `Update` nonché dallo schema OpenAPI. È una scorciatoia sintattica per `access: { read: [], write: [] }` — i due meccanismi sono identici, e impostarli entrambi su una proprietà viene rifiutato all'avvio |
-| `access` | `{ read?: string[]; write?: string[] }` | Chi può leggere e chi può scrivere questo singolo campo, in base al ruolo. Se la lista viene omessa, si delega alle [regole di sicurezza](/docs/collections/security-rules/) della riga; `[]` indica nessuno tramite l'API; un elenco di ruoli indica quei ruoli più `admin`. Un campo non leggibile è **assente** dalle risposte anziché essere `null`, e una scrittura che fa riferimento a un campo non scrivibile restituisce un 400. Vedi [Accesso ai campi](/docs/collections/field-access/) |
-| `metadata` | `Record<string, unknown>` | Qualsiasi elemento che il tuo codice debba associare a una proprietà. Rebase non lo legge; sopravvive invariato alla serializzazione |
-| `dynamicProps` | `function` | Costruttore di proprietà dinamiche (vedi [Campi condizionali](/docs/collections/validation-and-conditions/#conditional-fields)). **Solo form di amministrazione — non applicato dall'API o dal database.** |
-| `conditions` | `PropertyConditions` | Condizioni JSON Logic dichiarative. **Solo form di amministrazione — non applicato dall'API o dal database.** |
-
-:::note[Cosa significa "solo form di amministrazione"]
-Diverse opzioni seguenti riportano questa etichetta: definiscono la forma del
-form renderizzato dal pannello e nient'altro — l'API accetta una scrittura che
-le ignora, e non vi è alcun vincolo sottostante. Una regola che deve valere per
-ogni chiamante dell'API è una [regola di convalida](/docs/collections/validation-and-conditions/)
-— verificata sulle scritture REST, socket e MCP, [non su quelle in-process](/docs/collections/validation-and-conditions/#where-validation-runs)
-— oppure una [regola di sicurezza](/docs/collections/security-rules/), applicata
-dal database per chiunque.
-:::
-
-### Configurazione UI (`admin`)
-
-Le opzioni relative alla UI sono annidate all'interno del sotto-oggetto `admin`:
-
-```typescript
-price: {
-    type: "number",
-    name: "Price",
-    admin: {
-        readOnly: true,
-        columnWidth: 120,
-        hideFromCollection: false
-    }
-}
+export const products = defineTable("products", {
+    columns: {
+        id:          col.uuid().primaryKey().defaultRandom(),
+        name:        col.text().notNull().validate({ min: 2, max: 200 }),
+        description: col.text(),
+        body:        col.text(),
+        supportEmail: col.text().validate({ email: true }),
+        website:     col.text().validate({ url: true }),
+        category:    col.enum(["electronics", "clothing", "home"]).notNull(),
+        locales:     col.text({ enum: ["es", "en", "fr"] }).array(),
+        price:       col.numeric({ precision: 10, scale: 2 }).notNull(),
+        stock:       col.integer().default(0),
+        onSale:      col.boolean().default(false),
+        launchDay:   col.date(),
+        availableAt: col.timestamp({ withTimezone: true }),
+        ownerId:     col.uuid().userId(),
+        createdAt:   col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
+        createdBy:   col.uuid().onCreateUser(),
+    },
+    rls: "admin-only",
+});
 ```
 
-| Proprietà | Tipo | Descrizione |
-|-----------|------|-------------|
-| `admin.readOnly` | `boolean` | Impedisce la modifica |
-| `admin.disabled` | `boolean \| PropertyDisabledConfig` | Disabilita con tooltip opzionale |
-| `admin.filledByServer` | `boolean` | Il server compila il campo quando un nuovo record lo lascia vuoto (un hook `beforeSave`). Il form consente la creazione senza di esso; rimane obbligatorio in fase di modifica, e i controlli del server continuano ad essere applicati |
-| `admin.hideFromCollection` | `boolean` | Nasconde dalla vista a tabella. Solo visualizzazione: le righe correlate di una proprietà di relazione nascosta rimangono comunque incorporate nella lettura dell'elenco (vedi [Relazioni](/docs/collections/relations)) |
-| `admin.columnWidth` | `number` | Larghezza della colonna in pixel (vista a tabella) |
-| `admin.span` | `1 \| 2 \| 3 \| 4` | Larghezza del campo sulla griglia del form a quattro colonne |
-| `admin.Field` | `ComponentRef` | Componente personalizzato per il campo |
-| `admin.Preview` | `ComponentRef` | Componente personalizzato per la cella della tabella |
-| `admin.Filter` | `ComponentRef` | Campo di filtro personalizzato per questa proprietà. Ha la precedenza sull'override a livello di collezione `Collection.FilterField` e sul campo predefinito integrato per tipo |
-| `admin.filterOperators` | `WhereFilterOp[]` | Limita gli operatori offerti durante il filtraggio su questa proprietà. Il set offerto è l'**intersezione** tra le funzionalità del motore, i valori predefiniti del tipo e questo elenco — puoi solo restringere, mai aggiungere un operatore che il motore non è in grado di eseguire. `[]` disabilita il filtraggio sulla proprietà |
-| `admin.customProps` | `unknown` | Qualsiasi elemento necessario ai tuoi componenti `Field` o `Preview`. Rebase lo passa senza modifiche |
+Anche senza alcun file di frontend, ogni colonna ha già un campo associato.
+Questa personalizzazione ne modifica alcuni:
 
-#### `PropertyDisabledConfig`
+```tsx
+// frontend/src/cms/products.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { products } from "../../../backend/schema/products";
 
-La forma ad oggetto di `admin.disabled`. Il controllo rimane visibile ma disattivato (in grigio),
-il che rappresenta la differenza rispetto ad `admin.readOnly` — un lettore può vedere la struttura
-di ciò che non gli è consentito compilare.
-
-| Proprietà | Tipo | Descrizione |
-|-----------|------|-------------|
-| `disabledMessage` | `string` | Motivo per cui questa proprietà è disabilitata, mostrato al lettore. Senza di esso, un controllo disattivato non fornisce spiegazioni |
-| `clearOnDisabled` | `boolean` | Imposta il valore su `null` quando la proprietà viene disabilitata, in modo che un valore non aggiornato non venga salvato con l'entità |
-| `hidden` | `boolean` | Nasconde completamente il campo mentre è disabilitato, invece di renderlo semplicemente inattivo in grigio |
-
-## Proprietà String
-
-Il tipo `string` è il più versatile — a seconda delle opzioni impostate, viene renderizzato sotto forma di diversi widget.
-
-### Campo di testo
-
-Un campo di input testuale di base a riga singola.
-
-```typescript
-name: {
-    type: "string",
-    name: "Name",
-    validation: { required: true, min: 2, max: 200 }
-}
+export const productsCms = customizeTable<typeof products>("products", {
+    fields: {
+        description: { multiline: true },
+        body:        { name: "Product page", markdown: true },
+        website:     { urlPreview: true },
+        category: {
+            enumLabels: {
+                electronics: { label: "Electronics", color: "blueDark" },
+                clothing:    { label: "Clothing", color: "pink" },
+            },
+            enumOrder: ["home", "electronics", "clothing"],
+        },
+        locales: {
+            enumLabels: { es: "Spanish", en: "English", fr: "French" },
+        },
+        price:       { format: { style: "currency", currency: "EUR" } },
+        stock:       { format: { notation: "compact" }, columnWidth: 90 },
+        availableAt: { timezone: "Europe/Madrid" },
+    },
+});
 ```
+
+## Testo
+
+<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
+
+Una colonna `col.text()`, `col.varchar({ length })`, `col.char({ length })` o `col.uuid()` è
+un campo di input di testo. `varchar(n)` e `char(n)` ne limitano la lunghezza a `n`, mentre
+`.validate({ min, max, length, matches })` aggiunge le regole che il form verifica prima del salvataggio.
 
 <FieldWidgetPreview client:only="react" variant="text" />
 
-### Testo multilinea
-
-Imposta `admin.multiline` per eseguire il rendering come textarea. Modifica il modo
-in cui il campo viene visualizzato, non il contenuto della colonna; di conseguenza,
-si trova nel blocco `admin` insieme alle altre opzioni di presentazione.
-
-```typescript
-description: {
-    type: "string",
-    name: "Description",
-    admin: { multiline: true }
-}
-```
+`multiline: true` la trasforma in un'area di testo che si espande con il suo contenuto.
 
 <FieldWidgetPreview client:only="react" variant="multiline" />
 
-### Editor Markdown
-
-Imposta `admin.markdown` per visualizzare un editor markdown completo con barra degli strumenti.
-
-```typescript
-body: {
-    type: "string",
-    name: "Blog text",
-    admin: { markdown: true }
-}
-```
+`markdown: true` la trasforma in un editor markdown con barra degli strumenti e anteprima.
 
 <FieldWidgetPreview client:only="react" variant="markdown" />
 
-### Campo email
-
-Imposta `email: true` per aggiungere la convalida del formato email e visualizzare un'icona per l'email.
-
-```typescript
-email: {
-    type: "string",
-    name: "User email",
-    email: true,
-    validation: { required: true }
-}
-```
+`.validate({ email: true })` sulla colonna genera un campo di input email, validato come
+tale. Trattandosi di una caratteristica del dato, viene dichiarato sulla colonna, dove
+viene verificato anche dal server.
 
 <FieldWidgetPreview client:only="react" variant="email" />
 
-### Campo URL
-
-Imposta `url: true` per aggiungere la convalida del formato URL e visualizzare un'icona di collegamento.
-
-```typescript
-website: {
-    type: "string",
-    name: "Amazon link",
-    url: true
-}
-```
+`.validate({ url: true })` genera un campo di input URL, validato come URL, con anteprima
+del link. `urlPreview` modifica unicamente l'anteprima: `true` per un link, oppure `"image"`,
+`"video"`, `"audio"` o `"file"` per visualizzare il contenuto multimediale inline.
 
 <FieldWidgetPreview client:only="react" variant="url" />
 
-### Upload di file
+Una colonna di tipo text o uuid contrassegnata con `.userId()` contiene l'id di un utente
+ed è un selettore degli utenti del progetto: i loro nomi, email e avatar, mostrati a
+chiunque abbia i permessi di scrittura sulla tabella. `ownerId` mostrato sopra ne è un esempio.
+Lo stesso vale per ogni elemento di `col.text().userId().array()`.
 
-Imposta `storage` per renderizzare un'area dropzone di caricamento file. La colonna rimane una stringa — ciò che viene scritto in essa è la chiave dell'oggetto nel bucket:
+`previewAsTag: true` visualizza il valore come chip al di fuori del form. `clearable:
+true` aggiunge un controllo per impostarlo su `null`. `referenceTo: "<slug>"` tratta il
+valore come la chiave di un record in un'altra collection, su qualsiasi origine dati, e
+disegna un selettore di riferimento; vedi [Firestore](/docs/frontend/firebase/#from-a-table-to-firestore).
 
-```typescript
-avatar: {
-    type: "string",
-    name: "Main image",
-    storage: { storagePath: "avatars", acceptedFiles: ["image/*"] }
-}
-```
+## Insiemi chiusi di valori
 
-<FieldWidgetPreview client:only="react" variant="file_upload" />
+<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
-Tutte le opzioni interne a `storage`, e la variante per file multipli dello stesso campo, sono descritte in [Upload di file](/docs/collections/file-uploads).
-
-### Select (enum)
-
-Imposta `enum` per renderizzare un menu a discesa select. Per i dettagli, consulta [Valori Enum](/docs/collections/validation-and-conditions/#enum-values).
-
-```typescript no-verify
-category: {
-    type: "string",
-    name: "Category",
-    enum: [
-        { id: "electronics", label: "Electronics", color: "blueDark" },
-        { id: "clothing", label: "Clothing", color: "pink" },
-    ]
-}
-```
+Un `col.enum([...])` è un campo select, visualizzato altrove come chip colorato. Lo stesso
+vale per una colonna di testo o numerica con `.oneOf([...])`. A ogni valore viene assegnata
+un'etichetta ricavata dal suo identificatore (`needs_review` diventa "Needs Review") e un
+colore generato a partire dal valore stesso, identico a ogni caricamento.
 
 <FieldWidgetPreview client:only="react" variant="select" />
 
-### Selezione multipla (Multi-select)
+`enumLabels` definisce etichette e colori per alcuni valori; i valori non specificati
+mantengono l'etichetta e il colore derivati. Ogni voce può essere una stringa o
+`{ label, color?, disabled? }`: `color` è la chiave del colore del chip, come `"green"`
+o `"orangeDark"`, mentre `disabled` mantiene il valore visibile ma ne impedisce la selezione.
+`enumOrder` imposta l'ordine con cui i valori vengono proposti e l'ordine delle colonne kanban.
+Entrambi vengono verificati rispetto alla colonna: un valore non ammesso dalla colonna
+genererà un errore di tipo.
 
-La scelta di diversi valori all'interno di un set prefissato corrisponde a un **array di stringhe enum**, non a un flag su una di esse: la colonna contiene molti valori, quindi la proprietà che la descrive è l'array.
-Si tratta di un'unica colonna Postgres, un `text[]`, anziché un join: un array la cui proprietà `of` è una singola proprietà string riceve per impostazione predefinita un array nativo, e la proprietà `columnType` sottostante lo esplicita solamente.
-
-```typescript no-verify
-locales: {
-    type: "array",
-    name: "Available locales",
-    columnType: "text[]",
-    of: {
-        type: "string",
-        name: "Locale",
-        enum: [
-            { id: "es", label: "Spanish", color: "pink" },
-            { id: "en", label: "English", color: "blueLight" },
-            { id: "fr", label: "French", color: "purpleLight" },
-        ]
-    }
-}
-```
+Un array di un insieme chiuso, `col.text({ enum: [...] }).array()`, è una selezione multipla
+su una singola colonna `text[]`. Le `enumLabels` definite sull'array si applicano ai suoi elementi.
 
 <FieldWidgetPreview client:only="react" variant="multi_select" />
 
-### Opzioni String
+## Numeri
 
-| Proprietà | Tipo | Descrizione |
-|-----------|------|-------------|
-| `admin.multiline` | `boolean` | Renderizza come textarea |
-| `admin.markdown` | `boolean` | Renderizza come editor markdown |
-| `email` | `boolean` | Convalida del formato email |
-| `url` | `boolean` | Convalida del formato URL |
-| `storage` | `StorageConfig` | Abilita l'upload di file — vedi [Upload di file](/docs/collections/file-uploads) |
-| `enum` | `EnumValues` | Renderizza come menu a discesa select |
-| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | La colonna del database. Il valore predefinito è `text`, o `uuid` quando indicato da `isId`. `text` per stringhe senza limiti di lunghezza, `char` per larghezza fissa |
-| `isId` | `boolean \| string` | Contrassegna la proprietà come chiave primaria e stabilisce chi la compila: `"manual"` (tu), `"uuid"` (`gen_random_uuid()`), o qualsiasi altra stringa, usata esattamente come espressione SQL predefinita della colonna — nuda (`nanoid()`) o in formato template (``"sql`nanoid()`"``). La funzione deve esistere; nulla qui si occupa di crearla. `"increment"` è una strategia per valori di tipo **number** e, come `"cuid"`, viene rifiutato qui durante il caricamento della configurazione |
-| `autoValue` | `"user_on_create" \| "user_on_update"` | Assegna alla colonna lo **uid dell'utente attivo** — solo al momento della creazione o a ogni scrittura. Vedi [Colonne di audit](#colonne-di-audit) |
-| `userSelect` | `boolean` | Renderizza come selettore utente. Il valore è una semplice colonna di stringhe che memorizza l'id utente — nulla lo risolve o lo controlla in ingresso. **Solo form di amministrazione — non applicato dall'API o dal database.** Il selettore elenca nomi, email e avatar degli utenti a chiunque abbia i permessi di scrittura sulla collezione, tramite [`GET /api/admin/users/pick`](/docs/backend/auth-endpoints/), senza lo scope `users:read`. Una collezione le cui regole di scrittura sono espresse in puro SQL non viene inclusa, poiché tali regole non possono essere valutate preventivamente: in tal caso, solo i possessori di `users:read` possono effettuare la selezione. |
-| `admin.previewAsTag` | `boolean` | Renderizza questa stringa come tag nelle anteprime |
-| `admin.clearable` | `boolean` | Aggiunge un'icona per azzerare il valore (impostandolo su null) |
-| `admin.urlPreview` | `PreviewType \| boolean` | Come renderizzare una stringa che contiene un URL: `true` per un link, oppure `"image"`, `"video"`, `"audio"` o `"file"` per un'anteprima in linea. Si tratta solo di presentazione — la natura di URL del valore è determinata dal flag `url` sulla proprietà, da cui viene generato il contratto OpenAPI |
+<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
-### Colonne di audit
-
-`autoValue` su una stringa è la controparte `created_by` / `updated_by` della medesima opzione su una [data](#opzioni-date):
-
-```typescript
-createdBy: {
-    type: "string",
-    name: "Created by",
-    autoValue: "user_on_create",
-    admin: { readOnly: true }
-},
-
-updatedBy: {
-    type: "string",
-    name: "Updated by",
-    autoValue: "user_on_update"
-}
-```
-
-Il valore proviene dal contesto della chiamata, mai dal corpo della richiesta — il driver sovrascrive qualunque valore sia arrivato, impedendo a un chiamante di fingere di essere qualcun altro inviando il campo. Una colonna il cui valore è fornito dal chiamante non è una colonna di audit.
-
-In assenza di un utente attivo — una richiesta anonima, un token di servizio, uno script di seeding — la colonna viene impostata su `null`. Se associata a `validation: { required: true }`, ciò genera invece un errore 400: una collezione che richiede obbligatoriamente di sapere chi ha scritto una riga non può accettare scritture anonime.
-
-Non esiste una chiave esterna. Lo uid è una stringa, l'archivio utenti potrebbe risiedere su un database completamente diverso e l'eliminazione di un utente non deve cancellare la traccia di audit associata — dichiara una [relazione](/docs/collections/relations) se desideri un join.
-
-:::note[Chiavi primarie composite]
-Contrassegnando diverse proprietà con `isId`, queste costituiranno un'unica chiave composita: la tabella riceverà un singolo vincolo `PRIMARY KEY (a, b)` e una riga verrà indirizzata attraverso tutti i valori della sua chiave nell'ordine di dichiarazione, uniti da `:::` — `company_translation/1:::en_US`.
-Assegna a ciascuna colonna della chiave la strategia appropriata: `isId: true` per un valore fornito dal chiamante, che è la norma per ciascuna colonna della maggior parte delle chiavi composite, ed evita assolutamente `"increment"` su una chiave esterna o su una colonna di tipo string. Una chiave esterna è composta da una sola colonna e non può puntare a una chiave composita; pertanto, una relazione o un riferimento diretto *verso* tale collezione verrà rifiutato durante la generazione dello schema. Se ciò di cui avevi bisogno era un vincolo di unicità su più colonne piuttosto che l'identità della riga, utilizza un [indice](/docs/backend/indexes) univoco.
-
-Una collezione in cui nessuna proprietà definisce `isId` ottiene automaticamente una colonna `id`: `TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`. Il database si occupa di popolarla, quindi una riga creata dal pannello di amministrazione, dall'API REST o dall'SDK non necessita di alcuna chiave, e una chiave inviata manualmente verrà utilizzata esattamente come fornita. Una tabella creata prima dell'introduzione di questo valore predefinito lo riceverà al successivo avvio.
-
-Lo stesso vale per una chiave dichiarata con `isId: "uuid"` la cui tabella non ha un valore predefinito — una tabella acquisita con `rebase schema introspect` o creata manualmente: al successivo avvio verrà impostato `DEFAULT gen_random_uuid()`. L'avvio non imposta il valore predefinito per nessun'altra chiave dichiarata. La funzione di una strategia SQL potrebbe non essere ancora presente, pertanto aggiungi tu stesso tale default o lascia che sia `rebase db push` ad applicarlo.
-:::
-
-## Proprietà Number
-
-```typescript
-price: {
-    type: "number",
-    name: "Price",
-    validation: { required: true, min: 0 }
-}
-
-quantity: {
-    type: "number",
-    name: "Quantity",
-    columnType: "integer"  // Store as integer
-}
-```
+Ogni colonna di tipo integer, serial, `real`, `doublePrecision` e `numeric` è un campo di
+input numerico. Le colonne integer e serial accettano solo numeri interi, e
+`.validate({ min, max, moreThan, lessThan, positive, negative })` aggiunge i limiti di intervallo.
 
 <FieldWidgetPreview client:only="react" variant="number" />
 
-I campi numerici vengono visualizzati come un campo di input di testo standard provvisto di convalida numerica.
+`format` formatta la visualizzazione del numero senza modificare ciò che viene memorizzato: `style`
+(`"decimal"`, `"currency"`, `"percent"`), `currency` (con `"currency"`),
+`locale`, `minimumFractionDigits`, `maximumFractionDigits`, e `notation:
+"compact"`, che scrive `12000` come `12K` in una colonna stretta. `clearable` aggiunge un
+controllo per impostare il valore su `null`.
 
-### Opzioni Number
+## Booleani
 
-| Proprietà | Tipo | Descrizione |
-|-----------|------|-------------|
-| `enum` | `EnumValues` | Renderizza come select con valori numerici. A differenza di un enum di stringhe, questo **non crea alcun tipo enum in Postgres** — la colonna rimane `NUMERIC` o `INTEGER`, di conseguenza il pannello propone i valori ma il database non ne impone il rispetto |
-| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"`. Il valore predefinito è `integer` dove `validation.integer` o `isId` indicano che il valore è intero, `numeric` altrimenti |
-| `precision` / `scale` | `number` | Cifre significative totali e cifre decimali dopo la virgola per una colonna `numeric` — `NUMERIC(10, 2)`. I valori monetari definiti senza questi parametri rimangono un tipo `NUMERIC` non vincolato che accetta qualunque valore inviato dal chiamante, e non potranno essere ristretti successivamente senza dover riscrivere la colonna |
-| `isId` | `boolean \| string` | Contrassegna la proprietà come chiave primaria: `"manual"`, `"increment"`, o qualsiasi altra stringa usata come espressione predefinita SQL della colonna. `"increment"` corrisponde sempre a `INTEGER GENERATED BY DEFAULT AS IDENTITY` — un eventuale `columnType` affiancato viene ignorato, con un avviso, poiché ogni foreign key che punta a una chiave numerica è di tipo `INTEGER` e una chiave più ampia verrebbe referenziata da colonne più strette. `"uuid"` è una strategia per valori di tipo **string** e viene rifiutato qui durante il caricamento della configurazione |
-| `admin.clearable` | `boolean` | Aggiunge un'icona per azzerare il valore (impostandolo su null) |
-| `admin.format` | `NumberFormatOptions` | Formatta il numero come valuta, percentuale o con un numero fisso di decimali. Se omesso, viene visualizzato il valore grezzo — un numero nel database viene mostrato esattamente così come si trova nel database |
+<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
-#### `NumberFormatOptions`
-
-Solo a scopo di presentazione. Il valore memorizzato non cambia mai — una visualizzazione arrotondata corrisponde pur sempre al numero completo presente nella colonna e nell'API.
-
-| Proprietà | Tipo | Descrizione |
-|-----------|------|-------------|
-| `style` | `"decimal" \| "currency" \| "percent"` | Il valore predefinito è `"decimal"`. `"currency"` richiede il parametro `currency` |
-| `currency` | `string` | Codice ISO 4217 — `"EUR"`, `"USD"`. Impostarlo implica `style: "currency"`, rendendo sufficiente una singola chiave nella maggior parte dei casi |
-| `locale` | `string` | Tag BCP 47. Il valore predefinito è il locale del pannello, ed è ciò che permette allo stesso importo di apparire come `1,234.50` per un utente e come `1.234,50` per un altro |
-| `minimumFractionDigits` | `number` | Completa con zeri fino ad almeno questo numero di cifre decimali — `2` converte `5` in `5.00` |
-| `maximumFractionDigits` | `number` | Arrotonda al massimo a questo numero di cifre decimali. Non modifica il valore memorizzato |
-| `notation` | `"standard" \| "compact"` | `"compact"` visualizza `12000` come `12K`. Molto utile nelle colonne strette delle tabelle |
-
-## Proprietà Boolean
-
-```typescript
-active: {
-    type: "boolean",
-    name: "Selectable",
-    defaultValue: true
-}
-```
+Un `col.boolean()` è uno switch.
 
 <FieldWidgetPreview client:only="react" variant="boolean" />
 
-I valori booleani vengono renderizzati sotto forma di interruttore a levetta (toggle switch).
+## Date e orari
 
-## Proprietà Date
+<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
-### Solo data
-
-Imposta `mode: "date"` per mostrare un selettore di data senza l'orario.
-
-```typescript
-event_date: {
-    type: "date",
-    name: "Expiry date",
-    mode: "date"
-}
-```
+Un `col.timestamp({ withTimezone: true })` è un selettore di data e ora, un `col.date()` un
+selettore di data e un `col.time()` un'ora del giorno. `mode` consente di passare da `"date"` a
+`"date_time"`, mentre `timezone` mostra e seleziona il valore in un fuso orario IANA fisso
+(`"Europe/Madrid"`) anziché in quello dell'utente.
 
 <FieldWidgetPreview client:only="react" variant="date" />
 
-### Data e ora
-
-La modalità predefinita `"date_time"` include sia la data che l'orario.
-
-```typescript
-arrival_time: {
-    type: "date",
-    name: "Arrival time",
-    mode: "date_time"
-}
-```
-
 <FieldWidgetPreview client:only="react" variant="date_time" />
 
-### Timestamp automatici
+Una colonna con timestamp assegnato dal server, `.onCreateNow()` o `.onUpdateNow()`, è di
+sola lettura, viene mostrata nel blocco dei metadati del record ed è esclusa dalle colonne
+predefinite della tabella. Le colonne `.onCreateUser()` e `.onUpdateUser()` sono di sola lettura:
+il server scrive l'id dell'utente che esegue l'azione, indipendentemente da quanto indicato nella richiesta.
 
-Usa `autoValue` per impostare automaticamente i timestamp in fase di creazione o aggiornamento.
+## File
 
-```typescript
-createdAt: {
-    type: "date",
-    name: "Created At",
-    autoValue: "on_create",
-    admin: { readOnly: true }
-}
+<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
-updatedAt: {
-    type: "date",
-    name: "Updated At",
-    autoValue: "on_update"
-}
-```
+Una colonna `col.storage({ … })` è un campo di caricamento con anteprima, e
+`.multiple()` la rende un campo per file multipli. Il bucket, il percorso, i tipi
+accettati e il limite di dimensione vengono dichiarati sulla colonna; le funzioni eseguite
+nel browser vengono aggiunte con `storage` in `customizeTable`. Vedi
+[Caricamento file](/docs/collections/file-uploads/).
 
-`on_update` agisce tramite un trigger del database, non solo come un'impostazione a livello applicativo. Rebase scrive la colonna a ogni salvataggio effettuato — così che un hook `beforeSave` possa accedere al nuovo valore — e installa un trigger `BEFORE UPDATE` che la aggiorna per tutte le altre modifiche. Senza il trigger, uno script di seeding, un backfill durante una migrazione o una singola riga corretta tramite `psql` lascerebbero la colonna nello stato in cui dichiara che la riga non è stata modificata, inducendo qualsiasi processo che la interroga per decidere cosa reindicizzare o reinviare a ignorare tale riga.
+<FieldWidgetPreview client:only="react" variant="file_upload" />
 
-Il trigger viene generato in `.rebase/sql/triggers.sql`, applicato mediante `rebase db push` e configurato all'avvio dalla sincronizzazione dello schema — Atlas non è in grado di gestirlo, per lo stesso motivo per cui non può gestire gli helper di ricerca full-text.
+## Array e JSON
 
-### Opzioni Date
+<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
-| Proprietà | Tipo | Descrizione |
-|-----------|------|-------------|
-| `mode` | `"date" \| "date_time"` | Solo data oppure data + ora (predefinito: `"date_time"`). Determina il widget; la colonna sottostante rimane identica in entrambi i casi. **Solo form di amministrazione — non applicato dall'API o dal database.** |
-| `autoValue` | `"on_create" \| "on_update"` | Imposta automaticamente i timestamp. `on_create` definisce un `DEFAULT now()`; `on_update` genera un trigger `BEFORE UPDATE` **oltre** a impostare il valore a livello applicativo, garantendo che anche un `UPDATE` diretto eseguito da un seed o da una migrazione aggiorni la colonna |
-| `columnType` | `"timestamp" \| "date" \| "time"` | La colonna del database. Il valore predefinito è `timestamp` **con fuso orario**. Una colonna `date` viene selezionata e mostrata unicamente come giorno, a prescindere da `mode`; una colonna `time` viene mostrata unicamente come orario del giorno, in formato UTC, priva di data (viene trasferita associata convenzionalmente alla data 1970-01-01) |
-| `timezone` | `string` | Il fuso orario in cui il selettore legge e scrive il valore. **Solo form di amministrazione — non applicato dall'API o dal database.** |
-| `isId` | `"manual" \| true` | Rende un giorno di calendario parte della chiave primaria. Solo su una colonna `columnType: "date"`, e sempre fornito dal chiamante. Vedi [un giorno nella chiave](#un-giorno-nella-chiave) |
-| `admin.clearable` | `boolean` | Aggiunge un'icona per azzerare il valore (impostandolo su null) |
+Una colonna di tipo array (`<item>.array()`) è una lista ripetibile del campo dell'elemento. Una colonna `jsonb`
+con una [struttura `json.*`](/docs/schema/json/) è un gruppo di campi tipizzati, liste e
+blocchi; una priva di struttura è un editor chiave/valore. Vedi
+[Array e JSON](/docs/collections/arrays-and-maps/).
 
-### Un giorno nella chiave
+## Relazioni e riferimenti
 
-Una tabella per giorno, come un punteggio giornaliero per giocatore, identifica le sue righe tramite il giorno e qualcos'altro. Dichiara il giorno come proprietà `date` su una colonna `date` con `isId: "manual"`:
+<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
-```typescript
-properties: {
-    day: { name: "Day", type: "date", columnType: "date", isId: "manual" },
-    sid: { name: "Player", type: "string", isId: "manual" },
-    hype: { name: "Hype", type: "number" }
-}
-```
-
-La tabella ha come chiave `PRIMARY KEY (day, sid)` su una vera colonna `date`, da `rebase db push`, dalle migrazioni e dall'avvio. Il giorno viaggia come `YYYY-MM-DD` ovunque: nelle righe restituite da API e SDK, e nell'indirizzo della riga, `2026-11-09:::player-1`. Il server non lo trasforma mai in un timestamp, quindi un server che gira a ovest di UTC non lo rilegge come il giorno prima. Un timestamp o un `Date` inviato per il giorno viene memorizzato come il suo giorno UTC. Nei tipi generati il giorno è una `string` sulla riga, e il tipo di inserimento accetta anche un `Date`. Il caricamento della configurazione rifiuta `isId` su una proprietà `date` senza `columnType: "date"`, perché un timestamp non è un giorno.
-
-## Proprietà Array e Map
-
-I due tipi compositi — una lista ripetibile e un oggetto strutturato, entrambi archiviati come JSONB a meno che non sia utilizzabile un array nativo di Postgres. Ripetizioni, editor a blocchi, gruppi, editor chiave-valore e ogni opzione supportata sono illustrati in **[Array e mappe](/docs/collections/arrays-and-maps)**.
-
-## Proprietà Geopoint
-
-Una coppia latitudine/longitudine, memorizzata come `jsonb` — `{ latitude, longitude }`, corrispondente a quanto descritto dal tipo TypeScript generato, dallo schema OpenAPI e dal campo del form.
-
-```typescript
-location: {
-    type: "geopoint",
-    name: "Location"
-}
-```
-
-Le operazioni di scrittura richiedono la medesima struttura, oppure un'istanza di `GeoPoint` da `@rebasepro/types`:
-`new GeoPoint(41.4036, 2.1744)`.
-
-Non vi sono opzioni aggiuntive oltre a quelle comuni a ciascuna proprietà. La colonna non dispone di indicizzazione spaziale e non è presente un operatore di distanza su cui filtrare: un geopoint è un valore pensato per essere memorizzato e visualizzato, non per effettuare ricerche basate sulla prossimità geografica. Per tale finalità, si consiglia di modellare i due numeri come colonne dedicate.
-
-## Proprietà Reference
-
-Le reference collegano a entità presenti in un'altra collezione. Vengono visualizzate come una scheda di anteprima contenente i dettagli dell'entità referenziata.
-
-```typescript
-client: {
-    type: "reference",
-    name: "Related client",
-    path: "clients",
-    admin: {
-        previewProperties: ["first_name", "last_name", "email"]
-    }
-}
-```
+Una relazione `belongsTo` è un selettore della riga correlata, mostrato al posto della
+relativa colonna di chiave esterna; una relazione to-many è una scheda del record. Anche una colonna
+di testo con `referenceTo` funge da selettore.
 
 <FieldWidgetPreview client:only="react" variant="reference" />
 
-`reference` è il collegamento dei database documentali (Firestore, MongoDB). Su Postgres, collega invece con una [`relation`](/docs/collections/relations): i tipi di proprietà di una `PostgresCollectionConfig` rifiutano `reference`, così come quelli di una collezione Firestore rifiutano `relation`. Una `reference` che raggiunge comunque il generatore di schema — una configurazione scritta senza quei tipi — diventa una foreign key con la regola `ON DELETE` di `belongsTo`: se facoltativa applica `SET NULL`, se obbligatoria applica `RESTRICT`.
+Vedi [Relazioni nel pannello](/docs/collections/relations-in-the-admin-panel/).
 
+## Geopoint, vettori e binari
 
-### Opzioni Reference e Relation
+<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
-Queste opzioni sono valide sia per le proprietà di tipo `reference` che per quelle di tipo `relation`.
+Un `col.geopoint()` è un campo per latitudine e longitudine. Un `col.vector({ dimensions })` è un
+input vettoriale; `clearable` è la sua unica opzione. Un `col.bytea()` è un campo binario,
+letto e scritto in base64. Nessuno di essi dispone di opzioni specifiche del tipo oltre a
+quelle comuni a ogni campo.
 
-| Proprietà | Tipo | Descrizione |
-|-----------|------|-------------|
-| `admin.fixedFilter` | `FilterValues` | Filtra le entità disponibili all'interno del widget di selezione |
-| `admin.widget` | `"select" \| "dialog"` | Il widget da impiegare per selezionare l'entità correlata (solo per relations) |
-| `admin.includeId` | `boolean` | Mostra l'id dell'entità correlata nelle anteprime (predefinito: true) |
-| `admin.includeEntityLink` | `boolean` | Mostra un link che consente di aprire l'entità correlata (predefinito: true) |
-| `admin.previewProperties` | `string[]` | Quali proprietà della destinazione includere nell'anteprima (massimo 3) |
-| `admin.renderInForm` | `boolean` | Esegue il rendering di una relazione **many** sotto forma di selettore nel form, oltre alla scheda dedicata già presente. Il valore predefinito è `false`: la vista dell'entità elenca già le righe correlate in una scheda, rendendo le due superfici ridondanti per impostazione predefinita. Non ha alcun effetto su una relazione verso un singolo elemento (to-one), la quale non dispone di scheda |
+## Opzioni disponibili per ogni campo
 
-## Proprietà Vector
+<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
-Una colonna per embedding, finalizzata alla ricerca dei vicini più prossimi (nearest-neighbour). Esclusiva per Postgres.
+Indipendentemente dal tipo di colonna:
 
-```typescript
-embedding: {
-    type: "vector",
-    name: "Embedding",
-    dimensions: 1536
-}
-```
+- `name` e `description` sostituiscono l'etichetta derivata e aggiungono un testo di aiuto.
+- `hidden` esclude il campo dalle viste a tabella e a schede, mentre `hiddenInForm`
+  lo esclude dal form. Nessuno dei due modifica ciò che l'API legge o scrive; per nascondere
+  un valore a un chiamante, usa [field access](/docs/collections/field-access/).
+- `readOnly` visualizza il valore come testo; `disabled` disabilita visivamente il controllo, e nella
+  forma `{ disabledMessage, clearOnDisabled }` ne spiega il motivo e azzera il valore.
+- `columnWidth` imposta la larghezza della colonna nella tabella; `span` definisce quante delle
+  quattro colonne della griglia del form occupa il campo (vedi [Layout del form](/docs/frontend/form-layout/)).
+- `filterOperators` restringe gli operatori di filtro disponibili per il campo, e
+  `[]` disattiva il filtraggio su di esso. Gli operatori offerti sono il risultato dell'intersezione
+  tra quelli supportati dall'origine dati, i valori predefiniti del tipo e questo elenco: è possibile
+  soltanto applicare restrizioni.
+- `filledByServer` consente a un'operazione di creazione di lasciare il campo vuoto, affinché venga
+  popolato da un hook del server.
+- `Field`, `Preview` e `Filter` sostituiscono il controllo del form, la visualizzazione esterna al
+  form e il controllo del filtro con i tuoi componenti personalizzati; `customProps` viene
+  passato loro intatto. Vedi [Campi personalizzati](/docs/frontend/custom-fields/).
+- `propertyConfig` specifica il nome di un tipo di campo registrato su `<Rebase propertyConfigs>`.
+- `conditions` e `dynamicProps` modificano il campo in base ai valori del record stesso; vedi
+  [campi condizionali](/docs/collections/validation-and-conditions/#conditional-fields).
+- `metadata` è a tua completa disposizione.
 
-| Proprietà | Tipo | Descrizione |
-|-----------|------|-------------|
-| `dimensions` | `number` | **Obbligatorio.** Lunghezza del vettore. Compilato in `VECTOR(n)`. |
-| `index` | `VectorIndexConfig \| false` | Modalità di compilazione dell'indice ANN. Se omesso, viene generato un indice HNSW per la distanza del coseno. Il valore `false` non ne crea alcuno. |
+Tutte le opzioni, con il rispettivo tipo, sono descritte nel
+[riferimento di customizeTable](/docs/frontend/customize-table/#field-options).
 
-Un indice ANN viene creato contestualmente alla colonna, garantendo che `vectorSearch` operi in modo rapido e approssimato anziché ricorrere a una scansione sequenziale esatta. Viene configurato per la distanza del **coseno**, parametro predefinito usato da `vectorSearch` a meno che non si specifichi esplicitamente `distance` — un indice serve esattamente un singolo operatore, pertanto una query `l2` eseguita su un indice basato sul coseno tornerà implicitamente a una scansione sequenziale. I parametri `method` (`hnsw` o `ivfflat`), `distance` (singolo o multiplo), `m`, `efConstruction` e `lists` sono tutti configurabili in `index`. Oltre le 2000 dimensioni pgvector non è in grado di compilare nessuna delle due tipologie di indice; di conseguenza, la colonna rimarrà priva di indicizzazione e l'avvio del sistema notificherà tale condizione.
+:::note[Solo presentazione]
+Le opzioni di campo definiscono ciò che il CMS visualizza. L'API accetta operazioni di scrittura che le
+ignorano e dietro di esse non c'è alcun vincolo. Ciò che deve valere per qualsiasi chiamante
+appartiene alla colonna (`.notNull()`, `.validate()`, `.access()`) o alla
+[row-level security](/docs/collections/security-rules/) della tabella.
+:::
 
-Le query si effettuano tramite [`.vectorSearch()`](/docs/sdk/aggregates-and-search#vector-search), sezione in cui vengono approfonditi anche i requisiti di installazione di pgvector e l'ottimizzazione dell'indice. Per quanto riguarda gli indici convenzionali btree, GIN e BRIN su qualunque collezione, fai riferimento alla pagina [Indici](/docs/backend/indexes).
+## Prossimi passi
 
-## Proprietà Binary
+<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
-Byte grezzi archiviati sotto forma di `bytea`. I valori attraversano l'API rappresentati come **stringhe base64** — compreso il parametro `defaultValue`.
-
-```typescript
-signature: {
-    type: "binary",
-    name: "Signature"
-}
-```
-
-I file di dimensioni considerevoli devono essere gestiti nello [storage](/docs/backend/storage) e non all'interno di una colonna: un dato di tipo `bytea` viene letto e scritto integralmente insieme alla riga.
-
-I valori degli enum, le regole di convalida e i campi condizionali sono trattati in una guida dedicata:
-[Convalida e condizioni](/docs/collections/validation-and-conditions/).
-
-## Passaggi Successivi
-
-- **[Relazioni](/docs/collections/relations)** — Chiavi esterne e join
-- **[Regole di Sicurezza](/docs/collections/security-rules)** — Row Level Security
-- **[Campi Personalizzati](/docs/frontend/custom-fields)** — Creazione di componenti campo personalizzati
+- [customizeTable](/docs/frontend/customize-table/): ogni opzione, con il rispettivo tipo
+- [Validazione e condizioni](/docs/collections/validation-and-conditions/): cosa verifica il form e campi che reagiscono ai valori
+- [Caricamento file](/docs/collections/file-uploads/): colonne di archiviazione nel CMS
+- [Colonne](/docs/schema/columns/): i tipi di colonna da cui derivano questi campi

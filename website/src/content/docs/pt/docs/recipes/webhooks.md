@@ -1,36 +1,28 @@
 ---
-sourceHash: ead814d8414e0434
-title: "Receita: Integração de Webhook"
+sourceHash: 517637e2cfd34608
+title: "Receita: Integração de Webhooks"
 sidebar_label: Webhooks
-description: Utilize callbacks de entidade para enviar webhooks a serviços externos quando os dados mudam, sem manter aberta a transação da escrita.
+description: Use table hooks para enviar webhooks para serviços externos quando os dados mudarem, sem manter a transação de escrita aberta.
 ---
 
 ## Visão Geral
 
-Utilize os callbacks `afterSave` e `afterDelete` para notificar serviços externos quando os dados mudam no Rebase.
+Use os [table hooks](/docs/collections/callbacks/) `afterSave` e `afterDelete` para notificar serviços externos quando houver alterações de dados no Rebase.
 
-Duas características desses callbacks determinam como esta receita está escrita, e nenhuma delas é opcional:
+Dois detalhes sobre esses hooks determinam como esta receita foi estruturada, e nenhum deles é opcional:
 
-- **Eles são executados dentro da transação da escrita.** Tudo o que você aguardar com `await` ali
-  retém uma conexão do pool e os bloqueios da linha até retornar. Um receptor que leva dez segundos
-  é uma transação de dez segundos; um receptor que nunca responde é uma transação que nunca termina.
-- **Uma exceção lançada por `afterSave` desfaz a escrita.** O erro chega ao chamador como um 500 e a
-  linha não é gravada. Aguardar um terceiro dentro do callback transforma a indisponibilidade dele
-  na sua perda de dados.
+- **Eles são executados dentro da transação do banco de dados da escrita.** Qualquer coisa que você use `await` ali manterá uma conexão do pool e os bloqueios (locks) da linha até que ela retorne. Um receptor que leva dez segundos significa uma transação de dez segundos; um receptor que nunca responde é uma transação que nunca termina.
+- **Um erro lançado (`throw`) em `afterSave` reverte (`rollback`) a escrita.** O erro chega ao chamador como um 500 e a linha não é salva. Fazer `await` de um serviço terceiro dentro do hook transforma a indisponibilidade deles na sua perda de dados.
 
-Portanto: nunca use `await` numa requisição HTTP de saída dentro de um callback. Enfileire-a.
+Portanto: nunca use `await` em uma requisição HTTP de saída em um hook. Enfileire-a.
 
 ## Notificação do Slack em Novo Pedido
 
-`WebhookDispatcher` é exportado de `@rebasepro/server`. `enqueueEntityChange` retorna
-imediatamente — o POST acontece quando a escrita é confirmada, nunca para uma revertida — e o dispatcher
-valida o destino, assina o payload, limita cada tentativa com um prazo e repete as falhas.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-Entregue a ele a fila de jobs do backend e cada entrega se torna uma linha em `rebase.jobs`: ela sobrevive a
-um deploy ou a uma falha, é repetida com backoff pelo worker de qualquer instância que a reivindique, e um
-receptor que fica fora do ar por um dia custa linhas, não memória. Ligue a fila com
-`jobs: { enabled: true }` em `initializeRebaseBackend`, e conecte o dispatcher depois que ela
-tiver retornado:
+O `WebhookDispatcher` é exportado de `@rebasepro/server`. `enqueueEntityChange` retorna imediatamente — o POST acontece assim que a escrita faz commit, nunca para uma que sofre rollback — e o dispatcher valida o destino, assina o payload, limita cada tentativa com um prazo (deadline) e tenta novamente em caso de falha.
+
+Forneça a ele a fila de jobs do backend e cada entrega se tornará uma linha em `rebase.jobs`: ela sobrevive a um deploy ou a uma falha (crash), é tentada novamente com backoff pelo worker da instância que a reivindicar, e um receptor fora do ar por um dia custa linhas, não memória. Ative a fila com `jobs: { enabled: true }` em `initializeRebaseBackend`, e conecte o dispatcher assim que ele retornar:
 
 ```typescript
 import {
@@ -70,7 +62,7 @@ export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
     // `ctx` lets each attempt send its real `X-Webhook-Attempt`.
     backend.jobQueue?.register<QueuedWebhookDelivery>(WEBHOOK_DELIVERY_TASK, (ctx) => dispatcher.deliverQueuedJob(ctx.payload, ctx));
 
-    backend.setCollectionCallbacks("orders", {
+    backend.setTableHooks("orders", {
         afterSave: async ({ values, id, status }) => {
             if (status === "new") {
                 // Returns void, immediately. The job is written after the
@@ -82,23 +74,15 @@ export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
 }
 ```
 
-Apenas o id do webhook é armazenado no job, de modo que o seu segredo de assinatura nunca fica em `rebase.jobs`. Um
-destino que o dispatcher recusa, ou um receptor que responde com um redirecionamento, vai para a dead-letter
-após uma tentativa, com o motivo; qualquer outra falha é repetida como em qualquer job. Veja
-[Webhooks duráveis](/docs/backend/jobs#durable-webhooks).
+Apenas o id do webhook é armazenado no job, portanto seu segredo de assinatura nunca fica em `rebase.jobs`. Um destino recusado pelo dispatcher, ou um receptor que responde com redirecionamento, é enviado para a fila de mensagens mortas (dead-letter) após uma tentativa com o motivo; qualquer outro caso é tentado novamente como qualquer job. Consulte [Webhooks duráveis](/docs/backend/jobs#durable-webhooks).
 
-`setCollectionCallbacks` **substitui** os callbacks que a coleção `orders`
-declara. Se ela declara algum, mantenha-os:
-passe
-`composeCallbacks(declared, { afterSave })`, com `composeCallbacks` de
-`@rebasepro/server` e `declared` sendo os próprios `callbacks` da coleção. Veja
-[Combinando conjuntos de callbacks](/docs/collections/callbacks/#combining-callback-sets).
+`setTableHooks` **substitui** os hooks que a tabela `orders` declara. Se ela declarar algum, mantenha-os: passe `composeTableHooks(declared, { afterSave })`, com `composeTableHooks` de `@rebasepro/common` e `declared` sendo os próprios `hooks` da tabela (`orders.config.hooks`). Consulte [Combinando conjuntos de hooks](/docs/collections/callbacks/#combining-hook-sets).
 
 ### Sem uma fila de jobs
 
-Deixe `jobQueue` de fora — ou execute em um driver sem SQL, onde o backend não tem uma — e as
-entregas ficam na fila em memória, no processo que fez a alteração. É mais simples, e
-basta para uma notificação que você pode se dar ao luxo de perder:
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Omita `jobQueue` — ou execute onde o backend não tem fila de jobs — e as entregas serão enfileiradas na memória, no processo que fez a alteração. Isso é mais simples e suficiente para notificações que você pode se dar ao luxo de perder:
 
 ```typescript
 import { WebhookDispatcher, type RebaseBackendInstance } from "@rebasepro/server";
@@ -124,7 +108,7 @@ export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
         }
     ]);
 
-    backend.setCollectionCallbacks("orders", {
+    backend.setTableHooks("orders", {
         afterSave: async ({ values, id, status }) => {
             if (status === "new") {
                 dispatcher.enqueueEntityChange("orders", "INSERT", String(id), values);
@@ -134,34 +118,23 @@ export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
 }
 ```
 
-Mantenha o dispatcher fora do próprio arquivo da coleção. Um arquivo de coleção também é incluído no
-admin, no navegador: o build remove os seus callbacks, mas um dispatcher criado no topo do arquivo
-e o seu import de `@rebasepro/server` iriam para todos os visitantes, e fariam o build do admin falhar.
+Mantenha o dispatcher fora do arquivo da tabela em si. O `backend/schema` é carregado por todos os comandos que leem o schema — `rebase db push`, `generate-sdk`, `doctor` — e um dispatcher criado no topo do arquivo seria instanciado por cada um deles. Anexe-o onde o backend é criado, como mostrado acima.
 
-Uma falha ou um deploy entre a confirmação e a entrega perde o evento. Cada webhook tem a sua própria
-fila, então um receptor fora do ar atrasa apenas as suas próprias entregas, nunca as de outro webhook.
-A fila de cada webhook comporta no máximo
-10.000 entregas em espera; enquanto estiver cheia, uma nova entrega é recusada e reportada ao `onDelivery`
-com `success: false`, `statusCode: 0`, `attemptNumber: 0` e `responseBody: "queue full"`, e
-o log do servidor avisa uma vez. Chame `await dispatcher.flush(10_000)` no encerramento: ele espera o que
-está na fila e resolve `false` se o orçamento de tempo acabar antes, porque um receptor que está fora do ar pode
-reter cada uma das suas entregas por até ~36 segundos de tentativas.
+Uma falha (crash) ou um deploy entre o commit e a entrega descarta o evento. Cada webhook tem sua própria fila, de modo que um receptor fora do ar atrasa apenas suas próprias entregas, nunca as de outro webhook. A fila de cada webhook comporta no máximo 10.000 entregas em espera; enquanto estiver cheia, uma nova entrega é recusada e reportada ao `onDelivery` com `success: false`, `statusCode: 0`, `attemptNumber: 0` e `responseBody: "queue full"`, e o log do servidor registra isso uma vez. Chame `await dispatcher.flush(10_000)` no encerramento (shutdown): ele aguarda o que estiver na fila e resolve como `false` se o tempo limite se esgotar antes, já que um receptor fora do ar pode reter cada uma de suas entregas por até ~36 segundos de tentativas.
 
 ### O que o receptor recebe
 
-Toda entrega é um `POST` com um corpo JSON e estes cabeçalhos:
+Cada entrega é um `POST` com um corpo JSON e estes cabeçalhos:
 
 | Cabeçalho | Valor |
 | --- | --- |
 | `X-Webhook-Id` | O `id` do webhook |
 | `X-Webhook-Event` | `INSERT`, `UPDATE` ou `DELETE` |
-| `X-Webhook-Delivery` | Um id por entrega, o mesmo em toda tentativa dela |
+| `X-Webhook-Delivery` | Um id por entrega, o mesmo em cada tentativa |
 | `X-Webhook-Attempt` | Qual tentativa é esta, a partir de `1` |
-| `X-Webhook-Signature` | `sha256=` e o HMAC-SHA256 em hexadecimal do corpo bruto, com a chave `secret` do webhook (apenas quando ele tem uma) |
+| `X-Webhook-Signature` | `sha256=` e o HMAC-SHA256 em hexadecimal do corpo bruto, assinado com o `secret` do webhook (apenas quando houver um) |
 
-As entregas são at-least-once: um receptor que respondeu devagar demais, ou um worker que morreu depois do
-`POST`, faz a mesma entrega chegar de novo. Deduplique por `X-Webhook-Delivery` e verifique a
-assinatura sobre o corpo exatamente como ele chegou — antes de interpretá-lo:
+As entregas são no modelo *at-least-once* (pelo menos uma vez): um receptor que respondeu lentamente demais, ou um worker que caiu após o `POST`, significa que a mesma entrega chegará novamente. Desduplique usando `X-Webhook-Delivery` e verifique a assinatura sobre o corpo exatamente como ele chegou — antes de fazer o parse:
 
 ```typescript
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -173,18 +146,16 @@ export function isSignedByRebase(rawBody: string, header: string | null, secret:
 }
 ```
 
-### Chamar um endpoint diretamente
+### Chamando um endpoint diretamente
 
-Se você vai enviar um corpo construído à mão para um único endpoint e não quer o dispatcher, as
-mesmas duas regras continuam valendo — limite a requisição, e nunca deixe a falha dela chegar ao
-chamador:
+Se você estiver enviando um payload montado manualmente para um endpoint e não quiser usar o dispatcher, as mesmas duas regras ainda se aplicam — limite a requisição e nunca deixe que a falha dela chegue ao chamador:
 
 ```typescript
-import type { CollectionCallbacks } from "@rebasepro/types";
+import type { TableHooks } from "@rebasepro/server/schema";
 
 type Order = { customer_name: string; total: number };
 
-const callbacks: CollectionCallbacks<Order> = {
+const hooks: TableHooks<Order> = {
     afterSave: async ({ values, id, status }) => {
         if (status !== "new") return;
         // No `await`: the transaction must not wait for Slack. `AbortSignal.timeout`
@@ -199,34 +170,27 @@ const callbacks: CollectionCallbacks<Order> = {
             signal: AbortSignal.timeout(10_000)
         }).catch((error) => {
             // Swallowed on purpose. A throw here would be an unhandled rejection;
-            // a throw *inside* the callback would roll the order back.
+            // a throw *inside* the hook would roll the order back.
             console.error("Slack notification failed", error);
         });
     }
 };
 ```
 
-Nunca passe para um `fetch` nu uma URL vinda do seu banco de dados. O dispatcher recusa destinos
-loopback, link-local, privados e esquemas que não sejam `http(s)` antes de conectar, e recusa-se a
-seguir redirecionamentos, justamente porque uma URL armazenada é entrada controlada por um
-atacante.
-No Node, ele julga o endereço para o qual cada
-conexão é de fato feita, dentro da própria resolução de DNS da conexão, de modo que um nome cujo registro
-muda entre uma verificação e a conexão não consegue passar; o nome de um receptor é resolvido
-uma vez por conexão, não uma vez por entrega.
+Nunca passe uma URL que veio do seu banco de dados diretamente para um `fetch`. O dispatcher rejeita destinos loopback, link-local, privados e diferentes de `http(s)` antes de se conectar, e recusa-se a seguir redirecionamentos, precisamente porque uma URL armazenada é uma entrada controlada pelo usuário/atacante. No Node, ele avalia o endereço ao qual cada conexão é de fato realizada, dentro da própria resolução de DNS da conexão, de modo que um nome cujo registro mude entre a verificação e a conexão não possa passar despercebido; o nome de um receptor é resolvido uma vez por conexão, não uma vez por entrega.
 
 ## Sincronização com API Externa
 
-`afterDelete` recebe a linha excluída de forma plana, como `row` — as colunas da tabela, não um wrapper de entidade.
+`afterDelete` recebe a linha excluída de forma simples, como `values` — as colunas da tabela, não um wrapper de entidade.
 
 ```typescript
-import type { CollectionCallbacks } from "@rebasepro/types";
+import type { TableHooks } from "@rebasepro/server/schema";
 
 type Product = { name: string; description: string; price: number; shopify_id: string };
 
 const syncQueue: Promise<unknown>[] = [];
 
-const callbacks: CollectionCallbacks<Product> = {
+const hooks: TableHooks<Product> = {
     afterSave: async ({ values, id }) => {
         // Queued, not awaited: Shopify being down must not fail the save.
         syncQueue.push(
@@ -249,8 +213,8 @@ const callbacks: CollectionCallbacks<Product> = {
         );
     },
 
-    afterDelete: async ({ row }) => {
-        const shopifyId = row.shopify_id;
+    afterDelete: async ({ values }) => {
+        const shopifyId = values.shopify_id;
         if (!shopifyId) return;
         syncQueue.push(
             fetch(
@@ -268,16 +232,12 @@ const callbacks: CollectionCallbacks<Product> = {
 
 ## Tratamento de Erros
 
-`afterSaveError` é executado quando a gravação — ou qualquer callback `afterSave` — lança uma
-exceção. É um hook de notificação, não um resgate: a transação é desfeita, a linha não é gravada e
-**o erro é relançado depois que ele roda**. Em uma requisição, ele roda depois que o rollback termina,
-fora da transação que falhou, então uma entrega que ele passa para a fila do dispatcher é mantida em vez
-de ser desfeita junto com a escrita.
+`afterSaveError` é executado quando o save — ou qualquer hook `afterSave` — lança uma exceção. Trata-se de um hook de notificação, não de recuperação (rescue): a transação sofre rollback, a linha não é salva e **o erro é relançado após a sua execução**. Em uma requisição, ele é executado assim que o rollback é concluído, fora da transação que falhou, portanto, uma entrega passada para a fila do dispatcher é mantida em vez de sofrer rollback junto com a escrita.
 
 ```typescript
-import type { CollectionCallbacks } from "@rebasepro/types";
+import type { TableHooks } from "@rebasepro/server/schema";
 
-const callbacks: CollectionCallbacks = {
+const hooks: TableHooks = {
     afterSave: async ({ values }) => {
         // If this throws, the write is rolled back. That is the right behaviour
         // for a validation or an invariant, and the wrong one for a notification.
@@ -285,15 +245,14 @@ const callbacks: CollectionCallbacks = {
     },
     afterSaveError: async ({ id, values }) => {
         // Runs, and then the error is rethrown. Use it to alert, not to recover.
-        console.error(`Save failed for entity ${id}`, values);
+        console.error(`Save failed for row ${id}`, values);
     }
 };
 ```
 
-Se uma falha *não* deve custar ao usuário a sua escrita, ela não pode escapar de `afterSave` —
-capture-a ali, ou entregue o trabalho à fila do dispatcher.
+Se uma falha *não* deve custar a escrita do usuário, ela não deve lançar exceções para fora do `afterSave` — capture-a ali ou encaminhe o trabalho para a fila do dispatcher.
 
 ## Próximos Passos
 
--   **[Callbacks de Entidade](/docs/collections/callbacks)** — Referência completa de callbacks
--   **[Receita de Blog CMS](/docs/recipes/blog-cms)** — Exemplo completo de blog
+- **[Table hooks](/docs/collections/callbacks)** — Referência completa de hooks
+- **[Receita de Blog CMS](/docs/recipes/blog-cms)** — Exemplo completo de blog

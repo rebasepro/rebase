@@ -1,42 +1,42 @@
 ---
-sourceHash: 1aa81dc2f00c934e
+sourceHash: 4fc45b4d1d08afde
 title: API REST
 sidebar_label: API REST
-description: Endpoints de la API REST autogenerados para cada colección, con filtrado, ordenación, paginación e inclusión de relaciones.
+description: Endpoints de API REST autogenerados para cada tabla, con filtrado, ordenación, paginación e inclusión de relaciones.
 ---
 
 ## Descripción general
 
-Rebase genera automáticamente una API completa a partir de las definiciones de tus colecciones:
+Rebase genera automáticamente una API completa a partir de tus tablas:
 
-- **API REST** — Endpoints CRUD para cada colección en `/api/data/:slug`
-- **Especificación OpenAPI** — Especificación legible por máquina en `/api/docs`
-- **Swagger UI** — Explorador interactivo de API en `/api/swagger` (solo en modo de desarrollo)
+- **API REST** — Endpoints CRUD para cada tabla en `/api/data/:slug`
+- **Especificación OpenAPI** — Especificación legible por máquina en `/api/docs`, servida a cada cliente autenticado para las tablas que puede ver
+- **Swagger UI** — Explorador interactivo de API en `/api/swagger`, cuando publicas el documento (`REBASE_ENABLE_SWAGGER=true`, fuera de producción)
 
-No se requiere código: define tus colecciones y la API aparecerá automáticamente.
+No se requiere código: [declara tus tablas](/docs/schema/) y la API aparecerá automáticamente.
 
 ## Endpoints REST
 
-Para cada colección, se generan los siguientes endpoints. Cualquier otra ruta que monte el backend (autenticación, almacenamiento, administración, metadatos) se encuentra en el [índice de endpoints](/docs/backend/endpoints/).
+Para cada tabla, se generan los siguientes endpoints. Cualquier otra ruta que monte el backend (autenticación, almacenamiento, administración, metadatos) se encuentra en el [índice de endpoints](/docs/backend/endpoints/).
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | `GET` | `/api/data/:slug` | Listar entidades |
 | `POST` | `/api/data/:slug/query` | El mismo listado, con sus parámetros de consulta en un cuerpo JSON, para una consulta demasiado larga para una URL. Consulta [Consultas demasiado largas para una URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
 | `GET` | `/api/data/:slug/count` | Contar entidades |
-| `GET` | `/api/data/:slug/aggregate` | `count()`, `sum()`, `avg()`, `min()`, `max()`, opcionalmente agrupados. Acepta los mismos filtros que el endpoint de listado, y RLS se aplica a las filas que se agregan; consulta [Consultas](/docs/sdk/querying/) |
+| `GET` | `/api/data/:slug/aggregate` | `count()`, `sum()`, `avg()`, `min()`, `max()`, opcionalmente agrupados. Acepta los mismos filtros que el endpoint de listado, y RLS se aplica a las filas agregadas; consulta [Consultas](/docs/sdk/querying/) |
 | `GET` | `/api/data/:slug/:id` | Obtener una sola entidad |
 | `POST` | `/api/data/:slug` | Crear un registro |
-| `PATCH` | `/api/data/:slug/:id` | Actualizar un registro (parcial: solo se escriben las propiedades que envíes) |
+| `PATCH` | `/api/data/:slug/:id` | Actualizar un registro (parcial: solo se escriben las propiedades enviadas) |
 | `DELETE` | `/api/data/:slug/:id` | Eliminar un registro |
 | `POST` | `/api/data/:slug/bulk` | Crear múltiples entidades en una sola transacción |
 | `PATCH` | `/api/data/:slug/bulk` | Actualizar múltiples entidades en una sola transacción |
 | `POST` | `/api/data/:slug/bulk/delete` | Eliminar múltiples entidades en una sola transacción |
-| `POST` | `/api/data/_batch` | Escribir **a través de** colecciones en una sola transacción |
+| `POST` | `/api/data/_batch` | Escribir **entre** tablas en una sola transacción |
 
-### Rutas de subcolecciones
+### Rutas anidadas
 
-Las relaciones anidadas son accesibles a través de rutas URL:
+Las relaciones son accesibles a través de rutas URL:
 
 ```
 GET    /api/data/authors/42/posts         → list author's posts
@@ -50,9 +50,9 @@ DELETE /api/data/authors/42/posts/7       → delete the post
 
 #### Mecánica de enrutamiento y análisis de segmentos
 
-Para manejar profundidades arbitrarias de subcolecciones anidadas, Rebase enruta las solicitudes entrantes utilizando la expresión regular del parámetro `:rest{.+}` de Hono. El motor interno de análisis de segmentos analiza las rutas contando los segmentos separados por barras:
-- **Número impar de segmentos** (por ejemplo, `authors/42/posts` -> 3 segmentos) representa una solicitud de listado de colección.
-- **Número par de segmentos** (por ejemplo, `authors/42/posts/7` -> 4 segmentos) representa una operación sobre un ID de entidad específico. El último segmento se extrae como el `entityId` de destino.
+Para manejar profundidades de anidamiento arbitrarias, Rebase enruta las solicitudes entrantes utilizando la expresión regular de parámetros `:rest{.+}` de Hono. El motor interno de análisis de segmentos examina las rutas contando los segmentos separados por barras:
+- **Recuento impar de segmentos** (por ejemplo, `authors/42/posts` -> 3 segmentos) representa una solicitud de listado en la tabla relacionada.
+- **Recuento par de segmentos** (por ejemplo, `authors/42/posts/7` -> 4 segmentos) representa una operación en un id de fila específico. El último segmento se extrae como el id de destino.
 
 El motor filtra los espacios de nombres reservados del sistema (por ejemplo, `history`) del análisis de segmentos de ruta para evitar colisiones con los endpoints integrados.
 
@@ -65,14 +65,14 @@ curl -H "Authorization: Bearer <access-token>" \
      https://api.example.com/api/data/products
 ```
 
-Para llamadas entre servidores, utiliza la clave de servicio:
+Para llamadas de servidor a servidor, utiliza la clave de servicio:
 
 ```bash
 curl -H "Authorization: Bearer <service-key>" \
      https://api.example.com/api/data/products
 ```
 
-El filtrado de una lista — operadores `?field=op.value`, grupos `or`/`and`, el dialecto JSON `where` y cómo se combinan — tiene [su propia página](/docs/backend/filtering).
+El filtrado de listas —operadores `?field=op.value`, grupos `or`/`and`, el dialecto JSON de `where` y cómo se combinan— tiene [su propia página](/docs/backend/filtering).
 
 ## Ordenación
 
@@ -86,41 +86,41 @@ GET /api/data/products?orderBy=price:desc
 GET /api/data/products?orderBy=name:asc
 ```
 
-Si no se especifica una dirección, se asume `asc`. Una dirección que no sea ni `asc` ni `desc`, o un campo que la colección no tenga, resulta en un **400**, no en un 200 con las filas en el orden que la base de datos prefiera, lo cual sería indistinguible de una ordenación exitosa.
+Si falta la dirección, se asume `asc`. Una dirección que no sea ni `asc` ni `desc`, o un campo que la tabla no tenga, devuelve un **400**, no un 200 con las filas en cualquier orden que la base de datos decida, lo cual sería indistinguible de una ordenación que funcionó correctamente.
 
-### Múltiples claves
+### Varias claves
 
-La sintaxis abreviada admite una sola clave. Para más, pasa un array JSON; la segunda clave desempatará las filas que la primera considere iguales:
+La sintaxis abreviada admite una sola clave. Para más claves, pasa un array JSON; la segunda clave desempatará las filas que la primera considere iguales:
 
 ```bash
 # By category, and newest first within each category
 GET /api/data/products?orderBy=[{"field":"category"},{"field":"createdAt","direction":"desc"}]
 ```
 
-Ambas sintaxis están disponibles en todas las rutas que listan filas, incluidas las anidadas (`/api/data/authors/:id/posts`). Toda ordenación finaliza con el id de fila descendente, tanto si se solicita como si no: esto es lo que hace que el orden sea total, y paginar sobre un orden que no es total repite y omite filas.
+Ambas sintaxis se aplican a todas las rutas que listan filas, incluidas las anidadas (`/api/data/authors/:id/posts`). Cada ordenación finaliza con el id de fila en orden descendente, se haya solicitado o no: esto es lo que hace que el orden sea total, y la paginación sobre un orden que no es total repite y omite filas.
 
-Un parámetro `?orderBy=` repetido no realiza una ordenación por múltiples claves; el último prevalece, como ocurre con cualquier otro parámetro de consulta. Utiliza el array.
+Un parámetro `?orderBy=` repetido no es una ordenación multiclave: el último prevalece, como ocurre con cualquier otro parámetro de consulta. Utiliza el array.
 
-### Dónde se ordenan los valores NULL
+### Dónde se ordenan los NULLs
 
-De forma predeterminada, los valores NULL se ordenan **al final en orden ascendente y al principio en orden descendente**, que es la convención propia de Postgres. Un tercer segmento separado por dos puntos permite cambiar esto:
+De forma predeterminada, los NULLs se ordenan **al final de forma ascendente y al principio de forma descendente**, que es la propia convención de Postgres. Un tercer segmento separado por dos puntos indica lo contrario:
 
 ```bash
 # Newest first, with the undated rows at the end rather than the top
 GET /api/data/posts?orderBy=publishedAt:desc:last
 ```
 
-La forma de array JSON acepta una clave `"nulls"` para lo mismo:
+La variante de array JSON acepta una clave `"nulls"` para lo mismo:
 
 ```bash
 GET /api/data/posts?orderBy=[{"field":"publishedAt","direction":"desc","nulls":"last"}]
 ```
 
-Cualquier valor distinto de `first` o `last` devuelve un 400, en lugar de un orden silenciosamente diferente. El cursor descrito a continuación respeta lo que haya declarado la ordenación, por lo que paginar sobre una clave que acepte valores nulos sigue siendo correcto con cualquiera de las dos ubicaciones.
+Cualquier valor distinto de `first` o `last` devuelve un 400, no un orden silenciosamente diferente. El cursor que se explica a continuación respeta lo que haya declarado la ordenación, por lo que la paginación sobre una clave anulable se mantiene correcta bajo cualquiera de las dos ubicaciones.
 
 ## Paginación
 
-Utiliza `limit` y `offset`, o `page` — uno u otro:
+Utiliza `limit` y `offset`, o `page` (uno u otro):
 
 ```bash
 # Limit and offset
@@ -130,21 +130,21 @@ GET /api/data/products?limit=20&offset=40
 GET /api/data/products?page=3
 ```
 
-El límite predeterminado es **50**, y el máximo es **1000**. Ambos provienen de `DEFAULT_LIST_LIMIT` / `MAX_LIST_LIMIT`, que la especificación OpenAPI generada también reporta; un `limit` superior al máximo se rechaza en lugar de truncarse.
+El límite predeterminado es **50** y el máximo es **1000**. Ambos provienen de `DEFAULT_LIST_LIMIT` / `MAX_LIST_LIMIT`, que también informa la especificación OpenAPI generada; un `limit` superior al máximo se rechaza en lugar de ajustarse.
 
-Los tres parámetros de ventana se rechazan en lugar de corregirse, y cada uno indica su error: `INVALID_LIMIT`, `INVALID_OFFSET` (un número entero de 0 o más) e `INVALID_PAGE` (un número entero de 1 o más). Una ventana sutilmente diferente a la solicitada no se puede distinguir de haber llegado al final de la colección, razón por la cual ninguno de ellos se trunca ni se ignora.
+Los tres parámetros de ventana se rechazan en lugar de corregirse silenciosamente, y cada uno tiene su propio error: `INVALID_LIMIT`, `INVALID_OFFSET` (un número entero mayor o igual a 0) e `INVALID_PAGE` (un número entero mayor o igual a 1). Una ventana silenciosamente diferente a la solicitada no se puede distinguir de haber llegado al final de la tabla, por lo que ninguno de ellos se ajusta ni se ignora.
 
-Por la misma razón, `page` y `offset` juntos son un 400 `PAGE_WITH_OFFSET`, en lugar de que uno de los dos gane en silencio.
+Por la misma razón, `page` y `offset` juntos devuelven un 400 `PAGE_WITH_OFFSET` en lugar de que uno de ellos prevalezca silenciosamente.
 
-### Omitir el conteo
+### Omitir el recuento
 
-`meta.total` es un `COUNT(*)` sobre todas las filas que coinciden — en una tabla grande, la mayor parte de lo que cuesta una solicitud de listado. `?count=none` (`GET /api/data/orders?count=none`) lo omite: no hay `meta.total`, mientras que `meta.hasMore` sigue siendo exacto (la lectura pide una fila más allá de la página). `?count=exact` es el valor por defecto; cualquier otro valor es un 400 `INVALID_COUNT`. Una lectura con `?distinct=true` nunca se cuenta, ni tampoco una búsqueda vectorial con un `vector_threshold` (consulta [Búsqueda vectorial](/docs/backend/vector-search/)).
+`meta.total` es un `COUNT(*)` sobre cada fila coincidente; en una tabla grande, representa la mayor parte del coste de una solicitud de listado. `?count=none` (`GET /api/data/orders?count=none`) lo omite: no hay `meta.total`, mientras que `meta.hasMore` sigue siendo exacto (la lectura solicita una fila más allá de la página). `?count=exact` es el valor predeterminado; cualquier otro valor devuelve un 400 `INVALID_COUNT`. Una lectura con `?distinct=true` nunca se cuenta, y tampoco una búsqueda vectorial con un `vector_threshold` (consulta [Búsqueda vectorial](/docs/backend/vector-search/)).
 
 ### Paginación por cursor
 
-`offset` vuelve a contar las filas en cada solicitud, por lo que una fila insertada o eliminada entre dos páginas desplaza la ventana y la iteración omite o repite filas de forma silenciosa. En cambio, `?after=` realiza una búsqueda por cursor: la siguiente página comienza estrictamente después de la última fila servida.
+`offset` vuelve a contar las filas en cada solicitud, por lo que una fila insertada o eliminada entre dos páginas desplaza la ventana y el recorrido omite o repite filas silenciosamente. En su lugar, `?after=` busca directamente: la página siguiente comienza estrictamente después de la última fila servida.
 
-Cada respuesta de listado incluye `meta.nextCursor` mientras exista otra página. Reenvíalo sin modificaciones:
+Cada respuesta de listado incluye `meta.nextCursor` mientras exista otra página. Envíalo de vuelta sin cambios:
 
 ```bash
 GET /api/data/orders?orderBy=createdAt:desc&limit=100
@@ -153,46 +153,44 @@ GET /api/data/orders?orderBy=createdAt:desc&limit=100
 GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJjcmVhdGVkX2F0Iiw…
 ```
 
-El cursor es **opaco** (codifica las claves de ordenación *y* los valores de la última fila para ellas), por lo que se aplican tres reglas, cada una resultando en un 400 en lugar de una página incorrecta:
+El cursor es **opaco** (codifica las claves de ordenación *y* los valores de la última fila para ellas), por lo que se aplican tres reglas, cada una devolviendo un 400 en lugar de una página incorrecta:
 
 | Situación | Código |
 |-----------|--------|
-| `after` con `offset` o `page` | `CURSOR_WITH_OFFSET` — ambos indican dónde comienza la página |
-| `after` con un `orderBy` diferente al emitido originalmente | `CURSOR_ORDER_MISMATCH` |
+| `after` con `offset` o `page` | `CURSOR_WITH_OFFSET` — ambos definen dónde comienza la página |
+| `after` con un `orderBy` diferente al que se emitió | `CURSOR_ORDER_MISMATCH` |
 | Un cursor que esta API no emitió | `INVALID_CURSOR` |
 
-Una solicitud que no especifica ningún `orderBy` **adopta el del cursor**, por lo que reenviar `meta.nextCursor` sin volver a declarar la ordenación funciona.
+Una solicitud que no especifica `orderBy` **adopta el del cursor**, por lo que enviar `meta.nextCursor` de vuelta sin volver a indicar la ordenación funciona correctamente.
 
-Tanto las ordenaciones por múltiples claves como las claves que admiten valores nulos paginan correctamente: la comparación se construye sobre cada clave en orden, con la ubicación de NULL que declaró la ordenación. El único orden que ningún cursor puede describir es la relevancia (`_score`), calculada por consulta y no almacenada en ninguna parte; dicho listado simplemente no incluye `nextCursor`.
+Las ordenaciones multiclave y las claves anulables paginan correctamente: la comparación se realiza sobre cada clave en orden, respetando la posición de NULL que declaró la ordenación. El único orden que ningún cursor puede describir es la relevancia (`_score`), calculada por consulta y no almacenada en ninguna parte, por lo que dicho listado simplemente no incluye `nextCursor`.
 
 ## Selección de columnas
 
-`?fields=` restringe una lectura a las columnas que especifiques. Es una proyección que se aplica directamente en la consulta, no un recorte posterior de la respuesta:
+`?fields=` restringe la lectura a las columnas indicadas. Es una proyección enviada a la consulta, no un recorte en la respuesta:
 
 ```bash
 GET /api/data/posts?fields=id,title&limit=50
 ```
 
-La clave primaria siempre se devuelve (una fila a la que no se puede hacer referencia no puede actualizarse, eliminarse ni paginarse, y el cursor se deriva de ella), y las columnas con `excludeFromApi` permanecen ocultas tanto si se nombran como si no. Una columna desconocida resulta en un error 400 `UNKNOWN_FIELD` en lugar de una fila a la que silenciosamente le falte un campo.
+La clave primaria siempre se devuelve (una fila que no se puede direccionar no se puede actualizar, eliminar ni avanzar con paginación, y el cursor se deriva de ella), y las columnas `.private()` permanecen ocultas independientemente de si se especifican o no. Una columna desconocida devuelve un 400 `UNKNOWN_FIELD` en lugar de una fila a la que silenciosamente le falte un campo.
 
-Una relación nombrada en `?include=` se devuelve tanto si `?fields=` la nombra como si no:
-`?include=author&fields=title` devuelve `title`, la clave y `author`. Nombrar también la
-relación en `?fields=` está permitido y no cambia nada.
+Una relación especificada en `?include=` se devuelve independientemente de si `?fields=` la incluye o no: `?include=author&fields=title` devuelve `title`, la clave y `author`. Incluir también la relación en `?fields=` está permitido y no altera el resultado.
 
-`?distinct=true` colapsa las filas que sean idénticas en esas columnas:
+`?distinct=true` agrupa filas idénticas en esas columnas:
 
 ```bash
 # The statuses actually in use
 GET /api/data/posts?fields=status&distinct=true
 ```
 
-Se rechaza (400) cuando se usa junto con un `searchString` clasificado por rango o una búsqueda vectorial, ya que estos añaden una puntuación por fila que hace que cada una sea distinta por definición, y cuando `orderBy` nombra una columna que `fields` no devuelve (`DISTINCT_ORDER_BY_NOT_SELECTED`), puesto que Postgres no puede ordenar una lectura DISTINCT mediante una expresión que no esté en su lista de selección.
+Se rechaza (400) junto con un `searchString` clasificado o una búsqueda vectorial, los cuales asignan una puntuación por fila que hace que cada fila sea distinta por diseño, y cuando `orderBy` nombra una columna que `fields` no devuelve (`DISTINCT_ORDER_BY_NOT_SELECTED`): Postgres no puede ordenar una lectura DISTINCT mediante una expresión fuera de su lista de selección.
 
-`?fields=` y `?distinct=` también funcionan en la ruta de obtención por ID y en las rutas de subcolecciones anidadas.
+`?fields=` y `?distinct=` también funcionan en la ruta get-by-id y en las rutas anidadas.
 
 ### Formato de respuesta
 
-Las respuestas de listados incluyen metadatos de paginación:
+Las respuestas de listado incluyen metadatos de paginación:
 
 ```json
 {
@@ -210,7 +208,7 @@ Las respuestas de listados incluyen metadatos de paginación:
 }
 ```
 
-`nextCursor` está presente mientras `hasMore` sea `true` y la página haya devuelto al menos una fila; está ausente en la última página y en ordenaciones que ningún cursor pueda describir.
+`nextCursor` está presente mientras `hasMore` sea true y la página haya devuelto al menos una fila; está ausente en la última página y en un orden que ningún cursor pueda describir.
 
 Las respuestas de una sola entidad devuelven un objeto plano:
 
@@ -225,7 +223,7 @@ Las respuestas de una sola entidad devuelven un objeto plano:
 
 ## Errores
 
-Cada fallo, de cualquier ruta, se devuelve en una misma estructura contenedora:
+Cada fallo, desde cualquier ruta, se devuelve en una misma estructura:
 
 ```json
 {
@@ -238,27 +236,27 @@ Cada fallo, de cualquier ruta, se devuelve en una misma estructura contenedora:
 }
 ```
 
-`message` y `code` siempre están presentes. `details` aparece cuando el rechazo se refiere *a algo en específico*: el campo incorrecto, las rutas que fallaron. `requestId` aparece cuando la solicitud incluía un encabezado `X-Request-ID` o se le asignó uno; también se refleja en el encabezado de respuesta y es la referencia que debe citarse en un informe de error.
+`message` y `code` siempre están presentes. `details` aparece cuando el rechazo trata *sobre* algo (el campo incorrecto, las rutas que fallaron). `requestId` aparece cuando la solicitud incluía un encabezado `X-Request-ID` o se le asignó uno; también se refleja en el encabezado de respuesta y es lo que debe indicarse en un reporte de error.
 
-**Bifurca tu lógica según `code`, nunca según `message` o el código de estado únicamente.** Los códigos están en `SCREAMING_SNAKE_CASE` y son estables; los mensajes están escritos para una persona que lee una consola y pueden cambiar. El estado HTTP se encuentra en la respuesta, no en el cuerpo.
+**Bifurca según el `code`, nunca según el `message` o el estado por sí solo.** Los códigos están en `SCREAMING_SNAKE_CASE` y son estables; los mensajes están escritos para una persona que lee una consola y pueden cambiar. El estado HTTP se encuentra en la respuesta, no en el cuerpo.
 
 | Estado | Código típico | Significado |
 |--------|---------------|-------------|
-| 400 | `BAD_REQUEST`, `INVALID_INPUT`, `INVALID_LIMIT`, `INVALID_OFFSET`, `INVALID_PAGE` | La solicitud está mal formada o solicita algo imposible |
-| 401 | `UNAUTHORIZED` | Sin credencial, o una que no identifica a nadie |
-| 403 | `FORBIDDEN`, `SCOPE_MISSING`, `WRITE_DENIED` | Una credencial que identifica a alguien sin los permisos necesarios |
-| 404 | `NOT_FOUND` | El recurso solicitado no existe |
-| 409 | `CONFLICT` | Conflicto de estado: una clave duplicada, un árbol desincronizado |
+| 400 | `BAD_REQUEST`, `INVALID_INPUT`, `INVALID_LIMIT`, `INVALID_OFFSET`, `INVALID_PAGE` | La solicitud está mal formada o pide algo imposible |
+| 401 | `UNAUTHORIZED` | Sin credencial, o con una que no identifica a nadie |
+| 403 | `FORBIDDEN`, `SCOPE_MISSING`, `WRITE_DENIED` | Una credencial que identifica a alguien sin los permisos suficientes |
+| 404 | `NOT_FOUND` | El elemento solicitado no existe |
+| 409 | `CONFLICT` | El estado entra en conflicto: una clave duplicada, un árbol desincronizado |
 | 501 | varía | La funcionalidad existe pero **no está configurada** en este despliegue |
 | 503 | `SERVICE_UNAVAILABLE` | Una dependencia está caída; la solicitud nunca llegó a ella |
 
-Una funcionalidad que no esté disponible porque este despliegue no la habilitó responde 501 con un código y un motivo, no 404; un 404 inexplicable en una ruta a la que la interfaz de usuario acaba de llamar se interpreta como un despliegue defectuoso.
+Una funcionalidad que está ausente porque este despliegue no la habilitó responde con 501 junto con un código y un motivo, no 404; un 404 inexplicable en una ruta que la interfaz de usuario acaba de llamar se interpreta como un despliegue roto.
 
-Las rutas añaden sus propios códigos más específicos además de estos (`EMAIL_EXISTS`, `TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), por lo que debes considerar la lista de códigos como abierta. El SDK tipado convierte todos ellos en un único `RebaseApiError` que contiene `status`, `code` y `details`; consulta [Manejo de errores](/docs/backend#error-handling).
+Las rutas añaden sus propios códigos más específicos sobre estos (`EMAIL_EXISTS`, `TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), por lo que debes tratar la lista de códigos como abierta. El SDK tipado convierte todos ellos en un único `RebaseApiError` que contiene `status`, `code` y `details`; consulta [Gestión de errores](/docs/backend#error-handling).
 
 ## Búsqueda de texto
 
-Utiliza `searchString` para búsquedas de texto completo en campos de texto:
+Utiliza `searchString` para búsquedas de texto completo en campos de cadena:
 
 ```bash
 GET /api/data/products?searchString=wireless%20keyboard
@@ -266,16 +264,11 @@ GET /api/data/products?searchString=wireless%20keyboard
 
 ## Búsqueda vectorial
 
-Una colección con una propiedad `vector` admite una búsqueda de vecinos más cercanos en el
-listado: `?vector_search=embedding&vector=[0.15,0.22,-0.05]`, con `vector_distance` y
-`vector_threshold` opcionales. Los parámetros, los umbrales y cómo se comportan los
-filtros sobre el índice están en [Búsqueda vectorial](/docs/backend/vector-search/).
+Una tabla con una columna `col.vector()` admite una búsqueda de vecinos más cercanos en el listado: `?vector_search=embedding&vector=[0.15,0.22,-0.05]`, con un `vector_distance` y `vector_threshold` opcionales. Los parámetros, umbrales y cómo se comportan los filtros en el índice se encuentran en [Búsqueda vectorial](/docs/backend/vector-search/).
 
 ## Consultas demasiado largas para una URL
 
-`POST /api/data/:slug/query` (este listado) y `POST /api/data/:slug/count`
-toman los parámetros de consulta en un cuerpo JSON, para una consulta cuya URL no cabría — un embedding, una lista `in` larga.
-Consulta [Consultas demasiado largas para una URL](/docs/backend/vector-search/#queries-too-long-for-a-url).
+`POST /api/data/:slug/query` (este listado) y `POST /api/data/:slug/count` aceptan los parámetros de consulta en un cuerpo JSON para consultas cuya URL no cabría (un embedding, una lista `in` larga). Consulta [Consultas demasiado largas para una URL](/docs/backend/vector-search/#queries-too-long-for-a-url).
 
 ## Inclusión de relaciones
 
@@ -292,11 +285,11 @@ GET /api/data/articles?include=*
 GET /api/data/articles?include=comments.author
 ```
 
-Un nombre que no sea una relación de la colección devuelve un **400 `UNKNOWN_RELATION`**, en cualquier nivel. Anteriormente se ignoraba, respondiendo 200 con el campo simplemente ausente, lo cual era indistinguible de una fila que realmente no tuviera ninguna fila relacionada, haciendo que un error tipográfico pareciera datos vacíos. Una ruta con una profundidad superior a tres saltos devuelve `INCLUDE_TOO_DEEP`.
+Un nombre que no sea una relación de la tabla devuelve un **400 `UNKNOWN_RELATION`**, en cualquier nivel. Anteriormente se ignoraba, respondiendo 200 omitiendo simplemente el campo, lo que era indistinguible de una fila que genuinamente no tiene fila relacionada, haciendo que un error tipográfico pareciera datos vacíos. Una ruta con una profundidad superior a tres saltos devuelve `INCLUDE_TOO_DEEP`. Un nombre debe ser la clave exacta de la relación en el objeto `relations` de la tabla; las variantes en slug y snake_case que versiones anteriores intentaban no son válidas. Las filas relacionadas se devuelven en el [`orderBy`](/docs/collections/relations/) declarado por la relación cuando la solicitud no especifica ninguno, y una clave foránea generada por una relación en una columna `bigint` o `numeric` se devuelve como un número.
 
-### Delimitar una relación
+### Filtrar y limitar una relación
 
-El formato separado por comas no permite especificar un `limit` por relación, por lo que `include` también acepta JSON, diferenciándose por una llave de apertura:
+El formato separado por comas no permite especificar un `limit` por relación, por lo que `include` también acepta JSON, diferenciado por una llave de apertura:
 
 ```bash
 GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",true]},"orderBy":"createdAt:desc","fields":["id","body"],"include":{"author":true}}}
@@ -304,17 +297,18 @@ GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",tr
 
 | Clave | Significado |
 |-------|-------------|
-| `limit` | Filas **por fila principal**, no en toda la página. Lo aplica la consulta, así que las filas que lo superan nunca se leen de la base de datos |
+| `limit` | Filas **por fila primaria**, no a lo largo de toda la página. Se aplica en la consulta, por lo que las filas posteriores nunca se leen de la base de datos |
 | `where` | El mismo dialecto de filtrado que utiliza el `where` de nivel superior |
 | `logical` | Un grupo `or`/`and`/`not` sobre las filas relacionadas |
-| `orderBy` | La misma sintaxis de ordenación, incluida la posición de NULL. Los empates, y un `limit` sin `orderBy`, se resuelven por la clave de la fila relacionada, en orden ascendente |
-| `fields` | Columnas de la fila *relacionada*; su clave primaria siempre se conserva |
+| `orderBy` | La misma sintaxis de ordenación, incluida la posición de NULL. Los empates, y un `limit` sin `orderBy`, se ordenan por la clave de la fila relacionada en orden ascendente |
+| `fields` | Columnas de la fila *relacionada*; su clave siempre se conserva |
 | `include` | Relaciones de la fila relacionada, a su vez |
-| `count` | `true` devuelve además el total de cada fila principal bajo `_count` (`"_count":{"comments":37}`), contado por la misma sentencia. Solo relaciones a muchos. Consulta [Contar lo que deja fuera un límite](/docs/sdk/relations#counting-what-a-limit-leaves-out) |
+| `count` | `true` también devuelve el total de cada fila primaria bajo `_count` (`"_count":{"comments":37}`), contabilizado en la misma sentencia. Solo para relaciones de uno a muchos (*to-many*). Consulta [Contar lo que un límite omite](/docs/sdk/relations#counting-what-a-limit-leaves-out) |
 
-`true` significa "cargarla por completo", por lo que `{"author":true}` y `author` representan la misma solicitud. Ambas sintaxis funcionan en la ruta de listado, en la de obtención por ID y en las rutas de subcolecciones anidadas.
+`true` significa "cargarla por completo", por lo que `{"author":true}` y `author` representan la misma solicitud.
+Ambas sintaxis funcionan en la ruta de listado, la ruta get-by-id y las rutas anidadas.
 
-Cada salto se realiza mediante una única consulta por lotes para toda la página, nunca una por fila.
+Cada salto es una única consulta por lotes para toda la página, nunca una por fila.
 
 Las relaciones incluidas se incrustan directamente en la respuesta:
 
@@ -332,67 +326,70 @@ Las relaciones incluidas se incrustan directamente en la respuesta:
 }
 ```
 
-Una fila incluida es la que sirve la ruta propia del destino (`GET /api/data/authors/42`): las mismas columnas y codificaciones, claves foráneas como columnas, sin objetos de referencia.
+Una fila incluida es idéntica a lo que sirve la ruta propia del destino (`GET /api/data/authors/42`): las mismas columnas y codificaciones, claves foráneas como columnas y sin objetos de referencia.
 
 ## Escritura
 
-Las claves de idempotencia, las escrituras condicionales (`ETag` / `If-Match`), las operaciones de campo (`$inc`, `$push`, `$pull`, `$merge`), el upsert mediante una clave natural, `Prefer: return=minimal`, y el endpoint entre colecciones `POST /api/data/_batch` se encuentran detallados en su propia página: **[Escritura a través de REST](/docs/backend/writes/)**.
+Las claves de idempotencia, las escrituras condicionales (`ETag` / `If-Match`), las operaciones de campo (`$inc`, `$push`, `$pull`, `$merge`), el *upsert* mediante clave natural, `Prefer: return=minimal` y el endpoint entre tablas `POST /api/data/_batch` se encuentran detallados en su propia página: **[Escritura mediante REST](/docs/backend/writes/)**.
 
-## Pipeline de hooks del ciclo de vida
+## Canalización de hooks del ciclo de vida
 
-En Postgres, cada mutación REST (`POST`, `PATCH`, `DELETE`) ejecuta los callbacks de su colección en orden, dentro de la única transacción que lleva la escritura:
+En Postgres, cada mutación REST (`POST`, `PATCH`, `DELETE`) ejecuta los hooks de su tabla en orden, dentro de la misma transacción que efectúa la escritura:
 
 ```
 Request ──► BEGIN ──► beforeSave/beforeDelete ──► DB operation ──► afterSave/afterDelete ──► COMMIT ──► Response
 ```
 
-Cada hook se espera, y un error en cualquiera de ellos deshace toda la escritura:
+Cada hook se espera con `await`, y cualquier excepción lanzada por alguno de ellos revierte la escritura por completo:
 
-1. **`beforeSave`, `beforeDelete`** se ejecutan antes de la escritura. Pueden cambiar los valores entrantes, validar o rechazar la solicitud lanzando un error: el llamante recibe **400 `CALLBACK_REJECTED`** y no se escribe nada.
-2. **`afterSave`, `afterDelete`** se ejecutan después de la escritura pero *antes* del commit. Un error revierte la fila y responde el mismo 400, con `details.stage` indicando el hook. Mantienen la transacción abierta mientras se ejecutan, por eso son el lugar equivocado para un webhook o cualquier otra llamada de red: [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) explica adónde va ese trabajo.
+1. **`beforeSave`, `beforeDelete`** se ejecutan antes de la escritura. Pueden modificar los valores entrantes, validar o rechazar la solicitud lanzando un error: el cliente recibe un **400 `CALLBACK_REJECTED`** y no se escribe nada.
+2. **`afterSave`, `afterDelete`** se ejecutan después de la escritura pero *antes* del commit. Un error revierte la fila y responde con el mismo 400, indicando el hook en `details.stage`. Mantienen la transacción abierta mientras se ejecutan, por lo que no son el lugar adecuado para webhooks ni llamadas de red externas; consulta [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) para saber dónde ubicar ese trabajo.
 
 ## Endpoints del sistema
 
 | Método | Ruta | Autenticación | Descripción |
 |--------|------|---------------|-------------|
-| `GET` | `/health` and `/api/health` | ninguna | Comprobación de estado operativo y disponibilidad (liveness/readiness check) |
-| `GET` | `/api/docs` | ninguna; `schema:read` cuando `enableSwagger` es `false` (el valor predeterminado del runtime en producción) | La especificación JSON de OpenAPI 3.0 |
-| `GET` | `/api/swagger` | ninguna | Swagger UI. Se sirve solo fuera de producción; `REBASE_ENABLE_SWAGGER` no puede activarlo en producción. No se sirve cuando `enableSwagger` es `false`, tampoco en desarrollo |
-| `GET` | `/api/meta/schema-version` | ninguna | El hash del esquema a partir del cual se construyó este backend y la versión del runtime: deliberadamente sin autenticación, y nada que describa el esquema |
-| `GET` | `/api/meta/contract` | `schema:read`: un administrador, la service key o una clave de API que lo tenga | El contrato completo de las colecciones, para `rebase generate-sdk --from`. Cierre por fallo (fail-closed): `404` cuando no hay autenticación configurada |
+| `GET` | `/health` y `/api/health` | ninguna | Verificación de disponibilidad/preparación (liveness/readiness) |
+| `GET` | `/api/docs` | <span class="since-badge" data-since="0.31">Desde 0.31</span> de forma predeterminada, los clientes a los que `GET /api/schema/tables` describe tablas (401 anónimo salvo que `schemaTables.public`); ninguna cuando `enableSwagger` es `true`; la restricción de administrador cuando es `false` | La especificación OpenAPI 3.0 en JSON: de forma predeterminada solo las tablas, columnas y relaciones que el endpoint de esquema describe a ese cliente. `404 DOCS_UNAVAILABLE` cuando no hay autenticación configurada |
+| `GET` | `/api/swagger` | ninguna | Swagger UI. Servido solo cuando `enableSwagger` es `true` (`REBASE_ENABLE_SWAGGER=true`), y nunca en producción |
+| `GET` | `/api/meta/schema-version` | ninguna | El hash del esquema a partir del cual se construyó este backend y la versión del runtime; deliberadamente sin autenticación y sin nada que describa el esquema |
+| `GET` | `/api/meta/contract` | `schema:read`: un administrador, la clave de servicio o una clave de API que lo posea | La versión del esquema, el runtime y cada tabla tal como la ve un administrador, para `rebase generate-sdk --from`. Cierre por fallo (*fail-closed*): `404` cuando no hay autenticación configurada |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` cuando esté configurado | Métricas de Prometheus, cuando `REBASE_METRICS=true` |
 
 ## OpenAPI / Swagger
 
-La especificación OpenAPI se genera automáticamente a partir de las definiciones de tus colecciones: describe los endpoints de listado, consulta (query), recuento, agregación, lectura, creación, actualización, eliminación y operaciones masivas (bulk) de cada colección servida por el backend, sus rutas anidadas y `_batch`, con sus parámetros de consulta y esquemas de respuesta. No es un mapa completo de toda la superficie HTTP (las rutas de autenticación, almacenamiento, funciones y cron se documentan únicamente en este sitio), y las columnas marcadas con `excludeFromApi` quedan excluidas de ella.
+La especificación OpenAPI se genera automáticamente a partir de tus tablas: describe los endpoints list, query, count, aggregate, read, create, update, delete y bulk de cada tabla servida por el backend, sus rutas anidadas y `_batch`, con sus parámetros de consulta y esquemas de respuesta. No es un mapa completo de toda la superficie HTTP —las rutas de autenticación, almacenamiento, funciones y tareas cron se documentan únicamente en este sitio web— y las columnas marcadas como `.private()` se excluyen de ella. El atributo `description` de una tabla y `.describe()` de una columna constituyen sus descripciones.
 
-Para una colección con [`softDelete`](/docs/collections/soft-delete/), la especificación indica
-que una eliminación, individual o masiva, mueve la fila a la papelera, y documenta
-`?hard=true` en ambas eliminaciones y `?deleted=include|only` en el listado, la
-lectura individual, el conteo y la agregación. El explorador de API de Studio envía
-solo los parámetros que nombra la especificación, así que esto es lo que le permite
-purgar una fila o listar la papelera.
+Para una tabla con [`softDelete`](/docs/collections/soft-delete/), la especificación indica que una eliminación (individual o masiva) mueve la fila a la papelera, y documenta `?hard=true` en ambas eliminaciones, así como `?deleted=include|only` en el listado, la lectura individual, el recuento y la agregación. El explorador de API de Studio solo envía los parámetros indicados en la especificación, por lo que esto es lo que le permite purgar una fila o listar la papelera.
 
-Los clientes automatizados se autentican mediante una clave con alcance delimitado en lugar de una sesión: [Claves de API](/docs/backend/api-keys/).
+Los clientes automatizados se autentican con una clave con permisos (*scoped key*) en lugar de una sesión: [Claves de API](/docs/backend/api-keys/).
 
 ## Metadatos del esquema
 
-El esquema completo de colecciones del proyecto (cada colección, propiedad y relación) se sirve a un administrador autenticado:
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Las tablas que el backend sirve se describen, por cliente, en `GET /api/schema/tables`, los descriptores a partir de los cuales se renderizan el CMS y el Studio. A cualquier cliente autenticado se le sirven las tablas que puede ver, omitiendo lo que no puede leer; [Endpoints](/docs/backend/endpoints/#schema) contiene la matriz.
+
+El esquema completo tal como lo ve un administrador se sirve en:
 
 ```bash
 GET /api/meta/contract
 ```
 
-Necesita el alcance **`schema:read`**, que tiene un administrador, y en un despliegue sin autenticación configurada no se sirve en absoluto (404 `CONTRACT_UNAVAILABLE`) para evitar exponer el esquema a cualquiera. Su endpoint hermano devuelve una cadena de versión que representa el esquema sin describirlo, y es deliberadamente accesible sin credenciales, que es lo que consulta un proceso de CI:
+```json
+{ "schemaVersion": "v2:…", "runtime": { "version": "0.30.1", "contract": 2 }, "tables": [ … ] }
+```
+
+Requiere el permiso **`schema:read`**, que posee un administrador, y en un despliegue sin autenticación configurada no se sirve en absoluto (404 `CONTRACT_UNAVAILABLE`) en lugar de exponer el esquema a cualquiera. Las versiones del esquema comienzan con `v2:` desde la versión 0.31: se calculan a partir de las tablas compiladas, por lo que la versión de cada proyecto cambió una vez. Su endpoint hermano devuelve una cadena de versión que representa el esquema sin describirlo, y es deliberadamente accesible sin credenciales, lo cual es lo que sondea una tarea de CI:
 
 ```bash
 GET /api/meta/schema-version
 ```
 
-Para conocer la forma de los endpoints en lugar del esquema subyacente, el documento de OpenAPI está disponible en `GET /api/docs`, con Swagger UI en `/api/swagger` fuera de producción.
+Para la estructura de los endpoints en lugar del esquema subyacente, el documento OpenAPI se encuentra en `GET /api/docs`: al iniciar sesión, obtienes el documento de las tablas que puedes ver. Swagger UI en `/api/swagger` solo se sirve cuando el documento se publica con `REBASE_ENABLE_SWAGGER=true`, fuera de producción.
 
-## Próximos pasos
+## Siguientes pasos
 
 - **[SDK tipado](/docs/sdk)** — Cliente con seguridad de tipos para la API REST
-- **[Colecciones](/docs/collections)** — Define tu esquema de datos
+- **[Tablas](/docs/schema/)** — Define tu esquema de datos
 - **[Reglas de seguridad (RLS)](/docs/collections/security-rules)** — Controla el acceso por fila

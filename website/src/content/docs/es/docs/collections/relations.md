@@ -1,523 +1,353 @@
 ---
-sourceHash: 86856f16dce196a2
+sourceHash: e0fcc045382336df
 title: Relaciones
 sidebar_label: Relaciones
-description: Define relaciones SQL uno a uno, uno a muchos y muchos a muchos entre colecciones con claves foráneas, tablas de unión y combinaciones multi-hop.
+description: "Vincula tablas con rel.belongsTo, hasOne, hasMany, manyToMany y via: claves foráneas vinculadas o derivadas, tablas de unión con columnas _pivot, reglas de eliminación, reglas de nomenclatura y uniones de múltiples saltos."
 ---
 
-## Descripción general
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-Las relaciones definen cómo se conectan las colecciones a nivel de base de datos. Permiten a Rebase:
+Las `relations` de una tabla nombran los enlaces que tiene con otras tablas. Cada una es una llamada a `rel.*`, y su clave es el nombre de la relación: lo que solicita `include`, lo que lee una ruta anidada como `/api/data/users/1/posts`, y lo que una escritura nombra para establecer el enlace.
 
-- Renderizar **campos selectores de relaciones** en formularios de entidades
-- Resolver **entidades relacionadas** al mostrar vistas previas
-- Generar **restricciones de clave foránea** en el esquema de Drizzle
-- Admitir comportamientos de **eliminación/actualización en cascada**
+```ts
+// backend/schema/posts.ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
+import { tags } from "./tags";
 
-Las relaciones se pueden definir en línea (inline) dentro de la propiedad, o explícitamente en el array `relations` de una colección:
-
-### 1. Relaciones en línea (Recomendado)
-
-Declara el enlace en la propiedad, anidado bajo `relation`. Elige el `kind` y
-el tipo ofrecerá exactamente los campos que ese tipo necesita.
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const postsCollection = defineCollection({
-    slug: "posts",
-    name: "Posts",
-    table: "posts",
-    properties: {
-        title: { type: "string", name: "Title" },
-        content: { type: "string", name: "Content", admin: { multiline: true } },
-        author: {
-            type: "relation",
-            name: "Author",
-            relation: {
-                kind: "belongsTo",
-                target: () => usersCollection
-            }
-        }
-    }
-});
-```
-
-### 2. Array explícito de relaciones
-
-Para un enlace sin una propiedad propia (sin nada con qué nombrarlo en el formulario o en
-una columna de la tabla), decláralo en `relations`:
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const usersCollection = defineCollection({
-    slug: "users",
-    name: "Users",
-    table: "users",
-    properties: {
-        name: { type: "string", name: "Name" }
+export const posts = defineTable("posts", {
+    columns: {
+        id:    col.uuid().primaryKey().defaultRandom(),
+        title: col.text().notNull(),
     },
-    relations: [
-        {
-            kind: "hasMany",
-            relationName: "posts",
-            target: () => postsCollection
-        }
-    ]
+    relations: {
+        author: rel.belongsTo(() => users, { notNull: true, onDelete: "restrict" }),
+        tags:   rel.manyToMany(() => tags, { pivot: { sortOrder: col.integer().default(0) } }),
+    },
+    rls: "admin-only",
 });
 ```
 
-## Los cinco tipos (kinds)
+El destino es un thunk, `() => users`, por lo que dos tablas pueden apuntar entre sí sin importar el orden en que se carguen sus módulos. Ninguna necesita una anotación de tipo: lo que devuelve el thunk se verifica cuando se compila el esquema, y una relación cuyo destino no sea una tabla o vista del esquema se rechaza en ese punto.
 
-Una relación es de uno de cinco tipos. El tipo determina dónde reside la clave, si
-devuelve una fila o muchas, y qué puede afectar una escritura a través de ella.
+:::note[¿Vienes de collections?]
+Las relaciones ya no son propiedades. La columna de clave foránea de un `belongsTo` se deriva de la relación o se vincula a una columna declarada. La guía de actualización para esta versión muestra la correspondencia.
+:::
 
-| Kind | Dónde reside la clave | Devuelve | Notas |
+## Los cinco tipos
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+| Tipo | La clave reside | Devuelve | Opciones |
 |---|---|---|---|
-| `belongsTo` | en **esta** tabla | uno | `localKey`, por defecto `<relationName>_id` |
-| `hasOne` | en la tabla del **destino** | uno | `foreignKeyOnTarget`, por defecto el singular de esta colección más `_id` (`users` → `user_id`) |
-| `hasMany` | en la tabla del **destino** | muchos | los hijos pertenecen únicamente a este padre |
-| `manyToMany` | en una **tabla de unión** | muchos | las filas son compartidas; tú eres el dueño del enlace |
-| `via` | un `joinPath` explícito | cualquiera | editable cuando es de un solo salto (single-hop), de solo lectura en caso contrario; define la `cardinality` tú mismo |
+| `rel.belongsTo` | en **esta** tabla | una fila | `localKey`, `notNull`, `unique`, `onDelete`, `onUpdate`, `index`, `constraint` |
+| `rel.hasOne` | en la tabla de **destino**, única | una fila | `foreignKey`, `sourceKey` |
+| `rel.hasMany` | en la tabla de **destino** | muchas filas | `foreignKey`, `sourceKey`, `orderBy` |
+| `rel.manyToMany` | en una **tabla de unión** | muchas filas | `through`, `sourceKey`, `targetKey`, `pivot`, `onDelete` |
+| `rel.via` | donde indiquen los `steps` | una o muchas | `steps` (obligatorio), `cardinality` |
 
-Cada campo es opcional excepto `kind` y `target` (y, en `via`, `cardinality`
-y `joinPath`); el resto es derivado.
+Todas las opciones son opcionales excepto `steps` en `rel.via`. El resto se deriva según las reglas en [Nombres](#nombres).
 
-### belongsTo — la clave está en esta tabla
+Cada tipo también admite `access` y `private`, que deciden quién recibe las filas de la relación, de la misma manera que lo hacen para una columna:
 
-```typescript
-author: {
-    type: "relation",
-    name: "Author",
-    relation: { kind: "belongsTo", target: () => usersCollection }
-}
-// → posts.author_id
+- `access: { read?, write? }` enumera los roles que pueden incluir o filtrar por la relación y los roles que pueden establecer el enlace. Una lista omitida delega esa dirección a la fila; una lista vacía la cierra.
+- `private: true` mantiene la relación en el servidor: no está en la API, el SDK ni OpenAPI.
+
+Consulta [Acceso a campos](/docs/collections/field-access/) para saber qué ve un cliente sin acceso.
+
+## belongsTo — la clave está en esta tabla
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`belongsTo` coloca la clave foránea en la tabla que la declara. La columna SQL de la clave es `localKey`, y `<nombre de la relación en singular>_id` cuando se omite: `author` es `author_id`.
+
+La relación se **vincula** a una columna que declaraste o **deriva** una:
+
+- **Vinculada.** Cuando `columns` tiene una columna cuyo nombre SQL es `localKey`, la relación la utiliza. Su tipo debe ser el tipo de la clave de destino, y sus modificadores (`.notNull()`, `.unique()`) definen qué es el enlace.
+- **Derivada.** De lo contrario, la relación agrega la columna después de las declaradas, con el tipo de la clave de destino. Su clave en la conexión (wire key) es el camelCase de su columna: `author_id` se sirve como `authorId`. `notNull: true` y `unique: true` en la relación se aplican a esta columna derivada.
+
+```ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
+
+// Derived: an `author_id` column, served as `authorId`.
+export const notes = defineTable("notes", {
+    columns: { id: col.uuid().primaryKey().defaultRandom() },
+    relations: { author: rel.belongsTo(() => users, { notNull: true }) },
+    rls: "admin-only",
+});
+
+// Bound: `authorId` is the column `author_id`, so the relation uses it.
+export const drafts = defineTable("drafts", {
+    columns: {
+        id:       col.uuid().primaryKey().defaultRandom(),
+        authorId: col.uuid().notNull(),
+    },
+    relations: { author: rel.belongsTo(() => users) },
+    rls: "admin-only",
+});
 ```
 
-La columna se
-indexa automáticamente: Postgres indexa la clave a la que apunta una clave foránea, nunca la
-columna que la contiene, por lo que sin un índice cada inclusión de `hasMany` y listado anidado
-desde el otro lado escanea esta tabla. `index: false` mantiene la restricción y
-elimina el índice; consulta [Foreign keys are indexed for you](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
-para saber cuándo vale la pena y cuándo Rebase lo omite por su cuenta porque
-otro índice ya cubre la columna.
+La vinculación mantiene visible cada columna física en `columns`, en la posición que elijas. La derivación es más corta. Ambas producen la misma tabla.
 
-### hasMany / hasOne — la clave está en la de ellos
+Una relación y una columna no pueden compartir clave: la clave de la relación es lo que nombra `include`, por lo que la columna de clave foránea necesita una clave propia (`authorId`, no `author`). Dos relaciones no pueden utilizar la misma columna.
 
-```typescript
-relations: [
-    { kind: "hasMany", relationName: "posts", target: () => postsCollection }
-]
-// → reads posts.user_id
+| Opción | Por defecto | Qué hace |
+|---|---|---|
+| `localKey` | `<singular name>_id` | La columna SQL que contiene la clave. |
+| `notNull` | `false` | La columna derivada es `NOT NULL`. En una columna vinculada, escribe `.notNull()` en la columna en su lugar. |
+| `unique` | `false` | La columna derivada es `UNIQUE`, lo que hace que el enlace sea uno a uno. En una columna vinculada, escribe `.unique()`. |
+| `onDelete` | `restrict` cuando la columna es `NOT NULL`, `set null` en caso contrario | Qué ocurre con esta fila cuando se elimina la fila de destino. Consulta [Reglas de eliminación y actualización](#reglas-de-eliminación-y-actualización). |
+| `onUpdate` | ninguno (Postgres aplica `NO ACTION`) | Qué ocurre cuando cambia la clave de destino. |
+| `index` | `true` | `false` omite el índice en la columna de clave foránea. |
+| `constraint` | `true` | `false` almacena la clave sin una restricción `FOREIGN KEY`. |
+
+La columna de clave foránea se indexa a menos que se indique `index: false`: Postgres indexa la clave a la que apunta una clave foránea, nunca la columna que la contiene, por lo que sin un índice cada lectura desde el otro lado escanea esta tabla. Consulta [Las claves foráneas se indexan automáticamente](/docs/backend/indexes#foreign-keys-are-indexed-for-you).
+
+## hasOne y hasMany — la clave está en el destino
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`hasMany` lee filas del destino que apuntan de vuelta a esta. `hasOne` es el mismo enlace con a lo sumo una fila en el otro extremo. Ninguno añade una columna aquí: el destino declara el `belongsTo` que contiene la clave.
+
+```ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { posts } from "./posts";
+import { profiles } from "./profiles";
+
+export const authors = defineTable("authors", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), name: col.text().notNull() },
+    relations: {
+        // reads posts.author_id
+        posts:   rel.hasMany(() => posts, { foreignKey: "author_id" }),
+        // reads profiles.author_id, which is unique
+        profile: rel.hasOne(() => profiles, { foreignKey: "author_id" }),
+    },
+    rls: "admin-only",
+});
 ```
 
-`hasOne` es el mismo enlace con a lo sumo una fila en el otro extremo.
+`foreignKey` es la columna SQL en el destino, y por defecto es `<slug de esta tabla en singular>_id`: en `authors`, `author_id`.
 
-#### Unión mediante una clave natural
+`hasMany` acepta un `orderBy`: el orden en que se devuelven las filas relacionadas cuando quien hace la llamada no especifica ninguno. Es una clave de ordenamiento o varias, cada una `[column, "asc" | "desc", nulls?]`, que nombran las columnas del destino:
 
-Por defecto, la clave foránea de destino contiene el **id** de la fila de origen. Cuando los dos
-lados se unen mediante otro valor (un id de identidad externa, un SKU, un
-slug de tenant), indica esa columna con `sourceKey`:
-
-```typescript
-relations: [
-    {
-        kind: "hasMany",
-        relationName: "applications",
-        target: () => applicationsCollection,
-        sourceKey: "auth_user_id",          // column on THIS table
-        foreignKeyOnTarget: "auth_user_id"  // column on the TARGET's table
-    }
-]
-// → reads applications.auth_user_id = talents.auth_user_id
+```ts
+posts: rel.hasMany(() => posts, { foreignKey: "author_id", orderBy: [["published_at", "desc"]] }),
 ```
 
-`sourceKey` es el reflejo de `localKey` en `belongsTo`: aquel nombra la
-columna *desde* la que lee este lado, este nombra la columna *a la que* apunta
-el otro lado. Sin él, un enlace como el anterior no se puede expresar como `hasMany` en absoluto
-y debe recurrir a [`via`](#via--una-cadena-de-unión-explícita), que es de solo lectura para
-una cadena como esta.
+El orden declarado se aplica a un include, a la lectura de relación de un único padre y a un listado anidado (`/api/data/authors/1/posts`) siempre que quien hace la llamada no especifique un orden. El `orderBy` del llamador lo reemplaza en lugar de extenderlo. La clave del destino en orden ascendente siempre finaliza el orden, de modo que las páginas sean estables. Un `limit` de include por padre conserva las primeras filas de ese orden, y un listado anidado pagina sobre él, con un offset o un cursor.
 
-La columna debe ser única. Un enlace que apunta a más de una fila de origen
-no puede determinar a cuál pertenece una fila relacionada, y Postgres tampoco aceptará una
-clave foránea contra una columna no única. Rebase comprueba esto en tiempo de lectura
-y lo rechaza en lugar de elegir una al azar.
+### Unión mediante una clave natural
 
-Un padre cuyo `sourceKey` sea `NULL` no alcanza ninguna fila, y escribir a través de la
-relación genera un error: no hay nada a lo que las filas relacionadas puedan apuntar.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-### manyToMany — a través de una tabla de unión
+Por defecto, la clave del destino contiene la clave primaria de esta fila. Cuando los dos lados se unen mediante otro elemento (un identificador de identidad externa, un SKU), `sourceKey` nombra la columna en esta tabla:
 
-```typescript
-tags: {
-    type: "relation",
-    name: "Tags",
-    relation: { kind: "manyToMany", target: () => tagsCollection }
-}
-// → junction `posts_tags` (both table names, sorted), columns post_id / tag_id
+```ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { applications } from "./applications";
+
+export const talents = defineTable("talents", {
+    columns: {
+        id:         col.uuid().primaryKey().defaultRandom(),
+        authUserId: col.text().notNull().unique(),
+    },
+    relations: {
+        // applications.auth_user_id = talents.auth_user_id
+        applications: rel.hasMany(() => applications, { sourceKey: "auth_user_id", foreignKey: "auth_user_id" }),
+    },
+    rls: "admin-only",
+});
 ```
 
-Ambos lados declaran el suyo propio, y cada uno escribe `through` **desde su propio punto de
-vista**; `sourceColumn` siempre hace referencia a *esta* colección:
+La columna `sourceKey` debe ser única: un enlace que apunte a varias filas de origen no puede determinar a cuál pertenece una fila relacionada. Una fila cuyo `sourceKey` sea `NULL` no alcanza ninguna fila relacionada, y escribir a través de la relación genera un error.
 
-```typescript
-// on posts
-{ kind: "manyToMany", relationName: "tags", target: () => tagsCollection,
-  through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" } }
+## manyToMany — a través de una unión
 
-// on tags
-{ kind: "manyToMany", relationName: "posts", target: () => postsCollection,
-  through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" } }
-```
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-### via — una cadena de unión explícita
+`manyToMany` vincula filas a través de una tabla de unión que Rebase crea, con su propia seguridad a nivel de fila. Eliminar un enlace borra la fila de la unión, nunca el destino.
 
-Para enlaces que las cuatro formas anteriores no pueden expresar: rutas de múltiples saltos (multi-hop), claves compuestas
-o una combinación cuya condición no sea una simple clave foránea.
+```ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
 
-Una cadena de **un solo salto** (single-hop) se puede escribir a través de una creación o actualización, de la misma manera en que se escribe el tipo al que sustituye:
-
-- una cadena **to-one** de **un paso**: la fila de destino contiene la clave, por lo que
-  `{ badge: "b-1" }` apunta la columna de esa fila a esta, y `null` la desenlaza,
-  tal como lo hace una escritura de `hasOne`;
-- una cadena **to-many** de **dos pasos a través de una tabla** entre los extremos: esa
-  tabla contiene los enlaces, por lo que `{ tags: ["t-1", "t-2"] }` los establece como sus filas, como lo
-  hace una escritura de `manyToMany` (un `via` no incluye `_pivot`).
-
-Cualquier cosa más larga es de **solo lectura**: Rebase no deducirá cómo escribir a través de una
-cadena arbitraria. Una creación o actualización que especifique una se rechazará con
-`400 RELATION_NOT_WRITABLE`, y el formulario de administración mostrará el campo sin un selector.
-Una escritura anidada (`PATCH users/1/permissions/3`) a través de cualquier `via` se rechazará de
-la misma manera.
-
-```typescript
-{
-    kind: "via",
-    relationName: "permissions",
-    target: () => permissionsCollection,
-    cardinality: "many",
-    joinPath: [
-        { table: "user_roles",       on: { from: "id",            to: "user_id" } },
-        { table: "role_permissions", on: { from: "role_id",       to: "role_id" } },
-        { table: "permissions",      on: { from: "permission_id", to: "id" } }
-    ]
-}
-```
-
-## Propiedades de relación
-
-Para renderizar un campo de relación en un formulario, agrega una propiedad con `type: "relation"`:
-
-```typescript
-properties: {
-    author: {
-        type: "relation",
-        name: "Author",
-        relation: { kind: "belongsTo", target: () => usersCollection },
-        // Which control draws it is presentation, so it goes in the admin block:
-        // "select" (dropdown) or "dialog" (full picker).
-        admin: { widget: "select" }
-    }
-}
-```
-
-Al renderizar una vista previa (como en una celda de tabla o un chip de referencia), Rebase gestiona la hidratación automáticamente.
-
-### To-one obtiene un selector, many obtiene una pestaña
-
-La cardinalidad decide la superficie visual, y solo se utiliza una superficie:
-
-- **`belongsTo` / `hasOne`** — una fila, por lo que la propiedad es una clave foránea que
-  el autor edita. Se renderiza como el selector mostrado anteriormente.
-- **`hasMany` / `manyToMany`** — muchas filas, por lo que la vista de entidad las lista como una
-  **pestaña** propia. La propiedad no se renderiza en el formulario: los hijos de una colección
-  son una lista, no un valor que contiene el registro, y seleccionarlos desde un
-  menú desplegable no es algo que el formulario pueda ofrecer de manera adecuada.
-
-Declarar una relación de tipo many como propiedad sigue siendo útil: es lo que da nombre
-a la pestaña y lo que proporciona a la relación una columna en la tabla de la colección, la cual la
-consulta del listado hidrata para que las filas hijas aparezcan como chips en la fila. Solo se
-omite el campo del formulario.
-
-En la tabla, una relación con una propiedad propia obtiene **una** columna: la suya propia.
-Cada pestaña también tiene una columna de botón para saltar a la pestaña, pero para una
-relación declarada como propiedad ese botón repetía el mismo encabezado junto a una columna que ya
-mostraba los hijos, por lo que se omite. Si ocultas la columna de la relación
-(`admin: { hideFromCollection: true }`), el botón reaparece, de modo que la
-relación nunca desaparece por completo de la tabla.
-
-Ocultar la columna no detiene la consulta. La lectura de la lista de la colección incluye
-cada relación declarada por una propiedad, esté oculta o no, por lo que el código que lee las
-filas de la lista (`additionalFields`, resolutores de visualización, acciones de entidad, acciones de
-colección mediante `tableController.rows`, slots de plugins) encuentra las filas relacionadas
-allí, anidadas bajo el nombre de la relación tal como las devuelve el `include` de REST, junto
-a la columna de clave foránea. A `browserCallbacks.afterRead` se le entrega la misma fila. Una relación declarada únicamente en el array `relations`
-de la colección, sin propiedad, no se incrusta en la lista; sus filas se cargan cuando se
-abre su pestaña.
-
-Si deseas el selector en línea de todos modos, indícalo:
-
-```typescript
-properties: {
-    tags: {
-        type: "relation",
-        name: "Tags",
-        relation: { kind: "manyToMany", target: () => tagsCollection },
-        admin: { renderInForm: true }   // off by default; the tab is the default treatment
-    }
-}
-```
-
-## Combinaciones de múltiples saltos (Multi-Hop Joins)
-
-Para relaciones que atraviesan múltiples tablas, usa `kind: "via"` con un `joinPath`.
-Una cadena de más de un enlace es de solo lectura: Rebase no deducirá cómo escribir
-a través de una cadena arbitraria (consulta [via](#via--una-cadena-de-unión-explícita) para conocer las
-cadenas de un solo salto en las que sí escribe).
-
-```typescript
-// Users → Permissions through Roles
-relations: [
-    {
-        kind: "via",
-        relationName: "permissions",
-        target: () => permissionsCollection,
-        cardinality: "many",
-        joinPath: [
-            {
-                table: "user_roles",
-                on: { from: "id", to: "user_id" }
+export const projects = defineTable("projects", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), name: col.text().notNull() },
+    relations: {
+        members: rel.manyToMany(() => users, {
+            through: "project_members",
+            pivot: {
+                role:    col.enum(["owner", "editor", "viewer"]).notNull().default("viewer"),
+                addedAt: col.timestamp({ withTimezone: true }).onCreateNow(),
             },
-            {
-                table: "roles",
-                on: { from: "role_id", to: "id" }
-            },
-            {
-                table: "role_permissions",
-                on: { from: "id", to: "role_id" }
-            },
-            {
-                table: "permissions",
-                on: { from: "permission_id", to: "id" }
-            }
-        ]
-    }
-]
+        }),
+    },
+    rls: "admin-only",
+});
 ```
 
-### Combinaciones con claves compuestas
+| Opción | Por defecto | Qué hace |
+|---|---|---|
+| `through` | los dos nombres de tabla SQL, ordenados, unidos por `_` | La tabla de unión. Siempre en el esquema `public`. |
+| `sourceKey` | `<slug de esta tabla en singular>_id` | La columna de unión que apunta a esta tabla. |
+| `targetKey` | `<nombre de la relación en singular>_id` | La columna de unión que apunta al destino. |
+| `pivot` | ninguno | Columnas adicionales en la unión, creadas con `col.*`. |
+| `onDelete` | `cascade` | Qué ocurre con un enlace cuando se elimina cualquiera de las filas. |
 
-```typescript
-joinPath: [
-    {
-        table: "customers",
-        on: {
-            from: ["company_code", "region_id"],  // Multiple columns
-            to: ["code", "region_id"]
-        }
-    }
-]
+Ambos lados de un enlace pueden declararlo, cada uno desde su propio punto de vista: `sourceKey` siempre nombra la columna de la tabla que la declara. Se rechazan dos relaciones que resuelven en la misma tabla de unión con diferentes columnas clave.
+
+El destino puede ser la propia tabla; por ejemplo, pistas similares a otras pistas. Sus dos columnas de unión tendrían por defecto `track_id`, por lo que se debe diferenciar la del destino mediante `targetKey`; un autoenlace cuyas dos columnas resuelvan con el mismo nombre se rechaza al compilar el esquema:
+
+```ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+
+export const tracks = defineTable("tracks", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), title: col.text().notNull() },
+    relations: {
+        similar: rel.manyToMany(() => tracks, {
+            through: "tracks_similar",
+            targetKey: "similar_track_id",
+        }),
+    },
+    rls: "admin-only",
+});
 ```
 
-### Coincidencia con cualquiera de dos columnas
+El destino también puede ser una vista (`defineView`): `db push`, el arranque y `schema generate` crean la tabla de unión para ella, y `rebase doctor` considera esa unión como administrada. Una vista no declara ningún `manyToMany` propio.
 
-Una lista en `on` une una fila que cumpla **cualquiera de las condiciones**: un enlace mantenido en `a` o `b`. Es de **solo lectura**.
+### `_pivot`: las columnas propias de la unión
 
-```typescript
-joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+Las columnas `pivot` se leen y escriben bajo `_pivot`. Una lectura que incluye la relación sirve cada fila relacionada con las columnas de su enlace:
+
+```json
+{ "id": "p1", "name": "Website", "members": [
+    { "id": "u7", "email": "ada@example.com", "_pivot": { "role": "owner", "addedAt": "2026-11-02T09:14:00Z" } }
+] }
 ```
 
-Agregar un segundo paso hacia `people` (`on: [{ from: "a", to: "id" }, { from: "b", to: "id" }]`) también coincide con la propia columna del padre, por lo que cada persona se devuelve como su propio amigo: lista las filas de amistad o filtra a la persona.
+Una escritura establece los enlaces como una lista, y un elemento puede incluir el `_pivot` que el enlace debe contener:
 
-## Reglas de cascada
-
-Controla lo que sucede cuando las entidades relacionadas se actualizan o se eliminan:
-
-```typescript
-relations: [
-    {
-        kind: "belongsTo",
-        relationName: "author",
-        target: () => usersCollection,
-        localKey: "author_id",
-        onDelete: "cascade",    // Delete posts when user is deleted
-        onUpdate: "cascade"     // Update FK when user ID changes
-    }
-]
+```json
+{ "members": [{ "id": "u7", "_pivot": { "role": "owner" } }, "u9"] }
 ```
+
+Las columnas pivot admiten todos los modificadores de columna excepto `.primaryKey()`: la clave de la unión son sus dos columnas de enlace.
+
+### `_count`: cuántas filas relacionadas hay
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+Un include de una relación to-many (`hasMany`, `manyToMany`, un `via` to-many) puede solicitar el total junto con una página limitada de filas, servido bajo el `_count` de la fila. Se cuenta en la misma sentencia, bajo los mismos filtros y seguridad a nivel de fila. Consulta [Contar lo que un límite deja fuera](/docs/sdk/relations#counting-what-a-limit-leaves-out).
+
+## via — una cadena de unión explícita
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`via` lee a través de joins que especificas explícitamente: varios saltos, claves compuestas o una condición que no sea una simple clave foránea.
+
+```ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { permissions } from "./permissions";
+
+export const members = defineTable("members", {
+    columns: { id: col.uuid().primaryKey().defaultRandom() },
+    relations: {
+        permissions: rel.via(() => permissions, {
+            steps: [
+                { table: "member_roles",     on: { from: "id",            to: "member_id" } },
+                { table: "role_permissions", on: { from: "role_id",       to: "role_id" } },
+                { table: "permissions",      on: { from: "permission_id", to: "id" } },
+            ],
+        }),
+    },
+    rls: "admin-only",
+});
+```
+
+Cada paso une `table`, donde `from` nombra una columna de la tabla anterior (esta misma, para el primer paso) y `to` una columna de `table`. Una lista de columnas en ambos lados realiza la unión sobre una clave compuesta: `on: { from: ["company_code", "region_id"], to: ["code", "region_id"] }`. Una lista de condiciones en `on` une una fila que cumpla cualquiera de ellas, y es de solo lectura.
+
+`cardinality` es `"many"` a menos que indiques `"one"`. Se puede escribir a través de dos cadenas, de la misma forma en que se escribe para el tipo al que sustituyen:
+
+- una cadena **to-one** de **un paso**: la fila de destino contiene la clave, como ocurre con `hasOne`;
+- una cadena **to-many** de **dos pasos a través de una tabla** intermedia: esa tabla contiene los enlaces, como ocurre con `manyToMany` (sin `_pivot`).
+
+Cualquier otra cadena es de solo lectura. Una creación o actualización que la especifique se rechaza con `400 RELATION_NOT_WRITABLE`, al igual que una escritura anidada a través de cualquier `via`.
+
+Una cadena puede pasar a través de una tabla que la lectura ya contenga — un `via` de una tabla a sí misma, o nietos alcanzados a través de la misma tabla dos veces: cada paso se une bajo su propio alias. Un filtro de relación o un ordenamiento por un conteo relacionado no admite un `via`, y así lo indica.
+
+## Reglas de eliminación y actualización
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 | Acción | Comportamiento |
-|--------|----------|
-| `"cascade"` | Propagar el cambio a las filas relacionadas |
-| `"restrict"` | Impedir la operación si existen filas relacionadas |
-| `"no action"` | Igual que restrict (aplazar a la comprobación de la restricción) |
-| `"set null"` | Establecer la columna FK en NULL |
-| `"set default"` | Establecer la columna FK en su valor por defecto |
+|---|---|
+| `"cascade"` | Eliminar o actualizar también las filas relacionadas |
+| `"restrict"` | Rechazar la eliminación mientras existan filas relacionadas |
+| `"no action"` | Como `restrict`, verificado al final de la sentencia |
+| `"set null"` | Vaciar la columna de clave foránea |
+| `"set default"` | Establecer la columna de clave foránea en su valor por defecto |
 
-### Lo que obtienes cuando no especificas nada
+Cuando `onDelete` no está configurado, un `belongsTo` que admite nulos vacía el puntero (`set null`), uno `NOT NULL` rechaza la eliminación (`restrict`) y un enlace `manyToMany` se elimina con cualquiera de las filas (`cascade`). `NOT NULL` indica que una fila no puede existir sin su padre; no indica que eliminar el padre deba eliminar la fila. Solicita `"cascade"` cuando eso sea lo que buscas: es el único valor que elimina filas que no especificaste.
 
-`onDelete` es opcional, por lo que la mayoría de las relaciones nunca especifican uno. El valor por defecto depende de
-si la relación es obligatoria:
+## Nombres
 
-| Relación | `onDelete` por defecto |
-|--------|----------|
-| `belongsTo`, opcional | `"set null"` — el puntero se vacía |
-| `belongsTo`, `validation: { required: true }` | `"restrict"` — la eliminación del padre falla |
-| `manyToMany` (filas de unión) | `"cascade"` — el enlace desaparece, el destino se mantiene |
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-Una relación requerida **no** es una eliminación en cascada. `required` indica que un hijo no puede existir
-sin un padre; no dice que eliminar al padre deba destruir al hijo.
-Son afirmaciones diferentes, y solo una de ellas elimina filas que no especificaste.
-Por lo tanto, el comportamiento por defecto falla la eliminación e indica la restricción, y `"cascade"` es
-algo que debes solicitar explícitamente:
+Cada nombre que usa una relación se deriva cuando no lo especificas. Las reglas son las mismas que ya tiene una base de datos desplegada, por lo que no cambian entre versiones.
 
-```typescript
-{
-    kind: "belongsTo",
-    relationName: "order",
-    target: () => ordersCollection,
-    // A line item is meaningless without its order — say so.
-    onDelete: "cascade"
-}
-```
+| Nombre | Regla | `posts` con relación `author` → `users` |
+|---|---|---|
+| Columna `belongsTo` | `localKey`, de lo contrario `<nombre de la relación en singular>_id` | `author_id` |
+| Clave de conexión (wire key) de `belongsTo` | El camelCase de la columna | `authorId` |
+| Columna `hasOne` / `hasMany` en el destino | `foreignKey`, de lo contrario `<slug en singular de esta tabla>_id` | `post_id` en el destino |
+| Tabla de unión | `through`, de lo contrario ambos nombres de tabla SQL ordenados, unidos por `_` | `posts_tags` para `posts` ↔ `tags` |
+| Columna de unión a esta tabla | `sourceKey`, de lo contrario `<slug en singular de esta tabla>_id` | `post_id` |
+| Columna de unión al destino | `targetKey`, de lo contrario `<nombre de la relación en singular>_id` | `tag_id` para la relación `tags` |
 
-`onUpdate` no tiene un valor por defecto: si no se define nada, Postgres aplica `NO ACTION`. Establece
-`"cascade"` cuando la clave de destino sea algo que un usuario pueda editar (un slug, un SKU)
-para que los punteros la sigan.
+Una clave foránea derivada tiene el tipo de la clave a la que apunta. Una clave de tipo `serial` es referenciada por un `integer` estándar del mismo ancho, y una clave enum por su propio tipo enum.
 
-## Obtención de relaciones en el SDK
+El nombre de una relación `belongsTo` representa su columna de clave foránea dondequiera que una tabla nombre una columna: en `indexes`, en `tenant` y en el `ownerField` o condición de una regla.
 
-Al consultar datos a través del SDK tipado de Rebase, las relaciones **no** se incluyen por defecto. Usa el método `include()` para solicitar entidades relacionadas junto con los datos principales.
+## Lectura y escritura de relaciones
 
-### Incluir relaciones específicas
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+Las relaciones no se incluyen en una lectura a menos que quien hace la llamada lo solicite:
 
 ```typescript
-const { data } = await client.data.articles
-    .include("author", "categories")
+const { data } = await client.data.posts
+    .include("author", "tags")
     .find();
 ```
 
-### Incluir todas las relaciones
+Una fila incluye entonces tanto la clave foránea como la fila relacionada: `post.authorId` siempre está presente, `post.author` solo cuando se incluye. El [SDK tipado](/docs/sdk/relations/) cubre los includes en su totalidad: límites por relación, filtros, ordenamiento y anidamiento.
 
-```typescript
-const { data } = await client.data.articles
-    .include("*")
-    .find();
-```
+Una escritura establece un enlace to-one mediante su clave (`{ author: "u7" }` o `{ authorId: "u7" }`), o `null` para desvincular, y un enlace to-many como una lista de ids de destino u objetos `{ id, _pivot? }` (`{ tags: ["t1", "t2"] }`). Un enlace to-one escrito como un objeto (`{ author: { id: "u7" } }`) devuelve un `400 VALIDATION_INVALID_VALUE` indicando la relación: envía la clave. Un filtro en una relación compara su clave. Consulta [Escritura de datos](/docs/sdk/writing/).
 
-### Uso de la sintaxis de parámetros
+En el CMS, cada relación to-many se convierte en una pestaña debajo del registro. Consulta [Relaciones en el panel de administración](/docs/collections/relations-in-the-admin-panel/).
 
-```typescript
-const { data } = await client.data.articles.find({
-    include: ["author", "categories"]
-});
-```
+## Qué se rechaza
 
-### Estructura de la respuesta
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-Cuando se incluyen, la respuesta contiene tanto la **clave foránea escalar** como el **objeto de relación hidratado**:
+`rel.via()` sin steps arroja un error cuando se carga el módulo. Cuando se compila el esquema, una tabla se rechaza por:
 
-```typescript
-const { data } = await client.data
-    .collection<{ id: string; authorId: string; author?: { name: string } }>("articles")
-    .include("author")
-    .find();
+- una relación cuyo destino no es una tabla o vista del esquema;
+- una relación y una columna con la misma clave;
+- una columna vinculada cuyo tipo no es el tipo de la clave de destino, o un `notNull` o `unique` en la relación que la columna vinculada no tenga;
+- dos relaciones que utilizan una misma columna de clave foránea, o una columna derivada cuya clave o nombre SQL ya posee otra columna;
+- un `belongsTo` que apunta a una tabla con una clave compuesta, un `hasOne` o `hasMany` desde una sin un `sourceKey`, o un `manyToMany` con cualquiera de los lados compuesto: una columna no puede hacer referencia a varias, por lo que debe expresarse con `rel.via()`;
+- dos relaciones `manyToMany` que resuelven en una misma tabla de unión con diferentes columnas clave;
+- un `manyToMany` cuyas dos columnas de unión resuelven al mismo nombre (un autoenlace sin `targetKey`);
+- una columna pivot marcada con `.primaryKey()` (la clave de la unión son sus dos columnas de enlace) o que declare `.transform()` (los hooks de una columna pivot nunca se ejecutan; el `afterRead` del destino ve `_pivot`).
 
-// The SDK returns flat rows — there is no `.values` wrapper. (`Entity`, with
-// `id`/`path`/`values`, is an admin-UI view model, not what the client hands back.)
-for (const article of data) {
-    // Scalar FK — always present
-    article.authorId;     // "uuid-1234"
+## Siguientes pasos
 
-    // Hydrated relation — only present when included
-    article.author?.name;  // "Jane Doe"
-}
-```
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-> Los nombres de las relaciones pasados a `include()` deben coincidir con el nombre de la relación: el `relationName` de una entrada en el array `relations` de la colección, o la clave de la propiedad que la declara en línea.
-
-Para consultar la referencia completa del constructor de consultas (filtrado, ordenación, paginación, tiempo real), consulta la [documentación del SDK tipado](/docs/sdk).
-
-## Relaciones en el panel de administración
-
-Cada relación to-many (`hasMany`, `manyToMany` o un `via` to-many) se convierte en una pestaña dentro de un registro en el panel de administración, identificada por el nombre de la relación. [Relaciones en el panel de administración](/docs/collections/relations-in-the-admin-panel/) cubre las rutas, lo que crea, enlaza, desenlaza o elimina una pestaña, las mismas reglas a través de REST y qué relaciones no se convierten en pestaña.
-
-## Interfaz completa de Relation
-
-`Relation` es una unión cerrada: un miembro por cada `kind`, cada uno con únicamente los
-campos que ese tipo posee. No existe combinación de campos que describa dos
-enlaces distintos, ni campo que puedas definir que el tipo no utilice.
-
-```typescript
-type Relation =
-    | BelongsToRelation
-    | HasOneRelation
-    | HasManyRelation
-    | ManyToManyRelation
-    | ViaRelation;
-
-interface RelationBase {
-    relationName?: string;          // defaults to the property key, then the target's slug
-    target: () => CollectionConfig;
-    onUpdate?: OnAction;
-    onDelete?: OnAction;
-    overrides?: Partial<CollectionConfig>;   // applied when rendered as a tab
-}
-// `required` is not here. It is `validation: { required: true }` on the
-// property that declares the relation, the same key every other field uses.
-
-interface BelongsToRelation extends RelationBase {
-    kind: "belongsTo";
-    localKey?: string;              // column on THIS table
-    index?: boolean;                // btree on localKey; defaults to true
-}
-
-interface HasOneRelation extends RelationBase {
-    kind: "hasOne";
-    foreignKeyOnTarget?: string;    // column on the TARGET's table
-    sourceKey?: string;             // column on THIS table; defaults to the primary key
-}
-
-interface HasManyRelation extends RelationBase {
-    kind: "hasMany";
-    foreignKeyOnTarget?: string;    // column on the TARGET's table
-    sourceKey?: string;             // column on THIS table; defaults to the primary key
-}
-
-interface ManyToManyRelation extends RelationBase {
-    kind: "manyToMany";
-    through?: {
-        table?: string;
-        sourceColumn?: string;
-        targetColumn?: string;
-        properties?: Properties;    // extra columns on the junction row, served under `_pivot`
-    };
-}
-
-interface ViaRelation extends RelationBase {
-    kind: "via";
-    cardinality: "one" | "many";    // a join chain cannot imply it
-    joinPath: JoinStep[];
-}
-```
-
-### La forma resuelta
-
-Lo que escribes arriba es la forma de *autoría*. Internamente, Rebase trabaja con
-`ResolvedRelation`: el mismo enlace con todos los valores por defecto completados y nada
-opcional, más `cardinality`, `targetSlug` y dos indicadores (flags): `writable` (falso
-únicamente para un `via` de múltiples saltos o uno con un paso que coincida con alguna de varias condiciones) y `shared` (verdadero cuando las filas de destino pertenecen también a otros padres,
-por lo que una eliminación desenlaza en lugar de borrar).
-
-`sourceKey` es la única excepción a "nada opcional": su valor por defecto es la
-clave primaria del origen, y resolver eso requiere el esquema del driver, del
-cual la resolución no dispone. `undefined` en ese campo significa "la clave primaria" y
-nada más.
-
-Nunca escribes directamente un `ResolvedRelation`. En una propiedad de relación, `relation` es
-la tuya y `resolvedRelation` es la versión completada, asignada durante la
-normalización.
-
-## Próximos pasos
-
-- **[Reglas de seguridad](/docs/collections/security-rules)** — Seguridad a nivel de fila (Row Level Security)
-- **[Propiedades](/docs/collections/properties)** — Referencia de tipos de propiedades
+- [Seguridad a nivel de fila](/docs/collections/security-rules/): quién accede a las filas en cada extremo
+- [Índices](/docs/backend/indexes/): el índice de clave foránea y los índices compuestos sobre relaciones
+- [Relaciones en el SDK tipado](/docs/sdk/relations/): `include`, límites por relación, `_count`

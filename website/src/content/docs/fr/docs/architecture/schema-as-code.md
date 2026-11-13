@@ -1,48 +1,59 @@
 ---
-sourceHash: 5533919ae5334b5b
-title: Schéma comme Code
-sidebar_label: Schéma comme Code
-description: Comment Rebase utilise les collections TypeScript comme source unique de vérité pour votre schéma de base de données, votre interface utilisateur et votre API.
+sourceHash: 507990241e43f026
+title: Schema as Code
+sidebar_label: Schema as Code
+description: Comment Rebase utilise les tables TypeScript dans backend/schema comme source unique de vérité pour votre schéma de base de données, votre API, votre SDK et votre panneau d'administration.
 ---
 
-## L'Idée Principale
+## Le principe fondamental
 
-Dans Rebase, vos **définitions de collections TypeScript sont la source unique de vérité**. À partir d'un ensemble d'objets TypeScript, Rebase génère :
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-- **Tables PostgreSQL** via la génération de schéma Drizzle ORM
-- **Interface utilisateur CRUD** — formulaires, tables, validation, types de champs
-- **Points de terminaison d'API REST** avec filtrage, tri et pagination
-- **SDK typé** — opérations de données sécurisées par le type
-- **Politiques RLS** — Sécurité au niveau des lignes dans Postgres
+Dans Rebase, les **tables que vous déclarez avec `defineTable` dans `backend/schema/` constituent la source unique de vérité**. À partir de celles-ci, Rebase génère :
+
+- **Des tables PostgreSQL** via la génération de schéma Drizzle ORM
+- **Des politiques RLS** — la sécurité au niveau des lignes (Row Level Security) dans Postgres, à partir du champ `rls` requis de chaque table
+- **Des points de terminaison d'API REST** avec filtrage, tri et pagination, ainsi que le temps réel et MCP
+- **Un SDK typé** — des opérations sur les données sécurisées au niveau des types (type-safe)
+- **Les valeurs par défaut du panneau d'administration** — formulaires, listes, validation et types de champs, générés à partir des descripteurs de table servis par le backend à `GET /api/schema/tables` ; ce que le panneau affiche au-delà réside dans `frontend/src/cms/`
 
 Cela signifie que votre schéma est :
-- **Géré par version** — chaque modification est un commit git
-- **Type-safe** — TypeScript intercepte les erreurs à la compilation
+- **Versionné** — chaque modification est un commit git
+- **Type-safe** — TypeScript détecte les erreurs au moment de la compilation
 - **Révisable** — les modifications de schéma passent par des pull requests
-- **Portable** — la même définition fonctionne sur le frontend, le backend et la CLI
+- **Portable** — la même définition est lue par le backend, la CLI, le générateur de SDK et, sous forme de types, par le frontend
 
-## Édition Visuelle avec Manipulation d'AST
+## Édition visuelle avec manipulation d'AST
 
-Rebase fournit également un **éditeur visuel de collections** en mode Studio. Lorsqu'un non-développeur utilise l'éditeur visuel pour ajouter un champ :
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+Rebase fournit également un **éditeur de schéma visuel** dans Studio. Lorsque quelqu'un l'utilise pour ajouter une colonne :
 
 1. Le Studio ne modifie **pas** directement la base de données
-2. Au lieu de cela, il utilise [ts-morph](https://ts-morph.com/) pour analyser votre fichier source TypeScript en tant qu'AST
-3. Il insère la nouvelle définition de propriété précisément dans le bloc `properties`
-4. **Tout le code existant, les rappels et la logique personnalisée sont préservés intacts**
-5. Le fichier est enregistré, déclenchant le rechargement à chaud
+2. Au lieu de cela, il envoie la modification sous la forme d'un `TablePatch`, et le serveur utilise [ts-morph](https://ts-morph.com/) pour analyser le fichier de la table dans `backend/schema/` en tant qu'AST
+3. Il insère le nouveau constructeur `col.*` précisément dans le bloc `columns`
+4. **Tout le code existant, les hooks et la logique personnalisée sont préservés intacts** ; une modification qui toucherait à du code qu'elle ne réécrit pas est refusée
+5. Le fichier est enregistré, déclenchant le rechargement à chaud (hot reload)
 
-Cette approche "UI en tant que Générateur de Code" signifie que les modifications visuelles produisent le même code TypeScript propre qu'un développeur écrirait à la main.
+L'*apparence* d'une table dans le panneau n'en fait pas partie : les libellés, icônes et vues
+sont enregistrés dans les préférences du panneau ou écrits dans `frontend/src/cms/`. Consultez
+[Live schema editing](/docs/backend/live-schema-editing/) pour en savoir plus sur les modifications et
+ce que l'éditeur refuse.
 
-## Pipeline de Génération de Schéma
+Cette approche « UI as Code Generator » permet aux modifications visuelles de produire le même code TypeScript propre qu'un développeur écrirait à la main.
 
-Vos collections sont lues une fois et émises deux fois — sous forme d'un schéma
-Drizzle à travers lequel le serveur en cours d'exécution fait ses requêtes, et
-sous forme de SQL qui décrit la base de données que vous vouliez avoir. C'est
-sur ce SQL que la base de données est alignée, par [Atlas](https://atlasgo.io),
-qui compare votre schéma souhaité au schéma réel et planifie la modification :
+## Pipeline de génération de schéma
+
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+Vos tables sont lues une fois et émises deux fois — sous la forme d'un schéma Drizzle à travers
+lequel le serveur en cours d'exécution effectue ses requêtes, et sous la forme de SQL décrivant la base de données
+que vous souhaitiez obtenir. C'est à ce SQL que la base de données est alignée par
+[Atlas](https://atlasgo.io), qui compare votre schéma souhaité avec le schéma réel
+et planifie la modification :
 
 ```
-                        Collections (TypeScript)
+                      Tables (backend/schema)
                                   │
             ┌─────────────────────┴─────────────────────┐
             ▼                                           ▼
@@ -70,35 +81,37 @@ qui compare votre schéma souhaité au schéma réel et planifie la modification
                                                   PostgreSQL
 ```
 
-`db push` est la boucle de développement ; `db generate` + `db migrate` est la
-boucle révisable, celle à utiliser en production. Les deux passent par le même
-SQL généré, ils ne peuvent donc pas diverger sur ce que signifient vos
-collections, et les deux le réécrivent à partir des collections avant de le
-lire, il n'y a donc dans votre dépôt aucune copie qui puisse devenir obsolète.
-Ce que vous commitez, ce sont les migrations. Voir la
-[Génération de schéma](/docs/cli/schema) pour tous les indicateurs.
+`db push` constitue la boucle de développement ; `db generate` + `db migrate` constitue la
+boucle révisable, et celle à utiliser en production. Les deux passent par le même
+SQL généré, de sorte qu'ils ne peuvent pas être en désaccord sur la signification de vos tables, et
+tous deux le réécrivent à neuf à partir des tables avant de le lire, afin qu'aucune copie
+dans votre dépôt ne devienne obsolète. Les migrations sont ce que vous commitez. Consultez
+[Schema Generation](/docs/cli/schema) pour découvrir toutes les options.
 
 ### Exemple
 
-Étant donnée cette table :
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+Étant donné cette table :
 
 <!-- schema-sample: table -->
 ```ts
-import { defineTable, col } from "@rebasepro/server/schema";
+import { defineTable, col, sql } from "@rebasepro/server/schema";
 
 export const products = defineTable("products", {
     columns: {
-        id: col.text().primaryKey().defaultSql("gen_random_uuid()::text"),
+        id: col.text().primaryKey().default(sql`gen_random_uuid()::text`),
         name: col.text().notNull(),
         price: col.numeric(),
         active: col.boolean().default(true),
-        createdAt: col.timestamptz().onCreateNow()
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow()
     },
     rls: "admin-only"
 });
 ```
 
-Rebase génère ce schéma Drizzle — le fichier complet, colonne `id` et politiques par défaut comprises :
+Rebase génère ce schéma Drizzle — le fichier complet, politiques par défaut et
+le reste :
 
 <!-- schema-sample: drizzle -->
 ```typescript
@@ -127,23 +140,18 @@ export const enums = {  };
 export const relations = {  };
 ```
 
-Trois choses méritent d'être lues deux fois. La colonne `id` que vous n'avez pas
-déclarée : chaque collection reçoit une clé primaire `text`, sauf si une propriété
-revendique `isId`, et la base de données la remplit avec un uuid
-(`gen_random_uuid()::text`), si bien qu'une ligne créée depuis le panneau
-d'administration, l'API REST ou le SDK n'a besoin d'aucune clé propre. Une clé que vous
-envoyez vous-même est utilisée telle quelle. Le bloc `pgPolicy` : la sécurité au
-niveau des lignes est activée sur chaque table, et ces politiques de base sont ce
-qui permet au contexte serveur de confiance et au rôle `admin` de la lire malgré
-tout — voir les [Règles de sécurité](/docs/collections/security-rules). Et
-`active`, qui porte la `defaultValue` que vous avez écrite comme valeur par
-défaut de **colonne** : une `defaultValue` littérale se compile en un vrai
-`DEFAULT`, de sorte qu'une ligne insérée par l'API REST, un script de seed ou
-`psql` la reçoit elle aussi, pas seulement celle saisie dans le panneau
-d'administration. Une valeur par défaut de type `reference` ou `vector` n'est pas
-un littéral de colonne et reste une valeur au niveau de l'application.
+Trois éléments méritent ici une attention particulière. La colonne `id` : la base de données
+la remplit avec un uuid (`gen_random_uuid()::text`), de sorte qu'une ligne créée à partir du
+panneau d'administration, de l'API REST ou du SDK n'a pas besoin de clé propre, et toute clé que vous
+envoyez est utilisée telle quelle. Le bloc `pgPolicy` : `rls: "admin-only"` active la sécurité
+au niveau des lignes et ne génère que les politiques de base, permettant au contexte
+de serveur de confiance et au rôle `admin` de la lire — et personne d'autre ; consultez
+[Row-level security](/docs/collections/security-rules). Et `active`, qui
+porte le `.default(true)` que vous avez écrit en tant que valeur par défaut de **colonne** : une valeur par défaut
+littérale se compile en un vrai `DEFAULT`, ainsi une ligne insérée par l'API REST, un script
+de seed ou `psql` en bénéficie également, et pas seulement une ligne saisie dans le panneau d'administration.
 
-Et ce SQL, qui est ce que reçoit Atlas comme état souhaité :
+Et ce SQL, qui est ce qui est transmis à Atlas en tant qu'état souhaité :
 
 <!-- schema-sample: sql -->
 ```sql
@@ -160,22 +168,24 @@ CREATE TABLE "public"."products" (
 );
 ```
 
-Les politiques, les colonnes de recherche, les index vectoriels et les triggers
-`updated_at` sont écrits dans des fichiers à part et appliqués par la CLI de leur
-propre chef — Atlas n'en gère aucun des quatre.
+Les politiques, les colonnes de recherche, les index vectoriels et les déclencheurs `updated_at` sont écrits dans
+leurs propres fichiers et appliqués directement par la CLI — Atlas ne gère
+aucun des quatre.
 
-## Sécurité & Objets de Base de Données Non Mappés
+## Sécurité et objets de base de données non mappés
 
-Lorsque Rebase met à jour le schéma de base de données, il associe les définitions de collections TypeScript aux tables de la base de données. Pour garantir que **les objets de base de données non mappés (par exemple, tables, vues, énumérations) ne soient jamais supprimés ou modifiés**, Rebase implémente plusieurs couches de sécurité :
+Lorsque Rebase met à jour le schéma de base de données, il mappe les tables que vous déclarez avec les tables de la base de données. Pour garantir que **les objets de base de données non mappés (par ex. tables, vues, enums) ne soient jamais supprimés ou modifiés**, Rebase met en œuvre plusieurs couches de sécurité :
 
-1. **Exclusion des Tables Non Mappées** : Avant chaque push, la CLI liste chaque table et chaque vue de la base de données et passe à Atlas un `--exclude` pour chacune de celles qui ne sont adossées à aucune collection (ni à la table de jointure d'une collection), si bien qu'Atlas ne planifie jamais de changement sur elle. Si la base de données ne peut pas être lue, le push s'interrompt plutôt que de s'exécuter avec une liste partielle.
-2. **Schémas Appartenant à Rebase** : Le schéma `rebase` (tables d'authentification, fonctions d'aide RLS, table de révisions d'Atlas) et tout schéma `auth` sont exclus en entier, de sorte qu'un push ne peut jamais planifier un `DROP SCHEMA … CASCADE`.
-3. **Objets qu'Atlas Ne Sait Pas Modéliser** : Les colonnes de recherche, les index vectoriels et les triggers sont eux aussi exclus d'Atlas, et appliqués à partir de leurs propres fichiers générés.
-4. **Barrière contre les Changements Destructeurs** : `rebase db push` simule d'abord le plan. Une instruction qui détruit des données — une colonne ou une table supprimée, un changement de type avec perte — arrête le push : dans un terminal, la CLI vous demande de taper `yes`, et sans terminal (CI, scripts, agents) elle refuse, sauf si vous passez `--allow-destructive`.
-5. **Propriété des Index par le Nom** : Les index sont le seul objet qui vit *sur* une table mappée, le filtrage de tables ne peut donc pas les protéger — et un push planifiait `DROP INDEX` pour tout index absent de l'état souhaité, c'est-à-dire tous ceux écrits à la main. Rebase nomme désormais les index qu'il génère `<table>_<columns>_ix_<7 hex>` (`_ux_` s'ils sont uniques), une forme qu'aucun autre nommage ici ne produit, et exclut tout le reste du diff par le nom. Un index que vous avez écrit à la main, ou arrivé par introspection, n'est jamais touché ; une déclaration que vous supprimez retire toujours son index, ce qui est l'intention. Voir **[Index](/docs/backend/indexes)**.
+1. **Exclusion des tables non mappées** : Avant chaque push, la CLI liste chaque table et vue dans la base de données et transmet à Atlas un `--exclude` pour chacune de celles auxquelles aucune table déclarée (ou table de jonction d'une table déclarée) n'est mappée, afin qu'Atlas ne planifie jamais de modification à son sujet. Si la base de données ne peut pas être lue, le push est interrompu plutôt que d'être exécuté avec une liste partielle.
+2. **Schémas gérés par Rebase** : Le schéma `rebase` (tables d'authentification, fonctions utilitaires RLS, table de révision d'Atlas) et tout schéma `auth` sont exclus dans leur intégralité, de sorte qu'un push ne puisse jamais planifier de `DROP SCHEMA … CASCADE`.
+3. **Objets qu'Atlas ne peut pas modéliser** : Les colonnes de recherche, les index vectoriels et les déclencheurs sont également exclus d'Atlas et sont appliqués à partir de leurs propres fichiers générés.
+4. **Garde-fou contre les modifications destructives** : `rebase db push` simule d'abord l'exécution du plan. Une instruction qui détruit des données — la suppression d'une colonne ou d'une table, un changement de type avec perte de données — interrompt le push : dans un terminal, il vous demande de taper `yes`, et en l'absence de terminal (CI, scripts, agents), il refuse de s'exécuter à moins de lui passer l'option `--allow-destructive`.
+5. **Appartenance des index par le nom** : Les index sont le seul objet qui réside *sur* une table mappée, le filtrage des tables ne peut donc pas les protéger — et auparavant, un push planifiait un `DROP INDEX` pour tout index absent de l'état souhaité, ce qui incluait tous ceux écrits à la main. Rebase nomme désormais les index qu'il génère `<table>_<columns>_ix_<7 hex>` (`_ux_` lorsqu'il est unique), un format qu'aucun autre système de nommage ne produit ici, et exclut tout le reste du diff par son nom. Un index que vous avez écrit à la main, ou issu d'une introspection, n'est jamais touché ; une déclaration que vous supprimez est toujours supprimée, ce qui est le comportement voulu. Consultez **[Indexes](/docs/backend/indexes)**.
 
-## Prochaines Étapes
+## Prochaines étapes
 
-- **[Collections](/docs/collections)** — Référence complète de la configuration des collections
-- **[Propriétés](/docs/collections/properties)** — Mappages détaillés des types de colonnes
-- **[Index](/docs/backend/indexes)** — Déclarer les index dont vos requêtes ont besoin
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+- **[Tables](/docs/schema/)** — Toutes les options de `defineTable`
+- **[Columns](/docs/schema/columns/)** — Mappings détaillés des types de colonnes
+- **[Indexes](/docs/backend/indexes)** — Déclarer les index nécessaires à vos requêtes

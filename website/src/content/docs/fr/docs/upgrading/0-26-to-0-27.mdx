@@ -1,32 +1,32 @@
 ---
-sourceHash: c5c4b8a603134528
+sourceHash: bf1ba2b0f0306da2
 slug: fr/docs/upgrading/0-26-to-0-27
 title: Mise à niveau de 0.26 à 0.27
 sidebar_label: 0.26 → 0.27
-description: Les changements cassants apportés par la version 0.27 pour une application en 0.26 — planifications cron qui restreignent les deux champs de jour, nombres cron malformés, stratégie de clé incompatible avec son type, déploiements managés qui s'arrêtent sur un fichier non chargé, et clients de navigateur utilisant l'authentification par cookie par défaut.
+description: Les changements de rupture introduits par la version 0.27 pour une application en 0.26 — planifications cron restreignant les deux champs de jour, nombres cron malformés, stratégie de clé incompatible avec son type, déploiements gérés interrompus en cas de fichier non chargé, et clients navigateur utilisant l'authentification par cookie par défaut.
 ---
 
 # Mise à niveau 0.26 → 0.27
 
-Voici les entrées `### Breaking` que la version 0.27 apporte pour une application en 0.26.
+Voici les entrées `### Breaking` apportées par la version 0.27 pour une application en 0.26.
 
-Les deux modifications relatives à cron sont celles à lire en premier, car aucune des deux n'empêche le démarrage : une tâche commence à s'exécuter plus souvent, et l'autre cesse complètement de s'exécuter. La troisième ne concerne qu'une table déjà existante. La quatrième concerne Rebase Cloud, et vous y ferez face lors de votre prochain déploiement. La dernière concerne le SDK client dans un navigateur.
+Les deux modifications concernant cron sont celles à lire en premier, car aucune des deux n'empêche le démarrage : une tâche commence à s'exécuter plus souvent, et l'autre ne s'exécute plus du tout. La troisième ne concerne qu'une table déjà existante. La quatrième concerne Rebase Cloud et se présentera lors de votre prochain déploiement. La dernière concerne le SDK client dans un navigateur.
 
 ---
 
-## 97. Une planification cron qui restreint les deux champs de jour correspond à l'un ou l'autre
+## 97. Une planification cron restreignant les deux champs de jour correspond à l'un ou l'autre
 
-`0 9 1 * 1` ne s'exécutait auparavant que les lundis 1er du mois. Elle s'exécute désormais chaque 1er du mois et chaque lundi, conformément au comportement standard de cron. Cela s'applique lorsque aucun des deux champs de jour ne commence par `*`. Une planification contenant `*` ou `*/n` dans l'un des deux conserve son comportement antérieur.
+`0 9 1 * 1` ne s'exécutait auparavant que les lundis 1er du mois. Il s'exécute désormais chaque 1er du mois et chaque lundi, conformément au fonctionnement standard de cron. Cela s'applique lorsqu'aucun des deux champs de jour ne commence par `*`. Une planification contenant `*` ou `*/n` dans l'un ou l'autre conserve son comportement antérieur.
 
-La planification la plus impactée par ce changement est la formule courante du « premier lundi du mois » : `0 9 1-7 * 1` ne se déclenchait autrefois qu'une fois par mois, et se déclenche désormais chacun des sept premiers jours ainsi que chaque lundi.
+La planification la plus affectée est la formule classique du « premier lundi du mois » : `0 9 1-7 * 1` se déclenchait auparavant une fois par mois, et se déclenche désormais chacun des sept premiers jours du mois ainsi que chaque lundi.
 
-**Ce qu'il faut changer :** recherchez les planifications comportant un nombre dans les deux champs de jour :
+**Ce qu'il faut modifier :** recherchez les planifications contenant un nombre dans les deux champs de jour :
 
 ```bash
 grep -rnE "schedule:.*[\"'\`][^ ]+ +[^ ]+ +[0-9][^ ]* +[^ ]+ +[0-9]" backend/
 ```
 
-Si vous souhaitiez l'un ou l'autre de ces jours, ne modifiez rien. Si vous visiez les deux, planifiez l'un des champs de jour et testez l'autre dans le gestionnaire :
+Si vous visiez l'un ou l'autre jour, ne changez rien. Si vous visiez les deux à la fois, planifiez l'un des champs de jour et vérifiez l'autre dans le gestionnaire :
 
 ```typescript
 // backend/crons/first-monday.ts
@@ -43,32 +43,32 @@ export default defineCron({
 });
 ```
 
-Voir [Schedule Syntax](/docs/backend/cron-jobs/#schedule-syntax).
+Consultez [Syntaxe de planification](/docs/backend/cron-jobs/#schedule-syntax).
 
-## 98. Une planification cron comportant un nombre malformé est refusée
+## 98. Une planification cron avec un nombre malformé est refusée
 
-`5abc`, `*/5x`, `1.5` et les plages inversées, telles que `5-1`, passaient auparavant la validation. Un nombre était lu jusqu'au premier caractère non numérique, de sorte que `5abc` s'exécutait comme `5`, et une plage inversée ne contribuait à rien. Chacun de ces cas est désormais refusé en précisant le champ et la raison.
+`5abc`, `*/5x`, `1.5` ainsi qu'une plage inversée, telle que `5-1`, passaient auparavant la validation. Un nombre était lu jusqu'au premier caractère non numérique, ainsi `5abc` s'exécutait comme `5`, et une plage inversée ne contribuait à rien. Chacun de ces cas est désormais refusé en indiquant le champ concerné et la raison.
 
-Une tâche refusée n'est pas enregistrée et ne s'exécute pas, et le reste du backend démarre. Rien d'autre ne vous en avertit : le déploiement passe en ligne car le fichier lui-même a été chargé.
+Une tâche refusée n'est pas enregistrée et ne s'exécute pas, tandis que le reste du backend démarre. Rien d'autre ne vous en avertit : le déploiement passe en production car le fichier lui-même a été chargé.
 
-**Ce qu'il faut changer :** après la mise à niveau, recherchez `[cron] Rejecting job` dans les journaux du serveur, ou lisez `rejected` sur `GET /api/admin/cron`, ce que montre également l'outil Cron Jobs de Studio. Corrigez le nombre et la tâche sera enregistrée au prochain démarrage. Voir [Jobs that are not there](/docs/backend/cron-jobs-api/#jobs-that-are-not-there).
+**Ce qu'il faut modifier :** après la mise à niveau, recherchez `[cron] Rejecting job` dans les journaux du serveur, ou lisez `rejected` sur `GET /api/admin/cron`, ce que montre également l'outil Cron Jobs de Studio. Corrigez le nombre et la tâche sera enregistrée au prochain démarrage. Consultez [Tâches non présentes](/docs/backend/cron-jobs-api/#jobs-that-are-not-there).
 
-## 99. Une clé dont la stratégie ne peut pas être respectée par son type bloque le démarrage
+## 99. Une clé dont la stratégie ne peut pas être respectée par son type interrompt le démarrage
 
-`isId: "increment"` sur une clé qui n'est pas un `number`, et `isId: "uuid"` sur une clé qui n'est pas une `string`, sont refusés lors du chargement de la configuration avec un message indiquant la propriété. Les deux étaient auparavant interprétés comme une valeur par défaut SQL brute. Postgres refusait `DEFAULT increment` dès le premier `CREATE TABLE`, ce cas ne touche donc qu'une table déjà existante, où rien n'a exécuté cette instruction.
+`isId: "increment"` sur une clé qui n'est pas un `number`, et `isId: "uuid"` sur une clé qui n'est pas une `string`, sont refusés lors du chargement de la configuration avec un message précisant la propriété. Les deux étaient auparavant interprétés comme une valeur par défaut SQL brute. Postgres refusait `DEFAULT increment` dès le premier `CREATE TABLE`, donc cela ne concerne qu'une table déjà existante, où rien n'exécutait cette instruction.
 
-**Ce qu'il faut changer :** déclarez la clé conformément à ce qu'est la colonne. Une clé numérique prend `type: "number"` avec `"increment"`, et une clé chaîne de caractères prend `"uuid"`, ou `true` lorsque l'appelant fournit la valeur. Voir [String Options](/docs/collections/properties/#string-options).
+**Ce qu'il faut modifier :** déclarez la clé conformément à ce qu'est la colonne. Une clé numérique prend `type: "number"` avec `"increment"`, et une clé chaîne prend `"uuid"`, ou `true` lorsque l'appelant fournit la valeur. Consultez [Clés, identités et séquences](/docs/schema/columns/#keys-identity-and-serials).
 
-## 100. Un déploiement managé ou une prévisualisation échoue lorsqu'un fichier de fonction ou de tâche cron ne se charge pas
+## 100. Un déploiement géré ou une prévisualisation échoue lorsqu'un fichier de fonction ou de cron ne se charge pas
 
-Un fichier de fonction ou de tâche cron qui levait une exception ou ne pouvait pas être analysé lors de l'importation était auparavant ignoré, de sorte qu'un déploiement indiquait `✓ Live` et réussissait ses sondes alors que chaque route de ce fichier renvoyait une erreur 404. Les pods sur Rebase Cloud s'exécutent désormais avec `REBASE_REQUIRE_FILES_LOADED`, sur un runtime qui le prend en charge, de sorte que la nouvelle version n'est jamais marquée comme prête, l'ancienne continue de répondre aux requêtes, et le déploiement s'interrompt en indiquant le fichier et la raison.
+Un fichier de fonction ou de cron qui levait une exception ou échouait à l'analyse lors de l'importation était auparavant ignoré, de sorte qu'un déploiement indiquait `✓ Live` et passait ses sondes d'état alors que chaque route de ce fichier renvoyait une 404. Les pods sur Rebase Cloud s'exécutent désormais avec `REBASE_REQUIRE_FILES_LOADED`, sur un runtime qui le prend en charge, ainsi la nouvelle version ne passe jamais à l'état prêt, l'ancienne continue de répondre aux requêtes, et le déploiement s'interrompt en indiquant le fichier et la raison.
 
-Un projet qui fonctionnait avec un tel fichier sera confronté à cette erreur lors de son prochain déploiement. Les déploiements progressifs de flotte et les retours en arrière (rollbacks) n'y sont pas soumis. Un fichier qui s'importe correctement et n'exporte aucune fonction ni tâche, tel qu'un helper, est toujours ignoré.
+Un projet en production comportant un tel fichier sera confronté à cette erreur lors de son prochain déploiement. Les déploiements de flotte et les retours en arrière (rollbacks) n'y sont pas soumis. Un fichier qui s'importe sans erreur et n'exporte aucune fonction ni tâche, tel qu'un helper, est toujours ignoré.
 
-**Ce qu'il faut changer :** déployez, puis corrigez ou supprimez le fichier indiqué par le déploiement. En dehors de Rebase Cloud, rien ne change sauf si vous définissez vous-même `REBASE_REQUIRE_FILES_LOADED=true`. Voir [Environment & Configuration](/docs/getting-started/configuration/).
+**Ce qu'il faut modifier :** déployez, puis corrigez ou supprimez le fichier désigné par le déploiement. En dehors de Rebase Cloud, rien ne change sauf si vous définissez vous-même `REBASE_REQUIRE_FILES_LOADED=true`. Consultez [Environnement et configuration](/docs/getting-started/configuration/).
 
-## 101. Un client de navigateur utilise par défaut l'authentification par cookie
+## 101. Un client navigateur utilise l'authentification par cookie par défaut
 
-`createRebaseClient` sans `auth.authFlowMode` utilisait le mode json partout. Un backend exécuté par le runtime Rebase conserve toujours le jeton de rafraîchissement dans un cookie HttpOnly et renvoie `""` dans le corps de la réponse, de sorte qu'un client de navigateur utilisant cette valeur par défaut ne disposait de rien pour se renouveler, et était déconnecté sans avertissement environ une heure après sa connexion. Dans un navigateur, le mode par défaut est désormais le mode cookie. En dehors du navigateur, et dans un client de navigateur disposant de son propre `auth.storage`, il reste en json.
+`createRebaseClient` sans `auth.authFlowMode` utilisait le mode json partout. Un backend exécuté par le runtime Rebase conserve toujours le jeton de rafraîchissement dans un cookie HttpOnly et renvoie `""` dans le corps de réponse, de sorte qu'un client navigateur avec ce comportement par défaut ne disposait d'aucun élément pour se renouveler, et se retrouvait déconnecté sans avertissement environ une heure après la connexion. Dans un navigateur, le mode par défaut est désormais le mode cookie. Hors d'un navigateur, ainsi que pour un client navigateur doté de son propre `auth.storage`, le mode reste json.
 
-**Ce qu'il faut changer :** rien, lorsque votre backend s'exécute sur le runtime Rebase ou définit `auth.cookieAuth` : une application de navigateur qui était déconnectée au bout d'une heure reste désormais connectée. Un backend sans `auth.cookieAuth` nécessite `auth: { authFlowMode: "json" }` sur son client de navigateur. Le client consigne une erreur indiquant le mode à utiliser lors de la première connexion où les deux divergent. En mode cookie, la session n'est plus conservée dans `localStorage` ; un rechargement la restaure avec une seule requête `/auth/refresh`, veillez donc à lire la session après `auth.isInitialized()`. Voir [Where the Session Lives](/docs/sdk/authentication/#where-the-session-lives-authflowmode).
+**Ce qu'il faut modifier :** rien, si votre backend s'exécute sur le runtime Rebase ou définit `auth.cookieAuth` : une application de navigateur qui était déconnectée après une heure reste désormais connectée. Un backend sans `auth.cookieAuth` requiert `auth: { authFlowMode: "json" }` sur son client navigateur. Le client consigne une erreur indiquant le mode à utiliser lors de la première connexion où les deux divergent. En mode cookie, la session n'est plus conservée dans `localStorage` ; un rechargement la restaure à l'aide d'une seule requête `/auth/refresh`, veillez donc à lire la session après `auth.isInitialized()`. Consultez [Emplacement de la session](/docs/sdk/authentication/#where-the-session-lives-authflowmode).

@@ -1,32 +1,34 @@
 ---
-sourceHash: 3c34341487182d4a
+sourceHash: 71a134ba2ec7ae97
 title: Autenticazione
 sidebar_label: Autenticazione
-description: Configura l'autenticazione JWT, i provider OAuth, le email SMTP, la protezione bot e la collection users sul backend Rebase.
+description: Configura l'autenticazione JWT, i provider OAuth, le email SMTP, la protezione dai bot e la tabella utenti sul backend Rebase.
 ---
 
-L'autenticazione è suddivisa in tre pagine, poiché svolge tre compiti distinti. Questa pagina riguarda la **configurazione**: cosa inserire nel blocco `auth` e nell'ambiente.
+L'autenticazione è divisa in tre pagine, poiché comprende tre compiti distinti. Questa pagina riguarda la **configurazione**: cosa inserire nel blocco `auth` e nell'ambiente.
 
-- [Endpoint e token](/docs/backend/auth-endpoints/) — le route montate dal backend, le strutture di risposta, l'MFA, il contesto del database visibile da una policy, JWKS e chiavi di servizio.
-- [Adattatori di autenticazione personalizzati](/docs/backend/auth-adapters/) — sostituzione del provider integrato con Clerk, Firebase Auth o una soluzione proprietaria.
+- [Endpoint e token](/docs/backend/auth-endpoints/) — le route montate dal backend, la struttura delle risposte, MFA, il contesto del database visibile a una policy, JWKS e chiavi di servizio.
+- [Adattatori di autenticazione personalizzati](/docs/backend/auth-adapters/) — sostituire il provider integrato con Clerk, Firebase Auth o una soluzione proprietaria.
 
 ## Panoramica
 
-Rebase include un sistema completo di autenticazione backend:
+Rebase include un sistema di autenticazione backend completo:
 
 - **Token JWT** — Flusso di token di accesso e refresh con scadenza configurabile
 - **Provider OAuth** — Google, LinkedIn, GitHub, Microsoft, Apple e altri
-- **Email SMTP** — Flussi di reimpostazione della password e verifica email
-- **Hook di autenticazione** — Hook del ciclo di vita per la creazione degli utenti e altro
+- **Email SMTP** — Flussi di reimpostazione della password e verifica dell'email
+- **Hook di autenticazione** — Hook del ciclo di vita per la creazione dell'utente e altro
 - **Adattatori di autenticazione personalizzati** — Integrazione con Firebase Auth, Auth0, Clerk o qualsiasi provider esterno
-- **Chiave di servizio** — Chiave statica per l'autenticazione server-to-server
-- **Auto-bootstrapping** — Al di fuori della produzione, il primo utente ottiene automaticamente il ruolo di amministratore; un deployment di produzione definisce il proprio amministratore tramite `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD`
+- **Service key** — Chiave statica per l'autenticazione server-to-server
+- **Auto-bootstrapping** — Al di fuori della produzione, il primo utente riceve automaticamente il ruolo di amministratore; un deployment in produzione definisce il proprio admin tramite `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD`
 
 ## Configurazione
 
+<span class="since-badge" data-since="0.31">Da 0.31</span>
+
 :::note[Dove va inserito]
-**Runtime gestito:** ambiente — `JWT_SECRET`, `AUTH_*`, `SMTP_*`, `CAPTCHA_*` e le coppie `*_CLIENT_ID` / `*_CLIENT_SECRET` dei provider, una per ciascuno dei dodici provider ([i formati delle variabili](#i-formati-delle-variabili-di-ambiente); Apple richiede quattro chiavi anziché una coppia). La collection users corrisponde a quella specificata dal bundle (per convenzione `collections/users`).
-**Nessuna route gestita:** `auth.hooks`. Sono funzioni; effettua l'eject per trasmetterle.
+**Runtime gestito:** ambiente — `JWT_SECRET`, `AUTH_*`, `SMTP_*`, `CAPTCHA_*` e le coppie `*_CLIENT_ID` / `*_CLIENT_SECRET` dei provider, una per ciascuno dei dodici provider ([le sintassi](#le-variabili-dambiente); per Apple sono quattro chiavi, non una coppia). La tabella degli utenti è la [`defineAuthTable`](#la-tabella-utenti) esportata da `backend/schema/index.ts`.
+**Nessuna route gestita:** `auth.hooks`. Sono funzioni; effettua l'eject per passarle.
 **Con eject:** `initializeRebaseBackend({ auth })` in `backend/src/index.ts`.
 :::
 
@@ -36,7 +38,6 @@ Il blocco `auth` in `initializeRebaseBackend` controlla l'intera autenticazione 
 const backend = await initializeRebaseBackend({
     // ...
     auth: {
-        collection: usersCollection,         // Your users collection definition
         jwtSecret: env.JWT_SECRET,           // Required — signing secret
         accessExpiresIn: "1h",               // Access token lifetime (default: 1h)
         refreshExpiresIn: "30d",             // Refresh token lifetime (default: 30d)
@@ -82,66 +83,65 @@ const backend = await initializeRebaseBackend({
 
 | Chiave | Tipo | Predefinito | Descrizione |
 |-----|------|---------|--------------|
-| `collection` | `CollectionConfig` | — | La collection degli utenti. Consulta [Configurazione dell'autenticazione a livello di collection](#configurazione-dellautenticazione-a-livello-di-collection) |
-| `jwtSecret` | `string` | — | Segreto di firma HS256. Obbligatorio in produzione |
+| `jwtSecret` | `string` | — | Chiave segreta di firma HS256. Obbligatoria in produzione |
 | `signingKeys` | `JwtSigningKeyConfig[]` | — | Chiavi di firma asimmetriche — consulta [Token asimmetrici e JWKS](/docs/backend/auth-endpoints/#asymmetric-tokens-and-jwks) |
-| `activeKid` | `string` | prima chiave | Quale tra i `signingKeys` genera i nuovi token |
+| `activeKid` | `string` | prima chiave | Quale tra le `signingKeys` emette nuovi token |
 | `accessExpiresIn` | `string` | `1h` | Durata del token di accesso |
-| `refreshExpiresIn` | `string` | `30d` | Durata del refresh token. A scorrimento: ogni rotazione la rinnova, quindi indica per quanto tempo una sessione sopravvive all'**inattività**. Il runtime passa `JWT_REFRESH_EXPIRES_IN`, che per impostazione predefinita è anch'esso impostato su `30d`. I browser limitano il cookie di refresh a 400 giorni, pertanto un valore più lungo non offre vantaggi in modalità cookie |
-| `refreshTokenReuseIntervalSeconds` | `number` | `10` | Intervallo di tempo durante il quale un refresh token sostituito genera comunque un duplicato della sessione, in modo che un client che ha perso la risposta di refresh non venga disconnesso |
-| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | Cosa accade quando viene presentato un refresh token oltre tale finestra temporale. `"reject"` lo rifiuta (`TOKEN_ALREADY_USED`) e lo registra nei log, mantenendo attiva la sessione: non si tratta di rilevamento del riutilizzo, poiché chi ha effettuato il refresh per primo mantiene la sessione. `"revoke-session"` termina l'intero accesso in caso di replay di questo tipo (`SESSION_REVOKED`), come avviene in GoTrue, richiedendo al proprietario di eseguire nuovamente il login. `AUTH_REFRESH_TOKEN_REUSE` |
-| `requireAuth` | `boolean` | `true` | Richiede una sessione per l'API dei dati |
-| `allowRegistration` | `boolean` | `false` | Abilita `POST /api/auth/register`. Al di fuori della produzione, il primo utente su una tabella vuota viene comunque accettato; in produzione l'amministratore viene specificato tramite `REBASE_ADMIN_EMAIL` |
-| `disableSelfRegistration` | `boolean` | `false` | Interruttore di emergenza (kill switch): chiude anche la finestra di bootstrap del primo utente lasciata aperta da `allowRegistration: false` |
-| `allowAnonymous` | `boolean` | `false` | Abilita `POST /api/auth/anonymous`. Volutamente non vincolato da `allowRegistration` — un'applicazione pubblica prevalentemente in sola lettura potrebbe richiedere sessioni senza account. Trasformare un ospite in un account (`POST /api/auth/anonymous/link`) è una registrazione e richiede sia `allowRegistration` che `allowAnonymous` ancora abilitato: se disattivato, rifiuta anche gli ospiti già autenticati, impedendo a chiunque di convertirsi in un account (`403 ANONYMOUS_AUTH_DISABLED`) |
+| `refreshExpiresIn` | `string` | `30d` | Durata del refresh token. A scorrimento: ogni rotazione lo rinnova, quindi rappresenta per quanto tempo una sessione sopravvive all'**inattività**. Il runtime passa `JWT_REFRESH_EXPIRES_IN`, che per impostazione predefinita è anch'esso `30d`. I browser limitano il cookie di refresh a 400 giorni, quindi un valore più lungo non porta alcun vantaggio in modalità cookie |
+| `refreshTokenReuseIntervalSeconds` | `number` | `10` | Per quanto tempo un refresh token già ruotato può ancora emettere un duplicato della sua sessione, in modo che un client che ha perso una risposta di refresh non venga disconnesso |
+| `refreshTokenReuse` | `"reject" \| "revoke-session"` | `"reject"` | Cosa accade a un refresh token presentato oltre tale finestra temporale. `"reject"` lo rifiuta (`TOKEN_ALREADY_USED`) e lo registra nei log, mantenendo la sessione valida: non si tratta di reuse detection, poiché chi ha effettuato il refresh per primo mantiene la sessione. `"revoke-session"` termina l'intero accesso in caso di replay di questo tipo (`SESSION_REVOKED`), come fa GoTrue, e l'utente deve accedere nuovamente. `AUTH_REFRESH_TOKEN_REUSE` |
+| `requireAuth` | `boolean` | `true` | Richiede una sessione per le API dati |
+| `allowRegistration` | `boolean` | `false` | Apre `POST /api/auth/register`. Al di fuori della produzione il primo utente su una tabella vuota viene ammesso in entrambi i casi; in produzione l'admin viene definito con `REBASE_ADMIN_EMAIL` |
+| `disableSelfRegistration` | `boolean` | `false` | Interruttore di emergenza (kill switch): chiude anche la finestra di bootstrap per il primo utente che `allowRegistration: false` lascerebbe aperta |
+| `allowAnonymous` | `boolean` | `false` | Abilita `POST /api/auth/anonymous`. Volutamente non vincolato da `allowRegistration` — un'applicazione pubblica per lo più in sola lettura potrebbe richiedere sessioni senza account. Trasformare un ospite in un account (`POST /api/auth/anonymous/link`) è una registrazione e richiede anch'esso `allowRegistration` — e `allowAnonymous` ancora attivo: se disattivato, rifiuta anche gli ospiti già autenticati, impedendo a chiunque di convertirsi in un account (`403 ANONYMOUS_AUTH_DISABLED`) |
 | `allowUserLookup` | `boolean` | `false` | Monta `POST /api/auth/find-user` per i flussi di invito tramite email |
-| `captcha` | `CaptchaConfig` | — | Protezione dai bot sulle route che inviano email — consulta [Protezione bot](#protezione-bot) |
-| `defaultRole` | `string` | — | Ruolo assegnato a un utente appena registrato quando non ne viene specificato uno. Non può essere `admin` né un ruolo dichiarato con ambito del piano admin: l'avvio rifiuta entrambi |
-| `serviceKey` | `string` | — | Chiave statica per chiamate server-to-server — consulta [Autenticazione con chiave di servizio](/docs/backend/auth-endpoints/#service-key-authentication) |
-| `email` | `EmailConfig` | — | SMTP, per la reimpostazione della password, la verifica, gli inviti e i magic link |
-| `magicLink` | `boolean` | `false` | Abilita l'accesso senza password tramite email. Richiede la configurazione di `email`; in caso contrario, le route rispondono con `503 EMAIL_NOT_CONFIGURED` |
-| `emailOtp` | `boolean` | `false` | Abilita i codici di accesso a sei cifre via email — consulta [Codici monouso via email](#codici-monouso-via-email). Stesso requisito per l'email |
-| `deviceLogin` | `{ verificationUrl: string }` | — | Consente a un terminale o a un altro dispositivo privo di browser di autenticarsi tramite un browser — consulta [Accesso da dispositivo](/docs/backend/device-sign-in/). Richiede un database SQL |
-| `magicLinkCreatesUsers` | `boolean` | `false` | Registrazione senza password: una richiesta di magic link o di codice email per un indirizzo senza account ne crea uno (senza password, non verificato finché il link o il codice non vengono utilizzati), purché `allowRegistration` sia attivo. Esegue `beforeUserCreate` e applica il ruolo predefinito. Se disattivato, tali richieste non creano nulla e rispondono a un indirizzo sconosciuto esattamente come a uno noto. `AUTH_MAGIC_LINK_CREATES_USERS` |
-| `requireEmailVerification` | `boolean` | `false` | Rifiuta l'accesso con password finché l'indirizzo non è verificato, e registra con conferma preliminare — consulta [Verifica dell'email](/docs/backend/email-verification/). Richiede `email`; l'avvio fallisce in sua assenza |
-| `cookieAuth` | `CookieAuthConfig \| false` | attivo | Invia il refresh token come cookie `httpOnly` `Secure` `SameSite` invece che nel corpo JSON; `false` lo restituisce nel corpo — vedi sotto |
-| `providers` | `OAuthProvider[]` | `[]` | L'array canonico di OAuth; i campi con il nome dei provider vengono risolti al suo interno |
-| `allowedRedirectUris` | `string[]` | — | Limita gli URI di reindirizzamento accettati dalle route OAuth |
+| `captcha` | `CaptchaConfig` | — | Protezione dai bot sulle route che inviano email — consulta [Protezione dai bot](#protezione-dai-bot) |
+| `defaultRole` | `string` | — | Ruolo assegnato a un utente appena registrato quando non ne viene specificato alcuno. Non può essere `admin` né un ruolo dichiarato con uno scope a livello di amministrazione: l'avvio rifiuterà entrambi |
+| `serviceKey` | `string` | — | Chiave statica per chiamate server-to-server — consulta [Autenticazione con Service Key](/docs/backend/auth-endpoints/#service-key-authentication) |
+| `email` | `EmailConfig` | — | SMTP, per reimpostazione della password, verifica, inviti e magic link |
+| `magicLink` | `boolean` | `false` | Abilita l'accesso senza password tramite email. Richiede la configurazione di `email`; senza di essa le route rispondono con `503 EMAIL_NOT_CONFIGURED` |
+| `emailOtp` | `boolean` | `false` | Abilita i codici di accesso a sei cifre via email — consulta [Codici monouso](#codici-monouso-via-email). Stesso requisito di configurazione email |
+| `deviceLogin` | `{ verificationUrl: string }` | — | Consente a un terminale o a un altro dispositivo privo di browser di effettuare l'accesso tramite un browser — consulta [Accesso da dispositivo](/docs/backend/device-sign-in/). Richiede un database SQL |
+| `magicLinkCreatesUsers` | `boolean` | `false` | Registrazione senza password: una richiesta di magic-link o di codice email per un indirizzo senza account ne crea uno (senza password, non verificato finché il link o codice non viene utilizzato), purché `allowRegistration` sia attivo. Esegue `beforeUserCreate` e assegna il ruolo predefinito. Se disabilitato, queste richieste non creano nulla e rispondono a un indirizzo sconosciuto esattamente come a uno noto. `AUTH_MAGIC_LINK_CREATES_USERS` |
+| `requireEmailVerification` | `boolean` | `false` | Rifiuta l'accesso con password finché l'indirizzo non è verificato, e impone la conferma preliminare alla registrazione — consulta [Verifica dell'email](/docs/backend/email-verification/). Richiede `email`; in caso contrario l'avvio viene rifiutato |
+| `cookieAuth` | `CookieAuthConfig \| false` | attivo | Fornisce il refresh token come cookie `httpOnly` `Secure` `SameSite` invece che nel corpo JSON; `false` lo restituisce nel corpo — vedi sotto |
+| `providers` | `OAuthProvider[]` | `[]` | L'array OAuth canonico; i campi dei provider denominati confluiscono in esso |
+| `allowedRedirectUris` | `string[]` | — | Limita i redirect URI accettati dalle route OAuth |
 | `hooks` | `AuthHooks` | — | `beforeUserCreate`, `afterUserCreate`, `afterUserDelete`, … |
 
-#### Token di refresh in un cookie `httpOnly`
+#### Refresh token in un cookie `httpOnly`
 
 ```typescript no-verify
 auth: { cookieAuth: { sameSite: "Lax" } }
 ```
 
-Il refresh token è la credenziale a lungo termine e, se presente nel corpo della richiesta, qualsiasi vulnerabilità XSS nella pagina potrebbe leggerlo. `cookieAuth` lo conserva in un cookie inaccessibile agli script della pagina: attivo per impostazione predefinita a meno che non venga configurato diversamente, sempre nel runtime e dalla versione 0.30 in `initializeRebaseBackend`. Il token di **accesso** rimane nel corpo, per l'header `Authorization`. Una richiesta con `x-rebase-auth-flow: json` riceve il refresh token nel corpo; con `cookieAuth: false` ciò avviene per ogni richiesta, e un client browser richiede `authFlowMode: "json"`.
+Il refresh token è la credenziale a lunga durata e, se presente nel corpo della risposta, qualsiasi vulnerabilità XSS nella pagina potrebbe leggerlo. `cookieAuth` lo mantiene in un cookie inaccessibile agli script della pagina: attivo a meno che non venga disabilitato esplicitamente, sempre presente nel runtime e, a partire dalla versione 0.30, in `initializeRebaseBackend`. Il token di **accesso** rimane nel corpo della risposta, per essere usato nell'header `Authorization`. Una richiesta con `x-rebase-auth-flow: json` riceve il refresh token nel corpo; con `cookieAuth: false` lo riceve qualsiasi richiesta, e un client browser richiede `authFlowMode: "json"`.
 
-Devono essere rispettate due condizioni, altrimenti l'autenticazione si interrompe anziché degradare normalmente: le chiamate fetch del client verso gli endpoint di autenticazione richiedono `credentials: "include"`, e CORS deve consentire le credenziali — il che significa un elenco esplicito di origini, mai `origin: "*"`. `AUTH_COOKIE_SAME_SITE` è la variabile di ambiente corrispondente a `sameSite`, mentre `AUTH_COOKIE_SECURE` corrisponde a `secure`.
+Due aspetti devono necessariamente seguire, altrimenti l'accesso si interrompe invece di degradare normalmente: le chiamate fetch del client verso gli endpoint di autenticazione devono includere `credentials: "include"`, e CORS deve autorizzare le credenziali — il che implica un elenco esplicito di origini, mai `origin: "*"`. `AUTH_COOKIE_SAME_SITE` è la variabile d'ambiente per `sameSite`, e `AUTH_COOKIE_SECURE` per `secure`.
 
-Il cookie include il flag `Secure` a meno che non venga disattivato, e nulla nella richiesta può sovrascriverlo: basandosi sul protocollo della richiesta, che è `http` dietro qualsiasi proxy di terminazione TLS, invierebbe il token in chiaro. `AUTH_COOKIE_SECURE=false` è l'unica via d'uscita per un deployment erogato su semplice HTTP (un indirizzo LAN, un'appliance), e genera un avviso all'avvio. `http://localhost` non ne ha bisogno.
+Il cookie include `Secure` a meno che non venga disattivato esplicitamente, e nessun elemento della richiesta può dedurlo: leggendolo dal protocollo della richiesta, che è `http` dietro a qualsiasi proxy con terminazione TLS, il token verrebbe inviato in testo non cifrato. `AUTH_COOKIE_SECURE=false` è l'unica via d'uscita per un deployment erogato su semplice protocollo http (un indirizzo LAN, un'appliance), e genera un avviso all'avvio. `http://localhost` non ne ha bisogno.
 
 | Chiave | Predefinito | |
 |-----|---------|--|
 | `cookieName` | `__rb_refresh` | |
 | `domain` | dominio corrente | |
 | `path` | `/` | |
-| `sameSite` | `Lax` | `None` è riservato solo a un frontend realmente cross-site |
-| `secure` | `true` | Protetto per impostazione predefinita; `AUTH_COOKIE_SECURE=false` per HTTP non crittografato |
+| `sameSite` | `Lax` | `None` è solo per un frontend genuinamente cross-site |
+| `secure` | `true` | Protetto per impostazione predefinita; `AUTH_COOKIE_SECURE=false` per http non cifrato |
 
-:::caution[I callback delle collection non vengono eseguiti per gli utenti di autenticazione]
-La creazione e gli aggiornamenti degli utenti tramite il sistema di autenticazione — registrazione, gestione utenti amministratore e OAuth — scrivono **direttamente** nello user store ed eludono la pipeline di salvataggio delle collection. Un callback `beforeSave`/`afterSave`/`beforeDelete`/`afterDelete` sulla collection di autenticazione (users) **non** verrà eseguito per questi percorsi. Per effetti collaterali come il provisioning di un team personale alla registrazione, usa gli hook del ciclo di vita dell'autenticazione (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), che ricevono il record utente completamente popolato.
+:::caution[Gli hook di tabella non scattano per gli utenti di autenticazione]
+La creazione e gli aggiornamenti degli utenti tramite il sistema di autenticazione — registrazione, gestione utenti da parte dell'admin e OAuth — scrivono **direttamente** nello store utenti e bypassano la pipeline di salvataggio della tabella. Un hook `beforeSave`/`afterSave`/`beforeDelete`/`afterDelete` sulla tabella utenti **non** verrà eseguito per questi percorsi. Per effetti collaterali come il provisioning di un team personale alla registrazione, usa gli hook del ciclo di vita dell'autenticazione (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), che ricevono il record utente completo.
 
-OAuth esegue gli stessi hook degli altri accessi: `beforeLogin` (con l'indirizzo del provider e `"oauth"`), `beforeUserCreate` quando l'accesso crea l'account, `afterUserCreate` e `onAuthenticated`. `onAuthenticated` viene attivato anche al refresh del token (`"refresh"`), alla reimpostazione della password (`"password-reset"`) e al secondo fattore (`"mfa"`). `beforeLogin` non viene eseguito durante un refresh, che non è un accesso. Per bloccare un account già connesso, disabilitalo con `PUT /api/admin/users/:uid { disabled: true }`: questo rifiuterà ogni accesso e refresh, terminando ogni sessione e token associati.
+OAuth esegue gli stessi hook degli altri tipi di accesso: `beforeLogin` (con l'indirizzo del provider e `"oauth"`), `beforeUserCreate` quando l'accesso crea l'account, `afterUserCreate`, e `onAuthenticated`. `onAuthenticated` viene attivato anche in occasione di un refresh del token (`"refresh"`), un reset della password (`"password-reset"`) e un secondo fattore (`"mfa"`). `beforeLogin` non viene eseguito al refresh, che non è un'operazione di accesso. Per bloccare un account già connesso, disabilitalo con `PUT /api/admin/users/:uid { disabled: true }`: questo rifiuterà ogni accesso e refresh e terminerà ogni sessione e token associati.
 
-`beforeEmailChange(user, newEmail)` viene eseguito quando un utente autenticato richiede di trasferire il proprio account a un altro indirizzo. Eventuali regole sull'indirizzo applicate alla registrazione in `beforeUserCreate` (ad esempio, solo il proprio dominio) devono essere inserite anche qui, altrimenti un membro potrebbe registrarsi con un indirizzo consentito per poi passare a un qualsiasi altro indirizzo.
+`beforeEmailChange(user, newEmail)` viene eseguito quando un utente autenticato richiede di trasferire il proprio account a un altro indirizzo. Un vincolo sull'indirizzo imposto alla registrazione in `beforeUserCreate` (ad esempio consentendo solo il proprio dominio) deve essere applicato anche qui, altrimenti un utente potrebbe registrarsi con un indirizzo valido e poi passare a un qualsiasi altro indirizzo.
 
-Un hook che rifiuta l'operazione (`beforeUserCreate`, `beforeLogin`, `beforeUserDelete`, `beforeEmailChange`) solleva un'eccezione (throw). Il chiamante riceve `400 HOOK_REJECTED` con il messaggio dell'errore, o lo status associato all'errore: un `ApiError` o qualsiasi errore con uno `status` 4xx.
+Un hook che rifiuta l'operazione (`beforeUserCreate`, `beforeLogin`, `beforeUserDelete`, `beforeEmailChange`) genera un'eccezione (throw). Il chiamante riceve `400 HOOK_REJECTED` con il messaggio di errore, oppure lo status associato all'errore: un `ApiError` o qualsiasi errore con uno `status` 4xx.
 :::
 
-### Protezione bot
+### Protezione dai bot
 
-Il rate limiting limita un singolo chiamante. Mille indirizzi che inviano ciascuno una singola richiesta non supereranno mai una finestra per-IP — e `/auth/register`, `/auth/forgot-password` e `/auth/magic-link` inviano tutti email, quindi il costo di un form non protetto viene pagato in termini di reputazione del dominio di invio.
+Il rate limiting limita un singolo chiamante. Mille indirizzi che inviano una sola richiesta ciascuno non colpiranno mai una finestra basata sull'IP — e `/auth/register`, `/auth/forgot-password` e `/auth/magic-link` inviano tutti email, quindi il conto di un form non protetto si paga in termini di reputazione sul dominio di invio.
 
 ```ts
 auth: {
@@ -153,7 +153,7 @@ auth: {
 }
 ```
 
-Oppure dalle variabili di ambiente, che è la modalità prevista per un deployment gestito:
+O dall'ambiente, che è la modalità disponibile nei deployment gestiti:
 
 ```bash
 CAPTCHA_PROVIDER=turnstile
@@ -161,27 +161,27 @@ CAPTCHA_SECRET=...
 CAPTCHA_ROUTES=register,forgotPassword,magicLink,emailOtp   # optional; this is the default
 ```
 
-Il client invia il token del widget come `captchaToken` nel corpo JSON, oppure nell'header proprietario del widget `cf-turnstile-response` / `h-captcha-response`. Sono accettati entrambi; imposta `tokenField` per utilizzare una chiave diversa nel corpo.
+Il client invia il token del widget come `captchaToken` nel corpo JSON, oppure nell'header proprio del widget `cf-turnstile-response` / `h-captcha-response`. Entrambi sono accettati; imposta `tokenField` per utilizzare una chiave diversa nel corpo.
 
-**`login` non è protetto per impostazione predefinita.** Un challenge a ogni accesso grava su tutti gli utenti reali, e la prevenzione del credential stuffing è affidata al rate limiter e al blocco dell'account. Aggiungilo a `routes` se desideri proteggerlo.
+**`login` non è protetto per impostazione predefinita.** Un challenge a ogni accesso penalizzerebbe ogni utente legittimo, e il credential stuffing è contrastato dal rate limiter e dal blocco dell'account (lockout). Aggiungilo a `routes` se desideri proteggerlo.
 
-`POST /auth/anonymous/link`, in cui un ospite riceve un'email e una password, è considerato una registrazione: richiede il challenge `register` ed esegue `beforeUserCreate`, esattamente come `/auth/register`. L'accesso ospite in sé (`POST /auth/anonymous`) non richiede alcun challenge.
+`POST /auth/anonymous/link`, con cui un utente anonimo riceve un'email e una password, conta come registrazione: applica il challenge di `register` ed esegue `beforeUserCreate`, proprio come `/auth/register`. L'accesso ospite in sé (`POST /auth/anonymous`) non richiede alcun challenge.
 
-#### Modalità di fallimento protetto (Fail-closed)
+#### Comportamento fail-closed
 
-Se il provider non è raggiungibile, la verifica fallisce e la richiesta viene rifiutata. Un attaccante in grado di causare tale disservizio potrebbe altrimenti disattivare la protezione, cosa che un challenge non deve assolutamente permettere.
+Se il provider non è raggiungibile, la verifica fallisce e la richiesta viene rifiutata. Un aggressore in grado di provocare tale disservizio potrebbe altrimenti disattivare la protezione, che è esattamente ciò che un challenge non deve permettere.
 
-Il prezzo da pagare è che un'interruzione del provider blocca le registrazioni. Si tratta di un problema evidente, visibile e risolvibile rimuovendo una singola chiave di configurazione — un fallimento preferibile a uno silenzioso, riscontrato solo quando il dominio di posta finisce in una blocklist.
+Il costo è che un'interruzione del provider blocca le registrazioni. Si tratta di un problema evidente, visibile e risolvibile rimuovendo una singola chiave di configurazione — un fallimento migliore rispetto a uno silenzioso notato solo quando il dominio email finisce in una blocklist.
 
-#### Un errore di configurazione impedisce l'avvio
+#### Una configurazione errata impedisce l'avvio
 
-`enabled: true` senza provider, con un provider sconosciuto o senza segreto impedisce l'avvio. Un challenge silenziosamente assente quando la configurazione ne dichiara la presenza è l'unico errore inaccettabile in questo scenario.
+`enabled: true` senza alcun provider, con un provider sconosciuto o senza chiave segreta impedirà l'avvio del server. Un challenge assente in modo silente mentre la configurazione indica che è attivo è l'unico errore inammissibile in questo contesto.
 
-Al chiamante viene solo comunicato che il challenge è fallito — mai se il token era assente, non valido, già utilizzato o non verificabile. Il motivo specifico viene registrato nei log, poiché comunicarlo a uno script gli indicherebbe come aggirare la protezione.
+Al chiamante viene comunicato solo che il challenge è fallito — mai se il token era assente, non valido, già utilizzato o non verificabile. Il motivo effettivo viene registrato nei log, poiché informare uno script significherebbe aiutarlo a perfezionare l'attacco.
 
-### Email durante lo sviluppo
+### Email in fase di sviluppo
 
-Senza `SMTP_HOST`, le email di autenticazione non hanno una destinazione. Anziché rifiutare la richiesta, un server di sviluppo intercetta il messaggio e ne stampa i link:
+Senza `SMTP_HOST`, le email di autenticazione non hanno una destinazione. Anziché rifiutare la richiesta, un server di sviluppo cattura il messaggio e ne stampa i link:
 
 ```
 ⚠️  No SMTP is configured, so auth email is being captured here instead of sent.
@@ -189,32 +189,32 @@ Senza `SMTP_HOST`, le email di autenticazione non hanno una destinazione. Anzich
              http://localhost:5173/auth/magic-link?token=…
 ```
 
-Seguendo il link, il flusso si completa su qualsiasi pagina gestisca quel percorso: il CMS gestisce `/reset-password`, `/verify-email`, `/confirm-email-change` e `/auth/magic-link` per i magic link; un frontend differente necessita di una propria pagina dedicata per ciascuno (consulta la sezione [Magic Links](/docs/sdk/authentication/#magic-links) dell'SDK). Nulla cambia riguardo al token — viene generato, archiviato e validato esattamente come avverrebbe da una reale casella di posta; cambia unicamente la modalità di recapito.
+Seguendo il link, il flusso si completa sulla pagina designata per quel percorso: il CMS gestisce `/reset-password`, `/verify-email`, `/confirm-email-change` e `/auth/magic-link` per i magic link; un altro frontend necessita di una pagina dedicata per ciascuno (consulta la sezione [Magic Links](/docs/sdk/authentication/#magic-links) dell'SDK). Nulla del token cambia — viene generato, memorizzato e validato esattamente come avverrebbe con una vera casella di posta; cambia solo la modalità di recapito.
 
-Questa modalità è attiva quando sono soddisfatte tutte e tre le seguenti condizioni, e non esiste impostazione che possa modificarle:
+Questa modalità è attiva ogniqualvolta sussistono tutte e tre le seguenti condizioni, e non esistono impostazioni per modificarle:
 
-- `SMTP_HOST` non è impostato — un mail server configurato ha sempre la precedenza;
-- `NODE_ENV` non è `production`. Un'email intercettata di reimpostazione password contiene un token di reset funzionante, pertanto il buffer di cattura funge da archivio credenziali e non deve esistere in produzione;
-- `FRONTEND_URL` è un URL `http(s)` assoluto, poiché altrimenti il link inviato via email non avrebbe una base valida e risulterebbe inutilizzabile.
+- `SMTP_HOST` non è impostato — un server di posta configurato ha sempre la precedenza;
+- `NODE_ENV` non è `production`. Un'email di reset password catturata contiene un token di reset funzionante, pertanto il buffer di cattura costituisce un archivio di credenziali e non deve esistere in produzione;
+- `FRONTEND_URL` è un URL assoluto `http(s)`, poiché altrimenti il link inviato via email non avrebbe una base e risulterebbe inutilizzabile all'arrivo.
 
-Se una qualsiasi di queste condizioni non è soddisfatta, `POST /auth/magic-link` e `POST /auth/forgot-password` rispondono con `503 EMAIL_NOT_CONFIGURED` come in precedenza. In produzione, imposta `SMTP_HOST` (o `auth.email.sendEmail`) per inviare realmente le email.
+Se una qualsiasi di esse non sussiste, `POST /auth/magic-link` e `POST /auth/forgot-password` rispondono con `503 EMAIL_NOT_CONFIGURED` come di consueto. In produzione, imposta `SMTP_HOST` (o `auth.email.sendEmail`) per inviare realmente le email.
 
-#### Leggere le email intercettate senza terminale
+#### Leggere le email catturate senza un terminale
 
-I log sono utili solo per chi li sta monitorando direttamente. Un server in esecuzione su Docker, una seconda finestra o una riga scorsa via possono far perdere il link stampato — per questo motivo gli stessi messaggi intercettati sono accessibili via HTTP:
+I log sono utili solo a chi li sta osservando. Un server in Docker, una seconda finestra o una riga scorsa via rapidamente possono far perdere un link stampato — per questo la stessa cattura è disponibile via HTTP:
 
 ```
 GET    /api/admin/dev/emails      → { enabled: true, messages: [ … ] }
 DELETE /api/admin/dev/emails      → empties the mailbox
 ```
 
-Ogni messaggio include `to`, `subject`, `at`, le parti `html` e `text`, e `links` — gli URL assoluti trovati nel corpo, nell'ordine del documento, che costituiscono la parte di effettivo interesse.
+Ogni messaggio include `to`, `subject`, `at`, le parti `html` e `text`, e `links` — gli URL assoluti rilevati nel corpo del messaggio, nell'ordine del documento, che è la parte effettivamente d'interesse.
 
-Richiede l'ambito `users:write`, attraverso lo stesso meccanismo di protezione utilizzato da cron, log e backup, e risponde con `501 DEV_MAILBOX_UNAVAILABLE` quando non c'è nulla da mostrare — con SMTP configurato, le email vengono recapitate anziché trattenute. `NODE_ENV=production` ne rifiuta l'accesso a prescindere da qualsiasi altra configurazione: il contenuto di questi messaggi consente un accesso funzionante.
+Richiede lo scope `users:write`, attraverso lo stesso controllo utilizzato da cron, log e backup, e risponde con `501 DEV_MAILBOX_UNAVAILABLE` quando non c'è nulla da servire — con SMTP configurato, la posta viene recapitata anziché trattenuta. `NODE_ENV=production` lo rifiuta a prescindere da qualsiasi altra cosa: ciò che questi messaggi contengono è un accesso funzionante.
 
 ### Codici monouso via email
 
-Un magic link apre la sessione sul dispositivo in cui si trova la casella di posta. È il dispositivo ideale su un laptop, ma inadatto ovunque altrove — una televisione, un terminale, un secondo browser, un chiosco. Un codice supera questo limite, poiché è la persona stessa a trasferirlo.
+Un magic link apre la sessione sul dispositivo che contiene la casella di posta. È il dispositivo giusto su un portatile ed è quello sbagliato in qualunque altro contesto — un televisore, un terminale, un secondo browser, un chiosco. Un codice supera questo divario, perché è la persona a trasportarlo.
 
 ```ts
 auth: {
@@ -229,20 +229,20 @@ await rebase.auth.sendEmailOtp("someone@example.com");
 const { user } = await rebase.auth.verifyEmailOtp("someone@example.com", "384102");
 ```
 
-L'indirizzo viene reinviato insieme al codice, e non si tratta di una semplice comodità. Ciò che viene memorizzato è un hash dell'indirizzo *e* del codice combinati, così un tentativo di indovinare è mirato contro un singolo account specifico — non contro tutti gli account della tabella contemporaneamente, come avverrebbe con una ricerca basata unicamente sul codice tra un milione di possibilità.
+L'indirizzo viene inviato nuovamente insieme al codice, e non si tratta di una comodità. Ciò che viene memorizzato è un hash dell'indirizzo *e* del codice combinati insieme, in modo che un tentativo di indovinare sia rivolto a un singolo account specificato — e non contro ogni account della tabella contemporaneamente, che è ciò a cui corrisponderebbe una ricerca basata solo sul codice tra un milione di possibilità.
 
-Gli altri fattori che rendono sufficienti sei cifre:
+Gli altri fattori che mantengono sufficienti sei cifre:
 
-- **Dieci minuti** di validità e utilizzo singolo.
-- **Cinque tentativi di verifica per indirizzo per finestra temporale**, indicizzati sull'indirizzo anziché sull'IP del chiamante: l'IP può essere facilmente ruotato dall'attaccante, mentre l'account sotto attacco no. I conteggi risiedono nello store di rate-limit del deployment — per replica per impostazione predefinita, condivisi con `REBASE_RATE_LIMIT_STORE=sql`.
-- **Cifre uniformi**, generate da `randomInt` anziché da un'operazione di modulo su byte casuali.
-- `POST /auth/otp` risponde in modo identico per un indirizzo che non ha un account, impedendo di verificare se qualcuno sia un cliente.
+- **Dieci minuti**, e utilizzo singolo.
+- **Cinque tentativi di verifica per indirizzo per finestra**, basati sull'indirizzo anziché sull'IP del chiamante: l'IP può essere ruotato dall'aggressore, mentre l'account preso di mira no. I conteggi risiedono ovunque si trovi lo store del rate-limit del deployment — per replica per impostazione predefinita, condiviso con `REBASE_RATE_LIMIT_STORE=sql`.
+- **Cifre uniformi**, generate tramite `randomInt` anziché un modulo di byte casuali.
+- `POST /auth/otp` risponde in modo identico per un indirizzo privo di account, evitando così che possa essere utilizzato per verificare se qualcuno è un cliente.
 
-Leggere un codice dalla casella di posta dimostra il possesso dell'indirizzo, pertanto un accesso riuscito lo contrassegna come verificato — esattamente come accade seguendo un magic link. Su un account non ancora verificato, questa prima prova rimuove anche ciò che nessuno ha mai verificato: la password e ogni identità collegata il cui provider non ha confermato l'indirizzo. Consulta [Collegamento degli account tra metodi di accesso](#collegamento-degli-account-tra-metodi-di-accesso).
+La lettura di un codice dalla casella di posta attesta la titolarità dell'indirizzo, per cui un accesso riuscito lo contrassegna come verificato — esattamente come accade seguendo un magic link. Su un account non ancora verificato, questa prima prova rimuove anche ciò che nessuno ha mai verificato: la password e ogni identità collegata il cui provider non ha verificato l'indirizzo. Consulta [Collegamento degli account](#collegamento-degli-account-tra-diversi-metodi-di-accesso).
 
-### Personalizzazione grafica delle email predefinite
+### Personalizzare il branding delle email predefinite
 
-I template predefiniti per la reimpostazione della password, la verifica, gli inviti, il benvenuto, i magic link e la modifica dell'email mostrano un logo sopra la scheda informativa. Questo proviene da `email.logoUrl`:
+I template predefiniti per reimpostazione della password, verifica, invito, benvenuto, magic link e modifica dell'email mostrano un logo sopra la card. Proviene da `email.logoUrl`:
 
 ```ts
 email: {
@@ -252,15 +252,15 @@ email: {
 }
 ```
 
-Deve trattarsi di un file **PNG o JPG situato su un URL `http(s)` assoluto**. I client di posta non eseguono il rendering dei file SVG e bloccano gli URI `data:`, inoltre l'immagine viene recuperata dal client del destinatario anziché dal tuo server — quindi un percorso relativo, un data URI o un file locale non mostrerà alcun logo invece di un'immagine danneggiata. `appName` viene utilizzato come testo `alt`, consentendo ai client con immagini disattivate di visualizzare comunque il nome.
+Deve trattarsi di un file **PNG o JPG su un URL assoluto `http(s)`**. I client di posta non supportano gli SVG e bloccano gli URI `data:`, e l'immagine viene scaricata dal client del destinatario anziché dal server — pertanto un percorso relativo, un URI dati o un file locale non mostrerà alcun logo invece di un'immagine corrotta. `appName` viene utilizzato come testo `alt`, cosicché un client con il caricamento delle immagini disattivato mostri comunque il nome.
 
-Il fallback è deliberatamente asimmetrico. `appName` ricade su `Rebase`, ma il logo ricade sul marchio Rebase solo finché l'installazione **non** è stata rinominata. Impostando `appName` su un qualsiasi altro valore, non verrà mostrato alcun logo finché non configuri `logoUrl` — altrimenti gli utenti di Acme riceverebbero il logo Rebase in email firmate dal dominio di Acme.
+Il fallback è deliberatamente asimmetrico. `appName` fa fallback su `Rebase`, ma il logo fa fallback sul marchio Rebase solo fintanto che l'installazione **non** è stata rinominata. Se imposti `appName` con un qualsiasi altro valore, non vedrai alcun logo finché non imposti `logoUrl` — altrimenti gli utenti di Acme riceverebbero il logo Rebase in email firmate dal dominio di Acme.
 
-Se sostituisci un template tramite `email.templates`, nulla di tutto ciò si applica: la tua funzione gestisce l'intero corpo del messaggio. `templates.emailChange(confirmUrl, user, newEmail)` è il link inviato al nuovo indirizzo quando un utente modifica il proprio, e `templates.emailChangeNotice(user, newEmail)` è la notifica inviata al vecchio indirizzo; in entrambi i casi, `user.email` rappresenta l'indirizzo attuale.
+Se sostituisci un template tramite `email.templates`, nulla di tutto ciò si applica: la tua funzione gestisce l'intero corpo del messaggio. `templates.emailChange(confirmUrl, user, newEmail)` è il link inviato al nuovo indirizzo quando un utente modifica il proprio, e `templates.emailChangeNotice(user, newEmail)` è la notifica inviata al vecchio indirizzo; in entrambi i casi `user.email` rappresenta l'indirizzo attuale.
 
 ### Provider OAuth
 
-Ogni provider OAuth viene configurato almeno con un `clientId`. Alcuni provider richiedono anche un `clientSecret`:
+Ciascun provider OAuth è configurato almeno con un `clientId`. Alcuni provider richiedono un `clientSecret`:
 
 ```typescript
 auth: {
@@ -281,24 +281,24 @@ auth: {
 
 `gitlab` accetta anche un `baseUrl` opzionale, per un'istanza GitLab self-hosted.
 
-#### I formati delle variabili di ambiente
+#### Le variabili d'ambiente
 
-Un deployment gestito o basato su bundle non dispone di un blocco `auth` in cui scrivere — configura il server interamente tramite le variabili di ambiente — pertanto ogni provider sopra indicato prevede una coppia `<PROVIDER>_CLIENT_ID` / `<PROVIDER>_CLIENT_SECRET`, ed entrambe le parti devono essere impostate affinché il provider sia effettivamente configurato:
+Un deployment gestito o bundled non ha un blocco `auth` in cui scrivere — configura il server interamente tramite le variabili d'ambiente — quindi ogni provider sopra elencato dispone di una coppia `<PROVIDER>_CLIENT_ID` / `<PROVIDER>_CLIENT_SECRET`, ed entrambe le parti devono essere impostate affinché il provider risulti effettivamente configurato:
 
 ```bash
 DISCORD_CLIENT_ID=…
 DISCORD_CLIENT_SECRET=…
 ```
 
-`GET /api/auth/config` elenca quindi `discord` in `enabledProviders`, consentendo di verificare che la coppia sia stata caricata.
+`GET /api/auth/config` elenca quindi `discord` in `enabledProviders`, consentendo di verificare che la coppia sia stata caricata correttamente.
 
-Google si configura unicamente tramite `GOOGLE_CLIENT_ID`: il suo flusso basato su ID token non richiede un secret, pertanto `GOOGLE_CLIENT_SECRET` è facoltativo.
+Google è configurato con il solo `GOOGLE_CLIENT_ID`: il suo flusso basato su ID token non richiede segreti, quindi `GOOGLE_CLIENT_SECRET` è facoltativo.
 
-Apple non prevede un client secret: Rebase firma un JWT ES256 per ogni scambio. Richiede `APPLE_TEAM_ID`, `APPLE_KEY_ID` e `APPLE_PRIVATE_KEY` (il contenuto del file `.p8`, inclusi i ritorni a capo), oltre a `APPLE_CLIENT_ID` (il Services ID, per il web), `APPLE_BUNDLE_IDS` (gli ID separati da virgola delle tue app native iOS e macOS), o entrambi. Il Services ID è pubblico, quindi `/auth/config` lo espone per il pulsante **Sign in with Apple** del pannello di amministrazione.
+Apple non prevede un client secret: Rebase firma un JWT ES256 per ciascuno scambio. Richiede `APPLE_TEAM_ID`, `APPLE_KEY_ID` e `APPLE_PRIVATE_KEY` (il contenuto del file `.p8`, inclusi gli a capo), oltre a `APPLE_CLIENT_ID` (il Services ID, per il web), `APPLE_BUNDLE_IDS` (gli ID separati da virgola delle tue app native iOS e macOS), o entrambi. Il Services ID è pubblico, quindi `/auth/config` lo espone per il pulsante **Accedi con Apple** dell'amministratore.
 
-Due opzioni non hanno una variabile di ambiente corrispondente e richiedono il blocco `auth` (quindi un backend sottoposto a eject o configurato via codice): `microsoft.tenantId`, che altrimenti ha come valore predefinito `common` e accetta qualsiasi tenant Entra (con qualsiasi tenant, un indirizzo è considerato verificato solo quando la registrazione dell'app emette il claim `xms_edov`), e `gitlab.baseUrl`, per un'istanza self-hosted.
+Due opzioni non hanno una variabile d'ambiente equivalente e richiedono il blocco `auth` (dunque un backend con eject o configurato via codice): `microsoft.tenantId`, che altrimenti ha come valore predefinito `common` e accetta qualsiasi tenant Entra (con qualsiasi tenant, un indirizzo è considerato verificato solo se la registrazione dell'app emette il claim `xms_edov`), e `gitlab.baseUrl`, per un'istanza self-hosted.
 
-Ogni campo denominato viene risolto all'avvio all'interno di `auth.providers`, che rappresenta l'array canonico e il punto di estensione per tutto ciò che i campi denominati non coprono. Le voci vengono create con le factory `create*Provider` e le due forme si uniscono — i campi denominati vengono aggiunti in coda alle voci esplicite:
+Ogni campo denominato viene risolto all'avvio in `auth.providers`, che costituisce l'array canonico e il punto di estensione per tutto ciò che i campi denominati non coprono. Le voci vengono create con le factory `create*Provider`, e le due forme si uniscono — i campi denominati vengono aggiunti in coda alle voci esplicite:
 
 ```typescript no-verify
 import { createGoogleProvider, createGitHubProvider } from "@rebasepro/server";
@@ -311,134 +311,95 @@ auth: {
 }
 ```
 
-#### Limitare gli URI di reindirizzamento
+#### Limitare i redirect URI
 
 ```typescript no-verify
 auth: { allowedRedirectUris: ["https://admin.example.com/"] }
 ```
 
-Se non impostato, l'unico controllo sul reindirizzamento OAuth è la corrispondenza con gli URI registrati presso il provider stesso — il che autorizza **qualsiasi** URI registrato su quel client OAuth, inclusa la voce `localhost` aggiunta per lo sviluppo e l'host di staging che nessuno ha rimosso. Elencare le origini effettivamente gestite da questo backend ne limita l'accettazione a esse. Gli URI vengono confrontati in base a origine e percorso; query string, frammento e barra finale (trailing slash) vengono ignorati.
+Se lasciato non configurato, l'unico controllo sul redirect OAuth è la corrispondenza dell'URI registrato sul provider stesso — il che autorizza **qualsiasi** URI registrato su quel client OAuth, inclusa la voce `localhost` aggiunta da qualcuno per lo sviluppo e l'host di staging che nessuno ha rimosso. Elencare le origini effettivamente servite da questo backend restringe l'autorizzazione a esse. Gli URI vengono confrontati su origine più percorso; parametri di query, frammenti e trailing slash vengono ignorati.
 
-### Collegamento degli account tra metodi di accesso
+### Collegamento degli account tra diversi metodi di accesso
 
-Cosa succede quando qualcuno si registra con email/password come `ada@example.com`, e in seguito clicca su "Accedi con Google" con un account Google avente lo stesso indirizzo? Rebase **collega i due accessi in un unico account**, ma solo se il provider attesta che l'email è verificata. Non crea mai silenziosamente un secondo account per lo stesso indirizzo.
+Cosa succede quando qualcuno si registra con email/password come `ada@example.com`, e in seguito clicca su "Accedi con Google" con un account Google associato allo stesso indirizzo? Rebase **collega i due in un unico account**, ma solo quando il provider certifica l'email come verificata. Non crea mai silenziosamente un secondo account per lo stesso indirizzo.
 
-Su `POST /api/auth/<provider>` l'ordine di risoluzione è il seguente:
+Su `POST /api/auth/<provider>` l'ordine di risoluzione è:
 
-1. **Identità del provider nota**: se questa esatta identità del provider ha già effettuato l'accesso in precedenza, viene restituito quell'utente. L'email non viene consultata.
-2. **Account esistente con la stessa email, provider ha verificato l'email**: l'identità viene associata e l'utente viene autenticato in quell'account. Un solo account, due modalità di accesso. Un account non verificato viene prima verificato (vedi sotto).
-3. **Account esistente con la stessa email, provider non l'ha verificata**: rifiutato con `403 EMAIL_NOT_VERIFIED` e `details.reason` impostato su `provider-email-unverified`. Non viene creato o modificato nulla.
-4. **Nessun account con quell'email**: viene creato un nuovo account, contrassegnato come verificato se il provider ne ha confermato l'email.
+1. **Identità provider nota**: se questa identità provider specifica ha già effettuato l'accesso in precedenza, viene restituito quell'utente. L'email non viene consultata.
+2. **Account esistente con la stessa email, provider ha verificato l'email**: l'identità viene collegata e l'utente viene autenticato in quell'account. Un unico account, due modalità di accesso. Un account non verificato viene prima verificato (vedi sotto).
+3. **Account esistente con la stessa email, provider non l'ha verificata**: rifiutato con `403 EMAIL_NOT_VERIFIED` e `details.reason` impostato su `provider-email-unverified`. Nulla viene creato o modificato.
+4. **Nessun account con quell'email**: viene creato un nuovo account, verificato se il provider ha verificato l'email.
 
-Il passaggio 3 rappresenta il caso critico per la sicurezza. Se un'email del provider non verificata fosse sufficiente per il collegamento, chiunque riuscisse a farsi emettere da un provider un indirizzo non proprio potrebbe assumere il controllo del corrispondente account Rebase. Google attesta sempre `email_verified` per i veri account Google, pertanto il passaggio 2 è il normale percorso per l'accesso con Google; il passaggio 3 intercetta principalmente quei provider che consentono agli utenti di specificare un indirizzo arbitrario non confermato.
+Il passaggio 3 è il caso critico per la sicurezza. Se un'email non verificata dal provider fosse sufficiente per effettuare il collegamento, chiunque fosse in grado di indurre un provider a emettere un indirizzo non di sua proprietà potrebbe appropriarsi del corrispondente account Rebase. Google certifica sempre `email_verified` per i veri account Google, quindi il passaggio 2 è il normale percorso per l'accesso Google; il passaggio 3 intercetta principalmente i provider che consentono agli utenti di specificare un indirizzo non confermato arbitrario.
 
-Anche la situazione dell'account è fondamentale. Nulla verifica l'indirizzo fornito a `POST /auth/register`, quindi chiunque potrebbe registrare l'indirizzo di qualcun altro con una password, oppure accedervi tramite un provider che non ne garantisce la verifica, e attendere. Il collegamento dell'accesso Google del legittimo proprietario a tale account non deve lasciare attiva la via di accesso dell'altra persona.
+Anche il lato account è importante. Nulla verifica l'indirizzo fornito a `POST /auth/register`, quindi chiunque può registrare l'indirizzo di qualcun altro con una password, o accedere con esso tramite un provider che non ne garantisce la titolarità, e attendere. Collegare l'accesso Google del legittimo proprietario a tale account non deve lasciare attiva la via d'accesso dell'altra persona.
 
-Un provider che ha verificato l'indirizzo, un link di verifica, un magic link, un codice via email o una reimpostazione della password dimostrano tutti il possesso dell'indirizzo e verificano l'account. Su un account non ancora verificato, la prima prova di questo tipo rimuove la password (un reset ne imposta una nuova) e ogni identità collegata il cui provider non ha verificato quell'indirizzo, terminando inoltre tutte le sessioni prima di contrassegnare l'account come verificato: una password che nessuno ha verificato scompare dopo il primo accesso con Google.
+Un provider che ha verificato l'indirizzo, un link di verifica, un magic link, un codice email o una reimpostazione della password attestano tutti la titolarità dell'indirizzo e verificano l'account. Su un account non ancora verificato, la prima prova di questo tipo rimuove la password (un reset imposta quella nuova) e ogni identità collegata il cui provider non ha verificato quell'indirizzo, e termina tutte le sessioni, prima di contrassegnare l'account come verificato: una password che nessuno ha verificato scompare dopo il primo accesso con Google.
 
-Un link di verifica mantiene ciò che la persona che lo segue dimostra di possedere: una sessione attiva dell'account o la sua password. Consulta [Verifica dell'email](/docs/backend/email-verification/). Gli account creati da un amministratore con `POST /api/admin/users` vengono memorizzati come verificati, così un utente invitato può utilizzare immediatamente "Accedi con Google". Un repository di autenticazione personalizzato senza `unlinkUserIdentity` rifiuta tale verifica con `409 UNVERIFIED_IDENTITIES` qualora sia presente un'identità da rimuovere.
+Un link di verifica preserva solo ciò che la persona che lo segue è in grado di dimostrare: una sessione attiva dell'account, o la sua password. Consulta [Verifica dell'email](/docs/backend/email-verification/). Gli account creati da un amministratore con `POST /api/admin/users` vengono salvati come già verificati, cosicché un utente invitato possa utilizzare immediatamente "Accedi con Google". Un repository di autenticazione personalizzato privo di `unlinkUserIdentity` rifiuta tale prova con `409 UNVERIFIED_IDENTITIES` quando c'è un'identità da rimuovere.
 
-Questo comportamento non è configurabile — non esiste volutamente alcuna opzione per collegare account su email non verificate.
+Questo comportamento non è configurabile — non esiste volutamente alcuna opzione per consentire il collegamento su email non verificate.
 
 ### Verifica dell'email
 
-La registrazione invia al nuovo account un link di verifica; seguirlo mantiene solo ciò che la persona che lo segue è in grado di dimostrare. `requireEmailVerification` impone la conferma prima del completamento della registrazione. Consulta [Verifica dell'email](/docs/backend/email-verification/).
+La registrazione invia al nuovo account un link di verifica, e seguendolo viene preservato solo ciò che la persona che lo segue è in grado di dimostrare. `requireEmailVerification` impone che la registrazione richieda prima la conferma. Consulta [Verifica dell'email](/docs/backend/email-verification/).
 
 ## Tabelle create automaticamente
 
-Al primo avvio, Rebase effettua automaticamente il provisioning dello schema `rebase` e delle seguenti tabelle nel database (associate allo schema definito nella tua collection, ad es. `rebase`):
+Al primo avvio, Rebase esegue automaticamente il provisioning dello schema `rebase` e delle seguenti tabelle nel database:
 
-- **`rebase.users`** — Account utente con email, hash della password, metadati e una colonna text[] denominata `roles` (i ruoli sono archiviati come array di testo inline per ottimizzare le query ed evitare join).
-- **`rebase.user_identities`** — Le identità OAuth collegate a ciascun account, una riga per identità del provider.
-- **`rebase.refresh_tokens`** — Sessioni persistenti che contengono gli hash dei refresh token, user agent e indirizzi IP. Include un indice univoco su `token_hash`. Un accesso corrisponde a un `session_id`, condiviso da ogni token generato a seguito della rotazione; non esistono vincoli per dispositivo, quindi due browser associati allo stesso indirizzo rappresentano due sessioni distinte. Ogni token di una sessione include anche il relativo livello di garanzia (`aal`) e il metodo con cui è stato eseguito l'accesso (`method`, riportato da `providerId`).
-- **`rebase.password_reset_tokens`** — Token monouso con scadenza per i flussi di recupero della password.
+- **`rebase.users`** — Account utente con email, hash della password, metadati e una colonna `roles` text[] (i ruoli sono memorizzati come array di testo inline per ottimizzare le query ed evitare join).
+- **`rebase.user_identities`** — Le identità OAuth collegate a ciascun account, una riga per identità di provider.
+- **`rebase.refresh_tokens`** — Sessioni a lunga durata contenenti hash dei refresh token, user agent e indirizzi IP. Include un indice univoco su `token_hash`. Un accesso corrisponde a un `session_id`, condiviso da ogni token ruotato da esso; non vi è alcun vincolo per dispositivo, quindi due browser dietro lo stesso indirizzo costituiscono due sessioni. Ogni token di una sessione include anche il relativo livello di affidabilità (`aal`) e il metodo di accesso impiegato (`method`, riportato da `providerId`).
+- **`rebase.password_reset_tokens`** — Token monouso con scadenza per i flussi di recupero password.
 - **`rebase.magic_link_tokens`** — Token monouso con scadenza per l'accesso tramite magic link.
-- **`rebase.mfa_factors`** — Metodi di autenticazione a più fattori registrati (ad es. segreti TOTP crittografati con AES-256).
+- **`rebase.mfa_factors`** — Metodi di autenticazione a più fattori registrati (es. segreti TOTP cifrati con AES-256).
 - **`rebase.mfa_challenges`** — Log di verifica che tracciano i tentativi attivi di verifica MFA.
 - **`rebase.recovery_codes`** — Codici di backup/recupero multi-fattore con hash.
-- **`rebase.app_config`** — Archivio chiave-valore per le configurazioni di sistema.
+- **`rebase.app_config`** — Store chiave-valore per le configurazioni di sistema.
 
-I token soggetti a scadenza — link di reimpostazione, magic link e codici email, refresh token, challenge MFA — vengono eliminati un'ora dopo la loro scadenza. La pulizia (sweep) viene eseguita sui processi responsabili dei timer (tutti i ruoli tranne `functions` in un deployment suddiviso, a meno che `REBASE_CRON_SCHEDULER=false` non li rimuova da `api`) e su una sola istanza del cluster: ogni ora viene riservata in `rebase.cron_claims` con il job id `rebase:auth:expired-tokens`, proprio come uno slot cron. Con `cronPersistence: false` non è presente alcuna tabella di prenotazione delle esecuzioni (claims) e ogni istanza idonea esegue la pulizia. Un token scaduto viene rifiutato quando presentato, a prescindere dall'avvenuta esecuzione della pulizia; lo sweep serve unicamente a evitare l'aumento delle dimensioni delle tabelle.
+I token che scadono — link di reset, magic link e codici email, refresh token, challenge MFA — vengono eliminati una volta ogni ora dopo la scadenza. La pulizia viene eseguita sui processi responsabili dei timer (tutti i ruoli tranne `functions` in un deployment suddiviso, a meno che `REBASE_CRON_SCHEDULER=false` non li rimuova da `api`) e su una sola istanza del cluster: ogni ora viene rivendicata in `rebase.cron_claims` sotto l'ID di job `rebase:auth:expired-tokens`, esattamente come uno slot cron. Con `cronPersistence: false` non è presente alcuna tabella di claim e ciascuna di queste istanze esegue la pulizia. Un token scaduto viene rifiutato se presentato, indipendentemente dal fatto che la pulizia sia stata eseguita o meno; la pulizia serve unicamente a evitare la crescita indefinita delle tabelle.
 
 ## Bootstrap del primo utente
 
-Quando non sono presenti utenti nel database e il server **non** è in esecuzione con `NODE_ENV=production`, la prima persona che si registra diventa automaticamente un amministratore. Successivamente, la registrazione è regolata dall'impostazione `allowRegistration`.
+Quando non esistono utenti nel database e il server **non** è in esecuzione con `NODE_ENV=production`, la prima persona che si registra diventa automaticamente amministratore. Dopodiché, la registrazione è controllata dall'impostazione `allowRegistration`.
 
-In produzione questa finestra è chiusa, poiché un host con un nome di dominio pubblico è raggiungibile prima che il suo operatore si sia registrato, e chiunque arrivasse per primo ne assumerebbe il controllo. Un deployment di produzione definisce invece il suo primo amministratore tramite l'ambiente — `REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD`, creati all'avvio quando la tabella è ancora vuota — oppure assegna il ruolo tramite la chiave di servizio. Con la finestra chiusa, una tabella vuota rifiuta la registrazione di bootstrap con `SETUP_REQUIRED` (segnalandolo espressamente), un primo account creato tramite registrazione aperta è un normale account utente, `GET /api/auth/config` non restituisce mai `needsSetup`, `POST /api/admin/bootstrap` viene rifiutata e il log di avvio segnala un avviso quando la tabella è vuota e nessun amministratore è stato specificato.
+In produzione questa finestra è chiusa, poiché un host con un nome pubblico è raggiungibile prima che il suo gestore si sia registrato, e chiunque arrivasse per primo ne assumerebbe il controllo. Un deployment in produzione definisce invece il suo primo amministratore nelle variabili d'ambiente — `REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD`, creati all'avvio mentre la tabella è ancora vuota — oppure assegna il ruolo tramite la service key. Con la finestra chiusa, una tabella vuota rifiuta la registrazione di bootstrap con `SETUP_REQUIRED` (segnalandolo espressamente), un primo account creato tramite registrazione aperta è un account ordinario, `GET /api/auth/config` non segnala mai `needsSetup`, `POST /api/admin/bootstrap` rifiuta la richiesta, e il log di avvio avverte quando la tabella è vuota e non è stato indicato alcun amministratore.
 
-In ambiente locale (ad esempio su un laptop) questo significa poter sempre eseguire il bootstrap di un nuovo database senza doverlo popolare manualmente. Per prevenire esecuzioni concorrenti e race condition nella generazione dello schema durante l'hot reload (HMR) o l'avvio, le operazioni di bootstrap vengono sincronizzate tramite un advisory lock di Postgres:
+Su un portatile, ciò significa che puoi sempre effettuare il bootstrap di un nuovo database senza doverlo popolare manualmente. Per prevenire esecuzioni concorrenti e race condition nella generazione dello schema durante l'hot reloading (HMR) o all'avvio, le operazioni di bootstrap sono sincronizzate tramite un advisory lock di Postgres:
 ```sql
 SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'));
 ```
 
-## Configurazione dell'autenticazione a livello di collection
+## La tabella utenti
 
-Anziché affidarsi unicamente alle regole di autenticazione predefinite del database, è possibile contrassegnare qualsiasi collection Postgres (come `users.ts` o una collection personalizzata `members.ts`) come collection di autenticazione. Questo si configura tramite la proprietà `auth` sulla collection stessa:
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-```typescript
-import { randomBytes } from "node:crypto";
-import { defineCollection } from "@rebasepro/cms-types";
+Gli utenti sono memorizzati nella tabella dichiarata con `defineAuthTable` in `backend/schema`. Si tratta di una tabella ordinaria a cui vengono aggiunte le colonne richieste dall'autenticazione, una policy che consente a ciascun utente di leggere la propria riga e un vincolo riservato agli amministratori sulla colonna `roles`. Il suo blocco `auth` dichiara i ruoli, gli scope dell'applicazione, le chiavi API personali e gli hook eseguiti quando un amministratore crea un utente o reimposta una password:
 
-const membersCollection = defineCollection({
-  name: "Members",
-  slug: "members",
-  table: "members",
-  auth: {
-    enabled: true,
-    
-    // Customize what happens when an admin creates a user via the REST API
-    onCreateUser: async (values, ctx) => {
-      const hash = await ctx.hashPassword("welcome123");
-      return {
-        values: { ...values, passwordHash: hash, emailVerified: true },
-        temporaryPassword: "welcome123"
-      };
+```ts
+import { defineAuthTable, col } from "@rebasepro/server/schema";
+
+export const users = defineAuthTable("users", {
+    columns: {
+        id:    col.uuid().primaryKey().defaultRandom(),
+        email: col.text().notNull().unique(),
     },
-
-    // Customize what happens when an admin resets a user's password in the admin panel
-    onResetPassword: async (userId, ctx) => {
-      const tempPassword = randomBytes(12).toString("base64url");
-      return {
-        temporaryPassword: tempPassword, // saved as the new password, then shown to the admin
-        invitationSent: false
-      };
+    rls: "admin-only",
+    auth: {
+        roles: { support: { name: "Support", scopes: ["users:read", "users:write", "logs:read"] } },
+        personalKeys: true,
     },
-
-    // Inject/override auth-specific actions (e.g. show/hide the reset password button)
-    actions: {
-      resetPassword: true // Or false to disable, or a custom EntityAction
-    },
-
-    // What each role may do beyond its rows, the app's own scopes,
-    // and whether accounts may create personal API keys
-    roles: {
-      support: { name: "Support", scopes: ["users:read", "users:write", "logs:read"] }
-    },
-    scopes: {
-      "project:deploy": { label: "Deploy projects", target: "project" }
-    },
-    personalKeys: true
-  },
-  properties: { ... }
 });
 ```
 
-`roles`, `scopes` e `personalKeys` dichiarano il modello di accesso: quali ambiti del piano admin spettano a ciascun ruolo, gli ambiti definiti dall'applicazione per le proprie operazioni e se ciascun account può generare [chiavi API personali](/docs/backend/api-keys/#personal-keys). Consulta [Ruoli e ambiti](/docs/backend/roles-and-scopes/).
-
-Un valore `temporaryPassword` restituito da `onResetPassword` diventa la password dell'account. Rebase ne calcola l'hash con l'algoritmo configurato, la salva, disconnette l'utente da ogni sessione attiva e la mostra all'amministratore per poterla comunicare. L'hook non la memorizza e non ha modo di farlo. Non restituire alcun `temporaryPassword` se l'hook invia invece un proprio link di reset via email: in questo caso la password rimane invariata finché l'utente non ne imposta una nuova, ma le sessioni vengono comunque terminate.
-
-Quando gli hook personalizzati (`onCreateUser`, `onResetPassword`) vengono chiamati, ricevono una facciata `AuthCollectionContext` contenente:
-- `hashPassword(password: string): Promise<string>` — Calcola l'hash della password utilizzando l'algoritmo di hashing configurato (ad es. scrypt).
-- `sendEmail?: (options) => Promise<EmailSendResult>` — Invia un'email (disponibile solo quando il servizio email è configurato). Si risolve con i dati restituiti dal provider — `messageId`, `accepted`, `rejected` — consentendo all'hook di memorizzare l'ID e successivamente tracciare una risposta collegata.
-- `emailConfigured: boolean` — Indica se il servizio email è configurato.
-- `appName: string` — Il nome dell'applicazione specificato nella configurazione email.
-- `resetPasswordUrl: string` — L'URL di base per il link di reimpostazione della password.
+[La tabella utenti](/docs/schema/auth-table/) descrive le colonne, le policy iniettate, `onCreateUser` e `onResetPassword`; [Ruoli e scope](/docs/backend/roles-and-scopes/) illustra ciò che ciascun ruolo e scope concede.
 
 ## Prossimi passi
 
 - **[Endpoint e token](/docs/backend/auth-endpoints/)** — tutte le route montate da questa configurazione
-- **[Ruoli e ambiti](/docs/backend/roles-and-scopes/)** — cosa può fare ciascun ruolo, e come chiavi e token possono limitarlo
-- **[Adattatori di autenticazione personalizzati](/docs/backend/auth-adapters/)** — integrazione del proprio identity provider
-- **[Autenticazione frontend](/docs/frontend/authentication/)** — interfaccia di login, controller di autenticazione, gestione utenti
-- **[Regole di sicurezza (RLS)](/docs/collections/security-rules/)** — controllo degli accessi a livello di riga
-- **[Autenticazione nell'SDK tipizzato](/docs/sdk/authentication/)** — metodi di autenticazione nell'SDK tipizzato
+- **[Ruoli e scope](/docs/backend/roles-and-scopes/)** — cosa può fare ciascun ruolo, e come chiavi e token possono limitarlo
+- **[Adattatori di autenticazione personalizzati](/docs/backend/auth-adapters/)** — integrare il proprio provider di identità
+- **[Autenticazione frontend](/docs/frontend/authentication/)** — UI di login, controller di autenticazione, gestione utenti
+- **[Sicurezza a livello di riga (RLS)](/docs/collections/security-rules/)** — controllo degli accessi a livello di riga
+- **[Autenticazione con Typed SDK](/docs/sdk/authentication/)** — metodi di autenticazione nell'SDK tipizzato

@@ -1,48 +1,59 @@
 ---
-sourceHash: 5533919ae5334b5b
-title: Schema como Código
-sidebar_label: Schema como Código
-description: Como o Rebase usa coleções TypeScript como a única fonte de verdade para o seu schema de banco de dados, UI e API.
+sourceHash: 507990241e43f026
+title: Schema as Code
+sidebar_label: Schema as Code
+description: Como o Rebase usa as tabelas TypeScript em backend/schema como a única fonte da verdade para o esquema do seu banco de dados, API, SDK e painel administrativo.
 ---
 
 ## A Ideia Central
 
-No Rebase, suas **definições de coleção TypeScript são a única fonte de verdade**. A partir de um conjunto de objetos TypeScript, o Rebase gera:
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-- **Tabelas PostgreSQL** via geração de schema Drizzle ORM
-- **UI CRUD** — formulários, tabelas, validação, tipos de campo
-- **Endpoints da API REST** com filtragem, ordenação e paginação
-- **SDK tipado** — operações de dados com segurança de tipo
-- **Políticas RLS** — Segurança em Nível de Linha no Postgres
+No Rebase, as **tabelas que você declara com `defineTable` em `backend/schema/` são a única fonte da verdade**. A partir delas, o Rebase gera:
 
-Isso significa que seu schema é:
-- **Controlado por versão** — cada alteração é um commit git
-- **Com segurança de tipo** — TypeScript detecta erros em tempo de compilação
-- **Revisável** — as alterações de schema passam por pull requests
-- **Portátil** — a mesma definição funciona no frontend, backend e CLI
+- **Tabelas PostgreSQL** via geração de esquema do Drizzle ORM
+- **Políticas RLS** — Row Level Security no Postgres, a partir do `rls` obrigatório de cada tabela
+- **Endpoints de API REST** com filtragem, ordenação e paginação, além de realtime e MCP
+- **SDK Tipado** — operações de dados com segurança de tipos (type-safe)
+- **Os padrões do painel administrativo** — formulários, listas, validação e tipos de campo, renderizados a partir dos descritores de tabela que o backend disponibiliza em `GET /api/schema/tables`; o que o painel exibe além disso fica em `frontend/src/cms/`
+
+Isso significa que seu esquema é:
+- **Controlado por versão** — cada alteração é um commit no git
+- **Type-safe** — o TypeScript detecta erros em tempo de compilação
+- **Revisável** — alterações no esquema passam por pull requests
+- **Portátil** — a mesma definição é lida pelo backend, pela CLI, pelo gerador de SDK e, na forma de tipos, pelo frontend
 
 ## Edição Visual com Manipulação de AST
 
-O Rebase também oferece um **editor visual de coleções** no modo Studio. Quando um não-desenvolvedor usa o editor visual para adicionar um campo:
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+O Rebase também fornece um **editor visual de esquemas** no Studio. Quando alguém o utiliza para adicionar uma coluna:
 
 1. O Studio **não** modifica diretamente o banco de dados
-2. Em vez disso, ele usa [ts-morph](https://ts-morph.com/) para analisar seu arquivo fonte TypeScript como uma AST
-3. Ele insere a nova definição de propriedade precisamente no bloco `properties`
-4. **Todo o código existente, callbacks e lógica personalizada são preservados intocados**
-5. O arquivo é salvo, acionando o hot reload
+2. Em vez disso, ele envia a edição como um `TablePatch`, e o servidor usa o [ts-morph](https://ts-morph.com/) para analisar o arquivo da tabela em `backend/schema/` como uma AST
+3. Ele insere o novo construtor `col.*` precisamente dentro do bloco `columns`
+4. **Todo o código existente, hooks e lógica customizada são preservados intocados**; uma edição que interferiria em código que não deve ser reescrito é recusada
+5. O arquivo é salvo, disparando o hot reload
+
+A *aparência* de uma tabela no painel não faz parte disso: rótulos, ícones e visualizações
+são salvos como preferências do painel ou escritos em `frontend/src/cms/`. Veja
+[Edição de esquema ao vivo](/docs/backend/live-schema-editing/) para entender as edições e
+o que o editor recusa.
 
 Essa abordagem de "UI como Gerador de Código" significa que as edições visuais produzem o mesmo TypeScript limpo que um desenvolvedor escreveria manualmente.
 
-## Pipeline de Geração de Schema
+## Pipeline de Geração de Esquema
 
-Suas coleções são lidas uma vez e emitidas duas — como um schema Drizzle por meio
-do qual o servidor em execução faz suas consultas, e como SQL que descreve o
-banco de dados que você queria ter. É a esse SQL que o banco de dados é ajustado,
-pelo [Atlas](https://atlasgo.io), que compara o schema desejado com o real e
-planeja a mudança:
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Suas tabelas são lidas uma vez e emitidas em dois formatos — como um esquema Drizzle através do qual
+o servidor em execução faz consultas, e como SQL que descreve o banco de dados que você pretendia
+ter. É com esse SQL que o banco de dados é alinhado, por meio do
+[Atlas](https://atlasgo.io), que calcula o diff entre o esquema desejado e o esquema ativo
+e planeja a alteração:
 
 ```
-                        Collections (TypeScript)
+                      Tables (backend/schema)
                                   │
             ┌─────────────────────┴─────────────────────┐
             ▼                                           ▼
@@ -70,35 +81,37 @@ planeja a mudança:
                                                   PostgreSQL
 ```
 
-`db push` é o ciclo de desenvolvimento; `db generate` + `db migrate` é o
-revisável, e o que deve ser usado em produção. Os dois passam pelo mesmo SQL
-gerado, então não podem divergir sobre o que suas coleções significam, e os dois
-o geram de novo a partir das coleções antes de lê-lo, então não há nenhuma cópia
-no seu repositório que possa ficar desatualizada. O que você versiona são as
-migrações. Veja [Geração de Esquema](/docs/cli/schema) para todas as flags.
+O `db push` é o ciclo de desenvolvimento; `db generate` + `db migrate` é o ciclo
+revisável, e o que deve ser usado em produção. Ambos passam pelo mesmo
+SQL gerado, portanto não podem discordar sobre o que suas tabelas significam, e
+ambos o reescrevem do zero a partir das tabelas antes da leitura, não havendo cópia
+em seu repositório que possa ficar desatualizada. As migrações são o que você comita. Veja
+[Geração de Esquema](/docs/cli/schema) para todas as opções de flags.
 
 ### Exemplo
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Dada esta tabela:
 
 <!-- schema-sample: table -->
 ```ts
-import { defineTable, col } from "@rebasepro/server/schema";
+import { defineTable, col, sql } from "@rebasepro/server/schema";
 
 export const products = defineTable("products", {
     columns: {
-        id: col.text().primaryKey().defaultSql("gen_random_uuid()::text"),
+        id: col.text().primaryKey().default(sql`gen_random_uuid()::text`),
         name: col.text().notNull(),
         price: col.numeric(),
         active: col.boolean().default(true),
-        createdAt: col.timestamptz().onCreateNow()
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow()
     },
     rls: "admin-only"
 });
 ```
 
-O Rebase gera este schema Drizzle — o arquivo inteiro, com a coluna `id`, as políticas
-padrão e tudo mais:
+O Rebase gera este esquema Drizzle — o arquivo completo, com políticas padrão e
+tudo mais:
 
 <!-- schema-sample: drizzle -->
 ```typescript
@@ -127,22 +140,18 @@ export const enums = {  };
 export const relations = {  };
 ```
 
-Três coisas ali merecem uma segunda leitura. A coluna `id` que você não
-declarou: toda coleção recebe uma chave primária `text`, a menos que uma
-propriedade reivindique `isId`, e o banco de dados a preenche com um uuid
-(`gen_random_uuid()::text`), de modo que uma linha criada pelo painel admin,
-pela API REST ou pelo SDK não precisa de chave própria. Uma chave que você
-envia é usada como está. O bloco `pgPolicy`: row level security está habilitado
-em todas as tabelas, e essas políticas de base são o que mantém o contexto
-confiável do servidor e a role `admin` capazes de lê-la — veja
-[Regras de Segurança](/docs/collections/security-rules). E `active`, que carrega
-o `defaultValue` que você escreveu como um default de **coluna**: um
-`defaultValue` literal se transforma em um `DEFAULT` real, então uma linha
-inserida pela API REST, um script de seed ou o `psql` também o recebe, não só
-uma digitada no painel admin. Um default de `reference` ou `vector` não é um
-literal de coluna e permanece um valor da camada de aplicação.
+Três coisas aí merecem uma segunda leitura. A coluna `id`: o banco de dados
+a preenche com um uuid (`gen_random_uuid()::text`), de modo que um registro criado a partir do
+painel administrativo, da API REST ou do SDK não precisa de uma chave própria, e qualquer chave que você
+enviar será usada como fornecida. O bloco `pgPolicy`: `rls: "admin-only"` ativa a segurança
+em nível de linha (row level security) e gera apenas as políticas de base, que mantêm o contexto confiável
+do servidor e a role `admin` capazes de fazer a leitura — e mais ninguém; veja
+[Segurança em nível de linha](/docs/collections/security-rules). E `active`, que
+carrega o `.default(true)` definido por você como um valor padrão de **coluna**: um padrão
+literal compila para um `DEFAULT` real, de modo que uma linha inserida pela API REST, por um script de seed
+ou pelo `psql` também o recebe, não apenas as inseridas pelo painel administrativo.
 
-O que produz este SQL:
+E este SQL, que é o que é entregue ao Atlas como o estado desejado:
 
 <!-- schema-sample: sql -->
 ```sql
@@ -159,22 +168,24 @@ CREATE TABLE "public"."products" (
 );
 ```
 
-Policies, search columns, vector indexes and `updated_at` triggers are written to
-files of their own and applied by the CLI in their own right — Atlas manages
-none of the four.
+Políticas, colunas de busca, índices vetoriais e triggers de `updated_at` são gravados em
+arquivos próprios e aplicados pela CLI por conta própria — o Atlas não gerencia
+nenhum desses quatro.
 
 ## Segurança e Objetos de Banco de Dados Não Mapeados
 
-Quando o Rebase atualiza o schema do banco de dados, ele mapeia as definições de coleção TypeScript para as tabelas do banco de dados. Para garantir que **os objetos do banco de dados não mapeados (por exemplo, tabelas, views, enums) nunca sejam descartados ou modificados**, o Rebase implementa várias camadas de segurança:
+Quando o Rebase atualiza o esquema do banco de dados, ele mapeia as tabelas declaradas para tabelas no banco de dados. Para garantir que **objetos de banco de dados não mapeados (ex.: tabelas, views, enums) nunca sejam excluídos ou modificados**, o Rebase implementa várias camadas de segurança:
 
-1. **Exclusão de Tabelas Não Mapeadas**: Antes de cada push, a CLI lista todas as tabelas e views do banco de dados e entrega ao Atlas um `--exclude` para cada uma que não sustenta nenhuma coleção (nem é a tabela de junção de uma coleção), de modo que o Atlas nunca planeje uma alteração nela. Se o banco de dados não puder ser lido, o push é abortado em vez de rodar com uma lista parcial.
-2. **Schemas que o Rebase Possui**: O schema `rebase` (tabelas de autenticação, funções auxiliares de RLS, a tabela de revisões do Atlas) e qualquer schema `auth` são excluídos por inteiro, de modo que um push nunca possa planejar um `DROP SCHEMA … CASCADE`.
-3. **Objetos que o Atlas Não Sabe Modelar**: Colunas de busca, índices vetoriais e triggers também são excluídos do Atlas e aplicados a partir de seus próprios arquivos gerados.
-4. **Portão de Alterações Destrutivas**: O `rebase db push` primeiro executa o plano em modo de simulação (dry-run). Uma instrução que destrói dados — uma coluna ou tabela removida, uma mudança de tipo com perda — interrompe o push: em um terminal, ele pede que você digite `yes`; sem um terminal (CI, scripts, agentes), ele recusa, a menos que você passe `--allow-destructive`.
-5. **Propriedade dos Índices pelo Nome**: Índices são o único objeto que vive *sobre* uma tabela mapeada, portanto a filtragem de tabelas não consegue protegê-los — e um push planejava `DROP INDEX` para qualquer índice ausente do estado desejado, ou seja, para todos os escritos à mão. O Rebase agora nomeia os índices que gera como `<table>_<columns>_ix_<7 hex>` (`_ux_` quando únicos), uma forma que nenhum outro nomeador aqui produz, e exclui todo o resto do diff pelo nome. Um índice que você escreveu à mão, ou que veio por introspecção, nunca é tocado; uma declaração que você apaga continua removendo seu índice, que é a intenção. Veja **[Índices](/docs/backend/indexes)**.
+1. **Exclusão de Tabelas Não Mapeadas**: Antes de cada push, a CLI lista todas as tabelas e views do banco de dados e passa para o Atlas um `--exclude` para cada uma que não seja mapeada por nenhuma tabela declarada (ou tabela de junção de uma tabela declarada), garantindo que o Atlas nunca planeje alterações para elas. Se o banco de dados não puder ser lido, o push é abortado em vez de ser executado com uma lista parcial.
+2. **Esquemas de Propriedade do Rebase**: O esquema `rebase` (tabelas de autenticação, funções auxiliares de RLS, tabela de revisões do Atlas) e qualquer esquema `auth` são excluídos por completo, de modo que um push nunca planeje um `DROP SCHEMA … CASCADE`.
+3. **Objetos que o Atlas Não Modela**: Colunas de busca, índices vetoriais e triggers também são excluídos do Atlas e aplicados a partir de seus próprios arquivos gerados.
+4. **Barreira para Alterações Destrutivas**: O comando `rebase db push` executa primeiro um dry-run do plano. Qualquer instrução que destrua dados — uma coluna ou tabela excluída, uma alteração de tipo com perda de dados — interrompe o push: em um terminal, ele solicita que você digite `yes`, e sem um terminal (CI, scripts, agentes), ele recusa a execução a menos que você passe `--allow-destructive`.
+5. **Propriedade de Índices por Nome**: Os índices são o único objeto que reside *em* uma tabela mapeada, portanto a filtragem de tabelas não pode protegê-los — e antigamente um push planejava `DROP INDEX` para qualquer índice ausente no estado desejado, o que incluía todos os índices criados manualmente. Agora, o Rebase nomeia os índices gerados como `<table>_<columns>_ix_<7 hex>` (`_ux_` quando único), um formato que nenhum outro gerador de nomes utiliza, e exclui todo o restante do diff por nome. Um índice escrito manualmente ou importado via introspecção nunca é tocado; uma declaração que você remover ainda será excluída, o que é o comportamento esperado. Veja **[Índices](/docs/backend/indexes)**.
 
 ## Próximos Passos
 
-- **[Coleções](/docs/collections)** — Referência completa de configuração de coleção
-- **[Propriedades](/docs/collections/properties)** — Mapeamentos detalhados de tipos de coluna
-- **[Índices](/docs/backend/indexes)** — Declarar os índices de que suas consultas precisam
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+- **[Tabelas](/docs/schema/)** — Todas as opções do `defineTable`
+- **[Colunas](/docs/schema/columns/)** — Mapeamentos detalhados de tipos de coluna
+- **[Índices](/docs/backend/indexes)** — Como declarar os índices de que suas consultas precisam

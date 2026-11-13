@@ -1,8 +1,8 @@
 ---
-sourceHash: adec4552f7386908
+sourceHash: d337d344b88534c8
 title: Benutzerdefinierte Felder
 sidebar_label: Benutzerdefinierte Felder
-description: Erstellen Sie benutzerdefinierte Formularfelder für die Bearbeitung von Entitäten mit vollständigem Zugriff auf den Formularkontext, Entitätswerte und Rebase-Hooks.
+description: Erstellen Sie benutzerdefinierte Formularfelder für die Entitätsbearbeitung mit vollem Zugriff auf den Formularkontext, Entitätswerte und Rebase-Hooks.
 ---
 
 <video className="intro_video" loop autoPlay muted>
@@ -11,17 +11,34 @@ description: Erstellen Sie benutzerdefinierte Formularfelder für die Bearbeitun
 
 ## Übersicht
 
-Rebase generiert Formularfelder automatisch basierend auf Eigenschaftstypen. Für benutzerdefiniertes Verhalten können Sie eigene Felder erstellen.
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-## Erstellen eines benutzerdefinierten Feldes
+Das CMS rendert für jede Spalte basierend auf ihrem Typ ein Feld (siehe
+[Felder](/docs/collections/properties/)). Wenn dies nicht Ihren Anforderungen
+entspricht, können Sie dem Feld in `customizeTable` eine eigene Komponente
+zuweisen: `Field` ersetzt das Steuerelement im Formular, `Preview` ersetzt die
+Darstellung des Werts an allen anderen Stellen (einer Tabellenzelle, einer Karte,
+einem Referenz-Chip) und `Filter` ersetzt dessen Filter-Steuerelement.
+
+Eine Komponente ist ein Wert. `customizeTable` wird ausschließlich im
+Browser-Bundle ausgeführt, sodass Sie die Komponente wie an jeder anderen Stelle
+in Ihrem Frontend importieren und direkt übergeben. Ein Pfad als Zeichenkette
+(String) oder ein Lazy-Thunk `() => import(…)` wirft einen Fehler mit Hinweisen
+dazu, was stattdessen zu schreiben ist.
+
+## Erstellen eines benutzerdefinierten Felds
+
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein benutzerdefiniertes Feld ist eine React-Komponente, die `FieldProps` empfängt:
 
 ```tsx
+// frontend/src/fields/ColorPickerField.tsx
+import React from "react";
 import type { FieldProps } from "@rebasepro/cms";
-import type { StringProperty, NumberProperty } from "@rebasepro/types";
+import type { StringProperty } from "@rebasepro/cms-types";
 
-function ColorPickerField({ value, setValue, error, showError }: FieldProps<StringProperty>) {
+export function ColorPickerField({ value, setValue, error, showError, minimalistView }: FieldProps<StringProperty>) {
     return (
         <div>
             <input
@@ -29,6 +46,7 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
                 value={value ?? "#000000"}
                 onChange={(e) => setValue(e.target.value)}
             />
+            {!minimalistView && <span>{value}</span>}
             {showError && error && <span className="text-red-500">{error}</span>}
         </div>
     );
@@ -37,97 +55,65 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
 
 ### FieldProps
 
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
 | Prop | Typ | Beschreibung |
 |------|------|-------------|
 | `value` | `T` | Aktueller Feldwert |
 | `setValue` | `(value: T) => void` | Feldwert aktualisieren |
 | `error` | `string` | Validierungsfehlermeldung |
-| `showError` | `boolean` | Gibt an, ob der Fehler angezeigt werden soll |
-| `isSubmitting` | `boolean` | Formular wird gespeichert |
-| `property` | `Property` | Die Eigenschaftskonfiguration |
-| `context` | `FormContext` | Das Formular: dessen `values` (einschließlich ungespeicherter Änderungen), `setFieldValue`, `id` und `row`, der gespeicherte Datensatz, wie er vom Server gesendet wird (fehlt bei einem neuen Datensatz) |
+| `showError` | `boolean` | Ob der Fehler angezeigt werden soll |
+| `isSubmitting` | `boolean` | Formular wird gerade gespeichert |
+| `property` | `Property` | Das Feld, wie es vom CMS aufgelöst wurde: Label, Validierung, Optionen |
+| `context` | `FormContext` | Das Formular: seine `values` (einschließlich ungespeicherter Änderungen), `setFieldValue`, `id` und `row`, der gespeicherte Datensatz, wie er vom Server gesendet wird (fehlt bei einem neuen Datensatz) |
 | `disabled` | `boolean` | Feld ist schreibgeschützt |
 | `minimalistView` | `boolean` | Rendering im Popup-Zelleneditor der Tabelle (Kompaktmodus) |
+| `customProps` | `unknown` | Die `customProps` des Felds aus `customizeTable`, unverändert |
 
-## Registrieren eines benutzerdefinierten Feldes
+## Verwendung
 
-### Pro Eigenschaft
-
-Auf einer einzelnen Eigenschaft registrieren:
-
-```typescript
-properties: {
-    brand_color: {
-        type: "string",
-        name: "Brand Color",
-        admin: {
-            Field: ColorPickerField
-        }
-    }
-}
-```
-
-### Wenn die Sammlungsdatei auch vom Server gelesen wird
-
-Im Standard-Scaffold wird `config/collections/` sowohl vom Admin-Panel als auch vom Backend geladen – das Backend liest dieselben Dateien, um das Schema und die API abzuleiten. Eine direkte Komponentenreferenz ist nur dann sicher, wenn nichts auf dem Server diese Datei lädt, da der Import von `ColorPickerField` auch React, Ihr CSS und alles andere, was die Komponente einbindet, in den Modulgraphen des Servers importiert.
-
-Verweisen Sie stattdessen mit einem Lazy-Import auf die Komponente. Die Typüberprüfung erfolgt auf genau dieselbe Weise, und das Backend ruft sie niemals auf:
-
-```ts no-verify
-// config/collections/products.ts
-properties: {
-    brand_color: {
-        type: "string",
-        name: "Brand Color",
-        admin: {
-            Field: () => import("../../frontend/src/ColorPickerField"),
-            Preview: () => import("../../frontend/src/ColorPreview")
-        }
-    }
-}
-```
-
-Das Modul muss einen **default export** haben – der Thunk löst zu `default` auf, und ein rein benannter Export rendert nichts. Der Admin kapselt ihn beim ersten Rendern in `React.lazy`, sodass die Komponente auch als separater Chunk und nicht als Teil des anfänglichen Bundles geladen wird.
-
-### Globale Eigenschaftskonfiguration
-
-Einen wiederverwendbaren Feldtyp registrieren:
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```tsx
-const colorPropertyConfig: PropertyConfig = {
-    key: "color_picker",
-    name: "Color Picker",
-    property: {
-        type: "string",
-        admin: {
-            Field: ColorPickerField
-        }
-    }
-};
+// frontend/src/cms/brands.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { brands } from "../../../backend/schema/brands";
+import { ColorPickerField } from "../fields/ColorPickerField";
+import { ColorPreview } from "../fields/ColorPreview";
 
-// Register globally — keyed by the config's `key`
-<Rebase propertyConfigs={{ color_picker: colorPropertyConfig }}>…</Rebase>
+export const brandsCms = customizeTable<typeof brands>("brands", {
+    fields: {
+        brandColor: { Field: ColorPickerField, Preview: ColorPreview },
+    },
+});
 ```
 
-Verwenden Sie ihn dann in einer beliebigen Sammlung:
+`brandColor` ist im Backend ein `col.varchar({ length: 7 })`. Das Backend bekommt
+die Komponente nie zu Gesicht, und das Frontend importiert lediglich den Typ der
+Tabelle aus `backend/schema`.
 
-```typescript
-properties: {
-    color: {
-        type: "string",
-        name: "Color",
-        propertyConfig: "color_picker"
-    }
-}
-```
+## Ein wiederverwendbarer Feldtyp
+
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+Ein Feld, das Sie über mehrere Tabellen hinweg verwenden, kann einmalig in
+`<Rebase propertyConfigs>` registriert werden, mit dem Namen als Schlüssel, und
+auf jedem Feld über `propertyConfig: "color_picker"` angegeben werden.
 
 ## Zugriff auf den Formularkontext
 
-Benutzerdefinierte Felder können auf die vollständigen Entitätswerte zugreifen:
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+Ein benutzerdefiniertes Feld kann den gesamten Datensatz lesen, während er
+bearbeitet wird:
 
 ```tsx
-function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProperty>) {
-    const taxRate = Number(context.values.tax_rate ?? 0.1);
+import React from "react";
+import type { FieldProps } from "@rebasepro/cms";
+import type { NumberProperty } from "@rebasepro/cms-types";
+
+export function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProperty>) {
+    const taxRate = Number(context.values.taxRate ?? 0.1);
     const priceWithTax = value ? value * (1 + taxRate) : 0;
 
     return (
@@ -137,7 +123,7 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
                 value={value ?? 0}
                 onChange={(e) => setValue(Number(e.target.value))}
             />
-            <p>With tax: ${priceWithTax.toFixed(2)}</p>
+            <p>With tax: {priceWithTax.toFixed(2)}</p>
         </div>
     );
 }
@@ -145,56 +131,50 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
 
 ## Tabellenmodus
 
-Ein benutzerdefiniertes Feld wird nicht innerhalb einer Tabellenzelle gezeichnet: Die Zelle zeigt den Wert (oder Ihre `Preview`), und bei der Bearbeitung öffnet sich das Feld in einem Popup mit gesetztem `minimalistView`. Halten Sie es dort kompakt:
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-```tsx
-function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
-    if (minimalistView) {
-        return <input value={value ?? ""} onChange={(e) => setValue(e.target.value)}/>;
-    }
-
-    return (
-        <div>
-            <label>Full Editor</label>
-            <textarea value={value ?? ""} onChange={(e) => setValue(e.target.value)} />
-        </div>
-    );
-}
-```
+Ein benutzerdefiniertes Feld wird nicht innerhalb einer Tabellenzelle dargestellt:
+Die Zelle zeigt den Wert (oder Ihre `Preview`), und beim Bearbeiten wird das Feld in
+einem Popup geöffnet, bei dem `minimalistView` gesetzt ist. Halten Sie es dort
+kompakt, wie es oben bei `ColorPickerField` der Fall ist.
 
 ## Benutzerdefinierte Vorschauen
 
-Verwenden Sie für ein benutzerdefiniertes Rendering in der Tabelle (Nicht-Bearbeitungsmodus) die `Preview`-Komponente:
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+`Preview` stellt den Wert außerhalb des Formulars dar. Es empfängt
+`FieldPreviewProps`: `value`, die aufgelöste `property`, die `size`, die die
+Oberfläche vorgibt (`"small"`, `"medium"` oder `"large"`), und die `customProps`
+des Felds.
 
 ```tsx
-function ColorPreview({ value }: { value: string }) {
-    return (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{
-                width: 24, height: 24,
-                borderRadius: 4,
-                backgroundColor: value
-            }} />
-            <span>{value}</span>
-        </div>
-    );
-}
+// frontend/src/fields/ColorPreview.tsx
+import React from "react";
+import type { FieldPreviewProps } from "@rebasepro/cms-types";
 
-// Register it
-properties: {
-    color: {
-        type: "string",
-        name: "Color",
-        admin: {
-            Field: ColorPickerField,
-            Preview: ColorPreview
-        }
-    }
+export function ColorPreview({ value }: FieldPreviewProps) {
+    const color = typeof value === "string" ? value : "transparent";
+    return (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 16, height: 16, borderRadius: 4, backgroundColor: color }}/>
+            {typeof value === "string" ? value : ""}
+        </span>
+    );
 }
 ```
 
+## Benutzerdefinierte Filter
+
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+`Filter` ersetzt das Filter-Steuerelement eines einzelnen Felds. Es hat Vorrang
+vor einem sammlungsweiten `Collection.FilterField`-Override sowie dem integrierten
+Steuerelement für diesen Typ. Um lediglich die angebotenen Operatoren einzuschränken,
+verwenden Sie stattdessen `filterOperators`.
+
 ## Nächste Schritte
 
+- **[customizeTable](/docs/frontend/customize-table)** — Alle Feldoptionen
 - **[Entity Views](/docs/frontend/entity-views)** — Benutzerdefinierte Tabs im Entitätseditor
 - **[Entity Actions](/docs/frontend/entity-actions)** — Benutzerdefinierte Aktionsschaltflächen
 - **[Additional Columns](/docs/frontend/additional-columns)** — Berechnete Tabellenspalten

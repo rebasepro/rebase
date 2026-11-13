@@ -1,29 +1,39 @@
 ---
-sourceHash: 7662efa49c97d83b
+sourceHash: c6b361597710219f
 title: Projektstruktur
 sidebar_label: Projektstruktur
-description: Verstehen Sie die Struktur eines Rebase-Projekts – Frontend, Backend und Collections-Konfiguration.
+description: "Der Aufbau eines Rebase-Projekts — die Tabellen in backend/schema, die Backend-Module, die die Runtime liest, und die Anpassungen des Admin-Panels in frontend/src/cms — mit und ohne Panel."
 ---
 
-:::note[Fünf Begriffe, die diese Seite verwendet]
-Jeder davon hat hier eine ganz spezifische Bedeutung, und vier davon bedeuten anderswo in der Branche etwas anderes.
+:::note[Sechs Begriffe, die diese Seite verwendet]
+Jeder von ihnen hat hier eine spezifische Bedeutung, und die meisten bedeuten anderswo
+in der Branche etwas anderes.
 
-- **Collection** — eine Tabelle, beschrieben in TypeScript. Das Schema, die API und
-  die Admin-Oberfläche stammen alle aus derselben Datei.
-- **Studio** — der Entwicklerbereich des Admin-Panels: Schema-Editor, SQL-Konsole,
-  Policy-Browser. Dieselbe App, die Ihr Content-Team verwendet, umschaltbar per Toggle.
-- **Managed runtime** — das veröffentlichte `rebasepro/server`-Image startet Ihr
-  Projekt. Sie schreiben keine Server-Datei und erhalten Runtime-Upgrades ohne
-  Rebuild. Die Alternative ist `rebase eject`, weiter unten.
-- **Bundle** — das, was `rebase build` erzeugt: Ihre Collections, Functions und
-  Crons, kompiliert, mit einem Manifest, das angibt, wo sich jedes Element befindet.
-  Es ist das, was die Managed Runtime startet.
-- **Resource** — etwas, das das Projekt von seiner Laufzeitumgebung benötigt: eine Datenbank,
-  ein Bucket, ein Topic. Deklariert in `config/resources.ts`, angebunden über
+- **Table** — eine Postgres-Tabelle, in TypeScript mit `defineTable` in
+  `backend/schema/` deklariert. Das SQL, die Row-Level-Security-Policies, die API, die
+  SDK-Typen und die Standardeinstellungen des Admin-Panels stammen alle davon ab.
+- **Collection** — was das Admin-Panel anzeigt: eine Tabelle, die als Liste und
+  Formular dargestellt wird, angepasst in `frontend/src/cms/`, oder eine Firestore-Collection,
+  die das Panel direkt liest.
+- **Studio** — die Entwickler-Hälfte des Admin-Panels: Schema-Editor, SQL-Konsole,
+  Policy-Browser. Dieselbe App, die Ihr Content-Team verwendet, hinter einem Umschalter (Toggle).
+- **Managed Runtime** — das veröffentlichte `rebasepro/server`-Image startet Ihr
+  Projekt. Sie schreiben keine Server-Datei und erhalten Runtime-Upgrades ohne einen
+  Rebuild. Die Alternative ist `rebase eject` weiter unten.
+- **Bundle** — was `rebase build` erzeugt: Ihre Tabellen, Funktionen und Crons,
+  kompiliert, mit einem Manifest, das angibt, wo sich jedes Element befindet. Es ist das,
+  was die Managed Runtime startet.
+- **Resource** — etwas, das das Projekt von dort benötigt, wo es ausgeführt wird: eine
+  Datenbank, ein Bucket, ein Topic. Deklariert in `backend/resources.ts`, gebunden über
   Umgebungsvariablen.
 :::
 
-Ein Rebase-Starterprojekt besteht aus drei miteinander verbundenen Packages:
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+`rebase init` erstellt eines von zwei Layouts als Gerüst. Beide haben dasselbe `backend/`;
+der Unterschied besteht darin, ob das Projekt das Admin-Panel enthält.
+
+**Mit dem Admin-Panel** (Standard):
 
 ```
 my-app/
@@ -35,49 +45,100 @@ my-app/
 ├── scripts/
 │   └── example.ts          # A health check and an SDK call to uncomment: `pnpm example`
 │
-├── config/                 # Shared by the backend and the admin panel
-│   ├── index.ts            # Re-exports `collections`; the runtime reads `storageAuthorize` from here
-│   ├── collections/        # Your data model
-│   │   ├── index.ts        # Sort order (`collections`) and `defaultSecurityRules` — not a registry
-│   │   ├── posts.ts        # Example collections
-│   │   └── users.ts        # The auth collection
-│   ├── resources.ts        # What this project needs from wherever it runs
-│   ├── storage.ts          # Who may read, write and list files
-│   └── cms.d.ts            # One line that makes the `admin` block legal here
-│
 ├── backend/
+│   ├── schema/             # Your tables
+│   │   ├── index.ts        # Exports every table, and the optional defaultRls
+│   │   ├── posts.ts        # defineTable("posts", …)
+│   │   └── users.ts        # defineAuthTable("users", …)
+│   ├── resources.ts        # What this project needs from wherever it runs
+│   ├── storage.ts          # Who may read, write and list files (storageAuthorize)
 │   ├── functions/          # Custom API routes, auto-mounted at /api/functions/<name>
 │   │   └── hello.ts
 │   └── src/
-│       └── schema.generated.ts   # Drizzle schema, regenerated from your collections
+│       └── schema.generated.ts   # Drizzle schema, regenerated from your tables
 │
 └── frontend/               # The admin panel (React + Vite)
-    ├── src/App.tsx
-    ├── src/main.tsx
+    ├── src/
+    │   ├── App.tsx
+    │   ├── main.tsx
+    │   └── cms/            # How tables look in the panel: customizeTable(...)
+    │       └── posts.tsx
     └── vite.config.ts
 ```
 
-`tsc --noEmit` im Root prüft `scripts/`; in `config/`, `backend/` oder `frontend/` prüft es
-jeweils diesen Workspace.
+**Nur Backend** (`rebase init --headless`): dasselbe `backend/`, ohne
+`frontend/` — und auch ohne `backend/schema/`. Der Server liest die datenbankeigenen
+Tabellen beim Booten und stellt jede bereit, für die Row-Level-Security aktiviert ist. Siehe
+[Nur Backend](/docs/getting-started/headless/).
+
+```
+my-api/
+├── .env
+├── rebase.json
+├── package.json
+└── backend/
+    ├── storage.ts
+    └── functions/
+```
+
+Zwei weitere Dateien erscheinen, wenn Sie diese benötigen, und die Runtime liest beide:
+`backend/hooks.ts`, dessen `hooks`-Export für jede Tabelle ausgeführt wird
+([Globale Hooks](/docs/backend/hooks/)), und `backend/crons/` für geplante
+Jobs. `rebase generate-sdk --register` fügt `backend/generated/` hinzu.
+
+`tsc --noEmit` im Root prüft `scripts/`; in `backend/` oder `frontend/` prüft
+es den jeweiligen Workspace. Es gibt kein separates `config/`-Paket: Das Frontend
+importiert eine Tabelle aus `backend/schema` ausschließlich als Typ (`import type`). Ein
+Wert-Import (Value Import) von irgendetwas unter `backend/` würde Servercode — Hooks und
+die von ihnen gelesenen Secrets — an den Browser ausliefern. Daher lässt `rebaseBackendGuard()`
+aus `@rebasepro/app/vitePlugin` im `frontend/vite.config.ts` des Scaffolds
+`vite build` und `vite dev` fehlschlagen, wenn etwas zu `backend/` aufgelöst wird, wobei der
+Importer, der Import und die Datei benannt werden. `rebase build` verweigert ein Frontend
+ohne dieses Plugin. Um es zu einem bestehenden Projekt hinzuzufügen, importieren Sie es und
+fügen Sie `rebaseBackendGuard()` zu `plugins` in `frontend/vite.config.ts` hinzu.
 
 :::note[Es gibt kein `backend/src/index.ts`]
-Und kein `Dockerfile`. Ein neu erstelltes Projekt deklariert `runtime: "managed"` in
+Und kein `Dockerfile`. Ein gescaffoldetes Projekt deklariert `runtime: "managed"` in
 `rebase.json`, was bedeutet, dass das **veröffentlichte `rebasepro/server`-Image Ihr
 Projekt als Bundle startet** — dasselbe Artefakt, unabhängig davon, ob Sie es selbst
 hosten oder in Rebase Cloud deployen. Sie konfigurieren den Server über `rebase.json`,
-`config/` und Umgebungsvariablen, anstatt einen Einstiegspunkt zu schreiben.
+die Dateien in `backend/` und Umgebungsvariablen, anstatt einen Einstiegspunkt zu schreiben.
 
-Wenn Sie die volle Kontrolle über den Prozess haben möchten — eigene Middleware,
-eigene Routen, eigene Auth-Anbindung —, erstellt `rebase eject` den Einstiegspunkt,
-ein Dockerfile und eine Compose-Datei, die diese baut. Siehe
-[Custom Server Integration](/docs/backend/custom-server).
+Wenn Sie die volle Kontrolle über den Prozess übernehmen möchten — eigene Middleware, eigene
+Routen, eigene Auth-Verdrahtung —, schreibt `rebase eject` den Einstiegspunkt, ein Dockerfile
+und eine Compose-Datei, die diese baut. Siehe [Custom-Server-Integration](/docs/backend/custom-server).
 :::
+
+## Tabellen (`backend/schema/`)
+
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+Tabellen sind die **Single Source of Truth** für Ihr Datenmodell:
+
+```typescript title="backend/schema/products.ts"
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const products = defineTable("products", {
+    columns: {
+        id:    col.uuid().primaryKey().defaultRandom(),
+        name:  col.text().notNull(),
+        price: col.numeric(),
+    },
+    rls: "admin-only",
+});
+```
+
+Der Name wird zum REST-Endpunkt (`/api/data/products`), zum Tabellennamen in
+Postgres und zur Route des Panels; `table` und `slug` überschreiben diese. `rls` ist
+erforderlich. Eine Tabelle zählt, sobald `backend/schema/index.ts` sie exportiert — ein
+`defineTable`, das der Index auslässt, verweigert den Bootvorgang. [Tabellen](/docs/schema/)
+deckt alle Optionen ab.
 
 ## Frontend (`frontend/`)
 
-Das Frontend ist eine standardmäßige **Vite + React + TypeScript**-Anwendung. Die wichtigste Datei ist `App.tsx`, die alle Rebase-Controller miteinander verknüpft:
+Das Frontend ist eine standardmäßige **Vite + React + TypeScript**-Anwendung. Die wichtigste Datei ist `App.tsx`, die alle Rebase-Controller miteinander verbindet:
 
-```typescript title="frontend/src/App.tsx"
+```tsx title="frontend/src/App.tsx"
 import "@fontsource/jetbrains-mono";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/instrument-sans";
@@ -87,7 +148,12 @@ import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
-import { collections } from "virtual:rebase-collections";
+import { postsCms } from "./cms/posts";
+import { authorsCms } from "./cms/authors";
+import { tagsCms } from "./cms/tags";
+import { usersCms } from "./cms/users";
+// How the collection editor laid out the tables in development (labels, columns, views).
+import uiConfig from "./cms/ui-config.json";
 
 // `rebase dev` injects VITE_API_URL with the port it actually bound, and that
 // port is derived from this project's path rather than fixed — so a
@@ -122,9 +188,10 @@ export function App() {
                 {/* The sign-in screen. On its own this changes nothing —
                     it is where you pass `loginView` to replace it. */}
                 <RebaseAuth />
-                <RebaseCMS
-                    collections={collections}
-                />
+                {/* Every table the backend serves gets an admin view with no
+                    code. A file in ./cms changes how one of them looks:
+                    labels, icons, enum colours, custom fields and actions. */}
+                <RebaseCMS tableCustomizations={[postsCms, authorsCms, tagsCms, usersCms]} uiConfig={uiConfig} />
                 <RebaseStudio/>
                 <RebaseShell title="Rebase"/>
             </Rebase>
@@ -134,100 +201,82 @@ export function App() {
 ```
 
 `main.tsx` bindet es unter einem `react-router`-`basename` ein, der aus
-`import.meta.env.BASE_URL` übernommen wird. Diesen setzt `rebase build` anhand des
-`path`, den diese App in `rebase.json` deklariert — so stimmen die Assets, der
-Router und der Server bei einem einzigen Wert überein, ohne dass er dreimal manuell
-angegeben werden muss.
+`import.meta.env.BASE_URL` übernommen wird. Diesen setzt `rebase build` anhand des `path`,
+den diese App in `rebase.json` deklariert — so stimmen Assets, Router und Server in
+einem Wert überein, ohne dass dieser dreimal angegeben werden muss.
 
 ### Wichtige Konzepte
 
-- **`createRebaseClient`** — Erstellt den SDK-Client, der HTTP-Anfragen, WebSocket-Verbindungen und die Verwaltung von Authentifizierungstoken übernimmt. Rufen Sie ihn einmal auf, auf Modulebene: Innerhalb einer Komponente, selbst in einem `useMemo`, baut `<React.StrictMode>` in der Entwicklung einen zweiten Client
-- **`virtual:rebase-collections`** — Ein Vite-Plugin, das Ihre geteilten Collections zur Build-Zeit automatisch importiert
-- **`useRebaseAuthController`** — Verwaltet den angemeldeten Benutzer sowie den Token-Lebenszyklus und wird von `<Rebase>` an alle untergeordneten Komponenten weitergegeben
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+- **`createRebaseClient`** — Erstellt den SDK-Client, der HTTP-Anfragen, WebSocket-Verbindungen und die Verwaltung von Auth-Tokens abwickelt. Rufen Sie ihn einmalig auf Modulebene auf: Innerhalb einer Komponente, selbst in einem `useMemo`, erstellt `<React.StrictMode>` in der Entwicklung einen zweiten Client
+- **`<RebaseCMS tableCustomizations>`** — das Panel rendert jede Tabelle, die das Backend unter `GET /api/schema/tables` bereitstellt; die `customizeTable`-Objekte aus `frontend/src/cms/` verändern das Aussehen einiger von ihnen, und `uiConfig` enthält das, was der Collection-Editor während der Entwicklung gespeichert hat. Siehe [Anpassen einer Tabelle](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
+- **`useRebaseAuthController`** — Hält den angemeldeten Benutzer und den Token-Lebenszyklus und wird von `<Rebase>` an alle darunterliegenden Komponenten weitergegeben
 
 ## Backend (`backend/`)
 
-Es gibt keine Server-Datei zu lesen, und das ist beabsichtigt: Ein neu erstelltes
-Projekt deklariert `runtime: "managed"`, sodass das veröffentlichte
-`rebasepro/server`-Image Ihr Projekt startet. `backend/` enthält den Code, den
-die Runtime einliest:
+Es gibt keine Server-Datei, die gelesen werden müsste, und das ist genau so gewollt:
+Ein scaffoldetes Projekt deklariert `runtime: "managed"`, sodass das veröffentlichte
+`rebasepro/server`-Image Ihr Projekt startet. Was `backend/` enthält, ist der Code,
+den die Runtime lädt:
 
-| Pfad | Beschreibung |
+| Pfad | Was es ist |
 |---|---|
-| `backend/functions/` | Eigene Routen, automatisch unter `/api/functions/<filename>` gemountet |
-| `backend/crons/` | Zeitgesteuerte Jobs (Cronjobs), die auf dieselbe Weise erkannt werden (erstellen Sie das Verzeichnis bei Bedarf) |
-| `backend/src/schema.generated.ts` | Das Drizzle-Schema Ihrer Collections: von `rebase init` geschrieben und bei jedem `rebase dev` und `rebase build` neu generiert |
+| `backend/schema/` | Die Tabellen und das `defaultRls`, das deren Index exportiert |
+| `backend/resources.ts`, `backend/storage.ts`, `backend/hooks.ts` | Deklarierte Ressourcen, `storageAuthorize` und globale Tabellen-Hooks |
+| `backend/functions/` | Eigene Routen, automatisch gemountet unter `/api/functions/<filename>` |
+| `backend/crons/` | Geplante Jobs (Crons), auf die gleiche Weise erkannt (erstellen Sie das Verzeichnis, wenn Sie einen benötigen) |
+| `backend/src/schema.generated.ts` | Das Drizzle-Schema Ihrer Tabellen: geschrieben von `rebase init` und bei jedem `rebase dev` und `rebase build` neu generiert |
 
 Die Runtime richtet Folgendes ein:
 
-- **REST-API** unter `/api/data/*` — generierte CRUD-Operationen für jede Collection
+- **REST-API** unter `/api/data/*` — generiertes CRUD für jede Tabelle
 - **Auth** unter `/api/auth/*` — Registrierung, Login, Refresh, OAuth
 - **Storage** unter `/api/storage/*` — Upload und Download
-- **WebSocket** — Echtzeitsynchronisierung über Postgres LISTEN/NOTIFY
-- **Ihre Functions und Crons** aus den oben genannten Verzeichnissen
+- **WebSocket** — Echtzeit-Synchronisierung über Postgres LISTEN/NOTIFY
+- **Ihre Funktionen und Crons** aus den oben genannten Verzeichnissen
 
-Die Konfiguration erfolgt über `rebase.json`, das `config/`-Verzeichnis und
-Umgebungsvariablen. Siehe [Environment & Configuration](/docs/getting-started/configuration).
+Die Konfiguration erfolgt über `rebase.json`, die Dateien in `backend/` und
+Umgebungsvariablen. Siehe [Umgebung & Konfiguration](/docs/getting-started/configuration).
 
-`rebase build` wandelt all dies in ein **Bundle** um — die kompilierten
-Collections, Functions und Crons samt einem Manifest —, das die Managed Runtime
-bootet. Nichts an diesem Bundle wird von Hand geschrieben; wenn Sie sehen möchten,
-wie eines aufgebaut ist, finden Sie die Details unter
-[Runtime & Bundles](/docs/architecture/runtime-and-bundles/).
+`rebase build` verwandelt all dies in ein **Bundle** — die kompilierten Tabellen,
+Funktionen und Crons samt einem Manifest —, das die Managed Runtime startet. Nichts
+an dem Bundle wird von Hand geschrieben; wenn Sie sehen möchten, wie eines aufgebaut ist,
+erklärt [Runtime & Bundles](/docs/architecture/runtime-and-bundles/), was darin enthalten ist.
 
-Das vom Frontend bereitgestellte Panel besteht aus zwei Hälften. **Studio** ist
-der Entwicklerbereich — der Schema-Editor, die SQL-Konsole, der RLS-Policy-Browser —
-und befindet sich hinter dem Umschalter im Drawer, kein separates Deployment. Siehe
-[Studio](/docs/studio/).
+Das vom Frontend bereitgestellte Panel hat zwei Hälften. **Studio** ist der Entwicklerteil —
+der Schema-Editor, die SQL-Konsole, der RLS-Policy-Browser — und befindet sich hinter
+dem Umschalter im Drawer, kein separates Deployment. Siehe [Studio](/docs/studio/).
 
-Um stattdessen die Kontrolle über den Prozess zu übernehmen — eigene Middleware,
-Routen und Auth-Verdrahtung —, führen Sie `rebase eject` aus. **Alles unterhalb dieses
-Absatzes gilt nur für ausgeworfene (ejected) Projekte**: Ein neu erstelltes Projekt
-besitzt keine dieser Dateien, und nichts darin ruft `initializeRebaseBackend` auf.
-Der Befehl schreibt einen Einstiegspunkt, der `initializeRebaseBackend` direkt aufruft,
-sowie ein Dockerfile und eine Compose-Datei, die dieses baut; von da an warten Sie
-den Server selbst, und Plattform-Runtime-Upgrades werden nicht mehr auf das Projekt
-angewendet. Diese Schnittstelle ist in [Custom Server Integration](/docs/backend/custom-server)
-dokumentiert.
+Um stattdessen die volle Kontrolle über den Prozess zu übernehmen — eigene Middleware, Routen
+und Auth-Verdrahtung —, führen Sie `rebase eject` aus. **Alles unterhalb dieses Absatzes gilt
+nur für ausgecheckte (ejected) Projekte**: Ein scaffoldetes Projekt enthält keine dieser Dateien,
+und nichts darin ruft `initializeRebaseBackend` auf. Der Befehl schreibt einen Einstiegspunkt,
+der `initializeRebaseBackend` direkt aufruft, sowie ein Dockerfile und eine Compose-Datei,
+die es baut; ab diesem Zeitpunkt warten Sie den Server selbst und Plattform-Runtime-Upgrades
+erreichen das Projekt nicht mehr. Diese Schnittstelle ist in
+[Custom-Server-Integration](/docs/backend/custom-server) dokumentiert.
 
-## Collections (`config/collections/`)
+## Wie sie zusammenhängen
 
-Collections sind die **Single Source of Truth** für Ihr Datenmodell. Sie werden in TypeScript definiert und sowohl vom Frontend (zur UI-Generierung) als auch vom Backend (zur Schema-Generierung und für das API-Routing) verwendet.
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-```typescript title="config/collections/products.ts"
-import { defineCollection } from "@rebasepro/cms-types";
+1. **Sie deklarieren** Tabellen in `backend/schema/`
+2. **Das Backend** kompiliert sie, erstellt die Tabellen sowie Policies und bindet REST-, Echtzeit- und MCP-Routen ein
+3. **Das Admin-Panel** liest sie von `GET /api/schema/tables` und rendert für jede eine Ansicht, angepasst durch die Dateien in `frontend/src/cms/`
+4. **Die CLI** liest sie, um das Drizzle-Schema (`rebase schema generate`), die SDK-Typen (`rebase generate-sdk`) und aus diesem Schema Migrationsdateien (`rebase db generate`) zu generieren
 
-const productsCollection = defineCollection({
-    slug: "products",
-    name: "Products",
-    properties: {
-        name: { type: "string", name: "Name" },
-        price: { type: "number", name: "Price" }
-    }
-});
+Während `rebase dev` läuft, generiert das Speichern einer Datei unter `backend/schema/`
+`backend/src/schema.generated.ts` und die SDK-Typen in `generated/sdk/` neu, startet das
+Backend neu, und beim Booten werden die noch fehlenden Tabellen und Spalten erstellt. Außerhalb
+von `rebase dev` entsprechen diese Schritte `rebase schema generate` und `rebase generate-sdk`.
 
-// The default export is what the loader picks up — every file in this directory
-// is loaded, listed in index.ts or not, and every collection in the scaffold is
-// written this way.
-export default productsCollection;
-```
-
-Der `slug` wird zum URL-Pfad in der Admin-UI und zum REST-API-Endpunkt (`/api/data/products`), und der PostgreSQL-Tabellenname entspricht standardmäßig diesem Wert. Geben Sie `table` nur an, wenn sich beide voneinander unterscheiden.
-
-## Wie alles zusammenhängt
-
-1. **Sie definieren** Collections in `config/collections/`
-2. **Das Backend** liest sie ein, um Drizzle-Schemas zu generieren und REST-Routen einzubinden
-3. **Das Frontend** liest sie ein (über ein Vite-Plugin), um Tabellen, Formulare und die Navigation zu rendern
-4. **Die CLI** liest sie ein, um das Drizzle-Schema (`rebase schema generate`), die SDK-Typen (`rebase generate-sdk`) und, aus diesem Schema, Migrationsdateien (`rebase db generate`) zu erzeugen
-
-Während `rebase dev` läuft, werden beim Speichern einer Datei unter `config/collections/`
-die Datei `backend/src/schema.generated.ts` und die SDK-Typen in `generated/sdk/` neu
-generiert und das Backend neu gestartet; beim Hochfahren werden fehlende Tabellen und
-Spalten automatisch erstellt. Außerhalb von `rebase dev` entsprechen diese Schritte
-`rebase schema generate` und `rebase generate-sdk`.
+Ein Projekt von vor Version 0.31 verfügt stattdessen über ein Verzeichnis `config/collections/`.
+Jeder Befehl verweigert die Ausführung und verweist auf `rebase migrate collections-to-tables`,
+was die Migration durchführt — siehe [die Upgrade-Anleitung](/docs/upgrading/0-30-to-0-31/).
 
 ## Nächste Schritte
 
-- **[Quickstart](/docs/getting-started/quickstart)** — Starten Sie mit einem neuen Rebase-Projekt
-- **[Configuration](/docs/getting-started/configuration)** — Alle Umgebungsvariablen und Optionen
+- **[Schnellstart](/docs/getting-started/quickstart)** — Starten Sie mit einem neuen Rebase-Projekt
+- **[Tabellen](/docs/schema/)** — Deklarieren Sie Ihr Datenmodell
+- **[Konfiguration](/docs/getting-started/configuration)** — Alle Umgebungsvariablen und Optionen

@@ -1,29 +1,55 @@
 ---
-sourceHash: 5d02584650c7bfaa
+sourceHash: b1b5ef4227e130d2
 title: Escritura a través de REST
 sidebar_label: Escritura a través de REST
-description: Claves de idempotencia, escrituras condicionales con ETag e If-Match, operaciones de campo, upserts sobre clave natural, return=minimal y lotes entre colecciones.
+description: Claves de idempotencia, escrituras condicionales con ETag e If-Match, operaciones de campo, upserts sobre una clave natural, return=minimal y lotes entre tablas.
 ---
 
-Los verbos se encuentran en la página de la [REST API](/docs/backend/api/). Esta sección trata sobre las cinco cosas que una escritura puede *solicitar* más allá de su verbo, y el endpoint que escribe a través de múltiples colecciones a la vez. Todas ellas son opcionales por petición: una escritura que no solicite nada de esto se comporta exactamente como siempre lo ha hecho.
+Los verbos se encuentran en la página de la [API REST](/docs/backend/api/). Esta trata sobre las
+cinco cosas que una escritura puede *solicitar* más allá de su verbo, y el endpoint que escribe
+en varias tablas a la vez. Todas ellas son opcionales por solicitud (opt-in): una escritura que
+no solicite nada de esto se comporta exactamente como siempre lo ha hecho.
 
 ## Escritura
 
-Más allá de los verbos, las rutas de escritura admiten cinco elementos que cambian el comportamiento de una escritura. Los cinco son opcionales por petición, por lo que nada de lo aquí expuesto cambia lo que hace una petición que no los solicite. Las rutas anidadas (`/api/data/authors/42/posts`) ejecutan el mismo código de escritura que las raíz, así que todo lo de esta sección se les aplica también, excepto `?on_conflict=`.
+Más allá de los verbos, las rutas de escritura admiten cinco elementos que modifican el comportamiento
+de una escritura. Los cinco son opcionales por solicitud, por lo que nada de lo aquí expuesto cambia
+lo que hace una solicitud que no los pide. Las rutas anidadas
+(`/api/data/authors/42/posts`) ejecutan el mismo código de escritura que las rutas raíz, por lo
+que todo lo indicado en esta sección también se aplica a ellas, excepto `?on_conflict=`.
 
-El cuerpo de una escritura debe ser un objeto JSON. `null`, un número, una cadena o un array es un `400 BAD_REQUEST`.
+El cuerpo de una escritura debe ser un objeto JSON. Un valor `null`, un número, una cadena o un array resulta
+en un `400 BAD_REQUEST`.
 
-Una actualización no puede cambiar la clave de una fila. Un cuerpo que nombra
-la clave con otro valor es un `400 KEY_IMMUTABLE`, antes de que se ejecute
-ningún hook y sin que se escriba nada, sea cual sea la vía por la que llega la
-actualización: REST, el socket en tiempo real, MCP o el `rebase.data` en
-proceso. La clave que la fila ya tiene se acepta, como la acepta un formulario
-que devuelve toda la fila. Para mover una fila a una clave nueva, créala ahí y
-elimina la antigua.
+<span class="since-badge" data-since="0.31">Desde 0.31</span> Una escritura acepta los valores documentados en la API REST y nada más — la
+misma forma que devuelve una lectura: una relación a-uno (`belongsTo`, `hasOne`, un `via` a-uno)
+como la clave de la fila relacionada o `null`, una relación a-muchos como una lista de claves
+o de objetos `{ id, _pivot? }`, una fecha como texto ISO, un vector como una lista de números,
+un geopunto como `{ latitude, longitude }`, un `bytea` como una
+URL `data:application/octet-stream;base64,`. Una relación a-uno escrita como un
+objeto (`{ "author": { "id": 5 } }`) devuelve un `400 VALIDATION_INVALID_VALUE`
+("'posts.author' links one 'authors' row: write that row's key …"), al igual que un
+vector escrito como `{ "value": [...] }`. En el proceso, `rebase.data` también admite un
+`Date` y un `Buffer` / `Uint8Array`.
+
+Escribir una relación `hasMany` o `hasOne` desde el padre (`{ "replies": [1, 2] }`
+en un hilo) establece la clave foránea en las filas secundarias, por lo que queda sujeta a las
+reglas de dicha clave: una columna de clave que sea `.readOnly()`, `.private()` o esté restringida por
+`access.write` la rechazará (`400 VALIDATION_EXCLUDED_FIELDS` /
+`FIELD_NOT_WRITABLE`, "Writing 'replies' on 'threads' sets 'threadId' on the
+rows of 'replies'"), al igual que lo hace una escritura de la clave en la fila secundaria.
+
+Una actualización no puede cambiar la clave de una fila. Un cuerpo que indique la clave con otro
+valor resulta en un `400 KEY_IMMUTABLE`, antes de que se ejecute cualquier hook y sin escribir nada,
+independientemente de cómo llegue la actualización: REST, el socket en tiempo real, MCP o el
+`rebase.data` dentro del proceso. La clave que la fila ya tiene sí se acepta, tal como la envía un formulario
+que devuelve la fila completa. Para mover una fila a una nueva clave, créela
+allí y elimine la antigua.
 
 ### Idempotencia
 
-`Idempotency-Key: <uuid>` en cualquier escritura significa «si ya has respondido a esta petición exacta, responde de nuevo en lugar de ejecutarla dos veces».
+`Idempotency-Key: <uuid>` en cualquier escritura significa "si ya has respondido a esta
+solicitud exacta, vuelve a responderla en lugar de ejecutarla dos veces".
 
 ```bash
 curl -X POST /api/data/orders \
@@ -31,24 +57,43 @@ curl -X POST /api/data/orders \
      -d '{"total": 40}'
 ```
 
-Un cliente que nunca recibe una respuesta no puede saber si la escritura se confirmó, por lo que reintenta — y sin una clave, el servidor no puede distinguir ese reintento de una segunda escritura genuina. En una tabla con un id asignado por el servidor, esto genera una fila duplicada, ya que el id inventado por el cliente nunca se utilizó.
+Un cliente que nunca llega a ver una respuesta no puede saber si la escritura se confirmó, por
+lo que reintenta — y sin una clave, el servidor no puede distinguir ese reintento de una segunda
+escritura auténtica. En una tabla con un id asignado por el servidor, esto generaría una fila duplicada,
+ya que el id que inventó el cliente nunca llegó a utilizarse.
 
-Una clave identifica **una sola petición**: registra el método, la ruta, la cadena de consulta y el cuerpo para los que fue solicitada. Si se vuelve a enviar esa petición exacta, su respuesta se reproduce; si se envía una diferente bajo la misma clave, se rechaza con `IDEMPOTENCY_KEY_REUSED` (422) en lugar de responder con el resultado de la primera. Un reintento que llega mientras la primera aún está en curso recibe `IDEMPOTENCY_KEY_IN_PROGRESS` (409) — envíela de nuevo una vez que la primera haya finalizado. La cadena de consulta cuenta porque cambia lo que hace una petición: `DELETE /api/data/posts/5?hard=true` bajo la clave de un borrado lógico anterior es una petición distinta, no una repetición. El orden de sus parámetros no importa.
+Una clave identifica **una única solicitud**: registra el método, la ruta, la query string
+y el cuerpo para los que fue solicitada. Vuelva a enviar esa solicitud exacta y se reproducirá su respuesta; envíe una
+diferente bajo la misma clave y será rechazada con `IDEMPOTENCY_KEY_REUSED`
+(422) en lugar de responder con el resultado de la primera. Un reintento que llega
+mientras la primera todavía está en curso recibe `IDEMPOTENCY_KEY_IN_PROGRESS` (409) —
+envíelo de nuevo una vez que la primera haya finalizado. La query string cuenta porque
+cambia lo que hace una solicitud: `DELETE /api/data/posts/5?hard=true` bajo la clave de un
+borrado lógico anterior es una solicitud diferente, no una repetición. El orden de sus
+parámetros no importa.
 
-Se admite en `POST`, `PATCH`, `DELETE`, las tres rutas `/bulk` y `/_batch`. Las claves duran 24 horas y se limitan al emisor autenticado; una petición no autenticada no tiene una entidad principal a la que asociarla, por lo que el encabezado se ignora en ese caso. Un backend que no pueda almacenar claves ignora el encabezado en lugar de rechazar la escritura.
+Se respeta en `POST`, `PATCH`, `DELETE`, en las tres rutas `/bulk` y en `/_batch`.
+Las claves duran 24 horas y están limitadas al ámbito del emisor autenticado; una
+solicitud no autenticada no tiene una identidad a la cual asociarla, por lo que el encabezado se
+ignora en ese caso. Un backend que no pueda almacenar claves ignora el encabezado en lugar de
+rechazar la escritura.
 
-`DELETE` es el caso que vale la pena leer dos veces. Si se repite sin una clave, el segundo intento comprueba que la fila ya no existe y responde con `404` — lo cual un cliente que reintenta interpreta como un error permanente de una eliminación que en realidad tuvo éxito. Con una clave, reproduce el `204`.
+`DELETE` es el caso que merece una segunda lectura. Si se reintenta sin una clave, el segundo
+intento comprueba que la fila ya no existe y responde con `404` — lo cual un cliente que reintenta interpreta como
+un fallo definitivo para una eliminación que en realidad tuvo éxito. Con una clave, reproduce
+el `204`.
 
 ### Concurrencia optimista: `ETag` e `If-Match`
 
-`GET /api/data/:slug/:id` devuelve un `ETag`, y también lo hace el `GET` anidado de una sola fila. Envíelo de vuelta como `If-Match` en un `PATCH` o `DELETE` posterior y la escritura se rechazará con `412` si la fila ha cambiado en el ínterin.
+`GET /api/data/:slug/:id` devuelve un `ETag`, y también lo hace el `GET` anidado
+de una sola fila. Reenvíelo como `If-Match` en un `PATCH` o `DELETE` posterior y la escritura se
+rechazará con `412` si la fila ha cambiado en el ínterin.
 
-Un `PATCH` correcto responde con el `ETag` de la versión que escribió,
-de modo que la siguiente escritura condicional no necesita leer antes. La etiqueta
-viaja también en un `204` respondido por `Prefer: return=minimal`, y una respuesta
-reenviada para una `Idempotency-Key` lleva la misma etiqueta que la primera. Una
-suscripción en vivo a una fila lleva la misma etiqueta en cada fotograma (consulta
-[Tiempo real](/docs/backend/realtime/)).
+Un `PATCH` exitoso responde con el `ETag` de la versión que escribió,
+por lo que la siguiente escritura condicional no necesita una lectura previa. La etiqueta también viaja en un
+`204` devuelto para `Prefer: return=minimal`, y una respuesta reproducida por una
+`Idempotency-Key` lleva la misma etiqueta que la primera. Una suscripción a filas en vivo
+lleva la misma etiqueta en cada frame (consulte [Tiempo real](/docs/backend/realtime/)).
 
 ```bash
 # read
@@ -62,19 +107,27 @@ curl -X PATCH /api/data/docs/d1 \
 # → 412 PRECONDITION_FAILED if somebody else edited it first
 ```
 
-Sin esto, lectura-modificación-escritura funciona como «gana el último» sobre todo lo que la segunda escritura no haya enviado: dos editores con un segundo de diferencia tienen éxito y el cambio del primero desaparece sin ningún error en ninguna parte.
+Sin esto, la secuencia lectura-modificación-escritura funciona como "el último gana" sobre todo lo que la segunda
+escritura no haya enviado: dos editores con un segundo de diferencia tienen éxito ambos y el cambio del primero
+desaparece sin ningún error en ningún sitio.
 
-La etiqueta se deriva de una propiedad `date` con `autoValue: "on_update"` cuando la colección declara una — esa columna ya *es* una versión — y de un hash estable de la fila en caso contrario. `If-Match: *` solo afirma que la fila existe. No se escribe nada si la precondición falla.
+La etiqueta se obtiene de una columna de marca de tiempo con `.onUpdateNow()` cuando la
+tabla la declara —esa columna ya *es* una versión— y de un hash estable
+de la fila en caso contrario. `If-Match: *` solo asegura que la fila exista.
+No se escribe nada cuando la condición previa falla.
 
-El formulario de registro del panel de administración guarda con `If-Match`: un guardado hecho sobre una versión
-que alguien ha reemplazado entretanto se rechaza, el formulario lo indica y la edición se queda
-en el formulario, reajustada sobre la nueva versión con los campos en conflicto marcados.
+El formulario de registros del panel de administración guarda con `If-Match`: si se intenta guardar sobre una versión
+que alguien ha reemplazado entretanto, se rechaza, el formulario lo indica y la edición permanece en
+el formulario, rebasada sobre la nueva versión con los campos en conflicto señalados.
 
-La etiqueta se compara dentro de la propia transacción de la escritura, una vez bloqueada la fila. Dos escrituras con la misma etiqueta no pueden pasar ambas: la segunda espera a que la primera confirme, lee lo que escribió y se rechaza con `412`.
+La etiqueta se compara dentro de la propia transacción de la escritura, una vez bloqueada la
+fila. Dos escrituras con la misma etiqueta no pueden prosperar al mismo tiempo: la segunda espera a que
+la primera haga commit, lee lo que escribió y se rechaza con `412`.
 
 ### Operaciones de campo
 
-El valor de una propiedad en el cuerpo de un `PATCH` puede ser una operación sobre el valor almacenado en lugar de un valor estático:
+El valor de una propiedad en el cuerpo de un `PATCH` puede ser una operación sobre el valor almacenado
+en lugar de un valor:
 
 ```bash
 curl -X PATCH /api/data/posts/p1 -d '{
@@ -87,23 +140,57 @@ curl -X PATCH /api/data/posts/p1 -d '{
 | Operador | Tipo de propiedad | Se convierte en |
 |----------|-------------------|-----------------|
 | `$inc` | `number` | `SET col = COALESCE(col, 0) + n` |
-| `$push` | `array` | `array_append(col, …)` o una concatenación jsonb |
-| `$pull` | `array` | `array_remove(col, …)` o una reagregación jsonb |
+| `$push` | `array` | `array_append(col, …)`, o una concatenación jsonb |
+| `$pull` | `array` | `array_remove(col, …)`, o una reagregación jsonb |
 | `$merge` | `map` | `col || '…'::jsonb` (una fusión **superficial**) |
 
-El beneficio principal es la lectura que el emisor ya no necesita hacer. Expresar `views + 1` como un valor implica leerlo primero, y dos peticiones que lean `4`, sumen uno y escriban `5` terminarán con `5` — sin que ninguna de las dos respuestas indique que se perdió un incremento. Al compilarse dentro de la sentencia, la aritmética se ejecuta dentro del bloqueo de la fila y no puede perderse.
+La clave está en la lectura que el emisor ya no necesita hacer. Expresar `views + 1` como un
+valor implica leerlo primero, y dos solicitudes que lean `4` cada una, sumen uno y
+escriban `5` terminarán en `5` — sin que ninguna respuesta indique que se perdió un
+incremento. Compilada en la propia sentencia, la operación aritmética ocurre dentro del bloqueo de la fila
+y no puede perderse.
 
-Exactamente un operador por campo. Un operador sobre un tipo de propiedad para el que no está definido, un `$operator` desconocido o un operando con un formato incorrecto resulta en un `400` (`INVALID_FIELD_OPERATION`) indicando el campo — un error tipográfico nunca se escribe en la columna como un documento JSON.
+Exactamente un operador por campo. Un operador sobre un tipo de propiedad para el que no está definido,
+un `$operator` desconocido o un operando con una estructura incorrecta resulta en un `400`
+(`INVALID_FIELD_OPERATION`) indicando el campo — un error tipográfico nunca se escribe en
+la columna como un documento JSON.
 
-Un `map` es la excepción, porque su valor *es* un documento JSON y puede traer claves `$` propias — el `$schema` y el `$id` de un JSON Schema, una exportación de MongoDB. En un `map`, solo un objeto con exactamente una clave que sea uno de los operadores anteriores es una operación; cualquier otro objeto se almacena tal como se envió, claves `$` incluidas. Así, `{ "meta": { "$merge": { … } } }` fusiona, y `{ "meta": { "$schema": "https://json-schema.org/draft/2020-12/schema" } }` se almacena. Por tanto, un operador mal escrito en un `map` también se almacena; en cualquier otro tipo se sigue rechazando. El cliente sin conexión no tiene esquema para distinguir un `map` de cualquier otra cosa, así que sin conexión rechaza ese valor como una operación de campo; envíalo cuando vuelva la conexión.
+Un `map` es la excepción, ya que su valor *es* un documento JSON y puede contener
+claves `$` propias —el `$schema` y `$id` de un JSON Schema, un documento exportado desde otra base de datos. En un
+`map`, solo un objeto con exactamente una clave que sea uno de los operadores anteriores se considera
+una operación; cualquier otro objeto se almacena tal como se envía, incluyendo las claves `$`. Por lo tanto,
+`{ "meta": { "$merge": { … } } }` realiza la fusión, y
+`{ "meta": { "$schema": "https://json-schema.org/draft/2020-12/schema" } }` se
+almacena. En consecuencia, un operador mal escrito en un `map` también se almacena; en cualquier otro
+tipo sigue siendo rechazado. El cliente sin conexión no tiene un esquema para distinguir un `map` de
+otra cosa, por lo que mientras esté sin conexión rechazará dicho valor como una operación de campo;
+envíelo una vez restablecida la conexión.
 
-Las operaciones se aplican únicamente a actualizaciones: en una fila que aún no existe no hay nada sobre lo que operar, por lo que se rechazan en `POST`, en creaciones `/bulk` y en upserts.
+Las operaciones se aplican únicamente a las actualizaciones: sobre una fila que
+aún no existe no hay nada sobre lo que operar, por lo que se rechazan en
+`POST`, en creaciones `/bulk` y en upserts.
 
-Una operación responde a la `validation` de la propiedad igual que un valor. Los elementos añadidos se juzgan con las reglas del elemento, las claves fusionadas con las propiedades del mapa y el valor que una operación *produce* con los límites declarados: `min`, `max`, `moreThan`, `lessThan`, `positive` y `negative` de un número, y el mínimo y máximo de elementos (`min`, `max`) de un array. Esta última comprobación es una condición del mismo `UPDATE`, no una lectura previa. Con `stock: { validation: { min: 0 } }`, `{ "stock": { "$inc": -1 } }` tiene éxito mientras el stock sea al menos 1 y se rechaza en 0 con el mismo `400` (`VALIDATION_CONSTRAINT`) que recibe `{ "stock": -1 }`, indicando el campo y el límite. Dos decrementos concurrentes de un stock de 1 no pueden tener éxito ambos, porque el segundo se evalúa contra la fila que confirmó el primero. Un número sin valor cuenta como `0` y un array sin valor como vacío. Una operación rechazada no escribe nada, ni siquiera los valores simples que la acompañan en el cuerpo. Como la comprobación forma parte de la sentencia, también se aplica a las escrituras en proceso a través de `rebase.data`, que omiten la validación a nivel de petición.
+Una operación responde a la `validation` de la propiedad al igual que lo hace un valor. Los elementos
+añadidos con push se evalúan según las reglas de los elementos, las claves fusionadas según las propiedades del mapa,
+y el valor que una operación *produce*, según los límites declarados: `min`,
+`max`, `moreThan`, `lessThan`, `positive` y `negative` de un número, `min` y
+`max` elementos de un array. Esta última comprobación es una condición en el mismo `UPDATE`, no una lectura
+previa. En `stock: { validation: { min: 0 } }`, `{ "stock": { "$inc": -1 } }`
+tiene éxito mientras el stock sea de al menos 1 y se rechaza en 0 con el `400`
+(`VALIDATION_CONSTRAINT`) que recibiría `{ "stock": -1 }`, indicando el campo y el
+límite. Dos decrementos concurrentes de un stock de 1 no pueden tener éxito a la vez, ya que
+el segundo se evalúa frente a la fila confirmada por el primero. Un número no definido cuenta
+como `0` y un array no definido como vacío. Una operación rechazada no escribe nada, ni siquiera
+los valores normales que la acompañan en el cuerpo. Dado que la comprobación forma parte de la
+sentencia, también se mantiene para las escrituras en proceso mediante `rebase.data`, las cuales omiten
+la validación a nivel de solicitud.
 
 ### Upsert sobre una clave natural
 
-`POST /api/data/:slug?on_conflict=sku` inserta la fila, o actualiza la que ya tiene ese SKU, en lugar de fallar por ella. La ruta bulk admite el mismo objetivo como `onConflict` junto a `upsert: true`, al igual que cada operación `upsert` de un lote.
+`POST /api/data/:slug?on_conflict=sku` inserta la fila, o actualiza la que
+ya contiene ese SKU, en lugar de fallar por el conflicto. La ruta bulk admite
+el mismo objetivo como `onConflict` junto a `upsert: true`, y lo mismo ocurre con cada operación
+`upsert` de un lote.
 
 ```bash
 curl -X POST '/api/data/products?on_conflict=sku' \
@@ -116,23 +203,55 @@ curl -X POST /api/data/products/bulk -d '{
 }'
 ```
 
-El objetivo debe contar con una garantía de unicidad con la que la base de datos pueda coincidir: la clave primaria (el valor por defecto si no se especifica ninguno), una propiedad con `validation: { unique: true }` o las columnas de un [índice](/docs/backend/indexes/) `unique: true`. Cualquier otra cosa produce un error `400` (`INVALID_CONFLICT_TARGET`) listando los objetivos que sí existen; de lo contrario, Postgres respondería *there is no unique or exclusion constraint matching the ON CONFLICT specification* desde el interior de una transacción que ya ha realizado operaciones.
+El objetivo debe contar con una garantía de unicidad que la base de datos pueda cotejar: la
+clave primaria (el valor por defecto cuando no se especifica ninguna), una columna declarada como
+`.unique()`, o las columnas de un [índice](/docs/backend/indexes/) con `unique: true`.
+Cualquier otra cosa resulta en un `400` (`INVALID_CONFLICT_TARGET`) que enumera los objetivos
+que sí existen — de lo contrario, Postgres respondería *there is no unique or exclusion constraint matching the ON CONFLICT specification* desde dentro de una transacción que ya ha realizado operaciones.
 
-Especificar un objetivo sin `upsert: true` en una escritura masiva también genera un `400`: ignorarlo silenciosamente transformaría una importación reejecutable en una que duplica registros.
+Especificar un objetivo sin `upsert: true` en una escritura bulk también es un `400`: ignorarlo
+silenciosamente convertiría una importación reejecutable en una que duplica datos.
 
-`?on_conflict=` se rechaza en una creación anidada (`INVALID_CONFLICT_TARGET`). La fila con la que coincidiera podría estar bajo otro padre, y el upsert la movería bajo este. Envíe el upsert a la ruta propia de la colección.
+`?on_conflict=` se rechaza en una creación anidada (`INVALID_CONFLICT_TARGET`). La
+fila con la que coincidió podría pertenecer a otro registro padre, y el upsert la movería
+bajo este. Envíe el upsert a la ruta propia de la tabla.
 
-Un upsert que encuentra una fila almacenada es una actualización de ella. El servidor lee la fila que nombra la clave, en el ámbito del emisor de la llamada y dentro de la transacción de la escritura, y ejecuta la actualización ordinaria: se escriben los campos del cuerpo, los que omite conservan sus valores almacenados en lugar de restablecerse a su `defaultValue`, `beforeSave` y `afterSave` ven `status: "existing"` con los valores anteriores, y el historial registra una actualización. Una fila que la lectura no pudo ver, o una insertada de forma concurrente, la sigue capturando `ON CONFLICT … DO UPDATE`, que establece solo lo que escribieron el cuerpo y los hooks, y las marcas `on_update`. Una clave que nombra una fila fuera del ámbito `beforeQuery` del emisor de la llamada responde `404`. Una clave que pertenece a una fila en la [papelera](/docs/collections/soft-delete/) responde `409 ROW_IN_TRASH` y no escribe nada: restaura la fila primero, o púrgala.
+Un upsert que coincide con una fila almacenada se convierte en una actualización de la misma. El servidor lee la fila
+que indica la clave, dentro del ámbito del emisor y dentro de la transacción de la escritura, y
+ejecuta la actualización ordinaria: se escriben los campos presentes en el cuerpo, los omitidos
+conservan sus valores almacenados en lugar de restablecerse a su `.default()`,
+`beforeSave` y `afterSave` reciben `status: "existing"` con los valores anteriores,
+y el historial registra una actualización. Una fila que la lectura no pudo ver, o una insertada
+de forma concurrente, sigue siendo capturada por `ON CONFLICT … DO UPDATE`, que establece únicamente lo que
+el cuerpo y los hooks escribieron, junto con las marcas de `.onUpdateNow()`. Una clave que apunte a una fila
+fuera del ámbito de `beforeQuery` del emisor responde con `404`. Una clave que pertenezca a una
+fila en la [papelera](/docs/collections/soft-delete/) responde con `409 ROW_IN_TRASH`
+y no escribe nada: restaure la fila primero o púrguela.
 
-Una fila que ya existía conserva su marca de tiempo `on_create` y su creador `user_on_create`. Un conflicto implica que la creación de la fila es un hecho del pasado, y una reimportación nocturna que restableciera `createdAt` en todo lo que modificara alteraría por completo cualquier consulta de «nuevos esta semana».
+Una fila que ya existía conserva su marca de tiempo `.onCreateNow()` y su
+creador `.onCreateUser()`. Un conflicto significa que la creación de la fila es un hecho del
+pasado, y una reimportación nocturna que restableciera `createdAt` en todo lo que toque
+arruinaría cualquier consulta de "nuevo esta semana".
 
-#### No en la colección de usuarios
+#### No en la tabla de autenticación
 
-La colección de usuarios (la que tiene `auth` activado) rechaza un upsert por cualquier vía — `?on_conflict=`, `/bulk` con `upsert: true`, una operación `upsert` de `_batch`, el `upsert()` del SDK y el socket en tiempo real — con un `400` (`INVALID_CONFLICT_TARGET`). Sus filas son los usuarios, y crear uno y modificarlo siguen reglas distintas: una creación cifra la contraseña con hash, normaliza el email, ejecuta `onCreateUser` y envía la invitación, y una actualización no puede degradar al último administrador. Un upsert solo sabe cuál de las dos es dentro de la escritura, demasiado tarde para aplicar ninguna. Cree los usuarios con un `POST` normal y modifíquelos con `PATCH`.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+La tabla de autenticación (la declarada con `defineAuthTable`) rechaza un upsert por cualquier
+vía — `?on_conflict=`, `/bulk` con `upsert: true`, una operación `upsert` en `_batch`,
+el `upsert()` del SDK y el socket en tiempo real — con un `400`
+(`INVALID_CONFLICT_TARGET`). Sus filas son los usuarios, y crear uno o
+modificarlo siguen reglas diferentes: una creación calcula el hash de la contraseña, normaliza
+el correo electrónico, ejecuta `onCreateUser` y envía la invitación, mientras que una actualización no puede
+degradar al último administrador. Un upsert solo descubre cuál de los dos casos es dentro de la
+escritura, demasiado tarde para aplicar cualquiera de ellos. Cree usuarios con un `POST` simple y modifíquelos
+con `PATCH`.
 
 ### `Prefer: return=minimal`
 
-Por defecto, cada escritura responde con la fila completa, que es la que contiene las decisiones tomadas por el servidor: un id serial, una marca `autoValue`, o lo que `beforeSave` haya reescrito. Envíe `Prefer: return=minimal` cuando no necesite nada de esto:
+Por defecto, cada escritura responde con la fila completa, que es lo que contiene las
+decisiones tomadas por el servidor: un id serial, una marca `.onCreateNow()`, lo que sea
+que `beforeSave` haya modificado. Envíe `Prefer: return=minimal` cuando no necesite nada de esto:
 
 ```bash
 curl -X POST /api/data/events \
@@ -141,23 +260,31 @@ curl -X POST /api/data/events \
 # → 204 No Content, Preference-Applied: return=minimal
 ```
 
-Una escritura individual responde con `204`. Una escritura `/bulk` o `/_batch` responde con `200` devolviendo los **ids** en lugar de las filas — en una creación, el id es lo único que el emisor no puede calcular, por lo que descartarlo requeriría volver a leer la tabla mediante alguna clave natural para conocer lo que se acaba de escribir. Una clave de una sola columna se devuelve como un escalar; una clave compuesta, como un objeto con sus columnas.
+Una escritura individual responde `204`. Una escritura `/bulk` o `/_batch` responde `200`
+devolviendo los **ids** en lugar de las filas completas — en una creación, el id es lo único
+que el emisor no puede calcular, por lo que descartarlo implicaría volver a leer la tabla mediante
+alguna clave natural para saber qué se acaba de escribir. Una clave de una sola columna se
+devuelve como un escalar; una clave compuesta como un objeto con sus columnas.
 
-## Lotes entre colecciones
+## Lotes entre tablas
 
-`POST /api/data/_batch` escribe a través de colecciones en una única transacción, bajo el propio rol del emisor, con la misma validación, callbacks y seguridad a nivel de fila que aplicaría la ruta de una sola fila de cada operación.
+<span class="since-badge" data-since="0.31">Desde 0.31</span> Cada operación indica su tabla mediante `table` (antes era `collection`).
+
+`POST /api/data/_batch` escribe en múltiples tablas en una sola transacción, bajo el
+propio rol del emisor, con las mismas validaciones, hooks y seguridad a nivel de fila
+que aplicaría la ruta individual de cada operación.
 
 ```json
 POST /api/data/_batch
 {
   "operations": [
-    { "op": "create", "collection": "orders",
+    { "op": "create", "table": "orders",
       "values": { "total": 40 }, "ref": "order" },
-    { "op": "create", "collection": "order_items",
+    { "op": "create", "table": "order_items",
       "values": { "order_id": { "$ref": "order.id" }, "sku": "A-1" } },
-    { "op": "update", "collection": "stock",
+    { "op": "update", "table": "stock",
       "id": "A-1", "values": { "count": { "$inc": -1 } } },
-    { "op": "delete", "collection": "carts", "id": "c-9" }
+    { "op": "delete", "table": "carts", "id": "c-9" }
   ]
 }
 ```
@@ -169,18 +296,40 @@ POST /api/data/_batch
 }
 ```
 
-`op` es `create`, `update`, `upsert` o `delete`. `update` y `delete` requieren un `id`; `create`, `update` y `upsert` requieren `values`; `upsert` puede especificar un objetivo `onConflict` bajo los mismos términos descritos anteriormente. `data` está alineado con `operations` — la fila escrita para create, update o upsert, y `null` para delete —, de modo que un índice en uno corresponde al mismo índice en el otro.
+`op` puede ser `create`, `update`, `upsert` o `delete`. `update` y `delete` necesitan un
+`id`; `create`, `update` y `upsert` necesitan `values`; `upsert` puede indicar un
+objetivo `onConflict` en los mismos términos expuestos anteriormente. `data` está alineado con
+`operations` — la fila escrita en caso de create, update o upsert, y `null` en caso de
+delete — por lo que un índice en uno corresponde al mismo índice en el otro.
 
-### `$ref`: apuntar a una fila creada por el mismo lote
+### `$ref`: apuntar a una fila creada en el mismo lote
 
-Una operación puede asignarse un identificador con `ref`, y cualquier operación posterior puede colocar `{ "$ref": "<name>.<field>" }` donde iría un valor — dentro de `values` a cualquier nivel de anidamiento, o como un `id`. Esto se resuelve al campo correspondiente de la fila que escribió la operación nombrada.
+Una operación puede nombrarse a sí misma con `ref`, y cualquier operación posterior puede colocar
+`{ "$ref": "<name>.<field>" }` donde iría un valor — en `values` a cualquier profundidad, o
+como un `id`. Se resuelve al campo correspondiente de la fila que escribió la operación indicada.
 
-Esta es la razón por la que existe este endpoint en lugar de ser un bucle: la clave foránea de un elemento secundario no se puede conocer hasta que el elemento principal haya sido insertado, por lo que sin esto, el elemento principal y los secundarios tendrían que ser peticiones independientes — precisamente la secuencia que puede completarse a medias. Solo se resuelven las referencias hacia **atrás**; una referencia hacia adelante se rechaza antes de que se inicie la transacción.
+Esta es la razón por la que existe este endpoint en lugar de ser un simple bucle: la clave foránea
+de un registro secundario no se puede conocer hasta que se haya insertado el registro padre, por lo que sin esto
+el padre y los hijos tendrían que ser solicitudes separadas — precisamente la
+secuencia que puede completarse a medias. Solo se resuelven referencias hacia **atrás**; una referencia
+hacia adelante se rechaza antes de abrir la transacción.
 
 ### Qué se comprueba antes de escribir nada
 
-La estructura, las colecciones desconocidas, los campos desconocidos, las restricciones de valores, las operaciones de campo, los objetivos de conflicto y la accesibilidad de `$ref` se determinan antes de que se inicie la transacción. Un lote es de tipo todo o nada, y encontrar un error tipográfico en la operación 40 costaría, de lo contrario, la reversión de las 39 escrituras anteriores.
+La estructura, las tablas desconocidas, los campos desconocidos, las restricciones de valores, las operaciones de campo,
+los objetivos de conflicto y la accesibilidad de `$ref` se resuelven antes de que se
+abra la transacción. Un lote es todo o nada, y encontrar un error tipográfico en la operación 40
+costaría de otro modo la reversión de las 39 escrituras anteriores.
 
-Está limitado al mismo número de operaciones que una escritura masiva (1000 por defecto), ya que un lote mantiene sus bloqueos durante toda la transacción. Los callbacks de cada operación se ejecutan dentro de ella, uno tras otro, así que un hook lento se paga una vez por fila con la transacción abierta: 100 filas cuyo `beforeSave` espera 50 ms retienen una conexión, y los bloqueos de cada fila escrita hasta el momento, durante 5,3 s. Lo mismo vale para una escritura `/bulk`. Consulta [Un callback retiene una conexión](/docs/collections/context-data-api/#a-callback-holds-a-connection). Un controlador que no pueda hacer que el lote sea atómico responderá con `BATCH_UNSUPPORTED` en lugar de recurrir a un bucle de escrituras individuales — lo que no proporcionaría ni la atomicidad ni el único viaje de ida y vuelta por los que se recurre a un lote.
+Está limitado al mismo número de operaciones que una escritura bulk (1000 por defecto), ya que
+un lote mantiene sus bloqueos durante toda la transacción. Los hooks de cada operación se
+ejecutan dentro de ella, uno tras otro, por lo que el coste de un hook lento se asume por cada fila con la
+transacción abierta: 100 filas cuyo `beforeSave` espere 50 ms retienen una conexión,
+y los bloqueos de cada fila escrita hasta el momento, durante 5,3 s. Lo mismo aplica a una
+escritura `/bulk`. Consulte [Un hook retiene una conexión](/docs/collections/context-data-api/#a-hook-holds-a-connection). Un controlador que no pueda hacer
+que el lote sea atómico responderá con `BATCH_UNSUPPORTED` en lugar de recurrir a un bucle
+de escrituras individuales — lo cual no ofrecería ni la atomicidad ni el viaje de ida y vuelta único por el que se utiliza un lote.
 
-Un `update` o `delete` que haga referencia a una fila inexistente hace fallar a todo el lote con un `404`, por la misma razón por la que se rechaza una escritura parcial en cualquier otro lugar: el estado aplicado a medias es un estado sin una buena recuperación.
+Un `update` o `delete` que indique una fila que no existe hace fallar todo el lote
+con un `404`, por la misma razón por la que se rechaza una escritura parcial en cualquier otro sitio:
+un estado aplicado a medias no tiene una buena recuperación.

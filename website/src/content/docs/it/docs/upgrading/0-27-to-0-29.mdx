@@ -1,0 +1,164 @@
+---
+sourceHash: ebc124bb86c45865
+slug: it/docs/upgrading/0-27-to-0-29
+title: Aggiornamento da 0.27 a 0.29
+sidebar_label: 0.27 → 0.29
+description: I breaking change introdotti dalla versione 0.29 per un'app su 0.27 o 0.28 — l'admin passa al codice le righe del server invece della sua Entity interna, i suoi hook Entity diventano interni e "quale record" diventa `id` ovunque.
+---
+
+# Aggiornamento da 0.27 → 0.29
+
+Queste sono le voci `### Breaking` introdotte dalla versione 0.29 per un'app su 0.27 o 0.28;
+la versione 0.28 non dichiarava alcun breaking change.
+
+Derivano tutte da una singola modifica: tutto ciò che il codice riceve dal pannello di
+amministrazione è ora la **riga del server** (server's row), la stessa struttura già restituita da REST, `client.data`,
+`context.data` del backend e `useRows`. Una riga corrisponde esattamente alle colonne
+del record: date ISO (`YYYY-MM-DD` per una colonna di sola data), un belongsTo sotto la
+sua colonna foreign-key (`customerId`) e qualsiasi relazione caricata dall'admin annidata
+sotto il proprio nome, così come restituita da `include` di REST. L'id del record viene fornito **accanto**
+alla riga, come stringa (`id`). Il codice che modifica un record (un `Field`,
+`FormContext.values`, `dynamicProps`, funzioni per i nomi di storage) riceve ancora i valori
+del form, tipizzati per un editor (`Date`, oggetti di relazione). L'oggetto `{ id, path, values }`
+`Entity` dell'admin diventa interno.
+
+Leggi prima la prima sezione: è l'unica di cui nessun compilatore ti avviserà. Le
+altre sono ridenominazioni che TypeScript indicherà chiaramente.
+
+---
+
+## 102. `context.data` e `browserCallbacks` del browser passano righe
+
+`context.data` nel codice del browser (un'azione di entità, uno slot, una vista personalizzata, un
+plugin) restituiva in precedenza i valori del view-model dell'admin: oggetti `Date` e
+oggetti di relazione, anche se era tipizzato come righe piatte. Ora restituisce le
+righe promesse dal suo tipo, e le sue operazioni di scrittura eseguono i `browserCallbacks`
+della collection e aggiornano ogni vista di tale collection.
+
+`admin.browserCallbacks` (`beforeSave`, `afterSave`, `afterSaveError`,
+`beforeDelete`, `afterDelete`, `afterRead`) ricevono righe su ogni percorso: il form
+del record, le modifiche inline nelle celle, `useRowWrites`, le cancellazioni e `afterRead`. Le modifiche
+apportate sul posto da un callback alla riga ricevuta vengono mantenute.
+
+Questo compila senza modifiche ma si comporta diversamente: `values.due.getTime()`
+genera un errore, poiché `due` è ora una stringa.
+
+**Cosa modificare:**
+
+```ts
+// before: a Date and a relation object
+beforeSave: ({ values }) => ({ ...values, overdue: values.due < new Date(), customer: values.customer?.id })
+
+// after: an ISO string and the foreign key
+beforeSave: ({ values }) => ({ ...values, overdue: new Date(String(values.due)) < new Date() })
+```
+
+Trova i punti da controllare:
+
+```bash
+grep -rnE "browserCallbacks|context\.data\." --include='*.ts' --include='*.tsx' config/ frontend/src/
+```
+
+Il parametro `callbacks.afterRead` di una proprietà è tipizzato con il `row` che riceve; prima era
+tipizzato con un `entity` che non gli veniva mai passato.
+
+## 103. Gli hook per i dati di `Entity` sono interni
+
+`useData`, `useFetch`, `useBatchedFetch`, `useRelationSelector`,
+`saveEntityWithCallbacks` e `deleteEntityWithCallbacks` escono dall'API pubblica,
+e `useCollection` viene rimosso.
+
+**Cosa modificare:** leggi e scrivi le righe con gli hook dedicati alle righe o con `context.data`:
+
+```tsx
+// before
+const { data } = useCollection({ path: "orders", collection: ordersCollection, itemCount: 20 });
+data.map(entity => entity.values.number);
+
+// after
+const { rows } = useRows("orders", { limit: 20 });
+rows.map(row => row.number);
+```
+
+`usePermissions().canEdit` e `canDelete` accettano una riga. I builder di `collections` e
+`views` di `<RebaseCMS>`, così come il `data` di `useBuildNavigationStateController`,
+ricevono righe: `data: useData()` → `data: useRebaseContext().data`. Vedi
+[Hook](/docs/hooks/).
+
+## 104. I callback a livello di riga ricevono `{ row, id }` al posto di `{ entity }`
+
+Ogni callback a cui l'admin passa un record riceve ora la riga e, accanto ad essa,
+l'id del record:
+
+| Dove | Prima | Dopo |
+|---|---|---|
+| Azioni di entità `onClick`, `isEnabled`, `disabledReason` | `({ entity })` | `({ row, id, path })` |
+| `highlightEntity` / `unhighlightEntity` | `(entity)` | `highlightRow(id)` / `unhighlightRow(id)` |
+| Resolver di `admin.display` | `({ entity, context })` | `({ row, context })` |
+| `admin.additionalFields` `Builder` / `value` | `({ entity, context })` | `({ row, id, context })` |
+| `admin.exportable.additionalFields[].builder` | `({ entity, context })` | `({ row, context })` |
+| `<Rebase entityLinkBuilder>` | `({ entity })` | `({ row, id, path })` |
+| Viste entità, `formView.Builder` | `entity` | `row`, `id` |
+| Slot `entity.row.actions` | `{ entity, entityId }` | `{ row, id }` |
+| `FormContext`, `FieldProps.context` | `entity`, `entityId` | `row`, `id` |
+| `dynamicProps`, storage `fileName` / `storagePath` | `entityId` | `id` |
+
+**Cosa modificare:** `entity.values.status` → `row.status`, `entity.id` → `id`.
+Un record correlato caricato dall'admin è annidato: `row.customer.name`. `FormContext`
+è dichiarato una sola volta, in `@rebasepro/cms-types`. Il segnaposto del percorso di storage `{id}`
+si affianca a `{entityId}`, che continua a funzionare. Vedi
+[Azioni di entità](/docs/frontend/entity-actions/).
+
+## 105. "Quale record" è `id`, e il salvataggio è `onSaved`
+
+| Dove | Prima | Dopo |
+|---|---|---|
+| `EntityFormPanel` (ora `RecordForm`) | `entityId=` | `id=` |
+| `useSidePanel().open`, `.replace`, `navigateToEntity` | `{ path, entityId, onUpdate }` | `{ path, id, onSaved }` |
+| `onSaved` (form, pannello laterale) | `{ entity, entityId }` | `{ row, id }` |
+| `OnUpdateParams` | | `OnSavedParams` |
+| Override di `EntityForm`, `EntityFormBinding`, `Entity.Form` | `entityId`, `entity`, `onEntityChange(entity)` | `id`, `row`, `onRowChange({ row, id })` |
+| Slot `entity.field.*`, `form.*`; `defaultSelectedView` | `entityId` | `id` |
+
+L'URL del pannello laterale è invariato, quindi i link salvati continuano ad aprirsi. In JavaScript
+puro un vecchio nome viene ignorato anziché rifiutato: `open({ path, entityId })`
+apre un nuovo form vuoto. Effettua una ricerca:
+
+```bash
+grep -rnE "entityId|onUpdate" --include='*.ts' --include='*.tsx' --include='*.js' frontend/src/ config/
+```
+
+Ridenominati nello stesso contesto, entrambi ancora funzionanti con un avviso una tantum:
+`EntityFormPanel` diventa `RecordForm`, con le stesse proprietà, e un
+`CollectionPanel` definisce la propria collection con `collection` (`path="orders"` →
+`collection="orders"`; `path` indica dove risiedono le righe di una subcollection) e ordina
+con `orderBy` (`sort={["placed_at", "desc"]}` → `orderBy="placed_at:desc"`).
+
+## 106. Viste di collection, azioni di collection e la selezione gestiscono righe e id
+
+Le viste personalizzate delle collection (`admin.customViews`), le `Actions` delle collection e
+gli slot della barra degli strumenti ricevono un `TableController` di righe, e la selezione è composta da righe e
+id:
+
+| Prima | Dopo |
+|---|---|
+| `tableController.data`, `.sparseData` | `.rows` con `.ids`, `.sparseRows` con `.sparseIds` |
+| `.dataLoading`, `.dataLoadingError` | `.loading`, `.error` |
+| `onEntityClick(entity)` | `onRowClick(row, id)` |
+| `highlightedEntities`, `deletedEntities` | `highlightedIds`, `deletedIds` (stringhe) |
+| `selection.type === "entities"`, `.entities` | `"rows"`, `.rows` e `.ids` |
+| selezione query `excluded` | `excludedIds` |
+| `isEntitySelected(entity)` | `isSelected(id)` |
+| `toggleEntitySelection(entity)` | `toggleSelection(row)` |
+| `setSelectedEntities(entities)` | `setSelectedRows(rows)` |
+| `useSelectionController()` | `useSelectionController(collection, path?)` |
+| `const entities = await resolveSelection({ selection, accessor })` | `const { rows, ids } = await resolveSelection({ selection, data: context.data, collection })` |
+| `useSelectionDialog` `onSingleEntitySelected(entity)` | `onSingleRowSelected(row, id)` |
+
+Gli override di `CollectionPanel` e `Collection.View` accettano `onRowClick(row, id)` e
+`highlightedIds`. Una lista di righe ha i propri id affiancati nelle stesse posizioni —
+`tableController.ids[i]` è l'id di `tableController.rows[i]` — quindi il codice che
+leggeva `String(row.id)` funziona su una collection indicizzata da qualsiasi colonna. Gli id vengono confrontati
+come stringhe, pertanto `5` e `"5"` rappresentano lo stesso record.
+`resolveSelection` risolve sia una selezione con caselle spuntate sia una di tipo "seleziona tutti i corrispondenti"
+in righe della stessa forma. Vedi [Personalizzazione dell'admin](/docs/frontend/customizing/).

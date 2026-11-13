@@ -1,208 +1,125 @@
 ---
-sourceHash: e218de0d114db9f6
+sourceHash: e951bd1fd3fc48e0
 title: Validazione e condizioni
-sidebar_label: Validazione e condizioni
-description: "Valori enum, regole di validazione per proprietà e campi condizionali che rendono una proprietà obbligatoria, disabilitata o nascosta in base ai valori dell'entità stessa."
+sidebar_label: Validazione & condizioni
+description: "Come il modulo del CMS mostra le regole di una colonna — obbligatorio, lunghezza, pattern, limiti, univoco —, dove vengono verificate tali regole e i campi condizionali che diventano obbligatori, disabilitati o nascosti in base ai valori del record stesso."
 ---
 
-## Valori Enum
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-Utilizzato con proprietà di tipo stringa o numero per renderizzare menu a tendina (select):
+Le regole di una colonna vengono dichiarate una sola volta, sulla colonna, e vengono applicate dal server a ogni scrittura che raggiunge l'API. Il CMS legge le stesse regole dal descrittore della tabella e le verifica nel modulo prima del salvataggio, in modo che l'operatore veda l'errore direttamente sul campo anziché sotto forma di richiesta rifiutata.
 
-```typescript
-import type { StringProperty } from "@rebasepro/types";
+```ts
+// backend/schema/events.ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
-// Simple: each value mapped to its label
-const simple: StringProperty = {
-    type: "string",
-    name: "Status",
-    enum: { draft: "Draft", published: "Published", archived: "Archived" }
-};
-
-// As a list, which keeps the order you write
-const listed: StringProperty = {
-    type: "string",
-    name: "Status",
-    enum: [
-        { id: "draft", label: "Draft" },
-        { id: "published", label: "Published" },
-        { id: "archived", label: "Archived" }
-    ]
-};
-
-// With colors (for Kanban columns and chips)
-const colored: StringProperty = {
-    type: "string",
-    name: "Status",
-    enum: [
-        { id: "draft", label: "Draft", color: "grayDark" },
-        { id: "published", label: "Published", color: "greenDark" },
-        { id: "archived", label: "Archived", color: "orangeDark" }
-    ]
-};
-```
-
-Un semplice elenco di valori, `enum: ["draft", "published", "archived"]`, non fa parte
-del tipo. Una configurazione JavaScript che ne scrive uno funziona comunque: l'enum del database,
-i tipi generati e il menu a tendina dell'admin lo leggono come quei valori, ciascuno
-con sé stesso come etichetta.
-
-## Validazione
-
-Ogni regola risiede nel blocco `validation` della proprietà, e le regole accettate da una proprietà dipendono dal suo tipo: `min` conta i caratteri in una stringa, confronta grandezze in un numero e conta gli elementi in un array.
-
-```typescript
-properties: {
-    title: {
-        type: "string",
-        name: "Title",
-        validation: { required: true, min: 2, max: 200 }
+export const events = defineTable("events", {
+    columns: {
+        id:      col.uuid().primaryKey().defaultRandom(),
+        title:   col.text().notNull().validate({ min: 2, max: 200, requiredMessage: "Every event needs a title" }),
+        slug:    col.varchar({ length: 80 }).notNull().unique()
+                     .validate({ matches: "^[a-z0-9-]+$", matchesMessage: "Lowercase letters, digits and hyphens only" }),
+        isFree:  col.boolean().notNull().default(false),
+        price:   col.numeric({ precision: 10, scale: 2 }).validate({ min: 0 }),
+        seats:   col.integer().validate({ positive: true }),
     },
-    slug: {
-        type: "string",
-        name: "Slug",
-        validation: {
-            unique: true,
-            matches: /^[a-z0-9-]+$/,
-            matchesMessage: "Lowercase letters, digits and hyphens only",
-            trim: true,
-            lowercase: true
-        }
-    },
-    readingMinutes: {
-        type: "number",
-        name: "Reading time",
-        validation: { integer: true, moreThan: 0, max: 120 }
-    }
-}
+    rls: "admin-only",
+});
 ```
 
-### Dove viene eseguita la validazione
+:::note[Provieni dalle collezioni?]
+Non esiste più un blocco `validation` nel frontend. Le regole vengono definite sulla colonna con `.notNull()` e `.validate({ … })`, e il CMS le legge.
+:::
 
-Il server controlla `validation` al confine della richiesta — REST, il socket
-realtime e MCP — su ciò che il chiamante ha inviato, prima che venga eseguito
-`beforeSave`, e risponde a una scrittura che viola una regola con un 400 che
-nomina ogni campo non valido. Il codice server che scrive in-process è
-considerato attendibile e **non** viene controllato rispetto a queste regole:
-`rebase.data` e `rebase.dataAsAdmin` in una function o in un cron job,
-`context.data` in un callback, uno script di seed. Ciò che vale lì è ciò che il
-database applica — `required` (NOT NULL), `unique` (un indice univoco), il tipo
-di un enum e la larghezza di una colonna `varchar` o `char`. Qualsiasi altra
-cosa scritta dal tuo codice server va controllata nel codice che la scrive.
+## Cosa controlla il modulo
 
-Il pannello di amministrazione controlla le stesse regole prima di salvare, nel
-form del record e nell'editor in linea della tabella della collection. Una cella
-della tabella giudica un valore una volta che lo modifichi: un valore memorizzato
-che viola una regola aggiunta in seguito non mostra alcun errore nella tabella
-finché qualcuno non modifica quella cella.
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-### Tutti i tipi
+| Sulla colonna | Nel modulo |
+|---|---|
+| `.notNull()` | Obbligatorio, con `requiredMessage` come errore se specificato. Non obbligatorio dove nessuno digita il valore: una chiave generata, un timestamp, una colonna generata o `.readOnly()`. |
+| `.unique()` | Il valore viene verificato rispetto alla tabella prima di salvare una modifica, e un eventuale duplicato viene segnalato sul relativo campo. |
+| `varchar(n)`, `char(n)` | Al massimo `n` caratteri. |
+| text `min`, `max`, `length` | Conteggio dei caratteri, estremi inclusi. |
+| `matches`, `matchesMessage` | L'intero valore deve corrispondere al pattern; il messaggio costituisce l'errore. |
+| `email`, `url` | Il valore deve essere un'email, un URL. |
+| `trim`, `lowercase`, `uppercase` | Il valore viene normalizzato rimuovendo gli spazi vuoti (trim) o convertito in minuscolo/maiuscolo prima del salvataggio. |
+| number `min`, `max`, `moreThan`, `lessThan`, `positive`, `negative`, `integer` | Limiti e solo numeri interi. Le colonne di tipo integer e serial sono numeri interi indipendentemente da quanto specificato in `.validate()`. |
+| date `min`, `max` | La data minima e massima consentita. |
+| array `minItems`, `maxItems`, `uniqueItems` | Numero di elementi e nessun duplicato. |
 
-| Regola | Tipo | Descrizione |
-|------|------|-------------|
-| `required` | `boolean` | Il valore deve essere presente. Su una `string`, `""` conta come assente: l'API la rifiuta a ogni scrittura, una creazione o un aggiornamento, con la stessa violazione `required` (a meno che la collection abbia un `beforeSave`, che può compilarla) |
-| `requiredMessage` | `string` | Cosa viene detto quando non è presente: dal modulo di amministrazione, e come `message` della voce `required` del campo nel 400 dell'API. Il NOT NULL del database non porta alcun messaggio |
-| `unique` | `boolean` | Solo una riga nella tabella può contenere questo valore. Il modulo di amministrazione lo controlla anche quando salva un valore che la modifica ha cambiato, così un duplicato viene segnalato sul suo campo prima della scrittura |
-| `uniqueInArray` | `boolean` | Solo una voce *per array* può contenerlo. Si applica a un figlio diretto di una proprietà `array`, o a un figlio di primo livello di una `map` al suo interno. **Solo modulo di amministrazione — non applicato dall'API o dal database.** |
+Ogni regola è elencata, con il relativo significato esatto, in [Colonne](/docs/schema/columns/#validation).
 
-### Stringhe
+## Dove viene eseguita la validazione
 
-| Regola | Tipo | Descrizione |
-|------|------|-------------|
-| `min` / `max` | `number` | Numero minimo / massimo di caratteri, inclusi. Con `columnType: "varchar"` o `"char"`, `max` definisce anche la dimensione della colonna (`VARCHAR(max)`), quindi ridurlo su una tabella che contiene già righe più lunghe è una migrazione che il database rifiuterà, e l'editor di collection avvisa quando una modifica lo riduce. La colonna predefinita è `TEXT`, che `max` lascia senza limite — il vincolo resta allora solo il [controllo della richiesta](#dove-viene-eseguita-la-validazione) del server |
-| `length` | `number` | Esattamente questo numero di caratteri — un codice paese, un riferimento a lunghezza fissa |
-| `matches` | `string \| RegExp` | Un pattern che l'intero valore deve rispettare. Una stringa viene compilata per richiesta, quindi una che non si compila viene rifiutata all'avvio anziché trasformarsi silenziosamente in nessuna regola |
-| `matchesMessage` | `string` | Cosa mostra il modulo quando `matches` fallisce |
-| `trim` | `boolean` | Rimuove gli spazi vuoti iniziali e finali **prima** del salvataggio. Una trasformazione, non un controllo — modifica ciò che viene scritto, il che lo rende la soluzione per "lo stesso tag due volte, uno con uno spazio finale". **Solo modulo di amministrazione — non applicato dall'API o dal database.** |
-| `lowercase` / `uppercase` | `boolean` | Converte il valore in minuscolo/maiuscolo prima del salvataggio, come `trim`. **Solo modulo di amministrazione — non applicato dall'API o dal database.** |
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-I formati email e URL **non** sono regole di validazione. `email` e `url` sono flag sulla proprietà stessa, accanto a `type` — dichiarazioni sui dati a partire dalle quali viene generato il contratto OpenAPI, piuttosto che comportamenti del modulo:
+Il server controlla le regole di una colonna a livello di confine della richiesta (REST, socket in tempo reale e MCP) sui dati inviati dal chiamante, prima dell'esecuzione di `beforeSave`, e risponde a una scrittura che viola una regola con un errore 400 indicando ogni campo non valido. Il codice server che esegue scritture in-process è considerato attendibile e non viene verificato rispetto a queste regole; in quel caso si applicano solo i vincoli imposti dal database. Consulta [Colonne](/docs/schema/columns/#validation).
 
-```typescript
-properties: {
-    email: { type: "string", name: "Email", email: true },
-    website: { type: "string", name: "Website", url: true }
-}
-```
-
-Vedi [Proprietà stringa](/docs/collections/properties/#string-options).
-
-### Numeri
-
-| Regola | Tipo | Descrizione |
-|------|------|-------------|
-| `min` / `max` | `number` | Valore minimo / massimo accettato, **incluso** |
-| `moreThan` / `lessThan` | `number` | I corrispettivi esclusivi di `min` e `max` |
-| `positive` / `negative` | `boolean` | Rigorosamente superiore / inferiore a zero. `0` viene rifiutato da entrambi — usa `min: 0` per consentirlo |
-| `integer` | `boolean` | Nessuna parte frazionaria. Non modifica il tipo di colonna; lo fa `columnType` |
-
-### Date
-
-| Regola | Tipo | Descrizione |
-|------|------|-------------|
-| `min` / `max` | `Date` | Data minima / massima accettata, inclusa. Un istante fisso, non "oggi" |
-
-### Array
-
-| Regola | Tipo | Descrizione |
-|------|------|-------------|
-| `min` / `max` | `number` | Numero minimo / massimo di elementi, inclusi. Elementi, non caratteri |
+Il CMS verifica le stesse regole prima del salvataggio, sia nel modulo del record sia nell'editor inline della tabella. Una cella della tabella valuta un valore non appena viene modificata: un valore già memorizzato che viola una regola aggiunta successivamente non mostrerà alcun errore finché qualcuno non modificherà quella cella.
 
 ## Campi condizionali
 
-È possibile rendere i campi dinamici in modo che reagiscano ai valori dell'entità. Esistono due modi per farlo:
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-### 1. Condizioni JSON Logic (Dichiarative)
+Un campo può reagire ai valori del record stesso: diventare obbligatorio, disabilitato, in sola lettura o nascosto. Ci sono due modalità, entrambe in `customizeTable`:
 
-Puoi utilizzare la proprietà `conditions` per definire regole dichiarative in JSON Logic che possono essere serializzate e modificate visivamente nell'editor delle collezioni.
+```tsx
+// frontend/src/cms/events.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { events } from "../../../backend/schema/events";
 
-```typescript
-price: {
-    type: "number",
-    name: "Price",
-    conditions: {
-        disabled: { "==": [{ "var": "values.is_free" }, true] },
-        required: { "!=": [{ "var": "values.is_free" }, true] },
-        min: 0,
-        clearOnDisabled: true // Set to null if field gets disabled
-    }
-}
+export const eventsCms = customizeTable<typeof events>("events", {
+    fields: {
+        price: {
+            conditions: {
+                disabled: { "==": [{ "var": "values.isFree" }, true] },
+                required: { "!=": [{ "var": "values.isFree" }, true] },
+                min: 0,
+                disabledMessage: "Free events have no price",
+                clearOnDisabled: true,
+            },
+        },
+        seats: {
+            dynamicProps: ({ values, authController }) => ({
+                disabled: values.isFree === true || !authController.user?.roles?.includes("admin"),
+            }),
+        },
+    },
+});
 ```
 
-L'oggetto conditions ti dà accesso a:
-- `disabled`, `disabledMessage`, `clearOnDisabled`, `hidden`, `readOnly`
-- `required`, `requiredMessage`, `min`, `max`
-- `defaultValue`
-- `enumConditions`, `allowedEnumValues`, `excludedEnumValues`
-- `referencePath`, `referenceFilter`
-- `canAddElements`, `sortable` (per gli array)
-- `acceptedFiles`, `maxFileSize` (per i caricamenti)
+### `conditions`: JSON Logic
 
-`disabledMessage` è la frase che l'utente vede al posto del controllo. Senza di essa, un campo disattivato non spiega nulla, e questa è la differenza tra un modulo che guida l'utente e uno che lo blocca senza spiegazioni.
+`conditions` contiene regole [JSON Logic](https://jsonlogic.com/) applicate al record in fase di modifica (`values.<key>`). Essendo dati, l'editor dello schema può leggerle e modificarle. Una condizione può impostare:
 
-:::caution[Le condizioni sono un comportamento del modulo]
-**Solo modulo di amministrazione — non applicato dall'API o dal database.** Vengono eseguite nel browser, sull'entità in corso di modifica, e definiscono ciò che il pannello propone. Una regola che deve valere per ogni chiamante dell'API appartiene a `validation`, che il server controlla sulle scritture REST, socket e MCP (non sulle [scritture in-process](#dove-viene-eseguita-la-validazione) del tuo codice server), oppure a una [regola di sicurezza](/docs/collections/security-rules/), che il database impone a chiunque — pannello, SDK o `curl`.
+- `disabled`, `disabledMessage`, `clearOnDisabled`, `hidden`, `readOnly`;
+- `required`, `requiredMessage`, `min`, `max`;
+- `defaultValue`;
+- `enumConditions`, `allowedEnumValues`, `excludedEnumValues`;
+- `referencePath`, `referenceFilter`;
+- `canAddElements`, `sortable`, per gli array.
+
+`disabledMessage` è ciò che l'utente vede accanto al controllo disabilitato (in grigio). Senza di esso, un campo disabilitato non fornisce alcuna spiegazione.
+
+### `dynamicProps`: una funzione
+
+A `dynamicProps` viene passato il record mentre viene modificato (`values`, comprese le modifiche non salvate, e `previousValues` una volta salvato) insieme all'utente autenticato su `authController`, e restituisce le opzioni del campo applicabili in quel momento. Ciò che restituisce viene applicato sopra le altre opzioni del campo ogni volta che il modulo lo richiede, consentendogli di restituire qualsiasi opzione del campo: `disabled`, `hidden`, `readOnly`, `name`, `description`, `enumLabels`…
+
+:::caution[Le condizioni riguardano il comportamento del modulo]
+`conditions` e `dynamicProps` vengono eseguiti nel browser e modellano ciò che il CMS offre. L'API accetta scritture che le ignorano. Una regola che deve valere per qualsiasi chiamante appartiene alla colonna (`.notNull()`, `.validate()`) oppure alla [row-level security](/docs/collections/security-rules/) della tabella, che il database applica per chiunque.
 :::
 
-### 2. Property Builder (Programmatici)
+## Etichette per un set chiuso di valori
 
-Per comportamenti complessi che non possono essere espressi tramite JSON Logic, puoi utilizzare `dynamicProps`, che valuta una funzione Javascript.
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-```typescript
-price: {
-    type: "number",
-    name: "Price",
-    dynamicProps: ({ values, authController }) => ({
-        admin: { disabled: values.is_free === true || !authController.user?.roles?.includes("admin") },
-        validation: values.is_free ? {} : { required: true, min: 0 }
-    })
-}
-```
-
-Si applica la stessa avvertenza, e in modo ancora più netto: la funzione viene inclusa nel bundle del pannello ed eseguita a ogni render del modulo. **Solo modulo di amministrazione — non applicato dall'API o dal database.**
+I valori di un `col.enum([...])` o di un `.oneOf([...])` appartengono alla colonna. Le relative etichette, i colori e l'ordinamento appartengono invece al CMS, configurati tramite `enumLabels` ed `enumOrder`; vedi [set chiusi](/docs/collections/properties/#closed-sets-of-values).
 
 ## Passaggi successivi
 
-- [Proprietà](/docs/collections/properties/) — i tipi di proprietà a cui si applicano queste regole
-- [Definizione delle collezioni](/docs/collections/) — dove vengono dichiarate le proprietà
-- [Regole di sicurezza (RLS)](/docs/collections/security-rules/) — le regole imposte dal database, che la validazione non sostituisce
+<span class="since-badge" data-since="0.31">Da 0.31</span>
+
+- [Colonne](/docs/schema/columns/#validation): tutte le regole di validazione
+- [Campi](/docs/collections/properties/): i campi a cui si applicano queste regole
+- [Row-level security](/docs/collections/security-rules/): le regole applicate dal database, che la validazione non sostituisce

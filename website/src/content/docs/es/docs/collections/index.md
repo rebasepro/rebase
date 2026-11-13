@@ -1,461 +1,265 @@
 ---
-sourceHash: 92f11ec9a842b6d9
-title: Colecciones
-sidebar_label: Colecciones
-description: Las colecciones son el bloque de construcción fundamental de Rebase — cada colección se asigna a una tabla de base de datos y define su esquema, relaciones, seguridad y comportamiento de la interfaz de usuario.
+sourceHash: f7689301748e2ce5
+title: Tablas en el CMS
+sidebar_label: Tablas en el CMS
+description: "Cómo muestra el CMS cada tabla de Postgres sin configuración en el frontend: etiquetas, el widget que recibe cada tipo de columna, campos obligatorios y de solo lectura, relaciones, display slots y controles de Crear, Editar y Eliminar que respetan la seguridad a nivel de fila (RLS) de la tabla."
 ---
 
-## ¿Qué es una Colección?
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-Una **colección** es un objeto de TypeScript que describe una tabla de base de datos y cómo debe mostrarse en Rebase CMS. Define:
+Si usas el CMS, no necesitas describirle tus tablas. Cuando alguien inicia
+sesión, el panel solicita al backend las tablas que esa persona puede ver y
+muestra cada una como una **colección**: una página en la navegación con una
+vista de tabla, un formulario, filtros y las filas relacionadas del registro.
+Una tabla es el objeto del backend que declaras en [`backend/schema`](/docs/schema/);
+una colección es cómo la muestra el panel.
 
-- **Esquema** — Propiedades (columnas), sus tipos y reglas de validación
-- **Relaciones** — Claves foráneas, tablas de unión (junction tables) y rutas de unión (join paths)
-- **Seguridad** — Políticas de Row Level Security (seguridad a nivel de fila)
-- **Hooks del ciclo de vida** — Callbacks para operaciones de creación, actualización y eliminación
-- **Comportamiento del CMS** — Modos de vista, edición inline, vistas de entidad, acciones — todo bajo `admin`
-
-## Declarar una: `defineCollection`
-
-Envuelve el literal en `defineCollection`. En tiempo de ejecución es la función identidad —devuelve el objeto sin cambios—, por lo que no tiene costo. Lo que aporta es inferencia: un parámetro de tipo `const` captura las claves de tus `properties` como tipos literales, y los campos con forma de clave del bloque `admin` se verifican contra ellos. Un nombre que no sea una de tus propiedades es un **error de compilación**, no solo una sugerencia faltante.
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-
-const products = defineCollection({
-    name: "Products",
-    slug: "products",
-    table: "products",
-    properties: {
-        name: { name: "Name", type: "string" },
-        price: { name: "Price", type: "number" }
-    },
-    admin: {
-        display: { title: "name" },  // completion: "name" | "price"
-        sort: ["price", "asc"],      // completion on the first element
-        propertiesOrder: ["name", "price"]
-    }
-});
+```tsx
+// frontend/src/App.tsx: nothing about posts, users or tags here.
+<Rebase client={rebaseClient} authController={authController}>
+    <RebaseAuth/>
+    <RebaseCMS/>
+    <RebaseShell title="Acme"/>
+</Rebase>
 ```
 
-```typescript
-    admin: {
-        display: { title: "nmae" }
-        //                ~~~~~~ Type '"nmae"' is not assignable to type
-        //                       'PropertyPath<…>'. Did you mean '"name"'?
-    }
-```
+Todo lo que figura a continuación se deriva del descriptor de la tabla: sus
+columnas con sus tipos de Postgres, nulabilidad, valores predeterminados,
+reglas de validación y almacenamiento, sus relaciones y su configuración de
+seguridad a nivel de fila. Para cambiar algo de esto, añade un archivo
+[`customizeTable`](/docs/frontend/customize-table/); este indica únicamente lo
+que difiere.
 
-Los campos comprobados son `display`, `sort`, `propertiesOrder`, `listProperties`,
-`previewProperties`, `orderProperty` y los filtros `defaultFilter`, `fixedFilter`
-y `filterPresets`. Se aceptan tres formas además de una clave de propiedad simple:
-
-| Forma | Ejemplo | Notas |
-| --- | --- | --- |
-| Ruta con puntos hacia un `map` | `"profile.displayName"` | La **raíz** debe ser una propiedad real; la ruta debajo de ella no se comprueba. No aplica en `previewProperties` / `orderProperty`, que toman una clave de nivel superior. |
-| Columna de subcolección | `"subcollection:orders"` | Solo en `propertiesOrder` / `listProperties`. |
-| Una clave de `additionalFields` | `"score" as AdditionalFieldKey` | Solo en `propertiesOrder` / `listProperties`. Requiere el casteo (cast) — ver abajo. |
-
-`AdditionalFieldDelegate.key` es un `string` simple, por lo que el sistema de tipos no tiene forma de saber qué claves adicionales declara una colección. En lugar de reabrir estos campos a cualquier string, el casteo hace que la excepción sea explícita:
-
-```typescript
-import type { AdditionalFieldKey } from "@rebasepro/cms-types";
-
-propertiesOrder: ["title", "score" as AdditionalFieldKey]
-```
-
-Impórtalo desde `@rebasepro/cms-types` en un proyecto que tenga un panel de administración — esa es la copia que también verifica los tipos del bloque `admin`. Un proyecto BaaS headless, que no tiene bloque de administración, importa la misma función desde `@rebasepro/common`.
-
-Anotar el tipo directamente sigue funcionando y se sigue comprobando:
-
-```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
-
-const products: PostgresCollectionConfig = {
-    name: "Products",
-    slug: "products",
-    table: "products",
-    properties: {
-        name: { name: "Name", type: "string" }
-    }
-};
-```
-
-pero una anotación solo *valida la estructura* — no puede ver los nombres de tus propiedades, por lo que los campos clave de `admin` recurren a aceptar cualquier string. Prefiere `defineCollection` a menos que necesites nombrar el tipo.
-
-:::note
-`buildCollection` y `buildProperty` ya no existen. `buildCollection` es `defineCollection` sin la inferencia; `buildProperty` envolvía una propiedad en un tipo que ya tenía. Consulta el [registro de cambios](/docs/changelog) para ver la migración de una sola línea.
+:::note[¿Vienes de collections?]
+El panel solía leer `config/collections` a través de un plugin de Vite. Ahora lee
+las tablas que sirve el backend, y la presentación reside en
+`frontend/src/cms/*.tsx`.
 :::
 
-## Anatomía: el contrato y el panel
-
-Un archivo, dos audiencias. Todo lo que le importa a la *base de datos y a la API* se ubica en el nivel superior; todo lo que renderiza el *panel de administración* se ubica dentro de `admin`.
-
-```typescript
-const posts = {
-    // ── The backend reads these ──────────────────────────────
-    slug: "posts",
-    table: "posts",
-    properties: { /* … */ },
-    relations: [ /* … */ ],
-    securityRules: [ /* … */ ],
-    callbacks: { /* … */ },
-    history: true,
-
-    // ── The admin panel reads these ──────────────────────────
-    admin: {
-        icon: "FileText",
-        listProperties: ["title", "status"],
-        defaultViewMode: "table",
-        entityViews: ["preview"]
-    }
-};
-```
-
-La división no es cosmética. Es lo que permite a Rebase ser un backend por sí mismo:
-
-- Un proyecto **BaaS o headless** nunca escribe un bloque `admin`. Sus colecciones —o ninguna colección, ya que el modo BaaS inspecciona la base de datos— describen datos y autorización, nada más. `@rebasepro/types` no contiene código de interfaz de usuario, por lo que el árbol de dependencias de un proyecto headless se mantiene exclusivo del servidor.
-- El **backend nunca lee dentro del bloque**. Se descarta antes de que una colección se serialice al endpoint del contrato o en un bundle de compilación, y se excluye de la versión del esquema — por lo que cambiar un icono no reporta cada SDK generado como desactualizado.
-
-### El bloque `admin` solo existe si instalas los tipos de administración
-
-`@rebasepro/types` no declara ningún campo `admin` — ni en una colección, ni en una propiedad. En un proyecto BaaS, escribir uno es un **error de tipo**. `@rebasepro/cms-types` lo añade nuevamente mediante combinación de declaraciones (declaration merging), por lo que una línea por proyecto lo activa:
-
-```typescript no-verify
-// config/cms.d.ts
-/// <reference types="@rebasepro/cms-types" />
-```
-
-Después de eso, los tipos principales regulares contienen un bloque completamente tipado — un error tipográfico como `icoon` es un error, y obtienes autocompletado:
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-
-const posts = defineCollection({
-    slug: "posts",
-    name: "Posts",
-    table: "posts",
-    properties: {
-        title: { name: "Title", type: "string", admin: { multiline: true } }
-    },
-    admin: { icon: "FileText" }
-});
-```
-
-<!-- docs-verify: ignore -->
-Una aumentación (augmentation) se aplica a todo el *programa* de TypeScript, y `config/` y `frontend/` son programas separados — razón por la cual la referencia pertenece al paquete de configuración. No hay un tipo envoltorio `AdminCollectionConfig`: con el campo fusionado, `CollectionConfig` es el tipo de autoría.
-
-:::note[Por qué un proyecto BaaS no paga nada]
-Un tipo de propiedad en una instalación de BaaS no tiene `Field`, ni `columnWidth`, ni `hideFromCollection` — esos residen en `AdminPropertyOptions` en el paquete admin. La garantía está comprobada, no solo afirmada: `tests/e2e/baas-typecheck/src/admin_absent.ts` usa `@ts-expect-error` sobre `admin`, de modo que la compilación falla si el campo vuelve a ser modificable en core en algún momento.
-:::
-
-### Migrar desde una colección plana
-
-Antes de la versión 0.11, estos campos se encontraban en el nivel superior. Para moverlos:
-
-```bash
-node tooling/scripts/codemod/collections-admin-block.mjs config/collections
-```
-
-Informa sobre cualquier cosa que no pueda mover de forma segura — en particular, la presentación dentro de `relations[].overrides`, que requiere `overrides: { admin: { … } }` manualmente.
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-
-export const productsCollection = defineCollection({
-    slug: "products",              // URL path and API endpoint
-    name: "Products",              // Display name (plural)
-    singularName: "Product",       // Display name (singular)
-    table: "products",            // PostgreSQL table name
-
-    properties: {
-        name: {
-            type: "string",
-            name: "Product Name",
-            validation: { required: true }
-        },
-        price: {
-            type: "number",
-            name: "Price",
-            validation: { required: true, min: 0 }
-        },
-        category: {
-            type: "string",
-            name: "Category",
-            enum: [
-                { id: "electronics", label: "Electronics", color: "blue" },
-                { id: "clothing", label: "Clothing", color: "pink" },
-                { id: "books", label: "Books", color: "orange" }
-            ]
-        },
-        description: {
-            type: "string",
-            name: "Description",
-            admin: { multiline: true }
-        },
-        active: {
-            type: "boolean",
-            name: "Active",
-            defaultValue: true
-        },
-        createdAt: {
-            type: "date",
-            name: "Created At",
-            autoValue: "on_create",
-            admin: { readOnly: true }
-        }
-    },
-    admin: {
-        icon: "Package"               // Lucide icon name
-    }
-});
-
-```
-
-## Propiedades clave
-
-### Identificación
-
-| Propiedad | Tipo | Descripción |
-|----------|------|-------------|
-| `slug` | `string` | **Requerido.** Identificador seguro para URL. Se utiliza en la URL de la interfaz de administración y en la ruta de la API REST (`/api/data/{slug}`). |
-| `name` | `string` | **Requerido.** Nombre para mostrar (plural). Se muestra en la navegación y en los encabezados de página. |
-| `singularName` | `string` | Nombre para mostrar de una entidad individual. Se utiliza en "Nuevo producto", "Editar producto", etc. |
-| `description` | `string` | Una frase sobre el contenido de esta colección, mostrada sobre la lista. Markdown. |
-| `table` | `string` | Nombre de la tabla de PostgreSQL. Por defecto es `toSnakeCase(slug)` — configúralo solo para desacoplar la URL de la tabla, por ejemplo, una tabla existente `blog_posts` servida en `/posts`. |
-| `admin.icon` | `string` | Nombre de un icono de [Lucide](https://lucide.dev/icons), por ejemplo, `"FileText"`, `"ShoppingCart"`. Un elemento renderizado también funciona, pero el nombre sobrevive a la serialización, por lo que es lo que el editor de esquemas escribe de vuelta. |
-
-### Esquema
-
-| Propiedad | Tipo | Descripción |
-|----------|------|-------------|
-| `properties` | `Properties` | **Requerido.** Mapa de clave de propiedad → definición de propiedad. Cada clave se convierte en una columna de la base de datos. |
-| `relations` | `Relation[]` | Relaciones SQL — claves foráneas, tablas de unión. Consulta [Relaciones](/docs/collections/relations). |
-| `securityRules` | `SecurityRule[]` | Políticas de Row Level Security. Consulta [Reglas de seguridad](/docs/collections/security-rules). |
-| `indexes` | `CollectionIndex[]` | Índices de Postgres que necesita esta tabla. Consulta [Índices](/docs/backend/indexes). |
-| `search` | `SearchConfig` | Búsqueda de texto completo clasificada sobre los campos que especifiques, incluyendo contenido JSONB y arrays. Solo Postgres. Consulta [Búsqueda](/docs/backend/search). |
-| `auth` | `boolean \| AuthCollectionConfig` | Marca la colección como colección de autenticación (gestión de usuarios, restablecimiento de contraseña, etc.) |
-| `schema` | `string` | Esquema de Postgres en el que vive la tabla — `"public"`, `"rebase"`, `"auth"`. Por defecto es `"public"`. |
-| `disableDefaultPolicies` | `boolean` | Elimina las políticas base que inyecta el generador — un SELECT de administrador/servidor y, en una colección de autenticación, una autoelectura más un control de escritura exclusivo de administrador — y asume la responsabilidad total del RLS de esta colección. `false` por defecto. Consulta [Reglas de seguridad](/docs/collections/security-rules). |
-| `softDelete` | `boolean \| { field?: string }` | Convierte `delete` en una marca de tiempo y oculta las filas marcadas de todas las lecturas. `true` usa `deletedAt`; la forma de objeto renombra el campo. La colección debe declarar esa propiedad `date` por sí misma. Solo Postgres — consulta [Soft delete](/docs/collections/soft-delete) |
-| `strictWrites` | `boolean` | Rechaza una escritura que nombre un campo que esta colección no declara, con un 400. `true` por defecto. Establécelo en `false` solo cuando la columna exista genuinamente y no esté declarada — completada por un trigger o inspeccionada en lugar de escrita explícitamente. |
-
-### Configuración de la interfaz de usuario
-
-Todo lo siguiente va dentro de `admin`.
-
-| Propiedad | Tipo | Por defecto | Descripción |
-|----------|------|---------|-------------|
-| `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"list"` | Modo de vista por defecto |
-| `enabledViews` | `ViewMode[]` | Los cuatro integrados más cada vista personalizada declarada (kanban solo cuando existe una propiedad `enum`) | Qué modos de vista están disponibles |
-| `kanban` | `KanbanConfig` | — | Configuración de Kanban (propiedad de columna). Emparéjalo siempre con `orderProperty` — consulta [Modos de vista](/docs/frontend/view-modes) |
-| `orderProperty` | `string` | — | Clave de la propiedad de tipo **string** que contiene la clave de orden para arrastrar y soltar. Requerido para un tablero Kanban funcional |
-| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | Desde la vista: `"split"` para list, `"full_screen"` para table y cards, `"side_panel"` para kanban y vistas personalizadas | Cómo se abren las entidades para su edición |
-| `sideDialogWidth` | `number \| string` | — | Ancho del diálogo lateral |
-| `inlineEditing` | `boolean` | `true` | Habilita la edición inline en la vista de hoja de cálculo |
-| `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Densidad por defecto de las vistas de lista, tabla y tarjetas (la altura de fila de la tabla) |
-| `pagination` | `boolean \| number` | `true` (50) | Habilita la paginación y/o establece el tamaño de página. `false` carga cada fila; en desarrollo la consola advierte una vez cuando son más de 10.000 filas |
-| `listProperties` | `string[]` | — | Propiedades a mostrar en la vista de lista |
-| `propertiesOrder` | `string[]` | — | Orden de las columnas en la vista de tabla |
-| `selectionEnabled` | `boolean` | `true` | Habilita la selección de filas |
-| `hideFromNavigation` | `boolean` | `false` | Oculta de la navegación de la barra lateral |
-| `defaultSelectedView` | `string \| function` | — | Vista o subcolección por defecto a abrir |
-
-### Opciones de entidad
-
-Dentro de `admin`, excepto `history`, que es una característica de backend y permanece en el nivel superior.
-
-| Propiedad | Tipo | Por defecto | Descripción |
-|----------|------|---------|-------------|
-| `formAutoSave` | `boolean` | `false` | Guarda automáticamente dos segundos después de una edición, una vez que el formulario se valida. Un formulario Nuevo no se guarda hasta que se introduce algo. |
-| `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Copia de seguridad de los cambios no guardados |
-| `hideIdFromForm` | `boolean` | `false` | Oculta el ID de la entidad del formulario |
-| `hideIdFromCollection` | `boolean` | `false` | Oculta la columna ID de la tabla |
-| `includeJsonView` | `boolean` | `true` | Ofrece los valores sin procesar en el inspector de registros |
-| `history` | `boolean` | `false` | Rastrea cambios en el historial de entidades |
-| `alwaysApplyDefaultValues` | `boolean` | `false` | Cuando se abre un registro existente en el formulario, rellena el `defaultValue` declarado de cada propiedad en un valor que el registro deja vacío (`null` o ausente), de modo que la siguiente vez que se guarde se escriba |
-| `previewProperties` | `string[]` | — | Propiedades a mostrar en las previsualizaciones de referencias |
-| `display` | `EntityDisplay` | — | Qué llena cada rol de visualización — consulta [Visualización de entidad](#visualización-de-entidad-entity-display) |
-
-### Avanzado
-
-En el nivel superior, porque el backend los lee:
-
-| Propiedad | Tipo | Descripción |
-|----------|------|-------------|
-| `callbacks` | `CollectionCallbacks` | Hooks del ciclo de vida (`beforeSave`, `afterSave`, `beforeDelete`, etc.) |
-| `childCollections` | `() => CollectionConfig[]` | Las colecciones anidadas bajo una entidad de esta. Se completa durante la normalización a partir de lo que exprese el driver — un `subcollections` de Firestore, una relación `hasMany` de Postgres —, por lo que un driver personalizado es la única razón para configurarlo manualmente |
-| `dataSource` | `string` | Qué fuente de datos registrada respalda esta colección (por defecto: la que no tiene nombre) |
-| `engine` | `string` | El motor subyacente — `"postgres"`, `"firestore"`, `"mongodb"`. Se resuelve a partir de `dataSource`; configúralo solo para anularlo |
-| `databaseId` | `string` | Base de datos o esquema dentro del motor |
-| `metadata` | `Record<string, unknown>` | Cualquier cosa que tu propio código necesite vincular a una colección. Rebase no lo lee; sobrevive a la serialización sin cambios |
-| `ownerId` | `string` | **Solo para el formulario de administración — no exigido por la API ni por la base de datos.** El id de usuario con el que el editor de colecciones sella una colección que crea y que muestra junto a su nombre. Nada en la ruta de solicitud lo consulta |
-
-`subcollections` y `path` están únicamente en las configuraciones de **bases de datos documentales** — `FirebaseCollectionConfig` y, para `path`, `MongoDBCollectionConfig`:
-
-| Propiedad | Tipo | Descripción |
-|----------|------|-------------|
-| `subcollections` | `() => CollectionConfig[]` | **Solo Firestore.** Colecciones anidadas bajo cada documento. Una colección de Postgres expresa lo mismo con una [relación](/docs/collections/relations) `hasMany`, que es lo que llena `childCollections` |
-| `path` | `string` | **Solo Firestore y MongoDB.** La ruta o nombre de la colección en el motor, cuando difiere del slug |
-
-Y dentro de `admin`, porque solo el panel los dibuja:
-
-| Propiedad | Tipo | Descripción |
-|----------|------|-------------|
-| `admin.entityActions` | `EntityAction[]` | Acciones personalizadas en entidades (archivar, publicar, etc.) |
-| `admin.Actions` | `ComponentRef<CollectionActionsProps>[]` | Componentes de acciones personalizadas para la barra de herramientas |
-| `admin.entityViews` | `EntityCustomView[]` | Pestañas personalizadas en la vista detallada de la entidad |
-| `admin.additionalFields` | `AdditionalFieldDelegate[]` | Columnas computadas/virtuales |
-| `admin.exportable` | `boolean \| ExportConfig` | Habilita la exportación de datos |
-| `admin.components` | `CollectionComponentOverrideMap` | Anulaciones de componentes de interfaz de usuario con alcance de colección |
-
-Escribir cualquiera de esos seis en el nivel superior es un error de tiempo de arranque, con un mensaje que indica la clave y hacia dónde se movió.
-
-## Visualización de entidad {#entity-display}
-
-Cada superficie que representa un registro dibuja algún subconjunto de seis roles: **title**, **subtitle**, **image**, **status**, **date** y **tags**. Una fila de lista es imagen + título + subtítulo + estado + fecha, una tarjeta es lo mismo con la imagen arriba, un selector de referencia es título + subtítulo y el encabezado de una página es el título solo.
-
-Cada rol se deriva de tus propiedades y cada uno se puede especificar alternativamente — como una ruta de propiedad o como una función:
-
-```typescript
-const exercises = defineCollection({
-    name: "Exercises",
-    slug: "exercises",
-    table: "exercises",
-    properties: {
-        name: { name: "Name", type: "string" },
-        cover: { name: "Cover", type: "string", storage: { storagePath: "covers/" } },
-        city: { name: "City", type: "string" }
-    },
-    admin: {
-        display: {
-            title: "name",                                  // a property path
-            image: "cover",
-            subtitle: ({ row }) => `in ${String(row.city)}`        // computed
-        }
-    }
-});
-```
-
-Cualquier cosa que omitas conserva su valor derivado, por lo que especificar un rol no significa especificar los seis.
-
-A un resolver se le pasa `{ row, id, context }`. `row` es el registro tal como lo envía el servidor, la forma que devuelven `useRows` y `context.data`: fechas como strings ISO, un belongsTo como su columna de clave foránea (`authorId`), e `id` solo cuando la tabla tiene esa columna. `id` es el id del registro junto a él: su clave primaria como string, con las partes de una clave compuesta unidas por `:::`. Una relación que el panel de administración cargó llega anidada bajo su nombre, tal como la devuelve el `include` de REST — `row.author` es la fila del autor, sus propias columnas y nada más, al lado de `authorId` — de modo que un resolver lee el campo de un registro relacionado sin realizar una petición propia:
-
-```typescript
-admin: {
-    display: {
-        // Undefined where the row holds only the author's id.
-        subtitle: ({ row }) => typeof row.author === "object" && row.author !== null && "name" in row.author
-            ? String(row.author.name)
-            : undefined
-    }
-}
-```
-
-### Roles computados y asíncronos
-
-Un resolver puede ser `async`, lo que permite que un rol lea algo que el registro no contiene — un documento en una subcolección, un valor detrás de una API:
-
-```typescript
-admin: {
-    display: {
-        // The exercise's name lives one document down, per locale.
-        title: async ({ id, context }) => {
-            const locale = await context.data.exercise_locales.findById(`${id}/de-DE`);
-            return locale?.exercise_title;
-        }
-    }
-}
-```
-
-Mientras la promesa está en curso, la superficie muestra el valor derivado y lo sustituye por el resuelto cuando llega — un título nunca es un spinner de carga. Los resultados se almacenan en caché por registro y por rol, y las consultas simultáneas para el mismo par comparten una sola llamada, por lo que una lista de cincuenta filas resuelve cada fila una vez en lugar de una vez por renderizado.
-
-Devuelve `undefined` cuando un registro no tenga nada para el rol; el propio mecanismo de respaldo (fallback) de la superficie está mejor informado sobre lo que corresponde colocar en su lugar (un encabezado usa el nombre singular de la colección, un enlace usa el id). Si un resolver lanza un error (throws), se trata como `undefined` y se registra en el log una vez — un título que no se puede obtener no debe derribar la fila que lo muestra.
-
-Prefiere una ruta siempre que el valor esté en el registro: una ruta conserva la propia representación de la propiedad, de modo que el estado de un enum sigue siendo una etiqueta de color y una fecha sigue formateada, algo que un resolver que devuelve un string simple no puede expresar.
-
-:::note[`titleProperty` reemplazado]
-`admin.titleProperty` se eliminó a favor de `admin.display.title`. El mismo string funciona allí, y el nuevo campo también admite un resolver. Una colección que todavía conserve la clave antigua será rechazada por `defineCollection` con el habitual error de clave desconocida.
-:::
-
-### Selección de la propiedad de título
-Cuando `display.title` no está establecido, la propiedad utilizada como título para mostrar de la entidad (previsualizaciones, encabezados) se resuelve automáticamente:
-1. Si `propertiesOrder` está definido explícitamente, se elige la primera propiedad en ese orden que pueda ser un título: un `string`, una `relation` de cardinalidad única o una `reference`. Los identificadores (claves primarias y foráneas, columnas `uuid`, `isId`), los campos de carga de archivos y las propiedades ocultas nunca califican.
-2. Si no se define `propertiesOrder`, se clasifican los mismos candidatos: primero un string cuya clave nombre una etiqueta (`name`, `title`, `label`, …), luego texto corto simple, un email, un enum, texto largo, una relación o selector de usuario, y una referencia al final. Los empates se resuelven por orden de declaración.
-
-### Previsualizaciones de relaciones en tablas
-Cuando `propertiesOrder` se establece explícitamente, las propiedades de relación **no** se filtran automáticamente de las columnas de previsualización por defecto (mientras que sí se excluyen de los valores por defecto no ordenados para evitar operaciones de unión lentas).
-
-### Cómo se renderiza el valor de un título
-Independientemente de lo que contenga la propiedad de título, el panel renderiza un string. Una fecha se formatea, un array se une y una relación —que llega como `{ id, data: { values } }` en lugar de como texto— se examina buscando el primero de `name`, `title`, `label` o `displayName` en la fila relacionada, luego su primer valor de string corto, recurriendo a su id como alternativa. Por lo tanto, un título puede nombrar una propiedad de `relation` y seguir leyéndose como un nombre en lugar de un uuid.
-
-Este no es un helper exportado: es lo que ya hace cada superficie que dibuja un registro. No hay nada que llamar ni nada que importar.
-
-## Constructor de colecciones (Collection Builder)
-
-Para colecciones dinámicas que cambian según el usuario o datos externos, usa una función constructora (builder):
-
-```typescript
-const collectionsBuilder: CollectionConfigsBuilder = ({ user, authController }) => {
-    const collections = [productsCollection];
-
-    // `extra` is whatever your auth provider put there, so name its shape here.
-    const extra = authController.extra as { role?: string };
-    if (extra.role === "admin") {
-        collections.push(adminSettingsCollection);
-    }
-
-    return collections;
-};
-```
-
-El constructor también recibe `data`, que lee las filas tal como las envía el servidor, igual que `context.data`: `await data.collection("tenants").find()` se resuelve a `{ data: rows, meta }`.
-
-## Filtrado y ordenación
-
-Puedes configurar filtros por defecto o forzados. Los tres son de presentación —con lo que se abre el panel—, por lo que residen en `admin`:
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-
-const invoices = defineCollection({
-    slug: "invoices",
-    name: "Invoices",
-    table: "invoices",
-    properties: {
-        active: { name: "Active", type: "boolean" },
-        tenantId: { name: "Tenant", type: "string" },
-        createdAt: { name: "Created", type: "date" }
-    },
-    admin: {
-        // Default filter — users can change it
-        defaultFilter: { active: ["==", true] },
-
-        // Fixed filter — cannot be changed; filters the user applies
-        // on other fields combine with it
-        fixedFilter: { tenantId: ["==", currentTenantId] },
-
-        // Default sort
-        sort: ["createdAt", "desc"]
-    }
-});
-```
-
-El usuario aún puede filtrar una colección que tenga un `fixedFilter`: lo que aplique en otros campos se combina con él (AND), y los campos fijos permanecen bloqueados.
-
-Un `fixedFilter` restringe lo que el panel *solicita*; no es un límite de seguridad. Lo que un emisor tiene permitido leer es una [regla de seguridad](/docs/collections/security-rules), que la base de datos aplica para cada emisor, sea el panel o no.
-
-## Gran cantidad de colecciones
-
-Nada en Rebase limita la cantidad de colecciones, pero dos costos aumentan con ella:
-
-- **La primera descarga del admin.** El panel necesita su navegación en el momento en que alguien inicia sesión, por lo que la configuración de cada colección se incluye en lo que el navegador descarga para la pantalla de inicio de sesión — aproximadamente 2.4 KB minificados cada una, por lo que 200 colecciones añaden alrededor de 480 KB, cerca de 80 KB comprimidos con gzip. Lo que abrir una colección necesita (la tabla, las vistas de registros, el formulario) se carga únicamente en ese momento.
-- **`rebase db push`.** Atlas planifica un push calculando las diferencias de todo el esquema, y eso crece más rápido que el recuento de tablas: con 400 o más tablas, un push tarda decenas de segundos — consulta [cuánto tarda un push](/docs/cli/schema#rebase-db-push).
+## De dónde provienen las tablas
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+`<RebaseCMS>` llama a `client.schema.tables()`, que lee
+`GET /api/schema/tables`. La respuesta es la lista de descriptores de tablas,
+redactada para quien realiza la llamada: una tabla que no puede leer no
+aparece, al igual que una columna que sus roles no pueden leer (consulta
+[Field access](/docs/collections/field-access/)). El código del hook nunca sale
+del servidor; el descriptor solo indica qué hooks existen.
+
+- El panel consulta una vez que alguien inicia sesión, y vuelve a consultar
+  cuando el usuario que inició sesión o sus roles cambian. A un visitante que no
+  ha iniciado sesión no se le envía ninguna tabla.
+- El servidor etiqueta la respuesta con un `ETag`. El cliente conserva la última
+  respuesta y devuelve la etiqueta, por lo que un esquema sin cambios solo cuesta
+  un `304`.
+- Recargar la navegación vuelve a consultar. El editor de esquemas hace esto
+  después de modificar una tabla.
+
+Los mismos descriptores impulsan Studio y las aplicaciones MCP, de modo que los
+tres coinciden en lo que es una tabla.
+
+## Etiquetas
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Cada etiqueta se deriva de un identificador, por lo que una tabla se lee igual
+para cualquier usuario y en cada carga:
+
+| Identificador | Etiqueta |
+|---|---|
+| columna `first_name`, `firstName` o `FirstName` | First Name |
+| columna `author_id`, `photoUrl`, `apiKey` | Author ID, Photo URL, API Key |
+| columna `__order` | Order |
+| tabla `order_items` | Order Items, un registro: Order Item |
+| tabla `addresses`, `status_updates` | Addresses / Address, Status Updates / Status Update |
+| valor de enum `needs_review` | Needs Review |
+
+Las etiquetas de la tabla provienen del nombre bajo el cual fue definida, no de
+su slug o nombre SQL. `ID`, `IDs`, `URL`, `URLs`, `UUID`, `API` e `IP`
+conservan sus mayúsculas. El singular solo cambia la última palabra y no
+modifica las palabras que simplemente terminan en `s` (`Status`, `Analysis`,
+`Address`).
+
+## El campo que recibe cada columna
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+| Columna | Campo en el formulario | Notas |
+|---|---|---|
+| `col.text()`, `col.varchar({ length })`, `col.char({ length })`, `col.uuid()` | input de texto | `varchar` y `char` limitan la longitud |
+| una columna de texto con `.validate({ email: true })` | input de email | validado como email |
+| una columna de texto con `.validate({ url: true })` | input de URL, con vista previa del enlace | validado como URL |
+| una columna de texto con `{ enum: [...] }`, una columna numérica con `.oneOf([...])` | select | una opción por valor |
+| una columna de texto o uuid con `.userId()` | selector de usuario | el valor es el id del usuario |
+| `col.enum([...])`, una columna `pgEnum` | select, representado como un chip de color | un color por valor, determinado por el propio valor |
+| `col.smallint()` … `col.bigserial({ mode: "number" })` | input numérico | solo números enteros |
+| `col.real()`, `col.doublePrecision()`, `col.numeric({ precision, scale })` | input numérico | |
+| `col.boolean()` | switch | |
+| `col.timestamp({ withTimezone: true })` | selector de fecha y hora | |
+| `col.date()` | selector de fecha | |
+| `col.time()` | hora del día | |
+| `col.storage(…)` | campo de subida con vista previa | `.multiple()` es un campo de múltiples archivos |
+| `<item>.array()` | lista repetible del campo del elemento | un array de texto con `{ enum: [...] }` es una selección múltiple |
+| `col.jsonb().$type<T>()`, `col.json().$type<T>()` | editor de clave/valor | el tipo `T` se borra en tiempo de ejecución |
+| `col.jsonb(json.object({…}))` | un grupo de campos tipados | listas, bloques tipados y archivos en su interior, según la estructura |
+| `col.geopoint()` | latitud y longitud | |
+| `col.vector({ dimensions })` | input de vector | |
+| `col.bytea()` | campo binario | base64 en la transmisión |
+
+Un valor de enum conserva su color dondequiera que aparezca: en el select, en el
+chip de la tabla y como columna de kanban. El color depende únicamente del
+valor, por lo que añadir un valor nunca cambia el color de los demás.
+`customizeTable` puede definir las etiquetas y los colores deseados con
+`enumLabels`; un valor que no nombres conservará el derivado automáticamente.
+
+Una columna `jsonb` declarada con una [estructura `json.*`](/docs/schema/json/)
+obtiene un formulario real: un objeto es un grupo de campos, un array repite su
+elemento, un array de `json.oneOf` es un editor de bloques y `json.storage()` es
+un campo de subida dentro de él. Sin una estructura, el panel no puede
+interpretar el documento y ofrece edición libre de clave/valor.
+
+Cada tipo de columna, su widget y las opciones para modificarlo se encuentran
+en [Campos](/docs/collections/properties/).
+
+## Campos obligatorios, valores predeterminados y de solo lectura
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+| La columna | En el formulario |
+|---|---|
+| `.notNull()` | obligatorio, con el `requiredMessage` de `.validate()` si lo tiene |
+| `.default(literal)` | un nuevo registro se abre con ese valor; sigue siendo obligatorio al editar |
+| `` .default(sql`…`) ``, `.defaultNow()`, `.dbDefault()` | se puede dejar vacío al crear, para que la base de datos lo complete |
+| `.unique()` | el formulario verifica que el valor no esté en uso antes de guardar |
+| una clave primaria generada (`.defaultRandom()`, `.generatedByDefaultAsIdentity()`, un serial) | no editable; una clave sin valor predeterminado se ingresa manualmente al crear |
+| `.onCreateNow()`, `.onUpdateNow()` | de solo lectura y excluida de las columnas de tabla por defecto |
+| `.onCreateUser()`, `.onUpdateUser()` | de solo lectura |
+| `.readOnly()`, `.generatedAlwaysAs(…)` | de solo lectura |
+| el campo `tenant` de la tabla | completado por el servidor al crear y excluido de las columnas de tabla por defecto; sigue siendo editable para un usuario que tenga permisos de escritura |
+| `.private()` | nunca se sirve, por lo que nunca se muestra |
+
+Las reglas de `.validate()` de una columna son verificadas por el formulario
+antes de guardar, tal como el servidor las verifica al recibirlas. Consulta
+[Validación y condiciones](/docs/collections/validation-and-conditions/).
+
+El id del registro y sus marcas de tiempo `.onCreateNow()` y `.onUpdateNow()` se
+muestran en el bloque de solo lectura al pie de la barra lateral del formulario.
+
+## Relaciones
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+- Un `belongsTo` es un selector de la fila relacionada, en lugar de su columna
+  de clave foránea: el formulario muestra **Author**, no **Author ID**. Es
+  obligatorio cuando la clave foránea es `NOT NULL` sin valor predeterminado. Una
+  clave foránea que forma parte de la clave primaria se mantiene como un campo
+  propio, junto al selector.
+- Un `hasOne` es un selector de la única fila relacionada.
+- Un `hasMany`, un `manyToMany` y un `via` de tipo to-many son **pestañas** del
+  registro que listan las filas relacionadas. El selector junto a la pestaña está
+  oculto.
+- Un `via` es de solo lectura a menos que sea escribible.
+- Una relación con una tabla que no se sirve a quien realiza la llamada se
+  omite: el panel no puede abrir una tabla que no tiene. En ese caso, un
+  `belongsTo` deja su clave foránea como un campo simple, para que el valor siga
+  siendo visible.
+
+Consulta [Relaciones en el panel](/docs/collections/relations-in-the-admin-panel/).
+
+## Display slots
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Cada superficie que dibuja un registro utiliza algunos de seis slots: title,
+subtitle, image, status, date y tags (consulta [display slots](/docs/frontend/view-modes/#display-slots)).
+Un slot se completa a partir de una columna solo cuando la columna claramente
+pertenece allí; la primera columna coincidente, en orden de declaración, tiene
+prioridad:
+
+| Slot | Columna |
+|---|---|
+| title | una columna de texto sin conjunto cerrado de valores y sin archivo, cuya clave sea `title`, `name`, `label`, `displayName`, `fullName`, `heading`, `subject` o `username` (se ignoran mayúsculas/minúsculas y separadores) |
+| image | una única columna `col.storage()` cuyo `accept` indique un tipo de imagen |
+| status | una columna llamada `status` con un conjunto cerrado de valores |
+| date | una columna de fecha o marca de tiempo que el servidor no genere automáticamente (`publishDate`); en su defecto, la marca de actualización y luego la marca de creación |
+
+Un slot que ninguna columna complete se deja a la propia interpretación del
+registro por parte del panel (para el título: el primer campo de texto corto).
+`display` en `customizeTable` define cualquier slot de forma explícita.
+
+## Quién ve qué controles
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+El panel oculta **Create**, **Edit** y **Delete** cuando el usuario que inició
+sesión no tiene permiso para realizarlos. Lo decide evaluando la seguridad a
+nivel de fila (RLS) de la tabla en el navegador, con el mismo modelo de políticas
+que se compila para Postgres:
+
+- las reglas que declaraste en `rls`, más las políticas que Rebase añade junto a
+  ellas: la línea base de admin (a menos que `defaultPolicies: false`), el
+  permiso de auto-lectura y escritura de admin de la tabla de usuarios, y la
+  regla de multi-inquilino (tenancy)
+  (consulta [políticas que recibe una tabla](/docs/collections/security-rules/#policies-a-table-gets-without-writing-them));
+- `rls: "admin-only"`: solo los administradores ven los controles;
+- una regla escrita en SQL puro no se puede evaluar en el navegador, al igual que
+  una cláusula que el servidor retuvo para quien realiza la llamada: el control
+  se muestra y la base de datos decide cuando llega la escritura;
+- una vista SQL es de solo lectura. Una vista simple se lista y las tablas que
+  lee deciden qué filas se devuelven; una vista materializada se lista para los
+  roles que especifica (`["admin"]` cuando no especifica ninguno).
+
+Esto solo decide qué se dibuja. Cada escritura es verificada nuevamente por
+Postgres, de modo que un control que no debió mostrarse provocará una
+escritura rechazada, nunca una escritura que no debió haber ocurrido.
+
+## Orden y valores predeterminados
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Las tablas aparecen en la navegación en el orden en que las sirve el backend, es
+decir, el orden en que se exportan desde `backend/schema/index.ts`. Cada una se
+abre en la vista de tabla. `customizeTable` configura `group`, `icon`,
+`defaultViewMode` y el resto; `<RebaseCMS navigationGroupMappings>` organiza los
+grupos entre las tablas.
+
+## Carga y errores
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+- **Mientras las tablas se cargan**, una ruta a una colección muestra el estado
+  de carga, no "colección no encontrada", y un enlace profundo (deep link) se
+  abre una vez que la colección existe.
+- **Si las tablas no se pueden cargar**, la página principal y la ruta de la
+  colección indican qué falló y ofrecen reintentar. Cuando el servidor ya no
+  acepta la sesión, el mensaje solicita iniciar sesión de nuevo.
+- **Un backend que no sirve tablas** (uno sin autenticación configurada o
+  anterior a la ruta) no es un error: el panel muestra las
+  [colecciones externas](/docs/frontend/firebase/) y nada más.
+
+Las personalizaciones que nombran una tabla que no se sirve a quien realiza la
+llamada se ignoran, mostrando una advertencia en desarrollo. Consulta
+[qué se rechaza y qué se omite](/docs/frontend/customize-table/#what-is-refused-and-what-is-skipped).
+
+## Muchas tablas
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Nada limita la cantidad de tablas. El panel necesita todas las colecciones para
+renderizar la navegación, por lo que los descriptores se obtienen tras iniciar
+sesión, y lo necesario para abrir una colección (la tabla, las vistas de
+registro, el formulario) se carga únicamente en ese momento. Un esquema grande
+ralentiza más a `rebase db push` que al panel: con 400 o más tablas, un push
+tarda decenas de segundos; consulta
+[cuánto tarda un push](/docs/cli/schema#rebase-db-push).
 
 ## Próximos pasos
 
-- **[Callbacks de entidad](/docs/collections/callbacks)** — Hooks del ciclo de vida para sincronizar datos entre colecciones, validación y efectos secundarios
-- **[Propiedades](/docs/collections/properties)** — Todos los tipos de propiedades y opciones
-- **[Relaciones](/docs/collections/relations)** — Claves foráneas, tablas de unión, joins
-- **[Reglas de seguridad](/docs/collections/security-rules)** — Row Level Security
-- **[Modos de vista](/docs/frontend/view-modes)** — Lista, Tabla, Tarjetas, Kanban
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+- [customizeTable](/docs/frontend/customize-table/): modifica cualquiera de los puntos anteriores, por tabla
+- [Fields](/docs/collections/properties/): widget y opciones para cada tipo de columna
+- [View modes](/docs/frontend/view-modes/): tabla, tarjetas, kanban, display slots y filtros
+- [Relations in the panel](/docs/collections/relations-in-the-admin-panel/): pestañas, selectores y pivots
+- [Firestore beside Postgres](/docs/frontend/firebase/): colecciones desde otra fuente de datos

@@ -1,43 +1,35 @@
 ---
-sourceHash: 360c03b720e8021d
+sourceHash: 92edb85e26e286c4
 title: Clés API
 sidebar_label: Clés API
-description: "Des clés de longue durée pour les scripts, la CI, les agents et les intégrations : clés de service et clés personnelles, les portées qu'elles détiennent, leur articulation avec la sécurité au niveau des lignes, et les routes qui les gèrent."
+description: "Clés à longue durée de vie pour les scripts, la CI, les agents et les intégrations : clés de service et clés personnelles, les scopes qu'elles détiennent, leur composition avec la sécurité au niveau des lignes (RLS), et les routes qui les gèrent."
 ---
 
 ## Clés API
 
-Une clé API est un identifiant bearer de longue durée, `rk_live_…`, pour un appelant qui
-n'est pas une personne dans un navigateur : un script, un job de CI, un agent, un client MCP, un autre
-service. Ce qu'une clé peut faire est une liste de [portées](/docs/backend/roles-and-scopes/),
-comme `data:read:orders` ou `cron:write`.
+Une clé API est un identifiant porteur (bearer credential) à longue durée de vie, `rk_live_…`, pour un appelant qui n'est pas une personne dans un navigateur : un script, un job CI, un agent, un client MCP, un autre service. Ce qu'une clé est autorisée à faire est défini par une liste de [scopes](/docs/backend/roles-and-scopes/), tels que `data:read:orders` ou `cron:write`.
 
 Il en existe deux types :
 
-- Une **clé de service** est l'identité machine propre au projet. Elle agit en tant que
-  `api-key:<id>`, pas en tant que personne. Quiconque détient `keys:write` les gère, sous
-  `/api/admin/api-keys`.
-- Une **clé personnelle** agit en tant que le compte qui l'a créée. Chaque compte gère les
-  siennes, sous `/api/auth/keys`, quand l'application les active.
+- Une **clé de service** est l'identité machine propre au projet. Elle agit en tant qu'`api-key:<id>`, et non en tant que personne. Toute personne détenant `keys:write` les gère, sous `/api/admin/api-keys`.
+- Une **clé personnelle** agit en tant que compte qui l'a créée. Chaque compte gère les siennes, sous `/api/auth/keys`, lorsque l'application les active.
 
-### Utiliser une clé
+### Utilisation d'une clé
 
-Envoyez-la comme jeton bearer, comme un jeton d'accès. `$API_URL` est l'adresse de votre
-backend : ce que `rebase dev` a affiché, ou l'URL de votre déploiement.
+Envoyez-la en tant que jeton porteur (bearer token), comme un jeton d'accès. `$API_URL` est l'adresse de votre backend : celle affichée par `rebase dev` ou l'URL de votre déploiement.
 
 ```bash
 curl "$API_URL/api/data/orders" \
   -H "Authorization: Bearer rk_live_abc123..."
 ```
 
-La même clé fonctionne sur l'API REST, le stockage, les fonctions personnalisées, les surfaces
-d'administration que ses portées atteignent, le WebSocket temps réel et le [point de terminaison `/mcp`](/docs/ai/remote-mcp/).
+La même clé fonctionne sur l'API REST, le stockage, les fonctions personnalisées, les surfaces d'administration couvertes par ses scopes, le WebSocket temps réel et le [point de terminaison `/mcp`](/docs/ai/remote-mcp/).
 
 ## Clés de service
 
 ### En créer une
 
-Une clé de service a besoin d'un nom et d'au moins une portée.
+Une clé de service nécessite un nom et au moins un scope.
 
 ```bash
 # CLI: talks to the backend with the service key from .env
@@ -64,56 +56,45 @@ const { key } = await client.apiKeys.createKey({
 console.log(key.key); // the only time the plaintext is returned
 ```
 
-La réponse inclut la clé complète en texte brut (`rk_live_...`) **exactement une fois**.
-Enregistrez-la immédiatement.
+La réponse inclut la clé complète en clair (`rk_live_...`) **exactement une seule fois**. Conservez-la immédiatement.
 
 | Champ | Type | Description |
 |---|---|---|
-| `name` | `string` | Un libellé pour les humains |
-| `scopes` | `string[]` | Ce que la clé peut faire. Au moins une portée |
-| `roles` | `string[]` | Rôles RLS sous lesquels la clé s'exécute, à côté de `service`. Facultatif |
+| `name` | `string` | Un libellé lisible par des humains |
+| `scopes` | `string[]` | Ce que la clé peut faire. Au moins un |
+| `roles` | `string[]` | Rôles RLS sous lesquels la clé s'exécute, en plus de `service`. Facultatif |
 | `rate_limit` | `number \| null` | Requêtes par fenêtre de 15 minutes. `null` ou absent utilise la valeur par défaut du serveur pour les clés API, 1000. Voir [Limite de débit](#limite-de-débit) |
 | `expires_at` | `string \| null` | Expiration ISO-8601. Absent signifie qu'elle n'expire jamais |
 
-### Portées et RLS : deux barrières indépendantes
+### Scopes et RLS : deux barrières indépendantes
 
-Une requête faite avec une clé passe deux vérifications, et les deux doivent l'autoriser :
+Une requête effectuée avec une clé passe par deux vérifications, et les deux doivent l'autoriser :
 
-1. **Les portées de la clé**, vérifiées par la route : `data:write:orders` permet à la clé
-   d'écrire dans `orders` et nulle part ailleurs.
-2. **La sécurité au niveau des lignes (RLS)**, vérifiée par la base de données. Une clé ne la
-   contourne jamais. Une clé de service s'exécute en tant que `uid: "api-key:<id>"` avec le rôle
-   `service`, plus les `roles` qu'on lui a donnés. Les règles de type propriétaire
-   (`owner_id = rebase.uid()`) ne lui correspondent jamais.
+1. **Les scopes de la clé**, vérifiés par la route : `data:write:orders` permet à la clé d'écrire dans `orders` et rien d'autre.
+2. **La sécurité au niveau des lignes (RLS)**, vérifiée par la base de données. Une clé ne la contourne jamais. Une clé de service s'exécute en tant que `uid: "api-key:<id>"` avec le rôle `service`, plus les `roles` qui lui ont été attribués. Les règles de type propriétaire (`owner_id = rebase.uid()`) ne lui correspondent jamais.
 
-Ainsi, une clé qui détient `data:read` peut quand même obtenir des résultats vides. C'est le RLS
-qui fonctionne, pas un bug. Accordez le rôle `service` dans les règles de sécurité de la
-collection, ou donnez à la clé le rôle `admin`.
+Ainsi, une clé détenant `data:read` peut tout de même obtenir des résultats vides. C'est la RLS à l'œuvre, pas un bug. Accordez le rôle `service` dans les règles de sécurité de la collection, ou attribuez à la clé le rôle `admin`.
 
-#### Une clé de service lit zéro ligne tant qu'une règle n'accorde pas `service`
+#### Une clé de service ne lit aucune ligne tant qu'une règle n'accorde pas `service`
 
-C'est l'étape qui donne l'impression qu'une clé aux portées correctes ne fonctionne pas. La
-politique RLS que Rebase ajoute par défaut à chaque collection compile vers :
+C'est cette étape qui donne l'impression qu'une clé correctement configurée est défaillante. La stratégie RLS que Rebase ajoute par défaut à chaque table compile en :
 
 ```sql
 (SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))
 ```
 
-C'est le contexte serveur, ou un administrateur. Une clé de service sans le rôle `admin` ne
-correspond à aucune des deux branches. Sur une collection sans `securityRules`, la requête réussit
-avec un résultat vide et aucune erreur qui explique pourquoi. Accordez le rôle explicitement :
+Il s'agit du contexte serveur ou d'un administrateur. Une clé de service sans rôle `admin` ne correspond à aucune des deux branches. Sur une table dont le `rls` est `"admin-only"`, la requête réussit avec un résultat vide et sans erreur explicative. Accordez le rôle explicitement dans le `rls` de la table :
 
 ```ts
-securityRules: [
+rls: [
     { operation: "select", roles: ["service"], using: "true" }
 ]
 ```
 
-Puisque `rebase.uid()` porte l'identifiant de la clé, une règle peut aussi restreindre les lignes
-à une seule clé :
+Puisque `rebase.uid()` contient l'identifiant de la clé, une règle peut également restreindre les lignes à une clé spécifique :
 
 ```ts
-securityRules: [
+rls: [
     {
         operation: "select",
         condition: policy.compare(policy.authUid(), "eq", policy.literal("api-key:<id>"))
@@ -123,75 +104,53 @@ securityRules: [
 
 #### Le rôle `admin`
 
-`roles: ["admin"]` (`--roles admin` dans le CLI) fait aussi s'exécuter la clé sous le rôle RLS
-`admin` : elle passe donc les politiques admin par défaut de chaque collection qui les conserve.
-Ces politiques couvrent `SELECT`, `INSERT`, `UPDATE` et `DELETE`, donc la sécurité au niveau des
-lignes ne limite ni les lectures, ni les écritures, ni les suppressions de la clé : elle peut lire,
-modifier et supprimer toutes les lignes que ses portées atteignent. Le rôle passe aussi les
-vérifications admin hors de la base de données : `requireAdmin` dans les
-[fonctions personnalisées](/docs/backend/custom-functions/), et les écritures que le stockage
-réserve aux administrateurs. Il n'accorde aucune portée : la clé n'atteint toujours que ce que
-listent ses `scopes`.
+`roles: ["admin"]` (`--roles admin` sur le CLI) permet à la clé de s'exécuter également avec le rôle RLS `admin`, validant ainsi les stratégies d'administration par défaut de chaque collection qui les conserve. Ces stratégies couvrent `SELECT`, `INSERT`, `UPDATE` et `DELETE`, de sorte que la sécurité au niveau des lignes ne limite pas les lectures, écritures ou suppressions de la clé : elle peut lire, modifier et supprimer chaque ligne que ses scopes atteignent. Le rôle valide également les contrôles administrateur en dehors de la base de données : `requireAdmin` dans les [fonctions personnalisées](/docs/backend/custom-functions/), et les écritures de stockage réservées aux administrateurs. Il n'accorde aucun scope : la clé n'accède toujours qu'à ce que ses `scopes` listent.
 
-Un créateur ne peut donner à une clé que des rôles qu'il détient lui-même, sauf s'il est
-administrateur.
+Un créateur ne peut attribuer à une clé que les rôles qu'il détient lui-même, sauf s'il est administrateur.
 
 ### Accès complet, pour la CI et les migrations
 
-`--full-access` donne à la clé toutes les portées que détient son créateur, moins `keys:read` et
-`keys:write`, qu'aucune clé ne peut détenir. Via le CLI, qui utilise la clé de service, cela fait
-toutes les portées du plan des données et du plan d'administration. Ajoutez `--roles admin` et la
-sécurité au niveau des lignes ne limite plus les lignes qu'elle lit, modifie ou supprime :
+`--full-access` donne à la clé chaque scope détenu par son créateur, à l'exception de `keys:read` et `keys:write`, qu'aucune clé ne peut détenir. Via le CLI, qui utilise la clé de service, cela correspond à chaque scope du plan de données et du plan d'administration. Ajoutez `--roles admin` et la sécurité au niveau des lignes ne limite plus les lignes qu'elle peut lire, modifier ou supprimer :
 
 ```bash
 rebase api-keys create -n "CI" --full-access --roles admin --expires-in 90
 ```
 
-C'est la bonne configuration pour la CI, les migrations et les outils internes de confiance. Ce
-n'est pas la bonne pour un agent.
+C'est la configuration adaptée pour la CI, les migrations et les outils internes de confiance. Ce n'est pas la configuration adaptée pour un agent.
 
 ### Limite de débit
 
-Le `rate_limit` d'une clé est le nombre de requêtes qu'elle peut faire dans une fenêtre de
-15 minutes, et chaque porte d'entrée est décomptée dans un seul compartiment, `api-key:<id>` :
+Le `rate_limit` d'une clé correspond au nombre de requêtes qu'elle peut effectuer dans une fenêtre de 15 minutes, et chaque accès est décompté dans un bucket unique, `api-key:<id>` :
 
 - ses requêtes HTTP vers les API de données, de stockage et de fonctions ;
-- ses trames de données sur le socket temps réel : lectures, comptages, enregistrements et suppressions,
-  ainsi que les abonnements et les demandes d'historique de canal au-delà de
-  l'[allocation](/docs/backend/realtime/#what-a-write-costs-and-the-limits) de chaque socket ;
+- ses trames de données sur le socket temps réel : lectures (fetches), comptages, enregistrements et suppressions, ainsi que les abonnements et les requêtes d'historique de canal au-delà du [quota](/docs/backend/realtime/#what-a-write-costs-and-the-limits) de chaque socket ;
 - ses requêtes vers [`/mcp`](/docs/ai/remote-mcp/).
 
-Sans `rate_limit`, le compartiment reçoit la valeur par défaut du serveur pour les clés API, 1000.
-Une clé personnelle n'a pas de `rate_limit` propre, et est décomptée dans son propre compartiment
-avec cette valeur par défaut. Au-delà de la limite, une requête HTTP répond `429` et une trame du
-socket `RATE_LIMITED`.
+Sans `rate_limit`, le bucket applique la valeur par défaut du serveur pour les clés API, soit 1000. Une clé personnelle n'a pas de `rate_limit` propre et est comptabilisée dans son propre bucket avec cette valeur par défaut. Au-delà de la limite, une requête HTTP renvoie `429` et une trame de socket `RATE_LIMITED`.
 
-Les routes d'administration sous `/api/admin`, et les messages d'administration du socket comme
-ceux de l'éditeur SQL, ne sont pas soumis à la limite de débit.
+Les routes d'administration sous `/api/admin` et les messages d'administration du socket, tels que ceux de l'éditeur SQL, ne sont pas soumis à une limite de débit.
 
-Un administrateur qui simule une clé (« Simulate access », `x-rebase-simulate-api-key-id`) dépense sa propre allocation, pas celle de la clé : l'intégration qui tourne avec cette clé garde tout son budget. Simuler ou usurper un utilisateur est facturé de la même manière à l'administrateur.
+Un administrateur simulant une clé (« Simuler l'accès », `x-rebase-simulate-api-key-id`) consomme son propre quota, et non celui de la clé : l'intégration s'exécutant sur cette clé conserve l'intégralité de son budget. La simulation ou l'usurpation d'un utilisateur est imputée à l'administrateur de la même manière.
 
 ## Clés personnelles
 
-Une clé personnelle agit **en tant que son propriétaire** : son uid, et ses rôles tels qu'ils sont à
-chaque requête. Les règles de type propriétaire lui correspondent, donc elle lit exactement ce que
-son propriétaire lirait, restreint par ses portées. Elle convient aux scripts d'une personne, à un
-CLI sur son ordinateur portable, ou à un outil qu'elle connecte à son propre compte.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-Elles sont désactivées par défaut, car chacune est un identifiant de longue durée pour un compte.
-Activez-les dans le bloc auth de la collection des utilisateurs :
+Une clé personnelle agit **en tant que son propriétaire** : son uid, et ses rôles tels qu'ils sont lors de chaque requête. Les règles de type propriétaire lui correspondent, elle lit donc exactement ce que son propriétaire lirait, restreint par ses scopes. Elle convient aux scripts personnels, à un CLI sur son ordinateur portable ou à un outil connecté à son propre compte.
+
+Elles sont désactivées par défaut, car chacune d'elles est un identifiant à longue durée de vie pour un compte. Activez-les dans le bloc `auth` de la [table des utilisateurs](/docs/schema/auth-table/) :
 
 ```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+// backend/schema/users.ts
+import { defineAuthTable, col } from "@rebasepro/server/schema";
 
-export const usersCollection = defineCollection({
-    slug: "users",
-    name: "Users",
-    table: "users",
-    auth: { enabled: true, personalKeys: true },
-    properties: {
-        email: { name: "Email", type: "string" }
-    }
+export const users = defineAuthTable("users", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        email: col.text().notNull().unique()
+    },
+    rls: "admin-only",
+    auth: { personalKeys: true }
 });
 ```
 
@@ -208,8 +167,7 @@ const { keys } = await client.personalKeys.listKeys();
 await client.personalKeys.revokeKey(keys[0].id);
 ```
 
-La même chose en REST. `$ACCESS_TOKEN` est le jeton d'accès propre au compte, obtenu à la
-connexion :
+La même chose via REST. `$ACCESS_TOKEN` est le jeton d'accès propre au compte, obtenu lors de la connexion :
 
 ```bash
 curl -X POST "$API_URL/api/auth/keys" \
@@ -218,105 +176,69 @@ curl -X POST "$API_URL/api/auth/keys" \
   -d '{ "name": "My laptop", "scopes": ["data:read"] }'
 ```
 
-Une clé personnelle accepte `name`, `scopes` et `expires_at`. Elle ne porte pas de `roles`, car
-elle s'exécute avec ceux de son propriétaire, ni de `rate_limit`. Envoyer l'un ou l'autre donne
-`400 INVALID_INPUT`.
+Une clé personnelle accepte `name`, `scopes` et `expires_at`. Elle ne comporte aucun `roles`, car elle s'exécute avec ceux de son propriétaire, et aucun `rate_limit`. Envoyer l'un ou l'autre renvoie une erreur `400 INVALID_INPUT`.
 
-Ce que détient une clé personnelle, ce sont ses portées, réduites à ce que son propriétaire
-détient **maintenant**. Retirez un rôle au propriétaire et chaque clé qu'il a créée se réduit avec
-lui. Supprimez le compte et ses clés cessent de fonctionner. Désactivez `personalKeys` et toutes
-les clés personnelles cessent aussi de fonctionner.
+Ce qu'une clé personnelle détient correspond à ses scopes, restreints à ce que son propriétaire détient **actuellement**. Retirez un rôle au propriétaire et chaque clé créée par celui-ci voit ses privilèges réduits d'autant. Supprimez le compte et ses clés cessent de fonctionner. Désactivez `personalKeys` et chaque clé personnelle cesse également de fonctionner.
 
-Seul un compte peut avoir des clés personnelles. Une clé API, la clé de service et une session
-invité sont refusées : `403 API_KEY_SELF_MANAGEMENT_FORBIDDEN` pour une clé,
-`403 PERSONAL_KEY_NEEDS_ACCOUNT` pour les deux autres. Quand la fonctionnalité est désactivée,
-chaque route répond `403 PERSONAL_KEYS_DISABLED`.
+Seul un compte peut posséder des clés personnelles. Une clé API, la clé de service et une session invité sont refusées : `403 API_KEY_SELF_MANAGEMENT_FORBIDDEN` pour une clé, `403 PERSONAL_KEY_NEEDS_ACCOUNT` pour les deux autres. Lorsque la fonctionnalité est désactivée, chaque route renvoie `403 PERSONAL_KEYS_DISABLED`.
 
-## Ce que chaque portée atteint
+## Ce que chaque scope couvre
 
 ### Données
 
-`data:read`, `data:write` et `data:delete`, simples ou restreintes à une collection
-(`data:read:posts`). L'opération vient de la méthode HTTP : `GET`, `HEAD` et `OPTIONS` lisent,
-`POST`, `PUT` et `PATCH` écrivent, `DELETE` supprime. `POST /api/data/:slug/bulk/delete` compte
-comme une suppression, bien que ce soit un `POST`.
+`data:read`, `data:write` et `data:delete`, globaux ou restreints à une collection (`data:read:posts`). L'opération provient de la méthode HTTP : `GET`, `HEAD` et `OPTIONS` lisent, `POST`, `PUT` et `PATCH` écrivent, `DELETE` supprime. `POST /api/data/:slug/bulk/delete` compte comme une suppression, bien qu'il s'agisse d'un `POST`.
 
-Sur un chemin imbriqué, l'opération est vérifiée sur la collection où aboutit le chemin, et chaque
-collection traversée exige `data:read`. Une clé qui ne détient que `data:read:posts` est refusée
-sur `/api/data/authors/1/posts` tant qu'elle ne peut pas aussi lire `authors`.
+Sur un chemin imbriqué, l'opération est vérifiée par rapport à la collection à laquelle le chemin aboutit, et chaque collection traversée nécessite `data:read`. Une clé détenant uniquement `data:read:posts` se verra refuser `/api/data/authors/1/posts` tant qu'elle ne peut pas également lire `authors`.
 
 ### Stockage
 
-`storage:read` liste et télécharge. `storage:write` téléverse et crée des dossiers, et couvre
-chaque étape d'un téléversement avec reprise (TUS), y compris la vérification du décalage et
-l'annulation. `storage:delete` supprime. La cible est un identifiant de source de stockage.
-L'identifiant de la source par défaut est `(default)`, donc `storage:read:(default)` ne lit que la
-source par défaut, et `storage:write:avatars` écrit dans une source nommée `avatars`.
-Après la vérification de la portée, [`storageAuthorize`](/docs/backend/storage-authorization/)
-s'exécute quand même, avec l'identité de la clé.
+`storage:read` liste et télécharge. `storage:write` téléverse et crée des dossiers, et couvre chaque étape d'un téléversement reprenable (TUS), y compris la vérification de décalage (offset) et l'annulation. `storage:delete` supprime. La cible est l'identifiant d'une source de stockage. L'identifiant de la source par défaut est `(default)`, donc `storage:read:(default)` lit uniquement la source par défaut, et `storage:write:avatars` écrit dans une source nommée `avatars`. Après la vérification du scope, [`storageAuthorize`](/docs/backend/storage-authorization/) s'exécute tout de même, avec l'identité de la clé.
 
 ### Fonctions
 
-`functions:invoke` appelle toutes les fonctions personnalisées. `functions:invoke:<name>` en
-appelle une. Lister les fonctions sur `GET /api/functions` exige la portée simple.
+`functions:invoke` appelle chaque fonction personnalisée. `functions:invoke:<name>` en appelle une seule. Lister les fonctions via `GET /api/functions` nécessite le scope global.
 
-Ne donnez pas `functions:invoke` à une clé que vous voulez en lecture seule. Une fonction est du
-code, et elle peut écrire. Dans une fonction, `getScopes(c)` et `hasScope(c, …)` lisent ce que la
-clé détient, et une application peut déclarer ses propres portées qu'une fonction vérifiera. Voir
-[Fonctions personnalisées](/docs/backend/custom-functions/#scopes-and-app-scopes).
+N'attribuez pas `functions:invoke` à une clé que vous souhaitez restreindre à la lecture seule. Une fonction est du code, et elle peut effectuer des écritures. À l'intérieur d'une fonction, `getScopes(c)` et `hasScope(c, …)` lisent les autorisations de la clé, et une application peut déclarer ses propres scopes qu'une fonction vérifiera. Voir [Fonctions personnalisées](/docs/backend/custom-functions/#scopes-and-app-scopes).
 
 ### Surfaces d'administration
 
-Une portée du plan d'administration sur une clé atteint la surface correspondante. Un
-planificateur qui déclenche des tâches cron a besoin de `cron:write`. Un collecteur de journaux a
-besoin de `logs:read`. Un job de sauvegarde a besoin de `backups:read`. L'[index des
-endpoints](/docs/backend/endpoints/#admin) liste la portée qu'exige chaque route.
+Un scope du plan d'administration sur une clé donne accès à cette surface. Un ordonnanceur qui déclenche des tâches cron a besoin de `cron:write`. Un collecteur de logs a besoin de `logs:read`. Une tâche de sauvegarde a besoin de `backups:read`. L'[index des points de terminaison](/docs/backend/endpoints/#admin) liste le scope requis par chaque route.
 
-`keys:read` et `keys:write` ne peuvent jamais aller sur une clé. Une clé qui pourrait gérer des
-clés pourrait créer sa propre remplaçante, ou s'élargir. Toute requête vers les routes des clés
-faite avec une clé est refusée avec `403 API_KEY_SELF_MANAGEMENT_FORBIDDEN`. Gérez les clés en tant
-que personne qui détient `keys:write`, ou avec la clé de service.
+`keys:read` et `keys:write` ne peuvent jamais être attribués à une clé. Une clé capable de gérer des clés pourrait créer son propre successeur ou étendre ses propres privilèges. Toute requête vers les routes de gestion des clés effectuée avec une clé est rejetée avec `403 API_KEY_SELF_MANAGEMENT_FORBIDDEN`. Gérez les clés en tant que personne détenant `keys:write`, ou à l'aide de la clé de service.
 
 ### Temps réel
 
-Une clé authentifie aussi le WebSocket : envoyez-la dans le message `AUTHENTICATE`. Les lectures
-et les abonnements exigent `data:read` sur leur collection, les enregistrements `data:write`, les
-suppressions `data:delete`. Un abonnement à un chemin imbriqué exige la portée simple. Les canaux
-(diffusion et présence) sont refusés pour les clés. Les messages de l'éditeur SQL et des branches
-exigent `database:read` ou `database:write`.
+Une clé permet également d'authentifier le WebSocket : envoyez-la dans le message `AUTHENTICATE`. Les lectures (fetches) et abonnements nécessitent `data:read` sur leur collection, les sauvegardes `data:write`, les suppressions `data:delete`. Un abonnement à un chemin imbriqué nécessite le scope global. Les canaux (diffusion et présence) sont refusés pour les clés. L'éditeur SQL et les messages de branche nécessitent `database:read` ou `database:write`.
 
 ## Agents et serveurs MCP
 
-Un agent a besoin de la clé la *plus restreinte* qui fait son travail. Commencez avec des portées
-limitées, et donnez-lui une expiration :
+Un agent requiert la clé la plus *restreinte* possible pour accomplir sa tâche. Commencez avec des scopes limités et définissez une date d'expiration :
 
 ```bash
 rebase api-keys create -n "My Agent" --scopes data:read:articles --expires-in 30
 ```
 
-Laissez de côté `data:delete` quand l'agent peut modifier mais ne doit pas supprimer. `delete` est
-séparé de `write` précisément pour cette raison.
+Omettez `data:delete` lorsque l'agent est autorisé à modifier mais ne doit pas supprimer. L'opération `delete` est distincte de `write` précisément pour cette raison.
 
 ## Règles de création
 
-Chaque clé est vérifiée par rapport à celui qui la crée, de la même manière sur les deux routes :
+Chaque clé est vérifiée par rapport à son créateur, de la même manière sur les deux routes :
 
 | Refus | Quand |
 |---|---|
-| `400 INVALID_SCOPES` | Une portée est malformée, inconnue, ou porte une cible qu'elle n'accepte pas. `details.validScopes` liste les portées qu'une clé peut détenir. Elle omet `keys:*`, qu'aucune clé ne peut détenir |
-| `400 UNKNOWN_SCOPE_TARGET` | Une cible nomme une collection, une source de stockage ou une fonction que ce backend ne sert pas |
-| `400 KEY_MANAGEMENT_SCOPE` | `keys:read` ou `keys:write` a été demandée |
-| `403 SCOPE_EXCEEDS_CREATOR` | Une portée que le créateur ne détient pas. Une clé ne détient jamais plus que le compte qui l'a créée |
-| `403 ROLE_EXCEEDS_CREATOR` | Un rôle de clé de service que le créateur ne détient pas, quand le créateur n'est pas administrateur |
-| `400 INVALID_ROLE` | Un nom de rôle est vide ou contient `,` `{` `}` `"` `\` ou un caractère de contrôle, que RLS relirait comme d'autres rôles |
-| `403 KEY_OUTRANKS_CALLER` | Lors d'une modification (`PUT`) ou d'une révocation (`DELETE`) : la clé détient déjà un rôle ou une portée que l'appelant n'a pas, et l'appelant n'est pas administrateur |
+| `400 INVALID_SCOPES` | Un scope est malformé, inconnu ou comporte une cible qu'il n'accepte pas. `details.validScopes` liste les scopes qu'une clé peut détenir. Il exclut `keys:*`, qu'aucune clé ne peut détenir |
+| `400 UNKNOWN_SCOPE_TARGET` | Une cible nomme une collection, une source de stockage ou une fonction que ce backend ne dessert pas |
+| `400 KEY_MANAGEMENT_SCOPE` | `keys:read` ou `keys:write` a été demandé |
+| `403 SCOPE_EXCEEDS_CREATOR` | Un scope que le créateur ne détient pas. Une clé ne détient jamais plus que le compte qui l'a créée |
+| `403 ROLE_EXCEEDS_CREATOR` | Un rôle de clé de service que le créateur ne détient pas, lorsque le créateur n'est pas administrateur |
+| `400 INVALID_ROLE` | Un nom de rôle est vide ou contient `,` `{` `}` `"` `\` ou un caractère de contrôle, que la RLS interpréterait comme d'autres rôles |
+| `403 KEY_OUTRANKS_CALLER` | Lors d'une modification (`PUT`) ou d'une révocation (`DELETE`) : la clé détient déjà un rôle ou un scope que l'appelant ne possède pas, et l'appelant n'est pas administrateur |
 
-Une requête pour laquelle la clé elle-même n'a pas la portée répond `403 SCOPE_MISSING`, avec la
-portée dans `details.requiredScope`. Voir [Codes d'erreur](/docs/backend/errors/#authentication-and-accounts).
+Une requête pour laquelle la clé elle-même ne dispose pas du scope requis répond `403 SCOPE_MISSING`, avec le scope indiqué dans `details.requiredScope`. Voir [Codes d'erreur](/docs/backend/errors/#authentication-and-accounts).
 
-## Gérer les clés
+## Gestion des clés
 
-| Méthode | Chemin | Exige |
+| Méthode | Chemin | Requis |
 |---|---|---|
 | `GET` | `/api/admin/api-keys` | `keys:read` |
 | `GET` | `/api/admin/api-keys/:id` | `keys:read` |
@@ -327,48 +249,32 @@ portée dans `details.requiredScope`. Voir [Codes d'erreur](/docs/backend/errors
 | `POST` | `/api/auth/keys` | Un compte, avec `personalKeys` activé |
 | `DELETE` | `/api/auth/keys/:id` | Un compte : révoque l'une des siennes |
 
-Chaque route renvoie les clés masquées : `key_prefix`, jamais le hash. Chaque clé indique son
-`kind` (`service` ou `personal`), ses `scopes`, ses `roles` et, pour une clé personnelle, son
-`owner_uid`.
+Chaque route renvoie les clés masquées : `key_prefix`, jamais le hash. Chaque clé indique son `kind` (`service` ou `personal`), ses `scopes`, ses `roles` et, pour une clé personnelle, son `owner_uid`.
 
-Le CLI couvre les clés de service : `rebase api-keys list`, `get`, `create`, `revoke`, et `scopes`,
-qui liste toutes les portées que le backend connaît. Voir la
-[référence du CLI](/docs/cli/#rebase-api-keys). Il s'authentifie avec
-`REBASE_SERVICE_KEY` lu dans `.env`, et ne l'envoie qu'au serveur que `rebase dev`
-exécute pour ce projet : quand ce serveur est arrêté, il n'envoie rien. Pour un
-serveur lancé autrement, comme `rebase start` ou un conteneur, définissez
-`REBASE_BASE_URL` sur son adresse
-([l'environnement propre au CLI](/docs/getting-started/configuration/#the-clis-own-environment)).
+Le CLI prend en charge les clés de service : `rebase api-keys list`, `get`, `create`, `revoke` et `scopes`, qui liste chaque scope connu du backend. Voir la [référence du CLI](/docs/cli/#rebase-api-keys). Il s'authentifie avec `REBASE_SERVICE_KEY` depuis `.env`, et ne l'envoie qu'au serveur que `rebase dev` exécute pour ce projet ; si ce serveur est arrêté, il n'envoie donc rien. Pour un serveur exécuté autrement, tel que `rebase start` ou un conteneur, définissez `REBASE_BASE_URL` avec son adresse ([l'environnement propre au CLI](/docs/getting-started/configuration/#the-clis-own-environment)).
 
-## Clés créées avant les portées
+## Clés créées avant les scopes
 
-Les clés créées avant l'existence des portées portent une liste `permissions` et un indicateur
-`admin`. Au démarrage, le store donne à chacune les portées qu'elle détient désormais. Rien ne
-s'élargit ; là où une ancienne autorisation n'a pas d'équivalent exact, elle se restreint :
+Les clés créées avant l'existence des scopes comportent une liste de `permissions` et un indicateur `admin`. Au démarrage, le magasin attribue à chacune les scopes qu'elle détient désormais. Aucun privilège n'est étendu ; lorsqu'une ancienne autorisation n'a pas de correspondance exacte, elle est restreinte :
 
-| Ancienne autorisation | Portées désormais |
+| Ancienne autorisation | Scopes actuels |
 |---|---|
 | `{ "collection": "posts", "operations": ["read", "write"] }` | `data:read:posts`, `data:write:posts` |
 | `"*"` | `data:<op>` et `storage:<op>` pour chaque opération, plus `functions:invoke` si elle avait `write` |
 | `"storage"` | `storage:<op>` pour chaque opération |
-| `"functions"` | `functions:invoke`, seulement si elle avait `write` |
-| `"functions/<name>"` | `functions:invoke:<name>`, seulement si elle avait `write` |
+| `"functions"` | `functions:invoke`, uniquement si elle avait `write` |
+| `"functions/<name>"` | `functions:invoke:<name>`, uniquement si elle avait `write` |
 | `admin: true` | le rôle `admin`, plus `users:read`, `users:write`, `schema:read`, `schema:write`, `backups:read`, `cron:read`, `cron:write`, `logs:read` |
 
-Le secret ne change pas, donc une intégration continue de fonctionner. Deux autorisations se
-restreignent :
+Le secret ne change pas, de sorte qu'une intégration continue de fonctionner. Deux autorisations sont réduites :
 
-- Une autorisation de fonction sans `write` ne devient rien. Un `GET` comptait comme une
-  lecture, mais une fonction est du code, et l'appeler n'est pas une lecture.
-- Une clé admin n'obtient aucune portée `database:*`, qu'elle ne pouvait jamais atteindre
-  auparavant, et aucune portée `keys:*`, qu'aucune clé ne peut détenir.
+- Une autorisation de fonction sans `write` devient nulle. Un `GET` comptait auparavant comme une lecture, mais une fonction est du code, et en appeler une n'est pas une lecture.
+- Une clé admin n'obtient aucun `database:*`, auquel elle n'avait jamais accès auparavant, et aucun `keys:*`, qu'aucune clé ne peut détenir.
 
-Les anciennes colonnes `permissions` et `admin` restent en place, de sorte qu'un retour à un
-runtime plus ancien lit toujours ses clés. Une requête qui envoie `permissions` ou `admin` au lieu
-de `scopes` est refusée avec `400 INVALID_INPUT`.
+Les anciennes colonnes `permissions` et `admin` sont conservées, de sorte qu'un retour à une version antérieure du runtime lit toujours ses clés. Une requête envoyant `permissions` ou `admin` au lieu de `scopes` est rejetée avec `400 INVALID_INPUT`.
 
 ## Prochaines étapes
 
-- [Rôles et portées](/docs/backend/roles-and-scopes/) : toutes les portées, et comment les rôles les détiennent
-- [Index des endpoints](/docs/backend/endpoints/) : la portée qu'exige chaque route
-- [Règles de sécurité (RLS)](/docs/collections/security-rules/) : ce que la base de données applique en plus des portées d'une clé
+- [Rôles et scopes](/docs/backend/roles-and-scopes/) : chaque scope, et comment les rôles les détiennent
+- [Index des points de terminaison](/docs/backend/endpoints/) : le scope requis par chaque route
+- [Règles de sécurité (RLS)](/docs/collections/security-rules/) : ce que la base de données applique en plus des scopes d'une clé

@@ -1,75 +1,64 @@
 ---
-sourceHash: ec63c3fff5d4bc62
+sourceHash: 395db046e3ecafc8
 title: Columnas adicionales
 sidebar_label: Columnas adicionales
-description: Añade columnas calculadas/virtuales a las tablas de colección que derivan valores a partir de los datos de la entidad.
+description: Agregue columnas calculadas/virtuales a las tablas de colecciones que derivan valores de los datos de la entidad.
 ---
 
 ## Descripción general
 
-Las columnas adicionales permiten mostrar datos calculados o derivados en la tabla de la colección sin almacenarlos en la base de datos.
+Las columnas adicionales le permiten mostrar datos calculados o derivados en la tabla de la colección sin almacenarlos en la base de datos.
 
 ## Definición de columnas adicionales
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const ordersCollection = defineCollection({
-    slug: "orders",
-    name: "Orders",
-    table: "orders",
-    properties: {
-        items: {
-            name: "Items",
-            type: "array",
-            of: {
-                name: "Item",
-                type: "map",
-                properties: {
-                    price: { name: "Price", type: "number" },
-                    quantity: { name: "Quantity", type: "number" }
-                }
-            }
-        },
-        status: { name: "Status", type: "string" }
-    },
-    admin: {
-        additionalFields: [
-            {
-                key: "total_display",
-                name: "Total",
-                Builder: ({ row }) => {
-                    const items = Array.isArray(row.items) ? row.items : [];
-                    const total = items.reduce(
-                        (sum, item) => sum + Number(item.price ?? 0) * Number(item.quantity ?? 0), 0
-                    );
-                    return <span>${total.toFixed(2)}</span>;
-                }
-            },
-            {
-                key: "status_badge",
-                name: "Status",
-                Builder: ({ row }) => {
-                    const color = row.status === "completed" ? "green" : "orange";
-                    return (
-                        <span style={{ color }}>
-                            {String(row.status ?? "")}
-                        </span>
-                    );
-                },
-                dependencies: ["status"]  // Re-render when these fields change
-            }
-        ]
-    }
-});
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
+```tsx
+// frontend/src/cms/products.tsx
+import React from "react";
+import { customizeTable } from "@rebasepro/cms";
+import type { AdditionalFieldKey } from "@rebasepro/cms-types";
+import type { products } from "../../../backend/schema/products";
+
+export const productsCms = customizeTable<typeof products>("products", {
+    additionalFields: [
+        {
+            key: "total",
+            name: "Total",
+            Builder: ({ row }) => {
+                const items = Array.isArray(row.items) ? row.items : [];
+                const total = items.reduce(
+                    (sum: number, item: { price?: number; quantity?: number }) =>
+                        sum + Number(item.price ?? 0) * Number(item.quantity ?? 0), 0
+                );
+                return <span>{total.toFixed(2)}</span>;
+            },
+            dependencies: ["items"],
+            value: ({ row }) => {
+                const items = Array.isArray(row.items) ? row.items : [];
+                return items.length;
+            }
+        }
+    ],
+    fieldOrder: ["name", "total" as AdditionalFieldKey, "status"],
+});
 ```
+
+| Clave | Qué hace |
+|---|---|
+| `key` | Identifica la columna. Nómbrela en `fieldOrder` o `listFields` como `"total" as AdditionalFieldKey`. |
+| `name` | El encabezado. |
+| `width` | El ancho, en píxeles. |
+| `Builder` | Renderiza la celda. |
+| `dependencies` | Los campos cuyo cambio vuelve a renderizar la celda; se verifican contra la tabla. |
+| `value` | El valor de la celda, para exportación. |
 
 ## Props de Builder
 
 | Prop | Tipo | Descripción |
 |------|------|-------------|
-| `row` | `Record<string, unknown>` | El registro tal como el servidor envía la fila: fechas como cadenas ISO, un belongsTo como su columna de clave foránea, `id` solo cuando la tabla tiene esa columna. Una relación que el admin haya cargado se anida bajo su nombre como las columnas propias del registro relacionado |
-| `id` | `string` | El id del registro: su clave primaria como una cadena de texto, o las partes de una clave compuesta unidas por `:::`. El id que aceptan `useSidePanel().open` y una ruta |
+| `row` | `Record<string, unknown>` | El registro tal como el servidor envía la fila: fechas como cadenas ISO, un belongsTo como su columna de clave foránea, `id` solo donde la tabla tenga esa columna. Una relación que el admin cargó se anida bajo su nombre como las propias columnas del registro relacionado |
+| `id` | `string` | El id del registro: su clave primaria como cadena, las partes de una clave compuesta unidas por `:::`. El id que aceptan `useSidePanel().open` y una ruta |
 | `context` | `RebaseContext` | Contexto completo de Rebase |
 
 `value({ row, id, context })` recibe las mismas props.

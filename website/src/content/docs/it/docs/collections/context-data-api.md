@@ -1,56 +1,70 @@
 ---
-sourceHash: d672b029e72aca9e
+sourceHash: aaaaecaefd6bb6c4
 title: L'API context.data
 sidebar_label: API context.data
-description: Leggi e scrivi altre collection dall'interno di un callback con context.data — i suoi metodi, i privilegi con cui viene eseguito, la semantica transazionale e la connessione che un callback occupa.
+description: Leggi e scrivi su altre tabelle dall'interno di un hook di tabella con context.data — i suoi metodi, i privilegi con cui viene eseguito, la semantica delle transazioni e la connessione trattenuta da un hook.
 ---
 
-Ogni callback riceve un oggetto `context` che include `context.data` — un livello unificato di accesso ai dati per eseguire **operazioni tra collezioni** dall'interno degli hook del ciclo di vita.
+Ogni [hook di tabella](/docs/collections/callbacks/) riceve un oggetto `context` che include `context.data`: il layer di dati per leggere e scrivere su **altre tabelle** dall'interno dell'hook.
 
-## Accesso alle Collezioni
+## Accesso alle tabelle
 
-`context.data` utilizza un Proxy JavaScript, quindi puoi accedere a qualsiasi collezione tramite il suo slug come proprietà:
+`context.data` utilizza un Proxy JavaScript, quindi puoi accedere a qualsiasi tabella tramite il suo slug come proprietà:
 
 ```typescript
 afterSave: async ({ values, id, context }) => {
-    // Dynamic property access — works for any collection slug
+    // Dynamic property access — works for any table slug
     const jobs = context.data.jobs;
     const users = context.data.users;
 
-    // Alternatively, use the .collection() method for dynamic slugs
-    const collectionName = "jobs";
-    const accessor = context.data.collection(collectionName);
+    // Alternatively, use the .table() method for dynamic slugs
+    const slug = "jobs";
+    const accessor = context.data.table(slug);
 }
 ```
 
-Una proprietà è l'accessor della collection, il nome che l'SDK generato le dà:
-`context.data.myNotes` è la collection `my-notes`, qualunque sia la tabella in cui è
-archiviata. Un nome che non è l'accessor di nessuna collection viene letto come il suo snake_case,
-quindi `context.data.auditLog` è `audit_log`.
+Una proprietà è l'accessor della tabella, ovvero il nome assegnatole dall'SDK generato:
+`context.data.myNotes` è la tabella il cui slug è `my-notes`, indipendentemente dalla
+tabella SQL in cui è archiviata. Un nome che non corrisponde all'accessor di alcuna tabella viene letto nel suo
+formato snake_case, quindi `context.data.auditLog` diventa `audit_log`.
 
-Le righe non sono tipizzate (`Record<string, unknown>`) finché il progetto non registra il suo
-`Database` generato; da quel momento ogni accessor è tipizzato a partire da esso. Vedi
-[Dati lato server tipizzati](/docs/backend/typed-server-data).
+Le righe sono prive di tipi (`Record<string, unknown>`) finché il progetto non registra il proprio
+`Database` generato; a quel punto ogni accessor viene tipizzato a partire da esso. Consulta
+[Dati tipizzati lato server](/docs/backend/typed-server-data).
 
-## Metodi Disponibili
+## Metodi disponibili
 
-Ogni funzione di accesso alla collezione (`context.data.<slug>`) fornisce questi metodi:
+Ciascun accessor di tabella (`context.data.<slug>`) fornisce i seguenti metodi:
 
 | Metodo | Firma | Descrizione |
-|--------|-----------|-------------|
-| `.find()` | `find(params?: FindParams) → FindResult` | Interroga entità con filtri, ordinamento e paginazione |
-| `.findById()` | `findById(id: string \| number) → Row \| undefined` | Recupera una singola riga per ID |
-| `.create()` | `create(data: Insert, id?: string \| number) → Row` | Crea una nuova riga e la restituisce come memorizzata |
-| `.update()` | `update(id: string \| number, data: Update) → Row` | Aggiorna una riga esistente e la restituisce come memorizzata |
+|--------|-------|-------------|
+| `.find()` | `find(params?: FindParams) → FindResult` | Esegue query sulle righe con filtri, ordinamento e paginazione |
+| `.findById()` | `findById(id: string \| number) → Row \| undefined` | Recupera una singola riga tramite ID |
+| `.create()` | `create(data: Insert, id?: string \| number) → Row` | Crea una nuova riga e la restituisce così come archiviata |
+| `.update()` | `update(id: string \| number, data: Update) → Row` | Aggiorna una riga esistente e la restituisce così come archiviata |
 | `.delete()` | `delete(id: string \| number) → void` | Elimina un record |
-| `.count()` | `count(params?: FindParams) → number` | Conta le entità corrispondenti |
-| `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Sottoscrizione in tempo reale (dove supportato) |
-| `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Ascolta una singola entità |
-| `.trash` | `trash.find()`, `.count()`, `.restore(id)`, `.restoreMany(ids)`, `.purge(id)`, `.purgeMany(ids)` | Le righe che un [soft delete](/docs/collections/soft-delete#from-the-sdk) ha contrassegnato |
+| `.count()` | `count(params?: FindParams) → number` | Conta le righe corrispondenti |
+| `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Sottoscrizione in tempo reale (dove supportata) |
+| `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Ascolta le modifiche a una singola riga |
+| `.trash` | `trash.find()`, `.count()`, `.restore(id)`, `.restoreMany(ids)`, `.purge(id)`, `.purgeMany(ids)` | Le righe contrassegnate da un'[eliminazione soft](/docs/collections/soft-delete#from-the-sdk) |
+
+### Limiti noti in-process
+
+La stessa superficie su HTTP (`@rebasepro/client`) offre alcune funzionalità che
+quella in-process (`context.data`, `rebase.data`, `rebase.dataAsAdmin`) non supporta.
+Nulla di tutto ciò è nuovo nella versione 0.31:
+
+- Una riga in-process non include i `_matches` di ricerca né una versione: `etagOf(row)`
+  è `undefined`, quindi passa `ifMatch` ricavandolo da una riga letta tramite HTTP.
+- `listenCount()` non è disponibile in-process: genera l'errore "Realtime is not
+  available".
+- La scorciatoia di tabella `.search(text)` non accetta `{ explain }` (il metodo `.search` del query
+  builder lo accetta, ma in-process non ci sono `_matches` da restituire).
 
 ## Interrogare con `.find()`
 
-Il metodo `find()` filtra con tuple `[operator, value]` — la forma tipizzata della stringa di query `?status=eq.published` letta dall'API REST:
+Il metodo `find()` filtra tramite tuple `[operatore, valore]` — la forma tipizzata della
+query string `?status=eq.published` letta dall'API REST:
 
 ```typescript
 afterSave: async ({ values, context }) => {
@@ -71,21 +85,23 @@ afterSave: async ({ values, context }) => {
 }
 ```
 
-## Creazione di Entità
+## Creazione di righe
 
-`.create()` e `.update()` prendono i valori da scrivere, con le firme indicate sopra. [Sincronizzazione dei dati tra collezioni](/docs/collections/callbacks#syncing-data-between-collections) usa entrambi: una candidatura approvata crea un'offerta di lavoro pubblicata e viene ricollegata a essa.
+`.create()` e `.update()` accettano i valori da scrivere, con le firme riportate sopra.
+[Scrivere su altre tabelle](/docs/collections/callbacks/#writing-to-other-tables) li utilizza entrambi:
+un invio approvato crea un lavoro pubblicato e viene collegato a quest'ultimo.
 
 ## Sicurezza: con quali privilegi viene eseguito `context.data`
 
 :::important
-**`context.data` eredita i privilegi di ciò che ha attivato il callback.** Non si tratta di un livello di attendibilità fisso.
+**`context.data` eredita i privilegi di ciò che ha attivato l'hook.** Non si tratta di un livello di attendibilità fisso.
 
-- Attivato da una **richiesta utente** (REST, realtime, una modifica dal pannello di amministrazione) → **con ambito utente**. Il callback viene eseguito all'interno della transazione vincolata a RLS aperta per quella richiesta, pertanto le policy si applicano sia alle letture *che* alle scritture. Un callback non può vedere una riga che il suo chiamante non potrebbe vedere.
-- Attivato da **`rebase.dataAsAdmin` o da un cron job** (lo stesso singleton) → **con ambito admin**, non privo di ambito. Quel driver ha come ambito `{ uid: "service", roles: ["admin"] }`, quindi il callback viene comunque eseguito su una transazione vincolata a RLS — le tue policy vengono valutate a fronte di tale identità.
-- Attivato dal **driver di base** (flussi di autenticazione integrati, migrazioni) → **senza ambito**. Viene eseguito sulla connessione proprietaria e ignora RLS.
+- Attivato da una **richiesta utente** (REST, realtime, una modifica nel CMS) → **con ambito utente (user-scoped)**. L'hook viene eseguito all'interno della transazione vincolata a RLS aperta per tale richiesta, quindi le policy si applicano sia alle letture *che* alle scritture. Un hook non può vedere una riga che il suo chiamante non poteva vedere.
+- Attivato da **`rebase.dataAsAdmin` o da un cron job** (lo stesso singleton) → **con ambito admin (admin-scoped)**, non privo di ambito. Quel driver ha come ambito `{ uid: "service", roles: ["admin"] }`, quindi l'hook viene comunque eseguito su una transazione vincolata a RLS — le tue policy vengono valutate rispetto a tale identità.
+- Attivato dal **driver di base** (flussi di autenticazione integrati, migrazioni) → **senza ambito (unscoped)**. Viene eseguito sulla connessione proprietaria (owner connection) e ignora RLS.
 :::
 
-Questo ha un impatto notevole soprattutto nel caso che fallisce silenziosamente. RLS *filtra*, non solleva errori — quindi un callback che legge una riga di pari livello la troverà quando salva un'attività di amministrazione e potrebbe non trovare nulla quando salva un utente finale, senza alcun errore in entrambi i casi. Scrivi callback che tollerano un risultato vuoto, oppure ricorri deliberatamente al piano di amministrazione:
+Questo ha importanza soprattutto nella casistica in cui il fallimento avviene silenziosamente. RLS *filtra*, non solleva errori — quindi un hook che legge una riga correlata la troverà quando a salvare è un'attività amministrativa e potrebbe non trovare nulla quando a salvare è un utente finale, senza alcun errore in entrambi i casi. Scrivi hook che tollerino un risultato vuoto, oppure accedi deliberatamente al piano amministrativo:
 
 ```typescript
 afterSave: async ({ context }) => {
@@ -94,7 +110,7 @@ afterSave: async ({ context }) => {
 
     // Deliberately admin-scoped — for work the caller genuinely may not see,
     // such as an audit trail they must not be able to read or edit. Note this
-    // is an admin's reach, not a bypass: a collection whose only rule is
+    // is an admin's reach, not a bypass: a table whose only rule is
     // `policy.serverContext()` stays closed to it, since that compiles to
     // `rebase.uid() IS NULL` and this accessor's uid is `service`.
     // `dataAsAdmin` is always there server-side; its type allows for the
@@ -104,40 +120,52 @@ afterSave: async ({ context }) => {
 ```
 
 :::caution[`dataAsAdmin` è una seconda connessione, non fa parte di questa scrittura]
-Su Postgres, `context.client.dataAsAdmin` all'interno del callback di una richiesta viene eseguito in una transazione a sé, su un'altra connessione del pool, mentre la transazione della scrittura scatenante è ancora aperta. Quindi esegue il commit per conto proprio, e rimane anche se la scrittura subisce un rollback. Inoltre non può vedere la riga in fase di salvataggio, che non è ancora stata confermata, e non deve scriverla:
+`context.client.dataAsAdmin` all'interno dell'hook di una richiesta viene eseguito in una
+transazione separata, su un'altra connessione del pool, mentre la transazione della
+scrittura scatenante è ancora aperta. Pertanto, esegue il commit in modo indipendente e rimane memorizzato
+anche se la scrittura subisce un rollback. Inoltre non può vedere la riga in fase di salvataggio, che non è ancora
+stata sottoposta a commit, e non deve scriverla:
 
-- Una scrittura admin con una chiave esterna che rimanda a quella riga (un `audit_logs.article_id` che fa riferimento ad `articles`) non supera il controllo della chiave, e la scrittura del chiamante fallisce con essa.
-- Una scrittura admin sulla riga in fase di salvataggio, o su qualsiasi riga che questa scrittura ha bloccato, attende il lock della scrittura mentre la scrittura attende il callback. Postgres non può riconoscerlo come un deadlock, quindi la richiesta resta sospesa fino a `statement_timeout` (30 secondi per impostazione predefinita) e poi fallisce.
+- Una scrittura di amministrazione con una chiave esterna che punta a quella riga (un `audit_logs.article_id`
+  che fa riferimento ad `articles`) fallisce il controllo della chiave, e la scrittura del chiamante fallisce
+  insieme ad essa.
+- Una scrittura di amministrazione sulla riga in fase di salvataggio, o su qualsiasi riga bloccata da questa scrittura,
+  rimane in attesa del lock della scrittura mentre la scrittura attende l'hook. Postgres
+  non è in grado di rilevarlo come un deadlock, quindi la richiesta rimane bloccata fino allo `statement_timeout`
+  (30 secondi per impostazione predefinita) e poi fallisce.
 
-Per un record che deve fare riferimento alla riga, scrivilo con `context.data`, che viaggia sulla transazione della scrittura, oppure accoda un [job](/docs/backend/jobs): un job accodato dal callback viene confermato insieme alla scrittura, e il suo handler viene eseguito dopo il commit.
+Per un record che deve fare riferimento alla riga, scrivilo con `context.data`, che
+sfrutta la transazione della scrittura, oppure accoda un [job](/docs/backend/jobs): un job
+accodato dall'hook esegue il commit insieme alla scrittura e il suo handler viene eseguito dopo
+il commit.
 :::
 
-:::caution[Questa pagina indicava precedentemente il contrario]
-Le versioni precedenti di questa pagina indicavano che i callback ignoravano sempre RLS e avevano "pieno accesso al database indipendentemente dai permessi dell'utente che li ha attivati". Questo non era corretto, ed era errato nella direzione non sicura — induceva a scrivere callback partendo dal presupposto che potessero sempre vedere tutto.
+:::caution[Questa pagina in precedenza indicava l'opposto]
+Le versioni precedenti di questa pagina affermavano che gli hook (all'epoca chiamati callback) bypassavano sempre RLS e avevano "accesso completo al database indipendentemente dai permessi dell'utente che ha attivato l'operazione". Ciò era errato, ed errato nella direzione non sicura — incoraggiava la scrittura di hook basati sul presupposto di poter sempre vedere tutto.
 
-Il comportamento descritto sopra è verificato end-to-end su Postgres dal caso `"scopes context.data to the caller when a callback runs on a user request"` all'interno della suite di verifica RLS di `@rebasepro/server-postgres`.
+Il comportamento sopra descritto è verificato end-to-end su Postgres dal caso `"scopes context.data to the caller when a callback runs on a user request"` all'interno della suite di verifica di RLS di `@rebasepro/server-postgres`.
 :::
 
-## Semantica delle Transazioni
+## Semantica delle transazioni
 
 :::important
-**Le scritture di `context.data` di un callback fanno parte della scrittura che lo ha attivato.** Su Postgres, `beforeSave`, il salvataggio e `afterSave` — oppure `beforeDelete`, l'eliminazione e `afterDelete` — vengono eseguiti all'interno di un'unica transazione, ogni callback viene atteso prima del commit e `context.data` scrive tramite quella stessa transazione.
+**Le scritture di un hook tramite `context.data` fanno parte della scrittura che lo ha attivato.** `beforeSave`, il salvataggio e `afterSave` — oppure `beforeDelete`, l'eliminazione e `afterDelete` — vengono eseguiti all'interno di una sola transazione, con ciascun hook atteso prima del commit, e `context.data` scrive tramite quella medesima transazione.
 :::
 
-Di conseguenza, la scrittura scatenante e tutto ciò che i suoi callback hanno scritto vengono confermati insieme oppure per niente:
+Di conseguenza, la scrittura scatenante e tutto ciò che i suoi hook hanno scritto eseguono il commit insieme o non lo eseguono affatto:
 
-- Un errore lanciato da `afterSave` o `afterDelete` annulla la scrittura scatenante, insieme a ogni scrittura di `context.data` effettuata dai callback. Al chiamante viene restituito **400 `CALLBACK_REJECTED`** con `details.stage` che indica il nome dell'hook — o con lo stato stesso dell'errore quando ne include uno: un `RebaseApiError` che hai lanciato, il 409 per violazione di unicità.
-- I sottoscrittori realtime ricevono la notifica della riga solo dopo il commit, pertanto una scrittura che ha subito un rollback non viene mai annunciata.
-- Un callback mantiene aperta la transazione durante la sua esecuzione, quindi un callback lento equivale a un blocco trattenuto e a una connessione del pool impegnata — `beforeSave` e `beforeDelete` tanto quanto gli hook `after`. Vedi [Un callback tiene una connessione](#un-callback-tiene-una-connessione).
-- Una scrittura di `context.data` esegue anche i callback della collezione di destinazione, quindi un `afterSave` che aggiorna la propria riga esegue nuovamente se stesso. Le scritture annidate per più di 16 livelli vengono rifiutate con **500 `CALLBACK_RECURSION`**, indicando l'hook e la collezione, e l'intera scrittura subisce un rollback. Rendi condizionale una scrittura di questo tipo, come fa l'esempio sotto.
+- Un errore generato da `afterSave` o `afterDelete` annulla la scrittura scatenante tramite rollback, insieme a ogni scrittura effettuata con `context.data` dagli hook. Il chiamante riceve come risposta **400 `CALLBACK_REJECTED`** con `details.stage` che indica l'hook — oppure con lo stato proprio dell'errore quando ne include uno: un `RebaseApiError` generato da te, il 409 di una violazione di unicità.
+- I sottoscrittori realtime ricevono notifica della riga solo dopo il commit, quindi una scrittura per cui è stato eseguito il rollback non viene mai notificata.
+- Un hook mantiene la transazione aperta durante la propria esecuzione, quindi un hook lento comporta un lock trattenuto e una connessione del pool occupata — tanto per `beforeSave` e `beforeDelete` quanto per gli hook `after`. Consulta [Un hook trattiene una connessione](#un-hook-trattiene-una-connessione).
+- Una scrittura tramite `context.data` esegue anche gli hook della tabella di destinazione, quindi un `afterSave` che aggiorna la propria stessa riga eseguirà nuovamente se stesso. Le scritture nidificate per più di 16 livelli vengono rifiutate con **500 `CALLBACK_RECURSION`**, indicando l'hook e la tabella, e l'intera scrittura viene annullata con un rollback. Rendi tale scrittura condizionale, come mostrato nell'esempio seguente.
 
-Lascia che un fallimento generi un'eccezione quando la scrittura scatenante non deve sopravvivere ad esso. Intercettalo quando invece deve sopravvivere, ma solo attorno a una **scrittura** di `context.data`: una creazione, un aggiornamento o un'eliminazione che il database rifiuta (una violazione di unicità o di chiave esterna, un trigger) viene annullata da sola, e il resto viene salvato tramite commit.
+Lascia che un fallimento generi un errore quando la scrittura scatenante non deve sopravvivere ad esso. Intercettalo (catch) quando invece deve sopravvivere, ma solo attorno a una **scrittura** di `context.data`: una creazione, un aggiornamento o un'eliminazione rifiutata dal database (una violazione di chiave univoca o di chiave esterna, un trigger) viene annullata singolarmente, e il resto esegue il commit.
 
-Qualsiasi altra istruzione che fallisce sulla transazione della scrittura — una ricerca, la lettura che un aggiornamento o un'eliminazione effettua per trovare la propria riga (un id che la colonna chiave non può contenere), l'accodamento di un job rifiutato dal database — interrompe quella transazione in Postgres, e intercettare l'errore in JavaScript non lo annulla. La scrittura viene rifiutata con **500 `TRANSACTION_ABORTED`** e non viene memorizzato nulla, anziché rispondere con un successo per una scrittura che ha subito un rollback. Lascia che un fallimento di questo tipo generi un'eccezione, oppure verifica la condizione prima di eseguire l'istruzione.
+Qualsiasi altra istruzione che fallisce sulla transazione della scrittura — una ricerca, la lettura effettuata da un aggiornamento o da un'eliminazione per individuare la propria riga (un id che la colonna chiave non può contenere), l'accodamento di un job rifiutato dal database — interrompe tale transazione in Postgres, e intercettare l'errore in JavaScript non annulla tale interruzione. La scrittura viene rifiutata con **500 `TRANSACTION_ABORTED`** e non viene salvato nulla, invece di restituire successo per una scrittura per cui è stato eseguito il rollback. Lascia che tale fallimento generi un errore, oppure verifica la condizione prima di eseguire l'istruzione.
 
 ```typescript
 afterSave: async ({ values, id, status, context }) => {
-    // The update below saves this collection again, which runs this callback
+    // The update below saves this table again, which runs this hook
     // again: act on creates only, or it never stops.
     if (status !== "new") return;
     try {
@@ -152,40 +180,38 @@ afterSave: async ({ values, id, status, context }) => {
 }
 ```
 
-Le operazioni che devono uscire dal database — un'email, un webhook, una chiamata a un'API di terze parti — non appartengono al corpo del callback. Manterrebbero la transazione aperta per un tempo di andata e ritorno sulla rete, e nulla potrebbe annullarle in caso di rollback della scrittura. Accoda un [job](/docs/backend/jobs) a questo scopo, oppure eseguile dopo che la scrittura ha restituito la risposta: pubblica su un [canale realtime](/docs/backend/realtime), oppure usa `waitUntil` in una [funzione personalizzata](/docs/backend/custom-functions). La sezione [Hook](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) descrive quale soluzione sia più adatta.
+Le operazioni che devono uscire dal database — un'email, un webhook, una chiamata a un'API di terze parti — non devono risiedere nel corpo dell'hook. Manterrebbero la transazione aperta per un round trip di rete, e nulla può annullarle in caso di rollback della scrittura. Accoda un [job](/docs/backend/jobs) a tale scopo, oppure esegui l'operazione dopo il ritorno della scrittura: pubblica su un [canale realtime](/docs/backend/realtime), oppure usa `waitUntil` in una [funzione personalizzata](/docs/backend/custom-functions). La documentazione sugli [Hook](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) descrive quale soluzione sia più idonea.
 
-Su MongoDB nulla di tutto questo è valido. Quel driver esegue gli stessi callback senza una transazione, pertanto la scrittura è già archiviata quando viene eseguito `afterSave`, e un'eccezione generata lì segnala il fallimento senza annullarla.
+## Un hook trattiene una connessione
 
-## Un callback tiene una connessione
+Una scrittura viene eseguita su una connessione prelevata dal pool del database, e ogni
+hook viene eseguito su di essa: `beforeSave` e `beforeDelete` dopo che
+la transazione è iniziata, `afterSave` e `afterDelete` prima che esegua il commit. Per tutto
+il tempo in cui un hook è in esecuzione — in attesa di una ricerca, di un calcolo o di qualsiasi altra cosa — quella
+connessione non serve nient'altro, e i lock acquisiti dalla scrittura rimangono attivi:
+in `afterSave`, la riga appena scritta; in una scrittura bulk o [`_batch`](/docs/backend/writes/#cross-table-batches),
+ogni riga scritta dalla transazione prima di essa.
 
-Su Postgres una scrittura viene eseguita su una connessione prelevata dal pool del database,
-e ogni callback viene eseguito su di essa: `beforeSave` e `beforeDelete` dopo che la
-transazione è iniziata, `afterSave` e `afterDelete` prima del suo commit. Per tutto il
-tempo in cui un callback è in esecuzione — in attesa di una ricerca, di un calcolo, di qualsiasi cosa — quella
-connessione non serve nient'altro, e i lock che la scrittura ha preso restano presi:
-in `afterSave`, la riga appena scritta; in una scrittura bulk o [`_batch`](/docs/backend/writes/#cross-collection-batches),
-ogni riga che la transazione ha scritto prima.
+Il costo corrisponde alla durata stessa dell'hook, e le scritture concorrenti la accumulano:
 
-Il costo è la durata propria del callback, e le scritture concorrenti la sommano:
+- Il pool gestisce 20 connessioni per impostazione predefinita (`DB_POOL_MAX`). 25 salvataggi simultanei
+  il cui `beforeSave` ha atteso 300 ms hanno fatto sì che una lettura indipendente di una singola riga richiedesse 290 ms,
+  trascorsi quasi interamente in attesa di una connessione.
+- Una creazione bulk di 100 righe il cui `beforeSave` attende 50 ms corrisponde a un'unica transazione
+  aperta per 5,3 s, che trattiene la propria connessione e i lock di ogni riga scritta
+  finora per l'intera durata.
 
-- Il pool contiene 20 connessioni per impostazione predefinita (`DB_POOL_MAX`). 25 salvataggi
-  contemporanei il cui `beforeSave` attendeva 300 ms hanno fatto durare 290 ms una lettura
-  di una riga non correlata, quasi tutti spesi ad attendere una connessione.
-- Una creazione bulk di 100 righe il cui `beforeSave` attende 50 ms è una transazione
-  aperta per 5,3 s, che tiene la sua connessione e i lock di ogni riga scritta
-  finora per tutto quel tempo.
+Pertanto:
 
-Quindi:
-
-- Tieni fuori dai callback tutto ciò che è lento. Una chiamata a un altro servizio appartiene a un
-  [job](/docs/backend/jobs), o a dopo il ritorno della scrittura.
-- Cerca ciò di cui un hook ha bisogno prima della scrittura quando puoi — nel client, o
-  in una [funzione personalizzata](/docs/backend/custom-functions) che poi scrive.
-- Invia le righe i cui hook sono lenti in bulk più piccoli.
-- Se molti hook lenti sono eseguiti insieme per progetto, alza `DB_POOL_MAX`, entro quanto
-  il `max_connections` del database consente per ogni istanza.
+- Escludi dagli hook qualsiasi operazione lenta. Una chiamata a un altro servizio appartiene a un
+  [job](/docs/backend/jobs), o va eseguita dopo che la scrittura ha restituito il controllo.
+- Quando possibile, recupera ciò di cui l'hook ha bisogno prima della scrittura — nel client o
+  all'interno di una [funzione personalizzata](/docs/backend/custom-functions) che procede poi alla scrittura.
+- Invia le righe i cui hook sono lenti suddividendole in batch più piccoli.
+- Se per progettazione vengono eseguiti contemporaneamente molti hook lenti, aumenta `DB_POOL_MAX`,
+  entro i limiti consentiti da `max_connections` del database per ciascuna istanza.
 - Con
-  `REBASE_METRICS=true`, `/metrics` riporta `rebase_db_pool_wait_ms`: quanto
-  ha atteso ogni query per una connessione. Un pool sano lo tiene vicino a zero; una
-  coda che cresce con il traffico sono richieste in attesa di connessioni che i callback
-  tengono. Vedi [Metriche](/docs/deployment/self-hosting/#metrics).
+  `REBASE_METRICS=true`, `/metrics` riporta `rebase_db_pool_wait_ms`: il tempo
+  durante il quale ciascuna query è rimasta in attesa di una connessione. Un pool in buono stato mantiene questo valore vicino allo zero; una
+  coda che cresce con il traffico è indice di richieste in attesa delle connessioni trattenute
+  dagli hook. Consulta [Metriche](/docs/deployment/self-hosting/#metrics).

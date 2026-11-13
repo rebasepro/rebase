@@ -1,86 +1,89 @@
 ---
-sourceHash: e5d4169f7ba3f5e1
+sourceHash: 8a72cff37e30800b
 title: Vues
 sidebar_label: Vues
-description: Servez une vue SQL ou une vue matérialisée comme collection en lecture seule, déclarée dans la configuration et créée par db push.
+description: "Servez une vue SQL ou une vue matérialisée en lecture seule avec defineView : des vues security_invoker régies par les tables qu'elles lisent, des vues matérialisées filtrées par rôles, rafraîchies à la demande, créées par db push."
 ---
 
-## Une collection au-dessus d'une requête
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-Une collection peut servir une vue SQL au lieu d'une table. Déclarez la requête sous
-`view`, décrivez ses colonnes comme des propriétés, et marquez celle qui identifie une
-ligne avec `isId` — une vue n'a pas de clé primaire propre :
+`defineView` sert une requête SQL sous la forme d'une table en lecture seule. Déclarez la requête, les colonnes qu'elle retourne, ainsi que la ou les colonnes qui identifient une ligne :
 
 ```ts
-import { defineCollection } from "@rebasepro/cms-types";
+// backend/schema/artist-stats.ts
+import { defineView, col } from "@rebasepro/server/schema";
 
-export default defineCollection({
-    slug: "artists",
-    name: "Artists",
-    table: "artist_stats",
-    view: {
-        query: `SELECT lower(artist) AS artist, count(*)::int AS songs, max(fame) AS fame
-                FROM songs GROUP BY 1`
+export const artistStats = defineView("artist_stats", {
+    query: `SELECT lower(artist) AS artist, count(*)::int AS songs, max(fame) AS fame
+            FROM songs GROUP BY 1`,
+    columns: {
+        artist: col.text().primaryKey(),
+        songs:  col.integer().notNull(),
+        fame:   col.integer(),
     },
-    properties: {
-        artist: { name: "Artist", type: "string", isId: true },
-        songs: { name: "Songs", type: "number" },
-        fame: { name: "Fame", type: "number" }
-    }
 });
 ```
 
-Elle se lit comme n'importe quelle autre collection — `find`, `findById`, `count`,
-[`aggregate`](/docs/sdk/aggregates-and-search/),
-`listen`, les routes REST, MCP et le panneau d'administration — et elle est en lecture seule : chaque
-écriture renvoie une erreur `405 COLLECTION_READ_ONLY`, et l'administration n'offre ni création, ni modification, ni
-suppression. Écrivez dans les tables que la vue lit.
+Exportez-la depuis `backend/schema/index.ts` comme une table. Elle se lit comme n'importe quelle table — `find`, `findById`, `count`, [`aggregate`](/docs/sdk/aggregates-and-search/), `listen`, les routes REST, MCP et le CMS — et elle n'est jamais modifiée : chaque écriture renvoie une erreur `405 TABLE_READ_ONLY`. Écrivez dans les tables que la vue lit.
 
-`rebase db push` crée la vue après les tables (elle est appliquée par Rebase,
-et non par Atlas), `rebase db generate` l'ajoute à la migration, et un démarrage
-géré la crée lors de son étape de schéma. Une vue dont la requête n'a pas changé est laissée
-telle quelle ; une vue dont la requête a changé est supprimée puis recréée, avec toutes
-vos vues qui la lisent. Rebase refuse de remplacer une table, ou une vue qu'il n'a
-pas créée, qui porte déjà ce nom.
+`rebase db push` crée la vue après les tables, `rebase db generate` l'ajoute à la migration, et un démarrage géré (managed boot) la crée lors de son étape de schéma. Une vue dont la requête n'a pas changé est laissée intacte ; celle dont la requête a changé est supprimée puis recréée, en même temps que toutes vos vues qui la lisent. Rebase refuse de remplacer une table, ou une vue qu'il n'a pas créée, portant déjà ce nom.
+
+## Options
+
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+| Clé | Ce qu'elle fait |
+|---|---|
+| `query` | **Requis.** Le `SELECT` de définition. |
+| `columns` | **Requis.** Les colonnes retournées par la requête, sous forme de builders `col.*`. `.primaryKey()` marque celles qui identifient une ligne. |
+| `materialized` | `true` stocke les lignes. Voir [Vues matérialisées](#vues-matérialisées). |
+| `roles` | Qui peut lire une vue matérialisée. `["admin"]` si omis. Refusé sur une vue standard. |
+| `table` | Le nom de la vue SQL, lorsqu'il diffère du nom par défaut. |
+| `slug` | Le nom dans l'API. Le nom de la vue si omis. |
+| `schema` | Le schéma Postgres. `public` si omis. |
+| `database` | Une base de données Postgres non définie par défaut. |
+| `description` | Ce que contient la vue, pour OpenAPI et MCP. |
+| `relations` | Relations à travers lesquelles effectuer des lectures, comme sur une table. Aucune contrainte n'est créée pour une vue. |
+| `indexes` | Index sur les lignes stockées d'une vue matérialisée. |
+| `hooks` | `beforeQuery` et `afterRead` uniquement. Voir [Hooks de table](/docs/collections/callbacks/). |
+| `metadata` | Toutes les données que vous souhaitez fournir avec le descripteur de la vue. |
+
+Une vue possède au moins une colonne `.primaryKey()` : une vue n'a pas de clé propre, et une ligne a besoin d'une adresse.
 
 ## Qui voit quelles lignes
 
-Une vue simple s'exécute **en tant qu'appelant** (`security_invoker`), de sorte que les politiques des
-tables qu'elle lit déterminent ce que voit chaque appelant : un utilisateur dont les politiques lui
-montrent ses propres chansons voit la vue de ses propres chansons. C'est pourquoi
-`securityRules` ne peut pas être déclaré sur une vue — il n'y a rien à quoi les rattacher,
-et rien qu'elles pourraient ajouter. Voir [Règles de sécurité](/docs/collections/security-rules/) pour
-les politiques des tables sous-jacentes.
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+Une vue standard est créée `WITH (security_invoker = true)`, elle s'exécute donc **avec les droits de l'appelant** : la sécurité au niveau des lignes (RLS) des tables qu'elle lit détermine ce que chaque appelant voit. Un utilisateur dont les politiques lui permettent de voir ses propres morceaux voit la vue correspondant à ses propres morceaux. C'est pourquoi une vue n'a pas de `rls` : il n'y a rien à quoi associer des politiques, et rien qu'elles ne pourraient ajouter. Voir [Sécurité au niveau des lignes](/docs/collections/security-rules/) pour les politiques sur les tables sous-jacentes.
 
 ## Vues matérialisées
 
-`materialized: true` stocke les lignes, de sorte qu'une lecture n'exécute pas la requête :
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+`materialized: true` stocke les lignes, ainsi une lecture n'exécute pas la requête :
 
 ```ts
-view: {
+import { defineView, col } from "@rebasepro/server/schema";
+
+export const langs = defineView("langs", {
     query: "SELECT lang, count(*)::int AS songs FROM songs GROUP BY lang",
     materialized: true,
-    roles: ["admin", "analyst"]
-}
+    roles: ["admin", "analyst"],
+    columns: {
+        lang:  col.text().primaryKey(),
+        songs: col.integer().notNull(),
+    },
+    indexes: [{ columns: ["songs"], reason: "the most-used languages first" }],
+});
 ```
 
-Postgres n'applique aucune sécurité au niveau des lignes à une vue matérialisée : quiconque peut la lire
-la lit en entier. Rebase ne la sert donc qu'aux appelants détenant l'un des `roles`
-(`["admin"]` s'il est omis, rôle que détient `dataAsAdmin`) et refuse tous les autres
-avec `403 VIEW_NOT_READABLE`. N'y mettez rien que ses lecteurs ne doivent pas voir.
+Postgres n'applique aucune sécurité au niveau des lignes sur une vue matérialisée : quiconque peut la lire lit l'intégralité de son contenu. Rebase ne la sert donc qu'aux appelants disposant de l'un des `roles` (`["admin"]` par défaut, détenu par `dataAsAdmin`) et refuse tous les autres avec une erreur `403 VIEW_NOT_READABLE`. N'y mettez rien que ses lecteurs ne soient pas autorisés à voir.
 
-La règle est aussi appliquée dans la base de données, donc le [SQL exécuté en tant qu'appelant](/docs/backend/custom-functions/#3-getsqlc--sql-as-the-caller)
-s'y heurte lui aussi. Les lignes sont stockées sous `<table>_rebase_rows`, que seul
-le propriétaire de la base peut lire, et le nom même de la collection est une vue
-au-dessus d'elles, qui ne renvoie de lignes qu'à un appelant détenant l'un des `roles`
-et au serveur lui-même (`rebase.sql()`, crons). Interrogez le nom de la collection,
-jamais les lignes stockées.
+Cette règle est également appliquée dans la base de données, de sorte que le [SQL exécuté en tant qu'appelant](/docs/backend/custom-functions/#3-getsqlc--sql-as-the-caller) s'y conforme aussi. Les lignes sont stockées sous `<view>_rebase_rows`, que seul le propriétaire de la base de données peut lire, et le propre nom de la vue est une vue par-dessus celles-ci qui ne renvoie des lignes qu'à un appelant disposant de l'un des `roles`, ainsi qu'au serveur lui-même (`rebase.sql()`, crons). Interrogez le nom de la vue, jamais les lignes stockées.
 
-Les lignes correspondent au dernier rafraîchissement. Rafraîchissez avec `refresh()` — côté serveur
-via `rebase.dataAsAdmin.langs.refresh()`, ou depuis un client connecté avec l'un des
-rôles — ou via HTTP :
+Les lignes reflètent l'état lors du dernier rafraîchissement. Rafraîchissez avec `refresh()` — sur le serveur via `rebase.dataAsAdmin.langs.refresh()`, ou depuis un client connecté avec l'un des rôles requis — ou par HTTP :
 
-```ts
+```typescript
 await client.data.langs.refresh();
 await client.data.langs.refresh({ concurrently: true });
 ```
@@ -90,18 +93,12 @@ POST /api/data/langs/refresh
 { "concurrently": true }
 ```
 
-`concurrently` continue de servir les anciennes lignes pendant que les nouvelles sont calculées ; il
-requiert l'index unique que Rebase crée sur les colonnes `isId`, qui doivent donc être
-uniques dans le résultat de la requête. Pour rafraîchir selon un calendrier, appelez `refresh()` depuis une
-[tâche cron](/docs/backend/cron-jobs/). Une vue matérialisée peut porter ses propres `indexes`
-(voir [Index](/docs/backend/indexes/)), construits sur ses lignes stockées ; une vue
-simple lit les index de ses tables.
+`concurrently` continue de servir les anciennes lignes pendant que les nouvelles sont calculées. Cela nécessite l'index unique que Rebase crée sur les colonnes `.primaryKey()`, ces dernières doivent donc être uniques dans le résultat de la requête. Pour effectuer un rafraîchissement planifié, appelez `refresh()` depuis une [tâche cron](/docs/backend/cron-jobs/). Une vue matérialisée peut comporter ses propres `indexes` (voir [Index](/docs/backend/indexes/)), créés sur ses lignes stockées ; une vue standard lit les index de ses tables sous-jacentes.
 
 ## Ce qu'une vue ne peut pas avoir
 
-`securityRules`, `history`, `softDelete`, `tenant` et `search` sont refusés au
-démarrage, car chacun a besoin d'une table dans laquelle écrire ou à laquelle se rattacher.
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-Un `listen` sur une vue est informé d'un `refresh()`. Une écriture dans les tables sous-jacentes
-d'une vue n'atteint pas les abonnés de la vue : abonnez-vous aux tables, ou
-relisez la vue.
+`rls`, `history`, `softDelete`, `tenant` et `search` sont refusés lors de la compilation du schéma : chacun d'entre eux nécessite une table dans laquelle écrire ou à laquelle rattacher des politiques. `roles` sur une vue standard est refusé lors du chargement du module, tout comme une valeur `query` vide. `indexes` sur une vue standard est refusé lors de la compilation du schéma.
+
+Un `listen` sur une vue est notifié lors d'un `refresh()`. Une écriture dans les tables sous-jacentes d'une vue ne parvient pas aux abonnés de la vue : abonnez-vous aux tables, ou relisez la vue.

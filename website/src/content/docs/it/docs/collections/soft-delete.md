@@ -1,104 +1,70 @@
 ---
-sourceHash: e9550333c7d32a28
+sourceHash: a289b69be61220df
 title: Soft delete
 sidebar_label: Soft delete
-description: Trasforma l'eliminazione in un timestamp, nascondi le righe contrassegnate da ogni lettura e ripristinale con un normale aggiornamento.
+description: "softDelete su una tabella trasforma l'eliminazione in un timestamp, nasconde le righe contrassegnate da ogni lettura e le ripristina con un normale aggiornamento."
 ---
 
 ## Cosa cambia
 
-Con `softDelete` attivo, un'eliminazione **contrassegna una colonna invece di rimuovere la riga**,
-e ogni operazione di lettura esclude le righe contrassegnate. Tutto il resto
-dell'operazione rimane invariato: è richiesta la stessa autorizzazione, `beforeDelete` può
-ancora porre il veto e `afterDelete` viene comunque eseguito. Dal punto di vista del chiamante
-la riga è stata eliminata; il modo in cui la tabella registra l'operazione dipende da questo flag.
+<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+Con `softDelete` abilitato, un'eliminazione **appone un timestamp su una colonna invece di rimuovere la riga**, e ogni lettura esclude le righe contrassegnate. Nient'altro dell'operazione cambia: è richiesta la stessa autorizzazione, `beforeDelete` può ancora porre il veto e `afterDelete` viene comunque eseguito. Dal punto di vista del chiamante la riga è stata eliminata; il modo in cui la tabella registra l'operazione riguarda esclusivamente questo flag.
 
-const invoices = defineCollection({
-    slug: "invoices",
-    name: "Invoices",
-    table: "invoices",
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const invoices = defineTable("invoices", {
+    columns: {
+        id:        col.uuid().primaryKey().defaultRandom(),
+        reference: col.text().notNull(),
+        deletedAt: col.timestamp({ withTimezone: true }),
+    },
     softDelete: true,
-    properties: {
-        reference: { name: "Reference", type: "string" },
-        deletedAt: { name: "Deleted at", type: "date", admin: { readOnly: true } }
-    }
+    rls: "admin-only",
 });
 ```
 
-`true` utilizza `deletedAt` (colonna `deleted_at`). La forma a oggetto consente di rinominarlo:
-`softDelete: { field: "archivedAt" }`.
+`true` utilizza la colonna `deletedAt` (in SQL `deleted_at`). La forma ad oggetto ne specifica un'altra: `softDelete: { field: "archivedAt" }`. Il campo viene verificato rispetto alle colonne della tabella tramite i tipi.
 
-:::caution[La colonna deve essere dichiarata da te]
-Il flag stabilisce il *significato* di una colonna; non ne crea una dal nulla.
-Una collection che attiva `softDelete` senza dichiarare quella proprietà `date`
-viene rifiutata all'avvio — deliberatamente in anticipo, poiché l'alternativa
-sarebbe un errore riscontrato da chi prova a rimuovere una riga.
+:::caution[Spetta a te dichiarare la colonna]
+Il flag definisce il *significato* di una colonna; non ne aggiunge una. Una tabella che attiva `softDelete` senza dichiarare tale colonna, o con una colonna che non è di tipo `timestamptz`, `date` o `time`, viene rifiutata durante la compilazione dello schema — prima ancora che qualcuno tenti di rimuovere una riga.
 :::
-
-Solo Postgres, come la [ricerca](/docs/backend/search) e
-gli [indici](/docs/backend/indexes).
 
 ## Cosa vede una lettura
 
-Le righe contrassegnate sono nascoste per impostazione predefinita da `find`, `findById`, `count`,
-dalle aggregazioni, dal refetch in tempo reale e da questa collection caricata tramite
-una relazione. Tale comportamento predefinito è fondamentale: il codice scritto prima
-dell'introduzione del flag continua a funzionare e nessuno deve ricordarsi di filtrare.
+Le righe contrassegnate sono nascoste per impostazione predefinita da `find`, `findById`, `count`, dalle aggregazioni, dal refetch in tempo reale e quando questa tabella viene caricata tramite una relazione. Questo comportamento predefinito è il punto chiave: il codice scritto prima dell'esistenza del flag continua a funzionare e nessuno deve ricordarsi di applicare un filtro.
 
-Due parametri di query consentono di accedervi:
+Due parametri di query consentono di visualizzarle:
 
-| Parametro | Risultati |
-|-----------|-----------|
-| `?deleted=include` | Righe attive **e** quelle contrassegnate |
+| Parametro | Restituisce |
+|-----------|---------|
+| `?deleted=include` | Righe attive **e** contrassegnate |
 | `?deleted=only` | Solo le righe contrassegnate — la vista cestino |
 
-Qualsiasi altro valore restituisce un 400 invece di un fallback silenzioso. `?deleted=true` che
-nasconde silenziosamente ogni riga eliminata sembrerebbe funzionare, ma risponderebbe
-alla domanda opposta.
+Qualsiasi altro valore restituisce un errore 400 anziché un fallback silenzioso. Se `?deleted=true` nascondesse silenziosamente ogni riga eliminata, sembrerebbe funzionare ma risponderebbe alla domanda opposta.
 
-## Ripristino ed eliminazione definitiva
+## Ripristinare ed eliminare definitivamente
 
-Un **ripristino** è un normale aggiornamento che reimposta il campo su `null`. Non esiste
-un verbo speciale, perché non esiste uno stato speciale: la riga non è mai stata spostata altrove.
-Tramite REST è un `PATCH` — singolo, `/bulk` o `_batch` — il cui body imposta il
-campo su `null`:
+Un **ripristino** è un normale aggiornamento che reimposta il campo su `null`. Non esiste un verbo speciale, perché non esiste uno stato speciale — la riga non è mai andata via. Tramite REST è una `PATCH` — singola, `/bulk` o `_batch` — il cui corpo imposta il campo su `null`:
 
 ```bash
 curl -X PATCH /api/data/invoices/7 -d '{"deletedAt": null}'
 ```
 
-Quell'aggiornamento è l'unico che raggiunge una riga contrassegnata. Qualsiasi altra modifica
-di essa restituisce `404`, come fa la riga per ogni lettura predefinita; ripristinala prima.
+Questo aggiornamento è l'unico che può raggiungere una riga contrassegnata. Qualsiasi altra modifica a essa restituisce `404`, così come fa la riga per ogni lettura predefinita; occorre prima ripristinarla.
 
-L'operazione inversa non è un aggiornamento. Impostare il campo su un valore viene rifiutato con `400`
-`FIELD_NOT_WRITABLE` — elimina invece la riga — così il permesso `delete`,
-`beforeDelete` e `afterDelete` si applicano sempre. Un upsert può creare una riga
-già contrassegnata, ma non contrassegna mai una riga già memorizzata.
+Il contrario non è un aggiornamento. L'impostazione del campo su un valore viene rifiutata con `400` `FIELD_NOT_WRITABLE` — elimina invece la riga — in modo che il permesso di `delete`, `beforeDelete` e `afterDelete` le si applichino sempre. Un upsert può creare una riga già contrassegnata, ma non ne contrassegna mai una già memorizzata.
 
-Né un upsert scrive in una riga nel cestino: quando la sua chiave appartiene a
-una riga contrassegnata, viene rifiutato con `409` `ROW_IN_TRASH` e non viene
-scritto nulla. Ripristina prima la riga, oppure elimina definitivamente con
-`?hard=true` e ripeti l'upsert.
+Inoltre, un upsert non scrive in una riga presente nel cestino: quando la sua chiave appartiene a una riga contrassegnata, l'operazione viene rifiutata con `409` `ROW_IN_TRASH` e non viene scritto nulla. Ripristina prima la riga, oppure eliminala definitivamente con `?hard=true` ed esegui nuovamente l'upsert.
 
-Un'eliminazione tramite un percorso many-to-many, come `DELETE /api/data/posts/1/tags/5`,
-rimuove il collegamento del post 1 al tag. Non esegue il soft delete del tag, che altri
-post utilizzano ancora.
+Un'eliminazione tramite un percorso molti-a-molti, come `DELETE /api/data/posts/1/tags/5`, rimuove il collegamento del post 1 al tag. Non esegue il soft delete del tag, che altri post continuano a utilizzare.
 
-Una **vera** `DELETE` corrisponde a `?hard=true` nella chiamata di eliminazione. Richiede esattamente
-gli stessi permessi di un'eliminazione ordinaria: si tratta dello stesso verbo e gestirlo
-separatamente creerebbe una seconda superficie di controllo accessi per la medesima operazione. Ciò che
-cambia è la possibilità che la riga venga recuperata. Solo il valore letterale `true` o `1`
-significa sì; un errore di digitazione produce un 400, poiché un chiamante che ha richiesto di eliminare
-definitivamente e ha ottenuto un soft delete crederebbe erroneamente che i dati siano spariti.
+Una **vera** `DELETE` corrisponde a `?hard=true` nella chiamata di eliminazione. Richiede esattamente la stessa autorizzazione di un'eliminazione ordinaria: si tratta dello stesso verbo, e limitarlo separatamente creerebbe una seconda superficie di controllo degli accessi per una sola operazione. Ciò che cambia è se la riga possa o meno essere recuperata. Solo il valore letterale `true` o `1` indica un'affermazione; un errore di battitura restituisce un 400, perché un chiamante che ha chiesto un'eliminazione definitiva e ha ottenuto un soft delete crederebbe che i dati siano stati cancellati.
 
 ## Dall'SDK
 
-Il client tipizzato raggiunge il cestino tramite `trash` su ogni collection. Invia
-le richieste sopra descritte: `?deleted=only` sulle letture, l'aggiornamento a `null` per un
-ripristino, e `?hard=true` per un'eliminazione definitiva.
+Il client tipizzato accede al cestino tramite `trash` su ciascuna tabella. Invia le richieste sopra indicate: `?deleted=only` sulle letture, l'aggiornamento a `null` per il ripristino e `?hard=true` per l'eliminazione definitiva.
 
 ```typescript
 const trashed = await client.data.invoices.trash.find({ limit: 20 });
@@ -111,27 +77,16 @@ await client.data.invoices.trash.purge(7);         // DELETE ?hard=true
 await client.data.invoices.trash.purgeMany([8, 9]);
 ```
 
-`trash.find` e `trash.count` accettano gli stessi parametri di `find` e `count`.
-Un ripristino imposta `deletedAt` a meno che tu non nomini il campo: una collection dichiarata
-con `softDelete: { field: "archivedAt" }` si ripristina con
-`trash.restore(7, { field: "archivedAt" })`. Il client non può leggere il nome del
-campo dal server.
+`trash.find` e `trash.count` accettano gli stessi parametri di `find` e `count`. Un ripristino imposta `deletedAt` a meno che non si specifichi il campo: una tabella dichiarata con `softDelete: { field: "archivedAt" }` si ripristina con `trash.restore(7, { field: "archivedAt" })`. Il client non può leggere il nome del campo dal server.
 
-Usa `trash` su una collection che dichiara `softDelete`. Su una che non lo fa,
-il server ignora `?deleted=`, quindi `trash.find` restituisce le righe attive e
-`trash.purge` è un'eliminazione ordinaria.
+Usa `trash` su una tabella che dichiara `softDelete`. Su una tabella che non lo dichiara, il server ignora `?deleted=`, quindi `trash.find` restituisce le righe attive e `trash.purge` equivale a un'eliminazione ordinaria.
 
-Il codice server ha lo stesso `trash`: `context.data.invoices.trash` in una callback,
-e `rebase.data.invoices.trash` in una function o in un cron. Legge ed elimina
-definitivamente tramite il driver, con i privilegi del chiamante, come fa il resto di
-[`context.data`](/docs/collections/context-data-api).
+Il codice lato server dispone dello stesso `trash`: `context.data.invoices.trash` in un hook e `rebase.data.invoices.trash` in una funzione o in un cron job. Esegue letture ed eliminazioni definitive tramite il driver, con i privilegi del chiamante, esattamente come il resto di [`context.data`](/docs/collections/context-data-api).
 
-Con [offline](/docs/sdk/offline) abilitato, il cestino non viene mai messo in cache e nulla
-al suo interno viene accodato. Ogni chiamata richiede il server, e fallisce con l'errore `OFFLINE`
-senza di esso. Una riga ripristinata entra nel database locale, e una eliminata definitivamente ne esce.
+Con la modalità [offline](/docs/sdk/offline) abilitata, il cestino non viene mai memorizzato nella cache e nulla al suo interno viene accodato. Ciascuna chiamata richiede il server e fallisce con l'errore `OFFLINE` se questo non è disponibile. Una riga ripristinata si aggiunge al database locale, mentre una eliminata definitivamente ne viene rimossa.
 
-## Passaggi successivi
+## Prossimi passi
 
-- **[Definire le Collection](/docs/collections)** — dove viene dichiarato `softDelete`
-- **[API REST](/docs/backend/api)** — gli endpoint di eliminazione e query a cui appartengono questi parametri
-- **[Regole di Sicurezza (RLS)](/docs/collections/security-rules)** — chi ha i permessi per eliminare una riga
+- **[Tabelle](/docs/schema/)** — dove viene dichiarato `softDelete`
+- **[API REST](/docs/backend/api)** — gli endpoint di eliminazione e interrogazione a cui appartengono questi parametri
+- **[Sicurezza a livello di riga](/docs/collections/security-rules/)** — chi ha i permessi per eliminare una riga

@@ -1,42 +1,41 @@
 ---
-sourceHash: 1539f07967a7764b
+sourceHash: 04353ad7d35cfe5c
 title: Inicio rápido
 sidebar_label: Inicio rápido
 description: Crea un nuevo proyecto de Rebase y ponlo en marcha localmente en menos de 2 minutos.
 ---
 
-## Crea un nuevo proyecto
+## Crear un nuevo proyecto
 
 ```bash
 pnpm dlx @rebasepro/cli init my-app
 ```
 
-Esto genera la estructura de un proyecto con tres paquetes. Si alguno de los términos *collection*, *Studio*, *managed runtime*, *bundle* o *resource* te resulta nuevo, el cuadro de cinco términos en [Project Structure](/docs/getting-started/project-structure/) los define.
-
-
+Esto genera la estructura de un proyecto con dos paquetes. Si términos como *table*, *collection*,
+*Studio*, *managed runtime*, *bundle* o *resource* son nuevos para ti, el cuadro en
+[Project Structure](/docs/getting-started/project-structure/) los define.
 
 | Carpeta | Descripción |
 |---------|-------------|
-| `frontend/` | SPA de React — Vite + TypeScript con la UI de administración de Rebase |
-| `backend/` | Tus funciones personalizadas y tareas cron, además del esquema generado de Drizzle. No hay archivo de servidor: el runtime publicado arranca el proyecto |
-| `config/` | Archivos de configuración y definiciones de colecciones compartidos por ambas partes |
+| `backend/` | Tus tablas (`backend/schema/`), lo que el runtime lee junto a ellas (`resources.ts`, `storage.ts`), tus funciones y tareas programadas (crons), y el esquema generado de Drizzle. No hay un archivo de servidor: el runtime publicado inicializa el proyecto |
+| `frontend/` | SPA de React — Vite + TypeScript con la interfaz de administración de Rebase y las personalizaciones de sus tablas en `src/cms/` |
 
 ## Requisitos previos
 
-- **Node.js** 22.22+ — cada estructura generada, incluida la headless, declara `"node": ">=22.22.0"`
+- **Node.js** 22.22+ — cada estructura generada, incluida la versión headless, declara `"node": ">=22.22.0"`
 - **pnpm** (recomendado) o npm
 
-No es necesario instalar ninguna base de datos ni Docker. `rebase dev` ejecuta un PostgreSQL administrado para el proyecto, con sus datos en `.rebase/`. Consulta [Variante: usa tu propio PostgreSQL](#variante-usa-tu-propio-postgresql) si prefieres proporcionar uno: una instalación local, Neon, Supabase o el contenedor que incluye esta estructura inicial.
+Sin bases de datos que instalar ni Docker. `rebase dev` ejecuta un PostgreSQL administrado para el proyecto, con sus datos bajo `.rebase/`. Consulta [Variante: usar tu propio PostgreSQL](#variante-usar-tu-propio-postgresql) si prefieres proporcionar uno: una instalación local, Neon, Supabase o el contenedor incluido en este proyecto.
 
 ## Tu entorno ya está configurado
 
-`init` genera un archivo `.env` listo para usar en la raíz del proyecto con un `JWT_SECRET` real, una contraseña de base de datos y un puerto libre para la base de datos local. No necesitas crear ni editar nada para comenzar.
+`init` genera un archivo `.env` listo para usar en la raíz del proyecto con un `JWT_SECRET` real, una contraseña para la base de datos y un puerto libre para la base de datos local. No necesitas crear ni editar nada para comenzar.
 
 :::caution
-No ejecutes `cp .env.example .env`. `.env.example` es una referencia de las variables disponibles; copiarlo sobre tu `.env` descarta los secretos generados —`JWT_SECRET`, la clave de servicio, la contraseña de la base de datos y las credenciales del primer administrador, todos en blanco o comentados allí—. Edita `.env` directamente si deseas cambiar algún valor.
+No ejecutes `cp .env.example .env`. `.env.example` es solo una referencia de las variables disponibles; copiarlo sobre tu `.env` descartará los secretos generados: `JWT_SECRET`, la clave de servicio, la contraseña de la base de datos y las credenciales del primer administrador, que allí aparecen en blanco o comentadas. Edita `.env` directamente si deseas cambiar un valor.
 :::
 
-## Inicia los servidores de desarrollo
+## Iniciar los servidores de desarrollo
 
 ```bash
 cd my-app
@@ -44,148 +43,175 @@ pnpm install
 pnpm run dev
 ```
 
-Eso es todo para la primera ejecución. No hay base de datos que instalar ni ningún paso previo de esquemas: sin una variable `DATABASE_URL` configurada, `rebase dev` inicia un **PostgreSQL administrado (PGlite)** en el directorio del proyecto, genera el esquema de Drizzle a partir de tus colecciones y crea las tablas al arrancar, incluidas las de ejemplo: `posts`, `authors` y `tags`.
+Eso es todo para la primera ejecución. No hay ninguna base de datos que instalar ni pasos para el esquema:
+sin una variable `DATABASE_URL` configurada, `rebase dev` inicia un **PostgreSQL administrado (PGlite)**
+en el directorio del proyecto, genera el esquema de Drizzle a partir de tus tablas y
+crea las tablas al arrancar, incluidas las tablas de ejemplo `posts`, `authors` y `tags`.
 
-Inicia ambas partes al mismo tiempo:
+Inicia ambas partes juntas:
 
 - **Backend** — API REST, autenticación, almacenamiento, WebSocket
 - **Frontend** — el panel: Rebase CMS y Rebase Studio
-- **Recarga en caliente (hot reload)** para ambos
+- **Hot reload** para ambos
 
-Ambos puertos se **derivan de la ruta de este proyecto** en lugar de ser fijos, por lo que varios proyectos de Rebase pueden ejecutarse en paralelo. `rebase dev` imprime las dos URL a las que se vinculó: **utiliza esas**, no `localhost:3001` / `localhost:5173`. (`PORT` y `VITE_API_URL` en `.env` configuran `rebase start`, que ejecuta el bundle compilado, y se ignoran aquí). Fija un puerto con `rebase dev --port 3001`.
+Ambos puertos se **derivan de la ruta de este proyecto** en lugar de ser fijos, por lo que varios
+proyectos de Rebase pueden ejecutarse en paralelo. `rebase dev` imprime las dos URLs que vinculó —
+**usa esas**, no `localhost:3001` / `localhost:5173`. (`PORT` y `VITE_API_URL`
+en `.env` configuran `rebase start`, que ejecuta el bundle compilado, y aquí se ignoran).
+Fija un puerto con `rebase dev --port 3001`.
 
-### Flags que vale la pena conocer
+### Flags útiles
 
 | Flag | En | Qué hace |
 |---|---|---|
-| `--yes` | `init` | No solicitar confirmaciones nunca. **Requerido cuando no hay una terminal para responder**, como en CI. Omite git init y la instalación de dependencias (los valores predeterminados del modo interactivo responden que sí a ambos, así que pasa `--git` / `--install` si los deseas) |
-| `--headless` | `init` | Un backend sin archivos de colección y sin interfaz de usuario — consulta [Backend only](/docs/getting-started/headless/) |
-| `--template <name>` | `init` | Iniciar desde una plantilla distinta a la predeterminada |
-| `--install` / `--no-install` | `init` | Ejecutar el gestor de paquetes por ti, o no hacerlo |
-| `--docker` | `dev` | Usar PostgreSQL en un contenedor en lugar del administrado. Los demás comandos lo siguen hasta que `rebase dev` se ejecuta sin él. Una `DATABASE_URL` tiene prioridad sobre él: entonces no inicia nada, y lo dice |
-| `--no-db` | `dev` | No iniciar ninguna base de datos: ni el contenedor ni la administrada. Configura `DATABASE_URL` tú mismo |
+| `--yes` | `init` | No preguntar nunca. **Obligatorio cuando no hay una terminal para responder**, como en CI. Omite git init y la instalación de dependencias (los valores interactivos predeterminados aceptan ambos, así que pasa `--git` / `--install` si los deseas) |
+| `--headless` | `init` | Un backend sin `backend/schema/` y sin interfaz de usuario, que sirve las tablas de tu propia base de datos — consulta [Backend only](/docs/getting-started/headless/) |
+| `--template <name>` | `init` | Comenzar desde una plantilla distinta a la predeterminada |
+| `--install` / `--no-install` | `init` | Ejecutar el gestor de paquetes automáticamente, o no hacerlo |
+| `--docker` | `dev` | Usar PostgreSQL en un contenedor en lugar del administrado. Los demás comandos lo seguirán hasta que `rebase dev` se ejecute sin él. Una variable `DATABASE_URL` tiene prioridad: en ese caso no inicia nada y muestra un aviso |
+| `--no-db` | `dev` | No iniciar ninguna base de datos, ni el contenedor ni la administrada. Debes configurar `DATABASE_URL` tú mismo |
 
-## Variante: usa tu propio PostgreSQL
+## Variante: usar tu propio PostgreSQL
 
-La base de datos administrada es una comodidad, no un requisito. Para apuntar el proyecto a un Postgres que tú ejecutes, descomenta `DATABASE_URL` en `.env`:
+La base de datos administrada es una comodidad, no un requisito. Para apuntar el proyecto a
+un Postgres que tengas en ejecución, descomenta `DATABASE_URL` en `.env`:
 
 ```bash
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 ```
 
-Luego, inicia los servidores de desarrollo como se indicó anteriormente. Si se define una variable `DATABASE_URL`, esta nunca se modifica, y si apunta a cualquier lugar fuera de esta máquina, se deja completamente intacta.
+Luego inicia los servidores de desarrollo como se indicó anteriormente. Un `DATABASE_URL` configurado
+nunca se modifica, y uno que apunte a cualquier lugar fuera de esta máquina se deja
+completamente intacto.
 
-Los comandos de migración planifican los cambios con [Atlas](https://atlasgo.io/), el motor de migración de esquemas con el que Rebase planifica, el cual necesita una segunda base de datos vacía con la cual comparar. Con tu propia base de datos, Rebase crea una a su lado; en la administrada, que sirve exactamente una base de datos, inicia un PGlite desechable mientras dura el comando.
-En ambos casos:
+Los comandos de migración planifican los cambios con [Atlas](https://atlasgo.io/), el
+motor de migración de esquemas con el que Rebase planifica, el cual necesita una segunda base de datos vacía para
+comparar. En tu propia base de datos, Rebase crea una base de datos secundaria junto a ella; en la
+administrada, que sirve exactamente una base de datos, inicia una instancia desechable de PGlite durante
+la duración del comando.
+De cualquier manera:
 
 ```bash
 pnpm run db:push
 ```
 
-El arranque ya crea las tablas faltantes — y sus políticas de
-[RLS](/docs/collections/security-rules/) (seguridad a nivel de fila de PostgreSQL, que es como Rebase controla quién puede leer una fila) — de forma aditiva, por lo que `db push` se utiliza para lo que deliberadamente deja de lado: cualquier cambio que no sea puramente aditivo: una columna renombrada, un tipo más restringido o un campo eliminado.
+El arranque ya crea de forma acumulativa las tablas faltantes —y sus
+políticas de [RLS](/docs/collections/security-rules/), la seguridad a nivel de fila de PostgreSQL,
+que es como Rebase controla quién puede leer una fila—, por lo
+que `db push` es para lo que intencionalmente se deja sin modificar: cualquier cambio que no sea
+puramente acumulativo (una columna renombrada, un tipo restringido o un campo eliminado).
 
-La estructura del proyecto también incluye un `docker-compose.yml` con un servicio de PostgreSQL, si prefieres un contenedor en lugar de un Postgres instalado en tu sistema:
+El proyecto generado también incluye un `docker-compose.yml` con un servicio de PostgreSQL, si
+prefieres usar un contenedor en lugar de un Postgres instalado:
 
 ```bash
 docker compose up -d db
 ```
 
-## Introspección de una base de datos existente (opcional)
+## Inspeccionar una base de datos existente (Opcional)
 
-Si te estás conectando a una base de datos existente con tablas preexistentes, puedes realizar una introspección para generar automáticamente tus archivos de colección de TypeScript:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+Si te estás conectando a una base de datos existente con tablas previas, puedes inspeccionarla para generar un archivo `defineTable` para cada una:
 
 ```bash
 pnpm rebase schema introspect
 ```
 
-Esto analizará las tablas de tu base de datos y generará los archivos TypeScript correspondientes en `config/collections/` para que no tengas que escribirlos manualmente.
+Esto lee cada tabla, columna, clave foránea y política de seguridad a nivel de fila y escribe `backend/schema/<table>.ts` y el archivo `index.ts` que las exporta, para que no tengas que escribirlas a mano. Consulta [`schema introspect`](/docs/cli/schema/#rebase-schema-introspect).
 
 ## Primer inicio de sesión
 
-Cuando abras la URL del frontend que imprimió `rebase dev`, verás la pantalla de inicio de sesión. El **primer usuario** en registrarse se convierte automáticamente en administrador; este es el flujo de inicialización (bootstrap).
+Cuando abras la URL del frontend que imprimió `rebase dev`, verás la pantalla de inicio de sesión. El **primer usuario** que se registre se convierte automáticamente en administrador; este es el flujo de inicialización (bootstrap).
 
-1. La pantalla se abre en **Welcome!**, el formulario de esa primera cuenta
-2. Introduce tu correo electrónico y contraseña, y haz clic en **Create account**
-3. ¡Listo! Ya estás dentro con acceso total de administrador
+1. La pantalla se abre en **Welcome!**, el formulario para esa primera cuenta
+2. Introduce tu correo electrónico y contraseña, luego haz clic en **Create account**
+3. Ya estás dentro, con acceso total de administrador
 
-`rebase init` también escribió `REBASE_ADMIN_EMAIL` y una contraseña generada `REBASE_ADMIN_PASSWORD` en `.env`. Esas no son tus credenciales en este entorno: `rebase dev` las ignora y lo indica al arrancar. Pertenecen a un arranque en producción (`docker compose up`, o cualquier entorno con `NODE_ENV=production`), donde esta ventana de inicialización está cerrada, ya que el servidor responde en un nombre de host antes de que hayas escrito nada. Consulta [Tu primer administrador](/docs/getting-started/deployment#your-first-admin).
+`rebase init` también escribió `REBASE_ADMIN_EMAIL` y un `REBASE_ADMIN_PASSWORD` generado en `.env`. Esas no son tus credenciales aquí: `rebase dev` las ignora y lo advierte al arrancar. Pertenecen a un arranque en producción (`docker compose up`, o cualquier entorno con `NODE_ENV=production`), donde esta ventana de inicialización está cerrada porque el servidor responde en un nombre de host antes de que hayas escrito nada. Consulta [Your first admin](/docs/getting-started/deployment#your-first-admin).
 
-## Define tu primera colección
+## Define tu primera tabla
 
-Abre `config/collections/` y crea un nuevo archivo. Exporta la colección como el **export por defecto (default export)**; así es como la cargan el backend y el panel de administración desde cada archivo del directorio. El nombre de la tabla es opcional: por defecto usa el slug, así que defínelo solo cuando difieran:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```typescript title="config/collections/products.ts"
-import { defineCollection } from "@rebasepro/cms-types";
+Crea un archivo en `backend/schema/`:
 
-const productsCollection = defineCollection({
-    slug: "products",
-    name: "Products",
-    properties: {
-        name: {
-            type: "string",
-            name: "Name",
-            validation: { required: true }
-        },
-        price: {
-            type: "number",
-            name: "Price",
-            validation: { required: true, min: 0 }
-        },
-        description: {
-            type: "string",
-            name: "Description",
-            admin: { multiline: true }
-        },
-        active: {
-            type: "boolean",
-            name: "Active",
-            defaultValue: true
-        },
-        createdAt: {
-            type: "date",
-            name: "Created At",
-            autoValue: "on_create"
-        }
-    }
+```typescript title="backend/schema/products.ts"
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const products = defineTable("products", {
+    columns: {
+        id:          col.uuid().primaryKey().defaultRandom(),
+        name:        col.text().notNull(),
+        price:       col.numeric().notNull().validate({ min: 0 }),
+        description: col.text(),
+        active:      col.boolean().default(true),
+        createdAt:   col.timestamp({ withTimezone: true }).onCreateNow(),
+    },
+    // Takes the defaultRls the scaffold's index.ts exports: everyone reads, admins write.
+    rls: "inherit",
 });
-
-export default productsCollection;
 ```
 
-Luego añádela al array `collections` de `config/collections/index.ts`. Ese array es un orden de clasificación, no un registro: cada archivo de colección en el directorio se carga —por el backend, el panel de administración y el generador del SDK— tanto si el array lo lista como si no, y el array decide dónde aparece en la navegación. Para eliminar una colección, borra su archivo y su import y entrada en `index.ts`; un archivo que el índice aún importa impide que el backend cargue:
+Luego expórtalo desde `backend/schema/index.ts`. El archivo index es lo que el backend,
+la CLI y el generador de SDK leen: si no exporta un `defineTable`,
+el arranque fallará indicando el nombre del archivo.
 
-```typescript title="config/collections/index.ts" {2,5}
-// ...existing imports
-import productsCollection from "./products.js";
-
-export const collections = [
-    postsCollection, authorsCollection, tagsCollection, usersCollection, productsCollection
-];
+```typescript title="backend/schema/index.ts"
+// ...existing exports
+export { products } from "./products";
 ```
 
-## Crea la tabla
+## Crear la tabla
 
-Guarda el archivo. Eso es todo: `rebase dev` regenera `backend/src/schema.generated.ts` y los tipos del SDK en `generated/sdk/` a partir de tus colecciones, reinicia el backend y el arranque crea la nueva tabla, por lo que tu colección **Products** aparecerá en la navegación.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-Lo mismo ocurre con una propiedad añadida a una colección que ya tienes: guarda y la columna estará allí.
+Guarda el archivo. Ese es todo el paso: `rebase dev` regenera
+`backend/src/schema.generated.ts` y los tipos del SDK en `generated/sdk/` a partir de tus
+tablas, reinicia el backend y el arranque crea la nueva tabla y sus políticas de
+seguridad a nivel de fila — y **Products** aparece en la navegación del panel de administración,
+con una lista, un formulario y filtros derivados de las columnas.
 
-`rebase db push` es para los cambios que el arranque deja de lado deliberadamente: una columna renombrada, un tipo restringido, un campo eliminado:
+Lo mismo aplica para una columna agregada a una tabla existente: guarda y la
+columna estará allí.
+
+Para cambiar cómo se ve la tabla en el panel —un editor multilínea para
+`description`, un icono, un grupo—, añade un archivo en `frontend/src/cms/` y pásalo
+a `<RebaseCMS tableCustomizations>` en `App.tsx`:
+
+```tsx title="frontend/src/cms/products.tsx"
+import { customizeTable } from "@rebasepro/cms";
+import type { products } from "../../../backend/schema/products";
+
+export const productsCms = customizeTable<typeof products>("products", {
+    icon: "ShoppingCart",
+    fields: {
+        description: { multiline: true },
+    },
+});
+```
+
+Consulta [Personalizar una tabla](/docs/frontend/customize-table/).
+
+`rebase db push` es para los cambios que el arranque intencionalmente deja sin modificar: una columna
+renombrada, un tipo restringido, un campo eliminado:
 
 ```bash
 pnpm run db:push
 ```
 
-Se ejecuta en la base de datos
-administrada igual que en la tuya.
+Se ejecuta tanto en la
+base de datos administrada como en la tuya propia.
 
 ## Referencia de comandos de base de datos
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 | Comando | Descripción |
 |---------|-------------|
-| `rebase schema generate` | Genera el esquema de Drizzle a partir de tus colecciones de TypeScript. No se necesita base de datos: `rebase dev` lo ejecuta por ti |
-| `rebase schema introspect` | Genera colecciones de TypeScript a partir de una base de datos existente |
-| `rebase db push` | Aplica los cambios de esquema directamente a la base de datos, incluida la administrada |
+| `rebase schema generate` | Genera el esquema de Drizzle a partir de tus tablas. No se necesita base de datos: `rebase dev` lo ejecuta por ti |
+| `rebase schema introspect` | Escribe archivos `defineTable` a partir de una base de datos existente |
+| `rebase db push` | Envía los cambios de esquema directamente a la base de datos, incluida la administrada |
 | `rebase db generate` | Genera archivos de migración SQL |
 | `rebase db migrate` | Ejecuta las migraciones pendientes |
 
@@ -194,7 +220,7 @@ funcionan en la base de datos administrada.
 
 ## Próximos pasos
 
-- **[Estructura del proyecto](/docs/getting-started/project-structure)** — Comprende el código generado
-- **[Colecciones](/docs/collections)** — Profundiza en la definición del esquema
-- **[Entorno y configuración](/docs/getting-started/configuration)** — Todas las opciones de configuración
-- **[Despliegue](/docs/getting-started/deployment)** — Despliega en producción
+- **[Project Structure](/docs/getting-started/project-structure)** — Comprende el código generado
+- **[Tables](/docs/schema/)** — Profundiza en la definición del esquema
+- **[Environment & Configuration](/docs/getting-started/configuration)** — Todas las opciones de configuración
+- **[Deployment](/docs/getting-started/deployment)** — Despliega en producción

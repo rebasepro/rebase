@@ -1,11 +1,11 @@
 ---
-sourceHash: 2fdaa4d40da9ecb5
-title: Den Postgres-Treiber einbetten
-sidebar_label: Postgres-Treiber einbetten
-description: Öffnen Sie den Daten-Treiber und den Realtime-Socket von @rebasepro/server-postgres innerhalb von Express, Fastify oder reinem Node, ohne den Rebase-Server – inklusive Read-Replicas, Drizzle und Draining.
+sourceHash: 82f7615bf6bd44b4
+title: Einbetten des Postgres-Treibers
+sidebar_label: Einbetten des Postgres-Treibers
+description: Öffnen Sie den Datentreiber und den Realtime-Socket von @rebasepro/server-postgres in Express, Fastify oder reinem Node, ganz ohne Rebase-Server – einschließlich Read-Replicas, Drizzle und Draining.
 ---
 
-Eine Stufe unterhalb eines [eigenen Servers](/docs/backend/custom-server/) funktioniert `@rebasepro/server-postgres` ganz ohne den Rebase-Server. Es hängt von Drizzle und dem `http.Server` von Node ab, sodass Sie den Daten-Treiber und den Realtime-Socket innerhalb von Express, Fastify oder reinem Node öffnen können. Auf dieser Ebene setzen Sie das Backend selbst zusammen: Es gibt keine Auth-Routen, keinen Speicher und keine Admin-API, sofern Sie diese nicht selbst bauen.
+Eine Stufe unter einem [benutzerdefinierten Server](/docs/backend/custom-server/) funktioniert `@rebasepro/server-postgres` komplett ohne den Rebase-Server. Es hängt von Drizzle und Nodes `http.Server` ab, sodass Sie den Datentreiber und den Realtime-Socket innerhalb von Express, Fastify oder reinem Node öffnen können. Auf dieser Ebene bauen Sie das Backend selbst zusammen: Es gibt keine Auth-Routen, keinen Speicher und keine Admin-API, es sei denn, Sie erstellen diese selbst.
 
 ## Installation
 
@@ -13,10 +13,11 @@ Eine Stufe unterhalb eines [eigenen Servers](/docs/backend/custom-server/) funkt
 npm install @rebasepro/server-postgres @rebasepro/types express pg drizzle-orm
 ```
 
-## Treiber und Socket öffnen
+## Öffnen des Treibers und des Sockets
 
-`openPostgresDriver`
-und `postgresDriverConfigFromEnv` werden exportiert.
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+`openPostgresDriver` und `postgresDriverConfigFromEnv` werden exportiert.
 
 ```typescript
 import express from "express";
@@ -28,7 +29,7 @@ import {
     openPostgresDriver,
     postgresDriverConfigFromEnv
 } from "@rebasepro/server-postgres";
-import { collections } from "./collections";
+import { tables } from "./tables";
 
 async function startServer() {
     const app = express();
@@ -45,10 +46,10 @@ async function startServer() {
     // Leave this call out and the driver reads no environment variable at all.
     const pgConfig = postgresDriverConfigFromEnv({ connection: db, connectionString });
 
-    // The collections' tables must already exist: the driver serves them and never creates them.
+    // The tables must already exist: the driver serves them and never creates them.
     // `provision` (default true) is the rest of its DDL: the role requests run as, branch metadata,
     // channel history and change capture. `provision: false` when none of that may run here.
-    const { driver, internals } = await openPostgresDriver(pgConfig, { collections });
+    const { driver, internals } = await openPostgresDriver(pgConfig, { tables });
 
     // The realtime socket. It answers upgrades on `path` only, so a WebSocket
     // server of your own can share the same http.Server.
@@ -115,23 +116,29 @@ async function startServer() {
 startServer();
 ```
 
-`openPostgresDriver` ist das, was `createPostgresAdapter` ausführt, wenn der Rebase-Server startet, nachdem `postgresDriverConfigFromEnv` die Umgebung in die Konfiguration eingelesen hat. Sein zweites Argument legt fest, was geöffnet wird: die `collections`, ob das Öffnen eigenes DDL ausführen darf (`provision`, Standard `true`) und welche Rolle dieser Prozess im Realtime-Betrieb übernimmt (`realtime: false` für keine).
+`./tables` ist ein eigenes Modul, das Ihre `defineTable`s mit `compileSchema` aus `@rebasepro/common` kompiliert: der Deskriptor jeder Tabelle samt ihren Hooks, woraus der Treiber sein Laufzeitmodell erstellt ([Skripte](/docs/backend/scripts/#openrebase) akzeptiert dieselbe Liste):
 
-Es legt keine Collection-Tabelle an, sodass `POST /api/products` gegen eine Datenbank ohne eine solche mit `500` „Table not found for collection 'products'“ antwortet. Legen Sie die Tabellen zuerst an. `rebase db push` erledigt das aus einem Rebase-Projekt, dessen `config/collections` sie deklariert. In diesem Server fügt `await createPostgresAdapter(pgConfig).ensureCollectionSchema?.(collections)` vor `openPostgresDriver` die Tabellen und Spalten hinzu, die der Datenbank fehlen, so wie es der Start des Rebase-Servers tut, und ändert nichts, was bereits existiert.
+```typescript
+import { compileSchema } from "@rebasepro/common";
+import { products, orders } from "./schema";
+
+export const tables = compileSchema([products, orders]);
+```
+
+`openPostgresDriver` ist das, was `createPostgresAdapter` beim Booten des Rebase-Servers ausführt, nachdem `postgresDriverConfigFromEnv` die Umgebungsvariablen in die Konfiguration eingelesen hat. Das zweite Argument gibt an, was geöffnet werden soll: die `tables`, ob das Öffnen eigene DDL ausführen darf (`provision`, Standard `true`), und welche Rolle dieser Prozess in Realtime übernimmt (`realtime: false` für keine).
+
+Es werden keine Anwendungstabellen erstellt; bei einer Datenbank ohne entsprechende Tabellen antwortet `POST /api/products` daher mit `500` "Table not found for 'products' (table: products)". Erstellen Sie die Tabellen zuerst. `rebase db push` erledigt dies aus einem Rebase-Projekt, dessen `backend/schema` sie deklariert. In diesem Server fügt `await createPostgresAdapter(pgConfig).ensureTableSchema?.(tables)` vor `openPostgresDriver` die Tabellen und Spalten hinzu, die der Datenbank fehlen – genau wie beim Booten des Rebase-Servers –, ohne bestehende Strukturen zu verändern.
 
 ## Read-Replica-Verbindungen
-
-Setzen Sie `readConnectionString` in der Treiber-Konfiguration oder die Umgebungsvariable `DATABASE_READ_URL`, die der Start des Servers und `postgresDriverConfigFromEnv` dort einlesen, und der Treiber öffnet unter `internals.readDb` einen zweiten Connection-Pool gegen Ihre Read-Replica. Lesezugriffe gehen an die Replica; Schreibzugriffe bleiben auf dem Primary.
+Setzen Sie `readConnectionString` in der Treiberkonfiguration oder die Umgebungsvariable `DATABASE_READ_URL`, die beim Server-Boot und von `postgresDriverConfigFromEnv` eingelesen wird, und der Treiber öffnet einen zweiten Verbindungspool zu Ihrer Read-Replica unter `internals.readDb`. Lesezugriffe gehen an das Replikat; Schreibzugriffe verbleiben auf der primären Datenbank.
 
 ## Drizzle-Integration
+Sie müssen sich nicht zwischen Rebase und Drizzle entscheiden. Der Treiber kompiliert Ihre Schemas dynamisch, und `internals.db` ist der typisierte Drizzle-`NodePgDatabase`-Client für rohes SQL oder typsichere Drizzle-Builder neben den REST-Diensten von Rebase.
 
-Sie müssen sich nicht zwischen Rebase und Drizzle entscheiden. Der Treiber kompiliert Ihre Schemas dynamisch, und `internals.db` ist der typisierte Drizzle-`NodePgDatabase`-Client, für rohes SQL oder typsichere Drizzle-Builder neben den REST-Diensten von Rebase.
-
-## Verbindungen sauber beenden (Graceful Draining)
-
-In Serverless-Umgebungen oder Orchestratoren (wie Kubernetes) kann das Beenden von Pods zu abgebrochenen Verbindungen führen. Implementieren Sie stets Signal-Handler, die `internals.realtimeService.stopListening()` (beendet den dedizierten pg-LISTEN-Client) und `pool.end()` aufrufen, damit Sie auf Ihrem Datenbankserver keine Verbindungsslots verlieren.
+## Graceful Connection Draining
+In serverlosen Umgebungen oder Orchestratoren (wie Kubernetes) kann das Beenden von Pods zu abgebrochenen Verbindungen führen. Implementieren Sie immer Signal-Handler, die `internals.realtimeService.stopListening()` (wodurch der dedizierte pg-LISTEN-Client beendet wird) und `pool.end()` aufrufen, damit Sie keine Verbindungsslots auf Ihrem Datenbankserver belegen.
 
 ## Verwandte Themen
 
-- [Integration eines eigenen Servers](/docs/backend/custom-server/) — das gesamte Rebase-Backend, aus öffentlichen Bausteinen in Ihrem eigenen Server gebaut
-- [Skripte und die Konsole](/docs/backend/scripts/) — die Daten des Projekts aus einem Skript, einem Test oder einer REPL, ohne Server
+- [Integration eines benutzerdefinierten Servers](/docs/backend/custom-server/) — das gesamte Rebase-Backend, aufgebaut aus öffentlichen Bausteinen in Ihrem eigenen Server
+- [Skripte und die Konsole](/docs/backend/scripts/) — die Daten des Projekts aus einem Skript, einem Test oder einer REPL, ganz ohne Server

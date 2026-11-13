@@ -1,37 +1,37 @@
 ---
-sourceHash: 7f76b75fbc393e8c
-title: Deploy di Rebase su Google Cloud Platform
-description: Distribuisci la tua istanza Rebase in modo sicuro su GCP utilizzando Cloud SQL e Cloud Run, con particolare attenzione alle regioni dei data center UE.
+sourceHash: 0632063aadcff623
+title: Distribuzione di Rebase su Google Cloud Platform
+description: Distribuisci la tua istanza Rebase in modo sicuro su GCP utilizzando Cloud SQL e Cloud Run, concentrandoti sulle regioni dei data center dell'UE.
 sidebar_label: Google Cloud
 ---
 
 Google Cloud Platform (GCP) offre un'esperienza di sviluppo fluida per le applicazioni containerizzate. Per una configurazione di produzione solida, usa **Cloud SQL** per il database e **Cloud Run** per il runtime.
 
-Per garantire una rigorosa conformità ai dati a livello europeo, opera interamente all'interno di una regione UE come **europe-west3 (Frankfurt)**, **europe-west9 (Paris)** o **europe-west1 (Belgium)**.
+Per garantire una rigorosa conformità ai dati europei, opera interamente all'interno di una regione UE come **europe-west3 (Francoforte)**, **europe-west9 (Parigi)** o **europe-west1 (Belgio)**.
 
-Nulla in questa pagina è specifico di GCP per quanto riguarda il tuo progetto. Un deployment di Rebase è composto da due parti separabili: l'immagine di runtime pubblicata e il **bundle** prodotto da `rebase build` — e lo stesso bundle viene eseguito con Docker Compose su un computer portatile, su Rebase Cloud, tramite l'[Helm chart](/docs/deployment/kubernetes) e qui.
+Nulla in questa pagina riguarda il tuo progetto in modo specifico per GCP. Una distribuzione di Rebase è composta da due elementi separabili: l'immagine di runtime pubblicata e il **bundle** prodotto da `rebase build`; lo stesso bundle viene eseguito con Docker Compose su un laptop, su Rebase Cloud, tramite il [chart Helm](/docs/deployment/kubernetes) e qui.
 
-## 1. Eseguire il provisioning di Cloud SQL (PostgreSQL)
+## 1. Provisioning di Cloud SQL (PostgreSQL)
 
 1. Accedi alla console di **Cloud SQL** nella tua regione UE preferita.
-2. Fai clic su **Create Instance** e seleziona **PostgreSQL**.
-3. Imposta l'ID istanza e genera una password sicura per l'utente `postgres`.
-4. Espandi **Configuration Options** per scegliere un tipo di macchina (due vCPU sono un buon punto di partenza).
+2. Fai clic su **Crea istanza** e seleziona **PostgreSQL**.
+3. Imposta l'ID della tua istanza e genera una password sicura per l'utente `postgres`.
+4. Espandi **Opzioni di configurazione** per scegliere un tipo di macchina (due vCPU sono un buon punto di partenza).
 5. Configura un IP privato o una rete pubblica autorizzata, a seconda di come Cloud Run vi accederà.
 6. Componi il tuo URI di connessione:
    `postgresql://postgres:YOUR_PASSWORD@YOUR_IP:5432/postgres`
 
-Se le tue collezioni dichiarano una proprietà `vector`, abilita l'estensione una sola volta eseguendo `CREATE EXTENSION vector;` sul database.
+Se le tue tabelle dichiarano una colonna `col.vector()`, abilita l'estensione una sola volta eseguendo: `CREATE EXTENSION vector;` sul database.
 
-## 2. Creare il bundle e integrarlo in un'immagine
+## 2. Compilare il bundle e integrarlo in un'immagine
 
-Non c'è **alcuna immagine dell'applicazione da compilare dal tuo codice sorgente**. `rebase build` genera una directory `dist-bundle` con le tue collezioni compilate, funzioni, cron e — se il tuo progetto dichiara un'app statica — il tuo frontend compilato. L'immagine di runtime pubblicata la esegue:
+Non c'è **alcuna immagine dell'applicazione da compilare dal codice sorgente**. `rebase build` genera una directory `dist-bundle` con tabelle compilate, funzioni, cron job e, se il tuo progetto dichiara un'app statica, il frontend compilato. L'immagine di runtime pubblicata lo esegue:
 
 ```bash
 rebase build
 ```
 
-Cloud Run effettua il pull da un registry, quindi incorpora il bundle in un'immagine derivata. Tre righe, e fissa esattamente ciò che viene eseguito:
+Cloud Run esegue il pull da un registry, quindi integra il bundle in un'immagine derivata. Tre righe, e fissa esattamente ciò che viene eseguito:
 
 ```dockerfile title="Dockerfile"
 FROM rebasepro/server:0.30.1
@@ -53,9 +53,9 @@ docker build -t europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:lates
 docker push europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest
 ```
 
-L'aggiornamento futuro di Rebase richiede solo la modifica di quella riga `FROM`. Il tuo bundle rimane intatto.
+L'aggiornamento futuro di Rebase richiede solo la modifica di quella riga `FROM`. Il bundle rimane invariato.
 
-## 3. Eseguire il deploy su Cloud Run
+## 3. Distribuire su Cloud Run
 
 ```bash
 gcloud run deploy rebase-backend \
@@ -66,42 +66,44 @@ gcloud run deploy rebase-backend \
   --allow-unauthenticated
 ```
 
-Cloud Run inserisce `PORT` e il runtime vi si associa, quindi non c'è alcuna porta da configurare. Punta la startup probe a `/livez` anziché a `/health`: la seconda esegue un round-trip al database, pertanto una liveness probe su di essa riavvierebbe una revisione integra durante un breve singhiozzo del database.
+Cloud Run inserisce la variabile `PORT` a cui il runtime si associa, quindi non c'è alcuna porta da configurare. Punta il probe di avvio su `/livez` anziché su `/health`: quest'ultimo esegue un round-trip con il database, quindi un liveness probe su di esso riavvierebbe una revisione funzionante durante un temporaneo problema del database.
 
-`REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD` sono il modo in cui questo servizio ottiene un amministratore: in produzione il primo account a registrarsi non viene promosso, quindi nient'altro genererà il primo utente autenticato. Impostali prima che la prima revisione gestisca il traffico — consulta [Your first admin](/docs/getting-started/deployment/#your-first-admin).
+`REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD` sono il modo in cui questo servizio ottiene un amministratore: in produzione il primo account a registrarsi non viene promosso, quindi nient'altro genererà il primo utente autenticato. Impostali prima che la prima revisione gestisca il traffico — vedi [Il tuo primo amministratore](/docs/getting-started/deployment/#your-first-admin).
 
-`--set-env-vars` sostituisce l'**intero** blocco delle variabili d'ambiente a ogni deploy, quindi un deploy successivo che omette una variabile la rimuoverà silenziosamente. Mantieni l'elenco completo nel tuo script di deploy.
+`--set-env-vars` sostituisce l'**intero** blocco di variabili d'ambiente a ogni deploy, quindi una distribuzione successiva che omette una variabile la annullerà silenziosamente. Mantieni l'elenco completo nel tuo script di deploy.
 
-La connessione a un'istanza Cloud SQL privata richiede `--add-cloudsql-instances YOUR_PROJECT:REGION:INSTANCE` e un `DATABASE_URL` in formato socket; un'istanza pubblica con una rete autorizzata non richiede alcuno dei due.
+Per raggiungere un'istanza Cloud SQL privata sono necessari `--add-cloudsql-instances YOUR_PROJECT:REGION:INSTANCE` e un `DATABASE_URL` di tipo socket; per un'istanza pubblica con una rete autorizzata non è necessario alcuno dei due.
 
 ## 4. Lo schema
 
-**Il runtime crea le tabelle mancanti all'avvio, incluse quelle delle tue collezioni.** `REBASE_MIGRATE_ON_BOOT` ha come valore predefinito `ensure`, che è additivo su tutto lo schema: crea tabelle, colonne e tipi enum mancanti e applica la loro row-level security, consentendo al primo avvio su un'istanza vuota di essere subito pronto a gestire le tue collezioni.
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-Ciò che `ensure` non fa mai è modificare qualcosa che esiste già: non altera il tipo di una colonna, non elimina nulla e non modifica le etichette di un enum esistente, poiché l'avvio di una revisione non deve rimodellare uno schema come effetto collaterale di un deploy.
+**Il runtime crea le tabelle mancanti all'avvio, comprese quelle dichiarate da `backend/schema`.** `REBASE_MIGRATE_ON_BOOT` è impostato per impostazione predefinita su `ensure`, che è additivo per l'intero schema: crea tabelle, colonne e tipi enum mancanti e applica la loro row-level security, consentendo al primo avvio su un'istanza vuota di gestire immediatamente le tue collezioni.
 
-Un solo aspetto richiede quindi ancora l'uso della CLI, eseguita da un checkout locale o da un job di CI:
+Ciò che `ensure` non fa mai è modificare qualcosa che esiste già: non altera il tipo di una colonna, non elimina nulla e non modifica i valori di un enum esistente, poiché l'avvio di una revisione non deve rimodellare uno schema come effetto collaterale di un deploy.
+
+Per una cosa, quindi, è ancora necessaria la CLI, eseguita da un checkout locale o da un job CI:
 
 ```bash
 rebase db push
 ```
 
-Qualsiasi modifica non puramente additiva — una colonna rinominata, un tipo ristretto, un campo rimosso.
+Qualsiasi modifica che non sia puramente additiva: una colonna rinominata, un tipo ristretto, un campo rimosso.
 
-Dalla tua macchina, connettiti tramite il [Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/sql-proxy) e punta `DATABASE_URL` su `localhost`. L'immagine di runtime viene fornita senza la CLI, quindi questa operazione non viene mai eseguita all'interno del container Cloud Run. Per le migrazioni con controllo di versione, esegui il commit dei file di migrazione con `rebase db generate` ed esegui `rebase db migrate` come passaggio di rilascio.
+Dalla tua macchina, connettiti tramite il [Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/sql-proxy) e punta `DATABASE_URL` su `localhost`. L'immagine di runtime viene fornita senza la CLI, quindi questo non viene mai eseguito all'interno del container Cloud Run. Per le migrazioni con controllo di versione, esegui il commit dei file di migrazione con `rebase db generate` ed esegui invece `rebase db migrate` come passaggio di rilascio.
 
 ## Archiviazione dei file
 
-Le istanze di Cloud Run sono stateless ed effimere, pertanto l'archiviazione locale dei file comporta una perdita silenziosa di dati e il runtime la rifiuta in produzione.
+Le istanze di Cloud Run sono stateless ed effimere, quindi l'archiviazione di file in locale comporterebbe una perdita silenziosa di dati e il runtime la rifiuta in produzione.
 
-1. Crea un bucket privato di Google Cloud Storage nella regione UE che hai scelto.
-2. Crea una chiave HMAC per un service account che possa usare il bucket (**Cloud Storage → Settings → Interoperability**) e raggiungi il bucket tramite il suo endpoint compatibile con S3: `STORAGE_TYPE=s3`, `S3_BUCKET`, `S3_ENDPOINT=https://storage.googleapis.com`, `S3_REGION=auto` e la chiave come `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` — consulta [Storage](/docs/backend/storage). `STORAGE_TYPE=gcs` carica `@google-cloud/storage`, che l'immagine di runtime non include, e una copia nel tuo bundle non si trova nel suo percorso di risoluzione.
+1. Crea un bucket Google Cloud Storage privato nella regione UE prescelta.
+2. Crea una chiave HMAC per un account di servizio autorizzato a utilizzare il bucket (**Cloud Storage → Impostazioni → Interoperabilità**), e raggiungi il bucket tramite il suo endpoint compatibile con S3: `STORAGE_TYPE=s3`, `S3_BUCKET`, `S3_ENDPOINT=https://storage.googleapis.com`, `S3_REGION=auto`, e la chiave come `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` — vedi [Archiviazione](/docs/backend/storage). `STORAGE_TYPE=gcs` carica `@google-cloud/storage`, che non è incluso nell'immagine di runtime, e un'eventuale copia nel bundle non si trova nel suo percorso di risoluzione.
 
 :::caution
-Cloud Run scala a zero. Se il tuo progetto utilizza sottoscrizioni in tempo reale, imposta `--min-instances 1`: le connessioni WebSocket vengono terminate quando un'istanza viene ridotta a zero.
+Cloud Run scala a zero. Se il tuo progetto utilizza sottoscrizioni in tempo reale, imposta `--min-instances 1`: le connessioni WebSocket vengono terminate quando un'istanza viene ridimensionata.
 :::
 
 ## Passaggi successivi
 
-- [Deployment](/docs/getting-started/deployment) — la checklist per la produzione e le regole per il primo amministratore comuni a tutte le piattaforme.
+- [Distribuzione](/docs/getting-started/deployment) — la checklist di produzione e le regole per il primo amministratore comuni a ogni piattaforma.
 - [Configurazione](/docs/getting-started/configuration) — tutte le variabili d'ambiente lette dal runtime.

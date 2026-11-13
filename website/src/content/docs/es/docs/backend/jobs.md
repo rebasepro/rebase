@@ -1,32 +1,42 @@
 ---
-sourceHash: 812f7d9ff5297c33
+sourceHash: 9e21b0515cf58869
 title: Trabajos en segundo plano
 sidebar_label: Trabajos en segundo plano
-description: Una cola de trabajos duradera respaldada por Postgres — trabajo que sobrevive a un reinicio, reintentado con retroceso, donde los fallos se conservan en lugar de descartarse.
+description: Una cola de trabajos duradera respaldada por Postgres — trabajo que sobrevive a un reinicio, se reintenta con backoff y conserva los fallos en lugar de descartarlos.
 ---
 
-## Descripción general
+## Visión general
 
-Un trabajo es una fila en `rebase.jobs`. Es reclamado exactamente por un worker, reintentado con un retraso creciente si su handler lanza un error, y se mantiene en la tabla cuando finalmente se rinde para que alguien pueda revisarlo.
+Un trabajo es una fila en `rebase.jobs`. Es reclamado por exactamente un worker,
+reintentado con un retraso creciente si su handler lanza un error, y se mantiene en
+la tabla cuando finalmente desiste para que alguien pueda inspeccionarlo.
 
-No hay nada que instalar ni nada que ejecutar junto a Postgres. Un trabajo encolado dentro de una transacción que hace rollback nunca fue encolado.
+No hay nada que instalar ni nada que ejecutar junto a Postgres. Un trabajo
+encolado dentro de una transacción que se revierte (rollback) nunca llegó a encolarse.
 
-Úselo para trabajo que no debe perderse y no debe ocurrir dentro de una solicitud: enviar correos, llamar a servicios de terceros, generar un archivo, conciliar con un sistema externo.
+Utilízalo para tareas que no deban perderse y no deban ocurrir dentro de una petición:
+enviar correos, llamar a servicios de terceros, generar un archivo, sincronizar con un
+sistema externo.
 
-| | Se ejecuta | Sobrevive a un reinicio |
+| | Ejecución | Sobrevive a un reinicio |
 |---|---|---|
 | [Cron](/docs/backend/cron-jobs) | Según una programación | Sí — la programación está en el código |
-| **Trabajos** | Una vez, tan pronto como un worker esté libre | **Sí — el trabajo es una fila** |
+| **Jobs** | Una vez, tan pronto como un worker esté libre | **Sí — el trabajo es una fila** |
 | Un `setTimeout` en un callback | Una vez, en este proceso | No |
 
 ## Habilitación
 
 :::note[Dónde va esto]
-**Runtime gestionado**: en ninguna parte. `jobs` recibe *funciones* handler, que ninguna variable de entorno ni exportación de `config/index.ts` puede transportar, así que un proyecto generado mediante scaffolding no puede habilitar la cola. Ejecuta `rebase eject` (o escribe un [servidor personalizado](/docs/backend/custom-server/)) para acceder a ella. `REBASE_JOB_WORKERS` en `.env` solo decide si los workers de una cola ya habilitada se ejecutan en *este* proceso.
+**Runtime gestionado** — en ningún lugar. `jobs` recibe *funciones* handler, que
+ninguna variable de entorno ni exportación de `backend/storage.ts` o `backend/hooks.ts` puede contener,
+por lo que un proyecto generado no puede habilitar la cola. Ejecuta `rebase eject` (o escribe un
+[servidor personalizado](/docs/backend/custom-server/)) para acceder a ella. `REBASE_JOB_WORKERS`
+en `.env` solo decide si los workers de una cola ya habilitada se ejecutan en *este*
+proceso.
 
-**Ejected**: el bloque `jobs` en `initializeRebaseBackend({ … })`, como se muestra a continuación.
+**Ejected** — el bloque `jobs` en `initializeRebaseBackend({ … })`, como se muestra a continuación.
 
-El mapa completo está en la [Descripción general del backend](/docs/backend/#where-each-option-lives).
+El mapa completo se encuentra en [Visión general del backend](/docs/backend/#where-each-option-lives).
 :::
 
 ```typescript no-verify
@@ -42,25 +52,28 @@ await initializeRebaseBackend({
 });
 ```
 
-Desactivado a menos que lo solicite: un worker sigue buscando trabajo mientras el proceso viva, lo cual no es un valor predeterminado que cualquiera elegiría. Necesita un controlador capaz de ejecutar SQL; en uno que no puede (MongoDB), la cola no está disponible y se le informa al arrancar en lugar de al realizar el primer encolado.
+Desactivado a menos que lo solicites: un worker continúa buscando trabajo mientras el
+proceso esté activo, lo cual no es un comportamiento predeterminado que nadie haya elegido. Requiere un driver que
+pueda ejecutar SQL; en uno que no pueda, la cola no estará disponible y se te notificará
+al arrancar en lugar de al realizar el primer encolado.
 
-Un worker inactivo no sondea cada dos segundos. Cada encolado envía un
-`NOTIFY` en el canal `rebase_jobs` cuando se confirma, y un worker que mantiene un
-`LISTEN` sobre él reclama de inmediato: un trabajo encolado por otro proceso (el rol
-`api`, otra réplica) empieza en milisegundos, y uno diferido cuando
-vence. Aun así, revisa cada 30 segundos de todos modos. Un trabajo que encola este proceso,
-un reintento que programó y un trabajo que recuperó lo despiertan sin
-notificación.
+Un worker inactivo no realiza sondeos (polling) cada dos segundos. Cada encolado envía un
+`NOTIFY` en el canal `rebase_jobs` cuando se confirma la transacción (commit), y un worker que mantenga un
+`LISTEN` sobre él lo reclama de inmediato: un trabajo encolado por otro proceso (el rol `api`,
+otra réplica) comienza en cuestión de milisegundos, y uno diferido, cuando llegue su
+vencimiento. Además de eso, comprueba cada 30 segundos de todos modos. Un trabajo que este proceso
+encole, un reintento que haya programado y un trabajo que haya recuperado lo despiertan sin
+necesidad de notificación.
 
-El `LISTEN` necesita una conexión propia, que se busca como la busca el tiempo real:
-`DATABASE_DIRECT_URL` si está definida, si no `DATABASE_URL`. Detrás de un pooler en modo transacción
-como PgBouncer, define `DATABASE_DIRECT_URL`: un pooler no mantiene un
-`LISTEN`, y los trabajos de otros procesos esperarían entonces a la revisión de 30 segundos.
-Donde no hay ninguna conexión así (la base de datos de desarrollo en proceso),
-un worker inactivo espacia sus revisiones: mira tras `pollIntervalMs` (2 segundos),
-luego el doble de tiempo tras cada revisión que no encontró nada, hasta 30 segundos, y
-vuelve a empezar cada vez que encuentra trabajo. Un worker inactivo hace unos 2.900 reclamos
-al día en lugar de 43.200.
+El `LISTEN` necesita una conexión propia, encontrada del mismo modo en que realtime encuentra una:
+`DATABASE_DIRECT_URL` si está configurada, o `DATABASE_URL` en caso contrario. Detrás de un pooler en modo transacción
+como PgBouncer, configura `DATABASE_DIRECT_URL`: un pooler no mantiene un
+`LISTEN`, y los trabajos de otros procesos tendrían que esperar a la comprobación de los 30 segundos.
+Donde no exista dicha conexión en absoluto (la base de datos de desarrollo en el proceso),
+un worker inactivo aplica backoff en su lugar: comprueba tras `pollIntervalMs` (2 segundos),
+luego el doble de tiempo tras cada comprobación que no encuentre nada, hasta 30 segundos, y
+vuelve a empezar cada vez que encuentra trabajo. Un worker inactivo realiza alrededor de 2.900 reclamaciones al
+día en lugar de 43.200.
 
 ## Encolado
 
@@ -80,15 +93,27 @@ await jobQueue?.enqueue("send-digest", { userId: "u7" }, {
 });
 ```
 
-`idempotencyKey` unifica un doble clic, una solicitud reintentada y dos instancias que reaccionan al mismo evento en un solo trabajo. Está delimitado al trabajo no finalizado, por lo que la clave vuelve a ser reutilizable una vez que el trabajo se completa; de lo contrario, "el resumen nocturno para el usuario 7" solo se podría enviar exactamente una vez en la historia. Un encolado duplicado se resuelve como `null` en lugar de lanzar un error: el trabajo solicitado ya está en cola, que es el resultado deseado.
+`idempotencyKey` unifica un doble clic, una petición reintentada y dos instancias
+reaccionando al mismo evento en un único trabajo. Está delimitado al trabajo no finalizado,
+por lo que la clave vuelve a ser reutilizable una vez que el trabajo se completa; de lo contrario, «el
+resumen nocturno para el usuario 7» solo se podría enviar exactamente una vez en toda la historia. Un encolado
+duplicado se resuelve como `null` en lugar de lanzar una excepción: el trabajo solicitado queda encolado,
+que es el resultado esperado.
 
 ## Fallos
 
-Un handler falla al lanzar una excepción (throw). No existe un `return false`: un booleano sería ignorado silenciosamente por cualquier handler que olvidara retornar uno, y el fallo debe ser lo que se obtenga por defecto.
+Un handler falla al lanzar una excepción. No existe `return false`; un booleano sería
+ignorado silenciosamente por cualquier handler que olvidara devolverlo, y el fallo debe
+ser el comportamiento por defecto.
 
-- **Intentos restantes** → vuelve a `pending`, con `run_at` pospuesto por el retroceso (1s, 5s, 25s … con un límite de una hora; modifíquelo con `backoff`).
-- **Sin intentos restantes** → `failed`, y la fila *permanece*. Una cola que descarta silenciosamente lo que no pudo entregar es indistinguible de una que no tiene nada que hacer.
-- **Un fallo que ningún reintento puede cambiar** → lanza `PermanentJobError`, desde `@rebasepro/server`: el trabajo pasa a `failed` en este intento, con el mensaje como su `last_error`, en lugar de gastar los intentos que le quedan.
+- **Intentos restantes** → vuelve a `pending`, con `run_at` pospuesto por el backoff
+  (1s, 5s, 25s… limitado a una hora; personalizable con `backoff`).
+- **Sin intentos restantes** → `failed`, y la fila *permanece*. Una cola que descarta
+  silenciosamente lo que no pudo procesar es indistinguible de una que no tiene nada
+  que hacer.
+- **Un fallo que ningún reintento puede solucionar** → lanza `PermanentJobError`, de
+  `@rebasepro/server`: el trabajo pasa a `failed` en este intento, con el
+  mensaje como su `last_error`, en lugar de consumir sus intentos restantes.
 
 ```sql
 SELECT task, attempts, last_error, updated_at
@@ -97,14 +122,21 @@ ORDER BY updated_at DESC;
 ```
 
 Las filas fallidas se conservan 30 días; las exitosas, 3. Cada worker elimina las
-filas caducadas al arrancar y después cada hora, por lotes y fuera de la ruta de
-las solicitudes.
+filas expiradas al iniciarse y luego cada hora, por lotes, fuera de la
+ruta de las peticiones.
 
 ## Qué sucede cuando un worker muere
 
-Un proceso terminado a mitad de un trabajo no puede liberar su bloqueo, por lo que solo un tiempo de espera (timeout) liberará la fila. Mientras un handler se ejecuta, su worker renueva el bloqueo cada tercio de `visibilityTimeoutMs` (por defecto 5 minutos). Un bloqueo que pasa ese tiempo sin renovarse se vuelve a reclamar: vuelve a `pending` si al trabajo le quedan intentos; de lo contrario, se envía a la cola de fallidos (dead-letter) con un error que explica lo sucedido.
+Un proceso terminado a mitad de un trabajo no puede liberar su reclamación, por lo que nada salvo un tiempo de espera (timeout)
+liberará la fila. Mientras un handler se ejecuta, su worker renueva la reclamación cada tercio de
+`visibilityTimeoutMs` (por defecto 5 minutos). Una reclamación que pase ese tiempo
+sin renovarse es recuperada: vuelve a `pending` si el trabajo aún tiene intentos
+restantes, o se envía a la cola de fallos definitivos (dead-letter) con un error indicando lo sucedido.
 
-Así, un handler lento en un worker vivo conserva su trabajo, tarde lo que tarde, y el tiempo de espera solo decide cuánto tardan en volver los trabajos de un worker muerto. Un intento que perdió su bloqueo tampoco puede sobrescribir el resultado del trabajo: su éxito o fallo se registra en el log y se descarta, y decide el intento que tenga el bloqueo.
+De este modo, un handler lento en un worker activo mantiene su trabajo, sin importar cuánto tarde, y el
+timeout solo determina la rapidez con la que se recuperan los trabajos de un worker caído. Un intento que
+haya perdido su reclamación tampoco puede sobrescribir el resultado del trabajo: su éxito o fallo
+se registra en los logs y se descarta, y el intento que mantenga la reclamación es el que decide.
 
 ```typescript no-verify
 jobs: {
@@ -117,18 +149,18 @@ jobs: {
 
 ### Un handler que nunca termina
 
-La otra cara: un handler que espera un `fetch` que nunca responde retiene su ranura de
-worker, y su reclamo, mientras el proceso viva — cinco de ellos y el worker no ejecuta
-nada más, mientras `/health` sigue en verde.
+La otra cara de la moneda: un handler esperando un `fetch` que nunca responde retiene su
+ranura de worker, y su reclamación, mientras el proceso continúe en ejecución; con cinco de ellos, el
+worker no ejecutará nada más, mientras que `/health` se mantendrá en verde.
 `timeoutMs`
-acota un intento. Al llegar al límite, el intento falla — se reintenta mientras queden
-intentos, como cualquier excepción —, su ranura se libera y el `signal` del handler se
-aborta. Pásalo a lo que corresponda, para que el trabajo también se detenga; un handler que lo ignora
-sigue ejecutándose en segundo plano sin que nada registre su resultado.
+limita un intento. Al alcanzarse el límite, el intento falla —reintentándose mientras queden
+intentos disponibles, como cualquier excepción—, su ranura se libera y el `signal` del handler se
+aborta. Pasa la señal (signal) para que el trabajo también se detenga; un handler que la ignore
+seguirá ejecutándose en segundo plano sin que nada registre su resultado.
 
-Si se omite, son 15 minutos (`900_000`), y el worker lo indica en una línea de log al
-arrancar. Un job que legítimamente dura más fija su propio valor, y `timeoutMs: 0` elimina
-el límite.
+Si se omite, es de 15 minutos (`900_000`), y el worker lo indicará en una línea de log
+al iniciarse. Un trabajo que legítimamente requiera más tiempo puede definir su propio valor, y
+`timeoutMs: 0` elimina el límite.
 
 ```typescript no-verify
 jobs: {
@@ -146,24 +178,31 @@ Los handlers de cola y las suscripciones a temas reciben el mismo `signal` en su
 
 ## Varias instancias
 
-Seguro por diseño. Los workers reclaman con `SELECT … FOR UPDATE SKIP LOCKED`, por lo que cada trabajo va a exactamente uno de ellos y los demás pasan a la siguiente fila en lugar de hacer cola detrás de ella. No es necesario elegir ningún líder.
+Seguro por diseño. Los workers reclaman con `SELECT … FOR UPDATE SKIP LOCKED`, de modo
+que cada trabajo va exactamente a uno de ellos y los demás pasan a la siguiente fila
+en lugar de encolarse detrás. No es necesario elegir ningún líder.
 
-Una instancia solo reclama las tareas para las que tiene un handler. Durante un despliegue progresivo (rolling deploy), una instancia que ejecuta código más antiguo deja de lado los trabajos cuya tarea solo implementa el código nuevo: permanecen en `pending`, sin gastar ningún intento, hasta que un par actualizado los reclama. Una tarea que ninguna instancia implementa también permanece en `pending`, en lugar de ir a la cola de mensajes fallidos (dead-letter).
+Una instancia reclama únicamente las tareas para las cuales tiene un handler. Durante un despliegue continuo (rolling deploy),
+una instancia que ejecute código más antiguo ignora los trabajos cuyas tareas solo implementa
+el código nuevo: permanecen en `pending`, con sus intentos intactos, hasta que un par
+actualizado los reclame. Una tarea que ninguna instancia implemente también permanece en `pending`, en lugar
+de enviarse a dead-letter.
 
-## Análisis de huérfanos de almacenamiento
+## Escaneos de huérfanos de almacenamiento
 
-`rebase storage orphans` se ejecuta en esta cola cuando está activada: cada
-análisis, y cada eliminación a partir de un análisis, es un trabajo
-`storage.orphans`, con un solo intento. El backend registra el handler por sí
-mismo, en cada proceso con almacenamiento configurado, y solo lo ejecutan los
-procesos cuyos workers de trabajos están activados. Un análisis está limitado por
-`timeoutMs` como cualquier trabajo, así que un origen demasiado grande para
-analizarlo en 15 minutos necesita un `timeoutMs` mayor, o 0. Sin la cola, el
-servidor ejecuta el análisis dentro de su propio proceso. Consulta [la CLI](/docs/cli/#rebase-storage).
+`rebase storage orphans` se ejecuta en esta cola cuando está habilitada: cada escaneo, y cada
+eliminación derivada de un escaneo, es un trabajo de `storage.orphans`, con un solo intento. El backend
+registra el handler automáticamente, en cada proceso con almacenamiento configurado, y
+solo los procesos cuyos workers de trabajos estén activos lo ejecutan. Un escaneo está limitado por
+`timeoutMs` como cualquier trabajo, por lo que un origen demasiado grande para escanearse en 15 minutos necesita un
+`timeoutMs` mayor, o 0. Sin la cola, el servidor ejecuta el escaneo dentro de
+su propio proceso. Consulta [la CLI](/docs/cli/#rebase-storage).
 
 ## Webhooks duraderos
 
-[`WebhookDispatcher`](/docs/recipes/webhooks) encola sus entregas en memoria por defecto, lo que significa que una caída o un despliegue entre el cambio y la entrega descarta el evento. Proporciónele la cola y cada entrega se convertirá en una fila:
+[`WebhookDispatcher`](/docs/recipes/webhooks) encola sus entregas en memoria por
+defecto, lo que significa que una caída o un despliegue entre el cambio y la entrega
+descarta el evento. Conéctalo a la cola y cada entrega se convertirá en una fila:
 
 ```typescript no-verify
 import { WebhookDispatcher, WEBHOOK_DELIVERY_TASK } from "@rebasepro/server";
@@ -176,15 +215,27 @@ dispatcher.setWebhooks(myWebhooks);
 jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never, ctx));
 ```
 
-Solo el **id** del webhook se almacena en el trabajo, nunca el webhook en sí; de lo contrario, su secreto de firma permanecería en texto plano en `rebase.jobs` durante todo el tiempo que la retención conserve la fila, y un webhook editado entre el encolado y la entrega debe enviarse con su estado actual. Pasar `ctx` como segundo argumento hace que cada intento envíe su propio `X-Webhook-Attempt`; todos los intentos de una misma entrega envían el mismo `X-Webhook-Delivery`, de modo que un receptor puede deduplicar los reintentos.
+Solo el **id** del webhook se almacena en el trabajo, nunca el webhook en sí; de lo
+contrario, su secreto de firma residiría en `rebase.jobs` en texto no cifrado durante el tiempo que
+la retención conserve la fila, y un webhook editado entre el encolado y la
+entrega debe procesarse con su estado actual. Al pasar `ctx` como segundo argumento,
+cada intento envía su propio `X-Webhook-Attempt`; todos los intentos de una misma entrega envían
+el mismo `X-Webhook-Delivery`, lo que permite al receptor deduplicar los reintentos.
 
-Una entrega que el dispatcher se niega a enviar (un destino loopback, link-local, privado o que no sea `http(s)`), o una que el receptor responde con una redirección, falla de la misma manera cada vez. Pasa a dead-letter tras un solo intento, con el motivo en `last_error`. Cualquier otro fallo se reintenta como en cualquier trabajo.
+Una entrega que el despachador rechace enviar (un destino loopback, link-local, privado o
+no `http(s)`), o una a la que el receptor responda con una redirección, falla de la
+misma manera siempre. Se envía a dead-letter tras un intento, con el motivo
+en `last_error`. Cualquier otro fallo se reintenta como cualquier otro trabajo.
 
 ## Apagado
 
-`shutdown()` detiene al worker para que no reclame nuevos trabajos y espera a los que están en curso, de modo que un despliegue no ejecute dos veces el final de un lote. La espera está limitada a dos tercios del tiempo de espera de apagado (10 segundos de los 15 predeterminados), para que un handler que nunca termina no pueda retener el apagado. Un trabajo que siga ejecutándose después conserva su reclamo y se recupera mediante el tiempo de espera de visibilidad.
+`shutdown()` detiene al worker para que no reclame nuevos trabajos y espera a los que están
+en curso, de modo que un despliegue no ejecute dos veces el final de un lote. La espera está limitada
+a dos tercios del tiempo de espera de apagado (10 segundos del valor predeterminado de 15), por lo que un
+handler que nunca finalice no podrá bloquear el apagado. Un trabajo que continúe ejecutándose después de
+eso conserva su reclamación y es recuperado por el tiempo de espera de visibilidad.
 
 ## Próximos pasos
 
-- **[Trabajos Cron](/docs/backend/cron-jobs)** — trabajo según una programación
+- **[Cron Jobs](/docs/backend/cron-jobs)** — tareas según una programación
 - **[Webhooks](/docs/recipes/webhooks)** — notificar a otros sistemas ante un cambio

@@ -1,151 +1,165 @@
 ---
-sourceHash: 3e040c7b4aa68995
-title: Rebase non fa X
+sourceHash: 8412da52cc99478c
+title: Rebase non supporta X
 sidebar_label: Estendere il server
-description: La scala di estensione lato server — dichiarazione, callback di collezione, funzione personalizzata, rotte personalizzate, server personalizzato, eject — con ciò che ciascuno può e non può raggiungere.
+description: La scala di estensione lato server — dichiarazione, hook di tabella, funzione personalizzata, rotte personalizzate, server personalizzato, eject — con ciò che ciascun livello può e non può raggiungere.
 ---
 
 ## Panoramica
 
-Qualcosa di cui hai bisogno non si trova nella configurazione della collezione. Questa pagina descrive l'ordine in cui provare le varie soluzioni e — aspetto ancora più utile — ciò che ogni gradino *non può* raggiungere, in modo da fermarti al primo in grado di svolgere il lavoro.
+Qualcosa di cui hai bisogno non è presente nella definizione della tabella. Questa pagina indica l'ordine in cui
+provare le diverse soluzioni e — cosa ancora più utile — ciò che ciascun livello *non* può
+raggiungere, in modo da fermarsi a salire la scala non appena trovi quello adatto al tuo scopo.
 
 Esiste una pagina corrispondente per il pannello di amministrazione:
-[Extending Rebase](/docs/frontend/extending) copre plugin, slot, override dei componenti
-e viste personalizzate. Questa è dedicata al server.
+[Estendere Rebase](/docs/frontend/extending) tratta plugin, slot, override dei componenti
+e viste personalizzate. Questa pagina è dedicata al server.
 
-La regola che la scala riflette: **ogni gradino comporta un costo rispetto a ciò che quello sottostante manteneva.** Una dichiarazione è portabile, aggiornabile e compresa dal pianificatore dello schema, dall'SDK generato e dal pannello di amministrazione. Nel momento in cui raggiungi `rebase eject`, diventi responsabile della sequenza di avvio e gli aggiornamenti del runtime della piattaforma non raggiungeranno più il tuo progetto. Sali quindi solo fino a dove è strettamente necessario.
+La regola codificata dalla scala: **ogni gradino costa qualcosa che quello inferiore
+manteneva.** Una dichiarazione è portabile, aggiornabile e compresa dal pianificatore
+dello schema, dall'SDK generato e dal pannello di amministrazione. Nel momento in cui arrivi a
+`rebase eject` diventi responsabile della sequenza di avvio, e gli aggiornamenti del runtime
+della piattaforma non raggiungeranno più il tuo progetto. Quindi sali solo fino a dove è strettamente necessario.
 
 ## La scala
 
-| # | Gradino | Raggiunge | **Non** raggiunge | Costo di questa scelta |
+| # | Gradino | Cosa raggiunge | Cosa **non** raggiunge | Costo di questa scelta |
 |---|---|---|---|---|
-| 1 | **Dichiarazione** — una proprietà, una relazione, un indice, un blocco `search`, una regola di sicurezza | Lo schema, l'SDK generato, il pannello di amministrazione, il pianificatore delle migrazioni | Tutto ciò che richiede l'esecuzione di codice | Nessuno. Questo è il percorso supportato |
-| 2 | **Callback di collezione** — `beforeQuery`, `afterRead`, `beforeSave`, `afterSave`, `beforeDelete`, `afterDelete` | Ogni lettura e scrittura di una collezione, su qualsiasi trasporto, all'interno della transazione della richiesta stessa | Richieste che non toccano alcuna collezione; l'involucro della risposta; tutto ciò che è asincrono rispetto alla scrittura | Viene eseguito sull'hot path, mantenendo aperta la transazione |
-| 3 | **Funzione personalizzata** — un'app Hono in `functions/` | Il proprio URL, con autenticazione risolta, il driver limitato al chiamante e `rebase` a disposizione | Le rotte `/api/data` integrate. Si posiziona *accanto* ad esse, non davanti | Una superficie in più da autorizzare; nessun metodo SDK generato per essa |
-| 4 | **Rotte e middleware personalizzati** sull'app Hono | Qualsiasi elemento HTTP, inclusi i percorsi eseguiti *prima* dei router di Rebase | Il driver e l'identità del chiamante, a meno che non protegga tu stesso la rotta | Fuori da ogni router Rebase: nessun middleware di autenticazione è stato eseguito |
-| 5 | **Server personalizzato** — costruisci il backend con `createRebaseBackend` e monta i gruppi di rotte che vuoi, oppure incorpora il solo driver in Express, Fastify o semplice `http` | Ogni gruppo di rotte, al percorso che scegli, e quale processo avvia i timer; in fondo, solo l'adattatore dati e il realtime | Con il solo driver: tutto il resto, dalle rotte di autenticazione e lo storage al cron e all'API di amministrazione | Chiami tu ogni passaggio che `initializeRebaseBackend` faceva al tuo posto |
-| 6 | **`rebase eject`** | L'entrypoint e il `Dockerfile`, nel tuo repository | — | **Gli aggiornamenti del runtime della piattaforma non raggiungono più questo progetto.** CORS, configurazione dell'autenticazione, storage e shutdown diventano a carico tuo |
+| 1 | **Dichiarazione** — una colonna, una relazione, un indice, un blocco `search`, una regola `rls` | Lo schema, l'SDK generato, il pannello di amministrazione, il migration planner | Qualsiasi cosa debba eseguire codice | Nessuno. Questo è il percorso supportato |
+| 2 | **Hook di tabella** — `beforeQuery`, `afterRead`, `beforeSave`, `afterSave`, `beforeDelete`, `afterDelete` | Ogni lettura e scrittura di una tabella, su qualsiasi trasporto, all'interno della transazione della richiesta | Richieste che non toccano alcuna tabella; l'envelope della risposta; qualsiasi operazione asincrona rispetto alla scrittura | Viene eseguito sull'hot path, mantenendo aperta la transazione |
+| 3 | **Funzione personalizzata** — un'app Hono in `functions/` | Il proprio URL, con l'autenticazione risolta, il driver limitato al chiamante e l'oggetto `rebase` a disposizione | Le rotte integrate `/api/data`. Si posiziona *accanto* ad esse, non davanti | Una superficie in più da autorizzare; nessun metodo SDK viene generato per essa |
+| 4 | **Rotte e middleware personalizzati** sull'app Hono | Qualsiasi elemento HTTP, inclusi i percorsi eseguiti *prima* dei router di Rebase | Il driver e l'identità del chiamante, a meno che non protegga tu stesso la rotta | Fuori da ogni router di Rebase: nessun middleware di autenticazione è stato eseguito |
+| 5 | **Server personalizzato** — compila il backend con `createRebaseBackend` e monta i gruppi di rotte desiderati, oppure integra solo il driver in Express, Fastify o semplice `http` | Ciascun gruppo di rotte, nel percorso scelto, e il controllo su quale processo avvia i timer; al livello minimo, solo l'adattatore dati e realtime | Con il solo driver: tutto il resto, dalle rotte di autenticazione e lo storage fino a cron e all'API admin | Chiami manualmente ogni passaggio che `initializeRebaseBackend` eseguiva per te |
+| 6 | **`rebase eject`** | L'entrypoint e il `Dockerfile`, nel tuo repository | — | **Gli aggiornamenti del runtime della piattaforma smettono di raggiungere questo progetto.** CORS, configurazione dell'autenticazione, storage e arresto diventano tua responsabilità |
 
-:::tip[Due gradini vengono spesso saltati senza motivo]
-`beforeQuery` (gradino 2) restringe una lettura *prima che venga compilata*, motivo
-per cui solitamente le persone ricorrono al gradino 3 o 5. E un blocco `search` con
-`mode: "hybrid"` (gradino 1) è ciò per cui le persone di solito ricorrono all'SQL grezzo. Entrambi sono
-abbastanza recenti da non essere menzionati nelle risposte più datate su internet.
+:::tip[Due gradini vengono comunemente saltati senza motivo]
+`beforeQuery` (gradino 2) restringe una lettura *prima che venga compilata*, che è il
+motivo per cui le persone di solito ricorrono al gradino 3 o 5. E un blocco `search` con
+`mode: "hybrid"` (gradino 1) è ciò per cui le persone di solito ricorrono a SQL grezzo. Entrambi sono
+abbastanza recenti, quindi le risposte più datate su internet non li menzionano.
 :::
 
 ## 1. Dichiarazione
 
-La maggior parte di ciò di cui ha bisogno un backend è una dichiarazione sulla collezione, perché una
-dichiarazione è l'unico gradino che il resto del sistema può leggere. Il pianificatore dello schema
+La maggior parte di ciò di cui un backend ha bisogno è una dichiarazione sulla tabella, poiché una
+dichiarazione è l'unico gradino leggibile dal resto del sistema. Il pianificatore dello schema
 la trasforma in DDL, il generatore di codice la trasforma in metodi SDK, il pannello di amministrazione
 la renderizza e `rebase doctor` la confronta con il database attivo.
 
 | Voglio… | Dichiarare | Riferimento |
 |---|---|---|
-| Aggiungere una colonna | una proprietà | [Properties](/docs/collections/properties) |
-| Collegare due collezioni | una proprietà `relation` | [Relations](/docs/collections/relations) |
-| Velocizzare una query | `indexes` | [Indexes](/docs/backend/indexes) |
-| Decidere chi può leggere o scrivere una riga | `securityRules` | [Authentication](/docs/backend/authentication) |
-| Cercare testo correttamente — accenti, JSONB, ranking, sottostringhe | un blocco `search` | [Search](/docs/backend/search) |
-| Trovare righe per significato semantico | una proprietà `vector` | [Search](/docs/backend/search) |
-| Mantenere le righe cancellate | `softDelete` | [Soft delete](/docs/collections/soft-delete) |
-| Registrare chi ha modificato cosa | `history` | [History](/docs/backend/history) |
-| Eseguire un'attività pianificata | un file cron job | [Cron Jobs](/docs/backend/cron-jobs) |
-| Eseguire qualcosa dopo una scrittura, fuori banda | un job | [Jobs](/docs/backend/jobs) |
+| Aggiungere una colonna | una colonna `col.*` | [Colonne](/docs/schema/columns/) |
+| Collegare due tabelle | una relazione `rel.*` | [Relazioni](/docs/collections/relations) |
+| Rendere veloce una query | `indexes` | [Indici](/docs/backend/indexes) |
+| Decidere chi può leggere o scrivere una riga | `rls` | [Sicurezza a livello di riga](/docs/collections/security-rules/) |
+| Cercare testo correttamente — accenti, JSONB, ranking, sottostringhe | un blocco `search` | [Ricerca](/docs/backend/search) |
+| Trovare righe per significato semantico | una colonna `col.vector()` | [Ricerca vettoriale](/docs/backend/vector-search/) |
+| Mantenere le righe eliminate | `softDelete` | [Soft delete](/docs/collections/soft-delete) |
+| Registrare chi ha modificato cosa | `history` | [Cronologia](/docs/backend/history) |
+| Eseguire un'operazione pianificata | un file cron job | [Cron Job](/docs/backend/cron-jobs) |
+| Eseguire un'operazione dopo una scrittura, fuori banda | un job | [Job](/docs/backend/jobs) |
 
-**Ciò che non può raggiungere:** qualsiasi cosa debba prendere una decisione al momento della richiesta.
-Una dichiarazione è costituita da dati. Se la risposta dipende da chi effettua la richiesta, passa al gradino 2.
+**Cosa non può raggiungere:** qualsiasi cosa debba prendere una decisione al momento della richiesta.
+Una dichiarazione è un dato. Se la risposta dipende da chi sta effettuando la richiesta, passa al gradino 2.
 
-## 2. Callback di collezione
+## 2. Hook di tabella
 
-**Ambito:** una collezione, oppure ogni collezione quando registrate globalmente su
-`initializeRebaseBackend({ callbacks })`.
+**Ambito:** una singola tabella, oppure ogni tabella quando esportati come `hooks` da
+`backend/hooks.ts` (`initializeRebaseBackend({ hooks })` in caso di eject).
 
-I callback si attivano su **ogni** percorso dati — REST, SDK, sottoscrizioni WebSocket
+Gli hook scattano su **ogni** percorso dati — REST, SDK, sottoscrizioni WebSocket
 e scritture lato server tramite `rebase.dataAsAdmin` — e ciascuno viene eseguito all'interno della
-transazione aperta per quella richiesta. È qui che risiede l'intero valore: non esiste alcun modo per
-accedere alle righe di una collezione aggirandoli.
+transazione aperta per quella specifica richiesta. Questo è il loro valore fondamentale: non esiste un modo
+per accedere alle righe di una tabella che possa aggirarli.
 
-| Callback | Si attiva | Usalo per |
+| Hook | Quando scatta | Utilizzalo per |
 |---|---|---|
-| `beforeQuery` | prima che una lettura sia compilata | restringere **quali righe** vengono richieste da una lettura |
-| `afterRead` | per riga, dopo il recupero | redazione, mascheramento PII, campi calcolati |
+| `beforeQuery` | prima che una lettura venga compilata | restringere **quali righe** una lettura richiede |
+| `afterRead` | per ciascuna riga, dopo il recupero | redazione, mascheramento di PII, campi calcolati |
 | `beforeSave` | dopo la validazione, prima della scrittura | valori predefiniti, colonne derivate, rifiuto di una scrittura |
 | `afterSave` | dopo la scrittura, prima del commit | effetti collaterali che devono essere annullati insieme ad essa |
-| `afterSaveError` | quando un salvataggio genera un errore | reporting; `props.error` è l'errore generato |
-| `beforeDelete` | prima dell'eliminazione | rifiutarla |
-| `afterDelete` | dopo l'eliminazione, prima del commit | pulizia a cascata |
+| `afterSaveError` | quando un salvataggio genera un errore | segnalazione errori; `props.error` contiene l'errore generato |
+| `beforeDelete` | prima dell'eliminazione | rifiutare l'eliminazione |
+| `afterDelete` | dopo l'eliminazione, prima del commit | operazioni di pulizia a cascata |
 
-→ [Callback per collezione](/docs/collections/callbacks) ·
+→ [Hook di tabella](/docs/collections/callbacks) ·
 [Hook globali](/docs/backend/hooks)
 
 ### Restringere una lettura con `beforeQuery`
 
-`afterRead` vede le righe che sono già state recuperate, quindi può oscurare o redigere un valore
+<span class="since-badge" data-since="0.31">Da 0.31</span>
+
+`afterRead` intercetta righe che sono già state recuperate, quindi può oscurare un valore
 ma non può impedire che la riga venga letta. `beforeQuery` viene eseguito prima: riceve la
-query analizzata e restituisce condizioni da concatenare con un **AND**.
+query analizzata e restituisce condizioni da combinare in **AND** con essa.
 
 ```ts
-// config/collections/documents.ts
-callbacks: {
-    beforeQuery: ({ context }) => {
-        if (context.user?.roles?.includes("admin")) return;        // no narrowing
-        return { filter: { tenant_id: ["==", context.user?.tenant ?? null] } };
+// backend/schema/documents.ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const documents = defineTable("documents", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        tenantId: col.text(),
+        body: col.text()
+    },
+    rls: "admin-only",
+    hooks: {
+        beforeQuery: ({ context }) => {
+            if (context.user?.roles?.includes("admin")) return;        // no narrowing
+            return { filter: { tenantId: ["==", context.user?.claims?.tenant ?? null] } };
+        }
     }
-}
+});
 ```
 
-Vale la pena conoscere quattro proprietà prima di farvi affidamento:
+Quattro caratteristiche importanti da conoscere prima di farvi affidamento:
 
-- **Può solo restringere.** Il valore restituito è un filtro da aggiungere in AND, e non
-  c'è forma possibile che possa ampliare la lettura. Questa è una scelta deliberata: se a un hook venisse
-  passata la query chiedendogli di restituirne una nuova, potrebbe omettere una condizione; su un
-  data plane con sicurezza a livello di riga (RLS), una condizione omessa restituirebbe ogni riga che
-  le policy consentono.
-- **Si attiva su ogni percorso di lettura.** L'elenco (listing), la get singola, il conteggio,
-  l'aggregazione, la ricerca, la lettura vettoriale, un elenco su percorso annidato, il refetch realtime
-  che crea i frame di sottoscrizione e le righe caricate per una relazione o un `?include=` — dove ad
-  applicarsi è l'hook della collezione di **destinazione**. Un hook rispettato dall'elenco e non
-  dal conteggio genererebbe una pagina con l'indicazione "1 di 4 risultati".
-- **Un filtro che non può essere compilato rifiuta la richiesta.** Indicare una colonna che
-  la tabella non possiede genera un errore 400, non una condizione ignorata, a prescindere da come
+- **Può solo restringere.** Il valore restituito è un filtro da aggiungere in AND, e non esiste
+  alcun formato che possa restituire per ampliare la lettura. È una scelta intenzionale: un hook a cui
+  viene passata la query chiedendogli di restituirne una potrebbe rimuovere una condizione, e su un
+  piano dati con row-level security una condizione rimossa restituirebbe ogni riga consentita
+  dalle policy.
+- **Scatta su ogni percorso di lettura.** L'elenco, la lettura singola, il conteggio,
+  l'aggregazione, la ricerca, la lettura vettoriale, un elenco su percorso nidificato, il recupero realtime
+  che compone i frame di sottoscrizione e le righe caricate per una relazione o
+  un `?include=` — dove è l'hook della tabella di **destinazione** ad applicarsi.
+  Un hook rispettato dall'elenco ma non dal conteggio produce una pagina che mostra
+  "1 di 4 risultati".
+- **Un filtro che non può essere compilato rifiuta la richiesta.** Indicare una colonna non presente
+  nella tabella genera un errore 400, non una condizione ignorata, indipendentemente da come
   sia impostato `configureUnknownFilterFields`.
-- **Una scrittura su una riga da esso esclusa restituisce un 404.** Un aggiornamento o un'eliminazione
-  indirizzati a una riga al di fuori dell'ambito vengono rifiutati prima della scrittura, con la stessa risposta
-  "nessuna riga..." fornita da una lettura — di conseguenza l'ambito vale anche per le scritture, non solo per
-  le letture. Ciò che *non* controlla sono i valori in fase di scrittura: il rifiuto di una scrittura in base
-  al suo contenuto spetta a `beforeSave`.
+- **Una scrittura su una riga esclusa restituisce 404.** Un aggiornamento o un'eliminazione indirizzati a
+  una riga al di fuori dell'ambito viene rifiutata prima della scrittura, con la stessa risposta
+  "nessuna riga …" fornita da una lettura — quindi un ambito è un ambito anche per le scritture, non solo per
+  le letture. Ciò che *non* controlla sono i valori scritti: rifiutare una scrittura
+  in base al suo contenuto è compito di `beforeSave`.
 
-Una lettura viene deliberatamente *non* ristretta: il controllo di univocità dietro a
-`validation: { unique: true }`. Questo verifica se un valore esiste ovunque nella
-tabella, e se fosse ristretto risponderebbe "univoco" per un valore già presente in una riga nascosta —
-lasciando invece fallire l'inserimento a causa del vincolo.
+Una lettura non viene volutamente ristretta: il controllo di unicità alla base
+di `.unique()`. Questo verifica se un valore esiste ovunque all'interno della
+tabella; se fosse ristretto risponderebbe "univoco" per un valore già presente in una riga
+nascosta — lasciando poi fallire l'inserimento sul vincolo del database.
 
-`beforeQuery` è implementato da `@rebasepro/server-postgres`. Una collezione gestita
-da un altro engine che ne dichiara uno **fallisce all'avvio**, indicandone il nome, invece di essere
-servita con l'hook silenziosamente inerte. Lo stesso vale per un hook globale associato a un'origine dati
-diversa da Postgres. L'offuscamento che funziona su qualsiasi engine è `afterRead`.
+**Cosa non possono raggiungere gli hook:**
 
-**Ciò che i callback non possono raggiungere:**
-
-- Una richiesta che non tocca alcuna collezione. Non c'è nulla a cui il callback possa
+- Una richiesta che non tocca alcuna tabella. Non c'è nulla a cui l'hook possa
   agganciarsi.
-- L'involucro della risposta — codice di stato, intestazioni, struttura della paginazione. Un callback
+- L'envelope della risposta — codice di stato, header, struttura della paginazione. Un hook
   restituisce valori, non una risposta.
 - Operazioni che devono sopravvivere alla transazione. `afterSave` viene eseguito *prima* del commit,
-  quindi un'eccezione generata annulla (rollback) la scrittura. Tutto ciò che deve sopravvivere all'eventuale annullamento
-  della scrittura non fa parte della scrittura stessa: inseriscilo nella
+  quindi un errore generato al suo interno annulla la scrittura (rollback). Tutto ciò che deve sopravvivere
+  all'annullamento della scrittura non fa parte della scrittura: inseriscilo nella
   [coda dei job](/docs/backend/jobs).
-- Operazioni lente, nella pratica. Un callback mantiene aperta la transazione e con essa una connessione
-  del pool. Tutto ciò che comunica con terze parti dovrebbe andare nella coda.
+- Operazioni lente, nella pratica. Un hook mantiene aperta la transazione e, con essa, una
+  connessione del pool. Qualsiasi comunicazione con terze parti appartiene alla coda dei job.
 
 ## 3. Funzioni personalizzate
 
-**Ambito:** un URL sotto `/api/functions`.
+**Ambito:** un singolo URL sotto `/api/functions`.
 
-Un'app Hono in `backend/functions/`, rilevata in base al nome del file come avviene per collezioni
-e cron job, oppure passata come valore (`functions: { promote }`). Il middleware di autenticazione è già stato eseguito quando viene raggiunto il tuo gestore,
-il driver è limitato al chiamante e `rebase` è disponibile per storage, email,
+Un'app Hono in `backend/functions/`, rilevata in base al nome del file come avviene per i cron job,
+o passata come valore (`functions: { promote }`). Il middleware di autenticazione è già stato eseguito quando viene raggiunto il tuo handler,
+il driver è limitato all'ambito del chiamante e l'oggetto `rebase` è disponibile per storage, email,
 job e `dataAsAdmin`.
 
 ```typescript
@@ -155,7 +169,7 @@ import { defineFunction } from "@rebasepro/server/functions";
 export default defineFunction((app, { rebase }) => {
     app.post("/", async (c) => {
         const { id } = await c.req.json<{ id: string }>();
-        await rebase.dataAsAdmin.collection("products").update(id, { featured: true });
+        await rebase.dataAsAdmin.table("products").update(id, { featured: true });
         return c.json({ ok: true });
     });
 });
@@ -163,51 +177,52 @@ export default defineFunction((app, { rebase }) => {
 
 → [Funzioni personalizzate](/docs/backend/custom-functions)
 
-**Ciò che non può raggiungere:** le rotte integrate `/api/data`. Una funzione risiede
+**Cosa non può raggiungere:** le rotte integrate `/api/data`. Una funzione si posiziona
 *accanto* ad esse, non davanti, quindi non può modificare il modo in cui un elenco viene
-filtrato, paginato o strutturato — questo è il compito del gradino 2. Inoltre, non viene generato
-alcun metodo SDK per essa; i chiamanti la raggiungono con `client.functions.invoke(...)` o con una semplice `fetch`.
+filtrato, paginato o strutturato — quello è il gradino 2. Inoltre non riceve alcun metodo SDK
+generato; i chiamanti vi accedono tramite `client.functions.invoke(...)` o una semplice chiamata `fetch`.
 
 ## 4. Rotte e middleware personalizzati
 
-**Ambito:** l'app Hono, prima che Rebase la gestisca.
+**Ambito:** l'app Hono, prima che Rebase la modifichi.
 
-`initializeRebaseBackend` accetta l'app passata come parametro, pertanto tutto ciò che registri su
-tale app *prima* di chiamarlo viene eseguito prima di ogni router di Rebase — consulta
+`initializeRebaseBackend` accetta l'app che gli passi, quindi qualsiasi elemento registrato su
+quell'app *prima* di invocarlo viene eseguito prima di ogni router di Rebase — consulta
 [Ordine di registrazione delle rotte](/docs/backend/custom-functions#route-registration-order)
-per i dettagli sulla struttura. Un gruppo di rotte che monti tu stesso da `backend.routes` (gradino 5)
-non è una di queste rotte: porta con sé il proprio middleware di autenticazione.
+per i dettagli. Un gruppo di rotte montato autonomamente da `backend.routes` (gradino 5)
+non fa parte di queste rotte: include già il proprio middleware di autenticazione.
 
 :::caution[Nessun middleware di autenticazione è stato eseguito qui]
-Una rotta registrata in questo modo si trova **all'esterno** di ogni router Rebase, quindi
+Una rotta registrata in questo modo si trova **all'esterno** di ogni router di Rebase, quindi
 `getDriver(c)` non è impostato e nessun componente ha verificato il token. Proteggila con
 `requireAuth` importato da **`@rebasepro/server`** — la radice del pacchetto — che
-verifica autonomamente il token, poi `requireAdmin` o `requireScope` dallo stesso
-import per decidere cosa può fare il chiamante. Le guardie esportate da
-`@rebasepro/server/functions` leggono un'identità che un router Rebase ha già
-risolto, e restituiranno 500 piuttosto che fingere che ne esista una.
+verifica il token autonomamente, poi usa `requireAdmin` o `requireScope` dallo stesso
+import per stabilire cosa il chiamante può fare. I guard esportati da
+`@rebasepro/server/functions` leggono un'identità già risolta da un router di Rebase,
+e restituiranno un errore 500 anziché fingere che ne esista una.
 :::
 
-Un'insidia di Hono da tenere a mente, perché silenziosa: `app.use("/*", guard)` copre
-solo le rotte dichiarate *sotto* di essa. Una rotta aggiunta successivamente — in fondo al
-file, magari tra mesi — rimarrà non protetta. Inserisci le guardie direttamente nello slot middleware della rotta stessa.
+Un'insidia di Hono da tenere presente, poiché silenziosa: `app.use("/*", guard)` protegge
+solo le rotte dichiarate *sotto* di esso. Una rotta aggiunta successivamente — in fondo
+al file, mesi dopo — rimarrà non protetta. Inserisci i guard direttamente nello slot dei
+middleware della rotta stessa.
 
-**Ciò che non può raggiungere:** l'identità, il driver contestualizzato e l'involucro degli errori
-— a meno che tu non li colleghi manualmente. Tutto ciò che un router Rebase fornisce a un gestore è
-frutto dell'elaborazione svolta dal router Rebase stesso.
+**Cosa non può raggiungere:** l'identità, il driver vincolato all'ambito e l'envelope degli errori
+— a meno che tu non configuri ciascuno di essi manualmente. Tutto ciò che un router di Rebase fornisce a un handler è
+frutto delle operazioni svolte dal router stesso.
 
 ## 5. Server personalizzato
 
 **Ambito:** il processo.
 
-`initializeRebaseBackend` è una scorciatoia su alcune chiamate pubbliche, e questo gradino
-consiste nel chiamarle tu stesso. `createRebaseBackend` costruisce il backend e non monta,
-non avvia e non ascolta nulla. `backend.routes` contiene ogni gruppo di rotte come
-sotto-app Hono che puoi montare da sola, a qualsiasi percorso. `mount`, `attachRealtime` e
-`start` fanno il resto, se li vuoi:
+`initializeRebaseBackend` è una scorciatoia per alcune chiamate pubbliche, e questo gradino
+consiste nel chiamarle direttamente. `createRebaseBackend` compila il backend senza montare,
+avviare o ascoltare nulla. `backend.routes` contiene ciascun gruppo di rotte come
+una sotto-app Hono montabile singolarmente, su qualsiasi percorso. `mount`, `attachRealtime` e
+`start` gestiscono il resto, se desideri utilizzarli:
 
 ```typescript
-const backend = await createRebaseBackend({ database: adapter, auth, collections, provision: true });
+const backend = await createRebaseBackend({ database: adapter, auth, schemaDir, provision: true });
 
 app.route("/v2/data", backend.routes.data());   // only the parts you want,
 app.route("/v2/auth", backend.routes.auth());   // at the paths you want
@@ -215,35 +230,36 @@ await backend.attachRealtime(server);
 backend.start();                                // cron, job workers, sweeps
 ```
 
-Un gruppo porta con sé il proprio contesto di autenticazione, i rate limit e la protezione
-riservata agli admin, e rifiuta le intestazioni di impersonazione e di simulazione a meno che
-non sia il gruppo dei dati o quello delle funzioni, quindi `getDriver(c)` funziona in un gruppo
-montato ovunque. Ciò che non porta con sé è il middleware a livello di processo che aggiunge `mount()`: il limite del body,
-la compressione, il CSRF e l'involucro degli errori toccano a te quando monti i gruppi uno per uno.
+Un gruppo include il proprio contesto di autenticazione, rate limit e controllo admin, e rifiuta
+gli header di impersonificazione e simulazione a meno che non si tratti del gruppo data o functions,
+quindi `getDriver(c)` funziona all'interno di un gruppo montato ovunque. Ciò che non include è il
+middleware a livello di processo aggiunto da `mount()`: il limite sul body, la compressione, CSRF e
+l'envelope degli errori devono essere aggiunti da te quando monti i gruppi singolarmente.
 
-Un passo più in basso, `@rebasepro/server-postgres` è agnostico rispetto al framework: dipende
-solo da Drizzle e da `http.Server` di Node, quindi puoi incorporare il driver dei dati e il
-realtime in Express, Fastify o semplice Node e lasciare fuori del tutto il server Rebase.
+Facendo un ulteriore passo in profondità, `@rebasepro/server-postgres` è indipendente dal framework:
+dipende solo da Drizzle e da `http.Server` di Node, consentendoti di integrare
+il data driver e il realtime in Express, Fastify o Node standard escludendo
+completamente il server Rebase.
 
 → [Integrazione server personalizzato](/docs/backend/custom-server)
 
-**Ciò che non può raggiungere:** con `createRebaseBackend`, nulla è fuori portata;
-ti assumi l'ordine delle chiamate. Con il solo driver, tutto ciò che il server configura
-è da costruire a tuo carico: le rotte di autenticazione e il refresh dei token, lo storage,
-la coda dei job, il cron, l'API di amministrazione con cui comunica lo Studio, il server MCP,
-l'involucro degli errori e lo stack dei middleware.
+**Cosa non può raggiungere:** con `createRebaseBackend`, nulla è fuori portata;
+assumi il controllo dell'ordine delle chiamate. Utilizzando unicamente il driver, tutto ciò che il
+server predispone deve essere sviluppato da te: le rotte di autenticazione e il refresh dei token, lo storage,
+la coda dei job, il cron, l'API admin utilizzata da Studio, il server MCP,
+l'envelope degli errori e lo stack dei middleware.
 
-Fai ricorso ad esso quando hai un server esistente che deve rimanere l'entrypoint, o
-quando solo una parte del backend appartiene a questo processo. Se ciò che desideri in realtà
-è una sola rotta personalizzata, passa al gradino 3 o 4, con una superficie di esposizione
-nettamente inferiore.
+Ricorri a questo approccio se hai un server esistente che deve rimanere l'entrypoint principale, o
+quando solo una parte del backend deve risiedere in questo processo. Se ciò di cui hai effettivamente
+bisogno è una sola rotta personalizzata, quello è il gradino 3 o 4, con una superficie notevolmente ridotta.
 
 ## 6. `rebase eject`
 
 **Ambito:** il repository.
 
-Scrive l'entrypoint del backend e un `Dockerfile` nel progetto e ne ribalta la configurazione,
-in modo che il repository compili la propria immagine invece di eseguire il runtime distribuito.
+Scrive l'entrypoint del backend e un `Dockerfile` all'interno del progetto modificando la configurazione
+del backend, in modo che il repository compili la propria immagine invece di eseguire il
+runtime pubblicato.
 
 ```bash
 rebase eject --dry-run   # lists what would change, changes nothing
@@ -253,19 +269,19 @@ rebase eject
 → [`rebase eject`](/docs/cli#rebase-eject)
 
 **Quanto costa:** **gli aggiornamenti del runtime della piattaforma non raggiungono più il progetto.**
-CORS, configurazione dell'autenticazione, storage e shutdown diventano interamente a carico tuo per configurazione
-e manutenzione. Questo è l'unico gradino della scala dal quale è difficile tornare indietro.
+CORS, configurazione dell'autenticazione, storage e arresto diventano tua responsabilità da configurare
+e mantenere operativi. Questo è l'unico gradino della scala da cui è difficile tornare indietro.
 
-Esegui prima un'anteprima. `--force` sostituisce un eventuale `backend/src/index.ts` o
-`env.ts` esistente, conservando il file corrente come `<name>.bak`.
+Esegui prima un'anteprima. L'opzione `--force` sostituisce un eventuale `backend/src/index.ts` o
+`env.ts` esistente, salvando il file corrente come `<nome>.bak`.
 
-## Quando nessuna di queste soluzioni è la risposta
+## Quando nessuna di queste opzioni è la risposta
 
-Vale la pena menzionare due casi, poiché la scala non vi si adatta.
+Vale la pena evidenziare due casi specifici, poiché non rientrano in questa scala.
 
-**SQL grezzo.** Non è necessario uscire dal framework per scrivere una query che il query
-builder non è in grado di esprimere. Restringi il tipo di `driver.admin` con `isSQLAdmin` e usa
-`executeSql`, da una funzione personalizzata o da un callback:
+**SQL grezzo.** Non è necessario abbandonare il framework per scrivere una query non
+esprimibile tramite il query builder. Riduci il tipo di `driver.admin` con `isSQLAdmin` e usa
+`executeSql`, da una funzione personalizzata o da un hook:
 
 ```typescript
 import { isSQLAdmin, type DataDriver } from "@rebasepro/types";
@@ -281,30 +297,29 @@ async function topSellers(driver: DataDriver, since: string) {
 ```
 
 `driver` è ciò che viene fornito dal contesto di una funzione personalizzata (`c.get("driver")`), oppure
-da `context.driver` all'interno di un callback. Restringine il tipo con `isSQLAdmin` invece di effettuare un casting:
-la guardia fa la differenza tra un driver che dichiara l'impossibilità di eseguire SQL e uno
-che genera un errore `admin.executeSql is not a function` nel punto di chiamata.
+da `context.driver` all'interno di un hook. Effettua il restringimento del tipo con `isSQLAdmin` anziché
+un casting diretto: il guard fa la differenza tra un driver non in grado di eseguire SQL che lo segnala
+chiaramente e uno che lancia `admin.executeSql is not a function` nel punto di chiamata.
 
 `executeSql` restituisce
-tutte le righe che legge. Per l'SQL di cui non controlli la dimensione, passa `maxResultBytes`:
-un risultato le cui righe occupano più byte di così viene rifiutato con un errore il cui
-`code` è `RESULT_TOO_LARGE`, mai restituito in parte. L'`EXECUTE_SQL` del socket
-realtime, attraverso cui passa l'`executeSql` di un client admin, imposta 128 MB per
-ogni chiamante.
+ogni riga letta. Per query SQL la cui dimensione dei risultati non è sotto il tuo controllo, passa `maxResultBytes`:
+un risultato le cui righe occupano più byte di tale soglia viene rifiutato con un errore avente
+`code` pari a `RESULT_TOO_LARGE`, senza mai essere restituito parzialmente. L'evento `EXECUTE_SQL` del
+socket realtime, attraverso cui passa `executeSql` di un client admin, imposta un limite di 128 MB per
+ciascun chiamante.
 
-**Qualcosa che il framework dovrebbe fare e non fa.** Se ti ritrovi ad applicare
-patch a `@rebasepro/server-postgres`, o a eseguire l'eject per un singolo comportamento, conviene
-aprire una issue piuttosto che creare un fork —
+**Una funzionalità che il framework dovrebbe avere e non ha.** Se ti trovi a dover applicare
+delle patch a `@rebasepro/server-postgres`, o a eseguire l'eject per un singolo comportamento, è preferibile
+aprire una issue anziché creare un fork —
 [github.com/rebasepro/rebase/issues](https://github.com/rebasepro/rebase/issues).
-Sia `beforeQuery` sia `search.mode: "hybrid"` esistono proprio perché una patch al driver
-era l'unica alternativa.
+Sia `beforeQuery` che `search.mode: "hybrid"` esistono perché un driver con patch era l'unica alternativa possibile.
 
 ## Risorse correlate
 
 - [Estendere Rebase (frontend)](/docs/frontend/extending) — la stessa scala per il pannello di amministrazione
-- [Callback per collezione](/docs/collections/callbacks)
+- [Hook di tabella](/docs/collections/callbacks)
 - [Hook globali](/docs/backend/hooks)
 - [Funzioni personalizzate](/docs/backend/custom-functions)
 - [Integrazione server personalizzato](/docs/backend/custom-server)
 - [Ricerca](/docs/backend/search)
-- [Indice degli endpoint](/docs/backend/endpoints) — ogni rotta montata dal server
+- [Indice degli endpoint](/docs/backend/endpoints) — tutte le rotte montate dal server

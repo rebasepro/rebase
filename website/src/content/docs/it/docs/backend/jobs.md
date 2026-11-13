@@ -1,37 +1,32 @@
 ---
-sourceHash: 812f7d9ff5297c33
+sourceHash: 9e21b0515cf58869
 title: Job in background
 sidebar_label: Job in background
-description: Una coda di job persistente basata su Postgres — lavoro che sopravvive a un riavvio, ritentato con backoff, con i fallimenti conservati anziché eliminati.
+description: "Una coda di job persistente basata su Postgres: lavoro che sopravvive a un riavvio, ritentato con backoff, con i fallimenti conservati anziché scartati."
 ---
 
 ## Panoramica
 
-Un job è una riga in `rebase.jobs`. Viene acquisito da esattamente un worker, ritentato con un ritardo progressivo se il suo handler genera un errore, e lasciato nella tabella quando alla fine si arrende, in modo che qualcuno possa esaminarlo.
+Un job è una riga in `rebase.jobs`. Viene preso in carico da esattamente un worker, ritentato con un ritardo progressivo se il suo handler lancia un'eccezione, e lasciato nella tabella quando i tentativi si esauriscono definitivamente, consentendo a qualcuno di esaminarlo.
 
-Non c'è nulla da installare e nulla da eseguire insieme a Postgres. Un job accodato all'interno di una transazione che esegue un rollback non è mai stato accodato.
+Non c'è nulla da installare e nulla da eseguire insieme a Postgres. Un job accodato all'interno di una transazione che esegue un rollback non viene mai effettivamente accodato.
 
-Usalo per attività che non devono essere perse e che non devono essere eseguite all'interno di una richiesta: inviare email, chiamare terze parti, generare un file, riconciliare dati con un sistema esterno.
+Utilizzalo per le attività che non devono andare perdute e non devono essere eseguite durante la gestione di una richiesta HTTP: inviare email, chiamare un servizio di terze parti, generare un file, eseguire la riconciliazione con un sistema esterno.
 
 | | Esecuzione | Sopravvive a un riavvio |
 |---|---|---|
-| [Cron](/docs/backend/cron-jobs) | Pianificata | Sì — la pianificazione è nel codice |
+| [Cron](/docs/backend/cron-jobs) | Su pianificazione | Sì — la pianificazione è nel codice |
 | **Job** | Una volta, non appena un worker è libero | **Sì — il job è una riga** |
-| Un `setTimeout` in un callback | Una volta, in questo processo | No |
+| Un `setTimeout` in una callback | Una volta, in questo processo | No |
 
 ## Abilitazione
 
-:::note[Dove va configurato]
-**Runtime gestito** — da nessuna parte. `jobs` accetta *funzioni* handler, che nessuna
-variabile d'ambiente e nessun export di `config/index.ts` può trasportare, quindi un
-progetto creato con lo scaffold non può abilitare la coda. Esegui `rebase eject` (oppure scrivi un
-[server personalizzato](/docs/backend/custom-server/)) per raggiungerla. `REBASE_JOB_WORKERS`
-in `.env` decide solo se i worker di una coda già abilitata girano in *questo*
-processo.
+:::note[Dove va inserito]
+**Runtime gestito** — da nessuna parte. `jobs` accetta *funzioni* di gestione (handler), che nessuna variabile d'ambiente e nessun export di `backend/storage.ts` o `backend/hooks.ts` può contenere, quindi un progetto generato tramite scaffold non può abilitare la coda. Esegui `rebase eject` (o scrivi un [server personalizzato](/docs/backend/custom-server/)) per accedervi. `REBASE_JOB_WORKERS` nel file `.env` decide solo se i worker di una coda già abilitata vengono eseguiti in *questo* processo.
 
-**Ejected** — il blocco `jobs` su `initializeRebaseBackend({ … })`, come qui sotto.
+**Ejected** — il blocco `jobs` in `initializeRebaseBackend({ … })`, come mostrato di seguito.
 
-La mappa completa è in [Panoramica del backend](/docs/backend/#where-each-option-lives).
+La mappa completa si trova in [Panoramica del backend](/docs/backend/#where-each-option-lives).
 :::
 
 ```typescript no-verify
@@ -47,25 +42,11 @@ await initializeRebaseBackend({
 });
 ```
 
-Disabilitato se non richiesto esplicitamente: un worker continua a cercare lavoro finché il processo è in vita, un comportamento che non è una scelta predefinita desiderabile per tutti. Richiede un driver in grado di eseguire SQL — su uno che non può farlo (MongoDB), la coda non è disponibile e ti viene segnalato all'avvio anziché al primo inserimento in coda.
+Disabilitato a meno che non venga richiesto: un worker continua a cercare lavoro per tutta la durata del processo, il che non è un comportamento predefinito scelto a priori. Richiede un driver in grado di eseguire SQL — su uno che non può, la coda non è disponibile e la notifica avviene all'avvio anziché al primo accodamento.
 
-Un worker inattivo non esegue il polling ogni due secondi. Ogni inserimento in coda invia un
-`NOTIFY` sul canale `rebase_jobs` al momento del commit, e un worker che tiene un
-`LISTEN` su di esso acquisisce subito il job — un job accodato da un altro processo (il ruolo
-`api`, un'altra replica) parte in pochi millisecondi, e uno differito quando
-scade. Dietro a questo, controlla comunque ogni 30 secondi. Un job che questo processo
-accoda, un retry che ha pianificato e un job che ha recuperato lo svegliano senza
-una notifica.
+Un worker inattivo non effettua il polling ogni due secondi. Ogni accodamento invia un `NOTIFY` sul canale `rebase_jobs` al momento del commit, e un worker con un `LISTEN` attivo su di esso prende subito in carico il job — un'attività accodata da un altro processo (il ruolo `api`, un'altra replica) si avvia entro pochi millisecondi, e una ritardata al momento della scadenza. Oltre a questo, controlla comunque ogni 30 secondi. Un job accodato da questo processo, un retry pianificato o un job recuperato lo risvegliano senza necessità di notifiche.
 
-Il `LISTEN` richiede una connessione propria, trovata nello stesso modo in cui la trova il realtime:
-`DATABASE_DIRECT_URL` se impostato, altrimenti `DATABASE_URL`. Dietro un pooler in modalità
-transazione come PgBouncer, imposta `DATABASE_DIRECT_URL`: un pooler non mantiene un
-`LISTEN`, e i job di altri processi attenderebbero allora il controllo dei 30 secondi.
-Dove non esiste alcuna connessione di questo tipo (il database di sviluppo in-process),
-un worker inattivo rallenta: controlla dopo `pollIntervalMs` (2 secondi),
-poi il doppio dopo ogni controllo che non ha trovato nulla, fino a 30 secondi, e
-ricomincia ogni volta che trova lavoro. Un worker inattivo fa circa 2.900 acquisizioni al
-giorno invece di 43.200.
+Il comando `LISTEN` necessita di una connessione dedicata, individuata nello stesso modo in cui il realtime ne trova una: `DATABASE_DIRECT_URL` se impostata, altrimenti `DATABASE_URL`. Dietro a un pooler in modalità transazione come PgBouncer, imposta `DATABASE_DIRECT_URL`: un pooler non mantiene un `LISTEN`, e i job provenienti da altri processi dovrebbero altrimenti attendere il controllo periodico ogni 30 secondi. Dove non è presente alcuna connessione di questo tipo (il database di sviluppo in-process), un worker inattivo applica invece un backoff: controlla dopo `pollIntervalMs` (2 secondi), poi attende il doppio del tempo dopo ogni controllo andato a vuoto, fino a 30 secondi, e ricomincia da capo ogni volta che trova lavoro. Un worker inattivo effettua circa 2.900 tentativi di presa in carico al giorno anziché 43.200.
 
 ## Accodamento
 
@@ -85,15 +66,15 @@ await jobQueue?.enqueue("send-digest", { userId: "u7" }, {
 });
 ```
 
-`idempotencyKey` raggruppa un doppio clic, una richiesta ritentata e due istanze che reagiscono allo stesso evento in un unico job. Il suo ambito è limitato al lavoro non completato, quindi la chiave diventa riutilizzabile una volta completato il job — altrimenti "il digest notturno per l'utente 7" sarebbe inviabile esattamente una sola volta in assoluto. Un accodamento duplicato si risolve in `null` anziché generare un errore: il lavoro richiesto è in coda, che è il risultato desiderato.
+`idempotencyKey` raggruppa un doppio clic, una richiesta ritentata e due istanze che reagiscono allo stesso evento in un unico job. Il suo ambito è limitato al lavoro non completato, quindi la chiave diventa riutilizzabile una volta che il job è terminato — altrimenti "il digest notturno per l'utente 7" potrebbe essere inviato una sola volta in assoluto. Un accodamento duplicato si risolve in `null` anziché lanciare un'eccezione: il lavoro richiesto è in coda, che è esattamente il risultato desiderato.
 
-## Fallimenti
+## Gestione dei fallimenti
 
-Un handler fallisce sollevando un'eccezione (throwing). Non esiste alcun `return false` — un booleano verrebbe ignorato silenziosamente da ogni handler che si dimentica di restituirne uno, e il fallimento deve essere il comportamento predefinito in caso di errore.
+Un handler fallisce lanciando un'eccezione. Non esiste `return false` — un booleano verrebbe ignorato silenziosamente da qualsiasi handler che dimenticasse di restituirne uno, e il fallimento deve essere il comportamento ottenuto per impostazione predefinita.
 
-- **Tentativi rimanenti** → torna a `pending`, con `run_at` posticipato dal backoff (1s, 5s, 25s … con un limite massimo di un'ora; sovrascrivibile con `backoff`).
-- **Tentativi esauriti** → `failed`, e la riga *rimane*. Una coda che elimina silenziosamente ciò che non è riuscita a consegnare è indistinguibile da una che non ha nulla da fare.
-- **Un fallimento che nessun nuovo tentativo può cambiare** → lancia `PermanentJobError`, da `@rebasepro/server`: il job passa a `failed` a questo tentativo, con il messaggio come `last_error`, invece di consumare i tentativi rimanenti.
+- **Tentativi rimanenti** → torna a `pending`, con `run_at` posticipato dal backoff (1s, 5s, 25s … limitato a un'ora; sovrascrivibile con `backoff`).
+- **Nessun tentativo rimasto** → `failed`, e la riga *rimane*. Una coda che scarta silenziosamente ciò che non è riuscita a consegnare è indistinguibile da una che non ha nulla da fare.
+- **Un fallimento che nessun retry può risolvere** → lancia `PermanentJobError`, da `@rebasepro/server`: il job passa a `failed` a questo tentativo, con il messaggio impostato come `last_error`, invece di consumare i tentativi rimanenti.
 
 ```sql
 SELECT task, attempts, last_error, updated_at
@@ -101,14 +82,13 @@ FROM rebase.jobs WHERE status = 'failed'
 ORDER BY updated_at DESC;
 ```
 
-Le righe con esito negativo vengono conservate per 30 giorni; quelle riuscite per 3. Ogni worker elimina
-le righe scadute quando si avvia e poi ogni ora, a lotti, fuori dal percorso delle richieste.
+Le righe fallite vengono conservate per 30 giorni; quelle completate per 3. Ogni worker elimina le righe scadute al momento dell'avvio e successivamente ogni ora, in batch, al di fuori del percorso di gestione delle richieste.
 
-## Cosa succede quando un worker si arresta
+## Cosa succede quando un worker muore
 
-Un processo terminato durante l'esecuzione di un job non può rilasciare la presa in carico (claim), quindi solo un timeout potrà liberare la riga. Mentre un handler è in esecuzione, il suo worker rinnova la presa in carico ogni terzo di `visibilityTimeoutMs` (predefinito: 5 minuti). Una presa in carico rimasta senza rinnovo per tutto quel tempo viene recuperata — tornando a `pending` se il job ha ancora tentativi disponibili, altrimenti spostata in dead-letter con un errore che spiega l'accaduto.
+Un processo arrestato a metà di un job non può rilasciare la propria presa in carico (claim), quindi solo un timeout potrà liberare la riga. Mentre un handler è in esecuzione, il suo worker rinnova il claim a intervalli pari a un terzo di `visibilityTimeoutMs` (predefinito a 5 minuti). Un claim che rimane per tutto quel tempo senza essere rinnovato viene riacquisito — torna a `pending` se il job ha ancora tentativi a disposizione, altrimenti viene inviato in dead-letter con un errore che ne illustra l'accaduto.
 
-Quindi un handler lento su un worker attivo mantiene il proprio job, per quanto tempo impieghi, e il timeout decide soltanto quanto presto tornano disponibili i job di un worker che si è arrestato. Neppure un tentativo che ha perso la propria presa in carico può sovrascrivere l'esito del job: il suo successo o fallimento viene registrato nei log e scartato, e decide il tentativo che detiene la presa in carico.
+Di conseguenza, un handler lento su un worker attivo mantiene il proprio job, per quanto tempo possa richiedere, e il timeout decide soltanto con quale rapidità vengono recuperati i job di un worker terminato. Inoltre, un tentativo che ha perso il proprio claim non può sovrascrivere l'esito del job: il suo successo o fallimento viene registrato nei log e scartato, mentre è il tentativo che detiene il claim a determinarne l'esito finale.
 
 ```typescript no-verify
 jobs: {
@@ -119,20 +99,12 @@ jobs: {
 }
 ```
 
-### Un handler che non finisce mai
+### Un handler che non termina mai
 
-Il rovescio della medaglia: un handler in attesa di una `fetch` che non risponde mai tiene
-occupato il suo slot di worker, e la sua presa in carico, finché il processo è in vita — con cinque
-di questi il worker non esegue nient'altro, mentre `/health` resta verde.
-`timeoutMs`
-limita un tentativo. Alla scadenza il tentativo fallisce — ritentato finché restano
-tentativi, come qualsiasi throw — il suo slot viene liberato, e il `signal` dell'handler
-viene interrotto. Passa il signal a chi di dovere, così anche il lavoro si ferma; un handler che lo ignora
-continua a girare in background senza che nulla ne registri l'esito.
+Il rovescio della medaglia: un handler in attesa di una chiamata `fetch` che non risponde mai occupa il proprio slot nel worker, e il suo claim, per tutta la durata del processo — con cinque handler di questo tipo il worker non eseguirà più nient'altro, mentre `/health` rimarrà verde.
+`timeoutMs` delimita la durata di un singolo tentativo. Al raggiungimento della scadenza il tentativo fallisce — ritentato finché rimangono tentativi, come per qualsiasi eccezione lanciata — il suo slot viene liberato e il `signal` dell'handler viene interrotto (`aborted`). Inoltra il signal in modo che anche il lavoro si interrompa; un handler che lo ignora continuerà a essere eseguito in background senza che nulla ne registri l'esito.
 
-Se omesso, vale 15 minuti (`900_000`), e il worker lo dice con una riga di log
-all'avvio. Un job che legittimamente dura di più imposta un proprio valore, e
-`timeoutMs: 0` rimuove il limite.
+Se omesso, il valore predefinito è di 15 minuti (`900_000`), e il worker lo segnala con una riga di log all'avvio. Un job che legittimamente richiede più tempo può specificare un proprio valore, e `timeoutMs: 0` rimuove ogni limite.
 
 ```typescript no-verify
 jobs: {
@@ -146,28 +118,21 @@ jobs: {
 }
 ```
 
-Gli handler della coda e le sottoscrizioni ai topic ricevono lo stesso `signal` nel loro contesto.
+Gli handler della coda e le sottoscrizioni ai topic ricevono lo stesso `signal` all'interno del proprio contesto.
 
-## Istanze multiple
+## Più istanze
 
-Sicuro per progettazione. I worker acquisiscono i job con `SELECT … FOR UPDATE SKIP LOCKED`, quindi ogni job viene assegnato a uno solo di essi e gli altri passano alla riga successiva invece di mettersi in coda dietro di essa. Non è necessario eleggere alcun leader.
+Sicuro per progettazione. I worker acquisiscono i job con `SELECT … FOR UPDATE SKIP LOCKED`, in modo che ogni job vada a esattamente uno di essi e gli altri passino alla riga successiva anziché accodarsi dietro di essa. Non è necessario eleggere alcun leader.
 
-Un'istanza acquisisce solo i task per cui ha un handler. Durante un rolling deploy, un'istanza che esegue codice precedente lascia stare i job il cui task è implementato solo dal codice più recente: restano `pending`, senza consumare tentativi, finché un'istanza aggiornata non li acquisisce. Anche un task che nessuna istanza implementa resta `pending`, invece di finire in dead-letter.
+Un'istanza prende in carico solo i task per cui possiede un handler. Durante un rolling deploy, un'istanza che esegue il codice precedente non tocca i job il cui task è implementato esclusivamente dal codice più recente: rimangono in stato `pending`, con i relativi tentativi intatti, finché un'istanza aggiornata non li prende in carico. Anche un task che nessuna istanza implementa rimane in stato `pending`, anziché essere inviato in dead-letter.
 
-## Scansioni degli orfani dello storage
+## Scansione degli orfani dello storage
 
-`rebase storage orphans` viaggia su questa coda quando è attiva: ogni scansione,
-e ogni eliminazione da una scansione, è un job `storage.orphans`, con un solo
-tentativo. Il backend registra lui stesso l'handler, in ogni processo con lo
-storage configurato, e lo eseguono solo i processi i cui worker dei job sono
-attivi. Una scansione è vincolata da `timeoutMs` come qualsiasi job, quindi una
-sorgente troppo grande per essere scansionata in 15 minuti richiede un
-`timeoutMs` più alto, oppure 0. Senza la coda, il server esegue invece la
-scansione all'interno del proprio processo. Vedi [la CLI](/docs/cli/#rebase-storage).
+`rebase storage orphans` viene eseguito su questa coda quando è attiva: ogni scansione, e ogni eliminazione derivante da una scansione, è un job `storage.orphans`, con un solo tentativo. Il backend registra autonomamente l'handler in ogni processo con lo storage configurato, e viene eseguito solo dai processi in cui i job worker sono attivi. Una scansione è vincolata da `timeoutMs` come qualsiasi altro job, quindi una sorgente troppo grande per essere esaminata in 15 minuti richiede un `timeoutMs` più alto, oppure 0. In assenza della coda, il server esegue invece la scansione all'interno del proprio processo. Consulta [la CLI](/docs/cli/#rebase-storage).
 
 ## Webhook persistenti
 
-Per impostazione predefinita, [`WebhookDispatcher`](/docs/recipes/webhooks) accoda i suoi invii in memoria; questo significa che un crash o un deploy tra la modifica e l'invio comporterebbe la perdita dell'evento. Assegnagli la coda e ogni invio diventerà una riga:
+[`WebhookDispatcher`](/docs/recipes/webhooks) accoda le proprie consegne in memoria per impostazione predefinita, il che significa che un crash o un deploy tra la modifica e la consegna provoca la perdita dell'evento. Assegnagli la coda e ciascuna consegna diventerà una riga nel database:
 
 ```typescript no-verify
 import { WebhookDispatcher, WEBHOOK_DELIVERY_TASK } from "@rebasepro/server";
@@ -180,15 +145,15 @@ dispatcher.setWebhooks(myWebhooks);
 jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never, ctx));
 ```
 
-Sul job viene memorizzato solo l'**id** del webhook, mai il webhook stesso — altrimenti il suo segreto di firma rimarrebbe in chiaro in `rebase.jobs` per tutto il periodo di retention della riga, e un webhook modificato tra l'accodamento e l'invio deve essere inviato con la configurazione attuale. Passare `ctx` come secondo argomento fa sì che ogni tentativo invii il proprio `X-Webhook-Attempt`; tutti i tentativi di una stessa consegna inviano lo stesso `X-Webhook-Delivery`, così un destinatario può deduplicare i retry.
+Sul job viene memorizzato solo l'**id** del webhook, mai il webhook stesso — altrimenti il suo segreto di firma rimarrebbe in chiaro in `rebase.jobs` per tutta la durata del periodo di retention della riga, mentre un webhook modificato tra l'accodamento e la consegna deve essere inoltrato con lo stato attuale. Passare `ctx` come secondo argomento fa sì che ogni tentativo invii il proprio header `X-Webhook-Attempt`; ogni tentativo relativo a una determinata consegna invia lo stesso `X-Webhook-Delivery`, consentendo al destinatario di deduplicare i tentativi ripetuti.
 
-Un invio che il dispatcher si rifiuta di effettuare (una destinazione loopback, link-local, privata o non `http(s)`), o a cui il destinatario risponde con un redirect, fallisce ogni volta allo stesso modo. Finisce in dead-letter dopo un solo tentativo, con il motivo in `last_error`. Qualsiasi altro errore viene ritentato come per ogni job.
+Una consegna che il dispatcher rifiuta di inviare (una destinazione di loopback, link-local, privata o non-`http(s)`), o una a cui il destinatario risponde con un redirect, fallisce nello stesso modo a ogni tentativo. Viene inviata in dead-letter dopo un solo tentativo, con la motivazione memorizzata in `last_error`. Qualsiasi altro fallimento viene ritentato normalmente come qualsiasi job.
 
-## Arresto
+## Shutdown
 
-`shutdown()` impedisce al worker di acquisire nuovi job e attende il completamento di quelli in corso (in flight), evitando che un deploy esegua due volte la coda di un batch. L'attesa è limitata a due terzi del timeout di arresto (10 secondi dei 15 predefiniti), così un handler che non termina mai non può bloccare l'arresto. Un job ancora in esecuzione dopo questo limite mantiene il proprio blocco e viene recuperato dal timeout di visibilità.
+`shutdown()` impedisce al worker di acquisire nuovi job e attende il completamento di quelli in corso, garantendo che un deploy non esegua due volte la parte finale di un batch. L'attesa è limitata a due terzi del timeout di shutdown (10 secondi rispetto ai 15 predefiniti), evitando che un handler che non termina mai possa bloccare l'arresto. Un job ancora in esecuzione al termine di questo periodo mantiene il proprio claim e viene recuperato dal timeout di visibilità.
 
 ## Passaggi successivi
 
-- **[Cron Jobs](/docs/backend/cron-jobs)** — lavoro pianificato
-- **[Webhooks](/docs/recipes/webhooks)** — invia notifiche ad altri sistemi in caso di modifiche
+- **[Cron Jobs](/docs/backend/cron-jobs)** — lavoro su pianificazione
+- **[Webhooks](/docs/recipes/webhooks)** — notifica altri sistemi in caso di modifiche

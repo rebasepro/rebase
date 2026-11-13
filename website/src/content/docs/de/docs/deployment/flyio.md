@@ -1,41 +1,41 @@
 ---
-sourceHash: 36178b35f15041db
+sourceHash: 10c8baa5ed2e63bf
 title: Bereitstellung von Rebase auf Fly.io
-description: Erfahren Sie, wie Sie Rebase global bereitstellen oder mithilfe von Fly.io auf europäische Rechenzentren beschränken können.
+description: Erfahren Sie, wie Sie Rebase global bereitstellen oder mithilfe von Fly.io auf europäische Rechenzentren beschränken.
 sidebar_label: Fly.io
 ---
 
-Fly.io führt Docker-Container nah an Ihren Benutzern in einem globalen Anycast-Netzwerk aus und lässt sich flexibel konfigurieren, wo Daten gespeichert werden – ideal für ein Rebase-Deployment mit striktem europäischem Fokus. Fly verfügt über Rechenzentren in **Amsterdam (ams)**, **Frankfurt (fra)**, **Madrid (mad)** und **Paris (cdg)**.
+Fly.io führt Docker-Container nah an Ihren Benutzern in einem globalen Anycast-Netzwerk aus und lässt sich flexibel so konfigurieren, wo Daten gespeichert werden – ideal für ein Rebase-Deployment mit strikt europäischem Fokus. Fly verfügt über Rechenzentren in **Amsterdam (ams)**, **Frankfurt (fra)**, **Madrid (mad)** und **Paris (cdg)**.
 
-Nichts auf dieser Seite bezüglich Ihres Projekts ist Fly-spezifisch. Ein Rebase-Deployment besteht aus zwei trennbaren Teilen – dem veröffentlichten Runtime-Image und dem **Bundle**, das `rebase build` erzeugt – und dasselbe Bundle läuft unter Docker Compose auf einem Laptop, auf Rebase Cloud, unter dem [Helm-Chart](/docs/deployment/kubernetes) und hier.
+Nichts auf dieser Seite bezüglich Ihres Projekts ist spezifisch für Fly. Ein Rebase-Deployment besteht aus zwei trennbaren Teilen – dem veröffentlichten Runtime-Image und dem **Bundle**, das `rebase build` erzeugt – und dasselbe Bundle läuft unter Docker Compose auf einem Laptop, in der Rebase Cloud, unter dem [Helm-Chart](/docs/deployment/kubernetes) und hier.
 
 ## 1. Fly-App initialisieren
 
-Führen Sie bei installiertem `flyctl` aus Ihrem Projektverzeichnis Folgendes aus:
+Führen Sie bei installiertem `flyctl` aus Ihrem Projekt Folgendes aus:
 
 ```bash
 fly launch --no-deploy
 ```
 
-1. **App name:** `my-rebase-app`
-2. **Organization:** persönlich oder Ihre Unternehmens-Organisation.
+1. **App-Name:** `my-rebase-app`
+2. **Organisation:** persönlich oder Ihre Unternehmens-Organisation.
 3. **Region:** Wählen Sie ein europäisches Rechenzentrum – Frankfurt (`fra`) oder Paris (`cdg`).
-4. **Database:** Wählen Sie **Yes** für einen Postgres-Cluster. Fly erstellt ihn in derselben Region und fügt `DATABASE_URL` ein.
+4. **Datenbank:** Wählen Sie **Yes** für ein Postgres-Cluster. Fly erstellt es in derselben Region und fügt `DATABASE_URL` ein.
 5. **Redis:** Wählen Sie **No**.
 
 `--no-deploy`, weil die Secrets und das Bundle zuerst vorhanden sein müssen.
 
-Wenn Ihre Collections eine `vector`-Eigenschaft deklarieren, aktivieren Sie die Extension einmalig für diese Datenbank: `CREATE EXTENSION vector;`.
+Wenn Ihre Tabellen eine `col.vector()`-Spalte deklarieren, aktivieren Sie die Extension einmalig in dieser Datenbank: `CREATE EXTENSION vector;`.
 
-## 2. Bundle bauen und fly.toml auf das Runtime-Image verweisen lassen
+## 2. Bundle erstellen und fly.toml auf das Runtime-Image verweisen
 
-Es gibt **kein Anwendungs-Image, das aus Ihrem Quellcode gebaut werden muss**. `rebase build` erzeugt ein `dist-bundle`-Verzeichnis mit Ihren kompilierten Collections, Functions, Crons und – falls Ihr Projekt eine statische App deklariert – Ihrem erstellten Frontend:
+Es gibt **kein Anwendungs-Image, das aus Ihrem Quellcode gebaut werden muss**. `rebase build` erzeugt ein `dist-bundle`-Verzeichnis mit Ihren kompilierten Tabellen, Funktionen, Cronjobs und – falls Ihr Projekt eine statische App deklariert – Ihrem erstellten Frontend:
 
 ```bash
 rebase build
 ```
 
-Committen Sie ein dreizeiliges `Dockerfile` im Projektstammverzeichnis:
+Erstellen und committen Sie ein dreizeiliges `Dockerfile` im Projektstammverzeichnis:
 
 ```dockerfile title="Dockerfile"
 FROM rebasepro/server:0.30.1
@@ -66,11 +66,11 @@ primary_region = "fra"
   path = "/livez"
 ```
 
-Verwenden Sie `/livez` anstelle von `/health`: Letzteres führt einen Datenbank-Roundtrip durch, sodass ein Liveness-Check bei einem kurzen Schluckauf der Datenbank eine ansonsten gesunde Machine neu starten würde.
+Verwenden Sie `/livez` statt `/health`: Letzteres führt einen Datenbank-Roundtrip durch, sodass ein Liveness-Check bei einer kurzen Datenbankverzögerung eine ansonsten gesunde Machine neu starten würde.
 
 Ein späteres Upgrade von Rebase erfordert lediglich eine Änderung dieser `FROM`-Zeile. Ihr Bundle bleibt unberührt.
 
-## 3. Produktions-Secrets setzen
+## 3. Produktions-Secrets festlegen
 
 ```bash
 fly secrets set \
@@ -83,7 +83,7 @@ fly secrets set \
   -a my-rebase-app
 ```
 
-Die letzten beiden Variablen sind neu und bestimmen, wie diese App überhaupt einen Administrator erhält: In der Produktion wird das erste registrierte Konto nicht befördert, sodass sonst niemand zum ersten angemeldeten Aufrufer werden kann. Setzen Sie diese, bevor das erste Deployment Traffic verarbeitet – siehe [Ihr erster Admin](/docs/getting-started/deployment/#your-first-admin). `fly secrets list` zeigt nur Hashes an; bewahren Sie das durch diesen Befehl generierte Passwort daher gut auf, da es nicht wieder ausgelesen werden kann.
+Die letzten beiden sind neu und bestimmen, wie diese App überhaupt einen Administrator erhält: In der Produktion wird das erste registrierte Konto nicht hochgestuft, sodass auf andere Weise kein erster angemeldeter Aufrufer entsteht. Setzen Sie diese, bevor das erste Deployment Traffic empfängt – siehe [Ihr erster Admin](/docs/getting-started/deployment/#your-first-admin). `fly secrets list` zeigt nur Hashes/Digests an; bewahren Sie das mit diesem Befehl generierte Passwort daher gut auf, da es nicht wieder ausgelesen werden kann.
 
 ## 4. Bereitstellen
 
@@ -95,25 +95,27 @@ Anschließend `fly open`.
 
 ## 5. Das Schema
 
-**Die Runtime erstellt fehlende Tabellen beim Start, einschließlich derer Ihrer Collections.** `REBASE_MIGRATE_ON_BOOT` ist standardmäßig auf `ensure` gesetzt, was additiv auf das gesamte Schema wirkt – es erstellt fehlende Tabellen, Spalten und Enum-Typen und wendet deren Row-Level Security an –, sodass der erste Start gegen eine leere Datenbank direkt bereit ist, Ihre Collections auszuliefern.
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-Was `ensure` niemals tut, ist das Ändern bereits vorhandener Elemente: Es ändert weder Spaltentypen noch löscht es irgendetwas oder bearbeitet Labels bestehender Enums, da der Neustart einer Machine das Schema nicht als Nebeneffekt eines Deployments umstrukturieren darf.
+**Die Runtime erstellt beim Start fehlende Tabellen, einschließlich der in `backend/schema` deklarierten.** `REBASE_MIGRATE_ON_BOOT` ist standardmäßig auf `ensure` gesetzt, was additiv für das gesamte Schema wirkt – es erstellt fehlende Tabellen, Spalten sowie Enum-Typen und wendet deren Row-Level Security an –, sodass der erste Start mit einer leeren Datenbank direkt Ihre Collections bereitstellt.
 
-Eine Sache erfordert daher weiterhin die CLI, ausgeführt aus einem Checkout oder einem CI-Job:
+Was `ensure` niemals tut, ist etwas zu ändern, das bereits existiert: Es ändert weder einen Spaltentyp, noch löscht es etwas oder bearbeitet die Labels eines vorhandenen Enums, da der Neustart einer Machine das Schema nicht als Nebeneffekt eines Deployments umstrukturieren darf.
+
+Für eines wird daher weiterhin die CLI benötigt, ausgeführt aus einem Checkout oder einem CI-Job:
 
 ```bash
 rebase db push
 ```
 
-Jede Änderung, die nicht rein additiv ist – eine umbenannte Spalte, ein eingeschränkter Typ, ein entferntes Feld.
+Jede Änderung, die nicht rein additiv ist – eine umbenannte Spalte, ein eingeengter Typ, ein entferntes Feld.
 
-Öffnen Sie für eine private Fly-Postgres-Instanz einen Tunnel mit `fly proxy 5432 -a <your-db-app>` und lassen Sie `DATABASE_URL` auf `localhost:5432` verweisen. Das Runtime-Image wird ohne die CLI ausgeliefert, sodass dies niemals innerhalb der Machine läuft und auch ein `release_command` dies nicht aufrufen kann. Für versionierte Migrationen committen Sie Migrationsdateien mit `rebase db generate` und führen stattdessen `rebase db migrate` als Release-Schritt aus.
+Öffnen Sie für ein privates Fly Postgres einen Tunnel mit `fly proxy 5432 -a <your-db-app>` und lassen Sie `DATABASE_URL` auf `localhost:5432` verweisen. Das Runtime-Image wird ohne die CLI ausgeliefert, daher wird dies nie innerhalb der Machine ausgeführt und kann auch nicht von einem `release_command` aufgerufen werden. Für versionierte Migrationen committen Sie Migrationsdateien mit `rebase db generate` und führen stattdessen `rebase db migrate` als Release-Schritt aus.
 
 ## Dateispeicher
 
-Das Dateisystem einer Fly-Machine übersteht kein Deployment; lokaler Dateispeicher führt daher zu unbemerktem Datenverlust, weshalb die Runtime ihn in der Produktion verweigert. Binden Sie einen S3-kompatiblen Bucket an – Tigris wird von Fly bereitgestellt – mit `STORAGE_TYPE=s3`. Siehe [Storage](/docs/backend/storage).
+Das Dateisystem einer Fly-Machine übersteht ein Deployment nicht, daher bedeutet lokaler Dateispeicher stillen Datenverlust und wird von der Runtime in der Produktion verweigert. Binden Sie einen S3-kompatiblen Bucket an – Tigris ist derjenige, den Fly bereitstellt – mit `STORAGE_TYPE=s3`. Siehe [Speicher](/docs/backend/storage).
 
 ## Nächste Schritte
 
-- [Deployment](/docs/getting-started/deployment) – die Produktions-Checkliste und die Regeln für den ersten Administrator, die für alle Plattformen gelten.
+- [Deployment](/docs/getting-started/deployment) – die Produktions-Checkliste und die Regeln für den ersten Admin, die für alle Plattformen gelten.
 - [Konfiguration](/docs/getting-started/configuration) – alle Umgebungsvariablen, die die Runtime liest.

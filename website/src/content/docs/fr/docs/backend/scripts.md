@@ -1,31 +1,35 @@
 ---
-sourceHash: f108bf0d3f6de145
-title: Scripts et console
-sidebar_label: Scripts et console
-description: Ouvrez les données d'un projet depuis un script, un test ou un REPL avec openRebase, ou depuis le terminal avec rebase console. Pas de serveur, pas de modification du schéma.
+sourceHash: 87e4ee6ea63add18
+title: Scripts et la console
+sidebar_label: Scripts et la console
+description: Ouvrez les données d'un projet depuis un script, un test ou un REPL avec openRebase, ou depuis le terminal avec rebase console. Aucun serveur, aucune modification de schéma.
 ---
 
 ## Vue d'ensemble
 
-Pour consulter quelques lignes, en corriger une, essayer un filtre ou vérifier ce qu'une stratégie laisse
-voir à un utilisateur, vous ne devriez pas avoir à démarrer un serveur. Rebase vous donne les données du projet
-sous la forme d'un objet, à deux endroits :
+Pour examiner quelques lignes, en corriger une, tester un filtre ou vérifier ce
+qu'une politique permet à un utilisateur de voir, vous ne devriez pas avoir à
+démarrer un serveur. Rebase met à votre disposition les données du projet sous
+forme d'objet, à deux endroits :
 
 - **`rebase console`**, un REPL Node dans votre terminal avec le projet ouvert ;
-- **`openRebase`**, le même objet dans un script ou un test qui vous appartient.
+- **`openRebase`**, le même objet dans un script ou un test qui vous est propre.
 
-Les deux ouvrent la base de données sans la modifier : aucune table, aucun rôle, aucun déclencheur ni
-aucune fonction n'est créé. Le `close()` d'un script termine ce qu'`openRebase` a ouvert. Sur la
-base de développement gérée, `rebase console` démarre cette base lorsqu'elle n'est pas en cours
-d'exécution et la laisse démarrée ensuite, comme le font les commandes `rebase db` ;
-`rebase db stop` l'arrête. L'objet a le
-vocabulaire qu'une [fonction personnalisée](/docs/backend/custom-functions/) reçoit du
-serveur, `dataAsAdmin` et `sql`, de sorte qu'un extrait de code passe tel quel d'une fonction à un script
-puis à la console.
+Les deux ouvrent la base de données sans la modifier : aucune table, aucun rôle,
+déclencheur ou fonction n'est créé. L'appel à `close()` d'un script ferme ce que
+`openRebase` a ouvert. Sur la base de données de développement managée, `rebase
+console` démarre cette base de données lorsqu'elle n'est pas en cours d'exécution
+et la laisse active par la suite, tout comme le font les commandes `rebase db` ;
+`rebase db stop` l'arrête. L'objet dispose du même vocabulaire que celui qu'une
+[fonction personnalisée](/docs/backend/custom-functions/) reçoit du serveur,
+`dataAsAdmin` et `sql`, de sorte qu'un extrait de code peut passer d'une
+fonction à un script ou à la console sans aucune modification.
 
 ## `rebase console`
 
-Lancez-la dans votre projet :
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+Exécutez-le dans votre projet :
 
 ```bash
 rebase console
@@ -40,32 +44,33 @@ rebase console
 3
 ```
 
-Deux noms sont dans la portée, et l'`await` de premier niveau fonctionne :
+Deux variables sont dans la portée (scope), et le `await` de premier niveau fonctionne :
 
-| Nom | Ce que c'est |
+| Nom | Description |
 |---|---|
 | `rebase` | Ce que renvoie [`openRebase`](#openrebase) : `dataAsAdmin`, `sql`, `withAuth(user)` et `close()` |
-| `collections` | Les collections du projet, chargées comme les charge `rebase db push` |
+| `tables` | Les descripteurs des tables exposées par le projet, chargées depuis `backend/schema` de la même manière que `rebase db push` les charge (`rebase.tables`) |
 
-La console ouvre le projet comme le fait `rebase db push` : le même `.env`,
-la même base de données et les mêmes collections. Elle charge aussi les
-`callbacks` globaux de `config/index.ts`, de sorte que ses écritures exécutent les mêmes hooks qu'une
-écriture du serveur. Un projet qui utilise la base de développement
-managée la voit démarrer d'abord. L'historique de ce que vous avez tapé est
-conservé dans `.rebase/console_history`, que le `.gitignore` du scaffold
-exclut déjà.
+La console ouvre le projet de la même manière que `rebase db push` : le même
+`.env`, la même base de données et les mêmes tables, depuis `backend/schema`.
+Elle charge également les `hooks` globaux depuis `backend/hooks.ts`, afin que ses
+écritures exécutent les mêmes hooks qu'une écriture côté serveur. Pour un projet
+utilisant la base de données de développement managée, celle-ci est d'abord
+démarrée si nécessaire. L'historique de ce que vous avez saisi est conservé dans
+`.rebase/console_history`, que le `.gitignore` du scaffold exclut déjà.
 
-Une entrée envoyée par un pipe s'exécute ligne par ligne, chacune après que le `await` de la
-précédente s'est réglé, de sorte que la session ci-dessus fonctionne ainsi :
-`printf '…\n…\n' | rebase console`. Tout ce qui suit `.exit` est ignoré, et les
-valeurs ne sont colorées que dans un terminal. Tout ce que la console journalise va sur
-stderr.
+L'entrée transmise par un pipe s'exécute ligne par ligne, chacune après la
+résolution du `await` de la ligne précédente, de sorte que la transcription
+ci-dessus fonctionne avec `printf '…\n…\n' | rebase console`. Tout ce qui suit
+`.exit` est ignoré, et les valeurs ne sont colorées que sur un terminal. Tout ce
+que la console consigne (logs) est envoyé sur stderr.
 
-### Un extrait : `--eval`
+### Un extrait de code : `--eval`
 
-`rebase console -e "<code>"` exécute un seul morceau de code au lieu du REPL. La valeur d'une
-expression, ou le `return` du corps d'une fonction, est attendue (awaited) puis affichée
-en JSON sur stdout, de sorte que la sortie peut être redirigée dans un pipe :
+`rebase console -e "<code>"` exécute un fragment de code à la place du REPL. La
+valeur d'une expression, ou le `return` d'un corps de fonction, est attendue
+(`await`) et affichée sous forme de JSON sur stdout, permettant ainsi de
+rediriger la sortie (pipe) :
 
 ```bash
 rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
@@ -73,39 +78,71 @@ rebase console -e "rebase.sql('select count(*) from posts')" | jq .
 rebase console -e "const u = await rebase.withAuth({ uid: 'u1', roles: ['user'] }); return (await u.data.posts.find()).data"
 ```
 
-Tout ce que la console journalise, quelle que soit la valeur de `LOG_LEVEL`, va sur stderr, de sorte
-que stdout contient le résultat et rien d'autre. Un extrait qui lève une exception affiche l'erreur
-sur stderr et se termine avec le code `1`.
+Tout ce que la console consigne, quelle que soit la valeur de `LOG_LEVEL`, est
+envoyé sur stderr, de sorte que stdout ne contienne que le résultat et rien
+d'autre. Un extrait qui lève une exception affiche l'erreur sur stderr et se
+termine avec le code `1`.
 
-Une base de données que la
-console ne peut pas ouvrir est signalée une seule fois, et la console se termine avec le code `1` : la
-bannière « Cannot connect to PostgreSQL » qu'affichent les commandes `db`, ou, sur la base de
-développement managée, le fait qu'elle n'a plus de connexion libre. Cette base n'accepte que
-quelques connexions à la fois et un `rebase dev` en cours d'exécution en détient certaines :
-fermez donc un autre client ou arrêtez `rebase dev`, puis relancez-la.
+Une base de données que la console ne peut pas ouvrir est signalée une seule
+fois, puis elle se termine avec le code `1` : la bannière « Cannot connect to
+PostgreSQL » affichée par les commandes `db`, ou, sur la base de données de
+développement managée, le fait qu'elle n'ait plus de connexion disponible. Cette
+base de données n'accepte que peu de connexions à la fois et une instance en
+cours d'exécution de `rebase dev` en conserve certaines ; fermez donc un autre
+client ou arrêtez `rebase dev` et réessayez.
 
 ### Options
 
-| Option | Ce qu'elle fait |
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+| Option | Description |
 |---|---|
-| `--eval`, `-e` | Exécute ce code à la place du REPL, affiche son résultat attendu en JSON, et sort avec le code 1 s'il lève une exception |
-| `--collections`, `-c` | Chemin du répertoire des collections, s'il diffère de celui du projet |
-| `--database-url` | Ouvre cette base de données plutôt que celle du projet |
-| `--docker` | Utilise la base de données de docker compose, en la démarrant si nécessaire |
+| `--eval`, `-e` | Exécute ce code à la place du REPL, affiche son résultat attendu (`await`) au format JSON et quitte avec le code 1 en cas d'erreur |
+| `--schema-dir` | Le répertoire du schéma, s'il est différent de celui du projet (`backend/schema`, ou la clé `tables` de `rebase.json`) |
+| `--database-url` | Ouvre cette base de données à la place de celle du projet |
+| `--docker` | Utilise la base de données provenant de docker compose, en la démarrant si nécessaire |
 
 ## `openRebase`
 
-`openRebase`, de `@rebasepro/server-postgres`, est ce qu'appelle la console. Utilisez-le
-dans un script, un seed, une correction de données ou un test. Dans un projet issu d'un
-scaffold, placez le script sous `backend/`, par exemple `backend/scripts/publish-drafts.ts` :
-le workspace backend est celui qui dépend de `@rebasepro/server-postgres`, et un script du
-dossier `scripts/` à la racine ne peut pas l'importer.
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+`openRebase` du paquet `@rebasepro/server-postgres` est ce que la console
+appelle. Utilisez-le dans un script, un seed, une correction de données ou un
+test. Dans un projet généré à partir d'un scaffold, placez le script sous
+`backend/`, par exemple `backend/scripts/publish-drafts.ts` : le workspace
+backend est celui qui dépend de `@rebasepro/server-postgres`, et un script situé
+dans le dossier racine `scripts/` ne peut pas l'importer.
+
+`openRebase` prend en argument les tables compilées du projet : `compileSchema`
+de `@rebasepro/common` transforme les résultats de `defineTable` en tables
+exploitables par le pilote, hooks inclus. Placez cela dans un module partagé par
+les scripts, `backend/scripts/tables.ts`, après avoir ajouté `@rebasepro/common`
+à `backend/package.json` :
+
+```typescript no-verify
+import { compileSchema } from "@rebasepro/common";
+import * as schema from "../schema";
+
+// Every table the index exports, and the defaultRls its "inherit" tables take.
+export const tables = compileSchema(
+    [schema.users, schema.posts, schema.authors, schema.tags],
+    { defaultRls: schema.defaultRls }
+);
+```
+
+Passez les hooks globaux exportés par `backend/hooks.ts` sous la clé `hooks`, et
+les écritures du script les exécuteront tout comme le ferait une écriture côté
+serveur ; sans eux, un `beforeSave` global qui associe un tenant ou écrit une
+ligne d'audit ne sera exécuté lors d'aucune écriture de script. Omettez `tables`
+et `openRebase` lira les tables directement depuis la base de données, comme le
+fait un serveur sans `backend/schema`. `rebase console` charge les deux pour
+vous.
 
 ```typescript
 import { openRebase } from "@rebasepro/server-postgres";
-import { collections } from "../../config/collections";
+import { tables } from "./tables";
 
-const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
+const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, tables });
 
 const { data: drafts } = await rebase.dataAsAdmin.posts.find({ where: { status: ["==", "draft"] } });
 console.log(`${drafts.length} drafts`);
@@ -116,69 +153,73 @@ for (const draft of drafts) {
 await rebase.close();
 ```
 
-Lancez-le depuis `backend/`. `rebase db url` affiche l'URL de la base de données qu'utilise le
-projet, y compris la base de développement gérée :
+Exécutez-le depuis `backend/`. `rebase db url` affiche l'URL de la base de
+données utilisée par le projet, y compris celle de développement managée :
 
 ```bash
 cd backend
 DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/publish-drafts.ts
 ```
 
-| Membre | Ce qu'il fait |
+| Membre | Description |
 |---|---|
-| `dataAsAdmin` | Toutes les collections, lues et écrites avec l'identité de service du serveur (`{ uid: "service", roles: ["admin"] }`) : administrateur, et toujours évaluées par vos stratégies RLS, exactement comme `rebase.dataAsAdmin` dans une fonction |
-| `sql(query, { params })` | SQL brut sur la connexion propriétaire, avec la même convention d'appel que `rebase.sql` dans une fonction. Elle s'exécute sur l'unique source de données ouverte : `{ database }` en nommant une autre est refusé |
-| `withAuth(user)` | Se résout en `{ data }` : les collections telles que cet utilisateur les voit. Chaque lecture et chaque écriture s'exécute sous son identité, filtrée par la sécurité au niveau des lignes, comme le serait une requête HTTP de cet utilisateur |
-| `collections` | Les collections avec lesquelles il a été ouvert |
-| `close()` | Termine le pool de connexions créé par `openRebase`. Peut être appelé deux fois sans risque |
+| `dataAsAdmin` | Toutes les tables, lues et écrites avec l'identité de service du serveur (`{ uid: "service", roles: ["admin"] }`) : admin, tout en restant soumises à l'évaluation de vos politiques RLS, exactement comme `rebase.dataAsAdmin` dans une fonction |
+| `sql(query, { params })` | SQL brut sur la connexion propriétaire (owner), avec la même convention d'appel que `rebase.sql` dans une fonction. Il s'exécute sur l'unique source de données ouverte : toute option `{ database }` en désignant une autre est refusée |
+| `withAuth(user)` | Se résout en `{ data }` : les tables telles que cet utilisateur les voit. Chaque lecture et écriture s'exécute en son nom, filtrée par la sécurité au niveau des lignes (RLS), tout comme le serait une requête HTTP émise par cet utilisateur |
+| `tables` | Les descripteurs des tables desservies : celles qui lui ont été fournies ou celles décrites par la base de données |
+| `close()` | Ferme le pool de connexions créé par `openRebase`. Peut être appelé deux fois en toute sécurité |
 
 Ses options :
 
-| Option | Ce qu'elle fait |
+| Option | Description |
 |---|---|
-| `databaseUrl` | La base de données à ouvrir. `openRebase` crée le pool et `close()` le termine |
+| `databaseUrl` | La base de données à ouvrir. `openRebase` crée le pool et `close()` le ferme |
 | `connection` | Une connexion Drizzle que vous détenez déjà (`createPostgresDatabaseConnection(url).db`), à la place de `databaseUrl`. Elle reste la vôtre : `close()` la laisse ouverte |
-| `collections` | Les collections du projet. Un tableau vide les lit plutôt depuis la base de données, comme le fait un serveur sans fichiers de collections, et les sert en lecture seule |
-| `pool` | Les paramètres du pool, avec `databaseUrl` |
-| `dataSourceKey` | La source de données dont ces collections sont servies. Par défaut `(default)` |
-| `callbacks` | Les callbacks globaux du projet, les `callbacks` qu'exporte votre `config/index.ts`. Le serveur les exécute avant les hooks propres à chaque collection ; passez-les ici et l'écriture d'un script les exécute aussi |
+| `tables` | Les tables du projet, compilées avec `compileSchema` (voir ci-dessus). En cas d'absence ou si la valeur est vide, elles sont lues depuis la base de données, comme le ferait un serveur sans `backend/schema`, et sont desservies en lecture seule |
+| `pool` | Paramètres du pool, avec `databaseUrl` |
+| `dataSourceKey` | La base de données à partir de laquelle ces tables sont servies. Par défaut `(default)` |
+| `hooks` | Les hooks globaux du projet : les `hooks` exportés par `backend/hooks.ts`, que le serveur exécute avant ceux propres à chaque table. Passez-les ici et les écritures du script les exécuteront également. `rebase console` s'en charge pour vous |
 
-`openRebase` ne lit aucune variable d'environnement. Le `DATABASE_URL` ci-dessus est lu par
-votre script, et des paramètres comme `REBASE_DB_POOL_MAX` ou `REALTIME_CDC` ne changent
-rien ici.
+`openRebase` ne lit aucune variable d'environnement. La variable `DATABASE_URL`
+ci-dessus est lue par votre script, et les paramètres tels que
+`REBASE_DB_POOL_MAX` ou `REALTIME_CDC` ne changent rien ici.
 
-L'ouverture ne journalise rien
-au niveau `info`, de sorte que le stdout d'un script contient ce que le script affiche, et que
-`tsx scripts/report.ts > report.json` n'écrit que son JSON. Les avertissements et les erreurs
-vont sur stderr en développement. La note sur la façon dont les requêtes sont isolées
-(`RLS enforcement active`) est journalisée au niveau `debug` ; le démarrage d'un serveur
-l'affiche toujours au niveau `info`. Une base de données injoignable fait rejeter l'ouverture
-avec une seule erreur, `Cannot connect to PostgreSQL at <host>:<port>: <reason>.`, et rien
-n'est journalisé : c'est au script de décider quoi afficher.
+L'ouverture ne consigne rien au niveau `info`, de sorte que le stdout d'un script
+ne contient que ce que le script affiche, et `tsx scripts/report.ts > report.json`
+n'écrit que son JSON. Les avertissements et les erreurs vont sur stderr en
+développement. La notification indiquant comment les requêtes sont isolées
+(`RLS enforcement active`) est consignée au niveau `debug` ; le démarrage d'un
+serveur l'affiche toujours au niveau `info`. Une base de données inaccessible
+rejette l'ouverture avec une seule erreur, `Cannot connect to PostgreSQL at
+<host>:<port>: <reason>.`, et ne consigne rien d'autre : la décision d'afficher
+ou non cette information revient au script.
 
-Ses accesseurs sont typés par le `Database` qu'enregistre `rebase generate-sdk --register`,
-comme l'est le `rebase` d'une fonction : un nom de collection, de champ ou de valeur d'enum
-mal orthographié dans un script est donc une erreur de type. Le `backend/tsconfig.json` du
-scaffold inclut `scripts/`, de sorte que `tsc --noEmit` dans `backend/` la signale. Sans
-enregistrement, nommez-le
-à chaque appel avec `openRebase<Database>({ … })` ; `OpenedRebase<Database>` est le type à
-donner à un helper qui en reçoit un. Sans l'un ni l'autre, les lignes ne sont pas typées, ce
-qui explique pourquoi le premier exemple convertit `draft.id` avec `String()`.
+Ses accesseurs sont typés par l'interface `Database` enregistrée par `rebase
+generate-sdk --register`, tout comme le `rebase` d'une fonction, de sorte qu'une
+faute de frappe dans le nom d'une table, d'un champ ou d'une valeur
+d'énumération dans un script génère une erreur de type. Le fichier
+`backend/tsconfig.json` du scaffold inclut `scripts/`, ainsi `tsc --noEmit`
+exécuté dans `backend/` la signale. Sans enregistrement, spécifiez-le à chaque
+appel avec `openRebase<Database>({ … })` ; `OpenedRebase<Database>` est le type à
+attribuer à une fonction utilitaire (helper) qui en reçoit une instance. Sans
+l'un ni l'autre, les lignes ne sont pas typées, c'est pourquoi le premier exemple
+convertit `draft.id` avec `String()`.
 
 ### Vérifier ce qu'un utilisateur peut voir
 
-`withAuth` est le moyen le plus rapide de tester une règle de sécurité sur des données réelles.
-Le scaffold blog, celui que `rebase init` crée par défaut, déclare des règles sur `posts` même :
-un utilisateur connecté sans rôle lit les articles publiés et aucun brouillon, et seul un
-administrateur en écrit un. (Les autres collections reçoivent les `defaultSecurityRules` de
-`config/collections/index.ts`.) Ce script vérifie les deux moitiés, sous le nom
+`withAuth` est le moyen le plus rapide de tester une règle de sécurité sur des
+données réelles. Le scaffold de blog, valeur par défaut de `rebase init`, déclare
+des règles directement sur `posts` : un utilisateur connecté sans rôle lit les
+articles publiés et aucun brouillon, et seul un administrateur peut en écrire.
+(Les autres tables indiquent `rls: "inherit"` et adoptent le `defaultRls` défini
+dans `backend/schema/index.ts`.) Ceci vérifie les deux aspects, dans
 `backend/scripts/ada-check.ts` :
 
 ```typescript
 import { openRebase } from "@rebasepro/server-postgres";
-import { collections } from "../../config/collections";
+import { tables } from "./tables";
 
-const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
+const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, tables });
 const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });
 
 // A signed-in user reads published posts, and no drafts…
@@ -196,24 +237,27 @@ console.log(Number(counted[0]?.n) === seen.length);
 await rebase.close();
 ```
 
-Lancez-le comme le premier script, et il affiche `true` trois fois :
+Exécutez-le de la même manière que le premier script, et il affichera `true`
+trois fois :
 
 ```bash
 cd backend
 DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/ada-check.ts
 ```
 
-Une règle qui filtre les lignes par propriétaire se vérifie de la même façon : comparez le champ
-propriétaire de chaque ligne avec l'`uid` que vous avez passé. Sur le scaffold blog, aucune règle
-ne le fait, et `authorId` sur un article est l'id d'une ligne d'auteur, pas d'un utilisateur.
+Une règle qui filtre les lignes par propriétaire se vérifie de la même façon :
+comparez le champ propriétaire de chaque ligne avec l'`uid` transmis. Sur le
+scaffold de blog, aucune règle ne le fait, et `authorId` sur un article
+correspond à l'identifiant d'une ligne d'auteur, pas à celui d'un utilisateur.
 
-Un utilisateur est `{ uid, roles?, isAnonymous?, claims? }` ; les `claims` sont ce que
-`rebase.jwt()` lit dans une stratégie.
+Un utilisateur est représenté par `{ uid, roles?, isAnonymous?, claims? }` ;
+`claims` correspond à ce que `rebase.jwt()` lit dans une politique.
 
-`withAuth` s'exécute sous le rôle restreint qu'un démarrage de serveur crée (`rebase_user`).
-Sur une base de données où aucun serveur Rebase n'a démarré, ce rôle n'existe pas, et
-les requêtes `withAuth` échouent avec l'erreur de rôle inconnu de Postgres plutôt que de s'exécuter
-sans filtre. Lancez d'abord `rebase db push`, ou démarrez le serveur une fois.
+`withAuth` s'exécute sous le rôle restreint créé au démarrage du serveur
+(`rebase_user`). Sur une base de données sur laquelle aucun serveur Rebase n'a
+jamais démarré, ce rôle n'existe pas, et les requêtes `withAuth` échouent avec
+l'erreur de rôle inconnu de Postgres plutôt que de s'exécuter sans filtrage.
+Exécutez d'abord `rebase db push`, ou démarrez le serveur une fois.
 
 ### Dans un test
 
@@ -221,11 +265,11 @@ sans filtre. Lancez d'abord `rebase db push`, ou démarrez le serveur une fois.
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { openRebase, type OpenedRebase } from "@rebasepro/server-postgres";
-import { collections } from "../../config/collections";
+import { tables } from "./tables";
 
 let rebase: OpenedRebase;
 before(async () => {
-    rebase = await openRebase({ databaseUrl: process.env.TEST_DATABASE_URL!, collections });
+    rebase = await openRebase({ databaseUrl: process.env.TEST_DATABASE_URL!, tables });
 });
 after(() => rebase.close());
 
@@ -237,62 +281,73 @@ test("a signed-in user reads published posts only and writes none", async () => 
 });
 ```
 
-Enregistrez-le sous `backend/scripts/posts.test.ts` et lancez-le depuis `backend/` avec le
-lanceur de tests de Node, en faisant pointer `TEST_DATABASE_URL` vers une base de données sur
-laquelle un serveur Rebase a démarré :
+Enregistrez-le sous `backend/scripts/posts.test.ts` et exécutez-le depuis
+`backend/` avec le lanceur de tests de Node, en faisant pointer
+`TEST_DATABASE_URL` vers une base de données sur laquelle un serveur Rebase a
+déjà démarré :
 
 ```bash
 TEST_DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx --test scripts/posts.test.ts
 ```
 
-Cela fonctionne de la même façon sous Vitest ou Jest.
+La même chose fonctionne avec Vitest ou Jest.
 
-### Collections avec historique
+### Tables avec historique
 
-Une écriture sur une collection avec [`history: true`](/docs/backend/history/) enregistre son entrée
-comme le fait une écriture du serveur. L'entrée est écrite dans la transaction de la ligne elle-même,
-si bien qu'une écriture annulée ne laisse aucune entrée. Elle est enregistrée sous l'identité avec
-laquelle l'écriture s'est exécutée : `service` pour `dataAsAdmin`, l'`uid` de l'utilisateur avec
-`withAuth`. Les écritures de `rebase console` sont enregistrées de la même façon.
+Une écriture sur une table avec [`history: true`](/docs/backend/history/)
+enregistre son entrée de la même manière qu'une écriture côté serveur. L'entrée
+est inscrite dans la transaction propre à la ligne, de sorte qu'une écriture
+annulée (rollback) ne laisse aucune entrée. Elle est enregistrée sous l'identité
+avec laquelle l'écriture a été exécutée : `service` pour `dataAsAdmin`, l'`uid`
+de l'utilisateur sous `withAuth`. Les écritures depuis `rebase console` sont
+enregistrées de la même façon.
 
-`openRebase` ne crée rien où enregistrer. Si aucun backend avec historique n'a encore démarré sur la
-base de données, la table `rebase.entity_history` est absente. Une écriture sur une collection avec
-historique est alors refusée avec
-[`HISTORY_UNAVAILABLE`](/docs/backend/errors/#data-queries-and-writes) avant que l'un de ses callbacks
-ne s'exécute, et le message nomme ce qui manque. Les lectures fonctionnent comme d'habitude. Démarrez
-le backend une fois avec l'historique activé (`rebase dev` le fait), et les écritures passent.
+`openRebase` ne crée aucune structure pour ces enregistrements. Si aucun backend
+avec historique n'a démarré sur la base de données, la table
+`rebase.entity_history` est absente. Une écriture sur une table avec historique
+est alors refusée avec l'erreur
+[`HISTORY_UNAVAILABLE`](/docs/backend/errors/#data-queries-and-writes) avant
+même que l'un de ses hooks ne s'exécute, et le message précise ce qui manque.
+Les lectures fonctionnent normalement. Démarrez le backend une fois avec
+l'historique activé (ce que fait `rebase dev`), et les écritures aboutiront.
 
-Les entrées sont enregistrées, jamais purgées. La rétention est un réglage du serveur qu'un script ne
-peut pas voir ; le serveur les purge donc comme d'habitude : à sa prochaine écriture sur l'entité, et
-lors de son balayage horaire.
+Les entrées sont enregistrées, jamais purgées par le script. La rétention est un
+paramètre serveur invisible pour un script ; le serveur les purge donc comme
+d'habitude : lors de la prochaine écriture de l'entité, ainsi que lors de son
+nettoyage horaire.
 
-### Ce qu'il laisse de côté
+### Ce qui n'est pas inclus
 
-`openRebase` ouvre la couche de données et rien d'autre. Il ne démarre aucun temps réel de
-lui-même, mais ses écritures atteignent tout de même les requêtes en direct : les triggers de capture des changements de la base
-annoncent chaque écriture, quel qu'en soit l'auteur, de sorte que les abonnés d'un serveur en marche
-relisent aussi après un backfill. Ce n'est qu'avec `REALTIME_CDC=off` sur ce serveur qu'elles
-ne sont pas annoncées. Voir
-[Capture des changements de la base](/docs/backend/realtime-cdc/). Le stockage, l'e-mail, l'administration de
-l'authentification et vos fonctions n'y figurent pas.
+`openRebase` ouvre la couche de données et rien d'autre. Il ne démarre aucun
+mécanisme temps réel par lui-même, mais ses écritures atteignent tout de même les
+requêtes en direct (live queries) : les déclencheurs de capture des modifications
+(change-capture triggers) de la base de données signalent chaque écriture, quel
+qu'en soit l'auteur, de sorte que les abonnés sur un serveur en cours d'exécution
+récupèrent également les données après un backfill. Ce n'est qu'avec
+`REALTIME_CDC=off` sur ce serveur qu'elles ne sont pas signalées. Voir
+[Capture des modifications de base de données](/docs/backend/realtime-cdc/). Le
+stockage, les e-mails, l'administration de l'authentification et vos fonctions
+n'en font pas partie.
 
-Les callbacks de collection s'exécutent à chaque écriture, comme sur le serveur. Les `callbacks` globaux du projet
-ne s'exécutent que lorsque vous les passez via l'option `callbacks`.
-`rebase console` les passe pour vous : elle lit les `callbacks` qu'exporte votre
-`config/index.ts`, de sorte qu'un `beforeSave` global s'exécute aussi sur ses écritures. Si
-ce fichier ne peut pas être importé (par exemple, il a besoin d'une variable d'environnement que la
-console n'a pas reçue), la console affiche une ligne indiquant que les callbacks globaux sont
-désactivés pour la session, et s'ouvre sans eux.
+Les hooks propres à chaque table s'exécutent à chaque écriture, tout comme sur
+le serveur. Les hooks globaux du projet ne s'exécutent que si vous les
+transmettez via l'option `callbacks`. `rebase console` les transmet pour vous :
+elle lit les `hooks` exportés par votre `backend/hooks.ts`, de sorte qu'un
+`beforeSave` global s'exécute également lors de ses écritures. Si ce fichier ne
+peut pas être importé (par exemple, s'il a besoin d'une variable
+d'environnement non fournie à la console), la console affiche une ligne
+indiquant que les hooks globaux sont désactivés pour la session et s'ouvre sans
+eux.
 
-Lorsqu'un script a aussi besoin de ceux-là, construisez le backend sans le servir :
-`createRebaseBackend({ …, provision: false })` vous donne `backend.rebase`, le
-client complet en processus, sans rien monter ni rien démarrer. Voir
-[le backend sans serveur](/docs/backend/custom-server/#the-backend-without-a-server).
-Pour tester un callback de collection sans aucune base de données, appelez-le avec
-[`createCallContext`](/docs/collections/callbacks/#testing-a-callback).
+Lorsqu'un script a également besoin de ces éléments, construisez le backend sans
+le servir : `createRebaseBackend({ …, provision: false })` vous fournit
+`backend.rebase`, le client in-process complet, sans rien monter ni démarrer.
+Voir [le backend sans serveur](/docs/backend/custom-server/#the-backend-without-a-server).
+Pour tester le hook d'une table sans aucune base de données, appelez-le avec
+[`createCallContext`](/docs/collections/callbacks/#testing-a-hook).
 
 ## Voir aussi
 
-- [Intégration de serveur personnalisé](/docs/backend/custom-server/) — le backend sous forme de pièces publiques
+- [Intégration d'un serveur personnalisé](/docs/backend/custom-server/) — le backend sous forme de briques publiques
 - [Référence de la CLI](/docs/cli/) — toutes les commandes `rebase`
-- [Règles de sécurité](/docs/collections/security-rules/) — ce par quoi `withAuth` est filtré
+- [Règles de sécurité](/docs/collections/security-rules/) — les règles de filtrage appliquées à `withAuth`

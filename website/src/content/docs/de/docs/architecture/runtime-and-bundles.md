@@ -1,28 +1,30 @@
 ---
-sourceHash: 81823dd14c0cd697
+sourceHash: 47f5760918cfd724
 title: Runtime und Bundles
 sidebar_label: Runtime & Bundles
-description: Wie ein Rebase-Projekt in ein Projekt-Bundle und eine versionierte Runtime aufgeteilt wird und warum genau diese Trennung Upgrades, Multi-Repo-Apps und Managed Hosting ermöglicht.
+description: Wie ein Rebase-Projekt in ein Projekt-Bundle und eine versionierte Runtime aufgeteilt wird und warum diese Trennung Upgrades, Multi-Repo-Apps und Managed Hosting ermöglicht.
 ---
 
 ## Die zwei Hälften eines Deployments
 
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
 Ein Rebase-Deployment besteht aus zwei Dingen, nicht nur einem:
 
-- **Das Bundle** — Ihr Projekt. Kompilierte Collections, Hooks, Functions und Cron-Jobs sowie ein generiertes Manifest, das beschreibt, was diese benötigen.
-- **Die Runtime** — die Engine. `@rebasepro/server`, ausgeliefert als das veröffentlichte `rebasepro/server`-Container-Image.
+- **Das Bundle** — Ihr Projekt. Kompilierte Tabellen, Hooks, Funktionen und Cron-Jobs sowie ein generiertes Manifest, das beschreibt, was diese benötigen.
+- **Die Runtime** — die Engine. `@rebasepro/server`, ausgeliefert als veröffentlichtes `rebasepro/server`-Container-Image.
 
-Sie werden separat gebaut, versioniert und ausgeliefert. Genau aus dieser Entscheidung ergibt sich alles Weitere auf dieser Seite: Da die Engine nicht fest in Ihr Anwendungs-Image integriert ist, kann sie unterhalb Ihres Projekts ausgetauscht werden – für einen Sicherheitsfix, eine Leistungsverbesserung oder ein neues Feature –, ohne dass irgendetwas von dem, was Sie geschrieben haben, neu gebaut werden muss.
+Sie werden separat gebaut, versioniert und ausgeliefert. Genau aus dieser Entscheidung ergibt sich alles Weitere auf dieser Seite: Da die Engine nicht fest in Ihr Anwendungs-Image integriert ist, kann sie unter Ihrem Projekt ausgetauscht werden – für einen Sicherheits-Fix, eine Leistungsverbesserung oder ein neues Feature –, ohne dass von Ihnen geschriebener Code neu gebaut werden muss.
 
 ```
   your repository                 built artifact              running container
   ───────────────                 ──────────────              ─────────────────
-  config/collections/*.ts   ──►   dist-bundle/config/     ──►  rebasepro/server
-  backend/functions/*.ts          dist-bundle/backend/         + /bundle mounted
+  backend/schema/*.ts       ──►   dist-bundle/backend/schema/  ──►  rebasepro/server
+  backend/functions/*.ts          dist-bundle/backend/             + /bundle mounted
   rebase.json                     dist-bundle/manifest.json
 ```
 
-Die Runtime, die Sie selbst hosten, ist dieselbe Runtime, die Rebase Cloud ausführt. Es gibt keinen separaten „Plattform“-Build, und nichts am Managed-Tier ist für jemanden unerreichbar, der `docker compose up` ausführt.
+Die Runtime, die Sie selbst hosten, ist dieselbe Runtime, die Rebase Cloud ausführt. Es gibt keinen separaten „Platform“-Build, und nichts aus dem Managed-Angebot bleibt jemandem vorenthalten, der `docker compose up` ausführt.
 
 ## Ein Bundle bauen
 
@@ -30,36 +32,43 @@ Die Runtime, die Sie selbst hosten, ist dieselbe Runtime, die Rebase Cloud ausf�
 rebase build
 ```
 
-Dies generiert das Datenbankschema aus Ihren Collections neu, prüft die Typen, kompiliert sie, löst Import-Specifier auf, damit Node die Ausgabe direkt laden kann, und schreibt `dist-bundle/` mit folgendem Inhalt:
+Dies regeneriert das Datenbankschema aus Ihren Tabellen, führt eine Typprüfung durch, kompiliert sie, löst Import-Spezifizierer auf, sodass Node die Ausgabe direkt laden kann, und schreibt `dist-bundle/` mit folgendem Inhalt:
 
 | Pfad | Beschreibung |
 | --- | --- |
-| `manifest.json` | Generiert. Der Contract, den dieses Bundle zu erfüllen vorgibt. |
-| `package.json` | Generiert. Die Runtime-Abhängigkeiten Ihres Projekts. |
-| `config/` | Kompilierte Collections. |
-| `backend/functions/` | Kompilierte Server-Functions. |
+| `manifest.json` | Generiert. Der Vertrag (Contract), den dieses Bundle zu erfüllen vorgibt. |
+| `package.json` | Generiert. Die Laufzeit-Abhängigkeiten Ihres Projekts. |
+| `backend/schema/` | Kompilierte Tabellen: der `index`, der sie exportiert, und ein Modul pro Tabelle. |
+| `backend/resources.js`, `backend/storage.js`, `backend/hooks.js` | Die kompilierten Module, die die Runtime neben den Tabellen liest, sofern das Projekt sie enthält. |
+| `backend/functions/` | Kompilierte Server-Funktionen. |
 | `backend/crons/` | Kompilierte Cron-Jobs. |
 | `backend/src/schema.generated.js` | Kompiliertes Datenbankschema. |
 
-Es lohnt sich, das Manifest zu verstehen, da die Runtime genau dieses validiert, bevor sie dem Starten zustimmt:
+Es lohnt sich, das Manifest zu verstehen, denn es ist genau das, was eine Runtime validiert, bevor sie dem Start zustimmt:
 
 ```jsonc
 {
-  "bundleFormat": 2,
-  "runtime": { "range": "^1", "builtAgainst": "0.30.1", "contract": 1 },
-  "schemaVersion": "v1:c5d97d0f96b7f87a",
+  "bundleFormat": 3,
+  "runtime": { "range": "^1", "builtAgainst": "0.30.1", "contract": 2 },
+  "schemaVersion": "v2:3f0c9a1e7d2b5c48",
   "kind": "backend",
   "entry": {
-    "config": "config",
+    "tables": "backend/schema",
+    "resources": "backend/resources.js",
+    "storage": "backend/storage.js",
     "functions": "backend/functions",
     "static": [{ "path": "/", "dir": "static/admin", "spa": true }]
   },
+  "tables": ["authors", "posts", "tags", "users"],
   "hooks": { "native": false },
+  "storage": { "authorize": true },
   "deps": { "declared": { "zod": "^4.4.3" } }
 }
 ```
 
-`kind` ist entweder `backend` – startet den Server sowie alle statischen Apps in `entry.static` – oder `static`, was diese Assets und sonst nichts ausliefert: keine Datenbank, keine Authentifizierung. Ob ein Backend seine Collections im Code deklariert oder per Introspektion aus der Live-Datenbank ermittelt, ist keine dritte Art; es hängt schlicht davon ab, ob `entry.config` vorhanden ist.
+<span class="since-badge" data-since="0.31">Seit 0.31</span> `bundleFormat` 3 und Runtime-Vertrag (runtime contract) 2: Das Schema ist `entry.tables`, das kompilierte `backend/schema`-Verzeichnis, neben `entry.resources`, `entry.storage` und `entry.hooks`. `schemaVersion` beginnt mit `v2:` — sie wird aus den kompilierten Tabellen berechnet.
+
+`kind` ist entweder `backend` — startet den Server plus alle statischen Apps in `entry.static` — oder `static`, was diese Assets und sonst nichts ausliefert: keine Datenbank, keine Authentifizierung. Ob ein Backend seine Tabellen im Code deklariert oder sie aus der Live-Datenbank introspektiert, ist keine dritte Art (`kind`); es hängt einfach davon ab, ob `entry.tables` vorhanden ist.
 
 ## Ein Bundle ausführen
 
@@ -68,17 +77,19 @@ rebase start                       # locally
 docker run -v ./dist-bundle:/bundle rebasepro/server   # anywhere
 ```
 
-`rebase start` lädt das Bundle in-process, sodass Signale und Stacktraces Sie direkt erreichen. Lokal verlinkt es Ihre bereits installierten Abhängigkeiten in das Bundle, sodass keine zweite Installation nötig ist; ein Deployment installiert stattdessen die bundlespezifische `package.json`.
+`rebase start` lädt das Bundle im selben Prozess (in-process), sodass Signale und Stack-Traces Sie direkt erreichen. Lokal verlinkt es Ihre bereits installierten Abhängigkeiten in das Bundle, sodass keine zweite Installation nötig ist; ein Deployment installiert stattdessen die eigene `package.json` des Bundles.
 
 ## Kompatibilität
 
-Zwei Versionsnummern bestimmen, ob ein Bundle und eine Runtime zusammenarbeiten können, und dabei handelt es sich bewusst nicht um die Paketversion.
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-**`bundleFormat`** ist das On-Disk-Layout. Eine Runtime akzeptiert jedes Bundle, dessen Format kleiner oder gleich ihrem eigenen ist, und verweigert ein neueres, anstatt es unvollständig zu laden. Ein älteres Bundle auf einer neueren Runtime muss weiterhin funktionieren – das ist der eigentliche Sinn dieser Trennung. Daher liest eine Runtime jedes Format, das jemals ausgeliefert wurde. Format-1-Bundles, die dieses Feld `mode` nannten und ein einzelnes statisches Verzeichnis enthielten, starten weiterhin unverändert.
+Zwei Versionsnummern bestimmen, ob ein Bundle und eine Runtime zusammenarbeiten können, und es handelt sich dabei bewusst nicht um die Paketversion.
 
-**`runtime.contract`** ist die Schnittstelle zwischen einem Bundle und der Engine. Innerhalb einer Major-Version des Contracts bleibt jedes zuvor validierte Bundle weiterhin gültig. Patches und Minor-Versionen sind Drop-in-kompatibel; ein Major-Release ist es nicht, und eine Runtime verweigert ein Bundle einer anderen Major-Version, anstatt zu starten und sich später fehlerhaft zu verhalten.
+**`bundleFormat`** ist das On-Disk-Layout. Eine Runtime verweigert ein neueres Format, anstatt es nur teilweise zu laden. Ein älteres Bundle auf einer neueren Runtime funktioniert weiterhin, sofern das Layout dies zulässt — das ist der Zweck dieser Trennung — mit einer Ausnahme: **Ein Bundle im Format 1 oder Format 2 wird von einer 0.31-Runtime verweigert**. Diese Bundles enthalten `config/collections` — `defineCollection`-Objekte — und eine Runtime, die nur `backend/schema` liest, hat keine Möglichkeit, diese einzulesen; das Starten eines solchen Bundles würde die Datenbank introspektieren, anstatt die deklarierten Tabellen bereitzustellen. Die Fehlermeldung benennt die Lösung: Führen Sie [`rebase migrate collections-to-tables`](/docs/cli/schema/#rebase-migrate) auf dem Quellcode des Projekts aus und bauen Sie das Bundle anschließend neu.
 
-Deshalb ist das Upgrade von Rebase in einem selbst gehosteten Deployment lediglich eine Änderung des Tags:
+**`runtime.contract`** ist die Schnittstelle zwischen einem Bundle und der Engine; mit Version 0.31 wurde diese auf `2` geändert. Innerhalb einer Major-Version des Contracts bleibt jedes Bundle, das validiert wurde, weiterhin gültig. Patches und Minor-Versionen sind Drop-in-kompatibel; eine Major-Version ist es nicht, und eine Runtime verweigert ein Bundle aus einer anderen Major-Version, anstatt zu starten und sich später fehlerhaft zu verhalten.
+
+Aus diesem Grund ist ein Upgrade von Rebase in einem selbst gehosteten Deployment lediglich eine Änderung des Tags:
 
 ```yaml
 image: rebasepro/server:0.30.1   # a newer tag — your bundle is untouched
@@ -86,33 +97,34 @@ image: rebasepro/server:0.30.1   # a newer tag — your bundle is untouched
 
 ## Die Entwicklung nutzt denselben Pfad
 
-`rebase dev` startet dieselbe Runtime direkt über Ihrem TypeScript-Quellcode anstelle eines kompilierten Bundles. Hot-Reloading funktioniert weiterhin, und die Entwicklung spiegelt die Produktion exakt wider, da beide denselben Boot-Pfad durchlaufen, statt zwei Implementierungen, die auseinanderdriften könnten.
+`rebase dev` startet dieselbe Runtime über Ihrem TypeScript-Quellcode anstelle eines kompilierten Bundles. Hot-Reload funktioniert weiterhin, und die Entwicklung spiegelt die Produktion zuverlässig wider, da beide denselben Boot-Pfad durchlaufen, anstatt zwei Implementierungen zu nutzen, die auseinanderdriften können.
 
-Ein Projekt, das etwas benötigt, was die Standard-Runtime nicht bietet, kann dennoch eine eigene `backend/src/index.ts` schreiben und den Server als Bibliothek importieren. `rebase dev` erkennt und führt dies aus. Siehe [Custom server](/docs/backend/custom-server/) – Sie verlieren dabei die Standard-Runtime, nicht jedoch die API-Oberfläche.
+Ein Projekt, das Funktionen benötigt, die die Standard-Runtime nicht bietet, kann dennoch eine eigene `backend/src/index.ts` schreiben und den Server als Bibliothek importieren. `rebase dev` erkennt dies und führt es aus. Siehe [Benutzerdefinierter Server](/docs/backend/custom-server/) — Sie verlieren dabei die Standard-Runtime, nicht jedoch die API-Oberfläche.
 
 ## Was die Runtime aus der Umgebung liest
 
-Die Runtime wird vollständig über Umgebungsvariablen konfiguriert, da dies der gemeinsame Nenner aller Deployment-Ziele ist.
+Die Runtime wird vollständig über Umgebungsvariablen konfiguriert, da dies von jedem Deployment-Ziel unterstützt wird.
 
 | Variable | Bedeutung |
 | --- | --- |
-| `DATABASE_URL` | Connection-String für die Standarddatenbank. Erforderlich. |
-| `JWT_SECRET` | Signiergeheimnis (Secret), mindestens 32 Zeichen. In Produktion erforderlich. |
-| `CORS_ORIGINS` | Kommagetrennte Origins, die die API aufrufen dürfen. In Produktion erforderlich. |
-| `PORT` | Zu bindender Port. Standardmäßig lokal `3001`, im Image `8080`. |
-| `REBASE_SERVICE_KEY` | Server-to-Server-Schlüssel, der Administratorzugriff gewährt. |
+| `DATABASE_URL` | Verbindungszeichenfolge für die Standard-Datenbank. Erforderlich. |
+| `JWT_SECRET` | Signierungs-Secret, mindestens 32 Zeichen. In der Produktion erforderlich. |
+| `CORS_ORIGINS` | Kommagetrennte Origins, die die API aufrufen dürfen. In der Produktion erforderlich. |
+| `PORT` | Port, an den gebunden werden soll. Standardmäßig lokal `3001`, im Image `8080`. |
+| `REBASE_SERVICE_KEY` | Server-zu-Server-Schlüssel, der Administratorzugriff gewährt. |
 | `REBASE_METRICS` | `true`, um Prometheus-Metriken unter `/metrics` bereitzustellen. |
-| `REBASE_MIGRATE_ON_BOOT` | `ensure` – der Standard überall, auch in Produktion – führt den additiven Bereitstellungsschritt aus; `none` belässt das Schema unverändert. Jeder andere Wert verweigert den Start, und auch das Image verweigert `push`. |
-| `REBASE_SERVE_STATIC` | Statische Assets des Bundles über diesen Prozess ausliefern. Standardmäßig aktiviert. |
+| `REBASE_MIGRATE_ON_BOOT` | `ensure` — überall der Standard, einschließlich Produktion — führt den additiven Bereitstellungslauf aus; `none` lässt das Schema unverändert. Jeder andere Wert verweigert das Booten, und das Runtime-Image verweigert auch `push`. |
+| `REBASE_SERVE_STATIC` | Liefert die statischen Assets des Bundles aus diesem Prozess aus. Standardmäßig aktiviert. |
 
-Mehrere Datenbanken und Buckets werden konfiguriert, indem der Source-Key als Suffix an die Variable angehängt wird – siehe [Mehrere Datenbanken und Buckets](/docs/backend/multiple-sources/).
+Mehrere Datenbanken und mehrere Buckets werden konfiguriert, indem der Source-Key als Suffix an die Variable angehängt wird — siehe [Mehrere Datenbanken und Buckets](/docs/backend/multiple-sources/).
 
 ## Endpunkte, die die Runtime immer bereitstellt
 
 | Pfad | Zweck |
 | --- | --- |
-| `GET /health` | Readiness (Bereitschaft). Führt einen Round-Trip zur Datenbank durch. |
-| `GET /livez` | Liveness (Lebendigkeit). Berührt bewusst *nicht* die Datenbank, damit ein kurzer Datenbankaussetzer den Orchestrator nicht dazu veranlasst, einen gesunden Prozess zu beenden. |
-| `GET /api/meta/schema-version` | Die aktuelle Schema-Version. Nicht authentifiziert – es handelt sich um einen Versionsstempel, nicht um ein Schema. |
-| `GET /api/meta/contract` | Der vollständige Collection-Contract. Braucht `schema:read`. |
+| `GET /health` | Readiness. Führt einen Datenbank-Roundtrip durch. |
+| `GET /livez` | Liveness. Berührt die Datenbank bewusst *nicht*, damit ein kurzer Datenbankaussetzer nicht dazu führt, dass ein Orchestrator einen fehlerfreien Prozess beendet. |
+| `GET /api/meta/schema-version` | Die aktuelle Schema-Version. Nicht authentifiziert — es ist ein Versionsstempel, kein Schema. |
+| `GET /api/schema/tables` | Die Tabellen, wie der jeweilige Aufrufer sie sehen darf — die Grundlage für das Rendering des Admin-Panels. Siehe [Endpunkte](/docs/backend/endpoints/#schema). |
+| `GET /api/meta/contract` | Die Schema-Version, die Runtime und jede Tabelle aus Administratorsicht. Erfordert `schema:read`. |
 | `GET /metrics` | Prometheus-Metriken, wenn `REBASE_METRICS=true`. |

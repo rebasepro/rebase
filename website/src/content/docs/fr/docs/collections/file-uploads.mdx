@@ -1,163 +1,173 @@
 ---
-sourceHash: a0dfd4167267de59
+sourceHash: 5037df8f9b275f93
 title: Champs de téléversement de fichiers
 sidebar_label: Téléversements de fichiers
-description: "Déclarer un champ de fichier ou d'image sur une collection : le bloc storage, les téléversements simples et multiples, et les options résolues par le panneau plutôt que par le serveur."
+description: "Comment le CMS affiche une colonne col.storage() sous la forme d'un champ de téléversement : les règles appliquées par le serveur à la colonne, les fonctions spécifiques au navigateur ajoutées par customizeTable, les champs pour fichier unique et fichiers multiples, et le cycle de vie des fichiers stockés."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
 
-Un champ de fichier est une propriété **string** ordinaire dotée d'un bloc `storage`. La
-colonne contient du texte — la clé de l'objet dans le bucket, ou son URL si vous le
-demandez — et le bloc indique où vont les octets et ce que le formulaire acceptera.
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-Cette séparation a plus d'importance qu'il n'y paraît. La majeure partie de `storage` est
-lue par l'outil de téléversement du panneau d'administration lors de l'envoi vers l'API,
-de sorte qu'une écriture ne provenant pas d'un formulaire n'y passe pas — ces options portent
-l'étiquette ci-dessous. Les deux options qui déterminent ce qu'un fichier peut *être*, `maxSize`
-et `acceptedFiles`, font exception : le serveur les vérifie lors de chaque téléversement
-dans le `storagePath` de la propriété.
+Un champ de fichier est une colonne [`col.storage()`](/docs/schema/columns/#storage-columns).
+La colonne contient du texte, la clé de l'objet dans le bucket (ou son URL, si
+la colonne le spécifie), et le CMS l'affiche sous la forme d'un champ de téléversement avec un aperçu.
+
+Le fonctionnement d'un champ de stockage est divisé en deux parties, selon l'endroit où il s'exécute :
+
+| Déclaré | Emplacement | Options |
+|---|---|---|
+| sur la colonne, dans `backend/schema` | lu par le serveur **et** le CMS | `path`, `source`, `accept`, `maxBytes`, `imageResize`, `public`, `fileName`, `metadata`, `includeBucketUrl`, `storeUrl` |
+| dans `customizeTable`, dans `frontend/src/cms` | le navigateur uniquement | `storage.path(…)`, `storage.fileName(…)`, `storage.processFile`, `storage.postProcess`, `storage.previewUrl` |
+
+Les options de la colonne sont sérialisables, elles transitent donc dans le descripteur
+de la table et le serveur applique celles qu'il peut. Les options de `customizeTable` sont
+des fonctions : elles ne peuvent pas atteindre le serveur et ne modèlent donc que les
+téléversements effectués depuis le CMS.
 
 ## Un seul fichier
 
-```typescript
-avatar: {
-    type: "string",
-    name: "Main image",
-    storage: {
-        storagePath: "avatars",
-        acceptedFiles: ["image/*"],
-        maxSize: 2 * 1024 * 1024
-    }
-}
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+```ts
+// backend/schema/listings.ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const listings = defineTable("listings", {
+    columns: {
+        id:     col.uuid().primaryKey().defaultRandom(),
+        title:  col.text().notNull(),
+        cover:  col.storage({ path: "listings/{id}/", accept: ["image/*"], maxBytes: "10MB",
+                              imageResize: { maxWidth: 1600, format: "webp", quality: 80 } }),
+        photos: col.storage({ path: "listings/{id}/gallery/", accept: ["image/*"] }).multiple(),
+    },
+    rls: "admin-only",
+});
 ```
+
+`cover` est un champ de téléversement qui accepte une image de 10 Mo au maximum,
+redimensionnée à une largeur maximale de 1600 pixels et enregistrée au format WebP. Une colonne
+dont l'option `accept` indique un type d'image s'affiche sous forme d'aperçu d'image, et la première
+colonne de ce type remplit l'emplacement d'image de l'enregistrement dans les cartes et les listes.
 
 <FieldWidgetPreview client:only="react" variant="file_upload" />
 
 ## Plusieurs fichiers
 
-Un tableau de la même chose. Le bloc `storage` se déplace dans `of`, car il
-décrit chaque élément plutôt que la liste :
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-```typescript
-images: {
-    type: "array",
-    name: "Images",
-    of: {
-        type: "string",
-        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
-    }
-}
-```
+`.multiple()` transforme la colonne en `TEXT[]` et le champ en téléversement multifichier,
+réorganisable par glisser-déposer. Chaque option s'applique à chaque fichier.
 
 <FieldWidgetPreview client:only="react" variant="multi_file_upload" />
 
-## Options de stockage
+## Options côté navigateur
 
-Tout ce qui se trouve à l'intérieur de `storage`.
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-| Propriété | Type | Description |
-|-----------|------|-------------|
-| `storagePath` | `string \| function` | **Requis.** Emplacement où le fichier est envoyé dans le bucket. Une chaîne avec des variables de substitution — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{id}` (l'identifiant de l'enregistrement ; `{entityId}` est interprété de la même façon), `{propertyKey}`, `{path}` — ou une fonction du contexte du téléversement, qui nomme l'identifiant de l'enregistrement `id`. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données :** c'est le composant de téléversement du panneau qui le résout, et `client.storage.upload()` définit sa propre clé. Un chemin sous forme de chaîne est également l'emplacement où le serveur applique les restrictions `maxSize` et `acceptedFiles` de cette propriété à chaque téléversement |
-| `fileName` | `string \| function` | Le nom de fichier de l'objet téléversé, avec les mêmes variables de substitution. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
-| `storageSource` | `string` | Quel bucket enregistré utiliser, lorsqu'un projet en compte plusieurs. L'identifiant `bucket("media")` fonctionne également ici |
-| `public` | `boolean` | Stocker sous le préfixe public et servir via une URL stable, sans jeton et mettable en cache. `false` par défaut, ce qui correspond à des objets privés et des URL signées à courte durée de vie |
-| `acceptedFiles` | `FileType[]` | Types MIME acceptés par cette propriété. La notation avec astérisque fonctionne — `image/*`. **Appliqué par le serveur** pour chaque téléversement dans le `storagePath` de la propriété — voir [Ce que le serveur vérifie](#ce-que-le-serveur-vérifie) |
-| `maxSize` | `number` | Plus grand fichier accepté, en octets. **Appliqué par le serveur**, tout comme `acceptedFiles`, aussi bien pour les chemins de téléversement standards que pour ceux avec reprise |
-| `metadata` | `Record<string, unknown>` | Métadonnées de l'objet à stocker aux côtés du fichier |
-| `includeBucketUrl` | `boolean` | Écrire `s3://my-bucket/path/to/file.png` dans la colonne au lieu de `path/to/file.png`. `false` par défaut |
-| `storeUrl` | `boolean` | Écrire l'URL de téléchargement dans la colonne au lieu de la clé. `false` par défaut, et il est conseillé de laisser ainsi : une URL portant un jeton cesse de fonctionner dès que le jeton expire, et la référence d'origine est alors perdue |
-| `imageResize` | `ImageResize` | Redimensionner et recadrer avant le téléversement, pour `image/jpeg`, `image/png` et `image/webp`. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
-| `processFile` | `(file: File) => Promise<File>` | Transformer le fichier avant son téléversement. S'exécute dans le navigateur. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
-| `postProcess` | `(pathOrUrl: string) => Promise<string>` | Transformer le chemin ou l'URL résolu(e) avant son enregistrement. S'exécute dans le navigateur. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
-| `previewUrl` | `(fileName: string) => string` | Générer l'URL de prévisualisation, lorsque l'adresse réelle du fichier ne correspond pas à la valeur du champ. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |
+```tsx
+// frontend/src/cms/listings.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { listings } from "../../../backend/schema/listings";
 
-### Redimensionnement
+export const listingsCms = customizeTable<typeof listings>("listings", {
+    fields: {
+        cover: {
+            storage: {
+                // A folder per listing title, computed in the browser.
+                path: ({ values }) => `listings/${String(values.title ?? "untitled").toLowerCase()}/`,
+                fileName: ({ file }) => `${Date.now()}-${file.name}`,
+            },
+            urlPreview: "image",
+        },
+        photos: {
+            sortable: true,
+            storage: { processFile: async (file) => file },
+        },
+    },
+});
+```
 
-`imageResize` prend `maxWidth` et `maxHeight` en pixels, un `mode` valant
-`"contain"` (réduire pour ajuster, par défaut) ou `"cover"` (remplir les limites
-et recadrer), un `format` parmi `"original"`, `"jpeg"`, `"png"` ou `"webp"`, et une
-`quality` comprise entre 0 et 100 pour les formats avec perte — 80 par défaut. L'opération
-a lieu dans le navigateur, avant l'envoi des octets, de sorte qu'un téléversement ne
-provenant pas du panneau est stocké à sa taille d'origine.
+| `storage.` | S'exécute | Effet |
+|---|---|---|
+| `path(context)` | avant un téléversement | Le dossier de destination du fichier, remplaçant le modèle `path` de la colonne. |
+| `fileName(context)` | avant un téléversement | Le nom du fichier stocké, remplaçant le modèle `fileName` de la colonne. Peut être asynchrone. |
+| `processFile(file)` | avant un téléversement | Transforme le fichier (compression, suppression des métadonnées). |
+| `postProcess(pathOrUrl)` | après un téléversement | Transforme le chemin ou l'URL avant son écriture dans la colonne. |
+| `previewUrl(fileName)` | lors de l'affichage | L'URL pour prévisualiser un fichier stocké, lorsqu'elle ne correspond pas à la valeur du champ. |
 
-### Ce que le serveur vérifie
+`path` et `fileName` reçoivent le contexte du téléversement : le `file`, l'`id`
+de l'enregistrement (absent lors d'un nouvel enregistrement), ses `values` telles qu'éditées,
+la `propertyKey` et les règles de stockage résolues. Sur une colonne `.multiple()`, les mêmes
+options `storage` sont définies directement sur le champ et s'appliquent à chaque fichier.
 
-Auparavant, `maxSize` et `acceptedFiles` n'étaient appliqués que par une seule chose :
-le navigateur. La route de téléversement ne connaissait qu'une limite de taille globale
-unique et rien sur la propriété à laquelle le fichier était destiné, si bien qu'un
-`curl -F file=@payload.exe` contournant le sélecteur déposait un exécutable de 40 Mo dans
-le bucket d'avatars, sans que la configuration stipulant le contraire ne soit jamais consultée.
+`urlPreview` définit la façon dont la valeur stockée est prévisualisée (`"image"`, `"video"`,
+`"audio"`, `"file"`, ou `true` pour un lien), et `clearable` ajoute une commande permettant
+de vider le champ.
 
-Tous deux sont désormais vérifiés par le serveur en fonction de **l'endroit où atterrit
-le fichier**. Le `storagePath` d'une propriété est l'endroit où vont ses fichiers, c'est donc
-également là que ses limites s'appliquent : tout téléversement dont la clé est un fichier
-situé directement sous ce chemin — depuis le panneau, `client.storage.putObject`, un téléversement
-avec reprise, l'explorateur de stockage de Studio ou `curl` — y est soumis, qu'il nomme ou non
-la propriété, sur la propre source de stockage de la propriété. Les variables de substitution
-correspondent à ce que le panneau renseignerait : `{id}`, `{rand}`, `{file}` et similaires
-représentent un seul segment de chemin, `{path}` en représente autant qu'il y en a. Le chemin
-d'une propriété avec `public: true` se trouve sous `public/`.
+## Ce que le serveur vérifie
 
-- Plusieurs propriétés partageant un même chemin : un fichier accepté par l'une d'elles est accepté.
-- Un téléversement qui nomme également sa propriété (`collection` + `property`, telles que
-  `putObject({ context })` les envoie) est également soumis aux règles de cette propriété.
-  Nommer une propriété plus permissive ne déverrouille pas le chemin d'une propriété plus stricte.
-  Les téléversements du panneau (champs de fichiers, cellules de tableau et images markdown)
-  la nomment systématiquement.
-- Un `storagePath` écrit sous forme de fonction ne peut pas être lu sans être exécuté, il
-  ne dispose donc d'aucune règle côté serveur : ces limites ne s'appliquent qu'aux téléversements
-  qui nomment la propriété, ce que font ceux du panneau.
-- Un chemin revendiqué par aucune propriété est uniquement soumis à la limite propre à la source
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+`accept` et `maxBytes` sont appliqués par le serveur en fonction de **l'emplacement de destination
+du fichier**. Le `path` d'une colonne correspond à l'endroit où vont ses fichiers, et c'est donc
+également là que ses limites s'appliquent : tout téléversement dont la clé est un fichier situé
+directement sous ce chemin doit les respecter, qu'il provienne du CMS, de `client.storage.putObject`,
+d'un téléversement avec reprise, du navigateur de stockage de Studio ou de `curl`, qu'il nomme
+la colonne ou non, sur le bucket propre à la colonne. Les espaces réservés correspondent à ce
+que le CMS remplirait : `{id}`, `{rand}`, `{file}` et autres représentent un segment de chemin,
+`{path}` un nombre quelconque. Le chemin d'une colonne avec `public: true` se trouve sous `public/`.
+
+- Plusieurs colonnes partageant un même chemin : un fichier accepté par l'une d'elles est accepté.
+- Un téléversement qui spécifie également sa colonne, comme le font les téléversements du CMS, est
+  également soumis aux règles de cette colonne. Spécifier une colonne plus permissive ne débloque
+  pas le chemin d'une colonne plus stricte.
+- Une fonction `storage.path` dans `customizeTable` ne pouvant pas être lue par le serveur,
+  un fichier téléversé sous le chemin qu'elle calcule n'est soumis aux limites de la colonne que si
+  le téléversement spécifie la colonne, ce que font systématiquement les téléversements du CMS.
+- Un chemin qu'aucune colonne ne revendique est uniquement soumis à la propre limite du bucket
   (`STORAGE_MAX_FILE_SIZE`).
 
-### Images dans un champ markdown
+`imageResize`, `processFile` et `postProcess` ont lieu dans le navigateur, avant l'envoi
+des octets : un fichier téléversé d'une autre manière est stocké tel qu'il a été envoyé.
 
-Une propriété markdown (`admin.markdown: true`) avec un bloc `storage` accepte les
-téléversements d'images dans son éditeur. Le texte stocke chaque image sous forme de
-**référence de stockage** — `![](rebase-storage:posts/abc_cover.png)` — et non sous
-forme d'URL : l'URL d'un fichier privé contient un jeton de téléchargement qui expire au bout
-de quelques minutes, et le texte est conservé. L'éditeur et les prévisualisations du panneau
-d'administration échangent chaque référence contre une URL fraîche lorsqu'ils l'affichent ;
-un site qui effectue le rendu du champ fait de même avec `resolveStorageReferences(text, client)` —
-voir [Fichiers dans le texte](/docs/sdk/storage#files-inside-text).
+## Où un fichier peut être placé
 
-Le texte enregistré avant l'introduction des références contient les URL de téléchargement
-elles-mêmes, avec des jetons expirés. L'éditeur, les prévisualisations et `resolveStorageReferences`
-les renouvellent lors de l'affichage du texte, car un jeton désigne toujours son objet ;
-réinsérer l'image ou réécrire le texte avec `storageReferencesForDownloadUrls(text)` permet
-de stocker une référence.
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-### Où le fichier est autorisé à aller
+`path` est une valeur par défaut, pas une limite stricte : rien sur le serveur ne confine un téléversement
+à cet emplacement. Les autorisations d'écriture sont définies par des règles d'autorisation de stockage ; voir
+[Stockage](/docs/backend/storage/).
 
-`storagePath` est une valeur par défaut, pas une frontière : rien sur le serveur ne confine
-un téléversement à ce préfixe. Déterminer qui peut écrire où est le rôle d'une règle
-d'autorisation de stockage — voir [Stockage](/docs/backend/storage).
+## Les fichiers ne sont jamais supprimés à votre place
 
-### Les fichiers ne sont jamais supprimés pour vous
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-Vider un champ de fichier, remplacer son fichier ou supprimer la ligne à laquelle il appartient
-laisse l'objet stocké là où il se trouve. Chaque téléversement obtient sa propre clé, de sorte
-qu'un remplacement écrit un nouvel objet plutôt que d'écraser l'ancien, et rien ne supprime
-le précédent : deux lignes peuvent contenir la même clé, le panneau ne peut donc pas savoir
-si un fichier est inutilisé. Les objets vers lesquels aucune ligne ne pointe restent dans le
-bucket et sont facturés jusqu'à ce que vous les supprimiez — depuis l'explorateur de stockage
-de Studio, avec `client.storage.deleteObject(key)`, ou à l'aide d'une règle de cycle de vie sur
-le bucket. `rebase storage orphans` liste les fichiers qu'aucune ligne ne mentionne, et les
-supprime avec `--delete` — voir [la CLI](/docs/cli/#rebase-storage).
+Vider un champ de fichier, remplacer son fichier ou supprimer la ligne conserve l'objet
+stocké là où il se trouve. Chaque téléversement dispose de sa propre clé, un remplacement écrit
+donc un nouvel objet et rien ne supprime le précédent : deux lignes pouvant contenir la même
+clé, le CMS ne peut pas savoir si un fichier est inutilisé. Les objets vers lesquels aucune ligne
+ne pointe restent dans le bucket et sont facturés jusqu'à ce que vous les supprimiez depuis le
+navigateur de stockage de Studio, avec `client.storage.deleteObject(key)` ou à l'aide d'une
+règle de cycle de vie sur le bucket. `rebase storage orphans` liste les fichiers qu'aucune
+ligne ne mentionne et les supprime avec `--delete` ; voir [la CLI](/docs/cli/#rebase-storage).
 
-### Déplacer une propriété vers une autre source de stockage
+## Déplacer une colonne vers un autre bucket
 
-Un champ de fichier stocke la clé de l'objet, pas sa source. Modifier le `storageSource` d'une
-propriété fait pointer chaque valeur existante vers la nouvelle source, où ces clés n'existent
-pas, de sorte que les aperçus des fichiers téléversés avant la modification renvoient
-"not found". Copiez les objets vers la nouvelle source sous les mêmes clés avant de modifier
-la propriété — `rebase storage move --from <old> --to <new> --prefix <storagePath>`, ou via
-les outils propres au fournisseur tels que `aws s3 sync` ou `gcloud storage cp` — ou conservez
-l'ancienne source pour les fichiers existants.
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+Un champ de fichier stocke la clé de l'objet, pas son bucket. Modifier la `source` d'une
+colonne fait pointer chaque valeur existante vers le nouveau bucket, où ces clés n'existent
+pas, de sorte que les aperçus des fichiers plus anciens renvoient « introuvable ». Copiez
+d'abord les objets vers le nouveau bucket sous les mêmes clés, à l'aide de
+`rebase storage move --from <old> --to <new> --prefix <path>` ou des outils propres au fournisseur,
+tels que `aws s3 sync` ou `gcloud storage cp`, ou conservez l'ancien bucket pour les fichiers existants.
 
 ## Prochaines étapes
 
-- **[Propriétés](/docs/collections/properties)** — tous les types de propriétés et leurs options
-- **[Stockage](/docs/backend/storage)** — buckets, URL signées et ce que le serveur fait d'un téléversement
-- **[Règles de sécurité (RLS)](/docs/collections/security-rules)** — qui peut lire les lignes dont dépendent ces fichiers
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+- [Colonnes](/docs/schema/columns/#storage-columns) : toutes les options de `col.storage()`
+- [Champs](/docs/collections/properties/) : les autres types de colonnes
+- [Stockage](/docs/backend/storage/) : buckets, URL signées et gestion des téléversements par le serveur
+- [Fichiers dans le SDK](/docs/sdk/storage/#files-inside-text) : références de stockage à l'intérieur de texte

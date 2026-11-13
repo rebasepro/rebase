@@ -1,38 +1,28 @@
 ---
-sourceHash: ead814d8414e0434
+sourceHash: 517637e2cfd34608
 title: "Rezept: Webhook-Integration"
 sidebar_label: Webhooks
-description: Verwenden Sie Entity-Callbacks, um Webhooks an externe Dienste zu senden, wenn sich Daten ändern, ohne die Transaktion des Schreibvorgangs offen zu halten.
+description: Verwenden Sie Table Hooks, um Webhooks an externe Dienste zu senden, wenn sich Daten ändern, ohne die Transaktion des Schreibvorgangs offenzuhalten.
 ---
 
 ## Übersicht
 
-Verwenden Sie die Callbacks `afterSave` und `afterDelete`, um externe Dienste zu benachrichtigen, wenn sich Daten in Rebase ändern.
+Verwenden Sie die `afterSave`- und `afterDelete`-[Table Hooks](/docs/collections/callbacks/), um externe Dienste zu benachrichtigen, wenn sich Daten in Rebase ändern.
 
-Zwei Eigenschaften dieser Callbacks bestimmen, wie dieses Rezept geschrieben ist, und keine davon ist optional:
+Zwei Eigenschaften dieser Hooks bestimmen, wie dieses Rezept aufgebaut ist, und keine davon ist optional:
 
-- **Sie laufen innerhalb der Transaktion des Schreibvorgangs.** Alles, was Sie dort mit `await`
-  abwarten, hält eine Verbindung aus dem Pool und die Sperren der Zeile, bis es zurückkommt. Ein
-  Empfänger, der zehn Sekunden braucht, ist eine Transaktion von zehn Sekunden; ein Empfänger, der
-  nie antwortet, ist eine Transaktion, die nie endet.
-- **Eine Exception aus `afterSave` macht den Schreibvorgang rückgängig.** Der Fehler erreicht den
-  Aufrufer als 500 und die Zeile wird nicht gespeichert. Auf einen Dritten im Callback zu warten
-  macht dessen Ausfall zu Ihrem Datenverlust.
+- **Sie laufen innerhalb der Datenbanktransaktion des Schreibvorgangs.** Alles, was Sie dort mit `await` abwarten, hält eine Verbindung aus dem Connection-Pool sowie die Zeilensperren (Row Locks) offen, bis eine Rückmeldung erfolgt. Ein Empfänger, der zehn Sekunden benötigt, bedeutet eine zehnsekündige Transaktion; ein Empfänger, der nie antwortet, bedeutet eine Transaktion, die niemals endet.
+- **Ein Fehler (`throw`) aus `afterSave` führt zum Rollback des Schreibvorgangs.** Der Fehler erreicht den Aufrufer als 500-Fehler und die Zeile wird nicht gespeichert. Das Abwarten eines Drittanbieters innerhalb des Hooks macht dessen Ausfall zu Ihrem Datenverlust.
 
-Also: niemals `await` auf eine ausgehende HTTP-Anfrage in einem Callback. Stellen Sie sie in die Warteschlange.
+Daher gilt: Führen Sie niemals ein `await` für eine ausgehende HTTP-Anfrage in einem Hook aus. Stellen Sie sie in eine Warteschlange (Queue).
 
 ## Slack-Benachrichtigung bei neuer Bestellung
 
-`WebhookDispatcher` wird aus `@rebasepro/server` exportiert. `enqueueEntityChange` kehrt sofort
-zurück — der POST passiert, sobald der Schreibvorgang committet ist, nie für einen zurückgerollten — und
-der Dispatcher validiert das Ziel, signiert die Nutzlast, begrenzt jeden Versuch mit einer Frist und
-wiederholt Fehlschläge.
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-Geben Sie ihm die Job-Queue des Backends, und jede Zustellung wird zu einer Zeile in `rebase.jobs`: Sie überlebt
-einen Deploy oder einen Absturz, wird mit Backoff von der Instanz wiederholt, deren Worker sie beansprucht, und ein
-Empfänger, der einen Tag lang ausfällt, kostet Zeilen, nicht Arbeitsspeicher. Schalten Sie die Queue mit
-`jobs: { enabled: true }` in `initializeRebaseBackend` ein und verdrahten Sie den Dispatcher, sobald es
-zurückgekehrt ist:
+`WebhookDispatcher` wird aus `@rebasepro/server` exportiert. `enqueueEntityChange` kehrt sofort zurück – der POST-Request erfolgt erst, sobald der Schreibvorgang committet wurde, und niemals bei einem Rollback – und der Dispatcher validiert das Ziel, signiert die Payload, begrenzt jeden Versuch mit einer Frist (Deadline) und wiederholt fehlgeschlagene Versuche.
+
+Übergeben Sie ihm die Job-Queue des Backends, und jede Zustellung wird zu einer Zeile in `rebase.jobs`: Sie übersteht ein Deployment oder einen Absturz, wird mit Backoff von dem Worker der Instanz wiederholt, die sie reserviert, und ein Empfänger, der einen Tag lang offline ist, kostet lediglich Zeilen, keinen Arbeitsspeicher. Aktivieren Sie die Queue mit `jobs: { enabled: true }` in `initializeRebaseBackend` und binden Sie den Dispatcher ein, sobald dieses zurückgekehrt ist:
 
 ```typescript
 import {
@@ -72,7 +62,7 @@ export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
     // `ctx` lets each attempt send its real `X-Webhook-Attempt`.
     backend.jobQueue?.register<QueuedWebhookDelivery>(WEBHOOK_DELIVERY_TASK, (ctx) => dispatcher.deliverQueuedJob(ctx.payload, ctx));
 
-    backend.setCollectionCallbacks("orders", {
+    backend.setTableHooks("orders", {
         afterSave: async ({ values, id, status }) => {
             if (status === "new") {
                 // Returns void, immediately. The job is written after the
@@ -84,23 +74,15 @@ export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
 }
 ```
 
-Auf dem Job wird nur die ID des Webhooks gespeichert, sodass sein Signatur-Secret nie in `rebase.jobs` liegt. Ein
-Ziel, das der Dispatcher ablehnt, oder ein Empfänger, der mit einer Weiterleitung antwortet, geht nach
-einem Versuch mit dem Grund in die Dead-Letter-Ablage; alles andere wird wie jeder Job wiederholt. Siehe
-[Durable Webhooks](/docs/backend/jobs#durable-webhooks).
+Es wird nur die ID des Webhooks im Job gespeichert, sodass dessen Signaturgeheimnis (Secret) niemals in `rebase.jobs` verbleibt. Ein Ziel, das der Dispatcher verweigert, oder ein Empfänger, der mit einem Redirect antwortet, wird nach einem einzigen Versuch mit der Begründung als Dead Letter behandelt; alles andere wird wie jeder andere Job wiederholt. Siehe [Durable Webhooks](/docs/backend/jobs#durable-webhooks).
 
-`setCollectionCallbacks` **ersetzt** die Callbacks, die die Collection `orders`
-deklariert. Wenn sie welche deklariert, behalten Sie diese:
-Übergeben Sie
-`composeCallbacks(declared, { afterSave })`, mit `composeCallbacks` aus
-`@rebasepro/server` und `declared` als den eigenen `callbacks` der Collection. Siehe
-[Callback-Sets kombinieren](/docs/collections/callbacks/#combining-callback-sets).
+`setTableHooks` **ersetzt** die Hooks, die von der Tabelle `orders` deklariert wurden. Falls bereits Hooks vorhanden sind, behalten Sie diese bei: Übergeben Sie `composeTableHooks(declared, { afterSave })`, wobei `composeTableHooks` aus `@rebasepro/common` stammt und `declared` die eigenen `hooks` der Tabelle darstellen (`orders.config.hooks`). Siehe [Kombinieren von Hook-Sets](/docs/collections/callbacks/#combining-hook-sets).
 
 ### Ohne Job-Queue
 
-Lassen Sie `jobQueue` weg — oder arbeiten Sie mit einem Treiber ohne SQL, bei dem das Backend keine hat —, und die
-Zustellungen werden im Arbeitsspeicher in die Warteschlange gestellt, in dem Prozess, der die Änderung vorgenommen hat. Das ist einfacher, und es
-reicht für eine Benachrichtigung, die Sie sich leisten können zu verlieren:
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+Lassen Sie `jobQueue` weg – oder führen Sie den Code dort aus, wo das Backend keine Job-Queue hat –, werden die Zustellungen im Arbeitsspeicher des Prozesses eingereiht, der die Änderung vorgenommen hat. Das ist einfacher und reicht für Benachrichtigungen aus, deren Verlust verkraftbar ist:
 
 ```typescript
 import { WebhookDispatcher, type RebaseBackendInstance } from "@rebasepro/server";
@@ -126,7 +108,7 @@ export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
         }
     ]);
 
-    backend.setCollectionCallbacks("orders", {
+    backend.setTableHooks("orders", {
         afterSave: async ({ values, id, status }) => {
             if (status === "new") {
                 dispatcher.enqueueEntityChange("orders", "INSERT", String(id), values);
@@ -136,34 +118,24 @@ export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
 }
 ```
 
-Halten Sie den Dispatcher aus der Collection-Datei selbst heraus. Eine Collection-Datei wird auch im
-Admin, im Browser, gebündelt: Der Build entfernt ihre Callbacks, aber ein Dispatcher, der oben in der Datei erstellt wird,
-und sein `@rebasepro/server`-Import würden an jeden Besucher ausgeliefert und den Admin-Build scheitern lassen.
+Halten Sie den Dispatcher aus der Tabellendatei selbst heraus. `backend/schema` wird von jedem Befehl geladen, der das Schema einliest – `rebase db push`, `generate-sdk`, `doctor` – und ein am Anfang der Datei erstellter Dispatcher würde von jedem dieser Befehle instanziiert werden. Binden Sie ihn stattdessen dort ein, wo das Backend erstellt wird, wie oben gezeigt.
 
-Ein Absturz oder ein Deploy zwischen dem Commit und der Zustellung verliert das Ereignis. Jeder Webhook hat seine eigene
-Warteschlange, sodass ein ausgefallener Empfänger nur seine eigenen Zustellungen verzögert, nie die eines anderen Webhooks.
-Die Warteschlange jedes Webhooks hält höchstens
-10.000 wartende Zustellungen; solange sie voll ist, wird eine neue Zustellung abgelehnt und an `onDelivery` gemeldet,
-mit `success: false`, `statusCode: 0`, `attemptNumber: 0` und `responseBody: "queue full"`, und
-das Server-Log sagt es einmal. Rufen Sie beim Herunterfahren `await dispatcher.flush(10_000)` auf: Es wartet auf das, was
-in der Warteschlange steht, und liefert `false`, wenn das Budget zuvor aufgebraucht ist, weil ein ausgefallener Empfänger
-jede seiner Zustellungen bis zu ~36 Sekunden lang mit Wiederholungen festhalten kann.
+Ein Absturz oder ein Deployment zwischen dem Commit und der Zustellung führt zum Verlust des Ereignisses. Jeder Webhook verfügt über eine eigene Queue, sodass ein nicht erreichbarer Empfänger nur seine eigenen Zustellungen verzögert, niemals die eines anderen Webhooks.
+Die Queue jedes Webhooks fasst maximal 10.000 wartende Zustellungen. Ist sie voll, wird eine neue Zustellung abgelehnt und an `onDelivery` mit `success: false`, `statusCode: 0`, `attemptNumber: 0` und `responseBody: "queue full"` gemeldet, und das Server-Log gibt dies einmalig aus. Rufen Sie `await dispatcher.flush(10_000)` beim Herunterfahren auf: Dies wartet auf ausstehende Elemente in der Queue und gibt `false` zurück, falls das Zeitbudget zuerst erschöpft ist, da ein ausgefallener Empfänger jede seiner Zustellungen für bis zu ca. 36 Sekunden an Retry-Versuchen aufhalten kann.
 
 ### Was der Empfänger erhält
 
-Jede Zustellung ist ein `POST` mit einem JSON-Body und diesen Headern:
+Jede Zustellung ist ein `POST`-Request mit einem JSON-Body und diesen Headern:
 
 | Header | Wert |
 | --- | --- |
 | `X-Webhook-Id` | Die `id` des Webhooks |
 | `X-Webhook-Event` | `INSERT`, `UPDATE` oder `DELETE` |
-| `X-Webhook-Delivery` | Eine ID pro Zustellung, bei jedem Versuch dieselbe |
-| `X-Webhook-Attempt` | Welcher Versuch dies ist, ab `1` |
-| `X-Webhook-Signature` | `sha256=` und der Hex-HMAC-SHA256 des rohen Bodys, mit dem `secret` des Webhooks als Schlüssel (nur wenn er eines hat) |
+| `X-Webhook-Delivery` | Eine ID pro Zustellung, identisch bei jedem Versuch |
+| `X-Webhook-Attempt` | Der wievielte Versuch dies ist, beginnend bei `1` |
+| `X-Webhook-Signature` | `sha256=` gefolgt vom hexadezimalen HMAC-SHA256 des rohen Request-Bodys, generiert mit dem `secret` des Webhooks (nur vorhanden, wenn ein Secret konfiguriert ist) |
 
-Zustellungen sind at-least-once: Ein Empfänger, der zu langsam geantwortet hat, oder ein Worker, der nach dem
-`POST` gestorben ist, bedeutet, dass dieselbe Zustellung erneut ankommt. Deduplizieren Sie über `X-Webhook-Delivery`, und prüfen Sie die
-Signatur über den Body genau so, wie er ankam — bevor Sie ihn parsen:
+Die Zustellung erfolgt nach dem At-least-Once-Prinzip: Antwortet ein Empfänger zu langsam oder stürzt ein Worker nach dem `POST` ab, wird dieselbe Zustellung erneut gesendet. Führen Sie eine Deduplizierung anhand von `X-Webhook-Delivery` durch und prüfen Sie die Signatur über den Body exakt so, wie er eingetroffen ist – noch vor dem Parsen:
 
 ```typescript
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -177,16 +149,14 @@ export function isSignedByRebase(rawBody: string, header: string | null, secret:
 
 ### Einen Endpunkt direkt aufrufen
 
-Wenn Sie einen handgebauten Body an einen einzelnen Endpunkt senden und den Dispatcher nicht
-wollen, gelten dieselben zwei Regeln — begrenzen Sie die Anfrage, und lassen Sie ihren Fehlschlag
-niemals den Aufrufer erreichen:
+Wenn Sie einen manuell erstellten Body an einen einzelnen Endpunkt senden und den Dispatcher nicht verwenden möchten, gelten dennoch dieselben zwei Regeln – begrenzen Sie den Request zeitlich und lassen Sie niemals zu, dass Fehler den Aufrufer erreichen:
 
 ```typescript
-import type { CollectionCallbacks } from "@rebasepro/types";
+import type { TableHooks } from "@rebasepro/server/schema";
 
 type Order = { customer_name: string; total: number };
 
-const callbacks: CollectionCallbacks<Order> = {
+const hooks: TableHooks<Order> = {
     afterSave: async ({ values, id, status }) => {
         if (status !== "new") return;
         // No `await`: the transaction must not wait for Slack. `AbortSignal.timeout`
@@ -201,34 +171,28 @@ const callbacks: CollectionCallbacks<Order> = {
             signal: AbortSignal.timeout(10_000)
         }).catch((error) => {
             // Swallowed on purpose. A throw here would be an unhandled rejection;
-            // a throw *inside* the callback would roll the order back.
+            // a throw *inside* the hook would roll the order back.
             console.error("Slack notification failed", error);
         });
     }
 };
 ```
 
-Geben Sie niemals eine URL aus Ihrer Datenbank an ein nacktes `fetch`. Der Dispatcher lehnt
-Loopback-, Link-Local- und private Ziele sowie andere Schemata als `http(s)` ab, bevor er sich
-verbindet, und folgt keinen Weiterleitungen — genau deshalb, weil eine gespeicherte URL eine von
-Angreifern kontrollierte Eingabe ist.
-Unter Node beurteilt er die Adresse, zu der jede
-Verbindung tatsächlich aufgebaut wird, innerhalb des eigenen DNS-Lookups der Verbindung, sodass ein Name, dessen Eintrag
-sich zwischen einer Prüfung und der Verbindung ändert, nicht daran vorbeischlüpfen kann; der Name eines Empfängers wird
-einmal pro Verbindung aufgelöst, nicht einmal pro Zustellung.
+Übergeben Sie niemals eine URL aus Ihrer Datenbank an ein ungeschütztes `fetch`. Der Dispatcher weist Loopback-, Link-Local-, private sowie Nicht-`http(s)`-Ziele ab, bevor eine Verbindung hergestellt wird, und weigert sich, Weiterleitungen zu folgen – eben weil eine gespeicherte URL potenziell vom Angreifer kontrollierte Eingabedaten darstellt.
+Unter Node prüft er die Adresse, zu der die Verbindung tatsächlich aufgebaut wird, innerhalb des verbindungs-eigenen DNS-Lookups. Dadurch kann ein Name, dessen Eintrag sich zwischen Prüfung und Verbindungsaufbau ändert, nicht unbemerkt durchschlüpfen; der Hostname eines Empfängers wird einmal pro Verbindung aufgelöst, nicht einmal pro Zustellung.
 
-## Synchronisation mit externer API
+## Synchronisierung mit einer externen API
 
-`afterDelete` erhält die gelöschte Zeile flach, als `row` — die Spalten der Tabelle, nicht einen Entity-Wrapper.
+`afterDelete` erhält die gelöschte Zeile flach als `values` – die Spalten der Tabelle, kein Entity-Wrapper.
 
 ```typescript
-import type { CollectionCallbacks } from "@rebasepro/types";
+import type { TableHooks } from "@rebasepro/server/schema";
 
 type Product = { name: string; description: string; price: number; shopify_id: string };
 
 const syncQueue: Promise<unknown>[] = [];
 
-const callbacks: CollectionCallbacks<Product> = {
+const hooks: TableHooks<Product> = {
     afterSave: async ({ values, id }) => {
         // Queued, not awaited: Shopify being down must not fail the save.
         syncQueue.push(
@@ -251,8 +215,8 @@ const callbacks: CollectionCallbacks<Product> = {
         );
     },
 
-    afterDelete: async ({ row }) => {
-        const shopifyId = row.shopify_id;
+    afterDelete: async ({ values }) => {
+        const shopifyId = values.shopify_id;
         if (!shopifyId) return;
         syncQueue.push(
             fetch(
@@ -270,16 +234,12 @@ const callbacks: CollectionCallbacks<Product> = {
 
 ## Fehlerbehandlung
 
-`afterSaveError` läuft, wenn das Speichern — oder irgendein `afterSave`-Callback — eine Exception
-wirft. Es ist ein Benachrichtigungs-Hook, keine Rettung: Die Transaktion wird zurückgerollt, die Zeile
-wird nicht gespeichert, und **der Fehler wird danach erneut geworfen**. Bei einem Request läuft er, sobald
-das Zurückrollen abgeschlossen ist, außerhalb der fehlgeschlagenen Transaktion, sodass eine Zustellung, die
-er an die Queue des Dispatchers übergibt, erhalten bleibt, statt mit dem Schreibvorgang zurückgerollt zu werden.
+`afterSaveError` wird ausgeführt, wenn der Speichervorgang – oder ein beliebiger `afterSave`-Hook – einen Fehler auslöst. Es ist ein Benachrichtigungs-Hook, keine Rettungsroutine: Die Transaktion wird zurückgerollt, die Zeile wird nicht gespeichert und **der Fehler wird nach der Ausführung erneut geworfen**. Bei einem Request läuft er, sobald das Rollback abgeschlossen ist, außerhalb der fehlgeschlagenen Transaktion. Daher bleibt eine Zustellung, die an die Queue des Dispatchers übergeben wird, erhalten, anstatt mit dem Schreibvorgang zurückgerollt zu werden.
 
 ```typescript
-import type { CollectionCallbacks } from "@rebasepro/types";
+import type { TableHooks } from "@rebasepro/server/schema";
 
-const callbacks: CollectionCallbacks = {
+const hooks: TableHooks = {
     afterSave: async ({ values }) => {
         // If this throws, the write is rolled back. That is the right behaviour
         // for a validation or an invariant, and the wrong one for a notification.
@@ -287,16 +247,14 @@ const callbacks: CollectionCallbacks = {
     },
     afterSaveError: async ({ id, values }) => {
         // Runs, and then the error is rethrown. Use it to alert, not to recover.
-        console.error(`Save failed for entity ${id}`, values);
+        console.error(`Save failed for row ${id}`, values);
     }
 };
 ```
 
-Wenn ein Fehlschlag den Nutzer *nicht* seinen Schreibvorgang kosten soll, darf er nicht aus
-`afterSave` herausfliegen — fangen Sie ihn dort, oder übergeben Sie die Arbeit der Warteschlange des
-Dispatchers.
+Wenn ein Fehler den Benutzer *nicht* seinen Schreibvorgang kosten soll, darf er nicht aus `afterSave` heraus geworfen werden – fangen Sie ihn dort ab oder übergeben Sie die Arbeit an die Queue des Dispatchers.
 
 ## Nächste Schritte
 
-- **[Entity-Callbacks](/docs/collections/callbacks)** — Vollständige Callback-Referenz
-- **[Blog-CMS-Rezept](/docs/recipes/blog-cms)** — Vollständiges Blog-Beispiel
+- **[Table Hooks](/docs/collections/callbacks)** – Vollständige Hook-Referenz
+- **[Blog-CMS-Rezept](/docs/recipes/blog-cms)** – Vollständiges Blog-Beispiel

@@ -1,24 +1,24 @@
 ---
-sourceHash: 9154f788865b82a2
+sourceHash: d1b243f804318232
 title: Sistema de Plugins
 sidebar_label: Plugins
-description: Estenda o Rebase com plugins — injete componentes de UI, modifique coleções, adicione ações na barra de ferramentas e crie construtores de campos personalizados.
+description: Estenda o Rebase com plugins — injete componentes de interface, modifique coleções, adicione ações na barra de ferramentas e crie construtores de campos personalizados.
 ---
 
 ## Visão Geral
 
-**Plugins são um conceito do painel de administração.** Eles são executados no
-navegador, dentro do admin React, e são registrados onde você o constrói. Nada
-nesta página alcança o backend: um plugin não pode adicionar uma rota, um
-callback ou um cron. Para isso, consulte [Funções Personalizadas](/docs/backend/custom-functions),
-[Callbacks de Entidade](/docs/collections/callbacks) e [Tarefas Cron](/docs/backend/cron-jobs).
+**Os plugins são um conceito do painel de administração.** Eles são executados no navegador,
+dentro do admin React, e são registrados onde você o compila. Nada nesta página
+atinge o backend: um plugin não pode adicionar uma rota, um callback ou um cron. Para isso,
+consulte [Funções Personalizadas](/docs/backend/custom-functions), [Callbacks de Entidade](/docs/collections/callbacks)
+e [Tarefas Cron](/docs/backend/cron-jobs).
 
 Os plugins são o principal mecanismo de extensão no painel. Eles podem:
 
 - Envolver toda a aplicação com um **provider** (contexto, gerenciamento de estado)
 - Adicionar **ações na página inicial** e widgets
 - Injetar componentes de **visualização de coleção** (barra de ferramentas, cabeçalhos de coluna)
-- Adicionar componentes de **formulário** (construtores de campo, painéis adicionais)
+- Adicionar componentes de **formulário** (construtores de campos, painéis adicionais)
 - **Injetar ou modificar coleções** dinamicamente
 
 ## Interface do Plugin
@@ -51,21 +51,20 @@ interface RebasePlugin {
 }
 ```
 
-Cada um desses itens é opcional, exceto `key`. A lista completa de nomes de slots
-está na página de **[Slots](/docs/frontend/slots)**.
+Cada um desses é opcional, exceto o `key`. A lista completa de nomes de slots está na
+página **[Slots](/docs/frontend/slots)**.
 
-### Ciclo de vida
+### Ciclo de Vida
 
-- `onMount(context)` é executado uma vez, quando a autenticação fica pronta pela
-  primeira vez: um usuário está logado, ou o login foi pulado.
-- `onAuthStateChange(user)` é executado a cada mudança de usuário posterior: com
-  o novo usuário ao fazer login, com `null` ao sair. O plugin continua montado
-  nos dois casos.
+- `onMount(context)` é executado uma vez, quando a autenticação fica pronta pela primeira vez: um usuário
+  está conectado ou o login foi ignorado.
+- `onAuthStateChange(user)` é executado a cada alteração posterior de usuário: o novo usuário no
+  login, `null` no logout. O plugin permanece montado em ambos os casos.
 - `onUnmount()` é executado quando `<Rebase>` é desmontado.
 
-`lifecycle.onCollectionChange` está obsoleto. Nada nunca o chamou. Um plugin que o define continua compilando, e o `<Rebase>` avisa uma vez por
-plugin. Para acompanhar as linhas de uma coleção, assine a partir de `onMount` e
-cancele a assinatura em `onUnmount`:
+`lifecycle.onCollectionChange` está depreciado. Nada nunca o chamou. Um plugin que o define ainda compila, e o `<Rebase>` emite um aviso uma vez por
+plugin. Para acompanhar as linhas de uma coleção, inscreva-se a partir de `onMount` e
+cancele a inscrição em `onUnmount`:
 
 ```tsx
 import type { RebasePlugin } from "@rebasepro/cms-types";
@@ -76,7 +75,7 @@ const openOrdersPlugin: RebasePlugin = {
     key: "open_orders",
     lifecycle: {
         onMount: (context) => {
-            stopListening = context.data.collection("orders").listen(
+            stopListening = context.data.orders.listen(
                 { where: { status: ["==", "open"] } },
                 ({ data }) => console.log(`${data.length} open orders`)
             );
@@ -88,7 +87,7 @@ const openOrdersPlugin: RebasePlugin = {
 
 ## Usando Plugins
 
-Os plugins são adicionados no `<Rebase>`, junto ao client. Tudo abaixo dele — a
+Os plugins são inseridos no `<Rebase>`, ao lado do client. Tudo abaixo dele — a
 navegação, as visualizações de coleção, os formulários — os lê a partir dali:
 
 ```tsx
@@ -106,27 +105,25 @@ export function App() {
             authController={authController}
             plugins={[dataEnhancementPlugin]}
         >
-            <RebaseCMS collections={collections}/>
+            <RebaseCMS tableCustomizations={tableCustomizations}/>
             <RebaseShell title="My App"/>
         </Rebase>
     );
 }
 ```
 
-Os plugins geralmente são construídos por um hook, portanto, o array é reconstruído
-a cada renderização; isso é esperado e é a razão pela qual `plugins` é uma prop
-em vez de algo memorizado manualmente com memoize. Dois plugins com a mesma `key`
-são um erro — o `<Rebase>` registra os duplicados no log em vez de descartar um
-silenciosamente.
+Os plugins geralmente são construídos por um hook, portanto o array é reconstruído a cada renderização;
+isso é normal e é a razão pela qual `plugins` é uma prop em vez de algo que você
+memoriza manualmente. Dois plugins com o mesmo `key` são um erro — o `<Rebase>`
+registra os duplicados em log em vez de descartar um silenciosamente.
 
-Para uma única contribuição, você não precisa de um plugin: `<Rebase slots>`
+Para uma única contribuição, você não precisa de um plugin: o `<Rebase slots>`
 aceita diretamente as mesmas entradas de `SlotContribution`.
 
 ### Sob composição manual
 
-Apenas se você tiver substituído o `<RebaseShell>` pelas camadas subjacentes a
-ele, a lista de plugins precisará ser repassada manualmente para o controlador de
-navegação:
+Somente se você tiver substituído o `<RebaseShell>` pelas camadas subjacentes a ele,
+a lista de plugins precisará ser encadeada manualmente no controlador de navegação:
 
 ```tsx
 const navigationStateController = useBuildNavigationStateController({
@@ -140,13 +137,13 @@ const navigationStateController = useBuildNavigationStateController({
 });
 ```
 
-O `<RebaseNavigation>` faz exatamente essa chamada para você, lendo `plugins`
-a partir do controlador de customização fornecido pelo `<Rebase>`. Consulte
+O `<RebaseNavigation>` faz exatamente essa chamada para você, lendo `plugins` do
+controlador de personalização fornecido por `<Rebase>`. Consulte
 [Avançado: layout manual](/docs/frontend#advanced-manual-layout).
 
 ## Construindo um Plugin
 
-Aqui está um plugin mínimo que adiciona uma ação de barra de ferramentas a cada coleção:
+Aqui está um plugin mínimo que adiciona uma ação na barra de ferramentas a cada coleção:
 
 ```tsx
 import type { RebasePlugin } from "@rebasepro/cms-types";
@@ -174,12 +171,12 @@ function useMyPlugin(): RebasePlugin {
 
 ### Wrappers de campo de vários plugins
 
-Os wrappers de vários plugins se compõem, na ordem do array `plugins`.
-O `wrap` de cada plugin recebe, como `params.Field`, o campo como os plugins
-anteriores a ele o deixaram, de modo que o wrapper do primeiro plugin fica por dentro e o do último
-por fora. Um plugin cujo `wrap` retorna `null`, ou cuja proteção `enabled`
-retorna `false` para o campo, o repassa inalterado. Um wrapper que
-renderiza `Field` mantém, portanto, todos os wrappers anteriores a ele:
+Wrappers de vários plugins são compostos na ordem do array `plugins`.
+O `wrap` de cada plugin recebe, como `params.Field`, o campo tal como os plugins
+anteriores o deixaram, de modo que o wrapper do primeiro plugin seja o mais interno e o
+do último seja o mais externo. Um plugin cujo `wrap` retorna `null`, ou cujo
+guard `enabled` retorna `false` para o campo, o repassa inalterado. Um wrapper que
+renderiza `Field`, portanto, mantém todos os wrappers anteriores a ele:
 
 ```tsx
 import type { RebasePlugin } from "@rebasepro/cms-types";
@@ -203,11 +200,13 @@ const descriptionPlugin: RebasePlugin = {
 };
 ```
 
-## Plugins Nativos
+## Plugins Integrados
+
+
 
 ### Plugin de Aprimoramento de Dados
 
-Preenchimento automático de campos com tecnologia de IA:
+Autocompletar de campos baseado em IA:
 
 ```typescript
 import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
@@ -215,28 +214,27 @@ import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 const enhancementPlugin = useDataEnhancementPlugin();
 ```
 
-Ele adiciona uma ação Autofill a todo formulário e um comando de barra **Autocomplete**
-a todo campo markdown, que continua o texto a partir do cursor. Ambos aparecem
-apenas onde o plugin está habilitado: o serviço se declara disponível e
-`getConfigForPath` (quando você passa um) permite a coleção. Um campo cujo
-`customProps.editorProps.aiController` nomeia um controlador próprio usa
-esse. Outro plugin pode dar aos campos markdown um controlador da mesma forma, com
-`EditorAIControllerProvider` de `@rebasepro/cms` em um provider no escopo do formulário.
+Ele adiciona uma ação de Autofill a cada formulário e um comando de barra (slash command)
+**Autocomplete** a cada campo markdown, que continua o texto a partir do cursor. Ambos aparecem
+apenas onde o plugin está habilitado: o serviço informa que está disponível e
+`getConfigForPath` (quando fornecido) permite a coleção. Um campo cujo
+`customProps.editorProps.aiController` especifica um controlador próprio usará
+esse. Outro plugin pode fornecer um controlador aos campos markdown da mesma maneira, com
+o `EditorAIControllerProvider` do `@rebasepro/cms` em um provider com escopo de formulário.
 
-![Data enhancement](/img/data_enhancement.png)
+![Aprimoramento de dados](/img/data_enhancement.png)
 
 :::caution[Este recurso envia dados para fora da sua máquina]
-O preenchimento automático envia os valores dos campos da entidade para um serviço
-hospedado para gerar uma sugestão: apenas os valores de propriedades declaradas, nunca os de uma
-propriedade somente leitura, desabilitada ou oculta, de uma com `dynamicProps`, nem de uma coluna que a collection
-não declara. Por padrão, esse serviço é **`https://app.rebase.pro/api/functions/ai`**,
-executado pelo Rebase — gratuito para uso, sem necessidade de configuração e sem
-credencial anexada: as requisições são anônimas, limitadas por rate limit em vez de
-identidade. Seu JWT não é enviado. O autocompletar por barra (slash) do editor também envia texto: até 8.000
-caracteres de cada lado do cursor, nunca o documento inteiro.
+O Autofill envia (POST) os valores dos campos da entidade para um serviço hospedado para gerar uma
+sugestão: apenas os valores das propriedades declaradas, nunca de propriedades somente leitura,
+desabilitadas ou ocultas, com `dynamicProps`, ou de uma coluna não declarada pela coleção. Por padrão,
+esse serviço é **`https://app.rebase.pro/api/functions/ai`**, operado pelo Rebase — gratuito para uso,
+sem configuração e sem credencial anexada: as requisições são anônimas, limitadas por rate limit
+e não por identidade. Seu JWT não é enviado. O autocompletar por barra do editor também envia texto:
+até 8.000 caracteres em cada lado do cursor, nunca o documento inteiro.
 
-Se isso é aceitável ou não depende do que está contido nos campos. Aponte o `endpoint`
-para sua própria implantação para manter a geração dentro da sua infraestrutura:
+Se isso é aceitável ou não depende do que está nos campos. Aponte o `endpoint` para
+a sua própria infraestrutura para manter a geração dentro dela:
 
 ```typescript no-verify
 const enhancementPlugin = useDataEnhancementPlugin({
@@ -244,18 +242,17 @@ const enhancementPlugin = useDataEnhancementPlugin({
 });
 ```
 
-O formato de transmissão (wire format) é todo o contrato — consulte `api.ts` em
-`@rebasepro/plugin-ai`, com uma implementação de referência em `functions/ai.ts` no
-plano de controle. O plugin não renderiza nada até que o host para o qual ele aponta
-informe que está disponível em `GET /status`, de modo que uma URL incorreta resulta
-em um botão ausente em vez de uma requisição com falha.
+O formato da mensagem (wire format) é todo o contrato — consulte `api.ts` em `@rebasepro/plugin-ai`,
+com uma implementação de referência no `functions/ai.ts` do plano de controle. O
+plugin não renderiza nada até que o host para o qual ele aponta reporte que está disponível em
+`GET /status`, portanto uma URL incorreta resulta em um botão ausente em vez de uma requisição com falha.
 
-Todos os outros plugins nativos são locais no navegador e não enviam nada para lugar algum.
+Todos os outros plugins integrados são locais ao navegador e não enviam nada para lugar nenhum.
 :::
 
 ## Injeção de Coleções
 
-Plugins podem adicionar novas coleções dinamicamente:
+Os plugins podem adicionar novas coleções dinamicamente:
 
 ```typescript
 hooks: {
@@ -266,29 +263,28 @@ hooks: {
 
 ## Modificação de Coleções
 
-Plugins podem modificar coleções existentes:
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Os plugins podem modificar coleções existentes:
 
 ```typescript
 hooks: {
     // Receives one collection, returns the modified one.
     modifyCollection: (collection) => ({
         ...collection,
-        properties: {
-            ...collection.properties,
-            last_modified_by: {
-                type: "string",
-                name: "Modified By",
-                admin: { readOnly: true }
-            }
-        }
+        description: `${collection.description ?? ""} Managed by the ops team.`.trim()
     })
 }
 ```
 
-O `modifyCollection` é síncrono, e a administração o aplica quando resolve
-suas coleções, não toda vez que o plugin muda. Quando a mudança precisa de dados
-que você tem de buscar, busque-os antes de renderizar o `<Rebase>` e construa o plugin
-a partir do que voltou:
+A coleção que um plugin recebe é a visualização resolvida da tabela pelo painel, após
+a aplicação de seu `customizeTable`, portanto o plugin vê exatamente o que o painel está prestes
+a renderizar.
+
+`modifyCollection` é síncrono, e o admin o aplica quando resolve suas coleções,
+não a cada alteração do plugin. Quando a alteração precisa de dados que você tem que
+buscar, busque-os antes de renderizar o `<Rebase>` e construa o plugin a partir do
+que for retornado:
 
 ```tsx
 import { useEffect, useMemo, useState } from "react";
@@ -321,17 +317,17 @@ export function App() {
 
     return (
         <Rebase client={client} authController={authController} plugins={[labelsPlugin]}>
-            <RebaseCMS collections={collections}/>
+            <RebaseCMS tableCustomizations={tableCustomizations}/>
             <RebaseShell title="My App"/>
         </Rebase>
     );
 }
 ```
 
-`hooks.modifyCollectionAsync` está obsoleto. Nada nunca o chamou. Um plugin que o define continua compilando, e o `<Rebase>` avisa uma vez por
-plugin. Use `modifyCollection`, como acima.
+`hooks.modifyCollectionAsync` está depreciado. Nada nunca o chamou. Um plugin que o define ainda compila, e o `<Rebase>` emite um aviso uma vez por
+plugin. Use `modifyCollection` como mostrado acima.
 
 ## Próximos Passos
 
-- **[Ferramentas do Studio](/docs/studio)** — Console SQL, console JS, editor RLS
-- **[Campos Personalizados](/docs/frontend/custom-fields)** — Construção de campos de formulário personalizados
+- **[Ferramentas do Studio](/docs/studio)** — Console SQL, console JS, editor de RLS
+- **[Campos Personalizados](/docs/frontend/custom-fields)** — Construindo campos de formulário personalizados

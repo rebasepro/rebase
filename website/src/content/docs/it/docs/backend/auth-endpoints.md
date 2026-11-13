@@ -1,11 +1,11 @@
 ---
-sourceHash: 68c6cd85f7cc5ecc
-title: Endpoint e token di autenticazione
+sourceHash: 26d38afcbfd02569
+title: Endpoint di autenticazione e token
 sidebar_label: Endpoint di autenticazione
-description: Le route di autenticazione montate dal backend Rebase, la struttura delle loro risposte, l'autenticazione a più fattori, il contesto del database visibile a una policy, JWKS e chiavi di servizio.
+description: Le route di autenticazione montate dal backend Rebase, la struttura delle loro risposte, l'autenticazione a più fattori, il contesto del database visibile da una policy, JWKS e chiavi di servizio.
 ---
 
-Le route montate [dal blocco `auth`](/docs/backend/authentication/) e i token che restituiscono.
+Le route montate dal [blocco `auth`](/docs/backend/authentication/) e i token restituiti.
 
 ## Endpoint di autenticazione
 
@@ -15,94 +15,70 @@ Tutti gli endpoint di autenticazione sono montati su `/api/auth/`:
 |--------|------|-------------|
 | `POST` | `/api/auth/register` | Crea un nuovo account |
 | `POST` | `/api/auth/login` | Accedi con email/password |
-| `POST` | `/api/auth/refresh` | Rinnova l'access token |
-| `POST` | `/api/auth/<provider>` | Accesso OAuth (ad es. `/api/auth/google`, `/api/auth/linkedin`) |
-| `POST` | `/api/auth/link/<provider>` | Collega un provider OAuth all'account autenticato. Su un guest questa è una registrazione: richiede `allowRegistration`, prende l'indirizzo del provider quando il provider lo garantisce, e risponde con una sessione per l'account che il guest è diventato |
+| `POST` | `/api/auth/refresh` | Aggiorna il token di accesso |
+| `POST` | `/api/auth/<provider>` | Accesso OAuth (es. `/api/auth/google`, `/api/auth/linkedin`) |
+| `POST` | `/api/auth/link/<provider>` | Collega un provider OAuth all'account autenticato. Su un guest equivale alla registrazione: richiede `allowRegistration`, acquisisce l'indirizzo del provider quando quest'ultimo lo garantisce e risponde con una sessione per l'account in cui il guest si è trasformato |
 | `POST` | `/api/auth/logout` | Revoca il refresh token |
-| `POST` | `/api/auth/forgot-password` | Invia l'email per reimpostare la password |
-| `POST` | `/api/auth/reset-password` | Reimposta la password con un token |
-| `POST` | `/api/auth/find-user` | Risolve un'email in un profilo pubblico minimo (opzionale — `AUTH_ALLOW_USER_LOOKUP`) |
-| `POST` | `/api/auth/change-password` | Modifica la password del chiamante (autenticato). Termina ogni altra sessione e risponde con una nuova per il chiamante |
-| `GET` | `/api/auth/me` | Il profilo del chiamante |
-| `PATCH` | `/api/auth/me` | Aggiorna il profilo del chiamante |
-| `POST` | `/api/auth/change-email` | `{ newEmail }`: sposta l'account del chiamante su un altro indirizzo. Invia via email un link al nuovo indirizzo e un avviso a quello vecchio; nulla cambia finché il link non viene seguito. Richiede `aal2` su un account con un secondo fattore. `409 EMAIL_EXISTS` oppure `UNDELIVERABLE_ADDRESS`, `400 EMAIL_UNCHANGED`, `403 ANONYMOUS_USER` per un guest — vedi [Cambiare un indirizzo email](#cambiare-un-indirizzo-email) |
-| `POST` | `/api/auth/confirm-email-change` | `{ token }` dal link. Non richiede alcuna sessione. Sposta l'account sul nuovo indirizzo, verificato; `400 INVALID_TOKEN` per un link consumato, sostituito o scaduto, `409 EMAIL_EXISTS` quando l'indirizzo è stato preso mentre era in attesa |
-| `GET` | `/api/auth/config` | Ciò che questo backend offre a una schermata di accesso — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders`, e `storage`, che indica se il backend serve lo storage dei file. Non autenticato e calcolato a partire dagli stessi predicati applicati dalle route, garantendo che ciò che la schermata mostra corrisponda esattamente a ciò che può fare |
-| `POST` | `/api/auth/send-verification` | Invia al chiamante un link di verifica dell'email |
-| `GET` | `/api/auth/verify-email` | Consuma un link di verifica (l'URL contenuto nell'email). Mantiene ciò che una sessione attiva dell'account dimostra e rimuove ciò che nessuno ha dimostrato — vedi [Verifica email](/docs/backend/email-verification/) |
-| `POST` | `/api/auth/verify-email` | Lo stesso con `{ token, password?, removeUnproven? }`: la password lo mantiene e accede; senza nessuna delle due prove un account che ne possiede una risponde `409 PROOF_REQUIRED` |
-| `POST` | `/api/auth/magic-link` | Invia via email un link di accesso monouso. `503 EMAIL_NOT_CONFIGURED` se SMTP non è configurato |
+| `POST` | `/api/auth/forgot-password` | Invia l'email per il ripristino della password |
+| `POST` | `/api/auth/reset-password` | Reimposta la password con il token |
+| `POST` | `/api/auth/find-user` | Risolve un'email in un profilo pubblico minimale (opt-in — `AUTH_ALLOW_USER_LOOKUP`) |
+| `POST` | `/api/auth/change-password` | Modifica la password del chiamante stesso (autenticato). Termina tutte le altre sessioni e risponde con una nuova sessione per il chiamante |
+| `GET` | `/api/auth/me` | Il profilo del chiamante stesso |
+| `PATCH` | `/api/auth/me` | Aggiorna il profilo del chiamante stesso |
+| `POST` | `/api/auth/change-email` | `{ newEmail }`: sposta l'account del chiamante su un altro indirizzo. Invia un link al nuovo indirizzo e una notifica a quello vecchio; nulla cambia finché il link non viene aperto. Richiede `aal2` su un account con un secondo fattore. `409 EMAIL_EXISTS` o `UNDELIVERABLE_ADDRESS`, `400 EMAIL_UNCHANGED`, `403 ANONYMOUS_USER` per un guest — vedi [Modifica di un indirizzo email](#modifica-di-un-indirizzo-email) |
+| `POST` | `/api/auth/confirm-email-change` | `{ token }` dal link. Nessuna sessione richiesta. Sposta l'account sul nuovo indirizzo, verificato; `400 INVALID_TOKEN` per un link già utilizzato, sostituito o scaduto, `409 EMAIL_EXISTS` se l'indirizzo è stato occupato durante l'attesa |
+| `GET` | `/api/auth/config` | Ciò che questo backend offre a una schermata di accesso — `needsSetup`, `registrationEnabled`, `passwordReset`, `emailVerification`, `magicLink`, `anonymousLogin`, `adminPasswordReset`, `enabledProviders` e `storage`, che indica se il backend gestisce l'archiviazione file. Non autenticato e calcolato dagli stessi predicati applicati dalle route, in modo che quanto mostrato dalla schermata corrisponda sempre a ciò che può fare |
+| `POST` | `/api/auth/send-verification` | Invia al chiamante un link di verifica email |
+| `GET` | `/api/auth/verify-email` | Consuma un link di verifica (l'URL nell'email). Mantiene ciò che una sessione attiva dell'account dimostra e rimuove ciò che nessuno ha dimostrato — vedi [Verifica email](/docs/backend/email-verification/) |
+| `POST` | `/api/auth/verify-email` | Lo stesso con `{ token, password?, removeUnproven? }`: la password lo mantiene ed effettua l'accesso; senza alcuna prova, un account che ne possiede una risponde con `409 PROOF_REQUIRED` |
+| `POST` | `/api/auth/magic-link` | Invia via email un link monouso per l'accesso. `503 EMAIL_NOT_CONFIGURED` senza SMTP |
 | `POST` | `/api/auth/magic-link/verify` | Scambia un token magic-link con una sessione |
-| `POST` | `/api/auth/otp` | Invia via email un codice di accesso a sei cifre. Risponde allo stesso modo indipendentemente dal fatto che l'indirizzo sia associato a un account o meno |
+| `POST` | `/api/auth/otp` | Invia via email un codice di accesso a sei cifre. Risponde allo stesso modo indipendentemente dal fatto che l'indirizzo sia associato o meno a un account |
 | `POST` | `/api/auth/otp/verify` | Scambia `{ email, code }` con una sessione |
-| `POST` | `/api/auth/anonymous` | Crea una sessione anonima (opzionale — `ALLOW_ANONYMOUS`) |
-| `POST` | `/api/auth/anonymous/link` | Associa credenziali reali all'account anonimo già autenticato. Richiede sia `allowAnonymous` sia la registrazione aperta: `403 ANONYMOUS_AUTH_DISABLED` quando l'accesso anonimo è disattivato, anche per i guest già autenticati, e `403 REGISTRATION_DISABLED` finché la registrazione è chiusa |
-| `GET` | `/api/auth/sessions` | Elenca le sessioni attive del chiamante, una per accesso. Quella del chiamante stesso è contrassegnata `isCurrentSession` |
-| `DELETE` | `/api/auth/sessions` | Revoca tutte le sessioni, inclusa quella corrente — disconnessione remota su tutti i dispositivi |
-| `DELETE` | `/api/auth/sessions/:id` | Revoca una sessione: il suo refresh token, e l'access token posseduto da quel dispositivo |
-| `GET` | `/api/auth/scopes` | Ogni [scope](/docs/backend/roles-and-scopes/) noto a questo backend, e quelli che possiede il chiamante |
+| `POST` | `/api/auth/anonymous` | Crea una sessione anonima (opt-in — `ALLOW_ANONYMOUS`) |
+| `POST` | `/api/auth/anonymous/link` | Associa credenziali reali all'account anonimo già autenticato. Richiede sia `allowAnonymous` che la registrazione aperta: `403 ANONYMOUS_AUTH_DISABLED` una volta disattivato l'accesso anonimo (inclusi i guest autenticati in precedenza) e `403 REGISTRATION_DISABLED` quando la registrazione è chiusa |
+| `GET` | `/api/auth/sessions` | Elenca le sessioni attive del chiamante, una per ciascun accesso. Quella del chiamante stesso è contrassegnata come `isCurrentSession` |
+| `DELETE` | `/api/auth/sessions` | Revoca tutte le sessioni, inclusa questa — disconnessione remota su ogni dispositivo |
+| `DELETE` | `/api/auth/sessions/:id` | Revoca una singola sessione: il relativo refresh token e il token di accesso presente su quel dispositivo |
+| `GET` | `/api/auth/scopes` | Tutti gli [scope](/docs/backend/roles-and-scopes/) noti a questo backend e quelli posseduti dal chiamante |
 | `GET` | `/api/auth/keys` | Le [chiavi API personali](/docs/backend/api-keys/#personal-keys) del chiamante |
-| `POST` | `/api/auth/keys` | Crea una chiave personale. `403 PERSONAL_KEYS_DISABLED` a meno che la collezione users non imposti `auth.personalKeys` |
+| `POST` | `/api/auth/keys` | Crea una chiave personale. `403 PERSONAL_KEYS_DISABLED` a meno che la collection users non imposti `auth.personalKeys` |
 | `DELETE` | `/api/auth/keys/:id` | Revoca una delle chiavi del chiamante |
-| `GET` | `/.well-known/jwks.json` | Il JWKS pubblico — montato alla radice, non sotto `basePath`, perché è lì che cerca un verificatore. Montato ogni volta che il backend emette i propri token; un insieme di chiavi vuoto finché la [firma asimmetrica](#token-asimmetrici-e-jwks) non è configurata |
+| `GET` | `/.well-known/jwks.json` | Il JWKS pubblico — montato sulla root, non sotto `basePath`, perché è lì che un verificatore cerca. Montato ogni volta che il backend genera i propri token; un set di chiavi vuoto finché non viene configurata la [firma asimmetrica](#token-asimmetrici-e-jwks) |
 | `POST` | `/api/auth/mfa/enroll` | Avvia la registrazione TOTP (restituisce il segreto e i codici di recupero) |
-| `POST` | `/api/auth/mfa/verify` | Conferma la registrazione con un codice proveniente dall'app di autenticazione |
-| `GET` | `/api/auth/mfa/factors` | Elenca i fattori registrati dal chiamante |
-| `POST` | `/api/auth/mfa/challenge` | Avvia una verifica (challenge) su un fattore verificato |
-| `POST` | `/api/auth/mfa/challenge/verify` | Risponde a una challenge — questo passaggio emette la sessione |
-| `DELETE` | `/api/auth/mfa/unenroll` | Rimuove un fattore (richiede una sessione `aal2` una volta che l'account ha un fattore verificato) |
-| `POST` | `/api/auth/mfa/recovery-codes` | Sostituisce i codici di recupero del chiamante con dieci nuovi (richiede una sessione `aal2`) |
+| `POST` | `/api/auth/mfa/verify` | Conferma la registrazione con un codice dall'autenticatore |
+| `GET` | `/api/auth/mfa/factors` | Elenca i fattori registrati del chiamante |
+| `POST` | `/api/auth/mfa/challenge` | Apre una challenge per un fattore verificato |
+| `POST` | `/api/auth/mfa/challenge/verify` | Risponde a una challenge — questa operazione emette la sessione |
+| `DELETE` | `/api/auth/mfa/unenroll` | Rimuove un fattore (richiede una sessione `aal2` una volta che l'account dispone di un fattore verificato) |
+| `POST` | `/api/auth/mfa/recovery-codes` | Sostituisce i codici di recupero del chiamante con dieci nuovi codici (richiede una sessione `aal2`) |
 
-La gestione amministrativa di utenti e ruoli è una **superficie separata**, montata su
-`/api/admin/` anziché `/api/auth/`. La lettura richiede lo scope `users:read` e
-la modifica richiede `users:write`, tranne la lettura ristretta del selettore utenti qui sotto. Un admin e la chiave di servizio (service key) li possiedono entrambi; li possiede
-anche un ruolo che li dichiara. Nessuno può modificare un account che possiede più di quanto possieda
-lui. Vedi [Ruoli e scope](/docs/backend/roles-and-scopes/).
+La gestione amministrativa degli utenti e dei ruoli è una **superficie separata**, montata su `/api/admin/` anziché su `/api/auth/`. La lettura richiede lo scope `users:read` e la modifica richiede `users:write`, fatta eccezione per la lettura ristretta dello user picker indicata di seguito. Un amministratore e la chiave di servizio possiedono entrambi; lo stesso vale per un ruolo che li dichiara. Nessuno può modificare un account che dispone di permessi superiori ai propri. Consulta [Ruoli e scope](/docs/backend/roles-and-scopes/).
 
 | Metodo | Percorso | Descrizione |
 |--------|------|-------------|
-| `GET` | `/api/admin/users` | Elenca gli utenti (con paginazione). `?search=` trova una parte dell'email o del nome visualizzato, senza distinzione tra maiuscole e minuscole. Su Postgres trova anche qualsiasi ruolo che l'utente possiede, e l'uid; su MongoDB trova ancora solo email e nome visualizzato |
-| `GET` | `/api/admin/users/pick` | La lettura del selettore utenti: `uid`, `displayName`, `email` e `photoURL` per ogni utente, nient'altro. Accetta `?search=`, `?limit=` (25 per impostazione predefinita) e `?offset=`, oppure `?ids=a,b` per gli utenti che un valore memorizzato nomina. Risponde a `users:read`, e anche a chiunque possa scrivere una collection con un campo [`userSelect`](/docs/collections/properties/), così un editor può compilarlo. Una regola scritta come SQL grezzo (`using` / `withCheck` che il modello di policy non sa leggere) non può essere valutata in anticipo, quindi qui conta come un rifiuto: su una collection di questo tipo possono scegliere solo i titolari di `users:read`. Chiunque altro riceve `403 SCOPE_MISSING` |
+| `GET` | `/api/admin/users` | Elenca gli utenti (impaginato). `?search=` corrisponde a una parte (senza distinzione tra maiuscole e minuscole) dell'email o del nome visualizzato. Corrisponde anche a qualsiasi ruolo posseduto dall'utente e all'uid |
+| `GET` | `/api/admin/users/pick` | La lettura per lo user picker: `uid`, `displayName`, `email` e `photoURL` per utente, nient'altro. Accetta `?search=`, `?limit=` (25 per impostazione predefinita) e `?offset=`, oppure `?ids=a,b` per gli utenti indicati da un valore memorizzato. Risponde a `users:read`, oltre a chiunque possa scrivere in una collection con un campo [`userSelect`](/docs/collections/properties/) — in modo che un editor possa compilarne uno. Una regola scritta come SQL grezzo (`using` / `withCheck` che il modello di policy non può leggere) non può essere valutata a priori, quindi viene considerata come rifiutata: su tale collection solo i titolari di `users:read` possono effettuare la selezione. Chiunque altro riceve `403 SCOPE_MISSING` |
 | `POST` | `/api/admin/users` | Crea un utente |
 | `GET` | `/api/admin/users/:uid` | Legge un singolo utente |
-| `PUT` | `/api/admin/users/:uid` | Aggiorna un singolo utente. `{ disabled: true }` disattiva l'account senza eliminarlo: ogni accesso e refresh viene rifiutato (`ACCOUNT_DISABLED`), le sue sessioni terminano e ogni token che possiede viene rifiutato; `false` lo riattiva |
-| `DELETE` | `/api/admin/users/:uid` | Elimina un singolo utente. Le sue sessioni terminano, e ogni access token che possiede viene rifiutato da quella richiesta in avanti |
-| `POST` | `/api/admin/users/:uid/reset-password` | Reimposta la password di un utente senza richiedere quella attuale. `rebase auth reset-password` la richiama, e scrive direttamente nel database solo quando il backend non è raggiungibile; in entrambi i casi le sessioni dell'account terminano |
-| `DELETE` | `/api/admin/users/:uid/mfa` | Rimuove i secondi fattori e i codici di recupero di un utente, e termina le sue sessioni — per chi ha perso entrambi |
-| `GET` | `/api/admin/roles` | `admin` e i ruoli dichiarati dalla collezione users, con i loro scope |
-| `POST` | `/api/admin/bootstrap` | Consente al primo utente registrato di rivendicare il ruolo di amministratore quando non ne esiste alcuno. Rifiutato in produzione — vedi [Bootstrap del primo utente](/docs/backend/authentication/#first-user-bootstrap) |
+| `PUT` | `/api/admin/users/:uid` | Aggiorna un utente. `{ disabled: true }` disattiva l'account senza eliminarlo: ogni accesso e refresh viene rifiutato (`ACCOUNT_DISABLED`), le sue sessioni terminano e ogni token in suo possesso viene rifiutato; `false` lo riattiva |
+| `DELETE` | `/api/admin/users/:uid` | Elimina un utente. Le sue sessioni terminano e qualsiasi token di accesso in suo possesso viene rifiutato a partire da quella richiesta |
+| `POST` | `/api/admin/users/:uid/reset-password` | Reimposta la password di un utente senza richiedere quella attuale. `rebase auth reset-password` lo chiama e scrive direttamente sul database solo quando il backend non è raggiungibile; in entrambi i casi le sessioni dell'account terminano |
+| `DELETE` | `/api/admin/users/:uid/mfa` | Rimuove i secondi fattori e i codici di recupero di un utente, terminandone le sessioni — per chi ha perso entrambi |
+| `GET` | `/api/admin/roles` | `admin` e i ruoli dichiarati dalla collection users, con i relativi scope |
+| `POST` | `/api/admin/bootstrap` | Consente al primo utente registrato di richiedere il ruolo admin finché non ne esiste nessuno. Rifiutato in produzione — vedi [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 
-Tutti gli endpoint delle API dati richiedono un header `Authorization: Bearer <token>` valido quando `requireAuth: true` (impostazione predefinita).
+Tutti gli endpoint della data API richiedono un'intestazione `Authorization: Bearer <token>` valida quando `requireAuth: true` (il valore predefinito).
 
-### Policy delle password
+### Password policy
 
-Una nuova password richiede almeno 8 caratteri, con una lettera maiuscola, una
-minuscola e una cifra. Registrazione, reimpostazione e modifica rifiutano una
-password che non le rispetta con `400 WEAK_PASSWORD`, elencando ogni regola
-infranta, e lo stesso fa un amministratore che sceglie una password:
-`POST /api/admin/users`, una creazione sulla collection degli utenti tramite la
-data API (`POST /api/data/users`, il suo `/bulk`, una scrittura via socket o
-MCP), `PUT /api/admin/users/:uid` e
-`POST /api/admin/users/:uid/reset-password`. Su un `/bulk`, il messaggio inizia
-con `Row <n>: ` (contando da 0), come gli altri errori di riga del bulk.
+Una nuova password richiede almeno 8 caratteri, con una lettera maiuscola, una lettera minuscola e un numero. La registrazione, il ripristino e la modifica rifiutano una password non conforme con `400 WEAK_PASSWORD`, elencando ogni regola violata, così come accade per un amministratore che sceglie una password: `POST /api/admin/users`, una creazione sulla collection users tramite la data API (`POST /api/data/users`, il relativo `/bulk`, una scrittura socket o MCP), `PUT /api/admin/users/:uid` e `POST /api/admin/users/:uid/reset-password`. Su un `/bulk`, il messaggio inizia con `Row <n>: ` (conteggiato a partire da 0), come per gli altri errori di riga del bulk.
 
-Per creare account le cui password sono state impostate da un altro sistema,
-come in un'importazione, invia `skipPasswordPolicy: true` nel corpo della
-creazione (su ogni riga di un `/bulk`). Il server lo rispetta solo per un
-amministratore o per la chiave di servizio; per chiunque altro non rinuncia a
-nulla, e il rifiuto lo dice. Non viene mai memorizzato. L'importazione del
-pannello di amministrazione lo invia per ogni riga che contiene una `password`.
-L'accesso non verifica mai la policy, quindi una password più vecchia continua a funzionare. Per impostare
-regole tue, passa `auth.hooks.validatePasswordStrength` da un backend
-[ejected](/docs/backend/authentication/#configuration). Il primo admin creato da
-`REBASE_ADMIN_PASSWORD` è soggetto a una regola diversa: almeno 12 caratteri, e
-nient'altro.
+Per creare account le cui password sono state impostate da un altro sistema, come durante un'importazione, invia `skipPasswordPolicy: true` nel corpo della creazione (su ogni riga di un `/bulk`). Il server lo rispetta solo per un amministratore o per la chiave di servizio; per chiunque altro non concede eccezioni e il rifiuto lo segnala chiaramente. Non viene mai memorizzato. L'importazione del pannello di amministrazione lo invia per ogni riga contenente una `password`. L'accesso non verifica mai la policy, quindi una password meno recente continuerà a funzionare. Per impostare regole personalizzate, passa `auth.hooks.validatePasswordStrength` da un backend [espulso (ejected)](/docs/backend/authentication/#configuration). Il primo amministratore inizializzato tramite `REBASE_ADMIN_PASSWORD` segue una regola differente: almeno 12 caratteri e nient'altro.
 
 ### Formato della risposta
 
-Ogni endpoint che emette una sessione risponde con la stessa struttura (envelope) — `register`,
-`login`, ciascun provider OAuth, `magic-link/verify`, `otp/verify`, `anonymous`,
-`anonymous/link` e `mfa/challenge/verify`:
+Ogni endpoint che emette una sessione risponde con la stessa struttura (envelope) — `register`, `login`, ciascun provider OAuth, `magic-link/verify`, `otp/verify`, `anonymous`, `anonymous/link` e `mfa/challenge/verify`:
 
 ```json
 {
@@ -125,74 +101,36 @@ Ogni endpoint che emette una sessione risponde con la stessa struttura (envelope
 }
 ```
 
-Invia l'access token nell'header `Authorization: Bearer <accessToken>`.
-`accessTokenExpiresAt` è espresso in millisecondi epoch.
+Reinvia il token di accesso come `Authorization: Bearer <accessToken>`. `accessTokenExpiresAt` è espresso in millisecondi epoch.
 
-`POST /api/auth/refresh` risponde con la stessa struttura, con l'eccezione che `user`
-viene omesso completamente quando l'account non può essere riletto, quindi è da
-considerarsi opzionale in questo caso.
+`POST /api/auth/refresh` risponde con lo stesso envelope, eccetto che `user` viene omesso del tutto quando l'account non può essere riletto, quindi in questo caso va considerato opzionale.
 
-`providerId` indica come è stato effettuato l'accesso della sessione: `password`,
-`anonymous`, `magic-link`, `otp`, `mfa` (un accesso completato con un secondo
-fattore), oppure l'id del provider, ad esempio `google`. Viene memorizzato insieme
-alla sessione al momento dell'accesso, quindi `refresh` e `GET /api/auth/me`
-restituiscono la stessa risposta per tutta la durata della sessione. Una sessione
-il cui accesso è avvenuto prima della 0.24 legge `password`.
+`providerId` indica la modalità con cui è stata effettuata la sessione: `password`, `anonymous`, `magic-link`, `otp`, `mfa` (un accesso completato con un secondo fattore), oppure l'id del provider, come `google`. Viene memorizzato con la sessione al momento dell'accesso, quindi `refresh` e `GET /api/auth/me` forniscono la stessa risposta per l'intera durata della sessione. Una sessione avviata prima della versione 0.24 restituisce `password`.
 
-:::caution[L'SDK tipizzato appiattisce questo envelope — le richieste HTTP dirette no]
-Il JSON sopra riportato rappresenta il formato di trasmissione (wire format) ed è ciò che
-restituisce `fetch("/api/auth/login")`: il token si trova in **`body.tokens.accessToken`**.
+:::caution[L'SDK tipizzato appiattisce questo envelope — le richieste HTTP raw no]
+Il JSON sovrastante rappresenta il formato di trasmissione (wire format) ed è ciò che restituisce `fetch("/api/auth/login")`: il token si trova in **`body.tokens.accessToken`**.
 
-L'[SDK tipizzato](/docs/sdk/authentication) estrae `tokens` prima di restituire la
-sessione, per cui `auth.signInWithEmail()` si risolve invece in una struttura appiattita
-**`{ user, accessToken, refreshToken }`**.
+L'[SDK tipizzato](/docs/sdk/authentication) decomprime `tokens` prima di restituire la sessione, quindi `auth.signInWithEmail()` si risolve invece in una struttura appiattita **`{ user, accessToken, refreshToken }`**.
 
-Entrambe le strutture sono corrette; appartengono a due livelli diversi. Tentare di leggere
-la struttura dell'SDK da una `fetch` diretta restituisce `undefined`, il che si manifesta
-come "accesso riuscito ma non c'è alcun access token" — l'accesso è andato a buon fine, il
-token si trovava semplicemente un livello più sotto.
+Entrambe le strutture sono reali; appartengono a due livelli diversi. La lettura della struttura dell'SDK da una `fetch` diretta restituisce `undefined`, manifestandosi come "accesso riuscito ma nessun token di accesso disponibile" — l'accesso era andato a buon fine, ma il token si trovava un livello più sotto.
 :::
 
-### Cambiare un indirizzo email
+### Modifica di un indirizzo email
 
-Un utente autenticato
-sposta il proprio account su un altro indirizzo in due passaggi:
+Un utente autenticato può spostare il proprio account su un altro indirizzo in due passaggi:
 
-1. `POST /api/auth/change-email { newEmail }` registra la modifica e invia via
-   email un link, `<frontend>/confirm-email-change?token=…`, al nuovo indirizzo,
-   e un avviso senza link a quello attuale. Il link vive 24 ore, e una nuova
-   richiesta sostituisce l'ultima. `GET /api/auth/me` segnala l'indirizzo in
-   attesa come `pendingEmail`.
-2. `POST /api/auth/confirm-email-change { token }` sposta l'account: il nuovo
-   indirizzo diventa il suo indirizzo, verificato. Ogni identità OAuth il cui
-   provider garantiva per il vecchio indirizzo viene scollegata
-   (`removedProviders` le elenca), perché altrimenti chiunque controlli il
-   vecchio indirizzo potrebbe ancora accedere tramite esso, e qualsiasi link di
-   reset inviato al vecchio indirizzo smette di funzionare. Le sessioni vengono
-   mantenute.
+1. `POST /api/auth/change-email { newEmail }` registra la modifica e invia via email un link, `<frontend>/confirm-email-change?token=…`, al nuovo indirizzo e una notifica senza link a quello attuale. Il link è valido per 24 ore e una nuova richiesta sostituisce la precedente. `GET /api/auth/me` segnala l'indirizzo in attesa come `pendingEmail`.
+2. `POST /api/auth/confirm-email-change { token }` trasferisce l'account: il nuovo indirizzo diventa il suo indirizzo verificato. Ogni identità OAuth il cui provider garantiva per il vecchio indirizzo viene scollegata (`removedProviders` ne elenca i nomi), poiché chiunque controlli il vecchio indirizzo potrebbe altrimenti continuare ad accedere tramite di esso, e qualsiasi link di ripristino inviato al vecchio indirizzo smette di funzionare. Le sessioni vengono mantenute.
 
-Il nuovo indirizzo non viene riservato mentre il link è in attesa: tenerlo
-riservato permetterebbe a qualsiasi account di impedire a un estraneo di
-registrarsi con il proprio indirizzo. Se un altro account ha già quell'indirizzo
-nel momento in cui il link viene seguito, il link risponde `409 EMAIL_EXISTS` e
-nulla viene spostato; tra due account che richiedono lo stesso indirizzo, lo
-ottiene il primo che segue il proprio link. L'hook `beforeEmailChange` può
-rifiutare un indirizzo, come fa `beforeUserCreate` alla registrazione.
+Il nuovo indirizzo non viene riservato durante l'attesa del link: bloccarlo permetterebbe a qualsiasi account di impedire a un estraneo di registrarsi con il proprio indirizzo. Se un altro account acquisisce l'indirizzo prima che il link venga seguito, il link risponde con `409 EMAIL_EXISTS` e nulla viene trasferito; tra due account che richiedono lo stesso indirizzo, il primo a seguire il link lo ottiene. L'hook `beforeEmailChange` può rifiutare un indirizzo, come fa `beforeUserCreate` in fase di registrazione.
 
-Nel CMS, l'indirizzo si cambia da **Account settings → Profile**, e il link apre
-la schermata del CMS stesso, autenticato o no. Un altro frontend serve una
-pagina su `/confirm-email-change` che richiama la route con il token del link.
+Nel CMS, l'indirizzo viene modificato da **Account settings → Profile**, e il link apre la schermata interna del CMS, indipendentemente dal fatto che l'utente sia autenticato o meno. Un frontend alternativo serve una pagina su `/confirm-email-change` che richiama la route con il token del link.
 
-Con [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) abilitato (impostazione predefinita), il refresh
-token viene trasmesso come cookie `httpOnly` e `tokens.refreshToken` è una stringa vuota
-nel body. L'access token non subisce variazioni.
+Con [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) abilitato (impostazione predefinita), il refresh token viaggia come cookie `httpOnly` e `tokens.refreshToken` è una stringa vuota nel corpo. Il token di accesso rimane inalterato.
 
 ### Autenticazione a più fattori (TOTP)
 
-**Un secondo fattore vincola l'accesso, non solo singole operazioni.** Una volta che un
-account ha un fattore TOTP *verificato*, nessuna route emette una sessione finché non
-viene fornito un codice — l'accesso tramite password, ogni provider OAuth, magic link, codice
-via email e anonymous-link rifiutano tutti con `401 MFA_REQUIRED`:
+**Un secondo fattore regola l'accesso, non solo le singole operazioni.** Una volta che un account possiede un fattore TOTP *verificato*, nessuna route emette una sessione finché non viene presentato un codice — l'accesso tramite password, ogni provider OAuth, magic link, codice email e anonymous-link rifiutano tutti con `401 MFA_REQUIRED`:
 
 ```json
 {
@@ -207,42 +145,19 @@ via email e anonymous-link rifiutano tutti con `401 MFA_REQUIRED`:
 }
 ```
 
-`mfaToken` **non è una sessione**: ha uno scopo specifico, scade dopo cinque minuti
-e viene rifiutato da qualsiasi route autenticata. Invialo come bearer token a
-`POST /api/auth/mfa/challenge` (con un `factorId`) e successivamente a
-`POST /api/auth/mfa/challenge/verify` (con il `challengeId` e il codice a sei cifre,
-o un codice di recupero). Quest'ultima chiamata è quella che genera i token di accesso
-e di aggiornamento, con livello `aal2`; il livello viene memorizzato nella sessione e
-mantenuto durante le chiamate a `POST /api/auth/refresh`.
+`mfaToken` **non è una sessione**: ha un ambito limitato allo scopo, scade in cinque minuti e viene rifiutato da ogni route autenticata. Invialo come bearer token a `POST /api/auth/mfa/challenge` (con un `factorId`) e poi a `POST /api/auth/mfa/challenge/verify` (con il `challengeId` e il codice a sei cifre, o un codice di recupero). È quest'ultima chiamata a generare i token di accesso e di refresh, a livello `aal2`; il livello viene memorizzato sulla sessione e mantenuto attraverso `POST /api/auth/refresh`.
 
-Anche la registrazione dei fattori è protetta. Il primo fattore di un account può essere
-registrato da una sessione ordinaria, ma una volta verificato, `enroll`, `verify` e `unenroll`
-richiedono tutti una sessione `aal2` — altrimenti una password rubata permetterebbe di registrare
-un fattore secondario proprio, effettuare l'escalation e cancellare quello legittimo.
+Anche la registrazione dei fattori è protetta. Il primo fattore di un account può essere registrato da una sessione ordinaria, ma una volta verificato, `enroll`, `verify` e `unenroll` richiedono tutti una sessione `aal2` — altrimenti una password rubata potrebbe consentire di registrare un fattore proprio, eseguire lo step-up ed eliminare quello legittimo.
 
-La verifica è limitata su entrambi i fronti: una challenge scade dopo cinque tentativi
-errati, ogni account è limitato a dieci tentativi di verifica ogni 15 minuti (conteggiati per
-utente, quindi cambiare IP non serve a nulla) e un codice accettato viene registrato per il
-fattore in modo che non possa essere riutilizzato (replay attack) per il resto della sua
-finestra di tolleranza di ±1 step.
+La verifica è limitata su entrambi gli assi: una challenge scade dopo cinque tentativi falliti, ciascun account è limitato a dieci tentativi di verifica ogni 15 minuti (conteggiati per utente, quindi la rotazione degli IP non aiuta) e un codice accettato viene registrato per quel fattore in modo che non possa essere riutilizzato per il resto della sua finestra temporale di ±1 passaggio.
 
-Nella tabella degli utenti, **Reset two-step verification** (`DELETE /api/admin/users/:uid/mfa`) e
-**Disable or enable account** (`PUT /api/admin/users/:uid { disabled }`) sono
-offerti a chiunque possieda `users:write`, così come lo sono le route;
-l'interruttore non viene mai offerto sul proprio account, e un account che
-supera il tuo viene rifiutato con il motivo fornito dal server.
+Nella tabella utenti del CMS, **Reset two-step verification** (`DELETE /api/admin/users/:uid/mfa`) e **Disable or enable account** (`PUT /api/admin/users/:uid { disabled }`) sono disponibili per chiunque detenga `users:write`, così come previsto per le relative route; lo switch non viene mai offerto per il proprio account e la modifica a un account di grado superiore viene rifiutata con la motivazione del server.
 
-Imposta `MFA_ENCRYPTION_KEY` (almeno 32 caratteri casuali) per crittografare i segreti TOTP
-memorizzati. Senza di esso, il server ripiega su `JWT_SECRET` emettendo un avviso. Impostalo
-**prima** che qualsiasi utente si registri: i segreti salvati non includono un identificativo
-di chiave, quindi modificare la chiave in un secondo momento renderà indecifrabili i fattori
-esistenti e i rispettivi proprietari non potranno completare la verifica.
+Imposta `MFA_ENCRYPTION_KEY` (almeno 32 caratteri casuali) per crittografare i segreti TOTP memorizzati. In sua assenza, il server ripiega su `JWT_SECRET` e genera un avviso. Impostalo **prima** che chiunque effettui la registrazione: i segreti memorizzati non includono un id chiave, quindi cambiare la chiave in seguito rende i fattori esistenti indecifrabili e impedisce ai relativi proprietari di completare la challenge.
 
-### Invitare i membri del team via email
+### Invitare membri del team via email
 
-I flussi di invito richiedono la conversione di un indirizzo email in un user id, ma la collection
-`users` è protetta da RLS per le richieste client. Invece di creare manualmente una funzione
-server di amministrazione, puoi abilitare la funzione di ricerca integrata:
+I flussi di invito devono convertire un indirizzo email in un user id, ma la collection `users` è protetta da RLS dal lato client. Anziché implementare manualmente una funzione server di amministrazione, abilita la ricerca integrata:
 
 ```typescript no-verify
 await initializeRebaseBackend({
@@ -253,7 +168,7 @@ await initializeRebaseBackend({
 });
 ```
 
-Poi, dal client:
+Quindi, dal client:
 
 ```typescript
 const profile = await client.auth.findUserByEmail("teammate@example.com");
@@ -263,19 +178,16 @@ if (profile) {
 }
 ```
 
-L'endpoint è **riservato ai soli utenti autenticati** e restituisce esclusivamente `uid`, `displayName`
-e `photoURL` — mai l'email, i ruoli o i metadati dell'utente cercato. È **disabilitato per
-impostazione predefinita** poiché consente a qualsiasi utente autenticato di verificare quali
-indirizzi email possiedono un account; abilitalo solo se richiesto dalla UX dei tuoi inviti.
+L'endpoint è **solo per utenti autenticati** e restituisce esclusivamente `uid`, `displayName` e `photoURL` — mai l'email, i ruoli o i metadati dell'utente cercato. È **disattivato per impostazione predefinita** perché consente a qualsiasi utente autenticato di verificare quali indirizzi email hanno un account associato; attivalo solo se l'esperienza utente (UX) di invito lo richiede.
 
 ## Contesto del database per Row-Level Security (RLS)
 
-Rebase collega direttamente l'autenticazione delle richieste alla Row-Level Security (RLS) di PostgreSQL. Ogni query di database eseguita tramite un driver con ambito utente (user-scoped) viene eseguita all'interno di una transazione di database (`db.transaction()`) che imposta parametri di configurazione locali alla transazione:
+Rebase collega l'autenticazione delle richieste direttamente alla Row-Level Security (RLS) di PostgreSQL. Ogni query di database eseguita tramite un driver con ambito utente viene eseguita all'interno di una transazione di database (`db.transaction()`) che imposta parametri di configurazione locali alla transazione:
 
-*   `app.uid` — L'ID univoco dell'utente autenticato (`uid`). Il valore predefinito è `'anonymous'` per le richieste non autenticate. Il vecchio `app.user_id`, precedente alla ridenominazione, viene ancora scritto accanto ad esso, per le policy compilate prima della ridenominazione.
+*   `app.uid` — L'ID univoco (`uid`) dell'utente autenticato. Il valore predefinito è `'anonymous'` per le richieste non autenticate. La versione precedente alla ridenominazione `app.user_id` viene ancora registrata insieme ad esso, a supporto delle policy compilate prima della modifica.
 *   `app.user_roles` — Una stringa separata da virgole che elenca i ruoli assegnati all'utente.
-*   `app.is_anonymous` — `'true'` per una sessione ospite (accesso anonimo), `'false'` altrimenti.
-*   `app.jwt` — Una stringa JSON con i claim personalizzati del token più `sub`, `roles` e `is_anonymous` (`{"sub": "<uid>", "roles": [...], "is_anonymous": false, …}`).
+*   `app.is_anonymous` — `'true'` per una sessione guest (accesso anonimo), `'false'` altrimenti.
+*   `app.jwt` — Una stringa JSON contenente i claim personalizzati del token oltre a `sub`, `roles` e `is_anonymous` (`{"sub": "<uid>", "roles": [...], "is_anonymous": false, …}`).
 
 Questi parametri vengono configurati localmente per la durata della transazione utilizzando la funzione `set_config` di Postgres:
 ```sql
@@ -291,7 +203,7 @@ SELECT
 
 Per semplificare la scrittura delle policy di Row-Level Security, Rebase crea delle funzioni helper nello schema `rebase` durante il bootstrap del database:
 
-*   **`rebase.uid()`** — Restituisce l'ID dell'utente autenticato come `text`, oppure `NULL` se non impostato:
+*   **`rebase.uid()`** — Restituisce l'ID dell'utente autenticato come `text`, o `NULL` se non impostato:
     ```sql
     CREATE OR REPLACE FUNCTION rebase.uid() RETURNS text AS $$
         SELECT COALESCE(
@@ -300,21 +212,21 @@ Per semplificare la scrittura delle policy di Row-Level Security, Rebase crea de
         );
     $$ LANGUAGE sql STABLE;
     ```
-*   **`rebase.roles()`** — Restituisce la stringa dei ruoli separati da virgole:
+*   **`rebase.roles()`** — Restituisce la stringa separata da virgole dei ruoli:
     ```sql
     CREATE OR REPLACE FUNCTION rebase.roles() RETURNS text AS $$
         SELECT COALESCE(NULLIF(current_setting('app.user_roles', true), ''), '');
     $$ LANGUAGE sql STABLE;
     ```
-*   **`rebase.jwt()`** — Restituisce l'intero payload JWT come oggetto `jsonb`:
+*   **`rebase.jwt()`** — Restituisce l'intero payload del JWT come oggetto `jsonb`:
     ```sql
     CREATE OR REPLACE FUNCTION rebase.jwt() RETURNS jsonb AS $$
         SELECT COALESCE(NULLIF(current_setting('app.jwt', true), ''), '{}')::jsonb;
     $$ LANGUAGE sql STABLE;
     ```
-*   **`rebase.is_anonymous()`** — Indica se il chiamante è un ospite, come `boolean` (`false` se non impostato), così una policy può dire `NOT rebase.is_anonymous()`.
+*   **`rebase.is_anonymous()`** — Indica se il chiamante è un guest, come `boolean` (`false` quando non impostato), permettendo a una policy di specificare `NOT rebase.is_anonymous()`.
 
-Puoi utilizzare queste funzioni helper direttamente nelle tue regole di sicurezza personalizzate o nelle migrazioni del database:
+Puoi utilizzare questi helper direttamente nelle tue regole di sicurezza personalizzate o nelle migrazioni del database:
 ```sql
 CREATE POLICY owner_access ON posts
     FOR ALL
@@ -324,13 +236,9 @@ CREATE POLICY owner_access ON posts
 
 ## Token asimmetrici e JWKS
 
-Per impostazione predefinita, gli access token sono firmati con `jwtSecret` (HS256). Questo approccio
-funziona, ma comporta che qualsiasi entità debba *verificare* un token debba possedere la chiave che lo
-*emette* — quindi un gateway o un edge worker che controlla una sessione può anche contraffarla — e
-la modifica del segreto disconnette tutti gli utenti contemporaneamente.
+Per impostazione predefinita, i token di accesso sono firmati con `jwtSecret` (HS256). Questo approccio funziona, ma implica che qualsiasi elemento che debba *verificare* un token debba possedere anche la chiave per *generarlo* — quindi un gateway o un edge worker che controlla una sessione potrebbe anche falsificarne uno — e modificare il segreto comporta la disconnessione immediata di tutti gli utenti.
 
-Configurando una chiave di firma, Rebase firmerà invece gli access token in modo asimmetrico,
-pubblicando la chiave pubblica su **`/.well-known/jwks.json`** affinché chiunque possa verificarli:
+Configurando una chiave di firma, Rebase firmerà invece i token di accesso in modo asimmetrico, pubblicando la componente pubblica su **`/.well-known/jwks.json`** affinché chiunque possa effettuare la verifica:
 
 ```typescript no-verify
 auth: {
@@ -341,7 +249,7 @@ auth: {
 }
 ```
 
-Oppure dalle variabili d'ambiente, per una singola chiave:
+Oppure dalle variabili di ambiente, per una singola chiave:
 
 ```bash
 JWT_PRIVATE_KEY="$(cat jwt-key.pem)"
@@ -354,16 +262,11 @@ Genera una chiave con:
 openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out jwt-key.pem
 ```
 
-Anche le chiavi RSA sono supportate e firmano con `RS256`; le chiavi EC P-256 firmano con `ES256`. Viene
-configurata solo la chiave privata — la parte pubblica viene derivata da essa, impedendo disallineamenti
-tra la coppia. `jwtSecret` rimane comunque obbligatorio: serve ancora a firmare i token con scopo specifico
-(link di download, MFA in sospeso, reimpostazione della password) che solo questo server legge.
+Funzionano anche le chiavi RSA, che firmano in `RS256`; le chiavi EC P-256 firmano in `ES256`. Viene configurata solo la chiave privata — la componente pubblica viene derivata da essa, evitando disallineamenti tra le due parti. `jwtSecret` rimane comunque obbligatorio: serve ancora a firmare i token con ambito specifico (link di download, MFA in attesa, reimpostazione password) che solo questo server leggerà.
 
 ### Rotazione di una chiave
 
-Inserisci la nuova chiave per prima e mantieni elencata quella vecchia. I nuovi token verranno firmati
-dalla nuova chiave; i token già in circolazione continueranno a essere verificati con quella precedente
-fino alla loro scadenza, evitando la disconnessione degli utenti.
+Inserisci la nuova chiave per prima e mantieni elencata quella vecchia. I nuovi token verranno firmati con la nuova chiave; i token già in circolazione continueranno a essere verificati con quella precedente fino alla loro scadenza, senza provocare la disconnessione di alcun utente.
 
 ```typescript no-verify
 signingKeys: [
@@ -372,14 +275,11 @@ signingKeys: [
 ]
 ```
 
-Una volta trascorso il tempo di vita dell'access token più longevo, rimuovi la voce precedente. Usa
-`activeKid` se desideri pubblicare una chiave prima di iniziare a usarla per firmare.
+Una volta trascorso il ciclo di vita massimo del token di accesso, rimuovi la voce precedente. Utilizza `activeKid` se desideri pubblicare una chiave prima di usarla per la firma.
 
 ### Verifica altrove
 
-I token contengono il `kid` della chiave di firma nel loro header: è così che un verificatore
-seleziona la chiave corretta dal JWKS e sa quando riscaricarlo dopo una rotazione. Qualsiasi
-libreria standard esegue questa operazione automaticamente — ad esempio con `jose`:
+I token contengono il `kid` della chiave di firma nella propria intestazione; è in questo modo che un verificatore seleziona la chiave corretta dal JWKS e sa quando recuperarlo nuovamente dopo una rotazione. Qualsiasi libreria standard si occupa di questo processo — ad esempio, con `jose`:
 
 ```typescript no-verify
 import { createRemoteJWKSet, jwtVerify } from "jose";
@@ -389,13 +289,12 @@ const { payload } = await jwtVerify(token, jwks);
 ```
 
 :::note
-Senza `signingKeys` configurate, `/.well-known/jwks.json` risponde con `{"keys":[]}` e i
-token rimangono HS256. Nulla cambia finché non aggiungi una chiave.
+Senza `signingKeys` configurate, `/.well-known/jwks.json` risponde `{"keys":[]}` e i token rimangono in HS256. Nulla cambia finché non viene aggiunta una chiave.
 :::
 
-## Autenticazione con Service Key
+## Autenticazione con chiave di servizio (Service Key)
 
-Per la comunicazione server-to-server (ad es. cron job, servizi esterni), configura una chiave di servizio (service key) statica:
+Per la comunicazione server-to-server (ad es. cron job, servizi esterni), configura una chiave di servizio statica:
 
 ```typescript
 auth: {
@@ -404,21 +303,21 @@ auth: {
 }
 ```
 
-I client si autenticano con l'header `Authorization: Bearer <service-key>`. 
+I client si autenticano con l'intestazione `Authorization: Bearer <service-key>`. 
 
-### Chiave interna per ogni avvio
+### Chiave interna generata a ogni avvio (Per-Boot Key)
 
-Se `REBASE_SERVICE_KEY` non viene fornita nella configurazione, Rebase genera automaticamente una **chiave interna per ogni avvio** casuale. 
+Se `REBASE_SERVICE_KEY` non è fornita nella configurazione, Rebase genera automaticamente una **chiave interna a ogni avvio** casuale. 
 
-Questa chiave non viene mai registrata nei log e non lascia mai il processo. Viene utilizzata dal singleton `rebase` per autenticarsi rispetto alle API di control-plane del server stesso (auth, storage, ecc.). Ciò garantisce che i task amministrativi (come l'invio di un'email di benvenuto o la generazione di un URL di archiviazione) funzionino sempre fin da subito, sia in fase di sviluppo che in produzione, senza richiedere la gestione manuale delle chiavi.
+Questa chiave non viene mai registrata nei log e non lascia mai il processo. Viene utilizzata dal singleton `rebase` per autenticarsi presso le API del control plane del server stesso (auth, storage, ecc.). Ciò garantisce che le attività amministrative (come l'invio di un'email di benvenuto o la generazione di un URL di storage) funzionino sempre fin da subito, sia in sviluppo che in produzione, senza richiedere la gestione manuale delle chiavi.
 
-### Protezione da timing attack e requisiti delle chiavi
+### Protezione dai timing attack e requisiti della chiave
 
-Per prevenire timing attack (attacchi basati sui tempi di esecuzione), Rebase convalida sia la chiave di servizio configurata dall'utente sia la chiave interna utilizzando un confronto tra stringhe a tempo costante (`safeCompare`). La chiave di servizio configurata dall'utente **deve essere lunga almeno 32 caratteri**; se viene configurata una chiave più corta di 32 caratteri, Rebase genererà un errore di configurazione all'avvio e adotterà un comportamento fail-closed (blocco di sicurezza).
+Per prevenire i timing attack, Rebase convalida sia la chiave di servizio configurata dall'utente sia la chiave interna utilizzando una comparazione di stringhe a tempo costante (`safeCompare`). La chiave di servizio configurata dall'utente **deve essere lunga almeno 32 caratteri**; se viene configurata una chiave di lunghezza inferiore a 32 caratteri, Rebase genererà un errore di configurazione all'avvio con blocco di sicurezza (fail-closed).
 
 ## Passaggi successivi
 
-- **[Autenticazione](/docs/backend/authentication/)** — la configurazione da cui derivano queste route
-- **[Adapter di autenticazione personalizzati](/docs/backend/auth-adapters/)** — come sostituire il provider sottostante
+- **[Authentication](/docs/backend/authentication/)** — la configurazione da cui derivano queste route
+- **[Adattatori di autenticazione personalizzati](/docs/backend/auth-adapters/)** — sostituzione del provider sottostante
 - **[Regole di sicurezza (RLS)](/docs/collections/security-rules/)** — cosa fa una policy con `rebase.uid()`
-- **[Autenticazione con l'SDK tipizzato](/docs/sdk/authentication/)** — come chiamare queste route dall'SDK
+- **[Autenticazione con l'SDK tipizzato](/docs/sdk/authentication/)** — chiamare queste route dall'SDK

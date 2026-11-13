@@ -1,32 +1,32 @@
 ---
-sourceHash: c5c4b8a603134528
+sourceHash: bf1ba2b0f0306da2
 slug: es/docs/upgrading/0-26-to-0-27
 title: Actualización de 0.26 a 0.27
 sidebar_label: 0.26 → 0.27
-description: Los cambios importantes (breaking changes) que 0.27 introduce para una aplicación en 0.26 — programaciones cron que restringen ambos campos de día, números cron mal formados, una estrategia de clave que su tipo no puede cumplir, despliegues gestionados que se detienen ante un archivo que no se cargó y clientes del navegador que usan autenticación por cookies por defecto.
+description: Los cambios incompatibles que 0.27 introduce para una app en 0.26 — programaciones cron que restringen ambos campos de día, números cron con formato incorrecto, una estrategia de clave que su tipo no puede admitir, despliegues gestionados que se detienen ante un archivo que no se cargó y clientes de navegador que usan autenticación por cookies por defecto.
 ---
 
 # Actualización de 0.26 → 0.27
 
-Estas son las entradas `### Breaking` que 0.27 incluye para una aplicación en 0.26.
+Estas son las entradas `### Breaking` que 0.27 incluye para una app en 0.26.
 
-Los dos cambios en cron son los primeros que deben leerse, ya que ninguno impide que nada arranque: un trabajo comienza a ejecutarse con más frecuencia y el otro deja de ejecutarse por completo. El tercero solo afecta a una tabla que ya existía. El cuarto corresponde a Rebase Cloud y te lo encontrarás en tu próximo despliegue. El último es el SDK del cliente en un navegador.
+Los dos cambios en cron son los primeros que deben leerse, ya que ninguno impide que el sistema arranque: un trabajo comienza a ejecutarse con más frecuencia y el otro deja de ejecutarse por completo. El tercero afecta únicamente a una tabla que ya existía. El cuarto corresponde a Rebase Cloud y lo encontrará en su próximo despliegue. El último afecta al SDK del cliente en un navegador.
 
 ---
 
 ## 97. Una programación cron que restringe ambos campos de día coincide con cualquiera de los dos
 
-`0 9 1 * 1` solía ejecutarse solo los lunes día 1. Ahora se ejecuta cada día 1 y cada lunes, tal como lo hace el cron estándar. Esto aplica cuando ninguno de los dos campos de día comienza con `*`. Una programación con `*` o `*/n` en cualquiera de ellos mantiene el comportamiento que tenía.
+`0 9 1 * 1` solía ejecutarse únicamente cuando el día 1 caía en lunes. Ahora se ejecuta cada día 1 y cada lunes, como lo hace el cron estándar. Esto aplica cuando ninguno de los dos campos de día comienza con `*`. Una programación con `*` o `*/n` en cualquiera de ellos mantiene su comportamiento anterior.
 
-La programación que más cambia con esto es el patrón del "primer lunes del mes": `0 9 1-7 * 1` solía ejecutarse una vez al mes, y ahora se ejecuta en cada uno de los primeros siete días y todos los lunes.
+La programación donde esto genera el mayor cambio es en la expresión idiomática del "primer lunes del mes": `0 9 1-7 * 1` solía activarse una vez al mes, y ahora se activa en cada uno de los primeros siete días y todos los lunes.
 
-**Qué cambiar:** busca las programaciones que tengan un número en ambos campos de día:
+**Qué cambiar:** busque las programaciones que tengan un número en ambos campos de día:
 
 ```bash
 grep -rnE "schedule:.*[\"'\`][^ ]+ +[^ ]+ +[0-9][^ ]* +[^ ]+ +[0-9]" backend/
 ```
 
-Si tu intención era cualquiera de los dos días, déjalo así. Si te referías a ambos, programa un campo de día y evalúa el otro en el handler:
+Si la intención era que coincidiera con cualquiera de los dos días, déjelo como está. Si la intención era que coincidiera con ambos, programe un campo de día y verifique el otro en el handler:
 
 ```typescript
 // backend/crons/first-monday.ts
@@ -43,32 +43,32 @@ export default defineCron({
 });
 ```
 
-Consulta [Sintaxis de programación](/docs/backend/cron-jobs/#schedule-syntax).
+Consulte [Schedule Syntax](/docs/backend/cron-jobs/#schedule-syntax).
 
 ## 98. Se rechaza una programación cron con un número mal formado
 
-`5abc`, `*/5x`, `1.5` y un rango en orden inverso, como `5-1`, antes pasaban la validación. Los números se leían hasta el primer carácter que no fuera un dígito, por lo que `5abc` se ejecutaba como `5`, y un rango inverso no aportaba nada. Ahora cada uno de estos casos es rechazado indicando el campo y el motivo.
+Valores como `5abc`, `*/5x`, `1.5` y rangos en orden inverso, como `5-1`, antes superaban la validación. Los números se leían hasta el primer carácter que no fuera un dígito, por lo que `5abc` se ejecutaba como `5`, y un rango inverso no aportaba nada. Ahora cada uno de estos casos es rechazado indicando el campo y el motivo.
 
-Un trabajo rechazado no se registra ni se ejecuta, y el resto del backend arranca. Nada más te avisa: el despliegue pasa a estar activo (live) porque el archivo en sí se cargó.
+Un trabajo rechazado no se registra y no se ejecuta, mientras que el resto del backend arranca con normalidad. Nada más se lo notificará: el despliegue pasará a producción porque el archivo en sí se cargó.
 
-**Qué cambiar:** después de actualizar, busca `[cron] Rejecting job` en los registros del servidor, o consulta `rejected` en `GET /api/admin/cron`, que la herramienta Cron Jobs de Studio también muestra. Corrige el número y el trabajo se registrará en el siguiente arranque. Consulta [Trabajos que no están allí](/docs/backend/cron-jobs-api/#jobs-that-are-not-there).
+**Qué cambiar:** tras actualizar, busque `[cron] Rejecting job` en los registros del servidor o consulte el valor `rejected` en `GET /api/admin/cron`, que también se muestra en la herramienta Cron Jobs de Studio. Corrija el número y el trabajo se registrará en el siguiente arranque. Consulte [Jobs that are not there](/docs/backend/cron-jobs-api/#jobs-that-are-not-there).
 
-## 99. Una clave cuya estrategia no puede ser cumplida por su tipo detiene el arranque
+## 99. Una clave cuya estrategia no puede ser admitida por su tipo detiene el arranque
 
-`isId: "increment"` en una clave que no es de tipo `number`, e `isId: "uuid"` en una que no es `string`, se rechazan al cargar la configuración con un mensaje que nombra la propiedad. Anteriormente, ambos se leían como un valor predeterminado directo de SQL. Postgres rechazaba `DEFAULT increment` en el primer `CREATE TABLE`, por lo que esto solo afecta a una tabla que ya existía, donde nada llegó a ejecutar esa sentencia.
+`isId: "increment"` en una clave que no es un `number`, e `isId: "uuid"` en una que no es un `string`, son rechazados al cargar la configuración con un mensaje que nombra la propiedad. Anteriormente, ambos se interpretaban como un valor predeterminado directo de SQL. Postgres rechazaba `DEFAULT increment` en el primer `CREATE TABLE`, por lo que esto solo afecta a una tabla que ya existía, donde ninguna operación ejecutó dicha sentencia.
 
-**Qué cambiar:** declara la clave con el tipo real de la columna. Una clave numérica requiere `type: "number"` con `"increment"`, y una clave de cadena requiere `"uuid"`, o `true` cuando quien realiza la llamada proporciona el valor. Consulta [Opciones de cadenas](/docs/collections/properties/#string-options).
+**Qué cambiar:** declare la clave según el tipo real de la columna. Una clave numérica toma `type: "number"` con `"increment"`, y una clave de texto toma `"uuid"`, o `true` cuando el emisor proporciona el valor. Consulte [Keys, identity and serials](/docs/schema/columns/#keys-identity-and-serials).
 
-## 100. Un despliegue o vista previa gestionada falla cuando un archivo de función o de cron no se carga
+## 100. Un despliegue gestionado o vista previa falla cuando un archivo de función o de cron no se carga
 
-Un archivo de función o de cron que lanzaba un error o no se podía parsear al importarse solía omitirse, por lo que un despliegue reportaba `✓ Live` y pasaba sus sondeos mientras cada ruta de ese archivo respondía 404. Los pods en Rebase Cloud ahora se ejecutan con `REBASE_REQUIRE_FILES_LOADED`, en un runtime que cuenta con ello, de modo que la nueva versión nunca pasa a estar lista, la versión anterior continúa dando servicio y el despliegue finaliza señalando el archivo y el motivo.
+Un archivo de función o cron que arrojaba un error o no se analizaba sintácticamente durante la importación solía omitirse, de modo que el despliegue reportaba `✓ Live` y superaba sus pruebas de verificación mientras todas las rutas de ese archivo respondían con un error 404. Los pods en Rebase Cloud ahora se ejecutan con `REBASE_REQUIRE_FILES_LOADED`, en un runtime compatible, de modo que la nueva versión nunca pasa al estado preparado (ready), la versión anterior continúa prestando servicio y el despliegue se detiene señalando el archivo y el motivo.
 
-Un proyecto que haya estado funcionando con un archivo de este tipo se topará con esto en su próximo despliegue. Los rollouts de flota y los rollbacks no están sujetos a esto. Un archivo que se importa limpiamente y no exporta ninguna función o trabajo, como un helper, se sigue omitiendo.
+Un proyecto que haya estado funcionando con un archivo en ese estado se encontrará con este comportamiento en su próximo despliegue. Los rollouts de flota y los rollbacks no están sujetos a esto. Un archivo que se importa limpiamente y no exporta ninguna función o trabajo, como un helper, se sigue omitiendo.
 
-**Qué cambiar:** despliega y luego corrige o elimina el archivo que indique el despliegue. Fuera de Rebase Cloud nada cambia a menos que configures `REBASE_REQUIRE_FILES_LOADED=true` por tu cuenta. Consulta [Entorno y configuración](/docs/getting-started/configuration/).
+**Qué cambiar:** realice el despliegue y luego corrija o elimine el archivo que este indique. Fuera de Rebase Cloud nada cambia a menos que configure manualmente `REBASE_REQUIRE_FILES_LOADED=true`. Consulte [Environment & Configuration](/docs/getting-started/configuration/).
 
-## 101. El cliente del navegador usa autenticación por cookies por defecto
+## 101. El cliente de navegador usa autenticación por cookies por defecto
 
-`createRebaseClient` sin `auth.authFlowMode` usaba el modo json en todas partes. Un backend ejecutado por el runtime de Rebase siempre guarda el token de actualización (refresh token) en una cookie HttpOnly y devuelve `""` en el cuerpo de la respuesta, por lo que un cliente en el navegador con esa configuración por defecto no disponía de nada con qué renovar la sesión y se le cerraba la sesión sin previo aviso aproximadamente una hora después de iniciarla. En un navegador, el valor predeterminado ahora es el modo cookie. Fuera del navegador, y en un cliente de navegador al que se le proporcione su propio `auth.storage`, sigue siendo json.
+`createRebaseClient` sin la propiedad `auth.authFlowMode` utilizaba el modo json en todos los entornos. Un backend administrado por el runtime de Rebase siempre almacena el refresh token en una cookie HttpOnly y responde con `""` en el cuerpo de la respuesta; por ello, un cliente de navegador con esa configuración por defecto no disponía de datos para renovar la sesión y esta se cerraba sin advertencia aproximadamente una hora después de iniciar sesión. En el navegador, el modo por defecto ahora es cookie. Fuera del navegador, y en clientes de navegador configurados con su propio `auth.storage`, sigue siendo json.
 
-**Qué cambiar:** nada, cuando tu backend se ejecuta en el runtime de Rebase o configura `auth.cookieAuth`: una aplicación de navegador en la que se cerraba la sesión después de una hora permanecerá con la sesión iniciada. Un backend sin `auth.cookieAuth` necesita `auth: { authFlowMode: "json" }` en su cliente de navegador. El cliente registra un error indicando el modo a utilizar en el primer inicio de sesión donde ambos difieren. En el modo cookie, la sesión ya no se guarda en `localStorage`; al recargar la página se restaura con una solicitud a `/auth/refresh`, por lo que debes leer la sesión después de `auth.isInitialized()`. Consulta [Dónde reside la sesión](/docs/sdk/authentication/#where-the-session-lives-authflowmode).
+**Qué cambiar:** no requiere cambios si su backend se ejecuta en el runtime de Rebase o tiene configurado `auth.cookieAuth`: una aplicación de navegador en la que se cerraba la sesión tras una hora permanecerá iniciada. Un backend sin `auth.cookieAuth` necesita `auth: { authFlowMode: "json" }` en su cliente de navegador. El cliente registrará un error indicando el modo correspondiente en el primer inicio de sesión donde ambos difieran. En modo cookie, la sesión ya no se almacena en `localStorage`; una recarga la restablece mediante una única solicitud `/auth/refresh`, por lo que debe leer la sesión tras llamar a `auth.isInitialized()`. Consulte [Where the Session Lives](/docs/sdk/authentication/#where-the-session-lives-authflowmode).

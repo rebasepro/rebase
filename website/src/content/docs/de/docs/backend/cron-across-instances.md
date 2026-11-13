@@ -1,32 +1,31 @@
 ---
-sourceHash: c29c973e85ea9f28
-title: Cron über mehrere Instanzen
-sidebar_label: Cron über mehrere Instanzen
-description: "Wie sich Cron-Jobs mit mehr als einem Server-Prozess verhalten: eine Ausführung pro Slot, ein Slot, den ein Neustart verloren hat, eine Pause, die jede Replik einhält, und Ausführungen, die sich nie überschneiden."
+sourceHash: eb2b1e4f16ef2812
+title: Cron über Instanzen hinweg
+sidebar_label: Cron über Instanzen hinweg
+description: "Wie sich Cron-Jobs bei mehr als einem Serverprozess verhalten: ein Durchlauf pro Slot, Wiederherstellung von durch Neustarts verpassten Slots, Pause-Status für alle Replikate und sich niemals überschneidende Durchläufe."
 ---
 
-[Cron-Jobs](/docs/backend/cron-jobs) laufen in jedem Prozess, dessen Scheduler
-eingeschaltet ist: standardmäßig in jeder Replik, bei einem
-[aufgeteilten Deployment](/docs/deployment/split-processes/) nur im Worker. Jeder
-dieser Prozesse stellt dieselben Timer, und die Datenbank verhindert, dass sie
-sich gegenseitig in die Quere kommen — ein Claim pro `(job, slot)`, damit ein
-Slot einmal läuft; ein Nachholen für einen Slot, den ein Neustart verloren hat;
-und eine Zeile pro Job in `rebase.cron_job_state` mit der Pause, die jede Replik
-liest, und der Lease, die eine Ausführung hält, solange sie läuft.
+[Cron-Jobs](/docs/backend/cron-jobs) laufen in jedem Prozess, dessen Scheduler aktiviert ist:
+standardmäßig in jedem Replikat oder nur im Worker bei einem
+[Split Deployment](/docs/deployment/split-processes/). Jeder dieser Prozesse
+stellt dieselben Timer scharf, und die Datenbank verhindert, dass sie sich
+gegenseitig in die Quere kommen – ein Claim (Anspruch) pro `(job, slot)`, sodass ein Slot nur einmal ausgeführt wird; ein Catch-up (Nachholen) für einen Slot, den ein
+Neustart ausgelassen hat; und eine Zeile pro Job in `rebase.cron_job_state`, welche den
+Pause-Status speichert, den jedes Replikat liest, sowie den Lease, den ein Durchlauf während der Ausführung hält.
 
-Das alles braucht eine SQL-Datenbank; die Tabellen stehen unter
-[Datenbankschema für Persistenz](/docs/backend/cron-jobs/#database-persistence-schema).
-Unter MongoDB oder mit `cronPersistence: false` koordiniert nichts die Prozesse:
-Jeder führt jeden Job aus, schalten Sie den Scheduler also nur in einem davon ein
+Die Tabellen sind unter
+[Database Persistence Schema](/docs/backend/cron-jobs/#database-persistence-schema) aufgeführt.
+Mit `cronPersistence: false` koordiniert nichts die Prozesse:
+Jeder einzelne führt jeden Job aus. Schalten Sie daher den Scheduler nur in einem davon ein
 (`REBASE_CRON_SCHEDULER`).
 
-## Wiederherstellung verpasster Slots
+## Verpasste Slots nachholen
 
-Da der Scheduler den nächsten Slot bei jedem Start ausgehend von *jetzt* berechnet, wird ein Slot nur ausgeführt, wenn eine Instanz aktiv war und lief, als er an der Reihe war. Alles, was den Prozess während eines Slots ersetzt – ein Rolling Deploy, ein Absturz, eine Plattform, die den Container recycelt – lässt diesen Durchlauf ausfallen, und der Ersatz plant den Slot *danach*. Es tritt kein Fehler auf; die Ausführung findet einfach nie statt.
+Da der Scheduler den nächsten Slot bei jedem Start ausgehend von *jetzt* berechnet, wird ein Slot nur dann ausgelöst, wenn irgendeine Instanz aktiv war und lief, als der Zeitpunkt erreicht wurde. Alles, was den Prozess während eines Slots ersetzt – ein Rolling Deploy, ein Absturz oder das Recycling des Containers durch die Plattform –, verwirft diesen Durchlauf, und der Ersatzprozess plant den Slot *danach*. Es tritt kein Fehler auf; der Durchlauf findet einfach niemals statt.
 
-Dies ist **nicht** nur ein Scale-to-Zero-Problem. Ein Dienst, der an eine Warm-Instanz gebunden ist, verliert dennoch Ausführungen, da es einer Plattform freisteht, die Instanz mit dem Timer zu beenden und eine neue zu starten.
+Dies ist **nicht** nur ein Scale-to-Zero-Problem. Ein Dienst, der an eine Warm-Instanz gebunden ist, verliert dennoch Durchläufe, da es der Plattform freisteht, die den Timer haltende Instanz stillzulegen und eine neue zu starten.
 
-Setzen Sie `catchUpWindowSeconds` auf ein Zeitfenster, das spürbar größer als ein Neustart ist, und der Startprozess führt einen Slot aus, den er innerhalb dieses Fensters als nicht beansprucht vorfindet:
+Setzen Sie `catchUpWindowSeconds` auf ein Zeitfenster, das komfortabel größer als ein Neustart ist, und der Startprozess führt einen Slot aus, den er innerhalb dieses Fensters als nicht beansprucht vorfindet:
 
 ```typescript
 export default defineCron({
@@ -37,17 +36,17 @@ export default defineCron({
 });
 ```
 
-Drei wichtige Dinge dazu:
+Drei Dinge, die Sie wissen sollten:
 
 - **Standardmäßig deaktiviert.** Ohne `catchUpWindowSeconds` bleibt das Verhalten unverändert.
-- **Nur der jüngste verpasste Slot wird ausgeführt.** Ein Start nach einem sechsstündigen Ausfall holt einen stündlichen Job einmal nach, nicht sechsmal. Das Nachholen verhindert, dass eine Ausführung verloren geht; es spielt nicht die Historie erneut ab.
-- **Ein Store mit Claim-Unterstützung ist erforderlich.** Das Nachholen beansprucht den Slot über denselben `(job_id, slot)`-Schlüssel, den auch der reguläre Zeitplanpfad verwendet. Dies ist das Einzige, was unterscheidet zwischen „dieser Slot wurde nie ausgeführt“ und „dieser Slot wurde bereits auf der Instanz ausgeführt, die ersetzt wird“. Wenn kein Store angebunden ist, wird das Nachholen übersprungen und eine Warnung protokolliert – andernfalls würde eine Instanz, die alle 30 Minuten recycelt wird, denselben stündlichen Job bei jedem Start erneut ausführen.
+- **Nur der jüngste verpasste Slot wird ausgeführt.** Das Hochfahren nach einem sechsstündigen Ausfall holt einen stündlichen Job einmal nach, nicht sechsmal. Das Nachholen verhindert, dass ein Durchlauf verloren geht; es spielt nicht die Historie ab.
+- **Ein Claim-fähiger Speicher ist erforderlich.** Catch-up beansprucht den Slot über denselben `(job_id, slot)`-Schlüssel, den auch der reguläre Pfad verwendet. Dies ist das Einzige, was „dieser Slot lief nie“ von „dieser Slot lief bereits auf der Instanz, die ersetzt wird“ unterscheidet. Wenn kein Speicher angebunden ist, wird Catch-up übersprungen und eine Warnung protokolliert – andernfalls würde eine Instanz, die alle 30 Minuten recycelt wird, denselben stündlichen Job bei jedem Start erneut ausführen.
 
-Im Normalfall – ein Neustart wenige Minuten nachdem ein Slot regulär ausgeführt wurde – ist der jüngste Slot bereits beansprucht, sodass das Nachholen lediglich eine Claim-Prüfung pro Job beim Start erfordert und nichts weiter unternimmt.
+Im Regelfall – ein Neustart Minuten nachdem ein Slot normal ausgeführt wurde – ist der jüngste Slot bereits beansprucht, sodass Catch-up lediglich eine Claim-Prüfung pro Job beim Booten erfordert und nichts weiter unternimmt.
 
-Der Scheduler löscht Claims, die älter als sieben Tage sind, beim Start und danach jede Stunde, der jüngste Claim jedes Jobs bleibt jedoch immer erhalten, unabhängig von seinem Alter. Dieser Claim ist der Nachweis, dass der Slot bereits ausgeführt wurde, sodass ein monatlicher Job mit einem monatsweiten Nachholfenster nicht durch ein Deployment am 10. erneut ausgeführt wird.
+Der Scheduler löscht Claims, die älter als sieben Tage sind, beim Start und danach stündlich, behält jedoch immer den neuesten Claim jedes Jobs bei, unabhängig von dessen Alter. Dieser Claim ist der Nachweis, dass der Slot bereits ausgeführt wurde, sodass ein monatlicher Job mit einem monatsweiten Catch-up-Fenster bei einem Deployment am 10. des Monats nicht erneut ausgeführt wird.
 
-Ein nachgeholter Durchlauf ist ein normaler Eintrag in `cron_logs` (`manual` ist `false`), wobei die erste Log-Zeile den nachgeholten Slot und die Verspätung festhält:
+Ein nachgeholter Durchlauf ist ein normaler Eintrag in `cron_logs` (`manual` ist `false`), dessen erste Protokollzeile den wiederhergestellten Slot und die Verspätung festhält:
 
 ```
 ⏰ Catch-up run for missed slot 2026-07-29T06:00:00.000Z (612s late)
@@ -55,18 +54,16 @@ Ein nachgeholter Durchlauf ist ein normaler Eintrag in `cron_logs` (`manual` ist
 
 ---
 
-## Einen Job in allen Prozessen pausieren
+## Einen Job über alle Prozesse hinweg pausieren
 
-Eine Pause wird in
-`rebase.cron_job_state` gespeichert, nicht im Speicher des Prozesses, der die
-Anfrage beantwortet hat. Sie erreicht daher jede Replik — und bei einem
-[aufgeteilten Deployment](/docs/deployment/split-processes/) auch den Worker, wenn
-die Anfrage von einem `api`-Prozess beantwortet wurde, der keine Timer ausführt.
-Sie übersteht außerdem Neustarts und Redeploys: Ein in Studio pausierter Job
-bleibt pausiert.
+Eine Pause wird in `rebase.cron_job_state` gespeichert,
+nicht im Speicher des Prozesses, der die Anfrage verarbeitet hat. Sie erreicht somit
+jedes Replikat – und bei einem [Split Deployment](/docs/deployment/split-processes/)
+auch den Worker, wenn die Anfrage von einem `api`-Prozess bedient wurde, auf dem keine Timer laufen.
+Sie übersteht außerdem Neustarts und erneute Deployments: Ein in Studio pausierter Job bleibt pausiert.
 
-`$TOKEN` ist ein Admin-Access-Token und `$API_URL` die Adresse, die
-`rebase dev` ausgegeben hat — siehe [REST-API](/docs/backend/cron-jobs-api/).
+`$TOKEN` ist ein Admin-Access-Token und `$API_URL` die Adresse, die `rebase dev`
+ausgegeben hat – siehe die [REST API](/docs/backend/cron-jobs-api/).
 
 ```bash
 # Pause, for every process, until someone resumes it
@@ -78,37 +75,35 @@ curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json
     -d '{ "enabled": null }' "$API_URL/api/admin/cron/health-check"
 ```
 
-`true` und `false` überschreiben das `enabled` in der Datei des Jobs; `null`
-entfernt die Überschreibung. Die Zeile hält fest, wer die Änderung wann
-vorgenommen hat.
+`true` und `false` überschreiben das `enabled` in der Datei des Jobs; `null` entfernt die
+Überschreibung. Die Zeile erfasst, wer die Änderung vorgenommen hat und wann.
 
-Jeder Scheduler liest den Zustand, wenn ein Slot fällig wird, bevor er den Slot
-beansprucht — eine Abfrage pro Auslösung. Ein pausierter Job verbraucht seinen
-Slot also nicht, und ein auf einer Replik fortgesetzter Job läuft beim nächsten
-Slot auf der Replik, die ihn beansprucht. Das Nachholen beim Start liest ihn
-ebenfalls.
+Jeder Scheduler liest den Status, wenn ein Slot fällig wird, bevor er den
+Slot beansprucht – eine Abfrage pro Auslösung –, sodass ein pausierter Job seinen Slot nicht verbraucht und ein
+auf einem Replikat fortgesetzter Job bei seinem nächsten Slot auf dem Replikat ausgeführt wird, welches ihn beansprucht.
+Auch Catch-up beim Systemstart liest diesen Status.
 
-Kann der Zustand nicht gelesen werden — die Tabelle fehlt, die Datenbank ist
-kurz nicht erreichbar —, greift der Scheduler auf das `enabled` in der Datei des
-Jobs zurück und protokolliert eine Warnung. Das ist Absicht: Eine geplante
-Ausführung schlägt offen fehl, wie auch dann, wenn die Claims-Tabelle nicht
-antworten kann, denn eine defekte Tabelle darf nicht stillschweigend jeden Job
-anhalten. Kann die Änderung selbst nicht gespeichert werden, antwortet der `PUT`
-mit `503`, und kein Prozess wird geändert.
+Falls der Status nicht gelesen werden kann – weil die Tabelle fehlt oder die Datenbank kurzzeitig
+nicht erreichbar ist –, fällt der Scheduler auf das `enabled` in der Datei des Jobs zurück und
+protokolliert eine Warnung. Dies ist beabsichtigt: Ein geplanter Durchlauf schlägt „fail-open“ fehl, genau wie wenn
+die Claims-Tabelle nicht antworten kann, da eine defekte Tabelle nicht stillschweigend
+jeden Job stoppen darf. Wenn die Änderung selbst nicht gespeichert werden kann, antwortet das `PUT` mit `503`, und kein
+Prozess wird verändert.
 
-Ohne SQL-Datenbank (MongoDB) oder mit `cronPersistence: false` gibt es keinen Ort
-für den Zustand: Eine Pause gilt für den Prozess, der die Anfrage beantwortet
-hat, und ist nach einem Neustart verloren.
+Mit `cronPersistence: false` gibt es
+keinen Ort, um den Status beizubehalten: Eine Pause gilt nur für den Prozess, der sie verarbeitet hat, und
+geht beim Neustart verloren.
 
 ---
 
 ## Concurrency Guarding
 
-Um Stabilität bei ressourcenintensiven Vorgängen zu gewährleisten, implementiert Rebase eine strikte **Single-Concurrency-Ausführungssperre** pro Job-ID:
-- **Geplante Überschneidungen**: Wenn der geplante Tick eines Jobs ausgelöst wird, während die vorherige Ausführung noch läuft, überspringt der Scheduler den Tick und plant sofort den nächsten Kandidatenlauf.
-- **Kollisionen bei manuellem Trigger**: Wenn ein Operator einen laufenden Job manuell über Rebase Studio oder die REST-API auslöst, antwortet die Anfrage mit `409` und dem Code `CRON_JOB_ALREADY_EXECUTING`, um den aktiven Worker zu schützen. `details.log` ist der unten beschriebene Eintrag des Überspringens.
+Um die Stabilität bei der Ausführung ressourcenintensiver Vorgänge zu gewährleisten, implementiert Rebase eine strikte **Single-Concurrency-Ausführungssperre** pro Job-ID:
+- **Geplante Überschneidungen (Scheduled Overlaps)**: Wenn der geplante Tick eines Jobs ausgelöst wird, während die vorherige Ausführung noch läuft, überspringt der Scheduler den Tick und plant sofort den nächsten Kandidatendurchlauf.
+- **Kollisionen bei manueller Auslösung (Manual Trigger Collisions)**: Wenn ein Operator einen laufenden Job manuell über Rebase Studio oder die REST-API auslöst, antwortet die Anfrage mit `409` und dem Code `CRON_JOB_ALREADY_EXECUTING`, was den aktiven Worker schützt. `details.log` entspricht dem unten beschriebenen Skip-Eintrag.
 
-In beiden Fällen wird eine Zeile in `rebase.cron_logs` geschrieben, sodass das Überspringen im Ausführungsverlauf und nicht nur im Prozesslog sichtbar ist:
+In beiden Fällen wird eine Zeile in `rebase.cron_logs` geschrieben, sodass das Überspringen
+in der Ausführungshistorie und nicht nur im Prozessprotokoll auftaucht:
 
 ```json
 {
@@ -119,24 +114,23 @@ In beiden Fällen wird eine Zeile in `rebase.cron_logs` geschrieben, sodass das 
 }
 ```
 
-`success: true`, weil nichts fehlgeschlagen ist – `result.skipped` kennzeichnet den Vorgang. Mehrere dieser Einträge hintereinander weisen darauf hin, dass ein Job über seinen Zeitplan hinausgewachsen ist – ein Muster, das man nur erkennt, wenn die Übersprünge protokolliert werden.
+`success: true`, weil nichts fehlgeschlagen ist – `result.skipped` kennzeichnet dies. Eine
+Reihe davon hintereinander ist das typische Muster eines Jobs, der seinem Zeitplan entwachsen ist,
+und das ist ein Muster, das man nur erkennen kann, wenn die Überspringungen protokolliert werden.
 
-Die Sperre gilt prozessübergreifend,
-nicht nur innerhalb eines Prozesses. Jede Ausführung — geplant, manuell oder
-nachgeholt — nimmt vor dem Start ihres Handlers eine **Run-Lease** in
-`rebase.cron_job_state` und gibt sie am Ende der Ausführung wieder frei. Ein
-manueller Trigger aus dem `api`-Prozess, während der Worker den Job ausführt,
-antwortet daher mit `409`, und ein Slot, der fällig wird, während eine manuelle
-Ausführung in einem anderen Prozess die Lease hält, wird übersprungen. Die
-Log-Zeile des Überspringens nennt den Prozess, der die Lease hält.
+Die Sperre gilt
+über Prozesse hinweg, nicht nur innerhalb eines einzelnen. Jeder Durchlauf – ob geplant, manuell oder ein
+Catch-up – bezieht vor dem Start seines Handlers einen **Run-Lease** in `rebase.cron_job_state`
+und gibt ihn frei, sobald der Durchlauf endet. Daher antwortet ein manueller Auslöser aus dem `api`-Prozess,
+während der Worker den Job ausführt, mit `409`, und ein Slot, der fällig wird,
+während ein manueller Durchlauf den Lease auf einem anderen Prozess hält, wird übersprungen. Die Protokollzeile des
+Überspringens nennt den Prozess, der den Lease hält.
 
-Eine Lease dauert `timeoutSeconds` des Jobs plus 30 Sekunden; das ist auch das,
-was einen Job freigibt, dessen Prozess mitten in der Ausführung abgestürzt ist.
-Ein Job mit `timeoutSeconds: Infinity` hält sie höchstens eine Stunde: Ein
-Absturz blockiert den Job dann eine Stunde statt für immer, und eine Ausführung,
-die nach einer Stunde noch läuft, hält einen anderen Prozess nicht mehr davon ab,
-den Job zu starten. Ein Job, der legitimerweise stundenlang läuft, sollte ein
-endliches `timeoutSeconds` angeben, dem seine Lease dann folgt. Kann die Lease
-nicht genommen werden, weil die Datenbank nicht antwortet, läuft die Ausführung
-mit einer Warnung weiter, so wie eine geplante Ausführung, deren Claim nicht
-gelesen werden kann.
+Ein Lease dauert so lange wie `timeoutSeconds` des Jobs plus 30 Sekunden, was
+auch einen Job freigibt, dessen Prozess mitten im Durchlauf abgestürzt ist. Ein Job mit `timeoutSeconds: Infinity`
+hält ihn maximal eine Stunde lang: Ein Absturz blockiert den Job dann für eine Stunde anstatt
+für immer, und ein Durchlauf, der nach einer Stunde immer noch aktiv ist, hindert keinen anderen
+Prozess mehr daran, den Job zu starten. Ein Job, der berechtigterweise stundenlang läuft, sollte
+ein endliches `timeoutSeconds` angeben, nach dem sich der Lease dann richtet. Wenn der Lease nicht
+erhalten werden kann, weil die Datenbank nicht antwortet, wird der Durchlauf mit einer Warnung fortgesetzt,
+genauso wie ein geplanter Durchlauf verfährt, wenn sein Claim nicht gelesen werden kann.

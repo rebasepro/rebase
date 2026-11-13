@@ -1,0 +1,34 @@
+---
+sourceHash: 851ad92a5b10f789
+slug: de/docs/upgrading/0-29-to-0-30
+title: Upgrade von 0.29 auf 0.30
+sidebar_label: 0.29 → 0.30
+description: Die Breaking Changes, die 0.30 für eine App auf 0.29 mit sich bringt – ein mit initializeRebaseBackend gestartetes Backend speichert das Refresh-Token standardmäßig in einem Cookie.
+---
+
+# Upgrade von 0.29 → 0.30
+
+Dies sind die `### Breaking`-Einträge, die Version 0.30 für eine App auf 0.29 mit sich bringt.
+
+---
+
+## 107. Ein über die Library gestartetes Backend speichert das Refresh-Token in einem Cookie
+
+**Wen dies betrifft:** Ein Backend, das Sie selbst mit `initializeRebaseBackend` starten und das `auth.cookieAuth` nicht setzt, sowie ein Aufrufer davon, der das Refresh-Token aus dem Response-Body liest, ohne `x-rebase-auth-flow: json` zu senden: ein selbst geschriebener mobiler Client, ein `curl`-Skript, ein `@rebasepro/client` älter als 0.29 im JSON-Modus. Ein Backend, das von der Rebase-Laufzeitumgebung (`rebase dev`, ein Bundle, Rebase Cloud) und dem ejected Template ausgeführt wird, hatte dies bereits aktiviert, sodass sich dort nichts ändert.
+
+**Was sich geändert hat:** `cookieAuth` ist standardmäßig aktiv, sofern Sie es nicht explizit festlegen. Anmeldung und Refresh antworten mit `tokens.refreshToken: ""` im Body und setzen das Token als ein `HttpOnly`-, `Secure`-, `SameSite=Lax`-Cookie (`__rb_refresh`). Zuvor wurde das Token im Body zurückgegeben. Genau das erwartet ein Browser-`@rebasepro/client` seit Version 0.28, weshalb dessen App bei jedem Neuladen an einem solchen Backend den Anmeldebildschirm anzeigte.
+
+**Das Symptom, das Sie sehen würden:** Ein Client, der den Body liest, erhält ein leeres Refresh-Token, sodass seine Sitzung nicht erneuert werden kann und endet, sobald das Access-Token abläuft (etwa eine Stunde nach der Anmeldung).
+
+**Was zu tun ist**, je nachdem, was zutrifft:
+
+- Senden Sie `x-rebase-auth-flow: json` bei den Auth-Anfragen des Clients mit. Das Backend beantwortet diese Anfrage wie zuvor im Body und liest oder setzt dafür niemals das Cookie. `@rebasepro/client` ab Version 0.29 tut dies im JSON-Modus (siehe [Wo das Refresh-Token liegt](/docs/sdk/authentication/)).
+- Behalten Sie das alte Verhalten für jeden Client bei:
+
+  ```typescript no-verify
+  auth: { jwtSecret, cookieAuth: false }
+  ```
+
+  Ein Browser-Client an diesem Backend benötigt `auth: { authFlowMode: "json" }` in `createRebaseClient`, da er sonst bei jedem Neuladen abgemeldet wird.
+
+Eine Browser-App auf einem anderen Origin sendet nun das Cookie, daher muss das CORS des Backends Credentials erlauben: eine explizite Origin-Liste, niemals `origin: "*"`. Ein Frontend auf einer anderen Site als die API benötigt außerdem `cookieAuth: { sameSite: "None" }`, da der Browser das Cookie sonst niemals zurücksendet. Siehe [Refresh-Tokens in einem `httpOnly`-Cookie](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie).

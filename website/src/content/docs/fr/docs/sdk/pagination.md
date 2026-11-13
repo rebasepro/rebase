@@ -1,14 +1,11 @@
 ---
-sourceHash: f2c1bc257cbc2dca
+sourceHash: e658ebda47d3942e
 title: Pagination
 sidebar_label: Pagination
-description: Parcourir une collection par pagination limit/offset, numéros de page ou curseur keyset — et quand chacune cesse d'être exacte.
+description: Paginer une table avec limit/offset, des numéros de page ou un curseur keyset — et quand chacune de ces méthodes cesse d'être correcte.
 ---
 
-Trois façons de parcourir une collection : un offset, un numéro de page et un curseur. Les
-deux premières sont positionnelles et la troisième ne l'est pas, ce qui fait toute la différence —
-une page positionnelle relit en comptant depuis le début, de sorte que les lignes écrites pendant
-que vous paginez décalent ce que signifie « ligne 20 ».
+Trois façons de parcourir une table : un décalage (offset), un numéro de page et un curseur. Les deux premières sont positionnelles et la troisième ne l'est pas, ce qui fait toute la différence — une page positionnelle relit en comptant depuis le début, de sorte que les lignes écrites pendant la pagination décalent la signification de la « ligne 20 ».
 
 ```typescript
 // Offset-based pagination
@@ -24,22 +21,13 @@ if (page1.meta.hasMore) {
 const page = await client.data.products.find({ page: 2, limit: 20 });
 ```
 
-Utilisez l'un ou l'autre. `page` et `offset` ensemble décrivent deux fois la même fenêtre,
-et la lecture est refusée avec `PAGE_WITH_OFFSET` plutôt que d'appliquer
-silencieusement `page`. Le SDK la refuse avant toute requête, via HTTP, en cours de processus et
-hors ligne ; le serveur répond par un 400 à une requête brute qui envoie les deux.
+Utilisez l'un ou l'autre. `page` et `offset` décrivent ensemble la même fenêtre deux fois, et la lecture est refusée avec `PAGE_WITH_OFFSET` plutôt que d'appliquer silencieusement `page`. Le SDK la refuse avant toute requête, sur HTTP, en cours de processus et hors ligne ; le serveur répond à une requête brute envoyant les deux avec une erreur 400.
 
-`limit` doit être un nombre entier compris entre 1 et 1000. Une valeur plus grande —
-ou égale à zéro, négative ou fractionnaire — est rejetée avec une erreur 400 `INVALID_LIMIT` plutôt
-que tronquée (clamped), car une page silencieusement plus petite ne peut être distinguée de la dernière page.
-Pour lire au-delà de ce plafond, parcourez les pages avec `iterate()` ou `findAll()`.
+`limit` doit être un nombre entier compris entre 1 et 1000. Une valeur supérieure — ou égale à zéro, négative ou fractionnaire — est refusée avec une erreur 400 `INVALID_LIMIT` plutôt que restreinte (clamped), car une page silencieusement réduite ne peut être distinguée de la dernière page. Pour lire au-delà de cette limite maximale, parcourez les pages avec `iterate()` ou `findAll()`.
 
 #### Pagination par curseur
 
-Chaque réponse de liste comporte un `meta.nextCursor` tant qu'il existe une autre page.
-Renvoyez-le sous la forme de `after` et la page suivante reprendra **strictement après la dernière ligne
-servie**, plutôt qu'à un *nombre* de lignes que des écritures simultanées ont déjà
-déplacé :
+Chaque réponse de liste comporte un `meta.nextCursor` tant qu'il existe une autre page. Renvoyez-le dans le paramètre `after` et la page suivante reprendra **strictement après la dernière ligne servie**, plutôt qu'à un *décompte* de lignes que des écritures concurrentes auraient déjà décalé :
 
 ```typescript
 let after: string | undefined;
@@ -54,46 +42,20 @@ do {
 } while (after);
 ```
 
-`nextCursor` est absent sur la dernière page, et sur une page qu'aucun curseur ne
-peut décrire : une recherche triée par pertinence (`_score`), une recherche
-vectorielle, et une projection `fields` qui omet un des champs de `orderBy` — le
-curseur est construit à partir des valeurs de tri de la dernière ligne, et cette
-ligne ne les porte pas. Là, `meta.hasMore` peut valoir `true` sans `nextCursor`,
-et la boucle ci-dessus s'arrête prématurément : ajoutez les champs de tri à
-`fields`, ou paginez par `offset`. `iterate()` appelé avec un `cursor` refuse un
-tel listage avec `cursor-missing` plutôt que de s'arrêter. Un tri par un
-[agrégat sur une relation](/docs/sdk/relations/) se pagine bien par curseur.
+`nextCursor` est absent sur la dernière page, ainsi que sur une page qu'aucun curseur ne peut décrire : une recherche ordonnée par pertinence (`_score`), une recherche vectorielle, ou une projection `fields` qui omet l'un des champs de `orderBy` — le curseur est construit à partir des valeurs de tri de la dernière ligne, et cette ligne ne les contient pas. Dans ce cas, `meta.hasMore` peut valoir `true` sans aucun `nextCursor`, et la boucle ci-dessus s'arrête prématurément : ajoutez les champs de tri à `fields`, ou paginez par `offset`. L'appel à `iterate()` avec une option `cursor` refuse un tel listing avec l'erreur `cursor-missing` plutôt que de s'arrêter. Un tri par un [agrégat sur une relation](/docs/sdk/relations/) pagine bien par curseur.
 
-Le curseur est **opaque**. Il encode les clés de tri *et* les valeurs correspondantes de la dernière
-ligne, de sorte qu'il ne peut que poursuivre la liste dont il provient : conservez un `orderBy`
-identique d'une page à l'autre, sinon la requête est rejetée avec
-`CURSOR_ORDER_MISMATCH` plutôt que d'effectuer une recherche dans un ordre que personne n'a demandé. Une
-requête qui ne spécifie aucun `orderBy` adopte celui du curseur, vous pouvez donc le renvoyer
-directement sans redéfinir le tri.
+Le curseur est **opaque**. Il encode les clés de tri *et* les valeurs correspondantes de la dernière ligne, de sorte qu'il ne peut que poursuivre la liste d'où il provient : conservez un `orderBy` identique sur toutes les pages, faute de quoi la requête sera refusée avec `CURSOR_ORDER_MISMATCH` plutôt que de chercher dans un ordre non demandé. Une requête qui ne spécifie aucun `orderBy` adopte celui du curseur, vous pouvez donc simplement le réinjecter sans redéfinir le tri.
 
-Ne l'analysez pas et n'en construisez pas : l'encodage est conçu pour pouvoir changer, et
-toute autre valeur entraînera une erreur `INVALID_CURSOR`.
+Ne l'analysez pas et n'en construisez pas : l'encodage est sujet à modifications, et toute autre valeur produira une erreur `INVALID_CURSOR`.
 
 Quatre conséquences découlent de la nature d'un curseur :
 
-- **`after` ne peut pas être combiné avec `offset` ou `page`** (400
-  `CURSOR_WITH_OFFSET`). Les deux indiquent où commence la page, et respecter les deux
-  entraînerait l'omission de lignes.
-- **Les tris multi-clés et les clés pouvant être nulles fonctionnent tous les deux.** La comparaison est construite
-  sur chaque clé dans l'ordre, avec le [positionnement des valeurs NULL](/docs/sdk/querying#where-nulls-sort) déclaré par le tri —
-  et non un simple `>` sur une seule colonne.
-- **La pertinence ne peut pas faire l'objet d'un curseur.** Un `_score` est calculé par requête et
-  n'est stocké nulle part, et deux requêtes avec des chaînes de recherche différentes produisent des
-  scores qui ne sont pas sur la même échelle. Une telle liste ne comporte tout simplement aucun
-  `nextCursor` ; pagineza-la avec `offset`. Il en va de même de la distance d'une recherche
-  vectorielle, et un curseur envoyé avec une telle recherche est refusé avec
-  `VECTOR_CURSOR_UNSUPPORTED`.
-- **Un abonnement ne peut pas reprendre à partir d'un curseur.** `listen()` réexécute sa requête à
-  chaque écriture, et `after` désigne un point dans une seule de ces exécutions, donc
-  `listen({ after })` est refusé avec `CURSOR_NOT_LIVE` avant tout envoi. Utilisez `offset` ou
-  `page` pour une fenêtre en direct, ou `find({ after })` pour lire la page une fois.
+- **`after` ne peut pas être combiné avec `offset` ou `page`** (400 `CURSOR_WITH_OFFSET`). Les deux indiquent où la page commence, et respecter les deux entraînerait l'omission de lignes.
+- **Les tris sur plusieurs clés et les clés pouvant être nulles fonctionnent tous les deux.** La comparaison est construite sur chaque clé dans l'ordre, avec le [positionnement des valeurs NULL](/docs/sdk/querying#where-nulls-sort) déclaré par le tri — et non pas un simple `>` sur une seule colonne.
+- **La pertinence ne peut pas servir de curseur.** Un `_score` est calculé par requête et n'est stocké nulle part, et deux requêtes avec des chaînes de recherche différentes produisent des scores qui ne sont pas sur la même échelle. Un tel listing ne comporte tout simplement aucun `nextCursor` ; paginez-le avec `offset`. Il en va de même pour la distance d'une recherche vectorielle, et un curseur envoyé avec celle-ci est refusé avec `VECTOR_CURSOR_UNSUPPORTED`.
+- **Une souscription ne peut pas reprendre à partir d'un curseur.** `listen()` réexécute sa requête à chaque écriture, et `after` désigne un emplacement dans une exécution donnée ; par conséquent, `listen({ after })` est refusé avec `CURSOR_NOT_LIVE` avant même tout envoi. Utilisez `offset` ou `page` pour une fenêtre dynamique en temps réel, ou `find({ after })` pour lire la page une seule fois.
 
-En HTTP, il s'agit d'un paramètre unique :
+Sur HTTP, il s'agit d'un seul paramètre :
 
 ```
 GET /api/data/orders?orderBy=createdAt:desc&limit=100
@@ -102,40 +64,31 @@ GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJ…
 
 #### Ignorer le comptage
 
-`meta.total` est un `COUNT(*)` sur toutes les lignes correspondant à la requête, exécuté à côté de la
-page — et sur une grande table, il coûte plus cher que la page elle-même. Une lecture qui ne fait
-qu'avancer n'en a jamais besoin, car `meta.hasMore` n'en dépend pas : passez `count: "none"` et la lecture
-demande à la place une ligne de plus que la page.
+`meta.total` est un `COUNT(*)` sur chaque ligne correspondant à la requête, exécuté parallèlement à la page — et sur une grande table, son coût dépasse celui de la page. Une lecture qui ne fait que paginer vers l'avant n'en a jamais besoin, car `meta.hasMore` n'en dépend pas : passez `count: "none"` et la lecture demandera plutôt une ligne de plus au-delà de la page.
 
 ```typescript
 const { data, meta } = await client.data.orders.find({ limit: 100, count: "none" });
 meta.hasMore; // exact
 ```
 
-Sans comptage, il n'y a pas de total à indiquer : en HTTP, `meta.total` est absent, et en processus il
-s'agit des lignes jusqu'à la fin de la page (`offset` plus la page). En HTTP, c'est `?count=none` ;
-`?count=exact` est la valeur par défaut, et toute autre valeur renvoie une erreur 400 `INVALID_COUNT`.
-`iterate()` et `findAll()` l'envoient d'eux-mêmes à chaque page, puisqu'un parcours n'indique aucun total.
+Sans comptage, il n'y a aucun total à rapporter : sur HTTP, `meta.total` est absent, et en interne, il correspond aux lignes jusqu'à la fin de la page (`offset` plus la page). Sur HTTP, il s'agit de `?count=none` ; `?count=exact` est la valeur par défaut, et toute autre valeur renvoie un code 400 `INVALID_COUNT`. `iterate()` et `findAll()` l'envoient automatiquement sur chaque page, car un parcours ne renvoie aucun total.
 
-#### Quelles lectures sont enveloppées et lesquelles ne le sont pas
+#### Quelles lectures sont encapsulées, et lesquelles ne le sont pas
 
-Deux formes, et une seule règle : **une fenêtre est enveloppée, une réponse complète ne l'est pas.**
+Deux formats, et une seule règle : **une fenêtre est encapsulée, une réponse complète ne l'est pas.**
 
 | Méthode | Retourne | Pourquoi |
 |--------|---------|-----|
-| `find()`, `listen()` | `{ data, meta }` | Une page. `meta.total` / `meta.hasMore` sont le seul moyen de savoir s'il y en a d'autres |
-| `findAll()`, `createMany()`, `updateMany()` | `M[]` | Rien d'autre à signaler — le parcours est terminé, ou le lot *constitue* les lignes |
-| `iterate()` | une ligne à la fois | Rien n'est matérialisé du tout |
-| `findById()`, `get()`, `create()`, `update()` | une ligne | Pas une liste |
+| `find()`, `listen()` | `{ data, meta }` | Une seule page. `meta.total` / `meta.hasMore` sont le seul moyen de savoir s'il y a une suite |
+| `findAll()`, `createMany()`, `updateMany()` | `M[]` | Rien d'autre à rapporter — le parcours est terminé, ou le lot *est* l'ensemble des lignes |
+| `iterate()` | une ligne à la fois | Rien n'est matérialisé en mémoire |
+| `findById()`, `get()`, `create()`, `update()` | une seule ligne | Pas une liste |
 
-`data` n'est pas une enveloppe (wrapper) que le SDK ajoute parfois et oublie parfois. C'est
-là que résident les métadonnées de pagination, et elle est présente exactement quand il y en a.
+`data` n'est pas une enveloppe que le SDK ajoute parfois et oublie d'autres fois. C'est l'endroit où résident les métadonnées de pagination, et elle est présente précisément lorsqu'il y en a.
 
 #### Tout lire : `iterate()` et `findAll()`
 
-`iterate()` diffuse chaque ligne correspondant à une requête, une à la fois, en récupérant une page à
-la fois en coulisses. Rien ne s'accumule, c'est donc la méthode à privilégier pour
-une collection qui ne peut pas tenir en mémoire :
+`iterate()` diffuse chaque ligne correspondant à une requête, une à une, en récupérant une page à la fois en coulisses. Rien ne s'accumule, c'est donc la méthode à privilégier pour une table qui ne tient pas en mémoire :
 
 ```typescript
 for await (const order of client.data.orders.iterate({
@@ -153,8 +106,7 @@ const stale = await client.data.sessions.findAll({
 });
 ```
 
-Les deux sont également disponibles sur le fluent builder, où `.limit()` devient la **taille de page**
-plutôt qu'un total :
+Les deux sont également disponibles sur le fluent builder, où `.limit()` devient la **taille de page** plutôt qu'un total :
 
 ```typescript
 const rows = await client.data.orders
@@ -164,34 +116,24 @@ const rows = await client.data.orders
     .findAll();
 ```
 
-Quatre options définissent le parcours :
+Quatre options permettent de configurer le parcours :
 
-| Option | Par défaut | Description |
+| Option | Par défaut | Ce que cela fait |
 |--------|---------|--------------|
-| `pageSize` | 200 | Nombre de lignes par requête. |
-| `cursor` | — | Exiger la recherche par curseur : lever une erreur au lieu de se rabattre sur l'offset. Voir ci-dessous. |
-| `maxPages` | 10 000 | Plafond de requêtes, pour éviter qu'un serveur qui répond indéfiniment `hasMore` ne tourne en boucle sans fin. |
-| `maxRows` | 10 000 | `findAll()` uniquement. Tout dépassement **lève une exception** plutôt que de renvoyer un tableau tronqué comme s'il s'agissait de la réponse complète. Passez `Infinity` pour désactiver cette limite, ou utilisez `iterate()`. |
+| `pageSize` | 200 | Lignes par requête. |
+| `cursor` | — | Exiger la recherche par curseur : lève une exception au lieu de se rabattre sur l'offset. Voir ci-dessous. |
+| `maxPages` | 10 000 | Plafond de requêtes, pour éviter qu'un serveur qui renvoie indéfiniment `hasMore` ne tourne en boucle infinie. |
+| `maxRows` | 10 000 | `findAll()` uniquement. Dépasser cette limite **lève une exception** au lieu de renvoyer un tableau tronqué comme s'il s'agissait du résultat complet. Passez `Infinity` pour désactiver cette limite, ou utilisez `iterate()`. |
 
-**Le parcours cherche par curseur de lui-même.** Après la première page, il renvoie
-[le curseur du serveur](#pagination-par-curseur) — `meta.nextCursor` — sous forme de `after`,
-de sorte que chaque requête demande les lignes strictement postérieures à la dernière vue. Les écritures
-simultanées situées avant cette ligne ne peuvent pas décaler la fenêtre, et la base de données n'a jamais
-à sauter des lignes par comptage, ce qui rendait lents les longs parcours par offset : chaque page coûtait
-plus cher que la précédente.
+**Le parcours se positionne automatiquement.** Après la première page, il renvoie [le curseur du serveur](#pagination-par-curseur) — `meta.nextCursor` — dans le paramètre `after`, de sorte que chaque requête demande les lignes situées strictement après la dernière ligne observée. Des écritures simultanées avant cette ligne ne peuvent pas décaler la fenêtre, et la base de données n'a jamais besoin de sauter des lignes par décompte, ce qui ralentissait les longs parcours par offset : chaque page coûtait plus cher que la précédente.
 
-Lorsque le serveur n'émet aucun curseur — une recherche triée par pertinence, une recherche vectorielle,
-une lecture `distinct`, une projection `fields` qui omet un champ de tri — le parcours pagine par offset
-à la place, et une ligne insérée ou supprimée *pendant l'exécution du parcours* peut lui faire sauter ou
-répéter une ligne. Passez `cursor` pour faire de la recherche par curseur une exigence plutôt qu'une préférence :
+Lorsque le serveur ne fournit aucun curseur — recherche ordonnée par pertinence, recherche vectorielle, lecture `distinct`, projection `fields` omettant un champ de tri — le parcours pagine par offset à la place, et une ligne insérée ou supprimée *pendant l'exécution du parcours* peut entraîner le saut ou la répétition d'une ligne. Passez `cursor` pour faire du positionnement par curseur une exigence plutôt qu'une préférence :
 
 ```typescript
 for await (const job of client.data.jobs.iterate({ cursor: "id" })) { /* … */ }
 ```
 
-`cursor` indique la colonne selon laquelle trier lorsque la requête ne le précise pas déjà, et transforme le
-repli sur l'offset en erreur. Le parcours ne construit aucune comparaison propre, c'est pourquoi un tri
-multi-clés fonctionne —
+`cursor` indique la colonne selon laquelle trier lorsque la requête ne la spécifie pas déjà, et transforme le repli sur l'offset en une erreur. Le parcours ne construit aucune comparaison qui lui soit propre, c'est pourquoi un tri sur plusieurs clés fonctionne —
 
 ```typescript
 for await (const job of client.data.jobs.iterate({
@@ -200,13 +142,9 @@ for await (const job of client.data.jobs.iterate({
 })) { /* … */ }
 ```
 
-— et pourquoi une clé de tri pouvant être nulle fonctionne aussi.
+— et c'est aussi pourquoi une clé de tri pouvant être nulle fonctionne.
 
-Le tri doit tout de même être **total**, ce qui en pratique signifie unique : l'identifiant de ligne
-départage en dernier recours, de sorte que n'importe quelle colonne peut servir à départager. Avec `cursor`, un
-parcours dont le curseur cesse d'avancer lève une erreur `cursor-stalled` plutôt que de boucler indéfiniment,
-et une requête qu'aucun curseur ne peut décrire (pertinence) lève une erreur `cursor-missing` ; supprimez
-`cursor` et le parcours pagine celles-ci par offset.
+Le tri doit tout de même être **total**, ce qui signifie en pratique unique : l'identifiant de ligne départage en dernier recours, donc toute colonne peut servir à départager. Avec `cursor`, un parcours dont le curseur cesse d'avancer lève l'erreur `cursor-stalled` plutôt que de boucler indéfiniment, et une requête qu'aucun curseur ne peut décrire (pertinence) lève `cursor-missing` ; retirez `cursor` et le parcours paginera ces requêtes par offset.
 
 ## Voir aussi
 

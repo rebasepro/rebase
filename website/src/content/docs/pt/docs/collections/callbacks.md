@@ -1,564 +1,438 @@
 ---
-sourceHash: 22c9a921584050f6
-title: Callbacks de Entidade
-sidebar_label: Callbacks
-description: Use callbacks de ciclo de vida para executar lógica personalizada quando entidades forem criadas, atualizadas, lidas ou excluídas. Inclui a API context.data para operações entre coleções.
+sourceHash: 067f45147f37ef16
+title: Hooks de tabela
+sidebar_label: Hooks de tabela
+description: "Execute código no lado do servidor em cada etapa do ciclo de vida de uma tabela com hooks: restrinja leituras, mascare campos, valide e complete escritas, reaja a salvamentos e exclusões, e transforme colunas individuais."
 ---
 
-## Visão Geral
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-Os callbacks permitem interceptar o ciclo de vida da entidade para:
+Os `hooks` de uma tabela são executados no servidor em cada etapa da vida de uma linha: antes de uma
+leitura, em cada linha que sai do servidor, antes e depois de uma escrita, e antes e
+depois de uma exclusão. Eles são executados para todas as portas de entrada da tabela — REST, o SDK,
+realtime, MCP e código do servidor por meio de `rebase.data` — e seu código nunca
+sai do servidor, portanto, uma chave de API ou uma leitura de `process.env` em um hook é segura.
 
-- **Sincronizar dados entre coleções** — copie ou mova entidades entre tabelas em mudanças de status
-- **Transformar dados** antes de salvar (campos computados, geração de slugs)
-- **Validar** regras de negócio além da validação de schema
-- **Disparar efeitos colaterais** após gravações (enviar e-mails, sincronizar APIs, atualizar caches)
-- **Restringir uma leitura** antes de ser compilada, para que o chamador veja apenas suas próprias linhas
-- **Filtrar/transformar** dados após a leitura
-- **Operações em cascata** — limpar registros relacionados na exclusão
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
-## Onde os callbacks são executados
-
-Uma coleção possui dois blocos de callbacks, e a única diferença é qual runtime
-os executa.
-
-| | `callbacks` | `admin.browserCallbacks` |
-|---|---|---|
-| Executa em | no servidor | no painel de administração, no navegador |
-| Disparado para | REST, o SDK, realtime, `dataAsAdmin` | leituras e gravações feitas pelo painel |
-| Chega ao navegador | não — os corpos são removidos do bundle | sim, integralmente |
-| Use para | tudo abaixo | coleções com as quais o painel se comunica diretamente |
-
-**`callbacks` é o que você procura.** Ele é executado em todos os caminhos de dados
-que chegam ao servidor — REST, o SDK, realtime, MCP e `rebase.data` — e seu corpo nunca
-sai da máquina, portanto, uma chave de API ou uma leitura de `process.env` ali é segura. O
-restante desta página é sobre `callbacks`.
-
-Um gravador não é um caminho de dados: **o sistema de autenticação**. O registro, o login
-via OAuth e o gerenciamento de usuários do admin gravam as linhas de users diretamente e
-não executam nenhum de seus callbacks; portanto, um e-mail de boas-vindas no `afterSave` de
-`users` nunca é disparado no cadastro. Vincule-o aos [auth hooks](/docs/backend/authentication/)
-passados em `auth.hooks` — `beforeUserCreate`, `afterUserCreate`, `afterUserDelete` — que
-recebem um backend ejetado; a inicialização avisa quando a coleção de users declara callbacks
-que o cadastro não executará.
-
-`admin.browserCallbacks` existe para um único caso: uma coleção em um transporte `direct` ou
-`custom`, que o painel lê e grava *por si próprio*, sem nenhum servidor Rebase no caminho
-da requisição. Nada no lado do servidor enxerga essas operações, portanto `callbacks`
-nunca pode ser disparado para elas, e este bloco é o único lugar onde a lógica de ciclo
-de vida delas pode residir.
-
-```typescript
-import type { CollectionConfig } from "@rebasepro/types";
-
-const eventsCollection: CollectionConfig = {
-    slug: "events",
-    name: "Events",
-    dataSource: "analytics",      // declared with transport: "direct"
-    properties: {
-        city: { name: "City", type: "string" },
-        code: { name: "Code", type: "string" }
+export const articles = defineTable("articles", {
+    columns: {
+        id:     col.uuid().primaryKey().defaultRandom(),
+        title:  col.text().notNull(),
+        slug:   col.text().notNull().unique(),
+        status: col.enum(["draft", "published"]).notNull().default("draft"),
     },
-    admin: {
-        browserCallbacks: {
-            afterRead: ({ row }) => ({ ...row, label: [row.city, row.code].join(" · ") })
-        }
-    }
-};
-```
-
-Duas regras decorrem de "enviado a todos os visitantes", e nenhuma delas é estilística:
-
-1. **Sem segredos.** Nada de chaves de API, nada de `process.env`, nada que você se
-   importaria que um leitor do bundle visse. Isso pertence ao `callbacks`.
-2. **Não é um limite de segurança.** Um `browserCallbacks.afterRead` que oculta um
-   campo o oculta *depois* que o navegador já possui a linha — em um transporte direto,
-   o documento bruto veio diretamente do armazenamento de dados. É apenas apresentação.
-   A ocultação que precisa ser garantida deve ficar em `callbacks` ou nas próprias
-   regras do armazenamento de dados.
-
-Em uma coleção com transporte de servidor — o padrão e quase certamente a sua —, o
-servidor já executou `callbacks` antes que a linha chegue ao painel, portanto, um
-`browserCallbacks.afterRead` é executado *em adição* a ele. Escreva-o para ser
-idempotente, ou não o escreva.
-
-Ambos os blocos recebem a mesma coisa: linhas conforme o servidor as envia, uma data
-como sua string ISO e um belongsTo como sua coluna de chave estrangeira. Isso vale para
-cada gravação que o painel faz — o salvamento de um formulário de registro, uma edição
-inline em tabela, `useRowWrites` e uma gravação por meio do `context.data` do navegador —
-portanto, o mesmo corpo de callback funciona em qualquer um dos blocos. O que um
-`browserCallbacks.beforeSave` altera na linha retornada é o que o formulário salva. O
-`context` que ele recebe é o do navegador: seu `data` lê linhas da mesma maneira, e uma
-gravação por meio dele também executa o `browserCallbacks` da coleção; portanto, um hook
-que grava em sua própria coleção executa a si mesmo novamente.
-
-Um `browserCallbacks.afterSave` é executado após a gravação ter sido armazenada, e
-nada no navegador pode revertê-la. Um erro disparado (`throw`) a partir dele é exibido
-como um aviso; o salvamento em si é reportado como concluído, de modo que o formulário
-não oferece a opção de criar o registro uma segunda vez.
-
-## Definindo Callbacks
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-
-// The row shape is inferred from `properties`, so `values.title` below is a
-// `string` without anything being written twice.
-const articlesCollection = defineCollection({
-    slug: "articles",
-    name: "Articles",
-    table: "articles",
-    properties: {
-        title: { name: "Title", type: "string" },
-        slug: { name: "Slug", type: "string" },
-        createdAt: { name: "Created at", type: "string" },
-        updatedAt: { name: "Updated at", type: "string" }
-    },
-    callbacks: {
-        beforeSave: async ({ values, id, status }) => {
-            // Auto-generate slug from title
-            if (values.title) {
-                values.slug = values.title
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]+/g, "-")
-                    .replace(/(^-|-$)/g, "");
+    rls: "admin-only",
+    hooks: {
+        beforeSave: ({ values, previousValues }) => {
+            // Derive the slug from the title when none is given.
+            const title = values.title ?? previousValues?.title;
+            if (title && !values.slug && !previousValues?.slug) {
+                values.slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
             }
-
-            // Set timestamps
-            if (status === "new") {
-                values.createdAt = new Date().toISOString();
-            }
-            values.updatedAt = new Date().toISOString();
-
             return values;
         },
-
-        afterSave: async ({ values, id }) => {
-            // Send notification
-            console.log(`Article ${id} saved: ${values.title}`);
+        beforeDelete: ({ values }) => {
+            if (values.status === "published") {
+                throw new Error("Unpublish the article before deleting it.");
+            }
         },
-
-        beforeDelete: async ({ id }) => {
-            // Prevent deletion of published articles
-            // Throw (or return false) to block the deletion
-        },
-
-        afterRead: async ({ row }) => {
-            // Transform data after loading
-            return row;
-        }
-    }
-});
-```
-
-## Combinando conjuntos de callbacks
-
-Uma coleção tem um único objeto `callbacks`. Quando várias preocupações precisam de um hook
-cada uma, como carimbos de data/hora (timestamps), uma trilha de auditoria e um escopo de
-tenant, escreva cada uma como seu próprio conjunto e combine-as com `composeCallbacks`:
-
-```typescript
-import { composeCallbacks, defineCollection } from "@rebasepro/cms-types";
-import type { CollectionCallbacks } from "@rebasepro/types";
-
-const timestamps: CollectionCallbacks = {
-    beforeSave: ({ values, status }) => ({
-        ...values,
-        ...(status === "new" ? { createdAt: new Date().toISOString() } : {}),
-        updatedAt: new Date().toISOString()
-    })
-};
-
-const auditTrail: CollectionCallbacks = {
-    afterSave: async ({ context, id, status }) => {
-        await context.data.audit_log.create({ entity: "articles", entityId: String(id), action: status });
-    }
-};
-
-export default defineCollection({
-    slug: "articles",
-    name: "Articles",
-    table: "articles",
-    properties: {
-        title: { name: "Title", type: "string" },
-        createdAt: { name: "Created at", type: "string" },
-        updatedAt: { name: "Updated at", type: "string" }
     },
-    callbacks: composeCallbacks(timestamps, auditTrail)
 });
 ```
 
-Os conjuntos são executados na ordem fornecida, e cada hook é combinado da mesma forma
-que o backend combina suas próprias camadas [globais](/docs/backend/hooks), de coleção e de propriedade:
+As props são tipadas a partir das colunas da tabela: `values.title` acima é uma
+`string`, e `values.status` é `"draft" | "published"`.
 
-| Hook | Combinação |
-|---|---|
-| `beforeSave` | Encadeado: cada conjunto vê os valores retornados pelo anterior, combinados superficialmente (shallow-merge) sobre o que recebeu |
-| `afterRead` | Encadeado: cada conjunto recebe a linha retornada pelo anterior |
-| `beforeQuery` | Operação E (AND): cada conjunto vê a consulta do chamador, e uma linha deve passar por todas as restrições |
-| `beforeDelete` | Qualquer `false` veta a exclusão; todos os conjuntos ainda são executados |
-| `afterSave`, `afterDelete` | Executados em ordem, cada um aguardado com await; um throw interrompe os restantes |
-| `afterSaveError` | Executados em ordem; um throw não interrompe o próximo conjunto, e o primeiro erro é lançado novamente ao final |
-
-Um hook só estará presente no resultado se algum conjunto o possuir, e um conjunto
-`undefined` é ignorado. `composeCallbacks` também é exportado de `@rebasepro/server` e
-`@rebasepro/common`.
-
-Anexar callbacks após a inicialização com `backend.setCollectionCallbacks(slug, callbacks)`
-**substitui** aqueles declarados pela coleção. Para adicionar os seus a eles,
-passe `composeCallbacks(declared, yours)`.
-
-## Referência de Callbacks
-
-### `beforeQuery`
-
-Chamado **antes de uma leitura ser compilada**, para restringir quais linhas ela solicita. Retorne
-condições para aplicar com AND à consulta; não retorne nada para não adicionar nenhuma.
-
-```typescript
-beforeQuery: ({
-    operation,   // "list" | "get" | "count" | "aggregate" | "relation"
-    query,       // the parsed read, read-only
-    context
-}) => {
-    if (context.user?.roles?.includes("admin")) return;
-    return { filter: { tenant_id: ["==", context.user?.tenant ?? null] } };
-}
-```
-
-`afterRead` vê linhas que já foram buscadas, portanto pode ocultar um valor, mas não pode
-impedir que a linha seja lida. Este hook é executado antes, e três coisas sobre ele
-valem a pena saber:
-
-- **Ele só pode restringir.** O valor retornado é um filtro a ser aplicado com AND, e
-  nenhum valor retornado pode ampliar a leitura. `filter` aceita os mesmos filtros de
-  campo que uma consulta aceita; `logical` aceita um grupo `or`/`and`, para um escopo como
-  "meu ou compartilhado comigo" — ainda aplicado com AND como um todo, de modo que o `or`
-  só escolhe entre linhas que o restante da consulta já admite.
-- **Dispara em todos os caminhos de leitura.** A listagem, o get individual, o count, o
-  aggregate, a busca, a leitura vetorial, uma listagem de caminho aninhado, a nova busca
-  em tempo real por trás de um `.listen()` e as linhas carregadas para uma relação ou um
-  `?include=` — onde é o hook da coleção de **destino** que se aplica, pois essas são as
-  linhas de destino.
-- **Um filtro que não pode ser compilado recusa a requisição.** Nomear uma coluna que a
-  tabela não possui resulta em 400, nunca em uma condição descartada silenciosamente.
-- **Uma gravação em uma linha que ele exclui resulta em 404.** Uma atualização ou exclusão
-  direcionada a uma linha fora do escopo é recusada antes da gravação, com a mesma
-  resposta de "linha não encontrada..." que uma leitura retorna — portanto, um escopo é
-  um escopo para gravações também, e não apenas para leituras. Uma gravação de associação
-  um-para-muitos (`comments: [ids]` em um post) mantém um registro filho onde ele está se o
-  escopo de destino o ocultar, da mesma forma que deixa um id que não referencia nenhuma linha.
-  O que ele *não* controla são os valores que estão sendo gravados: recusar uma gravação
-  com base em seu conteúdo é papel do `beforeSave`.
-
-Uma leitura deliberadamente não é restringida: a verificação de unicidade por trás de
-`validation: { unique: true }`. Ela verifica se um valor existe em qualquer lugar da
-tabela e, se fosse restringida, responderia "único" para um valor que uma linha oculta
-já possui.
-
-:::caution[Apenas Postgres, por enquanto]
-`beforeQuery` é implementado por `@rebasepro/server-postgres`. Uma coleção servida
-por MongoDB ou Firestore que declare este hook **falha na inicialização**, nominalmente,
-em vez de ser servida com o hook silenciosamente inerte — o que, para um filtro de linhas,
-significaria todas as linhas servidas para todo mundo. Um `beforeQuery` [global](/docs/backend/hooks)
-falha na inicialização da mesma forma se qualquer fonte de dados não for Postgres, e o mesmo
-ocorre com um anexado posteriormente com `setCollectionCallbacks`. A ocultação que funciona
-em todos os mecanismos é [`afterRead`](#afterread).
+:::note[Vindo de coleções?]
+Os hooks de tabela são os `callbacks` de servidor de uma coleção, com o mesmo
+ciclo de vida. Cada hook recebe o descritor da tabela como `table`, e `afterRead`
+e os hooks de exclusão recebem a linha como `values`. O guia de atualização para esta
+versão lista as renomeações.
 :::
 
-→ Consulte [Estendendo o servidor](/docs/backend/extending#2-collection-callbacks) para
-saber onde isso se posiciona entre as outras opções.
+## Os sete hooks
 
-### `beforeSave`
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-Chamado antes que um registro seja gravado no banco de dados. Retorne os valores modificados.
-No Postgres, ele é executado dentro da transação da gravação, que já foi iniciada, mantendo
-uma conexão do pool enquanto estiver em execução — consulte [Um callback retém uma conexão](/docs/collections/context-data-api#a-callback-holds-a-connection).
+| Hook | Executa | Retorna |
+|---|---|---|
+| `beforeQuery` | antes de cada leitura ser compilada | um filtro para combinar com AND na leitura, ou nada |
+| `afterRead` | em cada linha que sai do servidor | a linha a ser servida |
+| `beforeSave` | antes de uma criação ou atualização, dentro de sua transação | os valores a escrever; lance um erro (throw) para recusar |
+| `afterSave` | após a escrita, antes do commit | nada; lance um erro (throw) para reverter a escrita |
+| `afterSaveError` | após uma escrita falhar e ser revertida | nada |
+| `beforeDelete` | antes de uma exclusão, dentro de sua transação | `false` ou lance um erro (throw) para recusar |
+| `afterDelete` | após a exclusão, antes do commit | nada; lance um erro (throw) para reverter a exclusão |
 
-```typescript
-beforeSave: async ({
-    values,       // Entity values
-    id,           // Entity ID (undefined for a new entity, unless the caller sent one)
-    status,       // "new" | "existing" | "copy"
-    previousValues, // Previous values (for updates)
-    context       // Full Rebase context
-}) => {
-    // Return modified values
-    return { ...values, updatedAt: new Date() };
-}
+Todo hook pode ser `async`. Todo hook recebe:
+
+| Prop | O que é |
+|---|---|
+| `table` | A tabela como o servidor a conhece: seu descritor, com colunas, relações e a postura de `rls`. |
+| `path` | O caminho endereçado pela requisição: o slug, ou um caminho aninhado. |
+| `context` | O chamador (`context.user`), e `context.data` com escopo definido para ele. Consulte [A API `context.data`](/docs/collections/context-data-api/). |
+
+Um mecanismo de escrita não os executa: **o sistema de autenticação**. O registro, login via OAuth
+e o gerenciamento de usuários de um administrador escrevem diretamente na tabela de usuários. Consulte
+[A tabela de usuários](/docs/schema/auth-table/#what-does-not-run-for-auth-writes).
+
+Uma tabela gravada pelo CMS diretamente no navegador, sem nenhum servidor Rebase no
+caminho da requisição, nunca atinge esses hooks. O CMS possui hooks próprios no lado do navegador
+para esse caso, descritos junto com as customizações do CMS.
+
+## `beforeQuery`
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Executa **antes de uma leitura ser compilada**, para restringir quais linhas ela solicita. Retorne
+condições para combinar com AND na consulta; retorne nada para não adicionar nenhuma.
+
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const tickets = defineTable("tickets", {
+    columns: {
+        id:       col.uuid().primaryKey().defaultRandom(),
+        tenantId: col.text().notNull(),
+        subject:  col.text().notNull(),
+    },
+    rls: [{ operation: "all", access: "authenticated" }],
+    hooks: {
+        beforeQuery: ({ operation, context }) => {
+            // operation: "list" | "get" | "count" | "aggregate" | "relation"
+            if (context.user?.roles?.includes("admin")) return;
+            return { filter: { tenantId: ["==", String(context.user?.uid ?? "")] } };
+        },
+    },
+});
 ```
 
-Lance um erro para **bloquear o salvamento**. A gravação nunca chega ao banco de dados, e
-o chamador recebe **400** com sua mensagem e o código `CALLBACK_REJECTED`:
+- **Só pode restringir.** `filter` aceita os mesmos filtros de campo que uma consulta aceita;
+  `logical` aceita um grupo `or`/`and` para um escopo como "meu, ou compartilhado comigo",
+  ainda assim combinado com AND como um todo.
+- **É executado em todos os caminhos de leitura**: a listagem, uma busca individual (get), a contagem,
+  a agregação, a busca, a leitura vetorial, uma listagem de caminho aninhado, a re-busca em tempo real
+  por trás de um `.listen()`, e as linhas carregadas para uma relação ou um
+  `?include=`, onde é o hook da tabela de **destino** que se aplica.
+- **Um filtro que não pode ser compilado recusa a requisição.** Informar uma coluna que a tabela
+  não possui resulta em 400, nunca em uma condição ignorada.
+- **Uma escrita em uma linha que ele exclui resulta em 404.** Uma atualização ou exclusão direcionada a
+  uma linha fora do escopo é recusada antes da escrita. A recusa de uma escrita com base em seu
+  conteúdo é função de `beforeSave`.
 
-```typescript
-beforeSave: async ({ values }) => {
-    if (values.price < 0) {
-        throw new Error("Price cannot be negative");
-    }
-    return values;
-}
-```
+A verificação de unicidade por trás de `.unique()` não é restringida: se fosse restringida, ela
+responderia "único" para um valor que uma linha oculta já possui.
+
+A segurança em nível de linha (Row-level security) é o modelo de autorização; `beforeQuery` é a lógica de
+aplicação sobre ela. Use [`rls`](/docs/collections/security-rules/) para qualquer coisa
+que também deva ser válida para SQL executado como o chamador.
+
+## `beforeSave`
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Executa antes de uma linha ser escrita e retorna os valores a serem gravados. `values` contém
+todos os valores em uma criação e os modificados em uma atualização; `previousValues` é
+a linha como ela era, em uma atualização; `status` é `"new"`, `"existing"` ou `"copy"`;
+`id` fica ausente em uma criação cuja chave é gerada pelo banco de dados.
+
+Ele é executado dentro da transação de escrita, portanto mantém uma conexão do pool ocupada durante
+todo o tempo em que executa. Consulte [Um hook retém uma conexão](/docs/collections/context-data-api/#a-hook-holds-a-connection).
+
+Lance um erro (throw) para **recusar a escrita**. Nada chega ao banco de dados, e o chamador
+recebe **400** com a sua mensagem e o código `CALLBACK_REJECTED`:
 
 ```json
 { "error": { "message": "Price cannot be negative", "code": "CALLBACK_REJECTED",
              "details": { "stage": "beforeSave", "path": "products" } } }
 ```
 
-Para definir o status e o código por conta própria — um 409 para um conflito, um 422 para algo
-bem formatado, mas inaceitável — lance um `RebaseApiError`:
+Para escolher o status e o código — um 409 para conflito, um 422 para algo
+bem formatado, mas inaceitável —, lance um `RebaseApiError`:
 
-```typescript
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
 import { RebaseApiError } from "@rebasepro/types";
 
-beforeSave: async ({ values }) => {
-    if (await isTaken(values.slug)) {
-        throw new RebaseApiError("That slug is taken", { status: 409, code: "SLUG_TAKEN" });
-    }
-    return values;
-}
+export const products = defineTable("products", {
+    columns: {
+        id:    col.uuid().primaryKey().defaultRandom(),
+        slug:  col.text().notNull(),
+        price: col.numeric({ precision: 10, scale: 2 }).notNull(),
+    },
+    rls: "admin-only",
+    hooks: {
+        beforeSave: async ({ values, context }) => {
+            if (values.slug) {
+                const taken = await context.data.products.count({ where: { slug: ["==", values.slug] } });
+                if (taken > 0) throw new RebaseApiError("That slug is taken", { status: 409, code: "SLUG_TAKEN" });
+            }
+            return values;
+        },
+    },
+});
 ```
 
-:::note
-Importe-o de `@rebasepro/types`, e não de `@rebasepro/server`. O arquivo de coleção
-é compartilhado com o frontend — a compilação do Vite do painel de administração lê este
-mesmo diretório —, portanto ele só pode importar pacotes que rodam em um navegador.
-`RebaseApiError` é a versão segura para navegador e é a mesma classe lançada pelo SDK tipado.
-:::
+Importe `RebaseApiError` de `@rebasepro/types`: arquivos de schema não carregam código de servidor,
+e essa é a mesma classe que o SDK tipado lança.
 
-### `afterSave`
+## `afterSave` e `afterSaveError`
 
-Chamado após a linha ser gravada e antes do commit, dentro da mesma transação. Um throw reverte o salvamento — consulte [Semântica de Transação](/docs/collections/context-data-api#transaction-semantics).
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-```typescript
-afterSave: async ({
-    values,         // Saved values: the row as stored, not afterRead's view of it
-    id,             // Entity ID
-    previousValues, // Previous values (undefined for new entities)
-    status,         // "new" | "existing" | "copy"
-    context
-}) => {
-    // Same transaction as the save: the log row commits with the article or not at all
-    await context.data.audit_log.create({ action: status, article_id: id, title: values.title });
-}
+`afterSave` executa após a linha ser escrita e antes do commit, na mesma
+transação. Seus `values` são a linha como armazenada. Um erro lançado (throw) reverte o salvamento,
+juntamente com tudo o que o hook escreveu por meio de `context.data`:
+
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const orders = defineTable("orders", {
+    columns: {
+        id:     col.uuid().primaryKey().defaultRandom(),
+        status: col.enum(["open", "paid", "shipped"]).notNull().default("open"),
+    },
+    rls: "admin-only",
+    hooks: {
+        afterSave: async ({ id, status, values, context }) => {
+            // Commits with the order, or not at all.
+            await context.data.audit_log.create({ table: "orders", rowId: String(id), action: status, state: values.status });
+        },
+    },
+});
 ```
 
-### `afterSaveError`
+Trabalhos que saem do banco de dados — um e-mail, um webhook — não pertencem ao
+corpo do hook: eles mantêm a transação aberta durante uma viagem de ida e volta pela rede (round trip), e nada
+os desfaz se a escrita for revertida. Em vez disso, enfileire um [job](/docs/backend/jobs/);
+um job enfileirado a partir de um hook é comitado com a escrita.
 
-Chamado quando uma operação de salvamento falha.
+`afterSaveError` executa quando um salvamento falha no banco de dados ou após ele, assim que a
+transação da escrita que falhou tiver sido revertida. Ele não executa para uma recusa em
+`beforeSave` ou para uma requisição recusada antes da escrita. Seu `context.data` é uma
+instância nova para o mesmo chamador, portanto um job enfileirado por ele sobrevive à falha reportada. Um
+erro lançado por ele é registrado em log, e o chamador ainda recebe o erro do próprio salvamento.
 
-```typescript
-afterSaveError: async ({
-    values,
-    id,
-    error,
-    context
-}) => {
-    console.error("Save failed:", error);
-}
+## `afterRead`
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Executa em cada linha que sai do servidor — a resposta de uma leitura, a resposta de uma escrita,
+um quadro de tempo real (realtime frame), um resultado MCP — e retorna a linha a ser servida. `values` é a
+linha como armazenada, após o [acesso de campo](/docs/collections/field-access/) ter
+removido o que o chamador não tem permissão para ler.
+
+Ele molda o que o chamador recebe e nada mais: `afterSave`, os hooks de
+exclusão e o [histórico](/docs/backend/history/) recebem a linha como armazenada, de modo que um valor
+mascarado aqui nunca é o que uma auditoria registra ou o que uma reversão grava de volta. O histórico
+também *serve* suas entradas por meio de `afterRead`, de forma que um snapshot mostra o valor
+mascarado assim como a linha o faz.
+
+Linhas incorporadas na resposta de outra tabela — um `include`, valores de uma referência de relação,
+as linhas que um frame de realtime carrega para uma relação — são mascaradas em um
+nível de profundidade com o `afterRead` da tabela de **destino**. A ordem é global, depois
+tabela e depois `.transform({ afterRead })` da coluna. Um serviço de realtime sem
+driver para executar os hooks recusa frames para uma tabela que os possui, em vez de
+enviá-los sem máscara.
+
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const customers = defineTable("customers", {
+    columns: {
+        id:    col.uuid().primaryKey().defaultRandom(),
+        name:  col.text().notNull(),
+        email: col.text().notNull(),
+        phone: col.text(),
+    },
+    rls: [{ operation: "select", roles: ["support", "sales"] }],
+    hooks: {
+        // Mask contact details for everyone but support.
+        afterRead: ({ values, context }) => {
+            if (context.user?.roles?.includes("support")) return values;
+            return {
+                ...values,
+                email: values.email.replace(/^(.).*(@.*)$/, "$1***$2"),
+                phone: values.phone === null ? null : "•••",
+            };
+        },
+    },
+});
 ```
-
-Ele é executado para um salvamento que falhou no banco de dados ou após ele — não para uma
-recusa em `beforeSave`, uma requisição recusada antes da gravação (validação, uma permissão
-ausente, um 404) ou um commit recusado após o retorno do salvamento ([lista completa](/docs/backend/hooks/#when-aftersaveerror-runs)).
-
-Em uma requisição, ele é executado após a transação da gravação com falha ter sido revertida,
-e não dentro dela. Seu `context.data` é uma nova instância para o mesmo chamador, onde cada
-chamada é uma transação independente; portanto, um [job](/docs/backend/jobs), mensagem de fila
-ou webhook enfileirado por ele faz commit e sobrevive à falha reportada. Um throw originado de
-`afterSaveError` é registrado em log, e o chamador ainda recebe o erro do próprio salvamento.
-
-### `afterRead`
-
-Chamado após a leitura de entidades do banco de dados. Transforme os dados para exibição.
-
-Ele molda o que o chamador recebe — a resposta de uma leitura ou de uma gravação, e seu frame
-em tempo real — e nada mais: `afterSave`, `beforeDelete`, `afterDelete` e o
-[histórico](/docs/backend/history) recebem a linha como armazenada: um valor mascarado aqui
-nunca é o que uma auditoria registra ou o que uma reversão grava de volta, e um campo adicionado
-aqui nunca é gravado.
 
 Uma agregação retorna somas e contagens, não linhas, portanto não pode passar por
-`afterRead`. Em uma coleção na qual ele se aplica, apenas `count()` sem `groupBy` é atendido;
-qualquer outro [aggregate](/docs/sdk/aggregates-and-search/#aggregates) é recusado com
-`400 AGGREGATE_MASKED_BY_AFTER_READ`.
+`afterRead`. Em uma tabela com esse hook, apenas `count()` sem `groupBy` é servido;
+qualquer outra [agregação](/docs/sdk/aggregates-and-search/#aggregates) é recusada
+com `400 AGGREGATE_MASKED_BY_AFTER_READ`.
 
-```typescript
-afterRead: async ({
-    row,    // The row to transform
-    context
-}) => {
-    // Add computed fields
-    return {
-        ...row,
-        displayName: `${row.first_name} ${row.last_name}`
-    };
-}
-```
+Um valor que um chamador nunca deve receber é melhor ocultado do que mascarado:
+[`.access()` ou `.private()`](/docs/collections/field-access/) removem a coluna
+antes que qualquer hook seja executado e a mantêm fora dos filtros também.
 
-### `beforeDelete`
+## `beforeDelete` e `afterDelete`
 
-Chamado antes que um registro seja excluído. Lance um erro para bloquear a exclusão, e o chamador receberá `400 CALLBACK_REJECTED` com sua mensagem. Retornar `false` também a bloqueia, como `403 CALLBACK_REJECTED` sem nenhuma mensagem personalizada.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-```typescript
-beforeDelete: async ({
-    id,
-    row,
-    context
-}) => {
-    if (row.status === "published") {
-        throw new Error("Cannot delete published articles. Unpublish first.");
-    }
-}
-```
+Ambos recebem a linha que está sendo excluída como `values`, e seu `id`.
 
-### `afterDelete`
+`beforeDelete` executa dentro da transação de exclusão. Lance um erro (throw) para recusar a exclusão,
+e o chamador receberá `400 CALLBACK_REJECTED` com sua mensagem. Retornar `false`
+também a recusa, como `403 CALLBACK_REJECTED` sem nenhuma mensagem sua.
 
-Chamado após a linha ser excluída e antes do commit, dentro da mesma transação. Um throw reverte a exclusão.
+`afterDelete` executa após a linha ser excluída e antes do commit. Lançar um erro
+reverte a exclusão. Em uma tabela com [soft delete](/docs/collections/soft-delete/),
+uma exclusão é uma marcação de data/hora (stamp), e ambos os hooks ainda assim são executados.
 
-```typescript
-afterDelete: async ({
-    id,
-    row,
-    context
-}) => {
-    // Cleanup related data
-    console.log(`Article ${id} deleted`);
-}
-```
+## Hooks de campo: `.transform()`
 
-## Callbacks de Propriedade
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-Você também pode definir callbacks no nível de propriedade para transformações específicas de campos:
+O `.transform()` de uma coluna aceita dois hooks em nível de campo: `beforeSave` retorna o
+valor a ser armazenado, e `afterRead` retorna o valor a ser servido. Eles são executados no
+servidor, para todos os chamadores, e recebem `value`, a linha inteira como `values` e
+as props que todo hook recebe.
 
-```typescript
-properties: {
-    email: {
-        type: "string",
-        name: "Email",
-        callbacks: {
-            beforeSave: ({ value }) => value?.toLowerCase().trim(),
-            afterRead: ({ value }) => value // Could decrypt, etc.
-        }
-    }
-}
-```
+`value` é tipado com precisão: `T | null` em uma coluna anulável, e `T` quando
+`.notNull()` é declarado **antes** de `.transform()`. Em um campo JSON é
+`T | undefined`, a menos que `.required()` venha primeiro.
 
-Cada callback também recebe `context.data`, uma camada de dados para ler e gravar em outras coleções a partir de dentro do hook — consulte [A API context.data](/docs/collections/context-data-api).
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
-## Sincronizando Dados Entre Coleções
-
-Um dos usos mais poderosos dos callbacks é a **sincronização de dados entre coleções** usando `context.data`:
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-
-const submissionsCollection = defineCollection({
-    slug: "job_submissions",
-    name: "Job Submissions",
-    table: "job_submissions",
-    properties: {
-        title: { name: "Title", type: "string" },
-        description: { name: "Description", type: "string" },
-        company_id: { name: "Company", type: "string" },
-        status: { name: "Status", type: "string" },
-        promoted_job_id: { name: "Promoted job", type: "string" }
+export const contacts = defineTable("contacts", {
+    columns: {
+        id:    col.uuid().primaryKey().defaultRandom(),
+        email: col.text().notNull().transform({
+            beforeSave: ({ value }) => value.trim().toLowerCase(),
+        }),
+        iban: col.text().transform({
+            afterRead: ({ value, context }) =>
+                value && !context.user?.roles?.includes("finance") ? `•••• ${value.slice(-4)}` : value,
+        }),
     },
-    callbacks: {
-        afterSave: async ({ values, id, previousValues, context }) => {
-            // When a submission is approved, create a published job
-            if (values.status === "approved" && previousValues?.status !== "approved") {
-                const newJob = await context.data.collection<Record<string, unknown>>("jobs").create({
-                    title: values.title,
-                    description: values.description,
-                    company_id: values.company_id,
-                    status: "published",
-                    source_submission_id: id,
-                });
-
-                // Update the submission with the promoted job reference
-                await context.data.collection<Record<string, unknown>>("job_submissions").update(id, {
-                    promoted_job_id: newJob.id,
-                });
-            }
-        }
-    }
+    rls: "admin-only",
 });
 ```
 
-Outros padrões entre coleções:
+`.transform()` também está disponível em itens de array e em cada campo de um
+[documento JSON](/docs/schema/json/). Para remoção de espaços (trim) e caixa alta/baixa, as
+[regras de validação](/docs/schema/columns/#validation) `trim`, `lowercase` e `uppercase`
+não precisam de código.
 
-- **Exclusão em cascata**: Use `afterDelete` para remover registros relacionados em coleções filhas
-- **Desnormalização**: Use `afterSave` para atualizar campos de resumo em uma coleção pai
-- **Log de auditoria**: Use `afterSave` / `afterDelete` para gravar em uma coleção de logs de auditoria
-- **Contadores**: Use `afterSave` / `afterDelete` para atualizar campos de contagem em entidades relacionadas
+## Escrevendo em outras tabelas
 
-## Testando um callback
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-Um callback é uma função simples que recebe um único objeto de propriedades (props), portanto
-um teste unitário pode apenas chamá-lo diretamente. `createCallContext` constrói a propriedade
-`context`: os campos que você passa são usados como estão, e qualquer um que você omitir
-torna-se um substituto que lança um erro no primeiro uso identificando a si mesmo, de forma que
-o teste fornece apenas o que o hook realmente utiliza.
+`context.data` lê e escreve em qualquer tabela pelo seu slug, como o chamador e na
+mesma transação que a escrita que executou o hook:
 
-```typescript
-import { test } from "node:test";
-import assert from "node:assert/strict";
-import { createCallContext } from "@rebasepro/server";
-import type { User } from "@rebasepro/types";
-import articlesCollection from "../config/collections/articles";
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
-const editor: User = {
-    uid: "u1", displayName: null, email: null, photoURL: null,
-    providerId: "password", isAnonymous: false, roles: ["editor"]
+export const submissions = defineTable("job_submissions", {
+    columns: {
+        id:            col.uuid().primaryKey().defaultRandom(),
+        title:         col.text().notNull(),
+        status:        col.enum(["pending", "approved", "rejected"]).notNull().default("pending"),
+        promotedJobId: col.uuid(),
+    },
+    rls: "admin-only",
+    hooks: {
+        afterSave: async ({ id, values, previousValues, context }) => {
+            // When a submission is approved, publish it as a job and link it back.
+            if (values.status === "approved" && previousValues?.status !== "approved") {
+                const job = await context.data.jobs.create({ title: values.title, status: "published" });
+                await context.data.job_submissions.update(id, { promotedJobId: job.id });
+            }
+        },
+    },
+});
+```
+
+A atualização acima salva `job_submissions` novamente, o que executa este hook de novo;
+a verificação de status é o que o interrompe. [A API `context.data`](/docs/collections/context-data-api/)
+aborda os privilégios com os quais ele executa, a transação e os limites de aninhamento.
+
+## Hooks para todas as tabelas
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Hooks que se aplicam a todas as tabelas — mascaramento de PII em todo o schema, um log
+global de auditoria — são exportados como `hooks` de `backend/hooks.ts`, no mesmo
+formato `TableHooks`. Eles são executados antes dos hooks da própria tabela, que por sua vez executam antes
+do `.transform()` de suas colunas. Consulte [Hooks globais](/docs/backend/hooks/).
+
+Hooks também podem ser anexados após a inicialização com `setTableHooks(slug, hooks)` no
+backend. Isso **substitui** os hooks que a tabela declarou; para adicioná-los aos existentes, passe
+`composeTableHooks(declared, yours)`.
+
+## Combinando conjuntos de hooks
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Uma tabela tem um único objeto `hooks`. Quando várias preocupações precisam de um hook — um gerador
+de slug, uma trilha de auditoria, um escopo de tenant —, escreva cada uma como seu próprio conjunto e
+combine-as com `composeTableHooks` de `@rebasepro/common`:
+
+```ts
+import { defineTable, col, type TableHooks } from "@rebasepro/server/schema";
+import { composeTableHooks } from "@rebasepro/common";
+
+const auditTrail: TableHooks = {
+    afterSave: async ({ table, id, status, context }) => {
+        await context.data.audit_log.create({ table: table.slug, rowId: String(id), action: status });
+    },
 };
 
-test("beforeSave derives the slug from the title", async () => {
-    const values = await articlesCollection.callbacks!.beforeSave!({
-        collection: articlesCollection,
-        path: "articles",
-        status: "new",
-        values: { title: "Hello World" },
-        context: createCallContext({ user: editor })
-    });
-    assert.equal(values.slug, "hello-world");
+export const pages = defineTable("pages", {
+    columns: {
+        id:    col.uuid().primaryKey().defaultRandom(),
+        title: col.text().notNull(),
+        slug:  col.text(),
+    },
+    rls: "admin-only",
+    hooks: composeTableHooks(auditTrail, {
+        beforeSave: ({ values }) =>
+            typeof values.title === "string" && !values.slug
+                ? { ...values, slug: values.title.toLowerCase().replace(/\s+/g, "-") }
+                : values,
+    }),
 });
 ```
 
-Um hook que lê ou grava via `context.data` precisa de um driver: passe
-`createCallContext({ data: buildSdkData(driver) })`, com `buildSdkData` de
-`@rebasepro/common` e qualquer `DataDriver`, inclusive um em memória. `user`
-permanece ausente a menos que você o passe, exatamente como em uma gravação sem chamador,
-de modo que um fluxo `if (context.user)` seja testado com fidelidade. Para executar
-hooks em um banco de dados real, consulte [Scripts e o Console](/docs/backend/scripts/).
+Os conjuntos são executados na ordem fornecida, e cada hook se combina da mesma forma que o backend
+combina suas camadas global e de tabela:
 
-## Referência Completa do Contexto
+| Hook | Combinado |
+|---|---|
+| `beforeSave` | Encadeado: cada conjunto vê os valores retornados pelo anterior, combinados superficialmente (shallow-merged) sobre o que foi recebido |
+| `afterRead` | Encadeado: cada conjunto recebe a linha retornada pelo anterior |
+| `beforeQuery` | Combinado com AND: cada conjunto vê a consulta do chamador, e uma linha precisa passar por todas as restrições |
+| `beforeDelete` | Qualquer `false` veta a exclusão; todos os conjuntos ainda são executados |
+| `afterSave`, `afterDelete` | Executados em ordem, cada um aguardado com await; um erro lançado interrompe os demais |
+| `afterSaveError` | Executados em ordem; um erro lançado não interrompe o próximo conjunto, e o primeiro erro é relançado no final |
 
-Cada callback recebe um objeto `context` do tipo `RebaseCallContext`:
+Um hook só estará presente no resultado se algum conjunto o possuir, e um conjunto `undefined` é
+ignorado. Um conjunto escrito separadamente de sua tabela, como `auditTrail` acima, é tipado
+com a linha genérica; portanto, leia seus valores como `unknown` e faça a validação dos tipos.
 
-```typescript
-interface RebaseCallContext {
-    /** The authenticated user, if any */
-    user?: User;
-    /** The driver running this operation (server-side only) */
-    driver?: DataDriver;
-    /** The query accessor — context.data.<slug>.create/update/find/delete */
-    data: RebaseSdkData;
-    /** Functions, storage, email and dataAsAdmin — but no `data` */
-    client: RebaseCallbackClient;
-    /** The default storage source */
-    storageSource: StorageSource;
-}
-```
+## Testando um hook
 
-Execute consultas por meio de `context.data`. `context.client` não possui `data`:
-no lado do servidor, ele é o singleton `rebase`, cujo único plano de dados é o
-`dataAsAdmin` com escopo de administrador; portanto, `context.client.data` é um
-erro de compilação. Para construir um desses em um teste, consulte
-[Testando um callback](#testando-um-callback).
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-## Próximos Passos
+Um hook é uma função simples com um objeto de props, portanto um teste unitário o chama assim:
+`posts.config.hooks?.beforeSave?.(props)`. `createCallContext` de
+`@rebasepro/server` constrói a prop `context` apenas com os campos fornecidos pelo
+teste; qualquer outro campo lança um erro no primeiro uso, identificando seu próprio nome. `table` é o
+descritor retornado por `compileTables` de `@rebasepro/common` para a tabela. Para executar
+hooks contra um banco de dados real, consulte [Scripts e o Console](/docs/backend/scripts/).
 
-- **[Regras de Segurança](/docs/collections/security-rules)** — Segurança em Nível de Linha (RLS)
-- **[Histórico de Entidades](/docs/backend/history)** — Trilha de auditoria
-- **[Funções Customizadas](/docs/backend/custom-functions)** — Adicione endpoints de API personalizados
+## Próximos passos
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+- [A API `context.data`](/docs/collections/context-data-api/): privilégios, transações e a conexão retida por um hook
+- [Hooks globais](/docs/backend/hooks/): hooks em todas as tabelas
+- [Histórico de entidades](/docs/backend/history/): uma trilha de auditoria sem a necessidade de escrever hooks

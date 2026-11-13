@@ -1,38 +1,38 @@
 ---
-sourceHash: 088ee76c9513e196
+sourceHash: 78888eb91334da42
 title: Portabilité du runtime
 sidebar_label: Portabilité du runtime
-description: Ce qu'une fonction personnalisée importe décide si elle pourrait s'exécuter hors d'un processus Node — ce qui est portable, ce qui est réservé à Node, et comment rebase build et rebase doctor le signalent.
+description: Ce qu'importe une fonction personnalisée détermine si elle peut s'exécuter en dehors d'un processus Node — ce qui est portable, ce qui est réservé à Node, et comment rebase build et rebase doctor le signalent.
 ---
 
-Une fonction personnalisée est une application Hono, et Hono fonctionne sur tous les runtimes de serveurs JavaScript. La capacité de *votre* fonction à s'exécuter ailleurs que sur un processus Node dépend donc de ce que son propre fichier importe et utilise.
+Une fonction personnalisée est une application Hono, et Hono s'exécute sur tous les runtimes JavaScript côté serveur. La possibilité que *votre* fonction puisse s'exécuter ailleurs que dans un processus Node dépend donc de ce que son propre fichier importe et utilise.
 
-Rien de tout cela ne constitue une restriction sur ce que vous pouvez écrire aujourd'hui. Chaque déploiement Rebase est un processus Node, une fonction qui lit un fichier ou ouvre un socket est une fonction tout à fait valable, et aucun build ni déploiement n'échoue à cause de ces éléments. Cela est documenté afin que la réponse soit connue dès maintenant plutôt que découverte fichier par fichier plus tard.
+Rien ici ne constitue une restriction sur ce que vous pouvez écrire aujourd'hui. Chaque déploiement Rebase est un processus Node, une fonction qui lit un fichier ou ouvre un socket est tout à fait valide, et aucun build ni déploiement n'échoue à cause de cela. Cela est documenté afin que la réponse soit connue dès maintenant plutôt que découverte fichier par fichier plus tard.
 
 **Portable — fonctionne sur tous les runtimes :**
 
 - Tout ce qui est exporté depuis `@rebasepro/server/functions`
-- `getDriver(c)` et `rebase.dataAsAdmin` — tous deux transitent par le même canal quel que soit l'environnement
+- `getDriver(c)` et `rebase.dataAsAdmin` — tous deux transitent par le même canal quel que soit l'endroit où ils s'exécutent
 - `rebase.auth`, `rebase.storage`, `rebase.email`
 - `fetch`, `Request`/`Response`, `URL`, `crypto.subtle`, `TextEncoder` — la plateforme web
-- Toute dépendance ne nécessitant pas Node
+- Toute dépendance qui ne nécessite pas Node
 
 **Réservé à Node :**
 
 - `rebase.sql()` — la connexion propriétaire à la base de données est un socket TCP
-- Un client Drizzle/`pg`/`mongodb` importé directement, pour la même raison
+- Un client Drizzle ou `pg` directement importé, pour la même raison
 - Les modules natifs de Node : `fs`, `path`, `crypto` (le module Node — `globalThis.crypto` est portable), `child_process`, …
-- Les packages basés sur ceux-ci : `jsonwebtoken`, `nodemailer`, `sharp`, `bcrypt`, …
+- Les paquets basés sur ceux-ci : `jsonwebtoken`, `nodemailer`, `sharp`, `bcrypt`, …
 
 **Bugs latents sur tous les runtimes** — il est recommandé de les corriger dans tous les cas :
 
-- Lecture de `process.env` au niveau du module (voir [Configuration et secrets](/docs/backend/custom-functions/#configuration-and-secrets))
-- Promesses sans attente ("fire-and-forget") au lieu de [`waitUntil`](/docs/backend/custom-functions/#background-work)
-- Compter sur le fait qu'un gestionnaire continue de s'exécuter après l'expiration du délai de sa requête. Sur Node, c'est le cas ; c'est une caractéristique du processus, et non une garantie offerte par le framework
+- Lecture de `process.env` au niveau du scope du module (voir [Configuration et secrets](/docs/backend/custom-functions/#configuration-and-secrets))
+- Promesses sans attente (« fire-and-forget ») au lieu de [`waitUntil`](/docs/backend/custom-functions/#background-work)
+- Dépendre du fait qu'un gestionnaire continue de s'exécuter après l'expiration du délai de sa requête. C'est le cas sous Node ; il s'agit d'une propriété du processus, pas d'une promesse faite par le framework
 
 ## Vérifier vos propres fonctions
 
-`rebase build` affiche une ligne par observation nécessitant une action et consigne le verdict pour chaque fonction dans le manifeste du bundle :
+`rebase build` affiche une ligne par résultat exploitable et enregistre le verdict par fonction dans le manifeste du bundle :
 
 ```json
 {
@@ -44,11 +44,11 @@ Rien de tout cela ne constitue une restriction sur ce que vous pouvez écrire au
 }
 ```
 
-`rebase doctor` signale la même chose sans nécessiter de build.
+`rebase doctor` signale la même chose sans effectuer de build.
 
-## Si vous avez besoin d'une branche spécifique à un runtime
+## Si vous avez besoin d'une logique spécifique au runtime
 
-`runtimeKey()` renvoie `"node"`, `"workerd"`, `"deno"`, `"bun"`, `"edge-light"`, `"fastly"` ou `"other"` ; `isNodeRuntime()` est la vérification standard. Utilisez-les pour dégrader gracieusement, non pour dupliquer une implémentation — une fonction qui nécessite deux implémentations distinctes correspond à deux fonctions.
+`runtimeKey()` renvoie `"node"`, `"workerd"`, `"deno"`, `"bun"`, `"edge-light"`, `"fastly"` ou `"other"` ; `isNodeRuntime()` est la vérification habituelle. Utilisez-les pour une dégradation gracieuse, pas pour scinder une implémentation — une fonction qui nécessite deux implémentations correspond en réalité à deux fonctions distinctes.
 
 ```typescript
 import { defineFunction, isNodeRuntime } from "@rebasepro/server/functions";

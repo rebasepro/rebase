@@ -1,16 +1,17 @@
 ---
-sourceHash: 53beac2b1e144124
-title: Panels in einer eigenen Seite
-sidebar_label: Panels in eigenen Seiten
-description: "Zeigen Sie eine Collection, das Formular eines Datensatzes, einen Datensatz oder einen Wert in einer eigenen Seite an: CollectionPanel, RecordForm, RecordDetail, FieldValue und CollectionsProvider, ohne Admin-Shell darum herum."
+sourceHash: 7a427ea4f8f8b272
+title: Panels auf einer eigenen Seite
+sidebar_label: Panels auf eigenen Seiten
+description: "Zeigen Sie eine Tabelle, das Formular eines Datensatzes, einen Datensatz oder einen Wert auf einer eigenen Seite an: CollectionPanel, RecordForm, RecordDetail, FieldValue und CollectionsProvider, ganz ohne Admin-Shell drumherum."
 ---
 
-Sie benötigen nicht das gesamte Admin-Interface, um eine Tabelle anzuzeigen. `<CollectionPanel>` nimmt die Collection als Wert entgegen und funktioniert überall unter `<Rebase>` und einem React-Router-Router, ohne `<RebaseCMS>`, `<RebaseNavigation>` oder `<RebaseShell>`:
+Sie benötigen nicht das gesamte Admin-Panel, um eine Tabelle anzuzeigen. `<CollectionPanel>` übernimmt
+eine Tabelle anhand ihres Slugs und funktioniert überall unter `<Rebase>` und einem React-Router-Router –
+ganz ohne `<RebaseCMS>`, `<RebaseNavigation>` oder `<RebaseShell>`:
 
 ```tsx
 import { Rebase, useRebaseAuthController } from "@rebasepro/app";
 import { CollectionPanel } from "@rebasepro/cms";
-import { postsCollection } from "../config/collections/posts";
 // Plus BrowserRouter, or any other router, from "react-router".
 
 export function App() {
@@ -20,7 +21,7 @@ export function App() {
         <Rebase client={client} authController={authController}>
             <BrowserRouter>
                 <MyPageLayout>
-                    <CollectionPanel collection={postsCollection}/>
+                    <CollectionPanel collection="posts"/>
                 </MyPageLayout>
             </BrowserRouter>
         </Rebase>
@@ -28,11 +29,22 @@ export function App() {
 }
 ```
 
-Ein Datensatz öffnet sich über Ihrer Seite in einem Side-Panel oder einem Dialog und niemals per URL: Keine Admin-Route stellt die Seite bereit, daher öffnen sich `full_screen` und `split` als Side-Panel, und `useUrlController().routesMounted` ist für Ihre eigenen Komponenten dort `false`. Jeder Router funktioniert: ein einfacher `<BrowserRouter>`, ein `<MemoryRouter>` oder ein Data-Router. Ein Router ist weiterhin erforderlich. Ein Data-Router ermöglicht es zudem einem Datensatz mit ungespeicherten Änderungen, die In-App-Navigation zu stoppen; bei den anderen schützt ihn lediglich die Browser-Eingabeaufforderung beim Verlassen der Seite. Hüllen Sie das Panel in `<RebaseAuthGate>` ein, wenn die Seite zuerst den Login von Rebase anzeigen soll.
+Ein Datensatz öffnet sich über Ihrer Seite, in einem Side-Panel oder einem Dialog, und niemals per URL:
+Da keine Admin-Route die Seite bedient, öffnen sich `full_screen` und `split` als Side-Panel,
+und `useUrlController().routesMounted` ist für Ihre eigenen Komponenten dort `false`. Jeder Router
+funktioniert: ein einfacher `<BrowserRouter>`, ein `<MemoryRouter>` oder ein Data-Router. Ein Router
+ist dennoch erforderlich. Ein Data-Router ermöglicht es zudem, dass ein Datensatz mit ungespeicherten
+Änderungen die In-App-Navigation stoppt; bei den anderen schützt ihn lediglich die Browser-Aufforderung
+zum Verlassen der Seite. Hüllen Sie das Panel in `<RebaseAuthGate>` ein, wenn die Seite zuerst den Rebase-Login
+anzeigen soll.
 
 ## Was ein Panel anzeigt
 
-Ein Panel stellt die Collection genauso dar wie der Admin. Diese Props schränken es auf das ein, was Ihre Seite benötigt; keine davon verändert die eigene Seite der Collection.
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+Ein Panel stellt die Tabelle so dar, wie es das Admin-Panel tut – anhand des vom Server bereitgestellten
+Deskriptors samt aller registrierten `customizeTable`-Anpassungen. Diese Props schränken die Ansicht auf das
+ein, was Ihre Seite benötigt; keine davon ändert die seiteigene Tabelle im Admin-Panel.
 
 ```tsx
 import { CollectionPanel } from "@rebasepro/cms";
@@ -52,42 +64,102 @@ import { Button } from "@rebasepro/ui";
     className="max-h-[480px]"/>
 ```
 
-`collection` nimmt den Namen der Collection entgegen, wie hier, oder die Collection selbst als Wert (`collection={ordersCollection}`); `path` benennt sie ebenfalls und adressiert eine Subcollection über ihren vollständigen Pfad.
+`collection` akzeptiert den Slug der Tabelle, wie hier gezeigt, oder eine externe Collection
+(`defineFirestoreCollection`) als Wert; `path` benennt sie ebenfalls und adressiert eine
+verschachtelte Collection über ihren vollständigen Pfad.
 
-- `fields` – die Eigenschaften, die angezeigt werden, in dieser Reihenfolge und nichts weiter. In der Tabelle sind dies die Spalten. In der Liste, auf einer Karte und auf einer Kanban-Karte sind sie das, woraus die Plätze der Zeile – Titel, Bild, Untertitel, Status, Datum, Relations-Chips, die Spalten der Liste – befüllt werden, frühere zuerst; ein Platz, den keines davon füllt, bleibt leer. Bei diesem Panel hat dies Vorrang vor `propertiesOrder`, der von einem Benutzer gespeicherten Spaltenreihenfolge und `listProperties`. Vom Benutzer per Drag-and-Drop angepasste Spaltenbreiten bleiben weiterhin erhalten; die Reihenfolge wird von Ihnen vorgegeben, daher können Spalten nicht verschoben werden.
-- `toolbar` – `"full"` (Standard); `"compact"`, was die Suche, den Ansichtsmodus-Umschalter und „Neu“ (sofern die Person Datensätze erstellen darf) umfasst; `"none"` (oder `null`) für keine; oder eine aus ihren Einzelteilen zusammengesetzte Toolbar: `CollectionToolbar` (mit `start` und `end`), `CollectionSearchBar`, `CollectionFiltersButton`, `CollectionViewModeToggle` und `CollectionAddButton`. Diese lesen das Panel aus, in dem sie gerendert werden, und werfen andernorts einen Fehler. Plugin-Slots und der `Collection.Actions`-Override befinden sich in der Standard-Toolbar.
-- `onRowClick` – wird mit der angeklickten Zeile und ihrer ID aufgerufen, anstatt dass das Panel sie öffnet, ausgelöst durch eine Zeile, eine Karte, eine Kanban-Karte oder die Bearbeiten-Aktion. Die Zeile entspricht der vom Server gesendeten Struktur, die auch `useRows`, `useRow` und `<FieldValue>` annehmen: exakt deren Spalten, ISO-Datumszeichenfolgen (`YYYY-MM-DD` für eine reine Datumsspalte) und eine belongsTo-Relation als Fremdschlüssel (`customerId`). Eine Relation, deren Ziel das Panel geladen hat, wird verschachtelt unter ihrem Namen geliefert, so wie es `include` bei REST zurückgibt (`order.customer` ist die Zeile des Kunden); ihr Fremdschlüssel ist ebenfalls vorhanden. Die ID ist der String, mit dem der Admin den Datensatz adressiert – sein Primärschlüssel bzw. bei zusammengesetzten Schlüsseln die mit `:::` verbundenen Teile –, den `highlightedIds` und `useSidePanel().open` erwarten. `row.id` ist die `id`-Spalte des Datensatzes, sofern die Tabelle eine solche besitzt, mit dem Typ dieser Spalte: `5` bei einem Integer-Schlüssel, dessen ID `"5"` ist.
-- `rowActions` – Ihr eigenes JSX in jeder Zeile, Karte und Kanban-Karte, dem die Zeile und ihre ID übergeben werden: z. B. ein „Freigeben“, ein „Versenden“. In der Tabelle ist dies die letzte Spalte, die immer sichtbar ist; bei einer Listenansichtszeile, einer Karte und einer Kanban-Karte befindet sie sich neben den Aktionen der Collection selbst. Ein Klick darauf öffnet den Datensatz nicht, und sie wird mit dem State Ihrer Komponente neu gerendert, sodass ein `saving`-Flag sie deaktivieren kann.
-- `orderBy` – die Reihenfolge, in der die Zeilen geöffnet werden, `"placed_at:desc"` oder `["placed_at", "desc"]`. Der Benutzer kann weiterhin nach einer anderen Spalte sortieren.
-- `highlightedIds` – die IDs der Zeilen, die als ausgewählt dargestellt werden, beispielsweise diejenige, die eine Seite neben der Liste anzeigt: `highlightedIds={selected ? [selected] : []}`. `[]` hebt keine hervor. Ohne diese Eigenschaft hebt das Panel die zuletzt geöffnete Zeile hervor. IDs werden als Strings verglichen, sodass `5` und `"5"` bei einem Integer-Schlüssel dieselbe Zeile referenzieren.
-- `where` – welche Zeilen enthalten sind, im Format von `useRows`: `where={{ status: ["==", "pending"] }}`. Filter, die der Benutzer für andere Felder festlegt, werden damit kombiniert, und die eigenen Felder können über die Toolbar weder geändert noch gelöscht werden. Die Eigenschaft folgt der Prop, sodass eine Tab-Leiste oder ein angeklickter Diagrammbalken sie über den State steuern kann. Sie überschreibt den `fixedFilter` der Collection Feld für Feld.
-- `viewMode` – der Modus, in dem geöffnet wird, vorrangig gegenüber dem in der URL und dem zuletzt vom Benutzer ausgewählten. Der Modus kann weiterhin gewechselt werden.
-- `title={false}` – kein Titel über dem Panel und auch keine eigene Überschrift der Listenansicht.
-- `updateUrl` – standardmäßig deaktiviert: Das Panel liest oder schreibt weder die `__view`-, Filter- noch Sortierparameter der Seite.
+- `fields` — die Eigenschaften, die angezeigt werden, in genau dieser Reihenfolge und sonst nichts. In der
+  Tabelle sind dies die Spalten. In der Liste, auf einer Karte und auf einer Kanban-Karte bestimmen sie, woraus
+  die Positionen der Zeile gefüllt werden – Titel, Bild, Untertitel, Status, Datum, Relations-Chips, die Spalten
+  der Liste –, wobei frühere zuerst verwendet werden; ein Platz, den keines davon füllt, bleibt leer. Bei diesem
+  Panel hat dies Vorrang vor `propertiesOrder`, der von einem Benutzer gespeicherten Spaltenreihenfolge und
+  `listProperties`. Vom Benutzer verschobene Spaltenbreiten bleiben weiterhin persistent; die Reihenfolge wird
+  von Ihnen vorgegeben, daher können Spalten nicht per Drag-and-Drop verschoben werden.
+- `toolbar` — `"full"`, der Standardwert; `"compact"`, was Suche, Ansichtsmodus-Umschalter und „Neu“ (sofern
+  die Person Datensätze erstellen darf) umfasst; `"none"` (oder `null`) für keine Toolbar; oder eine aus ihren
+  Bestandteilen zusammengesetzte: `CollectionToolbar` (mit `start` und `end`), `CollectionSearchBar`,
+  `CollectionFiltersButton`, `CollectionViewModeToggle` und `CollectionAddButton`. Diese lesen das Panel aus,
+  in dem sie gerendert werden, und werfen an anderer Stelle einen Fehler. Plugin-Slots und das
+  `Collection.Actions`-Override befinden sich in der Standard-Toolbar.
+- `onRowClick` — wird mit der angeklickten Zeile und ihrer ID aufgerufen, anstatt dass das Panel sie öffnet,
+  und zwar von einer Zeile, einer Karte, einer Kanban-Karte und der Bearbeiten-Aktion aus. Die Zeile entspricht
+  derjenigen, die der Server sendet, in der Form, wie sie `useRows`, `useRow` und `<FieldValue>` annehmen:
+  exakt ihre Spalten, ISO-Datumszeichenfolgen (`YYYY-MM-DD` für eine reine Datumsspalte) und eine belongsTo-Relation
+  als Fremdschlüssel (`customerId`). Eine Relation, deren Ziel das Panel geladen hat, kommt verschachtelt unter
+  ihrem Namen an, so wie RESTs `include` sie zurückgibt (`order.customer` ist die Zeile des Kunden); ihr
+  Fremdschlüssel ist ebenfalls vorhanden. Die ID ist der String, mit dem das Admin-Panel den Datensatz
+  adressiert – sein Primärschlüssel, wobei die Teile eines zusammengesetzten Schlüssels mit `:::` verknüpft sind –,
+  den `highlightedIds` und `useSidePanel().open` annehmen. `row.id` ist die `id`-Spalte des Datensatzes, sofern
+  die Tabelle eine hat, mit dem Typ dieser Spalte: `5` für einen Integer-Schlüssel, dessen ID `"5"` ist.
+- `rowActions` — Ihr eigenes JSX in jeder Zeile, Karte und Kanban-Karte, dem die Zeile und ihre ID übergeben
+  werden: z. B. ein „Approve“, ein „Ship“. In der Tabelle ist dies die letzte Spalte, immer sichtbar; in einer
+  Listenansicht, auf einer Karte und einer Kanban-Karte befindet es sich neben den Aktionen der Collection
+  selbst. Ein Klick darauf öffnet den Datensatz nicht, und es wird mit dem Status Ihrer Komponente neu gerendert,
+  sodass ein `saving`-Flag es deaktivieren kann.
+- `orderBy` — die Reihenfolge, in der die Zeilen geöffnet werden, `"placed_at:desc"` oder
+  `["placed_at", "desc"]`. Der Benutzer kann weiterhin nach einer anderen Spalte sortieren.
+- `highlightedIds` — die IDs der Zeilen, die als ausgewählt dargestellt werden, beispielsweise jene, die eine
+  Seite neben der Liste anzeigt: `highlightedIds={selected ? [selected] : []}`. `[]` markiert keine. Ohne diese
+  Eigenschaft hebt das Panel die zuletzt geöffnete Zeile hervor. IDs werden als Strings verglichen, sodass bei
+  einem Integer-Schlüssel `5` und `"5"` dieselbe Zeile referenzieren.
+- `where` — welche Zeilen enthalten sind, im selben Format wie für `useRows`:
+  `where={{ status: ["==", "pending"] }}`. Filter, die der Benutzer für andere Felder setzt, werden damit
+  kombiniert, und die eigenen Felder können über die Toolbar weder geändert noch gelöscht werden. Die
+  Eigenschaft reagiert reaktiv, sodass eine Tab-Leiste oder ein angeklickter Balken in einem Diagramm sie über
+  den State steuern kann. Sie überschreibt den `fixedFilter` der Collection Feld für Feld.
+- `viewMode` — der Modus, in dem geöffnet wird, vorrangig gegenüber dem in der URL und dem, den die Person
+  zuletzt ausgewählt hat. Die Ansicht kann dennoch gewechselt werden.
+- `title={false}` — kein Titel über dem Panel und auch keine eigene Überschrift der Listenansicht.
+- `updateUrl` — standardmäßig deaktiviert: Das Panel liest oder schreibt weder die `__view`-, Filter- noch
+  Sortierparameter der Seite.
 
-Die `entityActions` der Collection werden auf jeder Zeile, Karte und Kanban-Karte gerendert: als Buttons, wenn `collapsed: false` deklariert ist, und andernfalls im Menü der Zeile – ein „Freigeben“ auf jeder Karte ist eine solche Aktion.
+Die `entityActions` der Collection werden auf jeder Zeile, Karte und Kanban-Karte gerendert – als Buttons,
+wenn `collapsed: false` deklariert ist, und ansonsten im Menü der Zeile; ein „Genehmigen“ auf jeder Karte
+ist eine solche Aktion.
 
-Ein Panel passt seine Größe an seine Zeilen an. Ohne Höhenangabe des übergeordneten Elements oder nur mit einer `max-height` rendert eine kurze Collection ihre Toolbar und Zeilen, während eine lange innerhalb des verfügbaren Raums scrollt, bis zur Höhe des Fensters. Weisen Sie ihm eine Höhe zu, um den Raum auszufüllen. Das Layout richtet sich nach der eigenen Breite, nicht nach der des Fensters: In einer schmalen Spalte verwendet es sein kompaktes Layout, unabhängig vom Bildschirm.
+Ein Panel passt seine Größe an seine Zeilen an. Ohne Höhenvorgabe des Elternelements oder nur mit einem
+`max-height` rendert eine kurze Collection ihre Toolbar sowie Zeilen, und eine lange scrollt innerhalb des
+verfügbaren Platzes bis zur Fensterhöhe. Weisen Sie ihm eine Höhe zu, damit es diesen Platz ausfüllt. Das
+Layout orientiert sich an seiner eigenen Breite, nicht an der des Fensters: In einer schmalen Spalte nutzt
+es unabhängig vom Bildschirm sein kompaktes Layout.
 
-`propertiesOrder` ändert die Reihenfolge und blendet niemals aus: Eine Eigenschaft, die nicht aufgeführt ist, wird nach den genannten gerendert. Um eine Eigenschaft überall auszublenden, setzen Sie `admin.hideFromCollection` für diese; um nur bestimmte an einer Stelle anzuzeigen, übergeben Sie `fields`.
+`fieldOrder` in `customizeTable` der Tabelle ordnet nur um und blendet niemals aus: Ein Feld, das ausgelassen
+wird, wird nach den benannten Feldern dargestellt. Um ein Feld überall aus der Liste herauszuhalten, setzen Sie
+`hidden: true` in dessen Feld-Optionen; um an einer Stelle nur bestimmte Felder anzuzeigen, übergeben Sie `fields`.
 
 ## Das Formular eines einzelnen Datensatzes
 
-`<RecordForm>` tut dasselbe für das Formular eines einzelnen Datensatzes (vor Version 0.29 hieß es `EntityFormPanel`; dieser Name funktioniert weiterhin und gibt eine einmalige Warnung aus). Es lädt den Datensatz anhand der `id`, speichert ihn über die Datenschicht von `<Rebase>`, genau wie das Formular des Admins selbst, und ruft `onSaved` nach jedem Speichern mit dem gespeicherten Datensatz auf, so wie der Server die Zeile übermittelt, `row`, sowie dessen `id`. Lassen Sie `id` weg, um einen Datensatz zu erstellen. `onClose` wird aufgerufen, wenn das Formular verlassen werden soll, beispielsweise nachdem der Datensatz gelöscht wurde:
+`<RecordForm>` tut dasselbe für das Formular eines einzelnen Datensatzes (vor 0.29 hieß es `EntityFormPanel`;
+dieser Name funktioniert weiterhin und gibt eine einmalige Warnung aus). Es lädt den Datensatz anhand der
+`id`, speichert ihn über die Datenschicht von `<Rebase>` wie das Formular des Admin-Panels selbst und ruft
+nach jedem Speichern `onSaved` mit dem gespeicherten Datensatz so auf, wie der Server die Zeile sendet:
+`row` und seine `id`. Lassen Sie `id` weg, um einen Datensatz zu erstellen. `onClose` wird aufgerufen, wenn
+das Formular verlassen werden soll, beispielsweise nachdem der Datensatz gelöscht wurde:
 
 ```tsx
 <RecordForm
-    collection={postsCollection}
+    collection="posts"
     id={postId}
     onSaved={({ id }) => console.log("saved", id)}
     onClose={() => navigate("/posts")}/>
 ```
 
-Wie `CollectionPanel` akzeptieren das Formular und `RecordDetail` eine registrierte Collection über ihren Namen, ohne dass ein Konfigurationsobjekt vorliegen muss: `<RecordForm collection="posts" id={postId}/>` (`path="posts"` funktioniert ebenfalls). Unter `<RebaseCMS>` oder einem `CollectionsProvider`, der sie registriert, ist das alles, was sie benötigen. Wenn darüber kein Scope existiert, übergeben Sie die Collection als Wert, wie hier gezeigt, und das Panel stellt seinen eigenen Scope bereit; eine Collection, die über einen Pfad benannt wird, der nirgends registriert ist, meldet, dass der Datensatz nicht gefunden wurde.
+Wie `CollectionPanel` akzeptieren das Formular und `RecordDetail` eine Tabelle anhand ihres Slugs
+(`path="posts"` funktioniert ebenfalls). Jede vom Server bereitgestellte Tabelle ist ihnen bekannt – unter
+`<RebaseCMS>`, unter einem `CollectionsProvider` oder ganz ohne übergeordneten Scope; in diesem Fall bringt das
+Panel seinen eigenen mit. Eine externe Collection wird als Wert übergeben. Wird ein Pfad angegeben, der von
+nichts bedient wird, meldet die Komponente, dass der Datensatz nicht gefunden wurde.
 
-Löscht jemand anderes den Datensatz, während das Formular geöffnet ist, behält das Formular die eingegebenen Daten und meldet, dass der Datensatz an anderer Stelle gelöscht wurde. Die Aktion „Als neu speichern“ wandelt es in ein Formular um, das einen neuen Datensatz mit diesen Werten erstellt; `onSaved` meldet anschließend den neuen Datensatz.
+Löscht jemand anderes den Datensatz, während das Formular geöffnet ist, behält das Formular die eingegebenen
+Daten bei und meldet, dass der Datensatz an anderer Stelle gelöscht wurde. Die Aktion „Als neu speichern“
+wandelt es in ein Formular um, das mit diesen Werten einen neuen Datensatz erstellt; `onSaved` meldet
+anschließend den neuen Datensatz.
 
-Das Formular kann einen Teil eines Datensatzes anzeigen oder nach Ihren Wünschen strukturiert werden. `fields` zeigt nur die angegebenen Felder in dieser Reihenfolge; Sektionen und die Rail behalten ihre Gruppierung bei. Untergeordnete Elemente (Children) ersetzen die generierten Felder durch Ihr eigenes JSX, in dem `<FormField name="…"/>` ein einzelnes Feld mit der Beschriftung, Größe und den Regeln rendert, die das generierte Formular dafür vorgibt:
+Das Formular kann einen Teil eines Datensatzes anzeigen oder ihn nach Ihren Wünschen anordnen. `fields` zeigt
+nur die angegebenen Felder in genau dieser Reihenfolge an; Abschnitte und die Seitenleiste (Rail) behalten
+ihre Gruppierung bei. Children ersetzen die generierten Felder durch Ihr eigenes JSX, in dem
+`<FormField name="…"/>` ein einzelnes Feld mit der Beschriftung, Größe und den Regeln rendert, die das
+generierte Formular dafür vorsieht:
 
 ```tsx
 import { RecordForm, FormField } from "@rebasepro/cms";
@@ -101,13 +173,27 @@ import { RecordForm, FormField } from "@rebasepro/cms";
 </RecordForm>
 ```
 
-`compact` ist die kompakte Form für eine Seitenkarte oder ein 350–700 px breites Panel: keine Rail neben den Feldern (ihre Inhalte werden in die Spalte eingeklappt), keine Datensatz-Metadaten, Steuerelemente mittlerer Höhe und geringere Abstände: `<RecordForm collection="orders" id={orderId} fields={["status", "notes"]} compact/>`.
+`compact` ist die kompakte Form für eine seitliche Karte oder ein 350–700px breites Panel: keine Seitenleiste
+(Rail) neben den Feldern (ihr Inhalt wird in die Spalte eingefügt), keine Metadaten des Datensatzes,
+Steuerelemente mittlerer Höhe und engere Abstände:
+`<RecordForm collection="orders" id={orderId} fields={["status", "notes"]} compact/>`.
 
-In beiden Fällen validiert das Formular nur die angezeigten Felder; der Server prüft weiterhin den gesamten Datensatz. Ein Formular, das einen Datensatz erstellt und ein Pflichtfeld ohne Standardwert auslässt, weist beim Öffnen darauf hin: Eine Fehlermeldung benennt das Feld, und das Speichern bleibt blockiert, bis das Feld angezeigt oder mit einem Standardwert versehen wird. `collectionOverrides` ändert die Collection nur für dieses Formular, genau wie bei `CollectionPanel`.
+In beiden Fällen validiert das Formular nur die angezeigten Felder; der Server prüft weiterhin den gesamten
+Datensatz. Ein Formular, das einen Datensatz erstellt und ein Pflichtfeld ohne Standardwert auslässt, weist
+beim Öffnen darauf hin: Ein Fehler benennt das Feld, und das Speichern bleibt gesperrt, bis das Feld angezeigt
+wird oder einen Standardwert erhält. `collectionOverrides` ändert die Darstellung nur für dieses Formular,
+genau wie bei `CollectionPanel`.
 
-Jedes Formular kapselt seine DOM-IDs, sodass sich zwei Formulare eine Seite teilen können. Um ein Feld aus einem Test heraus zu finden, selektieren Sie `[data-form-field="title"]` innerhalb des `[data-form-path="posts"]` des Formulars.
+Jedes Formular begrenzt den Gültigkeitsbereich seiner DOM-IDs, sodass sich zwei Formulare eine Seite teilen
+können. Um ein Feld aus einem Test heraus zu finden, wählen Sie `[data-form-field="title"]` innerhalb von
+`[data-form-path="posts"]` des Formulars aus.
 
-`<RecordDetail>` ist das schreibgeschützte Pendant zu `RecordForm`. Es lädt den Datensatz anhand der `id` und stellt ihn so dar, wie es die Datensatzseite des Admins tut: dieselben Abschnitte und Bezeichnungen, wobei jeder Wert als Vorschau angezeigt wird – ein Enum erscheint als Chip, ein Datum in seiner Zeitzone und eine Relation als Titel des Zielobjekts. Es unterstützt `fields` und `collectionOverrides` genau wie das Formular und lässt dieselben Felder aus wie dieses: Felder, die durch eine `conditions.hidden`-Regel für diesen Datensatz verborgen sind, sowie Felder, die der angemeldete Benutzer nicht lesen darf.
+`<RecordDetail>` ist das schreibgeschützte Gegenstück zu `RecordForm`. Es lädt den Datensatz anhand der `id`
+und stellt ihn so dar, wie es die Datensatzseite des Admin-Panels tut: dieselben Abschnitte und Beschriftungen,
+wobei jeder Wert als Vorschau dargestellt wird – ein Enum also als Chip, ein Datum in seiner Zeitzone und
+eine Relation als Titel ihres Ziels. Es akzeptiert `fields` und `collectionOverrides` wie das Formular und
+lässt dieselben Felder aus wie dieses: Felder, die eine `conditions.hidden`-Regel für diesen Datensatz
+ausblendet, sowie solche, die der angemeldete Benutzer nicht lesen darf.
 
 ```tsx
 import { RecordDetail } from "@rebasepro/cms";
@@ -118,7 +204,13 @@ import { RecordDetail } from "@rebasepro/cms";
     fields={["customer", "status", "total"]}/>
 ```
 
-`<FieldValue>` stellt einen einzelnen Wert auf die gleiche Weise innerhalb Ihres eigenen JSX dar: Übergeben Sie den Wert so, wie der Server ihn sendet. Eine belongsTo-Relation wird als Fremdschlüssel geliefert (`order.customerId`), sodass `field="customer" value={order.customerId}` den Titel des verknüpften Datensatzes rendert; die Angabe des Fremdschlüssels selbst, `field="customerId"`, bewirkt dasselbe. Die Collection muss darüber durch `<RebaseCMS>` oder einen `CollectionsProvider` registriert sein. Eine unbekannte Collection oder ein unbekanntes Feld löst einen Fehler aus, der den Namen angibt.
+`<FieldValue>` stellt einen einzelnen Wert auf die gleiche Weise innerhalb Ihres eigenen JSX dar: Übergeben
+Sie den Wert so, wie der Server ihn sendet. Ein belongsTo wird als Fremdschlüssel übergeben
+(`order.customerId`), sodass `field="customer" value={order.customerId}` den Titel des verknüpften
+Datensatzes darstellt; die direkte Angabe des Fremdschlüssels, `field="customerId"`, bewirkt dasselbe. Die
+Tabelle muss der Komponente auf übergeordneter Ebene bekannt sein, entweder durch `<RebaseCMS>` oder einen
+`CollectionsProvider`. Eine unbekannte Collection oder ein unbekanntes Feld löst einen Fehler aus, der den
+Namen nennt.
 
 ```tsx
 import { useRows } from "@rebasepro/app";
@@ -136,25 +228,37 @@ function OrderList() {
 }
 ```
 
-## Mehrere Panels in einem Scope
+## Mehrere Panels in einem gemeinsamen Scope
 
-Die drei Panels bringen ihren eigenen `CollectionsProvider` mit, wenn sich keiner über ihnen befindet. Das ist die zugrundeliegende Schicht, und Sie können sie selbst einbinden, um einen gemeinsamen Scope für mehrere Panels zu nutzen oder die tiefer liegenden Bausteine (`CollectionViewBinding`, `useSidePanel`) darunter zu verwenden. Darin kann ein Panel seine Collection über `path` benennen:
+Die drei Panels bringen ihren eigenen `CollectionsProvider` mit, wenn ihnen keiner übergeordnet ist. Dies
+ist die darunterliegende Ebene, und Sie können sie selbst mounten, um einen gemeinsamen Scope für mehrere
+Panels zu nutzen oder die untergeordneten Bausteine (`CollectionViewBinding`, `useSidePanel`) darunter zu
+verwenden. Er akzeptiert dieselben Eingaben wie `<RebaseCMS>`:
 
 ```tsx
 import { CollectionPanel, CollectionsProvider } from "@rebasepro/cms";
+import { postsCms } from "./cms/posts";
 
-const collections = [postsCollection, authorsCollection];
+const tableCustomizations = [postsCms];
 
-<CollectionsProvider collections={collections}>
+<CollectionsProvider tableCustomizations={tableCustomizations}>
     <CollectionPanel collection="posts"/>
     <CollectionPanel collection="authors"/>
 </CollectionsProvider>
 ```
 
-`CollectionsProvider` verwaltet eine Registry der übergebenen Collections, wobei `modifyCollection` und `injectCollections` Ihrer Plugins wie im Admin angewendet werden, zuzüglich der Side-Panels und Dialoge, in denen Datensätze geöffnet werden, sowie des Schutzes vor ungespeicherten Änderungen. Halten Sie das `collections`-Array stabil: als Modulkonstante oder mittels `useMemo`.
+`CollectionsProvider` enthält eine Registry der vom Server bereitgestellten Tabellen, wobei Ihre
+`tableCustomizations` und etwaige `externalCollections` sowie `modifyCollection` und `injectCollections`
+Ihrer Plugins wie im Admin-Panel angewendet werden, zuzüglich der Side-Panels und Dialoge, in denen Datensätze
+geöffnet werden, sowie des Schutzes vor ungespeicherten Änderungen. Halten Sie die Arrays stabil: als
+Modulkonstante oder via `useMemo`. `tables` ersetzt die bereitgestellten Tabellen durch von Ihnen übergebene
+Deskriptoren, nützlich für Einbettungen und Tests.
 
 ## Nächste Schritte
 
-- [Anpassen des Admins](/docs/frontend/customizing): Orte, an denen eigene Komponenten platziert werden können, und Rezepte, die auf diesen Panels aufbauen.
-- [Hooks](/docs/hooks): `useRows`, `useRow`, `useRowCount`, `useAggregate` und `useRowWrites`, die Zeilen, die diese Panels und `FieldValue` lesen.
-- [Komponenten-Overrides](/docs/frontend/component-overrides): Ersetzen Sie die Ansicht oder das Formular, das ein Panel anzeigt.
+- [Admin-Panel anpassen](/docs/frontend/customizing): Wo eigene Komponenten platziert werden können und
+  Vorlagen auf Basis dieser Panels.
+- [Hooks](/docs/hooks): `useRows`, `useRow`, `useRowCount`, `useAggregate` und
+  `useRowWrites`, die Zeilen, die diese Panels und `FieldValue` lesen.
+- [Komponenten-Overrides](/docs/frontend/component-overrides): Ersetzen Sie die Ansicht
+  oder das Formular, das ein Panel darstellt.

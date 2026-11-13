@@ -1,66 +1,94 @@
 ---
-sourceHash: 0ca75b0fa4561a93
+sourceHash: 8f8ab97f8302c1f8
 title: Relazioni nel pannello di amministrazione
 sidebar_label: Relazioni nel pannello di amministrazione
-description: Come ogni relazione a molti diventa una scheda sotto un record — il segmento di percorso, righe proprie e condivise, le stesse regole via REST e cosa non diventa una scheda.
+description: "Come il CMS visualizza le relazioni di una tabella: un selettore per un belongsTo, una scheda sotto il record per ogni relazione to-many, righe di proprietà rispetto a righe condivise, le stesse regole via REST e le opzioni customizeTable per i campi di relazione."
 ---
 
-Ogni relazione a-molti — `hasMany`, `manyToMany` o un `via` a-molti — diventa una
-**scheda** sotto un record nel pannello di amministrazione, che elenca le righe
-che quel record raggiunge.
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-## Il segmento di percorso è il nome della relazione
+Il CMS legge le [relazioni](/docs/collections/relations/) di una tabella dal suo
+descrittore e disegna ciascuna in base a ciò che è:
 
-Un elenco di figli si indirizza come `parent/parentId/relationName`:
+| Relazione | Nel record |
+|---|---|
+| `belongsTo` | un selettore della riga correlata, al posto della relativa colonna di chiave esterna |
+| `hasOne` | un selettore della singola riga correlata |
+| `hasMany`, `manyToMany`, un `via` di tipo to-many | una **scheda** che elenca le righe correlate |
+| un `via` che non è modificabile | sola lettura |
 
+```ts
+// backend/schema/articles.ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
+import { tags } from "./tags";
+
+export const articles = defineTable("articles", {
+    columns: {
+        id:    col.uuid().primaryKey().defaultRandom(),
+        title: col.text().notNull(),
+    },
+    relations: {
+        author:       rel.belongsTo(() => users, { notNull: true }),
+        tags:         rel.manyToMany(() => tags),
+        featuredTags: rel.manyToMany(() => tags, { through: "articles_featured_tags" }),
+    },
+    rls: "admin-only",
+});
 ```
-/c/authors/a-1/posts          the posts of author a-1
-/c/posts/p-1/tags             the tags of post p-1
+
+Il modulo mostra **Author** come selettore di un utente e nessun campo `authorId`: il
+selettore modifica quella colonna. È obbligatorio, perché la chiave esterna è
+`NOT NULL` senza alcun valore predefinito. Una chiave esterna che fa parte della chiave primaria
+della tabella rimane un campo a sé stante accanto al selettore. **Tags** e **Featured Tags** sono
+schede del record.
+
+Una relazione la cui destinazione non viene servita al chiamante viene omessa: il CMS non può
+aprire una tabella che non possiede. Un `belongsTo` lascia quindi la sua chiave esterna come
+un semplice campo, in modo che il valore rimanga visibile e modificabile. Viene omesso anche un
+`belongsTo` la cui chiave esterna non può essere letta dal chiamante.
+
+## Il segmento del percorso è il nome della relazione
+
+<span class="since-badge" data-since="0.31">Da 0.31</span>
+
+Le righe di una scheda vengono indirizzate come `parent/parentId/relationName`:
+
+```text
+/c/authors/a-1/posts            the posts of author a-1
+/c/articles/p-1/featuredTags    the featured tags of article p-1
 ```
 
-L'ultimo segmento è il **nome della relazione**, non lo slug della collezione di
-destinazione. Spesso coincidono, perché una relazione senza nome prende lo slug
-della sua destinazione — ma una proprietà di relazione inline prende la *chiave
-della proprietà*:
+L'ultimo segmento è il **nome della relazione**, la chiave in `relations`, non lo
+slug della destinazione. È questo che consente il funzionamento di due relazioni verso la stessa tabella: ciascuna ha
+il proprio nome, quindi ciascuna ottiene la propria scheda e il proprio percorso.
 
-```typescript
-properties: {
-    featuredTags: {
-        type: "relation",
-        relation: { kind: "manyToMany", target: () => tagsCollection }
-    }
-}
-// tab and path segment: featuredTags   (not "tags")
-```
+## Righe di proprietà rispetto a righe condivise
 
-È anche ciò che fa funzionare due relazioni verso la stessa collezione: ognuna ha
-il proprio nome, quindi ognuna ha la propria scheda e il proprio percorso.
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-## Righe possedute contro righe condivise
+Ciò che una scheda consente di fare dipende da come viene memorizzata la relazione:
 
-Ciò che una scheda ti permette di fare dipende da come la relazione è
-memorizzata, perché i due casi significano cose diverse:
-
-| | Uno-a-molti (`foreignKeyOnTarget`) | Molti-a-molti (`through`) |
+| | Uno-a-molti (`hasMany`) | Molti-a-molti (`manyToMany`) |
 |---|---|---|
-| Il figlio appartiene a | questo solo padre | ogni padre che lo collega |
-| Creare | crea la riga sotto questo padre | crea la riga e la collega |
+| Il figlio appartiene a | solo a questo genitore | ogni genitore che lo collega |
+| Crea | crea la riga sotto questo genitore | crea la riga e la collega |
 | Aggiungi esistente | — | collega una riga esistente |
-| Rimuovi | **elimina** la riga | **scollega**; la riga resta intatta |
+| Rimuovi | **elimina** la riga | **scollega** la riga; la riga rimane intatta |
 
-Il pannello di amministrazione rende ciascun caso di conseguenza: una scheda
-molti-a-molti offre **Aggiungi esistente** e **Rimuovi da questo record**, e mai
-un'eliminazione che toglierebbe la riga agli altri padri.
+Una scheda molti-a-molti offre **Aggiungi esistente** e **Rimuovi da questo record**, e
+mai un'eliminazione che sottrarrebbe la riga ad altri genitori.
 
 ## Le stesse regole via REST
 
-Gli elenchi di figli sono normali query di collezione ristrette a un padre,
-quindi accettano tutto ciò che accetta un elenco radice — filtri, `orderBy`,
-`limit`, `offset`, `include` — e `meta.total` conta le righe filtrate. Filtra per
-campo (`?field=op.value`) oppure con un oggetto intero
-`?where={"field":["op","value"]}`; entrambi raggiungono la stessa query:
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-```
+Una scheda è una normale query ristretta a un solo genitore, quindi accetta tutto ciò che
+accetta un elenco radice (filtri, `orderBy`, `limit`, `offset`, `include`) e
+`meta.total` conteggia le righe filtrate. Filtra per campo (`?field=op.value`) o
+con un intero oggetto `?where={"field":["op","value"]}`:
+
+```text
 GET    /api/data/authors/a-1/posts?status=eq.published&orderBy=title&limit=20
 GET    /api/data/authors/a-1/posts?where={"status":["==","published"]}&orderBy=title
 GET    /api/data/authors/a-1/posts/p-1
@@ -69,22 +97,66 @@ PATCH  /api/data/authors/a-1/posts/p-1      update; will not reparent
 DELETE /api/data/authors/a-1/posts/p-1      delete (one-to-many) / unlink (many-to-many)
 ```
 
-Il segmento del padre è imposto, non decorativo. Indirizzare una riga che non sta
-sotto quel padre restituisce `404`, e `PATCH` non sposta mai una riga da un padre
-a un altro — imposta esplicitamente la chiave esterna se è quello che vuoi.
+Il segmento del genitore è vincolante. Indirizzare una riga che non appartiene a quel genitore
+restituisce `404`, e `PATCH` non sposta mai una riga da un genitore all'altro: imposta
+la chiave esterna esplicitamente se è questo ciò che desideri.
 
-Per un molti-a-molti, `PATCH parent/id/child/childId` è *appartenenza
-all'insieme*: collega la riga se non è ancora collegata, ed è idempotente. È così
-che alleghi una riga che esiste già.
+Per una relazione molti-a-molti, `PATCH parent/id/child/childId` rappresenta l'*appartenenza a un insieme*: collega
+la riga se non è ancora collegata, ed è idempotente. È così che si associa una riga
+già esistente.
 
 ## Cosa non diventa una scheda
 
-- **Relazioni a-uno** — sono un campo del record, non un elenco. Scrivere
-  attraverso un percorso a-uno viene rifiutato: la chiave esterna vive sulla
-  tabella del padre.
-- **Relazioni dichiarate dentro una `map`** — sono un campo di quella map.
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-## Passi Successivi
+- **Relazioni to-one**: un `belongsTo` o un `hasOne` è un campo del record, non
+  un elenco. La scrittura tramite un percorso to-one viene rifiutata.
+- **Una tabella con `hideFromEntityViews`** nel suo `customizeTable` non viene proposta
+  come scheda sui record delle tabelle correlate ad essa.
 
-- **[Relazioni](/docs/collections/relations/)** — i cinque tipi e come dichiararli
-- **[Scrivere via REST](/docs/backend/writes/)** — creare, aggiornare ed eliminare oltre una lista figlia
+## Personalizzazione dei campi di relazione
+
+<span class="since-badge" data-since="0.31">Da 0.31</span>
+
+```tsx
+// frontend/src/cms/articles.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { articles } from "../../../backend/schema/articles";
+
+export const articlesCms = customizeTable<typeof articles>("articles", {
+    fields: {
+        author: {
+            previewFields: ["displayName", "email"],
+            widget: "dialog",
+            includeEntityLink: true,
+        },
+        featuredTags: {
+            name: "Featured",
+            renderInForm: true,
+            overrides: { name: "Featured tags", defaultViewMode: "cards" },
+        },
+    },
+});
+```
+
+| Opzione | Effetto |
+|---|---|
+| `previewFields` | I campi della destinazione mostrati nel chip per una riga correlata. Ne possono rientrare al massimo tre. |
+| `widget` | `"select"` seleziona da un menu a discesa, `"dialog"` da una tabella ricercabile. |
+| `fixedFilter` | Propone solo le righe che superano questo filtro. |
+| `includeId` | Mostra l'id della riga correlata nelle anteprime. |
+| `includeEntityLink` | Mostra un link che apre la riga correlata. |
+| `renderInForm` | Disegna anche una relazione to-many come selettore nel modulo, accanto alla sua scheda. |
+| `overrides` | Come la destinazione viene presentata nella scheda di questa relazione: qualsiasi opzione di tabella eccetto `fields`. |
+
+`overrides` ridefinisce lo stile della scheda, non i campi della destinazione. Questi appartengono
+al `customizeTable` della tabella di destinazione stessa, e inserire `fields` all'interno di `overrides`
+genera un errore.
+
+## Passaggi successivi
+
+<span class="since-badge" data-since="0.31">Da 0.31</span>
+
+- [Relazioni](/docs/collections/relations/): i cinque tipi e come dichiarare ciascuno
+- [customizeTable](/docs/frontend/customize-table/#relations): opzioni di relazione nella guida di riferimento
+- [Scrittura via REST](/docs/backend/writes/): creazione, aggiornamento ed eliminazione oltre a una scheda

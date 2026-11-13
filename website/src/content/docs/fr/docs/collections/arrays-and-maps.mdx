@@ -1,130 +1,155 @@
 ---
-sourceHash: d77da0e28dd9035f
-title: Tableaux et maps
-sidebar_label: Tableaux et maps
-description: "Les deux types de propriétés composites : listes répétables, éditeurs de blocs, groupes structurés et objets clé-valeur libres, et comment chacun correspond à une colonne Postgres."
+sourceHash: ee142b42a4f33d5c
+title: Tableaux et champs JSON
+sidebar_label: Tableaux et JSON
+description: "Comment le CMS affiche les colonnes array et jsonb — listes répétables, sélections multiples, groupes structurés, éditeurs de blocs et documents clé/valeur libres — et comment customizeTable personnalise leurs éléments et clés imbriquées."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
 
-Un `array` est une liste ordonnée et un `map` est un objet structuré. Tous deux sont
-stockés sous forme de `jsonb`, à l'exception d'un tableau de primitives, qui devient
-un tableau Postgres natif (`text[]`, `integer[]`) afin que la base de données puisse
-l'indexer et y effectuer des recherches.
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-## Propriétés de type Array
+Une colonne de type tableau (array) est une liste que le formulaire répète. Une colonne `jsonb` est un document : le
+CMS génère un formulaire pour celui-ci lorsque la colonne décrit sa structure avec
+[`json.*`](/docs/schema/json/), et propose une édition clé/valeur libre dans le cas
+contraire.
 
-### Répétition simple
+```ts
+// backend/schema/pages.ts
+import { defineTable, col, json } from "@rebasepro/server/schema";
 
-Utilisez `of` pour définir une liste d'éléments répétables.
-
-```typescript
-tags: {
-    type: "array",
-    name: "Tags",
-    of: { type: "string" }
-}
+export const pages = defineTable("pages", {
+    columns: {
+        id:       col.uuid().primaryKey().defaultRandom(),
+        tags:     col.text().array(),
+        settings: col.jsonb().$type<{ theme?: "light" | "dark"; pinned?: boolean }>(),
+        address:  col.jsonb(json.object({
+            street: json.string().required(),
+            city:   json.string(),
+            zip:    json.string(),
+        })),
+        body:     col.jsonb(json.array(json.oneOf({
+            paragraph: json.string(),
+            image:     json.storage({ path: "pages/images/", accept: ["image/*"] }),
+            quote:     json.object({ text: json.string().required(), author: json.string() }),
+        }))),
+    },
+    rls: "admin-only",
+});
 ```
+
+## Tableaux
+
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+Une colonne de type tableau (`col.text().array()`) est une liste répétable du champ de l'élément : ci-dessus, `tags`
+est une liste de champs de texte. `.validate({ minItems, maxItems, uniqueItems })` sur
+le tableau définit le nombre d'éléments que le formulaire accepte.
 
 <FieldWidgetPreview client:only="react" variant="repeat" />
 
-### Téléversement de fichiers multiples
+Un tableau d'un ensemble fermé, `col.text({ enum: [...] }).array()`, est plutôt une
+sélection multiple ; voir [ensembles fermés](/docs/collections/properties/#closed-sets-of-values).
+Une colonne `col.storage().multiple()` est un téléversement de fichiers multiples ; voir
+[Téléversements de fichiers](/docs/collections/file-uploads/#several-files).
 
-Un tableau dont la propriété `of` contient le bloc `storage` correspond à un téléversement de fichiers multiples — voir
-[Téléversements de fichiers](/docs/collections/file-uploads).
+## Documents avec une structure
 
-<FieldWidgetPreview client:only="react" variant="multi_file_upload" />
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-### Éditeur de blocs
-
-Utilisez `oneOf` pour créer un éditeur de blocs avec plusieurs types de contenu. Chaque clé crée un type de carte que les utilisateurs peuvent choisir.
-
-```typescript
-content: {
-    type: "array",
-    name: "Content",
-    oneOf: {
-        properties: {
-            text: {
-                type: "map",
-                properties: {
-                    body: { type: "string", name: "Text", admin: { markdown: true } }
-                }
-            },
-            image: {
-                type: "map",
-                properties: {
-                    src: { type: "string", name: "Image", storage: { storagePath: "content" } },
-                    caption: { type: "string", name: "Caption" }
-                }
-            }
-        }
-    }
-}
-```
-
-<FieldWidgetPreview client:only="react" variant="block" />
-
-### Options de tableau
-
-| Propriété | Type | Description |
-|----------|------|-------------|
-| `of` | `Property \| Property[]` | Schéma de propriété pour les éléments du tableau |
-| `oneOf` | `object` | Tableau d'objets typés avec plusieurs types de discriminateurs. Accepte `properties`, et optionnellement `propertiesOrder`, `typeField` (par défaut `"type"`) et `valueField` (par défaut `"value"`) |
-| `columnType` | `"json" \| "jsonb" \| "text[]" \| "integer[]" \| "boolean[]" \| "numeric[]"` | La colonne de base de données. Un `of` primitif utilise par défaut le tableau Postgres natif correspondant ; tout le reste utilise `jsonb` |
-| `admin.expanded` | `boolean` | Indique si le champ doit être initialement déplié (par défaut : true) |
-| `admin.minimalistView` | `boolean` | Affiche directement les propriétés enfants sans panneau extensible |
-| `admin.sortable` | `boolean` | Les éléments peuvent-ils être réorganisés (par défaut : true) |
-| `admin.canAddElements` | `boolean` | De nouveaux éléments peuvent-ils être ajoutés (par défaut : true) |
-
-## Propriétés de type Map
-
-### Groupe (structuré)
-
-Utilisez `properties` pour définir un objet structuré avec des champs nommés.
-
-```typescript
-address: {
-    type: "map",
-    name: "Address",
-    properties: {
-        street: { type: "string", name: "Street" },
-        zip: { type: "string", name: "Postal code" }
-    }
-}
-```
+`col.jsonb(json.object({ … }))` est un groupe de champs, un par clé, chacun correspondant au champ
+demandé par son constructeur `json.*` : `json.string()` un champ texte, `json.number()` un
+nombre, `json.date()` un sélecteur de date, `json.storage()` un champ de téléversement. Une
+clé `.required()` est obligatoire dans le formulaire, et un `.default()` préremplit le formulaire
+d'un nouvel enregistrement.
 
 <FieldWidgetPreview client:only="react" variant="group" />
 
-### Clé-valeur (forme libre)
+`json.array(of)` répète son élément. Un tableau de `json.oneOf({ … })` est un éditeur de
+blocs : chaque variante est un type de bloc qu'un utilisateur peut ajouter, réorganiser et supprimer.
+Ci-dessus, `body` contient des paragraphes, des images et des citations.
 
-Définissez `keyValue: true` pour afficher un éditeur de paires clé-valeur arbitraires.
+<FieldWidgetPreview client:only="react" variant="block" />
 
-```typescript
-metadata: {
-    type: "map",
-    name: "Key value",
-    keyValue: true
-}
-```
+Un `json.oneOf` utilisé seul, en dehors d'un tableau, ainsi que `json.unknown()` ne disposent
+d'aucun champ structuré : ils sont édités sous forme de JSON libre.
+
+## Documents sans structure
+
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+`col.jsonb().$type<T>()` type le document pour TypeScript, mais `T` est effacé lors de l'exécution
+du code, de sorte que le serveur et le CMS n'en savent rien. Ci-dessus, `settings` est
+édité sous forme de paires clé/valeur libres. Donnez à la colonne une structure `json.*`
+lorsque le CMS doit afficher un formulaire pour celle-ci.
 
 <FieldWidgetPreview client:only="react" variant="key_value" />
 
-### Options de map
+## Personnalisation des éléments et des clés imbriquées
 
-| Propriété | Type | Description |
-|----------|------|-------------|
-| `properties` | `Properties` | Ensemble de propriétés incluses dans la map |
-| `propertiesOrder` | `string[]` | Clés ordonnées pour le rendu |
-| `admin.previewProperties` | `string[]` | Quelles propriétés afficher dans l'aperçu du tableau |
-| `admin.spreadChildren` | `boolean` | Afficher les propriétés enfants sous forme de colonnes distinctes dans la vue tableau |
-| `admin.minimalistView` | `boolean` | Afficher les propriétés sans panneau conteneur |
-| `admin.expanded` | `boolean` | Indique si le champ doit être initialement déplié (par défaut : true) |
-| `keyValue` | `boolean` | Afficher sous forme d'éditeur de paires clé-valeur arbitraires. N'est pas purement visuel malgré l'appellation : indique que la map n'a pas de structure déclarée, ce à partir de quoi le schéma OpenAPI est généré |
-| `columnType` | `"json" \| "jsonb"` | La colonne de base de données. Vaut par défaut `jsonb` |
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+```tsx
+// frontend/src/cms/pages.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { pages } from "../../../backend/schema/pages";
+
+export const pagesCms = customizeTable<typeof pages>("pages", {
+    fields: {
+        tags: { sortable: false, of: { previewAsTag: true } },
+        address: {
+            spreadChildren: true,
+            fieldOrder: ["zip", "city", "street"],
+            fields: {
+                street: { name: "Street and number" },
+                zip:    { name: "Postal code", span: 1 },
+            },
+        },
+        body: {
+            expanded: true,
+            oneOf: {
+                paragraph: { markdown: true },
+                quote:     { fields: { author: { name: "Who said it" } } },
+            },
+        },
+    },
+});
+```
+
+Sur un tableau :
+
+| Option | Effet |
+|---|---|
+| `of` | Les options de chaque élément : n'importe quelle option de champ, imbriquée aussi profondément que l'élément. |
+| `sortable` | Les éléments peuvent être réorganisés par glisser-déposer. |
+| `canAddElements` | Des éléments peuvent être ajoutés. |
+| `expanded` | Tous les éléments sont ouverts au chargement. |
+| `minimalistView` | Les éléments sans leur cadre et leur en-tête. |
+| `oneOf` | Pour une liste de blocs typés : les options de chaque variante, par nom de variante. |
+| `enumLabels`, `enumOrder`, `storage` | Définis sur le tableau, appliqués à chaque élément. |
+
+Sur un document :
+
+| Option | Effet |
+|---|---|
+| `fields` | Les options de chaque clé, par clé ; chacune accepte toute option de champ, y compris ses propres `fields`. |
+| `fieldOrder` | L'ordre dans lequel les clés sont affichées. |
+| `previewFields` | Les clés affichées lorsque le document est présenté sous forme d'aperçu. |
+| `spreadChildren` | Les clés sont disposées comme s'il s'agissait des propres champs de l'enregistrement. |
+| `expanded` | Les clés sont ouvertes au chargement. |
+| `minimalistView` | Les clés sans le cadre du document. |
+| `keyValue` | Éditer sous forme de paires clé/valeur libres, même lorsque la colonne a une structure. |
+
+`fields`, `fieldOrder` et `previewFields` sont typés selon les clés du document,
+que la colonne soit définie avec `col.jsonb().$type<T>()` ou possède une structure `json.*`. Sur une
+colonne `col.jsonb().$type<T>()`, cependant, le CMS n'a aucune structure à laquelle les appliquer : ils sont
+ignorés, avec un avertissement en mode développement. Les options imbriquées pour une clé, une variante ou
+un élément que le document ne possède pas sont ignorées de la même manière.
 
 ## Prochaines étapes
 
-- **[Propriétés](/docs/collections/properties)** — tous les autres types de propriétés et les options qu'ils partagent
-- **[Validation et conditions](/docs/collections/validation-and-conditions/)** — les règles qui s'appliquent aux éléments et à la liste elle-même
-- **[Téléversements de fichiers](/docs/collections/file-uploads)** — un tableau de chaînes `storage` correspond à un champ multi-fichiers
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+- [Documents JSON](/docs/schema/json/) : les constructeurs `json.*` et ce que le serveur fait d'une structure
+- [Champs](/docs/collections/properties/) : tous les autres types de colonnes
+- [customizeTable](/docs/frontend/customize-table/#json-columns) : la liste complète des options

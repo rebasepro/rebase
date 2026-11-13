@@ -1,465 +1,474 @@
 ---
-sourceHash: fb1bca6689625881
-title: Reglas de seguridad (RLS)
-sidebar_label: Reglas de seguridad
-description: Define políticas de seguridad a nivel de fila (RLS) para tus colecciones mediante atajos prácticos o expresiones SQL puras.
+sourceHash: f385a35cc59df9c6
+title: Seguridad a nivel de fila
+sidebar_label: Seguridad a nivel de fila
+description: "Cada tabla declara su postura de rls — admin-only, inherit o una lista de reglas — y Rebase la compila en políticas de seguridad a nivel de fila de Postgres. Formas de reglas, condiciones abreviadas, defaultRls y qué falla de forma cerrada."
 ---
 
-## Descripción general
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-Las reglas de seguridad te permiten definir políticas de **seguridad a nivel de fila (RLS)** para tus tablas de PostgreSQL directamente en las definiciones de tus colecciones. Cuando se genera el esquema de Drizzle, Rebase crea las sentencias `CREATE POLICY` correspondientes.
+Cada tabla indica quién puede acceder a sus filas mediante su clave `rls`. Rebase compila esto
+en seguridad a nivel de fila de Postgres: `ENABLE ROW LEVEL SECURITY` en la tabla y
+un `CREATE POLICY` por cada regla y operación. Luego, Postgres filtra cada
+sentencia en cada ruta — REST, realtime, MCP, el CMS y SQL ejecutado como el
+llamador — porque las reglas residen en la base de datos, no en el código de la aplicación.
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const postsCollection = defineCollection({
-    slug: "posts",
-    name: "Posts",
-    table: "posts",
-    properties: { /* ... */ },
-    securityRules: [
-        { operation: "select", access: "public" },
-        { operations: ["insert", "update", "delete"], ownerField: "authorId" }
-    ]
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const posts = defineTable("posts", {
+    columns: {
+        id:       col.uuid().primaryKey().defaultRandom(),
+        status:   col.enum(["draft", "published"]).notNull().default("draft"),
+        authorId: col.uuid().notNull().onCreateUser(),
+    },
+    rls: [
+        // Anyone reads the published posts.
+        { operation: "select", access: "public", condition: { status: "published" } },
+        // Authors read and edit their own, drafts included.
+        { operations: ["select", "insert", "update"], ownerField: "authorId" },
+        // Editors may delete.
+        { operation: "delete", roles: ["editor"] },
+    ],
 });
 ```
 
-## Cómo funciona
+`rls` no tiene un valor predeterminado. Omitirlo es un error de tipo, y una tabla que llegue
+al compilador sin una postura utilizable es rechazada. Consulta
+[Qué falla de forma cerrada](#qué-falla-de-forma-cerrada).
 
-1. Defines `securityRules` en una colección
-2. `rebase schema generate` crea el esquema de Drizzle con RLS habilitado
-3. `rebase db push` o `rebase db migrate` aplica las políticas a PostgreSQL
-4. Cada consulta se filtra automáticamente según el contexto del usuario actual
+:::note[¿Vienes de collections?]
+`rls` reemplaza a `securityRules`, y es obligatorio. Una regla escrita para
+`securityRules` es una entrada válida de `rls` tal como está. La guía de actualización para esta
+versión cubre `defaultSecurityRules` y `disableDefaultPolicies`.
+:::
 
-La identidad del usuario autenticado está disponible en SQL a través de:
+## Las tres posturas
 
-| Función | Devuelve |
-|----------|---------|
-| `rebase.uid()` | El ID del usuario actual |
-| `rebase.roles()` | IDs de roles de la aplicación separados por comas |
-| `rebase.jwt()` | Los claims completos del JWT como JSONB |
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-El backend de Rebase establece estos valores automáticamente por transacción.
+| `rls` | Significado |
+|---|---|
+| `"admin-only"` | Seguridad a nivel de fila activada y solo las políticas base de administrador: el rol `admin` y el propio código del servidor acceden a las filas. Cualquier otro llamador no obtiene filas y sus escrituras son rechazadas. |
+| `"inherit"` | El `defaultRls` exportado desde `backend/schema/index.ts`. Se rechaza cuando no hay ninguno. |
+| una lista de reglas | Las políticas a generar, una o más. Se rechaza `[]`: escribe `"admin-only"` para bloquear una tabla solo a administradores. |
 
-### Políticas que una colección recibe sin escribirlas
+`"admin-only"` es la postura con la que comenzar una tabla cuando aún no has decidido
+quién debería verla. Nada queda expuesto hasta que escribas las reglas que lo
+expongan.
 
-Las políticas de una tabla son más que las `securityRules` propias de la colección:
+### `defaultRls`
 
-- **`defaultSecurityRules`**, exportadas desde `config/collections/index.ts`. Una
-  colección cuyas `securityRules` están ausentes o vacías toma todas ellas en su
-  lugar, como si las hubiera escrito. Una colección que declara aunque sea una regla
-  propia no toma ninguna: las dos listas nunca se fusionan. Se aplican dondequiera
-  que se lea el directorio: `rebase dev`, `rebase db push`, el panel de administración
-  y un backend al que se le da `collectionsDir`.
-  El índice del scaffold también las aplica al array `collections` que exporta, así
-  que un backend al que se le pasa ese array también las recibe. Un array montado de
-  cualquier otra forma lleva solo las reglas que declaran sus colecciones.
-- **La base del administrador.** Cada colección recibe también
-  `<table>_default_admin_read` y `<table>_default_admin_write_insert`,
-  `_update` y `_delete`: políticas permisivas que permiten al contexto del servidor y
-  al rol `admin` leer y escribir cada fila. Se sitúan junto a las reglas con las que
-  acabe la colección, las propias o las predeterminadas heredadas, y las políticas permisivas
-  se combinan con OR, así que ensanchan ambas. La colección de usuarios recibe además una
-  lectura propia y una puerta de escritura restrictiva que mantiene `roles` solo para administradores.
-- **Tenencia (tenancy).** Una colección con alcance de inquilino recibe una regla restrictiva que confina
-  cada operación al inquilino de quien llama; el contexto del servidor la supera.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-`disableDefaultPolicies: true` en una colección elimina la base permisiva,
-y mantiene las puertas restrictivas. Es por colección: `defaultSecurityRules`
-no lleva tal indicador, así que una colección que hereda las predeterminadas conserva la
-base salvo que ella misma lo active. El DDL generado marca cada política
-inyectada, y `rebase db push` restaura la que se haya eliminado a mano.
+`backend/schema/index.ts` puede exportar una postura para las tablas que indiquen
+`rls: "inherit"`:
 
-## Atajos prácticos
+```ts
+// backend/schema/index.ts
+import type { DefaultRls } from "@rebasepro/server/schema";
 
-### Acceso basado en el propietario
+export { posts } from "./posts";
+export { comments } from "./comments";
 
-El patrón más simple: los usuarios solo pueden acceder a las filas de las que son propietarios:
-
-```typescript
-securityRules: [
-    { operation: "all", ownerField: "user_id" }
-]
+export const defaultRls: DefaultRls = [
+    { operation: "select", access: "authenticated" },
+    { operations: ["insert", "update", "delete"], roles: ["editor"] },
+];
 ```
 
-Esto genera: `USING ((user_id)::text = (SELECT rebase.uid()))` — consulta
-[Evaluado una vez por sentencia](#evaluado-una-vez-por-sentencia) para el `SELECT`.
+`defaultRls` es `"admin-only"` o una lista no vacía de reglas. Se aplica únicamente a
+las tablas que definen `"inherit"`; una tabla con sus propias reglas no toma ninguna
+de estas, y las dos listas nunca se fusionan. `rls: "inherit"` sin ningún `defaultRls`
+exportado detiene `rebase db generate`, `rebase db push` y el inicio del servidor con un error
+que indica exportar uno.
+
+## Políticas que una tabla obtiene sin escribirlas
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Las políticas en una tabla son más que sus propias reglas:
+
+- **La base de administración.** Cada tabla obtiene las políticas `<table>_default_admin_read` y
+  `<table>_default_admin_write` para insert, update y delete. Son
+  permisivas y admiten el contexto del servidor y el rol `admin`, por lo que los administradores
+  leen y escriben cada fila. Las políticas permisivas se combinan mediante OR, por lo que la base amplía
+  lo que permitan tus reglas; nunca las restringe.
+- **La tabla de usuarios.** Una tabla declarada con
+  [`defineAuthTable`](/docs/schema/auth-table/) también obtiene una política que permite a un
+  usuario autenticado leer su propia fila, y una barrera restrictiva que solo permite a un
+  administrador escribir en las columnas de privilegios (`roles`), independientemente de lo que digan sus reglas.
+- **Multiinquilino (Tenancy).** Una tabla con [`tenant`](/docs/collections/tenancy/) obtiene una
+  política restrictiva que confina cada operación al inquilino (*tenant*) del llamador.
+- **Tablas de unión.** La unión de una relación [`manyToMany`](/docs/collections/relations/#manytomany--through-a-junction)
+  obtiene sus propias políticas.
+
+`defaultPolicies: false` en una tabla elimina la base permisiva de administración y
+mantiene las barreras restrictivas, de modo que la tabla tiene exactamente las reglas que escribiste. Se
+rechaza junto con `"admin-only"`, que es la base y nada más:
+la combinación dejaría una tabla a la que ningún llamador puede acceder, incluidos los administradores.
+
+El DDL generado marca cada política inyectada, y `rebase db push` restaura las que
+se hayan eliminado manualmente.
+
+## Formas de reglas
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Una regla tiene una de estas formas. Mezclar dos en una misma regla es un error de tipo, y el
+compilador también lo rechaza, detectando así casos en JavaScript y conversiones de tipo (*casts*): `access` junto a
+`ownerField`, `using` o `withCheck`; `ownerField` junto a `using`, `withCheck`,
+`condition` o `check`; `condition` o `check` junto a `using` o `withCheck`.
+También lo es un valor fuera de la lista para `access`, `mode`, `operation(s)` o `roles`
+(un `"restrictive"` mal escrito se rechaza, no se interpreta como permisivo). Una regla nunca
+se convierte en una política que ignore silenciosamente la mitad de lo que se escribió.
+
+| Forma | Ejemplo | `USING` (qué filas) | `WITH CHECK` (qué se puede escribir) |
+|---|---|---|---|
+| Propietario | `{ ownerField: "authorId" }` | la columna es igual al id del llamador | lo mismo |
+| Pública | `{ access: "public" }` | cada fila | cada fila |
+| Autenticado | `{ access: "authenticated" }` | cada fila, para un llamador autenticado | lo mismo |
+| Autenticado con cuenta | `{ access: "registered" }` | cada fila, para un llamador autenticado que no sea invitado | lo mismo |
+| Acceso con condición | `{ access: "public", condition: { status: "published" } }` | la condición (y autenticado, para `"authenticated"` y `"registered"`) | `check`, o la condición, restringido de la misma manera |
+| Acceso con validación (check) | `{ access: "authenticated", check: { state: "open" } }` | solo la prueba de acceso | la validación, restringida por la prueba de acceso |
+| Estructurada | `{ condition: policy.rolesOverlap(["moderator"]) }` | la condición | `check`, o la condición |
+| SQL sin formato | `{ using: "{published_at} > now() - interval '30 days'" }` | el SQL | `withCheck`, o `using` |
+| Solo check sin formato | `{ operation: "insert", withCheck: "{owner_id} = rebase.uid()" }` | ninguna fila | el SQL |
+| Solo roles | `{ operation: "delete", roles: ["admin"] }` | cada fila, para los roles | lo mismo |
+
+Cada forma también acepta las claves compartidas:
+
+| Clave | Predeterminado | Qué hace |
+|---|---|---|
+| `operation` | `"all"` | `"select"`, `"insert"`, `"update"`, `"delete"` o `"all"`. |
+| `operations` | | Varias operaciones a la vez; se genera una política por operación. Tiene prioridad sobre `operation`. |
+| `roles` | | Roles de la aplicación; la regla se aplica solo a un llamador que posea uno de ellos. Se combina con AND con el resto de la regla. |
+| `mode` | `"permissive"` | `"restrictive"` convierte la regla en una barrera que también debe cumplirse. Consulta [Permisivas y restrictivas](#permisivas-y-restrictivas). |
+| `name` | derivado | El nombre de la política. Sin él, el nombre se deriva de la tabla, la operación y un hash de la regla, por lo que editar una regla renombra su política. |
+| `pgRoles` | `["public"]` | Roles nativos de Postgres: la cláusula `TO` de `CREATE POLICY`. No es lo mismo que `roles`. |
+
+Los `roles` son roles de aplicación de Rebase, almacenados en la columna `roles` de
+la tabla de usuarios y leídos dentro de una política a través de `rebase.roles()`. No son roles
+de Postgres: nombres como `anon` o `authenticated` pertenecen a `pgRoles`, y en `roles`
+producen una condición que ningún usuario cumple. Prácticamente todos los proyectos necesitan `roles`.
+
+:::note[Reglas migradas desde 0.30]
+El compilador de la versión 0.30 leía solo una cláusula de una regla y no reconocía ningún valor de `access` excepto
+`"public"`, por lo que cuatro variantes ahora otorgan algo diferente: un
+`access: "authenticated"` simple no otorgaba nada y ahora admite a cualquier llamador autenticado.
+`rebase migrate collections-to-tables` enumera cada una bajo "Revisar antes de desplegar"; consulta
+[la guía de actualización](/docs/upgrading/0-30-to-0-31/#review-before-deploying-these-rules-change-meaning).
+:::
+
+### Propietario (Owner)
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const notes = defineTable("notes", {
+    columns: {
+        id:      col.uuid().primaryKey().defaultRandom(),
+        ownerId: col.uuid().notNull().onCreateUser(),
+        body:    col.text(),
+    },
+    rls: [{ operation: "all", ownerField: "ownerId" }],
+});
+```
+
+Esto genera `USING ((owner_id)::text = (SELECT rebase.uid()))`.
+`ownerField` nombra una clave de columna, una columna SQL o una relación `belongsTo` (su
+columna de clave foránea). Compara la columna con el id del llamador; no la
+rellena. `.onCreateUser()` hace que el servidor escriba el id del llamador al crear,
+independientemente de lo que haya enviado la solicitud, que es lo que le da sentido a la comparación.
 
 ### Acceso público
 
-No pone ningún filtro de filas en las lecturas, de modo que todo solicitante al que la API deja pasar lee todas las filas:
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-```typescript
-securityRules: [
-    { operation: "select", access: "public" }
-]
-```
+`{ operation: "select", access: "public" }` genera `USING (true)`: sin filtro de
+filas en las lecturas, por lo que cualquier llamador al que la API dé paso lee cada fila.
 
-Esto genera: `USING (true)`
+Amplía qué filas ve un llamador, no quién puede llamar. De forma predeterminada, la API sigue
+respondiendo 401 a una solicitud sin token. Establece `AUTH_REQUIRE=false`
+(`auth.requireAuth: false`) para eliminar esa barrera y permitir que solo las políticas
+decidan; entonces, un llamador no autenticado también podrá leer estas filas.
 
-Amplía qué filas ve un solicitante, no quién puede llamar. Por defecto la API sigue
-respondiendo 401 a una solicitud sin token. Define `AUTH_REQUIRE=false`
-(`auth.requireAuth: false`) para quitar esa barrera y dejar que decidan solo
-las políticas; entonces un solicitante no autenticado también lee estas filas.
+`{ access: "authenticated" }` es lo mismo pero con una comprobación de inicio de sesión: el llamador tiene
+una sesión. Un invitado creado mediante inicio de sesión anónimo tiene una.
+`{ access: "registered" }` también excluye a los invitados; úsalo preferentemente en proyectos con
+inicio de sesión anónimo. Ambos se combinan con `condition` y `check` al igual que `"public"`.
+Consulta [`authenticated()` y `registered()`](#authenticated-y-registered).
 
-### Acceso autenticado
+### Condiciones
 
-Permite el acceso a cualquier usuario que haya iniciado sesión. En este caso se trata de un `condition` en lugar de un atajo de `access` —`access` tiene exactamente un único valor, `"public"`—, porque "haber iniciado sesión" es una comprobación sobre quien realiza la llamada, y el builder es el lugar donde residen las comprobaciones sobre el emisor:
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-```typescript
-import { policy } from "@rebasepro/types";
+Una `condition` indica qué filas existentes cubre una regla; un `check` indica qué valores
+nuevos o actualizados permite, y por defecto toma el valor de la condición. Ambos aceptan la
+forma abreviada de objeto o una expresión estructurada.
 
-securityRules: [
-    { operation: "select", condition: policy.authenticated() }
-]
-```
+La **forma abreviada** es un objeto simple de claves de columna y valores literales. Se cumple
+cuando cada columna coincide con su valor, y un valor `null` significa `IS NULL`:
 
-`policy.authenticated()` también es verdadero para el *inicio de sesión* anónimo, el cual genera una fila de usuario real y una sesión real. Utiliza `policy.registered()` donde un invitado no deba calificar: escribir una reseña, unirse a una organización o gastar dinero.
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
-### Acceso basado en roles
-
-Restringe las operaciones a roles específicos:
-
-```typescript
-securityRules: [
-    { operation: "all", roles: ["admin"] },
-    { operation: "select", roles: ["editor", "viewer"] }
-]
-```
-
-### Acceso por membresía / relacional
-
-Para delimitar el acceso según la membresía en una colección *relacionada* (por ejemplo, "solo las filas cuyo equipo incluya a quien realiza la llamada"), utiliza el `condition` estructurado con `policy.existsIn`. Se compila en una única subconsulta `EXISTS` correlacionada (sin búsquedas por fila) y es la alternativa segura y de primer nivel a escribir manualmente el SQL puro que se muestra más adelante.
-
-```typescript
-import { policy } from "@rebasepro/types";
-
-// documents visible only to members of the document's team:
-securityRules: [
-    {
-        operation: "select",
-        condition: policy.existsIn({
-            collection: "team_members",         // the join / membership collection
-            where: policy.and(
-                // correlate to the row being checked:
-                policy.compare(policy.field("team_id"), "eq", policy.outerField("team_id")),
-                // …and to the caller:
-                policy.compare(policy.field("user_id"), "eq", policy.authUid()),
-            ),
-        }),
+export const reports = defineTable("reports", {
+    columns: {
+        id:        col.uuid().primaryKey().defaultRandom(),
+        state:     col.enum(["open", "closed"]).notNull().default("open"),
+        public:    col.boolean().notNull().default(false),
+        deletedAt: col.timestamp({ withTimezone: true }),
     },
-]
+    rls: [
+        // Anyone reads public reports that are not deleted.
+        { operation: "select", access: "public", condition: { public: true, deletedAt: null } },
+        // Signed-in callers may file a report, but only as an open one.
+        { operation: "insert", access: "authenticated", check: { state: "open" } },
+    ],
+});
 ```
 
-Dentro de `where`, `policy.field(...)` hace referencia a una columna de la colección unida (`team_members`), mientras que `policy.outerField(...)` se refiere a una columna de la fila que se está comprobando (`documents`). Combínalo con `policy.authUid()` para delimitarlo al usuario actual. Dado que se aplica a nivel de base de datos, la interfaz de administración lo trata con autoridad del servidor (server-authoritative).
+La forma abreviada necesita al menos una clave, y ninguna clave puede llamarse `kind` (así
+es como se reconoce una expresión estructurada; compara una columna llamada `kind` con
+la forma detallada). Sus claves se validan contra la tabla al compilar el
+esquema: una clave que no corresponda a ninguna columna es rechazada, indicando la tabla y la clave en
+el error.
 
-#### El builder `policy`, en detalle
+Una condición **estructurada** se construye con `policy`, importado desde
+`@rebasepro/types`. Se compila a SQL para la base de datos y se evalúa en
+JavaScript mediante el CMS, de modo que el CMS nunca ofrece una acción que la base de datos vaya a
+rechazar:
 
-Importado desde `@rebasepro/types`. Las expresiones se componen; los operandos son las hojas.
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+import { policy } from "@rebasepro/types";
 
-| Expresión | Se compila como |
+export const documents = defineTable("documents", {
+    columns: {
+        id:     col.uuid().primaryKey().defaultRandom(),
+        teamId: col.uuid().notNull(),
+        userId: col.uuid().notNull(),
+    },
+    rls: [
+        // The owner, or anyone holding `moderator`.
+        {
+            operation: "update",
+            condition: policy.or(
+                policy.compare(policy.field("userId"), "eq", policy.authUid()),
+                policy.rolesOverlap(["moderator"])
+            ),
+        },
+        // Members of the document's team read it.
+        {
+            operation: "select",
+            condition: policy.existsIn({
+                table: "team_members",
+                where: policy.and(
+                    policy.compare(policy.field("team_id"), "eq", policy.outerField("teamId")),
+                    policy.compare(policy.field("user_id"), "eq", policy.authUid())
+                ),
+            }),
+        },
+    ],
+});
+```
+
+Dentro de `existsIn`, `policy.field()` nombra una columna de la otra tabla y
+`policy.outerField()` una columna de la fila que se está comprobando. Se compila en una
+subconsulta `EXISTS` correlacionada.
+
+| Expresión | Compila a |
 |---|---|
 | `policy.true()` / `policy.false()` | `true` / `false` |
-| `policy.and(…)` / `policy.or(…)` | conjunción / disyunción |
-| `policy.not(e)` | negación |
-| `policy.compare(left, op, right)` | una comparación entre dos operandos |
-| `policy.rolesOverlap(roles)` | quien realiza la llamada tiene **cualquiera** de estos roles de la app |
-| `policy.rolesContain(roles)` | quien realiza la llamada tiene **todos** estos roles de la app |
-| `policy.authenticated()` | sesión iniciada: `rebase.uid()` está definido **y no es un centinela anónimo**. `IS NOT NULL` por sí solo sería una tautología, ya que una solicitud anónima establece un valor centinela en lugar de dejarlo indefinido |
-| `policy.registered()` | sesión iniciada **con una cuenta**: `authenticated()` y no un invitado. Ver más abajo |
-| `policy.serverContext()` | `rebase.uid() IS NULL` — consulta la advertencia a continuación |
-| `policy.existsIn({ collection, where })` | una subconsulta `EXISTS` correlacionada |
-| `policy.raw(sql)` | una vía de escape, insertada textualmente |
+| `policy.and(…)` / `policy.or(…)` / `policy.not(e)` | conjunción, disyunción, negación |
+| `policy.compare(left, op, right)` | una comparación; `op` es `"eq"`, `"neq"`, `"lt"`, `"lte"`, `"gt"` o `"gte"` |
+| `policy.rolesOverlap(roles)` | el llamador posee **cualquiera** de estos roles |
+| `policy.rolesContain(roles)` | el llamador posee **todos** estos roles |
+| `policy.authenticated()` | un llamador autenticado |
+| `policy.registered()` | un llamador autenticado con cuenta, no un invitado |
+| `policy.serverContext()` | `rebase.uid() IS NULL`; consulta la advertencia más abajo |
+| `policy.existsIn({ table, where })` | un `EXISTS` correlacionado sobre otra tabla; uno sin `table` se rechaza cuando el esquema compila |
+| `policy.raw(sql)` | el SQL, insertado tal como se escribió |
 
 | Operando | Significado |
 |---|---|
-| `policy.field(name)` | una columna de la colección que se está comprobando; o, dentro de `existsIn`, de la unida |
-| `policy.outerField(name)` | dentro de `existsIn`, una columna de la fila externa |
-| `policy.literal(value)` | una cadena de texto, número, booleano o `null` |
+| `policy.field(name)` | una columna de la fila que se está comprobando, o dentro de `existsIn` de la otra tabla |
+| `policy.outerField(name)` | dentro de `existsIn`, una columna de la fila que se está comprobando |
+| `policy.literal(value)` | una cadena, número, booleano o `null` |
 | `policy.authUid()` | `rebase.uid()` |
-| `policy.authRoles()` | los roles del solicitante como un array, `string_to_array(rebase.roles(), ',')` |
-| `policy.authClaim(name)` | un claim personalizado del token de sesión, `NULLIF(rebase.jwt() ->> '<name>', '')`, convertido al tipo de la columna con la que se compara |
+| `policy.authRoles()` | los roles del llamador como un array |
+| `policy.authClaim(name)` | un claim personalizado en el token de sesión, convertido al tipo de la columna con la que se compara |
 
-#### Evaluado una vez por sentencia
+`existsIn`, `raw` y `authClaim` son evaluados únicamente por la base de datos; el CMS
+los trata como desconocidos y refleja lo que informa el servidor.
 
-Toda parte de una regla que no lee la fila —el id de quien realiza la llamada, una
-comprobación de roles, un claim, `serverContext()`— se compila dentro de una subconsulta
-escalar. Una regla de propietario se convierte en `(user_id)::text = (SELECT rebase.uid())`, y
-la lectura por defecto del administrador se convierte en
-`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`.
+### SQL sin formato
 
-Postgres calcula una subconsulta así una vez por sentencia (un *initPlan*) en lugar de una vez
-por fila, y planifica como si la comprobación dejara pasar la mitad de la tabla en lugar del
-1,5 % de ella. Esa estimación es lo que mantiene una página profunda de una tabla grande sobre
-su clave primaria: sin ella, la página 401 de un millón de filas era un escaneo secuencial y
-una ordenación de 640 MB. Quién puede leer o escribir qué no cambia.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-El SQL puro de `using` / `withCheck` recibe el mismo tratamiento cuando Rebase puede leer su
-estructura (`owner_id = rebase.uid()` sí). Cualquier otra cosa se inserta tal como está, así
-que envuelve las llamadas tú mismo: `(SELECT rebase.uid())`.
-
-### `authenticated()` y `registered()`
-
-A dos cosas distintas se las llama anónimas, y conviene ser precisos sobre a cuál de ellas se refiere una regla.
-
-Una solicitud **no autenticada** no incluye ninguna sesión. Se le asigna un ID centinela para que `rebase.uid()` nunca sea `NULL` en la ruta de usuario, y `policy.authenticated()` la excluye; eso es lo que hace que signifique "con sesión iniciada" en lugar de "cualquiera".
-
-Un **invitado** (guest) es lo opuesto: una sesión sin nadie detrás. `POST /auth/anonymous` crea una fila de usuario real con un uid real, por lo que un invitado supera cualquier comprobación que evalúe el ID. Ese es el propósito de la funcionalidad: un carrito antes del checkout, un borrador antes del registro; y significa que `authenticated()` es verdadero para cualquiera que haya pulsado *Continuar como invitado*, lo cual no solicita correo, contraseña ni aceptación de términos.
-
-`policy.registered()` es `authenticated()` más "no ser un invitado". Recurre a él siempre que una regla concierna a una persona que deba ser responsable de algo: escribir una reseña, unirse a una organización o gastar dinero. Recurre a `authenticated()` donde un invitado sea genuinamente bienvenido.
+`using` y `withCheck` aceptan SQL. `{column}` se resuelve a la columna de la tabla, y
+el llamador está disponible como `rebase.uid()`, `rebase.roles()` (roles separados por
+comas) y `rebase.jwt()` (los claims del token como `jsonb`):
 
 ```ts
-// Anyone with a session, guests included — a draft cart.
-{ operation: "insert", check: policy.authenticated() }
+import { defineTable, col } from "@rebasepro/server/schema";
 
-// Someone with an account.
-{ operation: "insert", check: policy.registered() }
-```
-
-Internamente, el indicador de invitado viaja con la sesión: está en el token de acceso y llega a la base de datos como `rebase.is_anonymous()`, de modo que una política puede realizar la comprobación sin necesidad de hacer una consulta adicional. Una base de datos servida por un servidor demasiado antiguo para configurarlo interpreta cada sesión como una cuenta, que es el comportamiento que dicho despliegue ya tenía.
-
-:::caution[`serverContext()` no es satisfecho por el singleton del servidor]
-Se compila como `rebase.uid() IS NULL`, y `rebase.dataAsAdmin` se ejecuta como `uid: "service"`, por lo que es **falso** para el descriptor de acceso que la mayoría entiende por "el servidor". Una colección con `disableDefaultPolicies: true` cuya única regla sea `serverContext()` deniega esas escrituras (`42501`) y devuelve cero filas —HTTP 200, vacío— para esas lecturas. `rebase.sql()` es el descriptor de acceso que genuinamente omite las políticas.
-:::
-
-## Expresiones SQL puras
-
-Para lógica compleja, utiliza `using` y `withCheck`:
-
-```typescript
-securityRules: [
-    {
-        operation: "select",
-        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = rebase.uid())"
-    }
-]
-```
-
-- **`using`** — Filtra qué filas existentes son visibles (se aplica a SELECT, UPDATE, DELETE)
-- **`withCheck`** — Valida los valores de las nuevas filas (se aplica a INSERT, UPDATE)
-
-Las referencias a columnas utilizan la sintaxis `{column_name}`, la cual se resuelve a la columna completamente calificada con el nombre de la tabla.
-
-## Combinar atajos y SQL
-
-Combina atajos prácticos con SQL puro:
-
-```typescript
-securityRules: [
-    // Admins can do anything
-    { operation: "all", roles: ["admin"], using: "true" },
-    // Regular users can only see their own rows
-    { operation: "select", ownerField: "user_id" },
-    // Users can insert, but only for themselves
-    { operation: "insert", withCheck: "{user_id} = rebase.uid()" },
-    // Locked rows cannot be updated
-    { operation: "update", mode: "restrictive", using: "{is_locked} = false" }
-]
-```
-
-## Permisivo vs Restrictivo
-
-PostgreSQL tiene dos modos de políticas:
-
-- **Permisivo** (predeterminado) — Múltiples políticas permisivas se combinan con un operador **OR**. Si cualquiera de ellas se cumple, se concede el acceso.
-- **Restrictivo** — Las políticas restrictivas se combinan con un operador **AND**. Todas deben cumplirse.
-
-```typescript
-securityRules: [
-    // Permissive: owners can access their rows
-    { operation: "all", ownerField: "user_id" },
-    // Restrictive: but locked rows cannot be updated
-    { operation: "update", mode: "restrictive", using: "{is_locked} = false", withCheck: "{is_locked} = false" }
-]
-```
-
-## Operaciones
-
-| Operación | Equivalente en SQL | Descripción |
-|-----------|-------------------|-------------|
-| `"select"` | `SELECT` | Leer filas |
-| `"insert"` | `INSERT` | Crear nuevas filas |
-| `"update"` | `UPDATE` | Modificar filas existentes |
-| `"delete"` | `DELETE` | Eliminar filas |
-| `"all"` | Todas las anteriores | Atajo para todas las operaciones |
-
-También puedes usar `operations` (en plural) para aplicar una regla a múltiples operaciones:
-
-```typescript
-{ operations: ["insert", "update", "delete"], ownerField: "authorId" }
-```
-
-## Interfaz completa de SecurityRule
-
-`SecurityRule` es una **unión**, no un único objeto abierto: una regla elige exactamente una forma de expresar su predicado, y las demás se tipifican como `never`, de modo que mezclarlas produce un error de compilación en lugar de una política que ignore silenciosamente la mitad de lo que escribiste.
-
-```typescript no-verify
-// Shared by every variant
-interface SecurityRuleBase {
-    name?: string;                        // Policy name. Omit it and one is derived
-    operation?: SecurityOperation;        // "select" | "insert" | "update" | "delete" | "all"
-    operations?: SecurityOperation[];     // …or several at once
-    mode?: "permissive" | "restrictive";  // Default: "permissive"
-    roles?: string[];                     // App roles, via rebase.roles()
-    pgRoles?: string[];                   // Native Postgres roles — the CREATE POLICY `TO` clause.
-                                          // NOT the same as `roles`. Default: ["public"]
-}
-
-// …plus exactly one of:
-{ ownerField: string }                        // <column> = rebase.uid()
-{ access: "public" }                          // the one shortcut — "no row filter"
-{ condition: PolicyExpression;                // the structured builder — `policy.*`
-  check?: PolicyExpression }                  // defaults to `condition`, as Postgres does
-{ using?: string; withCheck?: string }        // raw SQL
-```
-
-`roles` y `pgRoles` son los dos que suelen confundirse. `roles` es un rol de aplicación, aplicado *dentro* de la cláusula `USING` / `WITH CHECK` a través de `rebase.roles()`. `pgRoles` es un rol de base de datos y controla a qué conexiones se vincula la política en absoluto. Prácticamente todos los proyectos necesitan `roles`.
-
-:::tip[Cómo rellenar la columna indicada en `ownerField`]
-`ownerField` compara una columna con `rebase.uid()`; no introduce ningún valor en ella. Declara esa columna como una cadena de texto con [`autoValue: "user_on_create"`](/docs/collections/properties#audit-columns) y el controlador estampará el uid del usuario actuante al insertar, sobrescribiendo lo que haya enviado el cuerpo de la solicitud, que es lo que hace verdadera la premisa de la política. Si una columna es proporcionada por quien realiza la llamada, quien realiza la llamada puede mentir sobre ella.
-:::
-
-## Ejemplos
-
-### Plataforma de blog
-
-```typescript
-securityRules: [
-    // Anyone can read published posts
-    { operation: "select", using: "{status} = 'published'" },
-    // Authors can see their own drafts
-    { operation: "select", ownerField: "authorId" },
-    // Authors can create and edit their own posts
-    { operations: ["insert", "update"], ownerField: "authorId" },
-    // Only admins can delete
-    { operation: "delete", roles: ["admin"] }
-]
-```
-
-### SaaS multiinquilino (Multi-Tenant)
-
-```typescript
-securityRules: [
-    {
-        operation: "all",
-        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = rebase.uid())"
-    }
-]
-```
-
-Una regla permisiva como esta se combina con OR con las demás reglas de la
-colección, así que una regla `access: "public"` a su lado abre las filas de
-todas las organizaciones. Para que el límite se mantenga permita lo que permita
-la colección, decláralo con [`tenant`](/docs/collections/tenancy/): se compila
-en una política restrictiva, una columna `NOT NULL` indexada y escrituras
-comprobadas.
-
-## Acceso anónimo (inserciones públicas)
-
-Una necesidad común es permitir que los **usuarios no autenticados** envíen datos: formularios de contacto, suscripciones a boletines o solicitudes públicas. Rebase ofrece un patrón limpio para esto. Una solicitud sin token solo llega a estas políticas cuando `AUTH_REQUIRE=false` (`auth.requireAuth: false`); de lo contrario, la API la responde antes con un 401.
-
-### Recomendado: una regla `withCheck` pura
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-
-const contactMessagesCollection = defineCollection({
-    slug: "contact_messages",
-    name: "Contact Messages",
-    table: "contact_messages",
-    securityRules: [
-        // Anyone can submit a contact message
+export const tasks = defineTable("tasks", {
+    columns: {
+        id:       col.uuid().primaryKey().defaultRandom(),
+        orgId:    col.uuid().notNull(),
+        isLocked: col.boolean().notNull().default(false),
+    },
+    rls: [
         {
-            operation: "insert",
-            // A raw rule carries `using` (which rows are visible) and `withCheck`
-            // (what a write must satisfy); an insert only exercises the latter.
-            using: "true",
-            withCheck: "true"
+            operation: "select",
+            using: "EXISTS (SELECT 1 FROM org_members m WHERE m.org_id = {org_id} AND m.user_id = rebase.uid())",
         },
-        // Only admins can read, update, or delete messages
-        { operations: ["select", "update", "delete"], roles: ["admin"] }
+        { operation: "update", mode: "restrictive", using: "{is_locked} = false", withCheck: "{is_locked} = false" },
     ],
-    properties: {
-        email: { name: "Email", type: "string" }
-    }
 });
 ```
 
-El atajo `access: "public"` genera una política sin filtro de filas. Que un solicitante sin token llegue a ella depende de `AUTH_REQUIRE`, no de la política.
+El SQL sin formato es aplicado únicamente por Postgres: el CMS no puede evaluarlo. Prefiere una
+condición abreviada o estructurada siempre que sea posible expresar lo mismo.
 
-### Para captación de prospectos / registros
+## Evaluado una vez por sentencia
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-const leadSignupsCollection = defineCollection({
-    slug: "lead_magnet_signups",
-    name: "Lead Magnet Signups",
-    table: "lead_magnet_signups",
-    securityRules: [
-        // Allow anonymous inserts
-        { operation: "insert", using: "true", withCheck: "true" },
-        // Admins can view all signups
-        { operation: "select", roles: ["admin"] }
-    ],
-    properties: {
-        email: { name: "Email", type: "string" }
-    }
-});
-```
+Cada parte de una regla que no lea la fila —el id del llamador, una comprobación
+de roles, un claim, `serverContext()`— se compila dentro de una subconsulta escalar. Una regla de
+propietario se convierte en `(user_id)::text = (SELECT rebase.uid())`. Postgres calcula dicha
+subconsulta una vez por sentencia en lugar de una vez por fila, y planifica como si la
+comprobación pasara la mitad de la tabla en lugar del 1.5% de ella, lo que mantiene las páginas profundas de una
+tabla grande en su índice. Quién puede leer o escribir qué permanece sin cambios.
 
-### Cómo funcionan las solicitudes anónimas
+El SQL sin formato recibe el mismo tratamiento cuando Rebase puede interpretar su estructura
+(`owner_id = rebase.uid()` lo hace). Cualquier otra cosa se inserta tal como se escribió, por lo que
+debes envolver las llamadas tú mismo: `(SELECT rebase.uid())`.
 
-Cuando llega una solicitud sin un token JWT (y `AUTH_REQUIRE=false` la deja pasar), el backend de Rebase establece las variables de sesión de PostgreSQL en:
+## `authenticated()` y `registered()`
 
-| Variable | Valor |
-|----------|-------|
-| `app.uid` (y su alias heredado `app.user_id`) | `'anonymous'` |
-| `app.user_roles` | `''` (vacío) |
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-Esto significa que:
+A una solicitud sin ninguna sesión se le asigna un id centinela, por lo que `rebase.uid()`
+nunca es `NULL` en una solicitud, y `policy.authenticated()` (al igual que
+`access: "authenticated"`) la excluye.
 
-- `rebase.uid()` devuelve `'anonymous'`
-- `rebase.roles()` devuelve una cadena vacía
-- Las políticas con `access: "public"` se cumplen porque generan `USING (true)` / `WITH CHECK (true)`
-- Las condiciones `policy.authenticated()` fallan porque comprueban un ID de usuario real
-- Las políticas con `ownerField` fallan porque ninguna fila tendrá `user_id = 'anonymous'` (a menos que se establezca explícitamente)
+Un **invitado** es diferente: `POST /auth/anonymous` crea una fila de usuario real con
+una sesión real, por lo que un invitado pasa cada prueba que verifique el id.
+`policy.registered()` (y `access: "registered"`) es `authenticated()` más
+"no ser un invitado". Úsalo siempre que una regla concierna a una persona que deba rendir
+cuentas o asumir responsabilidades —escribir una reseña, unirse a una organización, gastar dinero—
+y `authenticated()` donde un invitado sea bienvenido: un carrito antes del pago, un borrador antes de registrarse.
 
-### Avanzado: SQL puro para acceso anónimo
-
-Si necesitas un control más granular, utiliza SQL puro:
-
-```typescript
-securityRules: [
-    {
-        operation: "insert",
-        withCheck: "rebase.uid() = 'anonymous' OR rebase.uid() IS NOT NULL"
-    }
-]
-```
-
-:::tip
-Evita el patrón heredado de comprobar `string_to_array(rebase.roles(), ',')` para el acceso anónimo. El atajo `access: "public"` es más simple y genera la política correcta automáticamente.
+:::caution[`serverContext()` no se satisface con `dataAsAdmin`]
+Se compila a `rebase.uid() IS NULL`, verdadero solo para los flujos integrados que
+se ejecutan sin usuario (registro, migraciones). `rebase.dataAsAdmin` se ejecuta como
+`uid: "service"` con el rol `admin`, por lo que es **falso** allí. Una tabla con
+`defaultPolicies: false` cuya única regla sea `serverContext()` rechazará esas
+escrituras y no devolverá filas a esas lecturas. `rebase.sql()` es el método de acceso que
+elude las políticas.
 :::
 
-## Filas aquí, campos al lado
+## Permisivas y restrictivas
 
-Las reglas de seguridad responden a una sola pregunta: a **qué filas** accede quien realiza la llamada. Postgres las aplica por sí mismo, en cada instrucción y sin importar la ruta; razón por la cual constituyen el modelo de autorización y todo lo que está por encima es mera conveniencia.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-No tienen nada que decir acerca de las *columnas* de una fila a la que el emisor sí accede. Una política que permite a un empleado leer las filas de su equipo le permite leer todos los campos de esas filas, salario incluido. Para eso existe el [`access`](/docs/collections/field-access/) por propiedad:
+Las reglas permisivas (las predeterminadas) se combinan mediante OR: se accede a una fila cuando cualquiera de
+ellas lo admite. Las reglas restrictivas se combinan mediante AND con ellas: cada regla restrictiva también
+debe cumplirse. Una regla permisiva amplía el acceso; una restrictiva solo puede
+reducirlo. El aislamiento de inquilinos (*tenancy*) es una regla restrictiva por esa razón: una regla `access: "public"`
+en otra parte de la tabla no puede anular el límite del inquilino.
 
-```typescript
-salary: {
-    type: "number",
-    // Everyone the rules above let read the row; only HR gets this column.
-    access: { read: ["hr"], write: [] }
-}
+## Qué falla de forma cerrada
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Una tabla no puede volverse accesible por accidente:
+
+- **En el editor**, `rls` es obligatorio y `[]` no es un valor válido.
+- **Al cargar el módulo**, `defineTable` lanza un error si `rls` falta, está vacío
+  o no es una de las tres posturas, por lo que JavaScript y las conversiones de tipo (*casts*) también se detectan.
+- **Al compilar el esquema** — `rebase db generate`, `rebase db push`,
+  `rebase doctor` y el inicio del servidor — el esquema se rechaza si se usa `"inherit"`
+  sin un `defaultRls`, `"admin-only"` con `defaultPolicies: false`, y una
+  regla que mencione una columna que la tabla no tiene (en `ownerField`, una
+  clave abreviada o un `policy.field()`). De lo contrario, un error tipográfico en una regla llegaría
+  a `CREATE POLICY` y fallaría allí, en una tabla cuya seguridad a nivel de fila
+  ya está activada, dejándola inaccesible para todos.
+- **Sin un esquema**, cuando el backend lee las tablas desde la base de datos, una
+  tabla sin `ENABLE ROW LEVEL SECURITY` no se sirve. El inicio del servidor la menciona, junto
+  con el `ALTER TABLE … ENABLE ROW LEVEL SECURITY` que la protege. Consulta
+  [Solo backend](/docs/getting-started/headless/).
+
+Cada solicitud ejecuta sus sentencias bajo un rol de base de datos al que se
+aplica la seguridad a nivel de fila, dentro de una transacción que transporta el id, los roles
+y los claims del llamador. Eso es lo que leen `rebase.uid()`, `rebase.roles()` y `rebase.jwt()`.
+
+## Solicitudes sin sesión
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Una solicitud sin token llega a las políticas únicamente cuando `AUTH_REQUIRE=false`;
+de lo contrario, la API responde 401 primero. Luego se ejecuta con `rebase.uid()` establecido
+en `'anonymous'` y sin roles: las reglas `access: "public"` la admiten, mientras que
+`access: "authenticated"` y las reglas de propietario no.
+
+Un formulario de contacto acepta inserciones de cualquiera y es leído únicamente por administradores:
+
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const contactMessages = defineTable("contact_messages", {
+    columns: {
+        id:      col.uuid().primaryKey().defaultRandom(),
+        email:   col.text().notNull().validate({ email: true }),
+        message: col.text().notNull().validate({ max: 5000 }),
+    },
+    rls: [
+        { operation: "insert", access: "public" },
+        { operations: ["select", "update", "delete"], roles: ["admin"] },
+    ],
+});
 ```
 
-Ambos se complementan y nunca entran en contradicción: una regla de campo no puede ampliar el acceso a filas, y una fila que no puedes leer no tiene campos de los que hablar. Los roles son los mismos roles: `rebase.roles()` dentro de una política, `user.roles` en la solicitud; por lo que `rolesOverlap(['hr'])` en una regla y `access: { read: ["hr"] }` en una propiedad significan el mismo `hr`. Las reglas de campo son aplicadas por el servidor en lugar de Postgres, por lo que cubren la superficie de la API; una consulta ejecutada mediante `rebase.sql()` ve todas las columnas, tal como omite RLS.
+## Filas aquí, columnas al lado
 
-## Pasos siguientes
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-- **[Acceso a nivel de campo](/docs/collections/field-access)** — Roles de lectura/escritura por campo
-- **[Relaciones](/docs/collections/relations)** — Claves foráneas y uniones (joins)
-- **[Callbacks de entidades](/docs/collections/callbacks)** — Hooks del ciclo de vida
-- **[Funciones personalizadas](/docs/backend/custom-functions)** — Endpoints de API personalizados
+`rls` decide a qué filas puede acceder un llamador. No tiene nada que decir sobre las
+columnas de una fila a la que sí acceda: una regla que permite a un empleado leer las filas de su
+equipo le permite leer todas las columnas de esas filas, salario incluido. Las reglas
+por columna se definen con [`.access()`](/docs/collections/field-access/) en la columna:
+
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const staff = defineTable("staff", {
+    columns: {
+        id:     col.integer().primaryKey().generatedByDefaultAsIdentity(),
+        name:   col.text().notNull(),
+        // Everyone the rules let read the row; only HR receives this column.
+        salary: col.numeric({ precision: 10, scale: 2 }).access({ read: ["hr"], write: [] }),
+    },
+    rls: [{ operation: "select", access: "authenticated" }],
+});
+```
+
+Los roles son los mismos roles: `policy.rolesOverlap(["hr"])` en una regla y
+`.access({ read: ["hr"] })` en una columna se refieren al mismo `hr`. Las reglas de columnas
+son aplicadas por el servidor, por lo que cubren todas las rutas de la API; una consulta ejecutada a través
+de `rebase.sql()` ve todas las columnas, ya que elude la seguridad a nivel de fila.
+
+## Próximos pasos
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+- [Acceso a campos](/docs/collections/field-access/): roles de lectura y escritura por columna
+- [Multiinquilino (Tenancy)](/docs/collections/tenancy/): un límite restrictivo por inquilino
+- [Roles y alcances](/docs/backend/roles-and-scopes/): de dónde provienen los roles
+- [La tabla de usuarios](/docs/schema/auth-table/): las políticas que agrega `defineAuthTable`

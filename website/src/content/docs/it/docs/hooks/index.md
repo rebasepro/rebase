@@ -1,15 +1,17 @@
 ---
-sourceHash: f5eae2844d2a9a93
-title: Riferimento agli Hook
+sourceHash: b247fb716c8348a7
+title: Riferimento agli hook
 sidebar_label: Hook
-description: Hook React forniti da Rebase per accedere ad autenticazione, dati, navigazione, pannelli laterali, archiviazione e stato dell'interfaccia utente.
+description: Hook di React forniti da Rebase per accedere ad autenticazione, dati, navigazione, pannelli laterali, archiviazione e stato dell'interfaccia utente.
 ---
 
 ## Panoramica
 
-Rebase fornisce hook React per accedere alle funzionalità del framework da qualsiasi componente all'interno dell'albero del provider `<Rebase>`.
+Rebase fornisce hook di React per accedere alle funzionalità del framework da qualsiasi componente all'interno dell'albero del provider `<Rebase>`.
 
 ## `useRebaseContext`
+
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 L'hook principale — accedi a tutto:
 
@@ -29,17 +31,17 @@ function MyComponent() {
 }
 ```
 
-`context.data` è lo stesso livello flat letto dagli hook delle righe: `context.data.orders.find()`
-si risolve in `{ data: rows, meta }`, una data è la sua stringa ISO e un belongsTo è la sua
-colonna foreign-key, esattamente come vengono restituiti da `context.data` e
-`client.data` di un callback di backend. I suoi metodi `create`, `update` e `delete` eseguono i
-`admin.browserCallbacks` della collection e aggiornano ogni vista della collection,
-proprio come fa `useRowWrites`. Usalo dove lo stato di React non è adatto:
-nell'`onClick` dell'azione di un'entità, in un callback, o in un collection builder.
+`context.data` è lo stesso layer piatto letto dagli hook per le righe: `context.data.orders.find()`
+si risolve in `{ data: rows, meta }`, una data corrisponde alla sua stringa ISO e una relazione belongsTo
+alla sua colonna foreign key, esattamente come vengono restituiti da `context.data` di una callback
+di backend e da `client.data`. I suoi metodi `create`, `update` e `delete` eseguono i
+`browserCallbacks` della tabella (definiti nel suo `customizeTable`) e aggiornano ogni vista della collection,
+proprio come fa `useRowWrites`. Utilizzalo nei casi in cui lo stato di React non sia adatto: l'`onClick`
+di un'azione su un'entità, una callback o un builder di collection.
 
 ## `useAuthController`
 
-Accedi allo stato di autenticazione e alle relative funzionalità:
+Accedi allo stato di autenticazione e alle sue funzionalità:
 
 ```typescript
 import { useAuthController } from "@rebasepro/app";
@@ -59,9 +61,11 @@ function UserMenu() {
 
 ## Righe: `useRows`, `useRow`, `useRowCount`, `useAggregate`, `useRowWrites`
 
-Leggi e scrivi le righe di una collection nel formato in cui le invia il server: date come stringhe ISO, un belongsTo sotto la sua colonna foreign-key (`author_id`). È lo stesso formato restituito da `client.data` e `context.data`, quindi il codice scritto con questi hook si legge come codice scritto direttamente per l'SDK.
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-Le righe di ogni collection provengono dall'origine dati che essa dichiara (`dataSource`, vedi [Multiple data sources](/docs/backend/multiple-sources)), mentre quelle di qualsiasi altra collection provengono dalla data source predefinita dell'app. In presenza di un `client`, il valore predefinito è `client.data` e le aggregazioni passano tramite HTTP. In assenza di un client, si tratta del driver della data source predefinita (un driver Firebase, ad esempio). Dove la data source supporta le sottoscrizioni, le righe rimangono aggiornate in tempo reale. Dove non è possibile, ogni hook di una collection effettua una nuova lettura dopo ogni scrittura su di essa all'interno dello stesso `<Rebase>` (tramite `useRowWrites`, `context.data`, un form di record o una vista della collection) e dopo ogni modifica segnalata dal driver della data source. Lo stesso vale per le viste della collection dell'admin. Le opzioni vengono confrontate per valore, quindi un oggetto inline non attiva una nuova lettura a ogni render. `error` è una stringa di messaggio e una scrittura non riuscita genera anche un reject.
+Leggi e scrivi le righe di una collection nel formato in cui le invia il server: date come stringhe ISO, un belongsTo sotto la sua colonna di foreign key (`author_id`). È la stessa struttura restituita da `client.data` e `context.data`, quindi il codice scritto con questi hook risulta naturale come quello scritto direttamente con l'SDK.
+
+Le righe di ciascuna collection provengono dalla sorgente dati dichiarata (`dataSource`, vedi [Origini dati multiple](/docs/backend/multiple-sources)), mentre quelle di qualsiasi altra collection provengono dalla sorgente dati predefinita dell'app. In presenza di un `client`, l'impostazione predefinita è `client.data`, e le aggregazioni avvengono tramite HTTP. In assenza di un client, viene utilizzato il driver della sorgente dati predefinita (un driver Firebase, ad esempio). Laddove la sorgente dati supporti le sottoscrizioni, le righe rimangono aggiornate in tempo reale. Dove non è supportato, ogni hook di una collection effettua nuovamente la lettura dopo ogni scrittura su di essa all'interno dello stesso `<Rebase>` (tramite `useRowWrites`, `context.data`, un form di record o una vista della collection) e dopo ogni modifica notificata dal driver della sorgente dati. Lo stesso vale per le viste delle collection del pannello di amministrazione. Le opzioni vengono confrontate per valore, pertanto un oggetto inline non attiva una nuova lettura a ogni render. `error` è una stringa contenente il messaggio, e una scrittura che fallisce genera anche un rifiuto della promise (reject).
 
 ```typescript
 import { useRowWrites, useRows } from "@rebasepro/app";
@@ -83,26 +87,29 @@ function PendingOrders() {
 }
 ```
 
-| Hook | Valore restituito |
-|------|-------------------|
-| `useRows(collection, { where, orderBy, limit, offset, searchString })` | `{ rows, total, hasMore, loadMore, loading, error, refresh }`. `limit` è la dimensione della pagina e `loadMore` aggiunge una pagina alla stessa lettura, fino a un massimo di 1000 righe. |
+| Hook | Restituisce |
+|------|-------------|
+| `useRows(collection, { where, orderBy, limit, offset, searchString })` | `{ rows, total, hasMore, loadMore, loading, error, refresh }`. `limit` rappresenta la dimensione della pagina e `loadMore` aggiunge una pagina alla stessa lettura, fino a un massimo di 1000 righe. |
 | `useRow(collection, id)` | `{ row, loading, error, refresh }`. `id` può essere `undefined`, nel qual caso non viene letto nulla. |
 | `useRowCount(collection, where)` | `{ count, loading, error }` |
-| `useAggregate(collection, { select, groupBy, where, orderBy, limit, offset })` | `{ result, loading, error }`. I parametri e il risultato sono quelli di `client.data.<collection>.aggregate()`. Una data source che non può aggregare imposta `error` e non restituisce mai un risultato vuoto. |
-| `useRowWrites()` | `{ create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }`. Ogni scrittura completata con successo aggiorna ogni hook di riga e ogni vista della collection associata. Una scrittura esegue i `admin.browserCallbacks` della collection esattamente come fa il salvataggio del form del record: `beforeSave` (che può modificare la riga o generare un errore per interrompere la scrittura), poi `afterSave` o `afterSaveError`; `beforeDelete`, poi `afterDelete`. A ciascuno vengono passate le righe nel formato inviato dal server. |
+| `useAggregate(collection, { select, groupBy, where, orderBy, limit, offset })` | `{ result, loading, error }`. I parametri e il risultato sono gli stessi di `client.data.<collection>.aggregate()`. Una sorgente dati che non supporta le aggregazioni imposta `error` e non restituisce mai un risultato vuoto. |
+| `useRowWrites()` | `{ create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }`. Ogni scrittura completata con successo aggiorna ogni hook per le righe e ogni vista della collection corrispondente. Una scrittura esegue i `browserCallbacks` della tabella (da `customizeTable`) esattamente come il salvataggio del form del record: `beforeSave` (che può modificare la riga o lanciare un errore per interrompere la scrittura), seguito da `afterSave` o `afterSaveError`; `beforeDelete`, seguito da `afterDelete`. A ciascuna callback vengono passate le righe nel formato restituito dal server. |
 
 ## `usePermissions`
 
-Hook per valutare ruoli e permessi per l'utente corrente. Elimina la necessità di passare manualmente `authController` alle funzioni di verifica dei permessi.
+Hook per valutare i ruoli e i permessi dell'utente corrente. Astrae la necessità di passare manualmente `authController` alle funzioni di verifica dei permessi.
 
-```typescript
+```tsx
+import React from "react";
 import { usePermissions } from "@rebasepro/app";
-import { productsCollection } from "../config/collections";
+import { useCollectionRegistryController } from "@rebasepro/cms";
 
 function CreateProductButton() {
     const { canCreate } = usePermissions();
+    // The panel's collection for the `products` table, as the signed-in user was served it.
+    const products = useCollectionRegistryController().getCollection("products");
 
-    const allowedToCreate = canCreate(productsCollection, "products");
+    const allowedToCreate = products !== undefined && canCreate(products, "products");
 
     return (
         <button disabled={!allowedToCreate}>
@@ -112,21 +119,26 @@ function CreateProductButton() {
 }
 ```
 
+Il risultato proviene dalla row-level security della tabella, valutata nel browser
+nello stesso modo in cui il pannello decide quali controlli mostrare (vedi
+[chi visualizza quali controlli](/docs/collections/#who-sees-which-controls)). È
+comunque sempre il database a decidere per ciascuna scrittura.
+
 ### Valore restituito
 
 | Metodo | Firma | Descrizione |
 |--------|-------|-------------|
-| `canCreate` | `(collection, path) => boolean` | Verifica se l'utente ha il permesso di creare entità nella collection. |
-| `canEdit` | `(collection, path, row) => boolean` | Verifica se l'utente ha il permesso di modificare la riga specificata, nel formato restituito da `useRows` o `context.data`. `null` esegue la verifica per l'intera collection senza considerare una riga specifica. |
-| `canDelete` | `(collection, path, row) => boolean` | Verifica se l'utente ha il permesso di eliminare la riga specificata. `null` esegue la verifica per l'intera collection senza considerare una riga specifica. |
-| `canRead` | `(collection) => boolean` | Verifica se l'utente ha il permesso di leggere la collection. |
+| `canCreate` | `(collection, path) => boolean` | Verifica se l'utente è autorizzato a creare entità nella collection. |
+| `canEdit` | `(collection, path, row) => boolean` | Verifica se l'utente è autorizzato a modificare la riga indicata, nel formato restituito da `useRows` o `context.data`. `null` effettua la verifica per la collection nel suo complesso, senza considerare una riga specifica. |
+| `canDelete` | `(collection, path, row) => boolean` | Verifica se l'utente è autorizzato a eliminare la riga indicata. `null` effettua la verifica per la collection nel suo complesso, senza considerare una riga specifica. |
+| `canRead` | `(collection) => boolean` | Verifica se l'utente è autorizzato a leggere la collection. |
 
 ## `useClipboard`
 
-Hook di utilità per copiare o tagliare testo negli appunti, con supporto automatico per meccanismi di fallback sui browser più datati.
+Hook di utilità per copiare o tagliare testo negli appunti (clipboard), con supporto automatico ai meccanismi di fallback per i browser più datati.
 
 > [!NOTE]
-> Nota l'ortografia esatta di `isCoppied` (con due `p`) nel payload restituito.
+> Nota l'esatta ortografia di `isCoppied` (con due `p`) nel payload restituito.
 
 ```typescript
 import { useClipboard } from "@rebasepro/app";
@@ -147,23 +159,23 @@ function CopyButton({ text }) {
 | Opzione | Tipo | Descrizione |
 |---------|------|-------------|
 | `copiedDuration` | `number` | Opzionale. Tempo in millisecondi prima di reimpostare `isCoppied` su `false`. |
-| `onSuccess` | `(text) => void` | Opzionale. Callback attivato in caso di copia riuscita. |
-| `onError` | `(err) => void` | Opzionale. Callback attivato in caso di errore. |
+| `onSuccess` | `(text) => void` | Opzionale. Callback attivata in caso di copia riuscita. |
+| `onError` | `(err) => void` | Opzionale. Callback attivata in caso di errore. |
 
 ### Valore restituito
 
 | Proprietà | Tipo | Descrizione |
 |-----------|------|-------------|
-| `ref` | `MutableRefObject` | Ref di React da associare agli elementi input/textarea da cui copiare. |
-| `copy` | `(text?: string) => void` | Avvia la copia del testo fornito o del contenuto dell'elemento referenziato. |
-| `cut` | `() => void` | Avvia il taglio del contenuto dell'elemento referenziato. |
+| `ref` | `MutableRefObject` | Ref di React da associare a elementi input/textarea da cui copiare. |
+| `copy` | `(text?: string) => void` | Attiva la copia del testo specificato o del contenuto dell'elemento associato al ref. |
+| `cut` | `() => void` | Attiva il taglio del contenuto dell'elemento associato al ref. |
 | `isCoppied` | `boolean` | True se il testo è stato copiato di recente. |
-| `clipboard` | `string` | Il valore del testo attualmente copiato. |
+| `clipboard` | `string` | Il valore testuale attualmente copiato. |
 | `clearClipboard` | `() => void` | Svuota gli appunti. |
 
 ## `useSidePanel`
 
-Apri entità a livello programmatico in un pannello laterale:
+Apri a livello di programmazione le entità in un pannello laterale:
 
 ```typescript
 import { useSidePanel } from "@rebasepro/cms";
@@ -216,9 +228,9 @@ function SaveButton() {
 
 `open()` accetta `{ type, title?, message, autoHideDuration?, action? }`.
 
-Lo slot `action` visualizza un pulsante accanto al messaggio, che è la posizione ideale
-per l'annullamento (undo): l'intervallo di tempo in cui l'annullamento ha senso corrisponde esattamente
-a quello in cui la snackbar è visibile sullo schermo:
+Lo slot `action` esegue il rendering di un pulsante accanto al messaggio, il punto ideale
+in cui inserire un'azione di annullamento (undo): la finestra temporale in cui ha senso annullare
+coincide con il tempo in cui la snackbar rimane visibile sullo schermo:
 
 ```typescript
 const rejectApplication = async (application: Application) => {
@@ -236,14 +248,14 @@ const rejectApplication = async (application: Application) => {
 };
 ```
 
-La snackbar si chiude automaticamente dopo aver fatto clic sull'azione, evitando che
-la stessa azione di annullamento venga eseguita due volte. Due snackbar con lo stesso messaggio
-compaiono entrambe se ciascuna dispone di un'azione; ad esempio, rifiutare due candidature di seguito
-permette di annullare separatamente ciascuna operazione.
+La snackbar si chiude automaticamente dopo il clic sull'azione, evitando così che lo stesso
+annullamento venga eseguito due volte. Due snackbar contenenti lo stesso messaggio vengono mostrate
+entrambe se ciascuna include un'azione: rifiutare due candidature di fila ti consente di annullare
+ciascuna operazione separatamente.
 
 ## `useStorageSource`
 
-Accedi alle operazioni di archiviazione file:
+Accedi alle operazioni di archiviazione dei file (storage):
 
 ```typescript
 import { useStorageSource } from "@rebasepro/app";
@@ -283,8 +295,8 @@ function ThemeToggle() {
 ## `useSelectionDialog`
 
 Apre una finestra di dialogo laterale per selezionare righe da una collection. Le righe vengono
-fornite nel formato inviato dal server, la stessa struttura restituita da `useRows`, insieme ai rispettivi ID
-— le stringhe accettate da `selectedIds` e `useSidePanel().open`:
+fornite nel formato restituito dal server (la stessa struttura di `useRows`) assieme ai rispettivi ID
+(le stringhe accettate da `selectedIds` e `useSidePanel().open`):
 
 ```typescript
 import { useSelectionDialog } from "@rebasepro/cms";
@@ -302,16 +314,15 @@ function SelectProduct() {
 }
 ```
 
-Con `multiselect: true`, `onMultipleRowsSelected(rows, ids)` segnala ogni
-selezione effettuata e `onSelectionDone(rows, ids)` restituisce la selezione finale una sola volta, quando si preme Fine — usalo
-quando l'azione sulla selezione comporta un'operazione di scrittura. `selectedIds` specifica le righe
-visualizzate come selezionate, posizionate per prime all'apertura del dialog.
+Con `multiselect: true`, `onMultipleRowsSelected(rows, ids)` notifica ogni selezione/deselezione
+e `onSelectionDone(rows, ids)` comunica la selezione finale una sola volta, quando viene premuto Fine (Done) —
+usalo quando l'azione sulla selezione comporta una scrittura. `selectedIds` indica le righe mostrate come
+selezionate, e in cima, all'apertura del dialogo.
 
 ## `useSelectionController`
 
-Una selezione delle righe di una collection gestita direttamente: passala a una vista come
-`admin.selectionController` (su un `CollectionPanel`, tramite
-`collectionOverrides`) e leggi ciò che l'utente seleziona:
+Una selezione di righe di una collection gestita direttamente: passala a una vista come
+`selectionController` (su un `CollectionPanel`, tramite `collectionOverrides`) e leggi ciò che l'utente seleziona:
 
 ```tsx
 import { CollectionPanel, useSelectionController } from "@rebasepro/cms";
@@ -330,10 +341,10 @@ function ShipOrders() {
 ```
 
 `selection.selection` è `{ type: "rows", ids, rows }` per le righe selezionate, oppure
-`{ type: "query", query, excludedIds, count }` quando viene scelto "tutti i corrispondenti";
+`{ type: "query", query, excludedIds, count }` quando viene scelta l'opzione "tutti i corrispondenti";
 `resolveSelection({ selection: selection.selection, data: context.data,
 collection })` legge le righe di una selezione basata su query e restituisce `{ rows, ids }` in entrambe le modalità. `isSelected(id)`,
-`toggleSelection(row)`, `setSelectedRows(rows)` e `clearSelection()` ne modificano lo stato.
+`toggleSelection(row)`, `setSelectedRows(rows)` e `clearSelection()` consentono di modificarla.
 
 ## `useNavigationStateController`
 
@@ -353,7 +364,7 @@ function MyComponent() {
 
 ## `useRebaseClient`
 
-Recupera l'istanza tipizzata dell'SDK sottostante (`RebaseClient`) dal contesto React. È utile per eseguire operazioni SDK dirette (come chiamare endpoint personalizzati o effettuare caricamenti manuali) all'interno dei componenti.
+Recupera l'istanza SDK tipizzata sottostante (`RebaseClient`) dal contesto React. Questo è utile per richiamare direttamente le operazioni dell'SDK (come la chiamata a endpoint personalizzati o caricamenti manuali) all'interno dei tuoi componenti.
 
 ```typescript
 import { useRebaseClient } from "@rebasepro/app";
@@ -372,7 +383,7 @@ function CustomAction() {
 
 ## `useUnsavedChangesDialog`
 
-Impedisce la navigazione o la chiusura della pagina quando i dati del form contengono modifiche non salvate. Richiede conferma prima del ricaricamento o della chiusura della scheda (`beforeunload`) e, all'interno dell'admin sotto un data router di React Router (`createBrowserRouter`), anche prima della navigazione interna all'app, tramite `useBlocker`. Con qualsiasi altro router, come un semplice `<BrowserRouter>`, si applica solo il prompt a livello di browser.
+Impedisce la navigazione o lo scaricamento della pagina quando i dati del form presentano modifiche non salvate. Richiede conferma prima del ricaricamento o della chiusura della scheda (`beforeunload`) e, all'interno del pannello admin configurato con un data router di React Router (`createBrowserRouter`), anche prima della navigazione in-app tramite `useBlocker`. Con qualsiasi altro router, come un semplice `<BrowserRouter>`, viene applicato solo il prompt a livello di browser.
 
 ```typescript
 import { useUnsavedChangesDialog } from "@rebasepro/app";
@@ -394,26 +405,26 @@ function EditForm() {
 
 | Parametro | Tipo | Descrizione |
 |-----------|------|-------------|
-| `when` | `boolean` | Flag per attivare il blocco della navigazione di pagina/router. |
-| `onOk` | `() => void` | Callback attivato quando l'utente conferma l'abbandono delle modifiche. |
+| `when` | `boolean` | Flag per attivare il blocco della navigazione della pagina/router. |
+| `onOk` | `() => void` | Callback attivata quando l'utente conferma lo scarto delle modifiche. |
 
 ### Valore restituito
 
 | Proprietà | Tipo | Descrizione |
 |-----------|------|-------------|
-| `dialogProps` | `UnsavedChangesDialogProps` | Props modali da passare direttamente a un componente UI `UnsavedChangesDialog`. |
-| `triggerDialog` | `() => void` | Attiva manualmente la visualizzazione del dialog a livello programmatico. |
+| `dialogProps` | `UnsavedChangesDialogProps` | Props del modale da passare direttamente a un componente UI `UnsavedChangesDialog`. |
+| `triggerDialog` | `() => void` | Attiva manualmente la visualizzazione del dialogo a livello di programmazione. |
 
 ## `useEffectiveRoleController`
 
-Cambia il ruolo per cui è strutturata la navigazione del pannello admin, senza dover effettuare il logout:
-influisce sulle viste di Studio elencate. Non invia nulla al server e non valuta alcuna
-policy di row-level security, pertanto una vista dati continua a mostrare solo ciò che si ha il permesso di leggere. Per
-testare l'RLS, usa **Simulate access** (sopra il tuo avatar nel menu laterale), oppure `client.simulate()` da
+Consente di cambiare il ruolo per cui è costruita la navigazione del pannello di amministrazione, senza effettuare il logout:
+determina quali viste Studio vengono elencate. Non invia nulla al server e non valuta le policy di
+row-level security, quindi una vista dati continuerà a mostrare solo ciò che hai i permessi di leggere. Per
+testare la RLS, usa **Simulate access** (sopra il tuo avatar nel drawer) o `client.simulate()` da
 codice; vedi [Testing access](/docs/frontend/authentication/#testing-access-simulate-access).
 
 `<Rebase>` fornisce il controller. `useBuildEffectiveRoleController`, l'hook
-precedentemente utilizzato per crearne uno da passare come `effectiveRoleController`, è deprecato a favore di
+che ne costruiva uno da passare come `effectiveRoleController`, è deprecato a favore di
 Simulate access e genera un avviso la prima volta che viene chiamato.
 
 ```typescript
@@ -435,7 +446,7 @@ function RoleSwitcher() {
 
 ## `useAdminModeController`
 
-Alterna le modalità di visualizzazione del layout admin all'interno del pannello di amministrazione.
+Consente di alternare le modalità di visualizzazione del layout all'interno del pannello di amministrazione.
 
 ```typescript
 import { useAdminModeController } from "@rebasepro/app";
@@ -449,7 +460,7 @@ function ModeToggle() {
 
 ## `useDialogsController`
 
-Apri schermate di dialogo in modo imperativo da qualsiasi punto dell'albero dei componenti.
+Apre finestre di dialogo in modo imperativo da qualsiasi punto dell'albero dei componenti.
 
 ```typescript
 import { useDialogsController } from "@rebasepro/app";
@@ -472,7 +483,7 @@ function OpenModalButton() {
 
 ## `useAnalyticsController`
 
-Cattura globalmente le azioni dell'interfaccia utente del CMS e gli eventi utente.
+Cattura le azioni dell'interfaccia utente del CMS e gli eventi utente a livello globale.
 
 ```typescript
 import { useAnalyticsController } from "@rebasepro/app";
@@ -491,5 +502,5 @@ function AnalyticsLogger() {
 
 ## Passaggi successivi
 
-- **[Panoramica del Frontend](/docs/frontend)** — Riferimento al framework React
+- **[Panoramica frontend](/docs/frontend)** — Riferimento al framework React
 - **[SDK tipizzato](/docs/sdk)** — SDK per le operazioni sui dati

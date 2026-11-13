@@ -1,19 +1,19 @@
 ---
-sourceHash: 68b71012725d6c0d
+sourceHash: 14cb375a352ba487
 title: Almacenamiento y Archivos
 sidebar_label: Almacenamiento
-description: Suba, descargue, liste y elimine archivos con el módulo de almacenamiento del SDK tipado de Rebase.
+description: Sube, descarga, lista y elimina archivos utilizando el módulo de almacenamiento del SDK tipado de Rebase.
 ---
 
-## Resumen
+## Visión general
 
-El módulo `client.storage` proporciona métodos para la gestión de archivos — subida, descarga, listado y eliminación. Funciona tanto con disco local como con backends de almacenamiento compatibles con S3, según la configuración de su servidor.
+El módulo `client.storage` proporciona métodos para la gestión de archivos: subida, descarga, listado y eliminación. Funciona tanto con disco local como con backends de almacenamiento compatibles con S3, según la configuración de tu servidor.
 
 Todos los métodos de almacenamiento utilizan el transporte compartido, por lo que los tokens de autenticación se inyectan automáticamente.
 
-## Subir un Archivo
+## Subir un archivo
 
-Use `putObject()` para subir un archivo. Acepta un objeto `File` o `Blob` junto con una clave de almacenamiento y metadatos opcionales:
+Utiliza `putObject()` para subir un archivo. Acepta un objeto `File` o `Blob` junto con una clave de almacenamiento opcional y metadatos:
 
 ```typescript
 const result = await client.storage.putObject({
@@ -30,17 +30,18 @@ const result = await client.storage.putObject({
 // result: { key: string; bucket: string; storageUrl: string }
 ```
 
-Un archivo de más de 8 MiB se sube por el endpoint reanudable (TUS)
-del servidor, 8 MiB por solicitud, en lugar de como una única solicitud multipart que el servidor
-analiza completa — así que una subida grande cuesta al servidor un fragmento de memoria, no de tres
-a cinco veces el archivo. Un fragmento que falla por el camino se vuelve a enviar desde donde
-llegó el servidor. El resultado, el objeto almacenado y las comprobaciones del servidor son
-los mismos en ambos casos. Cuando el endpoint reanudable no puede aceptar el archivo (un servidor
-más antiguo, o varias instancias que no comparten subidas), se envía como un único
-`POST /api/storage/upload`, y también cada archivo posterior de ese cliente. Consulta
-[Subidas reanudables (TUS)](/docs/backend/storage-resumable-uploads/).
+Un archivo de más de 8 MiB se sube a través del endpoint reanudable (TUS)
+del servidor, a razón de 8 MiB por petición, en lugar de como una única petición
+multipart que el servidor analiza por completo; de este modo, una subida grande
+le cuesta al servidor un fragmento de memoria, no entre tres y cinco veces el
+archivo. Un fragmento que falla en el camino se vuelve a enviar desde el punto en
+el que se quedó el servidor. El resultado, el objeto almacenado y las comprobaciones
+del servidor son los mismos en ambos casos. Cuando el endpoint reanudable no puede
+aceptar el archivo (un servidor más antiguo o varias instancias que no comparten
+subidas), se envía como un único `POST /api/storage/upload`, al igual que cualquier
+archivo posterior de ese cliente. Consulta [Resumable uploads (TUS)](/docs/backend/storage-resumable-uploads/).
 
-### Desde un Campo de Archivo
+### Desde un input de archivo
 
 ```typescript
 const input = document.querySelector<HTMLInputElement>("#file-input");
@@ -55,9 +56,9 @@ if (file) {
 }
 ```
 
-## Obtener una URL Firmada
+## Obtener una URL firmada
 
-Recupere una URL de descarga y los metadatos de un archivo almacenado:
+Obtén una URL de descarga y metadatos para un archivo almacenado:
 
 ```typescript
 const { url, metadata, fileNotFound } = await client.storage.getSignedUrl(
@@ -72,8 +73,8 @@ if (url) {
 }
 ```
 
-:::caution[El argumento `bucket` es hoy un prefijo de ruta]
-En `getSignedUrl`, `getObject` y `deleteObject`, el segundo argumento se pliega dentro de la clave del objeto (`<bucket>/<key>`) y nunca llega al servidor como bucket, así que un nombre que el despliegue no sirve se reporta como *archivo* ausente, no como bucket desconocido — y un archivo escrito con `putObject({ bucket: "media" })` no se lee de vuelta con `getSignedUrl(key, "media")`. Lea un archivo con la misma forma de llamada que lo escribió. El lado del servidor ya responde `404 UNKNOWN_STORAGE_SOURCE` para un bucket que no sirve en `/api/storage/list`, y en S3 o GCS también en las subidas; el argumento del SDK se está reelaborando para coincidir.
+:::caution[El argumento `bucket` es actualmente un prefijo de ruta]
+En `getSignedUrl`, `getObject` y `deleteObject`, el segundo argumento se incorpora a la clave del objeto (`<bucket>/<key>`) y nunca llega al servidor como un bucket, por lo que un nombre que el despliegue no sirve se reporta como un *archivo* inexistente, no como un bucket desconocido; y un archivo escrito con `putObject({ bucket: "media" })` no se recupera con `getSignedUrl(key, "media")`. Lee un archivo con la misma estructura de llamada con la que se escribió. En el lado del servidor ya se responde `404 UNKNOWN_STORAGE_SOURCE` para un bucket que no sirve en `/api/storage/list`, y también en S3 o GCS en las subidas; el argumento del SDK se está rediseñando para coincidir con esto.
 :::
 
 Con un bucket específico:
@@ -85,55 +86,56 @@ const { url } = await client.storage.getSignedUrl(
 );
 ```
 
-El SDK almacena en caché las URL firmadas para evitar llamadas redundantes al servidor, hasta que
-caduca el token de descarga de cada una. Las consultas hechas juntas — una página de vistas previas
-que llama a `getSignedUrl()` en el mismo tick — van al servidor como un
-`POST /api/storage/metadata` por cada 100 archivos, que el limitador de tasa cuenta como una
-décima parte de las solicitudes que reemplaza; un archivo que quien llama no puede leer hace fallar
-solo esa llamada. La caché pertenece a la credencial que la pidió: cuando
-cambia el token de acceso —un cierre de sesión, otro usuario que inicia sesión, una
-actualización—, empieza de cero, de modo que a un usuario nunca se le entrega una URL generada
-para otro.
+El SDK almacena en caché las URL firmadas para evitar llamadas redundantes al
+servidor, hasta que expire el token de descarga de cada una. Las búsquedas
+realizadas juntas —una página de previsualizaciones que llama a `getSignedUrl()`
+en el mismo ciclo— van al servidor como un único `POST /api/storage/metadata` por
+cada 100 archivos, lo que el limitador de tasa cuenta como una décima parte de las
+peticiones a las que reemplaza; un archivo que un llamador no puede leer solo
+falla en esa llamada concreta. La caché pertenece a la credencial que la solicitó:
+cuando el token de acceso cambia —un cierre de sesión, otro usuario que inicia sesión,
+una actualización— se reinicia, de modo que nunca se entrega a un usuario una URL
+generada para otro.
 
-### URL privadas vs. públicas
+### URLs privadas vs. públicas
 
-- **Los archivos privados** obtienen una URL con un **token de descarga de corta duración y limitado a la ruta** (`?token=…`, 5 minutos salvo que el servidor establezca `STORAGE_DOWNLOAD_TOKEN_TTL`, que 0.23 no lee) — nunca su token de acceso. Como caduca, **no persista una URL privada**; almacene la **ruta** del archivo y vuelva a llamar a `getSignedUrl()` al renderizarlo.
-- **Los archivos públicos** (almacenados bajo el prefijo `public/` — establezca `storage: { public: true }` en la propiedad, o pase `public: true` a `putObject`) obtienen una URL **estable, sin token, permanente y cacheable por CDN**, sin ida y vuelta al servidor. Son seguros para almacenar en una base de datos y enlazar directamente.
+- **Los archivos privados** obtienen una URL con un **token de descarga de corta duración y delimitado a la ruta** (`?token=…`, 5 minutos a menos que el servidor configure `STORAGE_DOWNLOAD_TOKEN_TTL`, el cual la versión 0.23 no lee), nunca tu token de acceso. Debido a que caduca, **no persistas una URL privada**; almacena la **ruta** del archivo y vuelve a llamar a `getSignedUrl()` cuando lo renderices.
+- **Los archivos públicos** (almacenados bajo el prefijo `public/`; define `storage: { public: true }` en la propiedad, o pasa `public: true` a `putObject`) obtienen una URL **estable, sin token, permanente y almacenable en CDN en caché** sin ida y vuelta al servidor. Es seguro almacenarlas en una base de datos y utilizarlas para enlaces directos.
 
 ### Archivos dentro de texto
 
-Un texto que incrusta un archivo — las imágenes de un campo markdown — tampoco
-puede contener una URL privada, así que contiene una **referencia de
-almacenamiento** en su lugar: `rebase-storage:posts/cover.png`, con
-`?storageId=media` cuando el archivo está en un origen de almacenamiento con
-nombre. Eso es lo que escribe el editor de markdown del panel de administración
-para una imagen subida. Intercambie las referencias por URL al renderizar el
-texto:
+El texto que incrusta un archivo —las imágenes en un campo markdown— tampoco
+puede contener una URL privada, por lo que en su lugar contiene una **referencia
+de almacenamiento**: `rebase-storage:posts/cover.png`, con `?storageId=media`
+cuando el archivo está en una fuente con nombre. Eso es lo que el editor markdown
+del panel de administración escribe para una imagen subida. Intercambia las
+referencias por URLs cuando renderices el texto:
 
 ```typescript
 import { resolveStorageReferences } from "@rebasepro/client";
 
-const post = await client.data.collection("posts").findById("post-1");
+const post = await client.data.table("posts").findById("post-1");
 const body = await resolveStorageReferences(String(post?.body ?? ""), client);
 // `body` is the same markdown, each reference replaced by a fresh URL.
 ```
 
-Cada objeto se firma una vez por llamada, desde su propio origen, de modo que
-una imagen privada sigue funcionando sin importar cuánto tiempo haga que se
-subió. Una referencia que nombra un objeto que ya no existe se deja como está.
-`storageReference(key, storageId?)` construye una, para texto que usted mismo
-escriba.
+Cada objeto se firma una vez por llamada, desde su propia fuente, por lo que una
+imagen privada sigue funcionando sin importar cuánto tiempo hace que se subió.
+Una referencia que apunta a un objeto que ya no existe se deja tal como está.
+`storageReference(key, storageId?)` construye una, para el texto que escribas tú
+mismo.
 
-El texto guardado antes de que existieran las referencias contiene la propia URL de descarga de un archivo privado,
-`…/storage/file/posts/cover.png?token=…`, cuyo token caducó pocos minutos
-después de escribirse. `resolveStorageReferences` también las renueva: el token
-sigue nombrando el objeto, así que la URL se sustituye por una nueva. Para guardar
-referencias en su lugar, reescribe el texto una vez con
-`storageReferencesForDownloadUrls(text)`, que deja intacta cualquier otra URL.
+El texto guardado antes de que existieran las referencias contiene directamente
+la URL de descarga de un archivo privado, `…/storage/file/posts/cover.png?token=…`,
+cuyo token expiró minutos después de haberse escrito. `resolveStorageReferences`
+también renueva esas: el token todavía nombra el objeto, por lo que la URL se
+reemplaza por una nueva. Para almacenar referencias en su lugar, reescribe el
+texto una vez con `storageReferencesForDownloadUrls(text)`, lo cual deja intacta
+cualquier otra URL.
 
-## Descargar un Archivo
+## Descargar un archivo
 
-Recupere un archivo como un objeto `File`:
+Recupera un archivo como un objeto `File`:
 
 ```typescript
 const file = await client.storage.getObject("products/images/camera.jpg");
@@ -157,7 +159,7 @@ Con un bucket específico:
 const file = await client.storage.getObject("camera.jpg", "product-images");
 ```
 
-## Eliminar un Archivo
+## Eliminar un archivo
 
 ```typescript
 await client.storage.deleteObject("products/images/camera.jpg");
@@ -166,11 +168,11 @@ await client.storage.deleteObject("products/images/camera.jpg");
 await client.storage.deleteObject("camera.jpg", "product-images");
 ```
 
-Eliminar un archivo inexistente no lanza un error.
+Eliminar un archivo inexistente no genera ningún error.
 
-## Listar Archivos
+## Listar archivos
 
-Liste archivos por prefijo, con paginación opcional:
+Lista archivos por prefijo, con paginación opcional:
 
 ```typescript
 const result = await client.storage.listObjects("products/images/", {
@@ -191,15 +193,15 @@ if (result.nextPageToken) {
 }
 ```
 
-Cada elemento lleva su `size` en bytes y `updated` (una marca de tiempo
-ISO 8601) en almacenamiento local, S3 y GCS, y su `contentType` en almacenamiento local
-y GCS — lo suficiente para mostrar una carpeta sin un `getSignedUrl()` por archivo. Un listado
-de S3 no tiene tipo de contenido; las carpetas (`result.prefixes`) no llevan ninguno de los
-tres.
+Cada elemento contiene su `size` en bytes y `updated` (una marca de tiempo ISO 8601)
+en almacenamiento local, S3 y GCS, y su `contentType` en almacenamiento local y GCS;
+suficiente para mostrar una carpeta sin necesidad de un `getSignedUrl()` por archivo.
+Un listado de S3 no tiene tipo de contenido; las carpetas (`result.prefixes`) no
+contienen ninguno de los tres.
 
-## Formatos de Clave de Almacenamiento
+## Formatos de claves de almacenamiento
 
-El SDK gestiona de forma transparente los prefijos de las claves de almacenamiento. Puede pasar claves con o sin el prefijo de protocolo:
+El SDK gestiona los prefijos de las claves de almacenamiento de forma transparente. Puedes pasar claves con o sin el prefijo del protocolo:
 
 ```typescript
 // All equivalent — the SDK strips the prefix internally
@@ -210,7 +212,7 @@ await client.storage.getSignedUrl("products/image.jpg");
 
 ## Referencia de la API
 
-| Método | Descripción | Devuelve |
+| Método | Descripción | Retorna |
 |--------|-------------|---------|
 | `putObject({ file, key?, bucket?, metadata? })` | Subir un archivo | `UploadFileResult` |
 | `getSignedUrl(key, bucket?)` | Obtener URL de descarga + metadatos | `DownloadConfig` |
@@ -218,8 +220,8 @@ await client.storage.getSignedUrl("products/image.jpg");
 | `deleteObject(key, bucket?)` | Eliminar un archivo | `void` |
 | `listObjects(prefix, options?)` | Listar archivos por prefijo | `StorageListResult` |
 
-## Próximos Pasos
+## Próximos pasos
 
-- **[Configuración de Almacenamiento](/docs/backend/storage)** — Configurar S3 o almacenamiento local en el servidor
-- **[Consultar Datos](/docs/sdk/querying)** — Operaciones CRUD y constructor de consultas
+- **[Configuración de almacenamiento](/docs/backend/storage)** — Configura S3 o almacenamiento local en el servidor
+- **[Consulta de datos](/docs/sdk/querying)** — Operaciones CRUD y constructor de consultas
 - **[Autenticación](/docs/sdk/authentication)** — Inicio de sesión y gestión de sesiones

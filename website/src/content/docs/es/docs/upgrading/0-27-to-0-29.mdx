@@ -1,0 +1,167 @@
+---
+sourceHash: ebc124bb86c45865
+slug: es/docs/upgrading/0-27-to-0-29
+title: Actualización de 0.27 a 0.29
+sidebar_label: 0.27 → 0.29
+description: Los breaking changes que 0.29 introduce para una aplicación en 0.27 o 0.28 — el admin entrega a tu código las filas del servidor en lugar de su Entity interna, sus hooks de Entity pasan a ser internos y "qué registro" es `id` en todas partes.
+---
+
+# Actualización de 0.27 → 0.29
+
+Estas son las entradas `### Breaking` que 0.29 incluye para una app en 0.27 o 0.28;
+0.28 no declaró ningún breaking change.
+
+Todos provienen de un único cambio: todo lo que tu código recibe del panel de
+administración es ahora la **fila del servidor**, la misma estructura que REST,
+`client.data`, el `context.data` del backend y `useRows` ya devuelven. Una fila
+son exactamente las columnas del registro: fechas ISO (`YYYY-MM-DD` para una
+columna de solo fecha), un belongsTo bajo su columna de clave foránea (`customerId`),
+y cualquier relación que el admin haya cargado anidada bajo su nombre, tal como lo
+devuelve el `include` de REST. El id del registro viene **junto** a la fila, como
+una cadena de texto (`id`). El código que edita un registro (un `Field`,
+`FormContext.values`, `dynamicProps`, funciones de nombres de almacenamiento) sigue
+recibiendo valores de formulario, tipados para un editor (`Date`, objetos de relación).
+La `Entity` `{ id, path, values }` del admin es interna.
+
+Lee primero la primera sección: es de la que ningún compilador te avisará. El
+resto son cambios de nombre que TypeScript identificará por ti.
+
+---
+
+## 102. `context.data` del navegador y `browserCallbacks` entregan filas
+
+`context.data` en el código del navegador (una acción de entidad, un slot, una
+vista personalizada, un plugin) solía devolver los valores del modelo de vista del
+admin: objetos `Date` y objetos de relación, a pesar de que estaba tipado como filas
+planas. Ahora devuelve las filas que su tipo siempre prometió, y sus escrituras
+ejecutan los `browserCallbacks` de la colección y refrescan cada vista de esa colección.
+
+`admin.browserCallbacks` (`beforeSave`, `afterSave`, `afterSaveError`,
+`beforeDelete`, `afterDelete`, `afterRead`) reciben filas en cualquier ruta: el
+formulario de registro, ediciones de celdas inline, `useRowWrites`, eliminaciones
+y `afterRead`. Se conservan las modificaciones in situ que un callback realice sobre
+la fila entregada.
+
+Esto compila sin cambios y luego se comporta de manera diferente: `values.due.getTime()`
+arroja un error, porque `due` ahora es una cadena.
+
+**Qué cambiar:**
+
+```ts
+// before: a Date and a relation object
+beforeSave: ({ values }) => ({ ...values, overdue: values.due < new Date(), customer: values.customer?.id })
+
+// after: an ISO string and the foreign key
+beforeSave: ({ values }) => ({ ...values, overdue: new Date(String(values.due)) < new Date() })
+```
+
+Encuentra los lugares donde revisar:
+
+```bash
+grep -rnE "browserCallbacks|context\.data\." --include='*.ts' --include='*.tsx' config/ frontend/src/
+```
+
+El `callbacks.afterRead` de una propiedad está tipado con el `row` que recibe; antes
+estaba tipado con una `entity` que nunca se le entregaba.
+
+## 103. Los hooks de datos de `Entity` son internos
+
+`useData`, `useFetch`, `useBatchedFetch`, `useRelationSelector`,
+`saveEntityWithCallbacks` y `deleteEntityWithCallbacks` salen de la API pública,
+y `useCollection` se elimina.
+
+**Qué cambiar:** lee y escribe filas con los hooks de filas o `context.data`:
+
+```tsx
+// before
+const { data } = useCollection({ path: "orders", collection: ordersCollection, itemCount: 20 });
+data.map(entity => entity.values.number);
+
+// after
+const { rows } = useRows("orders", { limit: 20 });
+rows.map(row => row.number);
+```
+
+`usePermissions().canEdit` y `canDelete` aceptan una fila. Los constructores de
+`collections` y `views` de `<RebaseCMS>`, y el `data` de `useBuildNavigationStateController`,
+reciben filas: `data: useData()` → `data: useRebaseContext().data`. Consulta
+[Hooks](/docs/hooks/).
+
+## 104. Los callbacks a nivel de fila reciben `{ row, id }` en lugar de `{ entity }`
+
+Cada callback al que el admin entrega un registro ahora recibe la fila y, junto a ella, el
+id del registro:
+
+| Dónde | Antes | Después |
+|---|---|---|
+| Acciones de entidad `onClick`, `isEnabled`, `disabledReason` | `({ entity })` | `({ row, id, path })` |
+| `highlightEntity` / `unhighlightEntity` | `(entity)` | `highlightRow(id)` / `unhighlightRow(id)` |
+| Resolutores de `admin.display` | `({ entity, context })` | `({ row, context })` |
+| `admin.additionalFields` `Builder` / `value` | `({ entity, context })` | `({ row, id, context })` |
+| `admin.exportable.additionalFields[].builder` | `({ entity, context })` | `({ row, context })` |
+| `<Rebase entityLinkBuilder>` | `({ entity })` | `({ row, id, path })` |
+| Vistas de entidad, `formView.Builder` | `entity` | `row`, `id` |
+| Slot `entity.row.actions` | `{ entity, entityId }` | `{ row, id }` |
+| `FormContext`, `FieldProps.context` | `entity`, `entityId` | `row`, `id` |
+| `dynamicProps`, `fileName` / `storagePath` de almacenamiento | `entityId` | `id` |
+
+**Qué cambiar:** `entity.values.status` → `row.status`, `entity.id` → `id`.
+Un registro relacionado que el admin cargó está anidado: `row.customer.name`. `FormContext`
+se declara una sola vez, en `@rebasepro/cms-types`. El marcador de posición de ruta de almacenamiento
+`{id}` se suma a `{entityId}`, que aún sigue funcionando. Consulta
+[Entity actions](/docs/frontend/entity-actions/).
+
+## 105. "Qué registro" es `id`, y el guardado es `onSaved`
+
+| Dónde | Antes | Después |
+|---|---|---|
+| `EntityFormPanel` (ahora `RecordForm`) | `entityId=` | `id=` |
+| `useSidePanel().open`, `.replace`, `navigateToEntity` | `{ path, entityId, onUpdate }` | `{ path, id, onSaved }` |
+| `onSaved` (formulario, panel lateral) | `{ entity, entityId }` | `{ row, id }` |
+| `OnUpdateParams` | | `OnSavedParams` |
+| `EntityForm`, `EntityFormBinding`, override de `Entity.Form` | `entityId`, `entity`, `onEntityChange(entity)` | `id`, `row`, `onRowChange({ row, id })` |
+| Slots `entity.field.*`, `form.*`; `defaultSelectedView` | `entityId` | `id` |
+
+La URL del panel lateral no cambia, por lo que los enlaces guardados siguen
+abriéndose. En JavaScript puro, un nombre antiguo se ignora en lugar de ser
+rechazado: `open({ path, entityId })` abre un nuevo formulario vacío. Búscalo:
+
+```bash
+grep -rnE "entityId|onUpdate" --include='*.ts' --include='*.tsx' --include='*.js' frontend/src/ config/
+```
+
+Renombrados mientras estás aquí, ambos siguen funcionando y emiten una advertencia solo una vez:
+`EntityFormPanel` pasa a ser `RecordForm`, con las mismas props, y un
+`CollectionPanel` nombra su colección con `collection` (`path="orders"` →
+`collection="orders"`; `path` es donde residen las filas de una subcolección) y
+ordena con `orderBy` (`sort={["placed_at", "desc"]}` → `orderBy="placed_at:desc"`).
+
+## 106. Las vistas de colección, las acciones de colección y la selección utilizan filas e ids
+
+Las vistas de colección personalizadas (`admin.customViews`), las `Actions` de colección y
+los slots de la barra de herramientas reciben un `TableController` de filas, y la
+selección consta de filas e ids:
+
+| Antes | Después |
+|---|---|
+| `tableController.data`, `.sparseData` | `.rows` con `.ids`, `.sparseRows` con `.sparseIds` |
+| `.dataLoading`, `.dataLoadingError` | `.loading`, `.error` |
+| `onEntityClick(entity)` | `onRowClick(row, id)` |
+| `highlightedEntities`, `deletedEntities` | `highlightedIds`, `deletedIds` (cadenas de texto) |
+| `selection.type === "entities"`, `.entities` | `"rows"`, `.rows` e `.ids` |
+| selección por consulta `excluded` | `excludedIds` |
+| `isEntitySelected(entity)` | `isSelected(id)` |
+| `toggleEntitySelection(entity)` | `toggleSelection(row)` |
+| `setSelectedEntities(entities)` | `setSelectedRows(rows)` |
+| `useSelectionController()` | `useSelectionController(collection, path?)` |
+| `const entities = await resolveSelection({ selection, accessor })` | `const { rows, ids } = await resolveSelection({ selection, data: context.data, collection })` |
+| `useSelectionDialog` `onSingleEntitySelected(entity)` | `onSingleRowSelected(row, id)` |
+
+Los overrides de `CollectionPanel` y `Collection.View` aceptan `onRowClick(row, id)` y
+`highlightedIds`. Una lista de filas tiene sus ids al lado en las mismas posiciones —
+`tableController.ids[i]` es el id de `tableController.rows[i]` —, por lo que el código que
+leía `String(row.id)` funciona en una colección indexada por cualquier columna. Los ids se
+comparan como cadenas de texto, por lo que `5` y `"5"` son el mismo registro.
+`resolveSelection` resuelve tanto una selección marcada con casillas como una de tipo
+"seleccionar todas las coincidencias" en filas con la misma estructura. Consulta
+[Customizing the admin](/docs/frontend/customizing/).

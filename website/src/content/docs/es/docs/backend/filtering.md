@@ -1,11 +1,11 @@
 ---
-sourceHash: 5d27aa9cb6533c38
-title: Filtrado en la API REST
+sourceHash: d75d6ec231ad3911
+title: Filtrado de la API REST
 sidebar_label: Filtrado
-description: Filtra las listas de la API REST con operadores al estilo PostgREST, grupos or/and y el dialecto JSON where, y cómo se combinan los filtros.
+description: Filtra solicitudes de listas REST con operadores al estilo de PostgREST, grupos or/and y el dialecto JSON where, y descubre cómo se combinan los filtros.
 ---
 
-Utiliza parámetros de consulta al estilo PostgREST para filtrar resultados. El formato es `?field=operator.value`:
+Utiliza parámetros de consulta al estilo de PostgREST para filtrar resultados. El formato es `?field=operator.value`:
 
 ```bash
 # Exact match
@@ -37,12 +37,12 @@ GET /api/data/products?tags=csall.(electronics,refurbished)
 GET /api/data/products?tags=cd.(electronics,books,toys)
 ```
 
-## Operadores de filtrado
+## Operadores de filtro
 
-| Operador | Significado | Ejemplo |
-|----------|-------------|---------|
-| `eq` | Es igual a (`==`) | `?active=eq.true` |
-| `neq` | No es igual a (`!=`) | `?status=neq.draft` |
+| Operator | Meaning | Example |
+|----------|---------|---------|
+| `eq` | Igual a (`==`) | `?active=eq.true` |
+| `neq` | No igual a (`!=`) | `?status=neq.draft` |
 | `gt` | Mayor que (`>`) | `?price=gt.100` |
 | `gte` | Mayor o igual que (`>=`) | `?price=gte.100` |
 | `lt` | Menor que (`<`) | `?price=lt.50` |
@@ -52,22 +52,20 @@ GET /api/data/products?tags=cd.(electronics,books,toys)
 | `cs` | El array contiene | `?tags=cs.value` |
 | `csa` | El array contiene alguno | `?tags=csa.(a,b)` |
 | `csall` | El array contiene todos | `?tags=csall.(a,b)` |
-| `cd` | Array contenido en: ningún elemento fuera de la lista | `?tags=cd.(a,b)` |
+| `cd` | Array contenido por: ningún elemento fuera de la lista | `?tags=cd.(a,b)` |
 | `like` | Coincidencia de patrón, sensible a mayúsculas y minúsculas (`like`) | `?sku=like.AB-%` |
 | `ilike` | Coincidencia de patrón, insensible a mayúsculas y minúsculas (`ilike`) | `?name=ilike.%widget%` |
 | `nlike` | No coincide con el patrón (`not-like`) | `?sku=nlike.TMP-%` |
-| `nilike` | No coincide con el patrón, insensible a mayúsculas y minúsculas (`not-ilike`) | `?name=nilike.%test%` |
+| `nilike` | No coincide, insensible a mayúsculas y minúsculas (`not-ilike`) | `?name=nilike.%test%` |
 | `isnull` | La columna es `NULL` (`is-null`) | `?deleted_at=isnull.null` |
 | `notnull` | La columna no es `NULL` (`is-not-null`) | `?deleted_at=notnull.null` |
 
-Los cuatro operadores de patrón comparan texto. Una columna enum se compara por su valor
-(`?status=like.draft%25`); en un número, una fecha o cualquier otra columna que no sea texto
-son un 400 `INVALID_FILTER_OPERATOR`.
+Los cuatro operadores de patrones coinciden con texto. Una columna de tipo enum se evalúa por su valor (`?status=like.draft%25`); en un número, una fecha o cualquier otra columna que no sea texto, devuelven un error 400 `INVALID_FILTER_OPERATOR`.
 
-`isnull` y `notnull` no toman operando: el operador es la condición completa, y `.null`, `.true`, `.false` o nada después del punto significan lo mismo. El SDK escribe `.null`, por lo que esa es la sintaxis que verás transmitida. Cualquier otra cosa después del punto no es un operando que tengan, así que toda la cadena se lee como un valor: `?reason=notnull.reason` coincide con el texto `notnull.reason`.
+`isnull` y `notnull` no toman operandos: el operador constituye toda la condición, y `.null`, `.true`, `.false` o nada después del punto significan lo mismo. El SDK escribe `.null`, por lo que esa es la sintaxis que verás transmitida. Cualquier otra cosa después del punto no se considera un operando que admitan, por lo que toda la cadena se lee como un valor: `?reason=notnull.reason` coincide con el texto `notnull.reason`.
 
 :::caution[`eq.null` es la cadena de cuatro caracteres, no `IS NULL`]
-`?deleted_at=eq.null` busca el texto literal `null`. SQL `= NULL` nunca es verdadero, por lo que ninguna interpretación de `eq.null` podría significar la comprobación de nulidad; utiliza `isnull` para ello. El SDK serializa `.where("deleted_at", "==", null)` como `isnull.null` exactamente por esta razón.
+`?deleted_at=eq.null` busca el texto literal `null`. Como en SQL `= NULL` nunca es verdadero, no existe ninguna interpretación de `eq.null` que signifique la comprobación de null; utiliza `isnull` para eso. El SDK serializa `.where("deleted_at", "==", null)` como `isnull.null` exactamente por esta razón.
 :::
 
 ## Operadores lógicos
@@ -85,39 +83,36 @@ GET /api/data/products?and=(active.eq.true,price.gt.0)
 GET /api/data/products?not=(discontinued.eq.true,stock.gt.0)
 ```
 
-`not` niega la **conjunción** de sus condiciones: `not(a)` es `NOT a`, y `not(a,b)` es `NOT (a AND b)`. Se compila en un `NOT (...)` de SQL real en lugar de operadores invertidos; SQL tiene lógica trivaluada, por lo que `NOT (a AND b)` y `(NOT a) OR (NOT b)` dejan de coincidir en el momento en que hay un NULL involucrado. Por lo tanto, una negación **incluye filas cuya columna es NULL**, que es lo que significa `NOT`; añade un `notnull` junto con él si eso no es lo que deseas.
+`not` niega la **conjunción** de sus condiciones: `not(a)` es `NOT a`, y `not(a,b)` es `NOT (a AND b)`. Se compila a un `NOT (...)` real de SQL en lugar de a operadores invertidos; dado que la lógica de SQL es trivaluada, `NOT (a AND b)` y `(NOT a) OR (NOT b)` dejan de coincidir en cuanto interviene un NULL. Por lo tanto, una negación **incluye las filas cuya columna es NULL**, que es lo que significa `NOT`; añade un `notnull` junto a ella con un AND si eso no es lo que deseas.
 
-**Un grupo por solicitud: `or` tiene prioridad sobre `and`, y ambos sobre `not`.** Son tres formas de expresar la misma ranura, no tres filtros. En su lugar, anídalos:
+**Un grupo por solicitud: `or` tiene prioridad sobre `and`, y ambos sobre `not`.** Son tres formas de escribir el mismo espacio, no tres filtros. En su lugar, anídalos:
 
 ```bash
 GET /api/data/products?or=(price.lt.10,and(active.eq.true,price.gt.0))
 GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
 ```
 
-Los grupos pueden anidarse hasta 32 niveles de profundidad; más allá de eso, la solicitud se rechaza con `INVALID_LOGICAL_GROUP`.
+Los grupos pueden anidarse hasta 32 niveles de profundidad; superado ese límite, la solicitud se rechaza con `INVALID_LOGICAL_GROUP`.
 
-Una condición dentro de un grupo cuyo operador el dialecto no tiene —
-`?not=(title.contains.x)` — es un 400 `UNKNOWN_FILTER_OPERATOR`, igual que en un `where`
-JSON. No se lee como una igualdad sobre `contains.x`, que dentro de `not` habría
-coincidido con todas las filas.
+Una condición dentro de un grupo cuyo operador no exista en el dialecto (por ejemplo, `?not=(title.contains.x)`) produce un error 400 `UNKNOWN_FILTER_OPERATOR`, tal como ocurre en un `where` en JSON. No se interpreta como una igualdad con `contains.x`, lo que dentro de `not` habría coincidido con todas las filas.
 
-Un grupo **restringe** los resultados junto con los filtros de campo en lugar de reemplazarlos; consulta [Cómo se combinan los filtros](#cómo-se-combinan-los-filtros).
+Un grupo **restringe** junto con los filtros de campo en lugar de reemplazarlos; consulta [Cómo se combinan los filtros](#cómo-se-combinan-los-filtros).
 
 ## El dialecto JSON `where`
 
-Los filtros de campo anteriores son una de las dos formas de enviar un filtro. La otra es un único objeto JSON, que es lo que el documento de OpenAPI publica en cada `GET /api/data/{slug}` y lo que aceptan las rutas de subcolecciones anidadas:
+Los filtros de campo anteriores son una de las dos formas de enviar un filtro. La otra es un único objeto JSON, que es lo que el documento de OpenAPI publica en cada `GET /api/data/{slug}` y lo que aceptan las rutas anidadas:
 
 ```bash
 GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
 ```
 
-Cada clave es un campo, y cada valor es una tupla canónica `[operator, value]`, las mismas tuplas que escribe el SDK. Un valor también puede ser una cadena con punto preserializada (`{"status":"eq.active"}`) o un escalar simple (`{"status":"active"}`); las tres se compilan en la misma condición. Un array de valores simples es un `in` implícito: `{"category":["electronics","gadgets"]}` se lee como `["in", ["electronics","gadgets"]]`, mientras que un primer elemento con forma de operador que no es un operador real (`["!!","x"]`) es un 400 `UNKNOWN_FILTER_OPERATOR`.
+Cada clave es un campo y cada valor es una tupla canónica `[operator, value]`, las mismas tuplas que escribe el SDK. Un valor también puede ser una cadena con punto preserializada (`{"status":"eq.active"}`) o un escalar simple (`{"status":"active"}`); las tres opciones compilan a la misma condición. Un array de valores simples es un `in` implícito: `{"category":["electronics","gadgets"]}` se interpreta como `["in", ["electronics","gadgets"]]`, mientras que un primer elemento con forma de operador que no sea un operador real (`["!!","x"]`) devuelve un error 400 `UNKNOWN_FILTER_OPERATOR`.
 
-El mismo objeto se lee igual dondequiera que llegue: aquí, en el `where` del SDK, en una consulta MCP y en el `filter` del socket en tiempo real — sus solicitudes de lista y de recuento y sus suscripciones en vivo.
+El mismo objeto se interpreta de la misma manera dondequiera que llegue: aquí, en el `where` del SDK, en una consulta MCP y en el `filter` del socket en tiempo real (sus solicitudes de listado y conteo, y sus suscripciones en vivo).
 
-La diferencia que vale la pena conocer: **JSON preserva los tipos.** `?price=gte.100` envía la cadena `"100"` y el controlador realiza el cast según el tipo de columna, mientras que `?where={"price":[">=",100]}` envía un número. Para una columna cuyas lecturas textuales y numéricas difieran (una cadena de versión, un código con ceros a la izquierda), ese es el parámetro adecuado a utilizar.
+La diferencia que vale la pena conocer: **JSON conserva los tipos.** `?price=gte.100` envía la cadena `"100"` y el controlador la convierte según el tipo de columna, mientras que `?where={"price":[">=",100]}` envía un número. Para una columna cuyas lecturas de texto y numéricas difieran (una cadena de versión, un código con ceros a la izquierda), ese es el parámetro adecuado a utilizar.
 
-Un `where` mal formado devuelve un error 400 `INVALID_WHERE`, no un filtro descartado silenciosamente: descartarlo ejecutaría la lectura sin filtros y devolvería todo lo que la seguridad a nivel de fila (RLS) permita.
+Un `where` mal formado devuelve un error 400 `INVALID_WHERE`, en lugar de ignorar silenciosamente el filtro: descartarlo ejecutaría la lectura sin filtros y devolvería todo lo que la seguridad a nivel de fila permita.
 
 ## Cómo se combinan los filtros
 
@@ -129,9 +124,9 @@ Un `where` mal formado devuelve un error 400 `INVALID_WHERE`, no un filtro desca
   AND (the search string)
 ```
 
-La única excepción es un campo nombrado tanto en `?field=op.value` como en `where`: en ese caso el parámetro de consulta **reemplaza** la condición de `where` sobre ese campo, por ser la petición más específica, en lugar de combinarse con ella mediante AND.
+La única excepción es un campo nombrado tanto en `?field=op.value` como en `where`: en ese caso, el parámetro de consulta **reemplaza** la condición del `where` en ese campo al ser la solicitud más específica, en lugar de combinarse con ella mediante un AND.
 
-No hay forma de aplicar un OR entre ellos. Cualquier condición que no sea un AND directo de esos grupos debe ubicarse dentro de un único árbol `or=`/`and=`.
+No hay forma de aplicar un OR entre ellos. Cualquier cosa que no sea un AND simple de esos grupos debe ubicarse dentro de un único árbol `or=`/`and=`.
 
 ## Próximos pasos
 

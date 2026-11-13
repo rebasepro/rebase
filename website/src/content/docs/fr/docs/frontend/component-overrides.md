@@ -1,23 +1,23 @@
 ---
-sourceHash: 950f7cd092f53f01
-title: Remplacement de composants (Swizzling)
-sidebar_label: Remplacement de composants
+sourceHash: b16bc057fd9a76c0
+title: Surcharges de composants (Swizzling)
+sidebar_label: Surcharges de composants
 description: Remplacez les composants d'interface par défaut par des implémentations personnalisées au niveau de l'application ou de la collection.
 ---
 
-## Aperçu
+## Vue d'ensemble
 
-Rebase vous permet de remplacer les composants d'interface utilisateur par défaut par vos propres implémentations personnalisées. Cela implémente un modèle de « swizzling » de composants de style Docusaurus prenant en charge deux modèles de personnalisation :
-- **Mode Eject** (par défaut) : votre composant remplace intégralement le composant intégré.
-- **Mode Wrap** (`wrap: true`) : votre composant enveloppe l'original. Ce qu'il enveloppe (généralement le composant intégré) est transmis via la prop `OriginalComponent` afin que vous puissiez l'afficher à l'intérieur de votre mise en page/logique personnalisée.
+Rebase vous permet de surcharger les composants d'interface par défaut avec vos propres implémentations personnalisées. Cela implémente un modèle de « swizzling » de composants similaire à celui de Docusaurus, qui prend en charge deux approches de personnalisation :
+- **Mode Eject** (par défaut) : Votre composant remplace intégralement le composant intégré.
+- **Mode Wrap** (`wrap: true`) : Votre composant enveloppe l'original. Ce qu'il enveloppe (généralement le composant intégré) est transmis via la prop `OriginalComponent`, ce qui vous permet de le rendre à l'intérieur de votre mise en page ou logique personnalisée.
 
-Les remplacements de composants peuvent être appliqués **globalement** au niveau de l'application (sur le fournisseur `<Rebase>`) ou **localement** au niveau de la collection (à l'intérieur des définitions de collections individuelles).
+Les surcharges de composants peuvent être appliquées **globalement** au niveau de l'application (sur le fournisseur `<Rebase>`) ou **localement** au niveau de la collection (au sein des définitions individuelles de collections).
 
 ---
 
-## Remplacements globaux de composants
+## Surcharges globales de composants
 
-Pour remplacer des composants globalement dans toute votre application, transmettez un objet `components` au fournisseur racine `<Rebase>`.
+Pour surcharger des composants globalement sur l'ensemble de votre application, transmettez un objet `components` au fournisseur racine `<Rebase>`.
 
 ```tsx
 import { Rebase } from "@rebasepro/app";
@@ -56,133 +56,124 @@ function App() {
 
 ---
 
-## Remplacements de composants au niveau de la collection
+## Surcharges de composants au niveau de la collection
 
-Pour remplacer des composants uniquement pour une collection spécifique, ajoutez un objet `components` sous son bloc `admin`. Cela est utile pour personnaliser les états vides, les cartes ou les vues détaillées pour des modèles particuliers.
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-Dans l'échafaudage par défaut, `config/collections/` est chargé **à la fois** par le panneau d'administration et par le backend, qui lit les mêmes fichiers pour dériver le schéma et l'API. Pointez donc vers chaque composant par **chemin de module** plutôt qu'en l'important. `Component` accepte les mêmes formes que `admin.Field` et `entityViews[].Builder` : un chemin, un `import()` différé (lazy), ou le composant lui-même.
+Pour surcharger les composants d'une seule table, transmettez `components` dans son `customizeTable`. C'est utile pour l'état vide (empty state), les cartes ou le formulaire d'une table particulière. Chaque `Component` est le composant lui-même, importé par valeur : le fichier s'exécute uniquement dans le navigateur.
 
-```ts
-// config/collections/products.ts
-import { defineCollection } from "@rebasepro/cms-types";
+```tsx
+// frontend/src/cms/products.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { products } from "../../../backend/schema/products";
+import { ProductCustomForm } from "../../../../../components/ProductCustomForm";
+import { ProductsEmptyState } from "../../../../../components/ProductsEmptyState";
 
-export const productsCollection = defineCollection({
-    name: "Products",
-    slug: "products",
-    table: "products",
-    properties: { /* ... */ },
-    admin: {
-        components: {
-            // Eject Mode: Replace the default entity form view
-            "Entity.Form": { Component: "../../frontend/src/ProductCustomForm" },
-
-            // Wrap Mode: Wrap the empty state to add quick links
-            "Collection.EmptyState": {
-                Component: "../../frontend/src/ProductsEmptyState",
-                wrap: true
-            }
-        }
-    }
+export const productsCms = customizeTable<typeof products>("products", {
+    components: {
+        // Replace: the product form is drawn by your component alone.
+        "Entity.Form": { Component: ProductCustomForm },
+        // Wrap: your component receives the original as `OriginalComponent`.
+        "Collection.EmptyState": { Component: ProductsEmptyState, wrap: true },
+    },
 });
 ```
 
-Le composant d'enveloppement réside avec le reste de votre code frontend et reçoit ce qu'il enveloppe sous la forme de `OriginalComponent` — le composant intégré, à moins que votre application ne le remplace également (voir [Lorsque les deux portées remplacent un composant](#lorsque-les-deux-portées-remplacent-un-composant)) :
+Un composant d'enveloppement (wrapper) reçoit ce qu'il enveloppe sous le nom de `OriginalComponent` : le composant intégré, à moins que votre application ne le surcharge également (voir [Lorsque les deux portées surchargent un composant](#lorsque-les-deux-portées-surchargent-un-composant-when-both-scopes-override-a-component)) :
 
 ```tsx
-// frontend/src/ProductsEmptyState.tsx
-import type React from "react";
+// frontend/src/components/ProductsEmptyState.tsx
+import React from "react";
 
-export default function ProductsEmptyState({ OriginalComponent, ...props }: {
+export function ProductsEmptyState({ OriginalComponent, ...props }: {
     OriginalComponent: React.ComponentType<Record<string, unknown>>
 }) {
     return (
         <div className="empty-state-wrapper">
             <OriginalComponent {...props} />
-            <button onClick={() => importDemoProducts()}>
-                Load Demo Products
-            </button>
+            <a href="/docs/import">Import your first products</a>
         </div>
     );
 }
 ```
 
-Chaque module nécessite un **export par défaut** (`default export`). Le plugin Vite pour les collections réécrit un chemin en un import différé (lazy import), de sorte que le composant constitue son propre chunk et se charge lors du premier rendu du remplacement. Cette réécriture couvre les fichiers situés dans le répertoire configuré `collectionsDir`. Un chemin situé dans un fichier en dehors de celui-ci parvient à l'administration sous forme de simple chaîne de caractères : la console l'indique, et le composant intégré s'affiche à sa place. En dehors de `collectionsDir`, écrivez vous-même l'import différé : `Component: () => import("../../frontend/src/ProductCustomForm")`.
+Un chemin sous forme de chaîne de caractères ou un thunk différé `() => import(…)` dans `Component` lèvera une erreur au chargement du module, en indiquant ce qu'il convient d'écrire à la place.
 
-Une référence directe (`Component: ProductCustomForm`) fonctionne également, mais uniquement dans un fichier de collection que le serveur ne charge pas, car importer le composant importe également React et tout ce dont il dépend.
+### Lorsque les deux portées surchargent un composant {#when-both-scopes-override-a-component}
 
-### Lorsque les deux portées remplacent un composant
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-Les deux portées se composent. Le remplacement au niveau de l'application (`<Rebase components>`) est d'abord appliqué au composant intégré, puis celui de la collection (`admin.components`) est appliqué au résultat :
+Les deux portées se composent. La surcharge au niveau de l'application (`<Rebase components>`) est d'abord appliquée au composant intégré, puis celle de la table (`components` dans `customizeTable`) est appliquée au résultat :
 
-| Niveau application | Niveau collection | Ce qui s'affiche dans cette collection |
+| Niveau applicatif | Niveau collection | Ce qui est rendu au sein de cette collection |
 |---|---|---|
-| n'importe lequel | aucun | ce qui s'affiche partout ailleurs : le remplacement au niveau de l'application, ou le composant intégré |
+| quelconque | aucun | ce qui est rendu partout ailleurs : la surcharge au niveau applicatif, ou le composant intégré |
 | aucun | wrap | le wrapper de la collection autour du composant intégré |
-| replace ou wrap | wrap | le wrapper de la collection autour du remplacement au niveau de l'application, transmis comme `OriginalComponent` |
-| n'importe lequel | replace | le composant de la collection seul ; il remplace les deux |
+| replace ou wrap | wrap | le wrapper de la collection autour de la surcharge au niveau applicatif, transmis en tant que `OriginalComponent` |
+| quelconque | replace | le composant de la collection seul ; il remplace les deux |
 
-Une collection peut donc ajouter un élément autour d'un composant que votre application personnalise déjà sans perdre cette personnalisation. Pour abandonner la version au niveau de l'application pour une collection donnée, utilisez le remplacement (replace) au lieu de l'enveloppement (wrap).
+Ainsi, une collection peut ajouter un habillage autour d'un composant que votre application personnalise déjà, sans perdre cette personnalisation. Pour abandonner la version au niveau applicatif pour une collection donnée, utilisez le remplacement (replace) au lieu de l'enveloppement (wrap).
 
 ---
 
-## Portées des composants remplaçables
+## Portées des composants surchargeables
 
-### Composants à portée application (`AppComponentName`)
+### Composants à portée applicative (`AppComponentName`)
 
-Ces composants ne peuvent être remplacés qu'au niveau du fournisseur racine `<Rebase>`, car ils représentent la structure globale de l'interface (shell).
+Ces composants ne peuvent être surchargés qu'au niveau du fournisseur racine `<Rebase>`, car ils représentent la structure globale du shell.
 
 | Clé du composant | Description |
 |---|---|
 | `"Shell.AppBar"` | La barre d'en-tête en haut de la page |
-| `"Shell.Drawer"` | Le volet de navigation latéral principal repliable |
+| `"Shell.Drawer"` | Le volet de navigation principal rétractable de la barre latérale |
 | `"Shell.DrawerNavigationItem"` | Liens individuels à l'intérieur de la barre latérale |
-| `"Shell.DrawerNavigationGroup"` | En-têtes de groupes de navigation repliables dans la barre latérale |
+| `"Shell.DrawerNavigationGroup"` | En-têtes de groupes de navigation rétractables dans la barre latérale |
 | `"HomePage"` | La page d'accueil par défaut en mode contenu |
 | `"HomePage.CollectionCard"` | Cartes de collection individuelles sur la page d'accueil |
-| `"Auth.LoginView"` | La fenêtre modale/superposition affichée lors d'une demande d'authentification |
+| `"Auth.LoginView"` | La vue modale affichée lors d'une demande d'authentification |
 
-### Composants à portée collection (`CollectionComponentName`)
+### Composants à portée de collection (`CollectionComponentName`)
 
-Ces composants peuvent être remplacés globalement (servant de valeurs par défaut pour toutes les collections) ou sur des collections individuelles.
+Ces composants peuvent être surchargés globalement (faisant office de valeurs par défaut pour toutes les collections) ou sur des collections individuelles.
 
 | Clé du composant | Description |
 |---|---|
-| `"Collection.View"` | La page d'accueil complète de la collection |
-| `"Collection.Table"` | La vue tabulaire sous forme de feuille de calcul par défaut |
-| `"Collection.Card"` | Le conteneur d'élément de vue en carte |
+| `"Collection.View"` | La page d'accueil entière de la collection |
+| `"Collection.Table"` | La vue tabulaire de type tableur par défaut |
+| `"Collection.Card"` | Le conteneur d'élément de la vue carte |
 | `"Collection.EmptyState"` | Vue affichée lorsqu'une collection est vide |
-| `"Collection.Actions"` | Boutons de la barre d'outils au-dessus du tableau/des cartes |
-| `"Collection.FilterField"` | Champ de filtre personnalisé pour une colonne |
-| `"Entity.Form"` | Le formulaire détaillé pour la création/mise à jour |
-| `"EditView.FormActions"` | Barre de boutons de soumission/annulation de formulaire |
+| `"Collection.Actions"` | Boutons de la barre d'outils au-dessus de la table/des cartes |
+| `"Collection.FilterField"` | Champ de saisie de filtre personnalisé pour une colonne |
+| `"Entity.Form"` | Le formulaire de détail pour la création/mise à jour |
+| `"EditView.FormActions"` | Barre de boutons d'action/annulation du formulaire |
 | `"DetailView"` | Vue détaillée en lecture seule |
-| `"Entity.SidePanel"` | Le conteneur du panneau latéral pour le formulaire/détail |
-| `"EntityPreview"` | Prévisualisation inline sous forme de puce (chip) de référence/relation |
-| `"Entity.MissingReference"` | Affiché lorsqu'une entité référencée est manquante |
+| `"Entity.SidePanel"` | Le conteneur du panneau latéral pour le formulaire/le détail |
+| `"EntityPreview"` | Aperçu inline d'une référence/relation sous forme de puce (chip) |
+| `"Entity.MissingReference"` | Rendu lorsqu'une entité référencée est manquante |
 
-:::note[Trois clés dérogent au motif `Entity.`]
-`"DetailView"`, `"EntityPreview"` et `"EditView.FormActions"` ne comportent aucun préfixe `Entity.`. `"Entity.DetailView"`, `"Entity.Preview"` et `"Entity.FormActions"` ne font pas partie de l'union — ils déclenchent une erreur de type, et en JavaScript pur, le remplacement ne s'applique tout simplement jamais.
+:::note[Trois clés dérogent au modèle `Entity.`]
+`"DetailView"`, `"EntityPreview"` et `"EditView.FormActions"` ne portent aucun préfixe `Entity.`. `"Entity.DetailView"`, `"Entity.Preview"` et `"Entity.FormActions"` ne font pas partie de l'union — ils déclenchent une erreur de typage, et en JavaScript pur, la surcharge ne s'applique tout simplement jamais.
 :::
 
-Votre composant de remplacement reçoit les mêmes props que celles transmises au composant intégré. Le mapping de remplacement ne spécifie pas de type de props par clé — `ComponentOverride<P>` définit par défaut `P` comme `Record<string, unknown>` — typez donc vous-même le paramètre ou passez un argument de type lorsque vous souhaitez vérifier les props. Certains composants intégrés exportent un type de props que vous pouvez importer et réutiliser : `CollectionViewProps` (`@rebasepro/ui`) ; `CollectionEmptyStateProps`, `CollectionActionsProps`, `SidePanelBindingProps` et `FilterFieldBindingProps` (`@rebasepro/cms-types`) ; `EntityFormProps`, `EntityFormBindingProps`, `EntityFormActionsProps`, `CollectionTableBindingProps`, `DetailViewBindingProps`, `DrawerNavigationItemProps` et `DrawerNavigationGroupProps` (`@rebasepro/cms`) ; `LoginViewProps` (`@rebasepro/app`). Les autres n'ont pas de type de props exporté — écrivez la structure que vous lisez réellement.
+Votre composant de remplacement reçoit les mêmes props que celles transmises au composant intégré. La table de correspondance des surcharges ne définit pas de type de props par clé — `ComponentOverride<P>` utilise par défaut `Record<string, unknown>` pour `P` — typez donc le paramètre vous-même, ou passez un argument de type, lorsque vous souhaitez vérifier les props. Certains composants intégrés exportent un type de props que vous pouvez importer et réutiliser : `CollectionViewProps` (`@rebasepro/ui`) ; `CollectionEmptyStateProps`, `CollectionActionsProps`, `SidePanelBindingProps` et `FilterFieldBindingProps` (`@rebasepro/cms-types`) ; `EntityFormProps`, `EntityFormBindingProps`, `EntityFormActionsProps`, `CollectionTableBindingProps`, `DetailViewBindingProps`, `DrawerNavigationItemProps` et `DrawerNavigationGroupProps` (`@rebasepro/cms`) ; `LoginViewProps` (`@rebasepro/app`). Les autres n'ont pas de type de props exporté — écrivez la structure que vous utilisez réellement.
 
-### Ce qu'un remplacement de `Collection.View` doit respecter
+### Ce qu'une surcharge de `Collection.View` doit respecter
 
-`Collection.View` est ce qui est rendu par un `CollectionPanel`, ainsi les props du panneau parviennent à votre remplacement sous la forme de `CollectionViewBindingProps` (`@rebasepro/cms`), propagées avec celles de la collection. Un composant de remplacement qui les ignore casse chaque page intégrant la collection. Respectez au minimum les éléments suivants :
+`Collection.View` correspond à ce qu'affiche un `CollectionPanel`, ainsi les props du panneau parviennent à votre surcharge sous forme de `CollectionViewBindingProps` (`@rebasepro/cms`), combinées avec celles propres à la collection. Un remplacement qui les ignore cassera toutes les pages qui intègrent la collection. Respectez au minimum les props suivantes :
 
 | Prop | Ce qu'attend l'appelant |
 |---|---|
-| `collectionOverrides` | Ce que l'appelant modifie à propos de la collection (un filtre fixe, un tri, le mode de vue), appliqué sur la collection enregistrée |
-| `fields` | Uniquement ces propriétés, dans cet ordre : les colonnes, et ce à partir de quoi les lignes de liste et les cartes sont renseignées |
+| `collectionOverrides` | Les modifications apportées par l'appelant à la collection (un filtre fixe, un tri, le mode d'affichage), appliquées par-dessus la collection enregistrée |
+| `fields` | Uniquement ces propriétés, dans cet ordre : les colonnes, et les éléments servant à alimenter les lignes de liste et les cartes |
 | `highlightedIds` | Les identifiants des lignes affichées comme sélectionnées ; `[]` pour aucune |
-| `onRowClick` | Appelé avec la ligne cliquée, telle qu'envoyée par le serveur, et son identifiant, au lieu de l'ouvrir. Le propre `onRowClick` du panneau |
+| `onRowClick` | Appelé avec la ligne cliquée, telle qu'envoyée par le serveur, et son identifiant, au lieu de l'ouvrir. Correspond au propre `onRowClick` du panneau |
 
-Le panneau transmet également `viewMode` (le mode dans lequel s'ouvrir), `toolbar` (la barre d'outils à afficher, `null` pour aucune) et `title` (`false` pour ne pas afficher de titre), là où son appelant les a définis. Le composant intégré `CollectionViewBinding` gère l'ensemble de ces éléments ; un remplacement qui l'enveloppe plutôt que de le remplacer peut simplement les transmettre directement.
+Le panneau transmet également `viewMode` (le mode dans lequel s'ouvrir), `toolbar` (la barre d'outils à afficher, `null` pour aucune) et `title` (`false` pour ne pas afficher de titre), lorsque son appelant les a définis. Le composant intégré `CollectionViewBinding` prend en charge l'ensemble de ces éléments ; une surcharge qui l'enveloppe plutôt que de le remplacer peut simplement les transmettre directement.
 
-Pour partir du composant intégré plutôt que de zéro, copiez son code source dans votre projet et enregistrez la copie ici : chaque partie à l'exception de `Collection.View`, `DetailView` et du glisser-déposer de la page d'accueil se compile avec les imports des packages. Voir [Copier une partie intégrée](/docs/frontend/customizing#copying-a-built-in-part).
+Pour partir de l'élément intégré plutôt que de zéro, copiez son code source dans votre projet et enregistrez la copie ici : chaque partie, à l'exception de `Collection.View`, `DetailView` et du glisser-déposer de la page d'accueil, se compile avec les imports de packages. Voir [Copier une partie intégrée](/docs/frontend/customizing#copying-a-built-in-part).
 
 ## Voir aussi
 
-- [Étendre Rebase](/docs/frontend/extending/) — les points d'extension qui ne nécessitent pas de remplacement
-- [Champs personnalisés](/docs/frontend/custom-fields/) — remplacer l'éditeur d'une propriété plutôt qu'un composant
-- [Slots](/docs/frontend/slots/) — ajouter à un composant au lieu de le remplacer
+- [Étendre Rebase](/docs/frontend/extending/) — les points d'extension qui ne nécessitent pas de surcharge
+- [Champs personnalisés](/docs/frontend/custom-fields/) — remplacer l'éditeur d'une seule propriété plutôt qu'un composant entier
+- [Slots](/docs/frontend/slots/) — ajouter des éléments à un composant au lieu de le remplacer

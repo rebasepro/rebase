@@ -1,13 +1,11 @@
 ---
-sourceHash: 4b2c2516afc9fad6
+sourceHash: 1e1ed4905f58d5fd
 title: Autorização de Storage
 sidebar_label: Autorização de Storage
 description: Decida quem pode ler, gravar, excluir ou listar cada objeto de storage com storagePolicies e o hook storageAuthorize, e de quais escopos de storage uma chave de API precisa.
 ---
 
-As coleções são protegidas por segurança em nível de linha; um bucket não tem um
-equivalente por objeto, então o storage é autorizado aqui. A [Configuração de
-Storage](/docs/backend/storage/) cobre os próprios backends.
+Tabelas são protegidas por segurança em nível de linha (row-level security); um bucket não tem equivalente por objeto, portanto o storage é autorizado aqui. A [Configuração de Storage](/docs/backend/storage/) aborda os próprios backends.
 
 ## Políticas
 
@@ -20,53 +18,49 @@ storagePolicies: [
 ]
 ```
 
-**Uma chave que nenhuma política contempla é recusada**, a menos que um hook `storageAuthorize` a permita: o hook só é consultado quando nenhuma política correspondeu à chave para aquela operação, e nenhum dos dois pode restringir o outro. Uma política que correspondeu e não concedeu é definitiva. Todo alargamento é uma linha explícita, e um erro nega em vez de conceder.
+**Uma chave não correspondida por nenhuma política é recusada**, a menos que um hook `storageAuthorize` a permita: o hook é consultado apenas quando nenhuma política correspondeu à chave para essa operação, e nenhum dos dois pode restringir o outro. Uma política que correspondeu e não concedeu acesso é definitiva. Toda ampliação de permissão é uma linha explícita, e um erro nega em vez de conceder.
 
-Os padrões correspondem **por segmento, nunca por substring** — `public/**` não corresponde a
-`publicity/secret.png`:
+Os padrões correspondem **por segmento, nunca por substring** — `public/**` não corresponde a `publicity/secret.png`:
 
-| Padrão | Corresponde a |
+| Padrão | Correspondência |
 |---|---|
 | `avatars/logo.png` | exatamente essa chave |
-| `users/*/avatar.png` | exatamente um segmento onde está o `*` |
-| `users/:uid/**` | um segmento capturado e depois o resto — inclusive nada |
+| `users/*/avatar.png` | exatamente um segmento onde `*` está |
+| `users/:uid/**` | um segmento capturado, depois o restante — incluindo nada |
 
-`**` só é permitido como segmento final. `:name` captura um segmento e nunca
-atravessa uma `/`; as capturas chegam como `params` ao predicado.
+`**` só é válido como o segmento final. `:name` captura um segmento e nunca abrange uma `/`; as capturas chegam como `params` no predicado.
 
-`allow` é `"public"` (qualquer pessoa que a rota deixe passar), `"authenticated"` (qualquer chamador com um uid) ou um
-predicado que recebe os params capturados, o usuário, a operação e o bucket.
+`allow` pode ser `"public"` (qualquer pessoa que a rota permita o acesso), `"authenticated"` (qualquer chamador com um uid), ou um predicado recebendo os parâmetros capturados, o usuário, a operação e o bucket.
 
-Uma política roda depois da autenticação da rota, então `"public"` sozinho não abre um caminho para chamadores anônimos. Com `requireAuth` ativo, eles alcançam apenas leituras de chaves `public/`, ou todas as leituras com `storagePublicRead`; `/upload`, `/list`, exclusões e uploads retomáveis sempre exigem um chamador. Fora disso a resposta é `401`.
+Uma política é executada após a autenticação da rota, portanto, `"public"` por si só não abre um caminho para chamadores anônimos. Com `requireAuth` ativado, eles acessam apenas leituras de chaves sob `public/`, ou todas as leituras com `storagePublicRead`; `/upload`, `/list`, exclusões e uploads retomáveis sempre precisam de um chamador. Caso contrário, a resposta é `401`.
 
-`operations` assume por padrão as quatro — `read`, `write`, `delete`, `list`.
+`operations` tem como padrão todas as quatro — `read`, `write`, `delete`, `list`.
 
-As políticas satisfazem por si só a proteção de inicialização em produção, e um padrão malformado
-faz a inicialização falhar, em vez do primeiro upload.
+As políticas satisfazem a proteção de inicialização em produção por si sós, e um padrão malformado falha na inicialização em vez de no primeiro upload.
 
 ## O hook
 
-`requireAuth` e `publicRead` são chaves *globais*: decidem se um chamador precisa estar autenticado, não no que esse chamador pode mexer. Sem um hook de autorização, **qualquer usuário autenticado pode ler qualquer chave que consiga nomear** — a única coisa que separa os arquivos de dois tenants é que a chave não pode ser adivinhada, o que não é um modelo de controle de acesso. Pior, ele pode fazer antes um `GET /storage/list?prefix=`, então as chaves nem precisam ser adivinhadas.
+`requireAuth` e `publicRead` são chaves *globais*: decidem se um chamador precisa estar autenticado, e não o que esse chamador pode acessar. Sem um hook de autorização, **qualquer usuário autenticado pode ler qualquer chave cujo nome conheça** — a única coisa que separa os arquivos de dois tenants é a impossibilidade de adivinhar a chave, o que não é um modelo de controle de acesso. Pior ainda, eles podem fazer `GET /storage/list?prefix=` primeiro, de modo que nem precisam adivinhar as chaves.
 
-:::caution[O storage não inicializa em produção sem um]
-As coleções são protegidas por segurança em nível de linha; o storage não. Não há um
-equivalente por objeto no bucket, então este hook *é* o modelo — e
-`initializeRebaseBackend` **lança uma exceção na inicialização** sob `NODE_ENV=production` quando
-o storage está configurado e nenhum destes está definido:
+:::caution[O storage não inicializará em produção sem uma dessas opções]
+As tabelas são protegidas por segurança em nível de linha (RLS); o storage não. Não há
+equivalente por objeto no bucket, portanto este hook *é* o modelo — e o
+`initializeRebaseBackend` **lança um erro na inicialização** com `NODE_ENV=production` quando
+o storage estiver configurado e nenhum destes estiver definido:
 
 - `storageAuthorize` — um hook, por objeto. Recomendado.
 - `storagePolicies` — as regras declaradas acima.
-- `storagePublicRead: true` — o bucket realmente é uma CDN pública somente para leitura.
-- `storageInsecureAllowAnyAuthenticated: true` — um app de tenant único em que todo
-  usuário autenticado tem a confiança de acessar todos os arquivos. Com um nome feito para ser lido duas vezes.
+- `storagePublicRead: true` — o bucket é genuinamente uma CDN pública somente leitura.
+- `storageInsecureAllowAnyAuthenticated: true` — uma aplicação single-tenant onde todo
+  usuário autenticado tem acesso a todos os arquivos. Nomeado deliberadamente para fazer você pensar duas vezes.
 
-Em desenvolvimento, ele registra um aviso em vez disso, de modo que um projeto pode estar errado nesse ponto e
-funcionar bem localmente até o momento em que é implantado. Um projeto gerado já traz um hook em
-`config/storage.ts` — leia-o antes de substituí-lo, e note que ele modela
-a *biblioteca de conteúdo compartilhada* de um CMS, que não tem o mesmo formato que arquivos por usuário.
+Em desenvolvimento, ele apenas registra um aviso, portanto um projeto pode estar configurado incorretamente
+e funcionar bem localmente até ser implantado. Um projeto recém-gerado já inclui um hook em
+`backend/storage.ts` — leia-o antes de substituí-lo e observe que ele modela uma
+*biblioteca de conteúdo compartilhado* de CMS, que tem uma estrutura diferente de arquivos por usuário.
 :::
 
-`storageAuthorize` é o análogo, para o storage, das regras de segurança de uma coleção, e é executado após a autenticação em toda rota de storage:
+`storageAuthorize` é o análogo no storage do `rls` de uma tabela, e é executado após a autenticação em cada rota de storage:
 
 ```typescript no-verify
 await initializeRebaseBackend({
@@ -82,36 +76,29 @@ await initializeRebaseBackend({
 
 | Campo | Descrição |
 |-------|-----------|
-| `key` | Chave do objeto, com o prefixo do bucket removido e a travessia de diretórios sanitizada |
+| `key` | Chave do objeto, com o prefixo do bucket removido e traversal sanitizado |
 | `bucket` | Bucket resolvido (`"default"` quando não especificado) |
 | `operation` | `"read"`, `"write"`, `"delete"` ou `"list"` |
-| `user` | `{ uid, email?, roles? }`, ou `null` quando a rota permite acesso anônimo |
-| `storageId` | O backend nomeado, quando a requisição apontou para um — sua chave canônica (`storageId=%20media` é `"media"`). Ausente para a fonte padrão, qualquer que seja a forma como a requisição a nomeou (sem parâmetro, vazio ou `(default)`) |
-| `data` | Acesso de leitura confiável que **ignora a RLS** — `data.collection(slug).find(query)` / `.findById(id)`. A propriedade fica em uma linha, não em um prefixo de chave, então o hook precisa de um leitor para responder "quem é o dono deste objeto?". Ele ignora a segurança em nível de linha de propósito: este hook *é* a decisão de autorização, e tomá-la por meio de um leitor já restringido pelas próprias permissões do chamador seria circular. Somente leitura, de propósito. |
+| `user` | `{ uid, email?, roles? }`, ou `null` onde a rota permite acesso anônimo |
+| `storageId` | O backend nomeado, quando a requisição tiver um como alvo — sua chave canônica (`storageId=%20media` é `"media"`). Ausente para a fonte padrão, independentemente de como a requisição o nomeou (sem parâmetro, vazio ou `(default)`) |
+| `data` | Acesso de leitura confiável que **ignora RLS** — `data.table(slug).find(query)` / `.findById(id)`. A propriedade pertence a uma linha, não a um prefixo de chave, portanto o hook precisa de um leitor para responder "quem é o proprietário deste objeto?". Ele ignora o row-level security deliberadamente: este hook *é* a decisão de autorização, e fazê-la por meio de um leitor já restrito pelas próprias permissões do chamador seria circular. Somente leitura por design. |
 
-Retorne `false` para negar com um **403**. Lançar uma exceção também nega — uma consulta de propriedade que falha não deixa o acesso aberto.
+Retorne `false` para negar com um **403**. Lançar um erro (throw) também nega — uma busca de propriedade que falha não deixa o acesso aberto.
 
-Vale saber:
+Vale a pena saber:
 
-- **A rota de metadados é onde o acesso de leitura é de fato decidido.** Ela emite o token de download de curta duração, restrito ao caminho, em que a rota de arquivo confia, então é ali que o hook a controla. Duas leituras pulam o hook, de propósito. Uma que traz um token desse tipo: o hook a aprovou quando o token foi emitido, para aquele caminho e aquela fonte apenas, de modo que um hook que agora recusaria (uma associação revogada desde então) não a impede antes de o token expirar — `storageDownloadTokenTtl`, 300 segundos por padrão. E a leitura de uma chave sob `public/` por um chamador sem credencial: o prefixo é a declaração de que qualquer pessoa pode lê-la, visitantes anônimos e CDNs inclusive. A leitura dela por um chamador autenticado ainda é consultada, mas a de um anônimo não, então um hook não consegue tornar privada uma chave `public/`; guarde o arquivo fora de `public/`. Só essas duas leituras o pulam: um usuário que o seu adaptador de autenticação chame de `public` é consultado como qualquer outro.
-- **Um bucket, um nome.** No S3 e no GCS, o `bucket` do hook é sempre `"default"`, inclusive quando uma requisição nomeia o bucket do provedor, o que alcança os mesmos objetos.
-- **Um caminho é público quando a chave que ele nomeia é.** O prefixo `public/` é testado na chave canônica que a rota serve — depois de um segmento de bucket `default/` inicial ser lido e de `//`, `./` e uma `/` inicial serem eliminados — nunca na URL como foi escrita. `/api/storage/file/notes://public/x.txt` nomeia a chave privada `notes:/public/x.txt`, e a chave `default/public/x.txt` (alcançada como `/api/storage/file/default/default/public/x.txt`) fica em uma pasta chamada `default`; nenhuma das duas é pública. Em um hook, teste a `key` que lhe foi entregue com `isPublicStorageKey` de `@rebasepro/types` — `isPublicStoragePath` lê um caminho ou URL do lado do cliente, e lê as duas como públicas.
-- **`list` é controlado pelo prefixo.** Listar é como se descobrem chaves que ninguém lhe contou.
-- **Os uploads resumíveis (TUS) são controlados no momento da criação**, então um upload negado não deixa nenhum arquivo temporário para trás.
-- Omitir o hook (e `storagePolicies`) não deixa nenhuma verificação por objeto, então a produção se recusa a inicializar a menos que `storagePublicRead` ou `storageInsecureAllowAnyAuthenticated` esteja definido.
+- **A rota de metadados é onde o acesso de leitura é realmente decidido.** Ela gera o token de download de curta duração e com escopo de caminho no qual a rota de arquivo confia, portanto o hook atua como portão ali. Duas leituras ignoram o hook, por design. Uma que carrega tal token: o hook a aprovou quando o token foi gerado, apenas para aquele caminho e fonte, de modo que um hook que agora recusaria (uma associação revogada desde então) não a interrompe antes que o token expire — `storageDownloadTokenTtl`, 300 segundos por padrão. E uma leitura de uma chave sob `public/` por um chamador sem credenciais: o prefixo é a declaração de que qualquer pessoa pode lê-la, incluindo visitantes anônimos e CDNs. A leitura feita por um chamador autenticado ainda passa pelo hook, mas a de um anônimo não; logo, um hook não pode tornar privada uma chave sob `public/`; em vez disso, armazene o arquivo fora de `public/`. Apenas essas duas leituras o ignoram: um usuário que seu adaptador de autenticação por acaso chame de `public` é consultado como qualquer outro.
+- **Um bucket, um nome.** No S3 e no GCS, o `bucket` do hook é sempre `"default"`, mesmo quando uma requisição especifica o nome do bucket no provedor, o que acessa os mesmos objetos.
+- **Um caminho é público quando a chave que ele nomeia é pública.** O prefixo `public/` é testado na chave canônica servida pela rota — depois que o segmento inicial de bucket `default/` é removido e `//`, `./` e uma `/` inicial são normalizados — nunca na URL exatamente como escrita. `/api/storage/file/notes://public/x.txt` referencia a chave privada `notes:/public/x.txt`, e a chave `default/public/x.txt` (acessada como `/api/storage/file/default/default/public/x.txt`) fica em uma pasta chamada `default`; nenhuma das duas é pública. Em um hook, teste a `key` recebida com `isPublicStorageKey` de `@rebasepro/types` — `isPublicStoragePath` lê um caminho ou URL do lado do cliente e considera ambos como públicos.
+- **`list` é controlado pelo prefixo.** Listar é como se descobre chaves sobre as quais ninguém lhe informou.
+- **Uploads retomáveis (TUS) são controlados no momento da criação**, de modo que um upload negado não deixa arquivos temporários para trás.
+- Omitir o hook (e `storagePolicies`) não deixa nenhuma verificação por objeto, portanto o ambiente de produção se recusa a inicializar, a menos que `storagePublicRead` ou `storageInsecureAllowAnyAuthenticated` esteja definido.
 
 ## Chaves de API e tokens
 
-Uma pessoa autenticada tem todos os escopos de storage, então o hook e as políticas acima
-decidem por ela. Uma [chave de API](/docs/backend/api-keys/) também precisa do escopo de
-storage da operação, na fonte que a requisição nomeia: `storage:read` para
-downloads, metadados e listagens, `storage:write` para uploads, pastas e todas as
-etapas de um upload resumível, `storage:delete` para exclusões. O alvo é o id da
-fonte, e o da fonte padrão é `(default)`: `storage:read:(default)`,
-`storage:write:avatars`. Sem ele, a resposta é `403 SCOPE_MISSING`. Com ele,
-o hook ainda é executado, como quem quer que a chave represente.
+Uma pessoa autenticada possui todos os escopos de storage, portanto o hook e as políticas acima decidem por ela. Uma [chave de API](/docs/backend/api-keys/) também precisa do escopo de storage para a operação, na fonte indicada pela requisição: `storage:read` para downloads, metadados e listagens; `storage:write` para uploads, pastas e cada etapa de um upload retomável; `storage:delete` para exclusões. O alvo é o ID da fonte, e o da fonte padrão é `(default)`: `storage:read:(default)`, `storage:write:avatars`. Sem isso, a resposta é `403 SCOPE_MISSING`. Com isso, o hook ainda é executado, atuando em nome de quem quer que a chave represente.
 
-## Próximos Passos
+## Próximos passos
 
 - **[Configuração de Storage](/docs/backend/storage/)** — backends, endpoints e limites
 - **[Chaves de API](/docs/backend/api-keys/)** — os escopos que uma chave carrega

@@ -1,21 +1,28 @@
 ---
-sourceHash: 702686890d8244f9
-title: Agent Skills
+sourceHash: dd9c77451521c040
+title: Skill dell'agente
 sidebar_label: Agent Skills
-description: rebase skills install scrive 24 skill di riferimento di Rebase nel tuo repository, nel layout previsto dal tuo assistente IA — Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity.
+description: rebase skills install scrive 24 skill di riferimento di Rebase nel tuo repository, nel layout previsto dal tuo assistente AI — Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity.
 ---
 
-Un assistente IA che ha letto la documentazione di Rebase scrive codice Rebase migliore rispetto a uno che cerca di indovinare dalla struttura delle API. `rebase skills install` copia 24 file di skill Markdown nel tuo repository, nel layout previsto dal tuo assistente:
+Un assistente AI che ha letto la documentazione di Rebase scrive codice Rebase migliore
+rispetto a uno che cerca di indovinare dalla forma delle API. `rebase skills install` copia 24
+file Markdown di skill nel tuo repository, nel layout previsto dal tuo assistente:
 
 ```bash
 rebase skills install
 ```
 
-Le skill sono **materiale di consultazione, non strumenti**. Spiegano all'assistente come vengono definite le collection, perché le migrazioni prevedono due passaggi e quali errori il framework non intercetterà per lui. Per gli strumenti che operano sui tuoi dati, consulta il [server MCP](/docs/ai/mcp).
+Le skill sono **materiale di riferimento, non strumenti**. Spiegano all'assistente come
+vengono dichiarate le tabelle, perché le migrazioni sono a due passaggi e quali errori il
+framework non intercetterà al posto suo. Per gli strumenti che agiscono sui tuoi dati, consulta il
+[server MCP](/docs/ai/mcp).
 
 ## Configurazione tramite `rebase init`
 
-Un nuovo progetto non necessita di questo comando. `rebase init` chiede se configurare i tuoi agent di coding IA, quindi elenca quelli rilevati sulla macchina:
+Un nuovo progetto non ha bisogno del comando. `rebase init` chiede
+se configurare i tuoi agenti di programmazione AI, quindi elenca quelli che trova sulla
+macchina:
 
 ```text
 ? Set up Rebase skills and the Rebase MCP server for your AI coding agent(s)? Yes
@@ -30,7 +37,9 @@ Detecting installed AI coding agents...
   · GitHub Copilot — can't be detected; tick it below if you use it
 ```
 
-Gli agent rilevati sono già selezionati. Per ciascuno di quelli mantenuti, scrive le skill e registra il [server MCP](/docs/ai/mcp) nella configurazione di progetto di quell'agent, il tutto prima del primo commit del progetto. In CI, o con `--yes`, è possibile specificarli per nome:
+Gli agenti rilevati sono preselezionati. Per ciascuno di quelli che mantieni, scrive le skill
+e registra il [server MCP](/docs/ai/mcp) nella configurazione di progetto di quell'agente, tutto
+prima del primo commit del progetto. In CI, o con `--yes`, specificali:
 
 ```bash
 rebase init my-app --yes --agent claude,cursor
@@ -38,20 +47,18 @@ rebase init my-app --yes --agent claude,cursor
 
 ## Un progetto esistente
 
-`rebase init` si rifiuta su una cartella che contiene già un progetto, quindi un
-progetto creato prima che esistesse la configurazione degli agent — o uno il
-cui autore ha rifiutato la richiesta — ottiene la stessa configurazione con
-`rebase skills install --mcp`: le skill, e il [server MCP](/docs/ai/mcp)
-registrato nella configurazione di progetto di ciascun agent. I server già
-presenti nel file vengono mantenuti, e una nuova esecuzione lascia inalterata
-la voce di Rebase.
+`rebase init` rifiuta una directory che contiene già un progetto, quindi un progetto
+creato prima che esistesse la configurazione dell'agente — o uno in cui l'autore ha rifiutato il prompt —
+ottiene la stessa configurazione tramite `rebase skills install --mcp`: le skill e il
+[server MCP](/docs/ai/mcp) registrato nella configurazione di progetto di ciascun agente. I server
+già presenti nel file vengono mantenuti e una nuova esecuzione lascia la voce di Rebase inalterata.
 
 ```bash
 rebase skills install --agent cursor --mcp
 ```
 
-Senza `--mcp` il comando scrive solo le skill, ed elenca gli agent la cui
-configurazione non ha ancora il server.
+Senza `--mcp` il comando scrive solo le skill ed elenca gli agenti la cui
+configurazione non include ancora il server.
 
 ## Quale assistente
 
@@ -63,7 +70,7 @@ rebase skills install --agent claude,cursor
 rebase skills install --agent all
 ```
 
-Sono supportati sette target — uno per ogni file puntatore scritto da `rebase init`:
+Sono supportate sette destinazioni — una per ogni file puntatore scritto da `rebase init`:
 
 | `--agent` | Assistente | Scritto in |
 |---|---|---|
@@ -76,74 +83,106 @@ Sono supportati sette target — uno per ogni file puntatore scritto da `rebase 
 | `copilot` | GitHub Copilot | `.github/instructions/rebase.instructions.md` + `<skill>/SKILL.md` |
 
 :::note[Cursor, Windsurf, Kiro e Copilot ricevono un singolo file sempre attivo]
-Questi quattro caricano l'intera directory delle regole in ogni richiesta. Un file di regole per ogni skill avrebbe comportato circa **84.000 caratteri** di documentazione di riferimento di Rebase inclusi in ogni domanda posta dall'utente, a prescindere dal fatto che riguardasse o meno Rebase — e un'istruzione letta superficialmente da un assistente è un'istruzione che non verrà seguita.
+Questi quattro caricano l'intera directory delle regole in ogni richiesta. Un file di regole per
+ogni skill avrebbe significato circa **84.000 caratteri** di documentazione di riferimento di Rebase inseriti prima di
+qualsiasi domanda posta da un utente, che riguardasse Rebase o meno — e
+un'istruzione che un assistente legge superficialmente è un'istruzione che non seguirà.
 
-Ricevono invece `rebase.mdc` (o `rebase.md`): un indice di ~3 KB con `alwaysApply: true`, che elenca gli argomenti trattati da ciascuna skill e il file da consultare. I contenuti veri e propri risiedono in sottodirectory dedicate per ciascuna skill e vengono aperti su richiesta.
+Ricevono invece `rebase.mdc` (o `rebase.md`): un indice di circa 3 KB con
+`alwaysApply: true`, che elenca gli argomenti trattati da ciascuna skill e il file da leggere. I
+contenuti effettivi si trovano nelle sottodirectory dedicate a ciascuna skill e vengono aperti su richiesta.
 :::
 
-`gemini` copre **sia** Gemini CLI che Antigravity — leggono entrambi la stessa directory `.agents/`, pertanto non esiste un valore separato `antigravity`. Anche Codex la legge; specificare sia `gemini` che `codex` scriverà la directory una sola volta.
+`gemini` copre **sia** Gemini CLI che Antigravity — leggono la stessa
+directory `.agents/`, quindi non esiste un valore separato per `antigravity`. Anche Codex la
+legge; specificando sia `gemini` che `codex`, la directory verrà scritta una sola volta.
 
-Senza l'opzione `--agent`, il comando rileva quali assistenti sono già utilizzati nel progetto cercando `.cursor/`, `.claude/skills/`, `.windsurf/`, `.agents/`, `.codex/` e `.kiro/`. Se non ne trova alcuno, richiede di effettuare una scelta, con gli assistenti installati sulla macchina già selezionati.
+Senza `--agent`, il comando rileva quali assistenti sono già utilizzati nel progetto
+cercando `.cursor/`, `.claude/skills/`, `.windsurf/`, `.agents/`, `.codex/` e
+`.kiro/`. Se non ne trova alcuno, ti invita a scegliere, con gli assistenti installati
+sulla macchina già preselezionati.
 
-**GitHub Copilot non viene mai rilevato automaticamente.** La sua directory sarebbe `.github/`, e la presenza di `.github/` non prova che qualcuno stia usando Copilot: `rebase init` scrive `.github/copilot-instructions.md` in ogni scaffolding e la maggior parte dei repository ha già una cartella `.github/` per i workflow. Installalo con `--agent copilot`.
+**GitHub Copilot non viene mai rilevato.** La sua directory sarebbe `.github/`, e
+`.github/` non è una prova dell'uso effettivo di Copilot: `rebase init` inserisce
+`.github/copilot-instructions.md` in ogni scaffolding iniziale, e la maggior parte dei repository ha
+una cartella `.github/` per i workflow. Installalo con `--agent copilot`.
 
-:::note[Un progetto appena creato mostra sempre il prompt]
-`rebase init` scrive `CLAUDE.md`, `.cursorrules` e simili, ma nessuna delle *directory* cercate dal rilevamento. Di conseguenza, la prima esecuzione in un nuovo progetto ricade sul prompt — e in ambiente CI, dove non c'è un TTY, termina restituendo un errore. Passa `--agent` esplicitamente in qualsiasi contesto non interattivo.
+:::note[Un progetto appena generato mostra sempre un prompt]
+`rebase init` scrive `CLAUDE.md`, `.cursorrules` e simili, ma nessuna delle
+*directory* cercate dal rilevamento. Pertanto, la prima esecuzione in un nuovo progetto ricade
+nella richiesta interattiva — e in ambiente CI, dove non è presente una TTY, termina invece con un errore.
+Passa `--agent` esplicitamente in qualsiasi contesto non interattivo.
 :::
 
-## Locali al progetto e destinate al commit
+## Locali al progetto e destinate a essere committate
 
-Le skill vengono scritte **relativamente alla radice del tuo progetto** — il percorso antenato più vicino contenente `rebase.json` — e non nella tua home directory né nella directory di lavoro corrente. Non viene installato nulla a livello globale.
+Le skill vengono scritte **rispetto alla directory radice del progetto** — l'antenato più vicino
+contenente `rebase.json` — non nella tua home directory e non nella directory di lavoro
+corrente. Nulla viene installato a livello globale.
 
-Effettua il commit di questi file. Fanno parte del repository esattamente come una configurazione di linting: in questo modo l'assistente di ogni collaboratore opera con la stessa comprensione del codebase, compresi i collaboratori che non hanno mai eseguito il comando.
+Esegui il commit di questi file. Fanno parte del repository esattamente come una configurazione di linter: in questo modo,
+l'assistente di ogni collaboratore opera con la stessa conoscenza del codebase,
+compresi i collaboratori che non hanno mai eseguito il comando.
 
-**Esegui nuovamente il comando per aggiornare** dopo un aggiornamento di Rebase:
+**Esegui nuovamente il comando per aggiornare** dopo un upgrade di Rebase:
 
 ```bash
 rebase skills install --agent all
 ```
 
-Ogni directory di destinazione contiene un manifest `.rebase-skills.json` con ciò che il comando ha scritto, così una nuova esecuzione sa distinguere una tua modifica dalla copia di una release precedente. Fanne il commit insieme alle skill.
+Ogni directory di destinazione contiene un manifest `.rebase-skills.json` con quanto
+scritto dal comando, consentendo a una successiva esecuzione di distinguere una modifica manuale rispetto alla copia di una versione precedente. Esegui il commit
+di questo file insieme alle skill.
 
-- Un file che nessuno ha modificato viene sostituito con la copia della nuova release.
-- Un file che hai modificato viene mantenuto, e il comando lo elenca. `--force` lo sostituisce.
-- Una skill che una release più recente non distribuisce più viene rimossa, a meno che tu non l'abbia modificata. In quel caso viene mantenuta ed elencata.
-- I file che il comando non ha mai scritto non vengono toccati.
+- Un file non modificato da nessuno viene sostituito con la copia della nuova versione.
+- Un file che hai modificato viene mantenuto e il comando lo segnala nell'elenco. `--force` lo sostituisce.
+- Una skill non più inclusa in una versione più recente viene rimossa, a meno che tu non l'abbia modificata.
+  In tal caso, viene mantenuta ed elencata.
+- I file non scritti dal comando non vengono toccati.
 
-Le istruzioni specifiche del progetto vanno comunque in [`ai-instructions.md`](/docs/ai/instruction-files), che ti appartiene. Una skill modificata smette di ricevere aggiornamenti finché non usi `--force`.
+Le indicazioni specifiche per il progetto devono comunque risiedere in
+[`ai-instructions.md`](/docs/ai/instruction-files), che è gestito da te. Una skill
+modificata smette di ricevere aggiornamenti finché non usi l'opzione `--force`.
 
-Il comando funziona anche al di fuori di un progetto Rebase, ripiegando sulla directory di lavoro corrente — utile per un repository frontend separato che comunica con un backend Rebase.
+Il comando funziona anche all'esterno di un progetto Rebase, ricorrendo alla directory di lavoro
+corrente — utile per un repository frontend separato che comunica con un backend Rebase.
 
 ## Le 24 skill
+
+<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 | Skill | Argomenti trattati |
 |---|---|
 | `rebase-basics` | Principi fondamentali, workflow e manutenzione — il punto di ingresso presupposto da tutte le altre |
-| `rebase-collections` | Definizione delle collection, tipi di proprietà, validazione, ricercabilità |
-| `rebase-backend-postgres` | Il backend Postgres: configurazione, generazione dello schema, migrazioni, connection pooling, repliche di lettura |
-| `rebase-api` | L'API REST generata — endpoint, filtri, ordinamento, paginazione |
+| `rebase-tables` | Creazione delle tabelle: colonne, relazioni, `rls`, hook e il livello CMS sovrastante (`customizeTable`) |
+| `rebase-backend-postgres` | Il backend Postgres: configurazione, generazione dello schema, migrazioni, pooling, repliche di lettura |
+| `rebase-api` | Le API REST generate — endpoint, filtri, ordinamento, paginazione |
 | `rebase-sdk` | L'SDK TypeScript generato: CRUD, filtri, ricerca, autenticazione, realtime, offline, storage |
 | `rebase-auth` | Autenticazione, ruoli, policy RLS, MFA, chiavi API, OAuth, adapter personalizzati |
-| `rebase-security` | Controllo degli accessi, intercettazione, design fail-closed, mascheramento PII, isolamento dei tenant |
-| `rebase-realtime` | Il motore WebSocket: sincronizzazione, canali di broadcast, presenza, notifiche broadcast di modifiche alle tabelle |
-| `rebase-storage` | Archiviazione su S3/GCS/locale, caricamenti, upload ripristinabili TUS, trasformazioni di immagini |
-| `rebase-custom-functions` | Endpoint API personalizzati tramite function discovery basata su file |
-| `rebase-cron-jobs` | Pianificazione di attività in background ricorrenti |
+| `rebase-security` | Controllo degli accessi, intercettazione, design fail-closed, mascheramento di PII, isolamento dei tenant |
+| `rebase-realtime` | Il motore WebSocket: sincronizzazione, canali broadcast, presenza, notifiche broadcast di modifiche alle tabelle |
+| `rebase-storage` | Archiviazione su S3/GCS/locale, caricamenti, caricamenti riprendibili con TUS, trasformazioni di immagini |
+| `rebase-custom-functions` | Endpoint API personalizzati tramite rilevamento di funzioni basato su file |
+| `rebase-cron-jobs` | Pianificazione di task in background ricorrenti |
 | `rebase-webhooks` | Webhook HTTP in uscita, firme HMAC, tentativi e backoff |
 | `rebase-email` | SMTP, template, provider personalizzati, il singleton `rebase.email` |
-| `rebase-entity-history` | Controllo delle versioni delle entità, tracciamento delle modifiche, log di audit, ripristino |
-| `rebase-admin` | Navigazione nel pannello di amministrazione, drawer laterali, URL, incorporamento di pannelli di collection |
-| `rebase-customize-admin` | Personalizzazione dell'admin con componenti React — singleton, pagine delle impostazioni, azioni in blocco, modalità di visualizzazione, campi personalizzati, sostituzione di parti integrate |
-| `rebase-custom-views` | Schermate personalizzate nell'admin — `rebase generate view`, viste di primo livello, schede dei record, widget dei campi |
-| `rebase-dashboards` | KPI, grafici e dashboard — numeri calcolati in SQL, disegnati con `@rebasepro/ui`, posizionati negli slot o in una pagina |
+| `rebase-entity-history` | Versionamento delle entità, tracciamento delle modifiche, audit log, ripristino |
+| `rebase-admin` | Navigazione del pannello di amministrazione, drawer laterali, URL, integrazione di pannelli per le collezioni |
+| `rebase-customize-admin` | Personalizzazione del pannello di amministrazione con componenti React — singleton, pagine di impostazioni, azioni di massa, modalità di visualizzazione, campi personalizzati, sostituzione di parti predefinite |
+| `rebase-custom-views` | Schermate personalizzate all'interno dell'admin — `rebase generate view`, visualizzazioni di primo livello, tab per i record, widget per i campi |
+| `rebase-dashboards` | KPI, grafici e dashboard — valori calcolati in SQL, renderizzati con `@rebasepro/ui`, collocati in slot o in una pagina |
 | `rebase-ui-components` | La libreria di componenti `@rebasepro/ui` |
-| `rebase-design-language` | Il design system dell'interfaccia utente: token, colori, tipografia, spaziatura, anti-pattern |
-| `rebase-studio` | Il livello degli strumenti di sviluppo Studio — SQL, RLS, storage, cron, visualizzatore di schemi, log |
+| `rebase-design-language` | Il design system dell'interfaccia: token, colori, tipografia, spaziatura, anti-pattern |
+| `rebase-studio` | Il livello degli strumenti di sviluppo di Studio — SQL, RLS, storage, cron, visualizzatore dello schema, log |
 | `rebase-cloud` | Deploy e gestione operativa su Rebase Cloud — progetti, database gestiti, variabili d'ambiente, domini, log, rollback |
 | `rebase-deployment` | Self-hosting: Docker, Kubernetes, AWS, GCP, Azure, Hetzner, Railway e Render |
 | `rebase-local-env-setup` | Configurazione iniziale dell'ambiente: Node.js, pnpm, PostgreSQL, Docker |
 
-Due di queste richiedono di essere lette spontaneamente. `rebase-basics` specifica che deve essere consultata ogni volta che l'assistente interagisce con Rebase, mentre `rebase-design-language` impone all'agent di leggerla prima di creare o modificare qualsiasi interfaccia visiva — quest'ultima esiste perché le UI generate tendono a discostarsi dal design system più velocemente di qualunque altra parte del codice.
+Due di queste richiedono di essere lette spontaneamente. `rebase-basics` dichiara di dover
+essere utilizzata ogni volta che un assistente interagisce con Rebase, mentre `rebase-design-language` stabilisce
+che un agente deve leggerla prima di creare o modificare qualsiasi interfaccia grafica — quest'ultima
+esiste perché le UI generate tendono ad allontanarsi dal design system più velocemente di qualsiasi
+altra parte del codebase.
 
 ## Esempio di esecuzione
 
@@ -153,4 +192,5 @@ Due di queste richiedono di essere lette spontaneamente. `rebase-basics` specifi
   ✓ Claude Code — 24 skills installed (+ 8 reference files) to .claude/skills
 ```
 
-Le skill sono distribuite dal pacchetto `@rebasepro/agent-skills`, da cui dipende la CLI, quindi il set ottenuto corrisponde alla versione della CLI installata.
+Le skill provengono dal pacchetto `@rebasepro/agent-skills`, da cui dipende la CLI;
+pertanto, il set ottenuto corrisponde alla versione della CLI installata.

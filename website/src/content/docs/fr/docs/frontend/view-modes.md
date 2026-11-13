@@ -1,139 +1,118 @@
 ---
-sourceHash: 608b8f9f3290a362
-title: Modes de vue
-sidebar_label: Modes de vue
-description: Configurez les vues en tableau, cartes et tableau Kanban pour vos collections.
+sourceHash: 57ee5c3ecdf49419
+title: Modes d'affichage
+sidebar_label: Modes d'affichage
+description: "Affichez les lignes d'une table sous forme de liste, de feuille de calcul, de cartes ou de tableau kanban ; choisissez ce qui remplit le titre, l'image, le statut et la date de chaque enregistrement ; et définissez le tri par défaut, les filtres et les préréglages de filtres en un clic."
 ---
 
-## Vue d'ensemble
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-Chaque collection peut être affichée dans quatre modes de vue :
+Chaque collection peut être affichée de quatre manières, depuis le sélecteur situé dans sa barre d'outils :
 
-- **Liste** — Vue en liste simple et épurée (le choix classique par défaut des CMS)
-- **Tableau** — Grille de type feuille de calcul avec édition en ligne, tri et filtrage
-- **Cartes** — Grille de cartes pour le contenu visuel (images, aperçus)
-- **Kanban** — Tableau avec glisser-déposer regroupé par une propriété d'énumération (enum)
+- **Table** : une feuille de calcul virtualisée avec édition en ligne, tri, filtrage
+  et sélection multiple. Le mode d'ouverture par défaut d'une collection, sauf indication contraire.
+- **List** : une ligne par enregistrement, avec son image, son titre, son sous-titre, son statut et
+  sa date.
+- **Cards** : une grille de cartes, pour les contenus riches en images.
+- **Kanban** : un tableau groupé par une colonne ayant un ensemble fermé de valeurs.
 
-Ce sont les modes intégrés. Une collection peut également proposer des modes de vue que vous écrivez vous-même — un calendrier, une carte, une galerie — dans le même sélecteur, pilotés par la même barre d'outils : consultez [Modes de vue personnalisés](/docs/frontend/extending#custom-view-modes) et la recette de calendrier dans [Personnalisation de l'administration](/docs/frontend/customizing).
+Une collection peut également proposer des modes d'affichage que vous développez (un calendrier, une carte,
+une galerie) dans le même sélecteur, pilotés par la même barre d'outils : voir
+[Modes d'affichage personnalisés](/docs/frontend/extending#custom-view-modes).
 
-## Configuration
+## Choisir les vues
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const productsCollection = defineCollection({
-    slug: "products",
-    // `orderProperty` and `kanban.columnProperty` are checked against these
-    // keys — with an empty `properties` block they narrow to `never`.
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        status: { name: "Status", type: "string" },
-        // The order key. A *string*, never a number — see "Ordering" below.
-        __order: {
-            name: "Order",
-            type: "string",
-            admin: { disabled: true, hideFromCollection: true }
-        }
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+```ts
+// backend/schema/tasks.ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const tasks = defineTable("tasks", {
+    columns: {
+        id:      col.uuid().primaryKey().defaultRandom(),
+        title:   col.text().notNull(),
+        status:  col.enum(["backlog", "in_progress", "review", "done"]).notNull().default("backlog"),
+        dueDate: col.date(),
+        // The board's order key: text, never a number.
+        __order: col.text(),
     },
-    name: "Products",
-    table: "products",
-    admin: {
-        defaultViewMode: "table",            // Default view
-        enabledViews: ["list", "table", "kanban"],    // Available views
-        orderProperty: "__order",           // Property for drag-and-drop ordering
-        kanban: {
-            columnProperty: "status"         // Enum property for columns
-        }
-    }
+    rls: "admin-only",
 });
-
 ```
 
-## Vue en liste
+```tsx
+// frontend/src/cms/tasks.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { tasks } from "../../../backend/schema/tasks";
 
-La vue en liste est le mode de vue par défaut classique et épuré d'un CMS, affichant les entités sous un format de liste simple, sans la densité d'une feuille de calcul.
+export const tasksCms = customizeTable<typeof tasks>("tasks", {
+    defaultViewMode: "kanban",
+    enabledViews: ["table", "kanban"],
+    kanban: { columnField: "status", orderField: "__order" },
+    fields: {
+        status: {
+            enumLabels: {
+                backlog:     { label: "Backlog", color: "gray" },
+                in_progress: { label: "In Progress", color: "blue" },
+                review:      { label: "Review", color: "orange" },
+                done:        { label: "Done", color: "green" },
+            },
+        },
+        __order: { hidden: true, hiddenInForm: true },
+    },
+});
+```
 
-## Vue en tableau
+| Option | Effet |
+|---|---|
+| `defaultViewMode` | L'affichage sur lequel arrive un visiteur : `"table"`, `"list"`, `"cards"`, `"kanban"` ou la clé d'une vue personnalisée. |
+| `enabledViews` | Les vues proposées par le sélecteur. |
+| `kanban` | `{ columnField, orderField }` : le tableau kanban. |
+| `defaultSize` | La hauteur de ligne, ci-dessous. |
+| `customViews` | Vos propres vues, par valeur ou par clé. |
 
-La vue en tableau est une feuille de calcul virtualisée haute performance offrant :
+### Hauteur de ligne
 
-- **Édition en ligne** — Cliquez sur n'importe quelle cellule pour la modifier directement
-- **Redimensionnement des colonnes** — Faites glisser les en-têtes de colonnes
-- **Réorganisation des colonnes** — Faites glisser pour réorganiser
-- **Tri** — Cliquez sur les en-têtes de colonnes
-- **Recherche textuelle** — Recherche plein texte sur les champs de type chaîne
-- **Filtrage** — Filtres par colonne
-- **Sélection multiple** — Sélectionnez des entités pour effectuer des actions groupées
-
-### Hauteur des lignes
-
-Contrôlez la hauteur des lignes avec `defaultSize` :
-
-| Taille | Pixels | Idéal pour |
+| `defaultSize` | Pixels | Idéal pour |
 |------|--------|----------|
-| `"xs"` | 36 | Tableaux de données denses |
+| `"xs"` | 36 | Tables de données denses |
 | `"s"` | 42 | Lignes de texte compactes |
 | `"m"` | 48 | Par défaut |
-| `"l"` | 96 | Miniatures d'images moyennes |
-| `"xl"` | 160 | Grandes miniatures d'images |
+| `"l"` | 96 | Vignettes d'images moyennes |
+| `"xl"` | 160 | Grandes vignettes d'images |
 
-## Vue Kanban
+## Kanban
 
-Configurez un tableau Kanban en spécifiant quelle propriété d'énumération (enum) utiliser pour les colonnes :
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const tasksCollection = defineCollection({
-    slug: "tasks",
-    name: "Tasks",
-    table: "tasks",
-    properties: {
-        title: { type: "string", name: "Title" },
-        status: {
-            type: "string",
-            name: "Status",
-            enum: [
-                { id: "backlog", label: "Backlog", color: "gray" },
-                { id: "in_progress", label: "In Progress", color: "blue" },
-                { id: "review", label: "Review", color: "orange" },
-                { id: "done", label: "Done", color: "green" }
-            ]
-        },
-        __order: {
-            type: "string",
-            name: "Order",
-            admin: { disabled: true, hideFromCollection: true }
-        }
-    },
-    admin: {
-        defaultViewMode: "kanban",
-        orderProperty: "__order",
-        kanban: {
-            columnProperty: "status"
-        }
-    }
-});
+`kanban.columnField` désigne la colonne utilisée pour regrouper le tableau. Elle doit contenir un
+ensemble fermé de chaînes de caractères, un `col.enum([...])` ou une colonne texte avec
+`.oneOf([...])` ; toute autre configuration provoquera une erreur de type. Les colonnes sont affichées dans l'ordre
+propre de la colonne, ou selon `enumOrder`, avec les libellés et couleurs de
+`enumLabels`. Glisser une carte vers une autre colonne met à jour `columnField`.
 
-```
+`kanban.orderField` indique où est enregistrée la position d'une carte **au sein** d'une colonne.
+Déclarez-le systématiquement : trois erreurs fréquentes produisent ici un tableau qui semble
+configuré alors qu'il ne l'est pas.
 
-Le glisser-déposer entre les colonnes met automatiquement à jour le champ enum et l'ordre de tri.
+**`orderField` n'est pas optionnel.** Sans lui, une carte peut toujours être déplacée entre les colonnes,
+car cette action écrit dans `columnField`. Mais sa position au sein d'une colonne n'ayant nulle part où
+être stockée, elle est réinitialisée à la prochaine lecture, et le tableau affiche un bandeau ambré
+indiquant que l'ordonnancement n'est pas configuré.
 
-### Ordonnancement
+**La colonne doit être de type texte.** Le réordonnancement écrit une clé d'indexation
+[fractional-indexing](https://github.com/rocicorp/fractional-indexing)
+(`"i0"`, `"i1"`, `"i0i"`), et non un index numérique. Une colonne numérique ne peut jamais en contenir, c'est pourquoi
+`orderField` n'accepte qu'une colonne texte. C'est un mécanisme interne, pas du contenu : masquez-la,
+comme ci-dessus.
 
-`kanban` et `orderProperty` sont les deux moitiés d'une même fonctionnalité. Déclarez les deux, systématiquement — trois erreurs courantes ici produisent un tableau qui semble configuré mais ne l'est pas.
-
-**`orderProperty` n'est pas facultatif.** Sans cette propriété, une carte peut toujours être glissée d'une colonne à l'autre car cela écrit dans `columnProperty`. En revanche, sa position *au sein* d'une colonne ne peut être stockée nulle part ; elle se réinitialise donc à la lecture suivante, et le tableau affiche une barre orange indiquant que l'ordonnancement n'est pas configuré.
-
-**La propriété doit être de type `string`.** Le réordonnancement écrit une clé [fractional-indexing](https://github.com/rocicorp/fractional-indexing) — `"i0"`, `"i1"`, `"i0i"` — et non un index numérique. Une propriété de type `number` ne pourra jamais la stocker : un `sortOrder` numérique fera donc en sorte que le tableau demande indéfiniment à être initialisé, et l'initialisation elle-même échouera sur une colonne numérique. Déclarez-la masquée ; il s'agit de plomberie interne, pas de contenu :
-
-```typescript
-__order: {
-    type: "string",
-    name: "Order",
-    admin: { disabled: true, hideFromCollection: true }
-}
-```
-
-**Les lignes créées en dehors de l'interface d'administration arrivent sans clé.** Rien n'en attribue une à l'insertion. Une ligne écrite par un cron, un script de seed, une migration ou l'API REST arrive avec `__order` à null, et le tableau affiche *"Some items don't have order values"* avec un bouton **Initialize** — un clic remplit la première page, puis la prochaine exécution du cron fait réapparaître la barre aussitôt. Si un backend crée des lignes pour un tableau, il doit lui-même attribuer la clé. Utilisez le même alphabet que celui utilisé par l'admin :
+**Les lignes créées hors du CMS arrivent sans clé.** Rien n'en attribue une à
+l'insertion. Une ligne créée par un cron, un script de seed, une migration ou l'API REST
+arrive avec `__order` à null, et le tableau affiche *"Some items don't have order
+values"* avec un bouton **Initialize**. Un clic permet de rétro-remplir la première page, mais
+la prochaine exécution du cron fera réapparaître immédiatement le bandeau. Si un backend crée des lignes pour un
+tableau, il doit ajouter la clé lui-même, avec l'alphabet utilisé par le CMS :
 
 ```typescript
 import { generateKeyBetween } from "fractional-indexing";
@@ -144,18 +123,16 @@ import { generateKeyBetween } from "fractional-indexing";
 // third argument produces keys like "a0" that the board rejects.
 const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
 
-const tasks = client.data.collection("tasks");
-
 // The last key currently in use. `is-not-null` is not optional: a descending
 // sort is NULLS FIRST, so without it this reads back one of the very rows that
 // has no key and every insert lands on the same "i0".
-const { data: last } = await tasks.find({
+const { data: last } = await client.data.tasks.find({
     where: { __order: ["is-not-null", null] },
     orderBy: ["__order", "desc"],
     limit: 1
 });
 
-await tasks.create({
+await client.data.tasks.create({
     title,
     status,
     __order: generateKeyBetween(
@@ -166,35 +143,106 @@ await tasks.create({
 });
 ```
 
-Les lignes créées via le formulaire d'administration arrivent également sans clé — la seule différence est que vous voyez la barre dès que vous en ajoutez une. **Initialize** permet de corriger le problème dans ce cas ; en revanche, sur un tableau alimenté par un backend, c'est une solution temporaire qui s'annule à chaque exécution.
+Les lignes créées via le formulaire arrivent également sans clé ; la seule différence est que
+vous voyez le bandeau dès que vous en ajoutez une. **Initialize** est la solution dans ce cas ; sur un
+tableau alimenté par un backend, c'est une solution qui s'annule à chaque exécution.
 
-## Vue en cartes
+## Emplacements d'affichage
 
-Les cartes affichent les entités sous forme de cartes visuelles — très utile pour le contenu riche en images :
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const articlesCollection = defineCollection({
-    slug: "articles",
-    name: "Articles",
-    table: "articles",
-    properties: {
-        title: { type: "string", name: "Title" },
-        cover: {
-            type: "string",
-            name: "Cover Image",
-            storage: { storagePath: "covers", acceptedFiles: ["image/*"] }
-        }
+Chaque surface affichant un enregistrement utilise certains de ces six emplacements : **title**,
+**subtitle**, **image**, **status**, **date** et **tags**. Une ligne de liste équivaut à image +
+titre + sous-titre + statut + date, une carte correspond à la même chose avec l'image au-dessus, un
+sélecteur de référence équivaut à titre + sous-titre, et l'en-tête d'une page ne comprend que le titre.
+
+Le CMS remplit certains emplacements à partir des colonnes de la table (voir les
+[emplacements d'affichage par défaut](/docs/collections/#display-slots)). `display` permet de définir chacun
+d'eux, sous forme de chemin de champ ou de fonction :
+
+```tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { tasks } from "../../../backend/schema/tasks";
+
+export const tasksCms = customizeTable<typeof tasks>("tasks", {
+    display: {
+        title: "title",
+        status: "status",
+        date: "dueDate",
+        subtitle: ({ row }) => row.dueDate ? `Due ${row.dueDate}` : undefined,
     },
-    admin: {
-        defaultViewMode: "cards"
-    }
 });
-
 ```
+
+Un emplacement que vous omettez conserve sa valeur dérivée.
+
+Un résolveur reçoit `{ row, id, context }`. `row` correspond à l'enregistrement tel que le serveur
+le renvoie, typé selon la ligne de la table : les dates sous forme de chaînes ISO, une relation belongsTo sous forme de sa
+colonne de clé étrangère. `id` est sa clé primaire sous forme de chaîne de caractères, les parties d'une clé composite
+étant jointes par `:::`. Une relation chargée par le CMS arrive imbriquée sous son nom, telle que le
+`include` de REST la renvoie, permettant à un résolveur de lire un champ de l'enregistrement lié
+sans requête supplémentaire.
+
+Un résolveur peut être `async`, pour aller chercher un élément que l'enregistrement ne contient pas. Pendant que
+la promesse est en cours, la surface affiche la valeur dérivée et la remplace par la
+valeur résolue dès qu'elle arrive : un titre n'affiche jamais de spinner. Les résultats sont mis en cache par
+enregistrement et par emplacement, et les requêtes simultanées se partagent un seul appel.
+
+Renvoyez `undefined` lorsqu'un enregistrement ne contient rien pour l'emplacement ; la surface se rabat
+alors sur ce qu'elle connaît (un titre de page utilise le nom de la collection au singulier, un lien utilise
+l'identifiant). Un résolveur qui lève une erreur est traité comme retournant `undefined` et consigné une fois dans les journaux.
+
+Privilégiez un chemin dès que la valeur est présente sur l'enregistrement : un chemin conserve le rendu
+propre au champ, ainsi un statut d'énumération reste une pastille de couleur et une date reste formatée,
+ce qu'un résolveur renvoyant une chaîne de caractères ne peut pas faire.
+
+Lorsqu'aucun emplacement ne définit le titre, le CMS en choisit un. Avec `fieldOrder`, c'est le premier
+champ dans cet ordre qui peut faire office de titre : du texte, une relation à cardinalité simple ou
+une référence. Sinon, les candidats sont classés : le texte dont la clé correspond à un libellé
+(`name`, `title`, `label`…) en premier, puis le texte court, un e-mail, une énumération, le texte long,
+une relation et une référence. Les clés, colonnes uuid, champs de fichier et champs masqués ne sont
+jamais éligibles. Tout ce que contient le titre est affiché sous forme de texte : une date formatée, un
+tableau joint, et une relation sous forme du premier champ disponible parmi `name`, `title`, `label` ou
+`displayName` sur la ligne liée, avec repli sur son identifiant.
+
+## Filtres, préréglages et tri
+
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+```tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { tasks } from "../../../backend/schema/tasks";
+
+export const tasksCms = customizeTable<typeof tasks>("tasks", {
+    sort: ["dueDate", "asc"],
+    defaultFilter: { status: ["!=", "done"] },
+    filterPresets: [
+        { label: "In review", filterValues: { status: ["==", "review"] } },
+        { label: "Overdue", filterValues: { dueDate: ["<", new Date().toISOString().slice(0, 10)] }, sort: ["dueDate", "asc"] },
+    ],
+});
+```
+
+| Option | Effet |
+|---|---|
+| `sort` | Le tri par défaut : une clé et une direction, ou plusieurs dans l'ordre. |
+| `defaultFilter` | Le filtre avec lequel le visiteur commence, et qu'il peut modifier. |
+| `fixedFilter` | Un filtre que le visiteur ne peut pas modifier. Les filtres qu'il applique sur d'autres champs y sont combinés. |
+| `filterPresets` | Filtres en un clic dans la barre d'outils : `{ label?, filterValues, sort? }`. Sans libellé, un libellé est généré à partir du filtre. |
+| `pagination` | Charger par pages (`true`, ou la taille de la page), ou tout charger en une fois (`false`). |
+
+Chaque clé est validée par rapport aux champs de la table. La propriété `filterOperators` propre à un champ
+restreint les opérations possibles pour le filtrer, et `[]` désactive complètement le filtrage sur ce champ.
+
+Un `fixedFilter` restreint ce que le CMS *demande*. Il ne s'agit pas d'une barrière de sécurité : ce qu'un
+appelant a le droit de lire est déterminé par la [sécurité au niveau des lignes (RLS)](/docs/collections/security-rules/)
+de la table, pour chaque appelant.
 
 ## Prochaines étapes
 
-- **[Personnalisation de l'administration](/docs/frontend/customizing)** — Vos propres modes de vue, pages et actions
-- **[Vues d'entités](/docs/frontend/entity-views)** — Onglets personnalisés sur les formulaires d'entité
-- **[Actions sur les entités](/docs/frontend/entity-actions)** — Actions d'entité personnalisées
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+- [customizeTable](/docs/frontend/customize-table/) : toutes les options
+- [Personnaliser l'administration](/docs/frontend/customizing/) : vos propres modes d'affichage, pages et actions
+- [Vues d'entité](/docs/frontend/entity-views/) : onglets sur un enregistrement
+- [Actions d'entité](/docs/frontend/entity-actions/) : boutons sur un enregistrement

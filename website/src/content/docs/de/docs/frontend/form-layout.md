@@ -1,178 +1,164 @@
 ---
-sourceHash: 42da06ee7f0f6c0c
+sourceHash: 93694433369991ae
 title: Formular-Layout
 sidebar_label: Formular-Layout
-description: Steuern Sie die Anordnung des Entitätsformulars – Spaltenbreiten, Abschnitte und die Metadaten-Leiste.
+description: "Gestalten Sie das Formular eines Datensatzes: Feldbreiten in einem vierspaltigen Raster, betitelte und einklappbare Abschnitte, die Metadaten-Leiste und eine Komponente, die das generierte Formular ersetzt."
 ---
 
-## Übersicht
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-Das Entitätsformular wird aus Ihren Eigenschaften generiert:
+Das Datensatzformular wird aus den Spalten und Relationen der Tabelle generiert:
 
-- Die ID und die Zeitstempel `createdAt` / `updatedAt` wandern schreibgeschützt in eine Metadaten-Leiste
-- Jedes andere Feld nimmt die volle Breite der Hauptspalte ein, außer dass zwei
-  benachbarte Felder mit demselben kleinen Editor – zwei Zahlen, zwei Schalter,
-  zwei Daten desselben Modus, zwei Auswahllisten mit kurzen Optionen – sich eine Zeile teilen
+- Die ID sowie die Erstellungs- und Aktualisierungszeitstempel werden in einer schreibgeschützten Metadaten-Leiste platziert;
+- jedes andere Feld nimmt die volle Breite der Hauptspalte ein, mit der Ausnahme, dass sich zwei
+  benachbarte Felder mit demselben kleinen Editor (zwei Zahlen, zwei Schalter,
+  zwei Datumsangaben desselben Modus, zwei Auswahllisten mit kurzen Optionen) eine Zeile teilen.
 
 Ein Feld mit einer langen Beschriftung, einem Hilfetext mit mehr als 60 Zeichen, `conditions`, einer
-`access`-Regel auf Feldebene oder `excludeFromApi` (das Formular rendert nichts für einen Benutzer,
-der es nicht lesen darf) oder einem benutzerdefinierten `Field` wird nie gepaart, ebenso wenig wie ein Freitext-String: Nichts in
-einem Schema unterscheidet einen kurzen Branch-Namen von einer langen URL. Das Formular prüft nie,
-welche Eigenschaft der Titel ist. Alle anderen Spalten werden von der Collection
-Feld für Feld über `admin.span` angefordert – festgelegt anhand des Inhalts jedes Feldes, wie
-unten beschrieben. Verwenden Sie `admin.form`, um
-Felder in Abschnitte zu gruppieren und in die Leiste zu verschieben.
+[Zugriffsregel](/docs/collections/field-access/) auf Spaltenebene oder einem benutzerdefinierten `Field`
+wird niemals gepaart, ebenso wenig wie Freitextfelder: Anhand eines Schemas lässt sich kein kurzer
+Branch-Name von einer langen URL unterscheiden. Alles Weitere wird in `customizeTable` festgelegt –
+Feld für Feld mit `span` und für das gesamte Formular mit `form`.
+
+```ts
+// backend/schema/orders.ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const orders = defineTable("orders", {
+    columns: {
+        id:             col.uuid().primaryKey().defaultRandom(),
+        reference:      col.text().notNull(),
+        sku:            col.text(),
+        status:         col.enum(["placed", "shipped", "delivered"]).notNull().default("placed"),
+        placedAt:       col.timestamp({ withTimezone: true }),
+        address:        col.text(),
+        carrier:        col.text(),
+        trackingNumber: col.text(),
+        notes:          col.text(),
+    },
+    rls: "admin-only",
+});
+```
+
+```tsx
+// frontend/src/cms/orders.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { orders } from "../../../backend/schema/orders";
+
+export const ordersCms = customizeTable<typeof orders>("orders", {
+    form: {
+        sidebar: ["status", "placedAt"],
+        sections: [
+            { key: "identity", fields: ["reference", "sku"] },
+            { key: "shipping", title: "Shipping", fields: ["address", "carrier", "trackingNumber"] },
+            { key: "internal", title: "Internal notes", fields: ["notes"], collapsed: true },
+        ],
+    },
+    fields: {
+        reference: { span: 3 },
+        sku:       { name: "SKU", span: 1 },
+        carrier:   { span: 2 },
+        trackingNumber: { span: 2 },
+        notes:     { multiline: true },
+    },
+});
+```
 
 ## Feldbreite
 
-Die Breite eines Feldes ist ein **Span** über ein vier-spaltiges Raster. `4` entspricht der vollen Breite
-der Hauptspalte.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+Die Breite eines Feldes ist eine Spannenangabe (**span**) über ein vierspaltiges Raster; `4` entspricht der vollen Breite
+der Hauptspalte. Spans rasten im Raster ein, wodurch zwei Felder unabhängig von ihrer
+Deklarationsreihenfolge bündig ausgerichtet werden.
 
-const productsCollection = defineCollection({
-    slug: "products",
-    table: "products",
-    name: "Products",
-    properties: {
-        sku: {
-            name: "SKU",
-            type: "string",
-            admin: { span: 1 }
-        },
-        name: {
-            name: "Product name",
-            type: "string",
-            admin: { span: 3 }
-        },
-        description: {
-            name: "Description",
-            type: "string",
-            admin: { markdown: true, span: 4 }
-        }
-    }
-});
-```
+Wählen Sie eine Spanne basierend auf dem Inhalt des Feldes, nicht basierend auf seinem Typ. Zwei kurze Werte,
+die zusammengehören, teilen sich eine Zeile: Start- und Enddatum, Ort und Land, Versanddienstleister
+und Sendungsnummer mit jeweils `2`, oder ein Wert und dessen Qualifizierer mit `3` + `1`.
+Zahlen, Booleans und kurze Codes können neben ihren Nachbarn den Wert `1` einnehmen. Alles,
+was länger zu lesen ist (Namen, URLs, E-Mails, IDs, Beschreibungen, Markdown, Dateien), behält
+`4`. Zeilen werden in Feldreihenfolge gefüllt und kein Feld wird verbreitert, um eine Lücke zu schließen;
+platzieren Sie Paare daher nebeneinander und achten Sie darauf, dass jede Zeile in der Summe 4 ergibt.
 
-Spans rasten in einem gemeinsamen Raster ein, wodurch zwei Felder unabhängig von
-ihrer Deklarationsreihenfolge bündig ausgerichtet werden. Sie haben `admin.widthPercentage` ersetzt,
-dessen bloße Prozentangaben an nichts ausgerichtet werden konnten; eine Collection, die
-dies noch verwendet, sollte den nächstgelegenen Span wählen (≤30 → `1`, ≤55 → `2`, ≤80 → `3`,
-ansonsten `4`).
-
-Wählen Sie einen Span basierend auf dem Inhalt des Feldes, nicht auf dessen Typ. Zwei kurze Werte,
-die zusammengehören, teilen sich eine Zeile – Start- und Enddatum, Stadt und Land,
-Anbieter und Region mit jeweils `2`, oder ein Wert und sein Qualifier mit `3` + `1`.
-Zahlen, boolesche Werte und kurze Codes können neben ihren Geschwisterfeldern `1` einnehmen. Alles,
-was länger zu lesen ist – Namen, URLs, E-Mails, IDs, Beschreibungen, Markdown, Dateien –
-behält `4`. Zeilen werden in der Reihenfolge der Deklaration gefüllt, und nichts verbreitert ein Feld, um eine
-Lücke zu schließen. Deklarieren Sie Paare daher nebeneinander und achten Sie darauf, dass jede Zeile in der Summe 4 ergibt.
-
-Bei Layouts, die zu schmal für zwei Spalten sind – dem Seitenpanel, dem Split-Pane oder einem Smartphone –,
-klappt das Raster auf eine einzelne Spalte zusammen und Spans werden ignoriert.
+Bei Layouts, die zu schmal für zwei Spalten sind (das Seitenpanel, der Split-Pane, ein Smartphone),
+bricht das Raster auf eine einzelne Spalte um und Spans werden ignoriert.
 
 ## Abschnitte
 
-`sections` gruppiert die Hauptspalte unter Überschriften. Ein Abschnitt mit Titel kann
-eingeklappt werden; ein unbetitelter nicht.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+`form.sections` gruppiert die Hauptspalte unter Überschriften. Jeder Abschnitt ist
+`{ key, title?, fields, collapsed?, collapsible?, readVariant? }`. Ein betitelter
+Abschnitt kann eingeklappt werden; ein unbetitelter nicht. `readVariant: "summary"`
+stapelt die Felder des Abschnitts als Beschriftungs- und Wertezeilen in der schreibgeschützten
+Ansicht des Datensatzes; der Standardwert `"grid"` verwendet das Raster des Formulars.
 
-const ordersCollection = defineCollection({
-    slug: "orders",
-    table: "orders",
-    name: "Orders",
-    properties: {
-        reference: { name: "Reference", type: "string" },
-        placed_at: { name: "Placed at", type: "date" },
-        address: { name: "Address", type: "string" },
-        carrier: { name: "Carrier", type: "string" },
-        tracking_number: { name: "Tracking number", type: "string" },
-        notes: { name: "Notes", type: "string" }
-    },
-    admin: {
-        form: {
-            sections: [
-                { key: "identity", properties: ["reference", "placed_at"] },
-                {
-                    key: "shipping",
-                    title: "Shipping",
-                    properties: ["address", "carrier", "tracking_number"]
-                },
-                {
-                    key: "internal",
-                    title: "Internal notes",
-                    properties: ["notes"],
-                    collapsed: true
-                }
-            ]
-        }
-    }
-});
-```
+Ein Feld, das in keinem Abschnitt benannt wird, geht niemals verloren: Es landet im letzten unbetitelten
+Abschnitt oder in einer unbetitelten abschließenden Gruppe, falls keiner vorhanden ist. Eine zur Tabelle
+hinzugefügte Spalte kann nicht dazu führen, dass ein Feld stillschweigend aus dem Formular verschwindet. Ein Validierungsfehler
+innerhalb eines eingeklappten Abschnitts klappt diesen automatisch auf.
 
-Eine Eigenschaft, die in keinem Abschnitt genannt wird, geht niemals verloren: Sie landet im letzten unbetitelten
-Abschnitt oder in einer unbetitelten Gruppe am Ende, falls keiner vorhanden ist. Das Hinzufügen einer Spalte zur
-Datenbank kann daher nicht dazu führen, dass ein Feld stillschweigend aus dem Formular verschwindet.
-
-Ein Validierungsfehler innerhalb eines eingeklappten Abschnitts klappt diesen aus, sodass sich ein Fehler niemals
-hinter einer geschlossenen Überschrift verbergen kann.
+Jeder Eintrag wird anhand der Tabelle geprüft. Ein Eintrag, den der Server für diesen
+Aufrufer nicht bereitstellt, weil dieser die Spalte nicht lesen darf, wird übersprungen.
 
 ## Die Metadaten-Leiste
 
-`sidebar` verschiebt Felder aus der Hauptspalte in eine schmale Leiste daneben –
-Status, Zuständigkeit, Veröffentlichungsdaten, Flags.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+`form.sidebar` verschiebt Felder aus der Hauptspalte in eine schmale Leiste daneben:
+Status, Zuständigkeit, Veröffentlichungsdaten, Flags. Die Leiste verwendet kein Raster, daher
+wird `span` dort ignoriert. Wenn kein Platz für eine Leiste vorhanden ist, wird sie als
+gewöhnlicher vorangestellter Abschnitt dargestellt.
 
-const postsCollection = defineCollection({
-    slug: "posts",
-    table: "posts",
-    name: "Posts",
-    properties: {
-        title: { name: "Title", type: "string" },
-        body: { name: "Body", type: "string", admin: { markdown: true } },
-        status: { name: "Status", type: "string" },
-        publishedAt: { name: "Published at", type: "date" },
-        author: { name: "Author", type: "string" }
-    },
-    admin: {
-        form: {
-            sidebar: ["status", "publishedAt", "author"],
-            showRecordMeta: true
-        }
-    }
+`form.showRecordMeta` platziert den schreibgeschützten Datensatz-Block (ID, erstellt, aktualisiert) am
+Ende der Leiste. Dies ist immer `true`, wenn eine Leiste angezeigt wird. `sidebar: []` deaktiviert
+die abgeleitete Leiste und behält jedes Feld in der Hauptspalte. `hideIdFromForm`
+blendet die ID vollständig aus dem Formular aus.
+
+## Ersetzen des Formulars
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`formView` tauscht das generierte Formular gegen eine eigene, als Wert importierte
+Komponente aus. Sie empfängt dieselben `EntityCustomViewParams` wie eine
+[Entity View](/docs/frontend/entity-views/). `includeActions: true` behält
+Speichern und Verwerfen in der Leiste des Datensatzes bei, während dieser auf dem Bildschirm angezeigt wird.
+
+```tsx
+import React from "react";
+import { customizeTable } from "@rebasepro/cms";
+import type { EntityCustomViewParams } from "@rebasepro/cms-types";
+import type { orders } from "../../../backend/schema/orders";
+
+function OrderForm({ row, modifiedValues }: EntityCustomViewParams) {
+    return <h2>{String(modifiedValues?.reference ?? row?.reference ?? "New order")}</h2>;
+}
+
+export const ordersCms = customizeTable<typeof orders>("orders", {
+    formView: { Builder: OrderForm, includeActions: true },
 });
 ```
 
-Die Leiste verwendet das Raster nicht, daher wird `span` für die darin enthaltenen Felder ignoriert. Wo
-kein Platz für eine Leiste ist, wird sie als normaler vorangestellter Abschnitt gerendert, sodass
-auf einem Smartphone oder im Seitenpanel nichts verloren geht.
+Für kleinere Änderungen können Sie stattdessen nur einen Teil des Formulars überschreiben (`Entity.Form`, siehe
+[Component Overrides](/docs/frontend/component-overrides/)) oder einige
+Felder mit `<RecordForm>` und `<FormField>` auf einer eigenen Seite selbst anordnen
+(siehe [Panels](/docs/frontend/panels/)).
 
-`showRecordMeta` platziert den schreibgeschützten Datensatz-Block – ID, erstellt, aktualisiert – am
-Ende der Leiste. Der Standardwert ist `true`, wann immer eine Leiste angezeigt wird, und ersetzt
-`hideIdFromForm` für die meisten Collections: Die ID ist nicht länger ein Feld in
-der Mitte des Formulars, sondern wird zu einer kopierbaren Metadatenzeile.
+## Weitere Formularoptionen
 
-Setzen Sie `sidebar: []`, um die abgeleitete Leiste vollständig zu unterdrücken und jedes Feld in
-der Hauptspalte zu belassen.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-## Referenz
-
-| Eigenschaft | Typ | Beschreibung |
-|-------------|-----|--------------|
-| `admin.span` | `1 \| 2 \| 3 \| 4` | Feldbreite im vierspaltigen Formularraster |
-| `admin.form.sidebar` | `string[]` | Eigenschaftsschlüssel, die in der Metadaten-Leiste angezeigt werden |
-| `admin.form.sections` | `FormSection[]` | Betitelte Gruppen für die Hauptspalte |
-| `admin.form.showRecordMeta` | `boolean` | ID/Erstellt/Aktualisiert am Ende der Leiste anzeigen |
-
-`FormSection` ist `{ key, title?, properties, collapsed?, collapsible?, readVariant? }`. `readVariant: "summary"` stapelt die Felder des Abschnitts in der schreibgeschützten Ansicht des Datensatzes als Label/Wert-Zeilen; der Standard, `"grid"`, verwendet das Raster des Formulars.
+| Option | Wirkung |
+|---|---|
+| `formAutoSave` | Speichern während der Eingabe. |
+| `alwaysApplyDefaultValues` | Deklarierte Standardwerte beim Öffnen in leere Felder eines gespeicherten Datensatzes einfügen. |
+| `includeJsonView` | Einen Tab hinzufügen, der den Datensatz als JSON anzeigt. |
+| `localChangesBackup` | Nicht gespeicherte Änderungen im lokalen Speicher behalten: `"manual_apply"`, `"auto_apply"` oder `false`. |
 
 ## Verwandte Themen
 
-- [Custom Fields](/docs/frontend/custom-fields/) — die Felder, die ein Layout anordnet
-- [Entity Views](/docs/frontend/entity-views/) — ein eigener Tab neben dem Formular
-- [Properties](/docs/collections/properties/) — die Eigenschaften-Optionen, die ein Layout liest
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+- [Benutzerdefinierte Felder](/docs/frontend/custom-fields/): die Felder, die ein Layout anordnet
+- [Entity Views](/docs/frontend/entity-views/): ein kompletter eigener Tab neben dem Formular
+- [customizeTable](/docs/frontend/customize-table/#form): die Formularoptionen in der Referenz

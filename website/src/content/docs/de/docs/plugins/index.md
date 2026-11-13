@@ -1,25 +1,25 @@
 ---
-sourceHash: 9154f788865b82a2
+sourceHash: d1b243f804318232
 title: Plugin-System
 sidebar_label: Plugins
-description: Erweitern Sie Rebase mit Plugins – injizieren Sie UI-Komponenten, modifizieren Sie Collections, fügen Sie Toolbar-Aktionen hinzu und erstellen Sie benutzerdefinierte Field Builder.
+description: Erweitern Sie Rebase mit Plugins – binden Sie UI-Komponenten ein, modifizieren Sie Collections, fügen Sie Toolbar-Aktionen hinzu und erstellen Sie benutzerdefinierte Field Builder.
 ---
 
 ## Übersicht
 
-**Plugins sind ein Konzept des Admin-Panels.** Sie laufen im Browser, innerhalb des
-React-Admins, und werden dort registriert, wo Sie es erstellen. Nichts auf dieser Seite greift
-auf das Backend zu: Ein Plugin kann weder eine Route noch einen Callback oder einen Cron hinzufügen. Siehe hierzu
+**Plugins sind ein Konzept des Admin-Panels.** Sie laufen im Browser innerhalb des
+React-Admins und werden dort registriert, wo Sie diesen erstellen. Nichts auf dieser Seite greift
+auf das Backend zu: Ein Plugin kann weder eine Route noch einen Callback oder Cron-Job hinzufügen. Dafür siehe
 [Custom Functions](/docs/backend/custom-functions), [Entity
 Callbacks](/docs/collections/callbacks) und [Cron Jobs](/docs/backend/cron-jobs).
 
 Plugins sind der primäre Erweiterungsmechanismus im Panel. Sie können:
 
-- Die gesamte App mit einem **Provider** kapseln (Kontext, State-Management)
-- **Aktionen für die Startseite** und Widgets hinzufügen
-- Komponenten für die **Collection-Ansicht** injizieren (Toolbar, Spaltenköpfe)
+- Die gesamte App mit einem **Provider** kapseln (Kontext, State Management)
+- **Aktionen und Widgets auf der Startseite** hinzufügen
+- **Collection-View**-Komponenten einbinden (Toolbar, Spaltenüberschriften)
 - **Formular**-Komponenten hinzufügen (Field Builder, zusätzliche Panels)
-- **Collections dynamisch injizieren oder modifizieren**
+- Collections dynamisch **injizieren oder modifizieren**
 
 ## Plugin-Interface
 
@@ -51,22 +51,20 @@ interface RebasePlugin {
 }
 ```
 
-Jede dieser Eigenschaften ist optional, außer `key`. Die vollständige Liste der Slot-Namen finden Sie auf
+Jedes dieser Felder ist optional, mit Ausnahme von `key`. Die vollständige Liste der Slot-Namen finden Sie auf
 der Seite **[Slots](/docs/frontend/slots)**.
 
 ### Lebenszyklus
 
-- `onMount(context)` wird einmal ausgeführt, sobald die Authentifizierung zum
-  ersten Mal bereit ist: Ein Benutzer ist angemeldet, oder die Anmeldung wurde
-  übersprungen.
-- `onAuthStateChange(user)` wird bei jedem späteren Benutzerwechsel ausgeführt:
-  mit dem neuen Benutzer bei einer Anmeldung, mit `null` bei einer Abmeldung.
-  Das Plugin bleibt dabei in beiden Fällen gemountet.
-- `onUnmount()` wird ausgeführt, wenn `<Rebase>` unmountet wird.
+- `onMount(context)` wird einmalig ausgeführt, sobald die Authentifizierung bereit ist: Ein Benutzer ist
+  angemeldet oder die Anmeldung wurde übersprungen.
+- `onAuthStateChange(user)` wird bei jeder späteren Änderung des Benutzers ausgeführt: der neue Benutzer bei
+  einer Anmeldung, `null` bei einer Abmeldung. Das Plugin bleibt über beides hinweg gemountet.
+- `onUnmount()` wird ausgeführt, wenn `<Rebase>` unmountet.
 
-`lifecycle.onCollectionChange` ist veraltet (deprecated). Es wurde nie aufgerufen. Ein Plugin, das es setzt, kompiliert weiterhin, und `<Rebase>` warnt
-einmal pro Plugin. Um die Zeilen einer Collection zu verfolgen, abonnieren Sie in `onMount`
-und kündigen in `onUnmount`:
+`lifecycle.onCollectionChange` ist veraltet. Es wurde nie aufgerufen. Ein Plugin, das es setzt, kompiliert weiterhin, und `<Rebase>` warnt einmal pro
+Plugin. Um den Zeilen einer Collection zu folgen, abonnieren Sie diese in `onMount` und
+beenden Sie das Abonnement in `onUnmount`:
 
 ```tsx
 import type { RebasePlugin } from "@rebasepro/cms-types";
@@ -77,7 +75,7 @@ const openOrdersPlugin: RebasePlugin = {
     key: "open_orders",
     lifecycle: {
         onMount: (context) => {
-            stopListening = context.data.collection("orders").listen(
+            stopListening = context.data.orders.listen(
                 { where: { status: ["==", "open"] } },
                 ({ data }) => console.log(`${data.length} open orders`)
             );
@@ -87,10 +85,10 @@ const openOrdersPlugin: RebasePlugin = {
 };
 ```
 
-## Plugins verwenden
+## Verwendung von Plugins
 
-Plugins werden an `<Rebase>` übergeben, neben dem Client. Alles darunter – die
-Navigation, die Collection-Ansichten, die Formulare – liest sie von dort:
+Plugins werden `<Rebase>` neben dem Client übergeben. Alles darunter – die
+Navigation, die Collection-Views, die Formulare – liest sie von dort:
 
 ```tsx
 import { Rebase, useRebaseAuthController } from "@rebasepro/app";
@@ -107,25 +105,25 @@ export function App() {
             authController={authController}
             plugins={[dataEnhancementPlugin]}
         >
-            <RebaseCMS collections={collections}/>
+            <RebaseCMS tableCustomizations={tableCustomizations}/>
             <RebaseShell title="My App"/>
         </Rebase>
     );
 }
 ```
 
-Plugins werden normalerweise über einen Hook erstellt, sodass das Array bei jedem Render-Vorgang neu aufgebaut wird;
-das ist in Ordnung und der Grund dafür, dass `plugins` eine Prop ist und nicht
-manuell memoriert werden muss. Zwei Plugins mit demselben `key` sind ein Fehler – `<Rebase>`
-protokolliert Duplikate, anstatt sie stillschweigend zu verwerfen.
+Plugins werden normalerweise durch einen Hook erstellt, daher wird das Array bei jedem Rendern neu erzeugt;
+das ist völlig in Ordnung und der Grund, warum `plugins` eine Prop ist, anstatt etwas, das Sie
+manuell memoizieren müssen. Zwei Plugins mit demselben `key` sind ein Fehler – `<Rebase>`
+protokolliert die Duplikate, anstatt eines stillschweigend zu verwerfen.
 
 Für einen einzelnen Beitrag benötigen Sie überhaupt kein Plugin: `<Rebase slots>`
 akzeptiert dieselben `SlotContribution`-Einträge direkt.
 
 ### Bei manueller Komposition
 
-Nur wenn Sie `<RebaseShell>` durch die darunterliegenden Layer ersetzt haben,
-muss die Plugin-Liste manuell an den Navigation-Controller übergeben werden:
+Nur wenn Sie `<RebaseShell>` durch die darunter liegenden Ebenen ersetzt haben,
+muss die Plugin-Liste manuell in den Navigations-Controller weitergereicht werden:
 
 ```tsx
 const navigationStateController = useBuildNavigationStateController({
@@ -143,7 +141,7 @@ const navigationStateController = useBuildNavigationStateController({
 Customization-Controller, den `<Rebase>` bereitstellt. Siehe
 [Erweitert: Manuelles Layout](/docs/frontend#advanced-manual-layout).
 
-## Ein Plugin erstellen
+## Erstellen eines Plugins
 
 Hier ist ein minimales Plugin, das jeder Collection eine Toolbar-Aktion hinzufügt:
 
@@ -171,14 +169,14 @@ function useMyPlugin(): RebasePlugin {
 }
 ```
 
-### Feld-Wrapper aus mehreren Plugins
+### Field-Wrapper aus mehreren Plugins
 
-Wrapper aus mehreren Plugins werden in der Reihenfolge des `plugins`-Arrays komponiert.
-Das `wrap` jedes Plugins erhält als `params.Field` das Feld so, wie die Plugins davor es
-hinterlassen haben, sodass der Wrapper des ersten Plugins am innersten liegt und der des
-letzten am äußersten. Ein Plugin, dessen `wrap` `null` zurückgibt oder dessen
-`enabled`-Guard für das Feld `false` zurückgibt, reicht es unverändert weiter. Ein
-Wrapper, der `Field` rendert, behält daher jeden Wrapper davor:
+Wrapper aus mehreren Plugins greifen in der Reihenfolge des `plugins`-Arrays ineinander.
+Das `wrap` jedes Plugins erhält als `params.Field` das Feld so, wie die Plugins
+davor es hinterlassen haben; der Wrapper des ersten Plugins ist also der innerste und der
+des letzten der äußerste. Ein Plugin, dessen `wrap` `null` zurückgibt oder dessen `enabled`-Guard
+für das Feld `false` zurückgibt, reicht es unverändert weiter. Ein Wrapper, der
+`Field` rendert, behält somit jeden Wrapper davor bei:
 
 ```tsx
 import type { RebasePlugin } from "@rebasepro/cms-types";
@@ -216,28 +214,28 @@ import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 const enhancementPlugin = useDataEnhancementPlugin();
 ```
 
-Es fügt jedem Formular eine Autofill-Aktion hinzu und jedem Markdown-Feld einen
-**Autocomplete**-Slash-Befehl, der den Text ab dem Cursor fortsetzt. Beide erscheinen
+Es fügt jedem Formular eine Autofill-Aktion und jedem Markdown-Feld einen **Autocomplete**-Slash-Befehl
+hinzu, der den Text ab dem Cursor fortsetzt. Beides erscheint
 nur dort, wo das Plugin aktiviert ist: Der Dienst meldet sich als verfügbar und
-`getConfigForPath` (sofern Sie eines übergeben) erlaubt die Collection. Ein Feld, dessen
-`customProps.editorProps.aiController` einen eigenen Controller nennt, verwendet
-diesen. Ein anderes Plugin kann Markdown-Feldern auf dieselbe Weise einen Controller geben, mit
-`EditorAIControllerProvider` aus `@rebasepro/cms` in einem formularbezogenen Provider.
+`getConfigForPath` (wenn Sie eines übergeben) lässt die Collection zu. Ein Feld, dessen
+`customProps.editorProps.aiController` einen eigenen Controller benennt, verwendet diesen.
+Ein anderes Plugin kann Markdown-Feldern auf dieselbe Weise einen Controller zuweisen, und zwar mit
+`EditorAIControllerProvider` aus `@rebasepro/cms` in einem Provider mit Form-Scope.
 
 ![Data enhancement](/img/data_enhancement.png)
 
-:::caution[Dieses Plugin sendet Daten von Ihrem Rechner]
-Autofill sendet die Feldwerte der Entität an einen gehosteten Dienst, um einen
-Vorschlag zu generieren: nur die Werte deklarierter Properties, nie die einer schreibgeschützten,
-deaktivierten oder verborgenen, einer mit `dynamicProps` oder einer Spalte, die die Collection
+:::caution[Dieses Plugin sendet Daten von Ihrem Rechner weg]
+Autofill sendet die Feldwerte der Entity per POST an einen gehosteten Dienst, um einen
+Vorschlag zu generieren: ausschließlich die Werte deklarierter Properties, niemals die von schreibgeschützten,
+deaktivierten oder ausgeblendeten Properties, solchen mit `dynamicProps` oder Spalten, die die Collection
 nicht deklariert. Standardmäßig ist dieser Dienst **`https://app.rebase.pro/api/functions/ai`**,
 der von Rebase betrieben wird – kostenlos nutzbar, ohne Konfiguration und ohne Anmeldedaten:
-Die Anfragen sind anonym und werden durch Ratenbegrenzung statt durch Identität beschränkt. Ihr
-JWT wird nicht gesendet. Auch die Slash-Autovervollständigung des Editors sendet Text: bis zu 8.000
-Zeichen auf jeder Seite des Cursors, nie das ganze Dokument.
+Die Anfragen sind anonym und werden über Rate-Limits statt über Identitäten begrenzt. Ihr
+JWT wird nicht gesendet. Die Slash-Autovervollständigung des Editors sendet ebenfalls Text: bis zu 8.000
+Zeichen auf jeder Seite des Cursors, niemals das gesamte Dokument.
 
-Ob dies akzeptabel ist, hängt davon ab, was in den Feldern enthalten ist. Richten Sie `endpoint` auf
-Ihr eigenes Deployment, um die Generierung innerhalb Ihrer Infrastruktur zu belassen:
+Ob das akzeptabel ist, hängt vom Inhalt der Felder ab. Richten Sie `endpoint` auf
+Ihr eigenes Deployment aus, um die Generierung innerhalb Ihrer Infrastruktur zu halten:
 
 ```typescript no-verify
 const enhancementPlugin = useDataEnhancementPlugin({
@@ -248,9 +246,9 @@ const enhancementPlugin = useDataEnhancementPlugin({
 Das Übertragungsformat ist der gesamte Vertrag – siehe `api.ts` in `@rebasepro/plugin-ai`,
 mit einer Referenzimplementierung in `functions/ai.ts` der Control Plane. Das
 Plugin rendert nichts, bis der Host, auf den es verweist, sich unter
-`GET /status` als verfügbar meldet. Eine falsche URL führt daher eher zu einem fehlenden Button als zu einer fehlgeschlagenen Anfrage.
+`GET /status` als verfügbar meldet. Eine falsche URL führt also lediglich zu einer fehlenden Schaltfläche und nicht zu einer fehlgeschlagenen Anfrage.
 
-Jedes andere integrierte Plugin läuft lokal im Browser und sendet keine Daten nach außen.
+Jedes andere integrierte Plugin läuft lokal im Browser und sendet nichts nach außen.
 :::
 
 ## Collection-Injection
@@ -266,6 +264,8 @@ hooks: {
 
 ## Collection-Modifikation
 
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
 Plugins können bestehende Collections modifizieren:
 
 ```typescript
@@ -273,22 +273,19 @@ hooks: {
     // Receives one collection, returns the modified one.
     modifyCollection: (collection) => ({
         ...collection,
-        properties: {
-            ...collection.properties,
-            last_modified_by: {
-                type: "string",
-                name: "Modified By",
-                admin: { readOnly: true }
-            }
-        }
+        description: `${collection.description ?? ""} Managed by the ops team.`.trim()
     })
 }
 ```
 
-`modifyCollection` ist synchron, und das Admin-Panel wendet es an, wenn es seine
+Die Collection, die ein Plugin empfängt, ist die aufgelöste Ansicht einer Tabelle des Panels, nachdem
+ihr `customizeTable` angewendet wurde; ein Plugin sieht also das, was das Panel gleich
+zeichnen wird.
+
+`modifyCollection` ist synchron, und der Admin wendet es an, wenn er seine
 Collections auflöst, nicht jedes Mal, wenn sich das Plugin ändert. Wenn die Änderung Daten
-braucht, die Sie abrufen müssen, rufen Sie sie ab, bevor Sie `<Rebase>` rendern, und bauen
-Sie das Plugin aus dem, was zurückkam:
+erfordert, die Sie abrufen müssen, rufen Sie diese vor dem Rendern von `<Rebase>` ab und erstellen Sie das Plugin
+aus den zurückgegebenen Daten:
 
 ```tsx
 import { useEffect, useMemo, useState } from "react";
@@ -321,17 +318,17 @@ export function App() {
 
     return (
         <Rebase client={client} authController={authController} plugins={[labelsPlugin]}>
-            <RebaseCMS collections={collections}/>
+            <RebaseCMS tableCustomizations={tableCustomizations}/>
             <RebaseShell title="My App"/>
         </Rebase>
     );
 }
 ```
 
-`hooks.modifyCollectionAsync` ist veraltet (deprecated). Es wurde nie aufgerufen. Ein Plugin, das es setzt, kompiliert weiterhin, und `<Rebase>` warnt
-einmal pro Plugin. Verwenden Sie `modifyCollection` wie oben.
+`hooks.modifyCollectionAsync` ist veraltet. Es wurde nie aufgerufen. Ein Plugin, das es setzt, kompiliert weiterhin, und `<Rebase>` warnt einmal pro
+Plugin. Verwenden Sie `modifyCollection` wie oben beschrieben.
 
 ## Nächste Schritte
 
-- **[Studio-Tools](/docs/studio)** – SQL-Konsole, JS-Konsole, RLS-Editor
-- **[Benutzerdefinierte Felder](/docs/frontend/custom-fields)** – Erstellen benutzerdefinierter Formularfelder
+- **[Studio Tools](/docs/studio)** — SQL-Konsole, JS-Konsole, RLS-Editor
+- **[Custom Fields](/docs/frontend/custom-fields)** — Erstellen benutzerdefinierter Formularfelder

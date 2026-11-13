@@ -1,22 +1,19 @@
 ---
-sourceHash: aa6e4f1031d85124
+sourceHash: 72daf47d8a15bafe
 title: Suche
 sidebar_label: Suche
-description: Wie sich .search() standardmäßig verhält und wie Sie eine Postgres-Collection für die gerankte Volltextsuche über die von Ihnen benannten Felder aktivieren – einschließlich JSONB- und Array-Inhalten.
+description: Wie sich .search() standardmäßig verhält und wie eine Tabelle die gerankte Volltextsuche über von Ihnen benannte Spalten aktiviert – einschließlich JSONB- und Array-Inhalten.
 ---
 
-`.search("term")` funktioniert auf jeder Collection ohne Konfiguration. Wozu es
-kompiliert wird, hängt davon ab, ob die Collection zusätzliche Konfigurationen
-definiert hat.
+`.search("term")` funktioniert auf jeder Tabelle ohne Konfiguration. Worin es
+kompiliert wird, hängt davon ab, ob die Tabelle mehr angefordert hat.
 
 ## Das Standardverhalten
 
-Ohne Konfiguration ist `.search()` ein **Substring-Abgleich ohne Berücksichtigung
-der Groß-/Kleinschreibung (case-insensitive)**, der über die `string`-Eigenschaften
-der obersten Ebene der Collection per OR verknüpft wird. Der Suchstring wird an
-Leerzeichen aufgeteilt und jeder Begriff muss übereinstimmen – diese können jedoch
-mit verschiedenen Eigenschaften übereinstimmen, sodass ein Name, der über zwei
-Spalten verteilt ist, dennoch gefunden wird:
+Ohne Konfiguration ist `.search()` ein **Teilstring-Abgleich ohne Berücksichtigung der Groß-/Kleinschreibung** (case-insensitive substring match),
+der per OR über die Textspalten der Tabelle verknüpft wird. Der Suchstring
+wird an Leerzeichen aufgeteilt und jeder Begriff muss übereinstimmen – sie können
+jedoch mit verschiedenen Spalten übereinstimmen, sodass ein Name, der über zwei Spalten verteilt ist, dennoch gefunden wird:
 
 ```sql
 -- .search("ada lovelace")
@@ -24,72 +21,69 @@ WHERE (first_name ILIKE '%ada%'      OR last_name ILIKE '%ada%')
   AND (first_name ILIKE '%lovelace%' OR last_name ILIKE '%lovelace%')
 ```
 
-Schließen Sie eine Wortfolge in doppelte Anführungszeichen ein – `.search('"ada lovelace"')` –,
-um stattdessen nach der Phrase zu suchen, genau wie der unten beschriebene
-Volltext-Pfad sie interpretiert.
+Setzen Sie eine Wortfolge in doppelte Anführungszeichen – `.search('"ada lovelace"')` –, um stattdessen
+nach der Phrase zu suchen, genau wie der unten beschriebene Volltext-Pfad sie interpretiert.
 
-Dies reicht für eine kleine Collection mit Text in einfachen Spalten aus. Es hat
-jedoch drei Einschränkungen, die durch keine interne Einstellung behoben werden können:
+Dies reicht für eine kleine Tabelle aus, deren Text in einfachen Spalten liegt. Es hat
+drei Einschränkungen, die keine Einstellung darin beheben kann:
 
-- **Es kann nicht in `map`- oder `array`-Eigenschaften hineinsehen.** Eine Collection,
-  die ihre durchsuchbaren Inhalte in JSONB speichert – Tags, Zertifizierungen, einen
-  Fragebogen –, hat ein Suchfeld, das stillschweigend keine Treffer liefert.
+- **Es kann nicht in JSON- oder Array-Spalten hineinsehen.** Eine Tabelle, die
+  ihre durchsuchbaren Inhalte in JSONB speichert – Tags, Zertifizierungen, einen Fragebogen –, hat
+  ein Suchfeld, das stillschweigend zu keinen Treffern führt.
 - **Es gibt keine Relevanz.** Zeilen werden in `orderBy`-Reihenfolge zurückgegeben,
-  sodass der beste Treffer auf Seite sieben liegen kann.
-- **Es kann keinen Index verwenden.** Ein führendes `%` hebelt einen B-Tree aus,
-  sodass jede Suche ein sequentieller Scan ist. Bei tausend Zeilen in Ordnung;
-  bei einer Million ein steiler Abgrund.
-  `rebase doctor` nennt die Collections, bei denen dies zum Problem zu werden beginnt:
-  kein `search`-Block und mehr als etwa 10.000 Zeilen.
+  sodass sich der beste Treffer auf Seite sieben befinden kann.
+- **Es kann keinen Index verwenden.** Ein führendes `%` hebelt einen B-Baum aus,
+  sodass jede Suche ein sequentieller Scan ist. Bei tausend Zeilen in Ordnung; bei einer Million ein steiler Abgrund.
+  `rebase doctor` nennt die Tabellen, bei denen dies relevant geworden ist: kein
+  `search`-Block und mehr als etwa 10.000 Zeilen.
 
-Der Begriff wird **wörtlich (literal)** abgeglichen: `%` und `_` sind LIKE-Metazeichen
-und werden escaped, bevor das Pattern erstellt wird. Die Suche nach `50%` sucht
-also tatsächlich nach `50%`, anstatt jede Zeile zurückzugeben. Wenn Sie Wildcards
-benötigen, akzeptiert der `like`-Filteroperator ein Pattern (`.where("title", "like", "post-%")`);
-`.search()` tut dies nicht.
+Der Begriff wird **wörtlich** abgeglichen: `%` und `_` sind LIKE-Metazeichen, und sie
+werden maskiert, bevor das Muster erstellt wird, sodass die Suche nach `50%` tatsächlich nach
+`50%` sucht, anstatt jede Zeile zurückzugeben. Wenn Sie Wildcards wünschen, akzeptiert der `like`-Filteroperator
+ein Muster (`.where("title", "like", "post-%")`); `.search()` tut
+dies nicht.
 
-Eine Ein-Wort-Suche kompiliert zu exakt demselben SQL wie bisher.
+Eine Ein-Wort-Suche kompiliert zu genau demselben SQL wie zuvor.
 
 ## Aktivierung (Opt-in)
 
-Deklarieren Sie einen `search`-Block auf einer Postgres-Collection und benennen
-Sie die Felder, die indexiert werden sollen:
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+Deklarieren Sie `search` auf einer Tabelle und benennen Sie die Spalten, die Sie indexiert haben möchten:
 
-const talents: PostgresCollectionConfig = {
-    slug: "talents",
-    table: "talents",
-    name: "Candidates",
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        full_name: { name: "Full name", type: "string" },
-        bio: { name: "Bio", type: "string" },
-        interests: { name: "Interests", type: "array", of: { name: "Interest", type: "string" } },
-        questionnaire: { name: "Questionnaire", type: "map", properties: {} }
+```ts
+import { defineTable, col, json } from "@rebasepro/server/schema";
+
+export const talents = defineTable("talents", {
+    columns: {
+        id:            col.uuid().primaryKey().defaultRandom(),
+        fullName:      col.text().notNull(),
+        bio:           col.text(),
+        interests:     col.text().array(),
+        questionnaire: col.jsonb(json.object({ certifications: json.array(json.string()) }, { additional: true })),
     },
     search: {
         language: "spanish",
         unaccent: true,
         fields: [
-            { path: "full_name", weight: "A" },
+            { path: "fullName", weight: "A" },
             { path: "bio", weight: "D" },
             "interests",
-            "questionnaire.certifications"
-        ]
-    }
-};
+            "questionnaire.certifications",
+        ],
+    },
+    rls: [{ operation: "select", access: "authenticated" }],
+});
 ```
 
-Es wird nichts automatisch abgeleitet. Ein Feld wird genau dann durchsucht,
-wenn Sie es explizit benennen, und ein Pfad, der nicht aufgelöst werden kann,
-führt beim Start zu einem Fehler, anstatt stillschweigend übersprungen zu werden –
-ein Suchfeld, von dem Sie annehmen, dass es aktiv ist, es aber nicht ist, ist
-genau der Fehler, den dieser Block verhindern soll.
+Nichts wird implizit abgeleitet. Ein Feld wird genau dann durchsucht, wenn Sie es benennen, und ein Pfad,
+der sich nicht auflösen lässt, wird bei der Kompilierung des Schemas abgelehnt, anstatt
+stillschweigend übersprungen zu werden – ein Suchfeld, von dem Sie glauben, dass es aktiv ist, es aber nicht ist, ist genau der
+Fehler, den dieser Block verhindern soll. Dasselbe gilt für eine Spalte, die durch `.private()` oder
+`.access({ read })` eingeschränkt ist: Der Index wird von allen Aufrufern gemeinsam genutzt.
 
-`.search()` kompiliert dann zu einem gerankten Volltext-Abgleich, und Zeilen
-werden mit einem `_score` zurückgegeben:
+`.search()` kompiliert dann zu einem gerankten Volltext-Match, und Zeilen werden mit einem
+`_score` zurückgegeben:
 
 ```typescript
 const { data } = await client.data.talents
@@ -101,101 +95,98 @@ const { data } = await client.data.talents
 ### Was durch die Deklaration erstellt wird
 
 Eine `tsvector`-Spalte, `GENERATED ALWAYS AS … STORED`, und ein GIN-Index darauf.
-Postgres berechnet die Spalte bei jedem Schreibvorgang eines Quellfelds neu und
-verweigert jeden Versuch, direkt hineinzuschreiben, sodass der Index nicht von
-der Zeile abweichen kann. Die Spalte wird niemals von der API zurückgegeben.
+Postgres berechnet die Spalte bei jedem Schreibvorgang in ein Quellfeld neu und verweigert jeden
+Versuch, direkt hineinzuschreiben, sodass der Index nicht von der Zeile abweichen kann. Die Spalte
+wird niemals von der API zurückgegeben.
 
-Sie werden in `.rebase/sql/search.sql` generiert, neben `schema.sql` und
-`policies.sql`, und `rebase db push` wendet sie für Sie an – es muss nichts
-Zusätzliches ausgeführt werden. Sie erhalten eine eigene Datei, da eine generierte
-`tsvector`-Spalte voraussetzt, dass zuvor eine `IMMUTABLE`-Hilfsfunktion existiert
-(`unaccent` ist nur `STABLE`, und das Flattening eines `jsonb`-Dokuments erfordert
-eine Set-Returning-Funktion), und Atlas – die Engine hinter `db push` – Funktionen
-im Free-Tier nicht verwalten kann.
+Sie werden in `.rebase/sql/search.sql` neben `schema.sql` und
+`policies.sql` generiert, und `rebase db push` wendet sie für Sie an – es muss nichts Zusätzliches
+ausgeführt werden. Sie erhalten eine eigene Datei, da eine generierte `tsvector`-Spalte voraussetzt, dass zuerst eine
+`IMMUTABLE`-Hilfsfunktion existiert (`unaccent` ist nur `STABLE`, und
+das Reduzieren eines `jsonb`-Dokuments erfordert eine Set-Returning-Funktion), und Atlas – die
+Engine hinter `db push` – in seiner kostenlosen Version keine Funktionen verwalten kann.
 
-Eine wichtige Konsequenz, falls Sie per Migration statt per Push deployen:
-Das Hinzufügen eines `search`-Blocks allein erzeugt keine Migration, da sich das
-von Atlas verglichene Schema nicht geändert hat. `rebase db generate` weist
-darauf hin, wenn dies passiert. Der Block wird dennoch durch `rebase db push`
-und durch die Schema-Sicherstellung beim Start angewendet; um ihn explizit in
-eine Migration aufzunehmen, hängen Sie `.rebase/sql/search.sql`, das
-`rebase db generate` gerade geschrieben hat, an eine Migration an.
+Eine beachtenswerte Konsequenz, wenn Sie per Migration statt per Push deployen:
+Das Hinzufügen eines `search`-Blocks allein erzeugt keine Migration, da sich das Schema, das
+Atlas vergleicht, nicht geändert hat. `rebase db generate` weist darauf hin, wenn dies geschieht.
+Der Block wird weiterhin durch `rebase db push` und durch das Überprüfen des Schemas beim Start
+angewendet; um ihn explizit in eine Migration aufzunehmen, hängen Sie `.rebase/sql/search.sql`,
+die von `rebase db generate` frisch geschrieben wurde, an eine Migration an.
 
-### Nachträgliches Ändern des Blocks
+### Den Block später ändern
 
-Eine generierte Spalte beinhaltet ihren Ausdruck, und Postgres kann diesen
-Ausdruck nicht in-place ändern – das Hinzufügen eines Feldes, das Verschieben
-einer Gewichtung, das Ändern der Sprache oder das Aktivieren von `unaccent` ist
-also **nichts**, was `ADD COLUMN IF NOT EXISTS` auf eine bereits vorhandene
-Spalte anwenden kann.
+Eine generierte Spalte behält ihren Ausdruck bei, und Postgres kann diesen
+Ausdruck nicht direkt an Ort und Stelle ändern – das Hinzufügen eines Felds, das Ändern einer Gewichtung, das Wechseln der Sprache
+oder das Aktivieren von `unaccent` ist also **nichts**, was `ADD COLUMN IF NOT EXISTS` auf
+eine bereits vorhandene Spalte anwenden kann.
 
-Rebase zeichnet beim Erstellen einen Fingerabdruck des Ausdrucks auf der Spalte
-auf und vergleicht ihn bei jedem Start und jedem `db push`. Eine Änderung wird
-unmissverständlich verweigert, zusammen mit den beiden Anweisungen, die sie
-anwenden – ein `DROP COLUMN` und ein `ADD COLUMN`, welche die Tabelle umschreiben
-und den GIN-Index neu aufbauen. Führen Sie diese zu einem Zeitpunkt Ihrer Wahl
-aus; nichts schreibt eine produktive Tabelle ungefragt in Ihrem Namen um.
+Rebase speichert beim Erstellen der Spalte einen Fingerprint des Ausdrucks
+und vergleicht ihn bei jedem Start und jedem `db push`. Eine Änderung wird mit deutlicher Fehlermeldung verweigert,
+zusammen mit den zwei Anweisungen, die sie anwenden – einem `DROP COLUMN` und einem `ADD COLUMN`,
+die die Tabelle neu schreiben und den GIN-Index neu aufbauen. Führen Sie diese zu einem von Ihnen
+gewählten Zeitpunkt aus; nichts schreibt eine Produktivtabelle ungefragt in Ihrem Namen um.
 
-Zwei Änderungen sind davon ausgenommen. Das Aktivieren von `fuzzy` ist additiv –
-eine zweite Spalte – und wird ohne all dies angewendet. Das Setzen von [`mode`](#mode)
-ändert die Abfrage statt der Spalte und wird daher direkt mit einem Deployment wirksam.
+Zwei Änderungen sind davon ausgenommen. Das Aktivieren von `fuzzy` ist additiv – eine zweite Spalte – und
+wird ohne all dies angewendet. Das Festlegen von [`mode`](#mode) ändert die Abfrage statt
+der Spalte, wird also einfach mit einem Deployment wirksam.
 
-Der Bootvorgang bricht ab, anstatt den Dienst zu starten, denn die Alternative
-ist das, was diese Überprüfung ersetzt hat: eine Spalte, die weiterhin die
-vorherigen Felder indexiert, und eine Suche, die für Inhalte, die offensichtlich
-in der Zeile vorhanden sind, nichts zurückgibt.
+Der Startvorgang bricht ab, anstatt Anfragen zu bedienen, denn die Alternative ist das, was diese
+Überprüfung ersetzt hat: eine Spalte, die weiterhin den vorherigen Feldsatz indexiert, und eine Suche, die
+für Inhalte, die eindeutig in der Zeile vorhanden sind, nichts zurückgibt.
 
 ## Was Sie in `fields` angeben können
 
-| Pfad | Löst auf zu | Beispiel |
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+Ein Pfad beginnt mit einem Spaltenschlüssel.
+
+| Pfad | Löst sich auf zu | Beispiel |
 |------|-------------|---------|
-| Eine `string`-Eigenschaft | die Spalte | `"full_name"` |
-| Eine `string[]`-Eigenschaft | jedes Element | `"interests"` |
-| Eine `map`-Eigenschaft | jeden String-Wert im Dokument | `"questionnaire"` |
-| Ein Pfad innerhalb einer `map` | jeden String-Wert an oder unterhalb dieses Punkts | `"questionnaire.certifications"` |
+| Eine Textspalte | die Spalte | `"fullName"` |
+| Eine `col.text().array()`-Spalte | jedes Element | `"interests"` |
+| Eine `col.jsonb()`-Spalte | jeden String-Wert im Dokument | `"questionnaire"` |
+| Ein Pfad innerhalb einer `col.jsonb()`-Spalte | jeden String-Wert an oder unterhalb dieses Punkts | `"questionnaire.certifications"` |
 
-Ein Pfad in eine Map indexiert **String-Werte in beliebiger Tiefe** darunter –
-Arrays von Strings, verschachtelte Objekte, Arrays von Objekten. JSON-*Schlüssel*
-werden nie indexiert, nur Werte, sodass ein Feldname, der in jeder Zeile vorkommt,
-nicht zu einem Begriff wird, der auf jede Zeile zutrifft.
+Ein Pfad in eine Map indexiert **String-Werte in beliebiger Tiefe** darunter – Arrays von
+Strings, verschachtelte Objekte, Arrays von Objekten. JSON-*Schlüssel* werden nie indexiert, nur
+Werte, sodass ein Feldname, der in jeder Zeile vorkommt, nicht zu einem Begriff wird, der auf
+jede Zeile zutrifft.
 
-Das Angeben eines Enums, einer UUID, einer `json`-Spalte (im Gegensatz zu `jsonb`)
-oder eines Arrays von Zahlen führt zu einem Startfehler mit entsprechender
-Erklärung. Insbesondere Enums stellen ein festes Vokabular dar: Filtern Sie diese
-mit `where`, was exakt ist und einen Index nutzt.
+Die Angabe eines Enums, einer UUID, einer `json`-Spalte (anstelle von `jsonb`) oder eines Arrays von
+Zahlen wird unter Angabe des Grundes verweigert. Insbesondere Enums stellen ein festes
+Vokabular dar: Filtern Sie diese mit `where`, was exakt ist und einen Index verwendet.
 
 ## Optionen
 
 ### `language`
 
-Die Postgres-Textsuchkonfiguration, die über Stemming (Wortstammbildung) und
-Stoppwörter entscheidet. `"spanish"` reduziert `auditores` auf `auditor` und
-verwirft `de`; der Standardwert `"simple"` macht keines von beiden.
+Die Postgres-Textsuchkonfiguration, die über Stemming und Stoppwörter entscheidet.
+`"spanish"` führt `auditores` auf `auditor` zurück und entfernt `de`; der Standardwert,
+`"simple"`, tut keines von beiden.
 
-`"simple"` ist die Standardeinstellung, da sie die einzige Wahl ist, die niemals
-falsch ist – ein Stemmer, der auf die falsche Sprache angewendet wird, verfälscht
-Lexeme unbemerkt. Setzen Sie sie auf die Sprache Ihres Inhalts, um Stemming zu
-aktivieren.
+`"simple"` ist der Standardwert, weil es die einzige Wahl ist, die niemals falsch ist – ein
+Stemmer, der auf die falsche Sprache angewendet wird, verfälscht Lexeme stillschweigend. Setzen Sie ihn auf die
+Sprache Ihrer Inhalte, um Stemming zu aktivieren.
 
 ### `mode`
 
-Wie ein Suchbegriff mit den von Ihnen benannten Feldern abgeglichen wird.
+Wie ein Suchstring mit den von Ihnen benannten Feldern abgeglichen wird.
 
-| `mode` | Treffer | Findet `Muñoz` anhand von `munoz` | Findet `sebastian` anhand von `seb` |
+| `mode` | Gleicht ab | Findet `Muñoz` über `munoz` | Findet `sebastian` über `seb` |
 |---|---|---|---|
-| `"fts"` (Standard) | ganze Lexeme, über den `tsvector` und dessen GIN-Index | mit `unaccent` | nein |
-| `"hybrid"` | dies, `OR` ein Substring-Abgleich über dieselben Felder | **immer** | **ja** |
+| `"fts"` (Standard) | ganze Lexeme über den `tsvector` und dessen GIN-Index | mit `unaccent` | nein |
+| `"hybrid"` | das, `ODER` ein Teilstring-Abgleich über dieselben Felder | **immer** | **ja** |
 
 ```typescript
 search: {
     language: "spanish",
     mode: "hybrid",
-    fields: ["full_name", "questionnaire.certifications"]
+    fields: ["fullName", "questionnaire.certifications"]
 }
 ```
 
-Der Standard und der Standard ohne Block haben gegensätzliche Schwachstellen,
-die dieser Modus schließt. Gemessen an einer echten Postgres-Instanz mit fünf Zeilen
+Der Standard und das Verhalten ohne Block haben jeweils gegensätzliche Lücken, und genau diese
+schließt dieser Modus. Gemessen an einer echten Postgres-Instanz über fünf Zeilen
 (`search-mode-matrix.test.ts` in `@rebasepro/server-postgres`):
 
 | Abfrage | kein Block (ILIKE) | `"fts"` + `unaccent` | `"hybrid"` |
@@ -205,116 +196,104 @@ die dieser Modus schließt. Gemessen an einer echten Postgres-Instanz mit fünf 
 | `audit` | der `Lead Auditor` | — | der `Lead Auditor` |
 | `iso 14001` | die `ISO 14001`-Zeile | die `ISO 14001`-Zeile | die `ISO 14001`-Zeile |
 
-`fuzzy` erreicht dieselben Zeilen, aber erst, wenn der Ähnlichkeits-Schwellenwert
-angepasst wird: Beim Standardwert von 0.3 gibt `iso 14001` auch eine `ISO 9001`-Zeile
-zurück. `"hybrid"` hat keinen Schwellenwert, der angepasst werden müsste – ein
-Substring kommt entweder vor oder nicht.
+`fuzzy` erreicht dieselben Zeilen, aber erst, wenn dessen Ähnlichkeitsschwelle angepasst wird:
+Beim Standardwert von 0.3 gibt `iso 14001` auch eine `ISO 9001`-Zeile zurück. `"hybrid"` hat keinen
+Schwellenwert, der angepasst werden müsste – ein Teilstring kommt entweder vor oder nicht.
 
-**Die Kosten.** Der Substring-Teil kann den GIN-Index nicht nutzen; ein führendes
-`%` kann das nie. Der `@@`-Teil wird weiterhin zuerst ausgeführt und nutzt weiterhin
-den Index. Was der Modus also hinzufügt, ist ein Scan über die Zeilen, die der
-Index verworfen hat. Bei einer großen Tabelle ist das der Unterschied zwischen
-einem Index-Scan und einem sequentiellen Scan, weshalb dies ein Modus und nicht
-der Standard ist.
+**Was es kostet.** Der Teilstring-Teil kann den GIN-Index nicht nutzen; ein führendes `%`
+kann das nie. Der `@@`-Teil läuft weiterhin zuerst und nutzt den Index, sodass der
+Modus lediglich einen Scan über die Zeilen hinzufügt, die der Index verworfen hat. Bei einer großen Tabelle ist das
+der Unterschied zwischen einem Index-Scan und einem sequentiellen Scan – weshalb dies
+ein optionaler Modus und nicht der Standard ist.
 
-**Das Ändern auf einer Produktivumgebung ist sicher** – die einzige Option in
-diesem Block, bei der das der Fall ist. `mode` wirkt sich nur auf Abfrageseite
-aus: Es ändert keine generierte Spalte, keinen Generierungsausdruck und keinen
-Index, löst also nicht die unter [Nachträgliches Ändern des Blocks](#nachträgliches-ändern-des-blocks)
-beschriebene Verweigerung aus. Das Aktivieren erfordert lediglich ein Deployment.
+**Eine Änderung an einer Produktivtabelle ist sicher** – die einzige Option in diesem Block,
+bei der dies zutrifft. `mode` wirkt sich nur auf die Abfrageseite aus: Es ändert weder eine generierte Spalte, noch einen
+Generierungsausdruck oder einen Index und löst daher nicht die unter
+[Den Block später ändern](#den-block-später-ändern) beschriebene Ablehnung aus. Das Aktivieren erfordert
+lediglich ein Deployment und sonst nichts.
 
-Es bereinigt Akzente im Substring-Teil **unabhängig davon, ob `unaccent` gesetzt ist**,
-da diese Normalisierung ebenfalls abfrageseitig geschieht. Das ist beabsichtigt:
-`unaccent` ist die Einstellung, die Sie später nicht aktivieren können, ohne die
-Tabelle neu zu schreiben. So kann eine Collection, die ohne diese Einstellung
-aufgesetzt wurde, dennoch aufhören, `Muñoz` zu übersehen. Was `unaccent` weiterhin
-bringt, ist die Bereinigung im `@@`-Teil, wo die Lexeme gespeichert werden.
+Es bereinigt Akzente im Teilstring-Teil, **unabhängig davon, ob `unaccent` gesetzt ist oder nicht**,
+da diese Normalisierung ebenfalls abfrageseitig erfolgt. Das ist Absicht: `unaccent` ist die
+Einstellung, die Sie später nicht aktivieren können, ohne die Tabelle neu zu schreiben, sodass eine Tabelle
+ohne diese Einstellung dennoch aufhören kann, `Muñoz` zu übersehen. Was `unaccent` weiterhin bringt, ist die
+Bereinigung auf der `@@`-Seite, wo die Lexeme gespeichert sind.
 
-Es fügt der Datenbank die `unaccent`-Erweiterung und eine `IMMUTABLE`-Hilfsfunktion
-hinzu, falls diese noch nicht vorhanden sind. Beide Anweisungen verwenden
-`IF NOT EXISTS` / `CREATE OR REPLACE`, und keine von beiden berührt eine Tabelle.
+Es fügt der Datenbank die Extension `unaccent` und eine `IMMUTABLE`-Hilfsfunktion
+hinzu, falls diese noch nicht vorhanden sind. Beide Anweisungen lauten
+`IF NOT EXISTS` / `CREATE OR REPLACE`, und keine von beiden fasst eine Tabelle an.
 
 ### `unaccent`
 
-Akzente vor der Indexierung entfernen (falten), sodass `auditoria` mit `auditoría`
-übereinstimmt.
+Akzente vor der Indexierung entfernen, sodass `auditoria` auf `auditoría` passt.
 
-Dies ist in einer Sprache mit Akzenten keine reine Kosmetik. Postgres reduziert
-die beiden Schreibweisen auf **unterschiedliche Lexeme** – `to_tsvector('spanish', 'auditoría')`
-ergibt `auditor`, während `'auditoria'` `auditori` ergibt. Ohne diese Option
-verfehlt eine Abfrage ohne Akzente jede Zeile, die Akzente enthält – was auf die
-meisten Suchanfragen der meisten Benutzer zutrifft.
+Dies ist in einer Sprache mit Akzenten nicht bloß kosmetischer Natur. Postgres führt die beiden Schreibweisen auf
+**unterschiedliche Lexeme** zurück – `to_tsvector('spanish', 'auditoría')` ergibt
+`auditor`, während `'auditoria'` `auditori` ergibt. Ohne diese Option verfehlt eine
+ohne Akzente eingegebene Abfrage jede Zeile, die Akzente enthält – was auf die meisten Abfragen
+der meisten Benutzer zutrifft.
 
-Erfordert die `unaccent`-Erweiterung.
+Erfordert die Extension `unaccent`.
 
 ### `fuzzy`
 
-Gleicht zusätzlich auf Trigramm-Ähnlichkeit ab, sodass auch Beinahe-Treffer
-berücksichtigt werden: `iso14000` findet `ISO 14001`, was kein Stemming der Welt
-leisten könnte, da es sich schlicht um unterschiedliche Lexeme handelt.
+Ebenfalls auf Trigram-Ähnlichkeit abgleichen, sodass Fast-Treffer dennoch gerankt werden: `iso14000` findet
+so `ISO 14001`, was kein Stemming der Welt leisten kann, da es sich schlicht um
+unterschiedliche Lexeme handelt.
 
 ```typescript
 search: {
-    fields: ["full_name", "questionnaire.certifications"],
+    fields: ["fullName", "questionnaire.certifications"],
     fuzzy: true,
     fuzzyThreshold: 0.3   // default
 }
 ```
 
-Fügt eine zweite generierte Spalte und einen Trigramm-Index hinzu und erfordert
-`pg_trgm`. Kostet Schreibzeit und Speicherplatz; fängt dafür die häufigste Art
-fehlgeschlagener Suchen ab.
+Fügt eine zweite generierte Spalte und einen Trigram-Index hinzu und erfordert `pg_trgm`.
+Kostet Schreibzeit und Speicherplatz; deckt dafür die häufigste Ursache fehlgeschlagener Suchanfragen ab.
 
 ### `weight`
 
-Jedes Feld besitzt eine der vier Gewichtungsklassen von Postgres, von `A` (am
-stärksten) bis `D`. `ts_rank` bewertet einen Treffer in `A` weitaus höher als in
-`D`, wodurch ein Name vor einer beiläufigen Erwähnung in einer langen Beschreibung
-gerankt wird. Felder haben standardmäßig die Gewichtung `B`.
+Jedes Feld besitzt eine der vier Gewichtungsklassen von Postgres, von `A` (am stärksten)
+bis `D`. `ts_rank` bewertet einen Treffer der Klasse `A` weitaus höher als einen der Klasse `D`, wodurch ein
+Name höher eingestuft wird als eine beiläufige Erwähnung in einer langen Beschreibung. Felder sind standardmäßig auf `B` gesetzt.
 
 ### `column`
 
 Die generierte Spalte heißt `search_vector`. Ändern Sie diesen Namen nur, wenn
-er mit einer bereits vorhandenen Spalte kollidiert – sobald sie erstellt wurde,
-ist sie Teil Ihres Schemas, und ein späteres Umbenennen erfordert ein Drop und
-Recreate, was die Tabelle umschreibt.
+er mit einer bereits vorhandenen Spalte kollidiert – sie ist nach der Erstellung Teil Ihres Schemas, und
+ein späteres Umbenennen erfordert ein Löschen und Neuerstellen, wodurch die Tabelle neu geschrieben wird.
 
 ## Ranking
 
-`_score` ist `ts_rank` für dieselbe Abfrage, mit der die Zeilen abgeglichen
-wurden, und ist nur vorhanden, wenn die Collection aktiviert wurde *und* die
-Anfrage einen Suchstring enthielt.
+`_score` ist das `ts_rank` bezüglich derselben Abfrage, mit der die Zeilen abgeglichen wurden, und
+ist nur vorhanden, wenn die Tabelle die Funktion aktiviert hat *und* die Anfrage einen
+Suchstring enthielt.
 
-Bei `mode: "hybrid"` erhält eine Zeile, die nur durch den Substring-Teil
-gefunden wurde, einen kleinen konstanten Wert (0.001) statt null – unterhalb des
-kleinsten `ts_rank`, den ein echter Lexem-Treffer erzeugen kann. Dadurch
-übertrifft ein Ganzwort-Treffer immer einen Substring-Treffer, und die Zeilen,
-die reine Substring-Treffer sind, fallen auf den Tiebreaker der Abfrage zurück,
-anstatt in beliebiger Reihenfolge der Tabelle zurückzukommen.
+Mit `mode: "hybrid"` erhält eine Zeile, die nur durch den Teilstring-Teil gefunden wurde, einen kleinen
+konstanten Wert (0.001) statt null – kleiner als das kleinste `ts_rank`, das ein echter
+Lexem-Treffer erzeugen kann. Dadurch wird ein Treffer auf ganze Wörter stets höher bewertet als ein Teilstring-Treffer, und die
+reinen Teilstring-Zeilen fallen auf das abfrageeigene Tiebreaking zurück, anstatt
+in beliebiger Reihenfolge der Tabelle zurückgegeben zu werden.
 
-Wenn `fuzzy` aktiviert ist, wird die Trigramm-Ähnlichkeit zu diesem Rang
-**addiert**. Dies ist keine bloße Verfeinerung – es macht `fuzzy` überhaupt
-erst zu einem Ranking. Ein Tippfehler führt auf dem exakten Pfad zu keinem Treffer,
-sodass jede gefundene Zeile einen `ts_rank` von exakt null hat; eine Sortierung
+Wenn `fuzzy` aktiviert ist, wird die Trigram-Ähnlichkeit zu diesem Rang **addiert**. Dies ist keine
+bloße Verfeinerung – es ist das, was `fuzzy` überhaupt erst zu einem Ranking macht. Ein Tippfehler matcht auf
+dem exakten Pfad nichts, sodass jede dadurch gefundene Zeile ein `ts_rank` von exakt null hat; eine Sortierung
 allein nach Rang würde den besten Treffer in beliebiger Reihenfolge zurückgeben.
-Die beiden Terme werden summiert statt gewichtet, sodass eine Zeile mit exakter
-Übereinstimmung zu beidem beiträgt und eine nur ähnliche Zeile übertrifft, ohne
-dass ein Koeffizient definiert werden muss. Außerhalb dieser beiden Bedingungen
-ist `orderBy: "_score"` ein unbekanntes Feld und gibt 400 zurück, anstatt
-stillschweigend unsortierte Zeilen zu liefern.
+Die beiden Terme werden addiert statt gewichtet, sodass eine exakt passende Zeile
+zu beidem beiträgt und eine bloß ähnliche Zeile übertrifft, ohne dass ein Koeffizient
+nötig wäre. Außerhalb dieser beiden Bedingungen ist `orderBy: "_score"` ein unbekanntes Feld und
+gibt 400 zurück, anstatt stillschweigend unsortierte Zeilen zu liefern.
 
-`_score` kann nicht mit Cursor-Paginierung (`startAfter`) kombiniert werden.
-Relevanz wird pro Abfrage berechnet und nicht gespeichert, sodass auf der
-Cursor-Zeile kein Wert vorhanden ist, mit dem die nächste Seite verglichen werden
-könnte, und zwei Anfragen mit unterschiedlichen Suchstrings erzeugen Scores auf
-unterschiedlichen Skalen. Verwenden Sie `limit`/`offset` für nach Relevanz
-sortierte Seiten.
+`_score` kann nicht mit Cursor-Pagination (`startAfter`) kombiniert werden. Die Relevanz wird
+pro Abfrage berechnet und nicht gespeichert, sodass auf der Cursor-Zeile kein Wert existiert,
+mit dem die nächste Seite verglichen werden könnte, und zwei Anfragen mit unterschiedlichen Suchstrings
+Scores erzeugen, die nicht auf derselben Skala liegen. Verwenden Sie `limit`/`offset` für
+nach Relevanz sortierte Seiten.
 
-## Warum stimmte diese Zeile überein?
+## Warum hat diese Zeile gematcht?
 
-Eine gerankte Liste verrät Ihnen, *welche* Zeilen zurückgegeben wurden, aber
-niemals, *warum* eine Zeile dort aufgeführt ist. Lassen Sie sich von jeder Zeile
-erklären, warum sie zutrifft:
+Eine gerankte Liste verrät Ihnen, *welche* Zeilen matchen, aber nie, *warum* eine dort steht. Lassen Sie sich
+von jeder Zeile erklären, warum sie gematcht hat:
 
 ```typescript
 const { data } = await client.data.talents
@@ -327,53 +306,40 @@ data[0]._matches;
 //    snippet: "<mark>ISO</mark> <mark>14001</mark> Lead Auditor" }]
 ```
 
-`field` entspricht exakt dem in `fields` deklarierten Pfad, sodass Sie ihn für
-die Anzeige einem Label zuordnen können. Die Felder werden in der Reihenfolge
-zurückgegeben, in der Sie sie deklariert haben.
+`field` entspricht exakt dem in `fields` deklarierten Pfad, sodass Sie ihn für die Anzeige auf
+ein Label mappen können. Felder werden in der Reihenfolge zurückgegeben, in der Sie sie deklariert haben.
 
-Dies geschieht pro Abfrage, nicht pro Collection, da die Kosten pro Abfrage
-anfallen: ein `ts_headline` pro deklariertem Feld pro zurückgegebener Zeile,
-und `ts_headline` parst das Dokument neu, anstatt den Index zu lesen. Passend
-für eine Ergebnisseite, ungeeignet für einen Export.
+Pro Abfrage, nicht pro Tabelle, da die Kosten pro Abfrage anfallen: ein `ts_headline`
+pro deklariertem Feld pro zurückgegebener Zeile, und `ts_headline` analysiert das Dokument erneut,
+anstatt den Index zu lesen. Genau richtig für eine Ergebnisseite, ungeeignet für einen Export.
 
-**Das Snippet enthält konstruktionsbedingt Markup** – jeder Treffer ist in
-`<mark>` eingeschlossen. Rendern Sie es als HTML oder entfernen Sie die Tags,
-aber behandeln Sie es nicht als reinen Text und vertrauen Sie dem umgebenden
-Text nicht: Es ist der Text, den der Benutzer eingegeben hat. Das Aufteilen
-anhand von `<mark>` und Rendern der Einzelteile ist sicherer als
+**Das Snippet enthält bauartbedingt Markup** – jeder Treffer ist in
+`<mark>` eingeschlossen. Rendern Sie es als HTML oder entfernen Sie die Tags, aber behandeln Sie es nicht als reinen
+Text und vertrauen Sie dem umgebenden Text nicht: Er enthält das, was der Benutzer eingegeben hat.
+Das Aufteilen an `<mark>` und Rendern der Einzelteile ist sicherer als
 `dangerouslySetInnerHTML`.
 
-Unter `mode: "hybrid"` wird auch ein Feld gemeldet, das nur per Substring
-übereinstimmt – es ist das Feld, das den Treffer verursacht hat. Dessen Snippet
-wird ohne Markierungen zurückgegeben: `ts_headline` markiert Lexeme, und ein
-halbes Wort ist kein Lexem.
+Unter `mode: "hybrid"` wird auch ein Feld gemeldet, das nur über einen Teilstring gematcht hat – es
+ist das Feld, das den Treffer ausgelöst hat. Dessen Snippet wird ohne Markierungen zurückgegeben:
+`ts_headline` markiert Lexeme, und ein halbes Wort ist kein Lexem.
 
-Wenn `unaccent` aktiviert ist, werden Snippets mit entfernten Akzenten
-dargestellt – `Auditoria`, nicht `Auditoría`. `ts_headline` über dem
-Originaltext kann einen Treffer, den eine unakzentuierte Abfrage erzeugt hat,
-nicht finden und würde den Text komplett ohne Markierungen zurückgeben; ein
-lesbares Snippet mit Hervorhebungen ist besser als ein optisch schöneres, das
-stillschweigend nichts hervorhebt.
+Wenn `unaccent` aktiviert ist, werden Snippets mit entfernten Akzenten ausgegeben – `Auditoria`, nicht
+`Auditoría`. Ein `ts_headline` auf dem Originaltext kann einen Treffer, den eine
+akzentfreie Abfrage erzeugt hat, nicht finden und würde den Text folglich völlig ohne Markierungen
+zurückgeben; ein lesbares Snippet mit Hervorhebungen ist besser als ein schöneres, das stillschweigend
+nichts hervorhebt.
 
-## Den Block zu einer Produktiv-Collection hinzufügen
+## Den Block zu einer Produktivtabelle hinzufügen
 
-Die generierte Spalte wird wie jede andere Spalte durch die Schema-Sicherstellung
-beim Start hinzugefügt. Ihr Index wird gebaut, nachdem der Server bedient, im
-Hintergrund, mit `CREATE INDEX CONCURRENTLY`, sodass Schreibvorgänge nicht blockiert
-werden (siehe [Indizes](/docs/backend/indexes#when-they-are-created)). Bis der Index
-gebaut ist, funktioniert eine Suche, liest aber die ganze Tabelle. Das Hinzufügen einer
-*gespeicherten (stored)* generierten Spalte schreibt die Tabelle jedoch um –
-planen Sie dies bei einer großen Tabelle wie jedes andere Tabellen-Rewrite.
-
-## Welche Engines
-
-Der `search`-Block ist Postgres-exklusiv und wird auf anderen Engines beim Start
-abgewiesen, anstatt stillschweigend ignoriert zu werden. MongoDB-Collections
-behalten ihren Regex-basierten Abgleich bei; Firestore-Collections verwenden
-den externen Text-Search-Controller.
+Die generierte Spalte wird wie jede andere Spalte durch die Schema-Prüfung beim Start hinzugefügt.
+Ihr Index wird im Hintergrund aufgebaut, nachdem der Server bereits Anfragen bedient – mit
+`CREATE INDEX CONCURRENTLY`, sodass Schreibvorgänge nicht blockiert werden (siehe
+[Indexes](/docs/backend/indexes#when-they-are-created)). Bis der Index aufgebaut ist, funktioniert eine
+Suche zwar, liest aber die gesamte Tabelle. Das Hinzufügen einer *stored* generierten Spalte
+schreibt die Tabelle jedoch neu um; planen Sie dies bei einer großen Tabelle daher wie jeden anderen Rewrite.
 
 ## Verwandte Themen
 
 - [REST API](/docs/backend/api/) — die Abfrageparameter, als die eine Suche den Server erreicht
-- [Indexes](/docs/backend/indexes/) — was der Search-Block erstellt und was er kostet
-- [Querying Data](/docs/sdk/querying/) — Suchen über das typisierte SDK
+- [Indexes](/docs/backend/indexes/) — was der search-Block erstellt und was er kostet
+- [Querying Data](/docs/sdk/querying/) — Suchen mit dem typisierten SDK

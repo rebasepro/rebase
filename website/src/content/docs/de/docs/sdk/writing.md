@@ -1,17 +1,17 @@
 ---
-sourceHash: 6b709366d4a1db96
+sourceHash: dc2857e881f65bd3
 title: Daten schreiben
 sidebar_label: Daten schreiben
-description: Erstellen, Upserten, Aktualisieren und Löschen mit dem SDK – Feldoperationen, bedingte Schreibvorgänge, Idempotenzschlüssel, Batch-Schreibvorgänge und kollektionsübergreifendes Schreiben in einer einzigen Transaktion.
+description: create, upsert, update und delete mit dem SDK — Feldoperationen, bedingte Schreibvorgänge, Idempotenzschlüssel, Batch-Schreibvorgänge und tabellenübergreifendes Schreiben in einer einzigen Transaktion.
 ---
 
-Lesevorgänge finden Sie unter [Daten abfragen](/docs/sdk/querying/). Diese Seite ist die andere Hälfte:
-alles, was eine Zeile ändert.
+Lesevorgänge werden unter [Querying data](/docs/sdk/querying/) beschrieben. Diese Seite ist die andere Hälfte:
+alles, was eine Zeile verändert.
 
-Jede Methode hier durchläuft dieselbe Pipeline wie ein Schreibvorgang von überall sonst – [Callbacks](/docs/collections/callbacks/),
+Jede Methode hier durchläuft dieselbe Pipeline wie ein Schreibvorgang von jeder anderen Stelle — [Hooks](/docs/collections/callbacks/),
 [Relationen](/docs/collections/relations/) und
-[Row-Level Security](/docs/collections/security-rules/) greifen weiterhin. Nichts
-davon ist eine Abkürzung an Ihren eigenen Regeln vorbei; was Ihnen diese Optionen bieten, ist ein
+[Row-Level-Security](/docs/collections/security-rules/) gelten weiterhin. Nichts
+davon ist eine Abkürzung an Ihren eigenen Regeln vorbei; was diese Optionen bringen, ist ein
 Roundtrip, eine Transaktion oder eine Race Condition, die Sie nicht mehr verlieren müssen.
 
 ## Einzelzeilen-Schreibvorgänge
@@ -34,7 +34,7 @@ const newProduct = await client.data.products.create(
 
 ### Upsert
 
-Fügen Sie die Zeile ein oder aktualisieren Sie diejenige, die deren Schlüssel bereits belegt:
+Fügt die Zeile ein oder aktualisiert diejenige, die diesen Schlüssel bereits belegt:
 
 ```typescript
 await client.data.products.upsert(
@@ -43,36 +43,37 @@ await client.data.products.upsert(
 );
 ```
 
-Der Server entscheidet innerhalb einer Transaktion, welches von beiden, und greift auf
-`INSERT … ON CONFLICT DO UPDATE` zurück, sodass es – anders als ein `findById` gefolgt von
-`create` oder `update` – die Race Condition zwischen den beiden nicht verlieren kann und – anders
-als `create` – nicht fehlschlägt, wenn die Zeile bereits vorhanden ist.
+Der Server entscheidet dies innerhalb einer Transaktion und greift auf
+`INSERT … ON CONFLICT DO UPDATE` zurück. Im Gegensatz zu einem `findById` gefolgt von
+`create` oder `update` kann er die Race Condition zwischen beiden also nicht verlieren, und im Gegensatz
+zu `create` schlägt er nicht fehl, wenn die Zeile bereits vorhanden ist.
 
-Ist die Zeile vorhanden, ist das Upsert ein Update dieser Zeile. Die Felder, die Sie senden, werden
-geschrieben, und die weggelassenen behalten ihre gespeicherten Werte – sie werden nicht auf ihren
-`defaultValue` zurückgesetzt. `beforeSave` und `afterSave` sehen `status: "existing"` mit den
-vorherigen Werten, und die Historie verzeichnet ein Update. Ein Schlüssel, der eine Zeile außerhalb
-des `beforeQuery`-Scopes des Aufrufers benennt, ergibt einen 404.
+Wenn die Zeile vorhanden ist, fungiert das Upsert als Aktualisierung dieser Zeile. Die übergebenen Felder
+werden geschrieben, und die weggelassenen behalten ihre gespeicherten Werte — sie werden nicht
+auf ihren `defaultValue` zurückgesetzt. `beforeSave` und `afterSave` sehen `status: "existing"`
+mit den vorherigen Werten, und die History zeichnet ein Update auf. Ein Schlüssel, der eine Zeile
+außerhalb des `beforeQuery`-Scopes des Aufrufers benennt, führt zu einem 404.
 
-`onConflict` ist standardmäßig der Primärschlüssel, was für die meisten Schreibvorgänge, für die ein
-Upsert genutzt wird, das falsche Ziel ist: Bei einem fortlaufenden ID-Schlüssel handelt es sich um
-ein einfaches Einfügen, da der Aufrufer die ID nicht kennt – ein wiederholbarer Import dupliziert
-somit beim zweiten Durchlauf jede Zeile. Geben Sie stattdessen den natürlichen Schlüssel an. Dieser
-muss eine Eindeutigkeitsgarantie aufweisen, die die Datenbank abgleichen kann – `validation: { unique:
-true }` auf der Eigenschaft oder die Spalten eines `unique: true`-[Index](/docs/backend/indexes/) –
-und alles andere führt zu einem 400-Fehler, der die tatsächlich existierenden Ziele auflistet, statt
-zu einem Fehler innerhalb einer Transaktion.
+`onConflict` verwendet standardmäßig den Primärschlüssel, was für die meisten
+Schreibvorgänge, für die ein Upsert verwendet wird, das falsche Ziel ist: Bei einem fortlaufenden ID-Schlüssel (Serial ID) ist dies
+ein einfacher Insert, da der Aufrufer die ID nicht kennt — ein wiederholbarer Import
+dupliziert somit beim zweiten Durchlauf jede Zeile. Geben Sie stattdessen den natürlichen Schlüssel an. Er
+muss eine Eindeutigkeitsgarantie besitzen, die die Datenbank abgleichen kann — `validation: { unique:
+true }` auf der Eigenschaft oder die Spalten eines `unique: true`-
+[Index](/docs/backend/indexes/) — andernfalls wird ein 400-Fehler ausgegeben, der die tatsächlich existierenden
+Ziele auflistet, anstatt eines Fehlers, der innerhalb einer Transaktion ausgelöst wird.
 
-Der `on_create`-Zeitstempel und der `user_on_create`-Ersteller einer bereits existierenden Zeile
-bleiben unberührt: Ein Konflikt bedeutet, dass ihre Erstellung eine Tatsache aus der Vergangenheit ist.
+Der `on_create`-Zeitstempel und der `user_on_create`-Ersteller einer bereits existierenden
+Zeile bleiben unberührt: Ein Konflikt bedeutet, dass ihre Erstellung eine Tatsache aus der Vergangenheit ist.
 
-#### Die gespeicherte Zeile behalten: `where` und `ignoreDuplicates`
+#### Beibehalten der gespeicherten Zeile: `where` und `ignoreDuplicates`
 
-`where` ersetzt die gespeicherte Zeile nur, wenn sie passt – ein Filter auf die Spalten der
-gespeicherten Zeile, geschrieben wie bei einem `find()`. `ignoreDuplicates` ersetzt sie nie. In beiden
-Fällen liefert der Aufruf `undefined`, wenn die gespeicherte Zeile unverändert geblieben ist, und die
-Prüfung ist die des Statements selbst (`ON CONFLICT … DO UPDATE … WHERE`, `ON CONFLICT DO NOTHING`),
-sodass zwischen einem Lesen und der Entscheidung kein anderer Schreibvorgang dazwischenkommen kann:
+`where` ersetzt die gespeicherte Zeile nur dann, wenn sie übereinstimmt — ein Filter auf den
+Spalten der gespeicherten Zeile, geschrieben wie in einem `find()`. `ignoreDuplicates` ersetzt sie
+niemals. In beiden Fällen wird der Aufruf zu `undefined` aufgelöst, wenn die gespeicherte Zeile
+unverändert geblieben ist. Die Prüfung erfolgt direkt im Statement (`ON CONFLICT … DO UPDATE
+… WHERE`, `ON CONFLICT DO NOTHING`), sodass kein anderer Schreibvorgang zwischen einem Lesevorgang
+und der Entscheidung stattfinden kann:
 
 ```typescript
 // Keep the best score of the day: written only when it beats the stored one.
@@ -86,13 +87,20 @@ const claim = await client.data.claims.upsert({ slot, owner }, { ignoreDuplicate
 if (!claim) throw new Error("taken");
 ```
 
-`createMany(rows, { upsert: true, where })` und `{ upsert: true, ignoreDuplicates: true }` tun
-dasselbe pro Zeile und liefern nur die Zeilen zurück, die sie geschrieben haben. Beide erfordern
-`upsert`, und die beiden lassen sich nicht kombinieren (`INVALID_CONFLICT_RULE`).
+`createMany(rows, { upsert: true, where })` und `{ upsert: true, ignoreDuplicates: true }`
+verhalten sich pro Zeile genauso und geben nur die Zeilen zurück, die sie geschrieben haben. Beide erfordern `upsert`, und
+die beiden können nicht kombiniert werden (`INVALID_CONFLICT_RULE`).
 
-#### Nicht auf der Users-Collection
+#### Nicht auf der Auth-Tabelle
 
-`upsert()` auf der Users-Collection (der mit aktiviertem `auth`) wird mit einem 400 (`INVALID_CONFLICT_TARGET`) abgelehnt, ebenso `createMany` mit `upsert` dort. Das Anlegen und das Ändern eines Benutzers folgen unterschiedlichen Regeln — ein Create hasht das Passwort und verschickt die Einladung, ein Update darf den letzten Administrator nicht herabstufen — und ein Upsert erfährt erst innerhalb des Schreibvorgangs, was es ist. Rufen Sie stattdessen `create` oder `update` auf.
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+`upsert()` auf der Auth-Tabelle (die mit `defineAuthTable` deklarierte) wird mit
+einem 400 (`INVALID_CONFLICT_TARGET`) abgewiesen, ebenso wie `createMany` mit `upsert`
+dort. Das Erstellen und das Ändern eines Benutzers folgen unterschiedlichen Regeln — ein Create
+hasht das Passwort und versendet die Einladung, ein Update darf nicht den letzten
+Administrator herabstufen — und ein Upsert erfährt erst während des Schreibvorgangs, um welchen Fall es sich handelt.
+Rufen Sie stattdessen `create` oder `update` auf.
 
 ### Update
 
@@ -120,26 +128,32 @@ await client.data.posts.update(postId, {
 | `$inc` | `number` | addieren (negativ zum Subtrahieren) |
 | `$push` | `array` | einen einzelnen Wert oder jeden Wert eines Arrays anhängen |
 | `$pull` | `array` | jedes Vorkommen eines Werts entfernen |
-| `$merge` | `map` | ein Objekt flach hineinmergen |
+| `$merge` | `map` | ein Objekt per Shallow-Merge einfügen |
 
-Der Grund, sie zu nutzen, ist der Lesevorgang, den Sie nicht mehr durchführen müssen, und die Race
-Condition, die dieser Lesevorgang eröffnen würde. `views = current + 1` bedeutet, zuerst `current`
-abzurufen, und zwei Anfragen, die jeweils `4` lesen, schreiben beide `5` – ein Inkrement geht
-verloren, ohne dass eine der Antworten darauf hinweist. Da dies in das Statement kompiliert wird,
-findet die Arithmetik innerhalb der Zeilensperre statt.
+Der Grund für ihre Verwendung ist der Lesevorgang, den man sich dadurch erspart, und die Race Condition, die dieser
+Lesevorgang eröffnen würde. `views = current + 1` bedeutet, dass zuerst `current` abgerufen werden muss, und zwei
+Anfragen, die jeweils `4` lesen, schreiben beide `5` — eine Inkrementierung geht verloren, und keine der beiden
+Antworten weist darauf hin. Direkt in das Statement kompiliert findet die Arithmetik innerhalb der
+Zeilensperre (Row Lock) statt.
 
-Genau ein Operator pro Feld und nur bei einem Update: Bei einer Zeile, die noch nicht existiert,
-gibt es nichts zu manipulieren, daher ist eine Operation in einem `create`, `createMany` oder
-`upsert` ein 400-Fehler. Ein Operator auf dem falschen Eigenschaftstyp oder ein falsch geschriebener
-`$operator` ist ein 400-Fehler, der das Feld benennt – niemals ein JSON-Dokument, das in die Spalte
-geschrieben wird.
+Genau ein Operator pro Feld und nur bei einem Update: Bei einer Zeile, die noch nicht
+existiert, gibt es nichts, worauf operiert werden könnte; daher führt eine Operation in einem `create`,
+`createMany` oder `upsert` zu einem 400-Fehler. Ein Operator auf dem falschen Eigenschaftstyp oder ein
+falsch geschriebener `$operator` führt zu einem 400-Fehler, der das betroffene Feld nennt — niemals zu einem JSON-Dokument,
+das in die Spalte geschrieben wird.
 
-Eine Operation unterliegt der `validation` der Eigenschaft wie ein Wert, und das schließt den Wert ein, den sie erzeugt. `{ stock: { $inc: -1 } }` auf einem `stock` mit `validation: { min: 0 }` gelingt, solange der Bestand mindestens 1 beträgt, und wird bei 0 mit demselben 400 (`VALIDATION_CONSTRAINT`) abgelehnt, den `{ stock: -1 }` erhält. Dasselbe gilt für `max`, `moreThan`, `lessThan`, `positive` und `negative` sowie für die Mindest- und Höchstzahl an Elementen (`min`, `max`) eines Arrays nach einem `$push` oder `$pull`. Die Prüfung ist Teil der Update-Anweisung, daher können zwei gleichzeitige Verringerungen eines Bestands von 1 nicht beide gelingen, und ein abgelehntes Update schreibt nichts.
+Eine Operation unterliegt wie ein gewöhnlicher Wert der `validation` der Eigenschaft, und das
+schließt den resultierenden Wert mit ein. `{ stock: { $inc: -1 } }` auf einem `stock`-Feld mit
+`validation: { min: 0 }` gelingt, solange der Bestand mindestens 1 beträgt, und wird bei 0 mit demselben
+400-Fehler (`VALIDATION_CONSTRAINT`) abgewiesen, den auch `{ stock: -1 }` erhält. Dasselbe gilt für
+`max`, `moreThan`, `lessThan`, `positive` und `negative` sowie für die `min`- und `max`-Elemente eines Arrays
+nach einem `$push` oder `$pull`. Die Prüfung ist Teil des Update-Statements, sodass zwei
+gleichzeitige Dekrementierungen eines Bestands von 1 nicht beide erfolgreich sein können, und ein abgewiesenes
+Update schreibt nichts.
 
-Im Offline-Modus werden sie abgelehnt, anstatt in die Warteschlange eingereiht zu werden: Eine
-Operation wird anhand eines gespeicherten Werts ausgewertet, von dem das Gerät keine aktuelle Kopie
-besitzt, und eine optimistische Zeile könnte bis zum Abarbeiten der Warteschlange nur den Marker
-selbst anzeigen.
+Im Offline-Modus werden sie abgewiesen statt in die Warteschlange gestellt: Eine Operation wird
+gegen einen gespeicherten Wert ausgewertet, von dem das Gerät keine aktuelle Kopie besitzt, und eine optimistische
+Zeile könnte bis zur Abarbeitung der Queue nur den Marker selbst anzeigen.
 
 ### Delete
 
@@ -147,14 +161,14 @@ selbst anzeigen.
 await client.data.products.delete(42);
 ```
 
-Bei einer Collection mit [Soft Delete](/docs/collections/soft-delete) markiert dies die
-Zeile, statt sie zu entfernen. `client.data.products.trash` listet, zählt, stellt wieder her
-und löscht die markierten Zeilen endgültig.
+Bei einer Tabelle mit [Soft Delete](/docs/collections/soft-delete) wird die
+Zeile markiert, anstatt sie zu löschen. `client.data.products.trash` listet, zählt, stellt wieder her
+und bereinigt die markierten Zeilen endgültig.
 
 ### Bedingte Schreibvorgänge
 
-`update` und `delete` akzeptieren ein `ifMatch`, sodass ein Schreibvorgang abgewiesen wird, wenn
-sich die Zeile seit dem Lesen geändert hat:
+`update` und `delete` akzeptieren ein `ifMatch`, sodass ein Schreibvorgang verweigert wird, wenn die Zeile
+sich geändert hat, seit Sie sie gelesen haben:
 
 ```typescript
 import { etagOf } from "@rebasepro/client";
@@ -164,20 +178,20 @@ await client.data.posts.update(1, { title: "New" }, { ifMatch: etagOf(post) });
 // → RebaseApiError, status 412, if somebody edited it in between
 ```
 
-Ohne dies gilt für Read-Modify-Write das Prinzip »Last-Writer-Wins« für alles, was Sie nicht
-gesendet haben: Zwei Bearbeiter im Abstand von einer Sekunde sind beide erfolgreich, und die
-Änderung des ersten ist ohne jegliche Fehlermeldung verloren.
+Ohne dies gilt bei Read-Modify-Write das Last-Writer-Wins-Prinzip für alles, was Sie nicht
+gesendet haben: Zwei Bearbeiter im Abstand von einer Sekunde haben beide Erfolg, und die Änderung des ersten ist
+verloren, ohne dass irgendwo ein Fehler auftritt.
 
-`etagOf(row)` liest die Version aus einer Zeile aus, die von `findById`/`get` stammt. Sie liegt auf
-einem nicht-aufzählbaren (non-enumerable) Schlüssel, sodass sie nie in den generierten `Row`-Typ, ein
-`JSON.stringify` oder ein Spread in den nächsten Update-Body gelangt. Sie ist `undefined` für eine
-Zeile aus `find()`, aus dem Offline-Cache oder von einem Server, der kein `ETag` sendet – und die
-Übergabe von `undefined` sendet keine Vorbedingung, sodass der obige Aufruf zu einem gewöhnlichen
-Update herabgestuft wird, anstatt einen Fehler zu werfen.
+`etagOf(row)` liest die Version aus einer Zeile aus, die von `findById`/`get` stammt. Sie
+befindet sich auf einem nicht-aufzählbaren Schlüssel, sodass sie niemals in den generierten `Row`-Typ, ein
+`JSON.stringify` oder ein Spread in den nächsten Update-Body gelangt. Bei einer Zeile
+aus `find()`, aus dem Offline-Cache oder von einem Server, der keinen `ETag` sendet, ist der Wert `undefined`
+— und die Übergabe von `undefined` sendet keine Vorbedingung, sodass der obige Aufruf
+zu einem gewöhnlichen Update herabgestuft wird, anstatt einen Fehler auszulösen.
 
-Eine Zeile aus `update()` trägt die Version, die dieser Schreibvorgang erzeugt hat, sodass
-bedingte Bearbeitungen ohne dazwischenliegendes Lesen aneinandergereiht werden können. Eine Zeile, die ein `listenById()`-Callback
-erhält, trägt die Version, die dieser Frame zeigt:
+Eine Zeile aus `update()` enthält die Version, die durch diesen Schreibvorgang erzeugt wurde, sodass
+bedingte Änderungen ohne zwischenzeitlichen Lesevorgang verkettet werden können. Eine Zeile, die ein
+`listenById()`-Callback empfängt, trägt die Version, die dieser Frame darstellt:
 
 ```typescript
 import { etagOf } from "@rebasepro/client";
@@ -191,37 +205,38 @@ client.data.posts.listenById(1, (post) => {
 await client.data.posts.update(1, { title: "New" }, { ifMatch: etagOf(shown) });
 ```
 
-Von einem Browser auf einem anderen Origin aus — ein Vite-Frontend auf eigenem Port, ein
-`app.`-Host, der einen `api.`-Host aufruft — ist das `ETag` nur lesbar, weil der Server es in
-`Access-Control-Expose-Headers` benennt. Die Rebase-Runtime tut dies, zusammen mit
-`Retry-After`, `X-Request-ID`, den `X-RateLimit-*`-Headern und `Preference-Applied`. Ein
-Backend, das sein eigenes `cors()` verdrahtet, muss dieselbe Liste freigeben, sonst ist
-`etagOf` dort immer `undefined`, und jeder bedingte Schreibvorgang geht unbedingt hinaus.
+Von einem Browser auf einer anderen Origin — etwa einem Vite-Frontend auf einem eigenen Port oder einem `app.`-
+Host, der einen `api.`-Host aufruft — ist das `ETag` nur lesbar, weil der Server
+es in `Access-Control-Expose-Headers` aufführt. Die Rebase-Runtime tut dies, zusammen
+mit `Retry-After`, `X-Request-ID`, den `X-RateLimit-*`-Headern und
+`Preference-Applied`. Ein Backend, das sein eigenes `cors()` konfiguriert, muss dieselbe Liste freigeben,
+da `etagOf` dort sonst immer `undefined` ist und jeder bedingte Schreibvorgang
+unkonditioniert gesendet wird.
 
-### Antwort überspringen
+### Überspringen der Antwort
 
-Jeder Schreibvorgang löst zu der Zeile auf, die geschrieben wurde. Übergeben Sie `{ returning: false }`,
-wenn Sie diese nicht benötigen:
+Jeder Schreibvorgang wird zu der Zeile aufgelöst, die er geschrieben hat. Übergeben Sie `{ returning: false }`, wenn Sie
+diese nicht benötigen:
 
 ```typescript
 await client.data.events.create({ kind: "page_view" }, undefined, { returning: false });
 ```
 
-Dadurch wird `Prefer: return=minimal` gesendet; der Server antwortet bei einem einzelnen
-Schreibvorgang mit `204` und bei einem Batch nur mit den IDs. Die Methode löst dann zu `undefined`
-(oder `[]`) auf, sodass Sie nicht versehentlich eine Zeile verwenden können, die der Server nie
-gesendet hat. Lohnenswert bei Importen und Fire-and-Forget-Schreibvorgängen – der Standard ist die
-Zeile, da sie enthält, was der *Server* entschieden hat.
+Dadurch wird `Prefer: return=minimal` gesendet; der Server antwortet bei einem einzelnen Schreibvorgang mit `204`
+und bei einem Batch nur mit den IDs. Die Methode löst sich dann zu `undefined` (oder `[]`) auf,
+sodass Sie nicht versehentlich eine Zeile verwenden können, die der Server gar nicht gesendet hat. Lohnenswert
+bei Importen und Fire-and-Forget-Schreibvorgängen — der Standardwert ist die Zeile, da sie enthält, was der
+*Server* festgelegt hat.
 
 ## Batch-Schreibvorgänge
 
 Drei Operationen schreiben viele Zeilen in einer **einzigen Anfrage und einer einzigen
-Transaktion**. Jede Zeile durchläuft weiterhin die normale Pipeline – Callbacks, Relationen,
-Row-Level Security – ein Batch ist also keine Abkürzung an Ihren eigenen Regeln vorbei; der Gewinn
-besteht in einem einzigen Roundtrip und einer einzigen Transaktion statt jeweils N davon.
+Transaktion**. Jede Zeile durchläuft weiterhin die normale Pipeline — Hooks, Relationen,
+Row-Level-Security — ein Batch ist also keine Abkürzung an Ihren eigenen Regeln vorbei; der Gewinn
+besteht in einem Roundtrip und einer Transaktion anstelle von jeweils N.
 
-Alle drei folgen dem Prinzip **Alles-oder-nichts**. Wird eine beliebige Zeile abgelehnt, wird keine
-davon übernommen und der Fehler nennt den betroffenen Index.
+Alle drei sind **Alles-oder-Nichts**. Wenn eine Zeile abgelehnt wird, wird keine davon übernommen und
+der Fehler nennt den betroffenen Index.
 
 ```typescript
 // Create
@@ -240,46 +255,47 @@ await client.data.orders.updateMany([
 await client.data.sessions.deleteMany(["s-1", "s-2"]);
 ```
 
-### Wie viele Statements ein Batch ist
+### Aus wie vielen Statements ein Batch besteht
 
-Bei einer Collection ohne `beforeSave`-, `afterSave`- oder `afterSaveError`-Hook,
-ohne `history` und ohne `tenant` besteht ein Batch aus einer Handvoll Statements statt
-aus einem pro Zeile: `createMany` sendet mehrzeilige `INSERT … RETURNING`-Statements (mit
-`upsert` `INSERT … ON CONFLICT … DO UPDATE`), und `updateMany` ein
-`UPDATE … FROM (VALUES …) RETURNING` pro Folge von Einträgen, die dieselben
-Felder setzen. Deklarierte Defaults, `autoValue`-Stempel, `afterRead` und Realtime-Events
-gelten für jede Zeile genauso wie bei einzelnen Schreibvorgängen. Lehnt die Datenbank den
-Batch ab, wird er rückgängig gemacht und Zeile für Zeile erneut ausgeführt, damit der Fehler weiterhin den
-fehlgeschlagenen Eintrag benennt. Eine Collection, die einen dieser Hooks deklariert, behält die
-zeilenweise Pipeline, weil jeder Hook einmal pro Zeile zwischen den Schreibvorgängen dieser Zeile läuft.
+Auf einer Tabelle ohne `beforeSave`-, `afterSave`- oder `afterSaveError`-Hook,
+ohne `history` und ohne `tenant` besteht ein Batch aus wenigen Statements statt
+einem pro Zeile: `createMany` sendet mehrzeilige `INSERT … RETURNING`-Statements (bei
+`upsert`: `INSERT … ON CONFLICT … DO UPDATE`), und `updateMany` sendet ein
+`UPDATE … FROM (VALUES …) RETURNING` pro Durchlauf von Einträgen, die dieselben
+Felder setzen. Deklarierte Standardwerte, `.onCreateNow()`- / `.onUpdateNow()`-Stempel, `afterRead` und Realtime-Events
+gelten für jede Zeile genauso wie bei Einzeloperationen. Wenn die Datenbank den
+Batch verweigert, wird er rückgängig gemacht und Zeile für Zeile erneut ausgeführt, sodass der Fehler weiterhin den Eintrag
+benennt, der fehlgeschlagen ist. Eine Tabelle, die einen dieser Hooks deklariert, behält die zeilenweise
+Pipeline bei, da jeder Hook einmal pro Zeile zwischen den Schreibvorgängen dieser Zeile ausgeführt wird.
 
-Ein einzelnes `update` liest ebenso nichts, wenn nichts die gespeicherte Zeile benötigt:
-das `UPDATE … RETURNING` ist zugleich das 404 für eine fehlende Zeile und die Zeile,
-mit der es antwortet. Ein `delete` ohne Hook, Historie oder Papierkorb, die bedient werden müssten,
-liest ebenfalls nichts.
+Ein einzelnes `update` liest ebenfalls nichts aus, wenn nichts die gespeicherte Zeile benötigt:
+Das `UPDATE … RETURNING` fungiert sowohl als 404 für eine fehlende Zeile als auch als die Zeile, mit der es
+antwortet. Ein `delete`, das weder Hook, History noch Trash bedienen muss, liest
+ebenfalls nichts.
 
-### Wie viele Round Trips ein Schreibvorgang ist
+### Wie viele Roundtrips ein Schreibvorgang benötigt
 
-Ein Schreibvorgang auf einer solchen Collection ist ein Round Trip zur Datenbank: das `BEGIN` der
-Transaktion, die Identität des Aufrufers, das Statement und das `COMMIT` gehen in einem Batch hinaus.
-Das gilt für `create`, `update`, `upsert`, `delete`, `updateWhere`, `deleteWhere` und ein gemeinsam
-geschriebenes `createMany`. Ein Statement, das die Datenbank ablehnt, überspringt das `COMMIT` dahinter,
-und der Schreibvorgang wird rückgängig gemacht wie jeder fehlgeschlagene. Ein Schreibvorgang, der einen
-Hook ausführt oder Historie aufzeichnet, sendet sein `COMMIT` danach, in einem zweiten Round Trip.
+Ein Schreibvorgang auf einer solchen Tabelle erfordert einen einzigen Roundtrip zur Datenbank: Das
+`BEGIN` der Transaktion, die Identität des Aufrufers, das Statement und das `COMMIT` werden
+in einem Batch übertragen. Das gilt für `create`, `update`, `upsert`, `delete`,
+`updateWhere`, `deleteWhere` und ein gemeinsam geschriebenes `createMany`. Ein Statement,
+das die Datenbank verweigert, überspringt das nachfolgende `COMMIT`, und der Schreibvorgang wird wie
+jeder fehlgeschlagene Vorgang zurückgerollt. Ein Schreibvorgang, der einen Hook ausführt oder History aufzeichnet, sendet sein
+`COMMIT` erst danach in einem zweiten Roundtrip.
 
 ### Warum `{ id, data }` statt flacher Zeilen
 
-`createMany` nimmt flache Zeilen entgegen, weil eine zu erstellende Zeile aus ihren Spalten *besteht*.
-`updateMany` benennt die Adresse separat, da bei einer Tabelle, deren Schlüssel nicht die `id` ist –
-etwa eine `sku` oder ein zusammengesetzter Schlüssel –, eine flache Zeile nicht unterscheiden kann, ob
-eine Spalte die Adresse oder ein zu schreibender Wert ist. Dies spiegelt das
-Einzelzeilen-`update(id, data)` exakt wider.
+`createMany` nimmt flache Zeilen entgegen, da eine neu erstellte Zeile aus ihren Spalten *besteht*.
+`updateMany` benennt die Adresse separat, da bei einer Tabelle, deren Schlüssel nicht die
+`id` ist — etwa eine `sku` oder ein zusammengesetzter Schlüssel —, eine flache Zeile nicht unterscheiden kann, ob
+eine Spalte die Adresse oder ein zu schreibender Wert ist. Dies spiegelt das zeilenbasierte
+`update(id, data)` exakt wider.
 
-## Schreiben mit einem Filter
+## Schreiben über einen Filter
 
-`updateWhere` und `deleteWhere` schreiben jede Zeile, die ein Filter trifft, in einem einzigen
-Statement – `UPDATE … WHERE … RETURNING` und `DELETE … WHERE`. Der Filter besteht aus `where` und
-`logical`, wie sie ein `find()` entgegennimmt:
+`updateWhere` und `deleteWhere` schreiben jede Zeile, auf die ein Filter zutrifft, in einem
+einzigen Statement — `UPDATE … WHERE … RETURNING` und `DELETE … WHERE`. Der Filter entspricht
+dem `where` und `logical`, die auch von `find()` akzeptiert werden:
 
 ```typescript
 // Every expired session, gone; resolves to how many.
@@ -292,10 +308,10 @@ const bumped = await client.data.songs.updateWhere(
 );
 ```
 
-Ein Filter, der nichts trifft, ist kein Fehler – das Ergebnis ist `[]` bzw. `0` –, was `deleteWhere`
-auch zum Löschen für eine Zeile macht, die bereits verschwunden sein kann, wo `delete` mit 404
-antwortet. Und weil das Statement, das schreibt, dasselbe ist, das den Filter prüft, ist es ein
-Compare-and-Set:
+Ein Filter, der auf nichts zutrifft, ist kein Fehler — das Ergebnis ist `[]` oder `0` —, was
+`deleteWhere` auch zur Löschmethode für eine Zeile macht, die möglicherweise bereits nicht mehr existiert,
+während `delete` mit 404 antwortet. Und da das Statement, das schreibt, dasselbe ist, das den
+Filter prüft, handelt es sich um ein Compare-and-Set:
 
 ```typescript
 // Save only over the revision this client read; [] means somebody else saved first.
@@ -305,51 +321,49 @@ const [saved] = await client.data.saves.updateWhere(
 );
 ```
 
-Ein Filter ohne Bedingung wird mit `FILTER_REQUIRED` abgelehnt, statt ausgeführt zu werden – er würde
-jede Zeile adressieren –, und ein Feld, das keine Spalte ist, wird wie bei einem Lesezugriff abgelehnt,
-nie stillschweigend verworfen. Ein gefiltertes Update kann keine Schlüsselspalte setzen.
+Ein Filter ohne Bedingung wird mit `FILTER_REQUIRED` abgewiesen, anstatt ausgeführt zu werden —
+er würde sonst jede Zeile betreffen — und ein Feld, das keine Spalte ist, wird wie bei einem Lesevorgang abgewiesen,
+niemals stillschweigend verworfen. Ein gefiltertes Update kann keine Schlüsselspalte setzen.
 
-Auf einer Collection, deren Schreibvorgänge zeilenweise Arbeit ausführen – ein Save- oder Delete-Hook,
-Historie, Tenancy, ein `beforeQuery`, Soft Delete, Zugriff pro Feld –, werden die passenden Zeilen im
-Scope des Aufrufers gelesen und einzeln durch die vollständige Pipeline geschrieben, in einer
-Transaktion. Über HTTP sind dies die Bulk-Routen mit einem Filter anstelle von IDs:
-`PATCH /api/data/<slug>/bulk` mit `{ where, logical, data }` und
-`POST /api/data/<slug>/bulk/delete` mit `{ where, logical }`. Auf der Users-Collection, deren Updates
-und Deletes Benutzer für Benutzer geprüft werden, sind sie nicht verfügbar (`FILTERED_USER_WRITE`);
-benennen Sie die Benutzer stattdessen mit `updateMany`/`deleteMany`.
+Auf einer Tabelle, deren Schreibvorgänge zeilenweise Arbeit erfordern — ein Save- oder Delete-Hook, History,
+Mandantenfähigkeit (Tenancy), ein `beforeQuery`, Soft Delete, feldbasierte Zugriffskontrolle —, werden die passenden Zeilen
+unter dem Scope des Aufrufers gelesen und nacheinander durch die vollständige Pipeline
+in einer einzigen Transaktion geschrieben. Über HTTP sind dies die Bulk-Routen mit einem Filter
+anstelle von IDs: `PATCH /api/data/<slug>/bulk` mit `{ where, logical, data }`
+und `POST /api/data/<slug>/bulk/delete` mit `{ where, logical }`. Sie stehen auf
+der Auth-Tabelle nicht zur Verfügung, da deren Updates und Deletes Benutzer für
+Benutzer geprüft werden (`FILTERED_USER_WRITE`); benennen Sie die Benutzer stattdessen mit `updateMany`/`deleteMany`.
 
-### Wiederholungen und Duplikate
+### Wiederholungsversuche und Duplikate
 
-Ein Client, der die Antwort nie erhält, kann nicht wissen, ob der Batch committet wurde, und
-versucht es erneut – und ohne einen Schlüssel kann der Server diesen Wiederholungsversuch nicht von
-einem zweiten, echten Batch unterscheiden. Übergeben Sie einen Idempotenzschlüssel bei allem, was
-möglicherweise erneut gesendet wird:
+Ein Client, der die Antwort nie erhält, kann nicht wissen, ob der Batch committet wurde,
+und wiederholt den Vorgang daher — und ohne einen Schlüssel kann der Server diesen Wiederholungsversuch nicht von
+einem zweiten echten Batch unterscheiden. Übergeben Sie einen Idempotenzschlüssel bei allem, was möglicherweise erneut gesendet wird:
 
 ```typescript
 const attemptKey = crypto.randomUUID();
 await client.data.products.createMany(rows, { idempotencyKey: attemptKey });
 ```
 
-Ein Schlüssel bezeichnet eine einzelne Anfrage, keinen Auftrag: Er wird für die Methode, den Pfad
-und den Body registriert, mit denen er gesendet wurde. Das erneute Senden exakt dieser Anfrage spielt
-deren Antwort erneut ab; derselbe Schlüssel bei einer anderen Anfrage wird mit
-`IDEMPOTENCY_KEY_REUSED` (422) abgelehnt. Erzeugen Sie daher einen Schlüssel pro Aufruf, anstatt eine
-fachliche ID wiederzuverwenden – eine `importId`, die sich `createMany` und `deleteMany` eines Imports
-teilen, würde dazu führen, dass das Löschen stillschweigend nicht ausgeführt wird.
+Ein Schlüssel bezeichnet eine einzelne Anfrage, keinen Job: Er wird für die Methode, den Pfad
+und den Body registriert, mit dem er gesendet wurde. Das erneute Senden genau dieser Anfrage wiederholt deren Antwort;
+derselbe Schlüssel bei einer anderen Anfrage wird mit `IDEMPOTENCY_KEY_REUSED`
+(422) abgewiesen. Erzeugen Sie daher einen Schlüssel pro Aufruf, anstatt eine fachliche ID wiederzuverwenden — eine `importId`,
+die sich das `createMany` und das `deleteMany` eines Imports teilen, würde dazu führen, dass das
+Löschen stillschweigend nicht ausgeführt wird.
 
-Ein Wiederholungsversuch, der eintrifft, während der erste Versuch noch beantwortet wird, erhält
-`IDEMPOTENCY_KEY_IN_PROGRESS` (409): Senden Sie ihn erneut, und er wird mit dem Ergebnis des ersten
-Versuchs beantwortet, sobald dieses vorliegt. Schlüssel werden 24 Stunden lang berücksichtigt, und das
-nur für authentifizierte Aufrufer – andernfalls gibt es keinen Principal, auf den der Schlüssel
-beschränkt werden könnte.
+Ein Wiederholungsversuch, der eintrifft, während der erste Versuch noch verarbeitet wird, erhält
+`IDEMPOTENCY_KEY_IN_PROGRESS` (409): Senden Sie ihn erneut, und er wird mit dem Ergebnis
+des ersten Versuchs beantwortet, sobald dieser abgeschlossen ist. Schlüssel sind 24 Stunden lang gültig, und
+zwar nur für einen angemeldeten Aufrufer — andernfalls gibt es keinen Principal, auf den der Schlüssel beschränkt werden könnte.
 
 Die Offline-Warteschlange setzt bei jeder Wiederholung automatisch einen Schlüssel.
 
 ### Limits
 
-Batches sind serverseitig begrenzt (standardmäßig 1000 Zeilen), da ein Batch seine Sperren für die
-gesamte Transaktion hält. Eine Überschreitung führt zu einem `BULK_TOO_LARGE`-Fehler, der sowohl das
-Limit als auch Ihre Zeilenanzahl nennt; teilen Sie die Daten daher in Chunks auf:
+Batches sind serverseitig begrenzt (standardmäßig 1000 Zeilen), da ein Batch
+seine Locks für die gesamte Transaktion hält. Eine Überschreitung führt zu einem `BULK_TOO_LARGE`-Fehler,
+der sowohl das Limit als auch Ihre Zeilenzahl nennt; teilen Sie die Daten daher in Chunks auf:
 
 ```typescript
 for (const chunk of chunks(rows, 1000)) {
@@ -357,67 +371,69 @@ for (const chunk of chunks(rows, 1000)) {
 }
 ```
 
-Eine Datenquelle, die nicht atomar schreiben kann, meldet `BULK_UNSUPPORTED`, anstatt stillschweigend
-einzelne Schreibvorgänge in einer Schleife auszuführen – was Ihnen weder die Atomarität noch den
-einzelnen Roundtrip bringen würde, weswegen Sie überhaupt zu einem Batch gegriffen haben.
+Eine Datenquelle, die nicht atomar schreiben kann, meldet `BULK_UNSUPPORTED`, anstatt
+stillschweigend Einzelschreibvorgänge in einer Schleife auszuführen — was Ihnen weder die Atomarität
+noch den einzelnen Roundtrip bieten würde, weshalb Sie überhaupt einen Batch gewählt haben.
 
-## Kollektionsübergreifendes Schreiben
+## Tabellenübergreifendes Schreiben
 
-`createMany` und verwandte Methoden arbeiten jeweils auf einer einzelnen Kollektion. `client.batch()`
-ist die kollektionsübergreifende Variante: eine Anfrage, eine Transaktion, alles oder nichts.
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+`createMany` und ähnliche Methoden beziehen sich jeweils auf eine Tabelle. `client.batch()` ist die
+tabellenübergreifende Variante: eine Anfrage, eine Transaktion, alles oder nichts.
 
 ```typescript
 const result = await client.batch([
-    { op: "create", collection: "orders",
+    { op: "create", table: "orders",
       values: { total: 40 }, ref: "order" },
-    { op: "create", collection: "orderItems",
+    { op: "create", table: "orderItems",
       values: { orderId: { $ref: "order.id" }, sku: "A-1" } },
-    { op: "update", collection: "stock",
+    { op: "update", table: "stock",
       id: "A-1", values: { count: { $inc: -1 } } },
-    { op: "delete", collection: "carts", id: "c-9" }
+    { op: "delete", table: "carts", id: "c-9" }
 ]);
 
 result.data;  // [ order, item, stock, null ] — aligned to the operations
 result.meta;  // { operations: 4 }
 ```
 
-`op` ist `create`, `update`, `upsert` oder `delete`, und `collection` schränkt `values` auf den
-generierten `Insert`- oder `Update`-Typ dieser Kollektion ein — eine Spalte, die die Kollektion
-nicht hat, ist ein Compile-Fehler, ebenso ein Create, dem eine erforderliche fehlt. `collection`
-ist der Accessor, der Name, den `client.data.<accessor>` annimmt (`orderItems` für den Slug
-`order_items`); der Client sendet den Slug, über das `collections`-Dictionary, mit dem er
-erstellt wurde. Jede Operation durchläuft die gleiche Pipeline wie ihr Einzelzeilen-Äquivalent –
-dieselbe Validierung, dieselben Callbacks und dieselbe Row-Level Security, als derselbe Benutzer.
+`op` ist `create`, `update`, `upsert` oder `delete`, und `table` grenzt
+`values` auf den generierten `Insert`- oder `Update`-Typ dieser Tabelle ein — eine Spalte,
+die die Tabelle nicht besitzt, führt zu einem Kompilierungsfehler, ebenso wie ein Create, dem eine
+erforderliche Spalte fehlt. `table` ist der Accessor, also der Name, den `client.data.<accessor>`
+verwendet (`orderItems` für den Slug `order_items`); der Client sendet den Slug
+über das `tables`-Dictionary, mit dem er erstellt wurde. Jede
+Operation durchläuft dieselbe Pipeline wie ihr Einzelzeilen-Pendant — dieselbe
+Validierung, dieselben Hooks und dieselbe Row-Level-Security, als derselbe Benutzer.
 
 ### `$ref`
 
-Eine Operation kann sich über `ref` selbst einen Namen geben; eine spätere Operation kann
-`{ $ref: "<name>.<field>" }` überall dort einsetzen, wo ein Wert stehen darf, einschließlich als `id`
-und in beliebiger Schachtelungstiefe innerhalb von `values`. Es löst zu dem Feld der Zeile auf, die von
-der benannten Operation geschrieben wurde.
+Eine Operation kann sich selbst über `ref` benennen; eine spätere Operation kann
+`{ $ref: "<name>.<field>" }` überall dort einsetzen, wo ein Wert erwartet wird, einschließlich als `id` und in
+beliebiger Tiefe innerhalb von `values`. Dies wird zu dem Feld der Zeile aufgelöst, die von der
+benannten Operation geschrieben wurde.
 
-Aus diesem Grund existiert diese Methode anstelle einer Schleife über `createMany`: Der
-Fremdschlüssel des Kind-Datensatzes existiert erst, wenn der Eltern-Datensatz eingefügt wurde, sodass
-beide in separaten Anfragen gesendet werden müssten – und separate Anfragen können nur teilweise
-erfolgreich sein. Die Wiederherstellung danach (zurücklesen, herausfinden, welche Hälfte angekommen ist,
-rückgängig machen) ist Code, den niemand schreiben möchte.
+Aus diesem Grund existiert die Methode anstelle einer Schleife über `createMany`: Der
+Fremdschlüssel des Child-Datensatzes existiert erst, wenn der Parent-Datensatz eingefügt wurde; daher
+müssten beide getrennte Anfragen sein — und getrennte Anfragen können teilweise erfolgreich sein. Die
+Fehlerbehebung dafür (zurücklesen, herausfinden, welche Hälfte gespeichert wurde, und diese rückgängig machen) ist
+Code, den niemand gerne schreibt.
 
-Nur Rückwärtsreferenzen werden aufgelöst. Eine Vorwärtsreferenz wird vor dem Öffnen der Transaktion
-abgelehnt, ebenso wie unbekannte Kollektionen, unbekannte Felder, unzulässige Feldoperationen und
-ungeeignete Konfliktziele – denn ein Fehler bei Operation 40 würde andernfalls den Rollback der 39
-vorangegangenen Schreibvorgänge erzwingen.
+Nur Rückwärtsreferenzen werden aufgelöst. Eine Vorwärtsreferenz wird abgewiesen, noch bevor die
+Transaktion geöffnet wird, zusammen mit unbekannten Tabellen, unbekannten Feldern, unzulässigen
+Feldoperationen und ungeeigneten Konfliktzielen — denn ein Fehler bei Operation 40 würde
+andernfalls das Rollback der 39 vorherigen Schreibvorgänge erzwingen.
 
 ### Limits und Fehlerbehandlung
 
-Dasselbe Limit von 1000 Operationen wie bei einem Bulk-Schreibvorgang, aus demselben Grund: Ein
-Batch hält seine Sperren für die gesamte Transaktion. Ein `update` oder `delete`, das eine nicht
-existierende Zeile benennt, lässt den gesamten Batch mit einem 404 fehlschlagen. Ein Backend, dessen
-Treiber dies nicht atomar ausführen kann, antwortet mit `BATCH_UNSUPPORTED`, anstatt Schleifen zu
-durchlaufen.
+Es gilt dieselbe Obergrenze von 1000 Operationen wie bei einem Bulk-Schreibvorgang, und zwar aus demselben
+Grund: Ein Batch hält seine Locks während der gesamten Transaktion. Ein `update` oder `delete`,
+das eine nicht existierende Zeile benennt, lässt den gesamten Batch mit einem 404-Fehler fehlschlagen. Ein Backend,
+dessen Treiber dies nicht atomar ausführen kann, antwortet mit `BATCH_UNSUPPORTED`, anstatt Schleifen zu durchlaufen.
 
-`idempotencyKey` und `returning` funktionieren genau wie bei jedem anderen Schreibvorgang.
+`idempotencyKey` und `returning` funktionieren genauso wie bei jedem anderen Schreibvorgang.
 
-Serverseitig nehmen `rebase.dataAsAdmin.batch([...])` und `context.data.batch([...])` dieselben
-Operationen entgegen und liefern dasselbe Ergebnis, in der eigenen Transaktion des Aufrufers. `batch`
-ist dort reserviert wie `collection`: Eine Collection, deren Accessor `batch` ist, erreichen Sie mit
-`data.collection("batch")`.
+Serverseitig akzeptieren `rebase.dataAsAdmin.batch([...])` und `context.data.batch([...])`
+dieselben Operationen und liefern dasselbe Ergebnis in der eigenen Transaktion des Aufrufers.
+`batch` ist dort ebenso wie `table` reserviert: Eine Tabelle, deren Accessor `batch` lautet,
+wird über `data.table("batch")` erreicht.

@@ -1,135 +1,200 @@
 ---
-sourceHash: 6713d8b8d0ba9125
+sourceHash: 7f137cdb15196a3e
 title: Ferramentas do Studio
 sidebar_label: Studio
-description: O Rebase Studio oferece ferramentas para desenvolvedores para edição visual de esquemas, consultas SQL, scripting JavaScript, gerenciamento de políticas RLS e navegação de armazenamento.
+description: O Rebase Studio oferece ferramentas de desenvolvedor para edição visual de esquemas, consultas SQL, scripts JavaScript, gerenciamento de políticas RLS e navegação de armazenamento.
 ---
 
 ## Visão Geral
 
-O Studio é a metade de desenvolvimento do painel de administração. O mesmo
-aplicativo que sua equipe de conteúdo usa para editar linhas também traz um
-editor de esquemas, um console SQL, um rascunho JavaScript, um navegador de
-políticas RLS e um navegador de armazenamento — e o Studio é o modo que os
-libera. Nada para instalar e nada para implantar: já está no painel, atrás do
-seletor da gaveta.
+O Studio é a metade do desenvolvedor no painel de administração. A mesma aplicação
+que sua equipe de conteúdo usa para editar linhas também traz um editor de esquemas,
+um console SQL, um scratchpad JavaScript, um navegador de políticas RLS e um navegador
+de armazenamento — e o Studio é o modo que os desbloqueia. Nada para instalar e nada
+para fazer deploy: já está no painel, atrás do seletor na gaveta lateral (drawer).
 
-![O editor de coleções, a ferramenta principal do Studio: um editor visual de esquemas que reescreve o seu TypeScript](/img/collection_editor.png)
+![O editor de coleções, a ferramenta principal do Studio: um editor visual de esquemas que escreve de volta no seu TypeScript](/img/collection_editor.png)
 
 Ele existe porque a alternativa é um segundo conjunto de credenciais. Editar uma
-coleção, verificar o que uma política realmente permite ou rodar uma única
-consulta contra a produção significa, do contrário, um cliente de banco de dados,
-uma cópia da string de conexão e uma trilha de auditoria que termina em «alguém
-com psql». O Studio faz tudo isso como o admin autenticado, através da mesma
-autorização que a API usa.
+tabela, verificar o que uma política realmente permite ou executar uma consulta
+em produção normalmente significa um cliente de banco de dados, uma cópia da string
+de conexão e uma trilha de auditoria que termina em "alguém com psql". O Studio faz
+tudo isso como o administrador conectado, por meio da mesma autorização usada pela API.
 
 ## Os dois modos
 
-O painel tem dois modos — `"cms" | "studio"`:
+O painel possui dois modos — `"cms" | "studio"`:
 
-- **CMS** (`"cms"`) — Para editores de conteúdo e equipes de operações. Mostra coleções e gerenciamento de dados. É o padrão.
-- **Studio** (`"studio"`) — Para desenvolvedores. Libera as ferramentas abaixo.
+- **CMS** (`"cms"`) — Para editores de conteúdo e equipes operacionais. Mostra as tabelas e o gerenciamento de dados. Este é o padrão.
+- **Studio** (`"studio"`) — Para desenvolvedores. Desbloqueia as ferramentas abaixo.
 
-Alterne entre eles com o controlador de modo admin ou com o seletor da gaveta. O
-modo escolhido é persistido no `localStorage` sob `rebase-admin-mode`; um
-navegador que usou o painel antes da 0.17.0 guarda o valor antigo `"content"` e é
-migrado para `"cms"` na leitura.
+Alterne entre eles com o controlador de modo de administração ou o seletor na gaveta lateral. O
+modo escolhido é mantido no `localStorage` sob `rebase-admin-mode`; um navegador
+que usou o painel antes da versão 0.17.0 mantém o valor antigo `"content"` e é
+migrado para `"cms"` durante a leitura.
 
-## Ferramentas do Studio Integradas
+## Ferramentas Nativas do Studio
 
-### Editor de Coleções
+### Editor de Coleções (Collection Editor)
 
-Um editor visual de esquemas que permite criar e modificar coleções através de uma interface de arrastar e soltar. Ao salvar as alterações, ele usa [ts-morph](https://ts-morph.com/) para escrever apenas as chaves que você alterou nos seus arquivos-fonte TypeScript, deixando o resto de cada arquivo como estava: imports, comentários, formatação, handlers, propriedades compartilhadas. Uma alteração em algo que o arquivo define em código, como uma propriedade importada de outro módulo, é recusada com o local onde fazê-la. É a captura de tela no topo desta página.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-O editor está ativo onde quer que o Studio esteja montado — o `<RebaseStudio/>` de um scaffold é suficiente, e não há nenhuma prop a acrescentar. `collectionEditor` afina-o, não o ativa:
+Um editor visual para uma tabela e como o painel a exibe. Um salvamento é dividido em dois:
+
+- **Fatos do esquema** — o tipo de uma coluna, nulidade, padrão, validação, valores
+  de enum, armazenamento, relações, regras, descrição, histórico — tornam-se edições
+  `TablePatch` que o editor de esquemas do servidor grava em `backend/schema/<table>.ts`
+  com o [ts-morph](https://ts-morph.com/), alterando apenas o código especificado por uma
+  edição e mantendo o restante do arquivo como estava: importações, comentários, formatação,
+  hooks, colunas compartilhadas. Uma edição que interfere no código — uma coluna criada por
+  uma função auxiliar, regras armazenadas em uma variável — é recusada, indicando o local onde
+  deve ser feita. Uma regra não modificada é devolvida exatamente como foi servida, para que o
+  nome de sua política nunca mude. Consulte [Edição de esquemas em tempo real](/docs/backend/live-schema-editing/#the-edits-tablepatch).
+- **Apresentação** — rótulos, ícone, modos de exibição, ordem das colunas, colunas ocultas,
+  larguras, rótulos e cores de enum, kanban, padrões de consulta — é uma preferência de UI,
+  nunca uma edição de esquema. As de um administrador são as do workspace: onde o servidor pode
+  gravar o código-fonte do projeto, elas vão para `frontend/src/cms/ui-config.json`, e
+  em um deploy, para a tabela `rebase.ui_preferences`, via
+  `/api/admin/ui-config`. Os redimensionamentos e mudanças de visualização do próprio usuário pertencem a ele.
+
+Uma alteração de slug, tabela SQL ou banco de dados é recusada como uma migração. Uma tabela cujas
+regras vêm de `defaultRls` solicita confirmação antes de assumir regras próprias. Um solicitante
+que receber regras ocultadas obtém um editor somente leitura. Um salvamento que o servidor não
+consegue compilar lista cada problema junto ao campo correspondente, e nada é gravado.
+Um arquivo modificado no disco desde que o editor o leu oferece a opção de recarregar em vez de
+sobrescrever a alteração (`SCHEMA_EDIT_STALE_FILE`). Um campo cuja definição é gerada em código — um helper,
+uma variável compartilhada — é exibido como somente leitura, com o motivo. A ordem das colunas é
+apenas de apresentação: a reordenação nunca move uma coluna na tabela. Esta é a
+captura de tela no topo desta página.
+
+**Importar uma tabela existente.** Uma tabela presente no banco de dados que não
+esteja declarada em `backend/schema` é listada em "Import an existing table"; selecionar uma grava
+seu arquivo `defineTable` exatamente como o banco de dados a descreve — colunas, chaves,
+índices, row-level security — por meio da edição `adoptTable`. A adoção não altera
+nada no banco de dados: ela não planeja DDL, e a primeira etapa de política recria
+uma política idêntica uma vez para validá-la. A postura de row-level security nunca é
+rebaixada: uma tabela com RLS desativado, ou sem políticas, é adotada como
+`rls: "admin-only"`, e o diálogo informa isso. Uma tabela sem chave primária não pode
+ser adotada. As rotas são `GET /api/admin/schema-editor/unmapped-tables` e
+`GET /api/admin/schema-editor/unmapped-tables/:schema/:table`.
+
+**Coleções do Firestore.** Em desenvolvimento, o editor de coleções também edita
+coleções do Firestore: um salvamento reescreve a chamada
+`defineFirestoreCollection({...})` da coleção em `frontend/src/cms` diretamente no local, alterando
+apenas o que você editou. Funções, componentes customizados, comentários e importações permanecem
+como foram escritos; campos definidos em código aparecem como somente leitura. Em produção, as
+coleções do Firestore são somente leitura no editor. Criar uma, ou alterar seu slug,
+é feito no código; para excluir uma, remova seu arquivo e sua entrada
+em `externalCollections`.
+
+O editor está ativo onde quer que o Studio esteja montado — o `<RebaseStudio/>` de um
+scaffold é suficiente, e não há nenhuma prop a ser adicionada. `collectionEditor` serve para ajustá-lo,
+não para ativá-lo:
 
 ```tsx
 import { RebaseCMS } from "@rebasepro/cms";
 import { RebaseStudio } from "@rebasepro/studio";
 
-// Studio is mounted, so the Collection Editor is available. Nothing else
-// is needed for it.
+// O Studio está montado, então o Collection Editor está disponível. Nada mais
+// é necessário para ele.
 <Rebase>
-    <RebaseCMS collections={collections}/>
+    <RebaseCMS tableCustomizations={tableCustomizations}/>
     <RebaseStudio/>
 </Rebase>
 
-// `collectionEditor` is for fine-tuning — a read-only editor, a different
-// token — not for opting in.
+// `collectionEditor` serve para ajustes finos — um editor somente leitura, um token
+// diferente — não para ativá-lo.
 <RebaseCMS
-    collections={collections}
+    tableCustomizations={tableCustomizations}
     collectionEditor={{
         getAuthToken: authController.getAuthToken
     }}
 />
 ```
 
-Se um *guardar* chega a aplicar-se é decisão do servidor, não do painel: o editor reescreve os ficheiros de origem das coleções, por isso está desativado com `NODE_ENV=production`, em modo `baas` e num servidor sem `collectionsDir`. O painel consulta `GET /api/admin/schema-editor/status` e mostra o motivo que recebe junto ao botão desativado.
+A confirmação de um *salvamento* cabe ao servidor, não ao painel: o editor
+reescreve `backend/schema`, portanto fica desativado sob `NODE_ENV=production` (a menos que
+a [edição de esquemas em tempo real](/docs/backend/live-schema-editing/) especifique um repositório),
+no modo `baas`, e em um servidor sem `schemaDir`. O painel consulta
+`GET /api/admin/schema-editor/status` e exibe o motivo retornado ao lado do
+botão desativado.
 
-### Ferramentas incorporadas
+### Ferramentas integradas
 
-Vêm com o Studio e são **carregadas de forma diferida pelo `RebaseStudio`** — cada uma é um chunk separado, obtido na primeira vez que a abres. Não são importáveis isoladamente: o `@rebasepro/studio` exporta deliberadamente apenas o orquestrador, por isso uma consola que nunca abres não custa nada.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-| Separador | Slug | Grupo | O que faz |
-|-----------|------|-------|-----------|
-| Consola SQL | `sql` | Base de dados | Executar SQL direto na tua base de dados PostgreSQL e ler os resultados numa tabela. A tabela mostra o resultado da última instrução, até às suas primeiras 10 000 linhas ou 32 MB de valores; um resultado mais longo indica quantas linhas havia, e copiar e exportar incluem apenas as linhas mostradas. Um resultado assim oferece também **Download full result as CSV**: o servidor transmite-o por inteiro através de um cursor só de leitura (`POST /api/admin/sql/csv`), uma consulta de cada vez, num servidor Postgres teu e não na base de dados de desenvolvimento em processo. Os valores são o texto da base de dados, tal como o psql os mostra, e **Export JSON** escreve-os assim; **Export typed JSON** escreve cada valor lido pelo tipo da sua coluna — inteiros e numéricos que um número JSON representa com exatidão, booleanos, `json`/`jsonb` como JSON — e mantém todos os outros valores como texto. Em todo o CSV (exportação, cópia e a transferência completa), um valor que uma folha de cálculo executaria como fórmula (um que começa por `=`, `+`, `-`, `@`, um tab ou um retorno de carro, exceto um número com sinal) é escrito com um `'` à frente, tal como a exportação da coleção o escreve. Enquanto uma execução está em curso, **Cancel run** devolve a consola de imediato; um servidor que aceite a trama `CANCEL_SQL` do socket (lista `cancel_sql` no `hello` com que responde ao socket) também interrompe a instrução com `pg_cancel_backend`. A base de dados de desenvolvimento em processo não pode ser interrompida, e um servidor mais antigo deixa a instrução terminar dentro do seu `statement_timeout` |
-| Políticas RLS | `rls` | Base de dados | Inspecionar e gerir as políticas de Row Level Security das tuas tabelas. Uma política é listada tal como a base de dados a guarda, marcada com **Differs from code** quando não é o que o projeto declara. Uma política que o Rebase gera não pode ser editada diretamente na base de dados, e numa tabela que o Rebase gere um aviso indica que cada arranque do servidor e cada `rebase db push` voltam a aplicar as políticas declaradas |
-| Visualizador de esquema | `schema-visualizer` | Base de dados | Diagrama de entidades das tuas coleções e das suas relações, desenhado a partir das definições das coleções: tabelas, colunas, tipos e relações são tal como as coleções os declaram. Só os marcadores de RLS são lidos da base de dados. A disposição corre num web worker, por isso a página continua a responder enquanto um diagrama grande é organizado. Um esquema com mais de 300 tabelas é desenhado uma vizinhança de tabela de cada vez — as tabelas a uma ou duas relações de distância — a partir da tabela mais ligada; escolhe outra tabela na lista para mudar |
-| Ramos | `branches` | Base de dados | Criar e gerir [ramos da base de dados](/docs/backend/branching), e revisar um como uma pull request: as alterações de esquema e de políticas RLS lado a lado, as linhas que inseriu, atualizou e excluiu, e uma mesclagem no banco de onde foi criado que diz antes o que vence — veja [Revisar e mesclar um branch](/docs/backend/branching/#reviewing-and-merging-a-branch) |
-| Cópias de segurança | `backups` | Base de dados | Navegar e descarregar as cópias de segurança da base de dados |
-| Explorador de logs | `logs` | Base de dados | Registo de pedidos em tempo real, mais tudo o que o servidor reporta em warn ou error — ver abaixo |
-| Consola JS | `js` | Compute | Escrever e executar JavaScript através do SDK do Rebase |
-| Tarefas cron | `cron` | Compute | Inspecionar e gerir [tarefas agendadas](/docs/backend/cron-jobs) |
-| Armazenamento | `storage` | Storage | Navegar, carregar e gerir ficheiros nos teus backends de armazenamento |
-| Explorador de API | `api` | API | Documentação de API interativa, com um executor de pedidos |
-| Chaves de API | `api-keys` | Controlo de acesso | Criar e gerir chaves de API de serviço com âmbitos |
+Toda ferramenta que reconhece o esquema lê as tabelas fornecidas pelo servidor, a partir de
+`GET /api/schema/tables`, com ou sem o CMS na página — assim o Studio funciona
+como o console de um backend sem painel de administração. Diante de um runtime anterior ao
+0.31, que não possui essa rota, as ferramentas com suporte a esquema informam que o runtime precisa
+ser atualizado, em vez de tentar adivinhar; diante de um backend sem autenticação, ou
+quando a requisição falha, cada uma informa o motivo. O console SQL, logs, armazenamento e
+as outras ferramentas que não leem o esquema funcionam de qualquer maneira.
 
-### O que o explorador de logs mostra
+Elas acompanham o Studio e são **carregadas sob demanda (lazy-loaded) pelo `RebaseStudio`** — cada uma é um
+chunk separado, buscado na primeira vez em que você a abre. Elas não podem ser importadas individualmente:
+`@rebasepro/studio` exporta deliberadamente apenas o orquestrador, para que um console que você nunca
+abre não custe nada.
 
-Dois fluxos num único anel em memória, mantido no processo do servidor:
+| Aba | Slug | Grupo | O que faz |
+|-----|------|-------|-----------|
+| SQL Console | `sql` | Database | Execute SQL puro contra seu banco de dados PostgreSQL e leia os resultados em uma tabela. A tabela mostra o resultado da última instrução, até suas primeiras 10.000 linhas ou 32 MB de valores; um resultado mais longo informa quantas linhas existiam, e a cópia e exportação incluem apenas as linhas exibidas. Esse resultado também oferece **Download full result as CSV**: o servidor faz o streaming de tudo por meio de um cursor somente leitura (`POST /api/admin/sql/csv`), uma consulta por vez, em um servidor Postgres próprio em vez do banco de dados de desenvolvimento em processo. Os valores são o texto do banco de dados, como o psql os exibe, e **Export JSON** grava dessa forma; **Export typed JSON** grava cada valor interpretado pelo tipo de sua coluna — inteiros e numéricos que um número JSON suporta com precisão, booleanos, `json`/`jsonb` como JSON — e mantém qualquer outro valor como texto. Em todos os CSVs (exportação, cópia e download completo), um valor que uma planilha executaria como fórmula (iniciado com `=`, `+`, `-`, `@`, tabulação ou retorno de carro, exceto um número assinado) é gravado com um `'` no início, da mesma forma que a exportação de coleções grava. Enquanto uma execução estiver em andamento, **Cancel run** libera o console imediatamente; um servidor que aceite o frame `CANCEL_SQL` do socket (ele lista `cancel_sql` no `hello` com o qual responde ao socket) também interrompe a instrução com `pg_cancel_backend`. O banco de dados de desenvolvimento em processo não pode ser interrompido, e um servidor mais antigo é deixado para concluir a instrução dentro de seu `statement_timeout` |
+| RLS Policies | `rls` | Database | Inspecione e gerencie políticas de Row Level Security para suas tabelas. O lado declarado é o que o servidor compilou a partir do `rls` de cada tabela (disponibilizado para solicitantes com `schema:read`), comparado com `pg_policies` da forma como o `rebase doctor` avalia inconsistências (drift): uma política é listada como o banco de dados a armazena, com a tag **Differs from code** onde ela não coincidir com o que o projeto declara, e uma regra declarada ausente no banco de dados é listada como não aplicada. Uma política gerada pelo Rebase não pode ser editada diretamente no banco de dados, e em uma tabela gerenciada pelo Rebase um banner informa que cada inicialização do servidor e `rebase db push` reaplicam as políticas declaradas. Um solicitante sem `schema:read` vê o que o banco de dados armazena e é informado do motivo pelo qual a declaração não é exibida |
+| Schema Visualizer | `schema-visualizer` | Database | Diagrama de entidades de suas tabelas e suas relações, desenhado a partir dos descritores fornecidos: nomes SQL, tipos Postgres, nulidade, chaves, valores de enum, chaves estrangeiras e junções são conforme declarados pelas tabelas. Apenas os marcadores de RLS são lidos do banco de dados. O layout é executado em um web worker, mantendo a página responsiva enquanto um diagrama grande é organizado. Um esquema com mais de 300 tabelas é desenhado considerando a vizinhança de uma tabela por vez — as tabelas a uma ou duas relações de distância — a partir da tabela mais conectada; selecione outra tabela na lista para navegar |
+| Branches | `branches` | Database | Crie e gerencie [branches de banco de dados](/docs/backend/branching), e revise uma branch como um pull request: suas alterações de esquema e política RLS lado a lado, as linhas que ela inseriu, atualizou e deletou, e uma mesclagem no banco de dados original indicando a precedência — consulte [Revisando e mesclando uma branch](/docs/backend/branching/#reviewing-and-merging-a-branch) |
+| Backups | `backups` | Database | Navegue e faça download de backups do banco de dados |
+| Logs Explorer | `logs` | Database | Log de requisições em tempo real, além de tudo o que o servidor reporta como warn ou error — veja abaixo |
+| JS Console | `js` | Compute | Escreva e execute JavaScript através do SDK do Rebase. Um script recebe `context.tables`, os descritores fornecidos (anteriormente `context.collections`), e acessa uma tabela como `client.data.<slug>` ou `client.data.table("<slug>")` |
+| Cron Jobs | `cron` | Compute | Inspecione e gerencie [tarefas agendadas](/docs/backend/cron-jobs) |
+| Storage | `storage` | Storage | Navegue, faça upload e gerencie arquivos em seus backends de armazenamento |
+| API Explorer | `api` | API | Documentação interativa da API, com um executor de requisições |
+| API Keys | `api-keys` | Access Control | Crie e gerencie chaves de API de serviço com escopo restrito; os alvos de um escopo `data:*` são as tabelas servidas |
 
-- **Cada pedido** — método, caminho, estado, duração, o `X-Request-ID`, a coleção
-  quando o pedido dizia respeito a uma e, quando o pedido falhou, o `code` de
-  erro e a mensagem que o cliente recebeu. Um pedido falhado é registado em
-  `warn` (4xx) ou `error` (5xx), para que o filtro de nível o encontre.
-  O seu `source` vem do caminho: `/api/auth/*` e `/api/oauth/*` são
-  `auth`, `/api/storage/*` é `storage`, e tudo o resto é `api`, para que o filtro
-  Source encontre os inícios de sessão em Auth e os carregamentos em Storage.
-- **Tudo o que o servidor reporta em warn ou error** — um aviso de esquema, uma
-  recusa de autenticação, um diagnóstico do driver, uma falha de arranque. O
-  `source` vem do próprio prefixo da mensagem (`[API]`, `[Auth]`, `[storage]`,
-  `[realtime]`), e tudo o que não for reconhecido fica `system`.
+### O que o Logs Explorer exibe
 
-A conversa de rotina em `info` fica deliberadamente de fora. O anel guarda 10.000
-entradas e um muro de `200` expulsa justamente aquilo que abriste o painel para
-encontrar.
+Dois fluxos em um buffer circular (ring) na memória, mantido no processo do servidor:
 
-Uma função personalizada que lança uma exceção mostra por isso a sua própria
-mensagem aqui, junto ao pedido que a chamou — o caso para o qual isto existe.
+- **Todas as requisições** — método, caminho, status, duração, o `X-Request-ID`, a
+  tabela quando a requisição se referia a uma e, em caso de falha, o
+  `code` de erro e a mensagem que o cliente recebeu. Uma requisição com falha é registrada como
+  `warn` (4xx) ou `error` (5xx), permitindo que o filtro de nível a localize.
+  Sua `source` é derivada do caminho: `/api/auth/*` e `/api/oauth/*` são
+  `auth`, `/api/storage/*` é `storage`, e tudo mais é `api`, permitindo que o
+  filtro de Origem encontre logins sob Auth e uploads sob Storage.
+- **Tudo o que o servidor reporta como warn ou error** — um aviso de esquema, uma
+  recusa de autorização, um diagnóstico de driver, uma falha de inicialização. A `source` provém do
+  próprio prefixo da mensagem (`[API]`, `[Auth]`, `[storage]`, `[realtime]`), e
+  qualquer coisa não reconhecida torna-se `system`.
 
-O anel é por processo e por arranque: não é durável, não é partilhado entre
-réplicas e um reinício esvazia-o. Para tudo o que precises de guardar, lê o stdout
-do processo, que leva as mesmas linhas e mais.
+Mensagens rotineiras de nível `info` são omitidas intencionalmente. O buffer retém 10.000 entradas
+e um volume excessivo de status `200` acabaria removendo aquilo que você abriu o painel para encontrar.
 
-O explorador di-lo. Mostra o log da única instância do servidor que o serve
-e identifica essa instância: o evento `snapshot` de
-`GET /api/admin/logs/stream` traz `instance`, o `HOSTNAME` do processo (o nome do
-pod no Kubernetes, o id do contentor no Docker) ou, na falta dele, `pid-<n>`. Não há
-vista que abranja as réplicas, nem dos processos `functions` e `worker` de uma
-[implantação dividida](/docs/deployment/split-processes/). Uma nova ligação que caia
-noutra instância substitui a janela em vez de misturar os dois logs.
+Portanto, uma função customizada que lance um erro exibe sua própria mensagem aqui, associada à
+requisição que a executou — exatamente o propósito para o qual isso existe.
 
-O **editor de coleções** também é uma ferramenta do Studio, mas não está nesta
-lista porque é registado de outra forma: o `RebaseStudio` não o carrega de forma
-diferida. O painel monta-o onde quer que o Studio esteja registado, porque, ao
-contrário das ferramentas acima, precisa do código-fonte das coleções do projeto à
-mão para lhe escrever de volta. É uma diferença na forma como é montado, não no
-que é — edita esquema, e o seu lugar é ao lado dos editores de SQL e RLS.
+O buffer é por processo e por inicialização: não é persistente, não é compartilhado
+entre réplicas e uma reinicialização o limpa. Para qualquer dado que precise manter, leia
+o stdout do processo, que contém essas mesmas linhas e muito mais.
 
-## Ligar o Studio
+O explorer deixa isso claro. Ele mostra o log da instância única de servidor que o está
+atendendo e nomeia essa instância: o evento `snapshot` de
+`GET /api/admin/logs/stream` traz `instance`, o `HOSTNAME` do processo (o
+nome do pod no Kubernetes, o id do contêiner no Docker) ou, alternativamente, `pid-<n>`. Não
+há visualização consolidada entre réplicas, nem dos processos `functions` e `worker` de uma
+[implantação dividida (split deployment)](/docs/deployment/split-processes/). Uma reconexão que caia em
+outra instância substitui a janela em vez de misturar os dois logs.
 
-Um componente, em qualquer lugar dentro de `<Rebase>`. Não renderiza nada —
-regista as ferramentas, e o `<RebaseShell>` desenha-as:
+O **Collection Editor** também é uma ferramenta do Studio, mas não está nesta lista porque
+é registrado de forma diferente: o `RebaseStudio` não o carrega sob demanda. O painel o monta
+onde quer que o Studio e o CMS estejam registrados, pois, diferentemente das ferramentas acima,
+ele edita a apresentação desenhada pelo CMS bem como o esquema. Essa é uma diferença na forma como
+ele é montado, não no que ele é — ele edita esquemas e pertence ao mesmo espaço dos editores de SQL e
+RLS.
+
+## Ativando o Studio
+
+Um único componente, em qualquer lugar dentro de `<Rebase>`. Ele não renderiza nada — ele registra
+as ferramentas, e o `<RebaseShell>` as exibe:
 
 ```tsx
 import { RebaseStudio } from "@rebasepro/studio";
@@ -137,7 +202,7 @@ import { RebaseStudio } from "@rebasepro/studio";
 export function App() {
     return (
         <Rebase client={client} authController={authController}>
-            <RebaseCMS collections={collections}/>
+            <RebaseCMS tableCustomizations={tableCustomizations}/>
             <RebaseStudio/>
             <RebaseShell title="My App"/>
         </Rebase>
@@ -145,16 +210,15 @@ export function App() {
 }
 ```
 
-As ferramentas aparecem na gaveta enquanto o modo Studio estiver ativo. Deixa
-`<RebaseStudio>` totalmente de fora e entregas um CMS só de conteúdo: sem modo
-Studio, sem seletor, sem nada carregado de forma diferida.
+As ferramentas aparecem na gaveta lateral enquanto o modo Studio estiver ativo. Deixe
+o `<RebaseStudio>` de fora completamente e você entregará um CMS apenas de conteúdo: sem modo Studio,
+sem seletor, sem nada carregado sob demanda.
 
-## Adicionar a tua própria ferramenta
+## Adicionando sua própria ferramenta
 
-`devViews` coloca as tuas próprias vistas ao lado das integradas. São
-[`AppView`](/docs/frontend#custom-views)s comuns — a única coisa que torna uma
-delas uma ferramenta do Studio em vez de uma vista do CMS é o componente em que é
-registada:
+`devViews` posiciona suas próprias visualizações ao lado das nativas. Elas são
+[`AppView`](/docs/frontend#custom-views)s comuns — a única coisa que torna uma delas uma
+ferramenta do Studio em vez de uma visualização do CMS é em qual componente ela é registrada:
 
 ```tsx
 import type { AppView } from "@rebasepro/cms-types";
@@ -171,35 +235,35 @@ const queues: AppView = {
 <RebaseStudio devViews={[queues]}/>
 ```
 
-| Registada em | Aparece em | Para |
+| Registrado em | Aparece em | Destinado a |
 |---|---|---|
-| `<RebaseCMS views>` | modo conteúdo | coisas que as pessoas que editam conteúdo usam |
-| `<RebaseStudio devViews>` | modo Studio | coisas que tu usas para operar o backend |
+| `<RebaseCMS views>` | modo de conteúdo | recursos que as pessoas que editam conteúdo utilizam |
+| `<RebaseStudio devViews>` | modo Studio | recursos que você utiliza para operar o backend |
 
-Uma vista vai em exatamente um dos dois — a gaveta ordena por quem a registou, por
-isso listar um slug em ambos esconde-a do modo conteúdo.
+Uma visualização vai para exatamente um deles — a gaveta lateral organiza os itens de acordo com quem
+os registrou, portanto listar um slug em ambos oculta-o do modo de conteúdo.
 
-Tal como `tools`, a lista é lida pelo seu *conteúdo*: escrevê-la inline é seguro, e
-uma nova renderização do host não volta a montar a ferramenta que está no ecrã.
-Renomear uma vista ou mudar o seu grupo volta, esse sim, a registá-la.
+Assim como `tools`, a lista é lida pelo seu *conteúdo*: defini-la inline é seguro, e
+uma nova renderização do host não remonta a ferramenta que estiver na tela. Renomear uma
+visualização ou alterar seu grupo causa um novo registro.
 
-### Escolher que ferramentas aparecem
+### Escolhendo quais ferramentas exibir
 
-Omite `tools` e todas as ferramentas acima são registadas. Passa-o para registar
-um subconjunto — uma consola alojada que já tem o seu próprio navegador de
-armazenamento, por exemplo, pode deixar essa de fora:
+Omita `tools` e todas as ferramentas acima serão registradas. Passe a propriedade para registrar um subconjunto —
+um console hospedado que possui seu próprio navegador de armazenamento, por exemplo, pode deixar essa ferramenta de fora:
 
 ```tsx
 <RebaseStudio tools={["sql", "rls", "schema-visualizer", "api"]} />
 ```
 
-A vista do Studio do Editor de Coleções é a ferramenta `"schema"`. Omite `tools` e ela está lá; passa uma lista sem `"schema"`, como acima, e fica de fora.
+A visualização do Collection Editor no Studio corresponde à ferramenta `"schema"`. Omita `tools` e ela
+estará presente; forneça uma lista sem `"schema"`, como acima, e ela ficará de fora.
 
-A lista é lida pelo seu *conteúdo*, não pela sua identidade, por isso escrevê-la
-inline é seguro: uma nova renderização do host não desmonta nem volta a montar a
-ferramenta que está no ecrã.
+A lista é lida por seu *conteúdo*, não por identidade, então escrevê-la inline é seguro: uma
+nova renderização do componente host não desmonta nem remonta a ferramenta que estiver aberta.
 
 ## Próximos Passos
 
 - **[Plugins](/docs/plugins)** — Estenda o framework com plugins
-- **[Coleções](/docs/collections)** — Configuração de coleções
+- **[Tabelas](/docs/schema/)** — Declarando as tabelas que o Studio lê
+- **[Personalizando uma tabela](/docs/frontend/customize-table/)** — Como o painel as exibe

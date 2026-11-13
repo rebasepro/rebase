@@ -1,8 +1,8 @@
 ---
-sourceHash: 1efb8010154baea9
-title: Entitätshistorie
-sidebar_label: Entitätshistorie
-description: Verfolgen Sie jede Änderung an Ihren Entitäten mit einem vollständigen Audit-Trail – wer hat was wann geändert, inklusive vollständigem Vorher-/Nachher-Zustand.
+sourceHash: 37c268f3d4b76c7f
+title: Entity-Historie
+sidebar_label: Entity-Historie
+description: Verfolgen Sie jede Änderung an Ihren Entitäten mit einem vollständigen Audit-Trail – wer was wann geändert hat, sowie die vollständige Vorher-/Nachher-Entität.
 ---
 
 ## Übersicht
@@ -12,17 +12,17 @@ Die Entitätshistorie zeichnet bei jedem Erstellen, Aktualisieren und Löschen e
 ## Historie aktivieren
 
 :::note[Wo dies hingehört]
-**Managed Runtime** – standardmäßig aktiviert. `REBASE_HISTORY=false` in der `.env` deaktiviert sie.
+**Managed Runtime** – standardmäßig aktiviert. `REBASE_HISTORY=false` in `.env` deaktiviert sie.
 
 **Ejected** – `history: true` in `initializeRebaseBackend({ … })`. Die unten gezeigte Objektform – `{ retention }` – ist nur im Ejected-Modus verfügbar; die Umgebungsvariable ist ein Boolean.
 
-Die vollständige Zuordnung finden Sie in der [Backend-Übersicht](/docs/backend/#where-each-option-lives).
+Die vollständige Übersicht finden Sie in der [Backend-Übersicht](/docs/backend/#where-each-option-lives).
 :::
 
 ### Backend
 
 :::note[Wo dies hingehört]
-**Managed Runtime:** `REBASE_HISTORY` (standardmäßig `true`; auf `false` setzen, um sie zu deaktivieren). Retention-Einstellungen haben keine Entsprechung als Umgebungsvariable – führen Sie ein Eject durch, um sie zu ändern.
+**Managed Runtime:** `REBASE_HISTORY` (standardmäßig `true`; auf `false` setzen, um sie zu deaktivieren). Retention-Einstellungen haben keine Entsprechung als Umgebungsvariable – führen Sie Eject aus, um sie zu ändern.
 **Ejected:** `initializeRebaseBackend({ history })` in `backend/src/index.ts`.
 :::
 
@@ -35,7 +35,7 @@ await initializeRebaseBackend({
 });
 ```
 
-Oder mit einem benutzerdefinierten Aufbewahrungszeitraum (Retention Period):
+Oder mit einer benutzerdefinierten Aufbewahrungsdauer (Retention):
 
 ```typescript
 history: {
@@ -43,84 +43,72 @@ history: {
 }
 ```
 
-### Pro Collection
+### Pro Tabelle
 
-Legen Sie fest, welche Collections eine Historie aufzeichnen sollen:
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const ordersCollection = defineCollection({
-    slug: "orders",
-    name: "Orders",
-    table: "orders",
-    history: true,       // Enable for this collection
-    properties: { /* ... */ }
+Legen Sie mit `history: true` fest, welche Tabellen die Historie nachverfolgen:
+
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const orders = defineTable("orders", {
+    columns: {
+        id:     col.uuid().primaryKey().defaultRandom(),
+        status: col.enum(["open", "paid", "shipped"]).notNull().default("open"),
+        total:  col.numeric({ precision: 10, scale: 2 }).notNull(),
+    },
+    history: true,
+    rls: "admin-only",
 });
 ```
 
-## Funktionsweise
+Ein View kann keine Historie nachverfolgen: er wird nie beschrieben.
 
-1. Das Backend erstellt automatisch eine Tabelle `rebase.entity_history`.
-2. Bei jedem Erstellen, Aktualisieren oder Löschen wird ein Eintrag aufgezeichnet mit:
-   - Der Entitäts-ID und dem Collection-Slug (in `table_name`)
-   - Den Werten der Entität nach der Änderung (`values`; bei einem Löschen die
-     Entität, die gelöscht wurde)
-   - Bei einem Update dem, was die geänderten Felder davor enthielten (`previous_values`)
+## Wie es funktioniert
+
+1. Das Backend erstellt automatisch eine `rebase.entity_history`-Tabelle.
+2. Bei jedem Erstellen, Aktualisieren oder Löschen wird ein Eintrag mit folgenden Angaben aufgezeichnet:
+   - Entitäts-ID und dem Slug der Tabelle (in `table_name`)
+   - Den Werten der Entität nach der Änderung (`values`; bei einem Löschvorgang die Entität, die gelöscht wurde)
+   - Bei einer Aktualisierung die Werte, die die geänderten Felder zuvor hatten (`previous_values`)
    - Zeitstempel und Benutzer-ID
-   - Der Aktion (`create`, `update`, `delete`)
-   - Einem Array aus `changed_fields`, das zeigt, welche Spalten geändert wurden
+   - Die Aktion (`create`, `update`, `delete`)
+   - Ein Array von `changed_fields`, das zeigt, welche Spalten geändert wurden
 
-Die Werte sind die Zeile, so wie die REST-API sie liefert: ihre Spalten, Daten als Zeitstempel, eine `belongsTo`-Relation als ihr Fremdschlüssel. Das ist es, was ein Revert zurückschreibt.
+Die Werte entsprechen der Zeile, wie die REST-API sie ausliefert: ihre Spalten, Datumsangaben als Zeitstempel, ein `belongsTo` als Fremdschlüssel. Dies ist es, was ein Revert zurückschreibt.
 
-Ein Eintrag enthält nie die Werte einer verknüpften Zeile. Um die Historie einer Zeile zu lesen,
-genügt Lesezugriff auf diese Zeile, nicht auf die Zeilen, auf die sie zeigt; deshalb wird eine
-Relation als Referenz gespeichert – `{ "__type": "relation", "id", "path" }` – und nicht mehr.
-Einträge, die ältere Versionen mit eingebetteter verknüpfter Zeile aufgezeichnet haben (ein Löschen
-speicherte früher die Sicht des Admin-Panels auf die Zeile), werden genauso ausgeliefert: Der
-History-Endpunkt entfernt die eingebetteten Werte, bevor er antwortet.
+Ein Eintrag enthält niemals die Werte einer verknüpften Zeile. Das Lesen der Historie einer Zeile erfordert nur Lesezugriff auf diese Zeile, nicht auf die Zeilen, auf die sie verweist; daher wird ein `belongsTo` lediglich als Fremdschlüssel gespeichert und nichts weiter.
 
-Bei einer Collection mit [Soft Delete](/docs/collections/soft-delete/) wird ein Löschen als `delete` aufgezeichnet und eine Wiederherstellung (das Update, das das Soft-Delete-Feld wieder auf `null` setzt) als `update`. Die Historie einer Zeile bleibt lesbar, während sich die Zeile im Papierkorb befindet, und ein Revert auf eine Version von vor dem Löschen stellt sie wieder her.
+Einträge, die ältere Versionen über die Ansicht des Admin-Panels der Zeile aufgezeichnet haben (ein Löschvorgang hat dies früher so gespeichert), werden als die Zeile ausgeliefert und zurückgesetzt, für die sie stehen: ein `{ "__type": "date", "value" }`-Envelope als dessen Wert, eine `{ "__type": "relation" }`-Ref einer besitzenden Relation als Fremdschlüssel unter dem Namen des Schlüssels selbst, jede andere Relations-Ref als Schlüssel der verknüpften Zeile, und eine verknüpfte Zeile, die die Ref eingebettet hat, wird niemals ausgeliefert. Das Zurücksetzen eines solchen Eintrags schreibt diese einfachen Werte; eine To-Many-Liste, die er enthält, wird nicht geschrieben und in `dropped_fields` aufgeführt.
+
+Bei einer Tabelle mit [Soft Delete](/docs/collections/soft-delete/) wird ein Löschen als `delete` und eine Wiederherstellung (die Aktualisierung, die das Soft-Delete-Feld wieder auf `null` setzt) als `update` aufgezeichnet. Die Historie einer Zeile bleibt lesbar, während sich die Zeile im Papierkorb befindet, und das Zurücksetzen auf eine Version vor dem Löschen stellt sie wieder her.
 
 ### Was `previous_values` enthält
 
-Ein Update-Eintrag
-behält in `previous_values` nur die Felder, die in `changed_fields` aufgeführt sind. Jedes
-andere Feld hatte vor und nach der Änderung denselben Wert und steht deshalb bereits in
-`values`; die ganze Zeile doppelt zu speichern kostete bei einer Ein-Feld-Änderung an einer
-Zeile mit 20 Feldern 1.269 Bytes, wo es jetzt 794 sind.
+Ein Update-Eintrag speichert in `previous_values` nur die in `changed_fields` aufgelisteten Felder. Jedes andere Feld hatte vor und nach der Änderung denselben Wert und ist daher bereits in `values` enthalten; das zweimalige Speichern der gesamten Zeile kostete bei einer Ein-Feld-Änderung an einer Zeile mit 20 Feldern 1.269 Bytes, während es jetzt 794 Bytes kostet.
 
-Vor 0.25 aufgezeichnete Einträge behalten die ganze vorherige Zeile. Das `format` des
-Eintrags sagt, welche es ist:
+Einträge, die vor Version 0.25 aufgezeichnet wurden, behalten die gesamte vorherige Zeile. Das `format` des Eintrags gibt an, um welches Format es sich handelt:
 
 | `format` | `previous_values` bei einem Update |
 |---|---|
-| `1` (Einträge von vor 0.25) | Die ganze Zeile vor der Änderung |
-| `2` | Nur die `changed_fields`, jedes so, wie die ganze Zeile es hatte |
+| `1` (Einträge vor 0.25) | Die gesamte Zeile vor der Änderung |
+| `2` | Nur die `changed_fields`, jeweils so, wie die gesamte Zeile sie hatte |
 
-Die Historienansicht des Admins und ein Revert lesen beide gleichermaßen: Die Ansicht zeigt den
-vorherigen Wert jedes geänderten Felds, und ein Revert schreibt die `values` des gewählten
-Eintrags zurück, die in beiden Formaten vollständig sind. Um die Zeile so wiederherzustellen,
-wie sie vor einer `format: 2`-Änderung war, nehmen Sie `values` und setzen jedes Feld zurück,
-das `previous_values` enthält.
+Die Historienansicht des Admin-Panels und ein Revert lesen beide gleichermaßen: Die Ansicht zeigt den vorherigen Wert jedes geänderten Felds, und ein Revert schreibt die `values` des ausgewählten Eintrags zurück, die in beiden Formaten vollständig sind. Um die Zeile so wiederherzustellen, wie sie vor einer Änderung mit `format: 2` war, nehmen Sie `values` und setzen Sie jedes in `previous_values` enthaltene Feld zurück.
 
 ### Diff-Tracking & strukturelle Deep Equality
 
 Um redundante Protokolle zu vermeiden, wenn Felder gespeichert werden, sich aber keine Werte ändern, führt der `HistoryService` einen strukturellen Deep-Equality-Vergleich auf den Top-Level-Schlüsseln der alten und neuen Werte durch:
-- Er ignoriert System-Metadaten-Eigenschaften, die mit `__` beginnen.
-- Wenn Unterschiede festgestellt werden, werden die Namen der geänderten Eigenschaften in der Spalte `changed_fields` (`text[]`) gespeichert.
+- Er ignoriert System-Metadatenfelder, die mit `__` beginnen.
+- Wenn Unterschiede festgestellt werden, werden die Namen der geänderten Felder in der Spalte `changed_fields` (`text[]`) gespeichert.
 - Wenn die Deep-Equality-Prüfung keinerlei Änderungen feststellt, wird das Einfügen in die Historie vollständig übersprungen.
 
-### Pruning
+### Bereinigung (Pruning)
 
-Die Aufbewahrung wird an zwei Stellen durchgesetzt:
-- **Nach jedem Schreibvorgang**, für die geschriebene Entität: Direkt nachdem sie gespeichert
-  oder gelöscht wurde, entfernt der Server die Einträge dieser Entität, die über die neuesten
-  200 hinausgehen oder älter als der Aufbewahrungszeitraum sind. Der Schreibvorgang wird dadurch
-  nicht aufgehalten.
-- **Einmal pro Stunde**,
-  für jede Entität: Einträge, die älter als der Aufbewahrungszeitraum sind, werden gelöscht,
-  unabhängig davon, wozu sie gehören — auch bei Entitäten, in die nie wieder geschrieben
-  wird, etwa gelöschten. Siehe [Pruning-Lebenszyklusmechanik](#pruning-lebenszyklusmechanik).
+Die Aufbewahrungsfrist wird an zwei Stellen durchgesetzt:
+- **Nach jedem Schreibvorgang** für die geschriebene Entität: Direkt nach dem Speichern oder Löschen bereinigt der Server die Einträge dieser Entität jenseits der neuesten 200 oder solche, die älter als der Aufbewahrungszeitraum sind. Dies blockiert den Schreibvorgang nicht.
+- **Einmal pro Stunde** für jede Entität: Einträge, die älter als der Aufbewahrungszeitraum sind, werden gelöscht, unabhängig davon, wozu sie gehören – einschließlich Entitäten, auf die nie wieder geschrieben wird, wie beispielsweise gelöschte Entitäten. Siehe [Mechanik des Bereinigungs-Lebenszyklus](#mechanik-des-bereinigungs-lebenszyklus).
 
 ## REST-Endpunkt
 
@@ -128,7 +116,7 @@ Die Aufbewahrung wird an zwei Stellen durchgesetzt:
 GET /api/data/:slug/:entityId/history
 ```
 
-Gibt eine Liste von Historie-Einträgen für eine bestimmte Entität zurück, absteigend nach Aktualität sortiert:
+Gibt eine Liste von Historieeinträgen für eine bestimmte Entität zurück, sortiert nach den neuesten zuerst. <span class="since-badge" data-since="0.31">Seit 0.31</span> Einträge, die von einer Transaktion aufgezeichnet werden – ein Erstellen und das darauffolgende Update in einem einzelnen `_batch`, ein Revert und dessen Revert – werden in der Reihenfolge zurückgegeben, in der sie geschrieben wurden: Das `updated_at` jedes Eintrags liegt zeitlich nach dem vorherigen Eintrag der Zeile. Eine bestehende Datenbank erhält dies mit ihrem nächsten Bereitstellungsstart (Provisioning Boot) oder einem Durchlauf mit `REBASE_PROVISION_ONLY=true`, wodurch die Funktion `rebase.record_history` ersetzt wird; ein Deployment, das niemals bereitgestellt wird, behält bis dahin die alte Reihenfolge bei. Einträge, die davor aufgezeichnet wurden, behalten ihre Reihenfolge.
 
 ```json
 {
@@ -150,47 +138,47 @@ Gibt eine Liste von Historie-Einträgen für eine bestimmte Entität zurück, ab
 }
 ```
 
+### Einträge werden wie Lesevorgänge ausgeliefert
+
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+Historieeinträge werden genauso ausgeliefert wie die Zeile selbst: zuerst Feldzugriff, dann `afterRead` (global, Tabelle, Spalte), innerhalb der schreibgeschützten Transaktion des Aufrufers. Eine Spalte, die durch einen Hook oder ein `.transform({ afterRead })` maskiert wird, ist in `values` und `previous_values` maskiert; eine Spalte, die die Rollen des Aufrufers nicht lesen dürfen, wird vorenthalten und aus `changed_fields` weggelassen; Schlüssel von Spalten, die die Tabelle nicht mehr besitzt, werden vorenthalten. Wer die Zeile jetzt lesen darf, kann auch deren Historie einsehen, und `updated_by` bleibt erhalten. Ein Hook, der bei einem alten Snapshot einen Fehler wirft, schlägt für die gesamte Anfrage fehl, anstatt sie unmaskiert auszuliefern, und die Historie einer endgültig gelöschten (hard-deleted) Zeile antwortet mit 404 ("No row with id '…' in table '…'").
+
+Der Postgres-Treiber unterstützt dies; ein benutzerdefinierter Treiber liefert die Historie durch Implementierung von `DataDriver.serveStoredRows(path, rows)` aus, und ohne dies antworten die Historien-Routen mit 501. Vor 0.31 wurden Einträge so ausgeliefert, wie sie gespeichert waren.
+
 ```
 POST /api/data/:slug/:entityId/history/:historyId/revert
 ```
 
-Schreibt die `values` des Eintrags über den normalen Speicherpfad in die Zeile zurück, sodass der
-Revert selbst als `update` aufgezeichnet wird. Die Antwort enthält die gespeicherte Zeile unter `data`
-und in `meta.reverted_from` die ID des Eintrags.
+Schreibt die `values` des Eintrags über den normalen Speicherpfad zurück in die Zeile, sodass das Revert selbst als `update` aufgezeichnet wird. Die Antwort enthält die gespeicherte Zeile unter `data` und die ID des Eintrags unter `meta.reverted_from`. Ein Revert schreibt niemals eine Spalte, die der Aufrufer nicht lesen kann: diese behalten ihren aktuellen Wert.
 
-Von älteren Versionen geschriebene Einträge können Schlüssel enthalten, für die die Zeile keine Spalte
-hat: ein Feld, das ein `afterRead` berechnet hat (vor 0.24 zeichnete ein Speichern die Zeile so auf,
-wie `afterRead` sie zeigte), oder eine Relation, die als Sicht des Admin-Panels auf sie gespeichert
-wurde. Ein Revert schreibt die Spalten der Zeile und lässt diese Schlüssel weg, wobei eine besitzende
-Relation als ihr Fremdschlüssel zurückgeht, und nennt in `meta.dropped_fields`, was er weggelassen hat.
-Ein Wert, den ein altes `afterRead` maskiert hat (`********`), hat eine Spalte und wird daher so
-zurückgeschrieben, wie er aufgezeichnet wurde.
+Einträge, die von älteren Versionen geschrieben wurden, können Schlüssel enthalten, für die die Zeile keine Spalte besitzt: ein von `afterRead` berechnetes Feld (vor Version 0.24 zeichnete ein Speichervorgang die Zeile so auf, wie `afterRead` sie anzeigte) oder eine Relation, die in der Darstellungsform des Admin-Panels gespeichert wurde. Ein Revert schreibt die Spalten der Zeile und lässt diese Schlüssel aus – wobei eine besitzende Relation als ihr Fremdschlüssel zurückgeht – und nennt die ausgelassenen Felder in `meta.dropped_fields`. Ein Wert, den ein altes `afterRead` maskiert hat (`********`), besitzt eine Spalte, sodass er so zurückgeschrieben wird, wie er aufgezeichnet wurde.
 
 ## Retention-Konfiguration
 
 | Einstellung | Standard | Beschreibung |
-|-------------|----------|--------------|
+|---|---|---|
 | `retention` | 90 | Einträge, die älter als diese Anzahl an Tagen sind, werden gelöscht. |
 
-Jede Entität behält zudem höchstens ihre neuesten **200** Einträge. Diese Obergrenze ist fest vorgegeben; es gibt dafür keine Einstellung.
+Jede Entität behält außerdem höchstens ihre **200** neuesten Einträge. Diese Obergrenze ist festgelegt; es gibt dafür keine Konfigurationseinstellung.
 
-### Pruning-Lebenszyklusmechanik
+### Mechanik des Bereinigungs-Lebenszyklus
 
-Nach jeder Änderung, die der Server aufzeichnet, wird die geänderte Entität bereinigt: Ihre Einträge, die älter als der Aufbewahrungszeitraum sind, werden gelöscht, danach alles, was über ihre neuesten 200 hinausgeht. Das läuft asynchron und hält den Schreibvorgang nicht auf.
+Nach jeder vom Server aufgezeichneten Änderung wird die geänderte Entität bereinigt: Ihre Einträge, die älter als der Aufbewahrungszeitraum sind, werden entfernt, danach alles jenseits der neuesten 200. Dies läuft asynchron ab und blockiert den Schreibvorgang nicht.
 
-Ein Schreibvorgang über [`openRebase` oder `rebase console`](/docs/backend/scripts/) zeichnet seinen History-Eintrag auf, bereinigt aber nichts, denn ein Skript kann nicht wissen, mit welcher Aufbewahrung Ihr Server konfiguriert ist. Der Server bereinigt diese Entität bei seinem nächsten Schreibvorgang darauf und im stündlichen Durchlauf weiter unten.
+Ein Schreibvorgang über [`openRebase` oder `rebase console`](/docs/backend/scripts/) zeichnet seinen Historieeintrag auf, bereinigt jedoch nichts, da ein Skript die für Ihren Server konfigurierte Retention nicht kennen kann. Der Server bereinigt diese Entität beim nächsten Schreibvorgang auf sie sowie beim stündlichen Bereinigungslauf unten.
 
-Einmal pro Stunde löscht das Backend zusätzlich jeden Eintrag, der älter als der Aufbewahrungszeitraum ist, von jeder Entität. Zuvor wurde die Historie einer Entität, in die nie wieder geschrieben wurde — jeder gelöschten —, überhaupt nicht bereinigt. Der Durchlauf:
+Einmal pro Stunde löscht das Backend außerdem für jede Entität alle Einträge, die älter als der Aufbewahrungszeitraum sind. Zuvor wurde die Historie einer Entität, die nie wieder beschrieben wurde – darunter jede gelöschte Entität –, überhaupt nicht bereinigt. Der Bereinigungslauf:
 
-- läuft pro Stunde auf einer Instanz der Flotte, auf den Prozessen, die die geplanten Jobs ausführen (er beansprucht seine Stunde in `rebase.cron_claims`, wie es eine Cron-Ausführung tut), zum ersten Mal beim Start des Backends;
-- löscht in Batches von 5.000 Einträgen, je eine Anweisung, bis ein Batch kürzer ausfällt, und überspringt Einträge, die ein anderer Durchlauf hält — ein erster Durchlauf über einen großen Rückstand besteht also aus vielen kurzen Löschvorgängen, nicht aus einem langen;
-- liest einen Index auf `updated_at`, `idx_history_updated_at`. In einer vor 0.25 erstellten Datenbank wird er nach dem ersten Start im Hintergrund aufgebaut, per `CREATE INDEX CONCURRENTLY`, ohne Lese- oder Schreibzugriffe zu blockieren — etwa eine Sekunde pro 2 Millionen Einträge.
+- läuft einmal pro Stunde auf einer Instanz der Flotte auf den Prozessen, die geplante Jobs ausführen (er beansprucht seine Stunde in `rebase.cron_claims`, genau wie ein Cron-Lauf), erstmals beim Start des Backends;
+- löscht in Batches von 5.000 Einträgen mit jeweils einem Statement, bis ein Batch kleiner ausfällt, und überspringt Einträge, die von einem anderen Bereinigungslauf gehalten werden – so besteht ein erster Durchlauf über einen großen Rückstand aus vielen kurzen Löschvorgängen statt einem langen;
+- liest einen Index auf `updated_at`, `idx_history_updated_at`. Auf einer vor Version 0.25 erstellten Datenbank wird dieser nach dem ersten Start im Hintergrund mit `CREATE INDEX CONCURRENTLY` aufgebaut, ohne Lese- oder Schreibvorgänge zu blockieren – etwa eine Sekunde pro 2 Millionen Einträge.
 
-Derselbe Start entfernt `idx_history_entity`, wo er existiert: `idx_history_time` beginnt mit denselben Spalten und bedient jeden Lesezugriff, den er bediente, sodass er nur jede aufgezeichnete Änderung verlangsamte. Das Entfernen wartet jeweils höchstens eine Sekunde auf die Sperre der Tabelle, und eine Tabelle, die etwas durchgehend hält, behält den Index bis zum nächsten Start.
+Derselbe Boot-Vorgang entfernt `idx_history_entity`, sofern vorhanden: `idx_history_time` beginnt mit denselben Spalten und deckt alle Lesevorgänge ab, die dieser bediente, sodass er jeden aufgezeichneten Änderungsvorgang nur verlangsamte. Das Entfernen wartet jeweils höchstens eine Sekunde auf die Tabellensperre, und eine Tabelle, die durchgehend von etwas belegt ist, behält den Index bis zum nächsten Start.
 
 Die Obergrenze von 200 Einträgen pro Entität wird nur nach einem Schreibvorgang auf diese Entität angewendet.
 
 ## Nächste Schritte
 
-- **[Entity Callbacks](/docs/collections/callbacks)** – Lifecycle-Hooks
-- **[Backend Overview](/docs/backend)** – Vollständige Backend-Konfiguration
+- **[Tabellen-Hooks](/docs/collections/callbacks/)** — Lifecycle-Hooks
+- **[Backend-Übersicht](/docs/backend)** — Vollständige Backend-Konfiguration

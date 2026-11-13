@@ -1,178 +1,129 @@
 ---
-sourceHash: 42da06ee7f0f6c0c
-title: Diseño de formulario
-sidebar_label: Diseño de formulario
-description: Controla cómo se organiza el formulario de entidad — anchos de columna, secciones y el riel de metadatos.
+sourceHash: 93694433369991ae
+title: Diseño del formulario
+sidebar_label: Diseño del formulario
+description: "Organice el formulario de un registro: anchos de campo en una cuadrícula de cuatro columnas, secciones con título y plegables, la barra lateral de metadatos y un componente que reemplaza el formulario generado."
 ---
 
-## Descripción general
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-El formulario de entidad se genera a partir de tus propiedades:
+El formulario del registro se genera a partir de las columnas y relaciones de la tabla:
 
-- el id y las marcas de tiempo `createdAt` / `updatedAt` van a un riel de metadatos, de solo lectura
-- cualquier otro campo ocupa el ancho completo de la columna principal, excepto que dos
-  campos contiguos con el mismo editor pequeño —dos números, dos interruptores,
-  dos fechas del mismo modo, dos selectores con opciones cortas— comparten una fila
+- el id y las marcas de tiempo de creación y actualización van a una barra lateral de metadatos de solo lectura;
+- todos los demás campos ocupan el ancho completo de la columna principal, excepto que dos campos contiguos con el mismo editor pequeño (dos números, dos interruptores, dos fechas del mismo modo, dos selectores con opciones cortas) comparten una fila.
 
-Un campo con una etiqueta larga, texto de ayuda de más de 60 caracteres, `conditions`, una
-regla `access` a nivel de campo o `excludeFromApi` (el formulario no muestra nada a un
-usuario que no puede leerlo), o un `Field` personalizado nunca se empareja, y tampoco lo hace ninguna cadena de texto libre: nada en
-un esquema distingue un nombre de rama corto de una URL larga. El formulario nunca comprueba
-qué propiedad es el título. Cualquier otra columna es algo que la colección solicita,
-campo por campo, con `admin.span` —establecido a partir de lo que contiene cada campo, como
-se muestra a continuación. Usa `admin.form` para
-agrupar campos en secciones y moverlos al riel.
+Un campo con una etiqueta larga, texto de ayuda de más de 60 caracteres, `conditions`, una [regla de acceso](/docs/collections/field-access/) a nivel de columna o un `Field` personalizado nunca se empareja, y tampoco ningún texto libre: nada en un esquema distingue el nombre corto de una rama de una URL larga. Cualquier otra cosa se solicita en `customizeTable`, campo por campo con `span`, y para todo el formulario con `form`.
+
+```ts
+// backend/schema/orders.ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const orders = defineTable("orders", {
+    columns: {
+        id:             col.uuid().primaryKey().defaultRandom(),
+        reference:      col.text().notNull(),
+        sku:            col.text(),
+        status:         col.enum(["placed", "shipped", "delivered"]).notNull().default("placed"),
+        placedAt:       col.timestamp({ withTimezone: true }),
+        address:        col.text(),
+        carrier:        col.text(),
+        trackingNumber: col.text(),
+        notes:          col.text(),
+    },
+    rls: "admin-only",
+});
+```
+
+```tsx
+// frontend/src/cms/orders.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { orders } from "../../../backend/schema/orders";
+
+export const ordersCms = customizeTable<typeof orders>("orders", {
+    form: {
+        sidebar: ["status", "placedAt"],
+        sections: [
+            { key: "identity", fields: ["reference", "sku"] },
+            { key: "shipping", title: "Shipping", fields: ["address", "carrier", "trackingNumber"] },
+            { key: "internal", title: "Internal notes", fields: ["notes"], collapsed: true },
+        ],
+    },
+    fields: {
+        reference: { span: 3 },
+        sku:       { name: "SKU", span: 1 },
+        carrier:   { span: 2 },
+        trackingNumber: { span: 2 },
+        notes:     { multiline: true },
+    },
+});
+```
 
 ## Ancho de campo
 
-El ancho de un campo es un **span** sobre una cuadrícula de cuatro columnas. `4` es el ancho completo de
-la columna principal.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+El ancho de un campo es un **span** sobre una cuadrícula de cuatro columnas; `4` es el ancho completo de la columna principal. Los spans se ajustan a la cuadrícula, que es lo que hace que dos campos se alineen sin importar el orden en que fueron declarados.
 
-const productsCollection = defineCollection({
-    slug: "products",
-    table: "products",
-    name: "Products",
-    properties: {
-        sku: {
-            name: "SKU",
-            type: "string",
-            admin: { span: 1 }
-        },
-        name: {
-            name: "Product name",
-            type: "string",
-            admin: { span: 3 }
-        },
-        description: {
-            name: "Description",
-            type: "string",
-            admin: { markdown: true, span: 4 }
-        }
-    }
-});
-```
+Elija un span según lo que contiene el campo, no según su tipo. Dos valores cortos que van juntos comparten una fila: fecha de inicio y de fin, ciudad y país, transportista y número de seguimiento con `2` cada uno, o un valor y su calificador con `3` + `1`. Los números, booleanos y códigos cortos pueden tomar `1` junto a sus campos hermanos. Todo lo que sea largo de leer (nombres, URLs, correos electrónicos, identificadores, descripciones, markdown, archivos) mantiene `4`. Las filas se llenan en el orden de los campos y nada ensancha un campo para cerrar un espacio vacío, así que coloque los pares uno al lado del otro y haga que cada fila sume 4.
 
-Los spans se ajustan a una cuadrícula compartida, que es lo que hace que dos campos se alineen independientemente
-del orden en que fueron declarados. Reemplazaron a `admin.widthPercentage`,
-cuyos porcentajes directos no podían alinearse con nada; una colección que aún
-conserve uno debería elegir el span más cercano (≤30 → `1`, ≤55 → `2`, ≤80 → `3`,
-de lo contrario `4`).
-
-Elige un span en función de lo que contiene el campo, no de su tipo. Dos valores cortos
-que van juntos comparten una fila —fecha de inicio y fin, ciudad y país,
-proveedor y región con `2` cada uno, o un valor y su calificador con `3` + `1`.
-Los números, booleanos y códigos cortos pueden tomar `1` junto a sus hermanos. Cualquier elemento
-de lectura larga —nombres, URLs, correos electrónicos, ids, descripciones, markdown, archivos—
-conserva `4`. Las filas se completan en orden de declaración y nada ensancha un campo para cerrar un
-espacio, así que declara los pares uno al lado del otro y haz que cada fila sume 4.
-
-En diseños demasiado estrechos para dos columnas —el panel lateral, el panel dividido, un teléfono—,
-la cuadrícula se reduce a una sola columna y los spans se ignoran.
+En disposiciones demasiado estrechas para dos columnas (el panel lateral, el panel dividido, un teléfono), la cuadrícula se reduce a una columna y los spans se ignoran.
 
 ## Secciones
 
-`sections` agrupa la columna principal bajo encabezados. Una sección con título se puede
-contraer; una sin título, no.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+`form.sections` agrupa la columna principal bajo encabezados. Cada sección es `{ key, title?, fields, collapsed?, collapsible?, readVariant? }`. Una sección con título se puede colapsar; una sin título no puede. `readVariant: "summary"` apila los campos de la sección como filas de etiqueta y valor en la vista de solo lectura del registro; el valor predeterminado, `"grid"`, utiliza la cuadrícula del formulario.
 
-const ordersCollection = defineCollection({
-    slug: "orders",
-    table: "orders",
-    name: "Orders",
-    properties: {
-        reference: { name: "Reference", type: "string" },
-        placed_at: { name: "Placed at", type: "date" },
-        address: { name: "Address", type: "string" },
-        carrier: { name: "Carrier", type: "string" },
-        tracking_number: { name: "Tracking number", type: "string" },
-        notes: { name: "Notes", type: "string" }
-    },
-    admin: {
-        form: {
-            sections: [
-                { key: "identity", properties: ["reference", "placed_at"] },
-                {
-                    key: "shipping",
-                    title: "Shipping",
-                    properties: ["address", "carrier", "tracking_number"]
-                },
-                {
-                    key: "internal",
-                    title: "Internal notes",
-                    properties: ["notes"],
-                    collapsed: true
-                }
-            ]
-        }
-    }
+Un campo que ninguna sección nombre nunca se descarta: va a parar a la última sección sin título, o a un grupo final sin título cuando no hay ninguna. Una columna agregada a la tabla no puede hacer que un campo desaparezca silenciosamente del formulario. Un error de validación dentro de una sección colapsada la expande.
+
+Cada entrada se verifica con respecto a la tabla. Cualquier entrada que el servidor no entregue a quien realiza la consulta, debido a que no tiene permisos para leer esa columna, se omite.
+
+## La barra lateral de metadatos
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+`form.sidebar` traslada los campos fuera de la columna principal a una barra lateral estrecha junto a ella: estado, propiedad, fechas de publicación, indicadores. La barra lateral no utiliza la cuadrícula, por lo que `span` se ignora allí. Donde no haya espacio para una barra lateral, se representa como una sección inicial ordinaria.
+
+`form.showRecordMeta` coloca el bloque de registro de solo lectura (id, created, updated) al pie de la barra lateral. Es `true` siempre que se muestre una barra lateral. `sidebar: []` desactiva la barra lateral derivada y mantiene todos los campos en la columna principal. `hideIdFromForm` oculta el id del formulario por completo.
+
+## Reemplazar el formulario
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+`formView` sustituye el formulario generado por un componente propio, importado por valor. Recibe los mismos `EntityCustomViewParams` que una [vista de entidad](/docs/frontend/entity-views/). `includeActions: true` mantiene Guardar y Descartar en la barra del registro mientras está en pantalla.
+
+```tsx
+import React from "react";
+import { customizeTable } from "@rebasepro/cms";
+import type { EntityCustomViewParams } from "@rebasepro/cms-types";
+import type { orders } from "../../../backend/schema/orders";
+
+function OrderForm({ row, modifiedValues }: EntityCustomViewParams) {
+    return <h2>{String(modifiedValues?.reference ?? row?.reference ?? "New order")}</h2>;
+}
+
+export const ordersCms = customizeTable<typeof orders>("orders", {
+    formView: { Builder: OrderForm, includeActions: true },
 });
 ```
 
-Una propiedad que ninguna sección nombra nunca se descarta: va a parar a la última
-sección sin título, o a un grupo final sin título si no hay ninguna. Por lo tanto, añadir una columna a
-la base de datos no puede hacer que un campo desaparezca silenciosamente del formulario.
+Para un cambio menor, puede sobrescribir una parte del formulario en su lugar (`Entity.Form`, consulte [Sobrescrituras de componentes](/docs/frontend/component-overrides/)), o diseñar algunos campos usted mismo con `<RecordForm>` y `<FormField>` en una página propia (consulte [Paneles](/docs/frontend/panels/)).
 
-Un error de validación dentro de una sección contraída la expande, por lo que un error nunca
-puede ocultarse detrás de un encabezado cerrado.
+## Otras opciones del formulario
 
-## El riel de metadatos
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-`sidebar` traslada los campos fuera de la columna principal hacia un riel estrecho a su lado —
-estado, propiedad, fechas de publicación, indicadores.
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-
-const postsCollection = defineCollection({
-    slug: "posts",
-    table: "posts",
-    name: "Posts",
-    properties: {
-        title: { name: "Title", type: "string" },
-        body: { name: "Body", type: "string", admin: { markdown: true } },
-        status: { name: "Status", type: "string" },
-        publishedAt: { name: "Published at", type: "date" },
-        author: { name: "Author", type: "string" }
-    },
-    admin: {
-        form: {
-            sidebar: ["status", "publishedAt", "author"],
-            showRecordMeta: true
-        }
-    }
-});
-```
-
-El riel no utiliza la cuadrícula, por lo que `span` se ignora para los campos que contiene. Donde
-no hay espacio para un riel, se renderiza como una sección inicial ordinaria, de modo que
-nada se pierde en un teléfono o en el panel lateral.
-
-`showRecordMeta` coloca el bloque de registro de solo lectura —id, creado, actualizado— al
-pie del riel. Por defecto es `true` siempre que se muestra un riel, y es lo que
-reemplaza a `hideIdFromForm` para la mayoría de las colecciones: el id deja de ser un campo en
-medio del formulario y se convierte en una línea de metadatos copiable.
-
-Establece `sidebar: []` para suprimir el riel derivado por completo y mantener todos los campos en
-la columna principal.
-
-## Referencia
-
-| Propiedad | Tipo | Descripción |
-|-----------|------|-------------|
-| `admin.span` | `1 \| 2 \| 3 \| 4` | Ancho del campo en la cuadrícula de cuatro columnas del formulario |
-| `admin.form.sidebar` | `string[]` | Claves de propiedad mostradas en el riel de metadatos |
-| `admin.form.sections` | `FormSection[]` | Grupos con título para la columna principal |
-| `admin.form.showRecordMeta` | `boolean` | Mostrar id/creado/actualizado al pie del riel |
-
-`FormSection` es `{ key, title?, properties, collapsed?, collapsible?, readVariant? }`. `readVariant: "summary"` apila los campos de la sección como filas etiqueta/valor en la vista de solo lectura del registro; el valor por defecto, `"grid"`, usa la cuadrícula del formulario.
+| Opción | Efecto |
+|---|---|
+| `formAutoSave` | Guardar a medida que el visitante escribe. |
+| `alwaysApplyDefaultValues` | Rellenar los valores predeterminados declarados en los campos vacíos de un registro almacenado cuando este se abre. |
+| `includeJsonView` | Agregar una pestaña con el registro en formato JSON. |
+| `localChangesBackup` | Mantener las ediciones no guardadas en el almacenamiento local: `"manual_apply"`, `"auto_apply"` o `false`. |
 
 ## Relacionado
 
-- [Custom Fields](/docs/frontend/custom-fields/) — el campo que un diseño está organizando
-- [Entity Views](/docs/frontend/entity-views/) — una pestaña completa propia junto al formulario
-- [Properties](/docs/collections/properties/) — las opciones de propiedad que lee un diseño
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+- [Campos personalizados](/docs/frontend/custom-fields/): los campos que organiza un diseño
+- [Vistas de entidad](/docs/frontend/entity-views/): una pestaña completa propia junto al formulario
+- [customizeTable](/docs/frontend/customize-table/#form): las opciones del formulario en la referencia

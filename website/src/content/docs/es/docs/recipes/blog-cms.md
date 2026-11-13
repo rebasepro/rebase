@@ -1,222 +1,108 @@
 ---
-sourceHash: 9b3f0b6b9519064a
-title: "Receta: CMS para blog"
-sidebar_label: CMS para blog
-description: Construye un CMS para blog completo con artículos, autores, categorías, edición de texto enriquecido y subida de imágenes.
+sourceHash: 0c385399c3a984b7
+title: "Receta: Blog CMS"
+sidebar_label: Blog CMS
+description: Crea un CMS de blog completo con artículos, autores, categorías, edición de texto enriquecido y subida de imágenes — tablas en backend/schema, presentación en frontend/src/cms.
 ---
 
-## Descripción general
+## Visión general
 
-Construye un backend para blog con:
+Crea un backend de blog con:
 - **Artículos** con contenido en markdown e imágenes de portada
 - **Autores** con perfiles
 - **Categorías** con una relación de muchos a muchos
 
-## Colecciones
+## Tablas
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Tres archivos en `backend/schema/`. Contienen lo que la base de datos y la API
+hacen cumplir; cómo los presenta el panel de administración viene después, en el frontend.
 
 ### Autores
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-export const authorsCollection = defineCollection({
-    slug: "authors",
-    name: "Authors",
-    singularName: "Author",
-    table: "authors",
-    properties: {
-        name: {
-            type: "string",
-            name: "Name",
-            validation: { required: true }
-        },
-        email: {
-            type: "string",
-            name: "Email",
-            email: true,
-            validation: { required: true, unique: true }
-        },
-        avatar: {
-            type: "string",
-            name: "Avatar",
-            storage: {
-                storagePath: "avatars",
-                acceptedFiles: ["image/*"],
-                maxSize: 2 * 1024 * 1024
-            }
-        },
-        bio: {
-            type: "string",
-            name: "Bio",
-            admin: { multiline: true }
-        }
+```ts
+// backend/schema/authors.ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const authors = defineTable("authors", {
+    columns: {
+        id:     col.uuid().primaryKey().defaultRandom(),
+        name:   col.text().notNull(),
+        email:  col.text().notNull().unique().validate({ email: true }),
+        avatar: col.storage({ path: "avatars/", accept: ["image/*"], maxBytes: "2MB" }),
+        bio:    col.text(),
     },
-    admin: {
-        icon: "person"
-    }
+    rls: "inherit",
 });
-
-export default authorsCollection;
 ```
 
 ### Categorías
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-export const categoriesCollection = defineCollection({
-    slug: "categories",
-    name: "Categories",
-    singularName: "Category",
-    table: "categories",
-    properties: {
-        name: {
-            type: "string",
-            name: "Name",
-            validation: { required: true }
-        },
-        slug: {
-            type: "string",
-            name: "Slug",
-            validation: { required: true, unique: true }
-        },
-        color: {
-            type: "string",
-            name: "Color",
-            enum: [
-                { id: "blue", label: "Blue", color: "blue" },
-                { id: "green", label: "Green", color: "green" },
-                { id: "red", label: "Red", color: "pink" },
-                { id: "orange", label: "Orange", color: "orange" }
-            ]
-        }
-    },
-    admin: {
-        icon: "label"
-    }
-});
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-export default categoriesCollection;
+```ts
+// backend/schema/categories.ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const categories = defineTable("categories", {
+    columns: {
+        id:    col.uuid().primaryKey().defaultRandom(),
+        name:  col.text().notNull(),
+        slug:  col.text().notNull().unique(),
+        color: col.enum(["blue", "green", "red", "orange"]),
+    },
+    rls: "inherit",
+});
 ```
 
 ### Artículos
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-import { policy } from "@rebasepro/types";
-import authorsCollection from "./authors";
-import categoriesCollection from "./categories";
-// The row shape, so callbacks below see typed `values` instead of `unknown`.
-type Article = {
-    title: string;
-    slug: string;
-    status: string;
-    publishedAt?: Date | null;
-};
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-export const articlesCollection = defineCollection({
-    slug: "articles",
-    name: "Articles",
-    singularName: "Article",
-    table: "articles",
-    history: true,
-    properties: {
-        title: {
-            type: "string",
-            name: "Title",
-            validation: { required: true }
-        },
-        slug: {
-            type: "string",
-            name: "URL Slug",
-            validation: { required: true, unique: true }
-        },
-        author: {
-            type: "relation",
-            name: "Author",
-            relation: {
-                kind: "belongsTo",
-                target: () => authorsCollection,
-                localKey: "author_id"
-            }
-        },
-        categories: {
-            type: "relation",
-            name: "Categories",
-            relation: {
-                kind: "manyToMany",
-                target: () => categoriesCollection,
-                through: {
-                    table: "article_categories",
-                    sourceColumn: "article_id",
-                    targetColumn: "category_id"
-                }
-            }
-        },
-        status: {
-            type: "string",
-            name: "Status",
-            enum: [
-                { id: "draft", label: "Draft", color: "gray" },
-                { id: "review", label: "In Review", color: "orange" },
-                { id: "published", label: "Published", color: "green" }
-            ],
-            defaultValue: "draft"
-        },
-        cover_image: {
-            type: "string",
-            name: "Cover Image",
-            storage: {
-                storagePath: "articles/covers",
-                acceptedFiles: ["image/*"]
-            }
-        },
-        content: {
-            type: "string",
-            name: "Content",
-            admin: { markdown: true }
-        },
-        excerpt: {
-            type: "string",
-            name: "Excerpt",
-            admin: { multiline: true },
-            validation: { max: 300 }
-        },
-        publishedAt: {
-            type: "date",
-            name: "Published At"
-        },
-        createdAt: {
-            type: "date",
-            name: "Created At",
-            autoValue: "on_create",
-            admin: { readOnly: true }
-        },
+```ts
+// backend/schema/articles.ts
+import { defineTable, col, rel, policy } from "@rebasepro/server/schema";
+import { authors } from "./authors";
+import { categories } from "./categories";
+
+export const articles = defineTable("articles", {
+    columns: {
+        id:          col.uuid().primaryKey().defaultRandom(),
+        title:       col.text().notNull(),
+        slug:        col.text().notNull().unique(),
+        status:      col.enum(["draft", "review", "published"]).default("draft"),
+        coverImage:  col.storage({ path: "articles/covers/", accept: ["image/*"] }),
+        content:     col.text(),
+        excerpt:     col.text().validate({ max: 300 }),
+        publishedAt: col.timestamp({ withTimezone: true }),
+        createdAt:   col.timestamp({ withTimezone: true }).onCreateNow(),
         // The signed-in user who created the article, stamped by the server.
         // `author` is the byline; this is who may keep editing the draft.
-        createdBy: {
-            type: "string",
-            name: "Created by",
-            autoValue: "user_on_create",
-            admin: { readOnly: true }
-        }
+        createdBy:   col.text().onCreateUser(),
     },
-    callbacks: {
-        beforeSave: async ({ values, status }) => {
-            // Auto-generate slug
-            if (values.title && !values.slug) {
-                values.slug = values.title
-                    .toLowerCase()
-                    .replace(/[^a-z0-9]+/g, "-");
-            }
-            // Set publishedAt when publishing
-            if (values.status === "published" && !values.publishedAt) {
-                // `publishedAt` is a `date` property, so its value is a Date.
-                values.publishedAt = new Date();
-            }
-            return values;
-        }
+    relations: {
+        author:     rel.belongsTo(() => authors),
+        categories: rel.manyToMany(() => categories, { through: "article_categories" }),
     },
-    securityRules: [
+    history: true,
+    hooks: {
+        beforeSave: ({ values }) => {
+            const next = { ...values };
+            // Auto-generate the slug
+            if (typeof next.title === "string" && !next.slug) {
+                next.slug = next.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+            }
+            // Stamp publishedAt when publishing
+            if (next.status === "published" && !next.publishedAt) {
+                next.publishedAt = new Date().toISOString();
+            }
+            return next;
+        },
+    },
+    rls: [
         // Anyone can read published articles
         { operation: "select", using: "{status} = 'published'" },
         // Writers read, create and edit their own articles
@@ -232,61 +118,101 @@ export const articlesCollection = defineCollection({
             condition: policy.or(
                 policy.rolesOverlap(["editor", "admin"]),
                 policy.compare(policy.field("status"), "neq", policy.literal("published"))
-            )
+            ),
         },
-        { operation: "delete", roles: ["admin"] }
+        { operation: "delete", roles: ["admin"] },
     ],
-    admin: {
-        icon: "article",
-        defaultViewMode: "table"
-    }
 });
-
-export default articlesCollection;
 ```
+
+`rls: "inherit"` en autores y categorías toma el `defaultRls` que exporta tu
+`backend/schema/index.ts`; en el scaffold, todos leen y los administradores
+escriben.
 
 ### Quién puede publicar
 
-El flujo de trabajo es el campo `status` más las reglas anteriores, y Postgres
-lo hace cumplir, así que vale igual para el panel de administración, la API REST
-y el SDK:
+El flujo de trabajo consiste en la columna `status` más las reglas anteriores, y Postgres
+lo hace cumplir, por lo que aplica por igual al panel de administración, la API REST y el SDK:
 
-- Un **redactor** (`writer`) crea artículos y mueve los suyos entre `draft` y
-  `review`. Guardar uno como `published` se rechaza, y también editar un
-  artículo una vez publicado.
-- Un **editor** lee todos los artículos, borradores incluidos, y publica.
-- Los **lectores**, con sesión iniciada o no, solo ven los artículos publicados.
-  Las lecturas anónimas necesitan `AUTH_REQUIRE=false` en el backend; consulta
+- Un **writer** crea artículos y mueve los suyos entre `draft` y
+  `review`. Se rechaza guardar uno como `published`, así como editar un artículo
+  una vez publicado.
+- Un **editor** lee todos los artículos, incluidos los borradores, y publica.
+- Los **lectores**, hayan iniciado sesión o no, solo ven artículos publicados. Las lecturas
+  anónimas requieren `AUTH_REQUIRE=false` en el backend; consulta
   [Acceso público](/docs/collections/security-rules/#public-access).
 
-`writer` y `editor` son entradas en los `roles` de un usuario. Si partiste del
-scaffold, añade `writer` a las opciones de rol en `config/collections/users.ts`.
+`writer` y `editor` son entradas en los `roles` de un usuario. Si empezaste desde el
+scaffold, añade `writer` a las opciones de rol de la columna `roles` en
+`backend/schema/users.ts`.
+
+## Cómo los muestra el panel
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+El panel de administración renderiza los tres sin necesidad de código adicional. Estos archivos en
+`frontend/src/cms/` añaden los iconos, los colores de los enums y los editores:
+
+```tsx
+// frontend/src/cms/articles.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { articles } from "../../../backend/schema/articles";
+
+export const articlesCms = customizeTable<typeof articles>("articles", {
+    icon: "Article",
+    defaultViewMode: "table",
+    fields: {
+        content: { markdown: true },
+        excerpt: { multiline: true },
+        status: {
+            enumLabels: {
+                draft:     { label: "Draft", color: "gray" },
+                review:    { label: "In Review", color: "orange" },
+                published: { label: "Published", color: "green" },
+            },
+        },
+    },
+});
+```
+
+```tsx
+// frontend/src/cms/authors.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { authors } from "../../../backend/schema/authors";
+
+export const authorsCms = customizeTable<typeof authors>("authors", {
+    icon: "Person",
+    fields: { bio: { multiline: true } },
+});
+```
 
 ## Configuración
 
-1. Guarda los tres archivos en `config/collections/` — `authors.ts`, `categories.ts`
-   y `articles.ts`; cada uno debe exportar su colección por defecto (default export),
-   o el arranque rechaza el directorio. Añádelos al array
-   `collections` de `config/collections/index.ts` para elegir dónde aparecen
-   en la navegación — cada archivo del directorio se carga de todos modos.
-2. Con `rebase dev` en ejecución, eso es todo: guardar regenera el esquema,
-   reinicia el backend y el arranque crea las tablas, la tabla de unión y sus
-   políticas de seguridad a nivel de fila. Fuera de `rebase dev`, contra tu
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+1. Guarda los tres archivos de tabla en `backend/schema/` y expórtalos desde
+   `backend/schema/index.ts`: un `defineTable` que el index no exporte
+   impedirá el arranque.
+2. Guarda los archivos de personalización en `frontend/src/cms/` y añádelos a
+   `<RebaseCMS tableCustomizations={[articlesCms, authorsCms]}>` en `App.tsx`.
+3. Con `rebase dev` en ejecución, eso es todo: al guardar se regenera el esquema,
+   se reinicia el backend y el arranque crea las tablas, la tabla de unión y
+   sus políticas de seguridad a nivel de fila. Fuera de `rebase dev`, contra tu
    propio PostgreSQL, ejecuta `rebase schema generate` y luego `rebase db push`.
 
-Ahora tienes un CMS para blog completamente funcional con:
+Ahora tienes un CMS de blog completamente funcional con:
 - Gestión de autores con subida de avatares
 - Etiquetado de categorías mediante relaciones de muchos a muchos
-- Edición de contenido en Markdown
-- Un flujo de trabajo Borrador → En revisión → Publicado en el que solo un editor
-  publica, impuesto por Postgres
+- Edición de contenido en markdown
+- Un flujo de trabajo Borrador → Revisión → Publicado en el que solo un editor publica,
+  garantizado por Postgres
 - Slugs de URL generados automáticamente
-- Redactores limitados a sus propios artículos, y borradores fuera de las lecturas públicas
-- Registro de auditoría completo mediante el historial de entidades
+- Escritores limitados a sus propios artículos y borradores protegidos de lecturas públicas
+- Registro de auditoría completo a través del historial de entidades
 
-## Consultar desde el SDK
+## Consultas desde el SDK
 
-Utiliza el SDK tipado para obtener artículos con sus relaciones:
+Usa el SDK tipado para obtener artículos con sus relaciones:
 
 ```typescript
 // The row shape you expect back — without it every field arrives as `unknown`.
@@ -301,7 +227,7 @@ type Article = {
 
 // Fetch published articles with author and categories included
 const { data: articles } = await client.data
-    .collection<Article>("articles")
+    .table<Article>("articles")
     .where("status", "==", "published")
     .include("author", "categories")
     .orderBy("publishedAt", "desc")
@@ -320,6 +246,9 @@ for (const article of articles) {
 
 ## Relacionado
 
-- [Definición de colecciones](/docs/collections/) — la API de colecciones que utiliza esta receta
-- [Relaciones](/docs/collections/relations/) — los enlaces de autor y etiquetas, en detalle
-- [Reglas de seguridad (RLS)](/docs/collections/security-rules/) — cómo publicar sin exponer borradores
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+- [Tablas](/docs/schema/) — la API `defineTable` que utiliza esta receta
+- [Personalizar una tabla](/docs/frontend/customize-table/) — la parte del panel
+- [Relaciones](/docs/collections/relations/) — los enlaces de autor y etiquetas, al detalle
+- [Seguridad a nivel de fila](/docs/collections/security-rules/) — publicar sin exponer borradores

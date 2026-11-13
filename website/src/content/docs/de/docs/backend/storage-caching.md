@@ -1,93 +1,89 @@
 ---
-sourceHash: 2e525d1d6efa4692
-title: Storage-Caching und CDNs
-sidebar_label: Storage-Caching und CDNs
-description: Wie Rebase gespeicherte Dateien ausliefert, damit Browser und CDNs sie zwischenspeichern können — ETags und 304er, Cache-Control je nachdem, wer ein Objekt lesen darf, Byte-Bereiche zum Spulen in Audio und Video, und was an einem vorgeschalteten CDN zu konfigurieren ist.
+sourceHash: 5711b13e11b0b4c4
+title: Speicher-Caching und CDNs
+sidebar_label: Speicher-Caching und CDNs
+description: Wie Rebase gespeicherte Dateien bereitstellt, damit Browser und CDNs sie cachen können – ETags und 304s, Cache-Control basierend darauf, wer ein Objekt lesen darf, Byte-Ranges zum Spulen in Audio und Video, und was auf einem vorgeschalteten CDN konfiguriert werden sollte.
 ---
 
-Jedes Objekt wird über den Server weitergeleitet, anstatt auf eine signierte URL
-umzuleiten — eine signierte URL schlägt bei Mixed Content (eine HTTPS-Seite, ein
-HTTP-MinIO) und bei Endpunkten fehl, die nur der Cluster erreichen kann. Die
-Response-Header sind daher der Schlüssel für ein funktionierendes Caching.
+Jedes Objekt wird über den Server per Proxy geleitet, anstatt auf eine signierte
+URL weitergeleitet zu werden – eine signierte URL führt bei Mixed Content (eine
+HTTPS-Seite, ein HTTP-MinIO) und bei Endpunkten, die nur der Cluster erreichen
+kann, zu Fehlern. Daher sorgen die Response-Header dafür, dass das Caching funktioniert.
 
-Jede Antwort enthält ein schwaches `ETag` und `Last-Modified`, basierend auf
-Größe und Änderungszeitpunkt des Objekts. Ein Client, der das Objekt bereits
-besitzt, sendet `If-None-Match` und erhält ein **304 ohne Body**, sodass ein
-erneutes Laden lediglich einen Roundtrip anstelle eines Transfers kostet.
+Jede Antwort enthält ein schwaches `ETag` und `Last-Modified`, die aus der Größe
+und der Änderungszeit des Objekts generiert werden. Ein Client, der das Objekt
+bereits besitzt, sendet `If-None-Match` und erhält **304 ohne Body**, sodass ein
+erneuter Ladevorgang nur einen Roundtrip anstelle eines Transfers kostet.
 
-`Cache-Control` richtet sich danach, wer das Objekt lesen darf:
+`Cache-Control` hängt davon ab, wer das Objekt lesen darf:
 
 | Objekt | Header |
 |---|---|
 | Unter dem Präfix `public/` oder `publicRead: true` | `public, max-age=60, stale-while-revalidate=86400, must-revalidate` |
 | Alles andere | `private, max-age=60, must-revalidate` |
-| Bildtransformationen | dasselbe mit `max-age=3600` |
+| Bildtransformationen | dasselbe, mit `max-age=3600` |
 
-`private` ist eine bewusste Entscheidung: Ein Objekt, für dessen Abruf
-Anmeldedaten erforderlich waren, darf nicht in einem gemeinsam genutzten Cache
-gespeichert werden, da ein CDN sonst die Datei eines Benutzers an den nächsten
-Aufrufer ausliefern könnte. Aus demselben Grund wird `Vary: Authorization`
-gesendet.
+`private` ist beabsichtigt: Ein Objekt, für dessen Abruf Anmeldedaten erforderlich
+waren, darf nicht in einem geteilten Cache (Shared Cache) gespeichert werden, da
+ein CDN sonst die Datei eines Benutzers an den nächsten Aufrufer ausliefern könnte.
+`Vary: Authorization` wird aus demselben Grund gesendet.
 
-Nichts wird jemals als `immutable` markiert. Ein Storage-Schlüssel kann
-überschrieben werden — das Schreiben auf einen bestehenden Schlüssel ist ein
-gewöhnlicher Vorgang —, weshalb das Versprechen, niemals eine Revalidierung
-vorzunehmen, dazu führen würde, dass eine ersetzte Datei bis zum Ablauf des
-Fensters unsichtbar bliebe.
+Nichts wird jemals als `immutable` markiert. Ein Storage-Key kann überschrieben
+werden – das Schreiben auf einen bestehenden Schlüssel ist ein gewöhnlicher
+Vorgang –, daher würde das Versprechen, niemals zu revalidieren, eine ersetzte
+Datei unsichtbar machen, bis das Zeitfenster abgelaufen ist.
 
 ## Spulen in Audio und Video
 
-Jede Objektantwort enthält `Accept-Ranges: bytes`, und eine `Range`-Anfrage
-wird mit `206 Partial Content` und einem `Content-Range` beantwortet. Ohne
-diesen Header gestattet ein Browser bei einem hierüber bereitgestellten
-Medienelement kein Spulen — und Safari weigert sich, ein `<video>`
-abzuspielen, dessen erste Antwort kein `206` ist. Bei Medieninhalten
-entscheidet dies also über einen funktionierenden oder defekten Player.
+Jede Objekt-Antwort enthält `Accept-Ranges: bytes`, und eine `Range`-Anfrage wird
+mit `206 Partial Content` und einem `Content-Range` beantwortet. Ohne dies bietet
+ein Browser bei einem von hier bereitgestellten Medienelement kein Spulen an – und
+Safari weigert sich, ein `<video>` abzuspielen, dessen erste Antwort kein `206`
+ist –, für Medien ist dies also der Unterschied zwischen einem funktionierenden
+und einem fehlerhaften Player.
 
-- Ein Bereich pro Anfrage: `bytes=0-499`, `bytes=500-`, `bytes=-500`. Das ist
-  das Format, das Browser für die Wiedergabe senden.
-- Mehrere Bereiche in einem Header werden mit dem gesamten Objekt und einem
-  `200` beantwortet, was stets zulässig ist. Relevante Clients senden diese
-  Variante nicht.
-- Ein Bereich, der hinter dem Dateiende beginnt, liefert ein `416` mit
-  `Content-Range: bytes */<size>`, keine stillschweigende Auslieferung der
-  gesamten Datei.
+- Ein Bereich pro Anfrage: `bytes=0-499`, `bytes=500-`, `bytes=-500`. Das ist es,
+  was Browser für die Wiedergabe senden.
+- Mehrere Bereiche in einem Header werden mit dem gesamten Objekt und einem `200`
+  beantwortet, was stets zulässig ist. Relevante Clients senden diese nicht.
+- Ein Bereich, der hinter dem Dateiende beginnt, resultiert in einem `416` mit
+  `Content-Range: bytes */<size>`, nicht in einer stillschweigenden Auslieferung
+  der gesamten Datei.
 - Revalidierung hat Vorrang vor einem Bereich: Eine Anfrage, die sowohl
-  `If-None-Match` als auch `Range` enthält, erhält den `304`-Status.
+  `If-None-Match` als auch `Range` enthält, erhält den `304`.
 
-Es werden nur die angeforderten Bytes gelesen — bei lokalem Speicher von der
-Festplatte, bei S3 und GCS mit einem Bereichslesezugriff —, und jedes Objekt wird
-beim Lesen an den Client gestreamt, statt zuerst im Speicher gehalten zu werden;
-die Auslieferung eines großen Videos kostet den Server also genauso viel
-Arbeitsspeicher wie die eines Vorschaubilds. Eine Revalidierung, die mit einem
-`304` endet, ein `HEAD`, ein `416` und eine gecachte Bild-Rendition werden aus
-den Metadaten des Objekts beantwortet, ohne dessen Bytes überhaupt zu lesen.
+Es werden nur die angeforderten Bytes gelesen – bei lokalem Speicher von der
+Festplatte und bei S3 sowie GCS über einen Ranged Read – und jedes Objekt wird
+direkt beim Lesen an den Client gestreamt, anstatt zuvor im Arbeitsspeicher
+gehalten zu werden. Die Bereitstellung eines großen Videos kostet den Server
+somit genauso viel Speicher wie die Bereitstellung eines Thumbnails. Eine
+Revalidierung, die in einem `304`, einem `HEAD`, einem `416` oder einer gecachten
+Bildwiedergabe endet, wird anhand der Metadaten des Objekts beantwortet, ohne
+dass dessen Bytes überhaupt gelesen werden.
 
-Ein eigener `StorageController` erhält dasselbe, indem er die optionalen
-Methoden `statObject` und `getObjectStream` implementiert. Einer ohne sie wird
-über `getObject` bedient, das für jede Anfrage das gesamte Objekt liest, auch
-bei Bereichsanfragen.
+Ein benutzerdefinierter `StorageController` erreicht dasselbe durch die
+Implementierung der optionalen Methoden `statObject` und `getObjectStream`. Ein
+Controller ohne diese Methoden wird über `getObject` bedient, wodurch bei jeder
+Anfrage das gesamte Objekt gelesen wird, einschließlich Ranges.
 
 ## Ein CDN vorschalten
 
-Da öffentliche Objekte mit `public`, einem `stale-while-revalidate`-Fenster und
-einem Validator ausgeliefert werden, kann jeder reguläre Reverse-Proxy oder
-jedes CDN sie ohne zusätzliche Konfiguration zwischenspeichern. Richten Sie ihn
-auf den API-Origin aus und lassen Sie ihn die Header verarbeiten.
+Da öffentliche Objekte `public` sind – mit einem `stale-while-revalidate`-Fenster
+und einem Validator –, kann jeder gewöhnliche Reverse-Proxy oder jedes CDN sie
+ohne zusätzliche Konfiguration cachen. Richten Sie ihn einfach auf den
+API-Origin aus und lassen Sie ihn die Header berücksichtigen.
 
-Zwei Dinge sollten am CDN selbst konfiguriert werden:
+Zwei Dinge, die auf dem CDN selbst konfiguriert werden sollten:
 
-- **`Vary: Authorization` berücksichtigen** oder authentifizierte Routen
-  überhaupt nicht zwischenspeichern. Ein CDN, das `Vary` ignoriert und
-  `private`-Antworten zwischenspeichert, erzeugt genau das Problem, zu dessen
-  Vermeidung dieser Header existiert.
-- **Mit Revalidierungen rechnen.** Das kurze `max-age` führt dazu, dass das
-  CDN regelmäßig nachfragt; diese Anfragen sind schlanke 304-Antworten und
-  sorgen dafür, dass ein überschriebenes Objekt nicht veraltet ausgeliefert
-  wird.
+- **`Vary: Authorization` berücksichtigen** oder authentifizierte Routen überhaupt
+  nicht cachen. Ein CDN, das `Vary` ignoriert und `private`-Antworten cacht, ist
+  genau der Fehlerfall, den dieser Header verhindern soll.
+- **Mit Revalidierung rechnen.** Das kurze `max-age` bedeutet, dass das CDN
+  regelmäßig nachfragt; diese Anfragen sind kostengünstige 304s, und sie
+  verhindern, dass ein überschriebenes Objekt veraltet ausgeliefert wird.
 
 ## Verwandte Themen
 
-- **[Storage-Konfiguration](/docs/backend/storage/)** — die Backends, von denen diese Header ausgeliefert werden, sowie das `public/`-Präfix und `publicRead`, die ein Objekt `public` machen.
-- **[Autorisierung auf Objektebene](/docs/backend/storage-authorization/)** — wer ein Objekt lesen darf, was über `public` oder `private` entscheidet.
-- **[Datei-Uploads](/docs/collections/file-uploads/)** — die Collection-Properties, die Dateien speichern.
+- [Storage Configuration](/docs/backend/storage/) – die Backends, von denen diese Header ausgeliefert werden, sowie das Präfix `public/` und `publicRead`, die ein Objekt öffentlich (`public`) machen.
+- [Per-object authorization](/docs/backend/storage-authorization/) – wer ein Objekt lesen darf, was die Entscheidung zwischen `public` und `private` bestimmt.
+- [File uploads](/docs/collections/file-uploads/) – die Storage-Spalten, die Dateien enthalten, und wie das Panel sie hochlädt.

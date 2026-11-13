@@ -1,12 +1,19 @@
 ---
-sourceHash: 8f1fa8424a290ff0
-title: Modifica dello schema live
-description: "Crea e modifica collection a fronte di un backend in esecuzione: prima committate nel repository, poi applicate."
+sourceHash: a8ca2780e6bbad15
+title: Modifica live dello schema
+description: Crea e modifica tabelle su un backend in esecuzione — la modifica viene scritta in backend/schema, prima committata nel tuo repository, poi applicata.
 ---
 
-L'editor dello schema nel pannello di amministrazione riscrive il codice sorgente delle tue collection. Questo funziona sulla tua macchina e da nessun'altra parte: i file di un server distribuito vengono ricostruiti dal repository a ogni deploy, quindi una modifica effettuata lì verrebbe scartata a quello successivo.
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-La modifica dello schema live è la risposta a questo problema. Essa **esegue il commit della modifica nel tuo repository, quindi applica il DDL** — così la modifica sopravvive al deploy successivo, poiché quest'ultimo viene generato a partire da essa.
+L'editor dello schema nel pannello di amministrazione riscrive i file delle tabelle in
+`backend/schema`. Questo funziona sulla tua macchina locale e da nessun'altra parte: i file di un
+server distribuito vengono ricompilati dal tuo repository a ogni deploy, quindi una modifica apportata
+lì verrebbe scartata al deploy successivo.
+
+La modifica live dello schema è la risposta a questo problema. **Esegue il commit della modifica nel tuo
+repository, quindi applica il DDL** — così la modifica sopravvive al deploy successivo,
+poiché il deploy viene compilato a partire da essa.
 
 ```
 GET  /api/admin/schema/status   whether this backend can do it, and whether you may
@@ -14,40 +21,72 @@ POST /api/admin/schema/plan     what would happen, without doing it
 POST /api/admin/schema/apply    commit, then apply
 ```
 
-Status e plan richiedono lo scope `schema:read`, e apply richiede `schema:write`, come qualsiasi altra interfaccia di `/api/admin` che indica uno scope. Un amministratore li possiede entrambi. L'applicazione richiede inoltre un elemento in più oltre allo scope — consulta [Chi può applicare](#chi-può-applicare).
+Status e plan richiedono lo scope `schema:read`, mentre apply richiede `schema:write`, come
+ogni altra superficie `/api/admin` che richiede uno scope. Un amministratore possiede entrambi.
+L'applicazione richiede anche un ulteriore requisito oltre allo scope — vedi [Chi può applicare](#chi-può-applicare).
 
-## Pianifica prima di applicare
+## Le modifiche: `TablePatch`
 
-`/plan` non ha effetti collaterali. Invia tramite POST la modifica, e ti
-indicherà cosa comporta. Una modifica a una collection esistente è una `patch` — ciò che è
-cambiato, come operazioni su percorsi di chiavi — mentre una nuova collection è
-l'intero `collection`:
+<span class="since-badge" data-since="0.31">Da 0.31</span>
+
+Ogni route che modifica lo schema accetta lo stesso corpo, `{ patches }`: un elenco
+di modifiche, ciascuna delle quali identifica la propria tabella tramite slug. Il tipo è `TablePatch`, proveniente da
+`@rebasepro/types`.
+
+| `op` | Cosa scrive in `backend/schema` |
+|---|---|
+| `createTable` | un nuovo `backend/schema/<name>.ts` che contiene la tabella, esportata da `index.ts` |
+| `deleteTable` | rimuove il file e la sua esportazione |
+| `addColumn` `{ key, column, before? }` | una colonna, prima di quella indicata da `before`, o per ultima |
+| `changeColumn` `{ key, column }` | riscrive la catena del builder di una colonna; un `.transform()` presente su di essa viene mantenuto |
+| `renameColumn` `{ key, to, column }` | rinomina la chiave, mantenendo la colonna SQL |
+| `removeColumn` `{ key }`, `moveColumn` `{ key, before? }` | rimuove o riordina una colonna |
+| `addRelation`, `changeRelation` `{ name, relation }`, `removeRelation` `{ name }` | una voce `rel.*`; il `target` della relazione è uno slug |
+| `setRls` `{ rls }` | la postura: `"admin-only"`, `"inherit"` o un elenco di regole |
+| `addRule` `{ rule, index? }`, `replaceRule` `{ index, rule }`, `removeRule` `{ index }` | una regola dell'elenco |
+| `setOption` `{ option, value }` | `description`, `tenant`, `softDelete`, `history`, `search`, `indexes`, `strictWrites`, `defaultPolicies` o `metadata`; `null` la rimuove |
+
+Una colonna viaggia come definizione — il tipo Postgres come `{ kind: … }`, e i
+modificatori come flag — senza i suoi hook `.transform()`, che sono codice e rimangono
+dove sono stati scritti:
 
 ```json
-{ "collectionId": "posts", "patch": [
-    { "op": "set", "path": ["properties", "subtitle"], "value": { "name": "Subtitle", "type": "string" } },
-    { "op": "remove", "path": ["admin", "group"] }
+{ "patches": [
+    { "op": "addColumn", "table": "posts", "key": "subtitle",
+      "column": { "type": { "kind": "text" } } }
 ] }
 ```
 
-Solo le chiavi che una patch nomina vengono scritte nel file della collection.
-Tutto il resto resta com'è — import, commenti, formattazione, l'`onClick` di
-un'azione sull'entità, una proprietà condivisa da un altro modulo, un enum
-importato altrove. Una patch che si estende *dentro* qualcosa definito nel
-codice (`status: statusProperty`, `enum: LOCALE_ENUM`, uno `...spread`) viene
-rifiutata con l'espressione su cui si è imbattuta, in modo che la modifica
-venga fatta dove risiede quel codice. Un intero `collection` inviato per una
-collection già esistente viene trasformato nella patch di ciò che differisce
-da essa, e una chiave il cui valore è codice non viene mai rimossa in questo
-modo. Il pannello di amministrazione invia patch.
+Viene riscritto solo il codice specificato da una modifica. Tutto il resto rimane invariato —
+importazioni, commenti, formattazione, una colonna condivisa da un altro modulo. L'editor
+rifiuta, indicando l'espressione, qualsiasi modifica che vada ad agire *all'interno* di qualcosa definito
+nel codice: una tabella costruita con uno spread, una colonna costruita da un helper, regole contenute in
+una variabile, una chiave calcolata, una colonna la cui struttura JSON include trasformazioni. Inoltre,
+non rinomina mai uno slug, una tabella, uno schema o il nome di una definizione (questo sposta
+dati: scrivi una migrazione), non rimuove mai l'ultima regola (ad esempio usa `setRls` con
+`"admin-only"`), rifiuta `rls` su una vista e rifiuta l'eliminazione di una tabella a cui puntano
+altre relazioni. Una modifica il cui risultato non compila viene rifiutata con
+`SCHEMA_EDIT_DOES_NOT_COMPILE` e i relativi errori del compilatore. In caso di rifiuto non viene scritto nulla.
 
-`$ADMIN_TOKEN` è un token di accesso — l'`accessToken` restituito da un accesso — per un account che possiede `schema:read`: un amministratore, o un ruolo che lo dichiara. Nulla sulla macchina lo imposta per te.
+L'aspetto visivo di una tabella nel pannello di amministrazione — etichette, icone, gruppi, modalità di visualizzazione, colori
+degli enum — non è una modifica dello schema: risiede in `frontend/src/cms` e nelle preferenze salvate
+del pannello, e nulla di tutto ciò viaggia in una `TablePatch`.
+
+`$ADMIN_TOKEN` è un token di accesso — l'`accessToken` restituito da un accesso — per un
+account che possiede `schema:read`: un amministratore, o un ruolo che lo dichiara. Nessun elemento
+sulla macchina lo imposta per te in automatico.
+
+## Pianifica prima di applicare
+
+<span class="since-badge" data-since="0.31">Da 0.31</span>
+
+`/plan` non ha effetti collaterali. Invia le modifiche e ti mostrerà cosa comportano:
 
 ```bash
 curl -X POST https://your-app/api/admin/schema/plan \
   -H "authorization: Bearer $ADMIN_TOKEN" \
   -H "content-type: application/json" \
-  -d '{"collectionId":"posts","collection":{}}'
+  -d '{"patches":[{"op":"addColumn","table":"posts","key":"subtitle","column":{"type":{"kind":"text"}}}]}'
 ```
 
 ```json
@@ -59,35 +98,57 @@ curl -X POST https://your-app/api/admin/schema/plan \
       "property": "subtitle", "detail": "New optional property subtitle …" }
   ],
   "statements": ["ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"subtitle\" TEXT;"],
-  "files": ["config/collections/posts.ts", "backend/src/schema.generated.ts"]
+  "files": ["backend/schema/posts.ts", "backend/src/schema.generated.ts"],
+  "message": "…the commit message the apply would use…",
+  "withheldConstraints": [],
+  "followUp": []
 }
 ```
 
-`files` è ogni file che l'apply include nel commit: il sorgente della collezione, quando il backend può scriverlo, poi lo schema generato.
+`files` include tutti i file di cui l'operazione di applicazione effettua il commit: il sorgente della tabella, quando il backend
+può scriverlo, e poi lo schema generato. I record delle modifiche del pianificatore mantengono
+i loro nomi wire (`add-property`, `collection`, `property`).
 
-Non si tratta di una comodità superflua. Due dei tre verdetti sono rifiuti, e uno di essi è un rifiuto che altrimenti scopriresti solo premendo il pulsante su un database attivo.
+Questa non è una semplice comodità. Due dei tre verdetti sono rifiuti, e uno di
+essi è un rifiuto che altrimenti scopriresti solo premendo il pulsante su un
+database in produzione.
 
 ## I tre verdetti
 
 | Verdetto | Significato |
 |---|---|
-| `safe` | Il percorso di ensure all'avvio è in grado di esprimerlo e il risultato corrisponde alla tua configurazione. Applicato. |
+| `safe` | Il percorso ensure in fase di avvio può esprimerlo e il risultato corrisponde alla tua configurazione. Applicato. |
 | `diverges` | Si applica *in parte*, lasciando un database che non corrisponde alla tua configurazione — e nulla lo segnala. Rifiutato. |
-| `needs-migration` | Il percorso di ensure non è affatto in grado di esprimerlo. Rifiutato. |
+| `needs-migration` | Il percorso ensure non può esprimerlo affatto. Rifiutato. |
 
-`diverges` è quello che vale la pena comprendere a fondo, perché queste modifiche sembrano essere andate a buon fine:
+`diverges` è quello che vale la pena comprendere, perché queste modifiche sembrano
+andare a buon fine:
 
-- **Una proprietà obbligatoria aggiunta a una tabella che contiene già righe** arriva come **nullable**. `NOT NULL` viene verificato a fronte di ogni riga già presente, e le righe scritte prima che la proprietà esistesse non hanno alcun valore per essa. Su una tabella **vuota** non c'è nulla da verificare, quindi il vincolo viene applicato ed è considerato `safe`.
-- **Rendere obbligatoria una proprietà esistente** ha la stessa logica: `SET NOT NULL` scansiona la tabella, quindi è `safe` su una tabella vuota e `diverges` su una popolata finché non esegui un backfill.
+- **Una colonna `.notNull()` aggiunta a una tabella che contiene già righe** viene creata
+  **nullable**. `NOT NULL` viene verificato su ogni riga già presente, e le righe
+  scritte prima che la colonna esistesse non hanno alcun valore per essa. Su una tabella
+  **vuota** non c'è nulla da verificare, quindi il vincolo viene applicato e questo è
+  `safe`.
+- **Rendere `.notNull()` una colonna esistente** ha la stessa dinamica: `SET NOT NULL`
+  esegue una scansione della tabella, quindi è `safe` su una vuota e `diverges` su una
+  popolata finché non si esegue un backfill.
 
-Due modifiche che in passato risultavano `diverges` ora sono `safe`, poiché il percorso di ensure le esegue:
+Due modifiche che in passato risultavano in `diverges` ora sono `safe`, poiché il percorso ensure
+le gestisce direttamente:
 
-- **L'aggiunta di un valore a un enum esistente** va a buon fine, tramite `ALTER TYPE … ADD VALUE IF NOT EXISTS`. In precedenza veniva ignorata insieme all'intero tipo, e la prima riga che utilizzava il nuovo valore veniva rifiutata da un tipo che non lo conosceva.
-- **Rendere facoltativa una proprietà obbligatoria** rimuove il vincolo `NOT NULL`. In precedenza veniva lasciato invariato, quindi le scritture che omettevano la proprietà continuavano a fallire.
+- **Un valore aggiunto a un enum esistente** viene applicato, tramite
+  `ALTER TYPE … ADD VALUE IF NOT EXISTS`. Prima veniva ignorato insieme all'intero
+  tipo, e la prima riga che utilizzava il nuovo valore veniva rifiutata da un tipo che
+  non ne era a conoscenza.
+- **Rendere opzionale una colonna `.notNull()`** rimuove il `NOT NULL`. Prima veniva lasciato
+  al suo posto, quindi le scritture che omettevano la colonna continuavano a fallire.
 
-### Vincoli richiesti ma non applicati
+### Vincoli richiesti e non applicati
 
-Una modifica può essere applicabile e lasciare comunque non applicato qualcosa richiesto dalla tua configurazione — come nel caso di una proprietà obbligatoria su una tabella popolata. Questo non costituisce un rifiuto, pertanto non compare in `changes`; appare invece in `withheldConstraints`, con l'ostacolo e ciò che lo risolverebbe:
+Una modifica può essere applicabile e comunque lasciare qualcosa richiesto dalla tua configurazione
+non applicato — il caso tipico è una colonna `.notNull()` su una tabella popolata. Questo non è
+un rifiuto, quindi non compare in `changes`; compare in
+`withheldConstraints`, con l'ostacolo e ciò che lo risolverebbe:
 
 ```json
 {
@@ -102,90 +163,100 @@ Una modifica può essere applicabile e lasciare comunque non applicato qualcosa 
 }
 ```
 
-Il percorso di ensure all'avvio segnala la stessa cosa come avviso. Prima dell'introduzione di questa funzionalità, un vincolo trattenuto veniva omesso in silenzio.
+Il percorso ensure all'avvio segnala la stessa cosa come avviso. Fino all'introduzione
+di questa funzionalità, un vincolo trattenuto veniva trattenuto in silenzio.
 
-`needs-migration` copre tutto ciò che il percorso di ensure non può fare:
-eliminare una collection o una proprietà, modificare il tipo di una colonna
-(un toggle su un intero, una stringa che diventa un enum, il tipo di elemento
-di un array, la larghezza di un varchar), rinominare una colonna, cambiare una
-chiave primaria, rimuovere un valore di enum, rendere univoca una colonna
-esistente, e modificare una relazione — il suo kind, il suo target, il suo
-`localKey`, il suo `onDelete`. Viene rifiutata anche una `hasMany` o `hasOne`
-la cui colonna di collegamento non è creata da nulla. Ogni rifiuto specifica
-la modifica e cosa fare in alternativa.
+`needs-migration` copre tutto ciò che il percorso ensure non può fare: eliminare una
+tabella o una colonna, modificare il tipo di una colonna (un interruttore a intero, una stringa
+che diventa un enum, il tipo di elemento di un array, la lunghezza di un varchar), rinominare una
+colonna, modificare una chiave primaria, rimuovere un valore di enum, rendere univoca una colonna
+esistente e modificare una relazione — il suo tipo, la sua destinazione, la sua `localKey`,
+il suo `onDelete`. Viene rifiutato anche un `hasMany` o `hasOne` la cui colonna di collegamento non viene creata da nulla.
+Ogni rifiuto specifica la modifica e cosa fare in alternativa.
 
-Il verdetto viene letto dallo schema che ciascun lato produce — lo stesso
-piano a partire dal quale vengono generati `schema.generated.ts` e `db push`
-— quindi una modifica che cambia il database non può essere segnalata come
-nessuna modifica. Due modifiche che sembrano cambiamenti e non vengono
-rifiutate:
+Il verdetto viene ricavato dallo schema prodotto da ciascuna parte — lo stesso piano da cui
+vengono renderizzati `schema.generated.ts` e `db push` — quindi una modifica che altera
+il database non può essere segnalata come assenza di modifiche. Due modifiche che sembrano cambiamenti
+e non vengono rifiutate:
 
-- **Rinominare la chiave di una proprietà mantenendo la sua colonna**
-  (`columnName` impostato sul vecchio nome della colonna) non sposta alcun
-  dato. È `safe`; i client dell'API leggono il nuovo nome.
-- **Impostare, modificare o eliminare un default** vincola solo le scritture
-  future. È `safe`, e viene applicato con `ALTER COLUMN … SET DEFAULT` /
-  `DROP DEFAULT`.
+- **Rinominare la chiave di una colonna mantenendo la relativa colonna SQL** (`renameColumn`,
+  che scrive il vecchio nome come primo argomento del builder, `col.text("old_name")`) non sposta dati. È `safe`; i client API leggono il nuovo nome.
+- **Impostare, modificare o rimuovere un valore predefinito** vincola solo le scritture future. È
+  `safe`, e applicato con `ALTER COLUMN … SET DEFAULT` / `DROP DEFAULT`.
 
-### Modificare solo la sorgente
+### Modifica solo del sorgente
 
-Una modifica rifiutata può comunque essere scritta nella sorgente della tua
-collection e committata, lasciando il database com'è — rimuovere una
-proprietà che non servi più è il caso tipico. Invia `/apply` con `"sourceOnly": true`. Non viene eseguito nulla; il
-messaggio di commit specifica cosa mantiene il database, ad esempio
+<span class="since-badge" data-since="0.31">Da 0.31</span>
+
+Una modifica rifiutata può comunque essere scritta in `backend/schema` e committata,
+lasciando il database così com'è — la rimozione di una colonna che non si intende più esporre è
+il caso tipico. Invia `/apply` con `"sourceOnly": true`. Non viene eseguito nulla sul database; il messaggio
+di commit specifica cosa viene mantenuto nel database, ad esempio
 `chore(schema): remove sku from products (source only — column products.sku kept)`,
-e ogni modifica nel piano porta una frase `sourceOnly` che indica cosa lascia
-indietro — compreso il caso in cui una colonna lasciata indietro è `NOT NULL`
-senza default, il che fa fallire ogni inserimento successivo finché non viene
-eliminata o resa nullable. Una modifica senza una frase di questo tipo
-(spostare una chiave primaria, una relazione la cui colonna di collegamento
-non è creata da nulla) non può essere scritta nella sola sorgente.
+e ogni modifica nel piano contiene una frase `sourceOnly` che spiega cosa
+lascia invariato — incluso il caso in cui una colonna lasciata nel DB sia `NOT NULL` senza
+un valore predefinito, il che farebbe fallire ogni inserimento successivo finché non viene rimossa o resa
+nullable. Una modifica priva di questo (spostamento di una chiave primaria, una relazione la cui colonna di collegamento
+non viene creata da nulla) non può essere scritta solo nel sorgente.
 
-Su un deployment che non cambia nulla nel proprio database (`REBASE_PROVISION=false`)
-nessuna modifica viene applicata dal pannello, quindi ogni modifica segue questo percorso:
-il pulsante principale della finestra di dialogo riporta **Commit** e invia
-`"sourceOnly": true`, e il processo che modifica quel database applica lo schema.
+Su una distribuzione che non apporta alcuna modifica al proprio database (`REBASE_PROVISION=false`),
+nessuna modifica viene applicata dal pannello, quindi ogni operazione segue questa strada: il
+pulsante principale della finestra di dialogo recita **Commit** e invia `"sourceOnly": true`, mentre il
+processo deputato a modificare il database applica lo schema.
 
-L'eliminazione di una collection dal pannello di amministrazione segue lo
-stesso percorso: `/apply` con `"remove": true` e `"sourceOnly": true` elimina
-il file della collection e la sua voce in `index.ts` e committa entrambi; la
-tabella e le sue righe restano. Viene rifiutata mentre un'altra collection
-importa il file (una relazione verso di essa), nominando l'importatore —
-eliminarlo interromperebbe il caricamento di ogni collection.
+L'eliminazione di una tabella dal pannello di amministrazione segue lo stesso percorso: `/apply` con una
+modifica `deleteTable` e `"sourceOnly": true` elimina il file della tabella e la sua
+esportazione in `index.ts` ed effettua il commit di entrambi; la tabella e le relative righe rimangono nel
+database. L'operazione viene rifiutata finché una relazione di un'altra tabella vi punta, specificando
+quella tabella — eliminarla impedirebbe la compilazione dello schema.
 
-## Cosa viene committato
+## Cosa viene incluso nel commit
 
-Non solo il file della collection. Da esso viene generato lo schema Drizzle, e uno schema non aggiornato compromette il deploy successivo, quindi entrambi finiscono nello stesso commit:
+Non solo il file della tabella. Lo schema Drizzle viene generato a partire da esso, e uno
+non aggiornato interromperebbe il deploy successivo, quindi entrambi vengono inclusi nello stesso commit:
 
-- `config/collections/<name>.ts` — la collection stessa
+- `backend/schema/<name>.ts` — la tabella stessa, e `backend/schema/index.ts` quando una tabella viene creata o eliminata
 - `backend/src/schema.generated.ts` — lo schema Drizzle
 
-Questi percorsi sono relativi al tuo **progetto**, non al tuo repository. Quando i due coincidono — un progetto `rebase init`, che rappresenta il caso comune — non c'è nulla di cui preoccuparsi. Quando il progetto si trova in una sottodirectory di un repository più grande, i percorsi includono il relativo prefisso, individuato risalendo dalla directory delle collection fino al `rebase.json` più vicino. Un progetto senza `rebase.json` mantiene i percorsi semplici.
+Questi percorsi sono relativi al tuo **progetto**, non al tuo repository. Quando i
+due coincidono — un progetto creato con `rebase init`, che è il caso tipico — non c'è
+nulla di cui preoccuparsi. Quando il tuo progetto si trova in una sottodirectory di un repository
+più grande, ai percorsi viene aggiunto il relativo prefisso, individuato risalendo dalla directory dello
+schema fino al `rebase.json` più vicino. Un progetto privo di
+`rebase.json` mantiene i percorsi semplici.
 
-Nel commit non finisce alcun SQL. `rebase db push` e `rebase db generate` scrivono il proprio a partire dalle collection a ogni esecuzione, in `.rebase/sql/`, che è in gitignore.
+Nessun file SQL viene inserito nel commit. `rebase db push` e `rebase db generate` scrivono il proprio SQL
+a partire dalle tabelle a ogni esecuzione, all'interno di `.rebase/sql/`, che è ignorato da git.
 
-Il messaggio di commit descrive la modifica piuttosto che limitarsi ad annunciarne una, ed è attribuito alla persona che l'ha effettuata, con il nome visualizzato e l'email
-dell'account (un utente senza nessuno dei due viene registrato come `<uid>@users.noreply.rebase.pro`).
+Il messaggio di commit descrive la modifica anziché limitarsi ad annunciarla, ed è
+attribuito alla persona che l'ha effettuata, tramite il nome visualizzato e l'email dell'account
+(un utente sprovvisto di entrambi viene registrato nel commit come `<uid>@users.noreply.rebase.pro`).
 
-Una modifica dello schema con un autore e un diff nella cronologia del tuo progetto è qualcosa
-che né Firebase né Supabase offrono: le modifiche alle loro tabelle sono invisibili al tuo
-repository.
+Una modifica dello schema con un autore e un diff nella cronologia del tuo progetto è una funzionalità
+che né Firebase né Supabase offrono: le loro modifiche alle tabelle sono invisibili
+al tuo repository.
 
 ## Chi può applicare
 
-Possedere `schema:read` è sufficiente per eseguire **plan**. La pianificazione non ha effetti collaterali, e un job CI che verifichi se una modifica proposta per una collection sia applicabile ne rappresenta un ottimo caso d'uso.
+Possedere `schema:read` è sufficiente per **pianificare**. La pianificazione non ha effetti collaterali, e un
+job di CI che verifichi se una modifica di schema proposta sia applicabile ne rappresenta un ottimo caso
+d'uso.
 
-L'applicazione è un privilegio distinto, poiché applicare scrive un commit e un commit reca con sé un autore:
+L'applicazione è un secondo livello di privilegio, poiché applicare scrive un commit e un commit
+richiede un autore:
 
 | Chiamante | Plan | Apply |
 |---|---|---|
-| Una persona autenticata che possiede `schema:write` | sì | sì |
-| Una chiave API che possiede `schema:read` / `schema:write` | sì | no |
+| Una persona autenticata con `schema:write` | sì | sì |
+| Una chiave API con `schema:read` / `schema:write` | sì | no |
 | La service key del server | sì | no |
 
-Una credenziale non è un autore. `api-key:7c3f…` nel tuo ambiente di CI non è una persona fisica, e consentirle di scrivere nel repository produrrebbe esattamente quella cronologia non attribuibile che questa funzionalità è stata concepita per rimpiazzare.
+Una credenziale non è un autore. `api-key:7c3f…` nel tuo ambiente di CI non è
+una persona, e permetterle di scrivere nel tuo repository produce esattamente la cronologia
+non attribuibile che questa funzionalità mira a superare.
 
-Se ciò che desideri è una modifica automatizzata dello schema — ad esempio una pipeline di migrazione — attivala esplicitamente:
+Se ciò che desideri è una modifica automatizzata dello schema — ad esempio una pipeline di migrazione —,
+abilitala esplicitamente:
 
 ```typescript no-verify
 initializeRebaseBackend({
@@ -194,9 +265,13 @@ initializeRebaseBackend({
 })
 ```
 
-oppure `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY=true`. Il commit viene quindi attribuito alla credenziale per nome — `Rebase API key (7c3f)` — in modo tale che, leggendo il `git log` a distanza di un mese, sia ancora possibile distinguere le modifiche apportate da una persona.
+oppure `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY=true`. Il commit viene quindi attribuito
+alla credenziale per nome — `Rebase API key (7c3f)` — così che leggendo `git log` a
+distanza di un mese sia ancora possibile distinguere quali modifiche sono state apportate da una persona.
 
-`GET /api/admin/schema/status` segnala ciò che *tu* sei autorizzato a fare, non soltanto ciò che il server supporta, consentendo così a un pannello di disabilitare il controllo spiegandone il motivo, invece di rifiutare l'operazione dopo che hai già deciso di procedere:
+`GET /api/admin/schema/status` segnala ciò che *tu* puoi fare, non solo ciò che il
+server supporta, consentendo a un pannello di disabilitare il controllo e spiegarne il motivo anziché
+rifiutare l'operazione dopo che hai deciso:
 
 ```json
 {
@@ -208,29 +283,42 @@ oppure `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY=true`. Il commit viene quindi att
 }
 ```
 
-## Se il tuo progetto gestisce migrazioni con controllo di versione
+## Se il tuo progetto gestisce migrazioni con versionamento
 
-L'applicazione in questo contesto **non** scrive una migrazione, e non può farlo: una migrazione adotta il formato di Atlas con un file di integrità, generato da un binario esterno a fronte di un database usa e getta, e un server in esecuzione non dispone di nessuno dei due.
+L'applicazione in questo contesto **non** scrive una migrazione, e non può farlo: una migrazione è nel
+formato di Atlas con un file di integrità, generato da un binario esterno su un database
+temporaneo, ed entrambi non sono presenti su un server in esecuzione.
 
-Ciò che invece committa è la collection, ed è a partire da essa che `rebase db generate` scrive la migrazione. Di conseguenza, la migrazione è a portata di un solo comando:
+Ciò di cui viene effettuato il commit è il file della tabella, ed è a partire da quello che `rebase db generate`
+scrive la migrazione. Quindi la migrazione è a portata di un solo comando:
 
 ```bash
 rebase db generate
 ```
 
-Sia il plan sia il risultato lo segnalano esplicitamente quando il progetto prevede migrazioni, poiché in caso contrario il problema passerebbe inosservato: il database conterrebbe la modifica e il repository la descriverebbe, ma l'ambiente successivo configurato rieseguendo le migrazioni non la conterrebbe, senza alcun avviso.
+Sia il piano che il risultato finale lo segnalano quando il tuo progetto usa le migrazioni, perché
+altrimenti l'errore passerebbe inosservato: il tuo database contiene la modifica e il tuo repository
+la descrive, ma l'ambiente successivo creato rieseguendo le migrazioni ne è privo,
+senza che nulla sia stato segnalato.
 
-Un progetto configurato tramite boot-ensure — il runtime gestito e qualsiasi self-host che mantenga `REBASE_MIGRATE_ON_BOOT` sul valore predefinito — non necessita di alcuna migrazione. Le sue collection costituiscono lo schema, e l'avvio successivo si occupa della riconciliazione.
+Un progetto con provisioning tramite boot-ensure — il runtime gestito, e qualsiasi self-host
+che mantenga `REBASE_MIGRATE_ON_BOOT` al valore predefinito — non richiede alcuna migrazione. Le sue
+tabelle costituiscono lo schema, e l'avvio successivo si occupa della riconciliazione.
 
 ## Prima il commit, poi l'applicazione
 
-L'ordine è importante e non è arbitrario.
+L'ordine è fondamentale e non è arbitrario.
 
-Se il DDL venisse eseguito per primo e il commit fallisse, il database avrebbe una colonna non descritta dal repository. Il percorso di ensure non elimina mai nulla, quindi il deploy successivo non la rimuoverebbe né la segnalerebbe — una colonna invisibile, assente dalle tue collection, finché qualcuno non andasse a cercarla.
+Se venisse eseguito prima il DDL e il commit fallisse, il tuo database conterrebbe una colonna
+che il tuo repository non descrive. Il percorso ensure non elimina mai nulla, quindi il
+deploy successivo non la rimuoverebbe né la segnalerebbe — una colonna invisibile, assente
+dalle tue tabelle, finché qualcuno non andasse a cercarla.
 
-Eseguire prima il commit fallisce nel modo opposto: il repository descrive qualcosa che il database non possiede ancora. Questo è lo stato ordinario di ogni progetto nell'intervallo tra una modifica e un deploy, e la fase di boot lo riconcilia all'avvio successivo.
+Effettuare prima il commit produce un fallimento di segno opposto: il repository descrive qualcosa che il
+database non ha ancora. Questo è lo stato ordinario di qualsiasi progetto tra
+una modifica e un deploy, e la fase di avvio si occupa di riconciliarlo al riavvio successivo.
 
-Pertanto, un'applicazione fallita **non è un errore**. La risposta lo indica chiaramente:
+Di conseguenza, un'applicazione non riuscita **non è un errore**. La risposta lo indica chiaramente:
 
 ```json
 {
@@ -241,95 +329,147 @@ Pertanto, un'applicazione fallita **non è un errore**. La risposta lo indica ch
 }
 ```
 
+## Le regole hanno effetto nella stessa applicazione
+
+<span class="since-badge" data-since="0.31">Da 0.31</span>
+
+Una modifica alle `rls` di una tabella (o a una nuova tabella) viene resa effettiva nella stessa applicazione: le
+policy delle tabelle modificate vengono scritte nel database subito dopo il DDL,
+e la risposta indica l'esito sotto la voce `policies`:
+
+```json
+{ "policies": { "status": "applied", "tables": ["posts"], "statements": 3 } }
+```
+
+Nei casi in cui le policy non possono essere scritte — un backend a cui non è consentito effettuare provisioning
+(`provision.tables` disattivato) o un driver privo di questa capacità — lo stato è
+`"deferred"`; quando la scrittura fallisce lo stato è `"failed"`, con il relativo errore. Entrambi
+restituiscono il messaggio "Rules saved to source; they take effect on the next
+deploy.", e il pannello continua a mostrare le regole applicate da Postgres fino a quel momento,
+mai regole che non siano effettivamente in vigore.
+
+Anche gli hook modificati nel codice sorgente diventano effettivi con l'applicazione: il server esegue le
+tabelle compilate dello schema modificato senza necessità di riavvio.
+
+## Servito senza riavvio
+
+<span class="since-badge" data-since="0.31">Da 0.31</span>
+
+Una modifica applicata dallo Studio viene resa disponibile immediatamente. Il driver Postgres rilegge
+le tabelle modificate dal database e le sostituisce: la data API,
+le include, gli hook e il realtime vedono una nuova tabella, colonna, relazione o junction
+senza bisogno di riavvio, e una nuova tabella riceve i suoi grant e il change capture. La
+risposta lo indica sotto `serving`:
+
+```json
+{ "serving": { "status": "now" } }
+```
+
+In una distribuzione in cui le tabelle sono derivate dal database (senza
+`backend/schema`), o con un driver che non può aggiornare le sue tabelle, il
+database e il codice sorgente contengono la modifica, ma il processo continua a servire le
+tabelle con cui si è avviato. Lo stato è in tal caso `"after-restart"`, con un `message`
+che la ricevuta dello Studio mostra come avviso; riavvia il processo per rendere disponibile
+la modifica.
+
+## Quando il file cambia durante la modifica
+
+Una modifica viene preparata sulla base dei file così come sono. Se uno di essi viene modificato su
+disco prima che la modifica venga applicata — un salvataggio da IDE, un altro processo — l'applicazione
+non scrive nulla e risponde con 409 `SCHEMA_EDIT_STALE_FILE`. L'editor delle collection
+propone il pulsante Ricarica; ripeti la modifica sul file nello stato in cui si trova attualmente.
+
 ## Dove funziona
 
-La modifica live dello schema riscrive il sorgente delle tue collection con lo stesso editor
-usato dai salvataggi del pannello che toccano solo il sorgente (richiede che `ts-morph` sia
-installato). Da dove arriva quel sorgente decide dove funziona:
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-- **Su disco** (`collectionsDir`, l'impostazione predefinita): funziona dove funziona l'editor
-  che tocca solo il sorgente. Quell'editor è disattivato con `NODE_ENV=production` a meno che
-  il server non imposti `schemaEditor: true`.
-- **In un repository che indichi** (`liveSchema.repository`, oppure
+La modifica live dello schema riscrive `backend/schema` con lo stesso editor utilizzato dai salvataggi
+del pannello in modalità solo sorgente (richiede l'installazione di `ts-morph`). La provenienza di tale
+sorgente determina dove può essere eseguito:
+
+- **Su disco** (`schemaDir`, il valore predefinito): viene eseguito dove funziona l'editor
+  solo sorgente. Tale editor è disattivato con `NODE_ENV=production`, a meno che il server
+  non imposti `schemaEditor: true`.
+- **In un repository indicato** (`liveSchema.repository`, o
   `REBASE_LIVE_SCHEMA_REPOSITORY` per un bundle): il sorgente viene letto da
-  GitHub e la modifica viene committata di nuovo lì, quindi funziona ovunque,
-  produzione compresa. È l'opt-in per un bundle compilato.
-
-### MongoDB
-
-Tutto quanto descritto sopra riguarda Postgres, dove una modifica dello schema si traduce in istruzioni DDL. Su MongoDB non ci sono tabelle da alterare: l'aggiunta di una proprietà non aggiunge nulla, la sua rimozione non rimuove nulla, e un documento scritto ieri rimane valido anche domani.
-
-Di conseguenza, ogni modifica è applicabile, nulla viene mai rifiutato e il piano non contiene istruzioni — il commit *è* la modifica stessa. Il pannello mostra "Commit" anziché "Commit and apply", e non asserisce che sia stato eseguito alcunché sul database.
-
-L'unico aspetto che merita un'attenta lettura è la rimozione. Su Postgres la rimozione di una proprietà viene rifiutata perché comporterebbe l'eliminazione di una colonna. Su MongoDB il campo rimane in ogni documento che lo contiene; la tua API smette semplicemente di restituirlo. La modifica lo esplicita chiaramente, evitando di lasciare presumere il comportamento tipico dei database relazionali.
+  GitHub e la modifica viene committata nuovamente lì, quindi funziona ovunque,
+  inclusa la produzione. Questa è l'opzione da abilitare per un bundle compilato.
 
 | Distribuzione | Funziona |
 |---|---|
 | `rebase dev` sulla tua macchina | sì |
-| Self-host con il progetto e il suo working tree git montati | sì, quando `NODE_ENV` non è `production`, oppure con `schemaEditor: true` |
-| Un bundle compilato: un self-host che serve una build, oppure l'immagine pubblicata | solo se fa opt-in con `REBASE_LIVE_SCHEMA_REPOSITORY` — vedi [Da un bundle compilato](#da-un-bundle-compilato) |
-| Qualsiasi server con `liveSchema.repository` configurato | sì, `NODE_ENV=production` compreso |
+| Self-host con il progetto e il suo working tree Git montati | sì, quando `NODE_ENV` non è `production`, o con `schemaEditor: true` |
+| Un bundle compilato: un self-host che esegue una build, o l'immagine pubblicata | solo se abilitato esplicitamente con `REBASE_LIVE_SCHEMA_REPOSITORY` — vedi [Da un bundle compilato](#da-un-bundle-compilato) |
+| Qualsiasi server con `liveSchema.repository` configurato | sì, incluso `NODE_ENV=production` |
 
-Un bundle è un output compilato, quindi non contiene il sorgente delle collection, e il
-runtime che lo serve disattiva l'editor che tocca solo il sorgente. Se non indica un
-repository, `/api/admin/schema/status` risponde `enabled: false` con il codice
-`SCHEMA_EDITOR_DISABLED`: modifica le collection in sviluppo, fai il commit e distribuisci.
+Un bundle è un output compilato, pertanto non contiene il codice sorgente di `backend/schema`, e
+il runtime che lo esegue disattiva l'editor solo sorgente. A meno che non indichi un
+repository, `/api/admin/schema/status` risponderà con `enabled: false` e il codice
+`SCHEMA_EDITOR_DISABLED`: modifica `backend/schema` in ambiente di sviluppo, committa ed
+esegui il deploy.
 
 ### Da un bundle compilato
 
-Un bundle non ha codice proprio da configurare, quindi fa opt-in con variabili d'ambiente.
-Nulla cambia per un bundle che non le imposta.
+<span class="since-badge" data-since="0.31">Da 0.31</span>
+
+Un bundle non ha codice proprio da configurare, quindi viene abilitato tramite variabili
+di ambiente. Non cambia nulla per un bundle che non le imposta.
 
 ```bash
 REBASE_LIVE_SCHEMA_REPOSITORY=acme/storefront     # turns it on
 REBASE_LIVE_SCHEMA_GITHUB_TOKEN=github_pat_…       # or the three _GITHUB_APP_* variables
 # REBASE_LIVE_SCHEMA_BRANCH=main                   # default
-# REBASE_LIVE_SCHEMA_COLLECTIONS_PATH=config/collections   # default
+# REBASE_LIVE_SCHEMA_PATH=backend/schema           # default
 ```
 
-L'elenco completo è in [Configurazione](/docs/getting-started/configuration#live-schema-editing-from-a-bundle).
-Un repository indicato senza una credenziale utilizzabile (nessuna, entrambi i tipi, metà di una
-GitHub App), o un valore che non è `owner/name`, si rifiuta di avviarsi, anziché servire
-un editor che fallisce quando qualcuno preme Applica.
+L'elenco completo si trova in [Configuration](/docs/getting-started/configuration#live-schema-editing-from-a-bundle).
+Un repository specificato senza credenziali utilizzabili (nessuna, entrambi i tipi, una GitHub
+App a metà), o un valore diverso da `owner/name`, blocca l'avvio del server, anziché servire
+un editor che fallirebbe non appena qualcuno preme Applica. Lo stesso avviene per la variabile rimossa
+`REBASE_LIVE_SCHEMA_COLLECTIONS_PATH`, con un messaggio che indica
+`REBASE_LIVE_SCHEMA_PATH`, e per un percorso che punta al di fuori del repository.
 
-Cosa resta uguale quando è attivo:
+Cosa rimane invariato quando è attivo:
 
-- È una superficie `/api/admin`: nessuna risposta senza `schema:read`, e
+- È una superficie di `/api/admin`: nessuna risposta senza `schema:read`, e
   `/apply` richiede `schema:write` e una persona (vedi [Chi può applicare](#chi-può-applicare)).
-- L'unica destinazione di scrittura è il repository che hai indicato. L'editor che tocca solo il
-  sorgente, che scrive file accanto al processo, resta disattivato.
-- Ogni modifica viene pianificata, mostrata, committata e poi applicata, esattamente come
-  sulla tua macchina.
+- La destinazione di scrittura è unicamente il repository indicato. L'editor solo sorgente,
+  che scrive i file localmente accanto al processo, rimane disattivato.
+- Ogni modifica viene pianificata, mostrata, committata e infine applicata, esattamente come sulla tua
+  macchina locale.
 
-Una cosa è diversa. Il deployment in esecuzione continua a servire le collection con cui è
-stato compilato finché la tua pipeline non compila e distribuisce il commit. Il database
-ha la modifica subito; il pannello di amministrazione e l'API vedono la nuova definizione
-della collection dopo quel deploy.
+Il processo che ha applicato la modifica la rende disponibile immediatamente: le sue route REST, i
+descrittori `GET /api/schema/tables` e il pannello di amministrazione seguono la modifica
+senza necessità di riavvio. Le altre repliche, e questo stesso processo dopo un riavvio, continuano a servire
+le tabelle con cui il bundle è stato compilato fino a quando la tua pipeline non compila e distribuisce
+il commit.
 
-Quindi un deployment fa **una sola modifica per deploy**. Una seconda modifica pianificata
-sulle collection che questo deployment esegue ancora farebbe il commit di file di schema
-generati che escludono la prima. Ogni applicazione quindi produce `schema.generated.ts`
-dalle collection che questo deployment esegue e lo confronta con la copia del repository.
-Quando differiscono, l'applicazione viene rifiutata con `SCHEMA_CHANGE_FAILED`, indicando
-il file, finché un processo che esegue quel commit non sostituisce questo. Il controllo
-legge il repository, non la memoria di questo processo, quindi vale dopo un riavvio, tra
-repliche e per una modifica che uno sviluppatore ha fatto push e che non è ancora stata
-distribuita. La pianificazione resta disponibile nel frattempo.
+Pertanto, una modifica deve attendere che quella precedente sia stata resa disponibile. Una modifica pianificata rispetto a
+tabelle rispetto alle quali il repository è già più avanti finirebbe per committare file di schema generati
+che escluderebbero la modifica precedente. Ogni operazione di apply renderizza quindi
+`schema.generated.ts` a partire dalle tabelle servite da questo processo e lo confronta con
+la copia presente nel repository. Se differiscono, l'applicazione viene rifiutata con
+`SCHEMA_CHANGE_FAILED`, indicando il file, finché un processo che esegue quel commit non
+sostituisce questo. Il controllo legge il repository, non la memoria di questo processo,
+quindi è valido anche dopo un riavvio, tra le repliche e per una modifica inviata da uno sviluppatore
+che non è ancora stata distribuita. Nel frattempo la pianificazione rimane disponibile.
 
-Le copie differiscono anche quando il file è stato generato da un'altra versione di Rebase,
-riformattato o modificato a mano. Se non c'è nulla in attesa di essere distribuito, esegui
-`rebase schema generate` con la versione che il deployment esegue, fai il commit del
-risultato e distribuiscilo. Le terminazioni di riga e gli spazi finali non contano come
-differenza.
+Le copie differiscono anche qualora il file sia stato generato da un'altra versione di Rebase,
+riformattato o modificato manualmente. Se non ci sono distribuzioni in attesa, esegui
+`rebase schema generate` con la versione eseguita dall'ambiente di produzione, committa il
+risultato e distribuiscilo. I caratteri di fine riga e gli spazi vuoti finali non vengono considerati
+come differenze.
 
-### Fare il commit su un repository remoto
+### Commit su un repository remoto
 
-`liveSchema.repository` fa sì che il server faccia il commit di ogni modifica su un
-repository GitHub tramite le Git Data API, invece di eseguire `git commit` in un
-working tree. Non dipende dal fatto che l'editor che tocca solo il sorgente sia attivo: con un
-repository configurato, la modifica live funziona con `NODE_ENV=production` e con
-`schemaEditor: false`, perché nulla su questa macchina viene scritto. Un bundle
-lo imposta tramite le variabili sopra.
+<span class="since-badge" data-since="0.31">Da 0.31</span>
+
+`liveSchema.repository` fa sì che il server effettui il commit di ogni modifica su un repository GitHub
+tramite la Git Data API anziché eseguire `git commit` in un
+working tree. Questo non dipende dall'attivazione dell'editor solo sorgente: con un
+repository configurato, la modifica live funziona anche con `NODE_ENV=production` e con
+`schemaEditor: false`, poiché nulla viene scritto su questa macchina. Un bundle
+lo imposta tramite le variabili sopra indicate.
 
 ```typescript no-verify
 initializeRebaseBackend({
@@ -340,18 +480,25 @@ initializeRebaseBackend({
             owner: "acme",
             repo: "storefront",
             branch: "main",
-            // Where the collection source lives in that repository.
-            // Defaults to "config/collections".
-            collectionsPath: "config/collections",
+            // Where backend/schema lives in that repository.
+            // Defaults to "backend/schema".
+            schemaPath: "backend/schema",
             auth: { kind: "token", token: process.env.GITHUB_TOKEN! }
         }
     }
 })
 ```
 
-La directory delle collection viene quindi letta dal repository, riscritta con lo stesso editor utilizzato in locale e ciò che è cambiato viene committato nuovamente tramite le Git Data API: un blob per file, un tree, un commit e l'aggiornamento di un ref. Nulla viene clonato e nulla viene lasciato su disco. Viene letta l'intera directory, non solo il file modificato, quindi una relazione può avere come destinazione un'altra collection (il suo file viene importato) e l'eliminazione di una collection funziona come in locale: rifiutata finché un'altra collection la importa, e rimossa da `index.ts` nello stesso commit.
+La directory dello schema viene quindi letta dal repository, riscritta con lo
+stesso editor in esecuzione in locale, e le modifiche vengono committate tramite
+la Git Data API: un blob per file, un albero, un commit e l'aggiornamento del ref. Nulla viene
+clonato e nulla viene lasciato su disco. Viene letta l'intera directory, non solo il
+file modificato, in modo che una relazione possa puntare a un'altra tabella e l'eliminazione di una tabella funzioni
+come in locale: rifiutata se una relazione di un'altra tabella vi punta, e
+rimossa da `index.ts` nello stesso commit. Viene recuperato solo `backend/schema`,
+quindi un file di tabella che importa elementi esterni ad esso non può essere modificato in questo modo.
 
-`auth` accetta un token o un'installazione di una GitHub App:
+`auth` accetta un token o un'installazione di GitHub App:
 
 ```typescript no-verify
 auth: {
@@ -362,25 +509,42 @@ auth: {
 }
 ```
 
-Utilizza il token per un singolo progetto che esegue commit su un repository già di tua proprietà — configurare un'App solo per permettere al tuo server di committare richiede troppa complessità burocratica per una credenziale su una sola riga. Utilizza invece l'App per un control plane che gestisce un'unica chiave condivisa tra più progetti, esattamente come fa Rebase Cloud: una sola App, un'installazione per ciascun progetto e nessun segreto specifico per singolo cliente da ruotare.
+Usa il token per un singolo progetto che effettua commit su un repository di tua proprietà —
+configurare un'App solo per permettere al tuo server di committare su di essa comporta una trafila eccessiva per
+una credenziale di una sola riga. Usa l'App per un control plane che gestisce un'unica chiave su
+molti progetti, che è ciò che fa Rebase Cloud: una sola App, un'installazione per ciascun
+progetto e nessun segreto da ruotare per ciascun cliente.
 
 Il token richiede il permesso `contents: read and write` su quel repository, e nient'altro.
 
-Senza `liveSchema.repository`, il commit è un semplice `git commit` nel working tree che contiene `collectionsDir`: nulla da autenticare, nessun token, nessuna rete.
+Senza `liveSchema.repository`, il commit è un normale `git commit` nel
+working tree che contiene `schemaDir`: nulla da autenticare, nessun token, nessuna
+chiamata di rete.
 
-Due aspetti rendono sicura l'esecuzione a fronte di un repository su cui sta lavorando qualcun altro:
+Due aspetti garantiscono la sicurezza dell'operazione su un repository su cui sta lavorando qualcun altro:
 
-- Esegue lo stage dei **soli** file che ha generato. Un commit dello schema che inglobasse lavori a metà sarebbe impossibile da revisionare; pertanto, l'operazione viene categoricamente rifiutata se nell'albero risulta già modificato uno dei propri file.
-- Il percorso remoto non esegue mai un aggiornamento forzato di un ref. Se qualcosa è stato inviato mentre il commit veniva generato, l'aggiornamento viene rifiutato: perdere silenziosamente il commit di qualcuno è peggio di un fallimento dell'operazione.
+- Esegue lo stage **soltanto** dei file generati. Un commit dello schema che includesse
+  lavori a metà sarebbe un commit impossibile da revisionare; inoltre l'operazione viene rifiutata
+  immediatamente se l'albero di lavoro presenta già modifiche su uno dei propri file.
+- Il percorso remoto non forza mai l'aggiornamento di un ref (mai force-update). Se qualcosa è stato inviato nel frattempo
+  mentre il commit veniva preparato, l'aggiornamento viene respinto — perdere il commit di qualcuno
+  silenziosamente è peggio che fallire l'operazione.
 
 ## Limitazioni
 
-- Solo modifiche additive. Tutto il resto viene rifiutato con una motivazione, poiché il percorso di ensure è l'unico elemento a modificare uno schema e può eseguire solo aggiunte.
-- Non viene scritto alcun file di migrazione. Un progetto configurato tramite boot-ensure non ne ha bisogno; un progetto configurato con migrazioni dovrebbe eseguire `rebase db generate`, che ne genera uno tramite Atlas con l'hash di integrità richiesto da Atlas.
-- Postgres e MongoDB (vedi [MongoDB](#mongodb)). La funzionalità viene rilevata sul driver, e gli altri motori rispondono con `SCHEMA_EDITING_UNSUPPORTED`.
+- Solo modifiche additive. Tutto il resto viene rifiutato con una motivazione, poiché il
+  percorso ensure è l'unico meccanismo che altera uno schema e può solamente aggiungere elementi.
+- Non viene scritto alcun file di migrazione. Un progetto configurato tramite boot-ensure non ne ha bisogno;
+  un progetto configurato tramite migrazioni dovrebbe eseguire `rebase db generate`, che ne
+  crea una tramite Atlas con l'hash di integrità richiesto da Atlas.
+- Solo Postgres. La funzionalità viene rilevata a livello di driver, e un driver
+  privo di tale supporto risponde con `SCHEMA_EDITING_UNSUPPORTED`.
+- Una distribuzione le cui tabelle sono derivate dal database renderà disponibile la modifica
+  applicata solo dopo il riavvio successivo (`serving.status: "after-restart"`, vedi
+  [Servito senza riavvio](#servito-senza-riavvio)).
 
-## Correlati
+## Risorse correlate
 
 - [Generazione dello schema](/docs/cli/schema/) — le stesse modifiche da riga di comando
-- [Definizione delle collection](/docs/collections/) — ciò che l'editor sta riscrivendo
-- [Studio](/docs/studio/) — il pannello accessibile dietro queste route
+- [Tabelle](/docs/schema/) — ciò che l'editor sta riscrivendo
+- [Studio](/docs/studio/) — il pannello alla base di queste route

@@ -1,17 +1,17 @@
 ---
-sourceHash: 1efb8010154baea9
+sourceHash: 37c268f3d4b76c7f
 title: Histórico de Entidades
 sidebar_label: Histórico de Entidades
-description: Rastreie todas as alterações em suas entidades com uma trilha de auditoria completa — quem alterou o quê, quando e a entidade completa antes/depois.
+description: Rastreie cada alteração em suas entidades com uma trilha de auditoria completa — quem alterou o quê, quando e a entidade completa antes/depois.
 ---
 
 ## Visão Geral
 
-O histórico de entidades registra um snapshot dos valores da entidade em cada criação, atualização e exclusão. Isso fornece uma trilha de auditoria completa com diffs.
+O histórico de entidades registra um snapshot dos valores da entidade a cada criação, atualização e exclusão. Isso fornece uma trilha de auditoria completa com diffs.
 
-## Habilitando o Histórico
+## Ativando o Histórico
 
-:::note[Onde isso fica]
+:::note[Onde isso é configurado]
 **Runtime gerenciado** — ativado por padrão. `REBASE_HISTORY=false` no `.env` o desativa.
 
 **Ejetado** — `history: true` em `initializeRebaseBackend({ … })`. A forma de objeto abaixo — `{ retention }` — é exclusiva para o modo ejetado; a variável de ambiente é um booleano.
@@ -21,12 +21,12 @@ O mapeamento completo está em [Visão Geral do Backend](/docs/backend/#where-ea
 
 ### Backend
 
-:::note[Onde isso fica]
-**Runtime gerenciado:** `REBASE_HISTORY` (`true` por padrão; defina como `false` para desativar). As configurações de retenção não têm formato de variável de ambiente — ejete para alterá-las.
+:::note[Onde isso é configurado]
+**Runtime gerenciado:** `REBASE_HISTORY` (`true` por padrão; defina como `false` para desativar). As configurações de retenção não possuem formato de variável de ambiente — ejete para alterá-las.
 **Ejetado:** `initializeRebaseBackend({ history })` em `backend/src/index.ts`.
 :::
 
-Habilite o histórico em `initializeRebaseBackend`:
+Ative o histórico em `initializeRebaseBackend`:
 
 ```typescript no-verify
 await initializeRebaseBackend({
@@ -39,94 +39,104 @@ Ou com um período de retenção personalizado:
 
 ```typescript
 history: {
-    retention: 30        // Days. Entries older than this are pruned (default: 90)
+    retention: 30        // Dias. Entradas mais antigas que isso são removidas (padrão: 90)
 }
 ```
 
-### Por Coleção
+### Por tabela
 
-Marque quais coleções devem rastrear o histórico:
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const ordersCollection = defineCollection({
-    slug: "orders",
-    name: "Orders",
-    table: "orders",
-    history: true,       // Enable for this collection
-    properties: { /* ... */ }
+Marque quais tabelas rastreiam o histórico com `history: true`:
+
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const orders = defineTable("orders", {
+    columns: {
+        id:     col.uuid().primaryKey().defaultRandom(),
+        status: col.enum(["open", "paid", "shipped"]).notNull().default("open"),
+        total:  col.numeric({ precision: 10, scale: 2 }).notNull(),
+    },
+    history: true,
+    rls: "admin-only",
 });
 ```
+
+Uma view não pode rastrear histórico: ela nunca é gravada.
 
 ## Como Funciona
 
 1. O backend cria uma tabela `rebase.entity_history` automaticamente.
-2. Em cada criação, atualização ou exclusão, uma entrada é registrada com:
-   - ID da entidade e o slug da coleção (em `table_name`)
-   - Os valores da entidade depois da alteração (`values`; em uma exclusão, a
-     entidade que foi excluída)
-   - Em uma atualização, o que os campos alterados continham antes (`previous_values`)
+2. A cada criação, atualização ou exclusão, uma entrada é registrada com:
+   - ID da entidade e o slug da tabela (em `table_name`)
+   - Os valores da entidade após a alteração (`values`; para uma exclusão, a entidade
+     que foi excluída)
+   - Em uma atualização, o que os campos alterados continham antes dela (`previous_values`)
    - Timestamp e ID do usuário
    - A ação (`create`, `update`, `delete`)
    - Um array de `changed_fields` mostrando quais colunas foram modificadas
 
-Os valores são a linha como a API REST a serve: suas colunas, datas como
-timestamps, um `belongsTo` como sua chave estrangeira. É isso que um revert
-grava de volta.
+Os valores correspondem à linha conforme a API REST a serve: suas colunas, datas como
+timestamps, um `belongsTo` como sua chave estrangeira. Isso é o que uma reversão grava de volta.
 
-Uma entrada nunca guarda os valores de uma linha relacionada. Ler o histórico de uma
-linha exige apenas acesso de leitura a essa linha, não às linhas para as quais ela
-aponta, então uma relação é mantida como referência — `{ "__type": "relation", "id", "path" }` —
-e nada mais. As entradas que versões antigas registraram com a linha relacionada
-embutida (uma exclusão costumava armazenar a visão da linha do painel de administração)
-são servidas da mesma forma: o endpoint de histórico descarta os valores embutidos antes
-de responder.
+Uma entrada nunca mantém os valores de uma linha relacionada. Ler o histórico de uma linha precisa apenas
+de acesso de leitura a essa linha, não às linhas para as quais ela aponta, portanto, um `belongsTo` é mantido
+como sua chave estrangeira e nada mais.
 
-Em uma coleção com [soft delete](/docs/collections/soft-delete/), uma exclusão
-é registrada como `delete` e uma restauração (a atualização que redefine o
-campo de soft delete para `null`) como `update`. O histórico de uma linha
-permanece legível enquanto ela está na lixeira, e revertê-la para uma versão
-anterior à exclusão a restaura.
+Entradas que versões mais antigas registraram por meio da visualização da linha no painel administrativo
+(uma exclusão costumava armazená-la) são servidas, e revertidas, como a linha que representam:
+um envelope `{ "__type": "date", "value" }` como seu valor, uma
+ref `{ "__type": "relation" }` de uma relação proprietária como a chave estrangeira sob
+o próprio nome da chave, qualquer outra ref de relação como a chave da linha relacionada, e uma
+linha relacionada incorporada pela ref nunca é servida. Reverter tal entrada grava
+esses valores simples; uma lista to-many que ela contenha não é gravada e é nomeada em
+`dropped_fields`.
+
+Em uma tabela com [soft delete](/docs/collections/soft-delete/), uma exclusão é
+registrada como `delete` e uma restauração (a atualização que redefine o campo de soft-delete
+de volta para `null`) como `update`. O histórico de uma linha permanece legível enquanto a linha estiver
+na lixeira, e revertê-la para uma versão anterior à exclusão a restaura.
 
 ### O que `previous_values` contém
 
-Uma entrada de
-atualização guarda, em `previous_values`, apenas os campos listados em
-`changed_fields`. Todos os outros campos tinham o mesmo valor antes e depois da
-alteração, portanto já estão em `values`; guardar a linha inteira duas vezes custava,
-para uma alteração de um campo em uma linha de 20 campos, 1.269 bytes, e agora custa 794.
+Uma entrada de atualização
+mantém, em `previous_values`, apenas os campos listados em `changed_fields`. Todos os
+outros campos mantiveram o mesmo valor antes e depois da alteração, portanto já estão em
+`values`; armazenar a linha inteira duas vezes custava a uma alteração de um único campo em uma
+linha de 20 campos 1.269 bytes, onde agora custa 794.
 
-As entradas registradas antes da 0.25 mantêm a linha anterior inteira. O `format` da
-entrada diz qual é o caso:
+Entradas registradas antes da versão 0.25 mantêm a linha anterior inteira. O `format` da entrada
+indica qual é:
 
 | `format` | `previous_values` em uma atualização |
 |---|---|
-| `1` (entradas anteriores à 0.25) | A linha inteira antes da alteração |
-| `2` | Apenas os `changed_fields`, cada um como a linha inteira o tinha |
+| `1` (entradas anteriores a 0.25) | A linha inteira antes da alteração |
+| `2` | Apenas os `changed_fields`, cada um como a linha inteira continha |
 
-A visão de histórico do admin e um revert leem ambos da mesma forma: a visão mostra o
-valor anterior de cada campo alterado, e um revert grava os `values` da entrada escolhida,
-que são completos nos dois formatos. Para reconstruir a linha como era antes de uma
-alteração `format: 2`, pegue `values` e recoloque cada campo que `previous_values`
-contém.
+A visualização de histórico do admin e uma reversão leem ambos da mesma forma: a visualização mostra o
+valor anterior de cada campo alterado, e uma reversão grava os `values` da entrada escolhida,
+que são completos em ambos os formatos. Para reconstruir a linha como era antes de uma
+alteração com `format: 2`, pegue `values` e recoloque cada campo que
+`previous_values` contém.
 
-### Rastreamento de Diffs e Igualdade Estrutural Profunda
+### Rastreamento de Diffs e Igualdade Estrutural Profunda (Deep Equality)
 
-Para evitar o registro de logs redundantes onde campos são salvos mas nenhum valor é alterado, o `HistoryService` realiza uma comparação de igualdade estrutural profunda (deep equality) nas chaves de nível superior dos valores antigos e novos:
-- Ele ignora propriedades de metadados do sistema que começam com `__`.
-- Se diferenças forem encontradas, os nomes das propriedades modificadas são salvos na coluna `changed_fields` (`text[]`).
-- Se a verificação de deep equality detectar zero alterações, a inserção no histórico é totalmente ignorada.
+Para evitar o registro de logs redundantes onde campos são salvos mas nenhum valor é alterado, o `HistoryService` realiza uma comparação de igualdade estrutural profunda nas chaves de nível superior dos valores antigos e novos:
+- Ignora campos de metadados do sistema que começam com `__`.
+- Se forem encontradas diferenças, os nomes dos campos modificados são salvos na coluna `changed_fields` (`text[]`).
+- Se a verificação de deep equality detectar zero alterações, a inserção do histórico é totalmente ignorada.
 
-### Limpeza (Pruning)
+### Remoção (Pruning)
 
-A retenção é aplicada em dois lugares:
-- **Após cada escrita**, para a entidade escrita: logo depois de ela ser salva ou
-  excluída, o servidor remove as entradas dessa entidade além das 200 mais recentes,
-  ou mais antigas que o período de retenção. Isso não segura a escrita.
+A retenção é aplicada em dois locais:
+- **Após cada gravação**, para a entidade gravada: logo após ela ser salva ou
+  excluída, o servidor remove as entradas dessa entidade além das 200 mais recentes, ou
+  mais antigas que o período de retenção. Isso não atrasa a gravação.
 - **Uma vez por hora**,
-  para todas as entidades: as entradas mais antigas que o período de retenção são
-  excluídas, não importa a quem pertençam — inclusive entidades que nunca mais são
-  escritas, como as excluídas. Veja [Mecânica do ciclo de vida da limpeza](#mecânica-do-ciclo-de-vida-da-limpeza).
+  para cada entidade: entradas mais antigas que o período de retenção são excluídas
+  independentemente de a quem pertençam — incluindo entidades que nunca mais serão gravadas,
+  como as excluídas. Consulte [Mecânica do ciclo de vida da remoção](#mecânica-do-ciclo-de-vida-da-remoção).
 
 ## Endpoint REST
 
@@ -134,7 +144,7 @@ A retenção é aplicada em dois lugares:
 GET /api/data/:slug/:entityId/history
 ```
 
-Retorna uma lista de entradas de histórico para uma entidade específica, ordenadas da mais recente para a mais antiga:
+Retorna uma lista de entradas de histórico para uma entidade específica, ordenada a partir da mais recente. <span class="since-badge" data-since="0.31">Desde 0.31</span> Entradas que uma transação registra — uma criação e a atualização seguinte em um único `_batch`, uma reversão e a reversão dela — retornam na ordem em que foram gravadas: o `updated_at` de cada entrada é posterior à entrada anterior da linha. Um banco de dados existente obtém isso em sua próxima inicialização de provisionamento, ou em uma execução com `REBASE_PROVISION_ONLY=true`, que substitui a função `rebase.record_history`; um deployment que nunca provisiona mantém a ordenação antiga até lá. Entradas registradas antes disso mantêm sua ordem.
 
 ```json
 {
@@ -156,61 +166,84 @@ Retorna uma lista de entradas de histórico para uma entidade específica, orden
 }
 ```
 
+### As entradas são servidas como leituras
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+As entradas de histórico são servidas da mesma forma que a linha: controle de acesso a nível de campo primeiro, depois
+`afterRead` (global, tabela, coluna), dentro da transação somente leitura do chamador. Uma coluna que um hook ou um `.transform({ afterRead })` mascara é mascarada
+em `values` e `previous_values`; uma coluna que as roles do chamador não podem ler é
+ocultada e deixada de fora de `changed_fields`; chaves de colunas que a tabela não
+possui mais são ocultadas. Qualquer pessoa autorizada a ler a linha agora pode ver seu histórico, e
+`updated_by` é mantido. Um hook que lança um erro em um snapshot antigo falha a requisição
+em vez de servi-la sem máscara, e o histórico de uma linha excluída permanentemente (hard-deleted) responde
+404 ("No row with id '…' in table '…'").
+
+O driver do Postgres faz isso; um driver personalizado serve o histórico implementando
+`DataDriver.serveStoredRows(path, rows)`, e sem isso as rotas de histórico
+respondem 501. Antes da versão 0.31, as entradas eram servidas exatamente como armazenadas.
+
 ```
 POST /api/data/:slug/:entityId/history/:historyId/revert
 ```
 
-Grava os `values` da entrada de volta na linha pelo caminho normal de salvamento, de modo que
-o revert é ele próprio registrado como um `update`. Responde com a linha salva em `data`
-e `meta.reverted_from`, o id da entrada.
+Grava os `values` da entrada de volta na linha por meio do fluxo normal de salvamento, de modo que a
+reversão é ela própria registrada como um `update`. Ela responde a linha salva sob `data`
+e `meta.reverted_from`, o id da entrada. Uma reversão nunca grava uma coluna que o chamador
+não possa ler: essas mantêm seu valor atual.
 
-Entradas gravadas por versões antigas podem conter chaves para as quais a linha não tem coluna:
-um campo que um `afterRead` calculou (antes da 0.24, um salvamento registrava a linha como o
-`afterRead` a mostrava), ou uma relação armazenada como a visão dela no painel de administração.
-Um revert grava as colunas da linha e deixa essas chaves de fora, com uma relação própria
-voltando como sua chave estrangeira, e nomeia o que deixou de fora em
-`meta.dropped_fields`. Um valor que um `afterRead` antigo mascarou (`********`) tem uma
-coluna, então é gravado de volta como foi registrado.
+Entradas gravadas por versões mais antigas podem conter chaves para as quais a linha não tem coluna: um
+campo computado por um `afterRead` (antes de 0.24, um salvamento registrava a linha conforme
+o `afterRead` a exibia), ou uma relação armazenada como a visualização dela no painel administrativo.
+Uma reversão grava as colunas da linha e omite essas chaves, com uma relação proprietária
+retornando como sua chave estrangeira, e indica o que foi omitido em
+`meta.dropped_fields`. Um valor mascarado por um `afterRead` antigo (`********`) possui uma
+coluna, portanto é gravado de volta como foi registrado.
 
 ## Configuração de Retenção
 
 | Configuração | Padrão | Descrição |
-|--------------|--------|-----------|
-| `retention` | 90 | Entradas mais antigas do que esse número de dias são excluídas. |
+|---------|---------|-------------|
+| `retention` | 90 | Entradas mais antigas que essa quantidade de dias são excluídas. |
 
-Cada entidade também mantém no máximo suas **200** entradas mais recentes. Esse limite é fixo; não há configuração para ele.
+Cada entidade também mantém no máximo suas **200** entradas mais recentes. Esse limite é fixo; ele
+não possui configuração.
 
-### Mecânica do Ciclo de Vida da Limpeza
+### Mecânica do Ciclo de Vida da Remoção
 
-Após cada alteração que o servidor registra, a entidade alterada é limpa: suas entradas mais antigas que o período de retenção são removidas, e em seguida tudo além das 200 mais recentes. Isso roda de forma assíncrona e não segura a escrita.
+Após cada alteração que o servidor registra, a entidade que mudou passa por remoção: suas
+entradas mais antigas que o período de retenção são removidas, e em seguida tudo o que estiver além de suas 200 mais
+recentes. Isso roda de forma assíncrona e não atrasa a gravação.
 
-Uma escrita feita pelo [`openRebase` ou pelo `rebase console`](/docs/backend/scripts/)
-registra a sua entrada de histórico, mas não poda nada, porque um script não pode
-saber a retenção com que o seu servidor está configurado. O servidor poda essa
-entidade na próxima escrita nela, e na varredura de hora em hora abaixo.
+Uma gravação feita por meio de [`openRebase` ou `rebase console`](/docs/backend/scripts/)
+registra sua entrada de histórico, mas não remove nada, porque um script não pode saber a
+retenção com a qual seu servidor está configurado. O servidor remove as entradas dessa entidade em sua
+próxima gravação nela, e na varredura horária descrita abaixo.
 
-Uma vez por hora, o backend também exclui todas as entradas mais antigas que o período de retenção, de todas as entidades. Antes disso, o histórico de uma entidade que nunca mais era escrita — toda entidade excluída — não era limpo de forma alguma. A varredura:
+Uma vez por hora, o
+backend também exclui todas as entradas mais antigas que o período de retenção, de todas as
+entidades. Antes disso, o histórico de uma entidade que nunca mais era gravada —
+todas as excluídas — não era limpo. A varredura:
 
-- roda em uma instância da frota por hora, nos processos que executam os jobs agendados
-  (ela reivindica sua hora em `rebase.cron_claims`, como uma execução de cron faz), a
-  primeira vez quando o backend inicia;
-- exclui em lotes de 5.000 entradas, uma instrução cada, até um lote voltar menor que o
-  limite, ignorando as entradas que outra varredura segura — assim, uma primeira varredura
-  sobre um grande acúmulo são muitas exclusões curtas, não uma longa;
-- lê um índice em `updated_at`, `idx_history_updated_at`. Em um banco de dados criado antes
-  da 0.25, ele é construído em segundo plano após a primeira inicialização, com
-  `CREATE INDEX CONCURRENTLY`, sem bloquear leituras nem escritas — cerca de um segundo
-  para cada 2 milhões de entradas.
+- roda em uma instância da frota por hora, nos processos que executam os
+  jobs agendados (ela reivindica sua hora em `rebase.cron_claims`, como faz uma execução de cron),
+  pela primeira vez quando o backend inicializa;
+- exclui em lotes de 5.000 entradas, uma instrução cada, até que um lote retorne
+  com menos registros, ignorando entradas retidas por outra varredura — portanto, uma primeira varredura sobre um
+  grande acúmulo consiste em muitas exclusões curtas, e não em uma única longa;
+- lê um índice em `updated_at`, `idx_history_updated_at`. Em um banco de dados
+  criado antes de 0.25, ele é construído em segundo plano após a primeira inicialização,
+  `CREATE INDEX CONCURRENTLY`, sem bloquear leituras ou gravações — cerca de um
+  segundo por 2 milhões de entradas.
 
-A mesma inicialização remove `idx_history_entity` onde ele existe: `idx_history_time`
-começa com as mesmas colunas e atende todas as leituras que ele atendia, de modo que ele
-só deixava cada alteração registrada mais lenta. A remoção espera no máximo um segundo
-por vez pelo lock da tabela, e uma tabela que algo mantém ocupada o tempo todo conserva o
-índice até a próxima inicialização.
+A mesma inicialização remove `idx_history_entity` onde ele existir: `idx_history_time`
+inicia com as mesmas colunas e atende a todas as leituras que o outro atendia, logo ele apenas tornava mais lenta cada
+alteração registrada. A remoção aguarda no máximo um segundo por vez pelo lock da tabela,
+e uma tabela retida por algo durante todo o processo mantém o índice até a próxima inicialização.
 
-O limite de 200 entradas por entidade só é aplicado depois de uma escrita nessa entidade.
+O limite de 200 entradas por entidade é aplicado somente após uma gravação nessa entidade.
 
 ## Próximos Passos
 
-- **[Entity Callbacks](/docs/collections/callbacks)** — Hooks de ciclo de vida
+- **[Hooks de tabela](/docs/collections/callbacks/)** — Hooks de ciclo de vida
 - **[Visão Geral do Backend](/docs/backend)** — Configuração completa do backend

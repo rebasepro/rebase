@@ -1,26 +1,27 @@
 ---
-sourceHash: 41c24af8b53a93a9
-title: Integration eines eigenen Servers
-sidebar_label: Eigener Server
-description: Bauen Sie das Rebase-Backend aus öffentlichen Bausteinen in Ihrem eigenen Server – createRebaseBackend, seine Routengruppen, mount, attachRealtime und start – oder betten Sie den Postgres-Treiber in Express ein.
+sourceHash: c42fc466c64146e7
+title: Custom-Server-Integration
+sidebar_label: Custom Server
+description: Erstellen Sie das Rebase-Backend aus öffentlichen Bausteinen in Ihrem eigenen Server – createRebaseBackend, dessen Routengruppen, mount, attachRealtime und start – oder binden Sie den Postgres-Treiber in Express ein.
 ---
 
-# Integration eines eigenen Servers
+# Custom-Server-Integration
 
-`initializeRebaseBackend` ist eine Abkürzung. Es baut das gesamte Backend, bindet es
-unter `/api` in Ihre Hono-App ein, hängt den Realtime-Socket an Ihren HTTP-Server und
-startet die Hintergrundarbeit, alles in einem Aufruf. Wenn Sie genau das möchten,
-verwenden Sie es.
+`initializeRebaseBackend` ist eine Abkürzung. Es erstellt das gesamte Backend,
+bindet es in Ihre Hono-App unter `/api` ein, hängt den Realtime-Socket an Ihren
+HTTP-Server an und startet die Hintergrundaufgaben – alles in einem einzigen
+Aufruf. Wenn das genau das ist, was Sie wollen, verwenden Sie es.
 
 Wenn nicht, gehen Sie einen Schritt tiefer. Jeder Teil dieses Aufrufs ist ein
-öffentlicher Baustein, den Sie selbst aufrufen können: Bauen Sie das Backend, binden Sie
-dann alles oder nur die gewünschten Routengruppen unter den gewünschten Pfaden ein und
-entscheiden Sie, welcher Prozess die Timer startet. [Den Postgres-Treiber einbetten](/docs/backend/embedding-postgres-driver/)
-geht noch einen Schritt weiter und öffnet allein den Postgres-Treiber in einer Express-App.
+öffentlicher Baustein, den Sie selbst aufrufen können: Erstellen Sie das Backend,
+binden Sie dann alles oder nur die gewünschten Routengruppen unter den
+gewünschten Pfaden ein und entscheiden Sie, welcher Prozess die Timer startet.
+[Postgres-Treiber einbinden](/docs/backend/embedding-postgres-driver/) geht noch
+einen Schritt weiter und öffnet den Postgres-Treiber isoliert in einer Express-App.
 
 ## Umgebungskonfiguration
 
-Rebase stellt mit `loadEnv()` in `@rebasepro/server` ein zentrales Hilfsprogramm bereit, das Ihre Umgebungsvariablen anhand eines strikten Zod-Schemas validiert. Rufen Sie es **nach** dem Laden Ihrer `.env`-Datei auf:
+Rebase bietet ein zentrales `loadEnv()`-Utility in `@rebasepro/server`, das Ihre Umgebungsvariablen anhand eines strikten Zod-Schemas validiert. Rufen Sie es **nach** dem Laden Ihrer `.env`-Datei auf:
 
 ```typescript
 import dotenv from "dotenv";
@@ -49,24 +50,35 @@ export const env = loadEnv({
 // env.STRIPE_SECRET_KEY → string        (validated, required)
 ```
 
-:::caution[Zwei Kopien von Zod]
-Zwei gleichzeitig geladene Kopien von Zod haben diesen Aufruf früher stillschweigend kaputt gemacht. `loadEnv` kombinierte die Schemas mit `.merge()`, das ein Schema der anderen Kopie akzeptiert und anschließend jedes Feld mit einem `.default()` ablehnt. Der Server fuhr hoch, meldete Erfolg und führte keinen seiner Crons aus; keine Fehlermeldung erwähnte Zod.
+:::caution[Zwei Kopien von zod]
+Zwei gleichzeitig geladene Kopien von zod führten früher dazu, dass dieser Aufruf
+lautlos fehlschlug. `loadEnv` kombinierte die Schemas mit `.merge()`, was ein
+Schema der anderen Kopie akzeptiert und anschließend jedes Feld mit einem
+`.default()` ablehnt. Der Server fuhr hoch, meldete Erfolg und führte keinen
+seiner Cronjobs aus; nichts am Fehler wies auf zod hin.
 
-`loadEnv` validiert jetzt das Basisschema und Ihr `extend`-Schema jeweils mit einem eigenen `.parse()`, sodass ein Schema, das von einer anderen Kopie von Zod erstellt wurde, funktioniert. Die Runtime stellt `zod` bereit, und die `backend/package.json` des Scaffolds führt es in dem Bereich auf, den `@rebasepro/server` verwendet, sodass eine einzige Kopie installiert wird: Halten Sie die beiden gleich.
+`loadEnv` validiert nun das Basisschema und Ihr `extend`-Schema jeweils mit
+einem eigenen `.parse()`, sodass ein Schema funktioniert, das von einer anderen
+Kopie von zod erstellt wurde. Die Runtime stellt `zod` bereit, und die
+`backend/package.json` des Scaffolds führt es in dem Bereich auf, den
+`@rebasepro/server` verwendet, sodass nur eine Kopie installiert ist: Halten Sie
+beide identisch.
 :::
 
 **Wichtigste Verhaltensweisen:**
-- Generiert in der Entwicklungsumgebung `JWT_SECRET` und `REBASE_SERVICE_KEY`, wenn sie nicht gesetzt sind, sodass Sie ohne manuelle Einrichtung starten können, und legt sie in `.rebase-dev-secrets.json` ab, damit ein Neustart niemanden abmeldet.
-- Blockiert automatisch generierte Secrets in der Produktionsumgebung – Sie müssen diese explizit setzen.
-- Prüft, ob in der Produktionsumgebung `CORS_ORIGINS` oder `FRONTEND_URL` gesetzt ist.
+- Generiert `JWT_SECRET` und `REBASE_SERVICE_KEY` in der Entwicklungsumgebung, wenn sie nicht gesetzt sind, sodass Sie ohne manuelle Einrichtung starten können, und speichert sie in `.rebase-dev-secrets.json`, damit ein Neustart niemanden abmeldet.
+- Blockiert automatisch generierte Secrets in der Produktion – Sie müssen sie explizit setzen.
+- Validates, dass in der Produktion `CORS_ORIGINS` oder `FRONTEND_URL` gesetzt ist.
 - Verweigert einen `extend`-Wert, der kein Zod-Schema ist.
-- Wirft einen `Error`, der jede fehlende oder falsche Variable nennt, etwa `DATABASE_URL: is required`, mit den Issues von Zod in seiner Eigenschaft `issues`.
+- Wirft einen `Error`, der jede fehlende oder fehlerhafte Variable benennt, wie z. B. `DATABASE_URL: is required`, mit den Problemen von Zod auf der Eigenschaft `issues`.
 
-Die vollständige Liste der unterstützten Variablen finden Sie in der `.env.example`-Datei der bereitgestellten Scaffold-App.
+Die vollständige Liste der unterstützten Variablen finden Sie in `.env.example` der generierten App.
 
 ## Ein Schritt unter `initializeRebaseBackend`
 
-`initializeRebaseBackend` besteht aus diesen Aufrufen und aus nichts sonst:
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+`initializeRebaseBackend` besteht aus diesen Aufrufen und nichts anderem:
 
 ```typescript
 import { createRebaseBackend, installUnhandledRejectionHandler, setDefaultBackend } from "@rebasepro/server";
@@ -84,14 +96,17 @@ await backend.attachRealtime(server);
 backend.start();
 ```
 
-Das `shutdown()`, das es zurückgibt, schließt auch den Server, der ihm übergeben
-wurde. Hier dasselbe, ausgeschrieben als `backend/src/index.ts` eines Projekts, bereit
-zum Ändern. `rebase dev` führt diese Datei aus, wenn ein Projekt eine hat, anstelle des
-eigenen Starts der Runtime. In ein Scaffold-Projekt eingefügt, liefert sie aus, was die
-Runtime ausgeliefert hat: die API auf dem Port, den `rebase dev` gewählt hat, Anmeldung
-und Registrierung mit der Users-Collection des Projekts, die Funktionen in
-`backend/functions/`, die Cron-Jobs in `backend/crons/`, die in `config/resources.ts`
-deklarierten Buckets und das CORS, das das Admin-Panel auf seinem eigenen Port braucht.
+Das zurückgegebene `shutdown()` schließt auch den übergebenen Server. Hier ist
+das Gleiche als `backend/src/index.ts` eines Projekts ausformuliert, bereit für
+Anpassungen. `rebase dev` führt diese Datei aus, wenn ein Projekt eine besitzt,
+anstelle des eigenen Boot-Vorgangs der Runtime. In ein Scaffold-Projekt
+eingefügt, stellt es genau das bereit, was auch die Runtime bereitgestellt hat:
+die API auf dem von `rebase dev` gewählten Port, Anmeldung und Registrierung über
+die Auth-Tabelle des Projekts, die von `backend/schema/index.ts` exportierten
+Tabellen, die globalen Hooks in `backend/hooks.ts`, die Funktionen in
+`backend/functions/`, die Cronjobs in `backend/crons/`, die in
+`backend/resources.ts` deklarierten Buckets sowie das CORS, das das Admin-Panel
+auf seinem eigenen Port benötigt.
 
 ```typescript
 import { existsSync } from "node:fs";
@@ -121,9 +136,9 @@ import {
     postgresDriverConfigFromEnv
 } from "@rebasepro/server-postgres";
 import { declaredStorageSources } from "@rebasepro/types";
-import "../../config/resources";
-import usersCollection from "../../config/collections/users";
-import { storageAuthorize } from "../../config/storage";
+import "../resources";
+import { storageAuthorize } from "../storage";
+import { hooks } from "../hooks";
 
 // dotenv never overrides a variable already set, so what `rebase dev` sets wins.
 dotenv.config({ path: process.env.DOTENV_CONFIG_PATH, quiet: true });
@@ -150,12 +165,12 @@ const server = createServer({ maxHeaderSize: 64 * 1024 }, getRequestListener(app
 const { db, pool, connectionString } = createPostgresDatabaseConnection(env.DATABASE_URL);
 
 const backend = await createRebaseBackend({
-    collectionsDir: path.join(root, "config/collections"),
+    schemaDir: path.join(root, "backend/schema"),
+    hooks,
     functionsDir: path.join(root, "backend/functions"),
     cronsDir: existsSync(cronsDir) ? cronsDir : undefined,
     database: createPostgresAdapter(postgresDriverConfigFromEnv({ connection: db, connectionString })),
     auth: {
-        collection: usersCollection,
         jwtSecret: env.JWT_SECRET,
         serviceKey: env.REBASE_SERVICE_KEY,
         allowRegistration: env.ALLOW_REGISTRATION,
@@ -188,107 +203,126 @@ installShutdownHandlers(
 );
 ```
 
-Die Pfade sind die des Scaffolds. Die Datei verlässt sich auf das, was `rebase dev`
-setzt: den gewählten Port in `PORT`, die verwaltete Datenbank in `DATABASE_URL` und die
-`.env` des Projekts in `DOTENV_CONFIG_PATH`. `loadEnv()` validiert, was darin steht, und
-erzeugt in der Entwicklung `JWT_SECRET`, wenn es nicht gesetzt ist. Lauschen Sie auf
-einem anderen Port, erreicht das Admin-Panel den Server nicht; überspringen Sie
-`loadEnv()`, ist ohne `JWT_SECRET` die Anmeldung aus.
-`rebase dev` wartet außerdem auf die Zeile `Server running at http://localhost:<port>`,
-bevor es das Backend als gestartet meldet. Die `auth`-Optionen sind die des Scaffolds;
-die Runtime liest zusätzlich die OAuth-Provider, E-Mail und die übrigen `AUTH_*`-Variablen,
-geben Sie also die an, die Sie nutzen, wie [Authentifizierung](/docs/backend/authentication/)
-es beschreibt. Ebenso liefert die Datei das gebaute Admin-Panel in Produktion nicht aus:
-Der Entrypoint, den [`rebase eject`](/docs/cli/) schreibt, tut das mit `serveSPA` und
-öffnet eine Verbindung je Datenbank, die in `config/resources.ts` deklariert ist.
+Die Pfade stammen aus dem Scaffold; lassen Sie den `hooks`-Import und die
+entsprechende Option weg, wenn das Projekt keine `backend/hooks.ts` hat. Benutzer
+werden in der Tabelle gespeichert, die `backend/schema` mit `defineAuthTable`
+deklariert, weshalb `auth` keine Tabelle benennt. Die Datei verlässt sich auf
+das, was `rebase dev` setzt: den ausgewählten Port in `PORT`, die verwaltete
+Datenbank in `DATABASE_URL` und die `.env` des Projekts in `DOTENV_CONFIG_PATH`.
+`loadEnv()` validiert diesen Inhalt und generiert `JWT_SECRET` in der
+Entwicklung, wenn es nicht gesetzt ist. Wenn Sie auf einem anderen Port lauschen,
+kann das Admin-Panel den Server nicht erreichen; überspringen Sie `loadEnv()`,
+ist ohne `JWT_SECRET` die Anmeldung deaktiviert. `rebase dev` wartet zudem auf
+die Zeile `Server running at http://localhost:<port>`, bevor es meldet, dass das
+Backend betriebsbereit ist. Die `auth`-Optionen stammen aus dem Scaffold; die
+Runtime liest auch die OAuth-Provider, E-Mail und die weiteren `AUTH_*`-Variablen
+ein – übergeben Sie also diejenigen, die Sie verwenden, wie unter
+[Authentifizierung](/docs/backend/authentication/) beschrieben. Die Datei
+liefert in der Produktion auch nicht das kompilierte Admin-Panel aus: Der
+Einstiegspunkt, den [`rebase eject`](/docs/cli/) schreibt, tut dies mit
+`serveSPA` und öffnet eine Verbindung pro in `backend/resources.ts`
+deklarierter Datenbank.
 
-`createRebaseBackend` nimmt dieselben Optionen wie `initializeRebaseBackend`, ohne
-`app`, `server` und `basePath` und mit verpflichtendem `provision`. Es baut alles:
-Es öffnet die Datenbank, richtet Auth und Storage ein, lädt die Funktionen und
-Cron-Jobs und baut jede Routengruppe sowie den In-Process-Client. Es bindet nichts
-ein, startet keinen Timer und fügt keinen Prozess-Listener hinzu. Jedes Weitere ist
-ein Aufruf, den Sie machen oder weglassen:
+`createRebaseBackend` akzeptiert dieselben Optionen wie
+`initializeRebaseBackend`, jedoch ohne `app`, `server` und `basePath`, und
+erfordert `provision`. Es baut alles auf: Es öffnet die Datenbank, richtet
+Authentifizierung und Storage ein, lädt die Funktionen und Cronjobs und
+erstellt jede Routengruppe sowie den prozessinternen Client. Es bindet nichts
+ein (mount), startet keine Timer und fügt keine Prozess-Listener hinzu. Jeder
+weitere Schritt ist ein Aufruf, den Sie selbst ausführen oder weglassen:
 
-| Aufruf | Was er tut | Lassen Sie ihn weg, und |
+| Aufruf | Funktion | Weglassen bedeutet |
 |---|---|---|
-| `installUnhandledRejectionHandler()` | Protokolliert eine Promise-Rejection, die niemand behandelt hat, etwa ein Fire-and-forget-Aufruf in einer benutzerdefinierten Funktion, statt Node den Prozess beenden zu lassen. Prozessweit, daher ist es die Entscheidung des Prozesses, nicht eines Backends. Gibt eine Funktion zurück, die ihn wieder deinstalliert, oder `undefined`, wenn bereits einer installiert war oder `REBASE_EXIT_ON_UNHANDLED_REJECTION` gesetzt ist. | beendet eine unbehandelte Rejection den Prozess, Nodes Standard |
-| `setDefaultBackend(backend)` | Macht dieses Backend zum [Prozess-Standard](#mehrere-backends-in-einem-prozess): dem Backend, für das `import { rebase }` und der Rest der API auf Modulebene antworten, wenn sie außerhalb der Requests, Cron-Läufe und Jobs aufgerufen werden, die ein Backend bedient | diese API hat dort kein Backend, für das sie antworten könnte |
-| `backend.mount(app, { basePath })` | Jede Routengruppe unter `basePath` (Standard `/api`), hinter der prozessweiten Middleware: Request-IDs, das Body-Limit, Komprimierung, CSRF, das Request-Log und der JSON-Envelope für Fehler und unbekannte Pfade. Dazu das JWKS-Dokument, der MCP-Server, die OpenAPI-Docs und die alten Routen-Aliasse. | nichts wird über HTTP ausgeliefert; `backend.rebase` und `backend.fetch` funktionieren weiterhin |
-| `backend.attachRealtime(server, { path })` | Der Realtime-Socket auf `server`, der Upgrades nur auf `path` beantwortet | es gibt keine Live-Abfragen |
-| `backend.start()` | Der Cron-Scheduler, die Job-Worker, die Bereinigungsläufe für abgelaufene Tokens und die History-Aufbewahrung, der Metrik-Sampler und das geplante RLS-Audit, jeweils dort, wo `ownership` sie diesem Prozess zuweist. Kann gefahrlos zweimal aufgerufen werden. | keines davon läuft, was ein Prozess, der Requests bedient, in einem [getrennten Deployment](/docs/deployment/split-processes/) auch will |
-| `backend.shutdown(timeoutMs, { server })` | Stoppt, was `start()` und `attachRealtime()` gestartet haben, und wartet auf laufende Cron-Läufe und Jobs. Schließt `server` nur, wenn Sie ihn übergeben. | |
+| `installUnhandledRejectionHandler()` | Protokolliert eine unbehandelte Promise-Rejection (wie einen Fire-and-Forget-Aufruf in einer benutzerdefinierten Funktion), anstatt Node den Prozess beenden zu lassen. Prozessweit, daher ist dies die Entscheidung des Prozesses, nicht eines Backends. Gibt eine Funktion zurück, die den Handler deinstalliert, oder `undefined`, wenn bereits einer installiert war oder `REBASE_EXIT_ON_UNHANDLED_REJECTION` gesetzt ist. | Eine unbehandelte Rejection beendet den Prozess (Standardverhalten von Node) |
+| `setDefaultBackend(backend)` | Macht dieses Backend zum [Prozess-Standard](#mehrere-backends-in-einem-prozess): worauf `import { rebase }` und der Rest der modulweiten API außerhalb der von einem Backend bedienten Anfragen, Cron-Ausführungen und Jobs antworten | Diese API hat dort kein Backend, auf das sie zugreifen kann |
+| `backend.mount(app, { basePath })` | Alle Routengruppen unter `basePath` (Standard `/api`), hinter den prozessweiten Middlewares: Request-IDs, Body-Limit, Komprimierung, CSRF, Request-Log und die JSON-Hülle für Fehler und unbekannte Pfade. Außerdem das JWKS-Dokument, der MCP-Server, die OpenAPI-Dokumentation und die Legacy-Routen-Aliase. | Nichts wird über HTTP bereitgestellt; `backend.rebase` und `backend.fetch` funktionieren weiterhin |
+| `backend.attachRealtime(server, { path })` | Der Realtime-Socket auf `server`, der Upgrades nur unter `path` entgegennimmt | Es gibt keine Live-Queries |
+| `backend.start()` | Der Cron-Scheduler, die Job-Worker, die Bereinigung abgelaufener Tokens und des Verlaufs (History-Retention), der Metrik-Sampler und das geplante RLS-Audit – jeweils dort, wo `ownership` dies diesem Prozess zuweist. Sicher für mehrfache Aufrufe. | Nichts davon läuft, was genau dem entspricht, was ein anfrageverarbeitender Prozess in einem [Split Deployment](/docs/deployment/split-processes/) benötigt |
+| `backend.shutdown(timeoutMs, { server })` | Stoppt, was `start()` und `attachRealtime()` gestartet haben, und wartet auf laufende Cronjobs und Jobs. Schließt `server` nur, wenn Sie ihn übergeben. | |
 
-Der Standard-`path` des Sockets ist der Basispfad, der an `mount()` übergeben wurde,
-ohne ein abschließendes `/api`, sodass `/api` zu `/` und `/x/api` zu `/x` wird; ein Basispfad, der nicht auf `/api` endet, ergibt `/`. Dort
-wählt sich das SDK ein, denn es verbindet sich mit seiner `baseUrl`, während seine
-HTTP-Requests an `${baseUrl}/api` gehen. Ein Upgrade auf jeden anderen Pfad bleibt den
-übrigen `upgrade`-Listenern des Servers überlassen, sodass Ihre App auf demselben
-`http.Server` einen eigenen WebSocket-Server betreiben kann.
+Der Standard-`path` des Sockets ist der an `mount()` übergebene Basispfad ohne
+das abschließende `/api`, sodass `/api` zu `/` wird und `/x/api` zu `/x`; ein
+Basispfad, der nicht auf `/api` endet, ergibt `/`. Genau dorthin verbindet sich
+das SDK, da es sich mit seiner `baseUrl` verbindet, während seine HTTP-Anfragen an
+`${baseUrl}/api` gehen. Ein Upgrade auf einen beliebigen anderen Pfad wird den
+anderen `upgrade`-Listenern des Servers überlassen, sodass Ihre App ihren eigenen
+WebSocket-Server auf demselben `http.Server` betreiben kann.
 
-### Was das Erstellen eines Backends verändern darf: `provision`
+### Was das Erstellen eines Backends ändern kann: `provision`
 
-Das Erstellen eines Backends kann DDL ausführen, daher verlangt `createRebaseBackend`
-von Ihnen eine Entscheidung:
+Das Erstellen eines Backends kann DDL ausführen, daher verlangt `createRebaseBackend` eine Entscheidung von Ihnen:
 
-| `provision` | Legt an | Für |
+| `provision` | Erstellt | Geeignet für |
 |---|---|---|
-| `true` | Alles, was das Backend ausliefert: die Collection-Tabellen und ihre RLS-Policies, die Änderungserfassung für Realtime, die Rolle, als die Requests laufen, und die eigenen Tabellen des Frameworks (API-Schlüssel, Cron-Läufe, Jobs, Metriken). | ein Deployment mit einem einzigen Prozess; das, was `initializeRebaseBackend` übergibt |
-| `false` | Nichts, weder beim Booten noch später: Auch die Tabellen, die andere Backends bei der ersten Nutzung anlegen (Idempotenzschlüssel, Cron-Claims), werden nicht angelegt. Das Schema muss bereits vorhanden sein, angewendet durch `rebase db push`, eine Migration oder einen anderen Prozess. Fehlende Auth-Tabellen verweigern den Start; eine fehlende optionale Tabelle schaltet ihre Funktion ab und wird im Log genannt. | ein Skript, ein Test, eine REPL, ein Prozess, der nur liest, eine Datenbank, die nur Ihr Änderungsprozess ändern darf |
-| `{ collections: false, realtime: false }` | Die Tabellen des Frameworks und die Rolle, aber weder das Collection-Schema noch die Änderungserfassung. | ein Prozess, der in einem getrennten Deployment das Schema nicht besitzt |
+| `true` | Alles, was das Backend bereitstellt: die deklarierten Tabellen und deren RLS-Richtlinien, Change Capture für Realtime, die Rolle, unter der Anfragen ausgeführt werden, und die framework-eigenen Tabellen (API-Keys, Cron-Ausführungen, Jobs, Metriken). | Ein Single-Process-Deployment; das, was `initializeRebaseBackend` übergibt |
+| `false` | Nichts, weder beim Booten noch später: Tabellen, die andere Backends bei der ersten Verwendung erstellen (Idempotenzschlüssel, Cron-Claims), werden ebenfalls nicht erstellt. Das Schema muss bereits vorhanden sein – angewendet durch `rebase db push`, eine Migration oder einen anderen Prozess. Fehlende Auth-Tabellen führen zu einem Fehler beim Booten; eine fehlende optionale Tabelle deaktiviert die entsprechende Funktion, was im Log vermerkt wird. | Ein Skript, einen Test, eine REPL, einen rein lesenden Prozess oder eine Datenbank, die nur durch Ihren Änderungsprozess modifiziert werden darf |
+| `{ collections: false, realtime: false }` | Die Tabellen des Frameworks und die Rolle, jedoch nicht das Schema der deklarierten Tabellen oder Change Capture. Der Schlüssel behält seinen alten Namen. | Einen Prozess, der in einem Split Deployment nicht für das Schema zuständig ist |
 
-Es ist mit Absicht eine Option und kein späterer Schritt. Der Treiber liest die
-Tabellen beim Öffnen und hängt die Änderungserfassung an die an, die dann existieren.
-Ein danach aufgerufenes `provision()` würde laufen, nachdem der Treiber bereits
-entschieden hätte, was existiert. `REBASE_MIGRATE_ON_BOOT=none` schaltet das
-Collection-Schema weiterhin für jedes Backend im Prozess ab. `initializeRebaseBackend` übergibt `false`, wenn `REBASE_PROVISION=false` gesetzt ist.
+Dass dies eine Option und kein späterer Schritt ist, ist Absicht. Der Treiber
+liest die Tabellen beim Öffnen ein und hängt Change Capture an diejenigen an, die
+zu diesem Zeitpunkt existieren. Ein nachträglich aufgerufenes `provision()` würde
+erst laufen, nachdem der Treiber bereits entschieden hat, was existiert.
+`REBASE_MIGRATE_ON_BOOT=none` deaktiviert das Tabellenschema weiterhin für jedes
+Backend im Prozess. `initializeRebaseBackend` übergibt `false`, wenn
+`REBASE_PROVISION=false` gesetzt ist.
 
 ## Nur die gewünschten Gruppen einbinden
 
-`backend.routes` enthält die Routengruppen. Jede ist eine Hono-Sub-App, die Sie für
-sich allein unter jedem Pfad einbinden können:
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+`backend.routes` enthält die Routengruppen. Jede davon ist eine Hono-Sub-App,
+die Sie separat unter einem beliebigen Pfad einbinden können:
 
 ```typescript
 import { Hono } from "hono";
 import { createRebaseBackend, type HonoEnv } from "@rebasepro/server";
 
 const app = new Hono<HonoEnv>();
-const backend = await createRebaseBackend({ database: adapter, auth, collections, functions, provision: true });
+const backend = await createRebaseBackend({ database: adapter, auth, tables, defaultRls, functions, provision: true });
 
 app.route("/v2/data", backend.routes.data());      // the data API, at a path of your own
 app.route("/hooks", backend.routes.functions());   // getUser(c) and getDriver(c) work inside
 ```
 
-`collections` ist das Array, das die `config/collections/index.ts` eines Scaffolds exportiert. Es trägt die `defaultSecurityRules` dieses Index, wie `collectionsDir` es tut, sodass das Backend die Policies anlegt, die `rebase db push` anlegen würde. Ein eigenes Array trägt nur die Regeln, die seine Collections deklarieren, und `provision: true` macht eine Collection, die keine deklariert, nur für Admins zugänglich und verwirft die Policies, die Rebase zuvor für sie generiert hat, auf jedem Server, der die Datenbank teilt.
+`tables` ist eine Liste von Ergebnissen aus `defineTable`, `defineAuthTable` und `defineView` – typischerweise alles, was `backend/schema/index.ts` exportiert – und `defaultRls` ist das, was dessen Tabellen mit `rls: "inherit"` übernehmen, also das `defaultRls`, das dieser Index exportiert. Jede Tabelle wird beim Erstellen des Backends kompiliert, und ein Problem in einer davon (kein `rls`, `"inherit"` ohne `defaultRls`, eine Relation zu einer Tabelle, die nicht in der Liste enthalten ist) lehnt die Erstellung mit einem `SchemaDefinitionError` ab, der alle Fehler benennt. Übergeben Sie stattdessen `schemaDir`, um das Verzeichnis so zu laden, wie es die Runtime tut (inklusive Index-Exporten und `defaultRls`); übergeben Sie beides, wird `tables` bereitgestellt, während der Schema-Editor in `schemaDir` schreibt.
 
-Der Index des Scaffolds wendet die Standards auf sein Array an. Kopieren Sie in einem unter 0.24 erstellten Projekt diese Schleife aus der `config/collections/index.ts` eines neuen Scaffolds, oder übergeben Sie `collectionsDir`.
+```typescript no-verify
+import * as schema from "../schema";
 
-| Gruppe | Normalerweise unter | Liefert |
+const tables = [schema.users, schema.posts];
+const defaultRls = schema.defaultRls;
+```
+
+| Gruppe | Standardmäßig unter | Stellt bereit |
 |---|---|---|
-| `routes.auth()` | `/api/auth` | Anmeldung, Sitzungen, OAuth, Passwort-Reset, `GET /config`, die eigenen API-Schlüssel des Aufrufers und den Scope-Katalog |
-| `routes.data()` | `/api/data` | die REST-Routen der Collections und ihre History |
-| `routes.storage()` | `/api/storage` | den Dateispeicher oder den Router, der `STORAGE_NOT_CONFIGURED` beantwortet |
-| `routes.functions()` | `/api/functions` | Ihre [benutzerdefinierten Funktionen](/docs/backend/custom-functions/) oder den Weiterleiter an den Prozess, der sie ausliefert |
-| `routes.admin()` | `/api/admin` | Benutzer und Rollen, Service-Schlüssel, Schema-Bearbeitung, Storage-Wartung, Backups, das RLS-Audit, den SQL-Export, das Entwicklungs-Postfach und die Logs |
-| `routes.cron()` | `/api/admin/cron` | die Cron-Admin-Oberfläche |
-| `routes.meta()` | `/api/meta` | den Projektvertrag, den ein generiertes SDK liest |
+| `routes.auth()` | `/api/auth` | Anmeldung, Sitzungen, OAuth, Passwort-Reset, `GET /config`, die eigenen API-Keys des Aufrufers und den Scope-Katalog |
+| `routes.data()` | `/api/data` | Die REST-Routen der Tabellen und deren Verlauf |
+| `routes.storage()` | `/api/storage` | Dateispeicher oder den Router, der mit `STORAGE_NOT_CONFIGURED` antwortet |
+| `routes.functions()` | `/api/functions` | Ihre [benutzerdefinierten Funktionen](/docs/backend/custom-functions/) oder den Forwarder zu dem Prozess, der sie ausführt |
+| `routes.admin()` | `/api/admin` | Benutzer und Rollen, Service-Keys, Schemabearbeitung, Storage-Wartung, Backups, das RLS-Audit, SQL-Export, das Entwicklungs-Postfach und die Logs |
+| `routes.cron()` | `/api/admin/cron` | Die Cron-Admin-Oberfläche |
+| `routes.meta()` | `/api/meta` | Den Projektvertrag, den ein generiertes SDK liest |
+| `routes.schema()` | `/api/schema` | `GET /tables`: die Tabellendeskriptoren, anhand derer das CMS und das Studio rendern – siehe [Endpunkte](/docs/backend/endpoints/#schema) |
 
-Jede Gruppe bringt die Middleware mit, die sie braucht: den Auth-Kontext, der `user`,
-`driver` und `scopes` des Aufrufers an den Request hängt, ihre Rate-Limits und ihr
-Admin-Gate. Daher antwortet sie überall gleich, wo sie eingebunden ist, auch unter
-einem parametrisierten Pfad wie `/:tenant/data`. Eine Gruppe liest außerdem, wo sie
-eingebunden wurde, sodass die Daten-API weiterhin jede Collection ihrer Datenquelle
-zuordnet und die Funktionsliste die Pfade nennt, unter denen sie tatsächlich
-ausgeliefert wird.
+Jede Gruppe bringt die Middleware mit, die sie benötigt: den
+Authentifizierungskontext, der `user`, `driver` und `scopes` des Aufrufers an
+den Request anhängt, ihre Rate-Limits und ihre Admin-Zugangskontrolle (Admin
+Gate). Sie verhält sich also überall gleich, egal wo sie eingebunden wird – auch
+unter einem parametrisierten Pfad wie `/:tenant/data`. Eine Gruppe erkennt auch,
+wo sie eingebunden wurde, sodass die Daten-API weiterhin jede Tabelle an ihre
+Datenbank weiterleitet und die Funktionsauflistung die tatsächlichen Pfade nennt,
+unter denen sie bereitgestellt wird.
 
-Eine Gruppe verweigert außerdem `x-rebase-impersonate` und `x-rebase-simulate-*` selbst
-(`400 IMPERSONATION_UNSUPPORTED` / `SIMULATION_UNSUPPORTED`), es sei denn, es ist die
-Daten- oder Funktionsgruppe, die sie berücksichtigen. `refuseUnhonouredImpersonation(honouredMounts)`
-aus `@rebasepro/server` leistet dasselbe für Routen Ihrer eigenen.
+Eine Gruppe verweigert `x-rebase-impersonate` und `x-rebase-simulate-*` zudem
+selbst (`400 IMPERSONATION_UNSUPPORTED` / `SIMULATION_UNSUPPORTED`), es sei
+denn, es handelt sich um die Daten- oder Funktionsgruppe, welche diese
+berücksichtigen. `refuseUnhonouredImpersonation(honouredMounts)` aus
+`@rebasepro/server` tut dasselbe für Ihre eigenen Routen.
 
-Was eine Gruppe nicht mitbringt, ist die prozessweite Middleware, die `mount()` vor
-alles setzt. Wenn Sie Gruppen einzeln einbinden, fügen Sie davon selbst hinzu, was Sie
-möchten: ein Body-Limit (`bodyLimit` aus `hono/body-limit`), Komprimierung und den
-JSON-Fehler-Envelope:
+Was eine Gruppe nicht mitbringt, ist die prozessweite Middleware, die `mount()`
+allem voranstellt. Wenn Sie Gruppen einzeln einbinden, fügen Sie die
+gewünschten Teile selbst hinzu: ein Body-Limit (`bodyLimit` aus
+`hono/body-limit`), Komprimierung und die JSON-Fehlerhülle:
 
 ```typescript
 import { errorHandler } from "@rebasepro/server";
@@ -296,21 +330,17 @@ import { errorHandler } from "@rebasepro/server";
 app.onError(errorHandler);
 ```
 
-Jeder Aufruf gibt einen frischen Router über denselben Handlern zurück, sodass Sie eine
-Gruppe an zwei Stellen einbinden können. Wer eine Gruppe anfordert, deren Oberfläche bei
-der Erstellung dieses Backends abgeschaltet wurde (`surfaces: { data: false }`), erhält
-einen Fehler, weil das Backend sie nie gebaut hat. Die OpenAPI-Docs und der MCP-Server
-haben keine Gruppe: Sie beschreiben die URLs des `mount()`-Layouts, daher liefert nur
-`mount()` sie aus.
+Jeder Aufruf gibt einen neuen Router über denselben Handlern zurück, sodass Sie eine Gruppe an zwei Stellen einbinden können. Das Anfordern einer Gruppe, ohne deren Oberfläche dieses Backend erstellt wurde (`surfaces: { data: false }`), löst einen Fehler aus, da das Backend sie nie erstellt hat. Die OpenAPI-Dokumentation und der MCP-Server haben keine eigene Gruppe: Sie beschreiben die URLs des `mount()`-Layouts, daher werden sie nur von `mount()` bereitgestellt.
 
 ## Das Backend ohne Server
 
-Ein gebautes Backend lässt sich nutzen, ohne etwas einzubinden. `backend.rebase` ist
-sein In-Process-Client, und `backend.fetch(request)` beantwortet einen `Request`, wie es
-`mount()` unter `/api` täte:
+Ein erstelltes Backend kann verwendet werden, ohne dass etwas eingebunden werden
+muss. `backend.rebase` ist sein prozessinterner Client, und
+`backend.fetch(request)` beantwortet einen `Request` so, wie `mount()` es unter
+`/api` tun würde:
 
 ```typescript
-const backend = await createRebaseBackend({ database: adapter, collections, provision: false });
+const backend = await createRebaseBackend({ database: adapter, schemaDir, provision: false });
 
 const { data } = await backend.rebase.dataAsAdmin.posts.find({ limit: 5 });
 const res = await backend.fetch(new Request("http://local/api/meta/schema-version"));
@@ -318,73 +348,78 @@ const res = await backend.fetch(new Request("http://local/api/meta/schema-versio
 await backend.shutdown();
 ```
 
-Die Control-Plane-Aufrufe auf diesem Client (`rebase.auth`, `rebase.admin`,
-`rebase.functions` und `rebase.cron`) erreichen die eigenen Routen des Backends
-In-Process. Sie funktionieren unabhängig davon, wo oder ob Sie die Gruppen eingebunden haben, und
-Middleware, die Sie Ihrer eigenen App hinzugefügt haben, läuft dafür nicht.
+Die Control-Plane-Aufrufe dieses Clients (`rebase.auth`, `rebase.admin`,
+`rebase.functions` und `rebase.cron`) erreichen die backend-eigenen Routen
+prozessintern. Sie funktionieren unabhängig davon, wo oder ob Sie die Gruppen
+eingebunden haben, und Middlewares, die Sie Ihrer eigenen App hinzugefügt haben,
+werden für sie nicht ausgeführt.
 
-Für ein Skript, das nur die Daten braucht, öffnet [`openRebase`](/docs/backend/scripts/)
-die Datenbank, ohne überhaupt ein Backend zu bauen.
+Für ein Skript, das lediglich die Daten benötigt, öffnet
+[`openRebase`](/docs/backend/scripts/) die Datenbank, ohne überhaupt ein Backend
+aufzubauen.
 
 ## Mehrere Backends in einem Prozess
 
-`createRebaseBackend` schreibt kein Prozess-Global. Jedes Backend hält seinen eigenen
-Zustand in `backend.services`, sodass zwei davon in einem Prozess zwei bleiben: Jedes
-signiert und verifiziert Sitzungen mit seinen eigenen Schlüsseln, beurteilt Scopes nach
-seinen eigenen Rollen, prüft API-Schlüssel in seinem eigenen Speicher und zählt
-Rate-Limits in seinem eigenen Speicher.
+`createRebaseBackend` schreibt keine prozessweiten globalen Variablen. Jedes
+Backend hält seinen eigenen Zustand in `backend.services`, sodass zwei davon in
+einem Prozess getrennt bleiben: Jedes signiert und verifiziert Sitzungen mit
+eigenen Schlüsseln, bewertet Scopes anhand eigener Rollen, prüft API-Keys im
+eigenen Store und zählt Rate-Limits im eigenen Store.
 
 ```typescript
-const a = await createRebaseBackend({ database: adapterA, auth: { jwtSecret: SECRET_A }, collections, provision: true });
-const b = await createRebaseBackend({ database: adapterB, auth: { jwtSecret: SECRET_B }, collections, provision: true });
+const a = await createRebaseBackend({ database: adapterA, auth: { jwtSecret: SECRET_A }, tables, provision: true });
+const b = await createRebaseBackend({ database: adapterB, auth: { jwtSecret: SECRET_B }, tables, provision: true });
 
 app.route("/a/data", a.routes.data());
 app.route("/b/data", b.routes.data());   // a session from `a` is a 401 here
 ```
 
-| `backend.services` | Was es ist |
+| `backend.services` | Beschreibung |
 |---|---|
-| `jwt` | Der JWT-Dienst des Backends: signiert und verifiziert Sitzungen, Download-Links und seine übrigen Tokens und liefert sein JWKS aus |
-| `access` | Sein Zugriffsmodell (Rollen zu Scopes) und der Resolver für den Besitzer eines persönlichen Schlüssels |
-| `apiKeyStore` | Wo seine API-Schlüssel geprüft werden |
+| `jwt` | Der JWT-Dienst des Backends: signiert und verifiziert Sitzungen, Download-Links und andere Tokens und stellt sein JWKS bereit |
+| `access` | Sein Zugriffsmodell (Rollen zu Scopes) und der Resolver für den Eigentümer eines persönlichen Schlüssels |
+| `apiKeyStore` | Wo dessen API-Keys geprüft werden |
 | `rateLimitStore`, `authLimiters` | Seine Rate-Limit-Zähler und die Limiter auf seinen Auth-Routen |
-| `collections()` | Die Collections, die es ausliefert |
+| `tables()` | Die kompilierten Deskriptoren der Tabellen, die es bereitstellt |
 | `topics`, `queues` | Seine Topic- und Queue-Runtimes |
 
-Ein Backend ohne `auth.jwtSecret`, etwa eines, dessen `auth` ein Adapter ist, signiert
-nichts selbst, daher folgt sein `services.jwt` dem Prozess-Standard.
+Ein Backend, dem kein `auth.jwtSecret` übergeben wurde (wie eines, dessen `auth`
+ein Adapter ist), signiert selbst nichts, sodass dessen `services.jwt` dem
+Prozess-Standard folgt.
 
-**Ressourcen gehören dem Prozess.** Die Deklarationen `database()`, `bucket()`, `topic()` und
-`queue()` in `config/resources.ts` sind Werte auf Modulebene, und
-jedes Backend im Prozess liest alle davon: Ein Backend, dessen eigenes Projekt
-kein Topic deklariert, schaltet seine Job-Queue dennoch für das Topic eines anderen Projekts ein
-und verweigert den Start, wenn sein Treiber keines tragen kann. Betreiben Sie die
-Ressourcen eines Projekts pro Prozess. Mehrere Backends dieses einen Projekts, jedes auf seiner eigenen
-Datenbank, sind in Ordnung.
+**Ressourcen gehören dem Prozess.** Die Deklarationen von `database()`,
+`bucket()`, `topic()` und `queue()` in `backend/resources.ts` sind Werte auf
+Modulebene, und jedes Backend im Prozess liest alle davon: Ein Backend, dessen
+eigenes Projekt kein Topic deklariert, aktiviert dennoch seine Job-Queue für das
+Topic eines anderen Projekts und verweigert den Start, wenn sein Treiber keines
+unterstützen kann. Führen Sie die Ressourcen eines Projekts pro Prozess aus.
+Mehrere Backends desselben Projekts, jeweils auf einer eigenen Datenbank, sind
+problemlos möglich.
 
-**Wohin `rebase` geht.** Innerhalb eines Requests, eines Cron-Laufs oder eines Jobs, den
-ein Backend bedient, ist `rebase`, ob aus `@rebasepro/server` importiert oder als
-`ctx.rebase` erhalten, dieses Backend, und ebenso das `publish` eines Topics und das
-`enqueue` einer Queue. Überall sonst (Modulebene, ein Skript, ein Test) antworten sie für
-den **Prozess-Standard**, den `setDefaultBackend(backend)` setzt und den
-`initializeRebaseBackend` auf sein eigenes Backend setzt. Dasselbe gilt für den Rest der
-API auf Modulebene: `verifyAccessToken` und die übrigen JWT-Helfer, `getAccessModel`,
+**Wohin `rebase` verweist.** Innerhalb einer Anfrage, einer Cron-Ausführung oder
+eines Jobs, den ein Backend bedient, ist `rebase` – egal ob aus
+`@rebasepro/server` importiert oder als `ctx.rebase` erhalten – dieses Backend,
+und dasselbe gilt für Topic-`publish` und Queue-`enqueue`. Überall sonst
+(Modul-Scope, ein Skript, ein Test) verweisen sie auf den **Prozess-Standard**,
+den `setDefaultBackend(backend)` festlegt und den `initializeRebaseBackend` auf
+sein eigenes Backend setzt. Das Gleiche gilt für den Rest der modulweiten API:
+`verifyAccessToken` und die anderen JWT-Helfer, `getAccessModel`,
 `verifyCredential` und `extractUserFromToken`.
 
-Drei Bausteine arbeiten direkt auf einem Backend, und einer auf gar keinem:
+Drei Komponenten arbeiten direkt mit einem Backend, und eine ganz ohne Backend:
 
 ```typescript
 import { createJwtService, requireAuth, requireScope } from "@rebasepro/server";
 
 // Mint a session for one of this backend's users, in a test or a login of your
-// own. `userId` is the user's id in the users collection.
+// own. `userId` is the user's id in the auth table.
 const token = await backend.services.jwt.generateAccessToken(userId, ["editor"]);
 
 // Check a session token, an rk_ API key or the service key for a socket or a tunnel of your
 // own, as this backend's routes judge it: its uid, roles, scopes and kind, or null.
 const caller = await backend.verifyCredential(token);
 
-// A route of your own, outside the groups, judged by this backend. The users collection
+// A route of your own, outside the groups, judged by this backend. The auth table
 // declares the app scope: auth: { scopes: { "project:deploy": { label: "Deploy projects" } } }.
 app.post("/deploy", (c, next) => { c.set("services", backend.services); return next(); },
     requireAuth, requireScope("project:deploy"), (c) => c.json({ ok: true }));
@@ -394,52 +429,68 @@ const jwt = createJwtService({ secret: process.env.JWT_SECRET!, accessExpiresIn:
 const payload = await jwt.verifyAccessToken(token);
 ```
 
-Eine erzeugte Sitzung wird bei jeder Anfrage wie jede andere geprüft, daher muss ihre
-uid ein vorhandener Benutzer sein: Bei einer uid ohne Benutzer wird die Anfrage verweigert.
+Eine generierte Sitzung wird bei jeder Anfrage wie jede andere geprüft, daher
+muss ihre UID zu einem existierenden Benutzer gehören: Bei einer UID ohne
+Benutzer wird die Anfrage abgelehnt.
 
-`verifyCredential` kommt zum selben Urteil wie die Routen: Eine Sitzung, von der sich ihr Eigentümer abgemeldet hat, eine uid ohne Benutzer und ein deaktiviertes Konto ergeben null, und die Rollen sind die, die das Konto jetzt hält. Es wirft, wenn die Datenbank nicht erreichbar ist.
+`verifyCredential` kommt zum selben Ergebnis wie die Routen: Eine Sitzung, von
+der sich der Eigentümer abgemeldet hat, eine UID ohne Benutzer und ein
+deaktiviertes Konto geben `null` zurück, und die Rollen entsprechen dem
+aktuellen Stand des Kontos. Es wird ein Fehler geworfen, wenn die Datenbank nicht
+erreichbar ist.
 
-Jede Routengruppe setzt `c.var.services` selbst. Eine Route außerhalb der Gruppen, die
-`requireAuth`, `requireScope` oder einen anderen Guard aus `@rebasepro/server` verwendet,
-liest es dort und fällt auf den Prozess-Standard zurück, wenn es nicht gesetzt ist.
-`requireScope` beurteilt den Aufrufer, den `requireAuth` identifiziert hat, und steht
-deshalb hinter `requireAuth`: Allein verweigert es jede Anfrage mit einem 401. Es nimmt
-einen integrierten Scope oder einen App-Scope, den das Backend unter `auth.scopes` in seiner
-Users-Collection deklariert, wie im Kommentar oben.
+Jede Routengruppe setzt `c.var.services` selbst. Eine Route außerhalb der
+Gruppen, die `requireAuth`, `requireScope` oder einen anderen Guard aus
+`@rebasepro/server` verwendet, liest es dort aus und fällt auf den
+Prozess-Standard zurück, wenn es nicht gesetzt ist. `requireScope` beurteilt den
+von `requireAuth` identifizierten Aufrufer und muss daher nach `requireAuth`
+stehen: Für sich allein lehnt es jede Anfrage mit 401 ab. Es akzeptiert einen
+integrierten Scope oder einen App-Scope, den das Backend unter `auth.scopes` in
+seiner Auth-Tabelle deklariert, wie im obigen Kommentar gezeigt.
 
-Ein Name, der kein Scope ist, oder ein falsch geschriebener integrierter wie `data:raed` wirft dort, wo die Route registriert wird. Ein App-Scope, den das antwortende Backend nicht deklariert, beantwortet jeden Aufrufer, auch einen Administrator, mit `500 SCOPE_NOT_DECLARED`.
+Ein Name, der kein Scope ist, oder ein falsch geschriebener integrierter Scope
+wie `data:raed` löst an der Stelle einen Fehler aus, an der die Route registriert
+wird. Bei einem App-Scope, den das antwortende Backend nicht deklariert, erhält
+jeder Aufrufer – auch ein Administrator – ein `500 SCOPE_NOT_DECLARED`.
 
 ## Herunterfahren
 
-Übergeben Sie bei `initializeRebaseBackend` das Backend an den integrierten Helper,
-statt einen Signal-Handler von Hand zu schreiben. Er schließt HTTP-Verbindungen
-ordnungsgemäß ab, stoppt den Cron-Scheduler, beendet Realtime-Dienste, schließt den
-SMTP-Connection-Pool, sobald nichts mehr senden kann, schützt vor wiederholten Signalen
-und erzwingt das Beenden, falls der Shutdown hängen bleibt:
+Übergeben Sie bei `initializeRebaseBackend` das Backend an den integrierten
+Helfer, anstatt einen eigenen Signal-Handler zu schreiben. Er leert laufende
+HTTP-Verbindungen (Drain), stoppt den Cron-Scheduler, baut Realtime ab, schließt
+den SMTP-Pool, sobald nichts mehr gesendet werden kann, schützt vor wiederholten
+Signalen und erzwingt das Beenden, falls das Herunterfahren hängt:
 
 ```typescript
 import { initializeRebaseBackend, installShutdownHandlers } from "@rebasepro/server";
 
-const backend = await initializeRebaseBackend({ app, server, database: adapter, collections });
+const backend = await initializeRebaseBackend({ app, server, database: adapter, tables });
 installShutdownHandlers(backend, { onCleanup: () => pool.end() });
 ```
 
-Kombinieren Sie ihn **nicht** mit Ihrem eigenen `server.close()`: Das `shutdown()` dieses
-Backends schließt den Server, der ihm übergeben wurde, bereits, und ein zweiter
-Schließversuch führt zu einem Deadlock. Ein Backend aus `createRebaseBackend` schließt
-einen Server nur, wenn Sie ihn übergeben, `backend.shutdown(timeoutMs, { server })`, wie
-im Beispiel oben auf dieser Seite.
+Kombinieren Sie dies **nicht** mit Ihrem eigenen `server.close()`: Das
+`shutdown()` dieses Backends schließt den übergebenen Server bereits, und ein
+zweites Schließen führt zu einem Deadlock. Ein mit `createRebaseBackend`
+erstelltes Backend schließt einen Server nur dann, wenn Sie ihn übergeben:
+`backend.shutdown(timeoutMs, { server })`, wie im Beispiel oben auf dieser
+Seite gezeigt.
 
-## Den Postgres-Treiber einbetten
+## Postgres-Treiber einbinden
 
-Einen Schritt weiter unten funktioniert `@rebasepro/server-postgres` ganz ohne den Rebase-Server:
-Öffnen Sie seinen Daten-Treiber und den Realtime-Socket in Express, Fastify
-oder reinem Node und setzen Sie den Rest selbst zusammen. Siehe
-[Den Postgres-Treiber einbetten](/docs/backend/embedding-postgres-driver/).
+Noch einen Schritt weiter unten funktioniert `@rebasepro/server-postgres`
+komplett ohne den Rebase-Server: Öffnen Sie dessen Datentreiber und den
+Realtime-Socket in Express, Fastify oder reinem Node und bauen Sie den Rest
+selbst zusammen. Siehe
+[Postgres-Treiber einbinden](/docs/backend/embedding-postgres-driver/).
 
 ## CORS für ein Browser-Frontend
 
-Ein eigener Server besitzt seine eigene CORS-Konfiguration, und ein Frontend auf einem anderen Origin kann nur die Response-Header lesen, die er freigibt. Geben Sie die frei, die das SDK liest, sonst ist `etagOf(row)` dort immer `undefined` — ein `ifMatch`-Schreibvorgang geht dann ohne `If-Match` hinaus — und ein 429 verliert sein `Retry-After`:
+Ein Custom-Server verwaltet seine eigene CORS-Konfiguration, und ein Frontend
+auf einem anderen Origin kann nur diejenigen Response-Header lesen, die er
+explizit freigibt (expose). Geben Sie diejenigen frei, die das SDK liest, da
+andernfalls `etagOf(row)` dort immer `undefined` ist – ein `ifMatch`-Schreibvorgang
+wird dann ohne `If-Match` gesendet – und bei einem 429-Fehler geht das
+`Retry-After` verloren:
 
 ```typescript
 import express from "express";
@@ -455,20 +506,22 @@ app.use(cors({
 ```
 
 `CORS_EXPOSED_HEADERS` ist die Liste, die die Runtime selbst freigibt. Ein
-Header, den das SDK in einer späteren Version zu lesen beginnt, erreicht Ihr Frontend also ohne
-Änderung an dieser Stelle. Sie besteht aus `ETag`, `Retry-After`, `X-Request-ID`, den drei
-`X-RateLimit-*`-Headern und `Preference-Applied`, dazu `Location`,
-`Upload-Offset` und `Rebase-Upload-Result`, worin eine fortsetzbare Übertragung (Dateien über
-8 MiB) antwortet, sowie `X-Rebase-Simulated-Context`, das benennt, als was die simulierte Anfrage
-eines Administrators ausgeführt wurde. Ohne die drei Upload-Header kann das SDK keine Übertragung von einem anderen Origin aus
-verfolgen und sendet jede Datei stattdessen als eine einzige Multipart-Anfrage.
+Header, den das SDK in einer späteren Version zu lesen beginnt, erreicht Ihr
+Frontend somit ohne Änderungen hier. Sie umfasst `ETag`, `Retry-After`,
+`X-Request-ID`, die drei `X-RateLimit-*`-Header und `Preference-Applied`, plus
+`Location`, `Upload-Offset` und `Rebase-Upload-Result`, mit denen ein
+fortsetzbarer Upload (Dateien über 8 MiB) antwortet, sowie
+`X-Rebase-Simulated-Context`, der angibt, als was die simulierte Anfrage eines
+Administrators ausgeführt wurde. Ohne die drei Upload-Header kann das SDK einem
+Upload von einem anderen Origin nicht folgen und sendet stattdessen jede Datei
+als eine einzige Multipart-Anfrage.
 
-Die Rebase-Runtime und das ejected Backend senden diese Liste bereits.
+Die Rebase-Runtime und das mit Eject exportierte Backend senden diese Liste bereits.
 
 ## Verwandte Themen
 
-- [Den Postgres-Treiber einbetten](/docs/backend/embedding-postgres-driver/) – Nur der Daten-Treiber und der Realtime-Socket, in Express
-- [Skripte und die Konsole](/docs/backend/scripts/) – Die Daten des Projekts aus einem Skript, einem Test oder einer REPL, ganz ohne Server
-- [Backend-Übersicht](/docs/backend/) – Wo die einzelnen Optionen liegen, wenn stattdessen die Runtime startet
-- [Getrennte Prozesse](/docs/deployment/split-processes/) – Die Rollen, die ein eigener Server reproduzieren muss
-- [Storage-Konfiguration](/docs/backend/storage/) – Die Quellen, die ein eigener Server selbst auflösen muss
+- [Postgres-Treiber einbinden](/docs/backend/embedding-postgres-driver/) — der Datentreiber und der Realtime-Socket allein, in Express
+- [Skripte und die Konsole](/docs/backend/scripts/) — die Projektdaten aus einem Skript, einem Test oder einer REPL, ganz ohne Server
+- [Backend-Übersicht](/docs/backend/) — wo sich die einzelnen Optionen befinden, wenn stattdessen die Runtime bootet
+- [Aufgeteilte Prozesse](/docs/deployment/split-processes/) — die Rollen, die ein Custom-Server reproduzieren muss
+- [Speicherkonfiguration](/docs/backend/storage/) — die Quellen, die ein Custom-Server selbst auflösen muss

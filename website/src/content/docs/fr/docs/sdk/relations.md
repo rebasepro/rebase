@@ -1,15 +1,15 @@
 ---
-sourceHash: 553be7b40d8454f7
+sourceHash: 3db2d10879df1c44
 title: Interroger les relations
 sidebar_label: Relations
-description: "Incluez des entités liées dans une requête et lisez une collection enfant via son parent grâce aux accesseurs de relations du SDK."
+description: "Inclure des entités liées dans une requête et lire une table enfant via son parent grâce aux accesseurs de relations du SDK."
 ---
 
-## Charger des lignes liées
+## Charger les lignes associées
 
-Les relations peuvent être incluses afin que les entités associées soient renvoyées aux côtés des données principales, plutôt que simplement leurs identifiants de clé étrangère.
+Les relations peuvent être incluses de manière à ce que les entités associées soient renvoyées aux côtés des données principales, plutôt que de simples identifiants de clés étrangères.
 
-### Utilisation de `include()` (Fluent)
+### Utiliser `include()` (Fluent)
 
 ```typescript
 // Include specific relations
@@ -23,10 +23,9 @@ const { data } = await client.data.posts
     .find();
 ```
 
-Les appels successifs **s'ajoutent** les uns aux autres plutôt que de se remplacer, ainsi
-`.include("author").include("categories")` demande les deux.
+Les appels répétés **s'ajoutent** les uns aux autres plutôt que de se remplacer, donc `.include("author").include("categories")` demande les deux.
 
-### Utilisation de `find({ include })` (Paramètres)
+### Utiliser `find({ include })` (Paramètres)
 
 ```typescript
 const { data } = await client.data.posts.find({
@@ -36,30 +35,25 @@ const { data } = await client.data.posts.find({
 
 ### Imbrication : relations de relations
 
-Un chemin avec des points charge une relation d'une relation, jusqu'à **trois sauts** (hops) :
+Un chemin avec notation pointée charge une relation de relation, jusqu'à **trois sauts** :
 
 ```typescript
 // Each post's comments, and each comment's author.
 const { data } = await client.data
-    .collection<{ id: string; comments?: { author?: { name: string } }[] }>("posts")
+    .table<{ id: string; comments?: { author?: { name: string } }[] }>("posts")
     .include("comments.author")
     .find();
 
 console.log(data[0].comments?.[0].author?.name);
 ```
 
-Nommer le saut intermédiaire est facultatif — `comments.author` implique déjà
-`comments` — et envoyer les deux revient à faire deux fois la même requête.
+Nommer le saut intermédiaire est facultatif — `comments.author` implique déjà `comments` — et envoyer les deux revient à faire la même requête deux fois.
 
-Chaque saut correspond à une requête groupée (batch) pour l'ensemble de la page, et non une par ligne : une page de 50
-publications avec `comments.author` représente trois requêtes, quel que soit le nombre de commentaires.
-La limite de profondeur est ce qui empêche une relation autoréférentielle de boucler indéfiniment ;
-au-delà, la requête renvoie une erreur 400 `INCLUDE_TOO_DEEP`.
+Chaque saut correspond à une seule requête groupée pour l'ensemble de la page, et non une par ligne : une page de 50 articles avec `comments.author` représente trois requêtes, quel que soit le nombre de commentaires. Cette limite de profondeur est ce qui empêche une relation auto-référentielle de boucler à l'infini ; au-delà, la requête renvoie une erreur 400 `INCLUDE_TOO_DEEP`.
 
 ### Restreindre ce qu'une relation charge
 
-La forme sous forme de liste ne permet pas de spécifier un `limit` par relation ; une relation qui
-doit être restreinte prend donc un objet d'options à la place :
+La syntaxe sous forme de liste ne permet pas de spécifier un `limit` par relation, une relation nécessitant d'être restreinte prend donc un objet d'options à la place :
 
 ```typescript
 const { data } = await client.data.posts.include({
@@ -73,23 +67,21 @@ const { data } = await client.data.posts.include({
 }).find();
 ```
 
-| Option | Ce qu'elle fait |
-|--------|-----------------|
-| `limit` | Nombre de lignes **par parent**, et non sur l'ensemble de la page — cinq commentaires sur chaque publication, pas cinq au total. Appliquée par la requête : les lignes au-delà ne sont jamais lues dans la base de données. |
-| `where` | Le même dialecte de filtrage que celui utilisé par le `where` de premier niveau. Poussé dans la requête SQL, de sorte que le `limit` s'applique aux lignes correspondantes. |
-| `logical` | Un groupe `or`/`and`/`not` sur les lignes liées. |
-| `orderBy` | La même syntaxe de tri, y compris le [positionnement des valeurs NULL](/docs/sdk/querying#where-nulls-sort). En cas d'égalité, ou pour une `limit` sans `orderBy`, l'ordre suit la clé de la ligne liée, croissante. |
-| `fields` | Colonnes de la ligne *liée*. Sa clé est toujours conservée, afin que la ligne reste adressable. |
-| `include` | Relations de la ligne liée, à leur tour — c'est ainsi que l'arborescence s'imbrique. |
-| `count` | Renvoie aussi le nombre total de lignes liées, par parent, sous le `_count` de la ligne. Voir [Compter ce qu'une limite laisse de côté](#compter-ce-quune-limite-laisse-de-côté). |
+| Option | Description |
+|--------|--------------|
+| `limit` | Lignes **par parent**, et non sur toute la page — cinq commentaires sur chaque publication, pas cinq au total. Appliqué au niveau de la requête, de sorte que les lignes excédentaires ne sont jamais lues depuis la base de données. |
+| `where` | La même syntaxe de filtre que celle utilisée par le `where` de premier niveau. Injecté dans la requête, de sorte que le `limit` s'applique aux lignes correspondantes. |
+| `logical` | Un groupe `or`/`and`/`not` sur les lignes associées. |
+| `orderBy` | La même syntaxe de tri, y compris le [positionnement des valeurs NULL](/docs/sdk/querying#where-nulls-sort). Les égalités, ainsi qu'un `limit` sans `orderBy`, sont triées selon la clé de la ligne associée, par ordre croissant. |
+| `fields` | Colonnes de la ligne *associée*. Sa clé est toujours conservée afin que la ligne reste adressable. |
+| `include` | Relations de la ligne associée, à leur tour — c'est ainsi que l'arbre s'imbrique. |
+| `count` | Renvoie également le nombre total de lignes associées, par parent, sous le champ `_count` de la ligne. Voir [Compter ce qu'une limite exclut](#compter-ce-quune-limite-exclut). |
 
-`true` est le raccourci pour "charger dans son intégralité" : `{ author: true }` et
-`["author"]` correspondent à la même requête.
+`true` est le raccourci pour « charger dans son intégralité » : `{ author: true }` et `["author"]` représentent la même requête.
 
-### Compter ce qu'une limite laisse de côté
+### Compter ce qu'une limite exclut
 
-Un `limit` plafonne ce qui est envoyé, et `count: true` dit combien a été laissé de côté. C'est ce dont une
-liste a besoin pour afficher quatre tags et un « +33 » :
+Un `limit` plafonne ce qui est envoyé, et `count: true` indique la quantité omise. C'est ce dont une liste a besoin pour afficher quatre tags et un « +33 » :
 
 ```typescript
 const { data } = await client.data.posts.include({
@@ -100,43 +92,27 @@ const { data } = await client.data.posts.include({
 ```
 
 - `_count` est un objet par ligne, indexé par nom de relation. Compter deux relations ajoute deux clés.
-- Le total est compté dans la même instruction SQL que celle qui lit les lignes. Il couvre les mêmes lignes
-  qu'une lecture sans le `limit` renverrait : le `where` de l'include, le soft delete et la sécurité au niveau
-  des lignes s'appliquent tous. Le demander n'ajoute aucune requête.
-- Sans `limit`, le total est le nombre de lignes renvoyées.
-- `count` ne fonctionne que sur les relations vers plusieurs lignes. Sur une relation vers une seule ligne,
-  il renvoie une erreur 400 `INVALID_INCLUDE`. Il en va de même pour une collection qui a une propriété
-  nommée `_count`, car le total l'écraserait.
-- Une relation que l'appelant n'a pas le droit de lire (accès aux champs) est omise de `_count`, de la même
-  manière que ses lignes.
+- Le total est calculé dans la même instruction SQL qui lit les lignes. Il couvre les mêmes lignes qu'une lecture sans le `limit` renverrait : le `where` du include, le soft delete et la sécurité au niveau des lignes (RLS) s'appliquent tous. Le demander n'ajoute aucune requête.
+- Sans `limit`, le total correspond au nombre de lignes renvoyées.
+- `count` fonctionne uniquement sur les relations to-many. Sur une relation to-one, il renvoie une erreur 400 `INVALID_INCLUDE`. Il en va de même pour une table possédant une colonne nommée `_count`, car le total l'écraserait.
+- Une relation que l'appelant n'a pas le droit de lire (accès au champ) est exclue de `_count`, de la même manière que ses lignes le sont.
 
-### Les noms de relation inconnus sont rejetés
+### Les noms de relations inconnus sont refusés
 
-Un nom qui n'est pas une relation de la collection entraîne une erreur **400
-`UNKNOWN_RELATION`**, à tous les niveaux de l'arborescence — y compris à l'intérieur d'un
-`include` imbriqué. Auparavant, il était ignoré, renvoyant un code 200 avec le champ simplement
-manquant, or un champ de relation manquant ne se distingue pas d'une ligne qui
-n'a réellement aucune ligne liée. Une faute de frappe ressemblait donc exactement à des données vides.
+Un nom qui n'est pas une relation de la table renvoie une erreur **400 `UNKNOWN_RELATION`**, à chaque niveau de l'arbre — y compris à l'intérieur d'un `include` imbriqué. Cela était autrefois ignoré, ce qui répondait un code 200 avec le champ simplement manquant, et un champ de relation manquant ne peut être distingué d'une ligne n'ayant réellement aucune ligne liée. Une faute de frappe ressemblait donc exactement à des données vides.
 
-Avec un type `Database` généré, l'exécution ne va pas si loin : les clés de `include` sont
-vérifiées par rapport aux relations réelles de la collection au moment de la compilation, de manière récursive.
-Voir [Includes typés](#includes-typés).
+Avec un type `Database` généré, cela ne va pas aussi loin : les clés de `include` sont vérifiées par rapport aux relations réelles de la table au moment de la compilation, de manière récursive. Voir [Includes typés](#includes-typés).
 
 ### Sur le réseau
 
-`include` est un paramètre de requête unique avec deux syntaxes, différenciées par une accolade
-au début :
+`include` est un paramètre de requête qui possède deux syntaxes, différenciées par une accolade ouvrante au début :
 
 ```
 GET /api/data/posts?include=author,comments.author
 GET /api/data/posts?include={"comments":{"limit":5,"include":{"author":true}}}
 ```
 
-La forme plate est celle qu'un humain saisit et celle dont la plupart des requêtes ont besoin ; la forme JSON
-existe car la forme plate ne peut pas transporter d'options par relation, et inventer une
-ponctuation pour celles-ci (`comments(limit:5)`) aurait constitué une troisième grammaire à apprendre
-en plus des deux que cette API possède déjà. Les deux formes sont acceptées sur chaque route de liste et
-d'obtention par ID, et le SDK choisit celle dont la requête a besoin.
+La forme plate est ce qu'un humain saisit et ce dont la plupart des requêtes ont besoin ; la forme JSON existe car la forme plate ne peut pas transporter d'options par relation, et inventer une ponctuation dédiée (`comments(limit:5)`) aurait représenté une troisième grammaire à apprendre en plus des deux que cette API possède déjà. Les deux sont acceptées sur chaque route de liste et de récupération par identifiant, et le SDK sélectionne celle dont la requête a besoin.
 
 ### Combinaison avec des filtres
 
@@ -149,13 +125,13 @@ const { data } = await client.data.posts
     .find();
 ```
 
-### Lecture des données de relation
+### Lire les données de relation
 
-Lorsque des relations sont incluses, la réponse contient **à la fois** la clé étrangère scalaire et l'objet de relation hydraté :
+Lorsque les relations sont incluses, la réponse contient **à la fois** la clé étrangère scalaire et l'objet de relation hydraté :
 
 ```typescript
 const { data } = await client.data
-    .collection<{ authorId: string; author?: { name: string } }>("posts")
+    .table<{ authorId: string; author?: { name: string } }>("posts")
     .include("author")
     .find();
 
@@ -172,18 +148,17 @@ for (const post of data) {
 
 ### Un `belongsTo` a trois formes
 
-Une seule relation, trois endroits où elle apparaît — et le réseau n'est délibérément pas
-symétrique à cet égard, il est donc utile de connaître les trois :
+Une seule relation, trois endroits où elle apparaît — et le réseau n'est délibérément pas symétrique à cet égard, il est donc utile de connaître les trois :
 
 | Emplacement | Forme | Pourquoi |
-|-------------|-------|----------|
-| **Écriture** | `{ author: id }` **ou** `{ authorId: id }` | Les deux sont acceptés. Le transformateur d'écriture mappe la propriété de relation sur la colonne de clé étrangère, ce qui revient à la même écriture. |
+|-------|-------|-----|
+| **Écriture** | `{ author: id }` **ou** `{ authorId: id }` | Les deux sont acceptés. Le transformateur d'écriture mappe la propriété de relation sur la colonne de clé étrangère, les deux correspondent donc à la même écriture. Un objet (`{ author: { id } }`) renvoie une 400 mentionnant la relation : envoyez la clé. |
 | **Lecture** | `authorId` | C'est une colonne. Chaque lecture la renvoie. |
 | **Lecture avec `include`** | `author`, la propre ligne de la cible | Chargée uniquement lorsque la requête la nomme, elle est donc absente de toute autre lecture. |
 
 ```typescript
 type Post = { id: string; title: string; authorId: string; author?: { name: string } };
-const posts = client.data.collection<Post>("posts");
+const posts = client.data.table<Post>("posts");
 
 // Write: either spelling.
 await posts.create({ title: "Hello", author: authorId } as Partial<Post>);
@@ -200,19 +175,13 @@ data[0].authorId;       // "uuid-1234" — still there
 data[0].author?.name;   // "Jane Doe"
 ```
 
-Un type `Database` généré type précisément les trois : `Insert` et `Update` acceptent
-l'une ou l'autre des syntaxes d'écriture, `Row` possède `authorId` sans condition, et `author` est
-facultatif sur `Row` — `RowWith<"posts", ["author"]>` est la ligne avec cette relation
-**requise**, pour une lecture qui l'a demandée. Voir [Includes typés](#includes-typés).
+Un type `Database` généré type précisément ces trois formes : `Insert` et `Update` acceptent l'une ou l'autre des syntaxes d'écriture, `Row` possède `authorId` inconditionnellement, et `author` est facultatif sur `Row` — `RowWith<"posts", ["author"]>` est la ligne avec ce champ **obligatoire**, pour une lecture qui l'a demandé. Voir [Includes typés](#includes-typés).
 
-Le seul cas où les trois formes se confondent est celui d'une relation nommée de manière identique à sa propre
-clé étrangère. Dans ce cas, la ligne incluse est servie *par-dessus* la colonne, et le
-type généré l'indique en typant cette clé comme étant les deux.
+Le seul cas où les trois formes se confondent est lorsqu'une relation porte exactement le même nom que sa propre clé étrangère. Dans ce cas, la ligne incluse est servie *par-dessus* la colonne, et le type généré le reflète en typant cette clé avec les deux.
 
 ### Includes typés
 
-`rebase generate-sdk` écrit le graphe de relations dans votre type `Database`, ainsi que
-deux utilitaires basés sur celui-ci :
+`rebase generate-sdk` écrit le graphe de relations dans votre type `Database`, ainsi que deux helpers basés sur celui-ci :
 
 ```typescript no-verify
 import type { IncludeFor, RowWith } from "./database.types";
@@ -223,54 +192,49 @@ const ok: IncludeFor<"posts"> = { comments: { limit: 5, include: { author: true 
 const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 ```
 
-`IncludeFor<A>` restreint les clés d'un include aux relations existantes, à chaque
-niveau — et un client typé vérifie `include` de la même manière, dans `find({ include })`
-et dans `.include(...)`, si bien que `posts.include("authr")` est une erreur de compilation plutôt
-qu'une 400 `UNKNOWN_RELATION`. Les lignes qu'une lecture renvoie continuent de typer chaque relation
-comme facultative ; `RowWith<A, I>` est cette ligne avec chaque relation incluse rendue
-**requise**, pour annoter ce que vous lisez — ainsi, après avoir demandé l'auteur,
-un `RowWith<"posts", ["author"]>` n'a besoin d'aucun `?.` sur `row.author.name`.
+`IncludeFor<A>` contraint les clés d'un include aux relations qui existent, à chaque niveau — et un client typé vérifie `include` de la même manière, dans `find({ include })` et dans `.include(...)`, de sorte que `posts.include("authr")` soit une erreur de compilation plutôt qu'une erreur 400 `UNKNOWN_RELATION`. Les lignes renvoyées par une lecture typent toujours chaque relation comme facultative ; `RowWith<A, I>` est cette ligne avec chaque relation incluse rendue **obligatoire**, pour annoter ce que vous lisez — ainsi, après avoir demandé l'auteur, un `RowWith<"posts", ["author"]>` ne nécessite aucun `?.` sur `row.author.name`.
 
-Sans `Database` généré, `include` reste un simple `string[]` ou un arbre : un
-type de ligne écrit manuellement ne contient aucune relation à valider, et le code
-400 du serveur sert de garde-fou.
+Sans type `Database` généré, `include` reste un simple `string[]` ou un arbre : un type de ligne écrit à la main ne contient aucune relation par rapport à laquelle effectuer la vérification, et l'erreur 400 du serveur sert alors de filet de sécurité.
 
-### Noms de relation
+### Noms des relations
 
-Les noms que vous passez à `include()` sont les clés des propriétés de relation de la collection :
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+Les noms que vous passez à `include()` sont les clés des `relations` de la table :
+
+```ts
+// backend/schema/articles.ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
+import { categories } from "./categories";
+
+export const articles = defineTable("articles", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        title: col.text().notNull()
+    },
+    relations: {
+        author: rel.belongsTo(() => users),
+        categories: rel.manyToMany(() => categories)
+    },
+    rls: "admin-only"
+});
+```
 
 ```typescript
-// Collection definition
-properties: {
-    author: {
-        type: "relation",
-        name: "Author",
-        relation: { kind: "belongsTo", target: () => usersCollection }
-    },
-    categories: {
-        type: "relation",
-        name: "Categories",
-        relation: { kind: "manyToMany", target: () => categoriesCollection }
-    }
-}
-
 // SDK usage — names must match
 client.data.articles.include("author", "categories").find()
 ```
 
 ## Interroger à travers une relation
 
-`include()` récupère les lignes associées *après* que la page a été sélectionnée. Les deux
-fonctionnalités ci-dessous sélectionnent la page **avec** elles : elles sont compilées en SQL, elles s'exécutent donc
-avant `limit` et `offset` plutôt qu'après.
+`include()` récupère les lignes associées *après* que la page a été sélectionnée. Les deux fonctionnalités ci-dessous sélectionnent la page **avec** elles : elles compilent en SQL, et s'exécutent donc avant `limit` et `offset` plutôt qu'après.
 
-C'est ce dont a besoin un écran de file d'attente — *qui attend, le plus ancien en premier* — où les deux
-parties de la question trouvent leur réponse dans une table liée plutôt que dans la ligne
-qui est listée.
+C'est ce dont un écran de file d'attente a besoin — *qui attend, les plus anciens d'abord* — où les deux aspects de la question sont résolus par une table liée plutôt que par la ligne listée.
 
-### Filtrer par une colonne de la ligne liée
+### Filtrer par une colonne de la ligne associée
 
-Une clé avec un point traverse une relation pour atteindre l'une des colonnes de la cible :
+Une clé avec notation pointée accède à l'une des colonnes de la cible à travers une relation :
 
 ```typescript
 // Candidates with at least one application still open.
@@ -281,8 +245,7 @@ const { data } = await client.data.talents.find({
 });
 ```
 
-Elle est compilée sous la forme d'un `EXISTS` sur la table liée, corrélé à la ligne en cours
-de listage — et non d'une jointure (join), ce qui multiplierait les lignes et fausserait silencieusement le `limit`.
+Elle compile en un `EXISTS` sur la table associée, corrélé à la ligne listée — et non une jointure, qui multiplierait les lignes et fausserait silencieusement `limit`.
 
 Tous les opérateurs fonctionnent, car l'élément comparé est une colonne ordinaire :
 
@@ -293,26 +256,18 @@ where: {
 }
 ```
 
-Les opérateurs négatifs — `!=`, `not-in`, `not-like`, `not-ilike` — signifient **"aucune
-ligne liée ne correspond"**, et non "une ligne liée diffère" :
+Les opérateurs négatifs — `!=`, `not-in`, `not-like`, `not-ilike` — signifient **« aucune ligne liée ne correspond »**, et non « au moins une ligne liée diffère » :
 
 ```typescript
 // Candidates with no hired application.
 where: { "applications.status": ["!=", "hired"] }
 ```
 
-C'est l'interprétation souhaitée, et la seule qui permette à `==` et `!=`
-de partitionner les lignes. L'autre interprétation — "au moins une candidature n'est pas 'hired'" — est
-vraie pour presque tous les candidats ayant plus d'une candidature, et ne répond
-à aucune question pertinente.
+C'est l'interprétation souhaitée, et la seule qui permet à `==` et `!=` de partitionner les lignes. L'autre interprétation — « une certaine candidature n'est pas 'hired' » — est vraie pour presque tous les candidats ayant plus d'une candidature, et ne répond à aucune question utile.
 
-`is-null` et `is-not-null` ne forment délibérément **pas** une paire complémentaire ici.
-Ils signifient "possède une ligne liée dont la colonne n'est pas définie" et "en possède une où elle est
-définie" — deux assertions vraies pour un candidat avec deux candidatures, une de chaque type.
+`is-null` et `is-not-null` ne forment délibérément **pas** une paire complémentaire ici. Ils signifient « possède une ligne liée dont la colonne n'est pas définie » et « en possède une où elle est définie » — les deux étant vrais pour un candidat ayant deux candidatures, une de chaque type.
 
-Un nom de relation inexistant, ou une colonne que la cible ne possède pas, déclenche une erreur
-400 listant les vraies colonnes de la cible. Une condition n'est jamais ignorée : abandonner
-une clé de filtre aurait pour effet d'*élargir* la lecture à l'ensemble des lignes.
+Un nom de relation qui n'existe pas, ou une colonne que la cible ne possède pas, renvoie une 400 indiquant les vraies colonnes de la cible. Il ne s'agit jamais d'une condition ignorée : ignorer une clé de filtre *élargirait* la lecture à chaque ligne.
 
 ### Trier par un agrégat sur une relation
 
@@ -327,7 +282,7 @@ const { data } = await client.data.talents.find({
 orderBy: [[{ relation: "orders", agg: "count" }, "desc"]]
 ```
 
-Le constructeur fluent accepte la même clé :
+Le constructeur fluent prend la même clé :
 
 ```typescript
 const { data } = await client.data.clients
@@ -335,63 +290,38 @@ const { data } = await client.data.clients
     .find();
 ```
 
-`min`, `max`, `count`, `sum` et `avg`. `field` est requis par tous
-sauf `count`, qui compte les lignes liées lorsque vous l'omettez et compte
-les lignes avec une colonne non nulle lorsque vous le renseignez.
+`min`, `max`, `count`, `sum` et `avg`. `field` est requis par chacun d'eux à l'exception de `count`, qui compte les lignes associées si vous l'omettez et compte les lignes avec une colonne non nulle si vous le spécifiez.
 
-C'est la partie d'une file d'attente que vous ne pouvez pas contourner côté client. Un filtre peut
-être approximé en dénormalisant un indicateur sur la ligne ; un ordre ne peut pas du tout
-être approximé une fois que le jeu de résultats est paginé, car le client ne détient jamais
-qu'une seule page et celle-ci a été sélectionnée selon le mauvais ordre.
+C'est l'aspect d'une file d'attente qu'on ne peut pas contourner côté client. Un filtre peut être approximé en dénormalisant un indicateur sur la ligne ; un tri ne peut absolument pas être approximé dès lors que le jeu de résultats est paginé, car le client ne détient jamais qu'une seule page et la page a été sélectionnée selon le mauvais ordre.
 
-Les lignes pour lesquelles la relation n'aboutit à rien se placent à une extrémité définie — **en dernier
-par ordre croissant, en premier par ordre décroissant**, l'emplacement que Postgres attribue à `NULL`. Un `count`
-portant sur rien vaut `0` plutôt que null, donc ces lignes sont triées avec la valeur zéro.
+Les lignes pour lesquelles la relation n'aboutit à rien se retrouvent à une extrémité définie — **en dernier par ordre croissant, en premier par ordre décroissant**, le positionnement que Postgres applique à `NULL`. Un `count` de zéro élément donne `0` plutôt que null, ces lignes sont donc triées avec la valeur zéro.
 
-Sur HTTP, la clé est une chaîne unique, elle s'intègre donc sans modification à `?orderBy=` :
+Via HTTP, la clé est une chaîne simple, elle s'intègre donc telle quelle dans `?orderBy=` :
 
 ```bash
 GET /api/data/talents?orderBy=min(applications.createdAt):asc
 ```
 
-La pagination par curseur fonctionne par-dessus. Aucun agrégat n'étant stocké sur la ligne du curseur
-pour servir de comparaison, le pilote recalcule la valeur de la ligne du curseur en SQL à partir
-de l'id dont il dispose.
+La pagination par curseur fonctionne avec cela. Il n'y a pas d'agrégat stocké sur la ligne du curseur auquel se comparer, le pilote recalcule donc la valeur de la ligne du curseur en SQL à partir de l'identifiant dont il dispose.
 
-### Sécurité au niveau des lignes (Row-level security)
+### Sécurité au niveau des lignes
 
-Les deux sont compilés en une sous-requête qui s'exécute avec les droits du lecteur, de sorte qu'une ligne liée masquée
-par vos stratégies de sécurité ne correspond pas à un filtre et ne contribue pas à un agrégat.
+Les deux se compilent en une sous-requête exécutée avec les droits du lecteur, ainsi une ligne liée masquée par vos stratégies ne correspondra à aucun filtre et ne contribuera à aucun agrégat.
 
-Une mise en garde, sur la direction **négative** uniquement : "aucune ligne liée ne correspond" et "aucune
-ligne liée *que ce lecteur peut voir* ne correspond" sont équivalents. Une table cible
-avec une sécurité au niveau des lignes et aucune politique `SELECT` pour `rebase_user` est opaque, donc
-chaque ligne semble non correspondante et un filtre `!=` / `not-in` renverra trop de résultats. Rien
-ne fuite — les propres politiques de la table listée décident toujours quelles lignes existent réellement,
-et la direction positive ne renvoie correctement rien. La solution consiste à définir une politique
-`SELECT` sur la cible. Rebase en dérive une pour une relation plusieurs-à-plusieurs (many-to-many) déclarée ; un
-schéma écrit à la main doit la fournir explicitement.
+Un avertissement toutefois, sur la direction **négative** uniquement : « aucune ligne liée ne correspond » et « aucune ligne liée *que ce lecteur peut voir* ne correspond » sont équivalents. Une table cible avec sécurité au niveau des lignes et sans stratégie `SELECT` pour `rebase_user` est opaque, ainsi chaque ligne semble sans correspondance et un filtre `!=` / `not-in` renverra trop de résultats. Rien ne fuite — les propres stratégies de la table listée déterminent toujours quelles lignes existent, et la direction positive ne renvoie correctement rien. La solution consiste à ajouter une stratégie `SELECT` sur la table cible. Rebase en déduit une automatiquement pour un many-to-many déclaré ; un schéma écrit manuellement doit la fournir.
 
-### Prise en charge par les moteurs
+### Prise en charge par le moteur
 
-Postgres uniquement. Firestore et MongoDB déclarent `filterableRelationKinds: []` et
-ne proposent aucune de ces deux fonctionnalités — une base orientée documents établit des liens par référence et ne dispose pas
-de sous-requête dans laquelle compiler ces opérations. Voir
-[capacités des sources de données](/docs/backend/multiple-sources).
+Postgres uniquement. Une collection Firestore dans le CMS déclare `filterableRelationKinds: []` et ne propose aucune de ces fonctionnalités — une base documentaire lie par référence et ne dispose pas de sous-requêtes dans lesquelles compiler tout cela. Voir [Firebase](/docs/frontend/firebase/).
 
 ### Pourquoi pas `additionalFields` ?
 
-`AdditionalFieldDelegate.value()` est asynchrone et reçoit l'ensemble du contexte, il *peut* donc
-lire une autre collection — et pourtant il ne peut pas aider ici. Il s'exécute dans
-le navigateur, une fois par ligne, **après** que la page a été récupérée et ordonnée. Une valeur
-calculée à cet endroit peut être affichée, mais ne peut jamais faire l'objet d'un filtre, d'un tri ou d'une pagination.
+`AdditionalFieldDelegate.value()` est asynchrone et reçoit l'ensemble du contexte, il *peut* donc lire une autre table — mais il ne peut toujours pas aider ici. Il s'exécute dans le navigateur, une fois par ligne, **après** que la page a été récupérée et triée. Une valeur ainsi calculée peut être affichée mais ne pourra jamais faire l'objet d'un filtrage, d'un tri ou d'une pagination.
 
-Si une valeur dérivée n'est pas un agrégat sur une relation, placez-la dans la base de données —
-une colonne générée, ou une colonne maintenue par trigger — et elle deviendra une
-propriété ordinaire.
+Si une valeur dérivée n'est pas un agrégat sur une relation, placez-la dans la base de données — via une colonne générée ou maintenue par un déclencheur — et elle deviendra une propriété ordinaire.
 
-## Étapes suivantes
+## Prochaines étapes
 
-- [Interroger les données](/docs/sdk/querying/) — le constructeur de requêtes renvoyé par ces accesseurs
-- [Relations](/docs/collections/relations/) — déclarer les liaisons lues par cette page
-- [API REST](/docs/backend/api/) — le même `include` via HTTP
+- [Querying Data](/docs/sdk/querying/) — le constructeur de requêtes que ces accesseurs renvoient
+- [Relations](/docs/collections/relations/) — déclarer les liaisons que cette page lit
+- [REST API](/docs/backend/api/) — le même `include` via HTTP

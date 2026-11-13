@@ -1,69 +1,101 @@
 ---
-sourceHash: 155fe61b0635a331
+sourceHash: 8ce5fe3122103e0c
 title: Acceso a campos
 sidebar_label: Acceso a campos
-description: Permisos de lectura y escritura por propiedad según el rol. Un emisor al que las reglas de seguridad de la fila permiten el paso aún así no recibe un campo que sus roles no pueden leer.
+description: "Permisos de lectura y escritura por columna según el rol con .access(), columnas que nunca salen del servidor con .private() y columnas que los clientes no pueden escribir con .readOnly(). Un invocador al que las políticas de fila le permiten el acceso sigue sin recibir una columna que sus roles no pueden leer."
 ---
 
-## Descripción general
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-[Las reglas de seguridad](/docs/collections/security-rules/) deciden a qué **filas** accede un emisor. `access` decide qué **campos de una fila alcanzada** puede ver y establecer.
+La [seguridad a nivel de fila (RLS)](/docs/collections/security-rules/) decide a qué **filas**
+accede un invocador. Tres modificadores de columna deciden qué **columnas de una fila alcanzada**
+ven y pueden establecer:
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+| Modificador | Lectura | Escritura |
+|---|---|---|
+| `.access({ read, write })` | los roles en `read`, cuando se especifiquen | los roles en `write`, cuando se especifiquen |
+| `.private()` | nadie, a través de la API | nadie, a través de la API |
+| `.readOnly()` | igual que la fila | nadie, a través de la API |
 
-const staff = defineCollection({
-    slug: "staff",
-    name: "Staff",
-    table: "staff",
-    properties: {
-        id: { type: "number", isId: "increment" },
-        name: { type: "string" },
-        salary: {
-            type: "number",
-            // Read by HR (and admins). Set by nobody through the API.
-            access: { read: ["hr"], write: [] }
-        }
+Las relaciones admiten las mismas reglas como opciones: `rel.*(target, { access: { read, write } })`
+y `rel.*(target, { private: true })`.
+
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const staff = defineTable("staff", {
+    columns: {
+        id:     col.integer().primaryKey().generatedByDefaultAsIdentity(),
+        name:   col.text().notNull(),
+        // Read by HR (and admins). Set by nobody through the API.
+        salary: col.numeric({ precision: 10, scale: 2 }).access({ read: ["hr"], write: [] }),
     },
-    securityRules: [
-        { operation: "select", access: "public" }
-    ]
+    rls: [{ operation: "select", access: "public" }],
 });
 ```
 
-La regla anterior no aplica ningún filtro de filas a `select`, por lo que cada emisor al que la API da acceso lee todas las filas de staff. Solo un emisor con el rol `hr` obtiene la columna `salary` de una de ellas, y nadie puede establecerla mediante HTTP.
+La regla anterior no impone ningún filtro de fila en `select`, por lo que cada invocador que la API
+deje pasar lee cada fila de staff. Solo un invocador que posea `hr` obtiene la columna `salary`
+de una de ellas, y nadie la establece a través de HTTP.
 
 ## La regla
 
-`access` tiene dos listas opcionales, y una lista omitida no es una lista vacía — esa diferencia es la clave de toda la funcionalidad.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+`.access()` recibe dos listas opcionales, y una lista omitida no es una lista vacía;
+la diferencia radica en toda la funcionalidad.
 
 | `read` / `write` | Significado |
 |------------------|-------------|
-| omitido | Delegar en la fila. Cualquier persona a quien las reglas de seguridad de la colección le permitan leer (o escribir) la fila obtiene el campo. |
-| `[]` | Nadie, a través de la API, con ningún privilegio — ni `admin`, ni la clave de servicio, ni una lectura en proceso (in-process). |
-| `["hr"]` | Un emisor con el rol `hr`, **o** `admin`, **o** código de servidor de confianza sin ninguna solicitud detrás. |
+| omitido | Delega a la fila. Todo aquel a quien la regla `rls` de la tabla le permita leer (o escribir) la fila, obtiene la columna. |
+| `[]` | Nadie, a través de la API, con ningún privilegio; ni `admin`, ni la service key, ni una lectura en proceso. |
+| `["hr"]` | Un invocador que posea `hr`, **o** `admin`, **o** código de servidor de confianza sin una petición detrás. |
 
-Los roles son roles de aplicación de Rebase — los mismos que `rebase.roles()` devuelve dentro de una política y contra los que compila `policy.rolesOverlap`. Proceden del contexto de la llamada: `user.roles` en la solicitud autenticada.
+Los roles son roles de aplicación de Rebase: los mismos que devuelve `rebase.roles()`
+dentro de una directiva y contra los que compila `policy.rolesOverlap`. Provienen del
+contexto de la llamada: `user.roles` en la petición autenticada.
 
 ### Por qué `admin` siempre pasa
 
-Cada política base que inyecta Rebase lleva una rama `rolesOverlap(['admin'])`, y `rebase.dataAsAdmin` se ejecuta como `{ uid: "service", roles: ["admin"] }`. Una regla de campo que pudiera bloquear a un administrador el acceso a una columna de su propia base de datos también impediría que Studio la renderice y que la CLI la exporte. Si necesitas una columna que ningún administrador lea a través de la API, eso es `read: []`.
+Cada directiva base que Rebase inyecta incluye una rama `rolesOverlap(['admin'])`, y
+`rebase.dataAsAdmin` se ejecuta como `{ uid: "service", roles: ["admin"] }`. Una regla de campo
+que pudiera bloquear a un administrador impidiéndole ver una columna de su propia base de datos
+también bloquearía al Studio para renderizarla y a la CLI para exportarla. Si
+necesitas una columna que ningún administrador lea a través de la API, eso es `read: []`.
 
 ### Por qué el plano de confianza pasa
 
-El código de servidor sin una solicitud detrás — una migración, o el adaptador de autenticación verificando una contraseña — lee sin ningún rol en absoluto, y una lista de roles no se le aplica. `[]` todavía sí se aplica: es una declaración sobre la superficie de la API más que sobre quién está llamando.
+El código de servidor sin una petición detrás (una migración o el adaptador de autenticación
+verificando una contraseña) lee sin ningún rol, y una lista de roles no
+se le aplica. `[]` aún se aplica: se trata de una declaración sobre la superficie de la API
+más que sobre quién está llamando.
 
-El `context.data` de un callback no pertenece a ese plano. Dentro de una solicitud, lee con los roles del emisor, por lo que las reglas de campo se aplican a lo que lee exactamente igual que se aplican a la solicitud.
+El `context.data` de un hook no forma parte de ese plano. Dentro de una petición, lee con los
+roles del invocador, por lo que las reglas de campo se aplican a lo que lee exactamente igual que
+se aplican a la petición: el propio driver rechaza un filtro, ordenación, proyección, include,
+búsqueda vectorial, agregado o sondeo de unicidad que mencione una columna que esos roles
+no pueden leer (`FIELD_NOT_READABLE`), y responde ante un nombre `.private()` como
+respondería ante un error tipográfico, de la misma forma que REST y el socket.
 
-## `excludeFromApi` es el mismo mecanismo
+## `.private()` y `.readOnly()` son el mismo mecanismo
 
-`excludeFromApi: true` es azúcar sintáctico para `access: { read: [], write: [] }`. Hay un único predicado detrás de ambas formas de escribirlo, por lo que todo lo que aparece en esta página también se aplica al flag. Escribe la opción que mejor se lea — pero no ambas en una misma propiedad, lo cual se rechaza al arrancar.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-## Lo que ve un emisor
+`.private()` es `.access({ read: [], write: [] })`, con una diferencia: una
+columna privada también se excluye de OpenAPI, de los tipos del SDK y de los esquemas
+de herramientas MCP, por lo que su nombre tampoco es público (consulta [Consultas](#consultas)). Una columna
+no puede ser a la vez `.private()` y declarar `.access()`; el esquema será rechazado.
+
+`.readOnly()` es `write: []`: nadie escribe la columna a través de la API, sea cual sea
+su rol, mientras que los valores predeterminados, los triggers y el código del servidor aún pueden completarla. Las lecturas se
+dejan a criterio de la fila, o a `.access({ read })` cuando se declaran ambos.
+
+## Lo que ve un invocador
 
 ### Lecturas
 
-Un campo que no puedes leer está **ausente** de la respuesta. Ni `null`, ni una cadena vacía — la clave simplemente no está.
+Un campo que no puedes leer está **ausente** de la respuesta. Ni `null`, ni una cadena
+vacía: la clave no existe en el objeto.
 
 ```json
 // GET /api/data/staff/1  as a caller holding `staff`
@@ -73,22 +105,28 @@ Un campo que no puedes leer está **ausente** de la respuesta. Ni `null`, ni una
 { "id": 1, "name": "Ada", "salary": 90000 }
 ```
 
-Esto es deliberado. Un valor retenido que se devolviera como `null` sería indistinguible de un `null` almacenado, por lo que un cliente podría mapear toda la columna contándolos — y un `update` que devolviera la fila completa sobrescribiría el valor real con el null que recibió.
+Esto es intencionado. Un valor retenido que se devuelva como `null` es indistinguible de un
+`null` almacenado, por lo que un cliente podría mapear toda la columna contándolos; además, una
+operación `update` que devolviera la fila sobreescribiría el valor real con el null que
+recibió.
 
-Se aplica en cada punto de salida: listados, obtención individual, destinos de relaciones incluidos con `?include=`, resultados de `_batch`, tramas en tiempo real de `.listen()`, resultados agregados e instantáneas del [historial](#historial).
+Se aplica en cada salida: lista, obtención individual, destinos de relaciones incluidos con
+`?include=`, resultados de `_batch`, tramas en tiempo real de `.listen()`, resultados de
+agregados e instantáneas del [historial](#historial).
 
-El valor de una propiedad de relación son sus filas relacionadas, así que una relación que no puedes leer se
-retiene entera. `?include=` la deja fuera de la fila, con su `_count`, desde
-todas las puertas: REST, el SDK, `.listen()` y las inclusiones anidadas un nivel por debajo.
-Nombrarla en cualquier otro sitio se rechaza como un campo (consulta [Consultas](#consultas)).
+El valor de una relación son sus filas relacionadas, por lo que una relación que no puedes leer se
+retiene por completo. `?include=` la omite de la fila, junto con su `_count`, desde
+cualquier vía: REST, el SDK, `.listen()` e includes anidados un nivel más abajo.
+Mencionarla en cualquier otro lugar se rechaza de la misma manera que un campo (consulta [Consultas](#consultas)).
 
 ### Consultas
 
-Un `where`, `orderBy`, `fields`, un `select` de agregación o un `groupBy` que mencione un campo que no puedes leer genera un **400 `FIELD_NOT_READABLE`**. Lo mismo ocurre con un filtro a través de una relación
-sobre un campo de su destino que no puedes leer (`?author.salary=gt.1`), una ordenación de agregado
-sobre uno (`orderBy=max(staff.salary)`) y una relación que no puedes leer
-nombrada en una ruta anidada (`/departments/1/members`, `/departments/1/members/7`) o
-en una ordenación de agregado (`orderBy=count(members)`):
+Un `where`, `orderBy`, `fields`, `select` de agregado o `groupBy` que mencione un campo que
+no puedes leer resulta en un **400 `FIELD_NOT_READABLE`**. También lo es un filtro a través de una relación
+sobre un campo de su destino que no puedes leer (`?author.salary=gt.1`), una ordenación agregada
+sobre uno de ellos (`orderBy=max(staff.salary)`), y una relación que no puedes leer
+mencionada en una ruta anidada (`/departments/1/members`, `/departments/1/members/7`) o
+una ordenación agregada (`orderBy=count(members)`):
 
 ```http
 GET /api/data/staff?salary=gt.100000
@@ -98,7 +136,7 @@ GET /api/data/staff?salary=gt.100000
 {
   "error": {
     "code": "FIELD_NOT_READABLE",
-    "message": "'salary' is not readable on 'staff' with your roles, so it cannot be used in a filter.",
+    "message": "'salary' is not readable on table 'staff' with your roles, so it cannot be used in a filter.",
     "details": {
       "collection": "staff",
       "fields": ["salary"],
@@ -110,53 +148,114 @@ GET /api/data/staff?salary=gt.100000
 }
 ```
 
-Sin esto, el valor sería legible predicado a predicado: veinte solicitudes equivaldrían a una búsqueda binaria sobre un salario.
+Sin esto, el valor sería legible predicado a predicado: veinte peticiones equivalen a una
+búsqueda binaria sobre un salario.
 
-El error **indica el nombre del campo**. Es una decisión de diseño, no un descuido: el documento OpenAPI publicado lista cada propiedad de cada colección — se sirve desde la aplicación, no desde el router de datos autenticado — por lo que los nombres de los campos ya son públicos. Ocultar el nombre aquí no protegería nada y respondería a un error tipográfico legítimo del emisor con un "campo desconocido", haciéndole buscar una errata que no existe. **Los nombres de los campos son públicos; los valores de los campos no lo son.**
+El error **menciona el campo**. Es una decisión deliberada, no un descuido: el
+documento OpenAPI publicado lista cada columna de cada tabla (se sirve
+desde la aplicación, no desde el enrutador de datos autenticado), por lo que los nombres de los campos
+ya son públicos. Ocultar el nombre aquí no protegería nada y respondería a un
+error tipográfico genuino de un invocador con un "unknown field", haciéndole buscar un error
+de ortografía inexistente. **Los nombres de los campos son públicos; los valores de los campos no.**
 
-Salvo los de un campo con `excludeFromApi`. OpenAPI, `list_collections` y el SDK generado
-lo omiten, así que su nombre no es público, y "no legible" confirmaría que existe. Un filtro,
-`orderBy`, `fields`, `include`, `select` o `groupBy` de agregado, o `vector_search` que
-nombre uno recibe exactamente la respuesta de un nombre mal escrito
-— `UNKNOWN_FILTER_FIELD`, `UNKNOWN_ORDER_BY_FIELD`, `UNKNOWN_FIELD`,
+Excepto los de una columna `.private()`. OpenAPI, `describe_table` y el SDK generado
+la omiten, por lo que su nombre no es público, y un "not readable" confirmaría que
+existe. Un filtro, `orderBy`, `fields`, `include`, `select` de agregado o
+`groupBy`, o `vector_search` que mencione una de ellas recibe exactamente la misma respuesta que recibe un nombre mal escrito:
+`UNKNOWN_FILTER_FIELD`, `UNKNOWN_ORDER_BY_FIELD`, `UNKNOWN_FIELD`,
 `UNKNOWN_RELATION`, `UNKNOWN_AGGREGATE_FIELD` o `UNKNOWN_VECTOR_PROPERTY`, con el
-mismo mensaje y los mismos detalles — y ninguna respuesta de campo desconocido lo lista entre
-los campos válidos.
+mismo mensaje y detalles; además, ninguna respuesta de campo desconocido la incluye entre los
+campos válidos.
 
 ### Escrituras
 
-Un valor para un campo en el que no puedes escribir devuelve un **400**, nunca una clave descartada en silencio — una escritura que descarta un campo informaría de éxito para una edición que no ocurrió.
+Un valor para un campo que no puedes escribir es un **400**, nunca una clave descartada silenciosamente:
+una escritura que descarta un campo informaría del éxito de una edición que nunca se produjo.
 
 | Código | Cuándo |
 |--------|--------|
-| `FIELD_NOT_WRITABLE` | `write` es una lista de roles que no cumples. Tu colega podría recibir un 200 para el mismo cuerpo. |
-| `VALIDATION_EXCLUDED_FIELDS` | `write` es `[]` (o `excludeFromApi`). Nadie puede escribir en él; la respuesta es la misma para cualquier emisor. |
+| `FIELD_NOT_WRITABLE` | `write` es una lista de roles que no cumples. Tu colega podría obtener un 200 con el mismo cuerpo. |
+| `VALIDATION_EXCLUDED_FIELDS` | `write` es `[]`, o la columna es `.private()` o `.readOnly()`. Nadie puede escribirla; la respuesta es la misma para cualquier invocador. |
 
-Ambos incluyen `details.violations` indexados por el nombre enviado en la petición. Se aplica en creaciones, `PATCH`/`PUT`, `/bulk`, `_batch`, upserts, operaciones de campo (`{ "salary": { "$inc": 1000 } }` hace referencia a `salary` al igual que cualquier valor) y en la trama `SAVE` de WebSocket.
+Ambos incluyen `details.violations` indexados por el nombre transmitido que enviaste. Se aplica en
+creación, `PATCH`/`PUT`, `/bulk`, `_batch`, upserts, operaciones de campo
+(`{ "salary": { "$inc": 1000 } }` nombra a `salary` como lo hace cualquier valor) y en la
+trama `SAVE` de WebSocket.
 
-Una operación de campo también necesita `read` sobre su campo. Una operación sobre un campo que puedes escribir pero no leer se rechaza con `FIELD_NOT_READABLE`: si superó o no un límite te revelaría el valor que no se te permite ver.
+Una operación de campo también necesita `read` sobre su campo. Una operación sobre un campo que puedes
+escribir pero no leer se rechaza con `FIELD_NOT_READABLE`: si superó un
+límite te indicaría el valor que no tienes permitido ver.
+
+### Un enlace sigue a su columna clave
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Un `belongsTo` y la columna clave a la que está vinculado son un solo campo con dos
+formas de escritura. Escribir `{ "reviewer": 7 }` está sujeto a todas las reglas de `reviewerId`
+(su regla de escritura, `.readOnly()`, `.private()`, una marca temporal de creación, la columna
+de tenant); enviar ambos con valores diferentes devuelve `400 VALIDATION_INVALID_VALUE`.
+Un invocador que no pueda leer `reviewerId` no obtiene `reviewer` en un `include`,
+y un filtro, ordenación o entrada de `fields` que lo mencione responderá con `FIELD_NOT_READABLE`;
+detrás de una clave `.private()`, la relación no existe en absoluto para los clientes. El
+endpoint del esquema, OpenAPI y MCP describen ambos de forma conjunta.
+
+Lo mismo aplica para cada relación, a través de lo que sea que lea su join: un
+`hasMany` / `hasOne` lee la clave foránea del destino, un `via` cada columna sobre la que se unen
+sus pasos, en cada tabla por la que pasa. Un invocador que no pueda leer una
+de esas columnas no obtiene la relación en un `include` o un `_count`, recibe
+`FIELD_NOT_READABLE` al filtrar u ordenar a través de ella (una relación desconocida cuando
+la columna es `.private()`), y no la ve descrita.
+
+`strictWrites: false` en una tabla solo deja pasar hacia el driver una clave que la tabla no declara.
+Nunca relaja una regla sobre una columna declarada, una marca temporal,
+el tenant, la clave, el destino de una relación o `_pivot`.
 
 ## Búsqueda
 
-La búsqueda por defecto — una colección sin bloque `search` — coincide mediante `ILIKE` en tus propiedades de cadena, y omite aquellas que el emisor no puede leer. Nada se filtra a través de ella.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-Una colección que **sí** declara un [bloque `search`](/docs/backend/search) se compila en una única columna `tsvector` generada compartida por todos los emisores. No existe una variante por rol de la misma, por lo que un campo restringido incluido en `search.fields` seguiría siendo *coincidente* para emisores que nunca pueden ver su valor — recuperable término a término. Rebase rechaza esa combinación al arrancar: elimina el campo de `search.fields` o retira la restricción de lectura.
+La búsqueda alternativa (una tabla sin un bloque `search`) aplica `ILIKE` sobre
+tus columnas de texto, y omite aquellas que el invocador no puede leer. Nada se filtra
+a través de ella.
+
+Una tabla que **sí** declara un [bloque `search`](/docs/backend/search) compila
+en una única columna `tsvector` generada compartida por todos los invocadores. No existe
+una variante de ella por rol, por lo que una columna restringida nombrada en `search.fields`
+seguiría siendo *coincidente* para invocadores que nunca pueden ver su valor (pudiendo recuperarlo
+término a término). El esquema se rechaza con esa combinación: elimina la columna de
+`search.fields` o retira la restricción de lectura. Una columna `tenant` tampoco puede tener
+restringida la lectura.
 
 ## Historial
 
-El [historial de entidades](/docs/backend/history) almacena la fila completa y se entrega a cualquiera que pueda leer la fila — la condición de acceso es "¿puedes consultar esta entidad?", no "¿eres administrador?". Por lo tanto, la regla de lectura también se aplica a cada instantánea almacenada: la entrada sigue listándose, indicando quién la modificó y cuándo, pero las columnas retenidas desaparecen de sus `values`.
+El [historial de entidades](/docs/backend/history) almacena la fila completa, y se sirve a
+cualquiera que pueda leer la fila; el criterio de acceso es "puedes obtener esta entidad", no "eres
+un admin". De modo que la regla de lectura también se aplica a cada instantánea almacenada: la entrada
+sigue listándose, con quién la cambió y cuándo, y las columnas restringidas desaparecen
+de sus `values`.
 
-La reversión no se ve afectada. La ruta de reversión lee la entrada almacenada en el lado del servidor, por lo que un emisor puede restaurar una versión cuyos campos no pueda ver en su totalidad — exactamente igual a como ya puede sobrescribir una fila sin leerla por completo.
+La reversión no se ve afectada. La ruta de reversión lee la entrada almacenada en el lado del servidor, por lo que un
+invocador puede restaurar una versión cuyos campos no pueda ver en su totalidad, exactamente igual a como
+ya puede sobrescribir una fila sin leerla por completo.
 
-## Qué muestra el panel de administración
+## Lo que muestra el CMS
 
-No hay nada que configurar. Studio lee a través de la misma API, por lo que un campo que el emisor no puede leer nunca llega y el formulario no lo dibuja; un campo en el que no puede escribir se rechaza si algo intenta enviarlo. Esta es una garantía en el lado del servidor, a diferencia de `admin.hideFromCollection`, que solo impide que el panel *renderice* un campo pero deja el valor en el JSON.
+Nada que configurar. El CMS lee a través de la misma API, por lo que una columna que el
+invocador no puede leer nunca llega y el formulario no la dibuja; una columna que
+no puede escribir se rechaza si algo intenta enviarla. Esta es una garantía
+del lado del servidor, a diferencia de ocultar un campo en el CMS, lo cual solo impide que sea
+*renderizado* y deja el valor en el JSON.
 
 ## Tipos generados y OpenAPI
 
-Los tipos `Row`, `Insert` y `Update` del SDK tienen una única forma para todos los emisores — no existe un `Row` que sea adecuado tanto para un lector con el rol `hr` como para uno que no lo tenga —, por lo que una regla basada en **roles** no los modifica. Un campo cerrado para todos (`[]` o `excludeFromApi`) está ausente de ellos, como siempre lo ha estado.
+Los tipos `Row`, `Insert` y `Update` del SDK tienen una única forma para todos los invocadores;
+no existe un `Row` que sea correcto tanto para un lector con el rol `hr` como para uno que no
+lo tiene, por lo que una regla de **rol** no los altera. Una columna `.private()` está ausente
+de los tres, y una columna `.readOnly()` está ausente de `Insert` y `Update`. Los
+[tipos inferidos](/docs/schema/types/) siguen la misma regla.
 
-El documento OpenAPI expone la regla en lugar de fingir ser específico para cada emisor. Cada propiedad restringida incluye `x-rebase-access`:
+El documento OpenAPI declara la regla en lugar de fingir estar adaptado a cada invocador.
+Cada columna restringida incluye `x-rebase-access`:
 
 ```json
 "salary": {
@@ -166,27 +265,49 @@ El documento OpenAPI expone la regla en lugar de fingir ser específico para cad
 }
 ```
 
-Un campo que nadie puede leer está ausente del esquema de lectura y de los parámetros de filtrado; un campo que nadie puede escribir está ausente del esquema de entrada. Ambas direcciones son esquemas independientes y se evalúan por separado, de modo que un token que un administrador envía mediante POST y nunca vuelve a leer aparece en el cuerpo de la solicitud y no en la fila.
+Un campo que nadie puede leer está ausente del esquema de lectura y de los parámetros
+de filtrado; un campo que nadie puede escribir está ausente del esquema de entrada. Ambas
+direcciones son esquemas independientes y se evalúan por separado, de modo que un token que un admin
+envía mediante POST y nunca vuelve a leer aparece en el cuerpo de la petición y no en la fila.
 
-## Escrituras en proceso (in-process)
+## Escrituras en proceso
 
-Las escrituras en proceso — `context.data` en un callback, `rebase.dataAsAdmin` en un callback, una función o un trabajo programado (cron job) — no pasan por la comprobación de escritura. Esa es la misma exención que `excludeFromApi` siempre ha tenido, y es lo que permite que la regla sea aplicable: algo tiene que ser capaz de almacenar el hash de la contraseña.
+Las escrituras en proceso (`context.data` en un hook, `rebase.dataAsAdmin` en un hook,
+una función o un cron job) no pasan por la comprobación de escritura: `.readOnly()`,
+un `access.write` por campo y `.private()` son reglas del límite de la API.
+Eso es lo que permite que la regla sea ejecutable en absoluto: algo tiene que ser capaz de
+almacenar el hash de la contraseña. Lo que sí se mantiene en proceso, tanto para una columna como para
+el enlace vinculado a ella: las marcas temporales del servidor prevalecen sobre un valor suministrado, una fila no puede
+cambiar de tenant y su clave no puede cambiar. La seguridad a nivel de fila se aplica
+en todas partes.
 
-Las lecturas a través de `rebase.dataAsAdmin` poseen el rol `admin`, por lo que una regla de roles no les oculta nada. `[]` todavía sí lo hace — incluso para `dataAsAdmin`. Usa [`rebase.sql()`](/docs/backend/custom-functions) si necesitas la columna sin procesar.
+Las lecturas mediante `rebase.dataAsAdmin` poseen el rol `admin`, por lo que una regla de rol no
+les oculta nada. `[]` aún lo hace, incluso frente a `dataAsAdmin`. Utiliza
+[`rebase.sql()`](/docs/backend/custom-functions) si necesitas la columna sin procesar.
 
 ## Validación
 
-Esto se rechaza al arrancar, antes de que el servidor sirva nada:
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-- `access` y `excludeFromApi` en la misma propiedad — son el mismo mecanismo y el flag tiene prioridad, por lo que el bloque junto a él quedaría inerte;
-- una cadena de texto simple donde corresponde una lista (`read: "admin"`), lo cual se interpreta como una regla no vacía que ningún emisor cumple y ocultaría el campo a todo el mundo;
-- un rol que no sea una cadena de texto no vacía;
-- un campo restringido incluido en el `search.fields` de la colección.
+`.access()` en una columna y `access` en una relación lanzan un error cuando el módulo
+se carga, a menos que `read` y `write` sean listas de nombres de roles no vacíos: una cadena
+donde corresponde una lista (`read: "admin"`) se rechaza en lugar de interpretarse como
+otra cosa.
 
-Los *nombres* de los roles no se validan contra un conjunto cerrado: los roles son datos de la aplicación, creados y eliminados mientras el servidor está en ejecución. Una errata en uno de ellos resulta en un campo que nadie puede leer, lo cual es la dirección más segura para fallar.
+Estos casos se rechazan cuando se compila el esquema, antes de que el servidor sirva
+nada:
+
+- `.private()` y `.access()` en la misma columna: son un mismo mecanismo;
+- una columna con lectura restringida nombrada en el `search.fields` de la tabla, o usada como su
+  campo `tenant`;
+- una clave primaria `.private()`: la clave es el mecanismo por el cual se referencia cada fila.
+
+Los *nombres* de los roles no se validan contra un conjunto predefinido: los roles son datos de la aplicación, creados
+y eliminados mientras el servidor se ejecuta. Un error tipográfico en uno de ellos da como resultado un campo que nadie puede leer, lo
+cual es la dirección segura ante un fallo.
 
 ## Consulta también
 
-- [Reglas de seguridad (RLS)](/docs/collections/security-rules/) — a qué filas accede un emisor
-- [Propiedades](/docs/collections/properties/) — la tabla completa de opciones
+- [Seguridad a nivel de fila](/docs/collections/security-rules/) — a qué filas accede un invocador
+- [Columnas](/docs/schema/columns/) — todos los modificadores de columna
 - [Códigos de error](/docs/backend/errors/) — `FIELD_NOT_READABLE`, `FIELD_NOT_WRITABLE`

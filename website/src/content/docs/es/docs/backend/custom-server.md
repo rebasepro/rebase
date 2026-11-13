@@ -1,22 +1,22 @@
 ---
-sourceHash: 41c24af8b53a93a9
+sourceHash: c42fc466c64146e7
 title: Integración de servidor personalizado
 sidebar_label: Servidor personalizado
-description: Construye el backend de Rebase a partir de piezas públicas en tu propio servidor — createRebaseBackend, sus grupos de rutas, mount, attachRealtime y start — o integra el driver de Postgres en Express.
+description: Construye el backend de Rebase a partir de piezas públicas en tu propio servidor — createRebaseBackend, sus grupos de rutas, mount, attachRealtime y start — o integra el controlador de Postgres en Express.
 ---
 
 # Integración de servidor personalizado
 
-`initializeRebaseBackend` es un atajo. Construye todo el backend, lo monta en tu app
-de Hono bajo `/api`, adjunta el socket de realtime a tu servidor HTTP e inicia el
-trabajo en segundo plano, todo en una sola llamada. Cuando eso es lo que quieres,
-úsala.
+`initializeRebaseBackend` es un atajo. Construye todo el backend, lo monta
+en tu aplicación Hono bajo `/api`, conecta el socket de tiempo real a tu servidor
+HTTP e inicia las tareas en segundo plano, en una sola llamada. Cuando eso sea lo que buscas,
+úsalo.
 
-Cuando no lo es, baja un paso. Cada parte de esa llamada es una pieza pública a la
-que puedes llamar tú mismo: construye el backend y luego monta todo o solo los
-grupos de rutas que quieras, en las rutas que quieras, y decide qué proceso inicia
-los temporizadores. [Integrar el driver de Postgres](/docs/backend/embedding-postgres-driver/)
-va un paso más allá y abre el driver de Postgres por sí solo en una app de Express.
+Cuando no sea así, baja un nivel. Cada parte de esa llamada es una pieza pública
+que puedes invocar tú mismo: construye el backend, luego monta todo o solo los
+grupos de rutas que quieras, en las rutas que desees, y decide qué proceso inicia
+los temporizadores. [Integración del controlador de Postgres](/docs/backend/embedding-postgres-driver/)
+va un paso más allá y abre únicamente el controlador de Postgres en una aplicación Express.
 
 ## Configuración del entorno
 
@@ -26,14 +26,14 @@ Rebase proporciona una utilidad centralizada `loadEnv()` en `@rebasepro/server` 
 import dotenv from "dotenv";
 import { loadEnv } from "@rebasepro/server";
 
-// `rebase dev` and `rebase start` name the project's .env in DOTENV_CONFIG_PATH.
-// Unset, dotenv reads `.env` in the working directory.
+// `rebase dev` y `rebase start` nombran el .env del proyecto en DOTENV_CONFIG_PATH.
+// Si no está establecido, dotenv lee `.env` en el directorio de trabajo.
 dotenv.config({ path: process.env.DOTENV_CONFIG_PATH, quiet: true });
 
 export const env = loadEnv();
 ```
 
-Para añadir tus propias variables tipadas, amplía el esquema:
+Para añadir tus propias variables tipadas, extiende el esquema:
 
 ```typescript
 import { loadEnv, z } from "@rebasepro/server";
@@ -45,28 +45,37 @@ export const env = loadEnv({
         STRIPE_SECRET_KEY: z.string(),
     })
 });
-// env.SMTP_HOST  → string | undefined  (fully typed)
-// env.STRIPE_SECRET_KEY → string        (validated, required)
+// env.SMTP_HOST  → string | undefined  (totalmente tipado)
+// env.STRIPE_SECRET_KEY → string        (validado, requerido)
 ```
 
 :::caution[Dos copias de zod]
-Cargar dos copias de zod a la vez solía romper esta llamada en silencio. `loadEnv` combinaba los esquemas con `.merge()`, que acepta un esquema de la otra copia y luego rechaza cada campo que tenga un `.default()`. El servidor se iniciaba, reportaba éxito y no ejecutaba ninguno de sus crons; nada en el fallo mencionaba zod.
+Tener dos copias de zod cargadas al mismo tiempo solía romper esta llamada silenciosamente. `loadEnv`
+combinaba los esquemas con `.merge()`, el cual acepta un esquema de la otra copia
+y luego rechaza cada campo que contenga un `.default()`. El servidor se iniciaba,
+reportaba éxito y no ejecutaba ninguno de sus cron jobs; nada en el fallo mencionaba
+zod.
 
-`loadEnv` ahora valida el esquema base y tu esquema `extend` cada uno con su propio `.parse()`, así que un esquema creado por otra copia de zod funciona. El runtime proporciona `zod`, y el `backend/package.json` del scaffold lo lista en el rango que usa `@rebasepro/server`, así que se instala una sola copia: mantén ambos iguales.
+`loadEnv` ahora valida el esquema base y tu esquema `extend` cada uno con su
+propio `.parse()`, de modo que un esquema construido por otra copia de zod funciona. El runtime
+proporciona `zod`, y el `backend/package.json` del scaffold lo lista en el rango
+que usa `@rebasepro/server`, por lo que se instala una sola copia: mantén ambas versiones iguales.
 :::
 
 **Comportamientos clave:**
-- Genera `JWT_SECRET` y `REBASE_SERVICE_KEY` en desarrollo cuando no están definidos, para que puedas comenzar sin configuración manual, y los guarda en caché en `.rebase-dev-secrets.json` para que un reinicio no cierre la sesión de nadie.
-- Bloquea los secretos generados automáticamente en producción; debes definirlos explícitamente.
-- Valida que `CORS_ORIGINS` o `FRONTEND_URL` estén configurados en producción.
-- Rechaza un valor `extend` que no sea un esquema de zod.
-- Lanza un `Error` que nombra cada variable que falta o es incorrecta, como `DATABASE_URL: is required`, con los issues de zod en su propiedad `issues`.
+- Genera `JWT_SECRET` y `REBASE_SERVICE_KEY` en desarrollo cuando no están establecidos, para que puedas comenzar sin configuración manual, y los almacena en caché en `.rebase-dev-secrets.json` para que un reinicio no cierre la sesión de nadie.
+- Bloquea los secretos autogenerados en producción — debes establecerlos explícitamente.
+- Valida que `CORS_ORIGINS` o `FRONTEND_URL` esté establecido en producción.
+- Rechaza un valor de `extend` que no sea un esquema de zod.
+- Lanza un `Error` nombrando cada variable que falte o sea incorrecta, como `DATABASE_URL: is required`, con los issues de zod en su propiedad `issues`.
 
-Consulta `.env.example` en la aplicación generada para ver la lista completa de variables admitidas.
+Consulta `.env.example` en la aplicación generada por el scaffold para ver la lista completa de variables soportadas.
 
 ## Un paso por debajo de `initializeRebaseBackend`
 
-`initializeRebaseBackend` son estas llamadas, y nada más:
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+`initializeRebaseBackend` consiste en estas llamadas, y nada más:
 
 ```typescript
 import { createRebaseBackend, installUnhandledRejectionHandler, setDefaultBackend } from "@rebasepro/server";
@@ -74,8 +83,8 @@ import { createRebaseBackend, installUnhandledRejectionHandler, setDefaultBacken
 installUnhandledRejectionHandler();
 const backend = await createRebaseBackend({
     ...options,
-    // `false` or `{ collections: false, realtime: false }` in the cases
-    // the `provision` section below lists.
+    // `false` o `{ collections: false, realtime: false }` en los casos
+    // que enumera la sección `provision` más abajo.
     provision: true
 });
 setDefaultBackend(backend);
@@ -84,15 +93,15 @@ await backend.attachRealtime(server);
 backend.start();
 ```
 
-El `shutdown()` que devuelve también cierra el servidor que se le dio. Aquí está
-lo mismo escrito por completo como el `backend/src/index.ts` de un proyecto, listo
-para cambiar. `rebase dev` ejecuta ese archivo cuando un proyecto lo tiene, en lugar
-del arranque propio del runtime. Pegado en un proyecto scaffold, sirve lo que
-servía el runtime: la API en el puerto que eligió `rebase dev`, el inicio de sesión
-y el registro con la colección de usuarios del proyecto, las funciones de
-`backend/functions/`, los trabajos cron de `backend/crons/`, los buckets declarados
-en `config/resources.ts` y el CORS que el panel de administración necesita en su
-propio puerto.
+El `shutdown()` que devuelve también cierra el servidor que se le proporcionó. Aquí está
+lo mismo escrito como el `backend/src/index.ts` de un proyecto, listo para ser modificado.
+`rebase dev` ejecuta ese archivo cuando un proyecto dispone de uno, en lugar del propio
+arranque del runtime. Pegado en un proyecto generado mediante scaffold, sirve lo que servía el runtime:
+la API en el puerto que eligió `rebase dev`, inicio de sesión y registro con la
+tabla de autenticación del proyecto, las tablas que exporta `backend/schema/index.ts`, los
+hooks globales en `backend/hooks.ts`, las funciones en `backend/functions/`, los cron jobs
+en `backend/crons/`, los buckets declarados en `backend/resources.ts`, y el CORS
+que el panel de administración necesita en su propio puerto.
 
 ```typescript
 import { existsSync } from "node:fs";
@@ -122,9 +131,9 @@ import {
     postgresDriverConfigFromEnv
 } from "@rebasepro/server-postgres";
 import { declaredStorageSources } from "@rebasepro/types";
-import "../../config/resources";
-import usersCollection from "../../config/collections/users";
-import { storageAuthorize } from "../../config/storage";
+import "../resources";
+import { storageAuthorize } from "../storage";
+import { hooks } from "../hooks";
 
 // dotenv never overrides a variable already set, so what `rebase dev` sets wins.
 dotenv.config({ path: process.env.DOTENV_CONFIG_PATH, quiet: true });
@@ -151,12 +160,12 @@ const server = createServer({ maxHeaderSize: 64 * 1024 }, getRequestListener(app
 const { db, pool, connectionString } = createPostgresDatabaseConnection(env.DATABASE_URL);
 
 const backend = await createRebaseBackend({
-    collectionsDir: path.join(root, "config/collections"),
+    schemaDir: path.join(root, "backend/schema"),
+    hooks,
     functionsDir: path.join(root, "backend/functions"),
     cronsDir: existsSync(cronsDir) ? cronsDir : undefined,
     database: createPostgresAdapter(postgresDriverConfigFromEnv({ connection: db, connectionString })),
     auth: {
-        collection: usersCollection,
         jwtSecret: env.JWT_SECRET,
         serviceKey: env.REBASE_SERVICE_KEY,
         allowRegistration: env.ALLOW_REGISTRATION,
@@ -189,110 +198,118 @@ installShutdownHandlers(
 );
 ```
 
-Las rutas son las del scaffold. El archivo depende de lo que fija `rebase dev`: el
-puerto que eligió en `PORT`, la base de datos gestionada en `DATABASE_URL` y el
-`.env` del proyecto en `DOTENV_CONFIG_PATH`. `loadEnv()` valida lo que eso contiene
-y genera `JWT_SECRET` en desarrollo cuando no está definido. Si escuchas en otro
-puerto, el panel de administración no puede llegar al servidor; si omites
-`loadEnv()` y no hay `JWT_SECRET`, el inicio de sesión queda desactivado.
-`rebase dev` también espera la línea `Server running at http://localhost:<port>`
-antes de informar de que el backend está en marcha. Las opciones de `auth` son las
-del scaffold; el runtime también lee los proveedores OAuth, el correo y las demás
-variables `AUTH_*`, así que pasa las que uses, como describe
-[Autenticación](/docs/backend/authentication/). Tampoco sirve el archivo el panel de
-administración compilado en producción: lo hace el punto de entrada que escribe
-[`rebase eject`](/docs/cli/), con `serveSPA`, y abre una conexión por cada base de
-datos declarada en `config/resources.ts`.
+Las rutas son las del scaffold; omite la importación y la opción `hooks` cuando el
+proyecto no tenga un `backend/hooks.ts`. Los usuarios se almacenan en la tabla que
+`backend/schema` declara con `defineAuthTable`, por lo que `auth` no define ninguna tabla por nombre.
+El archivo se basa en lo que establece `rebase dev`: el
+puerto que eligió en `PORT`, la base de datos administrada en `DATABASE_URL`, y el
+`.env` del proyecto en `DOTENV_CONFIG_PATH`. `loadEnv()` valida lo que contiene,
+y genera `JWT_SECRET` en desarrollo cuando no está establecido. Escucha en
+otro puerto y el panel de administración no podrá comunicarse con el servidor; omite `loadEnv()` y,
+al no haber `JWT_SECRET`, el inicio de sesión estará desactivado.
+`rebase dev` también espera a la línea `Server running at http://localhost:<port>`
+antes de reportar que el backend está listo. Las opciones de `auth` son las del scaffold; el
+runtime también lee los proveedores de OAuth, el correo electrónico y las demás variables `AUTH_*`,
+así que pasa las que utilices, tal como describe [Autenticación](/docs/backend/authentication/).
+El archivo tampoco sirve el panel de administración compilado en producción: el
+punto de entrada que genera [`rebase eject`](/docs/cli/) sí lo hace, con `serveSPA`, y abre
+una conexión por cada base de datos declarada en `backend/resources.ts`.
 
-`createRebaseBackend` recibe las mismas opciones que `initializeRebaseBackend`,
-sin `app`, `server` ni `basePath`, y con `provision` obligatorio. Lo construye
-todo: abre la base de datos, configura la autenticación y el almacenamiento,
-carga las funciones y los trabajos cron, y construye cada grupo de rutas y el
-cliente en el proceso. No monta nada, no inicia ningún temporizador y no añade
-ningún listener al proceso. Cada una de las demás es una llamada que haces tú, o
-dejas fuera:
+`createRebaseBackend` acepta las mismas opciones que `initializeRebaseBackend`,
+sin `app`, `server` y `basePath`, y con `provision` como parámetro obligatorio.
+Construye todo: abre la base de datos, configura la autenticación y el almacenamiento, carga las
+funciones y los cron jobs, y construye cada grupo de rutas y el cliente
+en el mismo proceso. No monta nada, no inicia ningún temporizador y no añade ningún listener de proceso. Cada
+una de las acciones restantes es una llamada que tú realizas, u omites:
 
 | Llamada | Qué hace | Si la omites |
 |---|---|---|
-| `installUnhandledRejectionHandler()` | Escribe en el registro un rechazo de promesa que nadie manejó, como una llamada sin esperar su resultado (fire-and-forget) en una función personalizada, en lugar de dejar que Node termine el proceso. Afecta a todo el proceso, así que es decisión del proceso, no de un backend. Devuelve una función que lo desinstala, o `undefined` cuando ya había uno instalado o `REBASE_EXIT_ON_UNHANDLED_REJECTION` está definida. | un rechazo no manejado termina el proceso, el comportamiento por defecto de Node |
-| `setDefaultBackend(backend)` | Hace de este backend el [valor por defecto del proceso](#varios-backends-en-un-mismo-proceso): aquel por el que responden `import { rebase }` y el resto de la API a nivel de módulo fuera de las solicitudes, las ejecuciones de cron y los trabajos que sirve un backend | esa API no tiene ningún backend por el que responder ahí |
-| `backend.mount(app, { basePath })` | Cada grupo de rutas bajo `basePath` (por defecto `/api`), detrás del middleware de todo el proceso: ids de solicitud, el límite del cuerpo, la compresión, CSRF, el registro de solicitudes y la envoltura JSON para errores y rutas desconocidas. También el documento JWKS, el servidor MCP, la documentación OpenAPI y los alias de rutas heredados. | no se sirve nada por HTTP; `backend.rebase` y `backend.fetch` siguen funcionando |
-| `backend.attachRealtime(server, { path })` | El socket de realtime, en `server`, que responde a los upgrades solo en `path` | no hay consultas en vivo |
-| `backend.start()` | El programador de crons, los workers de trabajos, los barridos de tokens caducados y de retención del historial, el muestreador de métricas y la auditoría RLS programada, cada uno donde `ownership` se lo asigna a este proceso. Se puede llamar dos veces sin problema. | ninguno se ejecuta, que es lo que quiere un proceso que sirve solicitudes en un [despliegue dividido](/docs/deployment/split-processes/) |
-| `backend.shutdown(timeoutMs, { server })` | Detiene lo que iniciaron `start()` y `attachRealtime()`, esperando a las ejecuciones de cron y los trabajos en curso. Cierra `server` solo cuando se lo pasas. | |
+| `installUnhandledRejectionHandler()` | Registra un rechazo de promesa no manejado, como una llamada tipo fire-and-forget en una función personalizada, en lugar de permitir que Node termine el proceso. Aplica a nivel de proceso, por lo que es decisión del proceso, no de un backend. Devuelve una función que lo desinstala, o `undefined` si ya se había instalado uno o si `REBASE_EXIT_ON_UNHANDLED_REJECTION` está establecido. | un rechazo no manejado termina el proceso, el comportamiento por defecto de Node |
+| `setDefaultBackend(backend)` | Convierte este backend en el [predeterminado del proceso](#varios-backends-en-un-proceso): lo que `import { rebase }` y el resto de la API a nivel de módulo responden fuera de las peticiones, ejecuciones de cron y trabajos que sirve un backend | esa API no tiene ningún backend al que responder allí |
+| `backend.mount(app, { basePath })` | Cada grupo de rutas bajo `basePath` (por defecto `/api`), detrás del middleware para todo el proceso: identificadores de petición, límite del cuerpo, compresión, CSRF, registro de peticiones y la envoltura JSON para errores y rutas desconocidas. También el documento JWKS, el servidor MCP, la documentación OpenAPI y los alias de rutas heredadas. | no se sirve nada a través de HTTP; `backend.rebase` y `backend.fetch` siguen funcionando |
+| `backend.attachRealtime(server, { path })` | El socket en tiempo real, en `server`, respondiendo únicamente a las actualizaciones (upgrades) en `path` | no hay consultas en vivo (live queries) |
+| `backend.start()` | El programador de cron, los workers de tareas, las limpiezas periódicas de tokens expirados y retención de historial, el muestreador de métricas y la auditoría programada de RLS, cada uno donde `ownership` lo asigne a este proceso. Es seguro llamarlo dos veces. | ninguno de ellos se ejecuta, que es lo que busca un proceso que sirve peticiones en un [despliegue dividido](/docs/deployment/split-processes/) |
+| `backend.shutdown(timeoutMs, { server })` | Detiene lo que iniciaron `start()` y `attachRealtime()`, esperando a que finalicen las ejecuciones de cron y los trabajos en curso. Cierra `server` solo cuando se lo pasas. | |
 
-El `path` por defecto del socket es la ruta base que se pasa a `mount()` sin un
-`/api` final, así que `/api` da `/` y `/x/api` da `/x`; una ruta base que
-no termina en `/api` da `/`. Ahí es donde se conecta el
-SDK, porque se conecta a su `baseUrl` mientras que sus solicitudes HTTP van a
-`${baseUrl}/api`. Un upgrade a cualquier otra ruta se deja a los demás listeners de
-`upgrade` del servidor, así que tu app puede ejecutar su propio servidor WebSocket
-en el mismo `http.Server`.
+El `path` por defecto del socket es la ruta base proporcionada a `mount()` eliminando
+`/api` al final, de modo que `/api` da `/` y `/x/api` da `/x`; una ruta base que
+no termine en `/api` da `/`. Ahí es donde se conecta el
+SDK, ya que se conecta a su `baseUrl` mientras que sus peticiones HTTP van a
+`${baseUrl}/api`. Una actualización hacia cualquier otra ruta se delega a los otros listeners
+de `upgrade` del servidor, por lo que tu aplicación puede ejecutar su propio servidor WebSocket en el mismo
+`http.Server`.
 
-### Qué puede cambiar crear un backend: `provision`
+### Qué puede cambiar la creación de un backend: `provision`
 
-Crear un backend puede ejecutar DDL, así que `createRebaseBackend` te pide que lo
-decidas:
+Crear un backend puede ejecutar DDL, por lo que `createRebaseBackend` te pide que decidas:
 
 | `provision` | Crea | Para |
 |---|---|---|
-| `true` | Todo lo que sirve el backend: las tablas de las colecciones y sus políticas RLS, la captura de cambios para realtime, el rol con el que se ejecutan las solicitudes y las tablas propias del framework (claves de API, ejecuciones de cron, trabajos, métricas). | un despliegue de un solo proceso; lo que pasa `initializeRebaseBackend` |
-| `false` | Nada, ni en el arranque ni después: tampoco se crean las tablas que otros backends crean en su primer uso (claves de idempotencia, claims de cron). El esquema ya debe existir, aplicado por `rebase db push`, una migración u otro proceso. Si faltan las tablas de auth, el arranque se rechaza; una tabla opcional que falta desactiva su función y se nombra en el log. | un script, un test, un REPL, un proceso que solo lee, una base de datos que solo su proceso de cambios puede modificar |
-| `{ collections: false, realtime: false }` | Las tablas del framework y el rol, pero no el esquema de las colecciones ni la captura de cambios. | un proceso que no es dueño del esquema en un despliegue dividido |
+| `true` | Todo lo que sirve el backend: las tablas declaradas y sus políticas RLS, captura de cambios para tiempo real, el rol bajo el que se ejecutan las peticiones y las tablas propias del framework (claves de API, ejecuciones de cron, trabajos, métricas). | un despliegue de un solo proceso; lo que pasa `initializeRebaseBackend` |
+| `false` | Nada, ni en el arranque ni más adelante: las tablas que otros backends crean en el primer uso (claves de idempotencia, bloqueos de cron) tampoco se crean. El esquema ya debe existir, aplicado mediante `rebase db push`, una migración u otro proceso. Si faltan tablas de autenticación se rechaza en el arranque; si falta una tabla opcional se desactiva su función, indicándolo en los registros. | un script, una prueba, un REPL, un proceso de solo lectura, una base de datos que solo tu proceso de cambios puede modificar |
+| `{ collections: false, realtime: false }` | Las tablas del framework y el rol, pero no el esquema ni la captura de cambios de las tablas declaradas. La clave mantiene su nombre anterior. | un proceso que no es propietario del esquema en un despliegue dividido |
 
-Es una opción y no un paso posterior a propósito. El driver lee las tablas al
-abrirse y adjunta la captura de cambios a las que existen en ese momento. Un
-`provision()` llamado después se ejecutaría cuando el driver ya habría decidido
-qué existe. `REBASE_MIGRATE_ON_BOOT=none` sigue desactivando el esquema de las
-colecciones para cualquier backend del proceso. `initializeRebaseBackend` pasa `false` cuando `REBASE_PROVISION=false`.
+Es una opción deliberada en lugar de un paso posterior. El controlador lee las
+tablas a medida que se abre y adjunta la captura de cambios a las que existen en ese momento.
+Un `provision()` invocado después se ejecutaría cuando el controlador ya hubiese
+determinado qué existe. `REBASE_MIGRATE_ON_BOOT=none` sigue desactivando el esquema
+de tablas para cualquier backend en el proceso. `initializeRebaseBackend` pasa
+`false` cuando `REBASE_PROVISION=false`.
 
-## Montar solo los grupos que quieras
+## Montar solo los grupos que desees
 
-`backend.routes` contiene los grupos de rutas. Cada uno es una sub-app de Hono que
-puedes montar por separado, en cualquier ruta:
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+`backend.routes` contiene los grupos de rutas. Cada uno es una subaplicación de Hono que puedes
+montar por separado, en cualquier ruta:
 
 ```typescript
 import { Hono } from "hono";
 import { createRebaseBackend, type HonoEnv } from "@rebasepro/server";
 
 const app = new Hono<HonoEnv>();
-const backend = await createRebaseBackend({ database: adapter, auth, collections, functions, provision: true });
+const backend = await createRebaseBackend({ database: adapter, auth, tables, defaultRls, functions, provision: true });
 
 app.route("/v2/data", backend.routes.data());      // the data API, at a path of your own
 app.route("/hooks", backend.routes.functions());   // getUser(c) and getDriver(c) work inside
 ```
 
-`collections` es el array que exporta el `config/collections/index.ts` de un scaffold. Lleva las `defaultSecurityRules` de ese índice, igual que `collectionsDir`, así que el backend aprovisiona las políticas que aprovisionaría `rebase db push`. Un array propio lleva solo las reglas que declaran sus colecciones, y `provision: true` deja solo para administradores una que no declara ninguna, eliminando las políticas que Rebase generó antes para ella, en todos los servidores que comparten la base de datos.
+`tables` es una lista de resultados de `defineTable`, `defineAuthTable` y `defineView` — típicamente todo lo que exporta `backend/schema/index.ts` — y `defaultRls` es lo que toman sus tablas con `rls: "inherit"`, el `defaultRls` que exporta dicho index. Cada tabla se compila cuando se crea el backend, y cualquier problema en alguna de ellas (sin `rls`, `"inherit"` sin `defaultRls`, una relación hacia una tabla que no está en la lista) la rechazará con un `SchemaDefinitionError` detallando cada uno. Pasa `schemaDir` en su lugar para cargar el directorio como lo hace el runtime, incluyendo las exportaciones del index y `defaultRls`; si pasas ambos, `tables` es lo que se sirve mientras que `schemaDir` es donde escribe el editor de esquemas.
 
-El índice del scaffold aplica los valores por defecto a su array. En un proyecto generado con la 0.24, copia ese bucle del `config/collections/index.ts` de un scaffold nuevo, o pasa `collectionsDir`.
+```typescript no-verify
+import * as schema from "../schema";
+
+const tables = [schema.users, schema.posts];
+const defaultRls = schema.defaultRls;
+```
 
 | Grupo | Normalmente en | Sirve |
 |---|---|---|
-| `routes.auth()` | `/api/auth` | inicio de sesión, sesiones, OAuth, restablecimiento de contraseña, `GET /config`, las claves de API propias de quien llama y el catálogo de scopes |
-| `routes.data()` | `/api/data` | las rutas REST de las colecciones y su historial |
-| `routes.storage()` | `/api/storage` | el almacenamiento de archivos, o el router que responde `STORAGE_NOT_CONFIGURED` |
+| `routes.auth()` | `/api/auth` | inicio de sesión, sesiones, OAuth, restablecimiento de contraseña, `GET /config`, las claves de API del propio llamador y el catálogo de scopes |
+| `routes.data()` | `/api/data` | las rutas REST de las tablas y su historial |
+| `routes.storage()` | `/api/storage` | almacenamiento de archivos, o el router que responde `STORAGE_NOT_CONFIGURED` |
 | `routes.functions()` | `/api/functions` | tus [funciones personalizadas](/docs/backend/custom-functions/), o el reenviador al proceso que las sirve |
-| `routes.admin()` | `/api/admin` | usuarios y roles, claves de servicio, edición del esquema, mantenimiento del almacenamiento, copias de seguridad, la auditoría RLS, la exportación SQL, el buzón de desarrollo y los registros |
-| `routes.cron()` | `/api/admin/cron` | la superficie de administración de cron |
+| `routes.admin()` | `/api/admin` | usuarios y roles, claves de servicio, edición de esquemas, mantenimiento de almacenamiento, copias de seguridad, auditoría de RLS, exportación SQL, el buzón de correo de desarrollo y los registros |
+| `routes.cron()` | `/api/admin/cron` | la interfaz de administración de cron |
 | `routes.meta()` | `/api/meta` | el contrato del proyecto que lee un SDK generado |
+| `routes.schema()` | `/api/schema` | `GET /tables`: los descriptores de tabla a partir de los cuales renderizan el CMS y el Studio — consulta [Endpoints](/docs/backend/endpoints/#schema) |
 
-Cada grupo lleva el middleware que necesita: el contexto de autenticación que pone
-el `user`, el `driver` y los `scopes` de quien llama en la solicitud, sus límites de
-tasa y su control de acceso de administración. Por eso responde igual dondequiera
-que se monte, también bajo una ruta parametrizada como `/:tenant/data`. Un grupo
-también lee dónde se montó, así que la API de datos sigue enrutando cada colección a
-su fuente de datos y el listado de funciones nombra las rutas en las que realmente
-se sirve.
+Cada grupo incluye el middleware que necesita: el contexto de autenticación que sitúa el
+`user`, `driver` y `scopes` del llamador en la petición, sus límites de tasa (rate limits) y su
+control de acceso de administrador. Por lo tanto, responde de la misma manera dondequiera que se monte, incluso bajo una
+ruta parametrizada como `/:tenant/data`. Un grupo también detecta dónde fue
+montado, de modo que la API de datos sigue enrutando cada tabla a su base de datos y
+el listado de funciones indica las rutas en las que realmente se sirve.
 
-Un grupo también rechaza por sí mismo `x-rebase-impersonate` y `x-rebase-simulate-*`
-(`400 IMPERSONATION_UNSUPPORTED` / `SIMULATION_UNSUPPORTED`), salvo que sea el grupo
-de datos o el de funciones, que los respetan. `refuseUnhonouredImpersonation(honouredMounts)`
+Un grupo también rechaza `x-rebase-impersonate` y `x-rebase-simulate-*` por sí mismo
+(`400 IMPERSONATION_UNSUPPORTED` / `SIMULATION_UNSUPPORTED`), a menos que sea el
+grupo de datos o de funciones, que sí los admiten. `refuseUnhonouredImpersonation(honouredMounts)`
 de `@rebasepro/server` hace lo mismo para tus propias rutas.
 
-Lo que un grupo no lleva es el middleware de todo el proceso que `mount()` pone
-delante de todo. Al montar los grupos uno por uno, añade tú lo que quieras de él: un
-límite del cuerpo (`bodyLimit` de `hono/body-limit`), compresión y la envoltura JSON
-de errores:
+Lo que un grupo no incluye es el middleware global del proceso que `mount()` coloca al
+frente de todo. Al montar grupos uno por uno, añade por tu cuenta lo que desees
+de este: un límite de cuerpo (`bodyLimit` de `hono/body-limit`), compresión y
+la envoltura JSON para errores:
 
 ```typescript
 import { errorHandler } from "@rebasepro/server";
@@ -300,20 +317,16 @@ import { errorHandler } from "@rebasepro/server";
 app.onError(errorHandler);
 ```
 
-Cada llamada devuelve un router nuevo sobre los mismos handlers, así que puedes
-montar un grupo en dos sitios. Pedir un grupo cuya superficie se desactivó al crear
-este backend (`surfaces: { data: false }`) lanza un error, porque el backend nunca
-lo construyó. La documentación OpenAPI y el servidor MCP no tienen grupo: describen
-las URLs de la disposición de `mount()`, así que solo `mount()` los sirve.
+Cada llamada devuelve un nuevo router sobre los mismos manejadores, por lo que puedes montar un grupo en dos lugares. Solicitar un grupo cuya superficie no fue incluida al crear este backend (`surfaces: { data: false }`) lanza un error, porque el backend nunca lo construyó. La documentación OpenAPI y el servidor MCP no tienen grupo: describen las URLs de la estructura de `mount()`, por lo que solo `mount()` los sirve.
 
-## El backend sin servidor
+## El backend sin un servidor
 
-Un backend ya construido se puede usar sin montar nada. `backend.rebase` es su
-cliente en el proceso, y `backend.fetch(request)` responde a un `Request` como lo
-haría `mount()` en `/api`:
+Un backend que has construido se puede usar sin montar nada.
+`backend.rebase` es su cliente dentro del proceso, y `backend.fetch(request)`
+responde a una `Request` tal como lo haría `mount()` en `/api`:
 
 ```typescript
-const backend = await createRebaseBackend({ database: adapter, collections, provision: false });
+const backend = await createRebaseBackend({ database: adapter, schemaDir, provision: false });
 
 const { data } = await backend.rebase.dataAsAdmin.posts.find({ limit: 5 });
 const res = await backend.fetch(new Request("http://local/api/meta/schema-version"));
@@ -321,25 +334,24 @@ const res = await backend.fetch(new Request("http://local/api/meta/schema-versio
 await backend.shutdown();
 ```
 
-Las llamadas del plano de control de ese cliente (`rebase.auth`, `rebase.admin`,
-`rebase.functions` y `rebase.cron`) llegan a las rutas del propio backend dentro del
-proceso. Funcionan dondequiera que hayas montado los grupos, o aunque no los hayas
-montado, y el middleware que añadiste a tu propia app no se ejecuta en ellas.
+Las llamadas del plano de control en ese cliente (`rebase.auth`, `rebase.admin`,
+`rebase.functions` y `rebase.cron`) acceden a las rutas propias del backend
+dentro del proceso. Funcionan en cualquier lugar donde hayas montado los grupos (o incluso si no los montaste), y
+el middleware que agregues a tu propia aplicación no se ejecuta sobre ellas.
 
 Para un script que solo necesita los datos, [`openRebase`](/docs/backend/scripts/)
-abre la base de datos sin construir ningún backend.
+abre la base de datos sin construir un backend en absoluto.
 
-## Varios backends en un mismo proceso
+## Varios backends en un proceso
 
-`createRebaseBackend` no escribe ningún global del proceso. Cada backend guarda su
-propio estado en `backend.services`, así que dos en un mismo proceso siguen siendo
-dos: cada uno firma y verifica sesiones con sus propias claves, juzga los scopes por
-sus propios roles, comprueba las claves de API en su propio almacén y cuenta los
-límites de tasa en su propio almacén.
+`createRebaseBackend` no escribe variables globales en el proceso. Cada backend mantiene su propio
+estado en `backend.services`, por lo que dos de ellos en un mismo proceso se mantienen independientes: cada uno
+firma y verifica sesiones con sus propias claves, evalúa los scopes según sus propios roles,
+comprueba las claves de API en su propio almacén y contabiliza los límites de tasa en su propio almacén.
 
 ```typescript
-const a = await createRebaseBackend({ database: adapterA, auth: { jwtSecret: SECRET_A }, collections, provision: true });
-const b = await createRebaseBackend({ database: adapterB, auth: { jwtSecret: SECRET_B }, collections, provision: true });
+const a = await createRebaseBackend({ database: adapterA, auth: { jwtSecret: SECRET_A }, tables, provision: true });
+const b = await createRebaseBackend({ database: adapterB, auth: { jwtSecret: SECRET_B }, tables, provision: true });
 
 app.route("/a/data", a.routes.data());
 app.route("/b/data", b.routes.data());   // a session from `a` is a 401 here
@@ -347,49 +359,47 @@ app.route("/b/data", b.routes.data());   // a session from `a` is a 401 here
 
 | `backend.services` | Qué es |
 |---|---|
-| `jwt` | El servicio JWT del backend: firma y verifica sesiones, enlaces de descarga y sus demás tokens, y sirve su JWKS |
-| `access` | Su modelo de acceso (roles a scopes) y el resolvedor del propietario de una clave personal |
-| `apiKeyStore` | Dónde se comprueban sus claves de API |
-| `rateLimitStore`, `authLimiters` | Sus contadores de límite de tasa, y los limitadores de sus rutas de autenticación |
-| `collections()` | Las colecciones que sirve |
-| `topics`, `queues` | Sus runtimes de topics y de colas |
+| `jwt` | El servicio JWT del backend: firma y verifica sesiones, enlaces de descarga y sus otros tokens, y sirve su JWKS |
+| `access` | Su modelo de acceso (roles a scopes) y el resolver para el propietario de una clave personal |
+| `apiKeyStore` | Donde se validan sus claves de API |
+| `rateLimitStore`, `authLimiters` | Sus contadores de límite de tasa, y los limitadores en sus rutas de autenticación |
+| `tables()` | Los descriptores compilados de las tablas que sirve |
+| `topics`, `queues` | Sus runtimes de topics y colas (queues) |
 
-Un backend al que no se le da `auth.jwtSecret`, como uno cuyo `auth` es un
-adaptador, no firma nada por sí mismo, así que su `services.jwt` sigue el valor por
-defecto del proceso.
+Un backend al que no se le asigne `auth.jwtSecret`, como uno cuya `auth` sea un adaptador,
+no firma nada propio, por lo que su `services.jwt` sigue el valor predeterminado del proceso.
 
-**Los recursos son del proceso.** Las declaraciones `database()`, `bucket()`, `topic()` y
-`queue()` de `config/resources.ts` son valores a nivel de módulo, y
-todos los backends del proceso las leen todas: un backend cuyo propio proyecto
-no declara ningún topic activa igualmente su cola de trabajos para el topic de otro proyecto,
-y se niega a arrancar si su driver no puede soportar uno. Ejecuta los recursos de un solo
-proyecto por proceso. Varios backends de ese único proyecto, cada uno con su propia
-base de datos, no dan problema.
+**Los recursos pertenecen al proceso.** Las declaraciones de `database()`, `bucket()`, `topic()` y
+`queue()` en `backend/resources.ts` son valores a nivel de módulo, y
+cada backend en el proceso lee todas ellas: un backend cuyo propio proyecto
+no declare ningún topic activará de todas formas su cola de trabajos para el topic de otro proyecto,
+y rehusará arrancar si su controlador no puede soportarlo. Ejecuta los recursos de un solo
+proyecto por proceso. Varios backends de ese mismo proyecto, cada uno en su propia
+base de datos, funcionan sin problemas.
 
-**A qué backend responde `rebase`.** Dentro de una solicitud, una ejecución de cron
-o un trabajo que sirve un backend, `rebase`, ya se importe de `@rebasepro/server` o
-se reciba como `ctx.rebase`, es ese backend, y también lo son el `publish` de un
-topic y el `enqueue` de una cola. En cualquier otro lugar (el ámbito del módulo, un
-script, una prueba) responden por el **valor por defecto del proceso**, que
-establece `setDefaultBackend(backend)` y que `initializeRebaseBackend` fija en su
-propio backend. Lo mismo ocurre con el resto de la API a nivel de módulo:
-`verifyAccessToken` y los demás helpers de JWT, `getAccessModel`, `verifyCredential`
-y `extractUserFromToken`.
+**Hacia dónde apunta `rebase`.** Dentro de una petición, una ejecución de cron o un trabajo que sirve
+un backend, `rebase`, ya sea importado desde `@rebasepro/server` o recibido como
+`ctx.rebase`, es ese backend, al igual que el `publish` de topics y el `enqueue` de colas.
+En cualquier otro lugar (ámbito de módulo, un script, un test) responden por el **predeterminado
+del proceso**, el cual se define mediante `setDefaultBackend(backend)`, y que
+`initializeRebaseBackend` asigna a su propio backend. Lo mismo ocurre con el resto de la
+API a nivel de módulo: `verifyAccessToken` y los demás helpers de JWT,
+`getAccessModel`, `verifyCredential` y `extractUserFromToken`.
 
-Tres piezas funcionan directamente sobre un backend, y una sobre ninguno:
+Tres piezas funcionan directamente sobre un backend, y una sin ningún backend:
 
 ```typescript
 import { createJwtService, requireAuth, requireScope } from "@rebasepro/server";
 
 // Mint a session for one of this backend's users, in a test or a login of your
-// own. `userId` is the user's id in the users collection.
+// own. `userId` is the user's id in the auth table.
 const token = await backend.services.jwt.generateAccessToken(userId, ["editor"]);
 
 // Check a session token, an rk_ API key or the service key for a socket or a tunnel of your
 // own, as this backend's routes judge it: its uid, roles, scopes and kind, or null.
 const caller = await backend.verifyCredential(token);
 
-// A route of your own, outside the groups, judged by this backend. The users collection
+// A route of your own, outside the groups, judged by this backend. The auth table
 // declares the app scope: auth: { scopes: { "project:deploy": { label: "Deploy projects" } } }.
 app.post("/deploy", (c, next) => { c.set("services", backend.services); return next(); },
     requireAuth, requireScope("project:deploy"), (c) => c.json({ ok: true }));
@@ -399,56 +409,47 @@ const jwt = createJwtService({ secret: process.env.JWT_SECRET!, accessExpiresIn:
 const payload = await jwt.verifyAccessToken(token);
 ```
 
-Una sesión generada se comprueba como cualquier otra en cada solicitud, así que su
-uid tiene que ser un usuario que exista: para un uid sin usuario, la solicitud se
-rechaza.
+Una sesión generada se valida como cualquier otra en cada petición, por lo que su uid debe corresponder a un usuario existente: para un uid sin usuario, la petición es rechazada.
 
-`verifyCredential` llega al mismo veredicto que las rutas: una sesión que su dueño cerró, un uid sin usuario y una cuenta desactivada devuelven null, y los roles son los que la cuenta tiene ahora. Lanza un error cuando no se puede llegar a la base de datos.
+`verifyCredential` llega a la misma conclusión que las rutas: una sesión en la que su propietario cerró sesión, un uid sin usuario y una cuenta deshabilitada devuelven null, y los roles son los que la cuenta posee actualmente. Lanza un error cuando no se puede alcanzar la base de datos.
 
-Cada grupo de rutas establece `c.var.services` por sí mismo. Una ruta fuera de los
-grupos que usa `requireAuth`, `requireScope` u otro guard de `@rebasepro/server` lo
-lee ahí, y recurre al valor por defecto del proceso cuando no está definido.
-`requireScope` juzga a quien identificó `requireAuth`, así que va después de
-`requireAuth`: por sí solo rechaza cada solicitud con un 401. Acepta un scope
-integrado, o un scope de la aplicación que el backend declara bajo `auth.scopes` en
-su colección de usuarios, como en el comentario de arriba.
+Cada grupo de rutas define `c.var.services` por sí mismo. Una ruta fuera de los grupos que utilice `requireAuth`, `requireScope` u otro guard de `@rebasepro/server` lo lee de allí, y recurre al predeterminado del proceso cuando no está definido. `requireScope` evalúa al llamador identificado por `requireAuth`, por lo que va después de `requireAuth`: por sí solo rechaza cualquier petición con un 401. Acepta un scope integrado, o un scope de la aplicación que el backend declare bajo `auth.scopes` en su tabla de autenticación, tal como se muestra en el comentario anterior.
 
-Un nombre que no es un scope, o uno integrado mal escrito como `data:raed`, lanza un error donde se registra la ruta. Un scope de la aplicación que el backend que responde no declara responde a todos los que llaman, también a un administrador, `500 SCOPE_NOT_DECLARED`.
+Un nombre que no sea un scope, o uno integrado mal escrito como `data:raed`, lanza un error en el momento en que se registra la ruta. Un scope de aplicación que el backend que responde no declara responderá a cualquier llamador, incluso a un administrador, con `500 SCOPE_NOT_DECLARED`.
 
-## Apagado
+## Apagado (Shutdown)
 
-Con `initializeRebaseBackend`, entrega el backend al helper integrado en lugar de
-escribir un manejador de señales. Drena HTTP, detiene el programador de crons,
-desconecta realtime, cierra el pool de SMTP cuando ya nada puede enviar, protege
-contra señales repetidas y fuerza la salida si el apagado se bloquea:
+Desde `initializeRebaseBackend`, pasa el backend al helper integrado en lugar
+de escribir un manejador de señales manualmente. Este drena el tráfico HTTP, detiene el programador de cron,
+desconecta el tiempo real, cierra el pool de SMTP una vez que ya nada pueda enviar mensajes,
+protege contra señales repetidas y fuerza la salida si el apagado se bloquea:
 
 ```typescript
 import { initializeRebaseBackend, installShutdownHandlers } from "@rebasepro/server";
 
-const backend = await initializeRebaseBackend({ app, server, database: adapter, collections });
+const backend = await initializeRebaseBackend({ app, server, database: adapter, tables });
 installShutdownHandlers(backend, { onCleanup: () => pool.end() });
 ```
 
-**No** lo combines con tu propio `server.close()`: el `shutdown()` de ese backend ya
-cierra el servidor que se le dio, y un segundo cierre provoca un bloqueo mutuo
-(deadlock). Un backend de `createRebaseBackend` cierra un servidor solo cuando se lo
-pasas, `backend.shutdown(timeoutMs, { server })`, como en el ejemplo al principio de
-esta página.
+**No** lo combines con tu propio `server.close()`: el método `shutdown()` de ese backend
+ya cierra el servidor que recibió, y un segundo cierre causará
+un interbloqueo (deadlock). Un backend proveniente de `createRebaseBackend` cierra un servidor solo cuando
+se lo pasas explícitamente, `backend.shutdown(timeoutMs, { server })`, como en el ejemplo al
+inicio de esta página.
 
-## Integrar el driver de Postgres
+## Integrar el controlador de Postgres
 
-Un paso más abajo, `@rebasepro/server-postgres` funciona sin el servidor de Rebase
-en absoluto: abre su driver de datos y su socket de realtime dentro de Express, Fastify
-o Node puro, y ensambla tú el resto. Consulta
-[Embedding the Postgres Driver](/docs/backend/embedding-postgres-driver/).
+Un nivel más abajo, `@rebasepro/server-postgres` funciona sin el servidor
+de Rebase en absoluto: abre su controlador de datos y socket de tiempo real dentro de Express, Fastify
+o Node puro, y ensambla el resto por tu cuenta. Consulta
+[Integración del controlador de Postgres](/docs/backend/embedding-postgres-driver/).
 
 ## CORS para un frontend en el navegador
 
-Un servidor personalizado tiene su propia configuración de CORS, y un frontend
-en otro origen solo puede leer las cabeceras de respuesta que ese servidor
-expone. Expón las que lee el SDK, o `etagOf(row)` será siempre `undefined` ahí
-— una escritura con `ifMatch` sale entonces sin `If-Match` — y un 429 pierde su
-`Retry-After`:
+Un servidor personalizado administra su propia configuración de CORS, y un frontend en otro origen
+solo puede leer las cabeceras de respuesta que este expone. Expón aquellas que lee el SDK, o de lo
+contrario `etagOf(row)` siempre será `undefined` allí — y una escritura con `ifMatch` saldrá
+sin `If-Match` — y un error 429 perderá su `Retry-After`:
 
 ```typescript
 import express from "express";
@@ -463,21 +464,21 @@ app.use(cors({
 }));
 ```
 
-`CORS_EXPOSED_HEADERS` es la lista que expone el propio runtime, así que una
-cabecera que el SDK empiece a leer en una versión posterior llega a tu frontend sin
-cambiar nada aquí. Son `ETag`, `Retry-After`, `X-Request-ID`, las tres cabeceras
-`X-RateLimit-*` y `Preference-Applied`, más `Location`, `Upload-Offset` y
-`Rebase-Upload-Result`, con las que responde una subida reanudable (archivos de más de
-8 MiB), y `X-Rebase-Simulated-Context`, que indica con qué identidad se ejecutó la
-solicitud simulada de un administrador. Sin las tres cabeceras de subida, el SDK no puede continuar una subida desde otro origen, y envía
-cada archivo como una sola solicitud multipart.
+`CORS_EXPOSED_HEADERS` es la lista que el propio runtime expone, de modo que una
+cabecera que el SDK comience a leer en una versión posterior llegará a tu frontend sin
+necesidad de cambios aquí. Incluye `ETag`, `Retry-After`, `X-Request-ID`, las tres
+cabeceras `X-RateLimit-*` y `Preference-Applied`, además de `Location`,
+`Upload-Offset` y `Rebase-Upload-Result`, que se devuelven en subidas reanudables (archivos de más
+de 8 MiB), y `X-Rebase-Simulated-Context`, que indica bajo qué contexto se ejecutó la petición
+simulada de un administrador. Sin las tres cabeceras de subida, el SDK no puede rastrear
+una subida desde otro origen y, en su lugar, envía cada archivo como una única petición multipart.
 
-El runtime de Rebase y el backend generado por `eject` ya envían esta lista.
+El runtime de Rebase y el backend generado con eject ya envían esta lista.
 
-## Relacionado
+## Temas relacionados
 
-- [Embedding the Postgres Driver](/docs/backend/embedding-postgres-driver/) — el driver de datos y el socket de realtime por sí solos, en Express
-- [Scripts y la consola](/docs/backend/scripts/) — los datos del proyecto desde un script, una prueba o un REPL, sin servidor
-- [Descripción general del backend](/docs/backend/) — dónde se ubica cada opción cuando el runtime arranca en su lugar
+- [Integración del controlador de Postgres](/docs/backend/embedding-postgres-driver/) — el controlador de datos y el socket de tiempo real por sí solos, en Express
+- [Scripts y la Consola](/docs/backend/scripts/) — los datos del proyecto desde un script, una prueba o un REPL, sin un servidor
+- [Descripción general del backend](/docs/backend/) — dónde reside cada opción cuando el runtime arranca directamente
 - [Procesos divididos](/docs/deployment/split-processes/) — los roles que un servidor personalizado debe reproducir
-- [Configuración de almacenamiento](/docs/backend/storage/) — las fuentes que un servidor personalizado debe resolver por sí mismo
+- [Configuración del almacenamiento](/docs/backend/storage/) — los orígenes que un servidor personalizado debe resolver por sí mismo

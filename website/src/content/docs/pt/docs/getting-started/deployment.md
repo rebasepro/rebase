@@ -1,44 +1,44 @@
 ---
-sourceHash: d1e6d42ab673666c
+sourceHash: 145ba18b6f108fbd
 title: Implantação
 sidebar_label: Implantação
-description: Implante seu projeto Rebase em produção usando Docker, plataformas em nuvem ou configurações manuais.
+description: Faça o deploy do seu projeto Rebase em produção usando Docker, plataformas em nuvem ou configurações manuais.
 ---
 
 ## O que uma Implantação Serve
 
-Um projeto Rebase é implantado como **um único servidor** (no Rebase Cloud: `https://<project>.rebase.website`). Esse servidor gerencia:
+Um projeto Rebase é implantado como **um único servidor** (no Rebase Cloud: `https://<project>.rebase.website`). Esse servidor lida com:
 
 - **`/api/*`** — a API de dados, autenticação, realtime e armazenamento
 - **todo o resto** — seu `frontend/` compilado como uma SPA estática
 
-Não há um serviço de administração separado: o painel administrativo faz parte de um frontend, portanto, onde ele aparece depende de qual é o seu frontend e se você atribui a ele um hostname próprio.
+Não há um serviço de administração separado: o painel de administração faz parte de um frontend, portanto onde ele aparece depende de como é o seu frontend e se você concede a ele um hostname próprio.
 
-| Tipo de projeto | A URL raiz exibe | O painel admin está em |
-|-----------------|------------------|------------------------|
+| Tipo de projeto | A URL raiz exibe | O painel de administração fica em |
+|-----------------|------------------|-----------------------------------|
 | Scaffold padrão (`rebase init`) | O painel de administração | `/` — o frontend **é** o admin |
-| Frontend customizado do produto | Seu aplicativo | Onde quer que você o monte, comumente `/admin` — consulte [Alterando a URL Base](#alterando-a-url-base) |
-| Admin como um app em seu próprio hostname | Seu aplicativo | `https://admin.example.com/`, servido pelo mesmo servidor — consulte [Alterando a URL Base](#alterando-a-url-base) |
-| Projeto somente backend | Nada (apenas API) | Não implantado |
+| Frontend de produto personalizado | Seu aplicativo | Onde quer que você o monte, geralmente `/admin` — veja [Alterando a URL Base](#alterando-a-url-base) |
+| Admin como um app em seu próprio hostname | Seu aplicativo | `https://admin.example.com/`, servido pelo mesmo servidor — veja [Alterando a URL Base](#alterando-a-url-base) |
+| Projeto apenas de backend | Nada (apenas API) | Não implantado |
 
 :::note[Primeira visita]
-Uma nova implantação de **produção** não oferece uma tela de bootstrap, e seu primeiro registro é uma conta comum. Em vez disso, defina o administrador antes da primeira inicialização — consulte [Seu primeiro admin](#seu-primeiro-admin).
+Uma nova implantação de **produção** não oferece uma tela de bootstrap, e seu primeiro registro é uma conta comum. Em vez disso, defina o administrador antes da primeira inicialização — veja [Seu primeiro admin](#seu-primeiro-admin).
 :::
 
 ## Docker Compose (Recomendado)
 
-O projeto gerado já inclui um `docker-compose.yml` funcional — **esse arquivo é o que deve ser usado para um projeto gerado por scaffolding**, no estado em que se encontra, em vez de escrito manualmente ou copiado de outro lugar. O `rebase init` preencheu seus segredos, sua primeira conta de administrador e sua versão fixada de runtime, e ele é inicializado pelo próprio acceptance gate do framework a cada push. Ele executa **dois** contêineres: o Postgres e o runtime publicado do Rebase com seu bundle compilado montado nele. Não há imagem de aplicativo para construir.
+O projeto gerado já inclui um `docker-compose.yml` funcional — **esse arquivo é o que deve ser usado para um projeto com scaffold**, exatamente como está, em vez de escrito manualmente ou copiado de outro lugar. O `rebase init` preencheu seus segredos, sua primeira conta de administrador e sua versão fixada do runtime, sendo inicializado pelo próprio gate de aceitação do framework a cada push. Ele executa **dois** containers: o Postgres e o runtime publicado do Rebase com seu bundle compilado montado nele. Não há imagem de aplicativo para compilar.
 
-[Auto-hospedagem](/docs/deployment/self-hosting) cobre a mesma implantação sem um scaffold por trás, usando [`infra/docker/docker-compose.selfhost.yml`](https://github.com/rebasepro/rebase/blob/main/infra/docker/docker-compose.selfhost.yml) do repositório do Rebase — e as duas coisas que este arquivo deliberadamente omite: um pooler de conexões e a execução de funções e do job worker como processos próprios.
+[Auto-hospedagem](/docs/deployment/self-hosting) cobre a mesma implantação sem um scaffold por trás, usando [`infra/docker/docker-compose.selfhost.yml`](https://github.com/rebasepro/rebase/blob/main/infra/docker/docker-compose.selfhost.yml) do repositório do Rebase — e as duas coisas que este arquivo deliberadamente omite: um pooler de conexões e a execução de functions e do worker de jobs como seus próprios processos.
 
 ```bash
 rebase build          # produces ./dist-bundle
 docker compose up -d
 ```
 
-`rebase build` primeiro, sempre: o serviço `api` monta `./dist-bundle` e, sem ele, o contêiner inicia apontando para um diretório vazio.
+Execute `rebase build` primeiro, sempre: o serviço `api` monta `./dist-bundle` e, sem ele, o container inicializa apontando para um diretório vazio.
 
-A estrutura do arquivo gerado:
+O formato do arquivo gerado:
 
 ```yaml title="docker-compose.yml (generated — abridged)"
 services:
@@ -81,39 +81,42 @@ volumes:
 
 Veja [Seu primeiro admin](#seu-primeiro-admin) abaixo para as três linhas `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION`.
 
-O bundle é montado como somente leitura. O `rebase build` instala as dependências declaradas do projeto em `dist-bundle`, a menos que você passe `--no-vendor`, caso em que o runtime as instala a cada inicialização e a montagem precisa ser gravável — remova o `:ro`. Consulte [Auto-hospedagem](/docs/deployment/self-hosting/#dependencies).
+O bundle é montado como somente leitura. O `rebase build` instala as dependências declaradas do projeto em `dist-bundle`, a menos que você passe `--no-vendor`, caso em que o runtime as instala a cada inicialização e o ponto de montagem precisa ter permissão de escrita — remova o `:ro`. Veja [Auto-hospedagem](/docs/deployment/self-hosting/#dependencies).
 
-O `rebase init` grava tudo isso no `.env` para você, incluindo uma senha de admin gerada. Cada uma é declarada com `${VAR:?…}`, de modo que uma variável ausente interrompe a stack com uma mensagem indicando-a, em vez de iniciar algo configurado pela metade — e o Compose interpola o arquivo inteiro antes de selecionar os serviços, portanto, uma variável ausente também interrompe `docker compose up -d db`.
+O `rebase init` grava todas essas variáveis no `.env` para você, incluindo uma senha de administrador gerada. Cada uma é declarada com `${VAR:?…}`, de modo que uma variável ausente interrompe a stack com uma mensagem indicando seu nome em vez de iniciar algo parcialmente configurado — e o Compose interpola o arquivo inteiro antes de selecionar os serviços, portanto uma ausência também interrompe o comando `docker compose up -d db`.
 
-Altere o e-mail do admin para o seu, faça login e altere a senha. Consulte [Seu primeiro admin](#seu-primeiro-admin).
+Altere o e-mail do admin para o seu, faça login e altere a senha. Veja [Seu primeiro admin](#seu-primeiro-admin).
 
 ### O schema
 
-O runtime cria tabelas ausentes na inicialização, **incluindo as de suas coleções** — `REBASE_MIGRATE_ON_BOOT` tem como padrão `ensure`, que é aditivo em todo o schema e aplica segurança em nível de linha (RLS) junto com ele. Um primeiro `docker compose up` em um banco de dados vazio já inicializa servindo suas coleções.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-O que a inicialização nunca faz é alterar algo que já existe: ela não altera o tipo de uma coluna, não remove nada nem edita os rótulos de um enum existente, porque a reinicialização de um contêiner não deve remodelar um schema como efeito colateral de um deploy. Essas alterações passam pela CLI, a partir de um checkout ou de um job de CI apontado para o banco de dados de produção:
+O runtime cria tabelas ausentes na inicialização, **incluindo as declaradas em `backend/schema`** — `REBASE_MIGRATE_ON_BOOT` tem como padrão `ensure`, que é aditivo em todo o schema e aplica row-level security junto a ele. Uma primeira execução do `docker compose up` contra um banco de dados vazio já inicializa servindo suas tabelas.
+
+O que a inicialização nunca faz é alterar algo que já existe: ela não altera o tipo de uma coluna, não remove nada nem edita os rótulos de um enum existente, porque o reinício de um container não deve remodelar um schema como efeito colateral de um deploy. Essas alterações são feitas pela CLI, a partir de um checkout local ou de um job de CI apontado para o banco de dados de produção:
 
 ```bash
 pnpm run db:push
 ```
 
-Execute-o para qualquer alteração que não seja puramente aditiva — uma coluna renomeada, um tipo mais restrito, um campo removido.
+Execute isso para qualquer alteração que não seja puramente aditiva — uma coluna renomeada, um tipo mais restrito, um campo removido.
 
-Para um **fluxo de trabalho de equipe versionado**, faça commit dos arquivos de migração com `pnpm run db:generate` e execute `pnpm run db:migrate` como uma etapa de release. De qualquer forma, ele é executado a partir de um checkout do projeto, não dentro do contêiner em execução — a imagem do runtime é distribuída sem a CLI.
+Para um **fluxo de trabalho de equipe com versionamento**, comite arquivos de migração com `pnpm run db:generate` e execute `pnpm run db:migrate` como uma etapa de release. De qualquer forma, ele é executado a partir de um checkout do projeto, não dentro do container em execução — a imagem do runtime é distribuída sem a CLI.
 
 ## Seu primeiro admin
 
-**Defina `REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD` antes da primeira inicialização.** Todos os guias de plataforma neste site apontam para cá, porque este é o único passo que não tem recuperação pelo lado de fora.
+**Configure `REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD` antes da primeira inicialização.**
+Todos os guias de plataforma deste site apontam para cá, pois este é o único passo sem recuperação a partir do exterior.
 
-Um banco de dados novo não tem usuários e, fora de produção, a política de registro admite o primeiro cadastro e o promove a administrador. Tem que ser assim: inicializar um admin requer um solicitante que já esteja conectado, de modo que um banco de dados vazio sem essa regra seria um beco sem saída. Em um laptop, a pessoa no teclado é o operador e isso é exatamente o esperado.
+Um banco de dados novo não possui usuários, e fora de produção a política de registro aceita o primeiro cadastro e o promove a administrador. Tem que ser assim: fazer o bootstrap de um admin exige um chamador que já esteja autenticado, portanto um banco de dados vazio sem tal regra seria um beco sem saída. Em um laptop, a pessoa no teclado é o operador e isso funciona perfeitamente.
 
-Isso é completamente incorreto em um host com um nome público. Os artefatos fornecidos colocam o DNS e o TLS no ar antes que o operador tenha digitado qualquer coisa, portanto, a janela fica aberta para a internet desde o primeiro segundo — e quem acessar o formulário de cadastro primeiro se torna dono da implantação.
+No entanto, isso é um grande erro em um host com um nome público. Os artefatos distribuídos sobem DNS e TLS antes que o operador tenha digitado qualquer coisa, então a janela fica aberta para a internet desde o primeiro segundo — e quem acessar o formulário de cadastro primeiro se torna dono da implantação.
 
-Portanto, sob `NODE_ENV=production`, essa janela é fechada. Uma tabela de usuários vazia recusa o registro de bootstrap com `SETUP_REQUIRED`, uma conta criada por meio de registro aberto é uma conta comum, `GET /api/auth/config` nunca anuncia `needsSetup`, e `POST /api/admin/bootstrap` recusa.
+Portanto, sob `NODE_ENV=production` essa janela fica fechada. Uma tabela de usuários vazia recusa o registro de bootstrap com `SETUP_REQUIRED`, uma conta criada por registro aberto é uma conta comum, `GET /api/auth/config` nunca informa `needsSetup` e `POST /api/admin/bootstrap` recusa a operação.
 
-O `rebase dev` lê o mesmo `.env` e deliberadamente ignora ambas as variáveis, avisando isso na inicialização: localmente, o primeiro registro ainda é a porta de entrada. Os valores que o `rebase init` escreveu pertencem à inicialização de produção. Fazer o seed em ambos os lados fecharia a janela antes que o desenvolvedor abrisse o aplicativo, o que fazia com que o primeiro passo do próprio quickstart gerasse uma conta sem função (role).
+O `rebase dev` lê o mesmo `.env` e deliberadamente ignora ambas as variáveis, informando isso na inicialização: localmente, o primeiro registro ainda é o método de entrada. Os valores gravados pelo `rebase init` pertencem à inicialização de produção. Fazer o seed em ambos os lados consumiria a janela antes que o desenvolvedor pudesse abrir o app, o que fazia com que o próprio primeiro passo do quickstart gerasse uma conta sem roles.
 
-Isso deixa duas formas de acesso, nenhuma das quais é uma corrida:
+Isso deixa duas formas de acesso, nenhuma das quais envolve uma corrida:
 
 ```bash
 REBASE_ADMIN_EMAIL=you@example.com
@@ -121,52 +124,52 @@ REBASE_ADMIN_PASSWORD=<at least 12 characters>
 DISABLE_SELF_REGISTRATION=true
 ```
 
-O runtime cria essa conta uma única vez, enquanto a tabela de usuários estiver vazia, e não faz nada em todas as inicializações subsequentes. Ou atribua a role a um usuário existente com a chave de serviço, se você provisionar contas fora de banda.
+O runtime cria essa conta uma única vez, enquanto a tabela de usuários estiver vazia, e não faz nada em todas as inicializações subsequentes. Ou atribua a role a um usuário existente com a chave de serviço, caso você faça o provisionamento de contas fora da aplicação.
 
-Duas regras que o runtime impõe na inicialização, ambas resultando em uma conta que ninguém pode usar se você errar:
+Duas regras que o runtime impõe na inicialização, ambas resultando em uma conta inutilizável caso você erre:
 
-- A senha deve ter **pelo menos 12 caracteres**, caso contrário será recusada e nenhuma conta será criada.
-- O endereço deve ser aceito por `POST /api/auth/login` — ele valida o corpo com `z.string().email()`, então um domínio sem ponto (`admin@localhost`) faz o seed normalmente e depois responde 400 em todas as tentativas de login. A inicialização também recusa esse endereço.
+- A senha deve ter **pelo menos 12 caracteres**, caso contrário ela é recusada e nenhuma conta é criada.
+- O endereço deve ser um que o `POST /api/auth/login` aceite — ele valida o corpo com `z.string().email()`, portanto um domínio sem ponto (`admin@localhost`) é inserido normalmente no seed, mas depois responde com erro 400 a cada login. A inicialização também recusa esse endereço.
 
-Defina ambos ou nenhum: meia credencial é um erro de digitação, e a implantação resultante — auto-registro desativado, sem admin — precisará de um prompt do `psql` para recuperação. A inicialização avisa quando a tabela está vazia em produção e nenhum admin é especificado.
+Defina ambos ou nenhum: metade de uma credencial é um erro de digitação, e a implantação resultante — auto-registro desativado, nenhum admin — exigirá um prompt do `psql` para ser recuperada. A inicialização avisa quando a tabela estiver vazia em produção e nenhum admin for especificado.
 
-Faça login e altere a senha. Ela está em texto simples onde quer que você tenha colocado seu ambiente.
+Faça login e altere a senha. Ela estará armazenada em texto simples onde quer que você tenha definido seu ambiente.
 
 ## Checklist de Produção
 
 Antes de implantar em produção, certifique-se de:
 
 | Item | Detalhes |
-|------|----------|
-| **Primeiro admin** | Defina `REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD` **antes da primeira inicialização**, e `DISABLE_SELF_REGISTRATION=true`. Em produção, a primeira conta a se registrar não é promovida — consulte [Seu primeiro admin](#seu-primeiro-admin). |
-| **NODE_ENV** | `NODE_ENV=production`. É o que fecha a janela de bootstrap, recusa armazenamento de arquivos local, exige `CORS_ORIGINS` e desativa a documentação do OpenAPI. Uma implantação deixada no padrão estará rodando em modo de desenvolvimento. |
-| **Schema do banco de dados** | A inicialização cria as tabelas das suas coleções e o RLS delas de forma aditiva. Execute `pnpm run db:push` (ou `pnpm run db:migrate`) para qualquer coisa que não seja puramente aditiva. |
-| **JWT_SECRET** | Use uma string aleatória criptograficamente forte (≥ 32 caracteres). Nunca reutilize entre ambientes. |
-| **DATABASE_URL** | Use uma instância gerenciada do Postgres (Neon, Supabase, RDS) com TLS ativado |
-| **CORS_ORIGINS** | Sempre, não apenas quando o frontend estiver em outro domínio. O runtime se recusa a iniciar em produção se não tiver nem `CORS_ORIGINS` nem `FRONTEND_URL`, porque uma API que adivinha suas origens permitidas eventualmente permitirá a origem errada. |
-| **Controle de acesso ao armazenamento** | Um bucket configurado **recusa a inicialização em produção** sem um modelo de controle de acesso. O armazenamento não está sob segurança em nível de linha (RLS) e suas chaves compartilham um namespace plano único; portanto, um padrão de permitir tudo deixa qualquer usuário autenticado listar (`GET /storage/list?prefix=`) e, em seguida, ler, sobrescrever ou excluir os arquivos de todos os outros usuários. Atenda a isso com um hook `storageAuthorize` ou `storagePolicies` (o scaffold inclui um hook em `config/storage.ts`), ou declare a intenção com `STORAGE_PUBLIC_READ` para uma CDN pública legítima, ou `STORAGE_ALLOW_ANY_AUTHENTICATED` para um aplicativo single-tenant onde toda conta é confiável para acessar qualquer arquivo. |
-| **Backend de armazenamento** | `STORAGE_TYPE=local` em produção é **ignorado**, e os uploads respondem `501 STORAGE_NOT_CONFIGURED` — o sistema de arquivos do contêiner é destruído na próxima reinicialização, portanto um backend local resulta em perda silenciosa de dados. Use `s3` ou `gcs`, ou defina `FORCE_LOCAL_STORAGE=true` se o caminho for realmente um volume durável. |
-| **MFA_ENCRYPTION_KEY** | Defina-o (mais de 32 caracteres aleatórios) se você usar TOTP. Se não definido, os segredos armazenados serão criptografados com `JWT_SECRET` — portanto, rotacioná-lo desconecta todos os usuários *e* torna qualquer autenticador cadastrado indecifrável. |
-| **HTTPS** | Termine o TLS no seu proxy reverso (nginx, Cloudflare, balanceador de carga) |
-| **Leituras públicas ainda precisam de um chamador** | `access: "public"` expande quais *linhas* um solicitante vê, não quem pode chamar: uma requisição anônima para `/api/data/*` responde 401 enquanto `AUTH_REQUIRE` estiver ativado. Defina `AUTH_REQUIRE=false` para um site público que lê seu próprio backend e deixe apenas o RLS decidir. Como é uma variável de ambiente, um `.env` local que a define **não** é enviado com o seu deploy. |
+|------|---------|
+| **Primeiro admin** | Configure `REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD` **antes da primeira inicialização**, e `DISABLE_SELF_REGISTRATION=true`. Em produção, a primeira conta a se registrar não é promovida — veja [Seu primeiro admin](#seu-primeiro-admin). |
+| **NODE_ENV** | `NODE_ENV=production`. É o que fecha a janela de bootstrap, recusa armazenamento local de arquivos, exige `CORS_ORIGINS` e desativa a documentação OpenAPI. Uma implantação deixada no padrão é executada em modo de desenvolvimento. |
+| **Schema do banco de dados** | A inicialização cria suas tabelas declaradas e o RLS delas de forma aditiva. Execute `pnpm run db:push` (ou `pnpm run db:migrate`) para qualquer alteração que não seja puramente aditiva. |
+| **JWT_SECRET** | Use uma string aleatória criptograficamente forte (≥ 32 caracteres). Nunca a reutilize entre ambientes. |
+| **DATABASE_URL** | Use uma instância gerenciada de Postgres (Neon, Supabase, RDS) com TLS habilitado. |
+| **CORS_ORIGINS** | Sempre, não apenas quando o frontend estiver em outro domínio. O runtime se recusa a iniciar em produção sem `CORS_ORIGINS` nem `FRONTEND_URL`, pois uma API que tenta adivinhar suas origens permitidas eventualmente permitirá a origem errada. |
+| **Controle de acesso ao storage** | Um bucket configurado **recusa a inicialização em produção** sem um modelo de controle de acesso. O storage não está sob row-level security e suas chaves compartilham um namespace único e plano; portanto, um padrão que permite tudo autoriza qualquer usuário autenticado a listar (`GET /storage/list?prefix=`) e, em seguida, ler, sobrescrever ou excluir os arquivos de todos os outros usuários. Atenda a isso com um hook `storageAuthorize` ou `storagePolicies` (o scaffold inclui um hook em `backend/storage.ts`), ou declare a intenção com `STORAGE_PUBLIC_READ` para um CDN público legítimo, ou `STORAGE_ALLOW_ANY_AUTHENTICATED` para um aplicativo single-tenant onde toda conta é confiável para acessar qualquer arquivo. |
+| **Backend de storage** | `STORAGE_TYPE=local` em produção é **ignorado**, e uploads respondem com `501 STORAGE_NOT_CONFIGURED` — o sistema de arquivos do container é destruído no próximo reinício, portanto um backend local resulta em perda silenciosa de dados. Use `s3` ou `gcs`, ou configure `FORCE_LOCAL_STORAGE=true` se o caminho for realmente um volume durável. |
+| **MFA_ENCRYPTION_KEY** | Defina-o (32+ caracteres aleatórios) se você usar TOTP. Se não estiver definido, os segredos armazenados serão criptografados com o `JWT_SECRET` — portanto, rotacioná-lo desconectará todos os usuários *e* tornará todos os autenticadores cadastrados indecifráveis. |
+| **HTTPS** | Faça a terminação de TLS no seu reverse proxy (nginx, Cloudflare, load balancer). |
+| **Leituras públicas ainda precisam de um chamador** | `access: "public"` expande quais *linhas* um chamador pode ver, não quem tem permissão para chamar: uma requisição anônima para `/api/data/*` responde 401 enquanto `AUTH_REQUIRE` estiver ativado. Defina `AUTH_REQUIRE=false` para um site público que lê seu próprio backend e deixe apenas o RLS decidir. Essa é uma variável de ambiente, portanto um `.env` local que a define **não** acompanha seu deploy. |
 
 ## Módulos Nativos no Runtime Gerenciado
 
-O runtime gerenciado do Rebase Cloud executa seu bundle dentro de uma imagem compartilhada. Ele não possui compilador e não tem como carregar um **módulo nativo** — qualquer coisa que forneça um binário `.node` pré-compilado. O mais comum, de longe, é o `sharp`, que também é a dependência óbvia para qualquer coisa que sirva imagens.
+O runtime gerenciado do Rebase Cloud executa seu bundle dentro de uma imagem compartilhada. Ele não possui compilador nem forma de carregar um **módulo nativo** — qualquer coisa que distribua um binário `.node` pré-compilado. O mais comum, de longe, é o `sharp`, que também é a dependência óbvia para qualquer coisa que sirva imagens.
 
-O `rebase cloud deploy` recusa isso antes do upload, e não depois:
+O `rebase cloud deploy` recusa isso antes do upload, em vez de depois:
 
 ```
 This bundle depends on native modules (sharp), which the managed runtime cannot run
 ```
 
-Três maneiras de resolver isso, na ordem em que costumam ser as mais adequadas:
+Existem três caminhos para resolver isso, na ordem em que costumam ser apropriados:
 
-1. **Mova o trabalho para o momento da compilação.** Redimensione e recodifique imagens na sua etapa de build e implante os resultados. Nada nativo é executado no caminho da requisição.
-2. **Use um serviço.** Uma CDN de imagens ou uma API de transformação faz o mesmo trabalho por trás de uma URL.
-3. **Execute seu próprio contêiner.** Uma implantação auto-hospedada (Docker, Kubernetes, qualquer um dos [guias de plataforma](/docs/deployment/self-hosting)) usa a sua imagem, portanto, pode conter o que quiser.
+1. **Mova o trabalho para o tempo de build.** Redimensione e recodifique imagens na sua etapa de build e implante os resultados. Nada nativo é executado no caminho da requisição.
+2. **Use um serviço.** Um CDN de imagens ou uma API de transformação realiza o mesmo trabalho atrás de uma URL.
+3. **Execute seu próprio container.** Uma implantação auto-hospedada (Docker, Kubernetes, qualquer um dos [guias de plataforma](/docs/deployment/self-hosting)) utiliza sua própria imagem, portanto ela pode conter o que quiser.
 
-Funções que apenas precisam do Node em vez de um binário nativo funcionam normalmente — o deploy relata essas separadamente (`1 of 3 function(s) depend on Node`) e as executa. O [Runtime de backend gerenciado](/docs/deployment/managed-runtime/) cobre o restante do que o runtime gerenciado permite: binários, memória, timeouts, sistema de arquivos, segredos, armazenamento e rede de saída.
+Functions que apenas precisam do Node em vez de um binário nativo funcionam normalmente — o deploy relata essas separadamente (`1 of 3 function(s) depend on Node`) e as executa. O [Runtime de backend gerenciado](/docs/deployment/managed-runtime/) aborda o restante do que o runtime gerenciado permite: binários, memória, timeouts, sistema de arquivos, segredos, storage e rede de saída.
 
 ## Servindo o Frontend
 
@@ -180,7 +183,7 @@ import path from "path";
 serveSPA(app, { frontendPath: path.resolve(process.cwd(), "../frontend/dist") });
 ```
 
-Faça a compilação do frontend primeiro:
+Compile o frontend primeiro:
 
 ```bash
 cd frontend && pnpm build
@@ -190,28 +193,28 @@ Dessa forma, você só precisa implantar um servidor que gerencia tanto a SPA qu
 
 ## Guias de Implantação por Plataforma
 
-Guias passo a passo detalhados para cada plataforma:
+Guias detalhados passo a passo para cada plataforma:
 
 | Plataforma | Tipo | Guia |
 |------------|------|------|
-| **AWS** | App Runner / ECS + RDS | [Deploy on AWS →](/docs/deployment/aws) |
-| **Google Cloud** | Cloud Run + Cloud SQL | [Deploy on GCP →](/docs/deployment/gcp) |
-| **Azure** | Container Apps + PostgreSQL | [Deploy on Azure →](/docs/deployment/azure) |
-| **Hetzner Cloud** | VPS + Docker Compose | [Deploy on Hetzner →](/docs/deployment/hetzner) |
-| **Scaleway** | Serverless Containers | [Deploy on Scaleway →](/docs/deployment/scaleway) |
-| **Railway** | PaaS (auto-detect Dockerfile) | [Deploy on Railway →](/docs/deployment/railway) |
-| **Fly.io** | Container runtime | [Deploy on Fly.io →](/docs/deployment/flyio) |
-| **InstaPods** | Node + PostgreSQL in one pod, no Docker | [Deploy on InstaPods →](/docs/deployment/instapods) |
-| **Hostman** | App Platform + Managed PostgreSQL, or a VPS | [Deploy on Hostman →](/docs/deployment/hostman) |
+| **AWS** | App Runner / ECS + RDS | [Deploy na AWS →](/docs/deployment/aws) |
+| **Google Cloud** | Cloud Run + Cloud SQL | [Deploy no GCP →](/docs/deployment/gcp) |
+| **Azure** | Container Apps + PostgreSQL | [Deploy no Azure →](/docs/deployment/azure) |
+| **Hetzner Cloud** | VPS + Docker Compose | [Deploy na Hetzner →](/docs/deployment/hetzner) |
+| **Scaleway** | Serverless Containers | [Deploy na Scaleway →](/docs/deployment/scaleway) |
+| **Railway** | PaaS (detecção automática de Dockerfile) | [Deploy na Railway →](/docs/deployment/railway) |
+| **Fly.io** | Container runtime | [Deploy no Fly.io →](/docs/deployment/flyio) |
+| **InstaPods** | Node + PostgreSQL em um único pod, sem Docker | [Deploy no InstaPods →](/docs/deployment/instapods) |
+| **Hostman** | App Platform + Managed PostgreSQL, ou uma VPS | [Deploy no Hostman →](/docs/deployment/hostman) |
 
 :::caution
-O Cloud Run e outras plataformas serverless são stateless. Use **armazenamento S3** em vez do sistema de arquivos local para upload de arquivos, e defina `--min-instances 1` se você usar recursos em tempo real do Rebase (as conexões WebSocket são encerradas quando as instâncias escalam para baixo).
+O Cloud Run e outras plataformas serverless são stateless. Use **armazenamento S3** em vez do sistema de arquivos local para upload de arquivos e defina `--min-instances 1` se você usar os recursos de realtime do Rebase (as conexões WebSocket são encerradas quando as instâncias reduzem para zero).
 :::
 
 
 ## Alterando a URL Base
 
-Se você quiser que o admin seja executado em um subcaminho (por exemplo, `/admin`), altere o `path` do app no `rebase.json`, e o `cms` junto com ele:
+Se você deseja que o admin seja executado em um sub-path (ex: `/admin`), altere o `path` do aplicativo no `rebase.json`, e o `cms` junto com ele:
 
 ```json title="rebase.json"
 "admin": {
@@ -224,11 +227,11 @@ Se você quiser que o admin seja executado em um subcaminho (por exemplo, `/admi
 }
 ```
 
-O `cms` é onde o CMS está, para onde o Rebase Cloud aponta, e ele deve estar dentro do `path` do app. O scaffold define ambos como `/`, portanto mover apenas o `path` é recusado — o CMS ficaria em `/`, fora de um aplicativo que agora começa em `/admin`.
+`cms` é onde fica o CMS para o qual o Rebase Cloud aponta os links, e ele deve estar dentro do `path` do aplicativo. O scaffold define ambos como `/`, portanto mover apenas o `path` é recusado — o CMS ficaria em `/`, fora de um aplicativo que agora começa em `/admin`.
 
-Para fornecer ao admin um hostname próprio em vez de um subcaminho, faça do `path` uma URL completa — `"path": "https://admin.example.com"` — e deixe `cms` em `"/"`. O admin então responderá apenas nesse hostname, e não no endereço do próprio projeto, ficando inacessível até que o DNS do hostname seja verificado. A API também permanece em `/api` nesse hostname. Consulte [Um app em seu próprio hostname](/docs/architecture/apps-and-repositories/#an-app-on-its-own-hostname) para entender como as requisições são associadas e o que um deploy no Rebase Cloud faz com o hostname.
+Para fornecer ao admin um hostname próprio em vez de um sub-path, defina o `path` como uma URL completa — `"path": "https://admin.example.com"` — e deixe o `cms` como `"/"`. O admin passará a responder apenas naquele hostname, e não no endereço principal do projeto, ficando inacessível até que o DNS do hostname seja verificado. A API permanece em `/api` naquele hostname também. Veja [Um app em seu próprio hostname](/docs/architecture/apps-and-repositories/#an-app-on-its-own-hostname) para saber como as requisições são correspondidas e o que o deploy do Rebase Cloud faz com o hostname.
 
-O `rebase build` passa `path` para o Vite como `base` (via `REBASE_APP_BASE`), o Vite o devolve como `import.meta.env.BASE_URL`, e o `main.tsx` do scaffold já o fornece ao router — assim, os assets, as rotas e o servidor entram em acordo sem que o prefixo precise ser escrito três vezes:
+O `rebase build` passa o `path` para o Vite como `base` (via `REBASE_APP_BASE`), o Vite o devolve como `import.meta.env.BASE_URL`, e o `main.tsx` do scaffold já o fornece ao router — portanto, os assets, as rotas e o servidor concordam entre si sem a necessidade de escrever o prefixo três vezes:
 
 ```tsx title="frontend/src/main.tsx"
 // At "/" this is "".
@@ -242,11 +245,11 @@ const router = createBrowserRouter([
 ], { basename });
 ```
 
-Mantenha o admin em um **data router** — `createBrowserRouter` com `<RouterProvider>`, como o scaffold faz. Com ele, um registro com alterações não salvas também bloqueia a navegação interna do aplicativo (um link no menu lateral, o botão voltar do navegador) e pede confirmação antes, por meio do `useBlocker`, recurso que apenas um data router fornece.
+Mantenha o admin em um **data router** — `createBrowserRouter` com `<RouterProvider>`, como o scaffold faz. Com ele, um registro com alterações não salvas também impede a navegação interna no app (um link no menu lateral, o botão voltar do navegador) e pede confirmação primeiro, por meio de `useBlocker`, que apenas um data router fornece.
 
-O admin também pode ser executado em um `<BrowserRouter>` simples. Nesse caso, a proteção de alterações não salvas recorre ao diálogo padrão do próprio navegador ao sair da página, o que cobre recarregar a página, fechar a aba ou digitar uma URL; a navegação interna no aplicativo prossegue sem confirmação.
+O admin também funciona sob um `<BrowserRouter>` simples. Nesse caso, a proteção de alterações não salvas recorre ao diálogo padrão de saída de página do próprio navegador, que cobre recarregamento, fechamento da aba ou digitação de uma URL; a navegação dentro do app prossegue sem confirmação.
 
-**Backend** — se você mover a API também, atualize o caminho base dela:
+**Backend** — se você mover a API também, atualize seu caminho base:
 
 ```typescript no-verify
 await initializeRebaseBackend({
@@ -256,18 +259,18 @@ await initializeRebaseBackend({
 ```
 
 :::note[Montagem sem um `basename` no router]
-A abordagem com `basename` descrita acima é a recomendada — o react-router remove o prefixo da localização, permitindo que o admin funcione sem alterações. Se, em vez disso, você incorporar o admin dentro de uma **rota com prefixo de caminho** de uma aplicação maior (por exemplo, `<Route path="/admin/*">`) sem `basename`, o caminho atual mantém o prefixo `/admin`. Informe isso ao CMS para que a resolução URL⇄coleção leve o prefixo em consideração — caso contrário, as visualizações ficarão presas em um spinner sem buscar dados:
+A abordagem com `basename` acima é a recomendada — o react-router remove o prefixo da localização, então o admin funciona inalterado. Se, em vez disso, você incorporar o admin dentro de uma **rota com prefixo de caminho** de uma aplicação maior (ex: `<Route path="/admin/*">`) sem `basename`, o caminho atual mantém seu prefixo `/admin`. Avise o CMS sobre isso para que a resolução URL⇄tabela leve o prefixo em consideração — caso contrário, as visualizações ficarão travadas em um spinner sem carregar dados:
 
 ```tsx
-<RebaseCMS collections={collections} basePath="/admin" />
+<RebaseCMS tableCustomizations={tableCustomizations} basePath="/admin" />
 ```
 
-Defina **ou** o `basename` do router **ou** o `basePath` do `RebaseCMS` — não ambos, caso contrário o prefixo será aplicado duas vezes.
+Defina **ou** o `basename` do router **ou** `RebaseCMS basePath` — não ambos, caso contrário o prefixo será aplicado duas vezes.
 :::
 
-### App do Produto + Admin em uma Única Implantação
+### App de Produto + Admin em Uma Única Implantação
 
-A razão comum para mover o admin para `/admin` é disponibilizar seu **próprio app de produto** na raiz da mesma implantação. Uma única entrada do Vite pode servir ambos, dividida por URL, de modo que cada app seja carregado sob demanda (lazy loading) e os visitantes do produto nunca baixem o bundle do admin:
+O motivo comum para mover o admin para `/admin` é distribuir seu **próprio aplicativo de produto** na raiz da mesma implantação. Uma única entrada do Vite pode servir ambos, divididos por URL, de modo que cada app seja carregado sob demanda (lazy-loaded) e os visitantes do produto nunca baixem o bundle do admin:
 
 ```tsx title="frontend/src/main.tsx"
 const isAdmin = window.location.pathname.startsWith("/admin");
@@ -283,9 +286,9 @@ const router = isAdmin
 root.render(<RouterProvider router={router}/>);
 ```
 
-Um roteador para ambas as metades: o admin funciona melhor em um data router, o que permite que alterações não salvas impeçam a navegação interna no app, e não há motivo para o app do produto usar um roteador diferente.
+Um único router para ambas as partes: é melhor manter o admin em um data router, o que permite que alterações não salvas impeçam a navegação interna, e não há razão para o app de produto estar em um diferente.
 
-O backend não precisa de alterações para esse padrão — a API permanece em `/api` e o catch-all da SPA serve `index.html` tanto para `/` quanto para `/admin/*`.
+O backend não precisa de alterações para esse padrão — a API permanece em `/api` e a rota catch-all da SPA serve o `index.html` tanto para `/` quanto para `/admin/*`.
 
 ## Próximos Passos
 

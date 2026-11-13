@@ -1,32 +1,50 @@
 ---
-sourceHash: fcc01fdc846a1e2a
+sourceHash: ff162864c3d1600b
 slug: it/docs/troubleshooting
 title: Risoluzione dei problemi
-description: Gli errori che impediscono l'avvio o il funzionamento di un backend Rebase — un database irraggiungibile, credenziali errate, un'estensione mancante, un rifiuto RLS, schema drift, una porta occupata, una funzione che non si carica — e come si presenta ciascuno di essi.
+description: Gli errori che impediscono a un backend Rebase di avviarsi o gestire le richieste — un database irraggiungibile, credenziali errate, un'estensione mancante, un rifiuto RLS, disallineamento dello schema, una porta occupata, una funzione che non si carica — e come si presenta ciascuno di essi.
 ---
 
-Gli errori che impediscono a un backend Rebase di avviarsi o gestire richieste, come appare ciascuno di essi sullo schermo e cosa fare per risolverlo.
+Gli errori che impediscono a un backend Rebase di avviarsi o gestire le richieste, come si
+presenta ciascuno di essi sullo schermo e cosa fare per risolverlo.
 
-L'avvio fallisce in modo evidente e totale. Se il database non è raggiungibile, le credenziali sono errate o lo schema della collection non può essere applicato, `initializeRebaseBackend` genera un'eccezione, non viene servita alcuna richiesta e il processo termina con codice di uscita `1`. Non esiste una modalità degradata: un server che si avvia rispondendo al login mentre ogni route `/api/data/*` fallisce è più difficile da diagnosticare rispetto a uno che non si avvia affatto.
+L'avvio fallisce in modo evidente e totale. Se il database non è raggiungibile, le
+credenziali sono errate, o lo schema non può essere compilato o applicato,
+`initializeRebaseBackend` genera un'eccezione, non viene gestita alcuna richiesta e il processo termina con codice di uscita `1`.
+Non esiste una modalità degradata: un server che si avvia rispondendo all'autenticazione mentre ogni
+rotta `/api/data/*` fallisce è più difficile da diagnosticare rispetto a uno che non si avvia affatto.
 
-Quindi il primo punto in cui guardare è sempre l'ultima riga del log prima dell'uscita.
+Quindi, il primo punto da controllare è sempre l'ultima voce nel log prima dell'uscita.
 
 ## Leggere un errore di avvio
 
-Ogni errore del database visualizzato è un wrapper. Drizzle rilancia i fallimenti delle query come `Failed query: …` con uno stack trace attraverso i propri elementi interni, e la frase che spiega cosa non va si trova al di sotto, in `.cause` — oppure all'interno di un `AggregateError` quando un host dual-stack ha tentato diversi indirizzi.
+Ogni errore del database visualizzato è un wrapper. Drizzle rilancia i fallimenti delle query come
+`Failed query: …` con uno stack trace che attraversa i propri componenti interni, e la frase che
+spiega il problema si trova al di sotto, in `.cause` — oppure all'interno di un `AggregateError`
+quando un host dual-stack ha tentato diversi indirizzi.
 
-Il runtime lo scompatta per te. Un fallimento all'avvio registra nei log:
+Il runtime lo spacchetta per te. Un errore di avvio registra:
 
 - una **diagnosi riquadrata** che indica l'host, la porta e la soluzione, e
-- righe `caused by:` che riportano la catena, terminando con il motivo fornito dal sistema operativo o da Postgres.
+- righe `caused by:` che riportano la catena, terminando con il motivo fornito dal
+  sistema operativo o da Postgres.
 
-Se stai leggendo i log in formato JSON (`NODE_ENV=production`), la stessa catena si trova sotto `error.cause`, con `code`, `address` e `port` su ciascun collegamento.
+Se stai leggendo log in formato JSON (`NODE_ENV=production`), la stessa catena si trova sotto
+`error.cause`, con `code`, `address` e `port` su ciascun passaggio.
 
 ### `Failed query: [redacted]`
 
-Non si tratta di una riga di log troncata. Drizzle costruisce ogni errore di query come `Failed query: <sql>` seguito dai valori associati, quindi l'istruzione e i suoi parametri — un indirizzo email, un hash della password — viaggiano all'interno del messaggio e dello stack trace di qualsiasi cosa il driver rilanci. Il logger rimuove quella sezione da ogni riga che scrive e stampa `[redacted]` al suo posto.
+Non si tratta di una riga di log troncata. Drizzle compone ogni errore di query come
+`Failed query: <sql>` seguito dai valori associati, quindi l'istruzione e i suoi
+parametri — un indirizzo email, un hash della password — viaggiano all'interno del messaggio e
+dello stack di qualsiasi cosa il driver rilanci. Il logger rimuove quella sezione da
+ogni riga che scrive e stampa `[redacted]` al suo posto.
 
-L'istruzione SQL è comunque raramente la risposta: il motivo si trova nelle righe `caused by:` sottostanti. Quando ne hai bisogno, imposta `REBASE_LOG_RAW_QUERIES=true` in fase di sviluppo e l'SQL verrà stampato. Questa variabile viene ignorata al di fuori dell'ambiente di sviluppo, quindi una variabile propagata per errore in produzione non potrà mostrare dati oscurati.
+L'istruzione raramente rappresenta la soluzione: il motivo si trova nelle
+righe `caused by:` sottostanti. Quando ne hai effettivo bisogno, imposta `REBASE_LOG_RAW_QUERIES=true` in
+ambiente di sviluppo e l'SQL verrà stampato. Questa variabile viene ignorata al di fuori dell'ambiente di sviluppo,
+quindi una variabile che trapela in un ambiente di produzione non potrà rendere visibile
+nulla in quel contesto.
 
 ## Il database non è in esecuzione
 
@@ -38,16 +56,19 @@ L'istruzione SQL è comunque raramente la risposta: il motivo si trova nelle rig
   The driver said: connect ECONNREFUSED 127.0.0.1:5432 (ECONNREFUSED)
 ```
 
-Nessun servizio è in ascolto su quell'indirizzo. Avvia il database:
+Non c'è nulla in ascolto su quell'indirizzo. Avvia il database:
 
 ```bash
 docker compose up -d db       # the service a Rebase scaffold ships
 brew services start postgresql@18
 ```
 
-Oppure esegui `rebase dev` senza alcun `DATABASE_URL`, che avvierà per te un database PGlite gestito senza richiedere alcuna installazione.
+Oppure esegui `rebase dev` senza alcun `DATABASE_URL`, che avvierà un database PGlite
+gestito al posto tuo e non richiede nulla di installato.
 
-Se l'host e la porta nel riquadro non sono quelli previsti, `DATABASE_URL` in `.env` non è quello letto dal processo — controlla la presenza di un secondo file `.env`, una variabile di shell già esportata o un container avviato prima della modifica.
+Se l'host e la porta nel riquadro non sono quelli previsti, `DATABASE_URL` in
+`.env` non è quello letto dal processo — controlla se è presente un secondo file `.env`, una variabile
+di shell già esportata o un container avviato prima della modifica.
 
 ## La password o il nome del database sono errati
 
@@ -56,35 +77,70 @@ Se l'host e la porta nel riquadro non sono quelli previsti, `DATABASE_URL` in `.
   The driver said: password authentication failed for user "app" (28P01)
 ```
 
-`28P01` indica una password errata, `28000` un ruolo che non può connettersi da qui e `3D000` un database inesistente. Tutti e tre sono fatti certi riguardanti la stringa di connessione: riprovare produrrà la stessa risposta, quindi l'avvio fallisce immediatamente invece di segnalare un pool che "potrebbe ripristinarsi".
+`28P01` indica una password errata, `28000` un ruolo a cui non è consentito connettersi da qui, e
+`3D000` un database inesistente. Tutti e tre sono fatti accertati riguardanti la
+stringa di connessione: riprovare genera la stessa risposta, quindi l'avvio fallisce immediatamente
+piuttosto che segnalare un pool che "potrebbe ripristinarsi".
 
-Controlla le credenziali in `DATABASE_URL`. Una password contenente `@`, `/`, `?` o `#` deve essere codificata in percent-encoding — una password non codificata rimodella silenziosamente l'URL e l'host a cui tenterai di connetterti non sarà quello specificato.
+Verifica le credenziali in `DATABASE_URL`. Una password contenente `@`, `/`, `?` o
+`#` deve essere codificata in formato percentuale (percent-encoded) — un carattere non codificato altera
+silenziosamente l'URL e l'host a cui finisci per connetterti non sarà quello scritto.
+
+## `SchemaDefinitionError` — lo schema non compila
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+L'avvio, `rebase db generate`, `db push`, `generate-sdk` e `doctor` compilano
+le tabelle esportate da `backend/schema/index.ts` prima di qualsiasi altra operazione, e si arrestano quando una qualsiasi
+tabella non compila — assenza di `rls`, `"inherit"` senza `defaultRls`, una relazione
+verso una tabella non esportata dall'index, un `defineTable` in un file adiacente che
+l'index tralascia — indicando ogni tabella, chiave e problema contemporaneamente. Correggi ciascuno di essi;
+`rebase verify` segnala lo stesso elenco senza avviare nulla.
+
+## `config/collections` viene rifiutato
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+Un progetto precedente alla versione 0.31 mantiene il proprio modello dati in `config/collections`, che
+non viene più letto da nulla: il runtime, ogni comando CLI e un bundle format-2
+vengono rifiutati mostrando `rebase migrate collections-to-tables` nel messaggio. Esegui il comando
+su un albero git pulito; riscriverà il progetto come `backend/schema` e
+`frontend/src/cms`, verificherà che l'SQL generato sia invariato e mostrerà i passaggi
+rimanenti da eseguire. Consulta [Upgrading 0.30 to 0.31](https://rebase.pro/docs/upgrading/0-30-to-0-31/).
 
 ## `type "vector" does not exist`
 
-pgvector è un'estensione del server, quindi Rebase la installa solo dove il progetto lo autorizza esplicitamente. Dichiarala in `config/resources.ts`:
+pgvector è un'estensione del server, pertanto Rebase la installa solo se un progetto dichiara
+che è consentito farlo. Dichiarala in `backend/resources.ts`:
 
 ```ts
 database({ extensions: ["vector"] })
 ```
 
-Il database richiede inoltre un'immagine che includa la libreria. L'immagine di scaffolding `pgvector/pgvector:pg18` la include; una standard `postgres:18` no. Se l'installazione stessa viene rifiutata (`extension "vector" is not available` o un errore di autorizzazione), la configurazione è già corretta e ciò che manca è la libreria sul server oppure un ruolo autorizzato a eseguire `CREATE EXTENSION vector;`.
+Il database richiede inoltre un'immagine che includa la libreria. Quella dello scaffold
+`pgvector/pgvector:pg18` la include; una versione standard `postgres:18` no. Se l'installazione
+stessa viene rifiutata (`extension "vector" is not available`, o un errore di permessi),
+la configurazione è già corretta e ciò che manca è la libreria sul
+server oppure un ruolo autorizzato a eseguire `CREATE EXTENSION vector;`.
 
 ## Il database ha rifiutato l'istruzione
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```
 DB_PERMISSION_DENIED — Permission denied by the database on "notes"
 (row-level security). Check the RLS policies for this table.
 ```
 
-SQLSTATE `42501`. Può indicare due problemi distinti, e il messaggio li differenzia:
+SQLSTATE `42501`. Due problemi differenti si manifestano con questo codice, e il messaggio
+li distingue:
 
-- **Una policy di row-level security (RLS) ha rifiutato la riga** — il messaggio
-  qui sopra. Il sistema di controllo accessi sta funzionando; il chiamante ha
-  richiesto qualcosa che le sue policy non consentono. Controlla le
-  `securityRules` della collection ed esegui `npx @rebasepro/rls-check` per un
-  controllo in sola lettura di ciò che il database applicherà effettivamente.
-- **Al ruolo manca un `GRANT`.** Il messaggio nomina l'oggetto invece:
+- **Una policy di sicurezza a livello di riga (RLS) ha rifiutato la riga** — il messaggio sopra. Il
+  sistema di controllo degli accessi funziona regolarmente; il chiamante ha richiesto qualcosa non
+  consentito dalle sue policy. Controlla la proprietà `rls` della tabella in `backend/schema`, ed esegui
+  `npx @rebasepro/rls-check` per un audit in sola lettura di ciò che il database
+  effettivamente applicherà.
+- **Il ruolo non dispone di un `GRANT`.** Il messaggio indica invece l'oggetto:
 
   ```
   DB_PERMISSION_DENIED — Permission denied by the database: the role this request
@@ -92,14 +148,15 @@ SQLSTATE `42501`. Può indicare due problemi distinti, e il messaggio li differe
   role, not a row-level security policy.
   ```
 
-  Nulla nella richiesta potrà risolvere il problema — il ruolo con cui vengono
-  eseguite le richieste non può interagire affatto con quell'oggetto. Il server
-  concede al ruolo di richiesta i privilegi sugli schemi di cui effettua il
-  provisioning, all'avvio; un oggetto creato al di fuori di esso (da un altro
-  ruolo, o in uno schema che nessuna collection dichiara) necessita di un
-  `GRANT` a parte. Questo è un problema di deployment.
+  Nessuna modifica alla richiesta sarà d'aiuto — il ruolo con cui vengono eseguite le richieste non può toccare
+  minimamente quell'oggetto. Il server assegna i permessi al proprio ruolo di richiesta sugli schemi che
+  predispone all'avvio; un oggetto creato al di fuori di esso (da un altro ruolo, o in uno
+  schema non dichiarato da alcuna tabella) necessita di un proprio `GRANT`. Questo è un
+  problema di deployment.
 
-Una lettura esclusa da RLS non è un errore: le righe vengono filtrate e si ottiene una pagina vuota. Se una collection risulta vuota per un utente autenticato che dovrebbe visualizzare le righe, il punto da verificare è la policy, non la query.
+Una lettura esclusa da RLS non è un errore: le righe vengono filtrate e si ottiene una
+pagina vuota. Se una tabella risulta vuota per un utente autenticato che dovrebbe visualizzare
+delle righe, il punto da verificare è la policy, non la query.
 
 ## `SCHEMA_DRIFT` — una tabella o una colonna non esiste
 
@@ -107,16 +164,18 @@ Una lettura esclusa da RLS non è un errore: le righe vengono filtrate e si otti
 SCHEMA_DRIFT — Schema drift: table "posts" does not exist.
 ```
 
-Il codice e il database non concordano. In fase di sviluppo:
+Il codice e il database non sono allineati. In ambiente di sviluppo:
 
 ```bash
-rebase db push        # apply the collections to the database
+rebase db push        # apply the tables to the database
 rebase doctor         # the full three-way drift report
 ```
 
-Su un tenant Cloud gestito, `db push` non può raggiungere il database — il runtime applica invece lo schema all'avvio, quindi esegui un nuovo deployment anziché il push.
+Su un tenant Cloud gestito, `db push` non può raggiungere il database — il runtime
+applica lo schema all'avvio, quindi esegui un nuovo deployment anziché il comando push.
 
-Se una tabella esiste ma una colonna no, la causa abituale è un file di collection modificato senza essere rigenerato: esegui `rebase schema generate` e fai nuovamente il push.
+Se una tabella esiste ma una colonna no, la causa abituale è un file di tabella
+modificato senza rigenerare: esegui `rebase schema generate` e nuovamente il push.
 
 ## `Error: EOF` da `db push` sul database gestito
 
@@ -125,15 +184,15 @@ Error: EOF
 ✗ atlas schema apply --to file://.rebase/sql/schema.sql --dry-run failed.
 ```
 
-Il database di sviluppo gestito accetta poche connessioni alla volta, e un `rebase dev` in
-esecuzione ne tiene alcune. Atlas, che pianifica il push, ne apre altre due, e una è stata
-chiusa mentre la usava. Nulla è stato applicato, quindi il comando si può rieseguire senza
-rischi; il server di sviluppo chiude le connessioni inattive dopo 30 secondi. Se continua a
-fallire, ferma `rebase dev` mentre fai il push.
+Il database di sviluppo gestito accetta poche connessioni per volta, e un'istanza attiva di
+`rebase dev` ne trattiene alcune. Atlas, che pianifica il push, ne apre altre
+due, e una è stata chiusa durante l'operazione. Non è stato applicato nulla, quindi il comando può essere
+eseguito nuovamente in sicurezza; il server dev chiude le connessioni inattive dopo 30 secondi. Se continua
+a fallire, arresta `rebase dev` mentre esegui il push.
 
 Il push chiude le proprie
-connessioni prima che Atlas parta, il che lascia spazio ad Atlas nel caso consueto, e
-l'errore dice che cosa è successo.
+connessioni prima dell'avvio di Atlas, lasciando solitamente spazio sufficiente per Atlas,
+e l'errore descrive l'accaduto.
 
 ## La porta è già in uso
 
@@ -141,24 +200,37 @@ l'errore dice che cosa è successo.
 Port 3001 is in use — trying 3002.
 ```
 
-In dev viene associata la porta libera successiva con una notifica. Il messaggio è importante perché tutto il resto — il `VITE_API_URL` del frontend, un segnalibro, un comando `curl` — punta ancora alla vecchia porta. La causa più frequente è un'istanza precedente di `rebase dev` che occupa ancora il socket.
+L'ambiente di sviluppo si collega alla prima porta libera successiva e lo notifica. Il messaggio è importante perché tutto
+il resto — il parametro `VITE_API_URL` del frontend, un segnalibro, un comando `curl` — punta
+ancora alla porta precedente. La causa abituale è un'istanza precedente di `rebase dev` che trattiene
+ancora il socket.
 
-Passa `--port` per fissarne una, oppure arresta l'altro processo. In produzione non vengono effettuati tentativi successivi: la porta configurata è vincolante ed `EADDRINUSE` è un errore fatale.
+Passa `--port` per fissarne una, oppure arresta l'altro processo. In produzione non sono previsti
+nuovi tentativi: la porta configurata è vincolante ed `EADDRINUSE` è un errore fatale.
 
 ## Il backend è andato in crash e `rebase dev` è rimasto in esecuzione
 
-Un backend che genera un'eccezione all'avvio non arresta il watcher: stampa lo stack trace e attende una modifica ai file. Quando il backend non si è annunciato entro `REBASE_DEV_READY_TIMEOUT_MS` (30 secondi per impostazione predefinita), `rebase dev` segnala questo:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+Un backend che genera un'eccezione all'avvio non arresta il watcher — stampa lo stack trace e
+rimane in attesa di una modifica ai file. Quando il backend non segnala il proprio avvio entro
+`REBASE_DEV_READY_TIMEOUT_MS` (30 secondi per impostazione predefinita), `rebase dev` segnala quanto segue:
 
 ```
   ✗ The backend has not started after 30s.
     Fix the error above; the watcher restarts it on the next change.
 ```
 
-L'errore sovrastante è quello effettivo. Le cause più comuni sono un errore di sintassi in un file di collection, un'importazione non risolta e un `DATABASE_URL` che punta a una risorsa inesistente.
+L'errore mostrato sopra è quello effettivo. Le cause più comuni sono un errore di sintassi in
+un file all'interno di `backend/schema`, un import non risolto e un `DATABASE_URL` che
+punta al nulla.
 
-## Una custom function non viene servita
+## Una funzione personalizzata non viene gestita
 
-Le funzioni vengono caricate da `backend/functions` all'avvio e un file che non si carica viene **ignorato, non è fatale** — il server si avvia senza di esso. Il sintomo è quindi un errore 404 su una route appena scritta, e la spiegazione si trova due righe prima nel log di avvio:
+Le funzioni vengono caricate da `backend/functions` all'avvio, e un file che non riesce
+a caricarsi viene **ignorato, senza causare errori fatali** — il server si avvia senza di esso. Di conseguenza, il sintomo è
+un errore 404 su una rotta appena creata, e la spiegazione si trova due righe prima nel
+log di avvio:
 
 ```
 ❌ [functions] Failed to load orders.ts: Cannot find module './util'
@@ -166,29 +238,43 @@ Le funzioni vengono caricate da `backend/functions` all'avvio e un file che non 
   - orders.ts (threw: Cannot find module './util')
 ```
 
-Le cause abituali: una dipendenza importata ma non presente in `package.json`, un'importazione relativa priva di estensione (`./util` anziché `./util.js` — il progetto è ESM, quindi l'estensione è obbligatoria) e un file che esporta qualcosa di diverso da un'app Hono. Scrivi le funzioni con `defineFunction(...)` da `@rebasepro/server/functions` per rilevare quest'ultimo caso come errore di compilazione — usa quel sottopercorso, non la root del pacchetto, affinché la funzione rimanga portabile.
+Le cause consuete: una dipendenza importata ma non presente in `package.json`, un import
+relativo privo dell'estensione (`./util` anziché `./util.js` — il progetto utilizza
+ESM, quindi l'estensione è obbligatoria), e un file che esporta qualcosa di diverso da
+un'app Hono. Crea le funzioni con `defineFunction(...)` da `@rebasepro/server/functions`
+per trasformare quest'ultimo caso in un errore di compilazione — utilizzando quel sotto-percorso, non la root del
+pacchetto, affinché la funzione rimanga portabile.
 
-Le sottodirectory non vengono scansionate. `functions/admin/users.ts` viene segnalato come elemento ignorato anziché essere servito.
+Le sottodirectory non vengono scansionate. `functions/admin/users.ts` viene segnalato come
+voce ignorata anziché essere reso disponibile.
 
-Una volta avviato il server, una funzione che genera un'eccezione al momento della richiesta risponde con l'envelope JSON di errore e registra il motivo nei log; una funzione che non risponde mai viene interrotta dopo `REBASE_FUNCTIONS_TIMEOUT_MS` e restituisce `504 FUNCTION_TIMEOUT`.
+Una volta avviato il server, una funzione che genera un'eccezione al momento della richiesta restituisce la busta
+JSON di errore e registra il motivo; una funzione che non risponde mai viene interrotta allo scadere di
+`REBASE_FUNCTIONS_TIMEOUT_MS` e restituisce `504 FUNCTION_TIMEOUT`.
 
-## Il servizio è attivo? `/livez` e `/health`
+## È attivo? `/livez` e `/health`
 
-| Percorso | Accede al database | Risposta |
+| Percorso | Interroga il database | Risponde |
 | --- | --- | --- |
-| `/livez` | No | `200 {"status":"ok"}` mentre il processo è in esecuzione. Utilizzalo per una liveness probe. |
-| `/health` | Sì, ogni data source | `200 {"status":"ok"}` quando ogni data source configurato risponde; `503 {"status":"degraded"}` quando uno non risponde. Utilizzalo per una readiness probe. |
+| `/livez` | No | `200 {"status":"ok"}` finché il processo è in esecuzione. Utilizzalo per una liveness probe. |
+| `/health` | Sì, ogni origine dati | `200 {"status":"ok"}` quando ogni origine dati configurata risponde; `503 {"status":"degraded"}` quando una di esse non risponde. Utilizzalo per una readiness probe. |
 
-Non impostare una liveness probe su `/health`: un problema temporaneo del database indurrebbe l'orchestratore a terminare un processo altrimenti integro, trasformando un breve disservizio in un ciclo continuo di riavvii.
+Non associare una liveness probe a `/health`: un problema temporaneo del database indurrebbe
+l'orchestratore a terminare un processo altrimenti integro, trasformando un breve disservizio in un
+ciclo continuo di riavvii.
 
-L'endpoint `/health` non richiede autenticazione, quindi al di fuori dello sviluppo restituisce solo l'esito e quale data source risulta degradato, e nient'altro. Il testo dell'errore generato dal driver — che include host, porta, nome del database e ruolo — viene inviato ai log.
+`/health` non è autenticato, pertanto al di fuori dell'ambiente di sviluppo restituisce unicamente l'esito e
+quale origine dati risulta degradata, nient'altro. Il testo dell'errore originale del driver —
+che cita host, porta, nome del database e ruolo — viene inviato ai log.
 
 ## Errori successivi all'avvio
 
-Ogni errore dell'API restituisce lo stesso envelope e include un `code`. Il [riferimento ai codici di errore](/docs/backend/errors/) elenca tutti i codici con il relativo stato e la soluzione.
+Ogni errore dell'API risponde con la medesima struttura di payload e include un `code`. Il
+[riferimento ai codici di errore](/docs/backend/errors/) elenca ciascuno di essi con lo stato
+e la risoluzione.
 
-## Passaggi successivi
+## Approfondimenti
 
-- [Codici di errore](/docs/backend/errors/) — ogni `code` che l'API può restituire, con lo stato e la soluzione.
-- [Ambiente e configurazione](/docs/getting-started/configuration/) — ogni variabile letta dal runtime e quelle senza le quali l'ambiente di produzione rifiuta l'avvio.
-- [Panoramica del backend](/docs/backend/) — cosa esegue l'avvio, in ordine, e a quale domanda risponde ciascuna probe.
+- [Codici di errore](/docs/backend/errors/) — ogni `code` che l'API può restituire, con lo stato e la correzione.
+- [Ambiente e Configurazione](/docs/getting-started/configuration/) — tutte le variabili lette dal runtime e quelle senza le quali la produzione si rifiuta di avviarsi.
+- [Panoramica del Backend](/docs/backend/) — le operazioni eseguite all'avvio, in ordine, e quale probe risponde a quale verifica.

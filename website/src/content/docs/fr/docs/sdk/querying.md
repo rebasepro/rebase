@@ -1,13 +1,15 @@
 ---
-sourceHash: 81a0c24fa8541fc2
+sourceHash: 45064786f1785a65
 title: Interroger les données
 sidebar_label: Interroger les données
-description: Opérations CRUD, constructeur de requêtes fluide, opérateurs de filtrage, tri, sélection de colonnes et agrégats avec le SDK typé de Rebase.
+description: Opérations CRUD, query builder fluide, opérateurs de filtrage, tri, sélection de colonnes et agrégats avec le SDK typé Rebase.
 ---
 
-## Accéder aux collections
+## Accéder aux tables
 
-Accédez à n'importe quelle collection via `client.data.<collectionName>` (camelCase, converti automatiquement en snake_case) ou `client.data.collection<Record<string, unknown>>("slug")` (slug explicite) :
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+Accédez à n'importe quelle table via `client.data.<tableName>` (en camelCase, automatiquement converti en snake_case) ou `client.data.table<Record<string, unknown>>("slug")` (slug explicite) :
 
 ```typescript
 // Property-style access (camelCase → snake_case slug)
@@ -15,14 +17,14 @@ client.data.blogPosts       // → slug "blog_posts"
 client.data.users           // → slug "users"
 
 // Dynamic access by slug
-client.data.collection<Record<string, unknown>>("blog_posts")
+client.data.table<Record<string, unknown>>("blog_posts")
 ```
 
-> **Mode strict (SDK généré) :** Lorsque vous passez le `collectionsDictionary` généré à `createRebaseClient`, le proxy de données valide les accès aux propriétés au moment de l'accès. Une faute de frappe telle que `client.data.prodcuts` lèvera immédiatement une erreur explicite avec une suggestion de correspondance la plus proche au lieu de produire plus tard une erreur 404 déroutante. Utilisez `client.data.collection<Record<string, unknown>>("slug")` pour contourner la validation pour les slugs dynamiques ou déterminés au moment de l'exécution.
+> **Mode strict (SDK généré) :** Lorsque vous transmettez le `tablesDictionary` généré à `createRebaseClient` en tant que `tables`, le proxy de données valide les accès aux propriétés au moment de l'accès. Une faute de frappe comme `client.data.prodcuts` lève immédiatement l'erreur `UNKNOWN_TABLE` avec une suggestion de correspondance la plus proche au lieu de produire une erreur 404 déroutante plus tard. Utilisez `client.data.table<Record<string, unknown>>("slug")` pour contourner la validation pour les slugs dynamiques ou déterminés au moment de l'exécution.
 
 ## Opérations CRUD
 
-### Find (Liste)
+### Find (Lister)
 
 ```typescript
 // All products (default limit: 50)
@@ -40,11 +42,11 @@ const { data, meta } = await client.data.products.find({
 // meta has { total, limit, offset, hasMore }
 ```
 
-### Lire un élément par ID
+### Lire un enregistrement par ID
 
-Deux méthodes, car il y a deux situations distinctes qui appellent du code différent.
+Deux méthodes existent, car il y a deux situations qui appellent un code différent.
 
-`get` est destiné à une ligne dont vous supposez l'existence — l'ID provient d'un lien, d'un paramètre de route ou d'une autre ligne. Elle renvoie la ligne, de sorte que rien en aval n'ait besoin de restreindre le type, et une ligne manquante déclenche une exception sur laquelle vous pouvez créer une branche conditionnelle :
+`get` est destiné à une ligne dont vous attendez l'existence — l'ID provient d'un lien, d'un paramètre de route ou d'une autre ligne. Il renvoie la ligne, de sorte que rien en aval n'a besoin d'affiner le type, et une ligne manquante est une exception sur laquelle vous pouvez brancher votre logique :
 
 ```typescript
 const product = await client.data.products.get(42);
@@ -64,24 +66,25 @@ async function loadProduct(id: string) {
 }
 ```
 
-`findById` est destiné à une ligne qui peut légitimement ne pas être présente — une recherche par un ID saisi par un utilisateur, une vérification de cache :
+`findById` est destiné à une ligne qui peut légitimement ne pas exister — une recherche par un ID saisi par un utilisateur, une vérification de cache :
 
 ```typescript
 const maybe = await client.data.products.findById(42);
 // Row | undefined
 ```
 
-`findById` accepte les relations à charger, comme `find` : `findById(1, { include: ["tags"] })`.
+`findById` prend les relations à charger, tout comme `find` :
+`findById(1, { include: ["tags"] })`.
 
 :::note
-La sécurité au niveau des lignes (Row-Level Security) renvoie délibérément la même réponse pour « ligne inexistante » et « non autorisé en lecture » : une erreur 404 qui ferait la distinction confirmerait l'existence de la ligne.
+La sécurité au niveau des lignes (Row-level security) fait que « aucune ligne de ce type » et « pas le droit de lecture » produisent délibérément la même réponse : un code 404 qui les distinguerait confirmerait que la ligne existe.
 :::
 
 ### Écriture
 
-`create`, `upsert`, `update`, `delete` et leurs variantes par lot se trouvent sur la page **[Écriture de données](/docs/sdk/writing/)**, ainsi que les opérations sur les champs, les écritures conditionnelles et les clés d'idempotence.
+`create`, `upsert`, `update`, `delete` et leurs variantes par lot se trouvent sur **[Écrire des données](/docs/sdk/writing/)**, ainsi que les opérations sur les champs, les écritures conditionnelles et les clés d'idempotence.
 
-### Count
+### Count (Compter)
 
 ```typescript
 const total = await client.data.products.count();
@@ -92,7 +95,7 @@ const activeCount = await client.data.products.count({
 });
 ```
 
-## Constructeur de requêtes fluide
+## Query Builder fluide
 
 Enchaînez les méthodes pour des requêtes plus expressives :
 
@@ -108,66 +111,59 @@ const { data } = await client.data.products
 ### Méthodes disponibles
 
 | Méthode | Description | Exemple |
-|---------|-------------|---------|
+|--------|-------------|---------|
 | `.where(field, op, value)` | Ajouter une condition de filtre | `.where("age", ">=", 18)` |
-| `.where(path, op, value)` | Filtrer sur le chemin d'une [relation](/docs/sdk/relations#querying-through-a-relation) ou d'un [JSON](/docs/sdk/aggregates-and-search#filtering-inside-json) | `.where("author.name", "==", "bob")` |
+| `.where(path, op, value)` | Filtrer sur un chemin de [relation](/docs/sdk/relations#querying-through-a-relation) ou [JSON](/docs/sdk/aggregates-and-search#filtering-inside-json) | `.where("author.name", "==", "bob")` |
 | `.where(group)` | Ajouter un [groupe OR/AND](#conditions-logiques-or--and--not) | `.where(or(cond(…), cond(…)))` |
 | `.orderBy(field, dir, nulls?)` | Trier les résultats | `.orderBy("name", "asc")` |
 | `.orderBy(aggregate, dir)` | Trier par un [agrégat sur une relation](/docs/sdk/relations#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
 | `.limit(n)` | Limiter le nombre de résultats | `.limit(25)` |
 | `.offset(n)` | Ignorer les N premiers résultats | `.offset(50)` |
 | `.after(cursor)` | Continuer après un [curseur](/docs/sdk/pagination#cursor-pagination) | `.after(meta.nextCursor)` |
-| `.fields(...columns)` | Renvoyer [uniquement ces colonnes](#renvoyer-moins-de-colonnes) | `.fields("id", "title")` |
-| `.distinct()` | Regrouper les lignes identiques sur ces colonnes | `.fields("status").distinct()` |
+| `.fields(...columns)` | Retourner [uniquement ces colonnes](#retourner-moins-de-colonnes) | `.fields("id", "title")` |
+| `.distinct()` | Fusionner les lignes identiques sur ces colonnes | `.fields("status").distinct()` |
 | `.search(text)` | Recherche textuelle — voir [Recherche](/docs/backend/search) | `.search("laptop")` |
 | `.vectorSearch(prop, vector, opts?)` | Recherche des plus proches voisins sur une propriété `vector` | `.vectorSearch("embedding", vec)` |
 | `.include(...relations)` | [Charger les lignes associées](/docs/sdk/relations#loading-related-rows) | `.include("author", "tags")` |
-| `.find()` | Exécuter la requête | Renvoie `FindResult<M>` |
+| `.find()` | Exécuter la requête | Retourne `FindResult<M>` |
 | `.aggregate(params)` | [Réduire au lieu de renvoyer des lignes](#agrégats) | `.aggregate({ select: [{ fn: "count" }] })` |
 | `.iterate(options?)` | [Diffuser en continu chaque ligne correspondante](/docs/sdk/pagination#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
-| `.findAll(options?)` | [Récupérer chaque ligne correspondante](/docs/sdk/pagination#reading-everything-iterate-and-findall) | Renvoie `M[]` |
-| `.count()` | Compter les lignes correspondantes | Renvoie `number` |
-| `.listen(onUpdate, onError?)` | S'abonner aux mises à jour en temps réel | Renvoie `unsubscribe()` |
+| `.findAll(options?)` | [Collecter chaque ligne correspondante](/docs/sdk/pagination#reading-everything-iterate-and-findall) | Retourne `M[]` |
+| `.count()` | Compter les lignes correspondantes | Retourne `number` |
+| `.listen(onUpdate, onError?)` | S'abonner aux mises à jour en temps réel | Retourne `unsubscribe()` |
 
 ### Opérateurs de filtrage
 
 | Opérateur | Alias | Description |
 |-----------|-------|-------------|
 | `"=="` | `"eq"` | Égal |
-| `"!="` | `"neq"` | Différent de |
+| `"!="` | `"neq"` | Non égal |
 | `">"` | `"gt"` | Supérieur à |
 | `">="` | `"gte"` | Supérieur ou égal à |
 | `"<"` | `"lt"` | Inférieur à |
 | `"<="` | `"lte"` | Inférieur ou égal à |
 | `"in"` | | Valeur présente dans le tableau |
-| `"not-in"` | `"nin"` | Valeur non présente dans le tableau |
-| `"array-contains"` | `"cs"` | Le champ de type tableau contient la valeur |
-| `"array-contains-any"` | `"csa"` | Le champ de type tableau contient l'une des valeurs |
-| `"array-contains-all"` | `"csall"` | Le champ de type tableau contient chacune des valeurs |
-| `"array-contained-by"` | `"cd"` | Le champ de type tableau ne contient que des éléments parmi les valeurs (un tableau vide compris) |
-| `"like"` | `"like"` | Correspondance de motif **sensible** à la casse ; `%` et `_` sont les caractères génériques |
+| `"not-in"` | `"nin"` | Valeur absente du tableau |
+| `"array-contains"` | `"cs"` | Le champ tableau contient la valeur |
+| `"array-contains-any"` | `"csa"` | Le champ tableau contient l'une des valeurs |
+| `"array-contains-all"` | `"csall"` | Le champ tableau contient chacune des valeurs |
+| `"array-contained-by"` | `"cd"` | Le champ tableau ne contient rien d'autre que les valeurs (tableau vide inclus) |
+| `"like"` | `"like"` | Correspondance de motif **sensible à la casse** ; `%` et `_` sont les caractères génériques |
 | `"ilike"` | `"ilike"` | Correspondance de motif insensible à la casse |
 | `"not-like"` | `"nlike"` | Ne correspond pas au motif |
 | `"not-ilike"` | `"nilike"` | Ne correspond pas au motif, insensible à la casse |
-| `"is-null"` | `"isnull"` | La colonne est `NULL`. Ne prend aucune valeur — toute valeur transmise est normalisée et ignorée |
+| `"is-null"` | `"isnull"` | La colonne est `NULL`. Ne prend aucune valeur — ce que vous passez est normalisé et ignoré |
 | `"is-not-null"` | `"notnull"` | La colonne n'est pas `NULL`. Ne prend aucune valeur |
 
-La colonne alias correspond à la notation **réseau** (wire format), utilisée dans les chaînes de requête REST. Elle n'apparaît jamais dans le code applicatif : le SDK et le panneau d'administration utilisent tous deux l'opérateur canonique de gauche.
+La colonne alias correspond à la notation **réseau** (wire), utilisée dans les chaînes de requête REST. Elle n'apparaît jamais dans le code applicatif : le SDK et le panneau d'administration utilisent tous deux l'opérateur canonique situé à gauche.
 
-Les quatre opérateurs de tableau fonctionnent sur les colonnes de tableau natives (`text[]`, `integer[]`,
-…) et sur les tableaux JSONB, et un index GIN sur la colonne les sert tous. Pour lister les éléments
-distincts d'une colonne de tableau, groupez un agrégat par
-`unnest(<field>)` (voir [Agrégats](/docs/sdk/aggregates-and-search/#grouping-by-an-expression)).
+Les quatre opérateurs de tableau fonctionnent sur les colonnes de tableau natives (`text[]`, `integer[]`, …) et sur les tableaux JSONB, et un index GIN sur la colonne les prend tous en charge. Pour lister les éléments distincts d'une colonne de tableau, groupez un agrégat par `unnest(<field>)` (voir [Agrégats](/docs/sdk/aggregates-and-search/#grouping-by-an-expression)).
 
-Les quatre opérateurs de motif comparent du texte. Un champ `enum` se compare par sa valeur, de sorte que
-`{ status: ["like", "draft%"] }` fonctionne sur un statut stocké comme enum Postgres. Sur un nombre, une
-date ou tout autre champ qui n'est pas du texte, ils sont refusés par une erreur 400 `INVALID_FILTER_OPERATOR`.
+Les quatre opérateurs de motif comparent du texte. Un champ `enum` est comparé par sa valeur, donc `{ status: ["like", "draft%"] }` fonctionne sur un statut stocké sous forme d'enum Postgres. Sur un nombre, une date ou tout autre champ qui n'est pas du texte, ils sont rejetés avec une erreur 400 `INVALID_FILTER_OPERATOR`.
 
 ### Ignorer la casse : `lower(field)`
 
-Une clé de filtre peut ramener un champ texte à une seule casse — `lower(artist)` ou
-`upper(code)` — et chaque opérateur compare alors la valeur ramenée à cette casse ; écrivez donc
-les valeurs dans cette casse :
+Une clé de filtre peut convertir un champ texte dans une casse spécifique — `lower(artist)` ou `upper(code)` — et chaque opérateur compare ensuite la valeur convertie ; écrivez donc les valeurs dans cette même casse :
 
 ```typescript
 await client.data.songs.find({
@@ -175,9 +171,7 @@ await client.data.songs.find({
 });
 ```
 
-Cela se compile en `lower(artist) = ANY($1)` : une seule liste liée, de longueur quelconque, qu'un
-index sur `lower(artist)` permet de servir. Via HTTP, la clé s'écrit de la même façon :
-`?lower(artist)=in.(abba,queen)`.
+Cela compile en `lower(artist) = ANY($1)` : une seule liste liée de n'importe quelle longueur, prise en charge par un index sur `lower(artist)`. Sur HTTP, la clé s'écrit de la même manière : `?lower(artist)=in.(abba,queen)`.
 
 ### Syntaxes de la clause Where
 
@@ -201,11 +195,11 @@ await client.data.products.find({
 });
 ```
 
-> **Remarque :** Les chaînes PostgREST pré-sérialisées (format 2) constituent une solution de secours pour transmettre des valeurs de filtre déjà au format réseau. Privilégiez la syntaxe sous forme de tuple pour la sécurité du typage et la lisibilité.
+> **Remarque :** Les chaînes PostgREST pré-sérialisées (format 2) sont une solution de secours pour transmettre des valeurs de filtre qui sont déjà au format réseau. Privilégiez la syntaxe par tuple pour la sécurité du typage et la lisibilité.
 
 ## Conditions logiques (OR / AND / NOT)
 
-Chaque champ dans `where` est combiné avec un opérateur logique AND. Pour associer des conditions avec un OR, ou pour nier un groupe, construisez une **condition logique** avec les fonctions d'assistance `or`, `and`, `not` et `cond` exportées par le SDK :
+Chaque champ dans `where` est combiné avec un AND. Pour relier des conditions par un OR, ou pour inverser un groupe, construisez une **condition logique** à l'aide des helpers `or`, `and`, `not` et `cond` exportés par le SDK :
 
 ```typescript
 import { or, and, not, cond } from "@rebasepro/client";
@@ -221,7 +215,7 @@ const { data } = await client.data.products.find({
 });
 ```
 
-Le constructeur fluide accepte la même arborescence :
+Le query builder fluide accepte la même arborescence :
 
 ```typescript
 const { data } = await client.data.products
@@ -230,13 +224,13 @@ const { data } = await client.data.products
     .find();
 ```
 
-`cond` prend l'opérateur canonique — la colonne de gauche du tableau [Opérateurs de filtrage](#opérateurs-de-filtrage). L'utilisation d'un opérateur que le dialecte ne prend pas en charge lève une `TypeError` lors de la sérialisation de la requête, plutôt que d'exécuter silencieusement une requête différente.
+`cond` prend l'opérateur canonique — la colonne de gauche du tableau des [Opérateurs de filtrage](#opérateurs-de-filtrage). Un opérateur non pris en charge par le dialecte produit une `TypeError` lors de la sérialisation de la requête, et non une requête silencieusement différente.
 
-Sur un client avec des [types générés](/docs/sdk#typed-sdk-generation), `logical` et `.where(group)` vérifient chaque condition de l'arbre par rapport à la ligne, comme le fait `where` : une colonne que la ligne n'a pas, ou une valeur du mauvais type pour l'opérateur (`cond("views", "==", "many")` sur une colonne numérique), est une erreur de compilation. Une relation ou un chemin JSON (`author.name`, `metadata->>tier`) n'est pas vérifié.
+Sur un client avec des [types générés](/docs/sdk#typed-sdk-generation), `logical` et `.where(group)` vérifient chaque condition de l'arborescence par rapport à la ligne, tout comme le fait `where` : une colonne inexistante sur la ligne, ou une valeur du mauvais type pour l'opérateur (`cond("views", "==", "many")` sur une colonne numérique), génère une erreur de compilation. Un chemin de relation ou JSON (`author.name`, `metadata->>tier`) n'est pas vérifié.
 
 ### Négation
 
-`not` nie la **conjonction** de ses conditions : `not(a)` équivaut à `NOT a`, et `not(a, b)` à `NOT (a AND b)`. Les groupes peuvent s'imbriquer, ainsi l'autre loi de De Morgan s'écrit `not(or(a, b))`.
+`not` inverse la **conjonction** de ses conditions : `not(a)` équivaut à `NOT a`, et `not(a, b)` à `NOT (a AND b)`. Les groupes s'imbriquent, donc l'autre loi de De Morgan s'écrit `not(or(a, b))`.
 
 ```typescript
 // Everything that is NOT a draft with fewer than ten views.
@@ -248,9 +242,9 @@ const { data } = await client.data.posts.find({
 });
 ```
 
-Cela se compile en un véritable `NOT (...)` SQL, et non en des opérateurs inversés. Cette distinction n'est pas cosmétique : la logique SQL est à trois valeurs, de sorte que `NOT (a AND b)` et `(NOT a) OR (NOT b)` cessent de coïncider dès qu'un `NULL` intervient, et seule l'une d'entre elles correspond à la requête que vous avez écrite.
+Cela compile en un véritable `NOT (...)` SQL, et non en des opérateurs inversés. Cette distinction n'est pas simplement cosmétique : SQL utilise une logique à trois valeurs, de sorte que `NOT (a AND b)` et `(NOT a) OR (NOT b)` cessent d'être équivalents dès qu'un `NULL` intervient, et un seul des deux correspond à la requête que vous avez écrite.
 
-Cela signifie également qu'une négation **inclut les lignes dont la colonne est NULL** — `not(cond("status", "==", "draft"))` renvoie les lignes sans aucun statut. C'est ce que signifie `NOT`, et c'est généralement ce que l'on souhaite ; si ce n'est pas le cas, associez-y un `is-not-null` avec un AND.
+Cela signifie également qu'une négation **inclut les lignes dont la colonne est NULL** — `not(cond("status", "==", "draft"))` renvoie les lignes sans aucun statut. C'est ce que signifie `NOT`, et c'est généralement ce que l'on souhaite ; si ce n'est pas le cas, ajoutez un `is-not-null` avec un AND à ses côtés.
 
 ### Composition avec le reste de la requête
 
@@ -260,34 +254,35 @@ Cela signifie également qu'une négation **inclut les lignes dont la colonne es
 (where fields, AND-ed)  AND  (logical group)  AND  (search)
 ```
 
-Il n'est pas possible d'appliquer un OR entre `where` et `logical`. Tout ce qui n'est pas un simple AND entre les trois doit être exprimé à l'intérieur d'un seul arbre `logical` — déplacez-y les champs nécessitant un OR.
+Il n'y a aucun moyen d'appliquer un OR entre `where` et `logical`. Tout ce qui n'est pas un simple AND des trois doit être exprimé au sein d'une seule arborescence `logical` — déplacez les champs que vous devez relier par un OR à l'intérieur de celle-ci.
 
 ### Sur le réseau
 
-Un groupe logique transite sous la forme d'un unique paramètre de requête `or=`, `and=` ou `not=`, selon la même syntaxe à points que celle employée par les filtres de champ :
+Un groupe logique transite sous la forme d'un paramètre de requête unique `or=`, `and=` ou `not=`, selon la même syntaxe à points que celle utilisée par les filtres de champs :
 
 ```
 GET /api/data/products?or=(status.eq.active,featured.eq.true)
 GET /api/data/posts?not=(status.eq.draft,views.lt.10)
 ```
 
-Un seul des trois s'applique par requête — `or` prévaut sur `and`, et tous deux prévalent sur `not`. Imbriquez un groupe dans un autre pour les combiner.
+Un seul des trois s'applique par requête — `or` l'emporte sur `and`, et tous deux sur `not`. Imbriquez un groupe dans un autre pour les combiner.
 
-Trois encodages méritent d'être connus, car ce sont ceux sur lesquels une chaîne de requête écrite manuellement fait souvent erreur :
+Trois encodages méritent d'être connus, car ce sont ceux sur lesquels une chaîne de requête écrite à la main se trompe généralement :
 
-| Condition | Forme réseau | Remarque |
-|-----------|--------------|----------|
-| `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` recherche la chaîne de quatre caractères `null` |
-| `cond("id", "in", [])` | `id.in.(\)` | `in.()` est une liste contenant une seule chaîne vide, ce qui correspond à une requête différente |
+| Condition | Format réseau | Note |
+|-----------|---------------|------|
+| `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` est une recherche de la chaîne de quatre caractères `null` |
+| `cond("id", "in", [])` | `id.in.(\)` | `in.()` est une liste contenant une chaîne vide, ce qui correspond à une requête différente |
 | `cond("author.name", "==", "bob")` | `author.name.eq.bob` | un [chemin de relation](/docs/sdk/relations#querying-through-a-relation) conserve son point |
 
-Les virgules, les parenthèses et les barres obliques inverses à l'intérieur d'une valeur sont échappées avec un antislash, ainsi `cond("name", "==", "Doe, John")` transite sous la forme `name.eq.Doe\, John` et ne divise pas le groupe.
+Les virgules, parenthèses et barres obliques inverses à l'intérieur d'une valeur sont échappées par une barre oblique inverse, de sorte que `cond("name", "==", "Doe, John")` transite sous la forme `name.eq.Doe\, John` et ne scinde pas le groupe.
 
 Les groupes peuvent s'imbriquer jusqu'à 32 niveaux de profondeur. Au-delà, la requête est rejetée avec l'erreur `INVALID_LOGICAL_GROUP` — aplatissez-la, puisque `or(a,or(b,c))` équivaut à `or(a,b,c)`.
 
 ## Pagination
 
-Les offsets, les numéros de page et les curseurs de type keyset disposent de leur propre page : [Pagination](/docs/sdk/pagination/).
+Les offsets, les numéros de page et les curseurs de type keyset ont leur propre page :
+[Pagination](/docs/sdk/pagination/).
 
 ## Tri
 
@@ -303,11 +298,11 @@ const { data } = await client.data.products
     .find();
 ```
 
-Si vous omettez la direction, la valeur par défaut est `"asc"` — c'est exactement ce que signifie `?orderBy=name` via HTTP, quelle que soit la base de données sous-jacente.
+Une direction omise prend par défaut la valeur `"asc"` — la même signification que `?orderBy=name` en HTTP, quelle que soit la base de données sous-jacente.
 
 ### Trier par plusieurs colonnes
 
-Un tri est une *liste* de clés. La deuxième départage les lignes considérées comme égales par la première, la troisième départage celles jugées égales par les deux premières — `orderBy` accepte donc tout aussi bien une liste de paires `[field, direction]` qu'une paire unique :
+Un tri est une *liste* de clés. La deuxième départage les lignes que la première considère comme égales, la troisième départage les lignes que les deux premières n'ont pas pu départager — ainsi, `orderBy` accepte une liste de paires `[field, direction]` tout aussi naturellement qu'une seule :
 
 ```typescript
 // By category, and newest first within each category.
@@ -316,7 +311,7 @@ const { data } = await client.data.products.find({
 });
 ```
 
-Avec le constructeur fluide, la même chose s'exprime en appelant `.orderBy()` à nouveau. Chaque appel **ajoute** une clé après les précédentes plutôt que de les remplacer :
+Le query builder fluide exprime la même chose en appelant `.orderBy()` à nouveau. Chaque appel **ajoute** une clé après les précédentes plutôt que de les remplacer :
 
 ```typescript
 const { data } = await client.data.products
@@ -325,15 +320,15 @@ const { data } = await client.data.products
     .find();
 ```
 
-Chaque tri se termine par l'ID de la ligne, par ordre décroissant, que vous l'ayez demandé ou non. C'est ce qui rend l'ordonnancement *total* : sans cela, deux lignes partageant une même valeur seraient renvoyées dans l'ordre choisi arbitrairement par la base de données, et paginer sur un ordre susceptible de varier entre deux exécutions d'une même requête répéterait certaines lignes et en omettrait d'autres.
+Chaque tri se termine par l'ID de la ligne, par ordre décroissant, que vous l'ayez demandé ou non. C'est ce qui rend l'ordonnancement *total* : sans cela, deux lignes partageant une même valeur sont renvoyées dans l'ordre choisi arbitrairement par la base de données, et paginer sur un ordre susceptible de varier entre deux exécutions d'une même requête répète certaines lignes et en ignore d'autres.
 
-Un tri multi-colonnes pagine parfaitement sous un [curseur](/docs/sdk/pagination#cursor-pagination) : la comparaison s'effectue sur chaque clé, dans l'ordre. Le seul ordre qu'un curseur ne peut pas décrire est **`_score`** — voir [Recherche](/docs/backend/search). La pertinence étant calculée par requête plutôt que stockée, il n'y a aucune valeur sur la ligne du curseur à laquelle comparer la page suivante, et une telle liste ne comporte aucun `nextCursor`.
+Un tri sur plusieurs colonnes pagine parfaitement à l'aide d'un [curseur](/docs/sdk/pagination#cursor-pagination) : la comparaison est construite sur chaque clé, dans l'ordre. Le seul ordre qu'un curseur ne peut pas décrire est **`_score`** — voir [Recherche](/docs/backend/search). La pertinence est calculée par requête plutôt que stockée, il n'y a donc aucune valeur sur la ligne du curseur à laquelle comparer la page suivante, et une telle liste ne comporte aucun `nextCursor`.
 
-### Positionnement des valeurs NULL lors du tri
+### Emplacement de tri des valeurs NULL
 
-Par défaut, les valeurs NULL sont triées **en dernier par ordre croissant et en premier par ordre décroissant** — la convention propre à Postgres. Ce comportement par défaut place chaque ligne sans date tout en haut d'une liste triée « du plus récent au plus ancien », avant toute donnée réelle, et la seule façon d'y échapper était auparavant d'utiliser un filtre `is-not-null` qui supprimait entièrement ces lignes.
+Par défaut, les valeurs NULL sont triées **en dernier dans l'ordre croissant et en premier dans l'ordre décroissant** — la convention propre à Postgres. Ce comportement par défaut place chaque ligne sans date tout en haut d'une liste triée « du plus récent au plus ancien », avant tout élément réel, et la seule solution consistait auparavant à appliquer un filtre `is-not-null` qui supprimait entièrement ces lignes.
 
-Un troisième élément sur la clé indique où les placer à la place :
+Un troisième élément sur la clé indique où elles doivent se positionner à la place :
 
 ```typescript
 // Newest first, and the ones with no date at the end where they belong.
@@ -348,13 +343,13 @@ const { data } = await client.data.posts
     .find();
 ```
 
-Via HTTP, il s'agit d'un troisième segment séparé par deux-points, `?orderBy=publishedAt:desc:last`, ou d'une clé `"nulls"` dans le format de tableau JSON. Toute valeur autre que `first`/`last` renvoie une erreur 400 au lieu de produire un tri silencieusement différent.
+En HTTP, il s'agit d'un troisième segment séparé par deux-points, `?orderBy=publishedAt:desc:last`, ou d'une clé `"nulls"` dans le format de tableau JSON. Toute valeur autre que `first`/`last` produit une erreur 400 plutôt qu'un ordre silencieusement différent.
 
-Le [curseur](/docs/sdk/pagination#cursor-pagination) respecte ce que le tri a déclaré, de sorte que la pagination sur une clé nullable reste correcte quel que soit le placement choisi.
+Le [curseur](/docs/sdk/pagination#cursor-pagination) respecte ce que le tri a déclaré, de sorte que la pagination sur une clé nullable reste correcte dans les deux cas de placement.
 
-## Renvoyer moins de colonnes
+## Retourner moins de colonnes
 
-`fields` restreint la lecture aux colonnes que vous spécifiez. Il s'agit d'une projection effectuée au niveau de la base de données — ce sont les colonnes *lues*, et non celles qui subsistent après un découpage de la réponse — ainsi, une requête qui n'a besoin que de deux champs d'une ligne large ne paie pas le coût du reste :
+`fields` restreint la lecture aux colonnes que vous nommez. Il s'agit d'une projection au niveau de la base de données — ce sont les colonnes *lues*, et non celles qui subsistent après un découpage de la réponse — de sorte qu'une requête n'ayant besoin que de deux champs d'une ligne large ne paie pas pour le reste :
 
 ```typescript
 const { data } = await client.data.posts.find({
@@ -367,20 +362,20 @@ const { data } = await client.data.posts.find({
 const { data } = await client.data.posts.fields("id", "title").find();
 ```
 
-Deux règles s'appliquent systématiquement, peu importe ce que vous spécifiez :
+Deux règles s'appliquent toujours, quelles que soient les colonnes nommées :
 
-- **La clé primaire est toujours renvoyée.** Une ligne qui ne peut pas être adressée ne peut être ni mise à jour, ni supprimée, ni dépassée par pagination — et `meta.nextCursor` en dérive, de sorte qu'une projection sans elle désactiverait silencieusement la navigation par curseur.
-- **Les colonnes `excludeFromApi` restent masquées.** En nommer une ne la démasque pas.
+- **La clé primaire est toujours renvoyée.** Une ligne qui ne peut pas être adressée ne peut pas être mise à jour, supprimée ou dépassée par pagination — et `meta.nextCursor` en découle, de sorte qu'une projection sans elle désactiverait silencieusement la navigation par curseur.
+- **Les colonnes `excludeFromApi` restent masquées.** Le fait d'en nommer une ne la démasque pas.
 
-Une colonne inconnue génère une erreur 400 `UNKNOWN_FIELD`. Interprétée comme « l'omettre », une faute de frappe comme `fields: ["titel"]` renverrait des lignes sans titre et sans aucune indication sur la cause.
+Une colonne inconnue génère une erreur 400 `UNKNOWN_FIELD`. Si elle était interprétée comme « à omettre », une faute de frappe comme `fields: ["titel"]` renverrait des lignes sans titre et sans aucune indication sur la cause.
 
-Une relation mentionnée dans `include` est chargée qu'elle apparaisse ou non dans `fields` ; pour restreindre les colonnes *au sein* d'une relation, consultez les [options par relation](/docs/sdk/relations#narrowing-what-a-relation-loads).
+Une relation nommée dans `include` est chargée qu'elle apparaisse ou non dans `fields` ; pour restreindre les colonnes *au sein* d'une relation, consultez les [options par relation](/docs/sdk/relations#narrowing-what-a-relation-loads).
 
 ### `distinct`
 
-`distinct` regroupe les lignes qui sont identiques sur les colonnes renvoyées, et une lecture distincte renvoie **uniquement** les colonnes que vous nommez — la clé primaire est exclue de la projection, contrairement à toutes les autres lectures. Cela doit être ainsi : une clé de substitution (surrogate key) diffère sur chaque ligne, la conserver rendrait donc chaque ligne unique par construction et la requête renverrait un statut 200 sans avoir rien filtré.
+`distinct` fusionne les lignes identiques sur les colonnes renvoyées, et une lecture distincte ne renvoie **que** les colonnes que vous spécifiez — la clé primaire est exclue de la projection, contrairement à toutes les autres lectures. Elle doit l'être : une clé de substitution diffère sur chaque ligne, la conserver rendrait donc chaque ligne unique par définition et la requête renverrait un statut 200 sans avoir rien fait.
 
-Cela n'a donc de sens qu'en combinaison avec `fields`. Sans cela, vous demandez toutes les colonnes visibles, clé comprise, et rien n'est regroupé :
+Cela ne prend donc tout son sens qu'accompagné de `fields`. Sans cela, vous demandez toutes les colonnes visibles, clé incluse, et rien n'est fusionné :
 
 ```typescript
 // The statuses actually in use.
@@ -390,18 +385,18 @@ const { data } = await client.data.posts
     .find();
 ```
 
-Une lecture distincte n'adresse aucune ligne en particulier — il n'y a pas de clé pour les désigner — elle renvoie donc un ensemble de valeurs plutôt qu'un ensemble de lignes à mettre à jour ou à supprimer, et elle ne comporte aucun `nextCursor`. Elle ne fournit également **aucun `meta.total`** : le décompte nécessiterait un `COUNT(DISTINCT …)` que le pilote n'émet pas, et renvoyer le nombre de lignes à la place décrirait un ensemble différent de celui servi — un résultat complet de deux lignes revenait avec `total: 8, hasMore: true`, ce qui amènerait un client à paginer indéfiniment. `hasMore` provient de la page elle-même.
+Une lecture distincte n'adresse aucune ligne — il n'y a pas de clé pour les adresser — elle renvoie donc un ensemble de valeurs plutôt qu'un ensemble de lignes à modifier ou supprimer, et elle ne comporte aucun `nextCursor`. Elle n'indique également **aucun `meta.total`** : compter nécessiterait un `COUNT(DISTINCT …)` que le pilote n'émet pas, et indiquer le nombre de lignes à la place décrirait un ensemble différent de celui servi — un résultat complet de deux lignes revenait avec `total: 8, hasMore: true`, ce qui poussait le client à paginer à l'infini. `hasMore` provient de la page elle-même.
 
 Deux combinaisons sont refusées plutôt que traitées de manière inutile :
 
-- **Une requête qui attribue un score à chaque ligne** — un `search()` classé ou un `vectorSearch()` associe un `_score`/`_distance` par ligne, de sorte qu'aucune paire de lignes n'est jamais identique et que `DISTINCT` n'aurait aucun effet. (Une recherche de sous-chaîne simple n'attache rien et fonctionne sans problème.)
-- **Trier par une colonne que vous n'avez pas renvoyée.** Postgres ne peut pas ordonner une lecture `DISTINCT` selon une expression qui ne figure pas dans la liste de sélection ; la requête renvoie une erreur 400 `DISTINCT_ORDER_BY_NOT_SELECTED` plutôt qu'une 500 citant du code SQL que vous n'avez jamais écrit.
+- **Une requête qui attribue un score à chaque ligne** — un `search()` avec classement ou un `vectorSearch()` associe un `_score`/`_distance` par ligne, de sorte que deux lignes ne sont jamais égales et que `DISTINCT` n'aurait aucun effet. (Une simple recherche de sous-chaîne n'associe rien et fonctionne très bien.)
+- **Trier par une colonne que vous n'avez pas renvoyée.** Postgres ne peut pas ordonner une lecture `DISTINCT` selon une expression en dehors de la liste du select ; la requête échoue avec une erreur 400 `DISTINCT_ORDER_BY_NOT_SELECTED` au lieu d'une 500 citant du SQL que vous n'avez jamais écrit.
 
-Via HTTP : `?fields=status&distinct=true`.
+En HTTP : `?fields=status&distinct=true`.
 
 ## Agrégats
 
-`aggregate()` réduit les lignes correspondantes au lieu de les renvoyer — `count`, `sum`, `avg`, `min`, `max`, éventuellement regroupées :
+`aggregate()` réduit les lignes correspondantes au lieu de les renvoyer — `count`, `sum`, `avg`, `min`, `max`, éventuellement groupés :
 
 ```typescript
 const rows = await client.data.orders.aggregate({
@@ -412,7 +407,7 @@ const rows = await client.data.orders.aggregate({
 // [{ status: "paid", sum_total: 41822.5, count: 317 }, …]
 ```
 
-Les filtres du constructeur s'y appliquent directement, ce qui constitue généralement la syntaxe la plus concise :
+Les filtres du builder sont conservés, ce qui constitue généralement la syntaxe la plus courte :
 
 ```typescript
 const rows = await client.data.orders
@@ -420,9 +415,9 @@ const rows = await client.data.orders
     .aggregate({ select: [{ fn: "sum", field: "total" }], groupBy: ["status"] });
 ```
 
-Les clés des résultats sont **dérivées**, et non choisies : `sum(total)` est renvoyé sous la forme `sum_total`, un simple `count()` sous la forme `count`. Vous permettre de les nommer impliquerait de vérifier que le nom ne correspond pas également à un champ de `groupBy` — une règle que personne ne devinerait, avec le risque d'écraser silencieusement une valeur si ce contrôle n'était pas fait.
+Les clés de résultat sont **dérivées**, et non choisies : `sum(total)` devient `sum_total`, un simple `count()` devient `count`. Vous permettre de les nommer impliquerait de vérifier que ce nom n'est pas également un champ de `groupBy` — une règle que personne ne devinerait, et une valeur silencieusement écrasée si elle n'était pas vérifiée.
 
-Les groupes se paginent comme les lignes d'un listage : `limit` les borne et `offset` les saute (un regroupement sur une colonne à forte cardinalité peut représenter l'équivalent de toute une table dans une seule réponse). Un agrégat groupé sans `limit` reçoit la valeur par défaut d'un listage — **50 groupes** en HTTP — lisez donc `meta` sur le résultat avant de le considérer comme complet :
+Les groupes sont paginés comme les lignes d'un listing : `limit` les borne et `offset` les saute (grouper par une colonne à forte cardinalité représente le volume de toute une table en une seule réponse). Un agrégat groupé sans `limit` reçoit la valeur par défaut du listing — **50 groupes** en HTTP — vérifiez donc `meta` sur le résultat avant de le considérer comme complet :
 
 ```typescript
 const byCustomer = await client.data.orders.aggregate({
@@ -433,19 +428,20 @@ const byCustomer = await client.data.orders.aggregate({
 byCustomer.meta; // { limit: 200, offset: 0, hasMore: true } — page on with offset: 200
 ```
 
-Le résultat reste un tableau de lignes ; `meta` en est une propriété non énumérable, de sorte qu'un spread ou un `JSON.stringify` ne voit que les lignes. Elle est présente chaque fois que les groupes ont été tronqués par un `limit`. Sans `groupBy`, il n'y a qu'une seule ligne, `limit` ne fait rien et `offset` est refusé. Dans une fonction serveur (`rebase.data`, `context.data`), un agrégat groupé sans `limit` renvoie chaque groupe. `include` n'est pas envoyé avec un agrégat : il n'a pas de relations à charger. Les groupes peuvent être triés avec `orderBy`, par une colonne de `groupBy` ou par la clé d'un agrégat — voir [Agrégats et recherche](/docs/sdk/aggregates-and-search/).
+Le résultat reste un tableau de lignes ; `meta` est une propriété non énumérable sur celui-ci, de sorte qu'une décomposition (spread) ou un `JSON.stringify` ne voit que les lignes. Elle est présente dès lors que les groupes ont été tronqués à une `limit`. Sans `groupBy`, il n'y a qu'une seule ligne, `limit` n'a aucun effet et `offset` est refusé. Dans une fonction serveur (`rebase.data`, `context.data`), un agrégat groupé sans `limit` renvoie l'ensemble des groupes. `include` n'est pas envoyé avec un agrégat : il n'a aucune relation à charger. Les groupes peuvent être triés avec `orderBy`, par une colonne `groupBy` ou par la clé d'un agrégat — voir [Agrégats et recherche](/docs/sdk/aggregates-and-search/).
 
-Tout l'intérêt est de ne pas récupérer les lignes pour ensuite les réduire. « Le chiffre d'affaires par statut » sur un million de commandes correspond ici à une seule requête et une seule ligne par statut, contre un `findAll()` suivi d'une boucle ailleurs — ce qui s'avère erroné en présence d'un `limit` et hors de prix sans lui. Cela passe par le même gestionnaire limité à la requête que toutes les autres lectures, de sorte que la sécurité au niveau des lignes s'applique aux lignes agrégées.
+Tout l'intérêt est de ne pas récupérer de lignes pour les réduire. Le « chiffre d'affaires par statut » sur un million de commandes représente ici une seule requête et une seule ligne par statut, contre un `findAll()` suivi d'une boucle partout ailleurs — ce qui est incorrect sous une `limit` et inabordable sans elle. L'opération s'exécute via le même handle délimité à la requête que toutes les autres lectures, de sorte que la sécurité au niveau des lignes s'applique aux lignes agrégées.
 
-Via HTTP : `GET /api/data/orders/aggregate?select=sum(total),count()&groupBy=status`.
+En HTTP : `GET /api/data/orders/aggregate?select=sum(total),count()&groupBy=status`.
 
-Le filtrage JSON, la recherche en texte intégral et la recherche vectorielle ont leur propre page : [Agrégats et recherche](/docs/sdk/aggregates-and-search/).
+Le filtrage JSON, la recherche en texte intégral et la recherche vectorielle font l'objet d'une page dédiée :
+[Agrégats et recherche](/docs/sdk/aggregates-and-search/).
 
-La lecture des entités associées — `include`, ainsi que les accesseurs qui interrogent à travers une relation — a sa propre page : [Interroger les relations](/docs/sdk/relations/).
+La lecture des entités associées — `include`, et les accesseurs qui interrogent à travers une relation — dispose de sa propre page : [Interroger les relations](/docs/sdk/relations/).
 
-## Points de terminaison personnalisés
+## Endpoints personnalisés
 
-Appelez des points de terminaison serveur personnalisés enregistrés via le système de fonctions :
+Appelez des endpoints serveur personnalisés enregistrés via le système de fonctions :
 
 ```typescript
 // Using client.functions.invoke()
@@ -468,13 +464,13 @@ const result = await client.call<{ summary: string }>(
 );
 ```
 
-Les deux méthodes renvoient **le corps de la réponse de la fonction, tel quel**. Aucune des deux n'extrait automatiquement une clé `data`, donc une fonction qui renvoie `{ data: [...] }` vous livre cet objet et vous lisez `.data` vous-même.
+Les deux renvoient **le corps de réponse de la fonction, tel quel**. Aucun des deux ne cherche à extraire une clé `data`, donc une fonction qui répond `{ data: [...] }` vous renvoie cet objet et vous lisez vous-même `.data`.
 
-`call()` prend un chemin complet et utilise toujours la méthode POST ; `invoke()` prend un nom de fonction et peut accepter une méthode HTTP, un sous-chemin et des en-têtes. Utilisez `invoke()` sauf si vous appelez un élément qui n'est pas une fonction.
+`call()` prend un chemin complet et effectue systématiquement un POST ; `invoke()` prend un nom de fonction et peut accepter une méthode, un sous-chemin et des en-têtes. Utilisez `invoke()` sauf si vous appelez autre chose qu'une fonction.
 
 ## Prochaines étapes
 
 - **[Authentification](/docs/sdk/authentication)** — Connexion, inscription, OAuth, sessions
-- **[Abonnements temps réel](/docs/sdk/realtime)** — Données en direct avec WebSockets
+- **[Abonnements temps réel](/docs/sdk/realtime)** — Données en direct avec les WebSockets
 - **[Stockage & Fichiers](/docs/sdk/storage)** — Téléverser, télécharger et gérer des fichiers
-- **[Relations](/docs/collections/relations)** — Définir des relations entre collections
+- **[Relations](/docs/collections/relations)** — Définir des relations entre les tables

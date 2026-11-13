@@ -1,13 +1,13 @@
 ---
-sourceHash: 7f14a487f380e2c9
-title: Aperçu de l'architecture
+sourceHash: b58890f96ff100b4
+title: Vue d'ensemble de l'architecture
 sidebar_label: Architecture
 description: Comprenez comment le backend, le frontend, le SDK typé et la base de données de Rebase s'intègrent pour former un Backend-as-a-Service complet.
 ---
 
 ## Architecture du système
 
-Rebase est une plateforme full-stack articulée autour de quatre couches :
+Rebase est une plateforme full-stack comprenant quatre couches :
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -32,9 +32,9 @@ Rebase est une plateforme full-stack articulée autour de quatre couches :
 
 ## Composants clés
 
-### Système d'adaptateur de base de données
+### Système d'adaptateurs de base de données
 
-Le backend s'initialise via un modèle unifié d'adaptateur de base de données. La logique spécifique à la base de données est découplée dans son propre package, et l'adaptateur gère automatiquement le pooling de connexions, la résolution de schéma et le routage des événements en temps réel.
+Le backend s'initialise via un modèle unifié d'adaptateurs de base de données. La logique spécifique à la base de données est découplée dans son propre package, et l'adaptateur gère automatiquement le pool de connexions, la résolution de schéma et le routage des événements en temps réel.
 
 ```typescript
 import { createPostgresAdapter } from "@rebasepro/server-postgres";
@@ -44,69 +44,77 @@ database: createPostgresAdapter({
 })
 ```
 
-Les collections se résolvent automatiquement par rapport à l'adaptateur configuré via le registre interne d'injection de dépendances.
+Chaque table est résolue par rapport à l'adaptateur configuré — la base de données par défaut, ou celle que son `database` désigne dans `backend/resources.ts`.
 
 :::tip
-Le `createPostgresAdapter` gère automatiquement le pooling de connexions à la base de données, la résolution de schéma et la configuration de `LISTEN/NOTIFY` en temps réel.
+Le `createPostgresAdapter` gère automatiquement le pool de connexions à la base de données, la résolution de schéma et la configuration de `LISTEN/NOTIFY` en temps réel.
 :::
 
-### Registre des collections
+### Descripteurs de tables
 
-Le `BackendCollectionRegistry` est l'index d'exécution de toutes les collections, de leurs tables PostgreSQL, de leurs enums et de leurs relations Drizzle. Il est alimenté au démarrage à partir de vos définitions de collections.
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-### Service en temps réel
+Au démarrage, le backend compile les tables exportées par `backend/schema/index.ts` en **descripteurs** : chaque colonne avec son type Postgres, sa nullabilité, ses règles de validation et de stockage, les relations par slug, et la posture de sécurité au niveau des lignes (row-level security). Tout problème sur une table entraîne le refus du démarrage avec une seule erreur `SchemaDefinitionError` énumérant chaque problème. Les descripteurs sont la base sur laquelle s'appuient REST, le temps réel, MCP et le document OpenAPI, sur laquelle la version du schéma est calculée, et ce que `GET /api/schema/tables` transmet au panneau d'administration et au Studio, caviardé en fonction de l'appelant. Le code des hooks ne quitte jamais le serveur. Un backend sans `backend/schema` introspecte la base de données pour générer ces mêmes descripteurs à la place.
+
+### Service temps réel
 
 La synchronisation en temps réel utilise le mécanisme natif `LISTEN/NOTIFY` de PostgreSQL :
 
-1. Une mutation de données se produit (insertion, mise à jour, suppression) — via l'API, ou par tout autre moyen qui écrit dans la table : `psql`, un cron, l'éditeur SQL
-2. Un trigger sur la table émet un `NOTIFY` sur un canal (là où le trigger ne peut pas être installé, le backend l'émet, uniquement pour les écritures passant par l'API)
+1. Une mutation de données se produit (insert, update, delete) — via l'API, ou tout autre élément qui écrit dans la table : `psql`, un cron, l'éditeur SQL
+2. Un déclencheur sur la table émet un `NOTIFY` sur un canal (lorsque le déclencheur ne peut pas être installé, le backend l'émet lui-même, uniquement pour les écritures effectuées via l'API)
 3. Le `RealtimeService` reçoit la notification
 4. Il diffuse le changement à tous les clients WebSocket connectés
 5. Les composants React effectuent un nouveau rendu avec les nouvelles données
 
-Pour les **déploiements multi-instances** (par exemple, Cloud Run avec plusieurs réplicas), chaque réplica détient sa propre connexion `LISTEN` vers la même base de données, de sorte qu'un changement atteint les abonnés de tous les réplicas. Derrière un pooler en mode transaction tel que PgBouncer, qui ne conserve pas de `LISTEN`, définissez `DATABASE_DIRECT_URL` sur la base de données elle-même.
+Pour les **déploiements multi-instances** (par ex. Cloud Run avec plusieurs réplicas), chaque réplica maintient sa propre connexion `LISTEN` vers la même base de données, de sorte qu'une modification parvient aux abonnés de chaque réplica. Derrière un gestionnaire de pool en mode transaction comme PgBouncer, qui ne conserve pas de `LISTEN`, définissez `DATABASE_DIRECT_URL` vers la base de données elle-même.
 
 ### Registre de stockage
 
-Tout comme les pilotes, les backends de stockage sont enregistrés dans un registre. Vous pouvez avoir plusieurs fournisseurs de stockage (local, S3) et router différents champs de fichiers vers différents backends à l'aide de `storage.storageSource`.
+Tout comme les pilotes, les backends de stockage sont enregistrés dans un registre. Vous pouvez avoir plusieurs fournisseurs de stockage (local, S3) et router différentes colonnes de stockage vers différents backends à l'aide de `col.storage({ source })`.
 
 ## Carte des packages
 
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
 | Package | Rôle | Utilisé par |
-|---------|------|---------|
-| `@rebasepro/types` | Interfaces TypeScript pour les collections, propriétés, entités, plugins | Tout |
-| `@rebasepro/server` | Initialisation du serveur backend, API REST, authentification, stockage, WebSocket | Backend |
-| `@rebasepro/client` | SDK typé — Transport HTTP, WebSocket, authentification | Frontend |
+|---------|------|-------------|
+| `@rebasepro/types` | Les constructeurs de tables (`defineTable`, `col`, `rel`), les descripteurs et les interfaces que chaque package partage | Tout |
+| `@rebasepro/server` | Initialisation du serveur backend, API REST, auth, stockage, WebSocket ; réexporte les constructeurs depuis `@rebasepro/server/schema`, un point d'entrée qui ne charge aucun code serveur | Backend |
+| `@rebasepro/server-postgres` | Le pilote Postgres : planification du schéma, migrations, politiques RLS, temps réel | Backend |
+| `@rebasepro/codegen` | Génération du SDK typé à partir des descripteurs de tables | Outils de dev |
+| `@rebasepro/client` | SDK typé — transport HTTP, WebSocket, auth | Frontend |
 | `@rebasepro/app` | Framework React — Scaffold, contrôleurs, formulaires, routes, hooks, vues de connexion, hooks de contrôleur d'authentification | Frontend |
-| `@rebasepro/ui` | Bibliothèque de composants d'interface utilisateur autonome (Tailwind v4 + Radix) | Frontend |
-| `@rebasepro/studio` | Éditeur de collection, console SQL, console JS, éditeur RLS, explorateur de stockage | Frontend |
-| `@rebasepro/cli` | CLI pour la génération de schéma, les migrations de base de données, la génération de SDK | Outils de dév |
-| `@rebasepro/forms` | Gestion d'état de formulaire React légère | Frontend |
-| `@rebasepro/plugin-ai` | Plugin d'autocomplétion de champs alimenté par l'IA | Frontend |
-| `@rebasepro/cms` | Vues, formulaires et routage de gestion de contenu, y compris l'importation et l'exportation CSV/JSON/Excel | Frontend |
-| `@rebasepro/inference` | Déduit les propriétés d'une collection à partir de lignes d'exemple (l'import « créer une collection à partir d'un fichier » de l'admin) | Frontend |
+| `@rebasepro/ui` | Bibliothèque de composants UI autonomes (Tailwind v4 + Radix) | Frontend |
+| `@rebasepro/studio` | Visualiseur et éditeur de schéma, console SQL, console JS, éditeur RLS, explorateur de stockage | Frontend |
+| `@rebasepro/cli` | CLI pour la génération de schéma, migrations de BD, génération de SDK | Outils de dev |
+| `@rebasepro/forms` | Gestion légère de l'état des formulaires React | Frontend |
+| `@rebasepro/plugin-ai` | Plugin d'autocomplétion de champs basé sur l'IA | Frontend |
+| `@rebasepro/cms` | Le panneau d'administration : une vue par table issue des descripteurs, `customizeTable`, formulaires et routage, import et export CSV/JSON/Excel | Frontend |
+| `@rebasepro/cms-types` | Les types et utilitaires du panneau : options de `customizeTable`, options de champs, actions d'entité, et le modèle de vue des collections et propriétés qu'affiche le panneau (`CollectionConfig`, `StringProperty`, `CollectionCallbacks`, …) | Frontend |
+| `@rebasepro/firebase` | Firestore en tant que source lue directement par le panneau : `defineFirestoreCollection` | Frontend |
+| `@rebasepro/inference` | Déduction de champs à partir de lignes d'exemples (l'import « créer à partir d'un fichier » de l'admin) | Frontend |
 
 ## Flux de données
 
 ### Flux de lecture
-1. L'utilisateur ouvre une collection dans Rebase CMS
-2. Le SDK typé envoie `GET /api/data/:slug` + ouvre une souscription WebSocket
+1. L'utilisateur ouvre une table dans Rebase CMS
+2. Le SDK typé envoie `GET /api/data/:slug` + ouvre un abonnement WebSocket
 3. Le backend interroge PostgreSQL via Drizzle ORM
-4. Le transformateur de données désérialise les enregistrements de la base de données au format entité
-5. La réponse est envoyée au frontend, les composants effectuent le rendu
-6. WebSocket maintient la vue synchronisée en temps réel
+4. La réponse contient les lignes telles que l'API les sert ; le panneau construit ses valeurs de formulaire à partir de la ligne et du descripteur de la table
+5. Réponse envoyée au frontend, les composants effectuent leur rendu
+6. Le WebSocket maintient la vue synchronisée en temps réel
 
 ### Flux d'écriture
-1. L'utilisateur modifie une entité dans le formulaire
-2. Les callbacks `beforeSave` s'exécutent (validation, transformation)
-3. Le SDK typé envoie `PATCH /api/data/:slug/:id`
-4. Le backend sérialise les valeurs, exécute l'`UPDATE` Drizzle
-5. Les callbacks `afterSave` s'exécutent (effets secondaires)
-6. La diffusion `NOTIFY` déclenche la mise à jour WebSocket vers tous les clients
+1. L'utilisateur modifie une ligne dans le formulaire
+2. Le SDK typé envoie `PATCH /api/data/:slug/:id`
+3. Le backend valide les valeurs par rapport à la table et exécute les hooks `beforeSave`
+4. Il exécute l'`UPDATE` sous la sécurité au niveau des lignes de l'appelant
+5. Les hooks `afterSave` s'exécutent, dans la même transaction
+6. La diffusion du `NOTIFY` déclenche la mise à jour par WebSocket vers tous les clients
 7. Si l'historique est activé, un instantané est enregistré
 
 ## Étapes suivantes
 
-- **[Schema as Code](/docs/architecture/schema-as-code)** — L'approche axée sur TypeScript
-- **[Backend Overview](/docs/backend)** — Configuration du serveur
-- **[Collections](/docs/collections)** — Définissez votre schéma de données
+- **[Schema as Code](/docs/architecture/schema-as-code)** — L'approche TypeScript-first
+- **[Aperçu du backend](/docs/backend)** — Configuration du serveur
+- **[Tables](/docs/schema/)** — Définissez votre schéma de données

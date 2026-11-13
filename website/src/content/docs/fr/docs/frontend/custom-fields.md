@@ -1,5 +1,5 @@
 ---
-sourceHash: adec4552f7386908
+sourceHash: d337d344b88534c8
 title: Champs personnalisés
 sidebar_label: Champs personnalisés
 description: Créez des champs de formulaire personnalisés pour l'édition d'entités avec un accès complet au contexte du formulaire, aux valeurs de l'entité et aux hooks Rebase.
@@ -11,17 +11,34 @@ description: Créez des champs de formulaire personnalisés pour l'édition d'en
 
 ## Vue d'ensemble
 
-Rebase génère automatiquement les champs de formulaire en fonction des types de propriétés. Pour un comportement personnalisé, vous pouvez créer vos propres champs.
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+Le CMS génère un champ pour chaque colonne à partir de son type (voir
+[Champs](/docs/collections/properties/)). Lorsque cela ne correspond pas à vos
+besoins, associez au champ votre propre composant dans `customizeTable` : `Field`
+remplace le contrôle dans le formulaire, `Preview` remplace la façon dont la valeur
+est affichée partout ailleurs (une cellule de tableau, une carte, une pastille de
+référence), et `Filter` remplace son contrôle de filtre.
+
+Un composant est une valeur. `customizeTable` s'exécute uniquement dans le bundle
+du navigateur, vous importez donc le composant comme vous le feriez n'importe où
+ailleurs dans votre frontend et le transmettez directement. Un chemin sous forme
+de chaîne de caractères ou un thunk lazy `() => import(…)` lèvera une exception,
+en indiquant quoi écrire à la place.
 
 ## Créer un champ personnalisé
+
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un champ personnalisé est un composant React qui reçoit `FieldProps` :
 
 ```tsx
+// frontend/src/fields/ColorPickerField.tsx
+import React from "react";
 import type { FieldProps } from "@rebasepro/cms";
-import type { StringProperty, NumberProperty } from "@rebasepro/types";
+import type { StringProperty } from "@rebasepro/cms-types";
 
-function ColorPickerField({ value, setValue, error, showError }: FieldProps<StringProperty>) {
+export function ColorPickerField({ value, setValue, error, showError, minimalistView }: FieldProps<StringProperty>) {
     return (
         <div>
             <input
@@ -29,6 +46,7 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
                 value={value ?? "#000000"}
                 onChange={(e) => setValue(e.target.value)}
             />
+            {!minimalistView && <span>{value}</span>}
             {showError && error && <span className="text-red-500">{error}</span>}
         </div>
     );
@@ -37,97 +55,65 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
 
 ### FieldProps
 
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
 | Prop | Type | Description |
 |------|------|-------------|
 | `value` | `T` | Valeur actuelle du champ |
-| `setValue` | `(value: T) => void` | Mettre à jour la valeur du champ |
+| `setValue` | `(value: T) => void` | Met à jour la valeur du champ |
 | `error` | `string` | Message d'erreur de validation |
 | `showError` | `boolean` | Indique s'il faut afficher l'erreur |
 | `isSubmitting` | `boolean` | Le formulaire est en cours d'enregistrement |
-| `property` | `Property` | La configuration de la propriété |
-| `context` | `FormContext` | Le formulaire : ses `values` (modifications non enregistrées incluses), `setFieldValue`, `id` et `row`, l'enregistrement sauvegardé tel qu'envoyé par le serveur (absent pour un nouvel enregistrement) |
+| `property` | `Property` | Le champ tel que résolu par le CMS : libellé, validation, options |
+| `context` | `FormContext` | Le formulaire : ses `values` (modifications non enregistrées incluses), `setFieldValue`, `id`, et `row`, l'enregistrement sauvegardé tel qu'envoyé par le serveur (absent pour un nouvel enregistrement) |
 | `disabled` | `boolean` | Le champ est en lecture seule |
 | `minimalistView` | `boolean` | Rendu dans l'éditeur de cellule contextuel du tableau (mode compact) |
+| `customProps` | `unknown` | Les `customProps` du champ définies dans `customizeTable`, intactes |
 
-## Enregistrer un champ personnalisé
+## Utilisation
 
-### Par propriété
-
-Enregistrer sur une seule propriété :
-
-```typescript
-properties: {
-    brand_color: {
-        type: "string",
-        name: "Brand Color",
-        admin: {
-            Field: ColorPickerField
-        }
-    }
-}
-```
-
-### Lorsque le fichier de collection est également lu par le serveur
-
-Dans le scaffold par défaut, `config/collections/` est chargé à la fois par le panneau d'administration **et** le backend — le backend lit les mêmes fichiers pour dériver le schéma et l'API. Une référence directe au composant n'est sûre que si rien sur le serveur ne charge ce fichier, car importer `ColorPickerField` importe également React, votre CSS et tout ce que le composant intègre dans le graphe de modules du serveur.
-
-Pointez plutôt vers le composant avec un import dynamique (lazy import). Le typage est vérifié exactement de la même manière, et le backend ne l'appelle jamais :
-
-```ts no-verify
-// config/collections/products.ts
-properties: {
-    brand_color: {
-        type: "string",
-        name: "Brand Color",
-        admin: {
-            Field: () => import("../../frontend/src/ColorPickerField"),
-            Preview: () => import("../../frontend/src/ColorPreview")
-        }
-    }
-}
-```
-
-Le module doit avoir un **export par défaut** — le thunk se résout vers `default`, et un export nommé uniquement n'affichera rien. L'admin l'enveloppe dans `React.lazy` lors du premier rendu, de sorte que le composant constitue également un chunk distinct plutôt que de faire partie du bundle initial.
-
-### Configuration globale de propriété
-
-Enregistrer un type de champ réutilisable :
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 ```tsx
-const colorPropertyConfig: PropertyConfig = {
-    key: "color_picker",
-    name: "Color Picker",
-    property: {
-        type: "string",
-        admin: {
-            Field: ColorPickerField
-        }
-    }
-};
+// frontend/src/cms/brands.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { brands } from "../../../backend/schema/brands";
+import { ColorPickerField } from "../fields/ColorPickerField";
+import { ColorPreview } from "../fields/ColorPreview";
 
-// Register globally — keyed by the config's `key`
-<Rebase propertyConfigs={{ color_picker: colorPropertyConfig }}>…</Rebase>
+export const brandsCms = customizeTable<typeof brands>("brands", {
+    fields: {
+        brandColor: { Field: ColorPickerField, Preview: ColorPreview },
+    },
+});
 ```
 
-Utilisez-le ensuite dans n'importe quelle collection :
+`brandColor` est un `col.varchar({ length: 7 })` côté backend. Le backend ne voit
+jamais le composant, et le frontend importe uniquement le type de la table depuis
+`backend/schema`.
 
-```typescript
-properties: {
-    color: {
-        type: "string",
-        name: "Color",
-        propertyConfig: "color_picker"
-    }
-}
-```
+## Un type de champ réutilisable
+
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+Un champ utilisé sur plusieurs tables peut être enregistré une seule fois dans
+`<Rebase propertyConfigs>`, indexé par son nom, et spécifié sur chaque champ avec
+`propertyConfig: "color_picker"`.
 
 ## Accéder au contexte du formulaire
 
-Les champs personnalisés peuvent accéder à l'ensemble des valeurs de l'entité :
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+Un champ personnalisé peut lire l'intégralité de l'enregistrement en cours de
+modification :
 
 ```tsx
-function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProperty>) {
-    const taxRate = Number(context.values.tax_rate ?? 0.1);
+import React from "react";
+import type { FieldProps } from "@rebasepro/cms";
+import type { NumberProperty } from "@rebasepro/cms-types";
+
+export function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProperty>) {
+    const taxRate = Number(context.values.taxRate ?? 0.1);
     const priceWithTax = value ? value * (1 + taxRate) : 0;
 
     return (
@@ -137,7 +123,7 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
                 value={value ?? 0}
                 onChange={(e) => setValue(Number(e.target.value))}
             />
-            <p>With tax: ${priceWithTax.toFixed(2)}</p>
+            <p>With tax: {priceWithTax.toFixed(2)}</p>
         </div>
     );
 }
@@ -145,56 +131,49 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
 
 ## Mode tableau
 
-Un champ personnalisé n'est pas rendu à l'intérieur d'une cellule de tableau : la cellule affiche la valeur (ou votre `Preview`), et la modifier ouvre le champ dans une popup avec `minimalistView` activé. Gardez-le compact dans ce cas :
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+Un champ personnalisé n'est pas affiché directement dans une cellule de tableau :
+la cellule affiche la valeur (ou votre `Preview`), et la modifier ouvre le champ
+dans une fenêtre contextuelle avec `minimalistView` activé. Veillez à ce qu'il
+reste compact dans ce contexte, comme le fait `ColorPickerField` ci-dessus.
+
+## Aperçus personnalisés
+
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+`Preview` affiche la valeur en dehors du formulaire. Il reçoit `FieldPreviewProps` :
+`value`, la `property` résolue, la taille `size` attribuée par la surface (`"small"`,
+`"medium"` ou `"large"`), ainsi que les `customProps` du champ.
 
 ```tsx
-function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
-    if (minimalistView) {
-        return <input value={value ?? ""} onChange={(e) => setValue(e.target.value)}/>;
-    }
+// frontend/src/fields/ColorPreview.tsx
+import React from "react";
+import type { FieldPreviewProps } from "@rebasepro/cms-types";
 
+export function ColorPreview({ value }: FieldPreviewProps) {
+    const color = typeof value === "string" ? value : "transparent";
     return (
-        <div>
-            <label>Full Editor</label>
-            <textarea value={value ?? ""} onChange={(e) => setValue(e.target.value)} />
-        </div>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 16, height: 16, borderRadius: 4, backgroundColor: color }}/>
+            {typeof value === "string" ? value : ""}
+        </span>
     );
 }
 ```
 
-## Prévisualisations personnalisées
+## Filtres personnalisés
 
-Pour un rendu personnalisé dans le tableau (mode hors édition), utilisez le composant `Preview` :
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-```tsx
-function ColorPreview({ value }: { value: string }) {
-    return (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{
-                width: 24, height: 24,
-                borderRadius: 4,
-                backgroundColor: value
-            }} />
-            <span>{value}</span>
-        </div>
-    );
-}
-
-// Register it
-properties: {
-    color: {
-        type: "string",
-        name: "Color",
-        admin: {
-            Field: ColorPickerField,
-            Preview: ColorPreview
-        }
-    }
-}
-```
+`Filter` remplace le contrôle de filtre d'un champ. Il prend le pas sur une
+surcharge globale à la collection `Collection.FilterField` ainsi que sur le
+contrôle natif pour ce type. Pour restreindre uniquement les opérateurs proposés,
+utilisez plutôt `filterOperators`.
 
 ## Étapes suivantes
 
-- **[Entity Views](/docs/frontend/entity-views)** — Onglets personnalisés dans l'éditeur d'entité
+- **[customizeTable](/docs/frontend/customize-table)** — Toutes les options de champ
+- **[Entity Views](/docs/frontend/entity-views)** — Onglets personnalisés dans l'éditeur d'entités
 - **[Entity Actions](/docs/frontend/entity-actions)** — Boutons d'action personnalisés
-- **[Additional Columns](/docs/frontend/additional-columns)** — Colonnes de tableau calculées
+- **[Additional Columns](/docs/frontend/additional-columns)** — Colonnes calculées dans le tableau

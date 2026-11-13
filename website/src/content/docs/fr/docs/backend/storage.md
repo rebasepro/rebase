@@ -1,8 +1,8 @@
 ---
-sourceHash: d1be02a2a8678241
+sourceHash: dde397d03ef58183
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
-description: Configurez les backends de stockage sur système de fichiers local, compatible S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.
+description: Configurez des backends de stockage sur système de fichiers local, compatibles S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.
 ---
 
 ## Vue d'ensemble
@@ -15,12 +15,12 @@ Rebase prend en charge trois backends de stockage :
 
 ## Configuration
 
-:::note[Où cela se place]
-**Runtime managé** — les variables `STORAGE_*` dans `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — suffixez n'importe laquelle d'entre elles avec `__<KEY>` pour une source nommée), plus une déclaration `bucket("<key>")` dans `config/resources.ts` pour chaque bucket au-delà de celui par défaut, et `export const storageAuthorize` depuis `config/index.ts`. `storageAuthorize` n'a volontairement aucune forme sous forme de variable d'environnement : aucune variable ne peut exprimer « cet utilisateur peut lire cette clé ».
+:::note[Où placer ceci]
+**Runtime managé** — les variables `STORAGE_*` dans `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — ajoutez le suffixe `__<KEY>` à n'importe laquelle d'entre elles pour une source nommée), plus une déclaration `bucket("<key>")` dans `backend/resources.ts` pour chaque bucket supplémentaire au-delà de celui par défaut, et `export const storageAuthorize` depuis `backend/storage.ts`. `storageAuthorize` n'a volontairement aucune forme en variable d'environnement : aucune variable ne peut exprimer « cet utilisateur a le droit de lire cette clé ».
 
-**Éjecté (Ejected)** — le bloc `storage` sur `initializeRebaseBackend({ … })`. `storagePolicies` et `storageTriggers` sont réservés au mode éjecté.
+**Éjecté** — le bloc `storage` dans `initializeRebaseBackend({ … })`. `storagePolicies` et `storageTriggers` sont réservés au mode éjecté.
 
-La cartographie complète se trouve dans la [Vue d'ensemble du backend](/docs/backend/#where-each-option-lives).
+Le récapitulatif complet se trouve dans la [Vue d'ensemble du backend](/docs/backend/#where-each-option-lives).
 :::
 
 Le stockage est configuré dans le bloc `storage` de `initializeRebaseBackend` :
@@ -37,7 +37,7 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-Le stockage local conserve les métadonnées de chaque objet à côté de celui-ci, sous la forme `<key>.metadata.json` ; ainsi, une clé dont le dernier segment se termine par `.metadata.json` est refusée avec `400 INVALID_STORAGE_KEY` sur toutes les routes. S3 et GCS conservent les métadonnées sur l'objet et stockent n'importe quelle clé. Sur un système de fichiers insensible à la casse (macOS et Windows par défaut), `Avatar.png` et `avatar.png` représentent un seul fichier local mais deux objets sur S3, GCS ou un disque Linux ; le serveur émet donc un avertissement au démarrage lorsque le dossier de stockage se trouve sur un tel système.
+Le stockage local conserve les métadonnées de chaque objet à côté de lui, sous la forme `<key>.metadata.json`. Par conséquent, une clé dont le dernier segment se termine par `.metadata.json` est refusée avec `400 INVALID_STORAGE_KEY` sur chaque route. S3 et GCS conservent les métadonnées sur l'objet et acceptent n'importe quelle clé. Sur un système de fichiers insensible à la casse (macOS et Windows par défaut), `Avatar.png` et `avatar.png` représentent un seul fichier local mais deux objets sur S3, GCS ou un disque Linux ; le serveur émet donc un avertissement au démarrage lorsque le dossier de stockage se trouve sur un tel système.
 
 ### Stockage S3
 
@@ -69,11 +69,11 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-Sur GCP (Cloud Run, GCE, GKE), les identifiants du compte de service par défaut sont utilisés automatiquement. En dehors de GCP, définissez la variable d'environnement `GOOGLE_APPLICATION_CREDENTIALS` avec le chemin vers votre fichier de clé de compte de service.
+Sur GCP (Cloud Run, GCE, GKE), les identifiants du compte de service par défaut sont utilisés automatiquement. En dehors de GCP, définissez la variable d'environnement `GOOGLE_APPLICATION_CREDENTIALS` avec le chemin d'accès vers votre fichier de clé de compte de service.
 
-### Multiples backends de stockage
+### Plusieurs backends de stockage
 
-Vous pouvez configurer plusieurs backends nommés et router différents champs vers différents stockages :
+Vous pouvez configurer plusieurs backends nommés et acheminer différents champs vers différents stockages :
 
 ```typescript
 storage: {
@@ -82,44 +82,33 @@ storage: {
 }
 ```
 
-Ensuite, dans les propriétés de votre collection, référencez un backend spécifique :
+Pointez ensuite une colonne de stockage vers un backend spécifique grâce à `source` :
 
 ```typescript
-image: {
-    type: "string",
-    name: "Image",
-    storage: {
-        storagePath: "products",
-        storageSource: "media"  // Routes to the "media" S3 backend
-    }
-}
+image: col.storage({ path: "products/", source: "media" }),  // Routes to the "media" S3 backend
 ```
 
 ## Points de terminaison de stockage
 
 | Méthode | Chemin | Description |
 |--------|------|-------------|
-| `POST` | `/api/storage/upload` | Téléversement direct de fichier, un seul corps `multipart/form-data` : `file` (obligatoire) ; `key`, la clé d'objet, dossiers compris (`author_pictures/ada.jpg`), sinon le nom du fichier à la racine ; `bucket`, sinon le bucket par défaut ; `storageId` ; `collection` et `property`, qui limitent le fichier au `maxSize` et aux `acceptedFiles` de cette propriété ; et `metadata_<name>` pour des métadonnées personnalisées. Tout autre champ est ignoré : il n'existe pas de champ `path` |
-| `POST` | `/api/storage/upload?storageId=<key>` | Téléversement vers un backend nommé spécifique |
-| `GET` | `/api/storage/file/*` | Récupérer un fichier — tout ce qui suit `/file/` est la clé de l'objet |
+| `POST` | `/api/storage/upload` | Téléversement direct de fichier, un seul corps `multipart/form-data` : `file` (obligatoire) ; `key`, la clé de l'objet, dossiers inclus (`author_pictures/ada.jpg`), sinon le nom du fichier à la racine ; `bucket`, sinon celui par défaut ; `storageId` ; `collection` et `property`, qui restreignent le fichier aux `maxSize` et `acceptedFiles` de cette propriété ; et `metadata_<name>` pour les métadonnées personnalisées. Tout autre champ est ignoré : il n'y a pas de champ `path` |
+| `POST` | `/api/storage/upload?storageId=<key>` | Téléverser vers un backend nommé spécifique |
+| `GET` | `/api/storage/file/*` | Récupérer un fichier — tout ce qui suit `/file/` constitue la clé de l'objet |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Récupérer un fichier depuis un backend spécifique |
-| `GET` | `/api/storage/metadata/*` | Taille, type de contenu et métadonnées personnalisées d'un objet, sans ses octets, plus un jeton de téléchargement à courte durée de vie lorsqu'il est privé |
+| `GET` | `/api/storage/metadata/*` | Taille, type de contenu et métadonnées personnalisées d'un objet, sans ses octets, ainsi qu'un jeton de téléchargement de courte durée lorsqu'il est privé |
 | `POST` | `/api/storage/metadata` | La même chose pour un maximum de 100 objets d'une même source : corps `{ keys, storageId? }` |
 | `DELETE` | `/api/storage/file/*` | Supprimer un fichier |
 | `GET` | `/api/storage/list` | Lister les objets sous un préfixe (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`). Un `maxResults` inférieur à 1, ou un `pageToken` jamais émis par la source, renvoie `400 INVALID_LIST_OPTIONS` |
 | `POST` | `/api/storage/folder` | Créer un marqueur de dossier vide |
-| `GET` | `/api/storage/sources` | Les sources de stockage desservies par ce backend, par clé |
+| `GET` | `/api/storage/sources` | Les sources de stockage servies par ce backend, par clé |
 | `OPTIONS` | `/api/storage/tus` | Interroger les fonctionnalités supportées du protocole TUS |
-| `POST` | `/api/storage/tus` | Initier une session de téléversement TUS avec reprise |
+| `POST` | `/api/storage/tus` | Initier une session de téléversement TUS résumable |
 | `HEAD` | `/api/storage/tus/:id` | Vérifier la progression du téléversement (décalage en octets) |
-| `PATCH` | `/api/storage/tus/:id` | Ajouter un fragment de données au fichier temporaire |
-| `DELETE` | `/api/storage/tus/:id` | Terminer/interrompre la session de téléversement TUS |
+| `PATCH` | `/api/storage/tus/:id` | Ajouter un segment de données au fichier temporaire |
+| `DELETE` | `/api/storage/tus/:id` | Terminer/abandonner la session de téléversement TUS |
 
-**Ce qu'ils renvoient.** Une enveloppe unique, identique à celle utilisée par `/api/data` : la charge utile
-se trouve sous `data`, et un échec est sous la forme `{ "error": { message, code, requestId } }`
-avec les codes listés dans la [référence des erreurs](/docs/backend/errors/). `/api/storage/file/*`
-est l'exception, car sa charge utile est le fichier lui-même — il renvoie les octets, avec
-`Content-Type`, `Content-Length` et les en-têtes de mise en cache.
+**Format de réponse.** Une enveloppe unique, identique à celle utilisée par `/api/data` : la charge utile se trouve sous `data`, et un échec renvoie `{ "error": { message, code, requestId } }` avec les codes documentés dans la [référence des erreurs](/docs/backend/errors/). `/api/storage/file/*` fait exception, car sa charge utile est le fichier lui-même — il renvoie les octets, avec les en-têtes `Content-Type`, `Content-Length` et les en-têtes de mise en cache.
 
 ```json
 // GET /api/storage/list?prefix=products/images/
@@ -127,35 +116,16 @@ est l'exception, car sa charge utile est le fichier lui-même — il renvoie les
   "size": 48213, "updated": "2026-10-01T12:00:00.000Z", "contentType": "image/jpeg" } ], "prefixes": [] } }
 ```
 
-Un listing décrit chaque fichier retourné : sa taille `size` en octets et
-`updated`, date de sa dernière écriture, sur le stockage local, S3 et GCS, ainsi que son
-`contentType` sur le stockage local et GCS. Un listing S3 ne transporte pas le type,
-il est donc absent sur S3 et `/api/storage/metadata/*` continue de le fournir. Un dossier dans
-`prefixes` n'en transporte aucun, tout comme un `StorageController` personnalisé qui
-ne les définit pas.
+Un listage décrit chaque fichier renvoyé : sa taille `size` en octets et `updated`, date de sa dernière écriture, sur le stockage local, S3 et GCS, ainsi que son `contentType` sur le stockage local et GCS. Un listage S3 ne comporte pas le type ; il est donc absent sur S3, mais `/api/storage/metadata/*` continue de l'indiquer. Un dossier dans `prefixes` n'en comporte aucun, tout comme un `StorageController` personnalisé qui ne les renseignerait pas.
 
-`POST /api/storage/upload` renvoie `201` avec `{ key, bucket, storageUrl }` de l'objet stocké sous `data` ;
-`GET /api/storage/metadata/*` renvoie les métadonnées de l'objet et, pour un objet privé, le `token` à courte durée de vie ; `POST
-/api/storage/metadata` renvoie un objet indexé par les chemins reçus, chacun contenant ce que le `GET` aurait répondu
-(voir ci-dessous). Un dossier n'est pas un objet : `/metadata` sur une clé se terminant par `/` renvoie `404` sur tous les stockages, même là où S3
-ou GCS conserve un marqueur `folder/`, aucun jeton de téléchargement n'est donc émis pour un préfixe ; `GET /api/storage/sources` renvoie le tableau des
-sources configurées, avec `configured: true`. Sur un déploiement sans aucun stockage configuré, il répond `200 {"data": [],
-"configured": false}`, tandis que toutes les autres routes renvoient `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` signale
-ce même état avec `storage: false`, permettant ainsi à un client d'éviter de poser la question. `GET /api/storage/sources` est public : il répond
-sans jeton même lorsque `requireAuth` est activé. Il énumère les sources (leur clé, moteur, transport et libellé) et jamais
-un fichier, et le SDK client le lit pour initialiser ses sources, ce qui peut se produire avant toute authentification. Une application qui
-lit anonymement une source `direct` en a également besoin. Chaque route qui liste, lit ou écrit un fichier conserve son authentification.
-`DELETE /api/storage/file/*` et `POST /api/storage/folder` ne transmettent qu'un `message`, puisqu'il n'y a rien à retourner.
+`POST /api/storage/upload` renvoie `201` avec `{ key, bucket, storageUrl }` pour l'objet stocké sous `data` ;
+`GET /api/storage/metadata/*` renvoie les métadonnées de l'objet et, pour un objet privé, le `token` de courte durée ; `POST /api/storage/metadata` renvoie un objet indexé par les chemins qui lui ont été transmis, chacun contenant ce que le `GET` aurait renvoyé (voir ci-dessous). Un dossier n'est pas un objet : appeler `/metadata` sur une clé se terminant par `/` renvoie `404` sur tous les stockages, même là où S3 ou GCS conserve un marqueur `folder/`, aucun jeton de téléchargement n'est donc émis pour un préfixe ; `GET /api/storage/sources` renvoie le tableau des sources configurées, avec `configured: true`. Sur un déploiement sans aucun stockage configuré, il renvoie `200 {"data": [], "configured": false}`, tandis que toutes les autres routes renvoient `501 STORAGE_NOT_CONFIGURED`. `GET /api/auth/config` rapporte ce même état avec `storage: false`, permettant ainsi au client d'éviter la requête. `GET /api/storage/sources` est public : il répond sans jeton, même lorsque `requireAuth` est activé. Il énumère les sources (leur clé, moteur, transport et libellé) et jamais un fichier, et le SDK client le lit pour initialiser ses sources, ce qui peut se produire avant toute authentification. Une application lisant anonymement une source `direct` en a également besoin. Toutes les routes qui listent, lisent ou écrivent un fichier conservent leur niveau d'authentification requis. `DELETE /api/storage/file/*` et `POST /api/storage/folder` ne renvoient qu'un simple `message`, puisqu'il n'y a rien d'autre à retourner.
 
-Sur S3 et GCS, un `bucket` doit faire partie de ceux desservis par la source, tant en écriture
-qu'en lecture : un téléversement, un `POST /api/storage/folder` ou un téléversement TUS désignant tout autre
-bucket répond `404 UNKNOWN_STORAGE_SOURCE`, tout comme le listing. Le stockage local
-crée quant à lui toujours un bucket lors de sa première écriture.
+Sur S3 et GCS, le `bucket` doit impérativement être desservi par la source, à l'écriture comme à la lecture : un téléversement, un appel `POST /api/storage/folder` ou un téléversement TUS spécifiant un autre bucket renvoie `404 UNKNOWN_STORAGE_SOURCE`, tout comme le listage. Le stockage local, quant à lui, crée toujours le bucket lors de sa première écriture.
 
 **Plusieurs objets à la fois.** `POST /api/storage/metadata` accepte
 `{ "keys": ["photos/a.png", "photos/b.png"], "storageId": "media" }` — jusqu'à 100
-chemins d'objets d'une même source, chacun formaté comme `GET /api/storage/metadata/<key>`
-le requiert — et renvoie une entrée par clé :
+chemins d'objets d'une même source, chacun formaté comme l'attend `GET /api/storage/metadata/<key>` — et renvoie une entrée par clé :
 
 ```json
 { "data": {
@@ -164,29 +134,16 @@ le requiert — et renvoie une entrée par clé :
 } }
 ```
 
-Chaque clé est évaluée exactement comme le ferait le `GET` — le même hook
-`storageAuthorize` et portée de stockage, la même règle publique, son propre jeton de téléchargement — et une
-clé refusée, manquante ou mal formée répond avec sa propre `error` sans faire échouer
-ni révéler les autres. Un appelant sans session sur un déploiement qui en exige
-une reçoit le code `401` que le `GET` aurait renvoyé, sauf si toutes les clés sont publiques. Plus de
-100 clés, ou un corps sans `keys`, renvoie `400 BAD_REQUEST`. Le limiteur de débit (rate limiter) comptabilise
-la requête comme ⌈N/10⌉ requêtes pour N clés, ainsi une page de 100 miniatures en coûte 10.
-`client.storage.getSignedUrl()` et le panneau d'administration regroupent ainsi les résolutions d'une page
-de cette façon, et basculent sur un `GET` par fichier sur un serveur dépourvu de cette
-route.
+Chaque clé est évaluée exactement de la même manière que pour un `GET` — même hook `storageAuthorize`, même portée de stockage, même règle publique, son propre jeton de téléchargement — et une clé refusée, manquante ou malformée renvoie sa propre `error` sans provoquer l'échec de la requête ni compromettre les autres. Un appelant sans session dans un déploiement qui en exige une recevra le code `401` que le `GET` aurait renvoyé, à moins que toutes les clés ne soient publiques. Plus de 100 clés, ou un corps de requête sans `keys`, renvoie `400 BAD_REQUEST`. Le limiteur de débit compte la requête comme ⌈N/10⌉ requêtes pour N clés, ainsi une page de 100 miniatures en coûte 10. `client.storage.getSignedUrl()` et le panneau d'administration regroupent ainsi les résolutions nécessaires à une page et se rabattent sur un `GET` individuel par fichier sur les serveurs ne disposant pas de cette route.
 
 **Comment une lecture de fichier est autorisée.** Les routes de lecture — `/api/storage/file/*` et
-`/api/storage/metadata/*` — acceptent le jeton signé à courte durée de vie émis par
-[`getSignedUrl()`](/docs/sdk/storage), transmis via `?token=<token>` ou en tant que
-`Bearer`. Un JWT d'accès ordinaire est **refusé** sur `/file/*` avec `401
-Unauthorized: Access JWT not allowed on file routes` : le jeton fonctionnant sur
-toutes les autres routes ne fonctionne volontairement pas ici, car une URL de fichier est
-destinée à être transmise à un navigateur, un CDN ou une balise `<img>`. Toutes les autres lignes ci-dessus
-acceptent le JWT d'accès comme d'habitude.
+`/api/storage/metadata/*` — acceptent le jeton signé de courte durée généré par
+[`getSignedUrl()`](/docs/sdk/storage), passé sous la forme `?token=<token>` ou en tant que jeton
+`Bearer`. Un JWT d'accès ordinaire est **refusé** sur `/file/*` avec l'erreur `401 Unauthorized: Access JWT not allowed on file routes` : le jeton valide sur toutes les autres routes ne fonctionne pas ici, par conception, car une URL de fichier a vocation à être transmise à un navigateur, un CDN ou une balise `<img>`. Toutes les autres lignes du tableau ci-dessus acceptent le JWT d'accès de manière classique.
 
 ## Transformations d'images à la volée
 
-Rebase inclut un pipeline de traitement d'images intégré propulsé par **Sharp**. Lors de la distribution de ressources images depuis le stockage, vous pouvez appliquer des opérations dynamiques via des paramètres d'URL :
+Rebase intègre un pipeline de traitement d'images propulsé par **Sharp**. Lors de la distribution de ressources visuelles depuis le stockage, vous pouvez appliquer des transformations dynamiques via des paramètres d'URL :
 
 ```bash
 # Serve image scaled to 300px width in webp format
@@ -195,145 +152,94 @@ GET /api/storage/file/products/laptop.jpg?width=300&format=webp
 
 ### Paramètres pris en charge
 
-- `width`, `height` : Limites de redimensionnement, `1`–`4096` (l'image n'est jamais agrandie).
+- `width`, `height` : Limites de redimensionnement, `1`–`4096` (l'image n'est jamais agrandie au-delà de sa taille d'origine).
 - `quality` : `1`–`100`.
-- `format` : Convertit le format de l'image. Formats supportés : `webp`, `jpeg`, `png`, `avif`.
+- `format` : Convertit le format d'image. Formats pris en charge : `webp`, `jpeg`, `png`, `avif`.
 - `fit` : `cover`, `contain`, `fill`, `inside` ou `outside`.
 
-Un paramètre en dehors de ces limites renvoie un **400**, et non une valeur discrètement tronquée —
-`?width=99999` renvoyait auparavant une image de 4096px et `?format=tiff` du webp, sans
-qu'aucun message ne le signale.
+Un paramètre en dehors de ces limites renvoie un statut **400**, et non une valeur corrigée silencieusement —
+`?width=99999` renvoyait auparavant une image de 4096px et `?format=tiff` une image au format webp, sans que rien ne l'indique.
 
-Les miniatures d'images stockées dans le panneau d'administration utilisent ce point de terminaison : un aperçu
-sous forme de tableau ou de carte demande un rendu webp environ deux fois supérieur à sa taille affichée (96–800px)
-plutôt que l'original. Les fichiers SVG et GIF sont toujours affichés tels quels.
-`sharp` est facultatif :
-sans lui, une demande de transformation reçoit l'original, et le backend avertit une fois de
-lancer `pnpm add sharp` dans `backend/`.
+Les miniatures d'images stockées du panneau d'administration s'appuient sur ce point de terminaison : un aperçu dans un tableau ou une carte demande un rendu webp d'environ deux fois sa taille affichée (96–800px) plutôt que l'original. Les fichiers SVG et GIF sont toujours affichés tels quels.
+`sharp` est optionnel :
+sans lui, une requête de transformation reçoit le fichier original, et le backend avertit une seule fois d'exécuter `pnpm add sharp` dans `backend/`.
 
-### Performance et mise en cache LRU
+### Performances et cache LRU
 
-La transformation consomme beaucoup de CPU et de mémoire, et sur un objet public, le point de terminaison est
-accessible de manière anonyme, de sorte que le travail est encadré plutôt que simplement mis en cache :
-- **Capacité** : un LRU plafonné à **500 entrées** globalement, indexé par source
-  de stockage, bucket et clé canonique.
+La transformation d'images est gourmande en CPU et en mémoire. De plus, sur un objet public, le point de terminaison est accessible de façon anonyme : le travail est donc strictement limité au lieu d'être simplement mis en cache :
+- **Capacité** : un cache LRU plafonné à **500 entrées** au global, indexé par source de stockage, bucket et clé canonique.
 - **TTL (Time to Live)** : Les variantes mises en cache expirent après **1 heure**.
-- Les requêtes concurrentes pour une même variante non mise en cache produisent **une seule** transformation,
-  et non une chacune.
-- Un nombre restreint de transformations s'exécute simultanément ; au-delà d'une file d'attente délimitée, le serveur
-  répond **503 `TRANSFORM_OVERLOADED`** plutôt que d'accepter un travail qu'il ne pourra
-  pas traiter.
+- Plusieurs requêtes simultanées pour une même variante non présente dans le cache ne produisent qu'**une seule** transformation, et non une par requête.
+- Un nombre restreint de transformations s'exécute en parallèle ; au-delà d'une file d'attente plafonnée, le serveur renvoie **503 `TRANSFORM_OVERLOADED`** au lieu d'accepter des traitements qu'il ne pourra pas mener à bien.
 
-Ce cache réside dans le processus, ce qui signifie qu'il n'est pas partagé entre les instances
-et ne survit pas à un redémarrage. Deux réplicas calculeront chacun chaque variante, et un
-déploiement invalidera l'intégralité du cache.
+Ce cache réside en mémoire dans le processus, ce qui implique qu'il n'est pas partagé entre différentes instances et ne survit pas à un redémarrage. Deux réplicas recalculeront chacun chaque variante, et un déploiement purge l'intégralité du cache.
 
-### Rendus persistant après un redémarrage
+### Rendus persistants après un redémarrage
 
-`storageRenditionCache` réécrit chaque image dérivée dans le même bucket que sa
-source, ainsi le travail est effectué une seule fois pour l'ensemble du déploiement plutôt qu'une fois par
-instance et par version :
+`storageRenditionCache` réécrit chaque image dérivée dans le même bucket que sa source, de sorte que le travail n'est effectué qu'une seule fois pour l'ensemble du déploiement, et non une fois par instance et par livraison :
 
 ```ts
 storageRenditionCache: { enabled: true }
 ```
 
-ou `STORAGE_RENDITION_CACHE=true` pour un déploiement sous forme de bundle. Les rendus sont stockés
-sous le préfixe réservé `_rebase/renditions/`, indexés par la version de l'objet
-source — ainsi, le remplacement d'une image distribue immédiatement la nouvelle version.
+ou `STORAGE_RENDITION_CACHE=true` pour un déploiement packagé. Les rendus sont stockés sous le préfixe réservé `_rebase/renditions/`, indexés par la version de l'objet source — remplacer une image sert ainsi immédiatement la nouvelle.
 
-Trois éléments à connaître avant de l'activer :
+Trois éléments à retenir avant de l'activer :
 
-- **Une lecture implique désormais une écriture.** Chaque nouvelle variante coûte un `PUT` dans votre bucket. Cette option est
-  désactivée par défaut pour cette raison.
-- **Une écriture échouée n'est pas une requête échouée.** Des identifiants en lecture seule, ou une politique
-  de bucket refusant le préfixe, basculent sur le cache en mémoire ; l'image est
-  toujours distribuée et la raison est consignée une seule fois dans les logs.
-- **Les rendus obsolètes ne sont pas nettoyés.** Remplacer un objet source
-  laisse orphelins ses anciens rendus. Définissez une règle de cycle de vie sur `_rebase/renditions/`
-  — ce préfixe est fixe et non configurable, précisément pour qu'une règle puisse le cibler.
+- **Une lecture implique désormais une écriture.** Chaque nouvelle variante coûte un `PUT` dans votre bucket. Cette option est donc désactivée par défaut.
+- **Un échec d'écriture n'entraîne pas l'échec de la requête.** En cas d'identifiants en lecture seule, ou d'une stratégie de bucket rejetant ce préfixe, le mécanisme bascule sur le cache mémoire du processus ; l'image est toujours servie et la raison n'est consignée qu'une fois dans les journaux.
+- **Les rendus obsolètes ne sont pas nettoyés automatiquement.** Le remplacement d'un objet source abandonne ses anciens rendus. Définissez une règle de cycle de vie sur `_rebase/renditions/` — ce préfixe est fixe et non configurable, précisément pour pouvoir être ciblé par une telle règle.
 
-Le préfixe n'est pas accessible depuis l'API. Le lire ou y écrire directement
-renvoie **400 `INVALID_STORAGE_KEY`** : chaque règle d'accès du produit —
-`storageAuthorize` tout comme les politiques déclaratives — est rédigée par rapport à la
-clé *source*, et un rendu distribué sous son propre chemin répondrait à une demande
-non sollicitée.
+Ce préfixe n'est pas accessible via l'API. Tenter de le lire ou d'y écrire directement renvoie **400 `INVALID_STORAGE_KEY`** : toutes les règles d'accès du système — `storageAuthorize` comme les stratégies déclaratives — s'appliquent à la clé *source*, et un rendu exposé sous son propre chemin répondrait à une question qui n'a pas lieu d'être.
 
-`_rebase/maintenance/` est réservé de la même façon. `rebase storage orphans` y conserve
-l'enregistrement de chaque analyse, dans la source analysée, afin que le processus qui
-exécute l'analyse et celui qui répond à son statut lisent le même enregistrement. Un
-appelant qui pourrait écrire un enregistrement pourrait choisir ce qu'une suppression
-ultérieure efface ; lire, écrire ou lister ce préfixe répond donc aussi 400. Les enregistrements sont supprimés 7
-jours après leur dernière écriture, au démarrage de l'analyse suivante de cette source.
+`_rebase/maintenance/` est réservé de la même façon. `rebase storage orphans` y conserve le rapport de chaque analyse, au sein de la source analysée, de sorte que le processus exécutant l'analyse et celui répondant à son statut lisent le même enregistrement. Un appelant en mesure d'écrire un tel rapport pourrait contrôler ce qu'une suppression ultérieure effacerait ; lire, écrire ou lister ce préfixe renvoie donc également une erreur 400. Les rapports sont purgés 7 jours après leur dernière écriture, lors du démarrage de l'analyse suivante sur cette source.
 
 ### Ce qui est distribué
 
-Le type de contenu stocké correspond à ce que le téléverseur a déclaré — rien n'analyse
-les octets — ainsi `/api/storage/file/*` n'affichera inline qu'une **liste blanche stricte** :
-images, vidéo, audio, `application/pdf` et `text/plain`. Tout le reste,
-`text/html` inclus, est distribué en tant que `application/octet-stream` avec
-`Content-Disposition: attachment`, et chaque réponse comporte
-`X-Content-Type-Options: nosniff`. Le stockage n'est pas un hébergeur web : une page téléversée
-rendue sur l'origine de l'API pourrait lire les cookies de cette origine et appeler ses
-points de terminaison.
+Le type de contenu stocké correspond exactement à celui déclaré par l'expéditeur lors du téléversement — aucun contrôle du contenu des octets n'est effectué — `/api/storage/file/*` n'affiche donc en ligne qu'une **liste d'autorisation stricte** : images, vidéo, audio, `application/pdf` et `text/plain`. Tout le reste, y compris `text/html`, est distribué sous la forme `application/octet-stream` avec l'en-tête `Content-Disposition: attachment`, et chaque réponse inclut `X-Content-Type-Options: nosniff`. L'espace de stockage n'est pas un serveur web : une page téléversée qui serait interprétée sur l'origine de l'API pourrait accéder aux cookies de cette origine et appeler ses points de terminaison.
 
-Un SVG est une image qui est également un document pouvant contenir des `<script>`. Il est
-distribué en tant que `image/svg+xml` — afin de s'afficher dans une balise `<img>` et dans les
-miniatures du panneau d'administration — avec
+Un fichier SVG est une image mais aussi un document, et peut contenir des balises `<script>`. Il est servi sous le type `image/svg+xml` — lui permettant ainsi de s'afficher dans une balise `<img>` et dans les miniatures du panneau d'administration — accompagné de l'en-tête
 `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`
-sur chaque réponse, URLs transformées et URLs avec jeton de téléchargement incluses. Ouvert
-directement, il s'affiche avec les scripts désactivés et une origine opaque, ne pouvant ainsi
-pas accéder aux cookies ou aux points de terminaison de l'API.
+sur chaque réponse, y compris pour les URL transformées et les URL avec jeton de téléchargement. Lorsqu'il est ouvert directement, il s'affiche avec les scripts désactivés et une origine opaque, ce qui l'empêche d'accéder aux cookies ou aux points de terminaison de l'API.
 
-## Taille maximale autorisée pour un fichier
+## Taille maximale des fichiers
 
-Chaque source de stockage accepte des fichiers jusqu'à sa propre limite : **50 Mo** sauf si
-`STORAGE_MAX_FILE_SIZE` (en octets, suffixé par `__<KEY>` pour une source nommée) ou le
-`maxFileSize` de la source n'en dispose autrement. Chaque point d'entrée limite un fichier à la même
-valeur. `POST /api/storage/upload` renvoie `413 PAYLOAD_TOO_LARGE` en cas de dépassement ; un
-téléversement avec reprise est refusé dès sa création, avant son premier fragment ; et
-`OPTIONS /api/storage/tus` l'annonce sous l'en-tête `Tus-Max-Size` — pour la source
-indiquée par `?storageId=`, ou celle par défaut sinon.
+Chaque source de stockage accepte des fichiers dans la limite définie pour celle-ci : **50 Mo** à moins que `STORAGE_MAX_FILE_SIZE` (en octets, suffixé par `__<KEY>` pour une source nommée) ou la directive `maxFileSize` de la source n'en dispose autrement. Tous les points d'entrée appliquent la même limite. `POST /api/storage/upload` renvoie `413 PAYLOAD_TOO_LARGE` au-delà de cette valeur ; un téléversement résumable est refusé dès son initialisation, avant son premier segment ; et `OPTIONS /api/storage/tus` l'annonce sous la forme `Tus-Max-Size` — pour la source indiquée via `?storageId=`, ou pour celle par défaut dans le cas contraire.
 
 ```bash
-STORAGE_MAX_FILE_SIZE=209715200          # (default): 200 MB
-STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media: 1 GB
+STORAGE_MAX_FILE_SIZE=209715200          # (défaut) : 200 Mo
+STORAGE_MAX_FILE_SIZE__MEDIA=1073741824  # media : 1 Go
 ```
 
-La quantité de données qu'un serveur garde en mémoire à la fois dépend du point d'entrée.
-`POST /api/storage/upload` constitue un corps multipart complet que le serveur traite en entier :
-trois à cinq fois la taille du fichier dans sa mémoire. Un téléversement avec reprise (TUS) ne conserve qu'un
-fragment à la fois. `client.storage.putObject()` et le panneau d'administration envoient les fichiers
-de plus de 8 Mio via le protocole avec reprise. Consultez
-[Téléversements avec reprise (TUS)](/docs/backend/storage-resumable-uploads/) pour découvrir le
-protocole, ce qu'il renvoie et son comportement à travers plusieurs instances.
+La quantité de données d'un fichier conservée simultanément en mémoire par le serveur dépend du point d'entrée.
+`POST /api/storage/upload` implique un corps multipart complet, que le serveur analyse intégralement : cela nécessite trois à cinq fois la taille du fichier en mémoire. Un téléversement résumable (TUS) ne conserve qu'un segment à la fois. `client.storage.putObject()` et le panneau d'administration transmettent les fichiers de plus de 8 Mio via le protocole résumable. Consultez la documentation sur les [Téléversements résumables (TUS)](/docs/backend/storage-resumable-uploads/) pour découvrir le protocole, le format de réponse et le comportement entre plusieurs instances.
 
 ## Variables d'environnement
 
 | Variable | Description |
 |----------|-------------|
-| `STORAGE_TYPE` | `"local"`, `"s3"` ou `"gcs"` |
-| `STORAGE_PATH` | Répertoire de stockage local (par défaut : `<project>/uploads`, sous `rebase dev` comme dans un serveur écrit par `rebase eject`). Un chemin relatif est lu depuis le répertoire où tourne le serveur, qui après `rebase eject` est `backend/`. Un bucket local nommé conserve ses fichiers à côté, dans `<STORAGE_PATH>__<key>`, sauf si `STORAGE_PATH__<KEY>` en définit un propre |
+| `STORAGE_TYPE` | `"local"`, `"s3"`, ou `"gcs"` |
+| `STORAGE_PATH` | Répertoire de stockage local (par défaut : `<project>/uploads`, sous `rebase dev` comme dans un serveur généré par `rebase eject`). Un chemin relatif est résolu depuis le répertoire d'exécution du serveur, qui correspond à `backend/` après un `rebase eject`. Un bucket local nommé stocke ses fichiers à côté, dans `<STORAGE_PATH>__<key>`, à moins que `STORAGE_PATH__<KEY>` n'en définisse un propre |
 | `S3_BUCKET` | Nom du bucket S3 |
 | `S3_REGION` | Région AWS (par défaut : `"auto"`) |
 | `S3_ACCESS_KEY_ID` | Clé d'accès AWS |
 | `S3_SECRET_ACCESS_KEY` | Clé secrète AWS |
 | `S3_ENDPOINT` | Point de terminaison S3 personnalisé (pour MinIO, R2) |
-| `S3_FORCE_PATH_STYLE` | Utiliser des URLs de type path-style (requis pour MinIO) |
+| `S3_FORCE_PATH_STYLE` | Utiliser des URL au format path-style (requis pour MinIO) |
 | `GCS_BUCKET` | Nom du bucket Google Cloud Storage |
 | `GCS_PROJECT_ID` | ID de projet GCP pour GCS |
 | `GCS_KEY_FILENAME` | Chemin vers un fichier de clé de compte de service GCP (à omettre sur GKE — Workload Identity/ADC fournit les identifiants) |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Variable ADC standard, lue directement par le SDK Google (inutile sur GCP avec les identifiants par défaut) |
-| `STORAGE_DOWNLOAD_TOKEN_TTL` | Durée de validité de l'URL de téléchargement d'un fichier privé, en secondes — durée de vie du jeton émis par `/api/storage/metadata/*` (par défaut `300`, au maximum `604800`, soit une semaine). Augmentez-la pour les vidéos et audios privés, qui continuent de requérir des plages d'octets après le rendu de la page. Équivalent en variable d'environnement de `storageDownloadTokenTtl` |
-| `STORAGE_MAX_FILE_SIZE` | Fichier le plus volumineux accepté par la source, en octets (par défaut `52428800`, soit 50 Mo). Suffixez par `__<KEY>` pour une source nommée. Une valeur qui n'est pas un nombre entier d'octets empêche le démarrage. Voir [Taille maximale autorisée pour un fichier](#taille-maximale-autorisée-pour-un-fichier) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Variable standard ADC, lue par le SDK Google lui-même (non requise sur GCP avec les identifiants par défaut) |
+| `STORAGE_DOWNLOAD_TOKEN_TTL` | Durée de validité de l'URL de téléchargement d'un fichier privé, en secondes — durée de vie du jeton généré par `/api/storage/metadata/*` (par défaut `300`, maximum `604800`, soit une semaine). Augmentez cette valeur pour les vidéos et audios privés, qui continuent de requérir des plages d'octets après le rendu de la page. Équivalent en variable d'environnement de `storageDownloadTokenTtl` |
+| `STORAGE_MAX_FILE_SIZE` | Taille maximale de fichier acceptée par la source, en octets (par défaut `52428800`, soit 50 Mo). Ajoutez le suffixe `__<KEY>` pour une source nommée. Une valeur qui n'est pas un entier empêche le démarrage du serveur. Voir [Taille maximale des fichiers](#taille-maximale-des-fichiers) |
 | `FORCE_LOCAL_STORAGE` | Autoriser `STORAGE_TYPE=local` en production — voir ci-dessous |
-| `STORAGE_PUBLIC_READ` | Distribuer les objets stockés aux lecteurs non authentifiés. Équivalent en variable d'environnement de `storagePublicRead`, et l'un des trois moyens de satisfaire le [garde-fou de démarrage en production](#autorisation-par-objet). |
-| `STORAGE_ALLOW_ANY_AUTHENTICATED` | Désactiver le garde-fou de démarrage, restaurant le comportement où tout utilisateur connecté peut lire, écraser, supprimer ou lister n'importe quelle clé. Équivalent en variable d'environnement de `storageInsecureAllowAnyAuthenticated`. Ne se justifie que si chaque utilisateur connecté a la confiance nécessaire pour accéder à l'ensemble des fichiers. |
+| `STORAGE_PUBLIC_READ` | Mettre les objets stockés à disposition des lecteurs non authentifiés. Équivalent en variable d'environnement de `storagePublicRead`, et l'un des trois moyens de satisfaire le [contrôle de démarrage en production](#autorisation-par-objet). |
+| `STORAGE_ALLOW_ANY_AUTHENTICATED` | Désactiver le contrôle de démarrage, rétablissant le comportement où tout utilisateur connecté peut lire, écraser, supprimer ou lister n'importe quelle clé. Équivalent en variable d'environnement de `storageInsecureAllowAnyAuthenticated`. Uniquement justifiable si chaque utilisateur connecté a la confiance nécessaire pour accéder à chaque fichier. |
 
 ## Plusieurs buckets
 
-Un projet peut comporter plus d'un bucket. Déclarez chacun d'eux dans `config/resources.ts`
-— le point unique lu par la plateforme, le runtime et la console :
+Un projet peut comporter plusieurs buckets. Déclarez chacun d'eux dans `backend/resources.ts`
+— l'emplacement unique lu à la fois par la plateforme, le runtime et la console :
 
 ```ts
 import { bucket } from "@rebasepro/types";
@@ -343,49 +249,31 @@ export const media = bucket("media", { engine: "s3", label: "Media" });
 ```
 
 Exécutez ensuite `rebase resources --write`, ce qui régénère `rebase.resources.json`
-afin qu'un hôte puisse lire votre topologie sans avoir à exécuter un build. Consultez
-[Sources multiples](/docs/backend/multiple-sources) pour la gestion combinée des bases de données, buckets et
-topics.
+afin qu'un hôte puisse interpréter votre topologie sans lancer de build. Consultez
+[Sources multiples](/docs/backend/multiple-sources) pour la gestion conjointe des bases de données, des buckets et des topics.
 
-Chaque source est configurée à partir des **mêmes noms de variables portant leur propre
-suffixe**. La source par défaut ne prend aucun suffixe, ainsi un projet à bucket unique continue
-d'utiliser les noms simples ci-dessus sans rien devoir déclarer, et déclarer des buckets nommés à côté
-ne les change pas ([détails](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)) :
+Chaque source se configure à partir des **mêmes noms de variables assortis de son propre suffixe**. La source par défaut ne prend aucun suffixe, ainsi un projet à bucket unique conserve les dénominations simples présentées ci-dessus sans rien devoir déclarer de plus, et l'ajout de buckets nommés à ses côtés n'altère en rien son fonctionnement ([détails](/docs/backend/multiple-sources/#which-bucket-receives-an-unqualified-upload)) :
 
 ```bash
-S3_BUCKET=app-uploads             # (default)
+S3_BUCKET=app-uploads             # (défaut)
 S3_BUCKET__MEDIA=app-media        # media
 S3_ACCESS_KEY_ID__MEDIA=…
 S3_SECRET_ACCESS_KEY__MEDIA=…
 ```
 
-Le suffixe est dérivé de la clé : mis en majuscules, les caractères non alphanumériques transformés en
-underscores, précédés d'un **double** underscore (`media-cdn` → `__MEDIA_CDN`). Un
-simple underscore entrerait en collision avec de véritables noms de variables — `S3_BUCKET_NAME`
-serait interprété comme le bucket `name`.
+Le suffixe est dérivé de la clé : converti en majuscules, les caractères non alphanumériques étant remplacés par des tirets bas, précédé d'un **double** tiret bas (`media-cdn` → `__MEDIA_CDN`). Un tiret bas unique entrerait en collision avec des variables existantes — `S3_BUCKET_NAME` serait alors interprété comme le bucket `NAME`.
 
-Associez une propriété à une source à l'aide de `storageSource` :
+Associez une colonne à une source via `source` :
 
 ```ts
-{
-    name: "Cover",
-    type: "string",
-    storage: { storagePath: "covers", storageSource: "media", acceptedFiles: ["image/*"] }
-}
+cover: col.storage({ path: "covers/", source: "media", accept: ["image/*"] }),
 ```
 
-Une source déclarée mais jamais configurée est **ignorée**, sans être fatale : les téléversements
-qui lui sont adressés renvoient `501 STORAGE_SOURCE_NOT_CONFIGURED`. La déclaration d'un bucket survient
-généralement avant qu'on ne lui associe un stockage, et une erreur de démarrage ici
-ferait crasher en boucle le backend en attendant une configuration. Une source que l'environnement configure
-*incorrectement* — un type sans bucket, ou un bucket sans identifiants — est refusée
-au démarrage, car il s'agit d'une erreur et non d'une simple omission.
+Une source déclarée mais non configurée est simplement **ignorée**, sans provoquer d'erreur fatale : les téléversements acheminés vers celle-ci renvoient `501 STORAGE_SOURCE_NOT_CONFIGURED`. La déclaration d'un bucket intervient généralement avant qu'un stockage effectif ne lui soit rattaché ; générer une erreur de démarrage à ce stade bloquerait le backend dans une boucle de redémarrages jusqu'à ce que ce soit fait. En revanche, une source configurée de manière *invalide* dans l'environnement — un type sans bucket, ou un bucket sans identifiants — est rejetée au démarrage, s'agissant d'une erreur de configuration et non d'une absence volontaire.
 
 ### Buckets partageant un même compte
 
-Les identifiants décrivent généralement le **fournisseur**, et non le bucket. Quinze buckets sur
-une même installation MinIO nécessiteraient sinon quinze copies de la même clé d'accès, et
-une rotation impliquerait quinze modifications coordonnées. Nommez plutôt un compte :
+Les identifiants décrivent généralement le **fournisseur**, et non le bucket. Quinze buckets sur une même instance MinIO nécessiteraient sans cela quinze copies de la même clé d'accès, et leur renouvellement imposerait quinze modifications simultanées. Désignez plutôt un compte partagé :
 
 ```ts
 export const media = bucket("media", { engine: "s3", account: "minio" });
@@ -393,51 +281,37 @@ export const avatars = bucket("avatars", { engine: "s3", account: "minio" });
 ```
 
 ```bash
-S3_BUCKET__MEDIA=b-media          # per bucket, always
+S3_BUCKET__MEDIA=b-media          # par bucket, toujours
 S3_BUCKET__AVATARS=b-avatars
-S3_ACCESS_KEY_ID__MINIO=…         # shared by both
+S3_ACCESS_KEY_ID__MINIO=…         # partagé par les deux
 S3_SECRET_ACCESS_KEY__MINIO=…
 S3_ENDPOINT__MINIO=https://minio.internal
 ```
 
-Seules les variables délimitées au compte adoptent une valeur de repli — `S3_ACCESS_KEY_ID`,
-`S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`, `S3_FORCE_PATH_STYLE`, et
-la paire GCS `GCS_PROJECT_ID` / `GCS_KEY_FILENAME`. Le nom du bucket n'a jamais de valeur de repli :
-c'est ce qui distingue une source d'une autre. Une valeur définie par bucket reste prioritaire,
-permettant ainsi à une source de changer de fournisseur sans impacter les autres.
+Seules les variables délimitées au niveau du compte sont partagées par défaut — `S3_ACCESS_KEY_ID`,
+`S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`, `S3_FORCE_PATH_STYLE`, ainsi que le couple GCS `GCS_PROJECT_ID` / `GCS_KEY_FILENAME`. Le nom du bucket ne l'est jamais : c'est précisément ce qui distingue une source d'une autre. Une valeur définie au niveau du bucket reste prioritaire, ce qui permet à une source donnée de changer de fournisseur sans impacter les autres.
 
-### Supprimer selon un calendrier les fichiers qu'aucune ligne ne nomme
+### Suppression planifiée des fichiers non référencés par une ligne
 
-Supprimer une ligne laisse ses fichiers dans le bucket. Rien n'est supprimé avec la
-ligne : une autre ligne, une version dans l'[historique](/docs/backend/history/) ou
-votre propre code qui garde la clé dans une simple chaîne peut encore nommer le
-fichier. Un bucket peut demander à la place le nettoyage qui voit tout cela :
+La suppression d'une ligne laisse ses fichiers dans le bucket. Rien n'est supprimé en même temps que la ligne : une autre ligne, une version dans l'[historique](/docs/backend/history/), ou votre propre code conservant la clé dans une simple chaîne de caractères peut encore référencer le fichier. Un bucket peut déclencher un processus de nettoyage capable d'examiner l'ensemble de ces références :
 
 ```ts
 export const voice = bucket("voice", { engine: "s3", orphanSweep: { olderThanHours: 72 } });
-export const media = bucket("media", { orphanSweep: true }); // a week, daily at 04:17 UTC
+export const media = bucket("media", { orphanSweep: true }); // une semaine, tous les jours à 04:17 UTC
 ```
 
-Chaque nettoyage déclaré est une tâche cron, `storage-orphan-sweep-<bucket>`
-(`storage-orphan-sweep-default` pour le bucket par défaut). Elle exécute l'analyse
-derrière `rebase storage orphans --delete`. Cette analyse lit chaque ligne de chaque
-collection et chaque entrée d'historique, et conserve :
+Chaque balayage déclaré constitue une tâche cron, `storage-orphan-sweep-<bucket>`
+(`storage-orphan-sweep-default` pour le bucket par défaut). Elle exécute l'analyse sous-jacente de `rebase storage orphans --delete`. Cette analyse parcourt l'ensemble des lignes de chaque table ainsi que chaque entrée d'historique, et conserve :
 
-- un fichier que quoi que ce soit nomme encore ;
-- un fichier plus récent que `olderThanHours` (au moins 24, une semaine par défaut) ;
-- tous les fichiers, pour cette exécution, quand une collection ne peut pas être lue.
+- tout fichier encore référencé par un quelconque élément ;
+- tout fichier plus récent que `olderThanHours` (au minimum 24 heures, une semaine par défaut) ;
+- tous les fichiers, pour cette exécution, si une table ne peut pas être lue.
 
-Elle vérifie ensuite à nouveau chaque fichier juste avant de le supprimer. Donnez à
-`schedule` une expression cron (UTC) pour changer le moment où elle s'exécute. En
-tant que tâche cron, elle s'exécute sur une seule instance par créneau. Son
-historique d'exécution indique combien de fichiers elle a supprimés et conservés, et
-elle peut être mise en pause ou lancée à la main depuis la liste des crons de
-l'admin. Elle nécessite un bucket que ce backend sert : un bucket
-`transport: "direct"` est refusé au démarrage avec un avertissement.
+Elle vérifie ensuite chaque fichier une seconde fois juste avant sa suppression. Définissez `schedule` à l'aide d'une expression cron (UTC) pour modifier sa fréquence d'exécution. Étant une tâche cron, elle ne s'exécute que sur une seule instance par créneau. L'historique de ses exécutions consigne le nombre de fichiers supprimés et conservés, et elle peut être mise en pause ou déclenchée manuellement depuis la liste des tâches cron dans l'administration. Elle requiert un bucket pris en charge par ce backend : un bucket avec `transport: "direct"` est refusé au démarrage avec un avertissement.
 
 ## Sources de stockage côté frontend
 
-Le frontend apprend les sources du serveur via `GET /api/storage/sources`, une source `server` n'a donc besoin d'aucune entrée. Transmettez `storageSources` au fournisseur `<Rebase>` pour une source `direct`, qui téléverse directement vers son fournisseur, ou pour définir vous-même un libellé ou un transport :
+Le frontend prend connaissance des sources du serveur via `GET /api/storage/sources` ; une source de type `server` n'a donc pas besoin d'entrée manuelle. Passez `storageSources` au fournisseur `<Rebase>` pour une source de type `direct`, qui téléverse directement vers son fournisseur, ou pour définir vous-même un libellé ou un transport :
 
 ```tsx
 import { Rebase } from "@rebasepro/app";
@@ -445,9 +319,9 @@ import { Rebase } from "@rebasepro/app";
 <Rebase
     apiUrl="https://api.example.com"
     storageSources={[
-        // `engine` names the provider, `transport` says who talks to it:
-        // "server" proxies through the Rebase backend, "direct" goes
-        // client-to-provider (and needs a `source` implementation).
+        // `engine` désigne le fournisseur, `transport` indique qui communique avec lui :
+        // "server" relaie via le backend Rebase, "direct" établit une connexion directe
+        // client-fournisseur (et requiert une implémentation `source`).
         { key: "media", engine: "s3", transport: "server", label: "Media CDN" },
         { key: "firebase", engine: "firebase", transport: "server", label: "Firebase Storage" },
     ]}
@@ -456,45 +330,39 @@ import { Rebase } from "@rebasepro/app";
 </Rebase>
 ```
 
-La `key` d'une source `server` doit correspondre à une clé de backend enregistrée dans la configuration `storage` du serveur. Le contexte React `StorageSourcesContext` détermine la source active pour chaque champ de téléversement.
+La `key` d'une source `server` doit concorder avec une clé déclarée dans le mapping `storage` du serveur. Le contexte React `StorageSourcesContext` détermine la source active pour chaque champ de téléversement.
 
-## Mise en cache et CDNs
+## Mise en cache et CDN
 
-Chaque objet transite par le serveur, avec un `ETag` pour une revalidation
-peu coûteuse, un en-tête `Cache-Control` dépendant de qui peut le lire, et des plages d'octets
-pour la navigation dans les flux audio et vidéo. [Mise en cache du stockage et CDNs](/docs/backend/storage-caching/)
-détaille les en-têtes ainsi que la configuration à appliquer sur un CDN placé en frontal.
+Chaque objet transite par le serveur, avec un en-tête `ETag` pour une revalidation légère, un en-tête `Cache-Control` adapté aux autorisations de lecture, et la prise en charge des plages d'octets (byte ranges) pour la recherche dans les fichiers audio et vidéo. La section [Mise en cache du stockage et CDN](/docs/backend/storage-caching/) détaille les en-têtes ainsi que les paramètres à configurer sur un CDN placé en amont.
 
 ## Conseils pour la production
 
 :::caution
-**En production, `type: "local"` désactive le stockage de fichiers au lieu de l'utiliser.** Sur une plateforme éphémère (Cloud Run, Heroku, un pod Kubernetes), le système de fichiers est effacé à chaque déploiement, redémarrage et éviction — les téléversements réussiraient donc, se reliraient correctement, puis disparaîtraient lors du déploiement suivant, sans la moindre erreur apparente.
+**En production, `type: "local"` désactive le stockage de fichiers au lieu de l'utiliser.** Sur une plateforme éphémère (Cloud Run, Heroku, un pod Kubernetes), le système de fichiers est réinitialisé à chaque déploiement, redémarrage ou éviction — ainsi, les téléversements réussiraient, se reliraient sans souci, mais disparaîtraient lors du déploiement suivant, sans générer d'erreur apparente.
 
-Par conséquent, la valeur par défaut locale n'est pas enregistrée, et une requête vers `/api/storage/*` qui ne spécifie aucune source de stockage renvoie **`501 STORAGE_NOT_CONFIGURED`**, en indiquant les sources qui sont desservies. Une source nommée et configurée, telle que `bucket("media", { engine: "s3" })`, continue d'être desservie. Les téléversements échouent de façon explicite et récupérable ; le reste de l'application continue de fonctionner. Le stockage de fichiers nécessite une activation explicite en production : il n'existe qu'à partir du moment où un bucket est configuré.
+La configuration locale par défaut n'est donc pas enregistrée, et toute requête vers `/api/storage/*` ne mentionnant aucune source de stockage renvoie **`501 STORAGE_NOT_CONFIGURED`**, en indiquant la liste des sources actives. Une source nommée et configurée, telle que `bucket("media", { engine: "s3" })`, continue de fonctionner normalement. Les téléversements échouent de manière explicite et recouvrable ; le reste de l'application continue de fonctionner. Le stockage de fichiers est activé explicitement en production : il n'est effectif qu'à partir du moment où un bucket existe.
 
-Définissez `STORAGE_TYPE=s3` ou `gcs`. Si un **volume persistant** contient réellement `STORAGE_PATH`, spécifiez explicitement `FORCE_LOCAL_STORAGE=true`. Montez-le sur le parent de `STORAGE_PATH`, afin que le répertoire `<STORAGE_PATH>__<key>` de chaque bucket local nommé s'y trouve également.
+Définissez `STORAGE_TYPE=s3` ou `gcs`. Si un **volume persistant** héberge réellement `STORAGE_PATH`, définissez `FORCE_LOCAL_STORAGE=true` pour le spécifier de manière explicite. Montez-le sur le répertoire parent de `STORAGE_PATH`, afin que le dossier `<STORAGE_PATH>__<key>` de chaque bucket local nommé s'y trouve également.
 :::
 
-- Montez un **volume persistant** sur le parent de `STORAGE_PATH` si vous utilisez le stockage local sur Docker/Kubernetes, et définissez `FORCE_LOCAL_STORAGE=true` — voir [Auto-hébergement](/docs/deployment/self-hosting/#file-storage)
-- Utilisez **S3** ou un équivalent compatible (R2, MinIO), ou **GCS**, pour les déploiements en production
-- Configurez un **CDN** (CloudFront, Cloudflare) en frontal pour les performances — voir [Placer un CDN en frontal](/docs/backend/storage-caching/#putting-a-cdn-in-front)
-- **Toute application avec du stockage en production doit déclarer un modèle d'accès** — voir
-  [Autorisation du stockage](/docs/backend/storage-authorization/).
-  Cela ne concerne pas uniquement les architectures multi-locataires : le serveur *refuse de démarrer* sans cela.
+- Montez un **volume persistant** sur le parent de `STORAGE_PATH` si vous utilisez le stockage local sous Docker/Kubernetes, et définissez `FORCE_LOCAL_STORAGE=true` — voir [Auto-hébergement](/docs/deployment/self-hosting/#file-storage)
+- Utilisez **S3** ou un service compatible (R2, MinIO), ou **GCS**, pour les déploiements en production
+- Configurez un **CDN** (CloudFront, Cloudflare) en amont pour optimiser les performances — voir [Mettre en place un CDN](/docs/backend/storage-caching/#putting-a-cdn-in-front)
+- **Toute application utilisant le stockage en production doit déclarer un modèle d'accès** — voir
+  [Autorisation de stockage](/docs/backend/storage-authorization/).
+  Cela ne concerne pas uniquement les environnements multi-locataires : le serveur *refuse de démarrer* en l'absence d'un modèle d'accès.
 
 ## Autorisation par objet
 
-Qui peut lire, écrire, supprimer ou lister chaque clé est décidé par `storagePolicies`
-et le hook `storageAuthorize`, et une clé d'API a aussi besoin de la portée de stockage pour
-l'opération. La production refuse de démarrer avec du stockage et sans modèle d'accès. Voir
-[Autorisation du stockage](/docs/backend/storage-authorization/).
+Les permissions de lecture, d'écriture, de suppression ou de listage pour chaque clé sont régies par `storagePolicies`
+et le hook `storageAuthorize` ; une clé d'API doit également posséder la portée de stockage requise pour l'opération concernée. En production, le serveur refuse de démarrer si un stockage est actif sans modèle d'accès associé. Voir
+[Autorisation de stockage](/docs/backend/storage-authorization/).
 
 ## Réagir à un téléversement
 
-Toute autre écriture dans Rebase peut déclencher une réaction — une ligne dispose de `beforeSave` et
-`afterSave`, une planification dispose d'une tâche cron — alors qu'un téléversement ne disposait de rien. Tout ce qu'un
-téléversement impliquait devait être géré par le client, lors d'un second appel, ce qui signifie que l'action
-n'était pas réalisée du tout si le client se déconnectait entre-temps.
+Toutes les autres opérations d'écriture dans Rebase permettent d'attacher un traitement — une ligne propose `beforeSave` et
+`afterSave`, une planification dispose d'une tâche cron — alors qu'un téléversement ne proposait rien. Toute logique découlant d'un téléversement devait être prise en charge par le client lors d'un second appel, avec le risque de ne jamais être exécutée si le client se déconnectait entre-temps.
 
 ```ts
 storageTriggers: [
@@ -502,40 +370,29 @@ storageTriggers: [
         path: "uploads/:uid/**",
         events: ["finalize"],
         handler: async ({ key, params, size, user }) => {
-            await indexUpload.enqueue({ key, uid: params.uid, size }); // a `queue()` in config/resources.ts
+            await indexUpload.enqueue({ key, uid: params.uid, size }); // a `queue()` in backend/resources.ts
         }
     }
 ]
 ```
 
-La syntaxe des modèles est la même que celle de `storagePolicies` — segments littéraux, `*`
-pour un segment, `:name` pour en capturer un, `**` pour le reste — et un modèle mal formé
-fait échouer le démarrage plutôt que d'ignorer silencieusement les événements sans correspondance.
+La syntaxe des motifs est identique à celle de `storagePolicies` — segments littéraux, `*`
+pour un segment individuel, `:name` pour en capturer un, `**` pour le reste — et un motif malformé bloque le démarrage du serveur au lieu d'ignorer silencieusement les correspondances.
 
-| Événement | Moment de déclenchement |
+| Événement | Moment d'exécution |
 | --- | --- |
-| `finalize` | après que l'objet est écrit de manière durable ; jamais pour une écriture ayant échoué |
-| `delete` | après la suppression effective de l'objet |
+| `finalize` | après que l'objet a été écrit de manière durable ; jamais pour une écriture ayant échoué |
+| `delete` | après la suppression définitive de l'objet |
 
-`finalize` se déclenche pour les téléversements multipart comme pour ceux avec reprise (TUS) — une seule fois
-par téléversement, et non par fragment — et un téléversement avec reprise indique l'utilisateur qui l'a
-*créé*, puisque c'est cette identité que l'autorisation a validée.
+L'événement `finalize` se déclenche pour les téléversements standards en multipart comme pour les téléversements résumables (TUS) — une seule fois par téléversement, et non à chaque segment — et un téléversement résumable rapporte l'utilisateur qui l'a *initié*, dans la mesure où il s'agit de l'entité vérifiée lors du contrôle d'autorisation.
 
-Ce qu'un gestionnaire (handler) ne doit pas présumer :
+Hypothèses qu'un gestionnaire ne doit pas faire :
 
-- **Un gestionnaire qui lève une exception ne fait pas échouer la requête.** L'objet est déjà stocké
-  au moment de son exécution ; renvoyer une erreur au client indiquerait que
-  le téléversement a échoué alors que ce n'est pas le cas, et les clients réessayent leurs téléversements. Les échecs sont consignés dans les logs
-  et la réponse reste inchangée. Si le traitement doit impérativement avoir lieu, ajoutez une tâche dans une file d'attente (queue).
-- **Les gestionnaires sont attendus avec `await`**, dans l'ordre de leur déclaration, avant l'envoi de la réponse —
-  exécuter en tâche de fond (« fire and forget ») laisserait une promesse qu'un environnement serverless est libre de
-  geler en plein vol. Un gestionnaire lent équivaut donc à un téléversement ralenti, ce qui constitue une
-  autre raison d'utiliser une file d'attente plutôt que d'effectuer le travail ici.
-- **Les écritures internes ne déclenchent pas de triggers.** Le cache de rendu d'images écrit
-  les objets dérivés directement dans le contrôleur de stockage ; un trigger `**` réagissant à
-  ces écritures se déclencherait sur sa propre sortie.
+- **Un gestionnaire qui lève une exception ne fait pas échouer la requête.** L'objet est déjà stocké au moment de son exécution ; retourner une erreur au client indiquerait un échec du téléversement alors que ce n'est pas le cas, provoquant de nouvelles tentatives superflues. Les erreurs sont consignées dans les journaux et la réponse HTTP reste inchangée. Si le traitement est critique, mettez-le dans une file d'attente (queue).
+- **Les gestionnaires sont attendus (`await`)**, dans leur ordre de déclaration, avant l'envoi de la réponse — adopter une approche sans attente (« fire and forget ») laisserait une promesse en suspens qu'un runtime serverless pourrait geler en cours d'exécution. Un gestionnaire lent ralentit donc directement le téléversement, ce qui constitue une raison supplémentaire de déléguer la tâche à une file d'attente plutôt que de l'exécuter sur place.
+- **Les écritures internes ne déclenchent pas les triggers.** Le cache de rendu d'images écrit les objets dérivés directement auprès du contrôleur de stockage ; un trigger `**` réagissant à ces écritures s'exécuterait en boucle sur sa propre production.
 
-## Étapes suivantes
+## Prochaines étapes
 
-- **[Stockage Frontend et téléversement de fichiers](/docs/frontend/storage)** — Champs de téléversement de fichiers et hooks
-- **[Propriétés](/docs/collections/properties)** — Configuration des propriétés de stockage
+- **[Stockage côté frontend & téléversement de fichiers](/docs/frontend/storage)** — Champs et hooks de téléversement de fichiers
+- **[Colonnes](/docs/schema/columns/#storage-columns)** — `col.storage()` et ses options

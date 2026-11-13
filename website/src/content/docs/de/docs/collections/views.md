@@ -1,86 +1,89 @@
 ---
-sourceHash: e5d4169f7ba3f5e1
+sourceHash: 8a72cff37e30800b
 title: Views
 sidebar_label: Views
-description: Stellen Sie eine SQL-View oder Materialized View als schreibgeschützte Collection bereit, deklariert in der Konfiguration und erstellt durch db push.
+description: "Einen SQL-View oder einen Materialized View mit defineView schreibgeschützt bereitstellen: security_invoker-Views, gesteuert durch die gelesenen Tabellen, Materialized Views rollenabhängig beschränkt, bei Bedarf aktualisiert, erstellt via db push."
 ---
 
-## Eine Collection über einer Abfrage
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-Eine Collection kann statt einer Tabelle eine SQL-View bereitstellen. Deklarieren Sie die Abfrage unter
-`view`, beschreiben Sie ihre Spalten als Properties und markieren Sie die Spalte, die eine
-Zeile identifiziert, mit `isId` — eine View hat keinen eigenen Primärschlüssel:
+`defineView` stellt eine SQL-Abfrage als schreibgeschützte Tabelle bereit. Deklarieren Sie die Abfrage, die zurückgegebenen Spalten und die Spalte oder Spalten, die eine Zeile identifizieren:
 
 ```ts
-import { defineCollection } from "@rebasepro/cms-types";
+// backend/schema/artist-stats.ts
+import { defineView, col } from "@rebasepro/server/schema";
 
-export default defineCollection({
-    slug: "artists",
-    name: "Artists",
-    table: "artist_stats",
-    view: {
-        query: `SELECT lower(artist) AS artist, count(*)::int AS songs, max(fame) AS fame
-                FROM songs GROUP BY 1`
+export const artistStats = defineView("artist_stats", {
+    query: `SELECT lower(artist) AS artist, count(*)::int AS songs, max(fame) AS fame
+            FROM songs GROUP BY 1`,
+    columns: {
+        artist: col.text().primaryKey(),
+        songs:  col.integer().notNull(),
+        fame:   col.integer(),
     },
-    properties: {
-        artist: { name: "Artist", type: "string", isId: true },
-        songs: { name: "Songs", type: "number" },
-        fame: { name: "Fame", type: "number" }
-    }
 });
 ```
 
-Sie wird wie jede andere Collection gelesen — `find`, `findById`, `count`,
-[`aggregate`](/docs/sdk/aggregates-and-search/),
-`listen`, die REST-Routen, MCP und das Admin-Panel — und ist schreibgeschützt: Jeder
-Schreibvorgang ergibt ein `405 COLLECTION_READ_ONLY`, und das Admin-Panel bietet kein Erstellen, Bearbeiten oder
-Löschen an. Schreiben Sie in die Tabellen, die die View liest.
+Exportieren Sie ihn wie eine Tabelle aus `backend/schema/index.ts`. Er lässt sich wie jede Tabelle lesen – `find`, `findById`, `count`, [`aggregate`](/docs/sdk/aggregates-and-search/), `listen`, die REST-Routen, MCP und das CMS – und wird niemals beschrieben: Jeder Schreibvorgang führt zu einem `405 TABLE_READ_ONLY`. Schreiben Sie in die Tabellen, die der View liest.
 
-`rebase db push` erstellt die View nach den Tabellen (sie wird von Rebase angewendet,
-nicht von Atlas), `rebase db generate` hängt sie an die Migration an, und ein Managed-
-Boot erstellt sie in seinem Schema-Schritt. Eine View, deren Abfrage sich nicht geändert hat, bleibt
-unberührt; eine, deren Abfrage sich geändert hat, wird gelöscht und neu erstellt, zusammen mit allen
-Ihren Views, die sie lesen. Rebase weigert sich, eine Tabelle oder eine View, die es nicht
-erstellt hat und die bereits diesen Namen trägt, zu ersetzen.
+`rebase db push` erstellt den View nach den Tabellen, `rebase db generate` hängt ihn an die Migration an, und ein verwalteter Start erstellt ihn in seinem Schema-Schritt. Ein View, dessen Abfrage sich nicht geändert hat, bleibt unberührt; einer, dessen Abfrage geändert wurde, wird gelöscht und neu erstellt, zusammen mit allen Ihren Views, die ihn lesen. Rebase weigert sich, eine Tabelle oder einen nicht von Rebase erstellten View zu ersetzen, der bereits diesen Namen trägt.
+
+## Optionen
+
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+| Schlüssel | Beschreibung |
+|---|---|
+| `query` | **Erforderlich.** Das definierende `SELECT`. |
+| `columns` | **Erforderlich.** Die Spalten, die die Abfrage zurückgibt, als `col.*`-Builder. `.primaryKey()` kennzeichnet diejenigen, die eine Zeile identifizieren. |
+| `materialized` | `true` speichert die Zeilen. Siehe [Materialized Views](#materialized-views). |
+| `roles` | Wer einen Materialized View lesen darf. `["admin"]`, wenn nicht angegeben. Bei einem regulären View unzulässig. |
+| `table` | Der SQL-View-Name, wenn er vom Namen abweicht. |
+| `slug` | Der Name in der API. Wenn nicht angegeben, der Name des Views. |
+| `schema` | Das Postgres-Schema. `public`, wenn nicht angegeben. |
+| `database` | Eine abweichende Postgres-Datenbank. |
+| `description` | Was der View enthält, für OpenAPI und MCP. |
+| `relations` | Relationen, über die gelesen werden kann, wie bei einer Tabelle. Für einen View wird kein Constraint erstellt. |
+| `indexes` | Indizes auf den gespeicherten Zeilen eines Materialized Views. |
+| `hooks` | Nur `beforeQuery` und `afterRead`. Siehe [Tabellen-Hooks](/docs/collections/callbacks/). |
+| `metadata` | Beliebige Daten, die mit dem Deskriptor des Views bereitgestellt werden sollen. |
+
+Ein View hat mindestens eine `.primaryKey()`-Spalte: Ein View besitzt keinen eigenen Primärschlüssel, und eine Zeile benötigt eine Adresse.
 
 ## Wer welche Zeilen sieht
 
-Eine einfache View läuft **als Aufrufer** (`security_invoker`), sodass die Policies der
-Tabellen, die sie liest, entscheiden, was jeder Aufrufer sieht: Ein Benutzer, dessen Policies ihm
-seine eigenen Songs zeigen, sieht die View seiner eigenen Songs. Deshalb
-können auf einer View keine `securityRules` deklariert werden — es gibt nichts, woran man sie
-anhängen könnte, und nichts, was sie hinzufügen könnten. Siehe [Sicherheitsregeln](/docs/collections/security-rules/) für
-die Policies auf den darunterliegenden Tabellen.
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+Ein regulärer View wird `WITH (security_invoker = true)` erstellt, läuft also **als der Aufrufer**: Die Row-Level Security der Tabellen, die er liest, entscheidet, was der jeweilige Aufrufer sieht. Ein Benutzer, dessen Richtlinien ihm seine eigenen Songs anzeigen, sieht im View nur seine eigenen Songs. Aus diesem Grund hat ein View kein `rls`: Es gibt nichts, woran Richtlinien angehängt werden könnten, und nichts, was sie hinzufügen könnten. Siehe [Row-Level Security](/docs/collections/security-rules/) für die Richtlinien auf den darunterliegenden Tabellen.
 
 ## Materialized Views
 
-`materialized: true` speichert die Zeilen, sodass ein Lesevorgang die Abfrage nicht ausführt:
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+`materialized: true` speichert die Zeilen, sodass ein Lesevorgang die Abfrage nicht erneut ausführt:
 
 ```ts
-view: {
+import { defineView, col } from "@rebasepro/server/schema";
+
+export const langs = defineView("langs", {
     query: "SELECT lang, count(*)::int AS songs FROM songs GROUP BY lang",
     materialized: true,
-    roles: ["admin", "analyst"]
-}
+    roles: ["admin", "analyst"],
+    columns: {
+        lang:  col.text().primaryKey(),
+        songs: col.integer().notNull(),
+    },
+    indexes: [{ columns: ["songs"], reason: "the most-used languages first" }],
+});
 ```
 
-Postgres legt keine Row-Level Security auf eine Materialized View: Wer sie lesen darf,
-liest alles. Deshalb stellt Rebase sie nur Aufrufern bereit, die eine der `roles` besitzen
-(`["admin"]`, wenn weggelassen, was `dataAsAdmin` besitzt), und weist alle anderen
-mit `403 VIEW_NOT_READABLE` ab. Legen Sie nichts hinein, was ihre Leser nicht sehen dürfen.
+Postgres wendet keine Row-Level Security auf einen Materialized View an: Wer ihn lesen darf, liest alles. Daher stellt Rebase ihn nur Aufrufern bereit, die eine der `roles` besitzen (`["admin"]`, wenn nicht angegeben, was `dataAsAdmin` besitzt), und weist alle anderen mit `403 VIEW_NOT_READABLE` ab. Speichern Sie nichts darin, was seine Leser nicht sehen dürfen.
 
-Die Regel wird auch in der Datenbank durchgesetzt, daher stößt [SQL, das als Aufrufer ausgeführt wird](/docs/backend/custom-functions/#3-getsqlc--sql-as-the-caller),
-ebenfalls darauf. Die Zeilen liegen unter `<table>_rebase_rows`, das nur der
-Datenbankeigentümer lesen darf, und der Name der Collection selbst ist eine View darüber,
-die Zeilen nur an einen Aufrufer mit einer der `roles` und an den Server selbst
-(`rebase.sql()`, Crons) liefert. Fragen Sie den Namen der Collection ab, nie die
-gespeicherten Zeilen.
+Diese Regel wird auch in der Datenbank durchgesetzt, sodass [als Aufrufer ausgeführtes SQL](/docs/backend/custom-functions/#3-getsqlc--sql-as-the-caller) sie ebenfalls erfüllt. Die Zeilen werden unter `<view>_rebase_rows` gespeichert, was nur der Datenbank-Owner lesen darf, und der Name des Views selbst ist ein View darüber, der Zeilen nur an Aufrufer mit einer der `roles` sowie an den Server selbst (`rebase.sql()`, Cron-Jobs) zurückgibt. Fragen Sie immer den Namen des Views ab, niemals die gespeicherten Zeilen.
 
-Die Zeilen entsprechen dem Stand der letzten Aktualisierung. Aktualisieren Sie mit `refresh()` — auf dem Server
-als `rebase.dataAsAdmin.langs.refresh()`, oder von einem Client, der mit einer der
-Rollen angemeldet ist — oder über HTTP:
+Die Zeilen entsprechen dem Stand der letzten Aktualisierung. Aktualisieren Sie mit `refresh()` – auf dem Server als `rebase.dataAsAdmin.langs.refresh()` oder über einen Client, der mit einer der Rollen angemeldet ist – oder über HTTP:
 
-```ts
+```typescript
 await client.data.langs.refresh();
 await client.data.langs.refresh({ concurrently: true });
 ```
@@ -90,18 +93,12 @@ POST /api/data/langs/refresh
 { "concurrently": true }
 ```
 
-`concurrently` liefert weiter die alten Zeilen aus, während die neuen berechnet werden; es
-benötigt den eindeutigen Index, den Rebase auf den `isId`-Spalten erstellt, diese müssen also
-im Ergebnis der Abfrage eindeutig sein. Um zeitgesteuert zu aktualisieren, rufen Sie `refresh()` aus einem
-[Cron-Job](/docs/backend/cron-jobs/) auf. Eine Materialized View kann eigene `indexes` besitzen
-(siehe [Indizes](/docs/backend/indexes/)), die auf ihren gespeicherten Zeilen aufgebaut werden; eine
-einfache View nutzt die Indizes ihrer Tabellen.
+`concurrently` liefert weiterhin die alten Zeilen aus, während die neuen berechnet werden. Dies erfordert den Unique Index, den Rebase auf den `.primaryKey()`-Spalten erstellt, sodass diese im Ergebnis der Abfrage eindeutig sein müssen. Um nach einem Zeitplan zu aktualisieren, rufen Sie `refresh()` aus einem [Cron-Job](/docs/backend/cron-jobs/) auf. Ein Materialized View kann eigene `indexes` besitzen (siehe [Indizes](/docs/backend/indexes/)), die auf seinen gespeicherten Zeilen aufbauen; ein regulärer View nutzt die Indizes seiner Tabellen.
 
-## Was eine View nicht haben kann
+## Was ein View nicht haben kann
 
-`securityRules`, `history`, `softDelete`, `tenant` und `search` werden beim
-Boot abgelehnt, weil jedes eine Tabelle braucht, in die geschrieben werden kann oder an die es sich anhängen lässt.
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-Ein `listen` auf einer View bekommt ein `refresh()` mit. Ein Schreibvorgang auf die Tabellen unter einer
-View erreicht die Abonnenten der View nicht: Abonnieren Sie die Tabellen oder
-lesen Sie die View erneut.
+`rls`, `history`, `softDelete`, `tenant` und `search` werden beim Kompilieren des Schemas abgelehnt: Jedes davon benötigt eine Tabelle, in die geschrieben werden kann oder an die Richtlinien angehängt werden können. `roles` bei einem regulären View wird beim Laden des Moduls abgelehnt, ebenso wie eine leere `query`. `indexes` bei einem regulären View wird beim Kompilieren des Schemas abgelehnt.
+
+Ein `listen` auf einem View registriert ein `refresh()`. Ein Schreibzugriff auf die Tabellen unterhalb eines Views erreicht die Abonnenten des Views nicht: Abonnieren Sie die Tabellen oder fragen Sie den View erneut ab.

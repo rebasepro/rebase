@@ -1,77 +1,74 @@
 ---
-sourceHash: 6517ed25b1776f7e
+sourceHash: 3317ba94279d0cb8
 title: Rebase erweitern
 sidebar_label: Rebase erweitern
-description: Ein Entscheidungsleitfaden zur Auswahl des richtigen Erweiterungsmechanismus – Plugins, Slots, Komponenten-Overrides, Entity-Views, Aktionen und mehr.
+description: Ein Leitfaden zur Auswahl des richtigen Erweiterungsmechanismus – Plugins, Slots, Komponenten-Overrides, Entity-Views, Aktionen und mehr.
 ---
 
 ## Übersicht
 
-Rebase bietet rund ein Dutzend Erweiterungsmechanismen – Plugins, Slots, Komponenten-Overrides, Entity-Views, Aktionen, benutzerdefinierte Felder und mehr. Jeder davon zielt auf einen anderen Geltungsbereich (anwendungsweit, pro Collection, pro Entity, pro Property) und einen anderen Teil der Benutzeroberfläche ab.
+Rebase bietet rund ein Dutzend Erweiterungsmechanismen – Plugins, Slots, Komponenten-Overrides, Entity-Views, Aktionen, benutzerdefinierte Felder und mehr. Jeder zielt auf einen anderen Scope (anwendungsweit, pro Collection, pro Entity, pro Property) und einen anderen Teil der UI ab.
 
-Dieser Leitfaden hilft Ihnen dabei, den richtigen Mechanismus für Ihren Anwendungsfall auszuwählen, und verlinkt anschließend auf die detaillierte Referenz des jeweiligen Mechanismus.
+Dieser Leitfaden hilft Ihnen, den richtigen Mechanismus für Ihren Anwendungsfall auszuwählen, und verlinkt anschließend auf die detaillierte Referenz des jeweiligen Mechanismus.
 
-:::tip[Beginnen Sie mit dem Modell, nicht mit der Liste]
-Jeder der unten aufgeführten Mechanismen ist im Grunde dasselbe: eine React-Komponente, die an einer bestimmten Stelle platziert wird. [Admin-Panel anpassen](/docs/frontend/customizing) erklärt dieses Modell auf einer einzigen Seite – Bausteine, Hooks, Orte – mit getesteten Vorlagen für ein Einstellungs-Singleton, benutzerspezifische Einstellungen, eine Massenaktion, eine Kalenderansicht, ein Dashboard und einen benutzerdefinierten Login-Bildschirm. Lesen Sie dies zuerst; kehren Sie anschließend hierher zurück, um die passende Stelle auszuwählen.
+:::tip[Mit dem Modell beginnen, nicht mit der Liste]
+Jeder der folgenden Mechanismen ist im Kern dasselbe: eine React-Komponente, die an einer bestimmten Stelle platziert wird. [Customizing the Admin](/docs/frontend/customizing) erklärt dieses Modell auf einer einzigen Seite – Bausteine, Hooks, Orte – mit erprobten Rezepten für ein Einstellungs-Singleton, Einstellungen pro Benutzer, eine Bulk-Aktion, eine Kalenderansicht, ein Dashboard und einen benutzerdefinierten Login-Bildschirm. Lesen Sie dies zuerst; kehren Sie hierher zurück, um den passenden Ort auszuwählen.
 :::
 
-Alles hier bezieht sich auf das **Admin-Panel**. Für den Server – das Einschränken eines Lesevorgangs,
-das Hinzufügen einer Route, das Einbetten des Treibers in Ihren eigenen Prozess, `rebase eject` – siehe
-[Rebase kann X nicht](/docs/backend/extending), was die entsprechende Übersicht
-für das Backend darstellt.
+Alles hier betrifft das **Admin-Panel**. Für den Server – Einschränken eines Lesevorgangs, Hinzufügen einer Route, Einbetten des Treibers in Ihren eigenen Prozess, `rebase eject` – siehe [Rebase doesn't do X](/docs/backend/extending), was die entsprechende Übersichtstabelle für das Backend darstellt.
 
 ## Entscheidungstabelle
 
-| Ich möchte… | Mechanismus | Geltungsbereich | Referenz |
-|---|---|---|---|
-| Die App-Bar ersetzen | `components` (`Shell.AppBar`) | App | [Komponenten-Overrides](/docs/frontend/component-overrides) |
-| Die Login-Seite ersetzen | `components` (`Auth.LoginView`) | App | [Komponenten-Overrides](/docs/frontend/component-overrides) |
-| Die Startseite ersetzen | `components` (`HomePage`) | App | [Komponenten-Overrides](/docs/frontend/component-overrides) |
-| Das Erscheinungsbild des Formulars einer Collection komplett ändern | `formView` | Collection | [unten](#formview) |
-| Eine einzelne Komponente innerhalb einer Collection austauschen | `admin.components` | Collection | [Komponenten-Overrides](/docs/frontend/component-overrides) |
-| Standard-Komponenten-Overrides für alle Collections festlegen | `components` (Collection-spezifische Namen) | App | [Komponenten-Overrides](/docs/frontend/component-overrides) |
-| Eine Schaltfläche zur Collection-Toolbar hinzufügen | Collection `Actions` | Collection | [Entity-Aktionen](/docs/frontend/entity-actions#collection-actions) |
-| UI in einen Collection-Toolbar-Slot einfügen | `collection.actions`-Slot | App/Plugin | [Slots](/docs/frontend/slots) |
-| Einer Tabelle eine berechnete Spalte hinzufügen | `additionalFields` | Collection | [Zusätzliche Spalten](/docs/frontend/additional-columns) |
-| Ein benutzerdefiniertes Feld-Widget für einen Property-Typ hinzufügen | `propertyConfigs` | Property-Typ | [Benutzerdefinierte Felder](/docs/frontend/custom-fields) |
-| Einen Entity-Tab hinzufügen | `entityViews` | Entity | [Entity-Views](/docs/frontend/entity-views) |
-| Die Zeilen einer Collection auf andere Art rendern | `admin.customViews` | Collection | [unten](#benutzerdefinierte-ansichtsmodi) |
-| Eine Zeilen-/Kontextaktion oder Entity-Schaltfläche hinzufügen | `entityActions` | Entity | [Entity-Aktionen](/docs/frontend/entity-actions) |
-| Eine Kennzahl auf der Startseitenkarte einer Collection platzieren | `home.card.widget`-Slot | App/Plugin | [Slots](/docs/frontend/slots) |
-| UI an einer bestimmten Chrome-Position einfügen | `slots` | App/Plugin | [Slots](/docs/frontend/slots) |
-| Mehrere Erweiterungen als eine installierbare Einheit bereitstellen | `plugins` | App | [Plugins](/docs/plugins) |
-| Das soeben Erstellte stylen | `@rebasepro/ui` + Theme-Tokens | beliebig | [Styling benutzerdefinierter UI](/docs/frontend/styling) |
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-:::tip[Egal, wofür Sie sich entscheiden: Bauen Sie es mit dem Baukasten]
-Jeder unten aufgeführte Mechanismus übergibt Ihnen eine React-Komponente und macht
-keine Vorgaben bezüglich des Inhalts. Verwenden Sie Komponenten aus `@rebasepro/ui`
-und die Farb-Tokens des Themes anstelle von handgeschriebenem CSS – eine benutzerdefinierte
-Ansicht ist immer noch eine Admin-Ansicht, und eine fest verdrahtete Farbe ist in
-einem der beiden Themes unsichtbar. Siehe
-[Styling benutzerdefinierter UI](/docs/frontend/styling).
+| Ich möchte… | Mechanismus | Scope | Referenz |
+|---|---|---|---|
+| Die App-Leiste ersetzen | `components` (`Shell.AppBar`) | app | [Component Overrides](/docs/frontend/component-overrides) |
+| Die Login-Seite ersetzen | `components` (`Auth.LoginView`) | app | [Component Overrides](/docs/frontend/component-overrides) |
+| Die Startseite ersetzen | `components` (`HomePage`) | app | [Component Overrides](/docs/frontend/component-overrides) |
+| Das Erscheinungsbild des Formulars einer Tabelle vollständig ändern | `formView` in `customizeTable` | table | [unten](#formview) |
+| Eine Komponente innerhalb der Collection einer Tabelle austauschen | `components` in `customizeTable` | table | [Component Overrides](/docs/frontend/component-overrides#collection-level-component-overrides) |
+| Standard-Komponenten-Overrides für alle Collections festlegen | `components` (Collection-bezogene Namen) | app | [Component Overrides](/docs/frontend/component-overrides) |
+| Einen Button zur Collection-Symbolleiste hinzufügen | `Actions` in `customizeTable` | table | [Entity Actions](/docs/frontend/entity-actions#collection-actions) |
+| UI an einem Slot der Collection-Symbolleiste einfügen | `collection.actions` slot | app/plugin | [Slots](/docs/frontend/slots) |
+| Einer Tabelle eine berechnete Spalte hinzufügen | `additionalFields` in `customizeTable` | table | [Additional Columns](/docs/frontend/additional-columns) |
+| Das Steuerelement eines Feldes ersetzen | `Field` in `customizeTable` | field | [Custom Fields](/docs/frontend/custom-fields) |
+| Einen wiederverwendbaren Feldtyp registrieren | `propertyConfigs` | app | [Custom Fields](/docs/frontend/custom-fields#a-reusable-field-type) |
+| Einen Entity-Tab hinzufügen | `entityViews` in `customizeTable` | entity | [Entity Views](/docs/frontend/entity-views) |
+| Die Zeilen einer Tabelle auf andere Weise rendern | `customViews` in `customizeTable` | table | [unten](#benutzerdefinierte-ansichtsmodi) |
+| Eine Zeilen-/Kontextaktion oder einen Entity-Button hinzufügen | `entityActions` in `customizeTable` | entity | [Entity Actions](/docs/frontend/entity-actions) |
+| Eine Kennzahl auf der Startseitenkarte einer Collection platzieren | `home.card.widget` slot | app/plugin | [Slots](/docs/frontend/slots) |
+| UI an einer bestimmten Position des UI-Rahmens (Chrome) einfügen | `slots` | app/plugin | [Slots](/docs/frontend/slots) |
+| Mehrere Erweiterungen als eine installierbare Einheit bereitstellen | `plugins` | app | [Plugins](/docs/plugins) |
+| Das soeben Erstellte stylen | `@rebasepro/ui` + Theme-Tokens | any | [Styling Custom UI](/docs/frontend/styling) |
+
+:::tip[Was auch immer Sie wählen: Bauen Sie es aus dem Kit]
+Jeder der folgenden Mechanismen stellt Ihnen eine React-Komponente bereit und macht keine Vorgaben darüber, womit Sie sie füllen. Verwenden Sie `@rebasepro/ui`-Komponenten und die Farb-Tokens des Themes statt selbstgeschriebenem CSS – eine benutzerdefinierte Ansicht ist immer noch eine Admin-Ansicht, und eine fest verdrahtete Farbe ist in einem der beiden Themes unsichtbar. Siehe [Styling Custom UI](/docs/frontend/styling).
 :::
 
 ## Mechanismen im Detail
 
 ### Plugins
 
-**Geltungsbereich:** App.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-Ein Plugin bündelt injizierte oder modifizierte Collections, Views, Slot-Beiträge, Field-Wrapper, Provider, Hooks und Lifecycle-Callbacks in einer einzigen installierbaren Einheit. Komponenten-Overrides, Entity-Views, Entity-Aktionen und `propertyConfigs` sind keine Plugin-Felder: Sie gehören auf `<Rebase>` oder auf die Collection.
+**Scope:** app.
 
-→ [Plugin-Referenz](/docs/plugins)
+Ein Plugin bündelt injizierte oder modifizierte Collections, Views, Slot-Beiträge, Feld-Wrapper, Provider, Hooks und Lifecycle-Callbacks in einer einzigen installierbaren Einheit. Komponenten-Overrides, Entity-Views, Entity-Aktionen und `propertyConfigs` sind keine Plugin-Felder: Sie werden an `<Rebase>` oder im `customizeTable` einer Tabelle übergeben.
+
+→ [Plugins-Referenz](/docs/plugins)
 
 ### Slots
 
-**Geltungsbereich:** App (pro Slot beigetragen).
+**Scope:** app (pro Slot beigetragen).
 
-Slots sind benannte UI-Erweiterungspunkte, die über das gesamte CMS-Chrome verteilt sind. Sie registrieren eine React-Komponente, die auf einen Slot-Namen verweist, und diese wird an dieser Position gerendert. Es gibt 27 Slots, die die Startseite, die Navigation, Collection-Ansichten, Formulare, Entity-Zeilen, Formularfelder und die App-Bar abdecken – und jeder einzelne davon wird gerendert.
+Slots sind benannte UI-Erweiterungspunkte, die über die gesamte CMS-Oberfläche (Chrome) verteilt sind. Sie registrieren eine React-Komponente für einen Slot-Namen, und diese wird an dieser Stelle gerendert. Es gibt 27 Slots, die die Startseite, die Navigation, Collection-Views, Formulare, Entity-Zeilen, Formularfelder und die App-Leiste abdecken – und jeder einzelne davon wird gerendert.
 
-→ [Slot-Referenz](/docs/frontend/slots)
+→ [Slots-Referenz](/docs/frontend/slots)
 
 ### Komponenten-Overrides (Swizzling)
 
-**Geltungsbereich:** Standardwerte auf App-Ebene oder pro Collection.
+**Scope:** Defaults auf App-Ebene oder pro Collection.
 
 Zwei Modi: **Eject** (vollständiger Ersatz) oder **Wrap** (Erweiterung des Originals).
 
@@ -86,7 +83,7 @@ Zwei Modi: **Eject** (vollständiger Ersatz) oder **Wrap** (Erweiterung des Orig
 - `HomePage.CollectionCard`
 - `Auth.LoginView`
 
-**Collection-spezifisch (12):**
+**Collection-bezogen (12):**
 - `Collection.View`
 - `Collection.Table`
 - `Collection.Card`
@@ -100,71 +97,81 @@ Zwei Modi: **Eject** (vollständiger Ersatz) oder **Wrap** (Erweiterung des Orig
 - `EntityPreview`
 - `Entity.MissingReference`
 
-**Rangfolge:** `components` auf Collection-Ebene gelten vorrangig gegenüber Standardwerten auf App-Ebene für denselben Komponentennamen: Ein Collection-Ersatz ersetzt beides, und ein Collection-Override mit `wrap: true` umschließt den Override auf App-Ebene. Komponentennamen, die nur auf App-Ebene existieren (`Shell.*`, `HomePage`, `Auth.*`), können nur auf `<Rebase>`-Ebene überschrieben werden.
+**Rangfolge:** Die `components` einer Tabelle werden auf die Standardwerte auf App-Ebene für denselben Komponentennamen angewendet: Ein Ersatz auf Collection-Ebene ersetzt beide, und ein Collection-Override mit `wrap: true` umschließt den Override auf App-Ebene. Nur auf App-Ebene verfügbare Komponentennamen (`Shell.*`, `HomePage`, `Auth.*`) können nur auf Ebene von `<Rebase>` überschrieben werden.
 
-→ [Komponenten-Overrides](/docs/frontend/component-overrides)
+→ [Component Overrides](/docs/frontend/component-overrides)
 
-### Entity-Views
+### Entity Views
 
-**Geltungsbereich:** Entity (fügt Tabs hinzu).
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-Benutzerdefinierte Ansichten, die als Tabs auf der Entity-Detailseite erscheinen. Definiert pro Collection oder einmalig auf `<Rebase entityViews>` (oder `<RebaseCMS entityViews>`) registriert und über den `key` in `admin.entityViews` einer Collection referenziert.
+**Scope:** entity (fügt Tabs hinzu).
 
-→ [Entity-Views](/docs/frontend/entity-views)
+Benutzerdefinierte Ansichten, die als Tabs auf der Entity-Detailseite erscheinen. Definiert pro Tabelle in `customizeTable` oder einmalig unter `<Rebase entityViews>` (oder `<RebaseCMS entityViews>`) registriert und über den `key` in den `entityViews` einer Tabelle referenziert.
 
-### Entity-Aktionen
+→ [Entity Views](/docs/frontend/entity-views)
 
-**Geltungsbereich:** Entity.
+### Entity Actions
 
-Benutzerdefinierte Aktionsschaltflächen für einzelne Entities (Veröffentlichen, Archivieren, Klonen usw.). Definiert pro Collection oder einmalig auf `<Rebase entityActions>` (oder `<RebaseCMS entityActions>`) registriert und über den `key` in `admin.entityActions` einer Collection referenziert.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-→ [Entity-Aktionen](/docs/frontend/entity-actions)
+**Scope:** entity.
+
+Benutzerdefinierte Aktions-Buttons für einzelne Entities (Veröffentlichen, Archivieren, Klonen usw.). Definiert pro Tabelle in `customizeTable` oder einmalig unter `<Rebase entityActions>` (oder `<RebaseCMS entityActions>`) registriert und über den `key` in den `entityActions` einer Tabelle referenziert.
+
+→ [Entity Actions](/docs/frontend/entity-actions)
 
 ### Collection `Actions`
 
-**Geltungsbereich:** Collection.
+**Scope:** collection.
 
-React-Komponenten auf Toolbar-Ebene, die `CollectionActionsProps` empfangen (ausgewählte Entities, Table-Controller, Collection-Kontext). Werden in der Collection-Toolbar neben den integrierten Aktionen gerendert.
+React-Komponenten auf Symbolleistenebene, die `CollectionActionsProps` empfangen (ausgewählte Entities, Table-Controller, Collection-Kontext). Werden in der Collection-Symbolleiste neben den integrierten Aktionen gerendert.
 
-**Beziehung zum `collection.actions`-Slot:** Beide sind additiv – `Actions`-Komponenten werden zuerst in der Toolbar gerendert, danach Slot-Beiträge von `collection.actions`. Sie ersetzen einander nicht.
+**Verhältnis zum Slot `collection.actions`:** Beide sind additiv – `Actions`-Komponenten werden zuerst in der Symbolleiste gerendert, gefolgt von Slot-Beiträgen aus `collection.actions`. Sie ersetzen einander nicht.
 
-→ [Entity-Aktionen — Collection-Aktionen](/docs/frontend/entity-actions#collection-actions)
+→ [Entity Actions — Collection Actions](/docs/frontend/entity-actions#collection-actions)
 
 ### Benutzerdefinierte Ansichtsmodi
-**Geltungsbereich:** Collection (fügt einen Ansichtsmodus hinzu).
 
-Eine Karte, ein Kalender, eine Galerie, eine Zeitleiste – eine andere Darstellung *derselben Zeilen*,
-angeboten im Ansichtsumschalter der Collection neben Liste, Tabelle, Karten und Board.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+**Scope:** collection (fügt einen Ansichtsmodus hinzu).
 
-```ts
-// collection config
-admin: {
+Eine Karte, ein Kalender, eine Galerie, eine Zeitleiste – eine alternative Darstellung *derselben Zeilen*, angeboten im Ansichtsumschalter der Collection neben Liste, Tabelle, Karten und Board.
+
+```tsx
+// frontend/src/cms/tasks.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { tasks } from "../../../backend/schema/tasks";
+import { MapView } from "../../../../../components/MapView";
+
+export const tasksCms = customizeTable<typeof tasks>("tasks", {
     customViews: [
-        { key: "map", name: "Map", icon: "Map", Builder: MapView }
+        { key: "map", name: "Map", icon: "Map", Builder: MapView },
     ],
     enabledViews: ["table", "map"],
-    defaultViewMode: "map"
-}
+    defaultViewMode: "map",
+});
 ```
 
-Oder registrieren Sie die Komponente einmalig und benennen Sie sie über den Key, wodurch sie auch
-im Collection-Editor auswählbar wird:
+Oder registrieren Sie die Komponente einmalig und benennen Sie sie per Schlüssel, wodurch sie auch im Collection-Editor auswählbar wird:
 
 ```tsx
 <RebaseCMS
-    collections={collections}
+    tableCustomizations={tableCustomizations}
     collectionViews={[{ key: "map", name: "Map", icon: "Map", Builder: MapView }]}
 />
 ```
 
-```ts
-admin: { customViews: ["map"] }
+```tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { tasks } from "../../../backend/schema/tasks";
+
+export const tasksCms = customizeTable<typeof tasks>("tasks", {
+    customViews: ["map"],
+});
 ```
 
-`Builder` empfängt den aktiven `tableController`, sodass die Ansicht die Filter der
-Collection, das Suchfeld, die Sortierung, die Paginierung, die Berechtigungsprüfungen
-und das Entity-Seitenpanel erbt – genau das ist der Grund, einen solchen Ansichtsmodus
-zu deklarieren, anstatt eine `AppView` zu bauen:
+`Builder` erhält den aktiven `tableController`, sodass die Ansicht die Filter der Collection, das Suchfeld, Sortierung, Paginierung, Berechtigungsprüfungen und das Entity-Seitenpanel erbt – genau das ist der Grund, einen solchen Ansichtsmodus zu deklarieren, anstatt eine `AppView` zu erstellen:
 
 ```tsx
 function MapView({ tableController, onRowClick }: CollectionCustomViewParams) {
@@ -175,12 +182,7 @@ function MapView({ tableController, onRowClick }: CollectionCustomViewParams) {
 }
 ```
 
-Die Zeilen stammen vom Server und haben die Struktur, die `useRows` zurückgibt: Datumsangaben als ISO-Strings,
-ein belongsTo als Fremdschlüsselspalte und eine Relation, die die Ansicht geladen hat, verschachtelt
-unter ihrem Namen. Eine Zeile hat nur dann eine `id`-Spalte, wenn ihre Tabelle eine besitzt; ihre ID steht
-daneben, `tableController.ids[i]` für `tableController.rows[i]`.
-`highlightedIds` sind die IDs der Zeilen, die die Ansicht als ausgewählt darstellt, und
-`selectionController` arbeitet ebenfalls mit IDs und Zeilen:
+Die Zeilen stammen vom Server und haben die von `useRows` zurückgegebene Struktur: Daten als ISO-Strings, ein `belongsTo` als Fremdschlüsselspalte und eine von der Ansicht geladene Relation, die unter ihrem Namen verschachtelt ist. Eine Zeile hat nur dann eine `id`-Spalte, wenn ihre Tabelle eine besitzt; ihre ID steht daneben, `tableController.ids[i]` für `tableController.rows[i]`. `highlightedIds` sind die IDs der Zeilen, die die Ansicht als ausgewählt darstellt, und `selectionController` arbeitet ebenfalls mit IDs und Zeilen:
 
 ```tsx
 import type { CollectionCustomViewParams } from "@rebasepro/cms-types";
@@ -200,72 +202,56 @@ function CardsView({ tableController, highlightedIds, onRowClick }: CollectionCu
 }
 ```
 
-Die Auswahl der Ansicht aktualisiert `?__view=`, bleibt bei einem Neuladen erhalten und wird pro Benutzer gespeichert.
-Die Deklaration reicht aus, um sie anzubieten – `enabledViews` muss nur gesetzt werden, wenn Sie
-*integrierte Ansichten entfernen* möchten. Bei einem einzelnen Eintrag wird der Umschalter ausgeblendet.
+Das Auswählen der Ansicht aktualisiert `?__view=`, bleibt bei einem Neuladen erhalten und wird pro Benutzer gespeichert. Die Deklaration reicht aus, um sie anzubieten – `enabledViews` muss nur gesetzt werden, wenn Sie *integrierte Ansichten entfernen* möchten. Bei einem einzelnen Eintrag wird der Umschalter ausgeblendet.
 
-**Dies ist kein Weg, um eine Ansicht über mehrere Collections hinweg zu erstellen.** Ein Ansichtsmodus
-ist eine alternative Darstellung der Abfrage einer einzelnen Collection. Wenn Ihre Komponente den
-`tableController` ignoriert und vier eigene Tabellen abruft, sollte sie als
-[`AppView`](/docs/frontend#custom-views) implementiert werden – die Toolbar darüber mit ihrem
-Suchfeld und der Datensatzanzahl würde andernfalls eine Abfrage beschreiben, die sie gar nicht rendert.
+**Dies ist keine Möglichkeit, eine sammlungsübergreifende Ansicht zu erstellen.** Ein Ansichtsmodus ist eine weitere Darstellung der Abfrage einer einzelnen Collection. Wenn Ihre Komponente den `tableController` ignoriert und selbst vier Tabellen abfragt, sollte sie eine [`AppView`](/docs/frontend#custom-views) sein – die Symbolleiste darüber mit ihrem Suchfeld und der Datensatzanzahl würde eine Abfrage beschreiben, die sie gar nicht rendert.
 
 ### `formView`
-**Geltungsbereich:** Collection.
 
-Ersetzt das gesamte standardmäßige Entity-Formular durch eine benutzerdefinierte Komponente. Wird in einer Collection-Definition festgelegt:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+**Scope:** collection.
 
-```typescript
-const collection = {
-    slug: "products",
-    admin: {
-        formView: {
-            Builder: MyCustomProductForm,
-            includeActions: true  // Speichern und Verwerfen in der Leiste (Standard: true)
-        }
-    }
-};
+Ersetzt das gesamte Standard-Entity-Formular durch eine benutzerdefinierte Komponente, festgelegt mit `formView: { Builder, includeActions }` in `customizeTable`; siehe [Replacing the form](/docs/frontend/form-layout/#replacing-the-form). `includeActions` (Standardwert `true`) behält Speichern und Verwerfen in der Leiste bei.
 
-```
+Verwenden Sie dies, wenn Sie ein vollständig benutzerdefiniertes Layout für die Bearbeitung der Datensätze einer Tabelle benötigen. Für kleinere Anpassungen sollten Sie stattdessen den `Entity.Form`-Override in `components` bevorzugen.
 
-Verwenden Sie dies, wenn Sie ein vollständig individuelles Layout für die Bearbeitung von Entities einer Collection benötigen. Für kleinere Anpassungen sollten Sie stattdessen `admin.components` mit einem `Entity.Form`-Override vorziehen.
-
-Der Builder wird innerhalb des Formulars des Datensatzes gerendert und empfängt dessen aktiven `formContext`: Schreiben Sie mit `formContext.setFieldValue`, und „Speichern“ in der Leiste speichert den Datensatz. Wenn der Datensatz nicht bearbeitet werden kann – in der schreibgeschützten Detailansicht oder bei einem Benutzer ohne Bearbeitungsberechtigung – ist `formContext.disabled` gleich `true` und Schreibvorgänge werfen Fehler. Setzen Sie `includeActions: false`, wenn Ihr Builder eigenständig über `formContext.submit()` speichert.
+Der Builder wird innerhalb des Formulars des Datensatzes gerendert und erhält dessen aktiven `formContext`: Schreiben Sie mit `formContext.setFieldValue`, und die Speichern-Schaltfläche der Leiste speichert den Datensatz. Wenn der Datensatz nicht bearbeitet werden kann – in der schreibgeschützten Detailansicht oder bei einem Benutzer ohne Bearbeitungsberechtigung –, ist `formContext.disabled` gleich `true` und Schreibvorgänge werfen Fehler. Setzen Sie `includeActions: false`, wenn Ihr Builder selbst über `formContext.submit()` speichert.
 
 ### `additionalFields`
 
-**Geltungsbereich:** Collection.
+**Scope:** collection.
 
-Berechnete/virtuelle Spalten, die in der Collection-Tabelle angezeigt werden. Diese entsprechen keinen gespeicherten Properties – sie werden zur Renderzeit berechnet.
+Berechnete Spalten, die in der Collection-Tabelle angezeigt werden. Sie entsprechen keinen gespeicherten Spalten, sondern werden zur Renderzeit berechnet.
 
-→ [Zusätzliche Spalten](/docs/frontend/additional-columns)
+→ [Additional Columns](/docs/frontend/additional-columns)
 
 ### `propertyConfigs`
 
-**Geltungsbereich:** Property-Typ.
+**Scope:** Property-Typ.
 
-Benutzerdefinierte Feld-Widgets für bestimmte Property-Typen, die benutzerdefinierte Formularfelder und Vorschaukomponenten bereitstellen.
+Wiederverwendbare Feldtypen, die einmalig unter `<Rebase propertyConfigs>` registriert und über die `propertyConfig` eines Feldes referenziert werden.
 
-→ [Benutzerdefinierte Felder](/docs/frontend/custom-fields)
+→ [Custom Fields](/docs/frontend/custom-fields)
 
 ## Nicht das Admin-Panel
 
-Wenn das, was Sie ändern möchten, das Verhalten des Servers betrifft und nicht das,
-was das Panel anzeigt, ist dies die falsche Seite. Der Server hat seine eigene Stufenleiter:
+Wenn das, was Sie ändern möchten, das Serververhalten betrifft und nicht das, was das Panel anzeigt, sind Sie hier auf der falschen Seite. Der Server hat seine eigene Staffelung:
 
 | Ich möchte… | Stufe | Referenz |
 |---|---|---|
-| Einschränken, welche Zeilen ein Lesevorgang zurückgibt | `beforeQuery`-Callback | [Server erweitern](/docs/backend/extending#2-collection-callbacks) |
-| Einen Wert bei der Ausgabe schwärzen/anpassen | `afterRead`-Callback | [Callbacks](/docs/collections/callbacks) |
-| Einen eigenen Endpunkt hinzufügen | Benutzerdefinierte Funktion | [Benutzerdefinierte Funktionen](/docs/backend/custom-functions) |
-| Dafür sorgen, dass die Suche Teilstrings findet *und* Akzente ignoriert | `search.mode: "hybrid"` | [Suche](/docs/backend/search) |
-| Die vollständige Kontrolle über den Serverprozess übernehmen | Eigener Server, dann `rebase eject` | [Server erweitern](/docs/backend/extending) |
+| Einschränken, welche Zeilen ein Lesevorgang zurückgibt | `beforeQuery`-Hook | [Extending the server](/docs/backend/extending#2-table-hooks) |
+| Einen Wert bei der Ausgabe schwärzen/entfernen | `afterRead`-Hook | [Table hooks](/docs/collections/callbacks) |
+| Einen eigenen Endpunkt hinzufügen | Eigene Funktion | [Custom Functions](/docs/backend/custom-functions) |
+| Dafür sorgen, dass die Suche Teilstrings findet *und* Akzente ignoriert | `search.mode: "hybrid"` | [Search](/docs/backend/search) |
+| Die volle Kontrolle über den Serverprozess übernehmen | Eigener Server, dann `rebase eject` | [Extending the server](/docs/backend/extending) |
 
-→ [Rebase kann X nicht](/docs/backend/extending)
+→ [Rebase doesn't do X](/docs/backend/extending)
 
 ## Zusammenfassung der Rangfolge
 
-- **Das `admin.components` einer Collection hat Vorrang vor globalen `components`** innerhalb dieser Collection. Ein Collection-Ersatz ersetzt beides; ein Collection-Override mit `wrap: true` umschließt den globalen Override, sofern vorhanden. Siehe [Komponenten-Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
-- **Collection `Actions` und der `collection.actions`-Slot sind additiv** – `Actions` werden zuerst gerendert, danach Slot-Beiträge.
-- **`entityActions` und `entityViews` auf App-Ebene sind eine Registry, keine Standardwerte:** Eine Collection zeigt diese nur an, wenn ihr eigenes `admin.entityActions` / `admin.entityViews` den entsprechenden `key` nennt.
-- **Plugins werden in der Reihenfolge des `plugins`-Arrays angewendet**, nicht nach `key`. Slot-Beiträge werden nach ihrer `order` gerendert (niedrigere zuerst, standardmäßig 50), und bei Gleichstand bleibt diese Reihenfolge erhalten. Field-Wrapper aus mehreren Plugins setzen sich in dieser Reihenfolge zusammen, wobei das erste Plugin am weitesten innen liegt. Siehe [Plugins](/docs/plugins#field-wrappers-from-several-plugins).
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+- **Die `components` einer Tabelle haben Vorrang vor globalen `components`** innerhalb ihrer Collection. Ein Ersatz auf Collection-Ebene ersetzt beide; ein Override mit `wrap: true` auf Collection-Ebene umschließt den globalen Override, falls vorhanden. Siehe [Component Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
+- **Collection-`Actions` und der `collection.actions`-Slot sind additiv** – `Actions` werden zuerst gerendert, danach die Slot-Beiträge.
+- **`entityActions` und `entityViews` auf App-Ebene sind eine Registry, keine Standardwerte:** Eine Tabelle zeigt ein Element nur an, wenn ihre eigenen `entityActions` / `entityViews` in `customizeTable` dessen `key` benennen.
+- **Plugins werden in der Reihenfolge des `plugins`-Arrays angewendet**, nicht nach `key`. Slot-Beiträge werden nach ihrer `order` gerendert (niedrigere zuerst, standardmäßig 50), und bei Gleichstand bleibt diese Reihenfolge erhalten. Feld-Wrapper aus mehreren Plugins komponieren sich in dieser Reihenfolge, wobei der des ersten Plugins der innerste ist. Siehe [Plugins](/docs/plugins#field-wrappers-from-several-plugins).

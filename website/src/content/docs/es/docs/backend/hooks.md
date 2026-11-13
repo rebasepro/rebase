@@ -1,76 +1,71 @@
 ---
-sourceHash: ba272fed815c24ef
+sourceHash: 81fb68b88d544514
 title: Hooks globales del backend
 sidebar_label: Hooks globales
-description: Aplica callbacks de ciclo de vida transversales a cada colección a nivel de servidor usando CollectionCallbacks.
+description: "Aplica hooks de ciclo de vida transversales a cada tabla a nivel de servidor: exporta hooks desde backend/hooks.ts, con la misma estructura TableHooks que usan los propios hooks de una tabla."
 ---
 
-## Visión general
+## Descripción general
 
-Rebase proporciona dos niveles de callbacks del ciclo de vida de entidades; ambos utilizan el mismo tipo `CollectionCallbacks` de `@rebasepro/types`:
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-- **[Callbacks por colección](/docs/collections/callbacks)**: Se definen en configuraciones de colección individuales. Se ejecutan únicamente para esa colección.
-- **Callbacks globales**: Se definen en `initializeRebaseBackend({ callbacks })`. Se disparan en **cada** colección, en cada ruta de datos (API REST, WebSocket / tiempo real, `rebase.dataAsAdmin` en el servidor). El único escritor que no ven es el sistema de autenticación: el registro, el inicio de sesión por OAuth y la gestión de usuarios del administrador escriben las filas de usuario directamente y ejecutan los [hooks de autenticación](/docs/backend/authentication/) (`afterUserCreate`, …) en su lugar.
+Rebase ejecuta los hooks de tabla en dos niveles, ambos del tipo `TableHooks` de
+`@rebasepro/server/schema`:
 
-Utilice callbacks globales para:
-- **Alcance de filas (Row scoping)** — `beforeQuery` en cada colección, de modo que las lecturas de un inquilino se delimiten en un solo lugar en vez de por colección. Solo Postgres: junto a una fuente de datos de MongoDB o Firestore, un `beforeQuery` global rechaza iniciarse en lugar de dejar las lecturas de esa fuente sin delimitar. Consulte [`beforeQuery`](/docs/collections/callbacks#beforequery).
-- **Enmascaramiento de PII** — ofusca campos sensibles para quienes realizan llamadas sin permisos de administrador en todas las colecciones.
-- **Registro de auditoría unificado** — registra cada creación, actualización o eliminación en un solo lugar. Las cuentas nuevas del registro y de OAuth no están entre ellas; registre esas desde `afterUserCreate`.
-- **Validación transversal** — aplica invariantes que abarcan múltiples colecciones.
+- **[Hooks de tabla](/docs/collections/callbacks)**: la clave `hooks` de un `defineTable`. Se ejecutan únicamente para esa tabla.
+- **Hooks globales**: exportados como `hooks` desde `backend/hooks.ts`. Se activan en **cada** tabla, en cada ruta de datos (API REST, WebSocket / tiempo real, MCP, `rebase.dataAsAdmin` en el servidor). El único escritor que no ven es el sistema de autenticación: el registro, el inicio de sesión OAuth y la administración de usuarios por parte del admin escriben filas de usuario directamente y ejecutan los [hooks de autenticación](/docs/backend/authentication/) (`afterUserCreate`, …) en su lugar.
+
+Usa hooks globales para:
+- **Restricción de filas (row scoping)** — `beforeQuery` en cada tabla, para que las lecturas de un tenant se delimiten en un solo lugar en vez de por tabla. Consulta [`beforeQuery`](/docs/collections/callbacks#beforequery).
+- **Enmascaramiento de PII** — redactar campos sensibles para llamadas que no sean de administradores en todas las tablas.
+- **Registro de auditoría unificado** — registrar cada creación, actualización o eliminación en un solo lugar. Las cuentas nuevas provenientes de registros y OAuth no están entre ellas; regístralas desde `afterUserCreate`.
+- **Validación transversal** — hacer cumplir invariantes que abarcan múltiples tablas.
 
 :::note
-**Orden de ejecución**: callbacks globales → callbacks de colección → callbacks de propiedad.
+**Orden de ejecución**: hooks globales → hooks propios de la tabla → `.transform()` de sus columnas.
 :::
+
+Cada hook recibe el descriptor de la tabla para la que se ejecuta como `table`, por lo que los hooks globales necesitan tablas declaradas: un backend que inspecciona la base de datos (sin `backend/schema`) los rechazará al arrancar.
 
 ---
 
 ## Configuración
 
 :::note[Dónde va esto]
-**Runtime gestionado** — `export const callbacks = { … }` desde `config/index.ts`. El runtime lee esa exportación al arrancar; no es necesario cambiar nada más.
+**Runtime gestionado** — `export const hooks = { … }` desde `backend/hooks.ts`. El runtime lee esa exportación al iniciar; no es necesario cambiar nada más. Cualquier otra exportación del archivo se reporta al arrancar y se ignora.
 
-**Eyectado (Ejected)** — la clave `callbacks` en `initializeRebaseBackend({ … })`.
+**Ejected** — la clave `hooks` en `initializeRebaseBackend({ … })`.
 
-El mapa completo está en [Visión general del backend](/docs/backend/#where-each-option-lives).
+El mapa completo se encuentra en [Visión general del backend](/docs/backend/#where-each-option-lives).
 :::
 
-Pase la clave `callbacks` a `initializeRebaseBackend`:
+```typescript
+// backend/hooks.ts
+import type { TableHooks } from "@rebasepro/server/schema";
 
-```typescript no-verify
-import { initializeRebaseBackend } from "@rebasepro/server";
-
-const instance = await initializeRebaseBackend({
-    // ... other config
-    callbacks: {
-        afterRead({ row, context }) {
-            // Runs after every entity read, across all collections
-            return row;
-        },
-        beforeSave({ values, context }) {
-            // Runs before every entity save
-            return values;
-        }
+export const hooks: TableHooks = {
+    afterRead({ values }) {
+        // Runs after every row read, across all tables
+        return values;
+    },
+    beforeSave({ values }) {
+        // Runs before every save
+        return values;
     }
-});
+};
 ```
 
-`callbacks` recibe
-un solo conjunto. Para mantener separadas varias responsabilidades, escriba cada una como su propio conjunto y pase
-`composeCallbacks(tenantScope, auditTrail)`: se combinan exactamente como los niveles
-anteriores. Consulte
-[Combinar conjuntos de callbacks](/docs/collections/callbacks/#combining-callback-sets).
-Lo mismo ocurre con `backend.setCollectionCallbacks(slug, callbacks)`, que
-reemplaza los callbacks que declaró una colección: pase
-`composeCallbacks(declared, yours)` para conservarlos.
+`hooks` toma un único conjunto. Para mantener separadas distintas responsabilidades, escribe cada una como su propio conjunto y pasa `composeTableHooks(tenantScope, auditTrail)` desde `@rebasepro/common`: se combinan exactamente igual que los niveles anteriores. Consulta [Combinar conjuntos de hooks](/docs/collections/callbacks/#combining-hook-sets).
+Lo mismo aplica para `backend.setTableHooks(slug, hooks)`, que reemplaza los hooks declarados por una tabla: pasa `composeTableHooks(declared, yours)` para conservarlos.
 
 ---
 
-## Tipo `CollectionCallbacks`
+## Tipo `TableHooks`
 
 ```typescript
-type CollectionCallbacks = {
+type TableHooks = {
     beforeQuery?(props): QueryNarrowing | void;     // Conditions to AND into a read before it is compiled
-    afterRead?(props):   Record<string, unknown>;  // Transform row before returning to caller
+    afterRead?(props):   Record<string, unknown>;  // Transform the row before returning it to the caller
     beforeSave?(props):  Partial<Values>;           // Modify values before writing to DB
     afterSave?(props):   void;                      // After the write, still in the transaction
     afterSaveError?(props): void;                   // Side-effects after a failed save
@@ -79,43 +74,37 @@ type CollectionCallbacks = {
 };
 ```
 
-`beforeQuery` delimita una lectura antes de que se compile; consulte
-[`beforeQuery`](/docs/collections/callbacks#beforequery).
+`beforeQuery` delimita una lectura antes de que se compile; consulta [`beforeQuery`](/docs/collections/callbacks#beforequery).
 
-Todos los callbacks pueden devolver una `Promise` (asíncrono) o un valor simple (síncrono).
+Todos los hooks pueden devolver una `Promise` (asíncrono) o un valor plano (síncrono).
 
 ---
 
-## Props de callbacks
+## Props del hook
 
-Cada callback recibe un único objeto de props. Campos comunes:
+Cada hook recibe un único objeto de propiedades (props). Campos comunes:
 
 | Campo | Tipo | Presente en |
 |-------|------|-------------|
-| `collection` | `CollectionConfig` | Todos los callbacks |
-| `path` | `string` | Todos los callbacks |
-| `row` | `Record<string, unknown>` | `afterRead`, `beforeDelete`, `afterDelete` |
+| `table` | `TableDescriptor` | Todos los hooks |
+| `path` | `string` | Todos los hooks |
+| `values` | `Record<string, unknown>` | Todos excepto `beforeQuery`: la fila leída (`afterRead`), en proceso de eliminación (`beforeDelete`, `afterDelete`), o los valores escritos (los hooks de guardado) |
 | `id` | `string \| number` | `beforeSave` (opcional), `afterSave`, `afterSaveError` (opcional), `beforeDelete`, `afterDelete` |
-| `values` | `EntityValues` | `beforeSave`, `afterSave`, `afterSaveError` |
-| `previousValues` | `EntityValues` (opcional) | `beforeSave`, `afterSave`, `afterSaveError` |
+| `previousValues` | fila (opcional) | `beforeSave`, `afterSave`, `afterSaveError` |
 | `status` | `"new" \| "existing" \| "copy"` | `beforeSave`, `afterSave`, `afterSaveError` |
-| `context` | `RebaseCallContext` | Todos los callbacks |
+| `error` | `unknown` | `afterSaveError` |
+| `operation`, `query` | tipo de lectura, la consulta del llamador | `beforeQuery` |
+| `context` | `RebaseCallContext` | Todos los hooks |
 
-`context.user` contiene el usuario autenticado (`uid`, `roles`, etc.). Una solicitud sin token, cuando la API la deja pasar, lleva la identidad anónima `{ uid: "anonymous", roles: ["anon"] }` en lugar de `undefined`.
+`context.user` contiene al usuario autenticado (`uid`, `roles`, etc.). Una solicitud sin token, donde la API permite el paso, lleva la identidad anónima `{ uid: "anonymous", roles: ["anon"] }` en lugar de `undefined`.
 
-`context.credential` nombra la clave de API con la que se hizo una escritura: `{ kind, id, name }`, donde `kind` es `"personal"` o `"service"`. Una clave personal actúa como su propietario, así que `context.user` es el propietario tanto si guardó a mano como si un trabajo de CI escribió con su clave; `context.credential` distingue ambos casos. Se establece en la API de datos, en el socket de tiempo real y en `/mcp`, y está ausente en una sesión, en la clave de servicio, en el trabajo en contexto de servidor (`rebase.dataAsAdmin`, crons) y en el navegador. Nunca lleva el secreto.
+`context.credential` identifica la clave de API con la que se realizó una escritura: `{ kind, id, name }`, donde `kind` es `"personal"` o `"service"`. Una clave personal actúa como su propietario, por lo que `context.user` es el propietario ya sea que guardó manualmente o que una tarea de CI escribió con su clave; `context.credential` permite distinguir entre ambos casos. Se establece en la API de datos, el socket en tiempo real y `/mcp`, y está ausente en una sesión, en la clave de servicio, en tareas del contexto del servidor (`rebase.dataAsAdmin`, crons) y en el navegador. Nunca contiene el secreto.
 
-`collection` siempre está presente. Un callback global se dispara para cada colección, por lo que
-es el único nivel que se registra independientemente de cualquiera de ellas, pero aun así
-nunca recibe una colección faltante. Una solicitud que nombra una ruta que el registro de
-colecciones no puede resolver se rechaza con `404 NOT_FOUND` antes de que se ejecute ningún nivel,
-que es la misma respuesta que las rutas de lectura y escritura dan a dicha ruta de todos modos. La
-alternativa —omitir el nivel para esas rutas— convertiría a `afterRead` en un paso de
-ofuscación con una excepción silenciosa, por lo que no se ofrece.
+`table` siempre está presente. Un hook global se ejecuta para cada tabla, por lo que es el único nivel que se registra independientemente de cualquiera de ellas — pero aun así nunca recibe una tabla faltante. Una solicitud que nombra una ruta que el servidor no puede resolver es rechazada con `404 NOT_FOUND` antes de que se ejecute cualquier nivel, que es la misma respuesta que las rutas de lectura y escritura darían a tal ruta de todos modos. La alternativa —omitir el nivel para esas rutas— convertiría a `afterRead` en un paso de redacción con una excepción silenciosa, por lo que no está disponible.
 
 ---
 
-## Flujo de ejecución
+## Pipeline de ejecución
 
 ```
 [Client Request]
@@ -128,11 +117,11 @@ ofuscación con una excepción silenciosa, por lo que no se ofrece.
  │ 1. Start PostgreSQL Transaction                             │
  │ 2. Set Config: app.user_id = '<uid>', app.user_roles = ...  │
  │                                                             │
- │ 3. Global Callback: beforeSave     ─┐                       │
- │ 4. Collection Callback: beforeSave ─┘ awaited               │
+ │ 3. Global hook: beforeSave         ─┐                       │
+ │ 4. Table hook: beforeSave          ─┘ awaited               │
  │ 5. Drizzle SQL execution & Postgres RLS evaluation          │
- │ 6. Global Callback: afterSave      ─┐                       │
- │ 7. Collection Callback: afterSave  ─┘ awaited               │
+ │ 6. Global hook: afterSave          ─┐                       │
+ │ 7. Table hook: afterSave           ─┘ awaited               │
  │                                                             │
  │ 8. Commit  ← a throw anywhere in 3–7 rolls the write back   │
  └─────┬───────────────────────────────────────────────────────┘
@@ -147,84 +136,65 @@ ofuscación con una excepción silenciosa, por lo que no se ofrece.
 
 ## Semántica bloqueante vs. asíncrona
 
-**Cada callback en la lista a continuación se espera con `await`, y todos ellos salvo
-`afterSaveError` se ejecutan dentro de la transacción que procesa la escritura.** No existe un nivel de "disparar y olvidar": la
-fila y todo lo que hicieron sus callbacks se confirman (commit) juntos o no se confirma nada.
+**Todos los hooks en la lista a continuación son esperados (`await`), y todos ellos excepto `afterSaveError` se ejecutan dentro de la transacción que realiza la escritura.** No existe un nivel de tipo "disparar y olvidar": la fila y todo lo que hicieron sus hooks se confirman (commit) juntos o no se confirma nada.
 
-- **`beforeSave`, `beforeDelete`** — si el callback lanza un error (throw), la operación se rechaza con un HTTP 400 que incluye su mensaje y el código `CALLBACK_REJECTED`, y la escritura en la base de datos nunca ocurre. Lance un `RebaseApiError` de `@rebasepro/types` para elegir el estado usted mismo — consulte [Callbacks de entidad](/docs/collections/callbacks#beforesave). Un `beforeDelete` que *devuelve* `false` es el mismo rechazo sin mensaje, y responde **403** con ese código.
-- **`afterRead`** — la fila devuelta (o la fila transformada) es lo que recibe el emisor de la llamada, y solo él: en una escritura da forma a la respuesta, mientras que `afterSave`, `beforeDelete`, `afterDelete` y el historial obtienen la fila tal como se almacenó — un valor enmascarado nunca se registra ni se revierte en la columna. Su transacción es `READ ONLY` — consulte [más abajo](#afterread-no-puede-escribir).
-- **`afterSave`, `afterDelete`** — se ejecutan *antes* del commit, con `await`. Si lanzan un error aquí, se revierte (rollback) la fila y se responde con el mismo **400 `CALLBACK_REJECTED`**, con `details.stage` indicando el hook. Mantienen la transacción abierta mientras se ejecutan, por lo que uno lento mantiene un bloqueo activo.
-- **`afterSaveError`** — se ejecuta cuando el guardado falló, en la salida. En una solicitud se ejecuta después de que la transacción de la escritura fallida se haya revertido, con un `context` en el que cada llamada es una transacción propia, de modo que un trabajo que encole para informar del fallo se conserva. Un error que lance se registra en el log; el emisor de la llamada recibe el error del propio guardado.
+- **`beforeSave`, `beforeDelete`** — si el hook lanza un error (`throw`), la operación es rechazada con un HTTP 400 que incluye tu mensaje y el código `CALLBACK_REJECTED`, y la escritura en la base de datos nunca ocurre. Lanza un `RebaseApiError` de `@rebasepro/types` para elegir el código de estado tú mismo — consulta [Hooks de tabla](/docs/collections/callbacks#beforesave). Un `beforeDelete` que *devuelve* `false` es el mismo rechazo pero sin mensaje, y responde **403** con ese código.
+- **`afterRead`** — la fila devuelta (o fila transformada) es lo que recibe el llamador, y solo el llamador: en una escritura da forma a la respuesta, mientras que `afterSave`, `beforeDelete`, `afterDelete` y el historial reciben la fila tal como fue almacenada — un valor enmascarado nunca se registra ni se restaura en la columna. Su transacción es `READ ONLY` — consulta [más abajo](#afterread-no-puede-escribir).
+- **`afterSave`, `afterDelete`** — se ejecutan *antes* del commit, de forma esperada (`await`). Un error lanzado aquí revierte la fila y responde con el mismo **400 `CALLBACK_REJECTED`**, con `details.stage` indicando el hook. Mantienen la transacción abierta mientras se ejecutan, por lo que uno lento mantendrá un bloqueo activo.
+- **`afterSaveError`** — se ejecuta cuando el guardado falló, al salir. En una solicitud, se ejecuta después de que la transacción de la escritura fallida haya sido revertida, con un `context` cuyas llamadas son cada una una transacción propia, de modo que cualquier trabajo que encole para reportar el fallo se conserva. Si este hook lanza un error, se registra en el log; el llamador recibe el error original del guardado.
 
 :::caution[Esta página solía decir lo contrario]
-Las versiones anteriores decían que `afterSave` y `afterDelete` "se ejecutan después de que la transacción
-haga commit" y "no bloquean la respuesta HTTP". En realidad, nunca hicieron ninguna de las dos cosas. El código que
-se escribió en base a esa frase —por ejemplo, una llamada a un webhook en `afterSave`— ha
-estado manteniendo una transacción de base de datos abierta durante la duración de un viaje de ida y vuelta HTTP,
-y revirtiendo la fila siempre que el extremo remoto estuviera caído.
+Versiones anteriores decían que `afterSave` y `afterDelete` "se ejecutan después de que la transacción se confirma" y "no bloquean la respuesta HTTP". Nunca hicieron ninguna de las dos cosas. El código escrito en base a esa afirmación —como una llamada a un webhook en `afterSave`— ha estado manteniendo abierta una transacción de base de datos durante el tiempo que dura un viaje de ida y vuelta HTTP, y revirtiendo la fila cada vez que el extremo remoto estaba caído.
 :::
 
 ### Cuándo se ejecuta `afterSaveError`
 
-Informa de un guardado que falló **en la base de datos o después de ella** —
-desde la sentencia INSERT o UPDATE en adelante. Un guardado rechazado antes de
-ese punto nunca llegó a la base de datos, así que el hook no se entera.
+Reporta un guardado que falló **en la base de datos o después de ella** — a partir de la sentencia INSERT o UPDATE en adelante. Un guardado rechazado antes de ese punto nunca llegó a la base de datos, por lo que no se notifica al hook al respecto.
 
 | Se ejecuta | No se ejecuta |
 |---|---|
-| La base de datos rechaza la sentencia: una violación de clave única o foránea, una restricción de comprobación (check) o un trigger, una política de seguridad a nivel de fila (`WRITE_DENIED`) | Un rechazo de `beforeSave` — el hook que rechazó es el que lo sabe |
-| `afterRead` o `afterSave` lanza un error (el emisor recibe `CALLBACK_REJECTED`) | Una solicitud rechazada antes del driver: validación (`VALIDATION_*`), un campo que el emisor no puede escribir, un permiso faltante |
-| La entrada del historial no se puede registrar | Una fila que el emisor no puede direccionar (`404`), una marca de inquilino que no puede establecer |
-| | El commit se rechaza después de que el guardado retornara: `TRANSACTION_ABORTED` (una sentencia fallida que un callback capturó), o una restricción diferida comprobada en el `COMMIT` |
-| | Una eliminación — no hay contraparte de eliminación |
+| La base de datos rechaza la sentencia: una infracción de clave única o foránea, una restricción check o trigger, una política de seguridad a nivel de fila (`WRITE_DENIED`) | Un rechazo en `beforeSave` — el hook que lo rechazó es el que lo sabe |
+| `afterRead` o `afterSave` lanzan un error (el llamador recibe `CALLBACK_REJECTED`) | Una solicitud rechazada antes del driver: validación (`VALIDATION_*`), un campo que el llamador no tiene permitido escribir, un permiso faltante |
+| La entrada de historial no se puede registrar | Una fila que el llamador no puede direccionar (`404`), un sello de tenant que no tiene permitido establecer |
+| | El commit es rechazado después de que el guardado retornó: `TRANSACTION_ABORTED` (una sentencia fallida capturada por un hook), o una restricción diferida comprobada en el `COMMIT` |
+| | Una eliminación — no existe un equivalente para delete |
 
-En una escritura masiva o `_batch` se ejecuta para la fila que falló; las
-filas anteriores a ella se revierten junto con el lote y no se informan.
+En una escritura masiva o `_batch`, se ejecuta para la fila que falló; las filas anteriores se revierten con el lote y no se reportan.
 
 ### Efectos secundarios que no deben retener la transacción
 
-Cualquier cosa lenta, o cualquier cosa que no se pueda deshacer si la transacción se revierte,
-no pertenece al cuerpo del callback:
+Cualquier cosa lenta, o cualquier cosa que no se pueda deshacer si la transacción se revierte, no pertenece al cuerpo del hook:
 
-| Desea | Haga esto en su lugar |
+| Necesidad | Haz esto en su lugar |
 |---|---|
-| Llamar a un tercero, enviar correo, generar un archivo | [Encolar un trabajo](/docs/backend/jobs). Un trabajo encolado en una transacción que se revierte nunca fue encolado — lo cual es el comportamiento deseado. |
-| Notificar a otros procesos que algo sucedió | Publicar en un [canal en tiempo real](/docs/backend/realtime) después de que la escritura retorne, no desde dentro del hook. |
-| Trabajo en una [función personalizada](/docs/backend/custom-functions) que el emisor de la llamada no necesita esperar | `waitUntil(c, promise)` de `@rebasepro/server/functions` — se ejecuta después de la respuesta, y el host espera a que termine antes de apagarse. |
+| Llamar a un tercero, enviar un correo, generar un archivo | [Encola un job](/docs/backend/jobs). Un job encolado en una transacción que se revierte nunca fue encolado — que es el comportamiento deseado. |
+| Notificar a otros procesos que algo ocurrió | Publica en un [canal de tiempo real](/docs/backend/realtime) después de que la escritura retorne, no desde dentro del hook. |
+| Trabajar en una [función personalizada](/docs/backend/custom-functions) que el llamador no necesita esperar | `waitUntil(c, promise)` de `@rebasepro/server/functions` — se ejecuta después de la respuesta y el host espera a que termine antes de apagarse. |
 
-La regla general: si el trabajo aún debe ocurrir cuando se deshace la escritura,
-no es parte de la escritura, por lo que no debe ir dentro del hook.
+La regla general: si el trabajo aún debe ocurrir cuando la escritura se deshace, no es parte de la escritura, por lo que no va dentro del hook.
 
 ### `afterRead` no puede escribir
-Una lectura con alcance de solicitud abre su transacción en modo `READ ONLY`, y también lo hace la
-relectura de una suscripción en tiempo real. `afterRead` se ejecuta dentro
-de ella, por lo que **ninguna escritura desde ese callback puede tener éxito** — ni una creación con `context.data`,
-ni una actualización, ni una oculta dentro de una función auxiliar a la que invoque. Postgres rechaza la
-instrucción con SQLSTATE `25006`, y al emisor de la llamada se le responde:
+
+Una lectura con alcance de solicitud abre su transacción como `READ ONLY`, y lo mismo hace la recarga de una suscripción en tiempo real. `afterRead` se ejecuta dentro de ella, por lo que **ninguna escritura desde ese hook puede tener éxito** — ni una creación con `context.data`, ni una actualización, ni una oculta dentro de un helper que llame. Postgres rechaza la sentencia con el código SQLSTATE `25006`, y se responde al llamador:
 
 ```json
-{ "error": { "message": "An `afterRead` callback tried to write. …",
+{ "error": { "message": "An `afterRead` hook tried to write. …",
              "code": "READ_ONLY_TRANSACTION",
              "details": { "dbCode": "25006" } } }
 ```
 
-Eso es un 409, no un 500: es su código el que está siendo rechazado, no el servidor fallando.
-El modo de solo lectura es deliberado — una lectura que escribe de forma silenciosa es una lectura cuyo
-costo, bloqueos y superficie de RLS nadie tenía presupuestados.
+Eso es un 409, no un 500: es tu código siendo rechazado, no una falla del servidor. El modo de solo lectura es deliberado — una lectura que escribe silenciosamente es una lectura cuyo costo, bloqueos y superficie de RLS nadie presupuestó.
 
-Por lo tanto, **la auditoría de lectura no pertenece a `afterRead`**. Registre la lectura fuera de la
-solicitud en su lugar — desde un trabajo en segundo plano alimentado por lo que ya emita, o
-desde una función personalizada que realice la lectura *y* la escritura mediante dos llamadas
-independientes:
+Por lo tanto, **la auditoría de lecturas no pertenece a `afterRead`**. Registra la lectura fuera de la solicitud — desde un job en segundo plano alimentado por lo que ya emites, o desde una función personalizada que haga la lectura *y* la escritura mediante dos llamadas independientes:
 
 ```typescript no-verify
 // ✗ Fails with READ_ONLY_TRANSACTION on every read.
-callbacks: {
-    afterRead: async ({ path, row, context }) => {
+export const hooks: TableHooks = {
+    afterRead: async ({ path, values, context }) => {
         await context.data.read_log.create({ path, uid: context.user?.uid });
-        return row;
+        return values;
     }
-}
+};
 ```
 
 ```typescript
@@ -241,8 +211,7 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
-La auditoría del lado de la escritura no tiene tal problema: `afterSave` y `afterDelete` se ejecutan en una
-transacción de lectura-escritura, y la fila de auditoría se confirma junto con el cambio que registra.
+La auditoría en el lado de la escritura no tiene este problema: `afterSave` y `afterDelete` se ejecutan en una transacción de lectura y escritura, y la fila de auditoría se confirma junto con el cambio que registra.
 
 ---
 
@@ -250,76 +219,67 @@ transacción de lectura-escritura, y la fila de auditoría se confirma junto con
 
 ### Enmascaramiento de PII
 
-Ofusque las direcciones de correo electrónico para los emisores sin privilegios de administrador en todas las colecciones:
+Redactar direcciones de correo electrónico para llamadas de usuarios no administradores en todas las tablas:
 
-```typescript no-verify
-import { initializeRebaseBackend } from "@rebasepro/server";
+```typescript
+// backend/hooks.ts
+import type { TableHooks } from "@rebasepro/server/schema";
 
-const instance = await initializeRebaseBackend({
-    // ... other config
-    callbacks: {
-        afterRead({ row, context }) {
-            const isAdmin = context.user?.roles?.includes("admin");
-            if (!isAdmin && row.email) {
-                return { ...row, email: "********" };
-            }
-            return row;
+export const hooks: TableHooks = {
+    afterRead({ values, context }) {
+        const isAdmin = context.user?.roles?.includes("admin");
+        if (!isAdmin && values.email) {
+            return { ...values, email: "********" };
         }
+        return values;
     }
-});
+};
 ```
 
 ### Registro de auditoría global
 
-Registre cada eliminación, en todas las colecciones, en una tabla `audit_log`. Debido a que
-`afterDelete` se ejecuta en la propia transacción de la eliminación, la fila de auditoría y la
-eliminación se confirman juntas — no hay un intervalo en el que una exista sin la
-otra:
+Registra cada eliminación, en todas las tablas, en una tabla `audit_log`. Dado que `afterDelete` se ejecuta dentro de la propia transacción de eliminación, la fila de auditoría y la eliminación se confirman juntas — no hay margen de tiempo en el que una exista sin la otra:
 
 ```typescript no-verify
-import { initializeRebaseBackend } from "@rebasepro/server";
+// backend/hooks.ts
+import type { TableHooks } from "@rebasepro/server/schema";
 
-const instance = await initializeRebaseBackend({
-    // ... other config
-    callbacks: {
-        async afterDelete({ collection, id, row, context }) {
-            if (collection.slug === "audit_log") return;   // don't audit the audit
-            await context.data.audit_log.create({
-                action: "delete",
-                collection: collection.slug,
-                entity_id: String(id),
-                actor: context.user?.uid ?? "anonymous",
-                // The API key, when the delete was made with one.
-                via_key: context.credential?.name ?? null,
-                snapshot: row
-            });
-        }
+export const hooks: TableHooks = {
+    async afterDelete({ table, id, values, context }) {
+        if (table.slug === "audit_log") return;   // don't audit the audit
+        await context.data.audit_log.create({
+            action: "delete",
+            table: table.slug,
+            entity_id: String(id),
+            actor: context.user?.uid ?? "anonymous",
+            // The API key, when the delete was made with one.
+            via_key: context.credential?.name ?? null,
+            snapshot: values
+        });
     }
-});
+};
 ```
 
-Tenga en cuenta lo que esto aporta y lo que cuesta: si la fila de auditoría no se puede escribir, la
-eliminación tampoco se produce. Para un registro de auditoría, esto suele ser lo que se desea.
-Si no es así, capture el error en el callback e indíquelo en un comentario.
+Ten en cuenta lo que esto aporta y lo que cuesta: si la fila de auditoría no se puede escribir, la eliminación tampoco ocurre. Para un registro de auditoría, generalmente esto es lo deseado. Si no es así, captura el error en el hook y acláralo en un comentario.
 
-La columna `via_key` lee `context.credential`, que es nuevo: En una
-versión anterior, omítala.
+### Lógica específica de tabla
 
-### Lógica específica por colección
-
-Los callbacks globales se disparan para todas las colecciones. Para delimitar la lógica a una sola colección, verifique `collection.slug` o `path`:
+Los hooks globales se activan para todas las tablas. Para limitar la lógica a una sola tabla, comprueba `table.slug` o `path`:
 
 ```typescript
-callbacks: {
-    beforeSave({ collection, values, context }) {
-        if (collection.slug === "orders") {
-            if (!values.total || values.total <= 0) {
+import type { TableHooks } from "@rebasepro/server/schema";
+
+export const hooks: TableHooks = {
+    beforeSave({ table, values }) {
+        if (table.slug === "orders") {
+            const total = values.total;
+            if (typeof total !== "number" || total <= 0) {
                 throw new Error("Order total must be positive");
             }
         }
         return values;
     }
-}
+};
 ```
 
-Para callbacks que solo se aplican a una única colección, prefiera en su lugar [callbacks por colección](/docs/collections/callbacks).
+Para hooks que solo aplican a una única tabla, es preferible utilizar [los hooks propios de la tabla](/docs/collections/callbacks) en su lugar.

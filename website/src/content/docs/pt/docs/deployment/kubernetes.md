@@ -1,15 +1,20 @@
 ---
-sourceHash: 8ca6480a862b6d07
+sourceHash: 00bc3369d6f3db69
 title: Kubernetes
 sidebar_label: Kubernetes
-description: Faça o deploy do Rebase em um cluster Kubernetes com o Helm chart oficial — um Deployment ou vários, um Job de migração responsável pelo schema, e aplicações estáticas no mesmo host.
+description: Implante o Rebase em um cluster Kubernetes com o Helm chart oficial — um Deployment ou vários, um Job de migração que gerencia o schema e aplicações estáticas no mesmo host.
 ---
 
 ## Visão Geral
 
-O chart oficial é o equivalente em Kubernetes da configuração de auto-hospedagem (self-hosting) com Docker Compose. Mesma ideia, mesma imagem, mesmo bundle: **o runtime é a imagem, seu projeto é o bundle, e atualizar o Rebase é apenas mudar uma tag.**
+O chart oficial é o equivalente em Kubernetes da configuração de auto-hospedagem
+com Docker Compose. Mesma ideia, mesma imagem, mesmo bundle: **o runtime é a imagem,
+seu projeto é o bundle e atualizar o Rebase é apenas uma alteração de tag.**
 
-Ele é publicado como um artefato OCI junto com a imagem de runtime, e ambos compartilham a mesma versão — o chart que faz o deploy do runtime `0.17.3` *é* o chart `0.17.3`, logo há apenas um número para acompanhar. Sem `--version` você obtém a versão mais recente; fixe-a para um deploy real, da mesma forma que você fixaria `image.tag`:
+Ele é publicado como um artefato OCI ao lado da imagem de runtime, e ambos possuem
+a mesma versão — o chart que faz o deploy do runtime `0.17.3` *é* o chart `0.17.3`,
+portanto há apenas um número para acompanhar. Sem `--version` você obtém o mais
+recente; fixe-o para um deploy real, da mesma forma que fixaria `image.tag`:
 
 ```bash
 helm install rebase oci://registry-1.docker.io/rebasepro/rebase \
@@ -22,46 +27,50 @@ helm install rebase oci://registry-1.docker.io/rebasepro/rebase \
   --set image.repository=my-registry/my-app
 ```
 
-O chart sai com o autorregistro desligado, então uma release precisa nomear a conta
-com a qual seu operador entra — caso contrário ela sobe com a tabela de usuários vazia e
-sem como produzir o primeiro chamador autenticado. `config.adminPassword` deve ter
-pelo menos 12 caracteres, e `config.adminEmail` precisa de um ponto no domínio: a
-rota de login valida o corpo com `z.string().email()`, então `admin@localhost`
-é uma conta na qual ninguém conseguiria entrar e o runtime se recusa a criá-la. Ambas
-são recusas em tempo de renderização, e não
-surpresas em tempo de execução — veja [o que o chart se recusa a
-renderizar](#o-que-o-chart-se-recusa-a-renderizar). Entre e troque a senha;
-esses valores vão para um Secret.
+O chart vem com o auto-registro desativado, portanto um release precisa definir
+a conta com a qual seu operador fará login — caso contrário, ele inicializará com
+uma tabela de usuários vazia e nenhuma maneira de gerar o primeiro chamador autenticado.
+`config.adminPassword` deve ter pelo menos 12 caracteres, e `config.adminEmail` precisa
+de um ponto em seu domínio: a rota de login analisa seu corpo com `z.string().email()`,
+de modo que `admin@localhost` seria uma conta na qual ninguém conseguiria fazer login
+e o runtime se recusa a criá-la (seed). Ambas são recusas em tempo de renderização, e
+não surpresas em tempo de execução — veja [o que o chart se recusa a renderizar](#o-que-o-chart-se-recusa-a-renderizar).
+Faça login e altere a senha; esses valores são armazenados em um Secret.
 
-Gerencie-os por fora, apontando `existingSecret` para um Secret
-que contenha `REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD` junto com
-`DATABASE_URL` e o restante.
+Em vez disso, gerencie-os fora de banda apontando `existingSecret` para um Secret
+contendo `REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD` juntamente com `DATABASE_URL`
+e o restante.
 
-O chart faz o deploy **apenas do runtime**. Ele não faz o deploy do Postgres — use CloudNativePG, um banco de dados gerenciado ou seu próprio StatefulSet, e aponte `config.databaseUrl` para ele. Um chart que também gerenciasse seu banco de dados teria que assumir seus backups e failover, o que é uma promessa muito maior do que apenas "executar a aplicação".
+O chart implanta **apenas o runtime**. Ele não implanta o Postgres — use CloudNativePG,
+um banco de dados gerenciado ou seu próprio StatefulSet, e aponte `config.databaseUrl`
+para ele. Um chart que também gerenciasse seu banco de dados teria que gerenciar seus
+backups e seu failover, o que é uma promessa muito maior do que "executar a aplicação".
 
-> **Maturidade.** Duas coisas separadas são verificadas em CI, e uma terceira não.
-> O chart passa por lint e renderização contra o Helm v4.2.4 — todas as topologias
-> documentadas nesta página, incluindo o comando de instalação acima, e um caso
-> que atinge cada recusa listada abaixo. A imagem de runtime que o chart implanta é
-> compilada e inicializada contra um Postgres real, das duas formas pelas quais um bundle pode chegar. O que
-> **nunca rodou foi o chart contra um cluster ativo**: nada agendou
-> esses manifestos, então os probes, a ordem do Job de migração de pré-instalação e
-> o ingress estão corretos como YAML e não comprovados como um deploy. Trate-o como um
-> ponto de partida bem testado em vez de um padrão comprovado em produção, e leia
+> **Maturidade.** Duas coisas distintas são verificadas no CI, e uma terceira não é.
+> O chart passa por lint e renderização com o Helm v4.2.4 — para cada topologia documentada
+> nesta página, incluindo o comando de instalação acima, e um caso cobrindo cada recusa
+> listada abaixo. A imagem de runtime que o chart implanta é construída e inicializada
+> contra um Postgres real, para ambas as formas que um bundle pode chegar. O que
+> **nunca foi executado é o chart contra um cluster ativo**: nada agendou esses manifestos,
+> de modo que os probes, a ordenação do Job de migração pré-instalação e o ingress estão
+> corretos como YAML, mas não foram comprovados como uma implantação real. Considere-o um
+> ponto de partida bem testado, e não um padrão comprovado em produção, e leia
 > [Auto-hospedagem](/docs/deployment/self-hosting) para o caminho comprovado.
 
-Para trabalhar a partir de um clone local — um chart modificado ou uma instalação air-gapped — `helm install rebase ./infra/charts/rebase` aceita os mesmos valores.
+Para trabalhar a partir de um checkout local — um chart modificado ou uma instalação
+isolada (air-gapped) — `helm install rebase ./infra/charts/rebase` aceita os mesmos valores.
 
-## Levando seu projeto para o pod
+## Como colocar seu projeto no pod
 
 | `bundle.mode` | Como | Quando |
 |---|---|---|
-| `image` (padrão) | Crie a imagem `FROM rebasepro/server` com `COPY dist-bundle /bundle`, depois defina `image.repository` | Quase sempre. Um único artefato, imutável, sem dependência em tempo de execução de que uma URL permaneça ativa |
-| `url` | Imagem padrão; o runtime baixa um tarball a cada inicialização do pod | Um painel de controle (control plane) que entrega bundles fora de banda |
+| `image` (padrão) | Construa `FROM rebasepro/server` com `COPY dist-bundle /bundle`, e então defina `image.repository` | Quase sempre. Um único artefato, imutável, sem dependência em tempo de execução de que uma URL permaneça online |
+| `url` | Imagem padrão; o runtime baixa um tarball a cada inicialização do pod | Um plano de controle que distribui bundles fora de banda |
 
 ## Um processo ou vários
 
-O padrão é um único Deployment servindo tudo — o mesmo formato executado pelo arquivo Compose. A divisão requer apenas um valor:
+O padrão é um único Deployment servindo tudo — o mesmo formato executado pelo
+arquivo Compose. Dividir exige apenas um valor:
 
 ```yaml
 split: true
@@ -72,21 +81,28 @@ worker:
   enabled: true
 ```
 
-Isso fornece uma camada de `api`, uma camada de `functions` e um `worker`, todos a partir da mesma imagem e do mesmo bundle. Veja [Processos Divididos](/docs/deployment/split-processes) para entender o que cada função faz e por que separá-las.
+Isso fornece a você uma camada de `api`, uma camada de `functions` e um `worker`, todos
+a partir da mesma imagem e do mesmo bundle. Consulte [Processos Separados](/docs/deployment/split-processes)
+para saber o que cada papel faz e por que você os separaria.
 
-O que o chart acrescenta em relação a fazer isso manualmente é que ele **deduz as configurações cujo modo de falha é silencioso**, a partir dos valores que você já forneceu:
+O que o chart agrega em relação a fazer isso manualmente é que ele **deriva as
+configurações cujo modo de falha é o silêncio**, a partir dos valores que você já forneceu:
 
-- `REBASE_ROLE` por unidade — `all` na API quando não há unidade de functions, para que ela continue servindo suas funções
-- `REBASE_MIGRATE_ON_BOOT=none` em todos os lugares, porque o Job de migração gerencia o schema
-- `REBASE_CRON_SCHEDULER=false` / `REBASE_JOB_WORKERS=false` na api quando um worker existir
-- `TRUSTED_PROXY_HOPS` na unidade de functions
-- `REBASE_RATE_LIMIT_STORE=sql` assim que um segundo processo passar a servir HTTP
+- `REBASE_ROLE` por unidade — `all` na api quando não houver unidade functions, para que ela ainda atenda suas functions
+- `REBASE_MIGRATE_ON_BOOT=none` em todos os lugares, pois o Job de migração é o responsável pelo schema
+- `REBASE_CRON_SCHEDULER=false` / `REBASE_JOB_WORKERS=false` na api assim que um worker existir
+- `TRUSTED_PROXY_HOPS` na unidade functions
+- `REBASE_RATE_LIMIT_STORE=sql` assim que um segundo processo atender requisições HTTP
 
-Um `REBASE_ROLE` incorreto não serve HTTP enquanto `/health` ainda responde, fazendo o readiness passar e toda requisição retornar 404. A ausência de `REBASE_MIGRATE_ON_BOOT` gera um loop de travamento (crash loop) cujo motivo fica em um log que ninguém está monitorando. O chart define todos eles, e o `config.env` não pode sobrescrevê-los.
+Um `REBASE_ROLE` incorreto não atende HTTP enquanto `/health` continua respondendo,
+de modo que a verificação de prontidão (readiness) passa e toda requisição retorna 404.
+Um `REBASE_MIGRATE_ON_BOOT` ausente resulta em um crash loop cujo motivo fica registrado
+em um log que ninguém está monitorando. O chart define todos eles, e `config.env` não
+pode sobrescrevê-los.
 
 ### Separando o cron da execução de jobs
 
-Dois workers com responsabilidades opostas — sem nova role e sem código:
+Dois workers com responsabilidades opostas — sem novos papéis e sem código:
 
 ```yaml
 worker:
@@ -97,7 +113,9 @@ worker:
 
 ## O painel de administração e qualquer outro front-end
 
-Uma aplicação estática usa a mesma imagem de runtime inicializando um bundle `kind: static`. Esse fluxo é interrompido antes de o runtime ler `DATABASE_URL` ou `JWT_SECRET`, portanto esses pods **não contêm nenhum segredo**.
+Uma aplicação estática usa a mesma imagem de runtime inicializando um bundle
+`kind: static`. Esse caminho é interrompido antes que o runtime leia `DATABASE_URL`
+ou `JWT_SECRET`, portanto esses pods **não possuem nenhum secret**.
 
 ```yaml
 staticApps:
@@ -108,19 +126,39 @@ staticApps:
       tag: "1.4.0"
 ```
 
-O ingress roteia `/admin` para ele e `/` para a API, no **mesmo host**. Isso é proposital: mesma origem significa que a autenticação por cookies e o CORS permanecem exatamente iguais, e a divisão continua sendo uma decisão interna de topologia, em vez de uma alteração na superfície pública do seu produto. A contrapartida é que os assets precisam ser *compilados* para esse caminho, o que o runtime verifica durante a inicialização.
+O ingress roteia `/admin` para ela e `/` para a API, no **mesmo host**. Isso é
+deliberado: mesma origem significa que a autenticação por cookie e o CORS permanecem
+exatamente iguais, e a separação continua sendo uma decisão de topologia interna
+em vez de uma mudança na superfície pública do seu produto. O preço disso é que os
+assets estáticos devem ser *compilados* para esse caminho, o que o runtime valida
+na inicialização.
 
-O deploy do admin passa a ser apenas o incremento da tag da imagem em um Deployment. O backend não é reiniciado.
+Fazer o deploy do admin passa a ser apenas atualizar a tag da imagem em um único
+Deployment. O backend não reinicia.
 
 ## Schema
 
-`migrationJob.enabled` (o padrão) executa um Job de `pre-install,pre-upgrade` que provisiona e finaliza, e cada pod inicializa com `REBASE_MIGRATE_ON_BOOT=none`. Nada no caminho das requisições gerencia o schema das coleções, o que é a resposta mais limpa para "exatamente um processo provisiona o schema" — isso deixa de ser uma regra que alguém precisa lembrar. Os pods ainda mantêm atualizadas, na inicialização, as tabelas do próprio framework (autenticação, chaves de API, jobs, cron); `provision: false` interrompe isso também, não renderiza nenhum Job e deixa o schema para uma [execução de provisionamento](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database) sob o seu próprio processo de mudanças.
+`migrationJob.enabled` (o padrão) executa um Job `pre-install,pre-upgrade` que faz o
+provisionamento e é finalizado, e cada pod inicializa com `REBASE_MIGRATE_ON_BOOT=none`.
+Nada no caminho da requisição gerencia o schema das tabelas, o que é a resposta mais
+limpa possível para "exatamente um processo provisiona o schema" — deixa de ser uma
+regra que alguém precisa lembrar. Os pods ainda mantêm as tabelas do próprio framework
+(auth, chaves de API, jobs, cron) atualizadas na inicialização; `provision: false`
+desativa isso também, não renderiza nenhum Job e deixa o schema a cargo de uma
+[execução de provisionamento](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database)
+sob seu próprio processo de mudanças.
 
-`mode: ensure` cria o que estiver faltando, de forma aditiva, e é o único modo que a imagem de runtime aceita. `push` é recusado na inicialização: aplicar alterações de schema das coleções é destrutivo, e o `rebase db push`, a partir de um checkout ou do CI, faz um dry-run da mudança, recusa as destrutivas sem confirmação e pode fazer um backup antes — nada disso um pod iniciando sem supervisão consegue fazer.
+`mode: ensure` cria o que estiver faltando de forma aditiva, e é o único modo aceito
+pela imagem de runtime. `push` é recusado na inicialização: aplicar alterações no schema
+de tabelas é destrutivo, e o `rebase db push` a partir de um checkout ou CI simula a
+alteração (dry-run), recusa mudanças destrutivas sem confirmação e pode realizar um
+backup previamente — coisas que um pod inicializando sem supervisão não consegue fazer.
 
 ## O que o chart se recusa a renderizar
 
-Cada um destes itens é uma configuração que não gera erros em tempo de execução — o deploy sobe e algo silenciosamente deixa de funcionar. Em vez disso, o `helm install` falha, indicando qual valor deve ser alterado:
+Cada uma dessas é uma configuração que não gera erro em tempo de execução — a
+implantação sobe e algo silenciosamente deixa de funcionar. Em vez disso, o `helm install`
+falha, indicando qual valor deve ser alterado:
 
 - mais de um processo HTTP com `sharedState.rateLimitStore=memory`
 - `functions.enabled` ou `worker.enabled` enquanto `split=false`
@@ -128,22 +166,28 @@ Cada um destes itens é uma configuração que não gera erros em tempo de execu
 - `bundle.mode=image` enquanto `image.repository` ainda for a imagem padrão de runtime
 - `ingress.enabled` sem host, ou `bundle.mode=url` sem URL
 - um `migrationJob.mode` ou `sharedState.rateLimitStore` não reconhecido
-- nenhum `config.adminEmail` com o autorregistro desligado — uma release na qual ninguém
-  consegue entrar. Defina os dois valores de admin, ou `config.allowSelfRegistration=true`
-  entendendo que a primeira pessoa a chegar ao formulário de cadastro se torna
-  administradora
+- ausência de `config.adminEmail` com o auto-registro desativado — um release no qual ninguém
+  consegue fazer login. Defina os dois valores de admin, ou `config.allowSelfRegistration=true`
+  entendendo que a primeira pessoa a acessar o formulário de cadastro se tornará a administradora
 - um `config.adminPassword` com menos de 12 caracteres, ou um `config.adminEmail` cujo
-  domínio não tem ponto. O runtime se recusa a criar qualquer um dos dois, na inicialização, e deixa a
-  mesma release trancada para fora
+  domínio não possua ponto. O runtime se recusa a inicializar qualquer um deles durante a
+  inicialização (seed), resultando na mesma situação de bloqueio de acesso
 
 ## O que o chart não pode fazer por você
 
-**Transmissão em tempo real (broadcast) e presença entre réplicas.** O barramento de canal padrão do runtime é em memória; portanto, com mais de uma réplica da API, um assinante em um pod não verá uma transmissão publicada em outro. A correção fica na configuração do seu projeto, e não no chart:
+**Broadcast e presença em tempo real (Realtime) entre réplicas.** O barramento de canal
+padrão do runtime funciona em memória; portanto, com mais de uma réplica de API, um
+assinante em um pod não verá um broadcast publicado em outro. A correção fica na
+configuração do seu projeto, não no chart:
 
 ```ts
 realtime: { bus: { type: "postgres" } }
 ```
 
-Defina `sharedState.channelBusConfigured: true` para declarar que você o configurou — o chart usa isso apenas para decidir se deve emitir um aviso. Assinaturas comuns de coleções não são afetadas; elas trafegam pelo CDC do Postgres.
+Defina `sharedState.channelBusConfigured: true` para declarar que você configurou isso —
+o chart usa essa flag apenas para decidir se deve exibir um aviso. Assinaturas normais
+de tabelas não são afetadas; estas trafegam através do CDC do Postgres.
 
-O restante do que um processo mantém só para si — arquivos locais, uploads retomáveis, o cache de transformação de imagens, o Logs Explorer — está listado com a configuração que compartilha cada um em [Executando mais de uma instância](/docs/deployment/multiple-instances/).
+O restante do que um processo mantém isolado — arquivos locais, uploads retomáveis,
+o cache de transformação de imagem, o Logs Explorer — está listado com a configuração
+que compartilha cada um deles em [Executando mais de uma instância](/docs/deployment/multiple-instances/).

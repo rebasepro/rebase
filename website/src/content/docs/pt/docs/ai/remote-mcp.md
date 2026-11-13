@@ -1,21 +1,17 @@
 ---
-sourceHash: 2dc919217172efd0
+sourceHash: 4c9e8266acfba86f
 title: O Endpoint MCP Remoto
 sidebar_label: Endpoint MCP remoto
-description: Sirva MCP a partir de um backend implantado em /mcp, para que as pessoas que usam seu app possam conectar o Claude ou o Cursor como elas mesmas — OAuth com uma tela de consentimento, dezessete ferramentas em três escopos, cada chamada sob sua própria row-level security.
+description: Disponibilize o MCP a partir de um backend implantado em /mcp, para que as pessoas que usam seu aplicativo possam conectar o Claude ou o Cursor como elas mesmas — OAuth com uma tela de consentimento, dezessete ferramentas sob três escopos, cada chamada sob sua própria segurança em nível de linha (RLS).
 ---
 
 :::tip[Conectando o Claude aos seus próprios projetos?]
 Esse é o [conector Rebase](/docs/ai/rebase-connector/): um conector para
 todos eles, e um servidor auto-hospedado conecta-se a ele com `rebase cloud connect`. Esta
-página é para as pessoas que **usam** seu app.
+página é para as pessoas que **usam** seu aplicativo.
 :::
 
-O [servidor MCP](/docs/ai/mcp/) é uma ferramenta de desenvolvedor: ele roda na sua máquina e mantém uma chave de
-serviço ou uma chave de API. Um backend implantado também pode servir o próprio MCP, em `/mcp`, para
-as pessoas que usam sua aplicação. Um assistente conectado por uma delas lê e
-grava no projeto **como essa pessoa**, e cada chamada é executada sob sua própria
-row-level security.
+O [servidor MCP](/docs/ai/mcp/) é uma ferramenta de desenvolvimento: ele roda na sua máquina e armazena uma chave de serviço ou uma chave de API. Um backend implantado também pode servir o próprio MCP, em `/mcp`, para as pessoas que usam seu aplicativo. Um assistente conectado por uma delas lê e grava no projeto **como essa pessoa**, e cada chamada é executada sob sua própria segurança em nível de linha (row-level security).
 
 Ele fica desativado a menos que você o ative, e ambas as variáveis são obrigatórias:
 
@@ -24,150 +20,32 @@ REBASE_MCP_ENABLED=true
 REBASE_PUBLIC_URL=https://app.example.com   # this deployment's real origin
 ```
 
-Sem `REBASE_PUBLIC_URL`, um segredo JWT ou um driver de dados que possa delimitar uma consulta
-a um usuário, o endpoint se recusa a montar e informa o motivo no log de inicialização. Nenhum
-`REBASE_ROLE` o ativa.
+Sem `REBASE_PUBLIC_URL`, um segredo JWT ou um driver de dados capaz de delimitar uma consulta a um único usuário, o endpoint se recusa a inicializar e informa o motivo no log de inicialização. Nenhum `REBASE_ROLE` o ativa.
 
-- **OAuth, com uma tela de consentimento.** Um cliente localiza o servidor de autorização
-  por meio de `/.well-known/oauth-protected-resource`, registra-se (o registro
-  dinâmico está ativado por padrão; `REBASE_MCP_OPEN_REGISTRATION=false` o limita
-  aos clientes que você registrar) e envia a pessoa para uma tela de consentimento que faz o
-  login por meio do seu `/auth/login` existente. Uma conta com um segundo fator
-  é então solicitada pelo seu código do autenticador ou um código de recuperação, por meio das
-  rotas existentes `/auth/mfa/challenge`. Quando o próprio frontend do seu app
-  mantém uma sessão no mesmo navegador, a tela oferece essa conta, e o
-  botão Permitir consente como ela sem senha; é assim que alguém que faz login apenas
-  com Google, GitHub ou link de e-mail se conecta. Caso contrário, faz login com uma
-  senha, e quem não tiver uma define uma primeiro com `/auth/forgot-password`
-  ("Esqueci minha senha" do seu app); a tela informa isso. Ela também indica o host para o qual o código de autorização é enviado
-  e informa que esse host não é verificado: qualquer pessoa pode registrar um cliente com
-  qualquer nome, portanto o host é a parte que uma pessoa pode verificar.
-- **Dezessete ferramentas, três escopos.** Os mesmos [escopos](/docs/backend/roles-and-scopes/)
-  que todas as credenciais usam. `data:read` oferece `list_collections`, `describe_collection`,
-  `query_collection`, `count_documents`, `aggregate_documents`, `get_document`, as três visualizações,
-  `show_collection`, `show_record` e `show_app`, `show_app_guide`, e as experimentais
-  `list_apps` e `open_app`; `data:write` adiciona `create_document`, `update_document` e as
-  experimentais `save_app` e `delete_app`; `data:delete` adiciona `delete_document`. Um cliente que não solicita
-  nada recebe `data:read`. Cada um se restringe a uma coleção: `data:read:posts`
-  lista, descreve e lê `posts` e nada mais. Um escopo decide quais ferramentas são
-  oferecidas e quais coleções elas alcançam, não quais linhas: uma lista vazia pode ser o
-  RLS funcionando, e `data:write` ainda assim não pode gravar uma linha que a pessoa não poderia.
-- **Três ferramentas colocam seu painel de administração na frente da pessoa.** Em um cliente que
-  renderiza MCP Apps, como o Claude, elas abrem as próprias visualizações do painel de administração na
-  conversa, extraídas de suas coleções: seus campos, enums, validação,
-  relações, seções de formulário e configurações de visualização.
-  - `show_collection` recebe os argumentos de `query_collection`, mais `view`
-    (`table`, `list`, `cards` ou `kanban`), e abre a visualização da coleção: a
-    pessoa pode pesquisar, filtrar, ordenar e paginar, abrir o formulário de uma linha e adicionar linhas.
-  - `show_record` abre o formulário de uma linha (`id`), ou um formulário para uma nova linha que
-    começa a partir dos `values` que o modelo preencheu, para que a própria pessoa
-    verifique e salve.
-  - `show_app` executa um app que o modelo escreve para a tarefa em questão: um
-    componente React (`code`) e as `collections` que ele lê. Ele importa os
-    próprios pacotes do Rebase, portanto o mesmo código funciona no seu projeto:
-    - `@rebasepro/app`: `useRows`, `useRow`, `useRowCount`, `useAggregate`
-      e `useRowWrites` sobre as linhas do projeto;
-    - `@rebasepro/cms`: o `CollectionPanel` do painel de administração (com
-      `CollectionToolbar` e suas partes, e `onRowClick`, que entrega ao
-      app a linha clicada conforme `useRows` a lê), `RecordForm` e `FormField`,
-      `RecordDetail`, `FieldValue` e `useSidePanel`, cada um nomeando sua
-      coleção por caminho, com seus campos, visualizações e ações customizados;
-    - `@rebasepro/ui`, todo o kit de interface, `SplitView` e os blocos de KPI e
-      gráficos incluídos.
+- **OAuth, com uma tela de consentimento.** Um cliente encontra o servidor de autorização por meio de `/.well-known/oauth-protected-resource`, registra-se (o registro dinâmico fica ativado por padrão; `REBASE_MCP_OPEN_REGISTRATION=false` o limita aos clientes que você registrar) e encaminha a pessoa para uma tela de consentimento que realiza o login através do seu `/auth/login` existente. Uma conta com segundo fator de autenticação é então solicitada a fornecer seu código de autenticador ou código de recuperação, por meio das rotas `/auth/mfa/challenge` existentes. Quando o próprio frontend do seu aplicativo mantém uma sessão no mesmo navegador, a tela oferece essa conta, e a opção Permitir autoriza como ela sem senha; é assim que alguém que faz login apenas com Google, GitHub ou link por e-mail se conecta. Caso contrário, o login é feito com senha, e quem não tiver uma define-a primeiro em `/auth/forgot-password` ("Esqueci minha senha" do seu app); a tela informa isso. Ela também informa o host para o qual o código de autorização é enviado e indica que esse host não é verificado: qualquer pessoa pode registrar um cliente com qualquer nome, portanto o host é a parte que a pessoa pode verificar.
+- **Dezessete ferramentas, três escopos.** <span class="since-badge" data-since="0.31">Desde 0.31</span> Os mesmos [escopos](/docs/backend/roles-and-scopes/) que todas as credenciais usam. `data:read` oferece `list_tables`, `describe_table`, `query_table`, `count_rows`, `aggregate_rows`, `get_row`, as três visualizações, `show_table`, `show_record` e `show_app`, `show_app_guide`, e os experimentais `list_apps` e `open_app`; `data:write` adiciona `create_row`, `update_row` e os experimentais `save_app` e `delete_app`; `data:delete` adiciona `delete_row`. Um cliente que não solicita nada recebe `data:read`. Cada um se restringe a uma tabela: `data:read:posts` lista, descreve e lê `posts` e nada mais. Um escopo decide quais ferramentas são oferecidas e quais tabelas elas alcançam, não quais linhas: uma lista vazia pode ser o RLS em funcionamento, e `data:write` ainda não pode gravar uma linha que a pessoa não poderia.
+- **Três ferramentas colocam seu painel administrativo diante da pessoa.** Em um cliente que renderiza MCP Apps, como o Claude, elas abrem as próprias visualizações do painel administrativo na conversa, desenhadas a partir dos descritores de tabela que o backend serve para essa pessoa — colunas, enums, validação, relações — com as preferências de interface que o painel compõe: o `ui-config.json` fornecido com o pacote, o do workspace e o da própria pessoa (uma chave de API não tem nenhum), para que rótulos, ordem das colunas, colunas ocultas e rótulos de enum correspondam ao painel. As próprias personalizações do painel do seu projeto aparecem onde o backend serve sua visualização MCP.
+  - `show_table` aceita os argumentos de `query_table`, mais `view` (`table`, `list`, `cards` ou `kanban`), e abre a visualização da tabela: a pessoa pode pesquisar, filtrar, ordenar e paginar, abrir o formulário de uma linha e adicionar linhas.
+  - `show_record` abre o formulário de uma linha (`id`), ou um formulário para uma nova linha a partir dos `values` preenchidos pelo modelo, para que a própria pessoa confira e salve.
+  - `show_app` executa um aplicativo que o modelo cria para a tarefa em questão: um componente React (`code`) e as tabelas (`tables`) que ele lê. Ele importa os próprios pacotes do Rebase, de modo que o mesmo código funciona no seu projeto:
+    - `@rebasepro/app`: `useRows`, `useRow`, `useRowCount`, `useAggregate` e `useRowWrites` sobre as linhas do projeto;
+    - `@rebasepro/cms`: o `CollectionPanel` do painel administrativo (com o `CollectionToolbar` e seus componentes, e `onRowClick`, que entrega ao app a linha clicada conforme lida por `useRows`), `RecordForm` e `FormField`, `RecordDetail`, `FieldValue` e `useSidePanel`, cada um identificando sua tabela por caminho, com seus campos, visualizações e ações customizados;
+    - `@rebasepro/ui`, todo o kit de interface, incluindo `SplitView` e os blocos de KPI e gráficos.
 
-    O servidor o compila primeiro, portanto um erro de sintaxe, um módulo que a visualização
-    não fornece ou um nome que ela não fornece de `@rebasepro/cms` ou
-    `@rebasepro/app` é o erro da chamada, com sua linha. Um erro durante a
-    execução é exibido em seu lugar e informado ao modelo na próxima
-    mensagem da pessoa. Um app pode usar apenas as coleções que listar. Seus estilos são
-    os utilitários padrão do Tailwind, compilados com a visualização antes de qualquer app
-    chegar: um valor arbitrário como `h-[560px]` não faz nada ali, portanto um
-    tamanho exato é um `style`.
+    O servidor o compila primeiro; assim, um erro de sintaxe, um módulo que a visualização não disponibiliza ou um nome que ela não exporta de `@rebasepro/cms` ou `@rebasepro/app` torna-se o erro da chamada, indicando a linha. Um erro durante a execução é exibido em seu lugar e informado ao modelo na mensagem seguinte da pessoa. Um app só pode usar as tabelas que listar. Seus estilos são os utilitários padrão do Tailwind, compilados com a visualização antes de qualquer app chegar: um valor arbitrário como `h-[560px]` não tem efeito ali, portanto um tamanho exato deve ser um `style`.
 
-    A descrição de `show_app` traz apenas o essencial, porque um cliente pode
-    cortar uma descrição de ferramenta longa demais (o claude.ai faz isso em
-    cerca de 4.000 caracteres). Ela diz ao modelo para chamar `show_app_guide`
-    primeiro, que devolve todos os hooks, componentes e props que um app pode
-    usar, com um exemplo completo. `show_app_guide` é oferecida onde quer que
-    `show_app` seja oferecida.
+    A descrição de `show_app` contém apenas o essencial, pois um cliente pode truncar descrições de ferramentas longas (o claude.ai faz isso por volta de 4.000 caracteres). Ela instrui o modelo a chamar `show_app_guide` primeiro, que retorna cada hook, componente e propriedade que um app pode usar, com um exemplo prático. O `show_app_guide` é disponibilizado onde quer que o `show_app` esteja presente.
 
-  Cada leitura e salvamento na visualização é uma chamada das ferramentas de leitura e gravação,
-  feita como a pessoa sob sua RLS, portanto um formulário oferece apenas o que foi
-  concedido à conexão dela: sem `data:write`, ele é somente leitura, e um campo
-  que suas roles não podem ler não aparece nele. Esse é o limite dentro do qual o código de um app
-  também opera: ele roda na visualização, portanto cada chamada feita é uma
-  daquelas ferramentas, como a pessoa, e ele não pode fazer nada que o modelo não pudesse fazer
-  com as mesmas ferramentas. No conector hospedado, cada gravação também é planejada
-  e confirmada pelo servidor. Dentro disso, o `useRowWrites` pergunta à pessoa
-  antes de gravar, para que um app não grave sem o clique dela; os
-  próprios controles do admin (o Salvar de um formulário, uma exclusão, uma edição de tabela) se comportam como em
-  uma tela de `show_collection`. O modelo é informado sobre o que mudou. Ele lê as linhas retornadas por cada ferramenta, não as configurações de coleção com as quais a
-  visualização é renderizada. Um cliente sem MCP Apps, como o Claude Code ou Cursor, não mostra nada,
-  e o modelo lê as mesmas linhas que leria com `query_collection`.
-- **Experimental: apps salvos no projeto.** `save_app` guarda um app que o modelo construiu
-  com `show_app` para que ele abra de novo: compila o código como `show_app` faz e o armazena com seu
-  `title`, suas `collections` e sua `visibility`, que é `personal` (seu dono, o padrão), `roles`
-  (quem tiver um de seus `roles`) ou `team` (todos que fazem login). Salvar para mais alguém além de
-  você exige o papel de admin, pois um app compartilhado é código que uma IA escreveu, rodando para
-  outras pessoas. Só o dono ou um admin substitui (`id`) ou exclui um app, e uma pessoa mantém no
-  máximo 200. `list_apps` lista os apps que quem chama pode abrir, `open_app` abre um como `show_app`
-  faria, e `delete_app` remove um. Ver um app não é alcançar seus dados: um app aberto lê e escreve
-  pelas ferramentas acima, como quem o abre, sob o RLS dessa pessoa. Os apps ficam em
-  `rebase.saved_apps`, que o backend cria na primeira vez que uma ferramenta o usa e não concede a
-  nenhum usuário final.
-  O painel de administração abre os mesmos apps: adicione `savedAppsView` de `@rebasepro/cms` às suas
-  `views`. Ele roda um app em um iframe isolado sem `allow-same-origin` e sem rede própria, e repassa
-  as chamadas de ferramentas para `POST /api/admin/apps/mcp`, as mesmas ferramentas para a sessão do
-  painel de administração, montado com as rotas de administração esteja ou não definido
-  `REBASE_MCP_ENABLED`. Os nomes e formatos das ferramentas ainda podem mudar.
-- **Concessões feitas antes da versão 0.24 mantêm seu alcance.** `mcp:read` é lido como
-  `data:read`, e `mcp:write` como `data:write data:delete`, em concessões armazenadas e
-  em tokens já emitidos.
-- **Uma chave de API também funciona.** `/mcp` também aceita `Authorization: Bearer rk_…`, para
-  um cliente configurado com um cabeçalho em vez de um fluxo OAuth. A chave acessa
-  as ferramentas que seus escopos `data:*` cobrem, atuando como quem ela representa: uma
-  [chave pessoal](/docs/backend/api-keys/#personal-keys) como seu proprietário, uma chave de serviço
-  como `api-key:<id>`.
-- **O vocabulário do SDK, as respostas do REST.** As ferramentas aceitam o que o SDK aceita —
-  `where` (`{"status": ["==", "paid"]}`), `orderBy` (`["created_at", "desc"]` ou
-  `"created_at:desc"`), `limit`, `offset`, `searchString` e `data` para uma
-  gravação — e leem por meio do caminho de `GET /api/data/<collection>`, de modo que uma linha retorna
-  como o REST a serve (datas em ISO, um `belongsTo` como sua chave estrangeira, ex.:
-  `authorId`) e pode ser enviada de volta em uma atualização sem alterações. `query_collection`
-  responde `{ data, meta }` com `meta.total` e `meta.hasMore`, e `count_documents`
-  com `{ count }`; `tools/list` dá às duas, a `aggregate_documents` e a `get_document`
-  um `outputSchema`, flexível onde uma resposta varia. `aggregate_documents` é `GET /api/data/<collection>/aggregate`:
-  `select` é uma lista na gramática do REST (`["count()", "sum(total)"]`), `groupBy`
-  uma lista de campos, e responde `{ data }` com uma linha por grupo, mais
-  `meta.hasMore` em uma chamada agrupada, cujos grupos paginam com `limit` e `offset`
-  e ordenam com `orderBy`. Em uma coleção que um callback `afterRead` reescreve, ele
-  serve apenas `count()`, assim como o REST faz. Como no REST, um `limit` acima de 1000, um argumento não declarado e uma
-  edição ou exclusão de uma linha na lixeira (404) são recusados; definir o campo de soft-delete
-  como `null` a restaura. `deleted: "only"` (ou `"include"`) em
-  `query_collection`, `count_documents` e `aggregate_documents` lê a lixeira, assim como o
-  `?deleted=` do REST faz, para que uma linha movida para a lixeira por `delete_document` possa ser encontrada novamente para
-  restauração. Sua descrição informa ao modelo que a exclusão é permanente apenas onde
-  a coleção não possui um campo de soft-delete.
-- **A listagem nomeia as coleções; `describe_collection` fornece o schema de uma delas.**
-  `list_collections` responde com o `name`, `title` e `description` de cada coleção,
-  e `describe_collection { collection }` com os schemas OpenAPI de `row` e
-  `create` dessa coleção, mais `softDeleteField` onde as linhas vão para uma lixeira. As descrições
-  das ferramentas instruem o modelo a descrever uma coleção antes de gravar nela. A
-  listagem de um projeto com 200 coleções tem cerca de 5k tokens, e cada descrição
-  menos de 1k; com todos os schemas na listagem, eram cerca de 150k.
-- **Um token apenas para este endpoint.** Um token de acesso MCP é recusado por
-  `/api/data`, `/api/admin` e pelo WebSocket, portanto conectar um assistente não
-  concede a ele uma sessão.
+  Cada leitura e gravação na visualização é uma chamada das ferramentas de leitura e escrita, feita em nome da pessoa sob seu RLS; assim, um formulário oferece apenas o que foi concedido à conexão: sem `data:write`, ele é somente leitura, e um campo que suas funções (roles) não podem ler não aparece nele. Esse também é o limite dentro do qual o código de um app opera: ele roda na visualização, portanto cada chamada feita é uma dessas ferramentas, como a pessoa, e ele não pode fazer nada que o modelo não pudesse fazer com as mesmas ferramentas. No conector hospedado, cada gravação também é planejada e confirmada pelo servidor. Dentro disso, o `useRowWrites` pede a confirmação da pessoa antes de gravar, para que um app não realize gravações sem o clique dela; os próprios controles do painel de administração (o Salvar de um formulário, uma exclusão, uma edição de tabela) comportam-se como fariam em uma tela de `show_table`. O modelo é informado sobre o que eles alteraram. Ele lê as linhas retornadas por cada ferramenta, não os descritores com os quais a visualização desenha a interface. Um cliente sem suporte a MCP Apps, como o Claude Code ou o Cursor, não exibe nada, e o modelo lê as mesmas linhas que leria de `query_table`.
+- **Experimental: aplicativos salvos no projeto.** `save_app` mantém um app construído pelo modelo com `show_app` para que possa ser aberto novamente: ele compila o código como `show_app` faz e o armazena com seu `title`, `tables` e `visibility`, que pode ser `personal` (seu proprietário, o padrão), `roles` (qualquer pessoa com uma das suas `roles`) ou `team` (todos que fazem login). Salvar para outras pessoas exige a role de administrador, já que um app compartilhado é um código escrito por IA em execução para outras pessoas. Apenas o proprietário ou um administrador pode substituir (`id`) ou excluir um app, e cada pessoa pode manter no máximo 200. `list_apps` lista os apps que o chamador pode abrir, `open_app` abre um como `show_app` faria e `delete_app` remove um app. Ver um app não significa acessar seus dados: um app aberto lê e grava por meio das ferramentas acima, como quem quer que o abra, sob seu próprio RLS. Os apps residem em `rebase.saved_apps`, que o backend cria na primeira vez que uma ferramenta o utiliza e não concede a nenhum usuário final. O painel administrativo abre os mesmos apps: adicione `savedAppsView` de `@rebasepro/cms` às suas `views`. Ele executa o app em um iframe em sandbox sem `allow-same-origin` e sem rede própria, e encaminha suas chamadas de ferramenta para `POST /api/admin/apps/mcp`, as mesmas ferramentas para a sessão do painel administrativo, que é montada com as rotas de administração independentemente de `REBASE_MCP_ENABLED` estar definido. Os nomes e formatos das ferramentas ainda podem mudar.
+- **Concessões feitas antes da versão 0.24 mantêm seu alcance.** `mcp:read` é interpretado como `data:read`, e `mcp:write` como `data:write data:delete`, em concessões armazenadas e em tokens já emitidos.
+- **Uma chave de API também funciona.** `/mcp` também aceita `Authorization: Bearer rk_…`, para um cliente configurado com um cabeçalho em vez de um fluxo OAuth. A chave tem acesso às ferramentas cobertas pelos seus escopos `data:*`, atuando como quem ela representa: uma [chave pessoal](/docs/backend/api-keys/#personal-keys) como seu proprietário, uma chave de serviço como `api-key:<id>`.
+- **O vocabulário do SDK, as respostas do REST.** As ferramentas aceitam o que o SDK aceita — `where` (`{"status": ["==", "paid"]}`), `orderBy` (`["created_at", "desc"]` ou `"created_at:desc"`), `limit`, `offset`, `searchString` e `data` para gravação — e realizam a leitura por meio do caminho de `GET /api/data/<table>`, de modo que uma linha retorna como o REST a serve (datas em formato ISO, um `belongsTo` como sua chave estrangeira, ex.: `authorId`) e pode ser reenviada em uma atualização sem alterações. `query_table` responde `{ data, meta }` com `meta.total` e `meta.hasMore`, e `count_rows` responde `{ count }`; `tools/list` fornece a ambos, `aggregate_rows` e `get_row`, um `outputSchema`, flexível onde a resposta varia. `aggregate_rows` equivale a `GET /api/data/<table>/aggregate`: `select` é uma lista na sintaxe do REST (`["count()", "sum(total)"]`), `groupBy` é uma lista de campos, e responde `{ data }` com uma linha por grupo, além de `meta.hasMore` em uma chamada agrupada, cujos grupos são paginados com `limit` e `offset` e ordenados com `orderBy`. Em uma tabela reescrita por um hook `afterRead`, ele serve apenas `count()`, assim como o REST faz. Como no REST, um `limit` acima de 1000, um argumento não declarado e uma edição ou exclusão de uma linha na lixeira (404) são recusados; definir o campo de exclusão lógica (soft-delete) como `null` a restaura. `deleted: "only"` (ou `"include"`) em `query_table`, `count_rows` e `aggregate_rows` lê a lixeira, assim como o `?deleted=` do REST faz, para que uma linha enviada à lixeira por `delete_row` possa ser encontrada novamente para restauração. Sua descrição informa ao modelo que a exclusão é permanente apenas onde a tabela não possui um campo de exclusão lógica.
+- **A listagem nomeia as tabelas; `describe_table` fornece o esquema de uma delas.** `list_tables` responde `{ tables: [{ name, description, kind? }] }` — sem rótulo — e `describe_table { table }` fornece os esquemas OpenAPI de `row` (as colunas servidas a este chamador) e `create` (as colunas graváveis) dessa tabela, sua `primaryKey`, as `relations` servidas e `rls` (SQL bruto omitido sem `schema:read`), além de `softDeleteField` onde as linhas vão para a lixeira, e a apresentação que as preferências de interface do chamador atribuem: `title` e, por coluna, `label`, `valueLabels`, `hidden`, `hiddenInForm`, `readOnly`. O que uma conexão pode saber sobre o esquema é definido pelo mesmo serializador que `GET /api/schema/tables` utiliza. As descrições das ferramentas instruem o modelo a descrever uma tabela antes de gravar nela. A listagem de um projeto com 200 tabelas tem cerca de 5k tokens, e cada descrição tem menos de 1k; com todos os esquemas na listagem, eram cerca de 150k.
+- **Um token apenas para este endpoint.** Um token de acesso MCP é recusado por `/api/data`, `/api/admin` e pelo WebSocket, de modo que conectar um assistente não fornece uma sessão a ele.
 
-Toda requisição para `/mcp` relê a conta da pessoa. Uma conta excluída ou desativada,
-ou um "encerrar sessão em todos os lugares" ou alteração de senha após a emissão
-do token, interrompe imediatamente um cliente conectado com um 401. Um rebaixamento de permissões se aplica à
-sua próxima chamada de ferramenta. Todo refresh faz as mesmas verificações e recusa definitivamente
-tal concessão. Uma sessão de convidado não pode dar consentimento de forma alguma.
+Cada requisição para `/mcp` relê a conta da pessoa. Uma conta excluída ou desativada, ou uma ação de "desconectar de todos os lugares" ou alteração de senha após a emissão do token, interrompe imediatamente um cliente conectado com um 401. Um rebaixamento de permissões se aplica à sua próxima chamada de ferramenta. Cada renovação (refresh) realiza as mesmas verificações e recusa tal concessão em definitivo. Uma sessão de convidado não pode fornecer consentimento de forma alguma.
 
-Um limite. Desconectar um cliente (`DELETE /api/oauth/grants/:clientId`, com a
-própria sessão da pessoa) revoga seus refresh tokens imediatamente, mas um token de acesso
-já emitido continua funcionando até expirar, dentro de uma hora.
+Um limite. Desconectar um cliente (`DELETE /api/oauth/grants/:clientId`, com a própria sessão da pessoa) revoga seus tokens de atualização imediatamente, mas um token de acesso já emitido continua funcionando até expirar, dentro de uma hora.
 
-As rotas estão em [Endpoints](/docs/backend/endpoints/#mcp-surface) e as
-variáveis em [Configuração](/docs/getting-started/configuration/#mcp-surface).
+As rotas estão em [Endpoints](/docs/backend/endpoints/#mcp-surface) e as variáveis em [Configuração](/docs/getting-started/configuration/#mcp-surface).

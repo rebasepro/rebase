@@ -1,19 +1,19 @@
 ---
-sourceHash: 68b71012725d6c0d
+sourceHash: 14cb375a352ba487
 title: Speicher & Dateien
 sidebar_label: Speicher
-description: Dateien mit dem Speichermodul des typisierten SDK von Rebase hochladen, herunterladen, auflisten und löschen.
+description: Dateien hochladen, herunterladen, auflisten und löschen mit dem Storage-Modul des typisierten Rebase SDKs.
 ---
 
-## Überblick
+## Übersicht
 
-Das Modul `client.storage` bietet Methoden zur Dateiverwaltung — Hochladen, Herunterladen, Auflisten und Löschen. Es funktioniert je nach Serverkonfiguration sowohl mit lokalem Speicher als auch mit S3-kompatiblen Speicher-Backends.
+Das `client.storage`-Modul bietet Methoden für die Dateiverwaltung – Hochladen, Herunterladen, Auflisten und Löschen. Es funktioniert je nach Serverkonfiguration sowohl mit lokalem Festplattenspeicher als auch mit S3-kompatiblen Storage-Backends.
 
-Alle Speichermethoden verwenden den gemeinsamen Transport, sodass Authentifizierungstokens automatisch eingefügt werden.
+Alle Storage-Methoden verwenden den gemeinsamen Transport, sodass Authentifizierungs-Token automatisch eingefügt werden.
 
-## Eine Datei hochladen
+## Datei hochladen
 
-Verwenden Sie `putObject()`, um eine Datei hochzuladen. Es akzeptiert ein `File`- oder `Blob`-Objekt zusammen mit einem optionalen Speicherschlüssel und Metadaten:
+Verwenden Sie `putObject()`, um eine Datei hochzuladen. Die Methode akzeptiert ein `File`- oder `Blob`-Objekt zusammen mit einem optionalen Storage-Key und Metadaten:
 
 ```typescript
 const result = await client.storage.putObject({
@@ -30,15 +30,7 @@ const result = await client.storage.putObject({
 // result: { key: string; bucket: string; storageUrl: string }
 ```
 
-Eine Datei über 8 MiB wird über den fortsetzbaren (TUS-)
-Endpunkt des Servers hochgeladen, 8 MiB pro Anfrage, statt als eine Multipart-Anfrage, die der Server
-vollständig parst — ein großer Upload kostet den Server so einen Chunk an Arbeitsspeicher, nicht das Drei-
-bis Fünffache der Datei. Ein Chunk, der unterwegs scheitert, wird ab dem Punkt erneut gesendet, bis zu dem
-der Server gekommen ist. Das Ergebnis, das gespeicherte Objekt und die Prüfungen des Servers sind
-in beiden Fällen dieselben. Kann der fortsetzbare Endpunkt die Datei nicht annehmen (ein älterer
-Server oder mehrere Instanzen, die Uploads nicht teilen), geht sie als ein
-`POST /api/storage/upload`, ebenso jede spätere Datei desselben Clients. Siehe
-[Fortsetzbare Uploads (TUS)](/docs/backend/storage-resumable-uploads/).
+Eine Datei von mehr als 8 MiB wird über den Resumable-Endpoint (TUS) des Servers hochgeladen, mit 8 MiB pro Anfrage, anstatt als eine einzelne Multipart-Anfrage, die der Server vollständig parst – so beansprucht ein großer Upload auf dem Server nur einen Chunk an Speicher und nicht das Drei- bis Fünffache der Datei. Ein Chunk, der unterwegs fehlschlägt, wird ab dem Punkt erneut gesendet, bis zu dem der Server gelangt ist. Das Ergebnis, das gespeicherte Objekt und die Prüfungen des Servers sind in beiden Fällen identisch. Wenn der Resumable-Endpoint die Datei nicht annehmen kann (ein älterer Server oder mehrere Instanzen, die Uploads nicht gemeinsam nutzen), wird sie als einzelne Anfrage an `POST /api/storage/upload` übertragen, und ebenso jede spätere Datei dieses Clients. Siehe [Resumable uploads (TUS)](/docs/backend/storage-resumable-uploads/).
 
 ### Aus einem Datei-Input
 
@@ -55,7 +47,7 @@ if (file) {
 }
 ```
 
-## Eine signierte URL abrufen
+## Signierte URL abrufen
 
 Rufen Sie eine Download-URL und Metadaten für eine gespeicherte Datei ab:
 
@@ -72,8 +64,8 @@ if (url) {
 }
 ```
 
-:::caution[Das Argument `bucket` ist heute ein Pfadpräfix]
-Bei `getSignedUrl`, `getObject` und `deleteObject` wird das zweite Argument in den Objektschlüssel eingefaltet (`<bucket>/<key>`) und erreicht den Server nie als Bucket. Ein Name, den das Deployment nicht bedient, wird deshalb als fehlende *Datei* gemeldet, nicht als unbekannter Bucket — und eine mit `putObject({ bucket: "media" })` geschriebene Datei wird mit `getSignedUrl(key, "media")` nicht wieder gelesen. Lesen Sie eine Datei mit derselben Aufrufform zurück, die sie geschrieben hat. Die Serverseite antwortet für einen Bucket, den sie nicht bedient, bereits mit `404 UNKNOWN_STORAGE_SOURCE`, auf `/api/storage/list` und bei S3 oder GCS auch bei Uploads; das SDK-Argument wird entsprechend überarbeitet.
+:::caution[Das Argument `bucket` ist derzeit ein Pfad-Präfix]
+Bei `getSignedUrl`, `getObject` und `deleteObject` wird das zweite Argument in den Objektschlüssel eingebunden (`<bucket>/<key>`) und erreicht den Server niemals als Bucket. Daher wird ein Name, den das Deployment nicht bedient, als fehlende *Datei* gemeldet und nicht als unbekannter Bucket – und eine mit `putObject({ bucket: "media" })` geschriebene Datei kann nicht mit `getSignedUrl(key, "media")` wieder ausgelesen werden. Lesen Sie eine Datei mit derselben Aufrufstruktur zurück, mit der sie geschrieben wurde. Die Serverseite antwortet für einen nicht bedienten Bucket bei `/api/storage/list` bereits mit `404 UNKNOWN_STORAGE_SOURCE`, ebenso auf S3 oder GCS bei Uploads; das SDK-Argument wird derzeit überarbeitet, um dem zu entsprechen.
 :::
 
 Mit einem bestimmten Bucket:
@@ -85,51 +77,30 @@ const { url } = await client.storage.getSignedUrl(
 );
 ```
 
-Das SDK speichert signierte URLs im Cache, um redundante Serveraufrufe zu vermeiden, bis das
-Download-Token der jeweiligen URL abläuft. Gemeinsam gestellte
-Abfragen — eine Seite mit Vorschauen, die `getSignedUrl()` im selben Tick aufruft — gehen als ein
-`POST /api/storage/metadata` pro 100 Dateien an den Server, den der Rate Limiter als ein Zehntel der
-ersetzten Anfragen zählt; eine Datei, die ein Aufrufer nicht lesen darf, lässt nur diesen einen Aufruf
-fehlschlagen. Der Cache gehört zu den Zugangsdaten, die ihn befüllt
-haben: Ändert sich das Access-Token — bei einer Abmeldung, wenn sich ein anderer Benutzer anmeldet
-oder bei einer Aktualisierung —, beginnt er von vorn, sodass nie ein Benutzer eine URL erhält, die
-für einen anderen erzeugt wurde.
+Das SDK speichert signierte URLs im Cache, um redundante Serveraufrufe zu vermeiden, bis das jeweilige Download-Token abläuft. Gemeinsam durchgeführte Abfragen – etwa eine Seite mit Vorschauen, die `getSignedUrl()` im selben Tick aufruft – werden als ein einziger `POST /api/storage/metadata` pro 100 Dateien an den Server gesendet, den der Rate-Limiter als ein Zehntel der ersetzten Anfragen zählt; eine Datei, die ein Aufrufer nicht lesen darf, schlägt nur für diesen Aufruf fehl. Der Cache gehört zu den Anmeldedaten der Anfrage: Wenn sich das Zugriffstoken ändert – bei einer Abmeldung, der Anmeldung eines anderen Benutzers oder einem Refresh –, beginnt der Cache von vorn, sodass kein Benutzer jemals eine URL erhält, die für einen anderen ausgestellt wurde.
 
 ### Private vs. öffentliche URLs
 
-- **Private Dateien** erhalten eine URL mit einem **kurzlebigen, pfadbeschränkten Download-Token** (`?token=…`, 5 Minuten, sofern der Server nicht `STORAGE_DOWNLOAD_TOKEN_TTL` setzt, was 0.23 nicht liest) — niemals Ihr Access-Token. Da es abläuft, **speichern Sie keine private URL**; speichern Sie den **Pfad** der Datei und rufen Sie `getSignedUrl()` beim Rendern erneut auf.
-- **Öffentliche Dateien** (unter dem Präfix `public/` gespeichert — setzen Sie `storage: { public: true }` auf die Property oder übergeben Sie `public: true` an `putObject`) erhalten eine **stabile, tokenlose, dauerhafte, CDN-cachefähige** URL ohne Server-Roundtrip. Diese können sicher in einer Datenbank gespeichert und direkt verlinkt werden.
+- **Private Dateien** erhalten eine URL mit einem **kurzlebigen, pfadbezogenen Download-Token** (`?token=…`, 5 Minuten, es sei denn, der Server setzt `STORAGE_DOWNLOAD_TOKEN_TTL`, was von 0.23 nicht gelesen wird) – niemals Ihr Zugriffstoken. Da sie abläuft, sollten Sie **eine private URL nicht persistent speichern**; speichern Sie stattdessen den Datei-**Pfad** und rufen Sie `getSignedUrl()` erneut auf, wenn Sie sie rendern.
+- **Öffentliche Dateien** (gespeichert unter dem Präfix `public/` – setzen Sie `storage: { public: true }` auf der Eigenschaft oder übergeben Sie `public: true` an `putObject`) erhalten eine **stabile, tokenlose, permanente und über ein CDN cachebare** URL ohne Roundtrip zum Server. Diese können sicher in einer Datenbank gespeichert und direkt verlinkt werden.
 
 ### Dateien innerhalb von Text
 
-Text, der eine Datei einbettet — die Bilder in einem Markdown-Feld — kann ebenfalls keine
-private URL halten, sondern hält stattdessen eine **Storage-Referenz**:
-`rebase-storage:posts/cover.png`, mit `?storageId=media`, wenn die Datei in einer benannten
-Quelle liegt. Das ist es, was der Markdown-Editor des Admin-Panels für ein hochgeladenes Bild
-schreibt. Tauschen Sie die Referenzen beim Rendern des Texts gegen URLs aus:
+Text, der eine Datei einbettet – wie Bilder in einem Markdown-Feld –, kann ebenfalls keine private URL enthalten, weshalb er stattdessen eine **Storage-Referenz** enthält: `rebase-storage:posts/cover.png`, mit `?storageId=media`, wenn sich die Datei in einer benannten Quelle befindet. Genau das schreibt der Markdown-Editor des Admin-Panels für ein hochgeladenes Bild. Tauschen Sie die Referenzen gegen URLs aus, wenn Sie den Text rendern:
 
 ```typescript
 import { resolveStorageReferences } from "@rebasepro/client";
 
-const post = await client.data.collection("posts").findById("post-1");
+const post = await client.data.table("posts").findById("post-1");
 const body = await resolveStorageReferences(String(post?.body ?? ""), client);
 // `body` is the same markdown, each reference replaced by a fresh URL.
 ```
 
-Jedes Objekt wird einmal pro Aufruf signiert, aus seiner eigenen Quelle, sodass ein privates
-Bild funktionsfähig bleibt, egal wie lange es schon hochgeladen ist. Eine Referenz, die ein
-nicht mehr existierendes Objekt benennt, bleibt unverändert. `storageReference(key,
-storageId?)` erstellt eine solche Referenz, für Text, den Sie selbst schreiben.
+Jedes Objekt wird einmal pro Aufruf aus seiner eigenen Quelle signiert, sodass ein privates Bild unabhängig vom Upload-Zeitpunkt weiterhin funktioniert. Eine Referenz, die ein nicht mehr existentes Objekt benennt, bleibt unverändert. `storageReference(key, storageId?)` erstellt eine solche Referenz für Text, den Sie selbst verfassen.
 
-Text, der gespeichert wurde, bevor es Referenzen gab, enthält die Download-URL einer privaten Datei
-selbst, `…/storage/file/posts/cover.png?token=…`, deren Token wenige Minuten
-nach dem Schreiben ablief. `resolveStorageReferences` erneuert auch diese:
-Das Token nennt weiterhin das Objekt, sodass die URL durch eine frische ersetzt wird. Um
-stattdessen Referenzen zu speichern, schreiben Sie den Text einmal mit
-`storageReferencesForDownloadUrls(text)` um, was jede andere URL
-unverändert lässt.
+Text, der gespeichert wurde, bevor Referenzen existierten, enthält die Download-URL der privaten Datei selbst, `…/storage/file/posts/cover.png?token=…`, deren Token wenige Minuten nach dem Schreiben abgelaufen ist. `resolveStorageReferences` erneuert auch diese: Das Token benennt das Objekt weiterhin, sodass die URL durch eine frische ersetzt wird. Um stattdessen Referenzen zu speichern, schreiben Sie den Text einmalig mit `storageReferencesForDownloadUrls(text)` um, wodurch jede andere URL unverändert bleibt.
 
-## Eine Datei herunterladen
+## Datei herunterladen
 
 Rufen Sie eine Datei als `File`-Objekt ab:
 
@@ -155,7 +126,7 @@ Mit einem bestimmten Bucket:
 const file = await client.storage.getObject("camera.jpg", "product-images");
 ```
 
-## Eine Datei löschen
+## Datei löschen
 
 ```typescript
 await client.storage.deleteObject("products/images/camera.jpg");
@@ -164,7 +135,7 @@ await client.storage.deleteObject("products/images/camera.jpg");
 await client.storage.deleteObject("camera.jpg", "product-images");
 ```
 
-Das Löschen einer nicht vorhandenen Datei wirft keinen Fehler.
+Das Löschen einer nicht vorhandenen Datei löst keinen Fehler aus.
 
 ## Dateien auflisten
 
@@ -189,15 +160,11 @@ if (result.nextPageToken) {
 }
 ```
 
-Jeder Eintrag trägt seine `size` in Bytes und `updated` (einen ISO-8601-
-Zeitstempel) bei lokalem Speicher, S3 und GCS und seinen `contentType` bei lokalem Speicher
-und GCS — genug, um einen Ordner ohne ein `getSignedUrl()` pro Datei anzuzeigen. Eine S3-
-Auflistung hat keinen Content-Type; Ordner (`result.prefixes`) tragen keines der
-drei.
+Jedes Element enthält bei lokalem Speicher, S3 und GCS seine `size` in Bytes und `updated` (einen ISO-8601-Zeitstempel) sowie bei lokalem Speicher und GCS seinen `contentType` – ausreichend, um einen Ordner ohne `getSignedUrl()` pro Datei anzuzeigen. Ein S3-Listing enthält keinen Content-Type; Ordner (`result.prefixes`) enthalten keines der drei Attribute.
 
-## Formate von Speicherschlüsseln
+## Storage-Key-Formate
 
-Das SDK verarbeitet Präfixe von Speicherschlüsseln transparent. Sie können Schlüssel mit oder ohne Protokollpräfix übergeben:
+Das SDK handhabt Storage-Key-Präfixe transparent. Sie können Keys mit oder ohne Protokoll-Präfix übergeben:
 
 ```typescript
 // All equivalent — the SDK strips the prefix internally
@@ -208,16 +175,16 @@ await client.storage.getSignedUrl("products/image.jpg");
 
 ## API-Referenz
 
-| Methode | Beschreibung | Rückgabe |
+| Methode | Beschreibung | Rückgabewert |
 |--------|-------------|---------|
-| `putObject({ file, key?, bucket?, metadata? })` | Eine Datei hochladen | `UploadFileResult` |
+| `putObject({ file, key?, bucket?, metadata? })` | Datei hochladen | `UploadFileResult` |
 | `getSignedUrl(key, bucket?)` | Download-URL + Metadaten abrufen | `DownloadConfig` |
 | `getObject(key, bucket?)` | Als `File`-Objekt herunterladen | `File \| null` |
-| `deleteObject(key, bucket?)` | Eine Datei löschen | `void` |
+| `deleteObject(key, bucket?)` | Datei löschen | `void` |
 | `listObjects(prefix, options?)` | Dateien nach Präfix auflisten | `StorageListResult` |
 
 ## Nächste Schritte
 
-- **[Speicherkonfiguration](/docs/backend/storage)** — S3 oder lokalen Speicher auf dem Server konfigurieren
-- **[Daten abfragen](/docs/sdk/querying)** — CRUD-Operationen und Query-Builder
-- **[Authentifizierung](/docs/sdk/authentication)** — Anmeldung und Sitzungsverwaltung
+- **[Storage Configuration](/docs/backend/storage)** — Konfigurieren Sie S3 oder lokalen Speicher auf dem Server
+- **[Querying Data](/docs/sdk/querying)** — CRUD-Operationen und Query-Builder
+- **[Authentication](/docs/sdk/authentication)** — Anmeldung und Sitzungsverwaltung

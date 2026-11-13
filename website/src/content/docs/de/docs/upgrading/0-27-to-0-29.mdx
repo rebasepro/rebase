@@ -1,0 +1,174 @@
+---
+sourceHash: ebc124bb86c45865
+slug: de/docs/upgrading/0-27-to-0-29
+title: Upgrade von 0.27 auf 0.29
+sidebar_label: 0.27 → 0.29
+description: Die Breaking Changes in 0.29 für eine App auf Version 0.27 oder 0.28 – das Admin-Panel übergibt Ihrem Code die Zeilen des Servers anstelle seiner internen Entity, die Entity-Hooks werden intern und „welcher Datensatz“ ist überall `id`.
+---
+
+# Upgrade von 0.27 → 0.29
+
+Dies sind die `### Breaking`-Einträge, die 0.29 für eine App auf 0.27 oder 0.28
+mit sich bringt; 0.28 enthielt keine Breaking Changes.
+
+Sie stammen alle von einer einzigen Änderung ab: Alles, was Ihr Code vom
+Admin-Panel empfängt, ist jetzt die **Zeile des Servers (Server Row)** –
+dieselbe Struktur, die REST, `client.data`, das `context.data` des Backends und
+`useRows` bereits zurückgeben. Eine Zeile (Row) entspricht exakt den Spalten des
+Datensatzes: ISO-Datumsangaben (`YYYY-MM-DD` für eine reine Datumsspalte), ein
+belongsTo unter seiner Fremdschlüsselspalte (`customerId`) und jede vom Admin
+geladene Relation verschachtelt unter ihrem Namen, so wie es RESTs `include`
+zurückgibt. Die ID des Datensatzes befindet sich **neben** der Zeile als String
+(`id`). Code, der einen Datensatz bearbeitet (ein `Field`,
+`FormContext.values`, `dynamicProps`, Speicher-Namensfunktionen), erhält
+weiterhin Formularwerte, typisiert für einen Editor (`Date`, Relationsobjekte).
+Das `{ id, path, values }`-`Entity` des Admins ist intern.
+
+Lesen Sie den ersten Abschnitt zuerst: Es ist der einzige, auf den Sie kein
+Compiler hinweist. Der Rest sind Umbenennungen, die TypeScript für Sie anzeigt.
+
+---
+
+## 102. `context.data` und `browserCallbacks` des Browsers übergeben Zeilen
+
+`context.data` im Browser-Code (eine Entity Action, ein Slot, eine
+benutzerdefinierte Ansicht, ein Plugin) gab bisher die View-Model-Werte des
+Admins zurück: `Date`-Objekte und Relationsobjekte, obwohl es als flache Zeilen
+typisiert war. Es gibt nun die Zeilen zurück, die sein Typ schon immer
+versprochen hat, und Schreibvorgänge führen die `browserCallbacks` der
+Collection aus und aktualisieren jede Ansicht dieser Collection.
+
+`admin.browserCallbacks` (`beforeSave`, `afterSave`, `afterSaveError`,
+`beforeDelete`, `afterDelete`, `afterRead`) erhalten Zeilen auf jedem Pfad: im
+Datensatzformular, bei Inline-Zellenbearbeitungen, `useRowWrites`,
+Löschvorgängen und `afterRead`. Eine Bearbeitung, die ein Callback direkt
+(in-place) an der übergebenen Zeile vornimmt, wird beibehalten.
+
+Dies kompiliert unverändert und verhält sich dann anders: `values.due.getTime()`
+wirft einen Fehler, da `due` jetzt ein String ist.
+
+**Was zu ändern ist:**
+
+```ts
+// before: a Date and a relation object
+beforeSave: ({ values }) => ({ ...values, overdue: values.due < new Date(), customer: values.customer?.id })
+
+// after: an ISO string and the foreign key
+beforeSave: ({ values }) => ({ ...values, overdue: new Date(String(values.due)) < new Date() })
+```
+
+Finden Sie die relevanten Stellen:
+
+```bash
+grep -rnE "browserCallbacks|context\.data\." --include='*.ts' --include='*.tsx' config/ frontend/src/
+```
+
+Das `callbacks.afterRead` einer Eigenschaft ist mit der `row` typisiert, die es
+empfängt; zuvor war es mit einer `entity` typisiert, die ihm nie übergeben wurde.
+
+## 103. Die `Entity`-Daten-Hooks sind intern
+
+`useData`, `useFetch`, `useBatchedFetch`, `useRelationSelector`,
+`saveEntityWithCallbacks` und `deleteEntityWithCallbacks` verlassen die
+öffentliche API, und `useCollection` wird entfernt.
+
+**Was zu ändern ist:** Zeilen mit den Zeilen-Hooks oder `context.data` lesen
+und schreiben:
+
+```tsx
+// before
+const { data } = useCollection({ path: "orders", collection: ordersCollection, itemCount: 20 });
+data.map(entity => entity.values.number);
+
+// after
+const { rows } = useRows("orders", { limit: 20 });
+rows.map(row => row.number);
+```
+
+`usePermissions().canEdit` und `canDelete` akzeptieren eine Zeile (`row`). Die
+`collections`- und `views`-Builder von `<RebaseCMS>` sowie `data` von
+`useBuildNavigationStateController` erhalten Zeilen:
+`data: useData()` → `data: useRebaseContext().data`. Siehe [Hooks](/docs/hooks/).
+
+## 104. Callbacks auf Zeilenebene erhalten `{ row, id }` anstelle von `{ entity }`
+
+Jeder Callback, dem der Admin einen Datensatz übergibt, erhält nun die Zeile und
+daneben die ID des Datensatzes:
+
+| Wo | Vorher | Nachher |
+|---|---|---|
+| Entity-Aktionen `onClick`, `isEnabled`, `disabledReason` | `({ entity })` | `({ row, id, path })` |
+| `highlightEntity` / `unhighlightEntity` | `(entity)` | `highlightRow(id)` / `unhighlightRow(id)` |
+| `admin.display`-Resolver | `({ entity, context })` | `({ row, context })` |
+| `admin.additionalFields` `Builder` / `value` | `({ entity, context })` | `({ row, id, context })` |
+| `admin.exportable.additionalFields[].builder` | `({ entity, context })` | `({ row, context })` |
+| `<Rebase entityLinkBuilder>` | `({ entity })` | `({ row, id, path })` |
+| Entity-Ansichten, `formView.Builder` | `entity` | `row`, `id` |
+| Slot `entity.row.actions` | `{ entity, entityId }` | `{ row, id }` |
+| `FormContext`, `FieldProps.context` | `entity`, `entityId` | `row`, `id` |
+| `dynamicProps`, Speicher `fileName` / `storagePath` | `entityId` | `id` |
+
+**Was zu ändern ist:** `entity.values.status` → `row.status`, `entity.id` → `id`.
+Ein zugehöriger Datensatz, den der Admin geladen hat, ist verschachtelt:
+`row.customer.name`. `FormContext` wird einmal deklariert, in
+`@rebasepro/cms-types`. Der Speicherpfad-Platzhalter `{id}` ergänzt
+`{entityId}`, was weiterhin funktioniert. Siehe
+[Entity-Aktionen](/docs/frontend/entity-actions/).
+
+## 105. „Welcher Datensatz“ ist `id`, und Speichern ist `onSaved`
+
+| Wo | Vorher | Nachher |
+|---|---|---|
+| `EntityFormPanel` (jetzt `RecordForm`) | `entityId=` | `id=` |
+| `useSidePanel().open`, `.replace`, `navigateToEntity` | `{ path, entityId, onUpdate }` | `{ path, id, onSaved }` |
+| `onSaved` (Formular, Sidepanel) | `{ entity, entityId }` | `{ row, id }` |
+| `OnUpdateParams` | | `OnSavedParams` |
+| `EntityForm`, `EntityFormBinding`, `Entity.Form`-Override | `entityId`, `entity`, `onEntityChange(entity)` | `id`, `row`, `onRowChange({ row, id })` |
+| Slots `entity.field.*`, `form.*`; `defaultSelectedView` | `entityId` | `id` |
+
+Die URL des Sidepanels bleibt unverändert, sodass gespeicherte Links weiterhin
+funktionieren. In reinem JavaScript wird ein alter Name ignoriert anstatt
+abgelehnt: `open({ path, entityId })` öffnet ein leeres neues Formular. Suchen
+Sie danach:
+
+```bash
+grep -rnE "entityId|onUpdate" --include='*.ts' --include='*.tsx' --include='*.js' frontend/src/ config/
+```
+
+Bei dieser Gelegenheit ebenfalls umbenannt (beide funktionieren weiterhin und
+geben eine einmalige Warnung aus): `EntityFormPanel` heißt nun `RecordForm` mit
+denselben Props, und ein `CollectionPanel` benennt seine Collection mit
+`collection` (`path="orders"` → `collection="orders"`; `path` gibt an, wo die
+Zeilen einer Subcollection liegen) und sortiert mit `orderBy`
+(`sort={["placed_at", "desc"]}` → `orderBy="placed_at:desc"`).
+
+## 106. Collection-Ansichten, Collection-Aktionen und die Auswahl verwenden Zeilen und IDs
+
+Benutzerdefinierte Collection-Ansichten (`admin.customViews`),
+Collection-`Actions` und die Toolbar-Slots erhalten einen `TableController` von
+Zeilen, und die Auswahl besteht aus Zeilen und IDs:
+
+| Vorher | Nachher |
+|---|---|
+| `tableController.data`, `.sparseData` | `.rows` mit `.ids`, `.sparseRows` mit `.sparseIds` |
+| `.dataLoading`, `.dataLoadingError` | `.loading`, `.error` |
+| `onEntityClick(entity)` | `onRowClick(row, id)` |
+| `highlightedEntities`, `deletedEntities` | `highlightedIds`, `deletedIds` (Strings) |
+| `selection.type === "entities"`, `.entities` | `"rows"`, `.rows` und `.ids` |
+| Query-Auswahl `excluded` | `excludedIds` |
+| `isEntitySelected(entity)` | `isSelected(id)` |
+| `toggleEntitySelection(entity)` | `toggleSelection(row)` |
+| `setSelectedEntities(entities)` | `setSelectedRows(rows)` |
+| `useSelectionController()` | `useSelectionController(collection, path?)` |
+| `const entities = await resolveSelection({ selection, accessor })` | `const { rows, ids } = await resolveSelection({ selection, data: context.data, collection })` |
+| `useSelectionDialog` `onSingleEntitySelected(entity)` | `onSingleRowSelected(row, id)` |
+
+`CollectionPanel` und `Collection.View`-Overrides akzeptieren `onRowClick(row, id)`
+und `highlightedIds`. Eine Liste von Zeilen enthält ihre IDs daneben an denselben
+Positionen – `tableController.ids[i]` ist die ID von `tableController.rows[i]` –,
+sodass Code, der `String(row.id)` gelesen hat, auf einer Collection
+funktioniert, die über eine beliebige Spalte indiziert ist. IDs werden als
+Strings verglichen, sodass `5` und `"5"` denselben Datensatz darstellen.
+`resolveSelection` löst eine manuell angehakte Auswahl sowie eine „Alle passenden
+auswählen“-Auswahl zu Zeilen derselben Struktur auf. Siehe
+[Admin anpassen](/docs/frontend/customizing/).

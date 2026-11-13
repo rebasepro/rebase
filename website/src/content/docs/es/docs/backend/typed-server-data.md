@@ -1,31 +1,38 @@
 ---
-sourceHash: e515564ee1857435
+sourceHash: d08c6bb1dfd3357e
 title: Datos tipados del lado del servidor
 sidebar_label: Datos tipados del lado del servidor
-description: "Registra tu tipo Database generado una sola vez, y context.data, rebase.dataAsAdmin y el rebase que recibe una función o un cron quedan tipados a partir de él: filas, filtros, ordenaciones, includes y entradas de escritura."
+description: "Registra tu tipo Database generado una sola vez, y context.data, rebase.dataAsAdmin y el rebase que recibe una función o cron se tiparán a partir de él: filas, filtros, ordenamientos, includes y datos de entrada de escritura."
 ---
 
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
 El cliente del navegador se tipa pasando tu `Database` generada a
-`createRebaseClient<Database>()` (consulta [Generación del SDK tipado](/docs/sdk#typed-sdk-generation)).
-Las superficies de datos del lado del servidor no tienen una llamada así a la que pasársela:
+`createRebaseClient<Database>()` (consulta [Generación de SDK tipado](/docs/sdk#typed-sdk-generation)).
+Las superficies de datos del lado del servidor no tienen una llamada de ese tipo a la que pasarlo:
 
-- `context.data` en un [callback de colección](/docs/collections/callbacks),
+- `context.data` en un [hook de tabla](/docs/collections/callbacks),
 - `rebase.dataAsAdmin` en el singleton `rebase`,
-- el `rebase` que recibe una [función personalizada](/docs/backend/custom-functions) o un
-  [cron job](/docs/backend/cron-jobs).
+- el `rebase` que se entrega a una [función personalizada](/docs/backend/custom-functions) o a un
+  [trabajo cron](/docs/backend/cron-jobs).
 
-Así que le indicas a TypeScript una vez, para todo el proyecto, qué `Database` sirven.
-Hasta que lo haces, no tienen tipos: cualquier colección con cualquier nombre, filas como
-`Record<string, unknown>`. Nada cambia en un proyecto que no registra nada.
+Así que le indicas a TypeScript una sola vez, para todo el proyecto, a qué `Database` sirven.
+Hasta que lo hagas, permanecerán sin tipar: cualquier tabla con cualquier nombre, filas como
+`Record<string, unknown>`. Nada cambia para un proyecto que no registra nada.
 
-## Registrar la `Database`
+Hay dos formas de registrar: la `Database` generada, que es exacta, o
+tu propio módulo `backend/schema`, que no necesita una ejecución de generación de código.
+
+## Registrar la `Database` generada
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```bash
 rebase generate-sdk --register
 ```
 
 Además del SDK en `generated/sdk/`, esto escribe dos archivos en
-`config/generated/`: una copia de `database.types.ts`, y un `register.ts` que
+`backend/generated/`: una copia de `database.types.ts` y un `register.ts` que
 declara el registro:
 
 ```ts
@@ -38,50 +45,84 @@ declare module "@rebasepro/types" {
 }
 ```
 
-Viven en `config/` porque tus archivos de colección se compilan dos veces, por el
-backend (cuyo `tsconfig.json` incluye `../config/`) y por el propio `tsc` del paquete
-`config`, y `config/` es el único directorio que ambos leen. Un registro allí que
-importara `../generated/sdk/` metería un archivo de fuera de `config/` en la compilación de
-ese paquete, lo que TypeScript rechaza. Así, un solo registro tipa tus funciones, tus cron jobs
-y los callbacks de tus archivos de colección, en ambas compilaciones. Es solo una declaración: el runtime hace
-exactamente lo mismo que antes.
+Residen en `backend/` porque ese es el programa en el que se compilan los hooks, funciones y
+crons a los que tipan, y los tipos se copian junto al
+registro en lugar de importarse desde `generated/sdk/`, que está fuera del
+`rootDir` del backend. Es solo una declaración: el runtime hace exactamente lo
+mismo que hacía antes. `--register` se niega a sobrescribir un `register.ts` que no
+haya escrito él mismo.
 
-La opción se recuerda en `rebase.json`, como `"registerDatabase": true` en la
-app del backend, de modo que cada `rebase generate-sdk` posterior, y `rebase dev` en cada
-cambio de colección, mantiene ambos archivos al día. El `.gitignore` del scaffold ignora los
-directorios `generated/`, así que un clon nuevo no tiene ninguno de los dos
-archivos hasta que algo los escribe de nuevo. `rebase build` (y `rebase cloud deploy`,
-que construye el mismo bundle) los escribe a partir de las colecciones antes de
-compilar, así que un trabajo de CI que ejecuta `rebase build` en un clon nuevo
-compila callbacks tipados. Un paso de CI que compila el backend o el paquete
-`config` de otra forma (`tsc`, `pnpm build`) sigue necesitando antes
-`rebase generate-sdk`, o los callbacks que leen filas tipadas se compilan contra
-el `context.data` sin tipos y fallan. Un proyecto sin
-`rebase.json` sigue registrando mientras `config/generated/register.ts`
-esté ahí. Para volver a datos del servidor sin tipos, elimina `registerDatabase` y
-borra `config/generated/`.
+El flag se recuerda en `rebase.json` como `"registerDatabase": true` en la
+aplicación de backend, de modo que cada `rebase generate-sdk` posterior, y cada `rebase dev` ante cada
+cambio en `backend/schema/`, mantiene ambos archivos actualizados. El `.gitignore`
+del scaffold ignora los directorios `generated/`, por lo que un clon limpio no tendrá ninguno
+de los dos archivos hasta que algo los vuelva a escribir. `rebase build` (y
+`rebase cloud deploy`, que compila el mismo bundle) los escribe a partir de las
+tablas antes de compilar, por lo que un trabajo de CI que ejecute `rebase build` en un clon
+limpio compilará hooks tipados. Un paso de CI que compile el backend de otra manera
+(`tsc`, `pnpm build`) aún necesita ejecutar `rebase generate-sdk` primero, o de lo contrario los hooks
+que leen filas tipadas se compilarán contra el `context.data` sin tipar y fallarán. Un proyecto
+sin `rebase.json` seguirá registrándose mientras
+`backend/generated/register.ts` esté allí. Para volver a los datos del lado del servidor
+sin tipar, elimina `registerDatabase` y borra `backend/generated/`.
 
-También puedes escribir el registro tú mismo, en cualquier archivo que compile el backend
-(`backend/src/rebase-env.d.ts`, importando `../../generated/sdk/database.types`).
-Entonces llega solo a la compilación del backend: en el propio `tsc` del paquete `config`,
-`context.data` sigue siendo el objeto sin tipos, así que los callbacks tienen que compilar de ambas formas.
+## Registrar el esquema, sin codegen
 
-## Qué tipa
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Un proyecto que no ha generado nada registra su módulo de esquema en su lugar,
+y se tipa directamente a partir de sus `defineTable`:
 
 ```ts
-// config/collections/orders.ts — a callback
-callbacks: {
-    async beforeSave({ context, values }) {
-        const { data } = await context.data.customers.find({
-            where: { email: ["==", "ada@example.com"] },  // `email` is a column of customers
-        });
-        data[0]?.email;                      // completes from the customers Row
-
-        await context.data.customer.find();  // error: no collection `customer`
-        return values;
+// backend/rebase-env.d.ts
+declare module "@rebasepro/types" {
+    interface Register {
+        tables: typeof import("./schema");
     }
 }
 ```
+
+Cada exportación del módulo que sea una tabla o una vista se tipa bajo su
+accessor (`orderItems` para `order_items`), con el `Row`, `Insert` y `Update`
+que emitiría el generador: exacto para cada columna declarada. Es más flexible
+con las relaciones, porque el objetivo de una relación está detrás de un thunk sin tipar:
+una clave foránea derivada es `string | number`, una fila incluida es `Record<string, unknown>`,
+y un `include` anidado no se valida. La `Database` generada es exacta para
+todo esto, y tiene prioridad cuando ambas están registradas. [Tipos
+inferidos](/docs/schema/types/) explica lo que `DatabaseOf` puede y no puede saber.
+
+Una superficie solo se tipa a partir de la `Database` generada: `context.data` dentro
+de los hooks de tabla de ese mismo esquema, porque tipar los hooks de un esquema a partir del
+propio esquema genera un ciclo que TypeScript rechaza.
+
+## Qué tipa
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+```ts
+// backend/schema/orders.ts — a hook
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const orders = defineTable("orders", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        total: col.numeric().notNull(),
+    },
+    rls: "admin-only",
+    hooks: {
+        async beforeSave({ context, values }) {
+            const { data } = await context.data.customers.find({
+                where: { email: ["==", "ada@example.com"] },  // `email` is a column of customers
+            });
+            data[0]?.email;                      // completes from the customers Row
+            return values;
+        },
+    },
+});
+```
+
+Con la `Database` generada registrada, `context.data.customer` (tabla
+inexistente) en ese hook es un error de tipo.
 
 ```ts
 // backend/functions/stats.ts
@@ -105,30 +146,30 @@ export default defineCron({
     name: "Cleanup",
     schedule: "0 3 * * *",
     async handler({ rebase }) {
-        // `create` takes the collection's Insert type: required columns are required.
+        // `create` takes the table's Insert type: required columns are required.
         await rebase.dataAsAdmin.auditLog.create({ action: "cleanup" });
     },
 });
 ```
 
-Cada accesor se tipa como el del cliente del navegador: `find`, `findById`
-y `listen` devuelven el `Row` de la colección; `where` y `orderBy` se
-indexan por sus columnas; `include` nombra sus relaciones; `create` toma su
-`Insert` y `update` su `Update`. Los accesores son los nombres en camelCase del
+Cada accessor está tipado de la misma manera que el del cliente del navegador: `find`, `findById`
+y `listen` devuelven el `Row` de la tabla; `where` y `orderBy` toman como
+claves sus columnas; `include` especifica sus relaciones; `create` toma su
+`Insert` y `update` su `Update`. Los accessors son los nombres en camelCase del
 archivo generado (`order_items` es `orderItems`).
-El servidor resuelve esos nombres a través de las colecciones registradas, así que una
-colección `my-notes` almacenada en una tabla `notes` es `context.data.myNotes`.
+El servidor resuelve esos nombres a través de las tablas servidas, por lo que una tabla cuyo
+slug es `my-notes` (almacenada en una tabla `notes`) es `context.data.myNotes`.
 
-`collection(slug)` con un slug que la `Database` declara se tipa del mismo modo:
-`context.data.collection("my-notes")` es `context.data.myNotes`. Un slug que
-calculas en tiempo de ejecución, o uno que el esquema no declara, obtiene el cliente
-sin tipos.
+`table(slug)` con un slug que la `Database` declara se tipa de la misma manera:
+`context.data.table("my-notes")` es `context.data.myNotes`. Un slug que
+calcules en tiempo de ejecución, o uno que el esquema no declare, obtiene el
+cliente sin tipar.
 
-## Una función, sin el registro
+## Una sola función, sin el registro
 
-`defineFunction` y `defineCron` también aceptan el tipo como argumento, que prevalece
-sobre el registro. Úsalo para tipar un solo archivo, o para probar datos tipados antes de
-registrar:
+`defineFunction` y `defineCron` también aceptan el tipo como argumento, el cual tiene prioridad
+sobre el registro. Utilízalo para tipar un solo archivo o para probar datos tipados antes
+de registrar:
 
 ```ts
 import type { Database } from "../../generated/sdk/database.types";
@@ -138,10 +179,10 @@ export default defineFunction<Database>((app, { rebase }) => {
 });
 ```
 
-## Helpers que reciben el objeto de datos
+## Helpers que toman el objeto de datos
 
-Un helper que recibe `context.data` o `rebase.dataAsAdmin` nombra el tipo
-registrado, de modo que sigue tipado y acepta ambos:
+Un helper que recibe `context.data` o `rebase.dataAsAdmin` nombra el
+tipo registrado, de modo que se mantiene tipado y acepta ambos:
 
 ```ts
 import type { RebaseSdkData, RegisteredDatabase } from "@rebasepro/types";
@@ -151,6 +192,6 @@ export async function paidOrders(data: RebaseSdkData<RegisteredDatabase>) {
 }
 ```
 
-Un helper declarado con un `RebaseSdkData` sin más conserva el tipo sin tipar, y un
-objeto de datos tipado no es asignable a él. Cambia el parámetro como arriba cuando
-registres.
+Un helper declarado simplemente con `RebaseSdkData` mantiene el tipo sin tipar, y un
+objeto de datos tipado no es asignable a él. Cambia el parámetro como se muestra arriba
+cuando hagas el registro.

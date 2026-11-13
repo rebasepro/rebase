@@ -1,23 +1,23 @@
 ---
-sourceHash: 950f7cd092f53f01
+sourceHash: b16bc057fd9a76c0
 title: Override dei componenti (Swizzling)
 sidebar_label: Override dei componenti
-description: Sovrascrivi i componenti UI predefiniti con implementazioni personalizzate a livello di applicazione o di collezione.
+description: Esegui l'override dei componenti UI predefiniti con implementazioni personalizzate a livello di applicazione o di collezione.
 ---
 
 ## Panoramica
 
-Rebase consente di sovrascrivere i componenti UI predefiniti con le tue implementazioni personalizzate. Ciò implementa un modello di swizzling dei componenti in stile Docusaurus che supporta due pattern di personalizzazione:
-- **Modalità eject** (predefinita): Il tuo componente sostituisce completamente quello integrato.
-- **Modalità wrap** (`wrap: true`): Il tuo componente avvolge l'originale. Ciò che viene avvolto (solitamente il componente integrato) viene passato come prop `OriginalComponent` in modo da poterlo renderizzare all'interno del tuo layout o della tua logica personalizzati.
+Rebase ti consente di eseguire l'override dei componenti UI predefiniti con le tue implementazioni personalizzate. Questo implementa un modello di swizzling dei componenti in stile Docusaurus che supporta due pattern di personalizzazione:
+- **Modalità Eject** (predefinita): il tuo componente sostituisce completamente quello integrato.
+- **Modalità Wrap** (`wrap: true`): il tuo componente avvolge l'originale. Ciò che viene avvolto (solitamente il componente integrato) viene passato come prop `OriginalComponent`, consentendoti di renderizzarlo all'interno del tuo layout o della tua logica personalizzata.
 
-Gli override dei componenti possono essere applicati **globalmente** a livello di applicazione (sul provider `<Rebase>`) o **localmente** a livello di collezione (all'interno delle singole definizioni di collezione).
+Gli override dei componenti possono essere applicati **a livello globale** nell'applicazione (sul provider `<Rebase>`) o **a livello locale** nella collezione (all'interno delle singole definizioni di collezione).
 
 ---
 
 ## Override dei componenti a livello globale
 
-Per sovrascrivere i componenti a livello globale nell'intera applicazione, passa un oggetto `components` al provider radice `<Rebase>`.
+Per eseguire l'override dei componenti a livello globale nell'intera applicazione, passa un oggetto `components` al provider radice `<Rebase>`.
 
 ```tsx
 import { Rebase } from "@rebasepro/app";
@@ -58,131 +58,122 @@ function App() {
 
 ## Override dei componenti a livello di collezione
 
-Per sovrascrivere i componenti solo per una specifica collezione, aggiungi un oggetto `components` sotto il relativo blocco `admin`. Questo è utile per personalizzare stati vuoti, card o viste di dettaglio per modelli specifici.
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-Nello scaffold predefinito, `config/collections/` viene caricato **sia** dal pannello di amministrazione sia dal backend, che legge gli stessi file per ricavare lo schema e l'API. Pertanto, punta a ciascun componente tramite **percorso del modulo** anziché importarlo. `Component` accetta le stesse forme di `admin.Field` ed `entityViews[].Builder`: un percorso, un `import()` lazy, o il componente stesso.
+Per eseguire l'override dei componenti per una sola tabella, passa `components` nel suo `customizeTable`. Questo è utile per lo stato vuoto (empty state), le schede (card) o il form di una particolare tabella. Ciascun `Component` è il componente stesso, importato per valore: il file viene eseguito solo nel browser.
 
-```ts
-// config/collections/products.ts
-import { defineCollection } from "@rebasepro/cms-types";
+```tsx
+// frontend/src/cms/products.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { products } from "../../../backend/schema/products";
+import { ProductCustomForm } from "../../../../../components/ProductCustomForm";
+import { ProductsEmptyState } from "../../../../../components/ProductsEmptyState";
 
-export const productsCollection = defineCollection({
-    name: "Products",
-    slug: "products",
-    table: "products",
-    properties: { /* ... */ },
-    admin: {
-        components: {
-            // Eject Mode: Replace the default entity form view
-            "Entity.Form": { Component: "../../frontend/src/ProductCustomForm" },
-
-            // Wrap Mode: Wrap the empty state to add quick links
-            "Collection.EmptyState": {
-                Component: "../../frontend/src/ProductsEmptyState",
-                wrap: true
-            }
-        }
-    }
+export const productsCms = customizeTable<typeof products>("products", {
+    components: {
+        // Replace: the product form is drawn by your component alone.
+        "Entity.Form": { Component: ProductCustomForm },
+        // Wrap: your component receives the original as `OriginalComponent`.
+        "Collection.EmptyState": { Component: ProductsEmptyState, wrap: true },
+    },
 });
 ```
 
-Il componente wrapper risiede insieme al resto del codice frontend e riceve ciò che avvolge come `OriginalComponent` — il componente integrato, a meno che anche l'app non lo sovrascriva (vedi [Quando entrambi gli ambiti sovrascrivono un componente](#quando-entrambi-gli-ambiti-sovrascrivono-un-componente)):
+Un componente wrapper riceve ciò che avvolge come `OriginalComponent`: il componente integrato, a meno che anche la tua applicazione non ne esegua l'override (vedi [Quando entrambi gli ambiti eseguono l'override di un componente](#quando-entrambi-gli-ambiti-eseguono-loverride-di-un-componente)):
 
 ```tsx
-// frontend/src/ProductsEmptyState.tsx
-import type React from "react";
+// frontend/src/components/ProductsEmptyState.tsx
+import React from "react";
 
-export default function ProductsEmptyState({ OriginalComponent, ...props }: {
+export function ProductsEmptyState({ OriginalComponent, ...props }: {
     OriginalComponent: React.ComponentType<Record<string, unknown>>
 }) {
     return (
         <div className="empty-state-wrapper">
             <OriginalComponent {...props} />
-            <button onClick={() => importDemoProducts()}>
-                Load Demo Products
-            </button>
+            <a href="/docs/import">Import your first products</a>
         </div>
     );
 }
 ```
 
-Ogni modulo richiede un **default export**. Il plugin Vite per le collezioni riscrive un percorso in un'importazione lazy, in modo che il componente costituisca un chunk a sé stante e venga caricato la prima volta che l'override viene renderizzato. Questa riscrittura copre i file all'interno della directory `collectionsDir` configurata. Un percorso in un file al di fuori di essa arriva all'admin come una semplice stringa: la console lo notifica e il componente integrato viene renderizzato al suo posto. Al di fuori di `collectionsDir`, scrivi tu stesso l'importazione lazy: `Component: () => import("../../frontend/src/ProductCustomForm")`.
+Un percorso stringa o un thunk lazy `() => import(…)` in `Component` genera un errore al caricamento del modulo, indicando cosa scrivere al suo posto.
 
-Anche un riferimento diretto (`Component: ProductCustomForm`) funziona, ma solo in un file di collezione non caricato dal server, poiché l'importazione del componente comporta anche l'importazione di React e di tutte le relative dipendenze.
+### Quando entrambi gli ambiti eseguono l'override di un componente
 
-### Quando entrambi gli ambiti sovrascrivono un componente
+<span class="since-badge" data-since="0.31">Da 0.31</span>
 
-I due ambiti si compongono. L'override a livello di app (`<Rebase components>`) viene applicato per primo al componente integrato, e quello della collezione (`admin.components`) viene applicato al risultato:
+I due ambiti si compongono. L'override a livello di app (`<Rebase components>`) viene applicato per primo al componente integrato, e quello della tabella (`components` in `customizeTable`) viene applicato al risultato:
 
 | Livello app | Livello collezione | Cosa viene renderizzato all'interno di quella collezione |
 |---|---|---|
 | qualsiasi | nessuno | ciò che viene renderizzato altrove: l'override a livello di app o il componente integrato |
 | nessuno | wrap | il wrapper della collezione attorno al componente integrato |
 | replace o wrap | wrap | il wrapper della collezione attorno all'override a livello di app, passato come `OriginalComponent` |
-| qualsiasi | replace | il solo componente della collezione; sostituisce entrambi |
+| qualsiasi | replace | solo il componente della collezione; sostituisce entrambi |
 
-In questo modo una collezione può aggiungere elementi attorno a un componente già personalizzato dall'applicazione senza perdere tale personalizzazione. Per rimuovere la versione a livello di app per una determinata collezione, utilizza replace anziché wrap.
+Pertanto, una collezione può aggiungere qualcosa attorno a un componente che la tua app già personalizza senza perdere tale personalizzazione. Per rimuovere la versione a livello di app per una singola collezione, usa replace invece di wrap.
 
 ---
 
-## Ambiti dei componenti sovrascrivibili
+## Ambiti dei componenti soggetti a override
 
-### Componenti con ambito applicazione (`AppComponentName`)
+### Componenti con ambito a livello di app (`AppComponentName`)
 
-Questi componenti possono essere sovrascritti unicamente a livello del provider radice `<Rebase>`, poiché rappresentano la struttura a livello di shell.
+Questi componenti possono essere sottoposti a override solo a livello del provider radice `<Rebase>`, poiché rappresentano la struttura a livello di shell.
 
-| Chiave componente | Descrizione |
+| Chiave del componente | Descrizione |
 |---|---|
 | `"Shell.AppBar"` | La barra di intestazione nella parte superiore della pagina |
-| `"Shell.Drawer"` | Il pannello di navigazione laterale principale comprimibile |
+| `"Shell.Drawer"` | Il drawer di navigazione principale comprimibile nella barra laterale |
 | `"Shell.DrawerNavigationItem"` | Singoli link all'interno della barra laterale |
 | `"Shell.DrawerNavigationGroup"` | Intestazioni comprimibili dei gruppi di navigazione nella barra laterale |
-| `"HomePage"` | La landing page iniziale predefinita in modalità contenuto |
-| `"HomePage.CollectionCard"` | Singole card di collezione nella home page |
+| `"HomePage"` | La home page predefinita in modalità contenuto |
+| `"HomePage.CollectionCard"` | Singole schede di collezione nella home page |
 | `"Auth.LoginView"` | L'overlay mostrato quando viene richiesta l'autenticazione |
 
-### Componenti con ambito collezione (`CollectionComponentName`)
+### Componenti con ambito a livello di collezione (`CollectionComponentName`)
 
-Questi componenti possono essere sovrascritti a livello globale (agendo come impostazioni predefinite per tutte le collezioni) o su singole collezioni.
+È possibile eseguire l'override di questi componenti a livello globale (fungendo da impostazioni predefinite per tutte le collezioni) o sulle singole collezioni.
 
-| Chiave componente | Descrizione |
+| Chiave del componente | Descrizione |
 |---|---|
-| `"Collection.View"` | L'intera landing page della collezione |
+| `"Collection.View"` | L'intera pagina principale della collezione |
 | `"Collection.Table"` | La vista tabellare predefinita a foglio di calcolo |
-| `"Collection.Card"` | Il wrapper dell'elemento nella vista a card |
+| `"Collection.Card"` | Il wrapper degli elementi nella vista a schede (card view) |
 | `"Collection.EmptyState"` | Vista mostrata quando una collezione è vuota |
-| `"Collection.Actions"` | Pulsanti della barra degli strumenti sopra la tabella/card |
+| `"Collection.Actions"` | Pulsanti della barra degli strumenti sopra la tabella/schede |
 | `"Collection.FilterField"` | Input di filtro personalizzato per una colonna |
-| `"Entity.Form"` | Il form di dettaglio per creazione/aggiornamento |
+| `"Entity.Form"` | Il form di dettaglio per la creazione/aggiornamento |
 | `"EditView.FormActions"` | Barra dei pulsanti di invio/annullamento del form |
 | `"DetailView"` | Vista di dettaglio in sola lettura |
-| `"Entity.SidePanel"` | Il contenitore del pannello laterale per form/dettaglio |
-| `"EntityPreview"` | Anteprima chip inline per riferimenti/relazioni |
-| `"Entity.MissingReference"` | Renderizzato quando un'entità referenziata è mancante |
+| `"Entity.SidePanel"` | Il contenitore del pannello laterale per form/dettagli |
+| `"EntityPreview"` | Anteprima inline in formato chip di riferimenti/relazioni |
+| `"Entity.MissingReference"` | Renderizzato quando un'entità di riferimento è mancante |
 
 :::note[Tre chiavi non seguono il pattern `Entity.`]
-`"DetailView"`, `"EntityPreview"` ed `"EditView.FormActions"` non contengono il prefisso `Entity.`. `"Entity.DetailView"`, `"Entity.Preview"` ed `"Entity.FormActions"` non fanno parte dell'unione — generano un errore di tipo e, in JavaScript puro, l'override semplicemente non viene mai applicato.
+`"DetailView"`, `"EntityPreview"` ed `"EditView.FormActions"` non contengono il prefisso `Entity.`. `"Entity.DetailView"`, `"Entity.Preview"` ed `"Entity.FormActions"` non fanno parte del tipo union: generano errori di tipo e, in JavaScript puro, l'override semplicemente non viene mai applicato.
 :::
 
-Il tuo componente sostitutivo riceve le stesse prop passate al componente integrato. La mappa degli override non definisce un tipo di prop per chiave — `ComponentOverride<P>` imposta `P` su `Record<string, unknown>` per impostazione predefinita — pertanto tipizza autonomamente il parametro, oppure passa un argomento di tipo, quando desideri validare le prop. Alcuni dei componenti integrati esportano un tipo per le prop che puoi importare e riutilizzare: `CollectionViewProps` (`@rebasepro/ui`); `CollectionEmptyStateProps`, `CollectionActionsProps`, `SidePanelBindingProps` e `FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps`, `EntityFormBindingProps`, `EntityFormActionsProps`, `CollectionTableBindingProps`, `DetailViewBindingProps`, `DrawerNavigationItemProps` e `DrawerNavigationGroupProps` (`@rebasepro/cms`); `LoginViewProps` (`@rebasepro/app`). Gli altri non forniscono un tipo esportato per le prop — definisci la struttura che leggi effettivamente.
+Il tuo componente sostitutivo riceve le stesse props fornite al componente integrato. La mappa degli override non definisce un tipo di props per chiave — `ComponentOverride<P>` imposta `P` su `Record<string, unknown>` per impostazione predefinita — pertanto tipizza autonomamente il parametro, oppure passa un argomento di tipo, quando desideri la verifica dei tipi sulle props. Alcuni dei componenti integrati esportano un tipo per le props che puoi importare e riutilizzare: `CollectionViewProps` (`@rebasepro/ui`); `CollectionEmptyStateProps`, `CollectionActionsProps`, `SidePanelBindingProps` e `FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps`, `EntityFormBindingProps`, `EntityFormActionsProps`, `CollectionTableBindingProps`, `DetailViewBindingProps`, `DrawerNavigationItemProps` e `DrawerNavigationGroupProps` (`@rebasepro/cms`); `LoginViewProps` (`@rebasepro/app`). I restanti non hanno un tipo esportato per le props: definisci la struttura che effettivamente utilizzi.
 
 ### Cosa deve rispettare un override di `Collection.View`
 
-`Collection.View` è ciò che viene disegnato da un `CollectionPanel`, quindi le prop del pannello raggiungono il tuo override come `CollectionViewBindingProps` (`@rebasepro/cms`), applicate in spread su quelle della collezione stessa. Un componente sostitutivo che le ignora compromette ogni pagina che incorpora la collezione. Rispetta almeno queste:
+`Collection.View` è ciò che viene renderizzato da `CollectionPanel`, quindi le props del pannello arrivano al tuo override come `CollectionViewBindingProps` (`@rebasepro/cms`), propagate insieme a quelle della collezione stessa. Un componente sostitutivo che le ignora provocherà il malfunzionamento di ogni pagina che incorpora la collezione. Rispetta almeno le seguenti:
 
 | Prop | Cosa si aspetta il chiamante |
 |---|---|
 | `collectionOverrides` | Le modifiche apportate dal chiamante alla collezione (un filtro fisso, un ordinamento, la modalità di visualizzazione), applicate sulla collezione registrata |
-| `fields` | Solo queste proprietà, in questo ordine: le colonne e gli elementi da cui vengono popolate le righe dell'elenco e le card |
-| `highlightedIds` | Gli id delle righe visualizzate come selezionate; `[]` per nessuna |
-| `onRowClick` | Invocato con la riga cliccata, così come inviata dal server, e il suo id, invece di aprirla. Il `onRowClick` proprio del pannello |
+| `fields` | Solo queste proprietà, in questo ordine: le colonne e i dati con cui vengono popolate le righe dell'elenco e le schede |
+| `highlightedIds` | Gli ID delle righe renderizzate come selezionate; `[]` per nessuna |
+| `onRowClick` | Chiamato con la riga cliccata, così come inviata dal server, e il suo ID, invece di aprirla. Rappresenta l'`onRowClick` del pannello stesso |
 
-Il pannello passa anche `viewMode` (la modalità con cui aprire), `toolbar` (la barra degli strumenti da visualizzare, `null` per nessuna) e `title` (`false` per non mostrare alcun titolo), se impostati dal chiamante. Il componente integrato `CollectionViewBinding` li gestisce tutti; un override che lo avvolge (wrap) anziché sostituirlo può inoltrarli direttamente.
+Il pannello passa inoltre `viewMode` (la modalità in cui aprire), `toolbar` (la barra degli strumenti da mostrare, `null` per nessuna) e `title` (`false` per non mostrare alcun titolo), laddove impostati dal chiamante. Il componente integrato `CollectionViewBinding` li gestisce tutti; un override che lo avvolge anziché sostituirlo può inoltrarli direttamente.
 
-Per iniziare dalla versione integrata anziché da zero, copia il suo codice sorgente nel tuo progetto e registra la copia qui: ogni elemento, ad eccezione di `Collection.View`, `DetailView` e del drag-and-drop della home page, compila con le importazioni dei pacchetti. Vedi [Copia di una parte integrata](/docs/frontend/customizing#copying-a-built-in-part).
+Per iniziare dal componente integrato anziché da zero, copia il suo codice sorgente nel tuo progetto e registra la copia qui: ogni parte, ad eccezione di `Collection.View`, `DetailView` e del drag-and-drop della home page, si compila con le importazioni dei pacchetti. Vedi [Copia di una parte integrata](/docs/frontend/customizing#copying-a-built-in-part).
 
-## Correlati
+## Contenuti correlati
 
 - [Estendere Rebase](/docs/frontend/extending/) — i punti di estensione che non richiedono un override
-- [Campi personalizzati](/docs/frontend/custom-fields/) — sostituire l'editor di una singola proprietà anziché un componente
+- [Campi personalizzati](/docs/frontend/custom-fields/) — sostituire l'editor di una singola proprietà anziché un intero componente
 - [Slot](/docs/frontend/slots/) — aggiungere elementi a un componente anziché sostituirlo

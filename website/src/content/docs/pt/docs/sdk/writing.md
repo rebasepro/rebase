@@ -1,21 +1,21 @@
 ---
-sourceHash: 6b709366d4a1db96
-title: Escrita de dados
-sidebar_label: Escrita de dados
-description: crie, faça upsert, atualize e exclua com o SDK — operações de campo, escritas condicionais, chaves de idempotência, escritas em lote e escrita entre coleções em uma única transação.
+sourceHash: dc2857e881f65bd3
+title: Gravação de dados
+sidebar_label: Gravação de dados
+description: create, upsert, update e delete com o SDK — operações de campo, gravações condicionais, chaves de idempotência, gravações em lote e gravação entre tabelas em uma única transação.
 ---
 
-As leituras estão em [Querying data](/docs/sdk/querying/). Esta página é a outra metade:
+As leituras estão em [Consulta de dados](/docs/sdk/querying/). Esta página é a outra metade:
 tudo o que altera uma linha.
 
-Cada método aqui passa pelo mesmo pipeline que uma escrita vinda de qualquer outro
-lugar passa — [callbacks](/docs/collections/callbacks/),
-[relações](/docs/collections/relations/) e
-[segurança em nível de linha](/docs/collections/security-rules/) continuam valendo. Nada
-disso é um atalho para burlar suas próprias regras; o que essas opções proporcionam é economizar
-um round trip, uma transação ou uma condição de corrida que você não precisa mais perder.
+Cada método aqui passa pelo mesmo pipeline que uma gravação originada de qualquer outro lugar
+passa — [hooks](/docs/collections/callbacks/),
+[relations](/docs/collections/relations/) e
+[row-level security](/docs/collections/security-rules/) continuam sendo aplicados. Nada
+disso é um atalho para burlar suas próprias regras; o que essas opções proporcionam é um round trip, uma
+transação ou uma condição de corrida que você não precisa mais perder.
 
-## Escritas em linha única
+## Gravações de linha única
 
 ### Create
 
@@ -44,37 +44,37 @@ await client.data.products.upsert(
 );
 ```
 
-O servidor decide qual das duas dentro de uma única transação, e recorre a
-`INSERT … ON CONFLICT DO UPDATE`, portanto, diferentemente de um `findById` seguido por um
-`create`-ou-`update`, ela não perde a condição de corrida entre os dois e, ao contrário do
+O servidor decide qual executar dentro de uma única transação e recorre a
+`INSERT … ON CONFLICT DO UPDATE`, portanto, diferentemente de um `findById` seguido por
+`create`-ou-`update`, ele não perde a corrida entre os dois e, ao contrário do
 `create`, não falha quando a linha já existe.
 
-Quando a linha existe, o upsert é uma atualização dela. Os campos que você envia são
-gravados e os que você omite mantêm seus valores armazenados — eles não são redefinidos
-para seu `defaultValue`. `beforeSave` e `afterSave` veem `status: "existing"`
-com os valores anteriores, e o histórico registra uma atualização. Uma chave que indica uma linha
-fora do escopo `beforeQuery` do chamador resulta em um 404.
+Quando a linha já existe, o upsert é uma atualização dela. Os campos enviados são
+gravados e os que você omitir mantêm seus valores armazenados — eles não são redefinidos
+para o seu `defaultValue`. `beforeSave` e `afterSave` visualizam `status: "existing"`
+com os valores anteriores, e o histórico registra uma atualização. Uma chave que referencia uma linha
+fora do escopo de `beforeQuery` de quem fez a chamada resulta em um 404.
 
-`onConflict` tem como padrão a chave primária, que é o alvo incorreto para a maioria das
-escritas em que um upsert é utilizado: indexado por um id serial que é uma simples
-inserção, já que o chamador não sabe o id — portanto, uma importação executável novamente
-duplica todas as linhas na segunda execução. Em vez disso, especifique a chave natural. Ela deve
-conter uma garantia de exclusividade com a qual o banco de dados possa fazer a correspondência — `validation: { unique:
-true }` na propriedade ou nas colunas de um [índice](/docs/backend/indexes/)
+O padrão de `onConflict` é a chave primária, que é o alvo incorreto para a maioria
+das gravações para as quais um upsert é utilizado: com base em um id serial que é uma
+inserção simples, porque quem chama não sabe o id — portanto, uma importação reexecutável
+duplicaria cada linha na segunda execução. Em vez disso, informe a chave natural. Ela deve
+conter uma garantia de unicidade com a qual o banco de dados possa fazer correspondência — `validation: { unique:
+true }` na propriedade, ou as colunas de um [índice](/docs/backend/indexes/)
 `unique: true` — e qualquer outra coisa resultará em um erro 400 listando os alvos
 que realmente existem, em vez de um erro gerado de dentro de uma transação.
 
-O timestamp `on_create` e o criador `user_on_create` de uma linha que já existia
-são mantidos intactos: um conflito significa que sua criação é um fato do passado.
+O timestamp `on_create` e o criador `user_on_create` de uma linha que já
+existia não são alterados: um conflito significa que sua criação é um fato do passado.
 
 #### Mantendo a linha armazenada: `where` e `ignoreDuplicates`
 
-`where` substitui a linha armazenada apenas quando ela corresponde — um filtro sobre as
-colunas da linha armazenada, escrito como um `find()` o escreve. `ignoreDuplicates` nunca
-a substitui. Em ambos os casos a chamada resolve para `undefined` quando a linha armazenada
-foi deixada como estava, e a verificação é da própria instrução (`ON CONFLICT … DO UPDATE
-… WHERE`, `ON CONFLICT DO NOTHING`), de modo que nenhuma outra escrita pode ocorrer entre
-uma leitura e a decisão:
+`where` substitui a linha armazenada apenas quando há correspondência — um filtro nas
+colunas da linha armazenada, escrito da mesma forma que em um `find()`. `ignoreDuplicates` nunca
+a substitui. De qualquer forma, a chamada é resolvida como `undefined` quando a linha armazenada
+for mantida como estava, e a verificação é feita pela própria instrução (`ON CONFLICT … DO UPDATE
+… WHERE`, `ON CONFLICT DO NOTHING`), portanto nenhuma outra gravação pode acontecer entre a leitura
+e a decisão:
 
 ```typescript
 // Keep the best score of the day: written only when it beats the stored one.
@@ -89,12 +89,19 @@ if (!claim) throw new Error("taken");
 ```
 
 `createMany(rows, { upsert: true, where })` e `{ upsert: true, ignoreDuplicates: true }`
-fazem o mesmo por linha e respondem apenas com as linhas que gravaram. Ambos exigem
-`upsert`, e os dois não podem ser combinados (`INVALID_CONFLICT_RULE`).
+fazem o mesmo por linha e retornam apenas as linhas que gravaram. Ambos necessitam de `upsert`, e
+os dois não podem ser combinados (`INVALID_CONFLICT_RULE`).
 
-#### Não na coleção de usuários
+#### Indisponível na tabela de autenticação
 
-`upsert()` na coleção de usuários (a que tem `auth` ativado) é recusado com um 400 (`INVALID_CONFLICT_TARGET`), assim como `createMany` com `upsert` nela. Criar um usuário e alterá-lo seguem regras diferentes — uma criação faz o hash da senha e envia o convite, uma atualização não pode rebaixar o último administrador — e um upsert só descobre qual dos dois é dentro da escrita. Chame `create` ou `update` em vez disso.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+O uso de `upsert()` na tabela de autenticação (aquela declarada com `defineAuthTable`) é recusado
+com um erro 400 (`INVALID_CONFLICT_TARGET`), assim como `createMany` com `upsert`.
+Criar um usuário e alterar um usuário seguem regras diferentes — uma criação
+gera o hash da senha e envia o convite; uma atualização não pode rebaixar o último
+administrador — e um upsert só descobre de qual caso se trata durante a gravação. Em vez disso,
+chame `create` ou `update`.
 
 ### Update
 
@@ -107,7 +114,7 @@ const updated = await client.data.products.update(42, {
 
 #### Operações de campo
 
-Em vez disso, um valor pode ser uma operação sobre o valor *armazenado*:
+Em vez disso, um valor pode ser uma operação no valor *armazenado*:
 
 ```typescript
 await client.data.posts.update(postId, {
@@ -119,28 +126,35 @@ await client.data.posts.update(postId, {
 
 | Operador | Tipo de propriedade | Significado |
 |----------|---------------------|-------------|
-| `$inc` | `number` | adiciona (negativo para subtrair) |
-| `$push` | `array` | anexa um valor, ou cada valor de um array |
-| `$pull` | `array` | remove todas as ocorrências de um valor |
-| `$merge` | `map` | faz a mesclagem superficial (shallow-merge) de um objeto |
+| `$inc` | `number` | somar (negativo para subtrair) |
+| `$push` | `array` | anexar um valor ou cada um de um array de valores |
+| `$pull` | `array` | remover todas as ocorrências de um valor |
+| `$merge` | `map` | mesclar superficialmente (shallow merge) um objeto |
 
-O motivo para recorrer a eles é a leitura que você deixa de fazer e a condição de corrida
-que essa leitura abriria. `views = current + 1` significa buscar `current` primeiro, e duas
-requisições que leem `4` escreverão `5` — um incremento é perdido e nenhuma
-das respostas avisa isso. Compilada na instrução, a aritmética acontece dentro do
-bloqueio da linha (row lock).
+O motivo para utilizá-las é a leitura que você deixa de fazer e a condição de corrida
+que essa leitura causaria. `views = current + 1` significa buscar `current` primeiro, e duas
+requisições que leem `4` cada uma gravarão `5` — um incremento é perdido e nenhuma das
+respostas indicará isso. Compilada na instrução, a aritmética ocorre dentro do
+bloqueio (lock) da linha.
 
-Exatamente um operador por campo, e apenas em uma atualização: em uma linha que ainda
-não existe não há nada sobre o que operar, portanto, uma operação em um `create`,
-`createMany` ou `upsert` retorna 400. Um operador no tipo de propriedade errado ou um
-`$operator` com erro de digitação resulta em um 400 informando o nome do campo — nunca em um documento JSON
+Exatamente um operador por campo, e apenas em um update: sobre uma linha que ainda
+não existe, não há nada sobre o que operar; portanto, uma operação em um `create`,
+`createMany` ou `upsert` resulta em um 400. Um operador no tipo de propriedade incorreto, ou um
+`$operator` com erro de digitação, resulta em um 400 identificando o campo — nunca em um documento JSON
 gravado na coluna.
 
-Uma operação responde à `validation` da propriedade como um valor, e isso inclui o valor que ela produz. `{ stock: { $inc: -1 } }` em um `stock` com `validation: { min: 0 }` tem sucesso enquanto o estoque for pelo menos 1 e é recusado em 0 com o mesmo 400 (`VALIDATION_CONSTRAINT`) que `{ stock: -1 }` recebe. O mesmo vale para `max`, `moreThan`, `lessThan`, `positive` e `negative`, e para a quantidade mínima e máxima de itens (`min`, `max`) de um array após um `$push` ou `$pull`. A verificação faz parte da instrução de atualização, então dois decrementos concorrentes de um estoque de 1 não podem ambos ter sucesso, e uma atualização recusada não grava nada.
+Uma operação responde à `validation` da propriedade da mesma forma que um valor simples, e
+isso inclui o valor resultante por ela produzido. `{ stock: { $inc: -1 } }` em um `stock` com
+`validation: { min: 0 }` é bem-sucedido enquanto o estoque for de pelo menos 1 e é recusado
+em 0 com o mesmo 400 (`VALIDATION_CONSTRAINT`) que `{ stock: -1 }` recebe. O
+mesmo se aplica a `max`, `moreThan`, `lessThan`, `positive` e `negative`, e aos itens
+`min` e `max` de um array após um `$push` ou `$pull`. A verificação faz parte
+da instrução de atualização, portanto dois decrementos simultâneos de um estoque igual a 1 não podem
+ser ambos bem-sucedidos, e uma atualização recusada não grava nada.
 
 Enquanto estiver offline, elas são recusadas em vez de enfileiradas: uma operação é avaliada
-em relação a um valor armazenado do qual o dispositivo não tem uma cópia atualizada, e uma linha
-otimista só poderia exibir o próprio marcador até que a fila fosse esvaziada.
+contra um valor armazenado do qual o dispositivo não tem uma cópia atual, e uma linha otimista
+só poderia exibir o próprio marcador até que a fila fosse processada.
 
 ### Delete
 
@@ -148,14 +162,14 @@ otimista só poderia exibir o próprio marcador até que a fila fosse esvaziada.
 await client.data.products.delete(42);
 ```
 
-Em uma coleção com [exclusão lógica](/docs/collections/soft-delete), isso marca a
+Em uma tabela com [soft delete](/docs/collections/soft-delete), isso marca a
 linha em vez de removê-la. `client.data.products.trash` lista, conta, restaura
-e exclui definitivamente as linhas marcadas.
+e expurga as linhas marcadas.
 
-### Escritas condicionais
+### Gravações condicionais
 
-`update` e `delete` aceitam um `ifMatch`, de forma que uma escrita é recusada caso a linha
-tenha sido alterada desde que você a leu:
+`update` e `delete` aceitam um `ifMatch`, de modo que uma gravação é recusada quando a linha foi
+alterada desde que você a leu:
 
 ```typescript
 import { etagOf } from "@rebasepro/client";
@@ -165,20 +179,20 @@ await client.data.posts.update(1, { title: "New" }, { ifMatch: etagOf(post) });
 // → RebaseApiError, status 412, if somebody edited it in between
 ```
 
-Sem isso, o ciclo leitura-modificação-escrita adota a regra do "último a escrever vence" (last-writer-wins) sobre tudo o que você
-não enviou: dois editores com um segundo de diferença são bem-sucedidos, e a alteração do primeiro
-é perdida sem nenhum erro em lugar algum.
+Sem isso, o fluxo de ler-modificar-gravar opera como "o último a gravar vence" sobre tudo o que você
+não enviou: dois editores com um segundo de diferença são ambos bem-sucedidos, e a alteração do primeiro é
+perdida sem nenhum erro em lugar algum.
 
-`etagOf(row)` lê a versão de uma linha originada de `findById`/`get`. Ela
-reside em uma chave não enumerável, portanto, nunca entra no tipo `Row` gerado, em um
-`JSON.stringify` ou em um spread para o próximo corpo de atualização. O valor é `undefined` para
-uma linha vinda de `find()`, do cache offline ou de um servidor que não envia
-`ETag` — e passar `undefined` não envia nenhuma pré-condição, fazendo com que a chamada acima
-se degrade para uma atualização comum em vez de lançar um erro.
+`etagOf(row)` lê a versão a partir de uma linha retornada por `findById`/`get`. Ele
+reside em uma chave não enumerável, portanto nunca entra no tipo `Row` gerado, em um
+`JSON.stringify` ou em um spread no corpo da próxima atualização. Ele é `undefined` para uma
+linha vinda de `find()`, do cache offline ou de um servidor que não envia
+`ETag` — e passar `undefined` não envia nenhuma pré-condição, logo a chamada acima
+se degrada para uma atualização comum em vez de lançar um erro.
 
-Uma linha vinda de `update()` carrega a versão que essa escrita produziu, de modo que
-edições condicionais se encadeiam sem uma leitura entre elas. Uma linha que um callback de `listenById()`
-recebe carrega a versão que esse frame mostra:
+Uma linha retornada por `update()` carrega a versão produzida por aquela gravação, permitindo que
+edições condicionais sejam encadeadas sem uma leitura intermediária. Uma linha que um callback de `listenById()`
+recebe carrega a versão exibida naquele frame:
 
 ```typescript
 import { etagOf } from "@rebasepro/client";
@@ -192,38 +206,38 @@ client.data.posts.listenById(1, (post) => {
 await client.data.posts.update(1, { title: "New" }, { ifMatch: etagOf(shown) });
 ```
 
-A partir de um navegador em outra origem — um frontend Vite em sua própria
-porta, um host `app.` chamando um host `api.` — o `ETag` só é legível porque o
-servidor o nomeia em `Access-Control-Expose-Headers`. O runtime do Rebase faz
-isso, junto com `Retry-After`, `X-Request-ID`, os cabeçalhos `X-RateLimit-*` e
-`Preference-Applied`. Um backend que configura seu próprio `cors()` precisa
-expor a mesma lista, ou o `etagOf` é sempre `undefined` ali e toda escrita
-condicional sai como incondicional.
+A partir de um navegador em outra origem — um frontend Vite em sua própria porta, um host `app.`
+chamando um host `api.` — a `ETag` só pode ser lida porque o servidor a especifica
+em `Access-Control-Expose-Headers`. O runtime do Rebase faz isso, juntamente
+com `Retry-After`, `X-Request-ID`, os cabeçalhos `X-RateLimit-*` e
+`Preference-Applied`. Um backend que configura seu próprio `cors()` deve expor a
+mesma lista; caso contrário, `etagOf` será sempre `undefined` nele e toda gravação condicional
+será enviada de forma incondicional.
 
-### Ignorando a resposta
+### Omitindo a resposta
 
-Toda escrita resolve para a linha que foi gravada. Passe `{ returning: false }` quando
+Toda gravação é resolvida para a linha que foi gravada. Passe `{ returning: false }` quando você
 não precisar dela:
 
 ```typescript
 await client.data.events.create({ kind: "page_view" }, undefined, { returning: false });
 ```
 
-Isso envia `Prefer: return=minimal`; o servidor responde com `204` para uma escrita única
-e apenas com os ids para um lote. O método então resolve para `undefined` (ou `[]`),
+Isso envia `Prefer: return=minimal`; o servidor responde `204` para uma gravação individual
+e apenas os ids para um lote. O método então resolve para `undefined` (ou `[]`),
 evitando que você use acidentalmente uma linha que o servidor nunca enviou. Vale a pena em importações
-e escritas do tipo "dispare e esqueça" (fire-and-forget) — o padrão é retornar a linha porque ela traz o que o
-*servidor* determinou.
+e gravações do tipo dispara-e-esquece — o padrão é retornar a linha porque ela traz o que o
+*servidor* definiu.
 
-## Escritas em lote
+## Gravações em lote
 
-Três operações escrevem várias linhas em uma **única requisição e em uma única
-transação**. Cada linha ainda passa pelo pipeline normal — callbacks, relações,
-segurança em nível de linha — portanto, um lote não é um atalho para burlar suas próprias regras; o ganho
-é um round trip e uma transação em vez de N de cada.
+Três operações gravam várias linhas em uma **única requisição e em uma única
+transação**. Cada linha ainda passa pelo pipeline normal — hooks, relations,
+row-level security — portanto, um lote não é um atalho para ignorar suas próprias regras; o ganho
+é ter um único round trip e uma única transação em vez de N de cada.
 
-Todas as três são **tudo ou nada**. Se qualquer linha for rejeitada, nenhuma delas será gravada e
-o erro indicará o índice com problema.
+Todas as três são no formato **tudo-ou-nada**. Se qualquer linha for rejeitada, nenhuma delas será aplicada e
+o erro indicará o índice problemático.
 
 ```typescript
 // Create
@@ -242,47 +256,46 @@ await client.data.orders.updateMany([
 await client.data.sessions.deleteMany(["s-1", "s-2"]);
 ```
 
-### Quantas instruções um lote representa
+### Quantas instruções compõem um lote
 
-Em uma coleção sem hooks `beforeSave`, `afterSave` ou `afterSaveError`, sem
-`history` e sem `tenant`, um lote é um punhado de instruções em vez de uma por
-linha: `createMany` envia instruções `INSERT … RETURNING` de várias linhas (com
-`upsert`, `INSERT … ON CONFLICT … DO UPDATE`), e `updateMany` um
-`UPDATE … FROM (VALUES …) RETURNING` por sequência de entradas que definem os
-mesmos campos. Padrões declarados, carimbos de `autoValue`, `afterRead` e eventos
-de realtime se aplicam a cada linha como se aplicam uma a uma. Se o banco recusar
-o lote, ele é desfeito e reexecutado linha a linha, para que o erro ainda aponte
-a entrada que falhou. Uma coleção que declara um desses hooks mantém o pipeline
-linha a linha, porque cada hook roda uma vez por linha entre as gravações dessa
-linha.
+Em uma tabela sem nenhum hook `beforeSave`, `afterSave` ou `afterSaveError`,
+sem `history` e sem `tenant`, um lote é composto por poucas instruções em vez de
+uma por linha: `createMany` envia instruções `INSERT … RETURNING` de múltiplas linhas (com
+`upsert`, `INSERT … ON CONFLICT … DO UPDATE`), e `updateMany` envia um
+`UPDATE … FROM (VALUES …) RETURNING` para cada sequência de entradas que definem os mesmos
+campos. Valores padrão declarados, carimbos `.onCreateNow()` / `.onUpdateNow()`, `afterRead` e eventos de tempo real
+se aplicam a cada linha da mesma forma que ocorrem individualmente. Se o banco de dados recusar o
+lote, ele é desfeito e reexecutado linha por linha para que o erro continue identificando a entrada
+que falhou. Uma tabela que declare um desses hooks mantém o pipeline linha por linha,
+pois cada hook é executado uma vez por linha entre as gravações daquela linha.
 
-Um `update` isolado também não lê nada quando nada precisa da linha armazenada:
-o `UPDATE … RETURNING` é ao mesmo tempo o 404 de uma linha ausente e a linha que
-ele devolve. Um `delete` sem hook, histórico ou lixeira a atender também não lê nada.
+Um `update` individual da mesma forma não lê nada quando nada necessita da linha armazenada:
+o `UPDATE … RETURNING` é tanto o 404 para uma linha inexistente quanto a linha com a qual ele
+responde. Um `delete` sem hook, histórico ou lixeira para atender também não faz nenhuma leitura.
 
-### Quantas idas ao banco uma escrita representa
+### Quantos round trips compõem uma gravação
 
-Uma escrita em uma coleção assim é uma única ida ao banco de dados (round trip): o
-`BEGIN` da transação, a identidade do chamador, a instrução e o `COMMIT` seguem em um
-único lote. Isso vale para `create`, `update`, `upsert`, `delete`, `updateWhere`,
-`deleteWhere` e um `createMany` escrito em conjunto. Uma instrução que o banco recusa
-pula o `COMMIT` que vem depois dela, e a escrita é desfeita como qualquer outra que
-falha. Uma escrita que executa um hook ou registra histórico envia seu `COMMIT` depois
-deles, em uma segunda ida ao banco.
+Uma gravação em uma tabela desse tipo é um único round trip até o banco de dados: o
+`BEGIN` da transação, a identidade de quem chamou, a instrução e o `COMMIT` vão todos
+em um único lote. Isso vale para `create`, `update`, `upsert`, `delete`,
+`updateWhere`, `deleteWhere` e um `createMany` gravados juntos. Uma instrução que
+o banco de dados recuse ignora o `COMMIT` subsequente, e a gravação sofre rollback como
+qualquer falha. Uma gravação que executa um hook ou registra histórico envia seu
+`COMMIT` após eles, em um segundo round trip.
 
-### Por que `{ id, data }` em vez de linhas simples
+### Por que `{ id, data }` em vez de linhas planas
 
-O `createMany` recebe linhas simples (flat rows) porque uma linha sendo criada *é* suas colunas.
-O `updateMany` especifica o endereço separadamente, porque em uma tabela cuja chave é algo
-além do `id` — um `sku`, uma chave composta —, uma linha simples não tem como dizer se uma
-coluna é o endereço ou um valor a ser gravado. Isso reproduz exatamente o
+`createMany` recebe linhas planas porque uma linha que está sendo criada *são* suas próprias colunas.
+`updateMany` especifica o endereço separadamente porque, em uma tabela cuja chave seja algo
+além de `id` — um `sku`, uma chave composta —, uma linha plana não consegue indicar se uma
+coluna é o endereço ou um valor a ser gravado. Isso espelha exatamente o
 `update(id, data)` de linha única.
 
-## Escrita por filtro
+## Gravação por filtro
 
-`updateWhere` e `deleteWhere` gravam todas as linhas que um filtro seleciona, em uma única
-instrução — `UPDATE … WHERE … RETURNING` e `DELETE … WHERE`. O filtro é o `where` e o
-`logical` que um `find()` recebe:
+`updateWhere` e `deleteWhere` gravam todas as linhas correspondentes a um filtro em uma única
+instrução — `UPDATE … WHERE … RETURNING` e `DELETE … WHERE`. O filtro corresponde ao
+`where` e `logical` aceitos por `find()`:
 
 ```typescript
 // Every expired session, gone; resolves to how many.
@@ -295,10 +308,10 @@ const bumped = await client.data.songs.updateWhere(
 );
 ```
 
-Um filtro que não corresponde a nada não é um erro — `[]`, ou `0` — o que também faz do
-`deleteWhere` o delete para uma linha que talvez já não exista, onde `delete` responde
-404. E, como a instrução que grava é a mesma que verifica o filtro, ele é um
-compare-and-set:
+Um filtro que não corresponda a nada não é um erro — retorna `[]` ou `0` —, o que também faz do
+`deleteWhere` a deleção adequada para uma linha que já pode não existir mais,
+onde `delete` responderia com 404. E como a instrução que grava é a mesma que verifica o
+filtro, trata-se de uma operação compare-and-set:
 
 ```typescript
 // Save only over the revision this client read; [] means somebody else saved first.
@@ -308,49 +321,49 @@ const [saved] = await client.data.saves.updateWhere(
 );
 ```
 
-Um filtro sem nenhuma condição é recusado com `FILTER_REQUIRED` em vez de executado —
-ele endereçaria todas as linhas — e um campo que não é uma coluna é recusado como em uma
-leitura, nunca descartado. Uma atualização filtrada não pode definir uma coluna de chave.
+Um filtro sem condições é recusado com `FILTER_REQUIRED` em vez de ser executado —
+caso contrário, afetaria todas as linhas — e um campo que não seja uma coluna é recusado assim como
+em uma leitura, nunca ignorado silenciosamente. Um update filtrado não pode alterar uma coluna de chave.
 
-Em uma coleção cujas escritas executam trabalho por linha — um hook de save ou delete,
-histórico, tenancy, um `beforeQuery`, soft delete, acesso por campo — as linhas
-correspondentes são lidas sob o escopo do chamador e gravadas uma a uma pelo pipeline
-completo, em uma única transação. Via HTTP, estas são as rotas em massa com um filtro no
-lugar dos ids: `PATCH /api/data/<slug>/bulk` com `{ where, logical, data }` e
-`POST /api/data/<slug>/bulk/delete` com `{ where, logical }`. Elas não estão disponíveis na
-coleção de usuários, cujas atualizações e exclusões são verificadas usuário por usuário
-(`FILTERED_USER_WRITE`); nomeie os usuários com `updateMany`/`deleteMany`.
+Em uma tabela cujas gravações executam processamento por linha — um hook de salvamento ou deleção, histórico,
+tenancy, um `beforeQuery`, soft delete, controle de acesso por campo —, as linhas correspondentes são
+lidas no escopo de quem fez a chamada e gravadas uma a uma através do pipeline completo,
+em uma única transação. Via HTTP, essas são as rotas bulk com um filtro
+no lugar dos ids: `PATCH /api/data/<slug>/bulk` com `{ where, logical, data }`
+e `POST /api/data/<slug>/bulk/delete` com `{ where, logical }`. Elas não estão
+disponíveis na tabela de autenticação, cujas atualizações e deleções são verificadas usuário
+por usuário (`FILTERED_USER_WRITE`); especifique os usuários com `updateMany`/`deleteMany`.
 
-### Novas tentativas e duplicatas
+### Tentativas de repetição e duplicatas
 
-Um cliente que nunca recebe a resposta não tem como saber se o lote foi confirmado (committed),
-então ele tenta novamente — e, sem uma chave, o servidor não consegue distinguir essa nova tentativa de
-um segundo lote autêntico. Passe uma chave de idempotência em qualquer coisa que possa ser reenviada:
+Um cliente que nunca recebe a resposta não tem como saber se o lote foi confirmado,
+portanto tenta novamente — e, sem uma chave, o servidor não consegue diferenciar essa nova tentativa
+de um segundo lote legítimo. Passe uma chave de idempotência em qualquer requisição que possa ser reenviada:
 
 ```typescript
 const attemptKey = crypto.randomUUID();
 await client.data.products.createMany(rows, { idempotencyKey: attemptKey });
 ```
 
-Uma chave identifica uma única requisição, não um trabalho (job): ela é registrada para o método, o caminho
-e o corpo com os quais foi enviada. Reenviar exatamente essa requisição reproduz sua resposta;
+Uma chave identifica uma única requisição, não um trabalho: ela é registrada para o método, o caminho
+e o corpo com os quais foi enviada. Reenviar exatamente essa mesma requisição reproduz a sua resposta anterior;
 a mesma chave em uma requisição diferente é recusada com `IDEMPOTENCY_KEY_REUSED`
-(422). Portanto, gere uma por chamada em vez de reutilizar um id de negócio — um `importId`
-compartilhado entre o `createMany` e o `deleteMany` de uma mesma importação deixaria a
-exclusão silenciosamente sem ser executada.
+(422). Portanto, gere uma nova para cada chamada em vez de reutilizar um id de negócio — um `importId`
+compartilhado pelo `createMany` e pelo `deleteMany` de uma importação faria com que a
+deleção fosse silenciosamente ignorada.
 
-Uma nova tentativa que chega enquanto a primeira tentativa ainda está sendo respondida recebe
-`IDEMPOTENCY_KEY_IN_PROGRESS` (409): envie-a novamente e ela será respondida com
-o resultado da primeira tentativa assim que for concluída. As chaves são respeitadas por 24 horas e
-apenas para um chamador autenticado — caso contrário, não há uma entidade (principal) à qual associá-la.
+Uma retentativa que chega enquanto a primeira tentativa ainda está sendo processada recebe
+`IDEMPOTENCY_KEY_IN_PROGRESS` (409): envie-a novamente, e ela será respondida com o
+resultado da primeira tentativa assim que esta for concluída. As chaves são válidas por 24 horas e
+apenas para um chamador autenticado — caso contrário, não haveria um principal para definir seu escopo.
 
-A fila offline define uma chave automaticamente a cada repetição (replay).
+A fila offline define uma chave automaticamente a cada repetição.
 
 ### Limites
 
-Os lotes são limitados no lado do servidor (1000 linhas por padrão), pois um lote mantém
-seus bloqueios durante toda a transação. Ultrapassar isso resulta em um erro `BULK_TOO_LARGE` que
-informa tanto o limite quanto a contagem de linhas enviada, portanto, divida em partes (chunks):
+Os lotes têm um limite máximo definido no servidor (1000 linhas por padrão), pois um lote mantém
+seus locks durante toda a transação. Ultrapassar esse limite gera um erro `BULK_TOO_LARGE` que
+informa tanto o limite quanto a contagem de linhas enviada, portanto, divida em partes:
 
 ```typescript
 for (const chunk of chunks(rows, 1000)) {
@@ -358,67 +371,69 @@ for (const chunk of chunks(rows, 1000)) {
 }
 ```
 
-Uma fonte de dados que não consegue gravar atomicamente relata `BULK_UNSUPPORTED` em vez
-de executar silenciosamente escritas individuais em loop — o que não ofereceria nem a atomicidade
+Uma fonte de dados que não pode gravar atomicamente relata `BULK_UNSUPPORTED` em vez
+de executar silenciosamente gravações individuais em loop — o que não ofereceria nem a atomicidade
 nem o round trip único que você buscou ao usar um lote.
 
-## Escrita entre coleções
+## Gravação entre tabelas
 
-O `createMany` e similares operam em uma coleção de cada vez. `client.batch()` é a
-forma entre coleções: uma requisição, uma transação, tudo ou nada.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+`createMany` e métodos afins operam em uma tabela por vez. `client.batch()` é a
+forma entre tabelas: uma requisição, uma transação, tudo ou nada.
 
 ```typescript
 const result = await client.batch([
-    { op: "create", collection: "orders",
+    { op: "create", table: "orders",
       values: { total: 40 }, ref: "order" },
-    { op: "create", collection: "orderItems",
+    { op: "create", table: "orderItems",
       values: { orderId: { $ref: "order.id" }, sku: "A-1" } },
-    { op: "update", collection: "stock",
+    { op: "update", table: "stock",
       id: "A-1", values: { count: { $inc: -1 } } },
-    { op: "delete", collection: "carts", id: "c-9" }
+    { op: "delete", table: "carts", id: "c-9" }
 ]);
 
 result.data;  // [ order, item, stock, null ] — aligned to the operations
 result.meta;  // { operations: 4 }
 ```
 
-`op` é `create`, `update`, `upsert` ou `delete`, e `collection` restringe
-`values` ao formato gerado de `Insert` ou `Update` daquela coleção — uma coluna
-que a coleção não tem é um erro de compilação, assim como um `create` sem uma
-coluna obrigatória. `collection` é o accessor, o nome que `client.data.<accessor>`
-usa (`orderItems` para o slug `order_items`); o cliente envia o slug, através do
-dicionário `collections` com o qual foi criado. Cada operação executa o pipeline
-que seu equivalente de linha única executaria — a mesma validação, callbacks e
-segurança em nível de linha, como o mesmo usuário.
+`op` é `create`, `update`, `upsert` ou `delete`, e `table` restringe
+`values` ao formato de `Insert` ou `Update` gerado para aquela tabela — uma coluna
+que a tabela não possui gera um erro de compilação, assim como um create no qual falte um
+campo obrigatório. `table` é o acessador, o nome adotado por `client.data.<accessor>`
+(`orderItems` para o slug `order_items`); o cliente envia o slug,
+por meio do dicionário `tables` com o qual foi criado. Cada
+operação executa o pipeline que seu equivalente de linha única executaria — a mesma
+validação, hooks e row-level security, sob o mesmo usuário.
 
 ### `$ref`
 
-Uma operação pode se identificar com `ref`; uma posterior pode usar
-`{ $ref: "<name>.<field>" }` onde quer que um valor seja aceito, inclusive como um `id` e em
-qualquer profundidade dentro de `values`. Isso é resolvido para aquele campo da linha gravada
-pela operação nomeada.
+Uma operação pode definir um identificador próprio com `ref`; uma operação posterior pode inserir
+`{ $ref: "<name>.<field>" }` em qualquer lugar onde um valor for aceito, inclusive como um `id` e em
+qualquer nível de profundidade dentro de `values`. Isso é resolvido para aquele campo da linha gravada
+pela operação identificada.
 
-É por isso que o método existe em vez de um loop sobre o `createMany`: a chave
-estrangeira do filho não existe até que o pai seja inserido, então os dois teriam
-que ser requisições separadas — e requisições separadas podem ser concluídas pela metade. A recuperação
-disso (ler de volta, descobrir qual metade foi gravada, desfazê-la) é um código que ninguém
-escreve.
+É por isso que o método existe em vez de um loop sobre `createMany`: a chave
+estrangeira do registro filho não existe até que o pai seja inserido, de modo que os dois teriam que
+ser requisições separadas — e requisições separadas podem ter sucesso apenas parcial. A recuperação
+disso (ler novamente, identificar qual metade foi aplicada e desfazê-la) é um código que ninguém
+quer escrever.
 
-Apenas referências para trás (backward references) são resolvidas. Uma referência para frente é recusada antes da
-abertura da transação, juntamente com coleções desconhecidas, campos desconhecidos, operações de campo
-inválidas e alvos de conflito inelegíveis — porque descobrir um erro na
-operação 40, de outra forma, custaria o rollback das 39 escritas anteriores.
+Apenas referências para operações anteriores são resolvidas. Uma referência futura é recusada antes
+que a transação seja aberta, juntamente com tabelas desconhecidas, campos desconhecidos, operações de campo
+inválidas e alvos de conflito inelegíveis — porque descobrir um erro na operação 40 custaria, de outro modo,
+o rollback das 39 gravações anteriores a ela.
 
 ### Limites e falhas
 
-O mesmo limite de 1000 operações de uma escrita em massa, pelo mesmo motivo: um lote
-mantém seus bloqueios durante toda a transação. Um `update` ou `delete` que especifique uma linha
-que não existe faz todo o lote falhar com um erro 404. Um backend cujo driver
-não possa garantir a atomicidade responde com `BATCH_UNSUPPORTED` em vez de entrar em loop.
+O mesmo limite de 1000 operações de uma gravação em massa, pelo mesmo motivo: um lote
+mantém seus locks durante toda a transação. Um `update` ou `delete` especificando uma linha
+que não existe faz todo o lote falhar com um 404. Um backend cujo driver não ofereça suporte
+a atomicidade responde com `BATCH_UNSUPPORTED` em vez de executar um loop.
 
-`idempotencyKey` e `returning` funcionam da mesma forma que em qualquer outra escrita.
+`idempotencyKey` e `returning` funcionam da mesma forma que em qualquer outra gravação.
 
 No lado do servidor, `rebase.dataAsAdmin.batch([...])` e `context.data.batch([...])`
-recebem as mesmas operações e respondem o mesmo resultado, na transação do próprio
-chamador. `batch` é reservado ali como `collection` é: uma coleção cujo accessor é
-`batch` é acessada com `data.collection("batch")`.
+aceitam as mesmas operações e respondem com o mesmo resultado, na transação do próprio chamador.
+`batch` é uma palavra reservada ali, assim como `table`: uma tabela cujo
+acessador seja `batch` é acessada com `data.table("batch")`.

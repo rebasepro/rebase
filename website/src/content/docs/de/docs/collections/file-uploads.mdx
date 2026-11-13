@@ -1,161 +1,181 @@
 ---
-sourceHash: a0dfd4167267de59
+sourceHash: 5037df8f9b275f93
 title: Datei-Upload-Felder
 sidebar_label: Datei-Uploads
-description: "Deklarieren eines Datei- oder Bildfeldes in einer Collection: der Storage-Block, Einzel- und Mehrfach-Datei-Uploads und welche der Optionen das Panel anstelle des Servers auflöst."
+description: "Wie das CMS eine col.storage()-Spalte als Upload-Feld darstellt: die Regeln, die der Server für die Spalte erzwingt, die reinen Browser-Funktionen, die customizeTable hinzufügt, Einzel- und Mehrdatei-Felder und was mit gespeicherten Dateien passiert."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
 
-Ein Dateifeld ist eine gewöhnliche **String**-Property mit einem `storage`-Block. Die
-Spalte enthält Text — den Key des Objekts im Bucket oder dessen URL, falls Sie
-diese anfordern — und der Block legt fest, wohin die Bytes übertragen werden und was das Formular akzeptiert.
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-Diese Trennung ist wichtiger, als es zunächst scheint. Der Großteil von `storage` wird vom Uploader des
-Admin-Panels auf dem Weg zur API gelesen, sodass ein Schreibvorgang, der nicht aus einem
-Formular stammt, diesen nicht durchläuft — diese Optionen tragen die untenstehende Kennzeichnung. Die beiden
-Optionen, die bestimmen, was eine Datei sein *darf*, `maxSize` und `acceptedFiles`, bilden die Ausnahme:
-Der Server prüft sie bei jedem Upload in den `storagePath` der Property.
+Ein Dateifeld ist eine [`col.storage()`](/docs/schema/columns/#storage-columns)-Spalte.
+Die Spalte enthält Text, den Schlüssel des Objekts im Bucket (oder dessen URL,
+falls die Spalte dies vorgibt), und das CMS stellt sie als Upload-Feld mit einer
+Vorschau dar.
+
+Die Funktionsweise eines Storage-Feldes ist zweigeteilt, je nachdem, wo sie ausgeführt wird:
+
+| Deklariert | Wo | Optionen |
+|---|---|---|
+| an der Spalte, in `backend/schema` | vom Server **und** dem CMS gelesen | `path`, `source`, `accept`, `maxBytes`, `imageResize`, `public`, `fileName`, `metadata`, `includeBucketUrl`, `storeUrl` |
+| in `customizeTable`, in `frontend/src/cms` | nur im Browser | `storage.path(…)`, `storage.fileName(…)`, `storage.processFile`, `storage.postProcess`, `storage.previewUrl` |
+
+Die Optionen der Spalte sind serialisierbar, sodass sie im Deskriptor der Tabelle
+übertragen werden und der Server erzwingt, was er davon durchsetzen kann. Die
+`customizeTable`-Optionen sind Funktionen: Sie können den Server nicht erreichen,
+daher wirken sie sich nur auf Uploads aus, die über das CMS getätigt werden.
 
 ## Eine Datei
 
-```typescript
-avatar: {
-    type: "string",
-    name: "Main image",
-    storage: {
-        storagePath: "avatars",
-        acceptedFiles: ["image/*"],
-        maxSize: 2 * 1024 * 1024
-    }
-}
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+```ts
+// backend/schema/listings.ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const listings = defineTable("listings", {
+    columns: {
+        id:     col.uuid().primaryKey().defaultRandom(),
+        title:  col.text().notNull(),
+        cover:  col.storage({ path: "listings/{id}/", accept: ["image/*"], maxBytes: "10MB",
+                              imageResize: { maxWidth: 1600, format: "webp", quality: 80 } }),
+        photos: col.storage({ path: "listings/{id}/gallery/", accept: ["image/*"] }).multiple(),
+    },
+    rls: "admin-only",
+});
 ```
+
+`cover` ist ein Upload-Feld, das ein Bild von maximal 10 MB akzeptiert, auf maximal
+1600 Pixel Breite skaliert und als WebP gespeichert wird. Eine Spalte, deren `accept`
+einen Bildtyp angibt, wird als Bild in der Vorschau angezeigt, und die erste dieser
+Spalten füllt den Bild-Slot des Datensatzes in Karten und Listen.
 
 <FieldWidgetPreview client:only="react" variant="file_upload" />
 
 ## Mehrere Dateien
 
-Ein Array desselben Typs. Der `storage`-Block wandert nach `of`, da er
-jedes einzelne Element und nicht die Liste beschreibt:
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-```typescript
-images: {
-    type: "array",
-    name: "Images",
-    of: {
-        type: "string",
-        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
-    }
-}
-```
+`.multiple()` macht die Spalte zu einem `TEXT[]` und das Feld zu einem Multi-Datei-Upload,
+dessen Reihenfolge per Drag & Drop geändert werden kann. Jede Option gilt für jede Datei.
 
 <FieldWidgetPreview client:only="react" variant="multi_file_upload" />
 
-## Storage-Optionen
+## Browserseitige Optionen
 
-Alles innerhalb von `storage`.
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-| Property | Typ | Beschreibung |
-|----------|------|-------------|
-| `storagePath` | `string \| function` | **Erforderlich.** Gibt an, wohin die Datei im Bucket abgelegt wird. Ein String mit Platzhaltern — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{id}` (die ID des Datensatzes; `{entityId}` wird identisch interpretiert), `{propertyKey}`, `{path}` — oder eine Funktion des Upload-Kontexts, welche die ID des Datensatzes `id` nennt. **Nur im Admin-Formular — wird von der API oder der Datenbank nicht erzwungen:** Der Uploader des Panels löst dies auf, und `client.storage.upload()` vergibt seinen eigenen Key. Ein String-Pfad ist auch der Ort, an dem der Server jeden Upload an die `maxSize` und `acceptedFiles` dieser Property bindet |
-| `fileName` | `string \| function` | Der Dateiname des hochgeladenen Objekts mit denselben Platzhaltern. **Nur im Admin-Formular — wird von der API oder der Datenbank nicht erzwungen.** |
-| `storageSource` | `string` | Welcher registrierte Bucket verwendet wird, wenn ein Projekt mehr als einen hat. Das Handle `bucket("media")` funktioniert hier ebenfalls |
-| `public` | `boolean` | Unter dem öffentlichen Präfix speichern und über eine stabile, tokenlose, cachebare URL bereitstellen. Standardmäßig `false`, was private Objekte und kurzlebige signierte URLs bedeutet |
-| `acceptedFiles` | `FileType[]` | MIME-Types, die diese Property akzeptiert. Die Sternchen-Form funktioniert — `image/*`. **Vom Server erzwungen** für jeden Upload in den `storagePath` der Property — siehe [Was der Server prüft](#was-der-server-prüft) |
-| `maxSize` | `number` | Größte zulässige Datei in Bytes. **Vom Server erzwungen**, genau wie `acceptedFiles`, sowohl für reguläre als auch für fortsetzbare (resumable) Upload-Pfade |
-| `metadata` | `Record<string, unknown>` | Objekt-Metadaten, die zusammen mit der Datei gespeichert werden sollen |
-| `includeBucketUrl` | `boolean` | Schreibt `s3://my-bucket/path/to/file.png` anstelle von `path/to/file.png` in die Spalte. Standardmäßig `false` |
-| `storeUrl` | `boolean` | Schreibt die Download-URL anstelle des Keys in die Spalte. Standardmäßig `false` und es empfiehlt sich, dies so zu belassen: Eine URL mit Token funktioniert nicht mehr, sobald das Token abläuft, und die ursprüngliche Referenz ist dann verloren |
-| `imageResize` | `ImageResize` | Größenänderung und Zuschnitt vor dem Upload für `image/jpeg`, `image/png` und `image/webp`. **Nur im Admin-Formular — wird von der API oder der Datenbank nicht erzwungen.** |
-| `processFile` | `(file: File) => Promise<File>` | Transformiert die Datei vor dem Upload. Läuft im Browser. **Nur im Admin-Formular — wird von der API oder der Datenbank nicht erzwungen.** |
-| `postProcess` | `(pathOrUrl: string) => Promise<string>` | Transformiert den aufgelösten Pfad oder die URL vor dem Speichern. Läuft im Browser. **Nur im Admin-Formular — wird von der API oder der Datenbank nicht erzwungen.** |
-| `previewUrl` | `(fileName: string) => string` | Erstellt die Vorschau-URL für Fälle, in denen die tatsächliche Adresse der Datei nicht der Wert des Feldes ist. **Nur im Admin-Formular — wird von der API oder der Datenbank nicht erzwungen.** |
+```tsx
+// frontend/src/cms/listings.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { listings } from "../../../backend/schema/listings";
 
-### Größenänderung
+export const listingsCms = customizeTable<typeof listings>("listings", {
+    fields: {
+        cover: {
+            storage: {
+                // A folder per listing title, computed in the browser.
+                path: ({ values }) => `listings/${String(values.title ?? "untitled").toLowerCase()}/`,
+                fileName: ({ file }) => `${Date.now()}-${file.name}`,
+            },
+            urlPreview: "image",
+        },
+        photos: {
+            sortable: true,
+            storage: { processFile: async (file) => file },
+        },
+    },
+});
+```
 
-`imageResize` akzeptiert `maxWidth` und `maxHeight` in Pixeln, einen `mode` von
-`"contain"` (herunterskalieren zum Einpassen, der Standard) oder `"cover"` (den Bereich füllen und
-beschneiden), ein `format` von `"original"`, `"jpeg"`, `"png"` oder `"webp"` sowie eine
-`quality` zwischen 0 und 100 für die verlustbehafteten Formate — standardmäßig 80. Dies geschieht im
-Browser, bevor die Bytes gesendet werden, sodass ein Upload, der nicht über das
-Panel erfolgte, in seiner Originalgröße gespeichert wird.
+| `storage.` | Ausführung | Auswirkung |
+|---|---|---|
+| `path(context)` | vor einem Upload | Der Ordner, in den die Datei gelangt, ersetzt die `path`-Vorlage der Spalte. |
+| `fileName(context)` | vor einem Upload | Der gespeicherte Dateiname, ersetzt die `fileName`-Vorlage der Spalte. Kann asynchron sein. |
+| `processFile(file)` | vor einem Upload | Transformiert die Datei (komprimieren, Metadaten entfernen). |
+| `postProcess(pathOrUrl)` | nach einem Upload | Transformiert den Pfad oder die URL, bevor er/sie in die Spalte geschrieben wird. |
+| `previewUrl(fileName)` | beim Rendern | Die URL zur Vorschau einer gespeicherten Datei, wenn sie nicht der Wert des Feldes ist. |
 
-### Was der Server prüft
+`path` und `fileName` erhalten den Kontext des Uploads: das `file`, die `id` des
+Datensatzes (fehlt bei einem neuen Datensatz), seine bearbeiteten `values`, den
+`propertyKey` und die aufgelösten Storage-Regeln. Bei einer `.multiple()`-Spalte
+werden dieselben `storage`-Optionen direkt auf das Feld angewendet und gelten für
+jede Datei.
 
-`maxSize` und `acceptedFiles` wurden früher von genau einer Stelle durchgesetzt: dem
-Browser. Die Upload-Route kannte lediglich eine globale Größenbegrenzung und wusste nichts über die
-Property, für die eine Datei bestimmt war. So konnte `curl -F file=@payload.exe` am Dateiauswahldialog
-vorbei eine 40 MB große ausführbare Datei in den Avatar-Bucket laden, ohne dass die Konfiguration,
-die anderes vorschrieb, jemals herangezogen wurde.
+`urlPreview` legt fest, wie der gespeicherte Wert in der Vorschau angezeigt wird
+(`"image"`, `"video"`, `"audio"`, `"file"` oder `true` für einen Link), und `clearable`
+fügt ein Steuerelement hinzu, das das Feld leert.
 
-Beide werden nun vom Server anhand dessen geprüft, **wo die Datei abgelegt wird**. Der
-`storagePath` einer Property ist der Ort, an den ihre Dateien gelangen, daher gelten dort auch
-ihre Beschränkungen: Jeder Upload, dessen Key eine Datei direkt unter diesem Pfad ist — sei es über das
-Panel, `client.storage.putObject`, einen fortsetzbaren Upload, den Storage-Browser von Studio
-oder `curl` — unterliegt diesen Beschränkungen auf der eigenen Storage-Quelle der Property,
-unabhängig davon, ob er die Property benennt oder nicht. Platzhalter stimmen mit dem überein, was das Panel
-einsetzen würde: `{id}`, `{rand}`, `{file}` und Ähnliche stehen für ein einzelnes Pfadsegment,
-`{path}` für eine beliebige Anzahl. Der Pfad einer Property mit `public: true` liegt unter `public/`.
+## Was der Server prüft
 
-- Mehrere Properties, die sich einen Pfad teilen: Eine Datei, die von einer davon akzeptiert wird, wird akzeptiert.
-- Ein Upload, der zusätzlich seine Property angibt (`collection` + `property`, wie
-  sie von `putObject({ context })` übermittelt werden), wird ebenfalls an diese Property gebunden. Die Angabe einer
-  weniger restriktiven Property schaltet nicht den Pfad einer strikteren Property frei.
-  Uploads über das Panel (Dateifelder, Tabellenzellen und Markdown-Bilder)
-  geben diese immer an.
-- Ein als Funktion geschriebener `storagePath` kann nicht ausgelesen werden, ohne ihn auszuführen, weshalb
-  für ihn keine serverseitige Regel existiert: Diese Limits gelten nur für Uploads, die die
-  Property angeben, was bei Uploads über das Panel der Fall ist.
-- Ein Pfad, der von keiner Property beansprucht wird, unterliegt allein dem Limit der Quelle
-  (`STORAGE_MAX_FILE_SIZE`).
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-### Bilder in einem Markdown-Feld
+`accept` und `maxBytes` werden vom Server anhand dessen erzwungen, **wo die Datei
+abgelegt wird**. Der `path` einer Spalte ist der Ort, an den ihre Dateien gelangen,
+daher gelten dort auch ihre Beschränkungen: Jeder Upload, dessen Schlüssel eine Datei
+direkt unter diesem Pfad ist, muss diese erfüllen – sei es über das CMS,
+`client.storage.putObject`, einen fortsetzbaren Upload, den Storage-Browser des
+Studios oder `curl`, unabhängig davon, ob die Spalte angegeben wird oder nicht, im
+Bucket der Spalte selbst. Platzhalter entsprechen dem, was das CMS einsetzen würde:
+`{id}`, `{rand}`, `{file}` und Ähnliches stehen für ein einzelnes Pfadsegment, `{path}`
+für eine beliebige Anzahl. Der Pfad einer Spalte mit `public: true` liegt unter `public/`.
 
-Eine Markdown-Property (`admin.markdown: true`) mit einem `storage`-Block nimmt im
-Editor Bild-Uploads entgegen. Der Text speichert jedes Bild als **Storage-Referenz** —
-`![](rebase-storage:posts/abc_cover.png)` — und nicht als URL: Die URL einer privaten Datei
-enthält ein Download-Token, das nach wenigen Minuten abläuft, während der Text dauerhaft gespeichert wird. Der
-Editor und die Vorschau des Admin-Panels tauschen jede Referenz gegen eine frische URL aus, wenn
-sie sie anzeigen; eine Website, die das Feld rendert, tut dasselbe mit
-`resolveStorageReferences(text, client)` — siehe
-[Files inside text](/docs/sdk/storage#files-inside-text).
+- Mehrere Spalten, die denselben Pfad teilen: Eine Datei, die von einer davon akzeptiert wird, wird akzeptiert.
+- Ein Upload, der auch seine Spalte benennt (wie es die Uploads des CMS tun), wird
+  auch an dieser Spalte gemessen. Die Angabe einer weniger restriktiven Spalte schaltet
+  nicht den Pfad einer strikteren Spalte frei.
+- Eine `storage.path`-Funktion in `customizeTable` kann vom Server nicht gelesen
+  werden; daher wird eine Datei, die unter dem von ihr berechneten Pfad hochgeladen
+  wird, nur dann an den Limits der Spalte gemessen, wenn der Upload die Spalte benennt
+  (was bei Uploads des CMS immer der Fall ist).
+- Ein Pfad, den keine Spalte beansprucht, unterliegt ausschließlich dem eigenen Limit
+  des Buckets (`STORAGE_MAX_FILE_SIZE`).
 
-Text, der vor Einführung der Referenzen gespeichert wurde, enthält die Download-URLs selbst mit abgelaufenen
-Tokens. Der Editor, die Vorschauen und `resolveStorageReferences` erneuern diese beim
-Anzeigen des Textes, da ein Token weiterhin sein Objekt benennt; erneutes Einfügen des Bildes
-oder das Umschreiben des Textes mit `storageReferencesForDownloadUrls(text)` speichert eine
-Referenz.
+`imageResize`, `processFile` und `postProcess` finden im Browser statt, bevor die
+Bytes gesendet werden: Eine Datei, die auf andere Weise hochgeladen wird, wird so
+gespeichert, wie sie gesendet wurde.
 
-### Wohin die Datei abgelegt werden darf
+## Wo eine Datei abgelegt werden darf
 
-`storagePath` ist ein Standardwert, keine feste Grenze: Serverseitig schränkt nichts einen
-Upload auf dieses Präfix ein. Die Entscheidung darüber, wer wohin schreiben darf, ist
-Aufgabe von Storage-Autorisierungsregeln — siehe [Storage](/docs/backend/storage).
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-### Dateien werden niemals automatisch gelöscht
+`path` ist ein Standardwert, keine feste Grenze: Nichts auf dem Server beschränkt
+einen Upload zwingend darauf. Wer wohin schreiben darf, ist eine Autorisierungsregel
+für den Speicher; siehe [Storage](/docs/backend/storage/).
 
-Das Leeren eines Dateifeldes, das Ersetzen seiner Datei oder das Löschen der zugehörigen Zeile
-belässt das gespeicherte Objekt an Ort und Stelle. Jeder Upload erhält einen eigenen Key, sodass ein
-Ersetzen ein neues Objekt schreibt, anstatt das alte zu überschreiben, und
-nichts entfernt das vorherige: Zwei Zeilen können denselben Key enthalten, sodass das
-Panel nicht wissen kann, ob eine Datei ungenutzt ist. Objekte, auf die keine Zeile verweist, verbleiben im
-Bucket und werden abgerechnet, bis Sie sie löschen — über den Storage-Browser von Studio,
-mit `client.storage.deleteObject(key)` oder über eine Lifecycle-Regel für den
-Bucket. `rebase storage orphans` listet die Dateien auf, die von keiner Zeile referenziert werden, und löscht sie
-mit `--delete` — siehe [the CLI](/docs/cli/#rebase-storage).
+## Dateien werden nie automatisch gelöscht
 
-### Eine Property zu einer anderen Storage-Quelle verschieben
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
-Ein Dateifeld speichert den Key des Objekts, nicht dessen Quelle. Das Ändern der
-`storageSource` einer Property verweist jeden vorhandenen Wert auf die neue Quelle, in der diese
-Keys nicht existieren, sodass Vorschaubilder von Dateien, die vor der Änderung hochgeladen wurden, mit
-"nicht gefunden" antworten. Kopieren Sie die Objekte unter denselben Keys in die neue Quelle, bevor Sie
-die Property ändern — `rebase storage move --from <old> --to <new> --prefix <storagePath>` oder
-die bordeigenen Tools des Anbieters wie `aws s3 sync` oder
-`gcloud storage cp` — oder behalten Sie die alte Quelle für die bestehenden Dateien bei.
+Das Leeren eines Dateifelds, das Ersetzen seiner Datei oder das Löschen der Zeile
+belässt das gespeicherte Objekt dort, wo es ist. Jeder Upload erhält einen eigenen
+Schlüssel, sodass ein Ersetzen ein neues Objekt schreibt und nichts das vorherige
+entfernt: Zwei Zeilen können denselben Schlüssel enthalten, daher kann das CMS
+nicht wissen, ob eine Datei ungenutzt ist. Objekte, auf die keine Zeile verweist,
+verbleiben im Bucket und werden in Rechnung gestellt, bis Sie sie über den
+Storage-Browser des Studios, mit `client.storage.deleteObject(key)` oder über eine
+Lebenszyklusregel für den Bucket löschen. `rebase storage orphans` listet die
+Dateien auf, die von keiner Zeile referenziert werden, und löscht sie mit `--delete`;
+siehe [die CLI](/docs/cli/#rebase-storage).
+
+## Eine Spalte in einen anderen Bucket verschieben
+
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+Ein Dateifeld speichert den Schlüssel des Objekts, nicht dessen Bucket. Das Ändern
+der `source` einer Spalte verweist alle vorhandenen Werte auf den neuen Bucket, in
+dem diese Schlüssel nicht existieren, sodass die Vorschau älterer Dateien mit „not found“
+antwortet. Kopieren Sie die Objekte zunächst unter denselben Schlüsseln in den neuen
+Bucket – entweder mit `rebase storage move --from <old> --to <new> --prefix <path>`
+oder mit den eigenen Werkzeugen des Anbieters wie `aws s3 sync` oder `gcloud storage cp` –
+oder behalten Sie den alten Bucket für die bestehenden Dateien bei.
 
 ## Nächste Schritte
 
-- **[Properties](/docs/collections/properties)** — alle Property-Typen und ihre Optionen
-- **[Storage](/docs/backend/storage)** — Buckets, signierte URLs und was der Server mit einem Upload macht
-- **[Security Rules (RLS)](/docs/collections/security-rules)** — wer die Zeilen lesen darf, an denen diese Dateien hängen
+<span class="since-badge" data-since="0.31">Seit 0.31</span>
+
+- [Spalten](/docs/schema/columns/#storage-columns): alle `col.storage()`-Optionen
+- [Felder](/docs/collections/properties/): die anderen Spaltentypen
+- [Storage](/docs/backend/storage/): Buckets, signierte URLs und was der Server bei einem Upload tut
+- [Dateien im SDK](/docs/sdk/storage/#files-inside-text): Speicherreferenzen innerhalb von Text

@@ -1,146 +1,129 @@
 ---
-sourceHash: 42da06ee7f0f6c0c
+sourceHash: 93694433369991ae
 title: Disposition du formulaire
 sidebar_label: Disposition du formulaire
-description: Contrôlez l'agencement du formulaire d'entité — largeurs de colonnes, sections et rail de métadonnées.
+description: "Organisez le formulaire d'un enregistrement : largeurs de champs sur une grille à quatre colonnes, sections titrées et repliables, rail de métadonnées et composant remplaçant le formulaire généré."
 ---
 
-## Vue d'ensemble
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-Le formulaire d'entité est généré à partir de vos propriétés :
+Le formulaire d'enregistrement est généré à partir des colonnes et des relations de la table :
 
-- l'identifiant (id) et les horodatages `createdAt` / `updatedAt` sont placés dans un rail de métadonnées, en lecture seule
-- tous les autres champs occupent la pleine largeur de la colonne principale, sauf si deux champs adjacents partagent le même type de petit éditeur — deux nombres, deux interrupteurs, deux dates avec le même mode, deux sélecteurs aux options courtes — auquel cas ils partagent une même ligne
+- l'identifiant ainsi que les horodatages de création et de mise à jour sont placés dans un rail de métadonnées en lecture seule ;
+- tous les autres champs occupent toute la largeur de la colonne principale, sauf si deux champs voisins disposent du même petit éditeur (deux nombres, deux interrupteurs, deux dates du même mode, deux sélecteurs avec des options courtes), auquel cas ils partagent une même ligne.
 
-Un champ doté d'un libellé long, d'un texte d'aide de plus de 60 caractères, de `conditions`, d'une règle `access` au niveau du champ ou de `excludeFromApi` (le formulaire n'affiche rien pour un utilisateur qui n'a pas le droit de le lire), ou d'un composant `Field` personnalisé n'est jamais combiné avec un autre, de même que les chaînes de texte libre : rien dans un schéma ne permet de différencier un nom de branche court d'une longue URL. Le formulaire ne cherche jamais à savoir quelle propriété correspond au titre. Toutes les autres colonnes doivent être explicitement demandées par la collection, champ par champ, via `admin.span` — déterminé en fonction du contenu de chaque champ, comme indiqué ci-dessous. Utilisez `admin.form` pour regrouper les champs en sections et les déplacer vers le rail.
+Un champ ayant un libellé long, un texte d'aide de plus de 60 caractères, des `conditions`, une [règle d'accès](/docs/collections/field-access/) au niveau de la colonne ou un `Field` personnalisé n'est jamais combiné avec un autre, de même qu'aucun texte libre : rien dans un schéma ne permet de distinguer un nom de branche court d'une URL longue. Tout le reste se configure dans `customizeTable`, champ par champ avec `span`, et pour l'ensemble du formulaire avec `form`.
+
+```ts
+// backend/schema/orders.ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const orders = defineTable("orders", {
+    columns: {
+        id:             col.uuid().primaryKey().defaultRandom(),
+        reference:      col.text().notNull(),
+        sku:            col.text(),
+        status:         col.enum(["placed", "shipped", "delivered"]).notNull().default("placed"),
+        placedAt:       col.timestamp({ withTimezone: true }),
+        address:        col.text(),
+        carrier:        col.text(),
+        trackingNumber: col.text(),
+        notes:          col.text(),
+    },
+    rls: "admin-only",
+});
+```
+
+```tsx
+// frontend/src/cms/orders.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { orders } from "../../../backend/schema/orders";
+
+export const ordersCms = customizeTable<typeof orders>("orders", {
+    form: {
+        sidebar: ["status", "placedAt"],
+        sections: [
+            { key: "identity", fields: ["reference", "sku"] },
+            { key: "shipping", title: "Shipping", fields: ["address", "carrier", "trackingNumber"] },
+            { key: "internal", title: "Internal notes", fields: ["notes"], collapsed: true },
+        ],
+    },
+    fields: {
+        reference: { span: 3 },
+        sku:       { name: "SKU", span: 1 },
+        carrier:   { span: 2 },
+        trackingNumber: { span: 2 },
+        notes:     { multiline: true },
+    },
+});
+```
 
 ## Largeur des champs
 
-La largeur d'un champ est un **span** défini sur une grille de quatre colonnes. La valeur `4` correspond à la pleine largeur de la colonne principale.
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+La largeur d'un champ est définie par un **span** sur une grille à quatre colonnes ; `4` représente la pleine largeur de la colonne principale. Les spans s'alignent automatiquement sur la grille, ce qui permet à deux champs de s'aligner quel que soit l'ordre dans lequel ils ont été déclarés.
 
-const productsCollection = defineCollection({
-    slug: "products",
-    table: "products",
-    name: "Products",
-    properties: {
-        sku: {
-            name: "SKU",
-            type: "string",
-            admin: { span: 1 }
-        },
-        name: {
-            name: "Product name",
-            type: "string",
-            admin: { span: 3 }
-        },
-        description: {
-            name: "Description",
-            type: "string",
-            admin: { markdown: true, span: 4 }
-        }
-    }
-});
-```
+Choisissez un span en fonction de ce que contient le champ, et non de son type. Deux valeurs courtes qui vont ensemble partagent une ligne : date de début et de fin, ville et pays, transporteur et numéro de suivi à `2` chacun, ou une valeur et son qualificatif à `3` + `1`. Les nombres, les booléens et les codes courts peuvent occuper `1` à côté de leurs semblables. Tout ce qui est long à lire (noms, URL, e-mails, identifiants, descriptions, markdown, fichiers) conserve `4`. Les lignes se remplissent dans l'ordre des champs et rien n'élargit un champ pour combler un espace vide ; placez donc les paires côte à côte et faites en sorte que chaque ligne totalise 4.
 
-Les largeurs (spans) s'alignent sur une grille commune, ce qui permet à deux champs de s'aligner quel que soit l'ordre dans lequel ils ont été déclarés. Ils remplacent `admin.widthPercentage`, dont les pourcentages bruts ne s'alignaient sur rien ; une collection utilisant encore cette propriété devrait adopter le span le plus proche (≤30 → `1`, ≤55 → `2`, ≤80 → `3`, sinon `4`).
-
-Déterminez un span en fonction du contenu du champ, et non de son type. Deux valeurs courtes associées se partagent une ligne — date de début et de fin, ville et pays, fournisseur et région avec un span de `2` chacun, ou une valeur et son qualificatif avec `3` + `1`. Les nombres, les booléens et les codes courts peuvent occuper `1` colonne à côté d'autres champs similaires. Tout élément plus long à la lecture — noms, URLs, e-mails, identifiants, descriptions, markdown, fichiers — conserve `4`. Les lignes se remplissent dans l'ordre de déclaration et rien n'élargit automatiquement un champ pour combler un vide ; déclarez donc les paires côte à côte et veillez à ce que le total de chaque ligne atteigne 4.
-
-Sur les écrans trop étroits pour afficher deux colonnes — le volet latéral, le volet scindé, un smartphone — la grille se réduit à une seule colonne et les spans sont ignorés.
+Sur les affichages trop étroits pour deux colonnes (le panneau latéral, le volet scindé, un smartphone), la grille se réduit à une seule colonne et les spans sont ignorés.
 
 ## Sections
 
-`sections` permet de regrouper les éléments de la colonne principale sous des titres. Une section pourvue d'un titre peut être repliée ; une section sans titre ne peut pas l'être.
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+`form.sections` regroupe la colonne principale sous des titres. Chaque section est un objet `{ key, title?, fields, collapsed?, collapsible?, readVariant? }`. Une section avec un titre peut être repliée ; une section sans titre ne le peut pas. `readVariant: "summary"` empile les champs de la section sous forme de lignes de libellé et valeur dans la vue en lecture seule de l'enregistrement ; la valeur par défaut, `"grid"`, utilise la grille du formulaire.
 
-const ordersCollection = defineCollection({
-    slug: "orders",
-    table: "orders",
-    name: "Orders",
-    properties: {
-        reference: { name: "Reference", type: "string" },
-        placed_at: { name: "Placed at", type: "date" },
-        address: { name: "Address", type: "string" },
-        carrier: { name: "Carrier", type: "string" },
-        tracking_number: { name: "Tracking number", type: "string" },
-        notes: { name: "Notes", type: "string" }
-    },
-    admin: {
-        form: {
-            sections: [
-                { key: "identity", properties: ["reference", "placed_at"] },
-                {
-                    key: "shipping",
-                    title: "Shipping",
-                    properties: ["address", "carrier", "tracking_number"]
-                },
-                {
-                    key: "internal",
-                    title: "Internal notes",
-                    properties: ["notes"],
-                    collapsed: true
-                }
-            ]
-        }
-    }
-});
-```
+Un champ mentionné dans aucune section n'est jamais ignoré : il se retrouve dans la dernière section sans titre, ou dans un groupe final sans titre s'il n'en existe aucune. L'ajout d'une colonne à la table ne peut pas faire disparaître silencieusement un champ du formulaire. Une erreur de validation dans une section repliée provoque son déploiement.
 
-Une propriété qui n'est listée dans aucune section n'est jamais supprimée : elle est placée dans la dernière section sans titre, ou dans un groupe final sans titre s'il n'en existe aucune. Ainsi, l'ajout d'une colonne dans la base de données ne peut pas faire disparaître silencieusement un champ du formulaire.
-
-Une erreur de validation survenant à l'intérieur d'une section repliée entraîne son ouverture, garantissant ainsi qu'aucune erreur ne reste dissimulée derrière un volet fermé.
+Chaque entrée est vérifiée par rapport à la table. Une entrée que le serveur ne transmet pas à cet appelant, parce qu'il n'a pas le droit de lire cette colonne, est ignorée.
 
 ## Le rail de métadonnées
 
-`sidebar` permet d'extraire des champs de la colonne principale pour les placer dans un rail étroit à côté — statut, propriétaire, dates de publication, indicateurs.
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+`form.sidebar` déplace les champs hors de la colonne principale vers un rail étroit situé à côté : statut, propriété, dates de publication, indicateurs. Le rail n'utilise pas la grille, donc `span` y est ignoré. Lorsqu'il n'y a pas assez de place pour un rail, il s'affiche comme une section de tête ordinaire.
 
-const postsCollection = defineCollection({
-    slug: "posts",
-    table: "posts",
-    name: "Posts",
-    properties: {
-        title: { name: "Title", type: "string" },
-        body: { name: "Body", type: "string", admin: { markdown: true } },
-        status: { name: "Status", type: "string" },
-        publishedAt: { name: "Published at", type: "date" },
-        author: { name: "Author", type: "string" }
-    },
-    admin: {
-        form: {
-            sidebar: ["status", "publishedAt", "author"],
-            showRecordMeta: true
-        }
-    }
+`form.showRecordMeta` place le bloc d'enregistrement en lecture seule (id, created, updated) en bas du rail. Il vaut `true` dès qu'un rail est affiché. `sidebar: []` désactive le rail dérivé et conserve tous les champs dans la colonne principale. `hideIdFromForm` masque complètement l'identifiant du formulaire.
+
+## Remplacer le formulaire
+
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
+
+`formView` remplace le formulaire généré par votre propre composant, importé par valeur. Il reçoit les mêmes `EntityCustomViewParams` qu'une [vue d'entité](/docs/frontend/entity-views/). `includeActions: true` conserve Enregistrer et Abandonner dans la barre de l'enregistrement tant qu'il est à l'écran.
+
+```tsx
+import React from "react";
+import { customizeTable } from "@rebasepro/cms";
+import type { EntityCustomViewParams } from "@rebasepro/cms-types";
+import type { orders } from "../../../backend/schema/orders";
+
+function OrderForm({ row, modifiedValues }: EntityCustomViewParams) {
+    return <h2>{String(modifiedValues?.reference ?? row?.reference ?? "New order")}</h2>;
+}
+
+export const ordersCms = customizeTable<typeof orders>("orders", {
+    formView: { Builder: OrderForm, includeActions: true },
 });
 ```
 
-Le rail n'utilise pas la grille ; `span` est donc ignoré pour les champs qu'il contient. Lorsqu'il n'y a pas assez d'espace pour afficher un rail, il s'affiche sous forme d'une section d'en-tête ordinaire, évitant ainsi toute perte d'information sur smartphone ou dans le volet latéral.
+Pour une modification plus ponctuelle, surchargez plutôt une partie du formulaire (`Entity.Form`, voir [Surcharges de composants](/docs/frontend/component-overrides/)), ou disposez vous-même certains champs avec `<RecordForm>` et `<FormField>` dans votre propre page (voir [Panneaux](/docs/frontend/panels/)).
 
-`showRecordMeta` place le bloc d'enregistrement en lecture seule — id, date de création, date de mise à jour — au bas du rail. Sa valeur par défaut est `true` dès lors qu'un rail est présent, et il remplace `hideIdFromForm` pour la plupart des collections : l'id n'est plus un champ au milieu du formulaire, mais devient une ligne de métadonnées que l'on peut copier.
+## Autres options de formulaire
 
-Définissez `sidebar: []` pour désactiver complètement le rail généré et conserver l'intégralité des champs dans la colonne principale.
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-## Référence
+| Option | Effet |
+|---|---|
+| `formAutoSave` | Sauvegarder au fur et à mesure que le visiteur saisit. |
+| `alwaysApplyDefaultValues` | Remplir les champs vides d'un enregistrement stocké avec les valeurs par défaut déclarées lors de son ouverture. |
+| `includeJsonView` | Ajouter un onglet présentant l'enregistrement au format JSON. |
+| `localChangesBackup` | Conserver les modifications non enregistrées dans le stockage local : `"manual_apply"`, `"auto_apply"` ou `false`. |
 
-| Propriété | Type | Description |
-|-----------|------|-------------|
-| `admin.span` | `1 \| 2 \| 3 \| 4` | Largeur du champ sur la grille de formulaire à quatre colonnes |
-| `admin.form.sidebar` | `string[]` | Clés des propriétés affichées dans le rail de métadonnées |
-| `admin.form.sections` | `FormSection[]` | Groupes avec titre pour la colonne principale |
-| `admin.form.showRecordMeta` | `boolean` | Affiche id/créé/mis à jour au bas du rail |
+## Voir aussi
 
-`FormSection` correspond à `{ key, title?, properties, collapsed?, collapsible?, readVariant? }`. `readVariant: "summary"` empile les champs de la section sous forme de lignes libellé/valeur dans la vue en lecture seule de l'enregistrement ; la valeur par défaut, `"grid"`, utilise la grille du formulaire.
+<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
-## Liens associés
-
-- [Custom Fields](/docs/frontend/custom-fields/) — les champs agencés par la disposition
-- [Entity Views](/docs/frontend/entity-views/) — un onglet personnalisé dédié à côté du formulaire
-- [Properties](/docs/collections/properties/) — les options de propriétés lues par la disposition
+- [Champs personnalisés](/docs/frontend/custom-fields/) : les champs organisés par une disposition
+- [Vues d'entités](/docs/frontend/entity-views/) : un onglet complet dédié à côté du formulaire
+- [customizeTable](/docs/frontend/customize-table/#form) : les options de formulaire dans la référence

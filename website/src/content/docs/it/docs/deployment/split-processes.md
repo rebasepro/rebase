@@ -1,23 +1,23 @@
 ---
-sourceHash: 01d285050b58be40
+sourceHash: f1296ae912e0725e
 title: Suddivisione in più processi
 sidebar_label: Processi separati
-description: Esegui un unico bundle suddiviso in vari processi cooperanti — un'API, un livello per le funzioni, un worker — a partire dalla stessa immagine di runtime pubblicata, evitando che una funzione custom pesante competa con l'API dati.
+description: Esegui un singolo bundle come più processi cooperanti — un'API, un livello di funzioni, un worker — dalla stessa immagine di runtime pubblicata, in modo che una funzione personalizzata pesante smetta di competere con l'API dei dati.
 ---
 
 ## Panoramica
 
-Un deployment di Rebase è normalmente costituito da un unico processo che gestisce tutto: l'API dati,
-l'autenticazione, lo storage, le tue funzioni personalizzate, il cron e la coda dei job. Questa è la configurazione
-ideale per quasi tutti i deployment e rimane quella predefinita.
+Una distribuzione Rebase è normalmente un unico processo che gestisce tutto: l'API dei dati,
+l'autenticazione, lo storage, le tue funzioni personalizzate, i cron e la coda dei job. Questa è la
+struttura corretta per quasi tutte le distribuzioni e rimane l'impostazione predefinita.
 
-Quando smette di essere la configurazione adatta — ad esempio per via di una funzione personalizzata che blocca l'event loop
-o di un livello di funzioni che dovrebbe scalare o riavviarsi indipendentemente dall'API — puoi avviare
-**la stessa immagine e lo stesso bundle** più volte, facendo in modo che ogni
+Quando smette di essere la struttura adatta — una funzione personalizzata che blocca l'event loop,
+un livello di funzioni che dovrebbe scalare o riavviarsi indipendentemente dall'API — puoi avviare
+**la stessa immagine e lo stesso bundle** più volte e fare in modo che ogni
 processo gestisca una parte diversa del progetto. Non c'è nulla di nuovo da compilare e
-nulla che un client debba sapere: gli URL non cambiano.
+nulla di cui il client debba essere a conoscenza: gli URL non cambiano.
 
-Una singola variabile d'ambiente determina il ruolo di un processo:
+Una variabile d'ambiente decide cosa sia un processo:
 
 ```bash
 REBASE_ROLE=api        # data, auth, admin, storage, meta — everything but functions
@@ -31,42 +31,42 @@ REBASE_ROLE=all        # the default: everything, one process
 | | `all` | `api` | `functions` | `worker` |
 | --- | :---: | :---: | :---: | :---: |
 | `/api/auth`, `/api/data`, `/api/storage`, `/api/meta` | ✅ | ✅ | — | — |
-| `/api/admin` (compresi log ed editor dello schema) | ✅ | ✅ | — | — |
+| `/api/admin` (inclusi i log e l'editor dello schema) | ✅ | ✅ | — | — |
 | `/api/functions/*` | ✅ | inoltra (vedi sotto) | ✅ | — |
-| `/api/admin/cron` (la superficie admin) | ✅ | ✅ | — | — |
+| `/api/admin/cron` (l'interfaccia di amministrazione) | ✅ | ✅ | — | — |
 | `/health`, `/livez`, `/metrics` | ✅ | ✅ | ✅ | ✅ |
-| Gestisce i websocket, consuma eventi di modifica | ✅ | ✅ | — | — |
+| Gestisce websocket, consuma eventi di modifica | ✅ | ✅ | — | — |
 | Crea lo schema all'avvio | ✅ | ✅ | — | — |
-| Esegue lo scheduler del cron | ✅ | ✅ | — | ✅ |
+| Esegue lo scheduler dei cron | ✅ | ✅ | — | ✅ |
 | Esegue i worker della coda dei job | ✅ | ✅ | — | ✅ |
 
-Health e metriche sono presenti su ciascun ruolo senza eccezioni; `/metrics` risponde solo con `REBASE_METRICS=true`. Un processo che un
-orchestratore non può sottoporre a probe è un processo di cui non può effettuare il rollout.
+Health e metriche sono presenti su ogni ruolo senza eccezioni; `/metrics` risponde solo con `REBASE_METRICS=true`. Un processo che un
+orchestratore non può sondare è un processo su cui non può eseguire un rollout.
 
 `GET /api/auth/config`,
-ciò che legge la schermata di accesso, segue il resto di `/api/auth`: lo servono solo `api` e
-`all`.
+ciò che legge la schermata di accesso, segue il resto di `/api/auth`: solo `api` e
+`all` lo gestiscono.
 
-Il realtime è presente nell'elenco perché ha un costo a prescindere dal fatto che venga usato o
-meno: un processo che consuma eventi di modifica mantiene attiva una connessione `LISTEN` al di fuori
-del pool per tutta la sua esecuzione, e installa i trigger di acquisizione all'avvio. Solo
-un processo che gestisce websocket ha dei destinatari a cui inviare i dati, quindi i due ruoli che
-non ne gestiscono non fanno nessuna delle due cose. **Le scritture effettuate da tali processi vengono comunque rilevate.**
-Con la change capture attiva, l'acquisizione avviene tramite trigger di database, quindi una modifica
-viene pubblicata dal database anziché dal singolo processo che l'ha eseguita. Con l'acquisizione
-disattivata (`REALTIME_CDC=off`, oppure `auto` che ripiega perché il ruolo del database non può
-creare trigger), un processo `worker` o `functions` annuncia invece ogni propria
-scrittura sul canale cross-istanza, senza tenere una connessione `LISTEN`.
-In entrambi i casi, una funzione che scrive una riga attiva comunque ogni
-subscriber sull'`api`.
+La funzionalità Realtime è nell'elenco perché comporta un costo, indipendentemente dal fatto che qualcuno la utilizzi o
+meno: un processo che consuma eventi di modifica mantiene una connessione `LISTEN` esterna
+al pool per tutta la sua durata di esecuzione e installa i trigger di cattura all'avvio. Solo
+un processo che gestisce websocket ha dei destinatari a cui recapitare gli eventi, quindi i due ruoli che
+non ne gestiscono non fanno nessuna delle due cose. **Le scritture effettuate da tali processi vengono comunque rilevate.** Con
+il change capture attivo, la cattura avviene tramite trigger del database, quindi una modifica viene pubblicata
+dal database anziché dal processo che l'ha eseguita. Con il capture disattivato
+(`REALTIME_CDC=off`, o con `auto` in fallback perché il ruolo del database non può
+creare trigger), un processo `worker` o `functions` annuncia ciascuna delle proprie
+scritture sul canale tra istanze (cross-instance), senza mantenere una connessione `LISTEN`.
+In entrambi i casi, una funzione che scrive una riga risveglia comunque ogni
+sottoscrittore su `api`.
 
-Dai a ogni processo lo stesso `REALTIME_CDC`. Un processo che possiede lo schema
-con `REALTIME_CDC=off` rimuove i trigger di cattura all'avvio, e un `api`
-ancora impostato su `auto` resterebbe in ascolto di modifiche che nessuno annuncia.
+Assegna a ogni processo lo stesso valore di `REALTIME_CDC`. Un processo che possiede lo schema
+con `REALTIME_CDC=off` rimuove i trigger di cattura all'avvio, e un'`api`
+ancora impostata su `auto` si metterebbe quindi in ascolto di modifiche che nessuno annuncia.
 
 ## Docker Compose
 
-Due servizi a partire da un'unica immagine, un unico bundle e un unico database:
+Due servizi da un'unica immagine, un solo bundle e un solo database:
 
 ```yaml
 services:
@@ -102,30 +102,30 @@ services:
 docker compose up --scale functions=3
 ```
 
-Entrambi i processi necessitano dello stesso `DATABASE_URL`, dello stesso `JWT_SECRET` e dello stesso
-`REBASE_SERVICE_KEY` — costituiscono un unico deployment, e un token generato da uno deve essere
-accettato dall'altro. Un processo con `REBASE_FUNCTIONS_UPSTREAM` e senza
+Entrambi i processi necessitano dello stesso `DATABASE_URL`, dello stesso `JWT_SECRET` e della stessa
+`REBASE_SERVICE_KEY` — costituiscono una sola distribuzione, e un token generato da uno deve
+essere accettato dall'altro. Un processo con `REBASE_FUNCTIONS_UPSTREAM` e senza
 `REBASE_SERVICE_KEY` rifiuta di avviarsi: le sue stesse chiamate `rebase.functions.invoke(...)`,
-da un hook o da un cron job, raggiungono il processo delle funzioni con quella chiave.
+provenienti da un hook o da un cron job, raggiungono il processo delle funzioni con quella chiave.
 
 ## Mantenere invariati gli URL
 
 `REBASE_FUNCTIONS_UPSTREAM` indica al processo `api` di inoltrare `/api/functions/*`
-al processo delle funzioni invece di gestirlo direttamente. Deve essere un URL `http://` o
+al processo functions anziché gestirlo direttamente. Deve essere un URL `http://` o
 `https://`; qualsiasi altra cosa interrompe l'avvio. Solo `api` e `worker` lo leggono
-(per il worker vedi [Cron e job in background](#cron-e-job-in-background)). I client, gli SDK generati e le chiavi
-API vedono esattamente la stessa superficie visibile prima della separazione, di conseguenza non è
-necessario modificare il codice dell'applicazione né configurare un reverse proxy per provarlo.
+(vedi [Cron e job in background](#cron-e-job-in-background) per il worker). I client, gli SDK generati e le chiavi
+API vedono esattamente la stessa superficie che vedevano prima della suddivisione, quindi nessun codice applicativo
+deve essere modificato e non è necessario configurare un reverse proxy per provarlo.
 
-Un deployment di produzione potrebbe preferire instradare il percorso direttamente a livello del proprio ingress;
-in tal caso, lascia non impostato `REBASE_FUNCTIONS_UPSTREAM` — il processo `api`
-risponderà con un 404 per tali percorsi e sarà il proxy a monte a decidere dove indirizzarli.
+Una distribuzione in produzione potrebbe preferire instradare il percorso direttamente a livello di ingress;
+in tal caso, lascia `REBASE_FUNCTIONS_UPSTREAM` non impostato: il processo `api`
+risponderà con 404 per tali percorsi e il proxy a monte deciderà dove indirizzarli.
 
 ### Hop del proxy
 
-Quando l'API inoltra la richiesta, aggiunge l'indirizzo del chiamante a `X-Forwarded-For`. Ciò
-fa sì che il processo delle funzioni si trovi dietro **un hop di proxy in più** rispetto all'API,
-e deve esserne informato:
+Quando l'API inoltra la richiesta, aggiunge l'indirizzo del chiamante a `X-Forwarded-For`. Questo
+fa sì che il processo functions si trovi dietro **un hop di proxy in più** rispetto all'API,
+e deve essere informato di ciò:
 
 ```bash
 # api behind one ingress            → TRUSTED_PROXY_HOPS=1
@@ -133,64 +133,65 @@ e deve esserne informato:
 ```
 
 `TRUSTED_PROXY_HOPS` è il numero di reverse proxy effettivamente presenti davanti
-a un processo. Ciascuno di essi aggiunge l'indirizzo rilevato a `X-Forwarded-For`, quindi il
+a un processo. Ciascuno aggiunge l'indirizzo rilevato a `X-Forwarded-For`, quindi il
 vero client corrisponde all'N-esima voce da destra; tutto ciò che si trova più a sinistra è
-fornito dal client e viene ignorato, impedendo così a un chiamante di falsificare l'header per
-aggirare le chiavi di rate limiting. Il valore predefinito è `0` — nessun proxy fidato.
+fornito dal client e viene ignorato, impedendo a un chiamante di falsificare l'header per
+aggirare le chiavi di rate-limiting. Il valore predefinito è `0` — nessun proxy considerato attendibile.
 
-Se questo valore viene impostato in modo errato, nulla si rompe in modo evidente: i rate limiter sul processo delle funzioni
-associano ogni richiesta all'indirizzo del container API, facendo sì che tutti i chiamanti condividano
-lo stesso bucket e che l'IP registrato per ogni evento di autenticazione sia identico.
+Se si sbaglia questa configurazione, nulla si romperà visibilmente: i rate limiter sul processo functions
+assoceranno ogni richiesta all'indirizzo del container API, condividendo un unico
+bucket tra tutti i chiamanti, e l'IP registrato per ogni evento di autenticazione sarà lo stesso.
 
-## Un solo processo gestisce lo schema
+## Un solo processo è proprietario dello schema
 
-In un deployment suddiviso, esattamente un solo processo crea le tabelle e applica le policy
-RLS all'avvio, ed è quello `api` (o `all`). Tutti gli altri processi devono
+Esattamente un solo processo in una distribuzione suddivisa crea tabelle e applica policy RLS
+all'avvio, ovvero il processo `api` (o `all`). Tutti gli altri processi devono
 impostare:
 
 ```bash
 REBASE_MIGRATE_ON_BOOT=none
 ```
 
-Questo è **obbligatorio**, non facoltativo: un processo `functions` o `worker` lasciato con il
-valore predefinito rifiuta di avviarsi, segnalandolo esplicitamente. `CREATE … IF NOT EXISTS` legge il catalogo
-e successivamente vi scrive in due passaggi separati, quindi processi avviati contemporaneamente entrano in
-conflitto — e un deployment in cui più istanze competono per effettuare il provisioning dello stesso
+Questo è **obbligatorio**, non opzionale: un processo `functions` o `worker` lasciato con l'impostazione
+predefinita rifiuterà di avviarsi, segnalando l'errore. `CREATE … IF NOT EXISTS` legge il catalogo
+e poi vi scrive in due passaggi separati, quindi i processi che si avviano contemporaneamente vanno in
+collisione — e una distribuzione in cui più processi competono per effettuare il provisioning dello stesso
 schema non è uno scenario previsto.
 
 In un
-[server personalizzato](/docs/backend/custom-server/), la stessa decisione è l'opzione
-`provision` di `createRebaseBackend`: `true` nel processo che possiede lo schema, e
-`{ collections: false, realtime: false }` in tutti gli altri, che mantiene comunque le
-tabelle proprie del framework. Anche `REBASE_MIGRATE_ON_BOOT=none` disattiva lì lo schema
-delle collection. Il lavoro in background si decide allo stesso modo: un processo che non
-chiama mai `start()` non esegue né lo scheduler del cron né i worker dei job, e uno che lo
-chiama esegue quelli che gli assegna la sua opzione `ownership`.
+[server personalizzato](/docs/backend/custom-server/), la stessa decisione corrisponde all'opzione
+`provision` di `createRebaseBackend`: `true` nel processo proprietario dello
+schema e `{ collections: false, realtime: false }` in tutti gli altri, mantenendo
+comunque le tabelle interne del framework. Anche in questo caso, `REBASE_MIGRATE_ON_BOOT=none` disattiva lo
+schema delle tabelle. Le attività in background vengono decise nello stesso modo:
+un processo che non chiama mai `start()` non esegue alcuno scheduler cron né worker dei job,
+mentre uno che lo chiama esegue quelli assegnati dall'opzione `ownership`.
 
-## Esecuzione di una sola funzione per processo
+## Gestire una singola funzione per processo
 
-Un processo può gestire un sottoinsieme specifico, consentendo a una funzione particolarmente onerosa
-di avere un proprio numero di repliche senza doverne spostare il codice:
+Un processo può gestire un sottoinsieme specifico, consentendo a una funzione onerosa di
+avere un proprio numero di repliche senza dover spostare il codice altrove:
 
 ```bash
 REBASE_FUNCTIONS_ONLY=send-invoice
 REBASE_FUNCTIONS_EXCLUDE=debug-tools
 ```
 
-I nomi corrispondono ai nomi dei file senza estensione — lo stesso nome con cui la funzione viene
-montata. Un nome non presente nel bundle **causa il fallimento dell'avvio** e l'errore elenca
-i nomi effettivamente contenuti. Un processo configurato per una specifica funzione esiste esclusivamente per
-essa, pertanto un refuso che portasse a non erogare silenziosamente nulla rappresenterebbe lo scenario peggiore.
+I nomi corrispondono ai nomi dei file senza estensione — lo stesso nome con cui la funzione viene montata.
+Un nome non contenuto nel bundle **fa fallire l'avvio**, e l'errore elenca
+i nomi effettivamente presenti. Un processo configurato per una singola funzione esiste per quella
+specifica funzione, quindi un refuso che gestisse silenziosamente il nulla sarebbe il peggior risultato
+possibile.
 
 ## Cron e job in background
 
-Entrambi possono già essere eseguiti in sicurezza su più processi: lo scheduler del cron acquisisce
-ciascuna coppia `(job, slot)` nel database, e la coda dei job acquisisce le righe con
-`FOR UPDATE SKIP LOCKED`. Di conseguenza, per impostazione predefinita `api` continua a eseguire entrambi,
-rendendo completa una suddivisione a due servizi senza richiedere un terzo container.
+Entrambi possono già essere eseguiti in modo sicuro in più di un processo: lo scheduler cron acquisisce
+ogni coppia `(job, slot)` nel database, e la coda dei job acquisisce le righe con
+`FOR UPDATE SKIP LOCKED`. Di conseguenza, `api` continua a eseguire entrambi per impostazione predefinita e una suddivisione
+a due servizi è completa senza richiedere un terzo container.
 
-Aggiungi un processo `worker` quando desideri spostare le attività pianificate fuori dal percorso delle richieste HTTP,
-e disattivale sull'API:
+Aggiungi un processo `worker` quando desideri separare le attività pianificate dal percorso delle richieste HTTP, e
+disattivalo sull'API:
 
 ```yaml
   api:
@@ -209,62 +210,62 @@ e disattivale sull'API:
 
 Un job che passa a un worker mantiene `rebase.dataAsAdmin`, `rebase.sql`,
 `rebase.storage` e `rebase.email`, che comunicano direttamente con il database, i bucket e
-il server di posta. Mantiene anche:
+il server di posta. Mantiene inoltre:
 
-- **`rebase.admin`** (utenti, ruoli, reimpostazioni delle password) **e `rebase.cron`.** Un
-  worker non serve alcuna superficie di amministrazione sulla sua porta, ma porta con sé questi due
-  in-process, solo per i propri job.
-- **`rebase.functions`, con `REBASE_FUNCTIONS_UPSTREAM`.** Un worker non serve
-  funzioni. Con l'upstream impostato, le sue stesse chiamate `rebase.functions.invoke(...)`
-  vengono inoltrate al processo delle funzioni, dove la funzione vede la
-  chiamata come il service. Il worker continua a non rispondere a nulla sotto `/api/functions`
-  sulla sua porta. Il worker necessita per questo del `REBASE_SERVICE_KEY` del deployment,
-  come `api`.
+- **`rebase.admin`** (utenti, ruoli, reimpostazione delle password) **e `rebase.cron`.** Un
+  worker non espone alcuna interfaccia di amministrazione sulla sua porta, ma include questi due componenti in-process,
+  esclusivamente per i propri job.
+- **`rebase.functions`, con `REBASE_FUNCTIONS_UPSTREAM`.** Un worker non gestisce
+  funzioni. Con l'upstream configurato, le sue chiamate `rebase.functions.invoke(...)`
+  vengono inoltrate al processo functions, dove la funzione riceve la
+  chiamata come servizio. Il worker continua a non rispondere a nulla sotto `/api/functions`
+  sulla sua porta. Il worker necessita della `REBASE_SERVICE_KEY` della distribuzione per questa operazione,
+  analogamente all'`api`.
 
-Perde `rebase.auth`: sono i flussi di accesso di una persona, e un worker
-non ne serve alcuno. Per il lavoro sugli account da un job, usa `rebase.admin`. Perde anche il
-resto dell'API di amministrazione (backup, log, l'editor dello schema e così via), e
-`rebase.functions` quando non è impostato alcun upstream. Una chiamata a una qualsiasi di queste risponde
-`404 NOT_FOUND` indicando la superficie disattivata e cosa fare al suo posto.
+Perde `rebase.auth`: questi rappresentano i flussi di accesso degli utenti e un worker
+non ne gestisce alcuno. Per la gestione degli account all'interno di un job, usa `rebase.admin`. Perde inoltre il
+resto dell'API di amministrazione (backup, log, editor dello schema e così via) e
+`rebase.functions` se non è impostato un upstream. Una chiamata a uno qualsiasi di questi risponde con
+`404 NOT_FOUND`, indicando quale interfaccia è disattivata e cosa fare in alternativa.
 
-Un processo `functions` non esegue mai nessuno dei due. La sua scalabilità dipende dal
-carico delle richieste e viene sostituito liberamente; assegnargli attività pianificate darebbe
-al suo numero di repliche un significato improprio.
+Un processo `functions` non esegue mai né l'uno né l'altro. Viene scalato in base al carico delle richieste e
+sostituito a piacere; assegnargli attività pianificate darebbe al conteggio delle sue repliche un
+significato improprio.
 
-Tieni presente che l'accodamento — `jobQueue.enqueue`, l'`enqueue` di una coda dichiarata, il
-`publish` di un topic — continua a funzionare ovunque, anche su un processo che non esegue
-worker — l'accodamento è una scrittura, l'esecuzione è un ciclo di polling, e
-solo quest'ultimo viene disattivato da un ruolo.
+Nota che l'accodamento — `jobQueue.enqueue`, l'`enqueue` di una coda dichiarata, il
+`publish` di un topic — continua a funzionare ovunque, compreso su un processo che non
+esegue worker: l'accodamento è un'operazione di scrittura, mentre l'esecuzione è un ciclo di polling, ed è
+solo quest'ultima a essere disattivata da un ruolo.
 
 ## Cosa non offre la suddivisione
 
 **Rate limit condivisi, a meno che non vengano richiesti.** Lo store predefinito è per singolo processo, quindi N
-processi moltiplicano la quota a disposizione di ciascun chiamante per N senza che alcun log lo
-segnali. Imposta `REBASE_RATE_LIMIT_STORE=sql` su ogni processo che gestisce traffico HTTP — il
-conteggio avviene in Postgres, quindi il limite rimane lo stesso indipendentemente dal numero di repliche.
-(Il chart Helm lo imposta automaticamente e si rifiuta di eseguire il rendering di una topologia multi-processo
-che lo lasci impostato su `memory`).
+processi moltiplicano la soglia consentita a ciascun chiamante per N, senza alcuna indicazione nei log.
+Imposta `REBASE_RATE_LIMIT_STORE=sql` su ogni processo che gestisce traffico HTTP: il conteggio viene
+effettuato in Postgres, mantenendo il limite invariato a prescindere dal numero di repliche.
+(Il chart Helm lo imposta automaticamente e rifiuta di eseguire il rendering di una topologia multi-processo
+che lo lasci su `memory`.)
 
-**Canali tra istanze diverse.** Broadcast e presence utilizzano per impostazione predefinita un bus in memoria,
-che non oltrepassa i confini del singolo processo. Questa è una questione legata al *numero di repliche*
-piuttosto che alla suddivisione dei ruoli — vale ugualmente per un deployment con ruolo singolo
-scalato a tre repliche — pertanto imposta `REALTIME_CHANNEL_BUS=postgres` (o `realtime.bus` nella
+**Canali tra istanze.** Broadcast e presence utilizzano per impostazione predefinita un bus in memoria,
+che non comunica tra processi diversi. Questa è una questione legata al *numero di repliche*
+più che alla suddivisione dei ruoli — vale lo stesso per una distribuzione a ruolo singolo
+scalata a tre istanze — pertanto imposta `REALTIME_CHANNEL_BUS=postgres` (o `realtime.bus` nella
 configurazione) ogni volta che più di un processo gestisce websocket.
 
-**Scalabilità a zero.** Nessuna di queste funzionalità scala un processo a zero o ne avvia uno
-su richiesta. Si tratta di una funzionalità a livello di piattaforma di orchestrazione, non del runtime.
+**Scalabilità a zero.** Nulla in questa configurazione riduce un processo a zero o ne avvia uno
+su richiesta. Questa è una funzionalità della piattaforma di hosting, non del runtime.
 
-Tutto il resto che un processo conserva solo per sé è raccolto in un unico elenco:
-[Eseguire più di un'istanza](/docs/deployment/multiple-instances/).
+Tutto il resto che un processo mantiene isolato per sé è documentato in:
+[Esecuzione di più istanze](/docs/deployment/multiple-instances/).
 
-## Rilascio indipendente di una singola unità
+## Rilasciare una singola unità in modo indipendente
 
-Tutto quanto descritto sopra suddivide *il luogo in cui il carico di lavoro viene eseguito*. L'intero sistema viene
-comunque distribuito come un'unica build: una sola immagine, un solo bundle, aggiornati insieme. Questa è l'impostazione
-predefinita corretta e la maggior parte dei deployment dovrebbe mantenerla.
+Tutto quanto descritto sopra suddivide il luogo in cui *viene eseguito il carico di lavoro*. Il tutto viene comunque distribuito come
+un'unica build: una sola immagine, un solo bundle, aggiornati insieme. Questa è l'impostazione predefinita ideale, e
+la maggior parte delle distribuzioni dovrebbe mantenerla.
 
-Un'unità può anche essere vincolata a una propria build specifica — ad esempio per un fix a una funzione
-che non richiede il riavvio dell'API:
+Un'unità può anche essere mantenuta su una propria build indipendente — una correzione a una funzione che non
+richiede il riavvio dell'API:
 
 ```yaml
 # values.yaml
@@ -275,58 +276,59 @@ functions:
     tag: "0.30.1"     # this unit only; the rest stay on the release-wide tag
 ```
 
-Solitamente ha senso bloccare solo il tag: il repository viene ereditato, quindi si tratta di
-un unico progetto e di un'unica immagine con una sola unità modificata. `bundleUrl` svolge lo stesso compito
+Di solito vale la pena bloccare solo il tag: il repository viene ereditato, quindi si tratta di
+un unico progetto e di un'unica immagine con una sola unità modificata. `bundleUrl` svolge la stessa funzione
 quando `bundle.mode: url`.
 
 ### La regola
 
-Due unità su build differenti rappresentano due insiemi distinti di collection su **un unico**
-database, e una sola unità ne esegue il provisioning. Di conseguenza:
+Due unità con build diverse corrispondono a due insiemi di tabelle a fronte di **un solo**
+database, e una sola unità ne esegue il provisioning. Pertanto:
 
-> **L'unità che gestisce lo schema deve essere aggiornata per prima. Un'unità può rimanere indietro; non deve mai essere più avanti.**
+> **L'unità proprietaria dello schema viene aggiornata per prima. Un'unità può rimanere indietro; non deve mai
+> anticipare.**
 
-Tale unità è il Job di migrazione, oppure l'`api` quando il Job è disattivato. Un'unità che opera
-*più avanti* rispetto allo schema interroga colonne non ancora esistenti e fa affidamento su policy RLS
-che nessuno ha ancora applicato — il primo caso genera un errore SQL su una route, il secondo restituisce un
-risultato vuoto con uno stato 200. Un'unità che opera *più indietro* rappresenta invece il normale stato
-di qualsiasi rollout in corso.
+Questa unità è il Job di migrazione, oppure `api` quando il Job è disattivato. Un'unità in esecuzione che
+*anticipa* lo schema esegue query su colonne che non esistono ancora e fa affidamento su policy RLS
+che nessuno ha applicato: il primo caso genera un errore SQL su una route, il secondo un
+risultato vuoto con stato 200. Un'unità che rimane *indietro* rappresenta lo stato ordinario di qualsiasi
+rollout in corso.
 
-### Cosa effettua la verifica
+### Cosa lo verifica
 
 Il processo che esegue il provisioning registra nel database la versione dello schema applicata.
-Tutti gli altri processi calcolano la propria a partire dalle collection caricate ed effettuano un
-confronto. In caso di discrepanza, viene emesso un avviso che indica entrambe:
+Tutti gli altri processi calcolano la propria versione dalle tabelle caricate ed
+effettuano un confronto. In caso di discrepanza lo segnalano, indicando entrambe:
 
 ```
 ⚠️ [schema] The database was last provisioned from a different set of collections
-   than this process was built from (database v1:6f2a…, this process v1:91cd…).
+   than this process was built from (database v2:6f2a…, this process v2:91cd…).
 ```
 
-Viene emesso un avviso e il servizio continua, poiché durante un rollout tale discrepanza è *corretta* —
-le unità non ancora aggiornate devono essere indietro. Imposta
+Emette un avviso e continua a servire traffico, poiché durante un rollout tale discrepanza è *corretta* —
+le unità che non sono state ancora aggiornate devono essere indietro. Imposta
 `REBASE_REQUIRE_SCHEMA_MATCH=true` (o `sharedState.requireSchemaMatch` nel
-chart) per impedire invece l'avvio, nel caso di un deployment in cui si preferisca non erogare
-affatto il servizio piuttosto che erogarlo in modo errato.
+chart) per rifiutare invece l'avvio, in una distribuzione in cui si preferisce non erogare alcun servizio
+piuttosto che servire risposte errate.
 
-Entrambi i lati del confronto sono **calcolati**, mai letti da un manifest. La
+Entrambi i lati del confronto vengono **calcolati**, mai letti da un manifest. La
 versione che una build dichiara su se stessa non è una prova del fatto che il database sia allineato
-ad essa.
+con essa.
 
-Nulla verifica la *direzione* — la versione dello schema è un hash, quindi può rilevare una discrepanza
-ma non quale dei due sia più avanti. Questo rende l'ordine di rollout una regola operativa da seguire,
-piuttosto che un vincolo imposto dal runtime.
+Nulla verifica la *direzione* — la versione dello schema è un hash, quindi può rilevare che
+le due versioni differiscono, ma mai quale sia la più recente. Questo è il motivo per cui l'ordine di rollout è una
+regola da seguire anziché un vincolo applicabile dal runtime.
 
 ## Aggiornamento
 
-Invariato: ogni processo esegue la stessa immagine pubblicata, quindi un aggiornamento corrisponde alla
-modifica dello stesso tag su ciascuno di essi. Esegui per primo il rollout del processo che gestisce lo schema — l'`api`,
-oppure il Job di migrazione — in modo che lo schema della nuova versione sia già al suo posto
-prima che gli altri processi vi operino contro: un'unità può rimanere indietro, mai essere più avanti (vedi
+Invariato: ogni processo esegue la stessa immagine pubblicata, quindi un aggiornamento consiste nella stessa
+modifica di tag su ciascuno di essi. Esegui prima il rollout del processo proprietario dello schema — `api`
+o il Job di migrazione — in modo che lo schema della nuova versione sia operativo prima che
+gli altri processi vengano eseguiti a fronte di esso: un'unità può restare indietro, mai anticipare (vedi
 [La regola](#la-regola)).
 
 ## Risorse correlate
 
-- [Guida al deployment](/docs/getting-started/deployment/) — il deployment a singolo processo da cui deriva questa suddivisione
+- [Guida alla distribuzione](/docs/getting-started/deployment/) — la distribuzione a processo singolo da cui deriva questa suddivisione
 - [Ambiente e configurazione](/docs/getting-started/configuration/) — `REBASE_ROLE`, `REBASE_CRON_SCHEDULER` e `REBASE_MIGRATE_ON_BOOT`
-- [Kubernetes](/docs/deployment/kubernetes/) — un deployment per ciascun ruolo
+- [Kubernetes](/docs/deployment/kubernetes/) — un deployment per ruolo

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5717c89c3977b9a3
+sourceHash: d3b3f413d231c3d0
 title: SDK tipado — Primeros pasos
 sidebar_label: Primeros pasos
 description: Instala y configura el SDK tipado de Rebase para interactuar con tu backend desde cualquier aplicación JavaScript o TypeScript.
@@ -7,15 +7,15 @@ description: Instala y configura el SDK tipado de Rebase para interactuar con tu
 
 ## Descripción general
 
-El paquete `@rebasepro/client` proporciona un SDK de JavaScript con seguridad de tipos para interactuar con tu backend de Rebase. Gestiona:
+El paquete `@rebasepro/client` proporciona un SDK de JavaScript con seguridad de tipos para interactuar con tu backend de Rebase. Se encarga de:
 
 - **Operaciones de datos** — CRUD con filtrado, ordenación y paginación
 - **Obtención de relaciones** — Incluye entidades relacionadas con `.include()`
 - **Suscripciones en tiempo real** — Actualizaciones en vivo basadas en WebSocket
-- **Sincronización local-first y offline** — Base de datos local de filas opcional, escrituras instantáneas offline, consultas en vivo
+- **Sincronización offline y local-first** — Base de datos local de filas opcional, escrituras offline instantáneas, consultas en vivo
 - **Autenticación** — Gestión de tokens, inicio de sesión, registro, OAuth
 - **Almacenamiento** — Subida, descarga y gestión de archivos
-- **Funciones personalizadas** — Llama a endpoints personalizados del servidor
+- **Funciones personalizadas** — Llamada a endpoints de servidor personalizados
 
 ## Instalación
 
@@ -25,7 +25,10 @@ pnpm add @rebasepro/client
 
 ## Creación de un cliente
 
-`rebase dev` deriva un puerto libre a partir de la ruta del proyecto en lugar de usar uno fijo, por lo que debes **leer `baseUrl` de la URL que imprimió**; no hay un puerto compartido por todos los proyectos. En un frontend con Vite, ese es el `VITE_API_URL` que el scaffold escribe en `.env`; en un script, una variable de entorno propia.
+`rebase dev` deduce un puerto libre a partir de la ruta del proyecto en lugar de usar uno
+fijo, por lo que debes **leer `baseUrl` de la URL que imprimió**; no hay un puerto
+que todos los proyectos compartan. En un frontend de Vite, ese es el `VITE_API_URL` que el scaffold
+escribe en `.env`; en un script, una variable de entorno propia.
 
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
@@ -35,7 +38,7 @@ const client = createRebaseClient({
 });
 ```
 
-La `websocketUrl` se deriva automáticamente de `baseUrl` (`http → ws`, `https → wss`). Puedes sobrescribirla explícitamente si es necesario:
+`websocketUrl` se deduce automáticamente de `baseUrl` (`http → ws`, `https → wss`). Puedes sobrescribirlo explícitamente si es necesario:
 
 ```typescript
 const client = createRebaseClient({
@@ -48,66 +51,74 @@ const client = createRebaseClient({
 
 | Opción | Tipo | Descripción |
 |--------|------|-------------|
-| `baseUrl` | `string` | URL del backend. Léela de lo que imprimió `rebase dev`, o de tu despliegue |
-| `websocketUrl` | `string` | URL de WebSocket — derivada automáticamente de `baseUrl` si se omite |
-| `token` | `string` | Token JWT estático para llamadas de servidor a servidor |
+| `baseUrl` | `string` | URL del backend. Léela de lo que imprimió `rebase dev` o de tu despliegue |
+| `websocketUrl` | `string` | URL de WebSocket — deducida automáticamente de `baseUrl` si se omite |
+| `token` | `string` | Token JWT estático para llamadas entre servidores |
 | `apiPath` | `string` | Prefijo de la API (por defecto: `"/api"`) |
-| `fetch` | `typeof fetch` | Implementación personalizada de fetch (p. ej. para SSR) |
-| `onUnauthorized` | `() => Promise<boolean>` | Controlador personalizado para 401 — devuelve `true` para reintentar |
-| `realtime` | `boolean \| RealtimeClientOptions` | Abre el WebSocket (por defecto `true`) — establece `false` en scripts de ejecución única. `{ affinity }` [nombra el grupo al que pertenece el socket](/docs/sdk/realtime#keeping-a-group-on-one-instance) |
-| `collections` | `Record<string, string>` | Mapea nombres de accesores a slugs de colecciones |
+| `fetch` | `typeof fetch` | Implementación personalizada de fetch (p. ej., para SSR) |
+| `onUnauthorized` | `() => Promise<boolean>` | Manejador personalizado para 401 — devuelve `true` para reintentar |
+| `realtime` | `boolean \| RealtimeClientOptions` | Abre el WebSocket (por defecto `true`) — establécelo en `false` en scripts de ejecución única. `{ affinity }` [nombra el grupo al que pertenece el socket](/docs/sdk/realtime#keeping-a-group-on-one-instance) |
+| `tables` | `Record<string, string>` | <span class="since-badge" data-since="0.31">Desde 0.31</span> Mapea nombres de accesores a slugs de tablas — el `tablesDictionary` generado |
 | `offline` | `boolean \| OfflineConfig` | [Sincronización local-first](/docs/sdk/offline) — desactivada por defecto |
-| `impersonate` | `string` | Ejecuta cada petición como este usuario (por uid), para comprobar qué ve un usuario. Solo con la sesión de un administrador: la API de datos, las funciones y el tiempo real se ejecutan como ese usuario, y cualquier otra ruta la rechaza |
-| `debug` | `boolean` | Registra el progreso de la conexión en tiempo real con `console.debug` (por defecto `false`) — ver [Registro de la conexión](#registro-de-la-conexión) |
+| `impersonate` | `string` | Ejecuta cada petición como este usuario, por uid, para comprobar qué puede ver un usuario. Solo una sesión de administrador puede hacerlo: la API de datos, las funciones y el realtime se ejecutan como ese usuario, y cualquier otra ruta lo rechaza |
+| `debug` | `boolean` | Registra el progreso de la conexión en tiempo real con `console.debug` (por defecto `false`) — consulta [Registro de conexión](#registro-de-conexión) |
 
-### Registro de la conexión
+### Registro de conexión
 
-Por defecto, el cliente no imprime nada sobre su conexión en tiempo real, así que una página pública no revela nada de su backend en la consola de un visitante. Las advertencias y los errores se imprimen siempre. Para ver cómo la conexión se abre, se autentica, se cae y vuelve a marcar, pasa `debug: true`, o actívalo en un solo navegador sin cambiar el sitio ejecutando esto en su consola:
+El cliente no imprime nada sobre su conexión en tiempo real de forma predeterminada, por lo que una página pública no muestra nada sobre su backend en la consola de un visitante. Las advertencias y errores siempre se imprimen. Para ver la conexión abrirse, iniciar sesión, caerse y reconectarse, pasa `debug: true`, o actívalo en un navegador sin modificar el sitio ejecutando esto en su consola:
 
 ```js
 localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_debug") to stop
 ```
 
-Se aplica desde la siguiente línea que registre el cliente, así que una página ya conectada no necesita recargarse. Fuera de un navegador, usa `globalThis.__REBASE_DEBUG__ = true`. Los navegadores muestran `console.debug` solo en el nivel Detallado (Verbose).
+Se aplica a partir de la siguiente línea que el cliente registre, por lo que una página que ya esté conectada no necesita recargarse. Fuera del navegador, define `globalThis.__REBASE_DEBUG__ = true`. Los navegadores solo muestran `console.debug` en el nivel Detallado (Verbose).
 
-## Generación de SDK tipado
+## Generación del SDK tipado
 
-Genera un cliente totalmente tipado a partir de las definiciones de tus colecciones:
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Genera un cliente totalmente tipado a partir de tus tablas:
 
 ```bash
 rebase generate-sdk
 ```
 
-Mientras `rebase dev` está en ejecución no hace falta: regenera los tipos en `generated/sdk/` al arrancar y en cada guardado bajo `config/collections/`. Ejecuta el comando tú mismo en CI, en un repositorio de frontend que no tiene colecciones (`rebase generate-sdk --from link`), o en cualquier lugar donde `rebase dev` no se esté ejecutando.
+Mientras `rebase dev` esté en ejecución no necesitas hacerlo: regenera los tipos en
+`generated/sdk/` al iniciar y con cada guardado en `backend/schema/`. Ejecuta el
+comando tú mismo en CI, en un repositorio de frontend que no tenga tablas propias
+(`rebase generate-sdk --from link`), o en cualquier lugar donde `rebase dev` no se esté ejecutando.
+`generate-sdk` lee las tablas que exporta `backend/schema/index.ts`, mediante el
+mismo cargador desde el que arranca el backend; `--from` lee en su lugar las `tables` del
+`/api/meta/contract` de un backend en ejecución.
 
 Luego pasa el parámetro de tipo `Database` a `createRebaseClient` para obtener autocompletado completo:
 
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
-import { collectionsDictionary, type Database } from "./generated/sdk/database.types";
+import { tablesDictionary, type Database } from "./generated/sdk/database.types";
 
 const client = createRebaseClient<Database>({
     baseUrl: import.meta.env.VITE_API_URL,
-    collections: collectionsDictionary,
+    tables: tablesDictionary,
 });
 
-// Full autocomplete on collection names and field types
+// Full autocomplete on table names and field types
 const { data } = await client.data.products.find();
 ```
 
-Cuando se proporciona `Database`, `createRebaseClient` devuelve una instancia de `CreateRebaseClientResult<DB>`. Esto mapea los accesores de colecciones en camelCase directamente en `client.data` a sus tipos correspondientes, brindándote autocompletado completo en las operaciones y tipos de colecciones (p. ej., `client.data.products.find()`).
+Cuando se proporciona `Database`, `createRebaseClient` devuelve una instancia de `CreateRebaseClientResult<DB>`. Esto mapea los accesores de tabla en camelCase directamente en `client.data` a sus tipos correspondientes, brindándote un autocompletado completo en las operaciones y tipos de tabla (p. ej., `client.data.products.find()`).
 
-`collectionsDictionary` mapea cada accesor de vuelta al slug que se usa en la transmisión de datos. **`collections` es obligatorio para un cliente tipado.** Los tipos ofrecen todos los accesores lo pases o no, pero sin él `client.data.myNotes` se envía a `/data/my_notes`, el accesor en snake_case, así que un slug como `my-notes` o un accesor renombrado responde 404. El cliente avisa una vez, nombrando el accesor y la solución. Una versión futura hará que `collections` sea obligatorio en los tipos cuando se proporcione `Database`.
+`tablesDictionary` mapea cada accesor al slug que se utiliza en la transmisión de red. El módulo generado también exporta `TableName`, la unión de cada slug, y el tipo `TablesDictionary`. **`tables` es obligatorio para un cliente tipado.** Los tipos ofrecen cada accesor independientemente de si lo pasas o no, pero sin él `client.data.myNotes` se envía a `/data/my_notes`, el accesor en snake_case, por lo que un slug como `my-notes` o un accesor renombrado responderá 404. El cliente advierte una vez, indicando el accesor y la solución. Con el diccionario, un accesor que no se encuentre en él lanza un error `RebaseClientError` con el código `UNKNOWN_TABLE` y una sugerencia. Una versión posterior hará que `tables` sea obligatorio en los tipos cuando se proporcione `Database`.
 
-Algunos nombres de `client.data` están ocupados: `collection` es la función dinámica `collection(slug)`, y `then`, `toJSON` y `$$typeof` se dejan intactos para las comprobaciones de promesas y de serialización. Una colección cuyo accesor fuera uno de ellos se genera como `<name>Collection` — el slug `collection` es `client.data.collectionCollection` — y `generate-sdk` imprime una advertencia que nombra ambos. `client.data.collection("collection")` también llega a ella.
+Algunos nombres en `client.data` ya están reservados: `table` es la función dinámica `table(slug)`, `batch` es [`client.batch`](/docs/sdk/writing/#writing-across-tables), y `then`, `toJSON` y `$$typeof` se reservan para comprobaciones de promesas y serialización. Una tabla cuyo accesor sería `table`, `then`, `toJSON` o `$$typeof` se genera como `<name>Table` —el slug `table` es `client.data.tableTable`— y `generate-sdk` imprime una advertencia mencionando ambos. `client.data.table("table")` también permite acceder a ella, y es la forma de acceder a una tabla cuyo accesor sería `batch`. `data.table(slug)` rechaza un slug con un segmento `.` o `..`, que saldría de `/data`, con `INVALID_TABLE_PATH`.
 
 ### Nombres de campos
 
-**El nombre de un campo en la transmisión es su clave de propiedad**, y la API utiliza camelCase en su totalidad. Una propiedad `createdAt` almacenada en una columna `created_at` es `row.createdAt`, y la clave foránea de una relación es `authorId` aunque la columna se mantenga como `author_id`. `where` y `orderBy` se basan en el mismo tipo `Row`, por lo que lo que compila es a lo que el backend responde.
+**El nombre de un campo en la transmisión es la clave de su columna**, y la API utiliza camelCase en todas partes. Una columna `createdAt` almacenada como `created_at` es `row.createdAt`, y la clave foránea de una relación es `authorId` aunque la columna siga siendo `author_id`. `where` y `orderBy` se basan en el mismo tipo `Row`, por lo que lo que compila es exactamente a lo que responde el backend.
 
-Una clave de propiedad que *tú* escribiste es tu clave, cualquiera que sea su formato — nada renombra un nombre que hayas elegido. Las dos claves que se derivan en lugar de declararse, la clave foránea de una relación y una columna leída mediante introspección, están en camelCase.
+Una clave de columna que *tú* escribiste es tu clave, cualquiera que sea su formato —nada renombra un nombre que hayas elegido—. Las dos claves que se derivan en lugar de declararse, la clave foránea de una relación y una columna leída mediante introspección, están en camelCase.
 
-`Row` describe una lectura, `Insert` un `create()` y `Update` un `update()` — no tienen la misma forma. Una columna que no es obligatoria es `T | null` en las tres, de modo que una escritura pueda vaciarla; la clave primaria siempre está presente en una lectura y nunca se puede establecer en una actualización; un destino `belongsTo` se puede escribir tanto como la relación (`{ author: 5 }`) o como su clave foránea (`{ authorId: 5 }`), y una obligatoria se satisface con cualquiera de las dos; un `hasOne` se escribe nombrando la fila destino (`{ profile: 9 }`), o `null` para desenlazarla; un `via` de un solo salto se escribe como el tipo al que sustituye (a uno: el id del destino o `null`; a muchos: una lista de ids), y uno de varios saltos es de solo lectura y no está en ninguno de los dos; y una pertenencia `hasMany` o `manyToMany` se escribe como una lista de ids de destino u objetos `{ id }` (`{ tags: ["t-1"] }`), cada uno con un `_pivot` cuando la tabla de unión declara columnas de payload. Un campo que nadie puede escribir (`access: { write: [] }`) no está ni en `Insert` ni en `Update`. Una columna `date` se lee como una cadena ISO, y una escritura acepta esa cadena o un `Date`.
+`Row` describe una lectura, `Insert` un `create()` y `Update` un `update()` —no tienen la misma estructura—. Una columna que no es obligatoria es `T | null` en los tres casos, por lo que una escritura puede vaciarla; la clave primaria siempre está presente en una lectura y nunca se puede establecer en una actualización; un destino `belongsTo` se puede escribir ya sea como la relación (`{ author: 5 }`) o como su clave foránea (`{ authorId: 5 }`), y uno obligatorio se satisface con cualquiera de los dos; un `hasOne` se escribe indicando la fila de destino (`{ profile: 9 }`), o `null` para desvincularlo; un `via` de un solo salto se escribe según el tipo que representa (to-one: el id de destino o `null`; to-many: una lista de ids), y uno de múltiples saltos es de solo lectura y no aparece en ninguno; y una pertenencia `hasMany` o `manyToMany` se escribe como una lista de ids de destino u objetos `{ id }` (`{ tags: ["t-1"] }`), llevando cada uno un `_pivot` cuando la tabla de unión declara columnas de carga útil (payload). Un campo que nadie puede escribir (`.access({ write: [] })`) no está ni en `Insert` ni en `Update`. Una columna `date` se lee como una cadena ISO, y una escritura acepta tanto esa cadena como un objeto `Date`.
 
 ## Ejemplo rápido
 
@@ -157,8 +168,8 @@ function MyComponent() {
 
 ## Siguientes pasos
 
-- **[Consultar datos](/docs/sdk/querying)** — CRUD, filtros, paginación y relaciones
+- **[Consulta de datos](/docs/sdk/querying)** — CRUD, filtros, paginación y relaciones
 - **[Autenticación](/docs/sdk/authentication)** — Inicio de sesión, registro, OAuth, sesiones
 - **[Suscripciones en tiempo real](/docs/sdk/realtime)** — Datos en vivo con WebSockets
-- **[Sincronización local-first y offline](/docs/sdk/offline)** — Trabaja sin conexión y sincroniza cuando vuelva
-- **[Almacenamiento y archivos](/docs/sdk/storage)** — Sube, descarga y gestiona archivos
+- **[Sincronización offline y local-first](/docs/sdk/offline)** — Trabaja sin conexión y sincroniza cuando regrese
+- **[Almacenamiento y archivos](/docs/sdk/storage)** — Sube, descarga y administra archivos

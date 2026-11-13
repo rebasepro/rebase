@@ -1,161 +1,175 @@
 ---
-sourceHash: a0dfd4167267de59
+sourceHash: 5037df8f9b275f93
 title: Campos de subida de archivos
 sidebar_label: Subidas de archivos
-description: "Declarar un campo de archivo o imagen en una colección: el bloque storage, subidas de uno o varios archivos, y cuáles de sus opciones resuelve el panel en lugar del servidor."
+description: "Cómo el CMS dibuja una columna col.storage() como un campo de subida: las reglas que el servidor aplica sobre la columna, las funciones exclusivas del navegador que añade customizeTable, campos para uno y múltiples archivos, y qué sucede con los archivos almacenados."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
 
-Un campo de archivo es una propiedad **string** ordinaria con un bloque `storage`. La
-columna contiene texto —la clave del objeto en el bucket, o su URL si así lo
-solicitas— y el bloque indica adónde van los bytes y qué aceptará el formulario.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-Esa separación importa más de lo que parece. La mayor parte de `storage` la lee el
-cargador del panel de administración de camino a la API, por lo que una escritura que no provenga
-de un formulario no pasa por él —esas opciones llevan la etiqueta a continuación. Las dos
-que deciden lo que un archivo puede *ser*, `maxSize` y `acceptedFiles`, son la excepción:
-el servidor las comprueba en cada subida hacia el `storagePath` de la propiedad.
+Un campo de archivo es una columna [`col.storage()`](/docs/schema/columns/#storage-columns).
+La columna contiene texto, la clave del objeto en el bucket (o su URL, si
+la columna así lo especifica), y el CMS lo dibuja como un campo de subida con vista previa.
+
+Lo que hace un campo de almacenamiento se divide en dos, según dónde se ejecute:
+
+| Declarado | Dónde | Opciones |
+|---|---|---|
+| en la columna, en `backend/schema` | leído por el servidor **y** el CMS | `path`, `source`, `accept`, `maxBytes`, `imageResize`, `public`, `fileName`, `metadata`, `includeBucketUrl`, `storeUrl` |
+| en `customizeTable`, en `frontend/src/cms` | solo en el navegador | `storage.path(…)`, `storage.fileName(…)`, `storage.processFile`, `storage.postProcess`, `storage.previewUrl` |
+
+Las opciones de la columna son serializables, por lo que viajan en el descriptor
+de la tabla y el servidor aplica las que puede de ellas. Las opciones de
+`customizeTable` son funciones: no pueden llegar al servidor, por lo que solo dan
+forma a las subidas realizadas desde el CMS.
 
 ## Un archivo
 
-```typescript
-avatar: {
-    type: "string",
-    name: "Main image",
-    storage: {
-        storagePath: "avatars",
-        acceptedFiles: ["image/*"],
-        maxSize: 2 * 1024 * 1024
-    }
-}
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+```ts
+// backend/schema/listings.ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const listings = defineTable("listings", {
+    columns: {
+        id:     col.uuid().primaryKey().defaultRandom(),
+        title:  col.text().notNull(),
+        cover:  col.storage({ path: "listings/{id}/", accept: ["image/*"], maxBytes: "10MB",
+                              imageResize: { maxWidth: 1600, format: "webp", quality: 80 } }),
+        photos: col.storage({ path: "listings/{id}/gallery/", accept: ["image/*"] }).multiple(),
+    },
+    rls: "admin-only",
+});
 ```
+
+`cover` es un campo de subida que acepta una imagen de un máximo de 10 MB,
+redimensionada a un ancho máximo de 1600 píxeles y guardada como WebP. Una columna
+cuyo `accept` indique un tipo de imagen ofrece vista previa como imagen, y la primera
+columna de este tipo ocupa la ranura de imagen del registro en tarjetas y listas.
 
 <FieldWidgetPreview client:only="react" variant="file_upload" />
 
 ## Varios archivos
 
-Un array de lo mismo. El bloque `storage` se mueve a `of`, porque
-describe cada elemento en lugar de la lista:
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-```typescript
-images: {
-    type: "array",
-    name: "Images",
-    of: {
-        type: "string",
-        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
-    }
-}
-```
+`.multiple()` convierte la columna en un `TEXT[]` y el campo en una subida de
+múltiples archivos, reordenable arrastrando. Cada opción se aplica a cada archivo.
 
 <FieldWidgetPreview client:only="react" variant="multi_file_upload" />
 
-## Opciones de almacenamiento
+## Opciones del lado del navegador
 
-Todo lo que está dentro de `storage`.
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-| Propiedad | Tipo | Descripción |
-|-----------|------|-------------|
-| `storagePath` | `string \| function` | **Obligatorio.** Dónde va el archivo en el bucket. Una cadena con marcadores de posición — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{id}` (el id del registro; `{entityId}` se lee igual), `{propertyKey}`, `{path}` — o una función del contexto de subida, que nombra al id del registro `id`. **Solo formulario de administración — no aplicado por la API ni la base de datos:** es el cargador del panel el que lo resuelve, y `client.storage.upload()` define su propia clave. Una ruta en cadena es también donde el servidor aplica a cada subida el `maxSize` y `acceptedFiles` de esta propiedad |
-| `fileName` | `string \| function` | El nombre de archivo del objeto subido, con los mismos marcadores de posición. **Solo formulario de administración — no aplicado por la API ni la base de datos.** |
-| `storageSource` | `string` | Qué bucket registrado usar, cuando un proyecto tiene más de uno. El identificador `bucket("media")` también funciona aquí |
-| `public` | `boolean` | Almacenar bajo el prefijo público y servir a través de una URL estable, sin token y almacenable en caché. `false` por defecto, lo que significa objetos privados y URLs firmadas de corta duración |
-| `acceptedFiles` | `FileType[]` | Tipos MIME que acepta esta propiedad. El formato con asterisco funciona — `image/*`. **Aplicado por el servidor** para cada subida en el `storagePath` de la propiedad — consulta [Qué comprueba el servidor](#qué-comprueba-el-servidor) |
-| `maxSize` | `number` | Archivo más grande aceptado, en bytes. **Aplicado por el servidor**, al igual que `acceptedFiles`, tanto en las rutas de subida simples como en las reanudables |
-| `metadata` | `Record<string, unknown>` | Metadatos del objeto a almacenar junto con el archivo |
-| `includeBucketUrl` | `boolean` | Escribe `s3://my-bucket/path/to/file.png` en la columna en lugar de `path/to/file.png`. `false` por defecto |
-| `storeUrl` | `boolean` | Escribe la URL de descarga en la columna en lugar de la clave. `false` por defecto, y conviene dejarlo así: una URL que lleva un token deja de funcionar cuando el token expira, y la referencia original se pierde |
-| `imageResize` | `ImageResize` | Redimensionar y recortar antes de subir, para `image/jpeg`, `image/png` e `image/webp`. **Solo formulario de administración — no aplicado por la API ni la base de datos.** |
-| `processFile` | `(file: File) => Promise<File>` | Transforma el archivo antes de que se suba. Se ejecuta en el navegador. **Solo formulario de administración — no aplicado por la API ni la base de datos.** |
-| `postProcess` | `(pathOrUrl: string) => Promise<string>` | Transforma la ruta o URL resuelta antes de que se guarde. Se ejecuta en el navegador. **Solo formulario de administración — no aplicado por la API ni la base de datos.** |
-| `previewUrl` | `(fileName: string) => string` | Construye la URL de vista previa, para cuando la dirección real del archivo no es el valor del campo. **Solo formulario de administración — no aplicado por la API ni la base de datos.** |
+```tsx
+// frontend/src/cms/listings.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { listings } from "../../../backend/schema/listings";
 
-### Redimensionamiento
+export const listingsCms = customizeTable<typeof listings>("listings", {
+    fields: {
+        cover: {
+            storage: {
+                // A folder per listing title, computed in the browser.
+                path: ({ values }) => `listings/${String(values.title ?? "untitled").toLowerCase()}/`,
+                fileName: ({ file }) => `${Date.now()}-${file.name}`,
+            },
+            urlPreview: "image",
+        },
+        photos: {
+            sortable: true,
+            storage: { processFile: async (file) => file },
+        },
+    },
+});
+```
 
-`imageResize` acepta `maxWidth` y `maxHeight` en píxeles, un `mode` de
-`"contain"` (reducir para ajustar, el predeterminado) o `"cover"` (rellenar los límites y
-recortar), un `format` de `"original"`, `"jpeg"`, `"png"` o `"webp"`, y una
-`quality` entre 0 y 100 para los formatos con pérdida — 80 por defecto. Ocurre en
-el navegador, antes de que se envíen los bytes, por lo que una subida que no provenga del
-panel se almacena en su tamaño original.
+| `storage.` | Se ejecuta | Efecto |
+|---|---|---|
+| `path(context)` | antes de una subida | La carpeta a la que va el archivo, reemplazando la plantilla `path` de la columna. |
+| `fileName(context)` | antes de una subida | El nombre del archivo almacenado, reemplazando la plantilla `fileName` de la columna. Puede ser asíncrono. |
+| `processFile(file)` | antes de una subida | Transforma el archivo (comprimir, eliminar metadatos). |
+| `postProcess(pathOrUrl)` | después de una subida | Transforma la ruta o URL antes de que se escriba en la columna. |
+| `previewUrl(fileName)` | al dibujar | La URL en la que previsualizar un archivo almacenado, cuando no es el valor del campo. |
 
-### Qué comprueba el servidor
+`path` y `fileName` reciben el contexto de la subida: el `file`, el `id` del
+registro (ausente en un registro nuevo), sus `values` editados, la `propertyKey` y
+las reglas de almacenamiento resueltas. En una columna `.multiple()`, las mismas
+opciones de `storage` van directamente en el campo y se aplican a cada archivo.
 
-`maxSize` y `acceptedFiles` solían ser aplicados por una sola cosa: el
-navegador. La ruta de subida conocía un único límite de tamaño global y nada sobre la
-propiedad a la que estaba destinado un archivo, por lo que un `curl -F file=@payload.exe`
-eludiendo el selector colocaba un ejecutable de 40 MB en el bucket de avatares y la configuración
-que indicaba lo contrario nunca se consultaba.
+`urlPreview` define cómo se previsualiza el valor almacenado (`"image"`, `"video"`,
+`"audio"`, `"file"` o `true` para un enlace), y `clearable` añade un control que
+vacía el campo.
 
-Ahora el servidor comprueba ambos según **dónde cae el archivo**. El
-`storagePath` de una propiedad es adónde van sus archivos, por lo que también es donde se aplican
-sus límites: cada subida cuya clave sea un archivo directamente bajo esa ruta —desde el
-panel, `client.storage.putObject`, una subida reanudable, el explorador de almacenamiento de Studio
-o `curl`— los cumple, nombre o no la propiedad, en la propia fuente de almacenamiento de la
-propiedad. Los marcadores de posición coinciden con lo que rellenaría el panel:
-`{id}`, `{rand}`, `{file}` y similares representan un segmento de ruta,
-`{path}` cualquier cantidad. La ruta de una propiedad con `public: true` se encuentra bajo `public/`.
+## Qué comprueba el servidor
 
-- Varias propiedades que comparten una misma ruta: se acepta un archivo que cualquiera de ellas acepte.
-- Una subida que también nombra su propiedad (`collection` + `property`, tal como las
-  envía `putObject({ context })`) también se sujeta a esa propiedad. Nombrar una
-  propiedad más permisiva no desbloquea la ruta de una más estricta.
-  Las subidas del panel (campos de archivo, celdas de tabla e imágenes de markdown) siempre
-  la nombran.
-- Un `storagePath` escrito como función no se puede leer sin ejecutarlo, por lo
-  que no tiene una regla del lado del servidor: esos límites solo se aplican a las subidas que nombran la
-  propiedad, lo cual hacen las del panel.
-- Una ruta que ninguna propiedad reclama se sujeta únicamente al límite propio de la fuente
-  (`STORAGE_MAX_FILE_SIZE`).
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-### Imágenes en un campo markdown
+`accept` y `maxBytes` son aplicados por el servidor en función de **dónde cae el
+archivo**. El `path` de una columna es adonde van sus archivos, por lo que también
+es donde se aplican sus límites: toda subida cuya clave sea un archivo directamente
+bajo esa ruta los cumple, ya sea desde el CMS, `client.storage.putObject`, una subida
+reanudable, el explorador de almacenamiento de Studio o `curl`, nombre o no a la
+columna, en el propio bucket de la columna. Los marcadores de posición coinciden con
+lo que el CMS rellenaría: `{id}`, `{rand}`, `{file}` y similares representan un
+segmento de ruta, `{path}` cualquier cantidad. La ruta de una columna con `public: true`
+se encuentra bajo `public/`.
 
-Una propiedad de markdown (`admin.markdown: true`) con un bloque `storage` admite la
-subida de imágenes en su editor. El texto almacena cada imagen como una **referencia de almacenamiento** —
-`![](rebase-storage:posts/abc_cover.png)` — no como una URL: la URL de un archivo privado
-contiene un token de descarga que expira en minutos, y el texto se guarda. El
-editor y las vistas previas del panel de administración intercambian cada referencia por una URL nueva cuando
-la muestran; un sitio web que renderiza el campo hace lo mismo con
-`resolveStorageReferences(text, client)` — consulta
-[Archivos dentro del texto](/docs/sdk/storage#files-inside-text).
+- Varias columnas que comparten una ruta: se acepta un archivo que cualquiera de ellas acepte.
+- Una subida que también nombra su columna, como hacen las subidas del CMS, se somete
+  también a esa columna. Nombrar una columna más permisiva no desbloquea la ruta de una más estricta.
+- El servidor no puede leer una función `storage.path` en `customizeTable`,
+  por lo que un archivo subido bajo la ruta que esta calcula solo se somete a los límites
+  de la columna cuando la subida nombra la columna, lo cual las subidas del CMS siempre hacen.
+- Una ruta que ninguna columna reclame se somete únicamente al límite del
+  propio bucket (`STORAGE_MAX_FILE_SIZE`).
 
-El texto guardado antes de las referencias conserva las propias URLs de descarga, con
-tokens expirados. El editor, las vistas previas y `resolveStorageReferences` las renuevan cuando
-muestran el texto, porque un token aún nombra su objeto; volver a insertar la imagen
-o reescribir el texto con `storageReferencesForDownloadUrls(text)` almacena una
-referencia.
+`imageResize`, `processFile` y `postProcess` ocurren en el navegador, antes de que
+los bytes sean enviados: un archivo subido de otra manera se almacena tal como se envió.
 
-### Adónde se permite que vaya el archivo
+## Adónde puede ir un archivo
 
-`storagePath` es un valor predeterminado, no un límite: nada en el servidor restringe una
-subida a ese prefijo. Decidir quién puede escribir y dónde es el propósito de una regla de
-autorización de almacenamiento — consulta [Almacenamiento](/docs/backend/storage).
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-### Los archivos nunca se eliminan automáticamente
+`path` es un valor predeterminado, no un límite estricto: nada en el servidor confina
+una subida a él. Quién puede escribir en qué lugar es una regla de autorización de
+almacenamiento; consulta [Almacenamiento](/docs/backend/storage/).
 
-Limpiar un campo de archivo, reemplazar su archivo o eliminar la fila a la que pertenece
-deja el objeto almacenado donde está. Cada subida obtiene su propia clave, por lo que un
-reemplazo escribe un objeto nuevo en lugar de sobrescribir el antiguo, y
-nada elimina el anterior: dos filas pueden tener la misma clave, por lo que el
-panel no puede saber si un archivo no se está utilizando. Los objetos a los que ninguna fila apunta permanecen en el
-bucket, y se facturan, hasta que los elimines —desde el explorador de almacenamiento de Studio,
-con `client.storage.deleteObject(key)` o con una regla de ciclo de vida en el
-bucket. `rebase storage orphans` lista los archivos que ninguna fila nombra y los elimina
-con `--delete` — consulta [la CLI](/docs/cli/#rebase-storage).
+## Los archivos nunca se eliminan por ti
 
-### Mover una propiedad a otra fuente de almacenamiento
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
-Un campo de archivo almacena la clave del objeto, no su fuente. Cambiar el
-`storageSource` de una propiedad apunta cada valor existente a la nueva fuente, donde esas
-claves no existen, por lo que las vistas previas de los archivos subidos antes del cambio responderán
-"not found". Copia los objetos a la nueva fuente bajo las mismas claves antes de
-cambiar la propiedad —`rebase storage move --from <old> --to <new> --prefix <storagePath>`,
-o con las herramientas propias del proveedor, como `aws s3 sync` o
-`gcloud storage cp`— o mantén la fuente antigua para los archivos existentes.
+Vaciar un campo de archivo, reemplazar su archivo o eliminar la fila deja el
+objeto almacenado donde está. Cada subida obtiene su propia clave, por lo que un
+reemplazo escribe un nuevo objeto y nada elimina el anterior: dos filas pueden
+contener la misma clave, por lo que el CMS no puede saber si un archivo está en desuso.
+Los objetos a los que ninguna fila apunta permanecen en el bucket y se facturan
+hasta que los elimines desde el explorador de almacenamiento de Studio, con
+`client.storage.deleteObject(key)` o con una regla de ciclo de vida en el bucket.
+`rebase storage orphans` lista los archivos a los que ninguna fila hace referencia
+y los elimina con `--delete`; consulta [la CLI](/docs/cli/#rebase-storage).
 
-## Siguientes pasos
+## Mover una columna a otro bucket
 
-- **[Propiedades](/docs/collections/properties)** — cada tipo de propiedad y sus opciones
-- **[Almacenamiento](/docs/backend/storage)** — buckets, URLs firmadas y qué hace el servidor con una subida
-- **[Reglas de seguridad (RLS)](/docs/collections/security-rules)** — quién puede leer las filas de las que dependen estos archivos
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+Un campo de archivo almacena la clave del objeto, no su bucket. Modificar el `source`
+de una columna hace que cada valor existente apunte al nuevo bucket, donde esas
+claves no existen, por lo que las vistas previas de archivos más antiguos responderán
+"not found". Copia primero los objetos al nuevo bucket con las mismas claves, mediante
+`rebase storage move --from <old> --to <new> --prefix <path>` o las herramientas
+propias del proveedor, tales como `aws s3 sync` o `gcloud storage cp`, o bien conserva
+el bucket anterior para los archivos existentes.
+
+## Pasos siguientes
+
+<span class="since-badge" data-since="0.31">Desde 0.31</span>
+
+- [Columnas](/docs/schema/columns/#storage-columns): todas las opciones de `col.storage()`
+- [Campos](/docs/collections/properties/): los demás tipos de columna
+- [Almacenamiento](/docs/backend/storage/): buckets, URLs firmadas y qué hace el servidor con una subida
+- [Archivos en el SDK](/docs/sdk/storage/#files-inside-text): referencias de almacenamiento dentro de texto
