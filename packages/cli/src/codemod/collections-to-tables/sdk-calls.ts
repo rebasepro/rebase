@@ -120,6 +120,41 @@ const OFFLINE_OPTIONS: Readonly<Record<string, string>> = {
 const SOURCE = /\.(ts|tsx|mts|js|mjs)$/;
 const IGNORED_DIRS = new Set(["node_modules", "dist", "build", "out", ".git", "coverage", ".turbo", ".next", ".rebase", "dist-bundle", "test-results"]);
 
+/** A line longer than this is not written by a person: the file is bundled or minified output. */
+const BUNDLE_LINE_LENGTH = 2000;
+
+/**
+ * Whether a JavaScript file is bundled or minified output — a vendored build of
+ * the client, say. Its identifiers are the bundle's own internals (a build of
+ * `@rebasepro/client` reads `maxCachedQueriesPerCollection` from its own
+ * options), so rewriting it would break it: it is replaced, not edited.
+ */
+export function isBundledFile(file: string, text: string): boolean {
+    if (!/\.(js|mjs|cjs)$/.test(file)) return false;
+    let start = 0;
+    while (start < text.length) {
+        const newline = text.indexOf("\n", start);
+        const end = newline === -1 ? text.length : newline;
+        if (end - start > BUNDLE_LINE_LENGTH) return true;
+        start = end + 1;
+    }
+    return false;
+}
+
+/**
+ * A node's symbol, or undefined when the checker has none to give. The
+ * checker throws on some files instead of answering (a `.js` script — not a
+ * module — read under a tsconfig without `allowJs`), and one such file must
+ * not end the run over every other file.
+ */
+function symbolOf(node: Node): ReturnType<Node["getSymbol"]> {
+    try {
+        return node.getSymbol();
+    } catch {
+        return undefined;
+    }
+}
+
 /** Whether a file is generated SDK output, which `rebase generate-sdk` rewrites. */
 export function isGeneratedSdkFile(file: string, text: string): boolean {
     const head = text.slice(0, 400);
@@ -229,7 +264,7 @@ function isListedReceiver(ctx: AstContext, receiver: Node, depth = 0): boolean {
     if (N.isCallExpression(receiver) && DATA_HOOKS.has(receiver.getExpression().getText())) return true;
     if (N.isIdentifier(receiver) && depth === 0) {
         if (isFactoryResult(ctx, receiver)) return true;
-        const declaration = receiver.getSymbol()?.getDeclarations()[0];
+        const declaration = symbolOf(receiver)?.getDeclarations()[0];
         if (declaration && N.isVariableDeclaration(declaration)) {
             const initializer = declaration.getInitializer();
             if (initializer) return isListedReceiver(ctx, initializer, depth + 1);
@@ -241,7 +276,7 @@ function isListedReceiver(ctx: AstContext, receiver: Node, depth = 0): boolean {
 /** Whether an identifier names a `createRebaseClient(...)` result declared in its file. */
 function isFactoryResult(ctx: AstContext, identifier: Node): boolean {
     const { Node: N } = ctx.tsm;
-    const declaration = identifier.getSymbol()?.getDeclarations()[0];
+    const declaration = symbolOf(identifier)?.getDeclarations()[0];
     if (!declaration || !N.isVariableDeclaration(declaration)) return false;
     let initializer: Node | undefined = declaration.getInitializer();
     while (initializer && (N.isAwaitExpression(initializer) || N.isAsExpression(initializer) || N.isParenthesizedExpression(initializer))) initializer = initializer.getExpression();
@@ -253,7 +288,7 @@ function hooksObject(ctx: AstContext, argument: Node): ObjectLiteralExpression |
     const { Node: N } = ctx.tsm;
     if (N.isObjectLiteralExpression(argument)) return argument;
     if (N.isIdentifier(argument)) {
-        const declaration = argument.getSymbol()?.getDeclarations()[0];
+        const declaration = symbolOf(argument)?.getDeclarations()[0];
         if (declaration && N.isVariableDeclaration(declaration)) {
             const initializer = declaration.getInitializer();
             return initializer ? resolveObject(ctx, initializer).node : undefined;
@@ -352,6 +387,16 @@ export async function rewriteSdkCalls(root: string, options: RewriteSdkOptions =
         const relative = toPosix(path.relative(root, file));
         if (isGeneratedSdkFile(file, text)) {
             if (/collection/i.test(text)) report.generated.push(relative);
+            continue;
+        }
+        if (isBundledFile(file, text)) {
+            if (/collection/i.test(text)) {
+                report.manualSteps.push({
+                    title: `Replace the bundled file ${relative}`,
+                    detail: `${relative} is bundled or minified JavaScript (a line longer than ${BUNDLE_LINE_LENGTH} characters), which the rewrite never edits: its names are the bundle's own. It mentions \`collection\`. If it is a build of a @rebasepro package (a vendored @rebasepro/client, say), replace it with the same package's 0.31 build; if it is a build of your own code, rebuild it after migrating the source it came from.`,
+                    file: relative
+                });
+            }
             continue;
         }
         const apply = (source: string, list: readonly { start: number; end: number; text: string }[]): string => {

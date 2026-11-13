@@ -50,6 +50,12 @@
       "line": 6,
       "code": "client.data.collection(\"posts\")",
       "reason": "left unchanged: the receiver's type is not the SDK data surface"
+    },
+    {
+      "file": "typed/web/feed.js",
+      "line": 5,
+      "code": "e.data.collection(\"posts\")",
+      "reason": "left unchanged: the receiver's type is not the SDK data surface"
     }
   ],
   "manualSteps": [
@@ -58,6 +64,11 @@
       "detail": "Line 4: `callbacks` belong to the collection model. Pass the tables instead — `schemaDir` (the directory whose index exports them) or `tables` + `defaultRls` imported from backend/schema; `hooks` (backend/hooks.ts) for global hooks; the auth table is the one defined with `defineAuthTable`, so `auth.collection` goes.",
       "snippet": "initializeRebaseBackend({\n    schemaDir: path.join(__dirname, \"<relative path to backend/schema>\"),\n    // or: tables: Object.values(await import(\"<backend/schema>\")), defaultRls,\n    // hooks,              (from backend/hooks.ts, if you had global callbacks)\n    // auth: { … },        (without `collection`)\n    …\n})",
       "file": "backend/src/index.ts"
+    },
+    {
+      "title": "Replace the bundled file typed/web/vendor/client.min.js",
+      "detail": "typed/web/vendor/client.min.js is bundled or minified JavaScript (a line longer than 2000 characters), which the rewrite never edits: its names are the bundle's own. It mentions `collection`. If it is a build of a @rebasepro package (a vendored @rebasepro/client, say), replace it with the same package's 0.31 build; if it is a build of your own code, rebuild it after migrating the source it came from.",
+      "file": "typed/web/vendor/client.min.js"
     },
     {
       "title": "Regenerate the typed SDK",

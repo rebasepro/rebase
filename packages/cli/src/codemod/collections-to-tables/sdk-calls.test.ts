@@ -98,7 +98,14 @@ describe("rebase migrate sdk-calls", () => {
         const firestore = fs.readFileSync(path.join(dir, "frontend/src/firestore.ts"), "utf8");
         expect(firestore).toContain(`collection(db, "events")`);
         expect(firestore).toContain(`registry.collection("events")`);
-        expect(report.left.map(left => `${left.file}:${left.line}`)).toEqual(["frontend/src/firestore.ts:8", "typed/src/use.ts:6"]);
+        // A script the checker throws on: no answer by type, not on the list, so left and listed — the run goes on.
+        expect(fs.readFileSync(path.join(dir, "typed/web/feed.js"), "utf8")).toContain(`e.data.collection("posts")`);
+        expect(report.left.map(left => `${left.file}:${left.line}`)).toEqual(["frontend/src/firestore.ts:8", "typed/src/use.ts:6", "typed/web/feed.js:5"]);
+        // A minified bundle (a vendored build of the client) is never edited: its own option names are not the project's calls.
+        expect(fs.readFileSync(path.join(dir, "typed/web/vendor/client.min.js"), "utf8")).toContain("e.maxCachedQueriesPerCollection");
+        expect(written).not.toContain("typed/web/vendor/client.min.js");
+        const bundleStep = report.manualSteps.find(step => step.file === "typed/web/vendor/client.min.js");
+        expect(bundleStep?.title).toBe("Replace the bundled file typed/web/vendor/client.min.js");
         // Hooks: the method renamed, the props adapted, the type renamed.
         const hooks = fs.readFileSync(path.join(dir, "backend/hooks.ts"), "utf8");
         expect(hooks).toContain(`backend.setTableHooks("posts", hooks)`);
