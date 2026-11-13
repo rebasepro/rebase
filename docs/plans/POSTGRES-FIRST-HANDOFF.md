@@ -158,105 +158,74 @@ All committed on the branch (≈150 commits OSS, 12 in `saas`). Details per slic
 ## 6. What is running right now, and what is next
 
 **The live list is the "CURRENT STATE" block at the top of `~/.rebase-audits/pgfirst/PLAN.md`**
-(agent ids, what each is doing, and the ordered NEXT list). It is rewritten at every checkpoint;
-this file only carries the shape of the work. As of 2026-11-13 01:30 CET:
+(agent ids, what each is doing, and the ordered NEXT list). It is appended to at every
+checkpoint; this file only carries the shape of the work. As of 2026-11-13 04:00 CET:
 
-- Done: all of Stage A; in Stage B every driver-internals slice (model, codecs, write path,
-  field access, hooks, relations), the server request path, the planner, the boot and
-  live-edit fixes; a first security review (six findings, all fixed) and a first parity review
-  (gaps closed); the Drizzle-style column spelling (additive half).
-- Running: the driver's last slice (it stops carrying collections at all), planner consumers
-  and renames, the spelling sweep, the migration module with the frozen legacy model, the
-  end-to-end lanes on a clean snapshot (cli green, selfhost green but for one fixture, admin
-  being re-run after fixes, driver lane running), a history-masking fix, admin-panel fixes.
+- Done: all of Stage A. Stage B: the driver, the server, the planner, boot and the live schema
+  editor run on compiled tables and descriptors only; the lowering bridge (`lowerTables`) is
+  deleted; the legacy model survives only as the frozen copy in `@rebasepro/common/migrate`.
+  The column spelling follows Drizzle everywhere (old spellings removed). First security and
+  parity reviews: every finding fixed. Control plane (`saas`) re-verified on the new tree.
+  English docs, CHANGELOG `[Unreleased]`, upgrade guide and skills are current up to the
+  slices listed as "one more docs touch" below. All four e2e lanes passed on a clean snapshot
+  (before the last four slices: they must be re-run).
+- Running (three builders): **B-VM** (one read shape: the Postgres driver's own read walk that
+  builds the admin's view model is deleted; the CMS builds it in the browser), **B-K7b** (the
+  CMS view-model types leave `@rebasepro/types` / `@rebasepro/common` for `@rebasepro/cms-types`;
+  it defers a few symbols until B-VM lands and must then be resumed), **PLAN-FIX** (a
+  many-to-many from a table to itself does not plan — regression; plus two leftovers).
 - Notes each slice left for docs and the CHANGELOG: `~/.rebase-audits/pgfirst/stage-b-docs-notes.md`.
   Reviews: `~/.rebase-audits/pgfirst/reviews/`. E2E findings: `~/.rebase-audits/pgfirst/e2e-findings.md`.
   Gate leftovers: `~/.rebase-audits/pgfirst/final-pass-checklist.md`. Drizzle mapping:
   `~/.rebase-audits/pgfirst/drizzle-alignment.md`.
 
 The Mac restarted at 20:18 and again at ~22:45 on 2026-11-12 (memory); each time every agent's
-uncommitted work was intact and all agents were resumed.
+uncommitted work was intact and all agents were resumed. Since then: at most three or four
+builders, heavy commands only through `locked.sh heavy`.
 
 ## 7. What is left, in order
 
-**Stage B — the internals read tables, not collections** (required: Francesco wants it
-"perfect for the future"). Contract: `STAGE-B.md`. Runtime map and slice table:
-`reports/pg-runtime.md` §4.
-
-1. When B-R1 reports, launch in parallel (fresh agents, briefs modelled on `060`/`062`):
-   - **B-R2 codecs**: `data-transformer.ts`, `row-pipeline.ts` (codec half), `field-op-sql.ts`,
-     aggregates, pivot serialisation — keyed on `ColumnType`.
-   - **B-R3 write path**: stamps, defaults, key immutability in the driver and
-     `PersistService.ts`; adds nested json user/time stamps (new). Then **B-R5 hooks** in the
-     same driver file (serialise R3 → R5): `TableHooks` + transforms native, one `afterRead`
-     chain (realtime re-implements it twice today), `open-rebase.ts`, `cli-console.ts`
-     (the console still exposes tables as `collections`).
-2. After B-R2: **B-R4** field access + search; **B-R6** relations (targets by slug;
-   implements `hasMany.orderBy`, the last pending feature).
-3. **B-R7**: driver/boot inputs are `CompiledTable[]` (`openRebase`, `openPostgresDriver`,
-   `ProvisionOptions.collections`); the `DataDriver` contract and socket frames say table/rows
-   (`subscribe_collection`, `listenCollection`, `fetchCollection` …) across types, client,
-   server, driver; offline queue `PendingMutation.collection` migrates with
-   `QUEUE_SCHEMA_VERSION 2`. B-S4a/b leave one named seam per area for this cut.
-4. **B-VM**: the server stops emitting the admin view-model envelope (`{__type:"date"}`,
-   relation refs) on the socket refetch; the CMS builds it from the wire row + descriptor
-   (Part II D). Read memory `rows-canonical-architecture` first.
-5. **B-K7**: view-model types and helpers (`Property`, CMS `CollectionConfig`,
-   `CollectionRegistry`, `util/entities` view-model half …) move from `types`/`common` to
-   `@rebasepro/cms-types`/cms by a scripted import rewrite; Firestore types to
-   `@rebasepro/firebase`. Fix the one `as AdminCollection` in `registeredCollection`.
-6. **B-K8**: delete `lowerTables`, lowered collections, `defineCollection`, legacy types from
-   `@rebasepro/types`. The lift (`collectionsToTableDefs`) survives only as migration tooling
-   (the codemod's core) under a `@rebasepro/common` migration subpath with its own frozen copy
-   of the pre-0.31 model. Then bank the API surface.
-7. **CLOUD-2**: `saas` follows the Stage B renames (two of its tests are red on the registry
-   rename already); re-run its suites and the throwaway-Postgres boot.
-8. Optional, if budget allows; otherwise tell Francesco: scripted conversion of the ~550
-   test files that still hold legacy collection literals (they go through the lift today and
-   double as its regression suite).
-
-**Stage A tail**
-
-9. **T8 e2e lanes** on the new layout (`pnpm ci:e2e --lane cli|admin|selfhost|vitest`; specs
-   under `tests/e2e` still write `app/config`; `cli-init-e2e`). Start when C6+C5 has reported
-   and all `dist` are rebuilt.
-10. **Docs final pass** after Stage B: reworded error messages (each Stage B report lists
-    old → new), `openRebase`/driver inputs (docs currently show the `lowerTables` bridge with a
-    caution), remaining `verify:docs:strict` findings, then translations — see the
-    TRANSLATIONS note in `PLAN.md` (repo script `website/scripts/translate_docs.mjs`, dry run
-    first; fallback: delete stale locale twins and say so).
-11. **Gates final pass** (resume or re-brief from `briefs/` "gates"): second API-surface
-    banking, bundle budgets (several chunks over budget — look at why before banking), casts
-    baseline, `check:names` exemption for dated audit records, a format-3 bundle fixture for
-    `verify:corpus`, audit-coverage entries, **retarget `tooling/scripts/harness/checks/config-build.mjs`**
-    (it still compiles the deleted `saas/config`; it is on the deploy preflight), jsdoc coverage.
-
-**Finish**
-
-12. Rebuild all `dist`; fresh-install clean worktree; `./tooling/scripts/verify-quality.sh`;
-    every `pnpm ci:e2e` lane; `saas` backend + console suites and tsc; `pnpm verify:docs:strict`.
-13. Independent review agents with fresh eyes, given code not conclusions: (a) security —
-    RLS fail-closed, redaction of `/api/schema/tables`, field access on every door; (b) parity
-    against the spec's §7 capability table (zero loss of functionality); (c) the codemod on
-    the real projects. Fix what they find.
-14. Fill Part II section F (checklist) and add a section G with the decisions taken while
-    building (list in `PLAN.md`, "DECISIONS TAKEN WHILE BUILDING"). Finalise `CHANGELOG.md`.
-    Delete this handoff file. Final report to Francesco.
-15. Release and rollout — only under section 9.
+1. **B-VM**, **B-K7b**, **PLAN-FIX** finish (see section 6). When B-VM reports, resume B-K7b
+   for its deferred symbols (value classes, `Entity`, the home of `buildRebaseData.ts`).
+2. **One more docs touch** (English): apply the notes sections B-R7b, SCHEMA-EDITOR-2,
+   LIVE-CATALOGUE, CORPUS, B-K8b, B-VM, B-K7b, PLAN-FIX (new error codes
+   `SCHEMA_EDITING_NO_REPOSITORY` / `SCHEMA_EDIT_STALE_FILE`, `refreshTables`, removed
+   `collections` inputs, the compiler's new refusals, the type-move rename list);
+   `docs/hosted-mcp-connector.md` still says payload version 2 (it is 3); rewrite Part II D's
+   last bullet and add the new decisions to Part II G.
+3. **Translations** of the stale locale twins — see the TRANSLATIONS note in `PLAN.md` (repo
+   script `website/scripts/translate_docs.mjs`, dry run first, key passed in the process
+   environment only; fallback: delete stale twins and say so).
+4. **Gates final pass**: `~/.rebase-audits/pgfirst/final-pass-checklist.md` (API-surface
+   banking, removed-names, casts / hooks / unused / untranslated baselines, bundle budgets,
+   template pins, stale paths in `docs/audits/systems.json`, `contracts/server.api.txt` and
+   `docs/gates.md` still naming `lowerTables`). Rebuild every `dist`.
+5. **Full verification** on a clean snapshot worktree (detached HEAD, `node_modules` cloned
+   with `cp -Rc`, dist built there): `./tooling/scripts/verify-quality.sh`, all four
+   `pnpm ci:e2e` lanes, `saas` backend + console suites and tsc, `pnpm verify:docs:strict`.
+6. **Final independent reviews** (fresh agents, given code not conclusions): security (REST
+   paths, history, real-Postgres RLS, saas intake, the new read path), parity against
+   `reviews/parity.md` and the spec's §7 table, the codemod on the real projects. Fix findings.
+7. Fill **Part II section F**; finalise `CHANGELOG.md`; delete this handoff file; final report.
+8. **Release and rollout** — only under section 9.
+9. Optional, if budget allows; otherwise tell Francesco: names that still say "collection" on
+   the wire (driver method names, socket frames, upload fields, offline queue, some JSON
+   keys); scripted conversion of the ~550 test files holding legacy collection literals.
 
 ## 8. Known red or open right now
 
-- The deploy preflight fails (stale `config-build` check; and it reports the lockfile as
-  modified in a worktree although `git status` is clean — find out what it compares).
-- `pnpm check:bundle` over budget on several chunks; `check:casts` wants reductions banked;
-  `check:audit-coverage` needs entries; `check:jsdoc-coverage` 11.6% vs 5%.
-- `check:templates` / `check:template-pins` are red on unreleased imports until the tag exists;
-  verify with `--released-as 0.31.0`. The version is **not** bumped (the release script bumps).
-- `examples/*` and the tree as a whole do not typecheck while Stage B agents are mid-edit.
-- `packages/cli` `dist` is stale (the built bin does not know `migrate`): rebuild before e2e.
-- Persisted formats still saying "collection" on purpose until B-R7 decides each:
-  offline queue, `keyTargets.collections` (keep), log field + Prometheus label (rename only
-  with dashboards/alerts), saved-apps column `collections` (kept).
+- `view-plan` (server-postgres) red until PLAN-FIX lands. `pnpm check:casts` red on
+  `packages/cms-types` until B-K7b lands.
+- `pnpm check:bundle` over budget on two chunks (look at why before banking);
+  `check:templates` / `check:template-pins` are red on unreleased imports until the tag
+  exists — verify with `--released-as 0.31.0`. The version is **not** bumped (the release
+  script bumps).
+- `DRIVER_SKEW` (published drivers a format-3 bundle may run on) is empty until 0.31.0 exists:
+  add 0.31.0 right after the npm release.
+- Every `dist` is stale: rebuild before any e2e lane.
+- Names that still say "collection" on purpose until decided: offline queue,
+  `keyTargets.collections` (keep), log field + Prometheus label (rename only with
+  dashboards/alerts), saved-apps column `collections` (kept), driver method / socket frame names.
 
 ## 9. Release and rollout — gates (all required, in this order)
 
@@ -296,6 +265,11 @@ uncommitted work was intact and all agents were resumed.
 - Translations: plan is to regenerate the five locales with the repo's own script and the
   Gemini key already configured for it (public docs text, small cost); else English fallback.
 - ~550 test files still describe fixtures in the old vocabulary (not user-facing).
-- Usage: weekly limit was at 41% on Thu 20:15 CET, burning ~5%/h with 7–8 agents; it resets
-  Sun 2026-11-15 08:00 CET. Before ~90%: launch nothing new, let agents commit, update this
-  file and `PLAN.md`.
+- The history endpoint served unmasked rows — also in the released 0.30.x (fixed on this
+  branch): live projects with history plus masking hooks are exposed until upgraded.
+- `.references()` on a column is refused (use `rel.belongsTo`) — the one Drizzle spelling he
+  may want flipped. A restore re-stamps policies. `policy-table-agreement` test deleted
+  (plan-golden pins the policy SQL).
+- Usage: weekly limit at 71% on Fri 03:30 CET with three builders (~0.6% per agent-hour); it
+  resets Sun 2026-11-15 08:00 CET. Before ~90%: launch nothing new, let agents commit, update
+  this file and `PLAN.md`.
