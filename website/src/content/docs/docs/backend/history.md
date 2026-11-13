@@ -80,11 +80,15 @@ The values are the row as the REST API serves it: its columns, dates as
 timestamps, a `belongsTo` as its foreign key. That is what a revert writes back.
 
 An entry never holds a related row's values. Reading a row's history needs only
-read access to that row, not to the rows it points at, so a relation is kept as
-a reference — `{ "__type": "relation", "id", "path" }` — and nothing more.
-Entries that older versions recorded with the related row embedded (a delete
-used to store the admin panel's view of the row) are served the same way: the
-history endpoint drops the embedded values before it answers.
+read access to that row, not to the rows it points at, so a `belongsTo` is kept
+as its foreign key and nothing more.
+
+Entries that older versions recorded through the admin panel's view of the row
+(a delete used to store it) are served, and reverted, as the row they stand for:
+a `{ "__type": "date", "value" }` envelope as its value, a
+`{ "__type": "relation" }` ref of an owning relation as the foreign key under
+the key's own name, any other relation's ref as the related row's key, and a
+related row the ref embedded is never served.
 
 On a table with [soft delete](/docs/collections/soft-delete/), a delete is
 recorded as `delete` and a restore (the update setting the soft-delete field

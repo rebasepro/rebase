@@ -5,7 +5,16 @@ table- and field-level presentation options), the entity actions, views and
 navigation models, the UI-preference shapes, and the translation keys the
 admin panel renders.
 
-This package is **types**. The tables themselves are declared in the backend,
+It also holds the collection and property view model the panel draws —
+`CollectionConfig`, `PostgresCollectionConfig`, `FirebaseCollectionConfig`,
+`StringProperty`, `NumberProperty` and every other `…Property`,
+`CollectionCallbacks`, the relation kinds — and the panel's helpers over it
+(conditions, permissions, property and relation resolution, field access).
+These moved here from `@rebasepro/types` and `@rebasepro/common` in 0.31: a
+custom field types its property as `FieldProps<StringProperty>` with
+`StringProperty` from this package.
+
+This package holds types and pure functions, no components. The tables themselves are declared in the backend,
 with `defineTable` from `@rebasepro/server/schema`; the admin panel renders
 every table the server serves with no configuration, and a project's
 `frontend/src/cms/*.tsx` files state how one table differs from that default,

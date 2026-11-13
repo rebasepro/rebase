@@ -109,4 +109,4 @@ A zero-dependency\* collection of pure utility functions for string manipulation
 
 ## Related Packages
 
-- `@rebasepro/types` — Type definitions used by some utility functions (`GeoPoint`)
+- `@rebasepro/types` — Type definitions used by some utility functions (`SecurityRule`, `SecurityOperation`)

@@ -351,6 +351,27 @@ never rules that are not in force.
 Hooks edited in source take effect with the apply too: the server runs the
 compiled tables of the edited schema without a restart.
 
+## Served without a restart
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+A change applied from the Studio is served at once. The Postgres driver reads
+the changed tables back from the database and swaps them in: the data API,
+includes, hooks and realtime see a new table, column, relation or junction
+without a restart, and a new table gets its grants and change capture. The
+response says so under `serving`:
+
+```json
+{ "serving": { "status": "now" } }
+```
+
+On a deployment whose tables are derived from the database (no
+`backend/schema`), or with a driver that cannot refresh its tables, the
+database and the source have the change but the process keeps serving the
+tables it opened with. The status is then `"after-restart"`, with a `message`
+the Studio's receipt shows as a warning; restart the process to serve the
+change.
+
 ## When the file changed under the edit
 
 An edit is prepared against the files as they are. If one of them changes on
@@ -519,12 +540,9 @@ working in:
   mints one through Atlas with the integrity hash Atlas requires.
 - Postgres only. The capability is detected on the driver, and a driver
   without it answers `SCHEMA_EDITING_UNSUPPORTED`.
-- After an apply that adds a column, the Postgres driver keeps the column
-  catalogue it opened with until the process restarts, so a REST write to the
-  new column can fail until then. Reads, and the descriptors the panel renders
-  from, already have it.
-- A table an apply adds is not served by the Postgres driver until the process
-  restarts.
+- A deployment whose tables are derived from the database serves an applied
+  change after the next start (`serving.status: "after-restart"`, see
+  [Served without a restart](#served-without-a-restart)).
 
 ## Related
 

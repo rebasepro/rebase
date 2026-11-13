@@ -325,7 +325,15 @@ the array column: its own `.validate()` takes `minItems`, `maxItems` and
 Modifiers that describe a column (`.notNull()`, a default, `.unique()`,
 `.access()`) go after `.array()` — `col.text().array().notNull().default([])`;
 before it they do not compile. An array of arrays is refused; use
-`col.jsonb()` for nested lists.
+`col.jsonb()` for nested lists. An array holds scalars — text, `uuid`, numbers,
+booleans, dates, enums: an `.array()` of `jsonb`, `json`, `vector`, `bytea`,
+geopoints or `col.custom()` is refused, and a list of documents, points or
+vectors is `col.jsonb(json.array(…))`. A custom list type is named as itself:
+`col.custom({ dataType: "inet[]" })`.
+
+Each item is served as its type is served on a scalar column: a
+`timestamptz[]` item as an RFC 3339 string, a `numeric[]` item as a number, and
+a null item as `null`.
 
 ## Keys, identity and serials
 
@@ -431,6 +439,18 @@ When the schema is compiled, the table is refused for:
   column, a time stamp on a non-temporal column, a user stamp on a column that
   is neither text nor `uuid`;
 - a `.private()` primary key, or a `timestamptz` or `time` primary key;
+- a primary key on a `jsonb`, `json`, geopoint, `vector`, `bytea`, array or
+  custom list column: a key is a scalar (text, `varchar`, `char`, `uuid`, an
+  enum, a number, a boolean or a date). `schema introspect` skips a table keyed
+  this way and says why;
+- an `.array()` of `jsonb`, `json`, `vector`, `bytea`, geopoints or
+  `col.custom()` (see [Arrays](#arrays));
+- a `.validate()` rule the column kind, its items or a JSON node does not
+  check (`integer` on a text column, `trim` on a number, `minItems` on a scalar);
+- a column that is both `.private()` and `.access()`;
+- a `.transform()` on a column and another on its JSON shape;
+- a `col.custom({ dataType })` whose type name is not the shape of a Postgres
+  type name;
 - `.oneOf([])`, and `.oneOf()` on a column that is neither text nor numeric;
 - an enum with a blank or repeated value, or a default that is not one of its
   values;

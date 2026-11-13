@@ -34,7 +34,7 @@ A custom field is a React component that receives `FieldProps`:
 // frontend/src/fields/ColorPickerField.tsx
 import React from "react";
 import type { FieldProps } from "@rebasepro/cms";
-import type { StringProperty } from "@rebasepro/types";
+import type { StringProperty } from "@rebasepro/cms-types";
 
 export function ColorPickerField({ value, setValue, error, showError, minimalistView }: FieldProps<StringProperty>) {
     return (
@@ -107,7 +107,7 @@ A custom field can read the whole record as it is being edited:
 ```tsx
 import React from "react";
 import type { FieldProps } from "@rebasepro/cms";
-import type { NumberProperty } from "@rebasepro/types";
+import type { NumberProperty } from "@rebasepro/cms-types";
 
 export function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProperty>) {
     const taxRate = Number(context.values.taxRate ?? 0.1);

@@ -321,6 +321,8 @@ export default defineFunction((app) => {
 
 `requireDriver(c)` is `getDriver(c)` without the `!` — it throws a message naming the wiring problem instead of failing twenty lines later on `undefined`.
 
+<span class="since-badge" data-since="0.31">Since 0.31</span> `fetchCollection` and `fetchOne` return the rows `GET /api/data/<table>` returns: dates as RFC 3339 strings, a `belongsTo` as its foreign key (`authorId`), and a related row only when `include` names it — `driver.fetchOne({ path: "articles", id, include: ["author"] })`.
+
 ### 2. `rebase.dataAsAdmin` — for trusted background work
 
 ```typescript

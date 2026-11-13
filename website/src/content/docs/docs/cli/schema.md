@@ -506,7 +506,12 @@ collection, `defineFirestoreCollection` files, `ui-config.json`), writes
 `backend/resources.ts`, `backend/storage.ts` and `backend/generated/register.ts`,
 adds `rebaseBackendGuard()` to a scaffold's `vite.config.ts`, then runs
 `rebase migrate sdk-calls`, which rewrites `.collection(` to `.table(`, the
-other SDK renames and the rule sources `existsIn` / `membership` in your code.
+other SDK renames and the rule sources `existsIn` / `membership` in your code,
+and moves the imports of names 0.31 moved to another package (the admin
+panel's types and helpers to `@rebasepro/cms-types`, the migration lift to
+`@rebasepro/common/migrate` — [the list](/docs/upgrading/0-30-to-0-31/#imports-that-moved)),
+adding the package to the importer's dependencies ("Dependencies added": run
+`pnpm install`). Bump every `@rebasepro` package to 0.31 before running it.
 Every run reads the result back: the generated SQL — DDL, policies, search,
 vector, triggers, views, the Drizzle schema — must be byte-identical, or every
 file is put back. What it cannot carry is refused with its file and line, and
@@ -520,6 +525,10 @@ deleted; the run prints the `git rm` line.
 | `--check` | On a migrated project: prove `backend/schema` still renders the same SQL. Exits 1 with the diff, or while a rule changes meaning. |
 | `--accept-rule-changes` | With `--check`: the rules under "Review before deploying" were reviewed. |
 | `--json` / `--force` / `--skip-sdk-calls` | The report as JSON (with `ruleChanges`); run on a dirty tree or over edited output; leave your code alone. |
+
+Read two lists in its SDK output: **"Rewritten by name — review"** (calls on an
+untyped receiver, rewritten by its name) and **"Left unchanged — check each"**
+(calls not proven to be the SDK: rename those that are, or they fail at runtime).
 
 The SQL check proves the conversion faithful, not that a rule still means what
 it did. The last section of the output, **"Review before deploying: these rules

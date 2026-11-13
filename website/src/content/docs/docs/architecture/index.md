@@ -97,7 +97,7 @@ Like drivers, storage backends are registered in a registry. You can have multip
 | `@rebasepro/forms` | Lightweight React form state management | Frontend |
 | `@rebasepro/plugin-ai` | AI-powered field autocompletion plugin | Frontend |
 | `@rebasepro/cms` | The admin panel: a view per table from the descriptors, `customizeTable`, forms and routing, CSV/JSON/Excel import and export | Frontend |
-| `@rebasepro/cms-types` | The panel's types: `customizeTable` options, field options, entity actions | Frontend |
+| `@rebasepro/cms-types` | The panel's types and helpers: `customizeTable` options, field options, entity actions, and the collection and property view model the panel draws (`CollectionConfig`, `StringProperty`, `CollectionCallbacks`, …) | Frontend |
 | `@rebasepro/firebase` | Firestore as a source the panel reads directly: `defineFirestoreCollection` | Frontend |
 | `@rebasepro/inference` | Infer fields from sample rows (the admin's "create from a file" import) | Frontend |
 

@@ -81,18 +81,18 @@ it. New in 0.31.
 
 | Module | Contents |
 |---|---|
-| `collections` | Collection config helpers |
-| `common` | General-purpose utilities |
-| `entities` | Entity value resolution |
-| `enums` | Enum type helpers |
-| `paths` | Path parsing and manipulation |
-| `resolutions` | Property and collection resolution |
-| `permissions` | Permission evaluation |
-| `relations` | Relation property helpers |
-| `builders` | Collection/property builder utilities |
-| `storage` | Storage path utilities |
-| `callbacks` | Hook composition utilities |
-| `conditions` | Conditional logic helpers |
+| `policy` | The policy compiler over table descriptors (`compilePolicyExpression`, the default admin policies, junction policies) |
+| `relations` | Relation helpers over descriptors (`getTableVarName`, `getEnumVarName`) |
+| `tenant` | Tenant scoping of reads and writes |
+| `identity`, `email` | Identity and email-address helpers |
+| `resumable-upload`, `download-url-cache` | Storage upload and download helpers |
+| `internal-tables`, `sql-rows`, `sql-redaction` | Rebase's own tables, raw SQL rows, redacting SQL for logs |
+
+The panel's helpers over the collection view model — conditions, permissions,
+property resolution, relation resolution, the collection-shaped policy
+helpers, `CollectionRegistry`, `composeCallbacks` — moved to
+[`@rebasepro/cms-types`](https://www.npmjs.com/package/@rebasepro/cms-types)
+in 0.31. Backend code composes a table's hooks with `composeTableHooks`.
 
 ## Quick Start
 

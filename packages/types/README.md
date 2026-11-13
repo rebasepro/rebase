@@ -14,7 +14,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ## What This Package Does
 
-Provides the canonical type definitions used across all Rebase packages — both client-side and server-side. It has no runtime dependencies, but it is not types-only: it also exports the constants and small runtime helpers those packages share (`GeoPoint`, `declaredDataSources`, …). Every other `@rebasepro/*` package depends on it.
+Provides the canonical type definitions used across all Rebase packages — both client-side and server-side. It has no runtime dependencies, but it is not types-only: it also exports the constants and small runtime helpers those packages share (`declaredDataSources`, `bucket`, …). Every other `@rebasepro/*` package depends on it.
 
 ## Key Exports
 
@@ -35,7 +35,7 @@ Provides the canonical type definitions used across all Rebase packages — both
 
 | Export | Description |
 |--------|-------------|
-| `DataDriver` | Abstract interface for database drivers (`fetchCollection`, `fetchOne`, `save`, `delete`, etc.) |
+| `DataDriver` | Abstract interface for database drivers (`fetchCollection`, `fetchOne`, `save`, `delete`, etc.). Reads return the row `GET /api/data/<table>` returns, with a relation only when `include` names it. |
 | `DatabaseAdapter` | Pluggable database adapter interface (used by `server`) |
 | `BackendBootstrapper` | Lifecycle interface for initializing database drivers, auth, history, and realtime |
 | `DatabaseAdmin` | Admin operations interface (SQL execution, table stats, table metadata) |
@@ -67,7 +67,7 @@ Provides the canonical type definitions used across all Rebase packages — both
 | `CronJobDefinition` | Cron job configuration type |
 | `WebSocketMessage` | WebSocket protocol message types |
 
-The admin panel's own types — `AuthController`, the plugin type `RebasePlugin`, `Locale` — live in `@rebasepro/cms-types`.
+The admin panel's own types — `AuthController`, the plugin type `RebasePlugin`, `Locale`, and the collection and property view model it draws (`CollectionConfig`, `StringProperty` and every `…Property`, `CollectionCallbacks`) — live in `@rebasepro/cms-types`.
 
 ## Quick Start
 

@@ -241,6 +241,30 @@ Both sides of one link may declare it, each from its own point of view:
 `sourceKey` always names the declaring table's column. Two relations that
 resolve to the same junction table with different key columns are refused.
 
+The target may be the table itself — tracks similar to other tracks. Its two
+junction columns would both default to `track_id`, so name the target's apart
+with `targetKey`; a self-link whose two columns resolve to the same name is
+refused when the schema compiles:
+
+```ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+
+export const tracks = defineTable("tracks", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), title: col.text().notNull() },
+    relations: {
+        similar: rel.manyToMany(() => tracks, {
+            through: "tracks_similar",
+            targetKey: "similar_track_id",
+        }),
+    },
+    rls: "admin-only",
+});
+```
+
+The target may also be a view (`defineView`): `db push`, boot and `schema
+generate` create the junction table for it, and `rebase doctor` counts that
+junction as managed. A view declares no `manyToMany` of its own.
+
 ### `_pivot`: the junction's own columns
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
@@ -316,6 +340,11 @@ through, the way the kind they stand in for is written:
 
 Every other chain is read-only. A create or update naming it is refused with
 `400 RELATION_NOT_WRITABLE`, and so is a nested write through any `via`.
+
+A chain may pass through a table the read already holds — a `via` from a table
+to itself, or grandchildren reached through the same table twice: each step is
+joined under its own alias. A relation filter or a sort by a related count does
+not take a `via`, and says so.
 
 ## Delete and update rules
 
@@ -402,7 +431,12 @@ compiled, a table is refused for:
   composite: one column cannot reference several, so express it with
   `rel.via()`;
 - two `manyToMany` relations resolving to one junction table with different key
-  columns.
+  columns;
+- a `manyToMany` whose two junction columns resolve to the same name (a
+  self-link without `targetKey`);
+- a pivot column marked `.primaryKey()` (the junction's key is its two link
+  columns) or declaring `.transform()` (a pivot column's hooks never run; the
+  target's `afterRead` sees `_pivot`).
 
 ## Next steps
 
