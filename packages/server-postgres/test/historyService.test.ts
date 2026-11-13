@@ -121,27 +121,22 @@ tags: [{ id: 2 }] }
             expect(queries[0].text).toContain("ARRAY[");
         });
 
-        // Calls 2026-10-12 (P7, DD-4c): a snapshot stores a relation as its
-        // target and id, never the related row's values — whoever may read
-        // `posts` history must not read `authors` columns out of it.
-        it("stores a relation as a reference, without the related row's values", async () => {
+        // Calls 2026-10-12 (P7, DD-4c): a snapshot never holds a related
+        // row's values — whoever may read `posts` history must not read
+        // `authors` columns out of it. The driver records the stored row read
+        // back without `include` (a relation as its foreign key), and the
+        // service stores exactly that; an old entry holding the admin's
+        // relation refs is reduced to keys when served (history-routes).
+        it("stores the row it is given — wire values, a relation as its foreign key", async () => {
             await historyService.recordHistory({
                 tableName: "posts",
                 id: "1",
                 action: "delete",
-                values: {
-                    title: "Hello",
-                    author: { __type: "relation", id: 7, path: "authors", data: { id: 7, path: "authors", values: { email: "a@b.c", salary: 9 } } },
-                    meta: { tags: [{ __type: "relation", id: "t1", path: "tags", data: { values: { secret: "x" } } }] }
-                }
+                values: { title: "Hello", authorId: 7, publishedAt: "2026-01-02T03:04:05.000Z", meta: { tags: ["t1"] } }
             });
 
             const stored = JSON.parse(String(queries[0].values[3]));
-            expect(stored).toEqual({
-                title: "Hello",
-                author: { __type: "relation", id: 7, path: "authors" },
-                meta: { tags: [{ __type: "relation", id: "t1", path: "tags" }] }
-            });
+            expect(stored).toEqual({ title: "Hello", authorId: 7, publishedAt: "2026-01-02T03:04:05.000Z", meta: { tags: ["t1"] } });
         });
 
         it("should properly perform query during entity creation (insert)", async () => {

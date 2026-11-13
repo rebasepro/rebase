@@ -147,14 +147,14 @@ describe("POST /:slug/:id/history/:historyId/revert", () => {
 // Calls 2026-10-12 (P7, DD-4c): entries recorded before the delete stopped
 // reading the admin view model hold `{ __type: "relation", data: { values } }`
 // envelopes carrying the related row. The list serves them as references only.
-describe("GET /:slug/:id/history serves relations as references", () => {
-    it("drops the related row's values from a legacy entry, in both snapshots", async () => {
+describe("GET /:slug/:id/history serves an old entry as the wire row it stands for", () => {
+    it("serves its relation refs as keys — an owning one as its foreign key — and none of the related row", async () => {
         const envelope = { __type: "relation", id: 7, path: "authors", data: { id: 7, path: "authors", values: { email: "a@b.c" } } };
         const historyService: HistoryService = {
             fetchHistory: jest.fn().mockResolvedValue({
                 data: [{
                     id: "h1", entity_id: "post-1", table_name: "posts", action: "delete",
-                    values: { title: "Hi", author: envelope, readers: [envelope] },
+                    values: { title: "Hi", publishedAt: { __type: "date", value: "2026-01-02T03:04:05.000Z" }, author: envelope, readers: [envelope] },
                     previous_values: { author: envelope }
                 }],
                 total: 1
@@ -171,6 +171,7 @@ describe("GET /:slug/:id/history serves relations as references", () => {
             properties: {
                 id: { type: "string", isId: "uuid" },
                 title: { type: "string" },
+                publishedAt: { type: "date" },
                 author: { type: "relation" },
                 readers: { type: "relation" }
             },
@@ -188,9 +189,8 @@ describe("GET /:slug/:id/history serves relations as references", () => {
         const res = await app.request("/api/data/posts/post-1/history");
         expect(res.status).toBe(200);
         const body = await res.json() as { data: Array<{ values: Record<string, unknown>; previous_values: Record<string, unknown> }> };
-        const ref = { __type: "relation", id: 7, path: "authors" };
-        expect(body.data[0].values).toEqual({ title: "Hi", author: ref, readers: [ref] });
-        expect(body.data[0].previous_values).toEqual({ author: ref });
+        expect(body.data[0].values).toEqual({ title: "Hi", publishedAt: "2026-01-02T03:04:05.000Z", authorId: 7, readers: [7] });
+        expect(body.data[0].previous_values).toEqual({ authorId: 7 });
         expect(JSON.stringify(body)).not.toContain("a@b.c");
     });
 });
@@ -209,6 +209,7 @@ describe("reverting an entry that holds keys the row has no column for", () => {
         properties: {
             id: { type: "string", isId: "uuid" },
             title: { type: "string" },
+            publishedAt: { type: "date" },
             author: { type: "relation" },
             comments: { type: "relation" }
         },
@@ -229,7 +230,7 @@ describe("reverting an entry that holds keys the row has no column for", () => {
         const scopedDriver = fakeDataDriver({
             restFetchService: {
                 fetchCollectionForRest: jest.fn(),
-                fetchOneForRest: jest.fn(async () => ({ id: "post-1", title: "now", authorId: 2 }))
+                fetchOneForRest: jest.fn(async () => ({ id: "post-1", title: "now", publishedAt: null, authorId: 2 }))
             },
             save
         });
@@ -268,6 +269,25 @@ describe("reverting an entry that holds keys the row has no column for", () => {
         expect(save).toHaveBeenCalledWith(expect.objectContaining({ values: { title: "then", authorId: 1 } }));
         const body = await res.json() as { meta: Record<string, unknown> };
         expect(body.meta).toEqual({ reverted_from: "h1" });
+    });
+
+    it("writes an old entry's dates and owning relation as the wire values they stand for", async () => {
+        const { app, save } = mountWith({
+            id: "post-1",
+            title: "then",
+            publishedAt: { __type: "date", value: "2026-01-02T03:04:05.000Z" },
+            author: { __type: "relation", id: 1, path: "authors", data: { id: 1, path: "authors", values: { email: "a@b.c" } } },
+            comments: [{ __type: "relation", id: 4, path: "comments" }]
+        });
+
+        const res = await revert(app, "/api/data/posts/post-1/history/h1/revert");
+
+        expect(res.status).toBe(200);
+        expect(save).toHaveBeenCalledWith(expect.objectContaining({
+            values: { id: "post-1", title: "then", publishedAt: "2026-01-02T03:04:05.000Z", authorId: 1 }
+        }));
+        const body = await res.json() as { meta: Record<string, unknown> };
+        expect(body.meta).toEqual({ reverted_from: "h1", dropped_fields: ["comments"] });
     });
 
     it("leaves an entry of columns as it is", async () => {

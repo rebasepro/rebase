@@ -5,7 +5,7 @@ import { resolveListLimitParam } from "../api/rest/query-parser";
 import { DataDriver, scopeGrants, type TableDescriptor } from "@rebasepro/types";
 import { httpMethodToOperation } from "../auth/api-keys/http-operation";
 import { refuseSimulatedWrite } from "../auth/simulation-read-only";
-import { type FieldViewer, relationsOfKind, restrictedKeys, withRelationReferencesOnly } from "@rebasepro/common";
+import { type FieldViewer, restrictedKeys } from "@rebasepro/common";
 import { requestViewer } from "../api/rest/field-access-query";
 import { assertNoClosedFields } from "../api/rest/write-validation";
 import type { RestTables, ServedTable } from "../api/rest/served-table";
@@ -69,15 +69,13 @@ async function servedHistoryEntries(
     const narrow = (snapshot: unknown): Record<string, unknown> | undefined => {
         if (!isPlainValues(snapshot)) return undefined;
         const kept: Record<string, unknown> = {};
-        for (const [key, value] of Object.entries(snapshot)) {
-            // An entry recorded before deletes stopped reading the admin view
-            // model embeds each related row; the caller may read this row, not
-            // those. Served as references, like new entries.
-            if (readable(key)) kept[key] = withRelationReferencesOnly(value);
+        // An old entry's view-model values as the wire values they stand for
+        // (see `wireOfStoredVersion`) — a related row it embedded is reduced
+        // to its key, so the caller, who may read this row, reads none of it.
+        for (const [key, value] of Object.entries(wireOfStoredVersion(snapshot, table))) {
+            if (readable(key)) kept[key] = value;
         }
-        // And its dates as the values they are: the wire carries no
-        // `{ __type: "date" }` envelope, from an old entry either.
-        return withoutDateEnvelopes(kept);
+        return kept;
     };
 
     // One call for every snapshot of the page: rows[] in entry order, each
@@ -189,19 +187,53 @@ function canonicalJson(value: unknown): string {
 }
 
 /**
- * A stored version with its dates as the values they are.
+ * A stored version as the wire row it stands for.
  *
- * A delete used to record the row through the admin's view-model walk, which
- * wraps a date as `{ __type: "date", value }`. Those entries stay as they were
- * written, and a revert to one handed the envelope to Postgres as the column's
- * value — a 400 `PG_22007` for a version the history list offered. Entries are
- * the stored row now; this reads the old ones too.
+ * An entry is the stored row today: wire values, which this leaves as they
+ * are. Older entries are not. A delete before 1bad8f5b5 recorded the row
+ * through the admin's view-model walk, so an entry may hold
+ *
+ * - a date as `{ __type: "date", value }` — served, and written back by a
+ *   revert, as its value (a revert once handed the envelope to Postgres as
+ *   the column's value: a 400 `PG_22007` for a version the list offered);
+ * - a relation as a ref `{ __type: "relation", id, path, data? }` under the
+ *   relation's name — an owning relation's as its foreign key under the
+ *   foreign key's own key (which is how a new entry holds it; when the entry
+ *   holds that key too, the ref goes), any other's as the related row's key,
+ *   a to-many list as a list of keys. The related row a ref embedded is
+ *   never served.
+ *
+ * Only the entry's own fields are read: a JSON document holding such keys
+ * further down is data.
  */
-function withoutDateEnvelopes(values: Record<string, unknown>): Record<string, unknown> {
-    return Object.fromEntries(Object.entries(values).map(([key, value]) => [
-        key,
-        isPlainValues(value) && value.__type === "date" ? value.value ?? null : value
-    ]));
+function wireOfStoredVersion(values: Record<string, unknown>, table: TableDescriptor): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(values)) {
+        if (isPlainValues(value) && value.__type === "date") {
+            out[key] = value.value ?? null;
+            continue;
+        }
+        const relation = table.relations.find(candidate => candidate.name === key);
+        if (!relation) {
+            out[key] = value;
+            continue;
+        }
+        const keys = Array.isArray(value) ? value.map(refKey) : refKey(value);
+        if (relation.kind === "belongsTo" && !Array.isArray(keys)) {
+            if (!(relation.localField in values)) out[relation.localField] = keys;
+            continue;
+        }
+        out[key] = keys;
+    }
+    return out;
+}
+
+/** The key a relation ref of an old entry points at; any other value as it is. */
+function refKey(value: unknown): unknown {
+    return isPlainValues(value) && (value.__type === "relation" || value.__type === "reference")
+        && (typeof value.id === "string" || typeof value.id === "number")
+        ? value.id
+        : value;
 }
 
 /**
@@ -215,14 +247,15 @@ function withoutDateEnvelopes(values: Record<string, unknown>): Record<string, u
  * to the driver, which has no column for them: 400 VALIDATION_UNKNOWN_FIELDS
  * for a version the history list offered.
  *
- * The columns are the keys of `current`, the REST row the route just read.
- * An owning relation's envelope goes back as its foreign key, which is how a
- * new entry holds it. Any other key — a computed field, a to-many relation,
- * which no entry restores — is dropped and named, so the caller is told the
- * revert was partial rather than finding out. A field the caller cannot read
- * is not in `current`, and is left to {@link restorableValues}. A masked value
- * an old `afterRead` recorded (`********`) has a column, and nothing here can
- * tell it from data: it is written back as it was stored.
+ * The columns are the keys of `current`, the REST row the route just read;
+ * `stored` has been through {@link wireOfStoredVersion}, so an owning
+ * relation's old ref is already its foreign key. Any other key — a computed
+ * field, a to-many relation, which no entry restores — is dropped and named,
+ * so the caller is told the revert was partial rather than finding out. A
+ * field the caller cannot read is not in `current`, and is left to
+ * {@link restorableValues}. A masked value an old `afterRead` recorded
+ * (`********`) has a column, and nothing here can tell it from data: it is
+ * written back as it was stored.
  */
 function columnValuesOf(
     stored: Record<string, unknown>,
@@ -231,20 +264,11 @@ function columnValuesOf(
     viewer: FieldViewer
 ): { values: Record<string, unknown>; dropped: string[] } {
     const unreadable = restrictedKeys(table, viewer, "read").refused;
-    /** Owning relation name → the foreign key's column key. */
-    const foreignKeyOf = new Map<string, string>();
-    for (const relation of relationsOfKind(table, "belongsTo")) foreignKeyOf.set(relation.name, relation.localField);
-
     const values: Record<string, unknown> = {};
     const dropped: string[] = [];
     for (const [key, value] of Object.entries(stored)) {
         if (key in current || unreadable.has(key)) {
             values[key] = value;
-            continue;
-        }
-        const foreignKey = foreignKeyOf.get(key);
-        if (foreignKey && foreignKey in current && !(foreignKey in stored)) {
-            values[foreignKey] = isPlainValues(value) ? value.id ?? null : value ?? null;
             continue;
         }
         dropped.push(key);
@@ -465,9 +489,10 @@ export function createHistoryRoutes(params: {
         // without the REST read hands back its own rendering, whose keys are
         // not the columns.
         const restRow = Boolean(scoped.restFetchService);
+        const storedVersion = wireOfStoredVersion(historyEntry.values, table);
         const { values: columnValues, dropped } = restRow
-            ? columnValuesOf(withoutDateEnvelopes(historyEntry.values), current, table, viewer)
-            : { values: withoutDateEnvelopes(historyEntry.values), dropped: [] };
+            ? columnValuesOf(storedVersion, current, table, viewer)
+            : { values: storedVersion, dropped: [] };
         const values = restorableValues(columnValues, current, table, viewer);
 
         // Revert by saving through the normal driver path — this will
