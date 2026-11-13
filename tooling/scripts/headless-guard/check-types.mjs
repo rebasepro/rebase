@@ -51,6 +51,9 @@ const label = onlyDts ? "declaration" : onlySrc ? "source" : "type-level";
  * (`usePostgresClientDriver`) and declares react/react-dom as peer
  * dependencies, so it is a frontend data-source driver, not core. It imports
  * only core types, which keeps the DAG intact.
+ *
+ * `inference` is absent too: it infers the admin panel's property view model
+ * from sample data, and only `@rebasepro/cms` uses it. It is CMS-side.
  */
 const CORE_PACKAGES = [
     "types",
@@ -61,7 +64,6 @@ const CORE_PACKAGES = [
     "server",
     "server-postgres",
     "cli",
-    "inference",
     "mcp"
 ];
 
