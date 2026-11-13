@@ -2,7 +2,7 @@
 
 > Working document for whoever coordinates next (a new Claude session, or this one after a
 > usage reset). Kept current by the coordinator. **Delete this file before the branch is
-> merged to `main`.** Last updated: 2026-11-12 21:00 CET.
+> merged to `main`.** Last updated: 2026-11-13 01:30 CET.
 
 ## 1. What this is
 
@@ -155,35 +155,27 @@ All committed on the branch (≈150 commits OSS, 12 in `saas`). Details per slic
   upgrade guide `upgrading/0-30-to-0-31`), READMEs, all 24 agent skills, `AGENTS.md`,
   `.agent/workflows`.
 
-## 6. What is running right now (2026-11-12 23:25 CET)
+## 6. What is running right now, and what is next
 
-**The table below is from 21:00 and is out of date — the current list of agents (ids, slices,
-which are resumed and which are still stopped after the second restart) is in the SNAPSHOT
-section of `~/.rebase-audits/pgfirst/PLAN.md`.** In short, at 23:25: resumed — two security-fix
-agents, parity fixes, Firestore editor, tooling gates, planner steps 2–6; stopped and waiting
-for a slot — driver codecs (B-R2), write path (B-R3), relations (B-R6), field access (B-R4);
-done since 21:00 — both server request-path slices (B-S4a, B-S4b), the driver foundation's
-model (B-R1), two independent reviews (`~/.rebase-audits/pgfirst/reviews/{security,parity}.md`).
+**The live list is the "CURRENT STATE" block at the top of `~/.rebase-audits/pgfirst/PLAN.md`**
+(agent ids, what each is doing, and the ordered NEXT list). It is rewritten at every checkpoint;
+this file only carries the shape of the work. As of 2026-11-13 01:30 CET:
 
-The Mac restarted at 20:18 and again at ~22:45; each time every agent's uncommitted work was intact.
+- Done: all of Stage A; in Stage B every driver-internals slice (model, codecs, write path,
+  field access, hooks, relations), the server request path, the planner, the boot and
+  live-edit fixes; a first security review (six findings, all fixed) and a first parity review
+  (gaps closed); the Drizzle-style column spelling (additive half).
+- Running: the driver's last slice (it stops carrying collections at all), planner consumers
+  and renames, the spelling sweep, the migration module with the frozen legacy model, the
+  end-to-end lanes on a clean snapshot (cli green, selfhost green but for one fixture, admin
+  being re-run after fixes, driver lane running), a history-masking fix, admin-panel fixes.
+- Notes each slice left for docs and the CHANGELOG: `~/.rebase-audits/pgfirst/stage-b-docs-notes.md`.
+  Reviews: `~/.rebase-audits/pgfirst/reviews/`. E2E findings: `~/.rebase-audits/pgfirst/e2e-findings.md`.
+  Gate leftovers: `~/.rebase-audits/pgfirst/final-pass-checklist.md`. Drizzle mapping:
+  `~/.rebase-audits/pgfirst/drizzle-alignment.md`.
 
-| Agent id | Slice | What it is doing |
-|---|---|---|
-| af7441a6d4e778f74 | B-R1 | Stage B foundation: `CompiledTable`, `compileSchema`, helper library `packages/common/src/table/**` (landed), then the driver's `RuntimeTable` + `PostgresTableRegistry`, keys, soft delete, auth-table shape. **Gate for B-R2…B-R7.** |
-| a13b24403aa3df57d | B-PLAN-2 | Planner core, in six small committed steps (LEDGER lines "B-PLAN-2 step N done"): 1 flip `planSchema` input to `CompiledTable[]`; 2 table-level facts; 3 columns + relations; 4 remove the internal lowering; 5 fold `plan-equivalence` into `plan-golden`; 6 consumers + renames. The policy compiler part is done (3951d9d5f1). |
-| adfe8ce0e7e1e57a1 | B-S4a | Server REST, write validation, OpenAPI, history on descriptors; makes the six pending validation features real. |
-| a6f8ea3adac490c1f | B-S4b | Server storage (done), MCP data path (done), then auth/admin users, global hooks, crons, boot on compiled tables. Owns `mcp/mcp-tools.ts`, `mcp/mcp-routes.ts`. |
-| ac54e4a50895b092b | DOCS-2 | Sidebar, redirects, generated files, marketing pages (landed), CHANGELOG paste, docs fixes, UI-preferences and verify docs. |
-| a07845201a2f4f49c | CLI-2 follow-up | Codemod creates and wires `frontend/src/cms/ui-config.json` for migrated projects. |
-
-Finished since the first version of this file: collection editor + UI preferences (contract:
-`~/.rebase-audits/pgfirst/ui-preferences-contract.md`), agent skills incl. the rename to
-`rebase-tables`, CLI-2 (`rebase verify` reads the CMS layer: `~/.rebase-audits/pgfirst/cli-2-verify-cms.md`),
-leftover packages (plugins, rls-check, examples, recipes), the cloud control plane.
-
-Briefs: `briefs/` (`INDEX.txt`; re-run the extraction snippet in `PLAN.md` history if newer
-briefs are missing). Idle agents that can be resumed for small follow-ups in their area are
-listed in `PLAN.md` ("IDLE BUT WARM").
+The Mac restarted at 20:18 and again at ~22:45 on 2026-11-12 (memory); each time every agent's
+uncommitted work was intact and all agents were resumed.
 
 ## 7. What is left, in order
 
