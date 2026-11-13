@@ -153,6 +153,9 @@ const PER_COPY_BY_DESIGN: Record<string, string> = {
     "types/resources.ts#amendments":
         "corrections THIS copy applies on top of a shared kind; an older inlined copy must keep binding " +
         "the way it shipped (see the comment above `amendments`).",
+    "types/ui_preferences.ts#builtChecks":
+        "a lazy memo of pure validator functions, built on first use instead of at import: each copy " +
+        "building its own identical set shares no identity and loses nothing.",
 };
 
 const MUTATING_METHODS = new Set([
