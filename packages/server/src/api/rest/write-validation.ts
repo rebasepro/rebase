@@ -55,10 +55,10 @@ import { ApiError } from "../errors";
  * nothing a `_pivot` could legally say about it, and the write path refuses
  * one with the relation named.
  */
-function junctionsWithPayload(table: TableDescriptor): Array<[string, TableDescriptor]> {
+function junctionsWithPayload(table: TableDescriptor): Array<[RelationOfKind<"manyToMany">, TableDescriptor]> {
     return relationsOfKind(table, "manyToMany")
         .filter((relation: RelationOfKind<"manyToMany">) => relation.through.pivot.length > 0)
-        .map(relation => [relation.name, pivotTable(table, relation)]);
+        .map(relation => [relation, pivotTable(table, relation)]);
 }
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -207,9 +207,12 @@ export type RelatedTableLookup = (slug: string) => TableDescriptor | undefined;
  * so does this, with the same codes, for the column the relation writes. The
  * rows themselves are still the child's row-level security's to admit.
  *
- * A many-to-many write sets the junction's two link columns, which have no
- * rules of their own (the relation's `access.write` is the parent's, judged
- * with its other fields); its `_pivot` columns are judged as columns.
+ * A many-to-many write sets the junction's two link columns: through a
+ * declared junction table they are judged by that table's column rules
+ * (`.readOnly()`, `.private()`, `access.write`), as a to-many `via`'s are; an
+ * implicit junction's have no rules of their own (the relation's
+ * `access.write` is the parent's, judged with its other fields). Its `_pivot`
+ * columns are judged as columns.
  *
  * Fails closed: a body naming such a relation is refused when the target's
  * descriptor cannot be found, because the column it writes cannot be judged.
@@ -296,11 +299,10 @@ function soleStepColumn(step: JoinStep, side: "from" | "to"): string | undefined
  *
  * - `hasMany` / `hasOne` — the target's foreign key;
  * - a to-one `via` — the column its one step joins to on the target;
- * - a writable to-many `via` — the junction's two link columns, judged when
- *   the junction is a declared table (an undeclared one has no rules);
- * - `belongsTo` and `manyToMany` — none: the first sets a column of this
- *   table (judged as that column), the second a junction the relation owns,
- *   whose `_pivot` columns are judged as columns.
+ * - a writable to-many `via` and a `manyToMany` — the junction's two link
+ *   columns, judged when the junction is a declared table (an implicit one
+ *   has no rules);
+ * - `belongsTo` — none: it sets a column of this table (judged as that column).
  *
  * `required` says whether the write must be refused when the table's rules
  * cannot be read: it must for the target of a key the write moves.
@@ -309,6 +311,9 @@ function columnsWrittenOnOtherRows(relation: TableDescriptor["relations"][number
     { table: string; columns: string[]; required: boolean } | undefined {
     if (relation.kind === "hasMany" || relation.kind === "hasOne") {
         return { table: relation.target, columns: [relation.foreignKey], required: true };
+    }
+    if (relation.kind === "manyToMany") {
+        return { table: relation.through.table, columns: [relation.through.sourceKey, relation.through.targetKey], required: false };
     }
     if (relation.kind !== "via" || relation.steps.length === 0) return undefined;
     if (relation.cardinality === "one") {
@@ -409,9 +414,14 @@ export function assertColumnWriteRules(
     // or `.private()` is refused on exactly the terms a table's column is.
     // Whatever the parent's `strictWrites` says: the junction's own decides
     // its unknown keys, the parent's decides nothing about its rules.
-    for (const [key, junction] of junctionsWithPayload(table)) {
-        for (const { pivot } of pivotsIn(values[key])) {
+    // Through a declared junction table, its own column rules hold too.
+    for (const [relation, junction] of junctionsWithPayload(table)) {
+        const declared = options?.relatedTables?.(relation.through.table);
+        for (const { pivot } of pivotsIn(values[relation.name])) {
             assertKnownWriteFields(pivot, junction, { viewer: options?.viewer });
+            if (declared) {
+                assertNoClosedFields(pivot, declared, `${where}'${relation.name}' on table '${table.slug}' writes '_pivot' on '${declared.slug}': `, options?.viewer);
+            }
         }
     }
 }
@@ -1068,7 +1078,8 @@ export function assertWriteValuesValid(
     // every element is an insert — the one case where a missing required pivot
     // column is certainly missing. A required pivot text sent as `""` is
     // refused on every write.
-    for (const [key, junction] of junctionsWithPayload(table)) {
+    for (const [relation, junction] of junctionsWithPayload(table)) {
+        const key = relation.name;
         for (const { index, pivot } of pivotsIn(values[key])) {
             const at = `${key}[${index}].${JUNCTION_PIVOT_KEY}`;
             for (const [pivotKey, pivotValue] of Object.entries(pivot)) {

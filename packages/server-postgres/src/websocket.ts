@@ -1416,8 +1416,9 @@ roles: verifiedUser.roles }
                         viewer: { roles: session?.user?.roles ?? ["anon"] },
                         // `required` holds on a create, as on `POST`.
                         status,
-                        // A `hasMany` / `hasOne` in the body writes the related rows' key.
-                        relatedTables: (slug) => registry?.getTable(slug)?.descriptor
+                        // A `hasMany` / `hasOne` in the body writes the related rows' key;
+                        // a many-to-many, a declared junction's link columns (named by SQL name).
+                        relatedTables: (name) => (registry?.getTable(name) ?? registry?.getTableBySqlName(name))?.descriptor
                     });
                     // Field operations (`{ views: { $inc: 1 } }`) reach the
                     // driver through this door exactly as they reach it through

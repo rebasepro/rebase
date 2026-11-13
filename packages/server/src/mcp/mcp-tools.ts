@@ -365,9 +365,9 @@ function writableValues(
     return values;
 }
 
-/** Any served table's descriptor by slug: what a relation in a write names. */
-function relatedTablesOf(ctx: McpToolContext): (slug: string) => TableDescriptor | undefined {
-    return (slug) => ctx.tables.find(table => table.slug === slug);
+/** Any served table's descriptor by slug or SQL name: what a relation in a write names (a junction, by SQL name). */
+function relatedTablesOf(ctx: McpToolContext): (name: string) => TableDescriptor | undefined {
+    return (name) => ctx.tables.find(table => table.slug === name) ?? ctx.tables.find(table => table.table === name);
 }
 
 function valuesObject(raw: unknown): Record<string, unknown> {
