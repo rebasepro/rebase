@@ -7,7 +7,9 @@ export const authors = defineTable("authors", {
         name: col.text().notNull().transform({
             beforeSave: ({ value }) => (typeof value === "string" ? value.trim() : value)
         }),
-        email: col.text().validate({ email: true })
+        email: col.text().validate({ email: true }),
+        // The panel chooses the folder: the author's handle, or their row.
+        avatar: col.storage({ path: "{path}/avatar", accept: ["image/*"], maxBytes: "1MB" })
     },
     rls: "inherit",
     hooks: auditedCallbacks("authors")

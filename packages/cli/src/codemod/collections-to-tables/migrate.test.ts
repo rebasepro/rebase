@@ -188,6 +188,9 @@ describe("what the blog fixture says about routing", () => {
         expect(report.files.find(file => file.path === "backend/schema/authors.ts")?.content).toContain(`hooks: auditedCallbacks("authors")`);
         expect(report.files.find(file => file.path === "backend/lib/collections/_audited.ts")?.content).toContain("afterRead: ({ values: row }: { values: Record<string, unknown> }) => {");
         expect(report.files.find(file => file.path === "backend/schema/tags.ts")?.content).toContain(`import { tagCallbacks } from "../../config/tag-callbacks";`);
+        // A function storage path: its keys' template on the column (where the server enforces the limits), the function in the customization.
+        expect(report.files.find(file => file.path === "backend/schema/authors.ts")?.content).toContain(`path: "{path}/avatar"`);
+        expect(report.files.find(file => file.path === "frontend/src/cms/authors.tsx")?.content).toContain("path: ({ values, entityId }) => {");
         // A custom backend entry: the auth collection option and its import go (the auth table is defineAuthTable's), storage is repointed.
         const entry = report.files.find(file => file.path === "backend/src/index.ts")?.content ?? "";
         expect(entry).not.toContain("usersCollection");
@@ -216,6 +219,16 @@ describe("what the blog fixture says about routing", () => {
         expect(report.files.find(file => file.path === "backend/entrypoint.sh")?.content).toContain("exec node dist/src/index.js");
         expect(report.files.some(file => file.path === "pnpm-workspace.yaml")).toBe(true);
         expect(report.notes.some(entry => entry.message.includes("module(s) of the project's own"))).toBe(false);
+    }, 120_000);
+});
+
+describe("a function storage path no template can name", () => {
+    it("is refused, since any template would claim keys the function never writes", async () => {
+        const dir = materialize("blog");
+        const file = path.join(dir, "config", "collections", "authors.ts");
+        fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace("return `${owner}/avatar`;", "return owner;"));
+        const report = await run(dir, { dryRun: true });
+        expect(report.refusals.map(refusal => refusal.reason).join("\n")).toContain("computes its storage path with a function");
     }, 120_000);
 });
 

@@ -449,6 +449,9 @@ function applyFieldNote(plan: PlanContext, builder: Builder, item: LiftNote, fie
             target.defaultValue = new RawSource(memberFunctionText(plan.ast, located.member));
             return;
         }
+        case "storage.storagePath":
+            at(target, ["storage"]).path = printable(plan, builder, item.value, [...literal, "storage", "storagePath"], `${label}.storage.storagePath`);
+            return;
         case "storage.processFile":
         case "storage.postProcess":
         case "storage.previewUrl":

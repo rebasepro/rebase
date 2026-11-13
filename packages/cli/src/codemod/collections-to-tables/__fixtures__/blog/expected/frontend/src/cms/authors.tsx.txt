@@ -6,6 +6,14 @@ export const authorsCms = customizeTable<typeof authors>("authors", {
     fields: {
         email: {
             name: "Email address"
+        },
+        avatar: {
+            storage: {
+                path: ({ values, entityId }) => {
+                    const owner = typeof values?.handle === "string" && values.handle ? values.handle : `authors/${entityId}`;
+                    return `${owner}/avatar`;
+                }
+            }
         }
     }
 });

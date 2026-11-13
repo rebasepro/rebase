@@ -15,7 +15,20 @@ export default defineCollection({
                 beforeSave: ({ value }) => (typeof value === "string" ? value.trim() : value)
             }
         },
-        email: { name: "Email address", type: "string", email: true }
+        email: { name: "Email address", type: "string", email: true },
+        // The panel chooses the folder: the author's handle, or their row.
+        avatar: {
+            name: "Avatar",
+            type: "string",
+            storage: {
+                acceptedFiles: ["image/*"],
+                maxSize: 1048576,
+                storagePath: ({ values, entityId }) => {
+                    const owner = typeof values?.handle === "string" && values.handle ? values.handle : `authors/${entityId}`;
+                    return `${owner}/avatar`;
+                }
+            }
+        }
     },
     callbacks: auditedCallbacks("authors"),
     admin: { group: "Content" }

@@ -51,6 +51,7 @@ import {
     withoutRebaseReexports
 } from "./project-files";
 import type { CollectionOutcome, MigrateOptions, MigrationReport, PlannedFile } from "./types";
+import { deriveStoragePaths } from "./storage-paths";
 import { repointConfigImports, tableUseSteps, type TableHome } from "./repoint";
 import { verifyMigration } from "./verify";
 
@@ -171,6 +172,8 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
 
     // The tables.
     let lift: LiftResult | undefined;
+    // A function storagePath whose keys a template can name: the template for the server, the function for the panel.
+    const storageNotes = deriveStoragePaths(plan, postgres);
     try {
         lift = collectionsToTableDefs(postgres.map(entry => entry.collection), legacy.defaultSecurityRules ? { defaultSecurityRules: legacy.defaultSecurityRules } : {});
     } catch (error) {
@@ -197,6 +200,7 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
     /** The auth table's module and its collection file: an `auth.collection` naming either is dropped. */
     const authFiles: string[] = [];
     if (lift) {
+        lift.notCarried.push(...storageNotes);
         for (const item of lift.notCarried) {
             if (item.kind !== "meaning") continue;
             const entry = postgres.find(candidate => candidate.collection.slug === item.collection);
