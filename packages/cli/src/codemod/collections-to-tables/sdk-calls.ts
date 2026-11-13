@@ -624,7 +624,7 @@ export async function rewriteSdkCalls(root: string, options: RewriteSdkOptions =
     if (report.generated.length > 0) {
         report.manualSteps.push({
             title: "Regenerate the typed SDK",
-            detail: `${report.generated.join(", ")} ${report.generated.length > 1 ? "are" : "is"} generated SDK output from before the rename; the rewrite never edits generated files. Run \`rebase generate-sdk\` (with the same output path and options as before) to write ${report.generated.length > 1 ? "them" : "it"} again.`,
+            detail: `${report.generated.join(", ")} ${report.generated.length > 1 ? "are" : "is"} generated SDK output from before the rename; the rewrite never edits generated files. Once the legacy files are removed (the \`git rm\` line this run prints — the command refuses a project that still has config/collections), run \`rebase generate-sdk\` (with the same output path and options as before) to write ${report.generated.length > 1 ? "them" : "it"} again.`,
             snippet: "rebase generate-sdk"
         });
     }

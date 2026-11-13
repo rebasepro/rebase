@@ -140,7 +140,7 @@ function printReport(report: MigrationReport): void {
     console.log("");
     switch (report.status) {
         case "migrated":
-            console.log(chalk.green("  Migrated. Review the diff, do the manual steps, then remove the legacy files:"));
+            console.log(chalk.green("  Migrated. Review the diff and do the manual steps. Remove the legacy files before running generate-sdk, db push, doctor or verify (they refuse a project that still has config/collections):"));
             break;
         case "already-migrated":
             console.log(chalk.green(report.verification

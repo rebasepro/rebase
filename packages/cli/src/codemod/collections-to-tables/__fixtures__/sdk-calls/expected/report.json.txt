@@ -109,7 +109,7 @@
     },
     {
       "title": "Regenerate the typed SDK",
-      "detail": "frontend/src/generated/sdk/database.types.ts is generated SDK output from before the rename; the rewrite never edits generated files. Run `rebase generate-sdk` (with the same output path and options as before) to write it again.",
+      "detail": "frontend/src/generated/sdk/database.types.ts is generated SDK output from before the rename; the rewrite never edits generated files. Once the legacy files are removed (the `git rm` line this run prints — the command refuses a project that still has config/collections), run `rebase generate-sdk` (with the same output path and options as before) to write it again.",
       "snippet": "rebase generate-sdk"
     }
   ],
