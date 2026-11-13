@@ -25,6 +25,7 @@ import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { createHistoryRoutes, type HistoryService } from "../src/history/history-routes";
 import { createFunctionScopeGuard } from "../src/auth/api-keys/api-key-middleware";
 import { tablesFromCollections } from "./helpers/tables";
+import { historyEntry } from "./helpers/history";
 
 jest.mock("../src/utils/logger", () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), child: jest.fn().mockReturnThis() }
@@ -73,7 +74,7 @@ function build() {
     app.route("/data", new RestApiGenerator(tablesFromCollections([posts]), driver).generateRoutes());
     const historyService: HistoryService = {
         fetchHistory: async () => ({ data: [], total: 0 }),
-        fetchHistoryEntry: async () => ({ id: "h1", entity_id: "p1", table_name: "posts", values: { title: "old" } })
+        fetchHistoryEntry: async () => historyEntry({ id: "h1", entity_id: "p1", values: { title: "old" } })
     };
     app.route("/history", createHistoryRoutes({
         historyService,

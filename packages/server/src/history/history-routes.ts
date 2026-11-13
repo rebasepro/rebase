@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { HonoEnv } from "../api/types";
 import { ApiError, errorHandler } from "../api/errors";
 import { resolveListLimitParam } from "../api/rest/query-parser";
-import { DataDriver, scopeGrants, type TableDescriptor } from "@rebasepro/types";
+import { DataDriver, scopeGrants, type EntityHistoryEntry, type TableDescriptor } from "@rebasepro/types";
 import { httpMethodToOperation } from "../auth/api-keys/http-operation";
 import { refuseSimulatedWrite } from "../auth/simulation-read-only";
 import { type FieldViewer, restrictedKeys } from "@rebasepro/common";
@@ -52,11 +52,11 @@ import type { RestTables, ServedTable } from "../api/rest/served-table";
  * {@link restorableValues}'s question.
  */
 async function servedHistoryEntries(
-    entries: Record<string, unknown>[],
+    entries: EntityHistoryEntry[],
     table: TableDescriptor,
     viewer: FieldViewer,
     driver: DataDriver
-): Promise<Record<string, unknown>[]> {
+): Promise<EntityHistoryEntry[]> {
     if (entries.length === 0) return entries;
     if (!driver.serveStoredRows) {
         throw new ApiError(501, "HISTORY_UNSERVABLE",
@@ -96,9 +96,9 @@ async function servedHistoryEntries(
     }
 
     return plan.map(({ entry, at, previousKeys }) => {
-        const out: Record<string, unknown> = { ...entry };
+        const out: EntityHistoryEntry = { ...entry };
         if (Array.isArray(entry.changed_fields)) {
-            out.changed_fields = entry.changed_fields.filter(field => typeof field === "string" && readable(field));
+            out.changed_fields = entry.changed_fields.filter(field => readable(field));
         }
         if (isPlainValues(entry.values)) out.values = at.values >= 0 ? served[at.values] : {};
         if (isPlainValues(entry.previous_values)) {
@@ -285,8 +285,10 @@ function isPlainValues(value: unknown): value is Record<string, unknown> {
  * Mounted at `{basePath}/data/:slug/:id/history`.
  */
 export interface HistoryService {
-    fetchHistory(tableName: string, id: string, options: { limit: number, offset: number }): Promise<{ data: Record<string, unknown>[], total: number }>;
-    fetchHistoryEntry(historyId: string): Promise<Record<string, unknown> | null>;
+    /** A row's entries, newest first, as stored (wire rows in `values` / `previous_values`). */
+    fetchHistory(tableName: string, id: string, options: { limit: number, offset: number }): Promise<{ data: EntityHistoryEntry[], total: number }>;
+    /** One entry by its id, of any row, or `null`. */
+    fetchHistoryEntry(historyId: string): Promise<EntityHistoryEntry | null>;
     /**
      * Delete every entry past the retention period, of every row; resolves to
      * how many went. Run hourly by the backend — see `retention-sweep.ts`. A

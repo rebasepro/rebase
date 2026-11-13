@@ -34,6 +34,7 @@ import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { tablesFromCollections } from "./helpers/tables";
+import { historyEntry } from "./helpers/history";
 
 /** The masked key the API-key middleware puts on the request. */
 function apiKey(scopes: string[]): ApiKeyMasked {
@@ -80,13 +81,12 @@ function mount(options: {
     // The privileged reader: table + id, no caller, no policies. What
     // `HistoryService` is.
     const fetchHistory = jest.fn(async (_table: string, _id: string) => ({
-        data: [{ id: "h1", action: "update", values: ALICES_SECRET, previous_values: null }],
+        data: [historyEntry({ id: "h1", entity_id: "post-alice", values: ALICES_SECRET })],
         total: 1
     }));
-    const fetchHistoryEntry = jest.fn(async () => ({
+    const fetchHistoryEntry = jest.fn(async (_historyId: string) => historyEntry({
         id: "h1",
         entity_id: "post-alice",
-        table_name: "posts",
         values: ALICES_SECRET
     }));
     const historyService: HistoryService = { fetchHistory, fetchHistoryEntry };
