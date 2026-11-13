@@ -30,7 +30,7 @@ type Generated = GeneratedSpecDatabase;
 
 /**
  * The keys of a `posts` block the type system knows exactly: every declared
- * column but `metadata` — a `col.jsonb<T>()` document, whose `T` the
+ * column but `metadata` — a `col.jsonb().$type<T>()` document, whose `T` the
  * descriptor (so the generated file) does not carry: it is typed there as an
  * open record — and none of the relation side.
  */

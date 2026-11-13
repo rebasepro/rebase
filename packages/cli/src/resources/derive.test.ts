@@ -180,7 +180,7 @@ describe("deriving", () => {
                 columns: {
                     id: col.uuid().primaryKey(),
                     cover: col.storage({ path: "events/", source: media }),
-                    gallery: col.array(col.storage({ path: "events/gallery/", source: media })),
+                    gallery: col.storage({ path: "events/gallery/", source: media }).array(),
                     body: col.jsonb(json.object({ hero: json.storage({ path: "events/hero/", source: media }) }))
                 },
                 rls: "admin-only"

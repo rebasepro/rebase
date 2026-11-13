@@ -35,7 +35,7 @@ const TSX = path.join(REPO, "node_modules", ".bin", "tsx");
 const tasks = `
 import { defineTable, col } from "@rebasepro/types";
 export const tasks = defineTable("tasks", {
-    columns: { id: col.uuid().primaryKey(), title: col.varchar() },
+    columns: { id: col.uuid().primaryKey(), title: col.varchar({ length: 255 }) },
     rls: "admin-only"
 });
 `;

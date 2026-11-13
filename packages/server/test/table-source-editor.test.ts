@@ -84,7 +84,7 @@ describe("columns", () => {
     it("removes and moves a column with its comment", async () => {
         const moved = await editor.preview([{ op: "moveColumn", table: "posts", key: "title" }]);
         expect(fileOf(moved, "posts.ts")).toContain(
-            "        authorId: col.uuid().column(\"author_id\"),\n" +
+            "        authorId: col.uuid(\"author_id\"),\n" +
             "        // The headline, trimmed before it is stored.\n" +
             "        title: col.text().notNull().transform({ beforeSave: ({ value }) => value.trim() })\n    },"
         );

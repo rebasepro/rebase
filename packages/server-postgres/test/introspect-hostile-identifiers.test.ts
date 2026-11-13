@@ -97,8 +97,8 @@ describe("generated tables compile for identifiers Postgres allows", () => {
         });
         expect(diagnostics(g)).toEqual([]);
         // The real column name survives — it is what the query layer uses.
-        expect(g.tables[0].schemaModule).toContain("fullName: col.text().column(\"full name\")");
-        expect(g.tables[0].schemaModule).toContain("\"2faEnabled\": col.boolean()");
+        expect(g.tables[0].schemaModule).toContain("fullName: col.text(\"full name\")");
+        expect(g.tables[0].schemaModule).toContain("\"2faEnabled\": col.boolean(\"2fa_enabled\")");
     });
 
     it("for a table name that is not a JavaScript identifier", () => {
@@ -122,7 +122,8 @@ describe("generated tables compile for identifiers Postgres allows", () => {
             ]
         });
         expect(diagnostics(g)).toEqual([]);
-        expect(topLevelStatements(g.tables[0].schemaModule)).toEqual(["import", "orders"]);
+        // The named enum type is declared once, as Drizzle declares it: `const orderStateEnum = pgEnum(…)`.
+        expect(topLevelStatements(g.tables[0].schemaModule)).toEqual(["import", "orderStateEnum", "orders"]);
     });
 
     it("does not let a database name add a declaration to the file", () => {
@@ -133,7 +134,7 @@ describe("generated tables compile for identifiers Postgres allows", () => {
             tables: [{ name: "t", columns: [uuidKey("t"), column("t", payload), column("t", "state", { data_type: "USER-DEFINED", udt_name: "s" })] }],
             enumValues: [{ enum_name: "s", enum_value: payload, sort_order: 1 }]
         });
-        expect(topLevelStatements(g.tables[0].schemaModule)).toEqual(["import", "t"]);
+        expect(topLevelStatements(g.tables[0].schemaModule)).toEqual(["import", "sEnum", "t"]);
         expect(diagnostics(g)).toEqual([]);
     });
 

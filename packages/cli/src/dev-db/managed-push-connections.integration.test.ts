@@ -196,7 +196,7 @@ describe("db push against the managed database while a dev server holds connecti
     it("records a column boot already added with a second --baseline, beside the dev server's connections", async () => {
         fs.writeFileSync(path.join(schemaDir(), "tasks.js"), tasks.replace(
             "title: col.text().notNull()",
-            "title: col.text().notNull(),\n        done: col.boolean(),\n        slug: col.varchar()"
+            "title: col.text().notNull(),\n        done: col.boolean(),\n        slug: col.varchar({ length: 255 })"
         ));
         // What boot does with the new column before any migration does.
         await held[0].query("ALTER TABLE public.tasks ADD COLUMN slug varchar");

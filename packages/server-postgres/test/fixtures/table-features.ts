@@ -7,7 +7,7 @@
  */
 import { col, defineTable, rel, pgEnum, sql } from "@rebasepro/types";
 
-/** `.generatedAs()`: a column Postgres computes from the row. */
+/** `.generatedAlwaysAs()`: a column Postgres computes from the row. */
 export const people = defineTable("people", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
@@ -19,7 +19,7 @@ export const people = defineTable("people", {
     rls: "admin-only"
 });
 
-/** `.identity()` at every width, key or not. */
+/** `.generatedByDefaultAsIdentity()` at every width, key or not. */
 export const counters = defineTable("counters", {
     columns: {
         id: col.bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
@@ -79,7 +79,7 @@ export const keyed = defineTable("keyed", {
     rls: "admin-only"
 });
 
-/** `col.array(inner)` of every scalar element type. */
+/** `<item>.array()` of every scalar element type. */
 export const lists = defineTable("lists", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
@@ -104,7 +104,7 @@ const PRIORITIES = ["low", "normal", "high"] as const;
 
 const priorityEnum = pgEnum("priority", PRIORITIES);
 
-/** `col.enum(values, { name })`: one shared type, used by several columns of several tables. */
+/** `pgEnum(name, values)`: one shared type, used by several columns of several tables. */
 export const tasks = defineTable("tasks", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),

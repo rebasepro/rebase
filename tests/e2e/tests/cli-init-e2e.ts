@@ -611,7 +611,7 @@ function createBooksCollection(projectPath: string) {
 
 export const books = defineTable("books", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         title: col.text().notNull(),
         author: col.text().notNull()
     },

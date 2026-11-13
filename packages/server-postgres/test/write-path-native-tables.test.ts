@@ -103,7 +103,7 @@ describe("the write path over defineTable tables", () => {
     });
 
     describe("defaults", () => {
-        it("applies .default(), drops a null sent for .dbDefault(), and leaves .defaultSql() to the database", async () => {
+        it("applies .default(), drops a null sent for .dbDefault(), and leaves .default(sql`…`) to the database", async () => {
             await setup(user).save({ path: "posts", values: { title: "Hi", region: null }, collection: collectionOf("posts"), status: "new" });
             expect(written().active).toBe(true);
             expect("region" in written()).toBe(false);

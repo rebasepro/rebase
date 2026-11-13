@@ -15,7 +15,7 @@ import { compileTables } from "./helpers/tables";
  *
  * - `text-one-of`: `.oneOf([...])` on a text column;
  * - `array-unique-items`: `validate({ uniqueItems: true })` on an array;
- * - array item rules (`col.array(col.text().validate(...).oneOf(...))`);
+ * - array item rules (`col.text({ enum: [...] }).validate(...).array()`);
  * - `json-document-shape`: a document whose top is a scalar or a `json.oneOf()`;
  * - `json-one-of-placement`: `json.oneOf()` as a field of an object;
  * - `json-unknown-field`: `json.unknown()` as a field or a variant — anything goes;

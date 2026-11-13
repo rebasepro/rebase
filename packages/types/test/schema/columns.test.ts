@@ -123,7 +123,7 @@ describe("col.* — modifiers", () => {
         expect(col.bigint({ mode: "number" }).generatedByDefaultAsIdentity().def.default).toEqual({ kind: "identity" });
     });
 
-    it("`.generatedAs()` makes the column read-only", () => {
+    it("`.generatedAlwaysAs()` makes the column read-only", () => {
         expect(col.integer().generatedAlwaysAs(sql`a + b`).def).toMatchObject({ generatedAs: "a + b", readOnly: true });
     });
 

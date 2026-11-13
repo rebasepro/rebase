@@ -46,7 +46,7 @@ export const SCHEMA_FILES: Record<string, string> = {
         "        // The headline, trimmed before it is stored.",
         "        title: col.text().notNull().transform({ beforeSave: ({ value }) => value.trim() }),",
         "        status: col.enum([\"draft\", \"published\"]).notNull().default(\"draft\"),",
-        "        authorId: col.uuid().column(\"author_id\")",
+        "        authorId: col.uuid(\"author_id\")",
         "    },",
         "    relations: {",
         "        author: rel.belongsTo(() => users, { localKey: \"author_id\" })",

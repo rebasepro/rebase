@@ -52,18 +52,18 @@ export const people = defineTable("people", {
         name: col.text().notNull(),
         email: col.text().unique(),
         bio: col.text(),
-        nickname: col.varchar(40),
+        nickname: col.varchar({ length: 40 }),
         age: col.integer(),
-        rating: col.numeric(5, 2),
+        rating: col.numeric({ precision: 5, scale: 2 }),
         score: col.numeric(),
-        big: col.bigint(),
+        big: col.bigint({ mode: "number" }),
         active: col.boolean().default(true),
         born: col.date(),
         wakeAt: col.time(),
-        createdAt: col.timestamptz().onCreateNow(),
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow(),
         status: col.enum(["new", "old"]).default("new"),
-        aliases: col.array(col.text()),
-        lucky: col.array(col.integer()),
+        aliases: col.text().array(),
+        lucky: col.integer().array(),
         meta: col.jsonb(),
         prefs: col.json()
     },
@@ -79,7 +79,7 @@ export const people = defineTable("people", {
 import { defineTable, col, rel } from "@rebasepro/server/schema";
 import { people } from "./people";
 export const categories = defineTable("categories", {
-    columns: { id: col.integer().primaryKey().identity(), title: col.text() },
+    columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), title: col.text() },
     relations: { people: rel.manyToMany(() => people) },
     // The scaffold's default rules: reads for everyone, writes for admins.
     rls: [
@@ -107,7 +107,7 @@ export const profiles = defineTable("profiles", {
 import { defineTable, col, rel } from "@rebasepro/server/schema";
 export const orders = defineTable("orders", {
     table: "order",
-    columns: { id: col.integer().primaryKey().identity(), select: col.text(), group: col.enum(["a", "b"]) },
+    columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), select: col.text(), group: col.enum(["a", "b"]) },
     relations: { friends: rel.manyToMany(() => orders) },
     rls: "admin-only"
 });`,
@@ -133,7 +133,7 @@ export const longThings = defineTable("long_things", {
     table: "long_things_tbl",
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
-        aStatusColumnWithQuiteALongNameThatKeepsGoingOn: col.enum(["x"]).column("a_status_column_with_quite_a_long_name_that_keeps_going_on")
+        aStatusColumnWithQuiteALongNameThatKeepsGoingOn: col.enum("a_status_column_with_quite_a_long_name_that_keeps_going_on", ["x"])
     },
     rls: "admin-only"
 });`
