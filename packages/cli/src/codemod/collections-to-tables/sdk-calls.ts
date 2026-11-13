@@ -821,6 +821,42 @@ function removeAuthCollection(ctx: AstContext, sf: SourceFile, property: Node, e
     return true;
 }
 
+/**
+ * `collections` (the array the collections index exports) in a backend entry
+ * becomes `schemaDir: path.join(__dirname, "…/schema")` — when the value is
+ * that import, and the file has `path` and a `__dirname` to write it with —
+ * and the import goes. The backend loads the same tables from their index.
+ */
+function replaceCollectionsOption(ctx: AstContext, sf: SourceFile, property: Node, edits: Edit[], options: RewriteSdkOptions): boolean {
+    const { Node: N, SyntaxKind } = ctx.tsm;
+    if (!options.schemaDir || !options.collectionsDir) return false;
+    const value = N.isShorthandPropertyAssignment(property) ? property.getNameNode() : N.isPropertyAssignment(property) ? property.getInitializer() : undefined;
+    if (!value || !N.isIdentifier(value)) return false;
+    const local = value.getText();
+    const declaration = sf.getImportDeclarations().find(candidate => candidate.getNamedImports().some(named => (named.getAliasNode()?.getText() ?? named.getName()) === local));
+    if (!declaration) return false;
+    const specifier = declaration.getModuleSpecifierValue();
+    if (!specifier.startsWith(".")) return false;
+    const target = path.resolve(path.dirname(sf.getFilePath()), specifier).replace(/\.(tsx?|mts|jsx?|mjs)$/, "").replace(/[\\/]index$/, "");
+    if (target !== path.resolve(options.collectionsDir)) return false;
+    const pathLocal = sf.getImportDeclarations().find(candidate => /^(node:)?path$/.test(candidate.getModuleSpecifierValue()))?.getDefaultImport()?.getText();
+    const hasDirname = sf.getVariableDeclaration("__dirname") !== undefined;
+    if (!pathLocal || !hasDirname) return false;
+    const rel = toPosix(path.relative(path.dirname(sf.getFilePath()), options.schemaDir));
+    edits.push({ start: property.getStart(), end: property.getEnd(), text: `schemaDir: ${pathLocal}.join(__dirname, ${JSON.stringify(rel.startsWith(".") ? rel : `./${rel}`)})`, rule: "boot-options" });
+    const otherUses = sf.getDescendantsOfKind(SyntaxKind.Identifier).filter(identifier =>
+        identifier.getText() === local && identifier !== value && !identifier.getFirstAncestorByKind(SyntaxKind.ImportDeclaration));
+    if (otherUses.length === 0) {
+        const named = declaration.getNamedImports();
+        if (named.length === 1 && !declaration.getDefaultImport() && !declaration.getNamespaceImport()) edits.push({ ...rangeWithTrailer(declaration), text: "", rule: "boot-options" });
+        else {
+            const binding = named.find(entry => (entry.getAliasNode()?.getText() ?? entry.getName()) === local);
+            if (binding) edits.push({ ...rangeWithTrailer(binding), text: "", rule: "boot-options" });
+        }
+    }
+    return true;
+}
+
 function bootOptions(ctx: AstContext, call: CallExpression, relative: string, report: SdkRewriteReport, edits: Edit[], options: RewriteSdkOptions): void {
     const { Node: N } = ctx.tsm;
     const object = call.getArguments()[0];
@@ -848,6 +884,7 @@ function bootOptions(ctx: AstContext, call: CallExpression, relative: string, re
             legacy.push(name);
             continue;
         }
+        if (name === "collections" && replaceCollectionsOption(ctx, call.getSourceFile(), property, edits, options)) continue;
         if (name === "collections" || name === "callbacks" || name === "collectionsDir") legacy.push(name);
         if (name === "auth" && N.isPropertyAssignment(property)) {
             const auth = property.getInitializerOrThrow();

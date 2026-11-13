@@ -71,6 +71,28 @@ function isIndex(file: string, dir: string): boolean {
     return path.dirname(file) === dir && /^index\.(tsx?|mts|jsx?|mjs)$/.test(path.basename(file));
 }
 
+/**
+ * Whether an import of the collections index binds names used only as the
+ * `collections` option of a backend entry — which the SDK pass's boot-options
+ * rewrite turns into `schemaDir` (or a step of its own).
+ */
+function onlyBootCollections(plan: PlanContext, sf: SourceFile, declaration: Node | undefined): boolean {
+    const { Node: N, SyntaxKind } = plan.ast.tsm;
+    if (!declaration || !N.isImportDeclaration(declaration) || declaration.getDefaultImport() || declaration.getNamespaceImport()) return false;
+    const locals = declaration.getNamedImports().map(named => named.getAliasNode()?.getText() ?? named.getName());
+    if (locals.length === 0) return false;
+    return locals.every(local => {
+        const uses = sf.getDescendantsOfKind(SyntaxKind.Identifier).filter(identifier => identifier.getText() === local && !identifier.getFirstAncestorByKind(SyntaxKind.ImportDeclaration));
+        return uses.length > 0 && uses.every(identifier => {
+            const parent = identifier.getParent();
+            const isOption = parent !== undefined && ((N.isShorthandPropertyAssignment(parent) && parent.getName() === "collections") ||
+                (N.isPropertyAssignment(parent) && parent.getName() === "collections" && parent.getInitializer() === identifier));
+            const call = identifier.getFirstAncestorByKind(SyntaxKind.CallExpression);
+            return isOption && call !== undefined && /^(initializeRebaseBackend|createRebaseBackend)$/.test(call.getExpression().getText());
+        });
+    });
+}
+
 /** Whether every reference to `local` in the file (but its import) is in a type position. */
 function usedAsTypeOnly(plan: PlanContext, sf: SourceFile, local: string): boolean {
     const { Node: N, SyntaxKind } = plan.ast.tsm;
@@ -123,6 +145,7 @@ export function repointConfigImports(plan: PlanContext, ctx: RepointContext, imp
                     continue;
                 }
                 if (!isUnder(ctx.collectionsDir, target)) continue; // the project's own module: it stays
+                if (isIndex(target, ctx.collectionsDir) && side === "backend" && onlyBootCollections(plan, sf, literal.getParent())) continue; // the boot-options rewrite handles it
                 if (isIndex(target, ctx.collectionsDir)) {
                     left.push(side === "backend"
                         ? `line ${line}: "${specifier}" — the collections index: the backend boots from backend/schema (\`schemaDir\`, or \`tables\` from its index)`

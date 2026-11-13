@@ -103,6 +103,11 @@ describe("rebase migrate sdk-calls", () => {
         // A script the checker throws on: no answer by type, so `.data` with a literal table decides by name — the run goes on.
         expect(fs.readFileSync(path.join(dir, "typed/web/feed.js"), "utf8")).toContain(`e.data.table("posts")`);
         expect(report.left.map(left => `${left.file}:${left.line}`)).toEqual(["backend/functions/untyped.ts:9", "frontend/src/firestore.ts:8", "typed/src/use.ts:6"]);
+        // The collections index's array as a boot option: the schema directory, and the import goes.
+        const bootArray = fs.readFileSync(path.join(dir, "backend/src/boot-array.ts"), "utf8");
+        expect(bootArray).toContain(`schemaDir: path.join(__dirname, "../schema")`);
+        expect(bootArray).not.toContain("config/collections");
+        expect(report.manualSteps.map(step => step.title)).not.toContain("Update the backend options in backend/src/boot-array.ts");
         // Untyped receivers named as the SDK: rewritten, and listed for review.
         const untyped = fs.readFileSync(path.join(dir, "backend/functions/untyped.ts"), "utf8");
         expect(untyped).toContain(`data.table("users")`);

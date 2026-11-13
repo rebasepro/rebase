@@ -1,0 +1,11 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { initializeRebaseBackend } from "@rebasepro/server";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// A backend entry that passed the collections index's array.
+await initializeRebaseBackend({
+    schemaDir: path.join(__dirname, "../schema"),
+    functionsDir: path.resolve(__dirname, "../functions")
+});

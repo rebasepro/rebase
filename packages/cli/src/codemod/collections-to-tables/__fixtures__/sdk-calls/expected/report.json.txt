@@ -13,6 +13,10 @@
       "edits": 4
     },
     {
+      "path": "backend/src/boot-array.ts",
+      "edits": 2
+    },
+    {
       "path": "backend/src/index.ts",
       "edits": 1
     },
@@ -45,7 +49,7 @@
     "collection-call": 13,
     "table-hooks": 5,
     "rule-vocabulary": 4,
-    "boot-options": 1,
+    "boot-options": 3,
     "storage-authorize": 1,
     "generated-types": 4,
     "error-codes": 1,

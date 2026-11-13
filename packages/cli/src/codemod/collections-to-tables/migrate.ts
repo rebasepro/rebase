@@ -326,10 +326,10 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
     for (const constant of split.constants) handled.add(constant.module);
     for (const { module, reason } of split.unsplit) {
         handled.add(module);
-        plan.manualSteps.push({
-            title: `Split ${relativeToRoot(plan, module)} by hand`,
-            detail: `The collections use enum values from ${relativeToRoot(plan, module)}; the tables inline the values and the customizations the labels, and the module was not moved because it ${reason}. If it is still the one source of those values, split it: the values into backend/lib (\`export const X = [...] as const\`), the labels into frontend/src/cms/lib (\`Record<(typeof X)[number], string>\`, importing the values' type), and name them in the tables and customizations.`,
-            file: relativeToRoot(plan, module)
+        // Advice, not a step: the tables inline the values and the customizations the labels, so nothing breaks if the module stays as it is.
+        report.notes.push({
+            file: relativeToRoot(plan, module),
+            message: `holds enum values the collections used; the tables inline the values and the customizations the labels (it was not split because it ${reason}). If it should stay the one source of those values, split it: the values into backend/lib (\`export const X = [...] as const\`), the labels into frontend/src/cms/lib (\`Record<(typeof X)[number], string>\`), named in the tables and customizations.`
         });
     }
 
@@ -445,9 +445,10 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
 
     const unmoved = unmovedConfigFiles(plan, configDir, handled).filter(file => relocator.isInCollections(path.join(root, file)));
     if (unmoved.length > 0) {
-        plan.manualSteps.push({
-            title: `Files of ${relativeToRoot(plan, legacy.collectionsDir)} nothing moved`,
-            detail: `Nothing imports these, so they were not moved, and they go with ${relativeToRoot(plan, legacy.collectionsDir)}: ${unmoved.join(", ")}. Move what is still used out of that directory before removing it.`
+        // Nothing the run writes and nothing of the project imports them: only the collections did, and their values are in the tables now.
+        report.notes.push({
+            file: relativeToRoot(plan, legacy.collectionsDir),
+            message: `${unmoved.join(", ")}: nothing needs ${unmoved.length > 1 ? "these" : "this"} after the migration (only the collections imported ${unmoved.length > 1 ? "them" : "it"}, and their values are in the tables now); ${unmoved.length > 1 ? "they go" : "it goes"} with ${relativeToRoot(plan, legacy.collectionsDir)}.`
         });
     }
 

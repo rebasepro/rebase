@@ -174,12 +174,31 @@ function printReport(report: MigrationReport): void {
  * once per field — printed once, listing what they are about. `--json` keeps
  * every step.
  */
+/** Kinds of step that come once per relation or file, with details of their own: printed as one step of each kind. */
+const STEP_FAMILIES: readonly { pattern: RegExp; title: string }[] = [
+    { pattern: /^Relation renamed in /, title: "Relations renamed" },
+    { pattern: /^Update the importers of /, title: "Exports that moved to backend/schema" },
+    { pattern: /^Check the uses of the tables /, title: "Imports of collections that are tables now" },
+    { pattern: /^Repoint the imports of /, title: "Imports of config/collections to repoint" }
+];
+
 export function groupSteps(steps: readonly ManualStep[]): ManualStep[] {
     const out: ManualStep[] = [];
     const groups = new Map<string, ManualStep[]>();
+    const families = new Map<string, ManualStep[]>();
     for (const step of steps) {
         if (step.snippet) {
             out.push(step);
+            continue;
+        }
+        const family = STEP_FAMILIES.find(candidate => candidate.pattern.test(step.title));
+        if (family) {
+            const members = families.get(family.title);
+            if (members) members.push(step);
+            else {
+                families.set(family.title, [step]);
+                out.push(step);
+            }
             continue;
         }
         const group = groups.get(step.detail);
@@ -191,6 +210,12 @@ export function groupSteps(steps: readonly ManualStep[]): ManualStep[] {
         }
     }
     return out.map(step => {
+        const family = step.snippet ? undefined : STEP_FAMILIES.find(candidate => candidate.pattern.test(step.title));
+        if (family) {
+            const members = families.get(family.title) ?? [step];
+            if (members.length === 1) return step;
+            return { title: `${family.title} (${members.length})`, detail: members.map(member => `${member.file ?? member.title}: ${member.detail}`).join(" | ") };
+        }
         const group = step.snippet ? undefined : groups.get(step.detail);
         if (!group || group.length === 1) return step;
         const about = group.map(member => `${member.title}${member.file ? ` (${member.file})` : ""}`);

@@ -18,6 +18,17 @@ describe("the printed output", () => {
         expect(grouped[0].detail).toBe(`${detail} — Check fields.slug.dynamicProps of posts (frontend/src/cms/posts.tsx); Check fields.locale.dynamicProps of pages (frontend/src/cms/pages.tsx)`);
     });
 
+    it("prints a kind of step that comes once per relation as one step listing each", () => {
+        const grouped = groupSteps([
+            { title: "Relation renamed in members", detail: "The relation is now \"company_idRelation\".", file: "backend/schema/members.ts" },
+            { title: "Relation renamed in jobs", detail: "The relation is now \"owner_idRelation\".", file: "backend/schema/jobs.ts" }
+        ]);
+        expect(grouped).toEqual([{
+            title: "Relations renamed (2)",
+            detail: "backend/schema/members.ts: The relation is now \"company_idRelation\". | backend/schema/jobs.ts: The relation is now \"owner_idRelation\"."
+        }]);
+    });
+
     it("prints the same remark about several keys once, with the keys", () => {
         const remark = "is not carried: `\"manual\"` and `true` are the same key to the server.";
         expect(groupNotes([
