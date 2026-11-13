@@ -8,7 +8,7 @@
  *
  * @module
  */
-import { EntityReference, EntityRelation } from "@rebasepro/types";
+import { EntityReference, EntityRelation, GeoPoint, JUNCTION_PIVOT_KEY, Vector } from "@rebasepro/types";
 import { type CollectionConfig } from "../types/collections";
 import { toWireKey } from "@rebasepro/utils";
 import {
@@ -30,8 +30,10 @@ export type CollectionResolver = (slug: string) => CollectionConfig | undefined;
 
 /**
  * `EntityDataOptions` for the admin: rows addressed by their collection's
- * declared key, converted to the collection's view model on the way in, and
- * cross-source references stored as ids on the way out. Every hook resolves
+ * declared key, converted to the collection's view model on the way in;
+ * on the way out, cross-source references stored as ids and — towards a
+ * server, over `client.data` — the view model turned back into the wire values
+ * the REST API documents ({@link viewModelToWire}), filters included. Every hook resolves
  * the collection when asked, not up front: the data layer is created by
  * `Rebase`, which sits above the admin that owns the collections.
  */
@@ -45,6 +47,8 @@ export function collectionEntityDataOptions(
         primaryKeysOf: createPrimaryKeyResolver(resolveCollection),
         viewModelOf,
         storedValuesOf: createStoredValuesConverter(resolveCollection),
+        wireValuesOf: createWireValuesConverter(resolveCollection),
+        wireFilterValueOf: () => toWireFilterValue,
         viewModelSourceOf: resolveCollection
     };
 }
@@ -236,6 +240,109 @@ function createStoredValuesConverter(resolveCollection: CollectionResolver) {
             return collection ? storeCrossSourceReferences(values, collection) : values;
         };
     };
+}
+
+/**
+ * The converter values pass through on their way to a server: the view model
+ * of `slug`'s collection as wire values ({@link viewModelToWire}). Applied by
+ * `wrapAsEntityData` only — a driver data source (Firestore) stores the view
+ * model's classes natively.
+ */
+function createWireValuesConverter(resolveCollection: CollectionResolver) {
+    return function wireValuesFor(slug: string) {
+        return <V extends Record<string, unknown>>(values: V): V => ({
+            ...values,
+            ...viewModelToWire(values, resolveCollection(slug)?.properties)
+        });
+    };
+}
+
+/**
+ * The admin's view model of a row as the values a write sends: what the REST
+ * API documents and the server accepts — nothing else is accepted.
+ *
+ * - a relation (`EntityRelation`, or a plain `{ id }` / relation ref the
+ *   panel holds) as the related row's key — a to-many list as a list of keys,
+ *   an element carrying a `_pivot` as `{ id, _pivot }`;
+ * - a reference (`EntityReference`) as the referenced id;
+ * - a `Vector` as its list of numbers;
+ * - a `GeoPoint` as `{ latitude, longitude }`;
+ * - a `Date` as its ISO 8601 instant (an invalid one as `null`, as JSON has
+ *   always sent it);
+ * - a map's and a list's values walked, by their declared properties where
+ *   there are some.
+ *
+ * Everything else is sent as it is. Without `properties` the values are still
+ * walked, by what each value is.
+ *
+ * @param values the row's values in the admin's view model
+ * @param properties the properties of the row's collection
+ * @group Data
+ */
+export function viewModelToWire(
+    values: Record<string, unknown>,
+    properties: Record<string, unknown> | undefined
+): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(values)) {
+        Object.defineProperty(out, key, {
+            value: wireValue(value, properties?.[key]),
+            enumerable: true,
+            writable: true,
+            configurable: true
+        });
+    }
+    return out;
+}
+
+/** Whether a property holds a link to another row: a relation, or a reference. */
+function isLinkProperty(property: unknown): boolean {
+    return isPlainRecord(property) && (property.type === "relation" || property.type === "reference");
+}
+
+/** The property a list's items are declared by: a relation's own (a to-many lists links), an array's `of`. */
+function itemPropertyOf(property: unknown): unknown {
+    if (!isPlainRecord(property)) return undefined;
+    if (isLinkProperty(property)) return property;
+    return property.type === "array" ? property.of : undefined;
+}
+
+function wireValue(value: unknown, property: unknown): unknown {
+    if (value === null || value === undefined) return value;
+    if (value instanceof EntityRelation || value instanceof EntityReference) return value.id;
+    if (value instanceof Vector) return [...value.value];
+    if (value instanceof GeoPoint) return { latitude: value.latitude, longitude: value.longitude };
+    if (value instanceof Date) return isNaN(value.getTime()) ? null : value.toISOString();
+    if (Array.isArray(value)) {
+        const itemProperty = itemPropertyOf(property);
+        return value.map(item => wireValue(item, itemProperty));
+    }
+    if (isPlainRecord(value)) {
+        if (isLinkProperty(property) && (typeof value.id === "string" || typeof value.id === "number")) {
+            const pivot = value[JUNCTION_PIVOT_KEY];
+            return isPlainRecord(pivot) ? { id: value.id, [JUNCTION_PIVOT_KEY]: pivot } : value.id;
+        }
+        const children = isPlainRecord(property) && property.type === "map" && isPlainRecord(property.properties)
+            ? property.properties
+            : undefined;
+        return viewModelToWire(value, children);
+    }
+    return value;
+}
+
+/**
+ * One filter value as a filter sends it to a server: a relation or a
+ * reference the admin filters by (an `EntityRelation`, an `EntityReference`,
+ * or the plain `{ __type: "relation" | "reference", id }` a filter persisted
+ * as JSON holds) as the related row's key. Anything else unchanged.
+ */
+function toWireFilterValue(value: unknown): unknown {
+    if (value instanceof EntityRelation || value instanceof EntityReference) return value.id;
+    if (isPlainRecord(value) && (value.__type === "relation" || value.__type === "reference")
+        && (typeof value.id === "string" || typeof value.id === "number")) {
+        return value.id;
+    }
+    return value;
 }
 
 /**

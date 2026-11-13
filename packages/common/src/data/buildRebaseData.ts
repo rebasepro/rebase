@@ -74,6 +74,27 @@ export interface EntityDataOptions {
     storedValuesOf?: (slug: string) => (<V extends Record<string, unknown>>(values: V) => V) | undefined;
 
     /**
+     * The converter values pass through, after {@link storedValuesOf}, on
+     * their way to an SDK client of wire rows ({@link wrapAsEntityData}
+     * only): the admin turns its view model (`EntityRelation`, `Vector`,
+     * `GeoPoint`, `Date`) into the values the REST API documents here. A
+     * driver data source ({@link buildRebaseData}) is handed the view model
+     * as it is — Firestore stores those classes natively. Absent: sent as
+     * handed.
+     */
+    wireValuesOf?: (slug: string) => (<V extends Record<string, unknown>>(values: V) => V) | undefined;
+
+    /**
+     * The converter each value of a filter (`where`, `logical`) passes
+     * through on its way to an SDK client of wire rows
+     * ({@link wrapAsEntityData} only) — the admin sends a relation it filters
+     * by as the related row's key. Called on every value, container or leaf,
+     * outermost first: a value it hands back changed is not walked into.
+     * Absent: filters are sent as handed.
+     */
+    wireFilterValueOf?: (slug: string) => ((value: unknown) => unknown) | undefined;
+
+    /**
      * What `viewModelOf(slug)` converts with right now (the collection as
      * resolved). A live list keeps the entities it built while this stays the
      * same object.
@@ -640,6 +661,55 @@ function createStoredValuesConverter(options?: EntityDataOptions) {
     return (slug: string) => options?.storedValuesOf?.(slug) ?? (<V extends Record<string, unknown>>(values: V): V => values);
 }
 
+/**
+ * The converter values pass through on their way to an SDK client of wire
+ * rows: `storedValuesOf`, then `wireValuesOf` — each identity unless the
+ * caller registered one.
+ */
+function createSentValuesConverter(options?: EntityDataOptions) {
+    const storedValuesFor = createStoredValuesConverter(options);
+    return (slug: string) => {
+        const stored = storedValuesFor(slug);
+        const wire = options?.wireValuesOf?.(slug);
+        return wire ? <V extends Record<string, unknown>>(values: V): V => wire(stored(values)) : stored;
+    };
+}
+
+/** Read params whose filter values may need converting before they are sent. */
+interface FilteredParams {
+    where?: unknown;
+    logical?: unknown;
+}
+
+/**
+ * Every value of a filter through `convert`, outermost first: a `where`
+ * record's tuples, a `logical` group's conditions. A value `convert` hands
+ * back changed is taken as it is; an unchanged list or plain object is walked
+ * into.
+ */
+function convertFilterValue(value: unknown, convert: (value: unknown) => unknown): unknown {
+    const converted = convert(value);
+    if (converted !== value) return converted;
+    if (Array.isArray(value)) return value.map(item => convertFilterValue(item, convert));
+    if (value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
+        return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, convertFilterValue(item, convert)]));
+    }
+    return value;
+}
+
+/** The filter converter of `slug` (see `EntityDataOptions.wireFilterValueOf`), applied to read params. */
+function createSentFilterConverter(options?: EntityDataOptions) {
+    return (slug: string) => <P extends FilteredParams>(params: P): P => {
+        const convert = options?.wireFilterValueOf?.(slug);
+        if (!convert || (params.where === undefined && params.logical === undefined)) return params;
+        return {
+            ...params,
+            ...(params.where !== undefined ? { where: convertFilterValue(params.where, convert) } : {}),
+            ...(params.logical !== undefined ? { logical: convertFilterValue(params.logical, convert) } : {})
+        };
+    };
+}
+
 export function buildRebaseData(driver: DataDriver, options?: EntityDataOptions): RebaseData {
     const cache = new Map<string, TableAccessor>();
     const primaryKeysFor = createPrimaryKeyResolver(options);
@@ -1165,12 +1235,15 @@ function toEntityAccessor<M extends Record<string, unknown>>(
      * stay the same object (see `listen`).
      */
     viewModelSource: () => unknown = () => undefined,
-    /** Values on their way to the client — see `createStoredValuesConverter`. */
-    toStored: <V extends Record<string, unknown>>(values: V) => V = (values) => values
+    /** Values on their way to the client — see `createSentValuesConverter`. */
+    toStored: <V extends Record<string, unknown>>(values: V) => V = (values) => values,
+    /** Read params on their way to the client — see `createSentFilterConverter`. */
+    toSentFilter: <P extends FilteredParams>(params: P) => P = (params) => params
 ): TableAccessor<M> {
+    const sent = <P extends FilteredParams>(params: P | undefined): P | undefined => params === undefined ? params : toSentFilter(params);
     const accessor: TableAccessor<M> = {
         async find(params?: FindParams<M>): Promise<FindResponse<M>> {
-            const res = await sdk.find(params);
+            const res = await sdk.find(sent(params));
             return { data: rowsToEntities<M>(res.data, slug, getPks(), toViewModel), meta: res.meta };
         },
         async findById(id: string | number, options?: ByIdReadOptions): Promise<Entity<M> | undefined> {
@@ -1209,10 +1282,10 @@ function toEntityAccessor<M extends Record<string, unknown>>(
         // one-shot `find()` on exactly this property, and a UI that subscribes
         // into a throw is worse than one that polls. The client's method is
         // always present now, so the capability is read off the stub instead.
-        count: isUnsupported(sdk.count) ? undefined : (params?: FindParams<M>) => sdk.count(params),
+        count: isUnsupported(sdk.count) ? undefined : (params?: FindParams<M>) => sdk.count(sent(params)),
         aggregate: isUnsupported(sdk.aggregate)
             ? undefined
-            : (params: AggregateParams<M>) => sdk.aggregate(params),
+            : (params: AggregateParams<M>) => sdk.aggregate(toSentFilter(params)),
         refresh: isUnsupported(sdk.refresh)
             ? undefined
             : (options?: RefreshOptions) => sdk.refresh(options),
@@ -1230,7 +1303,7 @@ function toEntityAccessor<M extends Record<string, unknown>>(
                 // converted with change (a key learned late, a schema edit).
                 let built = new WeakMap<object, Entity<M>>();
                 let builtWith: [PrimaryKeyInfo[], unknown] | undefined;
-                return sdk.listen(params, (res) => {
+                return sdk.listen(sent(params), (res) => {
                     const pks = getPks();
                     const source = viewModelSource();
                     if (!builtWith || builtWith[0] !== pks || builtWith[1] !== source) {
@@ -1257,15 +1330,15 @@ function toEntityAccessor<M extends Record<string, unknown>>(
         listenCount: isUnsupported(sdk.listenCount)
             ? undefined
             : (params: FindParams<M> | undefined, onCount: (total: number) => void, onError?: (e: Error) => void) =>
-                sdk.listenCount(params, onCount, onError),
+                sdk.listenCount(sent(params), onCount, onError),
         trash: !sdk.trash || isUnsupported(sdk.trash.find)
             ? undefined
             : {
                 async find(params?: FindParams<M>): Promise<FindResponse<M>> {
-                    const res = await sdk.trash.find(params);
+                    const res = await sdk.trash.find(sent(params));
                     return { data: rowsToEntities<M>(res.data, slug, getPks(), toViewModel), meta: res.meta };
                 },
-                count: (params?: FindParams<M>) => sdk.trash.count(params),
+                count: (params?: FindParams<M>) => sdk.trash.count(sent(params)),
                 purge: (id: string | number) => sdk.trash.purge(id),
                 purgeMany: (ids: (string | number)[]) => sdk.trash.purgeMany(ids)
             },
@@ -1313,13 +1386,14 @@ export function wrapAsEntityData(sdkData: { table(slug: string): SDKTableClient 
     const cache = new Map<string, TableAccessor>();
     const primaryKeysFor = createPrimaryKeyResolver(options);
     const viewModelFor = createViewModelConverter(options);
-    const storedValuesFor = createStoredValuesConverter(options);
+    const sentValuesFor = createSentValuesConverter(options);
+    const sentFilterFor = createSentFilterConverter(options);
 
     function getAccessor(slug: string): TableAccessor {
         let accessor = cache.get(slug);
         if (!accessor) {
             accessor = toEntityAccessor(sdkData.table(slug), slug, () => primaryKeysFor(slug), viewModelFor(slug),
-                () => options?.viewModelSourceOf?.(slug), storedValuesFor(slug));
+                () => options?.viewModelSourceOf?.(slug), sentValuesFor(slug), sentFilterFor(slug));
             cache.set(slug, accessor);
         }
         return accessor;
