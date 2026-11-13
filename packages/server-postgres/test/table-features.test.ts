@@ -26,7 +26,7 @@ import { ensureTables, type Queryable } from "../src/schema/ensure-tables";
 import { withPinnedPlannerWorld } from "../src/schema/render-outputs";
 import { assertWritableColumns } from "../src/services/collection-helpers";
 import { readCatalogueSchema } from "../src/schema/catalogue-schema";
-import { collectionIndexStatement } from "../src/schema/collection-index";
+import { tableIndexStatement } from "../src/schema/table-index";
 import { parseColumnFromServer, serializeColumnToServer } from "../src/data-transformer";
 import { columnAt, runtimeTableOfDef } from "./helpers/codec-columns";
 import { drizzle } from "drizzle-orm/pglite";
@@ -442,7 +442,7 @@ describe("table features: an index without a `reason`", () => {
         const [index] = tableOf(plan, "handles").indexes;
         expect(index).toMatchObject({ method: "btree", keys: [{ column: "country" }, { column: "handle" }] });
         expect(index.reason).toBeUndefined();
-        expect(ddlOf([handles])).toContain(collectionIndexStatement(index));
+        expect(ddlOf([handles])).toContain(tableIndexStatement(index));
         expect(drizzleOf([handles])).toContain(`index("${index.indexName}").on(table.country.asc().nullsLast(), table.handle.asc().nullsLast())`);
         const db = new PGlite();
         try {
@@ -470,7 +470,7 @@ describe("table features: `rel.belongsTo(…, { constraint: false })`", () => {
         const plan = planOf([people, audits]);
         expect(tableOf(plan, "audits").indexes.map(index => index.keys.map(key => key.column))).toEqual([["actor_id"], ["subject_id"]]);
         const ddl = ddlOf([people, audits]);
-        for (const index of tableOf(plan, "audits").indexes) expect(ddl).toContain(collectionIndexStatement(index));
+        for (const index of tableOf(plan, "audits").indexes) expect(ddl).toContain(tableIndexStatement(index));
         expect(drizzleOf([people, audits])).toContain(`index("${tableOf(plan, "audits").indexes[0].indexName}")`);
     });
 

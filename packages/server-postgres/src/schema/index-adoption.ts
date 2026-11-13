@@ -1,7 +1,7 @@
 /**
  * Adopting an index the database already has, instead of building a twin.
  *
- * A declared index is found by its derived name (`collection-index.ts`), so an
+ * A declared index is found by its derived name (`table-index.ts`), so an
  * index someone made by hand — or one an introspected database arrived with —
  * is invisible to it however exactly it matches the declaration: boot and
  * `db push` built the same index again under the derived name, and every write
@@ -29,7 +29,7 @@
  * answering a narrower question than the one declared, so a predicate this
  * cannot read as the same is not adopted.
  */
-import { isRebaseIndexName, renderPredicate, type CollectionIndexSpec } from "./collection-index";
+import { isRebaseIndexName, renderPredicate, type TableIndexSpec } from "./table-index";
 
 /** What the catalogue says about one existing index. */
 export interface ExistingIndexShape {
@@ -134,7 +134,7 @@ function normalizePredicate(text: string): string {
 }
 
 /** Whether `shape` is `spec` under another name. */
-export function indexMatchesSpec(spec: CollectionIndexSpec, shape: ExistingIndexShape): boolean {
+export function indexMatchesSpec(spec: TableIndexSpec, shape: ExistingIndexShape): boolean {
     if (shape.schema !== spec.schema || shape.table !== spec.table) return false;
     if (shape.constraint || !shape.valid || !shape.defaultOpclassAndCollation) return false;
     if (shape.method !== spec.method || shape.unique !== spec.unique) return false;
@@ -164,7 +164,7 @@ export function indexMatchesSpec(spec: CollectionIndexSpec, shape: ExistingIndex
  * never the same one twice.
  */
 export function planIndexAdoptions(
-    specs: readonly CollectionIndexSpec[],
+    specs: readonly TableIndexSpec[],
     shapes: readonly ExistingIndexShape[]
 ): IndexAdoption[] {
     const held = new Set(shapes.map(shape => `${shape.schema}.${shape.index}`));

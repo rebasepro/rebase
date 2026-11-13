@@ -4,7 +4,7 @@ import { execSync } from "child_process";
 import { createRequire } from "module";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
-import { isRebaseIndexName } from "./schema/collection-index";
+import { isRebaseIndexName } from "./schema/table-index";
 import type { GeneratedColumnDependency } from "./schema/generated-column-conflicts";
 import { COLUMN_TYPES_SQL, type ExistingColumnType } from "./schema/destructive-sql";
 import { UNDECLARABLE_CONSTRAINTS_SQL, undeclaredConstraintExcludes, type ExistingConstraint } from "./schema/undeclarable-constraints";
@@ -957,7 +957,7 @@ async function managedIndexNames(schemaDir: string): Promise<Set<string>> {
     const tables = await tablesIn(schemaDir);
     const { searchExcludePatterns, vectorExcludePatterns } =
         await import("./schema/generate-postgres-ddl-logic");
-    const { buildTableIndexSpecs } = await import("./schema/collection-index");
+    const { buildTableIndexSpecs } = await import("./schema/table-index");
 
     const names = new Set<string>(
         tables.flatMap(table => buildTableIndexSpecs(table.descriptor)).map(spec => spec.indexName)

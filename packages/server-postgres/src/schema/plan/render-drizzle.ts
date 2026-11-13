@@ -20,7 +20,7 @@
  *   what left `geopoint` with a database column and no Drizzle key.
  */
 import type { ColumnPlan, ForeignKeyPlan, OneRelationPlan, PgType, PolicyPlan, RelationPlan, SchemaPlan, TablePlan } from "./types";
-import { renderPredicate } from "../collection-index";
+import { renderPredicate } from "../table-index";
 
 /** What the generated file may leave out. */
 export interface DrizzleRenderOptions {

@@ -51,7 +51,7 @@ import { sha1Hex, truncateToBytes } from "@rebasepro/utils";
  * collection was lowered from a table's `indexes` (`tableIndex`), where
  * `reason` is optional — a legacy entry must state one. Read only by
  * {@link buildCollectionIndexSpecs}, the collection door only tests still use
- * (`collection-index.test`, `foreign-key-indexes.test` state their fixtures
+ * (`table-index.test`, `foreign-key-indexes.test` state their fixtures
  * as collections); deleted with it.
  */
 const isTableIndex = (index: CollectionIndex): boolean =>
@@ -80,7 +80,7 @@ export type ResolvedPredicate =
     | { and: readonly ResolvedPredicate[] };
 
 /** One index, fully resolved. The only shape the renderers accept. */
-export interface CollectionIndexSpec {
+export interface TableIndexSpec {
     schema: string;
     table: string;
     method: IndexMethod;
@@ -114,13 +114,13 @@ export interface CollectionIndexSpec {
  * the alternative is a `CREATE INDEX` that fails during a push with a Postgres
  * error mentioning a column the author never wrote.
  */
-export class CollectionIndexConfigError extends Error {
+export class TableIndexConfigError extends Error {
     readonly collectionSlug: string;
     readonly position: number;
 
     constructor(collectionSlug: string, position: number, message: string) {
         super(`${collectionSlug}.indexes[${position}]: ${message}`);
-        this.name = "CollectionIndexConfigError";
+        this.name = "TableIndexConfigError";
         this.collectionSlug = collectionSlug;
         this.position = position;
     }
@@ -171,7 +171,7 @@ const isOrderedMethod = (method: IndexMethod): boolean => method === "btree";
  * `v` is the only escape hatch, and it is expensive on purpose: bumping it
  * renames every index in the field.
  */
-export const indexFingerprint = (spec: Omit<CollectionIndexSpec, "indexName">): string => sha1Hex(JSON.stringify({
+export const indexFingerprint = (spec: Omit<TableIndexSpec, "indexName">): string => sha1Hex(JSON.stringify({
     v: 1,
     s: spec.schema,
     t: spec.table,
@@ -192,7 +192,7 @@ export const indexFingerprint = (spec: Omit<CollectionIndexSpec, "indexName">): 
  * `_fkey` suffix truncated away, so a second foreign key on that table would
  * derive a byte-identical name.
  */
-export const deriveIndexName = (spec: Omit<CollectionIndexSpec, "indexName">): string => {
+export const deriveIndexName = (spec: Omit<TableIndexSpec, "indexName">): string => {
     // Built suffix-first, so the two parts that carry meaning — the `_ix`/`_ux`
     // tag that {@link isRebaseIndexName} matches on, and the fingerprint — are
     // never in the string being truncated. Composing the whole name and then
@@ -238,8 +238,8 @@ export const renderPredicate = (predicate: ResolvedPredicate): string => {
  * nothing for a UNIQUE index — the rendered text is `CREATE UNIQUE INDEX …`
  * and the pattern never matches.
  */
-export const collectionIndexStatement = (
-    spec: CollectionIndexSpec,
+export const tableIndexStatement = (
+    spec: TableIndexSpec,
     options: { concurrently?: boolean; ifNotExists?: boolean } = {}
 ): string => {
     const unique = spec.unique ? "UNIQUE " : "";
@@ -267,10 +267,10 @@ export const collectionIndexStatement = (
         `ON "${spec.schema}"."${spec.table}"${using} (${keys})${include}${where};`;
 };
 
-export const collectionIndexStatements = (
-    specs: readonly CollectionIndexSpec[],
+export const tableIndexStatements = (
+    specs: readonly TableIndexSpec[],
     options: { concurrently?: boolean; ifNotExists?: boolean } = {}
-): string[] => specs.map(spec => collectionIndexStatement(spec, options));
+): string[] => specs.map(spec => tableIndexStatement(spec, options));
 
 const relationOf = (
     collection: CollectionConfig,
@@ -377,14 +377,14 @@ const legacyPredicate = (predicate: IndexPredicate): IndexPredicateSource => {
  * fixtures as collections, and builds through the same function, so the two
  * cannot disagree.
  *
- * Throws {@link CollectionIndexConfigError} rather than dropping a bad entry:
+ * Throws {@link TableIndexConfigError} rather than dropping a bad entry:
  * an index that silently does not exist is the failure mode this whole feature
  * is here to remove.
  */
 export const buildCollectionIndexSpecs = (
     collection: CollectionConfig,
     resolveColumnName: ResolveColumnName
-): CollectionIndexSpec[] => {
+): TableIndexSpec[] => {
     if (!isPostgresCollectionConfig(collection)) return [];
     const declared = collection.indexes;
     if (!declared || declared.length === 0) return [];
@@ -470,9 +470,9 @@ const tableIndexColumn = (table: TableDescriptor, key: string, fail: (message: s
  * its descriptor — what the planner calls, for a table and for a
  * materialized view's stored rows alike.
  *
- * Throws {@link CollectionIndexConfigError} rather than dropping a bad entry.
+ * Throws {@link TableIndexConfigError} rather than dropping a bad entry.
  */
-export const buildTableIndexSpecs = (table: TableDescriptor): CollectionIndexSpec[] => {
+export const buildTableIndexSpecs = (table: TableDescriptor): TableIndexSpec[] => {
     const declared = table.indexes;
     if (!declared || declared.length === 0) return [];
     return indexSpecsFrom({
@@ -517,16 +517,16 @@ const resolveSourcePredicate = (
     }
 };
 
-const indexSpecsFrom = (source: IndexTableSource): CollectionIndexSpec[] => {
+const indexSpecsFrom = (source: IndexTableSource): TableIndexSpec[] => {
     const { slug, schema, table } = source;
     const pk = [...source.primaryKey].sort().join(",");
 
-    const specs: CollectionIndexSpec[] = [];
+    const specs: TableIndexSpec[] = [];
     const byName = new Map<string, number>();
 
     source.indexes.forEach((index, position) => {
         const fail = (message: string): never => {
-            throw new CollectionIndexConfigError(slug, position, message);
+            throw new TableIndexConfigError(slug, position, message);
         };
 
         // A table's index may leave its reason out; a legacy entry may not.
@@ -604,7 +604,7 @@ const indexSpecsFrom = (source: IndexTableSource): CollectionIndexSpec[] => {
  * exclude list and `schema.sql` do — a second sort written out beside this one
  * is a second order the moment either is edited.
  */
-export const sortIndexSpecs = (specs: readonly CollectionIndexSpec[]): CollectionIndexSpec[] =>
+export const sortIndexSpecs = (specs: readonly TableIndexSpec[]): TableIndexSpec[] =>
     [...specs].sort((a, b) =>
         a.schema.localeCompare(b.schema) ||
         a.table.localeCompare(b.table) ||
@@ -629,7 +629,7 @@ export const FOREIGN_KEY_INDEX_REASON =
  * has to reach every row. Nor does GIN or BRIN, which answer different
  * questions than "the rows whose key is one of these".
  */
-export const leadsWithColumn = (spec: Pick<CollectionIndexSpec, "method" | "predicate" | "keys">, column: string): boolean =>
+export const leadsWithColumn = (spec: Pick<TableIndexSpec, "method" | "predicate" | "keys">, column: string): boolean =>
     spec.method === "btree" && spec.predicate === null && spec.keys[0]?.column === column;
 
 /**
@@ -650,7 +650,7 @@ export const leadsWithColumn = (spec: Pick<CollectionIndexSpec, "method" | "pred
  * derive. That identity is what makes the derived index and a declared one the
  * same object rather than two.
  */
-export const foreignKeyIndexSpec = (schema: string, table: string, column: string): CollectionIndexSpec => {
+export const foreignKeyIndexSpec = (schema: string, table: string, column: string): TableIndexSpec => {
     const withoutName = {
         schema,
         table,

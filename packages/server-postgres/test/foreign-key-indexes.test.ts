@@ -25,7 +25,7 @@ import { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasep
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
-import { buildCollectionIndexSpecs, foreignKeyIndexSpec, FOREIGN_KEY_INDEX_REASON } from "../src/schema/collection-index";
+import { buildCollectionIndexSpecs, foreignKeyIndexSpec, FOREIGN_KEY_INDEX_REASON } from "../src/schema/table-index";
 import { resolveColumnName } from "../src/schema/column-plan-helpers";
 import { compileSet, planCollections } from "./helpers/plan-tables";
 

@@ -30,7 +30,7 @@
  *   `contracts/derived-names.txt`); they are computed once, here, so the three
  *   files cannot name the same object differently.
  */
-import type { CollectionIndexSpec } from "../collection-index";
+import type { TableIndexSpec } from "../table-index";
 import type { SearchColumnSpec } from "../search-column";
 import type { VectorColumnSpec, VectorIndexPlan } from "../vector-index";
 
@@ -340,7 +340,7 @@ export interface TablePlan {
      */
     primaryKey: string[];
     /** The declared `indexes:` block, with its frozen names. */
-    indexes: CollectionIndexSpec[];
+    indexes: TableIndexSpec[];
     /** The opt-in `search` block's column, helpers and index. */
     search?: SearchColumnSpec;
     /** ANN indexes for the table's `vector` columns, and the ones skipped. */

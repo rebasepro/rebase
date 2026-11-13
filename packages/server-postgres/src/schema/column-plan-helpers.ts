@@ -1,7 +1,7 @@
 /**
  * TRANSITIONAL (Postgres-first Stage B): the SQL column name of a legacy
  * `Property`, for the collection door of the index builder
- * (`buildCollectionIndexSpecs` in `collection-index.ts`) and the tests that
+ * (`buildCollectionIndexSpecs` in `table-index.ts`) and the tests that
  * still state fixtures as collections. The planner reads descriptors and never
  * imports this; it is deleted with the collection door.
  */

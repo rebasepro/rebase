@@ -1,7 +1,7 @@
 import { declaredIndexesIfNotExists, indexAdoptionStatement, indexMatchesSpec, planIndexAdoptions, type ExistingIndexShape } from "../src/schema/index-adoption";
-import type { CollectionIndexSpec } from "../src/schema/collection-index";
+import type { TableIndexSpec } from "../src/schema/table-index";
 
-const spec = (over: Partial<CollectionIndexSpec> = {}): CollectionIndexSpec => ({
+const spec = (over: Partial<TableIndexSpec> = {}): TableIndexSpec => ({
     schema: "public",
     table: "events",
     method: "btree",

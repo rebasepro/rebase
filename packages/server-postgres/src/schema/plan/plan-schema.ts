@@ -77,12 +77,12 @@ import {
 } from "../vector-index";
 import {
     buildTableIndexSpecs,
-    collectionIndexStatement,
+    tableIndexStatement,
     deriveIndexName,
     foreignKeyIndexSpec,
     leadsWithColumn,
-    type CollectionIndexSpec
-} from "../collection-index";
+    type TableIndexSpec
+} from "../table-index";
 import { createHash } from "node:crypto";
 import { servedKeyOf, tableRelationName } from "../relation-names";
 import { SET_UPDATED_AT_FN, setUpdatedAtFunction } from "./updated-at-trigger";
@@ -822,7 +822,7 @@ export function planViews(tables: readonly TableDescriptor[]): ViewPlan[] {
             // A materialized view's own `indexes`, on its stored rows.
             indexes: materialized
                 ? buildTableIndexSpecs(descriptor)
-                    .map(spec => collectionIndexStatement({ ...spec, table: viewRowsName(name) }).replace(/;$/, ""))
+                    .map(spec => tableIndexStatement({ ...spec, table: viewRowsName(name) }).replace(/;$/, ""))
                 : []
         }];
     });
@@ -1211,7 +1211,7 @@ function applyTenantColumnEffects(
     descriptor: TableDescriptor,
     columns: ColumnPlan[],
     primaryKey: string[]
-): CollectionIndexSpec[] {
+): TableIndexSpec[] {
     const tenant = tenantOf(descriptor);
     if (!tenant) return [];
     const { schema, table } = descriptor;
@@ -1296,11 +1296,11 @@ function planForeignKeyIndexes(
     table: string,
     columns: ColumnPlan[],
     primaryKey: string[],
-    planned: readonly CollectionIndexSpec[],
+    planned: readonly TableIndexSpec[],
     linkColumn: (column: ColumnPlan) => string | undefined
-): CollectionIndexSpec[] {
+): TableIndexSpec[] {
     const created = columns.filter(c => !c.columnOwnedByProperty);
-    const derived: CollectionIndexSpec[] = [];
+    const derived: TableIndexSpec[] = [];
     for (const column of columns) {
         const name = linkColumn(column);
         if (name === undefined) continue;

@@ -39,7 +39,7 @@ import {
     searchColumnStamps,
     searchIndexStatements
 } from "../search-column";
-import { collectionIndexStatement, sortIndexSpecs } from "../collection-index";
+import { tableIndexStatement, sortIndexSpecs } from "../table-index";
 import { indexAdoptionStatement, planIndexAdoptions, type ExistingIndexShape } from "../index-adoption";
 import { vectorIndexStatement, type SkippedVectorIndex } from "../vector-index";
 import { customTypesAgree, typesAgree, type ColumnTypeDrift } from "../column-type-drift";
@@ -1105,7 +1105,7 @@ export function diffPlanAgainstCatalogue(
                 schema: spec.schema,
                 table: spec.table,
                 indexName: spec.indexName,
-                sql: collectionIndexStatement(spec, { concurrently: true, ifNotExists: true }),
+                sql: tableIndexStatement(spec, { concurrently: true, ifNotExists: true }),
                 ...(spec.unique ? { unique: true } : {})
             });
             continue;
@@ -1114,7 +1114,7 @@ export function diffPlanAgainstCatalogue(
         actions.push({
             kind: "create-index",
             target: `${spec.schema}.${spec.table}`,
-            sql: collectionIndexStatement(spec, {
+            sql: tableIndexStatement(spec, {
                 concurrently: concurrent(spec.schema, spec.table),
                 ifNotExists: true
             })

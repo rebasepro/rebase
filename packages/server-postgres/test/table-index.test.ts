@@ -19,15 +19,15 @@ import { compileSchema, lowerTables } from "@rebasepro/common";
 import {
     buildCollectionIndexSpecs,
     buildTableIndexSpecs,
-    collectionIndexStatement,
+    tableIndexStatement,
     deriveIndexName,
     isRebaseIndexName,
     indexFingerprint,
     renderPredicate,
-    CollectionIndexConfigError,
+    TableIndexConfigError,
     MAX_INDEX_KEYS,
     sortIndexSpecs
-} from "../src/schema/collection-index";
+} from "../src/schema/table-index";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { resolveColumnName } from "../src/schema/column-plan-helpers";
@@ -178,7 +178,7 @@ describe("the derived name", () => {
 });
 
 describe("rendering", () => {
-    const sqlOf = (indexes: LegacyCollectionIndex[]) => collectionIndexStatement(one(indexes));
+    const sqlOf = (indexes: LegacyCollectionIndex[]) => tableIndexStatement(one(indexes));
 
     it("emits a plain btree with no USING clause", () => {
         expect(sqlOf([{ on: ["status"], reason: "r" }]))
@@ -205,7 +205,7 @@ describe("rendering", () => {
         // elsewhere in this package — silently does nothing here, because the
         // rendered text is `CREATE UNIQUE INDEX`.
         const spec = one([{ on: ["email"], unique: true, reason: "r" }]);
-        expect(collectionIndexStatement(spec, { concurrently: true })).toContain("CREATE UNIQUE INDEX CONCURRENTLY");
+        expect(tableIndexStatement(spec, { concurrently: true })).toContain("CREATE UNIQUE INDEX CONCURRENTLY");
     });
 
     it("escapes a literal rather than interpolating it", () => {
@@ -230,7 +230,7 @@ describe("refusals", () => {
             specs(posts([{ on: ["status"], reason: "ok" }, { on: ["nope"], reason: "r" }]));
             throw new Error("should have thrown");
         } catch (err) {
-            expect(err).toBeInstanceOf(CollectionIndexConfigError);
+            expect(err).toBeInstanceOf(TableIndexConfigError);
             expect((err as Error).message).toContain("posts.indexes[1]");
         }
     });

@@ -57,7 +57,7 @@ import type { CheckFactsByTable } from "./introspect-db-constraints";
 import { serialSequenceName } from "./introspect-db-storage";
 import { reconstructSearchBlock } from "./introspect-db-search";
 import { SEARCH_STAMP_PREFIX } from "./search-column";
-import { foreignKeyIndexSpec } from "./collection-index";
+import { foreignKeyIndexSpec } from "./table-index";
 
 // ── Result ───────────────────────────────────────────────────────────────────
 

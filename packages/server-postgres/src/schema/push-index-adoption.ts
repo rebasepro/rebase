@@ -6,7 +6,7 @@
  */
 import { declaredDatabaseExtensions, type CompiledTable } from "@rebasepro/types";
 import { planSchema } from "./plan/plan-schema";
-import { sortIndexSpecs } from "./collection-index";
+import { sortIndexSpecs } from "./table-index";
 import { planIndexAdoptions, readIndexShapes, type IndexAdoption, type ShapeQueryable } from "./index-adoption";
 
 /** The renames that make the database's identical indexes the tables' declared ones. */

@@ -44,7 +44,7 @@ import {
     vectorIndexStatements
 } from "../vector-index";
 import { atlasExcludePattern } from "../atlas-exclude";
-import { collectionIndexStatements } from "../collection-index";
+import { tableIndexStatements } from "../table-index";
 import { quoteSqlLiteral } from "./plan-schema";
 import { triggerStatements } from "./updated-at-trigger";
 import { VIEW_ROWS_COMMENT_PREFIX, viewRowsName } from "./view-names";
@@ -362,7 +362,7 @@ export function renderPostgresDdl(plan: SchemaPlan, options: DdlRenderOptions = 
         // The collection's own `indexes:` block. Last of the three index
         // producers, and the only one the developer wrote deliberately rather
         // than getting as a side effect of another feature.
-        indexStatements.push(...collectionIndexStatements(table.indexes));
+        indexStatements.push(...tableIndexStatements(table.indexes));
 
         if (includePolicies) {
             // No FORCE: authenticated requests run as the non-owner
