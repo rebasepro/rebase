@@ -71,6 +71,25 @@ export function legacyLoadAliases(configDir: string, aliases: Readonly<Record<st
     const out: Record<string, string> = { ...aliases };
     const types = resolveFrom(configDir, aliases, TYPES);
     if (!types) return out;
+    // 0.30's `policy.existsIn({ collection, where })`: 0.31's builder reads `table` and would drop the name.
+    const typesShim = [
+        `// Written by rebase migrate collections-to-tables to load a 0.30 config/: ${TYPES} as installed, with 0.30's policy.existsIn({ collection }).`,
+        `export * from ${JSON.stringify(types)};`,
+        `import { policy as installedPolicy } from ${JSON.stringify(types)};`,
+        "export const policy = installedPolicy && {",
+        "    ...installedPolicy,",
+        "    existsIn: (args) => installedPolicy.existsIn({ ...args, table: args.table ?? args.collection })",
+        "};",
+        ""
+    ].join("\n");
+    const typesDir = path.join(os.tmpdir(), "rebase-legacy-shims", createHash("sha256").update(typesShim).digest("hex").slice(0, 16));
+    const typesFile = path.join(typesDir, "_rebasepro_types.ts");
+    if (!fs.existsSync(typesFile)) {
+        fs.mkdirSync(typesDir, { recursive: true });
+        fs.writeFileSync(typesFile, typesShim);
+    }
+    Object.assign(out, subpathAliases(configDir, aliases, TYPES));
+    out[TYPES] = typesFile;
     for (const name of SHIMMED) {
         const real = resolveFrom(configDir, aliases, name);
         if (!real) continue;

@@ -7,6 +7,16 @@ export const tags = defineTable("tags", {
         id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         name: col.text().notNull()
     },
-    rls: "inherit",
+    // Authors read the tags; built with 0.30's policy.existsIn({ collection }).
+    rls: [
+        {
+            operation: "select",
+            condition: {
+                kind: "existsIn",
+                table: "authors",
+                where: { kind: "compare", op: "eq", left: { kind: "field", name: "id" }, right: { kind: "authUid" } }
+            }
+        }
+    ],
     hooks: tagCallbacks
 });

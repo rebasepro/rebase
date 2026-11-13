@@ -188,6 +188,8 @@ describe("what the blog fixture says about routing", () => {
         expect(report.files.find(file => file.path === "backend/schema/authors.ts")?.content).toContain(`hooks: auditedCallbacks("authors")`);
         expect(report.files.find(file => file.path === "backend/lib/collections/_audited.ts")?.content).toContain("afterRead: ({ values: row }: { values: Record<string, unknown> }) => {");
         expect(report.files.find(file => file.path === "backend/schema/tags.ts")?.content).toContain(`import { tagCallbacks } from "../../config/tag-callbacks";`);
+        // 0.30's policy.existsIn({ collection }) keeps its table: 0.31's builder reads `table`, and the load restores 0.30's.
+        expect(report.files.find(file => file.path === "backend/schema/tags.ts")?.content).toMatch(/kind: "existsIn",\s+table: "authors"/);
         // A function storage path: its keys' template on the column (where the server enforces the limits), the function in the customization.
         expect(report.files.find(file => file.path === "backend/schema/authors.ts")?.content).toContain(`path: "{path}/avatar"`);
         expect(report.files.find(file => file.path === "frontend/src/cms/authors.tsx")?.content).toContain("path: ({ values, entityId }) => {");

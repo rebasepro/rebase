@@ -1,4 +1,5 @@
 import { defineCollection } from "@rebasepro/cms-types";
+import { policy } from "@rebasepro/types";
 import { tagCallbacks } from "../tag-callbacks";
 
 /** Nothing here is presentation the CMS would not derive: no customization file. */
@@ -7,6 +8,10 @@ export default defineCollection({
     singularName: "Tag",
     slug: "tags",
     callbacks: tagCallbacks,
+    // Authors read the tags; built with 0.30's policy.existsIn({ collection }).
+    securityRules: [
+        { operation: "select", condition: policy.existsIn({ collection: "authors", where: policy.compare(policy.field("id"), "eq", policy.authUid()) }) }
+    ],
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string", validation: { required: true } }
