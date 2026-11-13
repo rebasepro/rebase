@@ -1,15 +1,13 @@
 /**
  * Hand-written legacy collections covering every row of the Property → plan
  * table (`.rebase-audits` `pg-schema.md` §3.2) and every collection-level
- * field the planner reads (§3.1), for the bridge round trip.
+ * field the planner reads (§3.1), for the lift suite (`bridge-roundtrip.test.ts`).
  *
- * Written in the *canonical* legacy form — the one `lowerTables` produces when
+ * Written in the *canonical* legacy form — the one the lowering produced when
  * the planner gives two spellings the same column (an enum's values as
  * `{ id, label }` entries, a native array naming its `columnType` and its
  * `of`, relations in `relations` addressed by name from a relation property,
- * a `varchar`'s length in `validation.max` unless it is 255…) — so the round
- * trip can be compared by deep equality. What the round trip deliberately
- * ignores is listed beside the test, not here.
+ * a `varchar`'s length in `validation.max` unless it is 255…).
  */
 import type {
     SecurityRule

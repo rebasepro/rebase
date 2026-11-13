@@ -1,6 +1,5 @@
 export * from "./errors";
 export * from "./compile-tables";
-export * from "./lower-tables";
 export * from "./custom-sql-type";
 export * from "./print-table";
 export * from "./descriptor-to-def";

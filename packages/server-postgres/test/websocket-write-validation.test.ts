@@ -62,7 +62,7 @@ import { createPostgresWebSocket, type SocketDataDriver } from "../src/websocket
 import { fakeAuthAdapter, fakeDataDriver, fakeSocketRealtime } from "./helpers/spg-c-socket";
 import { registryOf } from "./helpers/spg-c-registry";
 import { col, defineTable, rel } from "@rebasepro/types";
-import { compileSchema, lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 import { buildTableRegistry } from "../src/model/build-registry";
 
 /**
@@ -505,7 +505,7 @@ describe("a socket write through a parent's relation, declared with defineTable"
         jest.clearAllMocks();
         mockWssInstance = null;
         writes = [];
-        tables = buildTableRegistry({ compiledTables: compileSchema([bandsT, membersT]), collections: lowerTables([bandsT, membersT]), tables: {} });
+        tables = buildTableRegistry({ compiledTables: compileSchema([bandsT, membersT]), tables: {} });
         const driver: SocketDataDriver = {
             ...fakeDataDriver(),
             registry: tables,

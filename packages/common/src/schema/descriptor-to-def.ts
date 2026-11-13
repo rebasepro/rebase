@@ -241,7 +241,7 @@ function defOf(descriptor: TableDescriptor, resolve: (slug: string) => AnyTableD
 /**
  * Definitions for a set of descriptors, in the order given: what
  * `compileTables` compiles back to the same descriptors (derived names and
- * defaults stated explicitly) and what `lowerTables` lowers.
+ * defaults stated explicitly), and what the planner plans from.
  *
  * A relation's target is resolved by slug among `descriptors`, lazily, so two
  * tables may point at each other. Throws a {@link SchemaDefinitionError}

@@ -25,7 +25,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { integer, jsonb, pgTable, serial, text } from "drizzle-orm/pg-core";
 import { col, defineTable, json, rel, type TableDescriptor, type TableHooks } from "@rebasepro/types";
-import { compileSchema, lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { buildTableRegistry } from "../src/model/build-registry";
@@ -164,7 +164,6 @@ beforeEach(async () => {
     const defs = [authors, posts];
     registry = buildTableRegistry({
         compiledTables: compileSchema(defs),
-        collections: lowerTables(defs),
         tables: { authors: authorsPg, posts: postsPg }
     });
     const orm = drizzle(db, { schema: { authors: authorsPg, posts: postsPg } });

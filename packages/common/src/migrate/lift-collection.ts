@@ -14,8 +14,8 @@
  * exactly, or the conversion is refused with a `SchemaDefinitionError` that
  * names the collection and property and says why.
  *
- * What it writes, so that `lowerTables` (its inverse) reproduces the planner's
- * input:
+ * What it writes, so that the compiled tables reproduce the legacy planner's
+ * output:
  *
  * - every derived name the table model would derive differently is pinned:
  *   `slug` when it is not the table, a relation's `localKey`, `foreignKey`,

@@ -16,14 +16,14 @@ import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { Hono } from "hono";
 import { col, defineTable, json } from "@rebasepro/types";
-import { compileSchema, lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
 import { readCatalogueSchema } from "../src/schema/catalogue-schema";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { RealtimeService } from "../src/services/realtimeService";
-import { FixtureTableRegistry } from "./helpers/tables";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { RestApiGenerator } from "../../server/src/api/rest/api-generator";
 import { errorHandler } from "../../server/src/api/errors";
 import type { HonoEnv } from "../../server/src/api/types";
@@ -60,12 +60,8 @@ beforeAll(async () => {
     await db.exec(renderPostgresDdl(planSchema(compiled, { databaseExtensions: [] }), {
         includePolicies: false, includeSearch: false, includeVector: false
     }));
-    // The lowered collection is what the subsystems not yet moved still read
-    // (registry, driver entry points); the codecs read the compiled table.
-    const [collection] = lowerTables([shelves]);
     const catalogue = await readCatalogueSchema({ client: queryable(db), tables: compiled.map(t => t.descriptor), defaultSchema: "public" });
-    const registry = new FixtureTableRegistry();
-    registry.registerMultiple([collection]);
+    const registry = new PostgresTableRegistry();
     registry.registerTables(compiled);
     for (const [name, table] of Object.entries(catalogue.tables)) registry.registerPgTable(table, name);
     const orm = pgliteNodePg(db, { schema: catalogue.tables });

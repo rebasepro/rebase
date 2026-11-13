@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { col, defineTable } from "@rebasepro/types";
-import { compileRulePolicies, compileTables, lowerTables } from "@rebasepro/common";
+import { compileTableRulePolicies, compileTables, policyTableFromDescriptor } from "@rebasepro/common";
 import {
     assertReviewConfig,
     diffStagedChange,
@@ -140,12 +140,12 @@ reviewerRoles: ["ops"] };
 });
 
 describe("reviewRls", () => {
-    /** The policies the rules compile to on the table they are spread into, as the backend lowers it. */
+    /** The policies the rules compile to on the table they are spread into, as the backend compiles them. */
     const compile = (review: StateFieldReview) => {
         const table = defineTable("posts", { columns: POSTS_COLUMNS, rls: reviewRls("posts", review) });
         const [descriptor] = compileTables([table]);
-        const [lowered] = lowerTables([table], { describe: () => descriptor });
-        return descriptor.rls.rules.flatMap(rule => compileRulePolicies(lowered, rule));
+        const policyTable = policyTableFromDescriptor(descriptor);
+        return descriptor.rls.rules.flatMap(rule => compileTableRulePolicies(policyTable, rule));
     };
 
     it("compiles to one restrictive policy per write, named after the slug, the same every time", () => {

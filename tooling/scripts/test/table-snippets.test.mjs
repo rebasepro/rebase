@@ -1,6 +1,6 @@
 /**
  * `check:doc-examples` runs a page's table fences through the real builders,
- * `compileTables` and `lowerTables`. These cases pin what a page is allowed to
+ * and `compileTables`. These cases pin what a page is allowed to
  * leave out (a table it never shows, a project `defaultRls`) and what it is
  * not (a schema the compiler refuses, a customization `customizeTable`
  * throws on).

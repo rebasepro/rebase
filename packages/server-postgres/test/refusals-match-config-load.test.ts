@@ -7,7 +7,7 @@
  * a message rather than a `CREATE TABLE` failing on a managed tenant with
  * nobody in the loop. Loading `backend/schema` refuses at *config load*, which
  * is earlier and kinder: `loadBackendSchema` compiles every definition
- * (`compileTables`, then the lowering) and throws one `SchemaDefinitionError`
+ * (`compileTables`) and throws one `SchemaDefinitionError`
  * naming the table and key of every problem at once, instead of stopping at
  * the first.
  *
@@ -21,9 +21,9 @@
  * The fixtures enumerating those shapes are legacy collections, so the load
  * side is what a project migrated by the codemod goes through: the lift
  * (`collectionsToTableDefs`, which refuses what it cannot express) and the
- * compiler and lowering the loader runs.
+ * compiler the loader runs.
  */
-import { compileTables, isSchemaDefinitionError, lowerTables, type SchemaDefinitionProblem } from "@rebasepro/common";
+import { compileTables, isSchemaDefinitionError, type SchemaDefinitionProblem } from "@rebasepro/common";
 import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { planSchema } from "../src/schema/plan/plan-schema";
@@ -31,13 +31,12 @@ import { refused } from "./fixtures/property-matrix-collections";
 import { everything } from "./fixtures/property-matrix-collections";
 import { planCollections, PLAN_REFUSAL_ALLOWED_MESSAGES } from "./helpers/plan-tables";
 
-/** Every problem loading these collections as tables reports: lifted, compiled and lowered as the loader does. */
+/** Every problem loading these collections as tables reports: lifted and compiled as the loader does. */
 function loadProblems(collections: LegacyCollectionConfig[]): readonly SchemaDefinitionProblem[] {
     try {
         const { tables, defaultRls } = collectionsToTableDefs(collections);
         const options = defaultRls !== undefined ? { defaultRls } : {};
         compileTables(tables, options);
-        lowerTables(tables, options);
         return [];
     } catch (error) {
         if (isSchemaDefinitionError(error)) return error.problems;
@@ -68,7 +67,7 @@ describe("a configuration the schema planner refuses", () => {
 
         // The two legacy shapes the lift refuses on purpose, stripped as
         // `compileSet` (helpers/plan-tables.ts) strips them (neither moves a planned
-        // byte), so the whole matrix reaches the compiler and the lowering
+        // byte), so the whole matrix reaches the compiler
         // rather than stopping at the lift.
         const arrs = everything.find(c => c.slug === "arrs")?.properties.ofTuple;
         if (arrs?.type === "array") delete arrs.of;

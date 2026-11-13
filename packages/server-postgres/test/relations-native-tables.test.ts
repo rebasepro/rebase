@@ -15,14 +15,14 @@
 import { describe, it, expect, beforeAll, afterAll, jest } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { col, defineTable, rel, type IncludeSpec } from "@rebasepro/types";
-import { compileSchema, lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
 import { readCatalogueSchema } from "../src/schema/catalogue-schema";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { RealtimeService } from "../src/services/realtimeService";
-import { FixtureTableRegistry } from "./helpers/tables";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
 const tags = defineTable("tags", {
@@ -103,12 +103,8 @@ beforeAll(async () => {
     await db.exec(renderPostgresDdl(planSchema(compiled, { databaseExtensions: [] }), {
         includePolicies: false, includeSearch: false, includeVector: false
     }));
-    // The lowered collections are what the subsystems not yet moved still read
-    // (registry, driver entry points); the relation services read the compiled tables.
-    const collections = lowerTables(defs);
     const catalogue = await readCatalogueSchema({ client: queryable(db), tables: compiled.map(t => t.descriptor), defaultSchema: "public" });
-    const registry = new FixtureTableRegistry();
-    registry.registerMultiple(collections);
+    const registry = new PostgresTableRegistry();
     registry.registerTables(compiled);
     for (const [name, table] of Object.entries(catalogue.tables)) registry.registerPgTable(table, name);
     const orm = pgliteNodePg(db, { schema: catalogue.tables });

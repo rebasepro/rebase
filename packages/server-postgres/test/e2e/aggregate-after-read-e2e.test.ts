@@ -15,7 +15,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
 import { col, defineTable } from "@rebasepro/types";
-import { buildSdkData, compileSchema, lowerTables } from "@rebasepro/common";
+import { buildSdkData, compileSchema } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { buildTableRegistry } from "../../src/model/build-registry.js";
@@ -83,10 +83,8 @@ describe("aggregates on a collection afterRead masks (E2E)", () => {
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
         const compiled = compileSchema([customers, orders]);
-        const collections = lowerTables([customers, orders]);
         const registry = buildTableRegistry({
             compiledTables: compiled,
-            collections,
             tables: { customers: customersTable, orders: ordersTable }
         });
         const realtime = new RealtimeService(db, registry);

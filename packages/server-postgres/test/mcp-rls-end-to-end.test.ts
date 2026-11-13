@@ -25,11 +25,11 @@ import { PGlite } from "@electric-sql/pglite";
 import { sql as drizzleSql } from "drizzle-orm";
 import { pgTable, text } from "drizzle-orm/pg-core";
 import { col, defineTable, type DataDriver } from "@rebasepro/types";
-import { compileTables, lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 
 import { applyAuthContext, REBASE_USER_ROLE } from "../src/security/rls-enforcement";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { FixtureTableRegistry } from "./helpers/tables";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
 import { MCP_TOOLS, McpToolError } from "../../server/src/mcp/mcp-tools";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
@@ -56,9 +56,9 @@ const CANDIDATES = defineTable("candidates", {
     rls: [{ operation: "all", ownerField: "ownerId" }]
 });
 
-/** What the backend's registry holds for it: the descriptor the tools describe, and the lowered config the data path reads. */
-const TABLES = compileTables([CANDIDATES]);
-const COLLECTIONS = lowerTables([CANDIDATES], { describe: slug => TABLES.find(table => table.slug === slug) });
+/** What the backend's registry holds for it: the compiled table the data path reads, and its descriptor (what the tools describe). */
+const COMPILED = compileSchema([CANDIDATES]);
+const TABLES = COMPILED.map(table => table.descriptor);
 
 let db: PGlite;
 
@@ -68,7 +68,8 @@ let db: PGlite;
  * the restricted role, and every statement runs inside it.
  */
 function rlsDriver(): DataDriver {
-    const registry = new FixtureTableRegistry(COLLECTIONS);
+    const registry = new PostgresTableRegistry();
+    registry.registerTables(COMPILED);
     registry.registerPgTable(candidatesTable, "candidates");
     const orm = pgliteNodePg(db, { schema: { candidates: candidatesTable } });
     const driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);

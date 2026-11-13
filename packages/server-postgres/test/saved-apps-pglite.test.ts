@@ -12,7 +12,7 @@
 import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { col, defineTable } from "@rebasepro/types";
-import { compileTables, lowerTables } from "@rebasepro/common";
+import { compileTables } from "@rebasepro/common";
 import { createSavedAppStore, MAX_APP_CODE_LENGTH, SavedAppError, type SavedAppStore } from "../../server/src/apps/saved-apps";
 import { MCP_TOOLS, type McpToolContext } from "../../server/src/mcp/mcp-tools";
 import { fakeDataDriver } from "../../server/test/helpers/server-a-fakes";
@@ -100,13 +100,12 @@ describe("saved apps", () => {
  * removes it. The compiler is a stand-in; the server's is tested with show_app.
  */
 describe("the saved-app tools", () => {
-    /** The table the apps read, as the backend holds it: its descriptor and the config the data path reads. */
+    /** The table the apps read, as the backend holds it: its descriptor. */
     const ORDERS = defineTable("orders", {
         columns: { id: col.uuid().primaryKey().defaultRandom(), status: col.text() },
         rls: "admin-only"
     });
     const TABLES = compileTables([ORDERS]);
-    const COLLECTIONS = lowerTables([ORDERS], { describe: slug => TABLES.find(table => table.slug === slug) });
 
     function context(caller: { uid: string; roles: string[] }): McpToolContext {
         return {

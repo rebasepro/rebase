@@ -3,10 +3,10 @@
  *
  * `compileTables` derives table, column, foreign-key and junction names itself
  * — it is what `GET /api/schema/tables`, the SDK generator and the panel read.
- * The planner derives the same names from the lowered collections, and the
+ * The planner derives the same names from the compiled tables, and the
  * planner is what creates the database. If the two ever disagree, a client is
  * told about a column the database does not have. So for each set of tables,
- * this compiles the descriptors and plans `lowerTables(defs)`, and checks:
+ * this compiles the descriptors and plans the compiled tables, and checks:
  *
  * - each table's SQL name and schema;
  * - each column's SQL name, key, nullability, primary-key membership and
@@ -20,7 +20,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { col, defineAuthTable, defineTable, defineView, rel } from "@rebasepro/types";
 import type { AnyTableDef, AnyViewDef, ColumnDescriptor, DefaultRls, TableDescriptor } from "@rebasepro/types";
-import { compileTables, isSchemaDefinitionError, lowerTables, compileSchema } from "@rebasepro/common";
+import { compileTables, isSchemaDefinitionError, compileSchema } from "@rebasepro/common";
 import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 
 import { planSchema } from "../src/schema/plan/plan-schema";

@@ -1,41 +1,26 @@
 /**
- * A lowered column carries the definition it came from.
+ * A compiled table carries the definition its descriptor was compiled from.
  *
- * The planner's input is `CompiledTable[]`; until its column planning reads
- * the descriptor (B-PLAN-2 step 3) it lowers the definitions itself and plans
- * each column from the `ColumnDef` (or `rel.*` definition) lowering attaches.
- * This holds every corpus set to that: every lowered property carries one.
+ * The planner's input is `CompiledTable[]`, and it plans each column from the
+ * `ColumnDef` (or `rel.*` definition) on `def` — the thunks, index predicates
+ * and SQL defaults a descriptor does not carry. This holds every corpus set
+ * to that: every column a descriptor states (but the foreign keys a relation
+ * derives) has its builder on `def`, and every relation its `rel.*` result.
  *
- * (It also proved, by stripping the legacy derivation fields from lowered
- * collections, that the planner never read them. With the planner's input no
- * longer a collection, nothing can hand it those fields: that half is true by
- * construction and was retired with the collection input.)
+ * It also holds the lift to the identity the planner relies on: a relation's
+ * target thunk returns the very definition that table was compiled from,
+ * every time, so `compileSchema` resolves it to the table in the set.
+ *
+ * (Before the bridge was deleted, this held the same of the lowered
+ * collections: every lowered property carried its definition, and every
+ * relation target was the collection that table lowered to.)
  */
-import { lowerTables, type LoweredCollection } from "@rebasepro/common";
-import { collectionsToTableDefs } from "@rebasepro/common/migrate";
-import type { SecurityRule } from "@rebasepro/types";
-import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
+import { isColumnBuilder, type AnyTableDef, type AnyViewDef } from "@rebasepro/types";
 
 import { loadPlanCorpus, type PlanCorpus } from "./helpers/plan-corpus";
+import { compileSet, liftSet } from "./helpers/plan-tables";
 
-function sharedDefaultRules(collections: readonly LegacyCollectionConfig[]): readonly SecurityRule[] | undefined {
-    if (collections.some(collection => !collection.securityRules?.length)) return undefined;
-    const counts = new Map<readonly SecurityRule[], number>();
-    for (const collection of collections) {
-        const rules = collection.securityRules;
-        if (rules && rules.length > 0) counts.set(rules, (counts.get(rules) ?? 0) + 1);
-    }
-    for (const [rules, count] of counts) if (count > 1) return rules;
-    return undefined;
-}
-
-function lowered(collections: readonly LegacyCollectionConfig[]): LoweredCollection[] {
-    const defaultSecurityRules = sharedDefaultRules(collections);
-    const { tables, defaultRls } = collectionsToTableDefs(collections, defaultSecurityRules ? { defaultSecurityRules } : {});
-    return lowerTables(tables, defaultRls ? { defaultRls } : {});
-}
-
-describe("the planner plans a lowered column from its definition", () => {
+describe("the planner plans a compiled column from its definition", () => {
     let corpus: PlanCorpus;
 
     beforeAll(async () => {
@@ -44,42 +29,51 @@ describe("the planner plans a lowered column from its definition", () => {
 
     afterAll(() => corpus?.dispose());
 
-    it("attaches the definition to every lowered property", () => {
+    it("carries the definition of every described column and relation", () => {
+        let compared = 0;
         for (const set of corpus.sets) {
-            let collections: LoweredCollection[];
+            let tables;
             try {
-                collections = lowered(set.collections);
+                tables = compileSet(set.collections);
             } catch {
-                continue; // a set the bridges adjust first; plan-golden covers it
+                continue; // a set the lift refuses; plan-golden covers it
             }
-            for (const collection of collections) {
-                for (const [key, property] of Object.entries(collection.properties)) {
-                    const carries = property.type === "relation" ? property.tableRelation !== undefined : property.tableColumn !== undefined;
-                    expect({ set: set.id, table: collection.slug, key, carries }).toEqual({ set: set.id, table: collection.slug, key, carries: true });
+            for (const { descriptor, def } of tables) {
+                for (const column of descriptor.columns) {
+                    if (column.derived) continue;
+                    const carries = isColumnBuilder(def.config.columns[column.key]);
+                    expect({ set: set.id, table: descriptor.slug, key: column.key, carries })
+                        .toEqual({ set: set.id, table: descriptor.slug, key: column.key, carries: true });
+                    compared++;
+                }
+                for (const relation of descriptor.relations) {
+                    const carries = def.config.relations?.[relation.name] !== undefined;
+                    expect({ set: set.id, table: descriptor.slug, relation: relation.name, carries })
+                        .toEqual({ set: set.id, table: descriptor.slug, relation: relation.name, carries: true });
                 }
             }
         }
+        expect(compared).toBeGreaterThan(1000);
     });
 
     // Moved from plan-equivalence.test.ts (folded into plan-golden, B-PLAN-2
-    // step 5): the lowering hands every relation target back as the very
-    // collection that table lowered to, memoised.
-    it("hands every relation target back as the very collection that table lowered to", () => {
+    // step 5), restated for the definitions the planner now reads.
+    it("hands every relation target back as the very definition that table was compiled from", () => {
         for (const set of corpus.sets) {
-            let collections: LoweredCollection[];
+            let defs: (AnyTableDef | AnyViewDef)[];
             try {
-                collections = lowered(set.collections);
+                defs = liftSet(set.collections).defs;
             } catch {
-                continue; // a set the lift adjusts first; plan-golden covers it
+                continue; // a set the lift refuses; plan-golden covers it
             }
-            const members = new Set<LegacyCollectionConfig>(collections);
-            for (const collection of collections) {
-                for (const relation of collection.relations ?? []) {
+            const members = new Set<AnyTableDef | AnyViewDef>(defs);
+            for (const def of defs) {
+                for (const [name, relation] of Object.entries(def.config.relations ?? {})) {
                     const target = relation.target();
                     expect(relation.target()).toBe(target);
-                    if (collections.some(c => c.slug === target.slug)) {
-                        expect({ set: set.id, from: collection.slug, relation: relation.relationName, member: members.has(target) })
-                            .toEqual({ set: set.id, from: collection.slug, relation: relation.relationName, member: true });
+                    if (defs.some(candidate => candidate.name === target.name)) {
+                        expect({ set: set.id, from: def.name, relation: name, member: members.has(target) })
+                            .toEqual({ set: set.id, from: def.name, relation: name, member: true });
                     }
                 }
             }

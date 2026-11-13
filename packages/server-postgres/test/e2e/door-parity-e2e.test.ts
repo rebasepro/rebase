@@ -30,10 +30,10 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
 import { col, defineTable, rel, type DataDriver, type SDKTableClient } from "@rebasepro/types";
-import { compileTables, lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { FixtureTableRegistry, tablesFromCollections } from "../helpers/tables.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { HistoryService } from "../../src/history/HistoryService.js";
 import { ensureHistoryTableExists } from "../../src/history/ensure-history-table.js";
@@ -122,12 +122,12 @@ const DOCS = defineTable("docs", {
 });
 
 /**
- * What the backend's registry holds: the descriptors the MCP tools describe
- * and the configs every other door reads, from one compile — as a backend boots.
+ * What the backend's registry holds: the compiled tables every door reads, and
+ * their descriptors (what the MCP tools describe), from one compile — as a backend boots.
  */
 const SCHEMA = [PEOPLE, DOCS];
-const TABLES = compileTables(SCHEMA);
-const COLLECTIONS = lowerTables(SCHEMA, { describe: slug => TABLES.find(table => table.slug === slug) });
+const COMPILED = compileSchema(SCHEMA);
+const TABLES = COMPILED.map(table => table.descriptor);
 
 const USER = testUser("door-user", ["admin"]);
 
@@ -408,8 +408,8 @@ describe("door parity: one operation, one answer (E2E)", () => {
         const db = drizzle(pool);
         const historyTable = await ensureHistoryTableExists(db);
 
-        const registry = new FixtureTableRegistry();
-        registry.registerMultiple(COLLECTIONS);
+        const registry = new PostgresTableRegistry();
+        registry.registerTables(COMPILED);
         registry.registerPgTable(peopleTable, "people");
         registry.registerPgTable(docsTable, "docs");
         realtime = new RealtimeService(db, registry);
@@ -429,7 +429,7 @@ describe("door parity: one operation, one answer (E2E)", () => {
             await next();
         });
         app.route("/api/data", createHistoryRoutes({ historyService, tables: () => ({ descriptors: TABLES }), driver }));
-        app.route("/api/data", new RestApiGenerator(tablesFromCollections(COLLECTIONS), driver).generateRoutes());
+        app.route("/api/data", new RestApiGenerator({ descriptors: TABLES }, driver).generateRoutes());
 
         // The socket, signed in as the same caller.
         server = createServer();

@@ -21,9 +21,8 @@
  * skills that calls `defineTable`, `defineAuthTable`, `defineView` or
  * `customizeTable` — and every excerpt that builds columns — *evaluates* it
  * with the real builders (see `docs-verify/table-snippets.mjs` for what is
- * stubbed and why), and hands the definitions to `compileTables` and
- * `lowerTables`: the compiler every door that reads `backend/schema` runs, and
- * the lowering into what the planner and runtime read. `customizeTable` runs
+ * stubbed and why), and hands the definitions to `compileTables`: the
+ * compiler every door that reads `backend/schema` runs. `customizeTable` runs
  * for real and refuses an unknown option, a legacy `admin` name or a component
  * that is not a value.
  *

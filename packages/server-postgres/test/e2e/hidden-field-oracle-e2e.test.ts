@@ -24,10 +24,10 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { integer, pgTable, serial, varchar, vector } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
 import { col, defineTable, rel } from "@rebasepro/types";
-import { compileTables, lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, PGVECTOR_IMAGE, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { FixtureTableRegistry } from "../helpers/tables.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js";
 import { errorHandler } from "../../../server/src/api/errors.js";
@@ -93,13 +93,12 @@ const posts = defineTable("posts", {
 });
 
 /**
- * What the backend's registry holds: the descriptors the MCP tools describe
- * and the configs REST and the driver read, from one compile — as a backend boots.
+ * What the backend's registry holds: the compiled tables REST and the driver
+ * read, and their descriptors (what the MCP tools describe), from one compile — as a backend boots.
  */
 const SCHEMA = [authors, notes, posts];
-const TABLES = compileTables(SCHEMA);
-const ALL = lowerTables(SCHEMA, { describe: slug => TABLES.find(table => table.slug === slug) });
-const [AUTHORS] = ALL;
+const COMPILED = compileSchema(SCHEMA);
+const TABLES = COMPILED.map(table => table.descriptor);
 const EDITOR = testUser("editor-1", ["editor"]);
 const SECRET_EMAIL = "ada-secret@hidden.test";
 const SECRET_SALARY = 987654;
@@ -167,8 +166,8 @@ describe("a private column answers as a field that does not exist (E2E)", () => 
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
-        const registry = new FixtureTableRegistry();
-        registry.registerMultiple(ALL);
+        const registry = new PostgresTableRegistry();
+        registry.registerTables(COMPILED);
         registry.registerPgTable(authorsTable, "authors");
         registry.registerPgTable(notesTable, "notes");
         registry.registerPgTable(postsTable, "posts");
@@ -302,7 +301,6 @@ describe("a private column answers as a field that does not exist (E2E)", () => 
         it("filters on it in process", async () => {
             const rows = await driver.fetchCollection({
                 path: "authors",
-                collection: AUTHORS,
                 filter: { email: ["==", SECRET_EMAIL] }
             });
             expect(rows.map(r => Number(r.id))).toEqual([1]);

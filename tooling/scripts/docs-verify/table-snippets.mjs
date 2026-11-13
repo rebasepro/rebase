@@ -14,8 +14,8 @@
  *
  * So the fences are *run* with the builders from `@rebasepro/types` (what
  * `@rebasepro/server/schema` re-exports), and the definitions they produce are
- * handed to `compileTables` and then `lowerTables` from `@rebasepro/common` —
- * the two steps every door that reads `backend/schema` takes. A
+ * handed to `compileTables` from `@rebasepro/common` — the compiler every
+ * door that reads `backend/schema` runs. A
  * `customizeTable(…)` call is run through the real `customizeTable`, which
  * refuses an unknown option, a legacy `admin` name or a component that is not
  * a value.
@@ -417,10 +417,7 @@ export async function tableSnippets(root, opts = {}) {
         const problems = [];
         if (own.length > 0) {
             const defs = [...own, ...borrowed];
-            const found = [
-                ...problemsOf(() => compiler.compileTables(defs, { defaultRls })),
-                ...problemsOf(() => compiler.lowerTables(defs, { defaultRls }))
-            ];
+            const found = problemsOf(() => compiler.compileTables(defs, { defaultRls }));
             for (const problem of found) {
                 if (!ownNames.has(problem.table)) continue;
                 if (problem.key && unshown.get(problem.table)?.has(problem.key)) continue;

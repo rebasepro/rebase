@@ -3,7 +3,6 @@ import { col, defineTable, defineView, rel, type TableDescriptor, pgEnum, sql } 
 
 import { compileTables } from "../../src/schema/compile-tables";
 import { columnDefOfDescriptor, tableDefsFromDescriptors } from "../../src/schema/descriptor-to-def";
-import { lowerTables } from "../../src/schema/lower-tables";
 import { isSchemaDefinitionError } from "../../src/schema/errors";
 import { DEFAULT_RLS } from "./print-table.fixtures";
 
@@ -71,10 +70,10 @@ describe("tableDefsFromDescriptors", () => {
 
     it("resolves relation targets among the set, lazily, so tables may point at each other", () => {
         const defs = tableDefsFromDescriptors(compileTables(DEFS));
-        const lowered = lowerTables(defs, { introspected: true });
-        const postsCollection = lowered.find(collection => collection.slug === "posts");
-        const author = postsCollection?.relations?.find(relation => relation.relationName === "author");
-        expect(author?.target().slug).toBe("users");
+        const postsDef = defs.find(def => def.config.slug === "posts");
+        const target = postsDef?.config.relations?.author?.target();
+        expect(target).toBeDefined();
+        expect(target).toBe(defs.find(def => def.name === "users"));
     });
 
     it("replaces the rls when asked, and says what no definition can", () => {

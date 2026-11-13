@@ -17,7 +17,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { boolean, integer, pgTable, serial, text } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
 import { col, defineTable, type User } from "@rebasepro/types";
-import { compileSchema, lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 import { createHistoryRoutes } from "@rebasepro/server";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
@@ -75,7 +75,6 @@ const ADMIN = testUser({ uid: "u-admin", roles: ["admin"] });
 
 const COMPILED = compileSchema([contacts]);
 const DESCRIPTORS = COMPILED.map(table => table.descriptor);
-const COLLECTIONS = lowerTables([contacts]);
 
 let db: PGlite;
 let base: PostgresBackendDriver;
@@ -84,7 +83,6 @@ let historyService: HistoryService;
 async function boot(): Promise<void> {
     const registry = buildTableRegistry({
         compiledTables: COMPILED,
-        collections: COLLECTIONS,
         tables: { contacts: contactsPg }
     });
     const orm = pgliteNodePg(db, { schema: { contacts: contactsPg } });
@@ -105,7 +103,7 @@ function app(user: User): Hono {
     });
     router.route("/api/data", createHistoryRoutes({
         historyService,
-        tables: () => ({ descriptors: DESCRIPTORS, collections: COLLECTIONS }),
+        tables: () => ({ descriptors: DESCRIPTORS }),
         driver: base
     }));
     return router;
@@ -165,16 +163,16 @@ beforeEach(async () => {
     // every column, private ones included — so its snapshots carry them. The
     // second by the owner, through their scoped driver.
     await base.save({
-        path: "contacts", id: "1", status: "existing", collection: COLLECTIONS[0],
+        path: "contacts", id: "1", status: "existing",
         values: { email: "ann.lee@example.com", secret: "s3cret-2", salary: 95000, code: "C-1b" }
     });
     await (await base.withAuth(OWNER)).save({
-        path: "contacts", id: "1", status: "existing", collection: COLLECTIONS[0],
+        path: "contacts", id: "1", status: "existing",
         values: { name: "Ann Lee", handle: "annlee" }
     });
     // Row 2, not readable by READER, gets an entry too.
     await base.save({
-        path: "contacts", id: "2", status: "existing", collection: COLLECTIONS[0],
+        path: "contacts", id: "2", status: "existing",
         values: { email: "robert@example.com" }
     });
     // An entry recorded while the table still had a column it has since

@@ -32,9 +32,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { is } from "drizzle-orm";
 import { PgTable } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
-import type { CollectionConfig } from "@rebasepro/types";
 import * as schemaBuilders from "@rebasepro/types";
-import { compileSchema, lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 import { createRebaseClient } from "@rebasepro/client";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
@@ -43,7 +42,6 @@ import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
 import { ensureTables } from "../src/schema/ensure-tables";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
-import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { RestApiGenerator } from "../../server/src/api/rest/api-generator";
 import { errorHandler } from "../../server/src/api/errors";
@@ -63,23 +61,9 @@ const SCAFFOLD_DEFAULT_RLS: schemaBuilders.DefaultRls = [
     { operations: ["insert", "update", "delete"], roles: ["admin"] }
 ];
 
-/** The compiled table each lowered collection came from: what the planner takes. */
-const compiledOf = new WeakMap<CollectionConfig, schemaBuilders.CompiledTable>();
-
-/** One table definition, lowered into the collection the runtime reads — as boot does. */
-function lowered(def: schemaBuilders.AnyTableDef): CollectionConfig {
-    const [collection] = lowerTables([def], { defaultRls: SCAFFOLD_DEFAULT_RLS });
-    compiledOf.set(collection, compileSchema([def], { defaultRls: SCAFFOLD_DEFAULT_RLS })[0]);
-    return collection;
-}
-
-/** The compiled tables of lowered collections, for the planner's doors. */
-function compiled(collections: CollectionConfig[]): schemaBuilders.CompiledTable[] {
-    return collections.map(collection => {
-        const table = compiledOf.get(collection);
-        if (!table) throw new Error(`"${collection.slug}" was not lowered here`);
-        return table;
-    });
+/** One table definition, compiled with the scaffold's `defaultRls` — as boot does. */
+function compiledTableOf(def: schemaBuilders.AnyTableDef): schemaBuilders.CompiledTable {
+    return compileSchema([def], { defaultRls: SCAFFOLD_DEFAULT_RLS })[0];
 }
 
 /**
@@ -111,17 +95,17 @@ function quickstartTableDef(): schemaBuilders.AnyTableDef {
     return def;
 }
 
-function quickstartCollection(): CollectionConfig {
-    return lowered(quickstartTableDef());
+function quickstartTable(): schemaBuilders.CompiledTable {
+    return compiledTableOf(quickstartTableDef());
 }
 
 interface GeneratedModule {
     tables: Record<string, unknown>;
 }
 
-/** `schema.generated.ts` for the collection, compiled and loaded inside this package. */
-function loadGenerated(collection: CollectionConfig): GeneratedModule {
-    const source = renderDrizzleSchema(planSchema(compiled([collection])), { policies: false });
+/** `schema.generated.ts` for the table, compiled and loaded inside this package. */
+function loadGenerated(products: schemaBuilders.CompiledTable): GeneratedModule {
+    const source = renderDrizzleSchema(planSchema([products]), { policies: false });
     const dir = fs.mkdtempSync(path.join(PACKAGE_ROOT, ".schema-run-"));
     try {
         const file = path.join(dir, "schema.generated.cjs");
@@ -143,18 +127,18 @@ const queryable = (db: PGlite) => ({
 const ADMIN = testUser({ uid: "quickstart-admin", roles: ["admin"] });
 
 /** REST as `init.ts` mounts it, and the SDK pointed at it, over one driver. */
-function doors(db: PGlite, collection: CollectionConfig) {
-    const generated = loadGenerated(collection);
+function doors(db: PGlite, products: schemaBuilders.CompiledTable) {
+    const generated = loadGenerated(products);
     const tables: Record<string, PgTable> = {};
     for (const [name, exported] of Object.entries(generated.tables)) {
         if (is(exported, PgTable)) tables[name] = exported;
     }
-    const table = tables[collection.slug];
-    if (!table) throw new Error(`schema.generated.ts exports no table for "${collection.slug}"`);
+    const table = tables[products.descriptor.slug];
+    if (!table) throw new Error(`schema.generated.ts exports no table for "${products.descriptor.slug}"`);
 
-    const registry = new FixtureTableRegistry();
-    registry.registerMultiple([collection]);
-    registry.registerPgTable(table, collection.slug);
+    const registry = new PostgresTableRegistry();
+    registry.registerTables([products]);
+    registry.registerPgTable(table, products.descriptor.slug);
     const orm = pgliteNodePg(db, { schema: tables });
     const driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 
@@ -165,7 +149,7 @@ function doors(db: PGlite, collection: CollectionConfig) {
         c.set("driver", await driver.withAuth(ADMIN));
         await next();
     });
-    app.route("/api/data", new RestApiGenerator({ descriptors: compiled([collection]).map(table => table.descriptor) }, driver).generateRoutes());
+    app.route("/api/data", new RestApiGenerator({ descriptors: [products].map(table => table.descriptor) }, driver).generateRoutes());
 
     const client = createRebaseClient({
         baseUrl: "http://quickstart.test",
@@ -178,10 +162,10 @@ function doors(db: PGlite, collection: CollectionConfig) {
 }
 
 /** A product, created over REST and through the SDK, with no key on either. */
-async function createProducts(db: PGlite, collection: CollectionConfig): Promise<void> {
-    const { app, client } = doors(db, collection);
+async function createProducts(db: PGlite, products: schemaBuilders.CompiledTable): Promise<void> {
+    const { app, client } = doors(db, products);
 
-    const response = await app.request(`/api/data/${collection.slug}`, {
+    const response = await app.request(`/api/data/${products.descriptor.slug}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: "Widget", price: 10 })
@@ -190,12 +174,12 @@ async function createProducts(db: PGlite, collection: CollectionConfig): Promise
     expect({ status: response.status, error: body.error?.message }).toEqual({ status: 201, error: undefined });
     expect(String(body.id)).toMatch(UUID);
 
-    const viaSdk = await client.data.table(collection.slug).create({ name: "Gadget", price: 5 });
+    const viaSdk = await client.data.table(products.descriptor.slug).create({ name: "Gadget", price: 5 });
     expect(String(viaSdk.id)).toMatch(UUID);
     expect(viaSdk.id).not.toBe(body.id);
 
     const stored = await db.query<{ id: string; name: string; active: boolean }>(
-        `SELECT id, name, active FROM "public"."${collection.slug}" ORDER BY name`
+        `SELECT id, name, active FROM "public"."${products.descriptor.slug}" ORDER BY name`
     );
     expect(stored.rows.map(row => row.name)).toEqual(["Gadget", "Widget"]);
     // The page's `defaultValue: true` landed too — the row is the one the page describes.
@@ -224,9 +208,9 @@ describe("the quickstart's `products` table, read from the page", () => {
     });
 
     it("takes a row over REST and through the SDK after boot creates the table", async () => {
-        const collection = quickstartCollection();
-        await ensureTables(queryable(db), compiled([collection]));
-        await createProducts(db, collection);
+        const products = quickstartTable();
+        await ensureTables(queryable(db), [products]);
+        await createProducts(db, products);
     });
 
     it("takes a row once boot has given an older table's key its default", async () => {
@@ -234,7 +218,7 @@ describe("the quickstart's `products` table, read from the page", () => {
         // PRIMARY KEY` and nothing to fill it. Boot never alters a column, but
         // a DEFAULT binds only future writes, so it is the one change it makes.
         const { defineTable, col, sql } = schemaBuilders;
-        const collection = lowered(defineTable("products", {
+        const products = compiledTableOf(defineTable("products", {
             columns: {
                 // The planner's implicit key: what a key-less collection got.
                 id: col.text().primaryKey().default(sql`gen_random_uuid()::text`),
@@ -256,15 +240,15 @@ describe("the quickstart's `products` table, read from the page", () => {
                 "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now()
             );
         `);
-        const outcome = await ensureTables(queryable(db), compiled([collection]));
+        const outcome = await ensureTables(queryable(db), [products]);
         expect(outcome.failures).toEqual([]);
-        await createProducts(db, collection);
+        await createProducts(db, products);
     });
 
     it("takes a row in a database built from `schema.sql`, the state `db push` converges to", async () => {
-        const collection = quickstartCollection();
+        const products = quickstartTable();
         await db.exec('CREATE SCHEMA IF NOT EXISTS "rebase";');
-        await db.exec(renderPostgresDdl(planSchema(compiled([collection])), { includePolicies: false }));
-        await createProducts(db, collection);
+        await db.exec(renderPostgresDdl(planSchema([products]), { includePolicies: false }));
+        await createProducts(db, products);
     });
 });

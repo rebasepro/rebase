@@ -64,7 +64,7 @@ const TABLE_MODEL = [/^packages\/types\/src\/schema\//, /^packages\/common\/src\
 
 /** Files scheduled for deletion or a later slice: their imports pin a symbol only temporarily. */
 const TEMPORARY = [
-    /^packages\/common\/src\/schema\/(lower-tables|lift-collection|lift-rule-spelling)\.ts$/,
+    /^packages\/common\/src\/schema\/(lift-collection|lift-rule-spelling)\.ts$/,
     /^packages\/server-postgres\/src\/schema\/collection-input\.ts$/,
     /^packages\/server-postgres\/src\/(services|utils)\//,
     /^packages\/server-postgres\/src\/(PostgresBackendDriver|data-transformer|websocket)\.ts$/,

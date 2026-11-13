@@ -1,5 +1,5 @@
 /**
- * Tables using what only the table model can say — the features `lowerTables`
+ * Tables using what only the table model can say — the features the lowering
  * used to refuse as pending, which the planner now plans from each column's
  * own definition. Corpus-independent on purpose: nothing here has a legacy
  * spelling to be equivalent to, so `table-features.test.ts` holds the planner,

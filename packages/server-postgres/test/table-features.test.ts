@@ -1,9 +1,9 @@
 /**
  * The schema features only the table model can state, end to end.
  *
- * Each was refused by `lowerTables` as a pending feature while the planner
- * re-derived every column from the legacy property; the planner now plans a
- * lowered column from its `ColumnDef`, so they are real. For each: the plan,
+ * Each was refused as a pending feature while the planner re-derived every
+ * column from the legacy property; the planner plans a column from its
+ * `ColumnDef`, so they are real. For each: the plan,
  * `schema.sql` (DDL) and `schema.generated.ts` (Drizzle) say it, Postgres
  * accepts the DDL (PGlite), the generated file compiles, and the boot planner
  * creates the same table and plans nothing more on a second boot.
@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { compileSchema, compileTables, findRelation, isSchemaDefinitionError, lowerTables, resolveCollectionRelations, type LoweredCollection } from "@rebasepro/common";
+import { compileSchema, compileTables, isSchemaDefinitionError } from "@rebasepro/common";
 import { col, defineTable, rel, type AnyTableDef, pgEnum } from "@rebasepro/types";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
@@ -36,9 +36,8 @@ import {
 
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
 
-function lowered(defs: readonly AnyTableDef[] = TABLE_FEATURES): LoweredCollection[] {
-    return lowerTables(defs);
-}
+/** The descriptor the runtime reads for the definition at `index` of `defs`. */
+const descriptorOf = (defs: readonly AnyTableDef[], index = 0) => compileSchema(defs)[index].descriptor;
 
 function planOf(defs: readonly AnyTableDef[] = TABLE_FEATURES): SchemaPlan {
     return withPinnedPlannerWorld(() => planSchema(compileSchema(defs), { databaseExtensions: [] }));
@@ -166,9 +165,10 @@ describe("table features: `.generatedAlwaysAs()`", () => {
         } finally {
             await db.close();
         }
-        // The runtime reads the lowered property: closed to writes, filled by the database.
-        const [collection] = lowered([people]);
-        expect(collection.properties.fullName).toMatchObject({ access: { write: [] }, databaseDefault: true, validation: { required: true } });
+        // The runtime reads the descriptor: closed to writes, computed by the database.
+        expect(columnAt(runtimeTableOfDef(people), "fullName")).toMatchObject({
+            readOnly: true, nullable: false, generated: { expression: "first_name || ' ' || last_name" }
+        });
     });
 
     it("is refused in a write's values, for every caller", () => {
@@ -423,16 +423,15 @@ describe("table features: a shared enum type, `pgEnum(name, values)`", () => {
 });
 
 describe("table features: a varchar/char length is the builder's `n`, not `.validate({ max })`", () => {
-    it("plans and renders the declared length, and lowers `max` as the API's rule", () => {
+    it("plans and renders the declared length, and keeps `max` as the API's rule", () => {
         const plan = planOf([handles]);
         expect(columnOf(plan, "handles", "handle").type).toEqual({ kind: "varchar", length: 40 });
         expect(columnOf(plan, "handles", "country").type).toEqual({ kind: "char", length: 2 });
         expect(ddlLine(ddlOf([handles]), "handle")).toBe("\"handle\" VARCHAR(40) NOT NULL,");
         expect(ddlLine(ddlOf([handles]), "country")).toBe("\"country\" CHAR(2)");
         expect(drizzleLine(drizzleOf([handles]), "handle")).toBe("handle: varchar(\"handle\", { length: 40 }).notNull(),");
-        const [collection] = lowered([handles]);
-        expect(collection.properties.handle).toMatchObject({ validation: { max: 20 } });
-        expect(collection.properties.country).toMatchObject({ validation: { min: 2, max: 3 } });
+        expect(columnAt(runtimeTableOfDef(handles), "handle")).toMatchObject({ validate: { max: 20 } });
+        expect(columnAt(runtimeTableOfDef(handles), "country")).toMatchObject({ validate: { min: 2, max: 3 } });
     });
 });
 
@@ -480,10 +479,9 @@ describe("table features: `rel.belongsTo(…, { constraint: false })`", () => {
             ["actor", "one"], ["subject", "one"], ["archived", "one"]
         ]);
         expect(drizzleLine(drizzleOf([people, audits]), "actorId")).toBe("actorId: uuid(\"actor_id\"),");
-        const [, collection] = lowered([people, audits]);
-        const relations = resolveCollectionRelations(collection);
-        expect(findRelation(relations, "actor")).toMatchObject({ kind: "belongsTo", localKey: "actor_id" });
-        expect(findRelation(relations, "subject")).toMatchObject({ kind: "belongsTo", localKey: "subject_id" });
+        const relations = descriptorOf([people, audits], 1).relations;
+        expect(relations.find(relation => relation.name === "actor")).toMatchObject({ kind: "belongsTo", localKey: "actor_id" });
+        expect(relations.find(relation => relation.name === "subject")).toMatchObject({ kind: "belongsTo", localKey: "subject_id" });
     });
 
     it("lets Postgres hold a key that points at nothing", async () => {

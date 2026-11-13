@@ -19,7 +19,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { integer, pgTable, serial, text, uuid, vector } from "drizzle-orm/pg-core";
 import { col, defineAuthTable, defineTable, rel, type DataDriver, type User } from "@rebasepro/types";
-import { compileSchema, lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { buildTableRegistry } from "../src/model/build-registry";
@@ -91,7 +91,6 @@ function driver(): PostgresBackendDriver {
     const defs = [users, bands, staff];
     const registry = buildTableRegistry({
         compiledTables: compileSchema(defs),
-        collections: lowerTables(defs),
         tables: { users: usersPg, bands: bandsPg, staff: staffPg }
     });
     const orm = pgliteNodePg(db, { schema: { users: usersPg, bands: bandsPg, staff: staffPg } });
@@ -285,7 +284,6 @@ describe("a relation with access rules", () => {
 describe("the socket's read check (`assertReadRequestReadable`)", () => {
     const registry = () => buildTableRegistry({
         compiledTables: compileSchema([users, bands, staff]),
-        collections: lowerTables([users, bands, staff]),
         tables: { users: usersPg, bands: bandsPg, staff: staffPg }
     });
 

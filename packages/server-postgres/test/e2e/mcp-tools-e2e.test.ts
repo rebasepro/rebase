@@ -20,10 +20,10 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { boolean, integer, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
 import { col, defineTable, rel } from "@rebasepro/types";
-import { compileTables, lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { FixtureTableRegistry, tablesFromCollections } from "../helpers/tables.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js";
 import { errorHandler } from "../../../server/src/api/errors.js";
@@ -89,13 +89,12 @@ const readers = defineTable("readers", {
 });
 
 /**
- * What the backend's registry holds: the descriptors the tools describe and
- * the configs the data path reads, from one compile — as a backend boots.
+ * What the backend's registry holds: the compiled tables the data path reads,
+ * and their descriptors (what the tools describe), from one compile — as a backend boots.
  */
 const SCHEMA = [authors, posts, readers];
-const TABLES = compileTables(SCHEMA);
-const [AUTHORS, POSTS, READERS] = lowerTables(SCHEMA, { describe: slug => TABLES.find(table => table.slug === slug) });
-const COLLECTIONS = [AUTHORS, POSTS, READERS];
+const COMPILED = compileSchema(SCHEMA);
+const TABLES = COMPILED.map(table => table.descriptor);
 
 const USER = testUser("mcp-user", ["admin"]);
 
@@ -180,8 +179,8 @@ describe("remote MCP tools on the real driver (E2E)", () => {
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
-        const registry = new FixtureTableRegistry();
-        registry.registerMultiple(COLLECTIONS);
+        const registry = new PostgresTableRegistry();
+        registry.registerTables(COMPILED);
         registry.registerPgTable(authorsTable, "authors");
         registry.registerPgTable(postsTable, "posts");
         registry.registerPgTable(readersTable, "readers");
@@ -196,7 +195,7 @@ describe("remote MCP tools on the real driver (E2E)", () => {
             c.set("driver", await driver.withAuth(USER));
             await next();
         });
-        app.route("/api/data", new RestApiGenerator(tablesFromCollections(COLLECTIONS), driver).generateRoutes());
+        app.route("/api/data", new RestApiGenerator({ descriptors: TABLES }, driver).generateRoutes());
     }, 120_000);
 
     afterAll(async () => {
