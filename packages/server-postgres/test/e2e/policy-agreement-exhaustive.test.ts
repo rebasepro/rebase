@@ -189,7 +189,7 @@ beforeAll(async () => {
 
     for (const caller of CALLERS) {
         for (const row of ROWS) {
-            const values = { ...row };
+            const entity = { id: row.id, path: "things", values: { ...row } };
             for (let start = 0; start < EXPRESSIONS.length; start += CHUNK) {
                 const chunk = EXPRESSIONS.slice(start, start + CHUNK);
                 const results = await evalBatch(chunk, caller, row.id);
@@ -199,7 +199,7 @@ beforeAll(async () => {
                     const js = evaluatePolicy(e.expr, {
                         uid: caller.uid,
                         roles: caller.roles,
-                        row: values
+                        entity
                     });
                     const record: Divergence = {
                         expression: e.name,
