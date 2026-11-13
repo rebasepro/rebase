@@ -25,7 +25,10 @@ values: { title: "Test" } };
 path: "users",
 values: { name: "Bob" } };
         const rel = getRelationFrom(entity);
-        expect(rel.data).toBe(entity);
+        // The entity's fields, carried as the relation's open data record: a
+        // copy (the relation does not alias the entity it was built from).
+        expect(rel.data).toEqual(entity);
+        expect(rel.data).not.toBe(entity);
     });
 
     it("handles numeric IDs", () => {
