@@ -159,11 +159,6 @@ describe("filtering by a relation with no column on this row", () => {
             expect(query.sql).not.toContain("JOIN");
         });
 
-        it("unwraps a relation wire object, which is what the admin sends", () => {
-            const query = render(filterPosts({ tags: ["==", { __type: "relation", id: 9, path: "tags" }] })[0]);
-            expect(query.params).toEqual([9]);
-        });
-
         it("compiles `in` into an EXISTS over the list", () => {
             const query = render(filterPosts({ tags: ["in", [1, 2, 3]] })[0]);
             expect(query.sql).toBe(

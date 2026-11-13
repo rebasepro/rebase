@@ -1,4 +1,3 @@
-import { Vector } from "@rebasepro/types";
 import { isPrototypePollutingKey } from "@rebasepro/utils";
 import { ApiError } from "@rebasepro/server";
 import type { ColumnDescriptor, ColumnType, JsonShape } from "@rebasepro/types";
@@ -119,6 +118,9 @@ function normalizeDateText(value: unknown): unknown {
  * a `belongsTo` becomes its foreign key, a relation whose foreign key is on
  * the target (or a `via` chain) is returned for `PersistService` to write.
  *
+ * A to-one link is written as the related row's key (or `null`); a value
+ * of any other shape is a 400 ({@link linkKey}).
+ *
  * Read from the table: which keys are columns, which are relations, and what
  * each column's Postgres type is. A key the table does not declare is kept as
  * sent; the catalogue check (`assertWritableColumns`) refuses it later.
@@ -164,42 +166,29 @@ joinPathRelationUpdates: [] };
 
         const relation = table.relations.get(key);
         if (relation) {
+            const label = `'${table.slug}.${key}'`;
             if (relation.kind === "belongsTo") {
-                // Owning relation: the relation object becomes the foreign key,
-                // under its key — Drizzle maps it back to the column.
-                const serializedValue = serializeRelationValue(effectiveValue);
-                if (serializedValue !== undefined) result[relation.localField] = serializedValue;
+                // Owning relation: the related row's key becomes the foreign
+                // key, under its key — Drizzle maps it back to the column.
+                result[relation.localField] = linkKey(effectiveValue, label, relation.target);
                 continue;
             }
-            if (relation.kind === "hasOne" || relation.kind === "hasMany") {
+            if (relation.kind === "hasOne") {
                 // Inverse relation: the target table's foreign key is updated.
-                inverseRelationUpdates.push({
-                    relationKey: key,
-                    newValue: serializeRelationValue(effectiveValue)
-                });
+                inverseRelationUpdates.push({ relationKey: key, newValue: linkKey(effectiveValue, label, relation.target) });
                 continue;
             }
-            if (relation.kind === "via") {
-                // A join chain is written through its own machinery, one row at
-                // a time for a to-one and as a set for a to-many.
-                const serializedValue = serializeRelationValue(effectiveValue);
-                if (relation.cardinality === "one") {
-                    // Ordering matters: PersistService applies these BEFORE
-                    // the main UPDATE, so the mapping reads the pre-update
-                    // foreign key rather than a value the same save changed.
-                    joinPathRelationUpdates.push({
-                        relationKey: key,
-                        newTargetId: relationTargetId(serializedValue)
-                    });
-                } else {
-                    inverseRelationUpdates.push({
-                        relationKey: key,
-                        newValue: serializedValue
-                    });
-                }
+            if (relation.kind === "via" && relation.cardinality === "one") {
+                // Ordering matters: PersistService applies these BEFORE the
+                // main UPDATE, so the mapping reads the pre-update foreign key
+                // rather than a value the same save changed.
+                joinPathRelationUpdates.push({ relationKey: key, newTargetId: linkKey(effectiveValue, label, relation.target) });
                 continue;
             }
-            result[key] = serializeRelationValue(effectiveValue);
+            // A membership (`hasMany`, `manyToMany`, a to-many `via`): its
+            // elements — keys, or `{ id, _pivot }` — are read where it is
+            // written (`RelationWriteService`).
+            inverseRelationUpdates.push({ relationKey: key, newValue: effectiveValue });
             continue;
         }
 
@@ -214,9 +203,20 @@ joinPathRelationUpdates: [] };
     };
 }
 
-/** The id a to-one `via` link is written to: a key, or `null` to unlink. */
-function relationTargetId(value: unknown): string | number | null {
-    return typeof value === "string" || typeof value === "number" ? value : null;
+/**
+ * A to-one link as it is written: the related row's key, or `null` to unlink
+ * (`""` too, as a cleared form field sends it). Anything else is a 400 — a
+ * relation object (`{ id }`, the admin panel's view model of a row) is not
+ * what the API takes, and writing it would hand Postgres an object as a key.
+ */
+function linkKey(value: unknown, label: string, target: string): string | number | null {
+    if (value === null || value === "") return null;
+    if (typeof value === "string" || typeof value === "number") return value;
+    throw ApiError.badRequest(
+        `${label} links one '${target}' row: write that row's key (a string or a number), or null to unlink — ` +
+        `not ${describeValue(value)}.`,
+        "VALIDATION_INVALID_VALUE"
+    );
 }
 
 /**
@@ -247,18 +247,6 @@ function dateToTimeOfDay(value: unknown): unknown {
     const date = value instanceof Date ? value : typeof value === "string" ? new Date(value) : undefined;
     if (!date || isNaN(date.getTime())) return value;
     return date.toISOString().slice(11, 23);
-}
-
-/**
- * A relation's value as it is written: a relation object (`{ id, … }`) becomes
- * its id, a list becomes a list of ids, an empty string becomes `null`.
- */
-export function serializeRelationValue(value: unknown): unknown {
-    if (value === null || value === undefined) return value;
-    if (Array.isArray(value)) return value.map(serializeRelationValue);
-    if (typeof value === "object" && "id" in value) return value.id;
-    if (value === "") return null;
-    return value;
 }
 
 /** How a column is named in a write error: its key, or its type. */
@@ -306,14 +294,15 @@ function serializeGeopoint(value: unknown, label: string): unknown {
     return { latitude, longitude };
 }
 
-/** A vector as pgvector takes it: a list of numbers, from a `Vector`, a `{ value }` envelope or a list. */
-function serializeVector(value: unknown): unknown {
-    if (value instanceof Vector) return value.value;
-    if (typeof value === "object" && value !== null && "value" in value && Array.isArray(value.value)) {
-        return value.value.map(Number);
+/** A vector as pgvector takes it: a list of numbers, or a 400. */
+function serializeVector(value: unknown, label: string): number[] {
+    if (!Array.isArray(value)) {
+        throw ApiError.badRequest(
+            `${label} expects a vector as a list of numbers, but received ${describeValue(value)}.`,
+            "VALIDATION_INVALID_VALUE"
+        );
     }
-    if (Array.isArray(value)) return value.map(Number);
-    return value;
+    return value.map(Number);
 }
 
 /**
@@ -335,7 +324,7 @@ function serializeScalar(value: unknown, codec: ValueCodec, label: string): unkn
         case "geopoint":
             return serializeGeopoint(value, label);
         case "vector":
-            return serializeVector(value);
+            return serializeVector(value, label);
         case "bytea": {
             const decoded = tryDecodeBase64DataUrl(value);
             return decoded ?? value;
@@ -417,7 +406,7 @@ function serializeJsonValue(value: unknown, shape: JsonShape, label: string): un
  * - a native array checked to be a list (400 otherwise), each item by the
  *   array's element type;
  * - a JSON document walked by its shape (`serializeJsonValue`);
- * - a vector unwrapped to a list of numbers;
+ * - a vector checked to be a list of numbers (400 otherwise);
  * - a `data:application/octet-stream;base64,` URL on `bytea` or text decoded
  *   to bytes.
  *

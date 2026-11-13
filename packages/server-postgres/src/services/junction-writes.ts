@@ -91,12 +91,12 @@ function column(table: PgTable, name: string | undefined, label: string, role: s
     // schema declares keys its columns by their key (`postId`). Looked up by
     // key only, a `via` through a declared table with snake_case columns was
     // refused as "no source column" on every write.
-    const columns = getTableColumns(table);
+    const byKey = name ? table[name as keyof typeof table] as AnyPgColumn | undefined : undefined;
     const found = name === undefined
         ? undefined
-        : name in columns
-            ? { key: name, column: columns[name] }
-            : Object.entries(columns).map(([key, candidate]) => ({ key, column: candidate })).find(entry => entry.column.name === name);
+        : byKey
+            ? { key: name, column: byKey }
+            : Object.entries(getTableColumns(table)).map(([key, candidate]) => ({ key, column: candidate })).find(entry => entry.column.name === name);
     if (!found) {
         throw misconfigured(label, `no ${role} column '${name ?? "?"}' on the junction table`);
     }

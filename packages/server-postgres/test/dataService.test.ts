@@ -237,11 +237,7 @@ describe("DataService", () => {
         it("should correctly serialize and deserialize a 'one' relation", async () => {
             const newPost = {
                 title: "Post by Jane",
-                author: {
-                    id: "3",
-                    path: "authors",
-                    __type: "relation"
-                }
+                author: "3"
             };
             db.returning.mockResolvedValue([{ id: 4 }]);
             // Mock the fetch-back call after the save
@@ -897,9 +893,7 @@ parent_id: 1 }
             const newProject = {
                 title: "New Project",
                 description: "A new project",
-                company: { id: "1",
-path: "companies",
-__type: "relation" }
+                company: "1"
             };
 
             db.returning.mockResolvedValue([{ id: 5 }]);
@@ -922,9 +916,7 @@ __type: "relation" }
         it("should handle updating entity with relation changes", async () => {
             const updatedTask = {
                 title: "Updated Task",
-                assignee: { id: "2",
-path: "users",
-__type: "relation" }
+                assignee: "2"
             };
 
             db.returning.mockResolvedValue([{ id: 1 }]);

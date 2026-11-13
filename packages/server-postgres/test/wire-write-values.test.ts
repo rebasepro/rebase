@@ -340,28 +340,33 @@ describe("relations: what a write stores", () => {
 });
 
 /**
- * What the admin panel sent before it converted its view model in the browser:
- * the JSON of an `EntityRelation` (`{ __type: "relation", id, path, data }`)
- * and of a `Vector` (`{ value }`). The server unwrapped them to the rows the
- * wire shapes store.
+ * What the admin panel sent before it converted its view model in the browser
+ * — the JSON of an `EntityRelation` (`{ __type: "relation", id, path, data }`)
+ * and of a `Vector` (`{ value }`) — is not the wire, and is refused rather
+ * than stored. A membership element is read for its `id` and `_pivot` alone,
+ * so a relation ref there is the documented `{ id }` object with extra keys.
  */
-describe("the admin's view-model JSON, before the panel converted it", () => {
+describe("the admin's view-model JSON is not accepted", () => {
     const ref = (id: number, path: string) => ({ __type: "relation", id, path, data: { id, path, values: { id } } });
 
-    it("a to-one relation as a relation ref stores its key", async () => {
-        const id = await restWrite("posts", { title: "vm", author: ref(2, "authors") });
-        expect(await storedRow("posts", id)).toEqual({ title: "vm", author_id: 2 });
+    it("a to-one relation as an object is a 400 that says to write the key", async () => {
+        await expect(restWrite("posts", { title: "vm", author: ref(2, "authors") }))
+            .rejects.toThrow("'posts.author' links one 'authors' row: write that row's key (a string or a number), or null to unlink — not an object.");
+        await expect(restWrite("posts", { title: "vm", author: { id: 2 } })).rejects.toThrow("not an object");
+        await expect(restWrite("authors", { profile: { id: 1 } }, 1)).rejects.toThrow("'authors.profile' links one 'profiles' row");
+        await expect(restWrite("authors", { card: [1] }, 1)).rejects.toThrow("'authors.card' links one 'cards' row");
+        expect(await storedRows("SELECT count(*)::int AS n FROM posts WHERE title = 'vm'")).toEqual([{ n: 0 }]);
     });
 
-    it("a membership as relation refs stores their keys", async () => {
+    it("a membership element is read for its id", async () => {
         const id = await restWrite("posts", { title: "vm2", tags: [ref(1, "tags"), ref(3, "tags")] });
         expect(await storedRows("SELECT tag_id FROM post_tags WHERE post_id = $1 ORDER BY tag_id", [id])).toEqual([
             { tag_id: 1 }, { tag_id: 3 }
         ]);
     });
 
-    it("a vector as `{ value }` stores its numbers", () => {
+    it("a vector as `{ value }` is a 400", () => {
         const column: ColumnDescriptor = { key: "embedding", column: "embedding", type: { kind: "vector", dimensions: 2 }, nullable: true };
-        expect(serializeColumnToServer({ value: [0.5, 1] }, column)).toEqual([0.5, 1]);
+        expect(() => serializeColumnToServer({ value: [0.5, 1] }, column)).toThrow("'embedding' expects a vector as a list of numbers");
     });
 });

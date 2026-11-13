@@ -246,9 +246,7 @@ name: "Title" },
 
         const result = serializeDataToServer(
             { title: "Test",
-tag: { id: "t1",
-path: "tags",
-__type: "relation" } },
+tag: "t1" },
             runtimeTableOf(makeCollection("items", properties))
         );
 

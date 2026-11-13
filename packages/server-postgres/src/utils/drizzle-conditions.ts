@@ -14,7 +14,7 @@ import {
     unknownFilterField,
     unknownVectorProperty,
     unknownRelationTargetField,
-    getColumnName, normalizeToEntityRelation, toFilterTuples, type RelationOfKind
+    getColumnName, toFilterTuples, type RelationOfKind
 } from "@rebasepro/common";
 import { currentFieldViewer, namesHiddenFromCaller } from "../services/field-viewer";
 import { generateForeignKeyName, splitSearchTerms, toWireKey } from "@rebasepro/utils";
@@ -422,18 +422,6 @@ function parseJsonFieldPath(field: string): { columnKey: string; path: string[] 
 }
 
 /**
- * Filter values may arrive as relation wire objects — `EntityRelation`
- * instances or their JSON form `{ __type: "relation", id, path }` — e.g. when
- * the admin filters a relation column. SQL comparisons need the raw id, so
- * unwrap them here (element-wise for list operators like `in` / `not-in`).
- */
-function unwrapRelationFilterValue(value: unknown): unknown {
-    if (Array.isArray(value)) return value.map(unwrapRelationFilterValue);
-    const relation = normalizeToEntityRelation(value);
-    return relation ? relation.id : value;
-}
-
-/**
  * The operand of `in`/`not-in`, as a list.
  *
  * A scalar is the one-element list, because that is what it means and because
@@ -541,6 +529,17 @@ export interface DrizzleDynamicQuery {
  * @example
  * const builder: ConditionBuilderStatic<SQL> = DrizzleConditionBuilder;
  */
+/**
+ * The error a `via` gets from the per-kind relation builders: a join chain is
+ * scoped and counted by `buildRelationScopeCondition`, never by these.
+ */
+function viaReadElsewhere(relation: RelationOfKind<"via">): Error {
+    return new Error(
+        `Relation '${relation.name}' is a \`via\` chain: it is read through \`buildRelationScopeCondition\` ` +
+        "(as RelationService does), not through the per-kind relation conditions."
+    );
+}
+
 export class DrizzleConditionBuilder {
 
     /**
@@ -1350,7 +1349,6 @@ export class DrizzleConditionBuilder {
         field: string,
         collectionPath: string
     ): { predicate?: SQL; negate: boolean } {
-        value = unwrapRelationFilterValue(value);
         const isNullish = value === null || value === undefined;
 
         const equals = () => sql`${ref} = ${value}`;
@@ -1537,7 +1535,6 @@ export class DrizzleConditionBuilder {
         field: string,
         collectionPath: string
     ): { predicate?: SQL; negate: boolean } {
-        value = unwrapRelationFilterValue(value);
         const isNullish = value === null || value === undefined;
 
         const equals = () => sql`${ref} = ${value}`;
@@ -1819,7 +1816,6 @@ export class DrizzleConditionBuilder {
         op: WhereFilterOp,
         value: unknown
     ): SQL | null {
-        value = unwrapRelationFilterValue(value);
         switch (op) {
             case "==":
                 if (value === null || value === undefined) {
@@ -1989,14 +1985,11 @@ export class DrizzleConditionBuilder {
         const whereConditions: SQL[] = [];
 
         switch (relation.kind) {
-            case "via": {
-                const { joins, finalCondition } = this.buildJoinPathConditions(
-                    relation.steps, targetTable, parentTable, parentIdColumn, parentId, registry
-                );
-                joinConditions.push(...joins);
-                whereConditions.push(finalCondition);
-                break;
-            }
+            case "via":
+                // A `via` is read through `buildRelationScopeCondition`, which
+                // aliases every step (a chain may pass a table twice);
+                // `RelationService` takes that path before it gets here.
+                throw viaReadElsewhere(relation);
 
             case "manyToMany": {
                 const junctionResult = this.buildJunctionTableConditions(
@@ -2023,287 +2016,6 @@ export class DrizzleConditionBuilder {
 
         return { joinConditions,
 whereConditions };
-    }
-
-    /**
-     * Build conditions for join path relations
-     */
-    private static buildJoinPathConditions(
-        joinPath: readonly JoinStep[],
-        targetTable: PgTable<any>,
-        parentTable: PgTable<any>,
-        parentIdColumn: AnyPgColumn,
-        parentId: string | number | (string | number)[],
-        registry: PostgresTableRegistry
-    ): {
-        joins: { table: PgTable<any>; condition: SQL }[];
-        finalCondition: SQL;
-    } {
-        const joins: { table: PgTable<any>; condition: SQL }[] = [];
-        let currentTable = targetTable;
-        const sourceTableName = drizzleTableName(parentTable);
-
-        // Process join steps in reverse order to build path back to parent
-        for (let index = joinPath.length - 1; index >= 0; index--) {
-            const {
-                joinTable,
-                condition,
-                additionalJoins
-            } = this.buildReverseJoinStep(joinPath, index, sourceTableName, currentTable, registry, true);
-
-            joins.push({
-                table: joinTable,
-                condition
-            });
-            currentTable = joinTable;
-
-            // Add any additional joins needed for many-to-many relationships
-            if (additionalJoins && additionalJoins.length > 0) {
-                joins.push(...additionalJoins);
-            }
-        }
-
-        // Ensure we've connected back to the parent table
-        // For junction tables, we might end up at the junction table instead of the parent table
-        if (currentTable !== parentTable) {
-            // `getTableName` is Drizzle's own accessor, and both of these are
-            // declared `PgTable<any>`, so there is nothing to assert.
-            //
-            // What stood here reached for the name four ways — the
-            // `Symbol.for("drizzle:Name")` slot, then `._.name`, `.tableName`
-            // and `.name` — through eight double casts and a
-            // `"unknown"` sentinel for when all four missed. `getTableName`
-            // reads the first of those and nothing else, because on a real
-            // `PgTable` the other three are all `undefined`; they were dead
-            // branches, and the casts were what kept anyone from seeing that
-            // (each `as string` on a `||` chain asserts a type for a value the
-            // compiler was told nothing about).
-            const currentTableName = drizzleTableName(currentTable);
-            const parentTableName = drizzleTableName(parentTable);
-
-            // Junction tables are named for the two ends they join, so an
-            // underscore is the signal that this walk plausibly stopped on one
-            // rather than going wrong. The two `=== "unknown"` arms that used
-            // to sit beside it went with the sentinel: a name that could not be
-            // read was never a case that could arise here, only one the
-            // fallback chain made it look like it could.
-            if (!currentTableName.includes("_")) {
-                throw new Error(`Join path did not result in connecting to parent table. Current: ${currentTableName}, Parent: ${parentTableName}`);
-            }
-        }
-
-        // Handle both single ID and array of IDs
-        const finalCondition = Array.isArray(parentId)
-            ? inArray(parentIdColumn, parentId)
-            : eq(parentIdColumn, parentId);
-
-        return {
-            joins,
-            finalCondition
-        };
-    }
-
-    /**
-     * One step of a join path walked target → parent: the table it brings in
-     * and the condition it joins on.
-     *
-     * A step listing alternatives joins on any of them, OR-ed. Each alternative
-     * is built the way a plain step is, and they must all bring in the same
-     * table — they are several ways to match one pair of tables, not several
-     * paths. The junction fallback is only tried for a plain step: guessing a
-     * junction for one alternative of several is guessing twice.
-     */
-    private static buildReverseJoinStep(
-        joinPath: readonly JoinStep[],
-        index: number,
-        sourceTableName: string,
-        currentTable: PgTable<any>,
-        registry: PostgresTableRegistry,
-        allowJunctionFallback: boolean
-    ): { joinTable: PgTable<any>; condition: SQL; additionalJoins?: { table: PgTable<any>; condition: SQL }[] } {
-        const { fromTableName, toTableName } = this.joinStepTableNames(joinPath, index, sourceTableName);
-        const fromTable = registry.getPgTable(fromTableName);
-        const toTable = registry.getPgTable(toTableName);
-
-        if (!fromTable || !toTable) {
-            throw new Error(`Join tables not found for step: from ${fromTableName} to ${toTableName}`);
-        }
-
-        const alternatives = joinConditions(joinPath[index]);
-        const built = alternatives.map(on => this.buildSingleJoinCondition(
-            currentTable,
-            fromTable,
-            toTable,
-            this.getColumnNamesFromColumns(on.from)[0],
-            this.getColumnNamesFromColumns(on.to)[0],
-            fromTableName,
-            toTableName,
-            allowJunctionFallback && alternatives.length === 1 ? registry : undefined
-        ));
-        if (built.length === 1) return built[0];
-        if (built.some(step => step.joinTable !== built[0].joinTable)) {
-            throw new Error(`The alternatives of the join into '${joinPath[index].table}' do not join the same tables`);
-        }
-        return { joinTable: built[0].joinTable, condition: or(...built.map(step => step.condition))! };
-    }
-
-    /**
-     * Build a single join condition between tables
-     */
-    private static buildSingleJoinCondition(
-        currentTable: PgTable<any>,
-        fromTable: PgTable<any>,
-        toTable: PgTable<any>,
-        fromColName: string,
-        toColName: string,
-        fromTableName: string,
-        toTableName: string,
-        registry?: PostgresTableRegistry
-    ): { joinTable: PgTable<any>; condition: SQL; additionalJoins?: { table: PgTable<any>; condition: SQL }[] } {
-        let joinTable: PgTable<any>;
-        let condition: SQL;
-        const additionalJoins: { table: PgTable<any>; condition: SQL }[] = [];
-
-        if (currentTable === toTable) {
-            // current -> toTable, so join the fromTable
-            // `getTableColumns` is Drizzle's own accessor and is already how the
-            // rest of this file reads a column map. Indexing the table object
-            // directly — which is what the two casts here were for — also
-            // reaches its methods and symbols, so a relation whose column is
-            // named `name` or `enableRLS` got one of those back and passed the
-            // `!left || !right` guard below with something that is not a column.
-            const left = joinColumn(fromTable, fromColName);
-            const right = joinColumn(currentTable, toColName);
-
-            if (!left || !right) {
-                // Check if this might be a many-to-many relationship requiring a junction table
-                if (registry) {
-                    const junctionResult = this.tryBuildJunctionJoin(
-                        currentTable,
-                        fromTable,
-                        fromColName,
-                        toColName,
-                        fromTableName,
-                        toTableName,
-                        registry
-                    );
-                    if (junctionResult) {
-                        return junctionResult;
-                    }
-                }
-                throw new Error(`Join columns not found: ${fromTableName}.${fromColName} = ${toTableName}.${toColName}`);
-            }
-
-            joinTable = fromTable;
-            condition = eq(left, right);
-        } else if (currentTable === fromTable) {
-            // current -> fromTable, so join the toTable
-            const left = joinColumn(toTable, toColName);
-            const right = joinColumn(currentTable, fromColName);
-
-            if (!left || !right) {
-                // Check if this might be a many-to-many relationship requiring a junction table
-                if (registry) {
-                    const junctionResult = this.tryBuildJunctionJoin(
-                        currentTable,
-                        toTable,
-                        fromColName,
-                        toColName,
-                        fromTableName,
-                        toTableName,
-                        registry
-                    );
-                    if (junctionResult) {
-                        return junctionResult;
-                    }
-                }
-                throw new Error(`Join columns not found: ${toTableName}.${toColName} = ${fromTableName}.${fromColName}`);
-            }
-
-            joinTable = toTable;
-            condition = eq(left, right);
-        } else {
-            throw new Error(`Join step does not match current table. Current table does not match from: ${fromTableName} or to: ${toTableName}`);
-        }
-
-        return {
-            joinTable,
-            condition,
-            additionalJoins
-        };
-    }
-
-    /**
-     * Try to build a junction table join when direct foreign key relationship is not found
-     */
-    private static tryBuildJunctionJoin(
-        currentTable: PgTable<any>,
-        targetTable: PgTable<any>,
-        fromColName: string,
-        toColName: string,
-        fromTableName: string,
-        toTableName: string,
-        registry: PostgresTableRegistry
-    ): { joinTable: PgTable<any>; condition: SQL; additionalJoins: { table: PgTable<any>; condition: SQL }[] } | null {
-        // Try to find a junction table that connects these two tables
-        // Common naming patterns: table1_table2, table1Table2, etc.
-        const possibleJunctionNames = [
-            `${fromTableName}_${toTableName}`,
-            `${toTableName}_${fromTableName}`,
-            `${fromTableName}${toTableName.charAt(0).toUpperCase() + toTableName.slice(1)}`,
-            `${toTableName}${fromTableName.charAt(0).toUpperCase() + fromTableName.slice(1)}`
-        ];
-
-        for (const junctionName of possibleJunctionNames) {
-            const junctionTable = registry.getPgTable(junctionName);
-            if (junctionTable) {
-                // Try to find the appropriate columns in the junction table
-                const sourceColName = `${fromTableName.slice(0, -1)}_id`; // Remove 's' and add '_id'
-                const targetColName = `${toTableName.slice(0, -1)}_id`;
-
-                const junctionSourceCol = junctionTable[sourceColName as keyof typeof junctionTable] as AnyPgColumn;
-                const junctionTargetCol = junctionTable[targetColName as keyof typeof junctionTable] as AnyPgColumn;
-
-                if (junctionSourceCol && junctionTargetCol) {
-                    // Found a valid junction table setup
-                    const currentTableIdCol = Object.values(currentTable).find((col: Record<string, unknown>) => col.primary) as AnyPgColumn;
-                    const targetTableIdCol = Object.values(targetTable).find((col: Record<string, unknown>) => col.primary) as AnyPgColumn;
-
-                    if (!currentTableIdCol || !targetTableIdCol) {
-                        continue; // Skip if we can't find primary keys
-                    }
-
-                    // Determine which direction to join
-                    if (currentTable === targetTable) {
-                        // We're joining through junction to reach the other table
-                        return {
-                            joinTable: targetTable,
-                            condition: eq(targetTableIdCol, junctionTargetCol),
-                            additionalJoins: [
-                                {
-                                    table: junctionTable,
-                                    condition: eq(currentTableIdCol, junctionSourceCol)
-                                }
-                            ]
-                        };
-                    } else {
-                        // Standard junction join
-                        return {
-                            joinTable: junctionTable,
-                            condition: eq(currentTableIdCol, junctionSourceCol),
-                            additionalJoins: [
-                                {
-                                    table: targetTable,
-                                    condition: eq(targetTableIdCol, junctionTargetCol)
-                                }
-                            ]
-                        };
-                    }
-                }
-            }
-        }
-
-        return null; // No junction table found
     }
 
     /**
@@ -2902,10 +2614,7 @@ whereConditions };
     ): T {
         switch (relation.kind) {
             case "via":
-                return this.buildJoinPathCountQuery(
-                    baseCountQuery, relation.steps, targetTable, parentTable,
-                    parentIdColumn, parentId, registry, additionalFilters
-                );
+                throw viaReadElsewhere(relation);
 
             case "manyToMany":
                 return this.buildJunctionCountQuery(
@@ -2927,43 +2636,6 @@ whereConditions };
                 throw new Error(`Unknown relation kind: ${JSON.stringify(exhaustive)}`);
             }
         }
-    }
-
-    /**
-     * Build join path conditions for count queries
-     */
-    private static buildJoinPathCountQuery<T extends DrizzleDynamicQuery>(
-        baseCountQuery: T,
-        joinPath: readonly JoinStep[],
-        targetTable: PgTable<any>,
-        parentTable: PgTable<any>,
-        parentIdColumn: AnyPgColumn,
-        parentId: string | number,
-        registry: PostgresTableRegistry,
-        additionalFilters?: SQL[]
-    ): T {
-        let query = baseCountQuery;
-        let currentTable = targetTable;
-        const sourceTableName = drizzleTableName(parentTable);
-
-        // Process join steps in reverse order
-        for (let index = joinPath.length - 1; index >= 0; index--) {
-            const { joinTable, condition } = this.buildReverseJoinStep(joinPath, index, sourceTableName, currentTable, registry, false);
-
-            query = query.innerJoin(joinTable, condition);
-            currentTable = joinTable;
-        }
-
-        if (currentTable !== parentTable) {
-            throw new Error("Join path did not result in connecting to parent table");
-        }
-
-        const allConditions = [eq(parentIdColumn, parentId)];
-        if (additionalFilters) {
-            allConditions.push(...additionalFilters);
-        }
-
-        return query.where(and(...allConditions));
     }
 
     /**
@@ -3029,21 +2701,6 @@ whereConditions };
             throw new Error(`Target column '${through.targetKey}' not found in junction table '${through.table}'`);
         }
         return { junctionTable, junctionSourceCol, junctionTargetCol };
-    }
-
-    private static joinStepTableNames(
-        joinPath: readonly JoinStep[],
-        index: number,
-        sourceTableName: string
-    ): { fromTableName: string; toTableName: string } {
-        const step = joinPath[index];
-        // Alternatives join one pair of tables, so the first says which.
-        const [on] = joinConditions(step);
-        return {
-            fromTableName: this.getTableNamesFromColumns(on.from)[0]
-                || (index === 0 ? sourceTableName : joinPath[index - 1].table),
-            toTableName: this.getTableNamesFromColumns(on.to)[0] || step.table
-        };
     }
 
     static getTableNamesFromColumns(columns: string | string[]): string[] {

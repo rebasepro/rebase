@@ -5,7 +5,6 @@ import {
     serializeLogicalCondition,
     deserializeLogicalCondition
 } from "../src/data/filter-dialect";
-import { EntityRelation } from "@rebasepro/types";
 import type { WhereFilterOp, FilterValues } from "@rebasepro/types";
 
 // ---------------------------------------------------------------------------
@@ -59,21 +58,9 @@ describe("serializeFilter", () => {
         expect(result).toEqual({ count: "gte.42" });
     });
 
-    it("serializes EntityRelation values as their id", () => {
-        const result = serializeFilter({ company: ["==", new EntityRelation("167", "company")] });
-        expect(result).toEqual({ company: "eq.167" });
-    });
-
-    it("serializes plain relation wire objects as their id", () => {
-        const result = serializeFilter({ company: ["==", { __type: "relation", id: 167, path: "company" }] });
-        expect(result).toEqual({ company: "eq.167" });
-    });
-
-    it("serializes lists of relation values as their ids", () => {
-        const result = serializeFilter({
-            company: ["in", [new EntityRelation("1", "company"), { __type: "relation", id: "2", path: "company" }]]
-        });
-        expect(result).toEqual({ company: "in.(1,2)" });
+    it("serializes a relation's key as any other value (the admin sends the key, not its view model)", () => {
+        expect(serializeFilter({ company: ["==", 167] })).toEqual({ company: "eq.167" });
+        expect(serializeFilter({ company: ["in", ["1", "2"]] })).toEqual({ company: "in.(1,2)" });
     });
 });
 

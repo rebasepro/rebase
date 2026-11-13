@@ -30,7 +30,6 @@ import {
     LIST_OPS,
     NULL_OPS
 } from "@rebasepro/types";
-import { normalizeToEntityRelation } from "../util/entities";
 
 // ---------------------------------------------------------------------------
 // Value stringification
@@ -38,10 +37,9 @@ import { normalizeToEntityRelation } from "../util/entities";
 
 /**
  * Serialize a JS value to its querystring representation.
- * `null` is serialized as the literal string `"null"`.
- * Relation values (`EntityRelation` instances or `{ __type: "relation", id, path }`
- * objects) are serialized as their raw id — the wire format only carries the
- * value to compare against the FK column.
+ * `null` is serialized as the literal string `"null"`. A relation is filtered
+ * by its key: the admin converts the relations it filters by before they get
+ * here (`cms-types` `collectionEntityDataOptions`).
  *
  * A `Date` is its ISO 8601 instant — what JSON makes of it on the socket and
  * in-process, so one filter names one instant through every door. `String()`
@@ -52,8 +50,6 @@ import { normalizeToEntityRelation } from "../util/entities";
 function stringifyValue(value: unknown): string {
     if (value === null) return "null";
     if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
-    const relation = normalizeToEntityRelation(value);
-    if (relation) return String(relation.id);
     return String(value);
 }
 

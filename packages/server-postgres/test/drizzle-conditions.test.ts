@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { eq, SQL } from "drizzle-orm";
 import { integer, pgTable, PgDialect, PgTable, primaryKey, serial, varchar, text } from "drizzle-orm/pg-core";
-import { EntityRelation, type JoinStep, WhereFilterOp } from "@rebasepro/types";
+import { type JoinStep, WhereFilterOp } from "@rebasepro/types";
 import { LegacyCollectionConfig, resolveLegacyRelation } from "@rebasepro/common/migrate";
 import { manyToMany, via } from "./helpers/relation-descriptors";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -161,192 +161,6 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             expect(renderSql(result.whereConditions[0])).toMatchObject({
                 sql: '"posts_tags"."tag_id" in ($1, $2, $3)',
                 params: [20, 21, 22]
-            });
-        });
-    });
-
-    describe("Join Path Relations with Junction Tables", () => {
-        it("should handle join paths that include many-to-many relationships", () => {
-            // Create a special mock registry that simulates missing direct foreign keys
-            const mockRegistryForJunction = new FixtureTableRegistry();
-
-            // Create tables without the direct foreign key relationship
-            const mockPostsTableNoDirect = pgTable("posts", {
-                id: serial("id").primaryKey(),
-                title: varchar("title").notNull(),
-                content: varchar("content")
-                // Note: NO tag_id foreign key column
-            });
-
-            const mockTagsTableNoDirect = pgTable("tags", {
-                id: serial("id").primaryKey(),
-                name: varchar("name").notNull()
-                // Note: NO post_id foreign key column
-            });
-
-            jest.spyOn(mockRegistryForJunction, "getPgTable").mockImplementation((tableName: string) => {
-                switch (tableName) {
-                    case "posts": return mockPostsTableNoDirect;
-                    case "tags": return mockTagsTableNoDirect;
-                    case "posts_tags": return mockPostsTagsTable;
-                    default: return undefined;
-                }
-            });
-
-            // Simulate a join path like: Post -> Tags (where posts would need tag_id but doesn't have it)
-            const joinPathWithJunction = [
-                {
-                    table: "tags",
-                    on: {
-                        from: "posts.tag_id", // This column doesn't exist - should trigger junction table discovery
-                        to: "tags.id"
-                    }
-                }
-            ];
-
-            const relation = via("tags_via_join", "tags", "many", joinPathWithJunction);
-
-            // Should automatically detect and use the posts_tags junction table
-            const result = DrizzleConditionBuilder.buildRelationConditions(
-                relation,
-                1, // post ID
-                mockTagsTableNoDirect, // target table (tags)
-                mockPostsTableNoDirect, // parent table (posts)
-                mockPostsTableNoDirect.id, // parent ID column
-                mockTagsTableNoDirect.id, // target ID column
-                mockRegistryForJunction
-            );
-
-            expect(result.joinConditions.length).toBeGreaterThan(0);
-            expect(result.whereConditions).toHaveLength(1);
-            expect(mockRegistryForJunction.getPgTable).toHaveBeenCalledWith("posts_tags");
-        });
-
-        it("should fallback to error when no junction table is found for missing foreign keys", () => {
-            const joinPathWithMissingRelation = [
-                {
-                    table: "nonexistent_table",
-                    on: {
-                        from: "posts.nonexistent_column",
-                        to: "nonexistent_table.id"
-                    }
-                }
-            ];
-
-            const relation = via("missing_relation", "nonexistent", "one", joinPathWithMissingRelation);
-
-            expect(() => {
-                DrizzleConditionBuilder.buildRelationConditions(
-                    relation,
-                    1,
-                    mockTagsTable,
-                    mockPostsTable,
-                    mockPostsTable.id,
-                    mockTagsTable.id,
-                    mockRegistry
-                );
-            }).toThrow("Join tables not found");
-        });
-
-        it("should handle complex multi-hop join paths with junction tables", () => {
-            // Simulate: Author -> Posts -> Tags (where Posts-Tags uses junction table)
-            const complexJoinPath = [
-                {
-                    table: "posts",
-                    on: {
-                        from: "authors.id",
-                        to: "posts.author_id"
-                    }
-                },
-                {
-                    table: "tags",
-                    on: {
-                        from: "posts.id", // This will require posts_tags junction
-                        to: "tags.id"
-                    }
-                }
-            ];
-
-            const relation = via("author_tags", "tags", "many", complexJoinPath);
-
-            const result = DrizzleConditionBuilder.buildRelationConditions(
-                relation,
-                1, // author ID
-                mockTagsTable, // target (tags)
-                mockAuthorsTable, // parent (authors)
-                mockAuthorsTable.id,
-                mockTagsTable.id,
-                mockRegistry
-            );
-
-            expect(result.joinConditions.length).toBeGreaterThan(1); // Should have multiple joins
-            expect(result.whereConditions).toHaveLength(1);
-        });
-    });
-
-    describe("Junction Table Discovery", () => {
-        // The previous version of this test declared `from: "posts.id"` — a
-        // column that exists — so the direct join succeeded and the naming loop
-        // it is named for was never entered. It then asserted `.not.toThrow()`,
-        // which the direct path satisfies just as well, so nothing about
-        // junction discovery was under test at all.
-        it("should try multiple naming patterns for junction tables", () => {
-            // Neither table carries the other's foreign key, which is what
-            // sends `buildSingleJoinCondition` looking for a junction.
-            const postsNoDirect = pgTable("posts", {
-                id: serial("id").primaryKey(),
-                title: varchar("title").notNull()
-            });
-            const tagsNoDirect = pgTable("tags", {
-                id: serial("id").primaryKey(),
-                name: varchar("name").notNull()
-            });
-
-            const relation = via("test_junction", "tags", "many", [
-                    {
-                        table: "tags",
-                        on: {
-                            from: "posts.tag_id",
-                            to: "tags.id"
-                        }
-                    }
-                ]);
-
-            // Only the *reversed* name resolves, so a lookup that gave up after
-            // `<from>_<to>` would fail here.
-            const mockRegistryWithPatterns = new FixtureTableRegistry();
-
-            jest.spyOn(mockRegistryWithPatterns, "getPgTable").mockImplementation((tableName: string) => {
-                switch (tableName) {
-                    case "posts": return postsNoDirect;
-                    case "tags": return tagsNoDirect;
-                    case "tags_posts": return mockPostsTagsTable;
-                    default: return undefined;
-                }
-            });
-
-            const result = DrizzleConditionBuilder.buildRelationConditions(
-                relation,
-                1,
-                tagsNoDirect,
-                postsNoDirect,
-                postsNoDirect.id,
-                tagsNoDirect.id,
-                mockRegistryWithPatterns
-            );
-
-            expect(mockRegistryWithPatterns.getPgTable).toHaveBeenCalledWith("posts_tags");
-            expect(mockRegistryWithPatterns.getPgTable).toHaveBeenCalledWith("tags_posts");
-
-            // Discovery emits the pair: target→junction, then junction→source.
-            expect(result.joinConditions.map(j => j.table)).toEqual([mockPostsTagsTable, postsNoDirect]);
-            expect(result.joinConditions.map(j => renderSql(j.condition).sql)).toEqual([
-                '"tags"."id" = "posts_tags"."post_id"',
-                '"posts"."id" = "posts_tags"."tag_id"'
-            ]);
-            expect(renderSql(result.whereConditions[0])).toMatchObject({
-                sql: '"posts"."id" = $1',
-                params: [1]
             });
         });
     });
@@ -986,14 +800,13 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
         });
     });
 
-    describe("buildFilterConditions - relation wire objects (regression)", () => {
+    describe("buildFilterConditions - a relation filtered by its key", () => {
         const { PgDialect } = require("drizzle-orm/pg-core");
         const pgDialect = new PgDialect();
 
-        it("should unwrap a serialized relation object to its id when filtering an FK column", () => {
-            // Admin relation filter arrives over the wire as a plain JSON object
+        it("compares the foreign key column with the key (the admin sends a relation it filters by as its key)", () => {
             const conditions = DrizzleConditionBuilder.buildFilterConditions(
-                { author: ["==", { __type: "relation", id: "167", path: "authors" }] },
+                { author: ["==", "167"] },
                 mockPostsTable,
                 "posts"
             );
@@ -1001,32 +814,6 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
             const query = pgDialect.sqlToQuery(conditions[0]);
             expect(query.sql).toBe('"posts"."author_id" = $1');
             expect(query.params).toEqual(["167"]);
-        });
-
-        it("should unwrap an EntityRelation instance to its id", () => {
-            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
-                mockPostsTable.author_id,
-                "==",
-                new EntityRelation(42, "authors")
-            );
-            expect(condition).not.toBeNull();
-            const query = pgDialect.sqlToQuery(condition!);
-            expect(query.sql).toBe('"posts"."author_id" = $1');
-            expect(query.params).toEqual([42]);
-        });
-
-        it("should unwrap relation objects element-wise for list operators", () => {
-            const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
-                mockPostsTable.author_id,
-                "in",
-                [
-                    { __type: "relation", id: "1", path: "authors" },
-                    new EntityRelation("2", "authors")
-                ]
-            );
-            expect(condition).not.toBeNull();
-            const query = pgDialect.sqlToQuery(condition!);
-            expect(query.params).toEqual(["1", "2"]);
         });
 
         it("should leave non-relation values untouched", () => {
@@ -1095,52 +882,6 @@ describe("DrizzleConditionBuilder - manyToMany scope SQL", () => {
  * that count: opening an order from a product's Orders tab (the demo's
  * products → order_items → orders) failed while the tab itself listed fine.
  */
-describe("DrizzleConditionBuilder - join path with bare column names", () => {
-    const products = pgTable("products", { id: serial("id").primaryKey(), name: varchar("name") });
-    const orderItems = pgTable("order_items", {
-        id: serial("id").primaryKey(),
-        product_id: integer("product_id"),
-        order_id: integer("order_id")
-    });
-    const orders = pgTable("orders", { id: serial("id").primaryKey(), status: varchar("status") });
-
-    const tables: Record<string, PgTable> = { products, order_items: orderItems, orders };
-    const registry = registryWithTables(tables);
-
-    const relation = via("orders", "orders", "many", [
-            { table: "order_items", on: { from: "id", to: "product_id" } },
-            { table: "orders", on: { from: "order_id", to: "id" } }
-        ]);
-
-    it("joins back from the target to the parent for an include", () => {
-        const result = DrizzleConditionBuilder.buildRelationConditions(
-            relation, 7, orders, products, products.id, orders.id, registry
-        );
-
-        expect(result.joinConditions.map(j => j.table)).toEqual([orderItems, products]);
-        expect(result.joinConditions.map(j => renderSql(j.condition).sql)).toEqual([
-            '"order_items"."order_id" = "orders"."id"',
-            '"products"."id" = "order_items"."product_id"'
-        ]);
-        expect(renderSql(result.whereConditions[0])).toMatchObject({ sql: '"products"."id" = $1', params: [7] });
-    });
-
-    it("counts through the same joins, which is what a nested read is gated on", () => {
-        const query = {
-            innerJoin: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            $dynamic: jest.fn().mockReturnThis()
-        };
-
-        DrizzleConditionBuilder.buildRelationCountQuery(
-            query, relation, 7, orders, products, products.id, orders.id, registry
-        );
-
-        expect(query.innerJoin.mock.calls.map(([table]) => table)).toEqual([orderItems, products]);
-        expect(renderSql(query.where.mock.calls[0][0] as SQL)).toMatchObject({ sql: '"products"."id" = $1', params: [7] });
-    });
-});
-
 /**
  * A `via` step whose `on` lists alternatives, in the `EXISTS` a nested listing
  * and count are scoped by: every alternative's pairs AND-ed, the alternatives
@@ -1202,5 +943,20 @@ describe("DrizzleConditionBuilder - join path scope with alternatives", () => {
     it("renders a list of one exactly as the bare condition", () => {
         expect(scope(friendshipsCollection, friendships, [{ table: "friendships", on: [{ from: "id", to: "a" }] }]))
             .toEqual(scope(friendshipsCollection, friendships, [{ table: "friendships", on: { from: "id", to: "a" } }]));
+    });
+});
+
+describe("DrizzleConditionBuilder - a via is never read through the per-kind builders", () => {
+    const products = pgTable("products", { id: serial("id").primaryKey() });
+    const orders = pgTable("orders", { id: serial("id").primaryKey() });
+    const registry = registryWithTables({ products, orders });
+    const relation = via("orders", "orders", "many", [{ table: "orders", on: { from: "id", to: "product_id" } }]);
+
+    it("refuses one, naming the builder that reads it", () => {
+        expect(() => DrizzleConditionBuilder.buildRelationConditions(relation, 7, orders, products, products.id, orders.id, registry))
+            .toThrow("is a `via` chain: it is read through `buildRelationScopeCondition`");
+        const query = { innerJoin: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), $dynamic: jest.fn().mockReturnThis() };
+        expect(() => DrizzleConditionBuilder.buildRelationCountQuery(query, relation, 7, orders, products, products.id, orders.id, registry))
+            .toThrow("is a `via` chain");
     });
 });

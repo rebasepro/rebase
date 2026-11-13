@@ -285,9 +285,7 @@ customerId: 1 }
         it("should serialize owning relation correctly on create", async () => {
             const newOrder = {
                 total: 150,
-                customer: { id: "1",
-path: "customers",
-__type: "relation" }
+                customer: "1"
             };
 
             db.returning.mockResolvedValue([{ id: 3 }]);
@@ -353,12 +351,8 @@ price: 20 }
             const newOrder = {
                 total: 300,
                 products: [
-                    { id: "1",
-path: "products",
-__type: "relation" },
-                    { id: "2",
-path: "products",
-__type: "relation" }
+                    "1",
+                    "2"
                 ]
             };
 
@@ -404,9 +398,7 @@ userId: 1 }
         it("should create one-to-one relations correctly", async () => {
             const newProfile = {
                 bio: "New user bio",
-                user: { id: "1",
-path: "customers",
-__type: "relation" }
+                user: "1"
             };
 
             db.returning.mockResolvedValue([{ id: 1 }]);
@@ -528,9 +520,7 @@ customerId: 1 }
     describe("Relation Updates", () => {
         it("should update owning relations correctly", async () => {
             const updatedOrder = {
-                customer: { id: "2",
-path: "customers",
-__type: "relation" }
+                customer: "2"
             };
 
             db.returning.mockResolvedValue([{ id: 1 }]);
@@ -664,9 +654,7 @@ to: "user_profiles.user_id" } }
 
                 const newPost = {
                     title: "Test Post",
-                    authorProfile: { id: "1",
-path: "user_profiles",
-__type: "relation" }
+                    authorProfile: "1"
                 };
 
                 // The link is written through the parent's own foreign key, so
@@ -721,9 +709,7 @@ authorId: 7 }]);
 
                 const postUpdate = {
                     title: "Test Post Updated",
-                    authorProfile: { id: "1",
-path: "user_profiles",
-__type: "relation" }
+                    authorProfile: "1"
                 };
 
                 const expectedOps: string[] = [];
@@ -764,9 +750,7 @@ authorId: 1 }]);
             it("should update inverse one-to-one relation", async () => {
                 const customerWithProfile = {
                     name: "John Doe",
-                    profile: { id: "1",
-path: "user_profiles",
-__type: "relation" }
+                    profile: "1"
                 };
 
                 db.returning.mockResolvedValue([{ id: 1 }]);
@@ -826,9 +810,7 @@ to: "user_profiles.user_id" } }
 
                 const newAuthor = {
                     name: "Jane Author",
-                    profile: { id: "2",
-path: "user_profiles",
-__type: "relation" }
+                    profile: "2"
                 };
 
                 // See the owning joinPath test above: the parent's key is read
@@ -907,12 +889,8 @@ name: "Jane Author" }]);
                 const orderWithProducts = {
                     total: 500,
                     products: [
-                        { id: "1",
-path: "products",
-__type: "relation" },
-                        { id: "2",
-path: "products",
-__type: "relation" }
+                        "1",
+                        "2"
                     ]
                 };
 
@@ -994,12 +972,8 @@ to: "tags.id" } }
                 const postWithTags = {
                     title: "Tagged Post",
                     tags: [
-                        { id: "1",
-path: "tags",
-__type: "relation" },
-                        { id: "2",
-path: "tags",
-__type: "relation" }
+                        "1",
+                        "2"
                     ]
                 };
 
@@ -1025,12 +999,8 @@ title: "Tagged Post" }]);
                 const customerWithOrders = {
                     name: "Big Customer",
                     orders: [
-                        { id: "1",
-path: "orders",
-__type: "relation" },
-                        { id: "2",
-path: "orders",
-__type: "relation" }
+                        "1",
+                        "2"
                     ]
                 };
 
@@ -1101,12 +1071,8 @@ to: "orders.id" } }
                 const productWithOrders = {
                     name: "Popular Product",
                     orders: [
-                        { id: "1",
-path: "orders",
-__type: "relation" },
-                        { id: "2",
-path: "orders",
-__type: "relation" }
+                        "1",
+                        "2"
                     ]
                 };
 
@@ -1177,12 +1143,8 @@ to: "posts.id" } }
                 const tagWithPosts = {
                     name: "Popular Tag",
                     posts: [
-                        { id: "1",
-path: "posts",
-__type: "relation" },
-                        { id: "2",
-path: "posts",
-__type: "relation" }
+                        "1",
+                        "2"
                     ]
                 };
 

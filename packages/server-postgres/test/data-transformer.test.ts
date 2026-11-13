@@ -1,60 +1,9 @@
-import { sanitizeAndConvertDates, serializeColumnToServer, serializeRelationValue } from "../src/data-transformer";
+import { sanitizeAndConvertDates, serializeColumnToServer } from "../src/data-transformer";
 import { col, json } from "@rebasepro/types";
 import { columnOf } from "./helpers/codec-columns";
 
-describe("serializeRelationValue", () => {
-    it("should extract id from a relation object", () => {
-        const value = { id: "abc-123",
-path: "authors",
-__type: "relation" };
-        expect(serializeRelationValue(value)).toBe("abc-123");
-    });
-
-    it("should return null for empty string values", () => {
-        expect(serializeRelationValue("")).toBeNull();
-    });
-
-    it("should pass through a plain string ID", () => {
-        expect(serializeRelationValue("uuid-string")).toBe("uuid-string");
-    });
-
-    it("should pass through a numeric ID", () => {
-        expect(serializeRelationValue(42)).toBe(42);
-    });
-
-    it("should return null for null values", () => {
-        expect(serializeRelationValue(null)).toBeNull();
-    });
-
-    it("should return undefined for undefined values", () => {
-        expect(serializeRelationValue(undefined)).toBeUndefined();
-    });
-
-    it("should serialize an array of relation objects to array of IDs", () => {
-        const value = [
-            { id: "id-1",
-path: "authors" },
-            { id: "id-2",
-path: "authors" }
-        ];
-        expect(serializeRelationValue(value)).toEqual(["id-1", "id-2"]);
-    });
-
-    it("should convert empty strings within arrays to null", () => {
-        expect(serializeRelationValue(["", "some-uuid"])).toEqual([null, "some-uuid"]);
-    });
-
-    it("should handle mixed array of objects, strings and nulls", () => {
-        const value = [
-            { id: "id-1",
-path: "authors" },
-            "raw-id-2",
-            "",
-            null
-        ];
-        expect(serializeRelationValue(value)).toEqual(["id-1", "raw-id-2", null, null]);
-    });
-});
+// A to-one link's value (a key, `null`, `""`; anything else refused) is pinned
+// by `wire-write-values.test.ts` through the driver.
 
 describe("serializeColumnToServer", () => {
     // ── Text column ──
@@ -198,10 +147,10 @@ describe("serializeColumnToServer", () => {
     describe("vector column", () => {
         const vector = columnOf(col.vector({ dimensions: 3 }));
 
-        it("should serialize a Vector envelope to a flat array", () => {
-            const vectorVal = { __type: "Vector",
-value: [1.5, -2.0, 3.14] };
-            expect(serializeColumnToServer(vectorVal, vector)).toEqual([1.5, -2.0, 3.14]);
+        it("refuses anything but a list: the admin's `Vector` JSON (`{ value }`) is not the wire", () => {
+            expect(() => serializeColumnToServer({ __type: "Vector", value: [1.5, -2.0, 3.14] }, vector))
+                .toThrow("expects a vector as a list of numbers, but received an object");
+            expect(() => serializeColumnToServer("[1,2,3]", vector)).toThrow("but received a string");
         });
 
         it("should serialize a raw number array to a flat array", () => {
