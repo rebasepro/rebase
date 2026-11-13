@@ -1490,7 +1490,9 @@ roles: verifiedUser.roles }
                         );
                     }
                     const session = clientSessions.get(clientId);
-                    assertNestedWriteAllowed({ parent, relation, target }, kind, path, { roles: session?.user?.roles ?? ["anon"] });
+                    assertNestedWriteAllowed({ parent, relation, target }, kind, path, { roles: session?.user?.roles ?? ["anon"] },
+                        // A declared junction is named by its SQL name.
+                        (name) => (registry.getTable(name) ?? registry.getTableBySqlName(name))?.descriptor);
                 };
 
                 /** The auth table at `path`, or `undefined` for any other. */

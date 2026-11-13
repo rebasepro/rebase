@@ -1,7 +1,12 @@
 import { describe, expect, it } from "@jest/globals";
-import { col, defineTable, rel, type TableDescriptor } from "@rebasepro/types";
+import { Hono } from "hono";
+import { col, defineTable, rel, type DataDriver, type RelationDescriptor, type TableDescriptor } from "@rebasepro/types";
 import { compileSchemaDefs } from "../src/schema/load-schema";
 import { assertKnownWriteFields, assertWriteRequestValid } from "../src/api/rest/write-validation";
+import { assertNestedWriteAllowed } from "../src/api/rest/nested-write-access";
+import { RestApiGenerator } from "../src/api/rest/api-generator";
+import { errorHandler } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
 
 /**
  * A many-to-many write through a DECLARED junction table is held to that
@@ -13,6 +18,11 @@ import { assertKnownWriteFields, assertWriteRequestValid } from "../src/api/rest
  * Before: `PATCH /cases/1 { tags: [7] }` set `case_tags.tag_id` although that
  * column is `.readOnly()` — `columnsWrittenOnOtherRows` answered nothing for a
  * many-to-many. Older than this branch (also 0.30.x).
+ *
+ * The same rule holds on the nested routes (security look 5, L-1 / L-2):
+ * `POST` / `PATCH` / `DELETE /cases/1/tags/7` link and unlink, and `PATCH
+ * /cases/1/graded/7 { _pivot }` edits the link's columns — all through
+ * `assertJunctionWritable`, the one place every door asks.
  */
 
 const tags = defineTable("tags", {
@@ -89,5 +99,93 @@ describe("a many-to-many write through a declared junction", () => {
         expect(codeOf(() => assertKnownWriteFields({ loose: [7] }, casesTable(), { viewer: editor, relatedTables }))).toBeUndefined();
         // Nor is a many-to-many refused when the junction's rules cannot be read.
         expect(codeOf(() => assertKnownWriteFields({ loose: [7] }, casesTable(), { viewer: editor }))).toBeUndefined();
+    });
+});
+
+const tagsTable = (): TableDescriptor => {
+    const table = DESCRIPTORS.find(candidate => candidate.slug === "tags");
+    if (!table) throw new Error("tags");
+    return table;
+};
+const relationOf = (name: string): RelationDescriptor => {
+    const relation = casesTable().relations.find(candidate => candidate.name === name);
+    if (!relation) throw new Error(name);
+    return relation;
+};
+
+describe("the nested-path gate (REST's nested routes and the socket)", () => {
+    const hop = (name: string) => ({ parent: casesTable(), relation: relationOf(name), target: tagsTable() });
+
+    it("refuses linking and unlinking through a declared junction whose link column is closed", () => {
+        for (const kind of ["create", "update", "unlink"] as const) {
+            expect(codeOf(() => assertNestedWriteAllowed(hop("tags"), kind, "cases/1/tags", editor, relatedTables))).toBe("VALIDATION_EXCLUDED_FIELDS");
+            expect(codeOf(() => assertNestedWriteAllowed(hop("labels"), kind, "cases/1/labels", editor, relatedTables))).toBe("FIELD_NOT_WRITABLE");
+            expect(codeOf(() => assertNestedWriteAllowed(hop("labels"), kind, "cases/1/labels", moderator, relatedTables))).toBeUndefined();
+            expect(codeOf(() => assertNestedWriteAllowed(hop("loose"), kind, "cases/1/loose", editor, relatedTables))).toBeUndefined();
+        }
+    });
+});
+
+describe("the nested REST routes", () => {
+    function harness(roles: string[]) {
+        const writes: string[] = [];
+        const row = { id: 7, label: "t" };
+        const driver: DataDriver = {
+            key: "postgres",
+            initialised: true,
+            async fetchOne() { return { ...row }; },
+            async fetchCollection() { return []; },
+            async count() { return 0; },
+            async save(props) { writes.push("save"); return { ...row, ...props.values }; },
+            async delete() { writes.push("delete"); },
+            async checkUniqueField() { return true; },
+            async updateRelationPivot() { writes.push("pivot"); }
+        };
+        const app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.use("/*", async (c, next) => {
+            c.set("driver", driver);
+            c.set("user", { uid: "u1", roles });
+            await next();
+        });
+        app.route("/", new RestApiGenerator({ descriptors: DESCRIPTORS }, driver).generateRoutes());
+        const send = (method: string, path: string, body?: unknown) => app.request(path, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            ...(body === undefined ? {} : { body: JSON.stringify(body) })
+        });
+        return { send, writes };
+    }
+    const codeOfResponse = async (response: Response) => (await response.json() as { error: { code: string } }).error.code;
+
+    it("refuses POST, PATCH and DELETE through a declared junction whose link column is closed, writing nothing", async () => {
+        const { send, writes } = harness(["editor"]);
+        for (const [method, path, body] of [
+            ["POST", "/cases/1/tags", { id: 8, label: "new" }],
+            ["PATCH", "/cases/1/tags/7", { label: "x" }],
+            ["DELETE", "/cases/1/tags/7", undefined]
+        ] as const) {
+            const response = await send(method, path, body);
+            expect([method, response.status, await codeOfResponse(response)]).toEqual([method, 400, "VALIDATION_EXCLUDED_FIELDS"]);
+        }
+        expect(writes).toEqual([]);
+    });
+
+    it("holds a `_pivot` edit to the declared junction's column rules", async () => {
+        const editorCall = harness(["editor"]);
+        const refused = await editorCall.send("PATCH", "/cases/1/graded/7", { _pivot: { grade: "A" } });
+        expect(refused.status).toBe(400);
+        expect(await codeOfResponse(refused)).toBe("FIELD_NOT_WRITABLE");
+        expect(editorCall.writes).toEqual([]);
+
+        const moderatorCall = harness(["moderator"]);
+        const admitted = await moderatorCall.send("PATCH", "/cases/1/graded/7", { _pivot: { grade: "A" } });
+        expect(admitted.status).toBe(204);
+        expect(moderatorCall.writes).toEqual(["pivot"]);
+    });
+
+    it("leaves an implicit junction as it was", async () => {
+        const { send } = harness(["editor"]);
+        expect((await send("DELETE", "/cases/1/loose/7")).status).not.toBe(400);
     });
 });

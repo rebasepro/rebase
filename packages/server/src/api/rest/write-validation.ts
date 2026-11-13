@@ -226,6 +226,10 @@ function assertRelationTargetsWritable(
 ): void {
     for (const relation of table.relations) {
         if (!Object.hasOwn(values, relation.name)) continue;
+        if (relation.kind === "manyToMany") {
+            assertJunctionWritable(table, relation, { link: true }, { where, viewer, relatedTables });
+            continue;
+        }
         const written = columnsWrittenOnOtherRows(relation);
         if (!written) continue;
         const target = relatedTables?.(written.table);
@@ -248,6 +252,45 @@ function assertRelationTargetsWritable(
             );
         }
         assertCopiedColumnsReadable(relation, table, where, viewer);
+    }
+}
+
+/**
+ * May this caller write this many-to-many's link — add or drop it (`link`) —
+ * or these `_pivot` fields of it? The one answer every door asks: a body
+ * (`{ tags: [7] }`, `{ tags: [{ id, _pivot }] }` — REST, bulk, `_batch`, the
+ * socket's SAVE, MCP) and a nested path (`POST` / `PATCH` / `DELETE
+ * /cases/1/tags/7`, a `_pivot` edit — REST and the socket).
+ *
+ * Through a DECLARED junction table, the link sets its two link columns and
+ * a pivot edit its pivot columns, so each is held to that table's column
+ * rules (`.readOnly()`, `.private()`, `access.write`) with the codes the
+ * direct write on the junction answers. An implicit junction (no declared
+ * table) has no rules of its own: nothing to refuse here. The relation's own
+ * `access.write` is the parent's field rule, judged with the parent's fields.
+ */
+export function assertJunctionWritable(
+    table: TableDescriptor,
+    relation: RelationOfKind<"manyToMany">,
+    write: { link: boolean; pivot?: Record<string, unknown> },
+    options: { where?: string; viewer: FieldViewer | undefined; relatedTables: RelatedTableLookup | undefined }
+): void {
+    const declared = options.relatedTables?.(relation.through.table);
+    if (!declared) return;
+    const where = options.where ?? "";
+    if (write.link) {
+        for (const sqlName of [relation.through.sourceKey, relation.through.targetKey]) {
+            const key = keyForColumn(declared, sqlName) ?? sqlName;
+            assertNoClosedFields(
+                { [key]: true },
+                declared,
+                `${where}Writing '${relation.name}' on '${table.slug}' sets '${key}' on the rows of '${declared.slug}': `,
+                options.viewer
+            );
+        }
+    }
+    if (write.pivot) {
+        assertNoClosedFields(write.pivot, declared, `${where}'${relation.name}' on table '${table.slug}' writes '_pivot' on '${declared.slug}': `, options.viewer);
     }
 }
 
@@ -299,10 +342,10 @@ function soleStepColumn(step: JoinStep, side: "from" | "to"): string | undefined
  *
  * - `hasMany` / `hasOne` — the target's foreign key;
  * - a to-one `via` — the column its one step joins to on the target;
- * - a writable to-many `via` and a `manyToMany` — the junction's two link
- *   columns, judged when the junction is a declared table (an implicit one
- *   has no rules);
- * - `belongsTo` — none: it sets a column of this table (judged as that column).
+ * - a writable to-many `via` — the junction's two link columns, judged when
+ *   the junction is a declared table (an implicit one has no rules);
+ * - `belongsTo` — none: it sets a column of this table (judged as that column);
+ * - `manyToMany` — {@link assertJunctionWritable}'s, not this one's.
  *
  * `required` says whether the write must be refused when the table's rules
  * cannot be read: it must for the target of a key the write moves.
@@ -311,9 +354,6 @@ function columnsWrittenOnOtherRows(relation: TableDescriptor["relations"][number
     { table: string; columns: string[]; required: boolean } | undefined {
     if (relation.kind === "hasMany" || relation.kind === "hasOne") {
         return { table: relation.target, columns: [relation.foreignKey], required: true };
-    }
-    if (relation.kind === "manyToMany") {
-        return { table: relation.through.table, columns: [relation.through.sourceKey, relation.through.targetKey], required: false };
     }
     if (relation.kind !== "via" || relation.steps.length === 0) return undefined;
     if (relation.cardinality === "one") {
@@ -416,12 +456,9 @@ export function assertColumnWriteRules(
     // its unknown keys, the parent's decides nothing about its rules.
     // Through a declared junction table, its own column rules hold too.
     for (const [relation, junction] of junctionsWithPayload(table)) {
-        const declared = options?.relatedTables?.(relation.through.table);
         for (const { pivot } of pivotsIn(values[relation.name])) {
             assertKnownWriteFields(pivot, junction, { viewer: options?.viewer });
-            if (declared) {
-                assertNoClosedFields(pivot, declared, `${where}'${relation.name}' on table '${table.slug}' writes '_pivot' on '${declared.slug}': `, options?.viewer);
-            }
+            assertJunctionWritable(table, relation, { link: false, pivot }, { where, viewer: options?.viewer, relatedTables: options?.relatedTables });
         }
     }
 }

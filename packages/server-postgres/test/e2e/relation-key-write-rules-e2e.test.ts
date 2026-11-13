@@ -115,6 +115,19 @@ const loose = defineTable("loose", {
     rls: open
 });
 
+// FINAL-FIX-PRODUCT L-3 + security look 5: a many-to-many through a DECLARED
+// junction, whose link column only a moderator may write.
+const stickers = defineTable("stickers", { columns: { id: col.serial().primaryKey(), name: col.text() }, rls: open });
+const folders = defineTable("folders", {
+    columns: { id: col.serial().primaryKey(), name: col.text() },
+    relations: { stickers: rel.manyToMany(() => stickers, { through: "folder_stickers", sourceKey: "folder_id", targetKey: "sticker_id" }) },
+    rls: open
+});
+const folderStickers = defineTable("folder_stickers", {
+    columns: { id: col.serial().primaryKey(), folderId: col.integer(), stickerId: col.integer().access({ write: ["moderator"] }) },
+    rls: open
+});
+
 type Row = Record<string, unknown>;
 
 describe("a relation write from the parent is held to the child key's rules (E2E)", () => {
@@ -160,7 +173,7 @@ describe("a relation write from the parent is held to the child key's rules (E2E
         connection = createPostgresDatabaseConnection(container.connectionString);
         backend = await initializeRebaseBackend({
             app, server,
-            tables: [threads, replies, pins, people, docs, orgs, memos, badges, owners, labels, loose],
+            tables: [threads, replies, pins, people, docs, orgs, memos, badges, owners, labels, loose, stickers, folders, folderStickers],
             database: createPostgresAdapter({ connection: connection.db, connectionString: container.connectionString }),
             auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },
             history: true
@@ -186,6 +199,9 @@ describe("a relation write from the parent is held to the child key's rules (E2E
             INSERT INTO badges (label, owner_id) VALUES ('b1 of o1', 1), ('b2 of o2', 2), ('b3 of o2', 2);
             INSERT INTO labels (name) VALUES ('l1');
             INSERT INTO loose (name) VALUES ('x1');
+            INSERT INTO stickers (name) VALUES ('s1'), ('s2');
+            INSERT INTO folders (name) VALUES ('f1');
+            INSERT INTO folder_stickers (folder_id, sticker_id) VALUES (1, 2);
         `);
         await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
     }, 180_000);
@@ -426,6 +442,18 @@ describe("a relation write from the parent is held to the child key's rules (E2E
         expect((await admin.query("SELECT count(*)::int AS n FROM labels_loose")).rows[0].n).toBe(0);
         const allowed = await patch("moderator", "/loose/1", { labels: [{ id: 1, _pivot: { grade: "A+" } }] });
         expect(allowed.status, allowed.text).toBe(200);
+    });
+
+    it("a many-to-many through a declared junction obeys its link column's rules — body and nested route", async () => {
+        const links = async () => (await admin.query("SELECT folder_id, sticker_id FROM folder_stickers ORDER BY sticker_id")).rows;
+        const before = await links();
+        expect(codeOf((await patch("editor", "/folders/1", { stickers: [1, 2] })).text)).toBe("FIELD_NOT_WRITABLE");
+        expect(codeOf((await request("editor", "PATCH", "/folders/1/stickers/1", { name: "s1" })).text)).toBe("FIELD_NOT_WRITABLE");
+        expect(codeOf((await request("editor", "DELETE", "/folders/1/stickers/2")).text)).toBe("FIELD_NOT_WRITABLE");
+        expect(await links()).toEqual(before);
+        const allowed = await request("moderator", "DELETE", "/folders/1/stickers/2");
+        expect(allowed.status, allowed.text).toBeLessThan(300);
+        expect(await links()).toEqual([]);
     });
 
     describe("history revert (history on)", () => {

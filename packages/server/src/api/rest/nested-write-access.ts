@@ -1,6 +1,6 @@
 import type { RelationDescriptor, TableDescriptor } from "@rebasepro/types";
 import { type FieldViewer, keyForColumn } from "@rebasepro/common";
-import { assertNoClosedFields } from "./write-validation";
+import { assertJunctionWritable, assertNoClosedFields, type RelatedTableLookup } from "./write-validation";
 
 /** The last hop of a nested path: the parent table, the relation it names, and that relation's target table. */
 export interface NestedWriteHop {
@@ -42,16 +42,26 @@ export type NestedWriteKind = "create" | "update" | "pivot" | "unlink";
  * An update through an owning parent changes neither: the driver refuses it
  * unless the row is already the parent's, and does not write the key.
  *
+ *  - Linking or unlinking through a many-to-many writes the junction's link
+ *    columns: through a declared junction table they are held to its column
+ *    rules ({@link assertJunctionWritable}, the rule a body write obeys). A
+ *    `_pivot` edit's fields are judged by the route that reads them, through
+ *    the same function.
+ *
  * One rule for every door that takes a nested path — the REST routes and the
  * realtime socket — asked of the same fields `assertNoClosedFields` judges a
  * body by, so the answer (`FIELD_NOT_WRITABLE`, or `VALIDATION_EXCLUDED_FIELDS`
  * for a private relation) is the one the root route gives.
+ *
+ * @param relatedTables - the served tables by slug or SQL name: where a
+ *   declared junction's rules are read from.
  */
 export function assertNestedWriteAllowed(
     hop: NestedWriteHop,
     kind: NestedWriteKind,
     path: string,
-    viewer: FieldViewer | undefined
+    viewer: FieldViewer | undefined,
+    relatedTables: RelatedTableLookup
 ): void {
     const { parent, relation, target } = hop;
     const where = `A write through '${path}' sets a relation: `;
@@ -59,6 +69,10 @@ export function assertNestedWriteAllowed(
     const changesMembership = kind === "create" || relation.kind === "manyToMany";
     if (changesMembership) {
         assertNoClosedFields({ [relation.name]: true }, parent, where, viewer);
+    }
+
+    if (relation.kind === "manyToMany" && kind !== "pivot") {
+        assertJunctionWritable(parent, relation, { link: true }, { where, viewer, relatedTables });
     }
 
     if (kind === "create" && (relation.kind === "hasOne" || relation.kind === "hasMany")) {

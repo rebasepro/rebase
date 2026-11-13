@@ -7,7 +7,7 @@ import { parseQueryOptions, orderByEntriesToTuples, parseAggregateSelect, parseG
 import { apiHiddenKeys, cursorToStartAfter, isSoftDeleteRestore, pivotTable, relationOf } from "@rebasepro/common";
 import { isObject } from "@rebasepro/utils";
 import { assertNoHiddenAggregateNames, assertQueryFieldsReadable, assertReadableFields, requestViewer } from "./field-access-query";
-import { assertKnownWriteFields, assertWriteRequestValid, assertWriteValuesValid, projectResponseFields } from "./write-validation";
+import { assertJunctionWritable, assertKnownWriteFields, assertWriteRequestValid, assertWriteValuesValid, projectResponseFields } from "./write-validation";
 import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "./field-ops";
 import { resolveConflictTarget } from "./conflict-target";
 import { assertNestedWriteAllowed, type NestedWriteKind } from "./nested-write-access";
@@ -783,7 +783,7 @@ export class RestApiGenerator {
             parent: nested.chain[nested.chain.length - 2].table,
             relation: nested.relation,
             target: nested.chain[nested.chain.length - 1].table
-        }, kind, nested.path, requestViewer(c));
+        }, kind, nested.path, requestViewer(c), this.lookup);
     }
 
     /**
@@ -841,6 +841,14 @@ export class RestApiGenerator {
             );
         }
         assertWriteRequestValid(pivot as Record<string, unknown>, junction, { viewer: requestViewer(c) });
+        // Through a declared junction table, its own column rules hold too —
+        // the rule the body spelling (`{ tags: [{ id, _pivot }] }`) obeys.
+        if (nested.relation.kind === "manyToMany") {
+            assertJunctionWritable(nested.chain[nested.chain.length - 2].table, nested.relation, { link: false, pivot: pivot as Record<string, unknown> }, {
+                viewer: requestViewer(c),
+                relatedTables: this.lookup
+            });
+        }
 
         if (!driver.updateRelationPivot) {
             throw ApiError.badRequest(
