@@ -16,14 +16,13 @@
  *
  * Roots of "backend":
  *   - imports from a backend package's source (server, server-postgres, cli, codegen,
- *     client, mcp, rls-check, utils, inference — inference is a headless core package
- *     by `check:types-headless`, it cannot import cms-types), `app/backend`,
- *     `examples/* /backend`, `saas/backend`;
+ *     client, mcp, rls-check, utils), `app/backend`, `examples/* /backend`, `saas/backend`.
+ *     `inference` infers admin properties: it is CMS-side;
  *   - every declaration of the table model: `packages/types/src/schema/**`,
  *     `packages/common/src/{schema,table}/**`.
- * Roots of "backend (temporary)": the files `TEMPORARY` lists (the lowering/lift bridge,
- * the driver runtime mid-migration) and every backend source file that calls
- * `driverCollection` (the seams). A backend TEST importer pins a symbol like a source
+ * Roots of "backend (temporary)": the files `TEMPORARY` lists (none since the bridge was
+ * deleted; the legacy model lives in `@rebasepro/common/migrate`, which no root export
+ * reaches). A backend TEST importer pins a symbol like a source
  * one: a backend test cannot import an admin package either.
  *
  * Output: a markdown report (default `~/.rebase-audits/pgfirst/kernel-usage.md`) and,
@@ -52,10 +51,10 @@ const KERNEL_PACKAGES = ["types", "common"] as const;
 type KernelPackage = typeof KERNEL_PACKAGES[number];
 
 const BACKEND_PACKAGES = new Set([
-    "server", "server-postgres", "cli", "codegen", "client", "mcp", "rls-check", "utils", "inference"
+    "server", "server-postgres", "cli", "codegen", "client", "mcp", "rls-check", "utils"
 ]);
 const CMS_PACKAGES = new Set([
-    "cms", "cms-types", "app", "studio", "firebase", "ui", "forms", "mcp-apps",
+    "cms", "cms-types", "app", "studio", "firebase", "inference", "ui", "forms", "mcp-apps",
     "plugin-ai", "plugin-insights", "plugin-review"
 ]);
 
@@ -63,13 +62,7 @@ const CMS_PACKAGES = new Set([
 const TABLE_MODEL = [/^packages\/types\/src\/schema\//, /^packages\/common\/src\/(schema|table)\//];
 
 /** Files scheduled for deletion or a later slice: their imports pin a symbol only temporarily. */
-const TEMPORARY = [
-    /^packages\/common\/src\/schema\/(lift-collection|lift-rule-spelling)\.ts$/,
-    /^packages\/server-postgres\/src\/schema\/collection-input\.ts$/,
-    /^packages\/server-postgres\/src\/(services|utils)\//,
-    /^packages\/server-postgres\/src\/(PostgresBackendDriver|data-transformer|websocket)\.ts$/,
-    /^packages\/server\/src\/schema\/driver-seam\.ts$/
-];
+const TEMPORARY: RegExp[] = [];
 
 const SOURCE_EXT = /\.(ts|tsx|mts|cts)$/;
 const SKIP_DIRS = new Set(["node_modules", "dist", ".astro", ".git", "coverage", ".turbo", "build", ".vite", ".claude"]);
@@ -300,9 +293,7 @@ for (const full of workspaceFiles) {
     const unit = unitOf(file);
     const scope: Scope = isTest(file) ? "test" : "src";
     const importer: Importer = { file, unit, side: sideOf(file, unit), scope };
-    // A driverCollection seam is a temporary importer as a whole file.
     const text = fs.readFileSync(full, "utf8");
-    if (importer.side === "backend" && scope === "src" && /\bdriverCollection\b/.test(text)) importer.side = "backend-temp";
     scanSource(text, importer, file.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
 }
 
@@ -388,6 +379,8 @@ interface Row {
     pinnedBy?: string;
     /** Kernel declarations (outside the symbol's own) that reference it: they must move with it. */
     kernelReferrers: string[];
+    /** Every importing file outside the kernel, `side:scope:path` (for planning a move). */
+    importerFiles: string[];
 }
 
 function countByUnit(list: Importer[]): Record<string, number> {
@@ -423,7 +416,8 @@ const rows: Row[] = exported.map(symbol => {
         temporaryImporters: tempImporters,
         pinnedBy: pin ?? (classification === "backend" ? "kernel closure" : undefined),
         kernelReferrers: [...new Set(symbol.keys.flatMap(k => [...(referrers.get(k) ?? [])]))]
-            .filter(k => !symbol.keys.includes(k)).sort()
+            .filter(k => !symbol.keys.includes(k)).sort(),
+        importerFiles: external.map(i => `${i.side}:${i.scope}:${i.file}`).sort()
     };
 });
 

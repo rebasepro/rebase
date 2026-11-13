@@ -62,6 +62,18 @@
  *   working copy holds, ready for a private-index commit. `--files` limits it
  *   to the repo-relative paths listed one per line.
  *
+ * - `removed` (optional): kernel symbols deleted with no successor,
+ *   `{ "name", "from", "instead" }` — nothing is rewritten for them; they are
+ *   recorded (see below).
+ *
+ * Unless `--dry-run`, every cross-package symbol move (and every `removed`
+ * entry) is recorded in `tooling/scripts/headless-guard/moved-symbols.json` —
+ * `{ symbol, from, to, as?, instead? }` with package specifiers, `to: null`
+ * for a removal — the table the migration codemod rewrites a user project's
+ * imports from. A move out of the kernel (`@rebasepro/types`,
+ * `@rebasepro/common`) is also added to the `check:types-headless` refusal
+ * list `cms-only-symbols.json`, under its destination package.
+ *
  * Prints every file it changed (or would change).
  */
 import { execFileSync } from "node:child_process";
@@ -86,9 +98,72 @@ export interface SymbolMove {
     specifier?: string;
 }
 
+/** A kernel symbol deleted with no successor. */
+export interface SymbolRemoval {
+    name: string;
+    /** Repo-relative path of the module that declared it. */
+    from: string;
+    /** One line: what a project writes instead. */
+    instead: string;
+}
+
 export interface MoveMap {
     symbols?: SymbolMove[];
     files?: Record<string, string>;
+    removed?: SymbolRemoval[];
+}
+
+/** One row of `moved-symbols.json`. `to: null` = removed, `instead` says what replaces it. */
+export interface MovedSymbolRecord {
+    symbol: string;
+    from: string;
+    to: string | null;
+    as?: string;
+    instead?: string;
+}
+
+const GUARD_DIR = path.join(ROOT, "tooling", "scripts", "headless-guard");
+const MOVED_SYMBOLS = path.join(GUARD_DIR, "moved-symbols.json");
+const CMS_ONLY_SYMBOLS = path.join(GUARD_DIR, "cms-only-symbols.json");
+const KERNEL_SPECIFIERS = new Set(["@rebasepro/types", "@rebasepro/common"]);
+
+/**
+ * Record a map's cross-package moves and removals in `moved-symbols.json`
+ * (upserted by `symbol` + `from`, kept sorted), and its moves out of the kernel
+ * in the `cms-only-symbols.json` refusal list.
+ */
+export function recordMoves(map: MoveMap): MovedSymbolRecord[] {
+    const records: MovedSymbolRecord[] = [];
+    for (const move of map.symbols ?? []) {
+        const from = bareName(move.from);
+        const to = move.specifier ?? bareName(move.to);
+        if (from === to && !move.as) continue;
+        records.push({ symbol: move.name, from, to, ...(move.as ? { as: move.as } : {}) });
+    }
+    for (const removal of map.removed ?? []) {
+        records.push({ symbol: removal.name, from: bareName(removal.from), to: null, instead: removal.instead });
+    }
+    if (records.length === 0) return records;
+
+    const file = fs.existsSync(MOVED_SYMBOLS)
+        ? JSON.parse(fs.readFileSync(MOVED_SYMBOLS, "utf8")) as { "//"?: string; moves: MovedSymbolRecord[] }
+        : { moves: [] as MovedSymbolRecord[] };
+    const key = (r: MovedSymbolRecord) => `${r.from}#${r.symbol}`;
+    const byKey = new Map(file.moves.map(r => [key(r), r]));
+    for (const record of records) byKey.set(key(record), record);
+    file.moves = [...byKey.values()].sort((a, b) => a.from.localeCompare(b.from) || a.symbol.localeCompare(b.symbol));
+    fs.writeFileSync(MOVED_SYMBOLS, `${JSON.stringify(file, null, 2)}\n`);
+
+    const guard = JSON.parse(fs.readFileSync(CMS_ONLY_SYMBOLS, "utf8")) as { "//"?: string; moved: Record<string, string[]> };
+    for (const record of records) {
+        if (!KERNEL_SPECIFIERS.has(record.from) || record.to === null || KERNEL_SPECIFIERS.has(record.to)) continue;
+        if (record.to.startsWith("@rebasepro/common/")) continue;
+        const list = new Set(guard.moved[record.to] ?? []);
+        list.add(record.symbol);
+        guard.moved[record.to] = [...list].sort();
+    }
+    fs.writeFileSync(CMS_ONLY_SYMBOLS, `${JSON.stringify(guard, null, 2)}\n`);
+    return records;
 }
 
 const SOURCE_EXT = /\.(ts|tsx|mts|cts)$/;
@@ -599,6 +674,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
         skipped
     });
     if (patchFromHead) fs.writeFileSync(path.resolve(patchOut), patchFromHead.patch.join(""));
+    if (!args.includes("--dry-run")) {
+        const recorded = recordMoves(map);
+        if (recorded.length > 0) console.log(`  recorded ${recorded.length} symbol(s) in tooling/scripts/headless-guard/moved-symbols.json`);
+    }
     for (const file of changed) console.log(`  ${patchFromHead ? "patched (from HEAD)" : args.includes("--dry-run") ? "would rewrite" : "rewrote"} ${file}`);
     for (const file of skipped) console.log(`  skipped (uncommitted changes) ${file}`);
     console.log(`${changed.length} file(s)${skipped.length > 0 ? `, ${skipped.length} skipped` : ""}`);

@@ -1,0 +1,355 @@
+{
+  "//": "Every symbol that left @rebasepro/types or @rebasepro/common (or moved between packages) in the Postgres-first refactor: from/to are package specifiers; to: null means removed, and instead says what a project writes in its place. The migration codemod rewrites a user project imports from this table. tooling/scripts/move-kernel-symbols.mts appends to it; never edit a row by hand.",
+  "moves": [
+    {
+      "symbol": "applyDefaultValuesOnCreate",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "AuthContext",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "buildConditionContext",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "canCreateEntity",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "canDeleteEntity",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "canEditEntity",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "canReadCollection",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "checkOperation",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "CheckOperationOptions",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "COLLECTION_PATH_SEPARATOR",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "collectionsToTableDefs",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/common/migrate"
+    },
+    {
+      "symbol": "collectionToTableDef",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/common/migrate"
+    },
+    {
+      "symbol": "DEFAULT_ONE_OF_TYPE",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "DEFAULT_ONE_OF_VALUE",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "evaluateCondition",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "fullPathToCollectionSegments",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getArrayResolvedProperties",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getChildViewDeclaringProperties",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getChildViewRelationPropertyKeys",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getDefaultValueFor",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getDefaultValueFortype",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getDefaultValuesFor",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getLabelOrConfigFrom",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getPrimaryKeys",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getReferenceFrom",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getRelationFrom",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getRelationTargetPath",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms"
+    },
+    {
+      "symbol": "hasEntityId",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms"
+    },
+    {
+      "symbol": "isPropertyBuilder",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "LiftNote",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/common/migrate"
+    },
+    {
+      "symbol": "LiftNoteKind",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/common/migrate"
+    },
+    {
+      "symbol": "LiftOptions",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/common/migrate"
+    },
+    {
+      "symbol": "LiftResult",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/common/migrate"
+    },
+    {
+      "symbol": "liftRuleSpelling",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/common/migrate"
+    },
+    {
+      "symbol": "liftTenantSourceSpelling",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/common/migrate"
+    },
+    {
+      "symbol": "PolicyClauses",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "registerConditionOperations",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "resolveArrayProperties",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "resolveEnumValues",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ResolveFilenameStringParams",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "resolveProperties",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "resolveProperty",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "resolvePropertyEnum",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ResolvePropertyProps",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "resolveStorageFilenameString",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "resolveStoragePathString",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ResolveStoragePathStringParams",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "resolveStorageSource",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "sanitizeData",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "segmentsToStrippedPath",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "sortProperties",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "stripCollectionPath",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "traverseValueProperty",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "traverseValuesProperties",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "unavailableStorageSource",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "UnknownResolution",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "updateDateAutoValues",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "updateUserAutoValues",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ADMIN_COLLECTION_KEYS",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ADMIN_PROPERTY_KEYS",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "AdminCollectionKey",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "AdminPropertyKey",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "CollectionRegistryController",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ConditionContext",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "EffectiveRoleController",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "FilterPreset",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "McpAppModuleExport",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "nestAdminCollectionKeys",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "nestAdminKeysOf",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "nestAdminPropertyKeys",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    }
+  ]
+}
