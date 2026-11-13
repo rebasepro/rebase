@@ -1,0 +1,4 @@
+import { composeCallbacks } from "@rebasepro/server";
+
+// Collection callbacks composed on the backend: cms-types is the panel's package, not the server's.
+export const composed = composeCallbacks({}, {});

@@ -31,6 +31,7 @@ import type { AstContext } from "./ast";
 import { toPosix } from "./ast";
 import { CALL_OPTION_CHANGES, CODE_SPELLINGS, EXPORT_CHANGES, REMOVED_PACKAGES, SCRIPT_SPELLINGS, UPGRADE_GUIDE, type CodeSpelling } from "./export-changes";
 import { MOVED_SYMBOLS } from "./moved-symbols.generated";
+import { own } from "./own";
 import type { ManualStep, MovedSymbol, Note } from "./types";
 
 /** A replacement of `[start, end)` in a file's text. */
@@ -147,6 +148,20 @@ function braces(declaration: ImportDeclaration | ExportDeclaration, named: Node,
 }
 
 /**
+ * Names that moved to the panel's package but have a backend counterpart: in a
+ * backend file the import is not moved to `@rebasepro/cms-types` (the server
+ * does not run the panel's model) — the step names what the backend uses.
+ */
+const BACKEND_INSTEAD: Readonly<Record<string, string>> = {
+    composeCallbacks: "on the backend, use `composeTableHooks` from @rebasepro/common: table hooks get `table` instead of `collection`, and `values` instead of `row` in afterRead / beforeDelete / afterDelete."
+};
+
+/** Whether a project file is backend code (under a `backend/` directory). */
+function isBackendFile(relative: string): boolean {
+    return /(^|\/)backend\//.test(relative);
+}
+
+/**
  * Plan the moves of one file.
  *
  * @param ctx the AST context
@@ -195,6 +210,11 @@ export function rewriteMovedImports(ctx: AstContext, sf: SourceFile, relative: s
                 if (!row) continue;
                 if (row.to === null) {
                     removedLines.push(`line ${declaration.getStartLineNumber()}: \`${spec.name}\` from ${from} — ${row.instead ?? "it is no longer exported."}${guideLink(row)}`);
+                    continue;
+                }
+                const backendInstead = isBackendFile(relative) ? own(BACKEND_INSTEAD, spec.name) : undefined;
+                if (backendInstead) {
+                    removedLines.push(`line ${declaration.getStartLineNumber()}: \`${spec.name}\` from ${from} — ${backendInstead}`);
                     continue;
                 }
                 const plan = planOf(declaration);

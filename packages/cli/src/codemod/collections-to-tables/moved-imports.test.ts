@@ -119,6 +119,9 @@ describe("rebase migrate sdk-calls: moved, renamed and removed names", () => {
         expect(steps).toContain("an MCP tool named for collections (line 2)");
         expect(steps).toContain("script \"introspect\" uses schema introspect --output");
         expect(steps).toContain("#120-mongodb-is-retired");
+        // A backend file composing callbacks is pointed at the table-hook helper, not moved to the panel's package.
+        expect(read(dir, "backend/src/hooks.ts")).toContain(`import { composeCallbacks } from "@rebasepro/server";`);
+        expect(steps).toContain("`composeCallbacks` from @rebasepro/server — on the backend, use `composeTableHooks` from @rebasepro/common");
     });
 
     it("changes nothing on its own output", async () => {

@@ -51,6 +51,11 @@
       "file": "backend/src/access.ts"
     },
     {
+      "title": "Replace what 0.31 removed or changed in backend/src/hooks.ts",
+      "detail": "The codemod leaves these imports as written; each needs a hand edit. line 1: `composeCallbacks` from @rebasepro/server — on the backend, use `composeTableHooks` from @rebasepro/common: table hooks get `table` instead of `collection`, and `values` instead of `row` in afterRead / beforeDelete / afterDelete.",
+      "file": "backend/src/hooks.ts"
+    },
+    {
       "title": "Repoint the moved names frontend/src/cms/index.ts reaches without a named import",
       "detail": "The codemod rewrites named imports only. line 4: `export * from \"@rebasepro/types\";` no longer re-exports 105 name(s) that moved (ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS, AdminCollectionKey, AdminPropertyKey, AfterDeleteProps, AfterReadProps, …). If this module's importers read them through it, also re-export them from @rebasepro/cms-types.",
       "file": "frontend/src/cms/index.ts"
