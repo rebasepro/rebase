@@ -24,6 +24,9 @@ describe("REST joinPath relations — parent ids come from the row's key columns
     registry.registerPgTable(pgTable("sku_items", { sku: text("sku").primaryKey(), label: text("label") }), "sku_items");
     registry.registerPgTable(pgTable("memberships", { tenant_id: integer("tenant_id"), user_id: integer("user_id") }), "memberships");
     registry.registerPgTable(pgTable("warehouses", { id: integer("id").primaryKey(), city: text("city") }), "warehouses");
+    // The table the `via`s step through: the database has it (a join through
+    // a table it does not have is closed whole).
+    registry.registerPgTable(pgTable("stock", { sku: text("sku"), tenant_id: integer("tenant_id"), warehouse_id: integer("warehouse_id") }), "stock");
 
     const warehousesCollection: LegacyCollectionConfig = {
         slug: "warehouses",

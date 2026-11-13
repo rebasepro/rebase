@@ -1,5 +1,5 @@
-import { RebaseApiError, type CompiledTable, type TableHooks, type TableRegistryInterface } from "@rebasepro/types";
-import type { RelatedTables } from "@rebasepro/common";
+import { RebaseApiError, type CompiledTable, type RelationDescriptor, type TableHooks, type TableRegistryInterface } from "@rebasepro/types";
+import { UNSERVED_TABLE, viaJoinTableNames, type RelatedTables } from "@rebasepro/common";
 import { PgEnum, PgTable } from "drizzle-orm/pg-core";
 import { Relations } from "drizzle-orm";
 import { buildRuntimeTable, withCatalogueTable, type RuntimeTable } from "./runtime-table";
@@ -118,7 +118,38 @@ export class PostgresTableRegistry implements TableRegistryInterface {
      * column it reads (`relationJoinColumns` in `@rebasepro/common`).
      */
     relatedTables(): RelatedTables {
-        return name => (this.getTable(name) ?? this.getTableBySqlName(name))?.descriptor;
+        return name => {
+            const served = this.getTable(name) ?? this.getTableBySqlName(name);
+            if (served) return served.descriptor;
+            // A table withheld, or one this database does not have: a join
+            // through it reads what the server refuses everyone, so the
+            // relation is closed whole. A junction (or any other catalogue
+            // table no schema declares) has no column rules to judge.
+            if (this.withheldNamed(name) !== undefined || !this.pgTables.has(name)) return UNSERVED_TABLE;
+            return undefined;
+        };
+    }
+
+    /**
+     * Refuse a `via` whose steps pass through a withheld table — any step's
+     * table, or a `table.column` its join conditions name — with that table's
+     * reason (503 `TABLE_WITHHELD`), as a relation into a withheld target is
+     * refused. Every caller: the server does not read through a table it
+     * refuses to serve, on a read or a write. Any other relation: nothing to do
+     * here (a many-to-many over an unprotected junction withholds its owner).
+     */
+    refuseWithheldJoin(relation: RelationDescriptor): void {
+        if (relation.kind !== "via") return;
+        for (const name of viaJoinTableNames(relation)) this.refuseWithheld(name);
+    }
+
+    /** The withheld entry `name` (slug, kebab slug or SQL name) names, if any. */
+    private withheldNamed(name: string): { table: string; message: string } | undefined {
+        const slug = name.replace(/-/g, "_");
+        for (const [key, entry] of this.withheldTables) {
+            if (key === name || key === slug || entry.table === name) return entry;
+        }
+        return undefined;
     }
 
     /**

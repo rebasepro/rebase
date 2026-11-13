@@ -34,13 +34,14 @@ export function assertReadRequestReadable(
     read: { slug: string },
     viewer: FieldViewer,
     /** Where the table's descriptor — and its relations' targets' — are read from. */
-    registry: Pick<PostgresTableRegistry, "getTable" | "getTableBySqlName" | "requireTable">
+    registry: Pick<PostgresTableRegistry, "relatedTables" | "requireTable">
 ): void {
     // Fail closed: a table this registry does not serve is refused by
     // `requireTable`, never read unchecked.
     const table = registry.requireTable(read.slug).descriptor;
-    // By slug or SQL name: a `via` step names a table by its SQL name.
-    const related = (name: string) => (registry.getTable(name) ?? registry.getTableBySqlName(name))?.descriptor;
+    // By slug or SQL name: a `via` step names a table by its SQL name. A table
+    // the server does not serve closes every `via` through it.
+    const related = registry.relatedTables();
     // Nothing on the table restricts a name and nothing reaches another
     // table: there is nothing to refuse. Every read on a caller's behalf
     // passes here, so the common case costs one walk of the columns.

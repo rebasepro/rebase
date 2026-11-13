@@ -17,10 +17,18 @@ import {
     unknownProjectionField,
     unknownRelationTargetField,
     unknownVectorProperty,
-    vectorColumnKeys
+    vectorColumnKeys,
+    UNSERVED_TABLE,
+    type RelatedTables
 } from "@rebasepro/common";
 import { ApiError } from "../errors";
-import type { TableLookup } from "./served-table";
+
+/**
+ * The tables a read's relations reach, by slug or SQL name: the REST layer's
+ * served tables, or a driver's lookup, which also says which tables it does
+ * not serve (`UNSERVED_TABLE`, closing every `via` through one).
+ */
+type TableLookup = RelatedTables;
 
 /**
  * A read may not name a field the caller cannot read.
@@ -250,7 +258,8 @@ function assertRestrictedFieldsUnused(
 /** The table a relation of `table` points at, when the relation exists and its target is described. */
 function relationTarget(table: TableDescriptor, name: string, lookup: TableLookup): TableDescriptor | undefined {
     const relation = relationOf(table, name);
-    return relation ? lookup(relation.target) : undefined;
+    const target = relation ? lookup(relation.target) : undefined;
+    return target === UNSERVED_TABLE ? undefined : target;
 }
 
 /**

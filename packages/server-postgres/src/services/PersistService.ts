@@ -1,7 +1,7 @@
 import { eq, and, isNotNull, isNull, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { FilterValues, JUNCTION_PIVOT_KEY, type LogicalCondition, joinConditions } from "@rebasepro/types";
+import { FilterValues, JUNCTION_PIVOT_KEY, RebaseApiError, type LogicalCondition, joinConditions } from "@rebasepro/types";
 import { createStampKeys } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
@@ -1360,7 +1360,8 @@ export class PersistService {
         // Re-wrapping one flattens it into a generic Error, and the status is lost
         // on the way out — a policy rejection would surface as a 500. Matched by
         // name as well as instance: a duplicated module copy breaks `instanceof`.
-        if (error instanceof ApiError || (error as Error)?.name === "ApiError") {
+        // The registry's own refusals (`TABLE_WITHHELD`) are `RebaseApiError`s.
+        if (error instanceof ApiError || error instanceof RebaseApiError || (error as Error)?.name === "ApiError") {
             return error as Error;
         }
 

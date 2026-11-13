@@ -156,7 +156,36 @@ export function isPrivateRelation(table: TableDescriptor, relation: RelationDesc
  *
  * @internal Shared with @rebasepro/server and @rebasepro/server-postgres; not part of the public API.
  */
-export type RelatedTables = (slugOrTable: string) => TableDescriptor | undefined;
+export type RelatedTables = (slugOrTable: string) => TableDescriptor | typeof UNSERVED_TABLE | undefined;
+
+/**
+ * What a {@link RelatedTables} lookup answers for a table the server does not
+ * serve: one it withheld (`TABLE_WITHHELD`), or a name no table of its
+ * database has. A `via` whose steps pass through such a table is readable and
+ * writable by nobody ({@link relationJoinColumns}): the join would read a
+ * table the server refuses everyone, and whose column rules it cannot judge.
+ *
+ * @group Table
+ *
+ * @internal Shared with @rebasepro/server-postgres; not part of the public API.
+ */
+export const UNSERVED_TABLE: unique symbol = Symbol("rebase.unservedTable");
+
+/**
+ * The join column a `via` reads on a table the server does not serve
+ * ({@link UNSERVED_TABLE}): closed to every caller, the admin and the trusted
+ * plane included, so every gate that judges a relation by its join columns
+ * refuses it.
+ */
+const UNSERVED_JOIN_COLUMN: ColumnDescriptor = {
+    key: "",
+    column: "",
+    type: { kind: "text" },
+    nullable: true,
+    readOnly: true,
+    access: PRIVATE_ACCESS
+};
+Object.freeze(UNSERVED_JOIN_COLUMN);
 
 /**
  * The declared columns a relation's join condition reads, on every table it
@@ -172,7 +201,10 @@ export type RelatedTables = (slugOrTable: string) => TableDescriptor | undefined
  *   own table).
  *
  * A column a table does not describe (an implicit key, an implicit junction)
- * has no rules and is not listed; so is a table `related` cannot find.
+ * has no rules and is not listed; so is a table `related` cannot find. A
+ * `via` step (or a `table.column` qualifier) `related` answers
+ * {@link UNSERVED_TABLE} for lists a column nobody may read or write: the
+ * relation is closed whole.
  *
  * @group Table
  *
@@ -185,7 +217,7 @@ export function relationJoinColumns(table: TableDescriptor, relation: RelationDe
         const column = on.columns.find(candidate => candidate.column === name || candidate.key === name);
         if (column && !out.includes(column)) out.push(column);
     };
-    const target = (): TableDescriptor | undefined => related?.(relation.target);
+    const target = (): TableDescriptor | undefined => described(related?.(relation.target));
     const primaryKey = (on: TableDescriptor | undefined): void => {
         for (const key of on?.primaryKey ?? []) add(on, key);
     };
@@ -203,7 +235,7 @@ export function relationJoinColumns(table: TableDescriptor, relation: RelationDe
             break;
         case "manyToMany": {
             primaryKey(table);
-            const junction = related?.(relation.through.table);
+            const junction = described(related?.(relation.through.table));
             add(junction, relation.through.sourceKey);
             add(junction, relation.through.targetKey);
             primaryKey(target());
@@ -213,6 +245,10 @@ export function relationJoinColumns(table: TableDescriptor, relation: RelationDe
             const tableNamed = (name: string): TableDescriptor | undefined => {
                 if (name === table.table || name === table.slug) return table;
                 const found = related?.(name);
+                if (found === UNSERVED_TABLE) {
+                    if (!out.includes(UNSERVED_JOIN_COLUMN)) out.push(UNSERVED_JOIN_COLUMN);
+                    return undefined;
+                }
                 if (found) return found;
                 const end = target();
                 return end && end.table === name ? end : undefined;
@@ -236,6 +272,34 @@ export function relationJoinColumns(table: TableDescriptor, relation: RelationDe
         }
     }
     return out;
+}
+
+/**
+ * Every table a `via` relation's join passes through, by the name its steps
+ * use: each step's table, and each table a `table.column` in a join
+ * condition names. In step order, each name once.
+ *
+ * @group Table
+ *
+ * @internal Shared with @rebasepro/server-postgres; not part of the public API.
+ */
+export function viaJoinTableNames(relation: Extract<RelationDescriptor, { kind: "via" }>): string[] {
+    const out: string[] = [];
+    const add = (name: string | undefined): void => {
+        if (name !== undefined && !out.includes(name)) out.push(name);
+    };
+    for (const step of relation.steps) {
+        add(step.table);
+        for (const condition of Array.isArray(step.on) ? step.on : [step.on]) {
+            for (const name of [condition.from, condition.to].flat()) add(splitQualified(name)[0]);
+        }
+    }
+    return out;
+}
+
+/** A lookup's answer as a descriptor: a table it does not serve has none to judge. */
+function described(found: TableDescriptor | typeof UNSERVED_TABLE | undefined): TableDescriptor | undefined {
+    return found === UNSERVED_TABLE ? undefined : found;
 }
 
 /** `table.column` as its two parts; a bare column has no table. */
@@ -340,7 +404,7 @@ function namesWhere(
         refused.add(column.column);
     }
     for (const relation of table.relations) {
-        const read = joins ? relationJoinColumns(table, relation, joins) : [boundKeyColumn(table, relation)];
+        const read = joins ? relationJoinColumns(table, relation, joins === NO_RELATED ? undefined : joins) : [boundKeyColumn(table, relation)];
         if (!restricted(relation) && !read.some(column => column !== undefined && restricted(column))) continue;
         restrict(relation.name);
         if (relation.kind === "belongsTo") restrictForeignKey(table, relation, restrict, refused);

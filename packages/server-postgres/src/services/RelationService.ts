@@ -357,6 +357,7 @@ export class RelationService {
      * table a step may revisit. See {@link ViaJoinPath}.
      */
     private viaJoinPath(parentTable: PgTable, relation: RelationOfKind<"via">): ViaJoinPath {
+        this.registry.refuseWithheldJoin(relation);
         const source: PgTable = alias(parentTable, VIA_SOURCE);
         const joins: { table: PgTable; condition: SQL }[] = [];
         let current = source;

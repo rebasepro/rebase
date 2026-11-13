@@ -24,6 +24,8 @@ export {
     hasJoinAccessRules,
     relationJoinColumns,
     restrictedKeys,
+    UNSERVED_TABLE,
+    viaJoinTableNames,
     type RelatedTables
 } from "./access";
 export * from "./relations";

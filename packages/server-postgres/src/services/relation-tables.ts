@@ -31,10 +31,14 @@ export function pointsBack(relation: RelationDescriptor): relation is PointsBack
 /**
  * The table a relation points at. Throws, naming the slug, when this driver
  * does not serve it — boot refused such a relation already
- * (`assertRelationsResolve`), so reaching one here is a wiring defect.
+ * (`assertRelationsResolve`), so reaching one here is a wiring defect — and
+ * 503 `TABLE_WITHHELD` when it, or a table a `via` passes through on the way,
+ * is withheld.
  */
 export function relationTarget(registry: PostgresTableRegistry, relation: RelationDescriptor): RuntimeTable {
-    return registry.requireTable(relation.target);
+    const target = registry.requireTable(relation.target);
+    registry.refuseWithheldJoin(relation);
+    return target;
 }
 
 /**

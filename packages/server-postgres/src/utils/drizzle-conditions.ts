@@ -592,6 +592,7 @@ export class DrizzleConditionBuilder {
 
         switch (relation.kind) {
             case "via": {
+                registry.refuseWithheldJoin(relation);
                 const { table, key } = parent();
                 return this.buildJoinPathScopeCondition(
                     relation.steps, table, key, targetTable, registry
