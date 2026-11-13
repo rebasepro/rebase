@@ -1,0 +1,82 @@
+---
+slug: docs/upgrading/0-30-to-0-31-imports
+title: Imports that moved in 0.31
+sidebar_label: 0.31 moved imports
+description: "Every export 0.31 moved from @rebasepro/types, @rebasepro/common or @rebasepro/server to @rebasepro/cms-types, @rebasepro/cms or @rebasepro/common/migrate, and every one it removed, with what to write instead."
+---
+
+# Imports that moved in 0.31
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+The kernel packages describe tables only, so what describes a collection as the admin panel draws it moved to `@rebasepro/cms-types`, and the migration lift to `@rebasepro/common/migrate` ([section 135 of the upgrade guide](/docs/upgrading/0-30-to-0-31/#135-rebaseprotypes-and-rebaseprocommon-drop-the-collection-model-from-their-roots)).
+
+`rebase migrate sdk-calls` (part of `rebase migrate collections-to-tables`) moves each import below to its new package — merged into an import of that package the file already has, `import type`, inline `type` and `as` aliases kept — and adds the package to the importing workspace package's dependencies; run `pnpm install` afterwards. An import of a removed name, a namespace import, an `export *`, a dynamic `import()` or a `require()` that uses a moved name is a numbered manual step.
+
+This list is written from `tooling/scripts/headless-guard/moved-symbols.json`, the table the codemod reads. See [`rebase migrate`](/docs/cli/schema/#rebase-migrate) for the command, and [Customizing a table](/docs/frontend/customize-table/) for where the panel's types are used.
+
+{/* moved-imports:start — written by tooling/scripts/docs-verify/moved-imports-guide.mjs from moved-symbols.json; do not edit by hand */}
+
+**From `@rebasepro/common` to `@rebasepro/cms`** (2):
+
+`getRelationTargetPath`, `hasEntityId`.
+
+**From `@rebasepro/common` to `@rebasepro/cms-types`** (92):
+
+`applyDefaultValuesOnCreate`, `AuthContext`, `buildConditionContext`, `buildRebaseData`, `buildRoutedRebaseData`, `canCreateEntity`, `canDeleteEntity`, `canEditEntity`, `canReadCollection`, `canReadField`, `canWriteField`, `checkOperation`, `CheckOperationOptions`, `COLLECTION_PATH_SEPARATOR`, `CollectionRegistry`, `compileRulePolicies`, `composeCallbacks`, `copyCarriesRelation`, `createRelationRef`, `createRelationRefWithData`, `DEFAULT_ONE_OF_TYPE`, `DEFAULT_ONE_OF_VALUE`, `effectiveAccess`, `EntityDataOptions`, `enumToObjectEntries`, `evaluateCondition`, `fieldKeyForColumn`, `findRelation`, `fullPathToCollectionSegments`, `getArrayResolvedProperties`, `getChildViewDeclaringProperties`, `getChildViewRelationPropertyKeys`, `getCopyValues`, `getDeclaredPrimaryKeys`, `getDefaultValueFor`, `getDefaultValueFortype`, `getDefaultValuesFor`, `getEffectiveSecurityRules`, `getEffectiveSecurityRulesOnce`, `getEntityChildViews`, `getGeneratedPolicyNames`, `getGeneratedPolicyNamesOnce`, `getInjectedSecurityRules`, `getLabelOrConfigFrom`, `getPrimaryKeys`, `getReferenceFrom`, `getRelationFrom`, `getSubcollections`, `getTableName`, `isJunctionBackedRelation`, `isPropertyBuilder`, `LegacyPolicyCompileOptions`, `LegacyRulePolicyCompileOptions`, `legacyTableResolver`, `normalizeToEntityRelation`, `PolicyClauses`, `policyTableFromCollection`, `policyToPostgres`, `QueryBuilder`, `registerConditionOperations`, `RelationRef`, `RelationRefWithData`, `resolveArrayProperties`, `resolveCollectionRelations`, `resolveEnumValues`, `ResolveFilenameStringParams`, `resolvePrimaryKeys`, `resolveProperties`, `resolveProperty`, `resolvePropertyEnum`, `ResolvePropertyProps`, `resolveRelation`, `resolveRelationProperty`, `resolveStorageFilenameString`, `resolveStoragePathString`, `ResolveStoragePathStringParams`, `resolveStorageSource`, `RoutableData`, `RoutedRebaseDataParams`, `rowToViewModel`, `sanitizeData`, `segmentsToStrippedPath`, `sortProperties`, `stripCollectionPath`, `traverseValueProperty`, `traverseValuesProperties`, `unavailableStorageSource`, `UnknownResolution`, `updateDateAutoValues`, `updateUserAutoValues`, `withDeprecatedAlias`, `wrapAsEntityData`.
+
+**From `@rebasepro/common` to `@rebasepro/common/migrate`** (8):
+
+`collectionsToTableDefs`, `collectionToTableDef`, `LiftNote`, `LiftNoteKind`, `LiftOptions`, `LiftResult`, `liftRuleSpelling`, `liftTenantSourceSpelling`.
+
+**From `@rebasepro/server` to `@rebasepro/cms-types`** (1):
+
+`composeCallbacks`.
+
+**From `@rebasepro/types` to `@rebasepro/cms-types`** (118):
+
+`ADMIN_COLLECTION_KEYS`, `ADMIN_PROPERTY_KEYS`, `AdminCollectionKey`, `AdminPropertyKey`, `AfterDeleteProps`, `AfterReadProps`, `AfterSaveErrorProps`, `AfterSaveProps`, `AnyCollectionConfig`, `ArrayProperty`, `ArrayPropertyValidationSchema`, `AuthCollectionConfig`, `AuthState`, `BaseCollectionConfig`, `BaseProperty`, `BeforeDeleteProps`, `BeforeQueryProps`, `BeforeSaveProps`, `BelongsToRelation`, `BinaryProperty`, `BooleanProperty`, `BrinIndex`, `BtreeIndex`, `ChildViewSource`, `CollectionCallbacks`, `CollectionConfig`, `CollectionIndex`, `CollectionRegistryController`, `CollectionView`, `ColorHue`, `ColorKey`, `ColorScheme`, `ColorTone`, `ConditionContext`, `ConditionRule`, `DataType`, `DateProperty`, `DatePropertyValidationSchema`, `EffectiveRoleController`, `EngineProperties`, `Entity`, `EntityChildView`, `EntityReference`, `EntityReferenceProps`, `EntityRelation`, `EntityValues`, `EnumValueConditions`, `EnumValueConfig`, `EnumValues`, `FieldAccess`, `FileType`, `FilterPreset`, `FindResponse`, `FirebaseCollectionConfig`, `FirebaseProperties`, `FirebaseProperty`, `GeoPoint`, `GeopointProperty`, `getCollectionDataPath`, `getDeclaredSubcollections`, `GinIndex`, `HasManyRelation`, `HasOneRelation`, `ImageResize`, `IndexKey`, `IndexPredicate`, `InferEntityType`, `InferPropertyType`, `isFirebaseCollectionConfig`, `isPostgresCollectionConfig`, `isRelationalCollectionConfig`, `JsonLogicRule`, `ManyToManyRelation`, `MapProperty`, `McpAppModuleExport`, `nestAdminCollectionKeys`, `nestAdminKeysOf`, `nestAdminPropertyKeys`, `NoSuchKey`, `NumberProperty`, `NumberPropertyValidationSchema`, `PostgresCollectionConfig`, `PostgresProperties`, `PostgresProperty`, `Properties`, `Property`, `PropertyBuilderProps`, `PropertyCallbacks`, `PropertyConditions`, `PropertyTypeNotOnThisEngine`, `PropertyValidationSchema`, `QueryBuilderInterface`, `RebaseData`, `ReferenceProperty`, `Relation`, `RelationBase`, `RelationProperty`, `ResolvedBelongsTo`, `ResolvedHasMany`, `ResolvedHasOne`, `ResolvedManyToMany`, `ResolvedRelation`, `ResolvedRelationBase`, `ResolvedVia`, `SqlExpression`, `StorageConfig`, `StrictProperties`, `StringProperty`, `StringPropertyValidationSchema`, `TableAccessor`, `TableTrashAccessor`, `UnorderedIndexKey`, `UploadedFileContext`, `Vector`, `VectorDistance`, `VectorIndexConfig`, `VectorProperty`, `ViaRelation`.
+
+**Removed, with no successor in another package** (37) — the codemod lists each import as a numbered manual step:
+
+| Name | Was exported by | Write instead |
+|---|---|---|
+| `FindResponse` | `@rebasepro/client` | FindResult from @rebasepro/types: what client.data.<table>.find() resolves to. |
+| `defineCollection` | `@rebasepro/cms-types` | defineTable (backend/schema) + customizeTable for the panel's presentation; defineFirestoreCollection (@rebasepro/firebase) for Firestore; defineLegacyCollection (@rebasepro/common/migrate) for 0.30 fixtures. |
+| `apiHiddenFieldNames` | `@rebasepro/common` | apiHiddenKeys(descriptor) from @rebasepro/common. |
+| `assertBeforeQueryIsPostgresOnly` | `@rebasepro/common` | Nothing: Postgres is the only server engine. |
+| `buildPropertyCallbacks` | `@rebasepro/common` | Column transforms: col.*().transform(...) on the table definition. |
+| `DEFAULT_STRING_COLUMN_LENGTH` | `@rebasepro/common` | col.varchar({ length }) states the length on the column. |
+| `defaultUsersCollection` | `@rebasepro/common` | defineAuthTable for the user store; AUTH_SECRET_NAMES lists its secrets. |
+| `defineCollection` | `@rebasepro/common` | defineTable (backend/schema); the CMS customizes a table with customizeTable; Firestore uses defineFirestoreCollection; legacy fixtures defineLegacyCollection from @rebasepro/common/migrate. |
+| `EntityCallbackContext` | `@rebasepro/common` | TableHookProps["context"] from @rebasepro/types. |
+| `getJunctionCollectionConfig` | `@rebasepro/common` | junctionPolicyTable(junction) from @rebasepro/common. |
+| `getJunctionSecurityRules` | `@rebasepro/common` | tableJunctionRules(junction) from @rebasepro/common. |
+| `getTenantConfig` | `@rebasepro/common` | tenantOf(descriptor) from @rebasepro/common reads a table's tenancy. |
+| `hasFieldAccessRules` | `@rebasepro/common` | hasColumnAccessRules(descriptor) from @rebasepro/common. |
+| `includableRelationNames` | `@rebasepro/common` | includableRelations(descriptor) from @rebasepro/common. |
+| `JunctionDeclaringSide` | `@rebasepro/common` | TableJunctionSide from @rebasepro/common. |
+| `JunctionEndpoint` | `@rebasepro/common` | TableJunctionEndpoint from @rebasepro/common. |
+| `JunctionSpec` | `@rebasepro/common` | TableJunction from @rebasepro/common. |
+| `queryableFieldNames` | `@rebasepro/common` | queryableColumnKeys(descriptor) from @rebasepro/common. |
+| `resolveJunctionSpecs` | `@rebasepro/common` | resolveTableJunctions(descriptors) from @rebasepro/common. |
+| `resolveStringColumnLength` | `@rebasepro/common` | col.varchar({ length }) states the length on the column. |
+| `restrictedFieldNames` | `@rebasepro/common` | restrictedKeys(descriptor, viewer, kind) from @rebasepro/common. |
+| `vectorPropertyNames` | `@rebasepro/common` | vectorColumnKeys(descriptor) from @rebasepro/common. |
+| `withRelationReferencesOnly` | `@rebasepro/common` | History entries hold the stored (wire) row, which embeds no related row; the history routes serve an older entry's relation refs as keys. Nothing replaces it. |
+| `wrapAsSdkData` | `@rebasepro/common` | buildSdkData(driver) from @rebasepro/common: the SDK is built on the driver's rows; there is no Entity accessor to flatten. |
+| `ListenCollectionRequest` | `@rebasepro/server` | ListenCollectionProps from @rebasepro/types (a subscription's rows are plain rows). |
+| `ListenEntityRequest` | `@rebasepro/server` | ListenOneProps from @rebasepro/types. |
+| `DataTransformer` | `@rebasepro/types` | Nothing: the Postgres driver's codecs read the column descriptor. |
+| `deserializeCollections` | `@rebasepro/types` | Nothing: GET /api/schema/tables serves table descriptors; collections are not serialized. |
+| `hasForeignKeyOnTarget` | `@rebasepro/types` | Read RelationDescriptor.kind (hasOne \| hasMany). |
+| `InferCollectionConfigType` | `@rebasepro/types` | Infer a table's row with InferRow<typeof table>. |
+| `initTextSearch` | `@rebasepro/types` | DataDriver no longer declares it; the Firestore driver (FirestoreDataDriver) declares its own. |
+| `isManyToMany` | `@rebasepro/types` | Read RelationDescriptor.kind === "manyToMany". |
+| `isSerializedCollectionRef` | `@rebasepro/types` | Nothing: GET /api/schema/tables serves table descriptors; collections are not serialized. |
+| `isToMany` | `@rebasepro/types` | Read RelationDescriptor.kind (hasMany \| manyToMany \| via). |
+| `ResolvedForeignKeyOnTarget` | `@rebasepro/types` | Read RelationDescriptor.kind (hasOne \| hasMany). |
+| `serializeCollections` | `@rebasepro/types` | Nothing: GET /api/schema/tables serves table descriptors; collections are not serialized. |
+| `SerializedCollectionRef` | `@rebasepro/types` | Nothing: GET /api/schema/tables serves table descriptors; collections are not serialized. |
+
+{/* moved-imports:end */}

@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const TABLE = path.join(ROOT, "tooling/scripts/headless-guard/moved-symbols.json");
-const GUIDE = path.join(ROOT, "website/src/content/docs/docs/upgrading/0-30-to-0-31.mdx");
+const GUIDE = path.join(ROOT, "website/src/content/docs/docs/upgrading/0-30-to-0-31-imports.mdx");
 const START = "{/* moved-imports:start — written by tooling/scripts/docs-verify/moved-imports-guide.mjs from moved-symbols.json; do not edit by hand */}";
 const END = "{/* moved-imports:end */}";
 

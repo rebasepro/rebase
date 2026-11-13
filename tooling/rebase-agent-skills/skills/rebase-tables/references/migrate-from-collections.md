@@ -199,8 +199,9 @@ It rewrites, in the project's own code (never in generated files):
 | an import of a name that moved to another package (`StringProperty` from `@rebasepro/types`, `resolveCollectionRelations` from `@rebasepro/common`, the lift from `@rebasepro/common`, …) | the same import from `@rebasepro/cms-types`, `@rebasepro/cms` or `@rebasepro/common/migrate`, merged into an import of it the file has |
 | `reviewSecurityRules`, `assertUploadWithinPropertyLimits`, `UPLOAD_COLLECTION_FIELD`, `UPLOAD_PROPERTY_FIELD` | `reviewRls`, `assertUploadWithinColumnLimits`, `UPLOAD_TABLE_FIELD`, `UPLOAD_COLUMN_FIELD` (every reference in the file) |
 
-The full list of moved and removed names is the upgrade guide's "Imports that
-moved" (generated from `tooling/scripts/headless-guard/moved-symbols.json`). A
+The full list of moved and removed names is the docs page "Imports that moved
+in 0.31" (`/docs/upgrading/0-30-to-0-31-imports/`, generated from
+`tooling/scripts/headless-guard/moved-symbols.json`). A
 package an import now names is added to that workspace package's
 `dependencies`, printed under **Dependencies added**: run `pnpm install`. An
 import of a removed name, a namespace import, `export *`, a dynamic `import()`

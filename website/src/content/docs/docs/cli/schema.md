@@ -509,7 +509,7 @@ adds `rebaseBackendGuard()` to a scaffold's `vite.config.ts`, then runs
 other SDK renames and the rule sources `existsIn` / `membership` in your code,
 and moves the imports of names 0.31 moved to another package (the admin
 panel's types and helpers to `@rebasepro/cms-types`, the migration lift to
-`@rebasepro/common/migrate` — [the list](/docs/upgrading/0-30-to-0-31/#imports-that-moved)),
+`@rebasepro/common/migrate` — [the list](/docs/upgrading/0-30-to-0-31-imports/)),
 adding the package to the importer's dependencies ("Dependencies added": run
 `pnpm install`). Bump every `@rebasepro` package to 0.31 before running it.
 Every run reads the result back: the generated SQL — DDL, policies, search,
