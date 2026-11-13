@@ -90,6 +90,16 @@ export class Relocator {
     readonly helpers = new Map<string, HelperCopy>();
     /** Modules of the project's own in config/ that backend code the run writes imports in place. */
     readonly keptBackendModules = new Set<string>();
+    /** Edits to a module's own text before it is copied or kept (a helper's callbacks as table hooks), by absolute path. */
+    readonly sourceEdits = new Map<string, { start: number; end: number; text: string }[]>();
+
+    /** A module's text with its {@link sourceEdits} applied. */
+    private editedSource(file: string): string {
+        let out = fs.readFileSync(file, "utf8");
+        const edits = this.sourceEdits.get(file);
+        if (edits) for (const edit of [...edits].sort((a, b) => b.start - a.start)) out = out.slice(0, edit.start) + edit.text + out.slice(edit.end);
+        return out;
+    }
     /** Collection files that move rather than become tables (Firestore ones): legacy path → new path. */
     readonly moved = new Map<string, string>();
 
@@ -163,7 +173,7 @@ export class Relocator {
         const key = `${copy.side}:${copy.from}`;
         const cached = this.contents.get(key);
         if (cached !== undefined) return cached;
-        const text = fs.readFileSync(copy.from, "utf8");
+        const text = this.editedSource(copy.from);
         this.contents.set(key, text);
         const moved = this.moveSpecifiersInText(text, copy.from, copy.to, copy.side);
         this.contents.set(key, moved);
@@ -176,7 +186,7 @@ export class Relocator {
      * copy to backend/lib gets them): the hooks it serves are table hooks now.
      */
     keptBackendContent(file: string): string {
-        const text = fs.readFileSync(file, "utf8");
+        const text = this.editedSource(file);
         const sf = this.ctx.project.createSourceFile(`/__rebase_migrate__/kept-${path.basename(file)}`, text, { overwrite: true });
         try {
             const edits: { start: number; end: number; text: string }[] = [];

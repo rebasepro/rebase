@@ -184,6 +184,10 @@ describe("what the blog fixture says about routing", () => {
         const users = report.files.find(file => file.path === "backend/schema/users.ts");
         expect(users?.content).toContain("        // Only admins list users.\n        { operation: \"select\"");
         expect(report.files.find(file => file.path === "backend/schema/index.ts")?.content).toContain("/** Anyone reads, admins write. */\nexport const defaultRls");
+        // Callbacks from the project's own helpers: `hooks:` names the helper, whose functions take table-hook props where they are written.
+        expect(report.files.find(file => file.path === "backend/schema/authors.ts")?.content).toContain(`hooks: auditedCallbacks("authors")`);
+        expect(report.files.find(file => file.path === "backend/lib/collections/_audited.ts")?.content).toContain("afterRead: ({ values: row }: { values: Record<string, unknown> }) => {");
+        expect(report.files.find(file => file.path === "backend/schema/tags.ts")?.content).toContain(`import { tagCallbacks } from "../../config/tag-callbacks";`);
         // A custom backend entry: the auth collection option and its import go (the auth table is defineAuthTable's), storage is repointed.
         const entry = report.files.find(file => file.path === "backend/src/index.ts")?.content ?? "";
         expect(entry).not.toContain("usersCollection");
@@ -193,16 +197,18 @@ describe("what the blog fixture says about routing", () => {
         // config/ keeps the project's own modules: still a workspace package, still compiled by the backend.
         expect(report.files.some(file => file.path === "pnpm-workspace.yaml")).toBe(false);
         expect(report.files.find(file => file.path === "backend/tsconfig.json")?.content).toContain(`"../config/**/*"`);
-        expect(report.notes.map(entry => entry.message).join("\n")).toContain("keeps 3 module(s) of the project's own (config/actions.ts, config/form-rules.ts, config/slugify.ts)");
+        expect(report.notes.map(entry => entry.message).join("\n")).toContain("keeps 4 module(s) of the project's own (config/actions.ts, config/form-rules.ts, config/slugify.ts, config/tag-callbacks.ts)");
     }, 120_000);
 
     it("with nothing of its own left in config/, drops the config package and compiles the backend from its own directory", async () => {
         const dir = materialize("blog");
         // The blog's helpers moved beside the collections: config/ holds nothing but what Rebase read.
         const collections = path.join(dir, "config", "collections");
-        for (const helper of ["slugify.ts", "actions.ts", "form-rules.ts"]) fs.renameSync(path.join(dir, "config", helper), path.join(collections, `_${helper}`));
+        for (const helper of ["slugify.ts", "actions.ts", "form-rules.ts", "tag-callbacks.ts"]) fs.renameSync(path.join(dir, "config", helper), path.join(collections, `_${helper}`));
         const posts = path.join(collections, "posts.ts");
         fs.writeFileSync(posts, fs.readFileSync(posts, "utf8").replace(`"../slugify"`, `"./_slugify"`).replace(`"../actions"`, `"./_actions"`).replace(`"../form-rules"`, `"./_form-rules"`));
+        const tags = path.join(collections, "tags.ts");
+        fs.writeFileSync(tags, fs.readFileSync(tags, "utf8").replace(`"../tag-callbacks"`, `"./_tag-callbacks"`));
         const report = await run(dir, { dryRun: true });
         expect(report.refusals).toEqual([]);
         expect(report.files.find(file => file.path === "backend/schema/posts.ts")?.content).toContain(`import { slugify } from "../lib/collections/_slugify";`);

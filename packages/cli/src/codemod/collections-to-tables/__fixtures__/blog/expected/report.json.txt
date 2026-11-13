@@ -30,6 +30,7 @@
     }
   ],
   "files": [
+    "create backend/lib/collections/_audited.ts",
     "create backend/lib/collections/_text.ts",
     "create backend/resources.ts",
     "create backend/schema/authors.ts",
@@ -54,12 +55,16 @@
   "refusals": [],
   "notes": [
     {
+      "file": "config/collections/_audited.ts",
+      "message": "exports no collection: read as a module the collections import, not as a table. It is copied next to the code that imports it, since config/collections goes; when nothing imports it, a step lists it."
+    },
+    {
       "file": "config/collections/_text.ts",
       "message": "exports no collection: read as a module the collections import, not as a table. It is copied next to the code that imports it, since config/collections goes; when nothing imports it, a step lists it."
     },
     {
       "file": "config",
-      "message": "keeps 3 module(s) of the project's own (config/actions.ts, config/form-rules.ts, config/slugify.ts): 0.31 stops reading config/collections, not config/. They stay where they are, importable as before; only what Rebase read is removed."
+      "message": "keeps 4 module(s) of the project's own (config/actions.ts, config/form-rules.ts, config/slugify.ts, config/tag-callbacks.ts): 0.31 stops reading config/collections, not config/. They stay where they are, importable as before; only what Rebase read is removed."
     }
   ],
   "manualSteps": [

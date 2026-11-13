@@ -1,0 +1,10 @@
+/** Callbacks several collections share, built by a function: a helper beside the collections. */
+export function auditedCallbacks(label: string) {
+    const prefix = `[${label}]`;
+    return {
+        afterRead: ({ row }: { row: Record<string, unknown> }) => {
+            void prefix;
+            return row;
+        }
+    };
+}

@@ -1,0 +1,10 @@
+/** Callbacks of the tags, kept in a module of the project's own. */
+const hooks = {
+    callbacks: {
+        beforeDelete: ({ id }: { id: string | number }) => {
+            void id;
+        }
+    }
+};
+
+export const tagCallbacks = hooks.callbacks;

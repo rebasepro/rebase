@@ -1,10 +1,12 @@
 import { defineCollection } from "@rebasepro/cms-types";
+import { tagCallbacks } from "../tag-callbacks";
 
 /** Nothing here is presentation the CMS would not derive: no customization file. */
 export default defineCollection({
     name: "Tags",
     singularName: "Tag",
     slug: "tags",
+    callbacks: tagCallbacks,
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         name: { name: "Name", type: "string", validation: { required: true } }

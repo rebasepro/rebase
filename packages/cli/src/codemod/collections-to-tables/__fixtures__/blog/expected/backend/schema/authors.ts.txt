@@ -1,4 +1,5 @@
 import { defineTable, col } from "@rebasepro/server/schema";
+import { auditedCallbacks } from "../lib/collections/_audited";
 
 export const authors = defineTable("authors", {
     columns: {
@@ -8,5 +9,6 @@ export const authors = defineTable("authors", {
         }),
         email: col.text().validate({ email: true })
     },
-    rls: "inherit"
+    rls: "inherit",
+    hooks: auditedCallbacks("authors")
 });

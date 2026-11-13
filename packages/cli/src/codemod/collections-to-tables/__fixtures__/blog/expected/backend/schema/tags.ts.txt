@@ -1,4 +1,5 @@
 import { defineTable, col } from "@rebasepro/server/schema";
+import { tagCallbacks } from "../../config/tag-callbacks";
 
 /** Nothing here is presentation the CMS would not derive: no customization file. */
 export const tags = defineTable("tags", {
@@ -6,5 +7,6 @@ export const tags = defineTable("tags", {
         id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         name: col.text().notNull()
     },
-    rls: "inherit"
+    rls: "inherit",
+    hooks: tagCallbacks
 });

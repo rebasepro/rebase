@@ -1,4 +1,5 @@
 import { defineCollection } from "@rebasepro/cms-types";
+import { auditedCallbacks } from "./_audited";
 
 export default defineCollection({
     name: "Authors",
@@ -16,5 +17,6 @@ export default defineCollection({
         },
         email: { name: "Email address", type: "string", email: true }
     },
+    callbacks: auditedCallbacks("authors"),
     admin: { group: "Content" }
 });

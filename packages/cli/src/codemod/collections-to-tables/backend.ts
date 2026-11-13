@@ -23,6 +23,7 @@ import { isViewDef, type AnyTableDef, type AnyViewDef, type DefaultRls } from "@
 
 import type { Member, PathSegment } from "./ast";
 import { collectReferences, leadingComments, memberOf, nodeAtPath, nodeText, postDeclarationAssignments, resolveObject, toPosix } from "./ast";
+import { carryHelperHooks } from "./helper-hooks";
 import { carryHook, carryTransform, type CarriedFunction } from "./hooks";
 import { importLines, RelocationError, replaceLegacyTypes } from "./modules";
 import type { CollectionEntry, PlanContext } from "./plan-context";
@@ -234,13 +235,37 @@ export function planBackend(plan: PlanContext, input: BackendPlanInput, names: M
 function planTableModule(plan: PlanContext, entry: CollectionEntry, def: AnyTableDef | AnyViewDef, name: TableName, names: Map<string, TableName>): void {
     const collection = entry.collection;
     const splices = new Splices();
-    const sources: { hooks?: Record<string, string>; transforms?: Record<string, string>; auth?: { onCreateUser?: string; onResetPassword?: string } } = {};
+    const sources: { hooks?: string | Record<string, string>; transforms?: Record<string, string>; auth?: { onCreateUser?: string; onResetPassword?: string } } = {};
     const carried: CarriedSite[] = [];
     let failed = false;
 
     // Table hooks.
     const hookNames = functionNames(collection.callbacks);
-    if (hookNames.length > 0) {
+    const callbacksSite = hookNames.length > 0 ? locate(plan, entry, ["callbacks"]) : undefined;
+    const callbacksValue = callbacksSite?.member && !callbacksSite.member.method ? callbacksSite.member.value : undefined;
+    const fromHelper = callbacksValue !== undefined && !resolveObject(plan.ast, callbacksValue).node;
+    if (fromHelper && callbacksValue) {
+        // `callbacks: softDeleteCallbacks("company")`: the helper's functions take table-hook props where they are written.
+        const helper = carryHelperHooks(plan, callbacksValue, hookNames);
+        for (const [file, fileEdits] of helper.edits) plan.relocator.sourceEdits.set(file, [...(plan.relocator.sourceEdits.get(file) ?? []), ...fileEdits]);
+        for (const file of helper.files) if (!plan.relocator.isInCollections(file)) plan.relocator.keptBackendModules.add(file);
+        sources.hooks = splices.token(nodeText(callbacksValue));
+        carried.push({ member: { node: callbacksValue, value: callbacksValue }, carried: { text: "", todos: [] }, label: "hooks" });
+        for (const { file, hook, todo } of helper.todos) {
+            plan.manualSteps.push({
+                title: `Check hooks.${hook} of ${name.table}`,
+                detail: `hooks.${hook} (in ${relativeToRoot(plan, file)}, which \`${callbacksValue.getText().split("\n")[0]}\` returns) ${todo} The line is marked \`TODO(rebase-migrate)\`.`,
+                file: relativeToRoot(plan, file)
+            });
+        }
+        if (helper.unresolved) {
+            plan.manualSteps.push({
+                title: `Check the hooks ${name.table} gets from \`${callbacksValue.getText().split("\n")[0]}\``,
+                detail: `The table says \`hooks: ${callbacksValue.getText().split("\n")[0]}\`, as the collection said \`callbacks:\`, but the codemod could not follow it to the functions (${helper.unresolved}). Table hooks get \`table\` for \`collection\`, and \`values\` for \`row\` in afterRead / beforeDelete / afterDelete: check ${hookNames.map(hook => `\`${hook}\``).join(", ")} where they are written.`,
+                file: relativeToRoot(plan, name.file)
+            });
+        }
+    } else if (hookNames.length > 0) {
         const { members, failed: hookFailure } = carryCallbacks(plan, entry, ["callbacks"], hookNames, "`callbacks`");
         failed ||= hookFailure;
         const hooks: Record<string, string> = {};
