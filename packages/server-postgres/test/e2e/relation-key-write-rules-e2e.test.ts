@@ -17,7 +17,7 @@ import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
 import pg from "pg";
 import { Hono } from "hono";
-import { col, defineTable, rel } from "@rebasepro/types";
+import { col, defineTable, rel, type RlsPosture } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
@@ -30,7 +30,7 @@ import type { AuthRepository } from "../../../server/src/auth/interfaces.js";
 const JWT_SECRET = "relation-key-write-rules-e2e-secret-long-enough-01234";
 const SERVICE_KEY = "relation-key-write-rules-e2e-service-key-0123456789ab";
 
-const open = [{ operation: "all" as const, access: "authenticated" as const }];
+const open: RlsPosture = [{ operation: "all", access: "authenticated" }];
 
 const threads = defineTable("threads", {
     columns: { id: col.serial().primaryKey(), title: col.text() },

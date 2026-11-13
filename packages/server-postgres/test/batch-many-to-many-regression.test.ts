@@ -22,7 +22,6 @@
  *   queries junction→target directly and extracts parentId from the junction
  *   table's sourceColumn/targetColumn.
  */
-import { Table } from "drizzle-orm";
 import { RelationService } from "../src/services/RelationService";
 import { FixtureTableRegistry } from "./helpers/tables";
 import type { RelationDescriptor } from "@rebasepro/types";
@@ -31,11 +30,12 @@ import { relationOfTable } from "./helpers/relation-descriptors";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 // ─── Mock Tables ──────────────────────────────────────────────────────
-// Each carries its column map under Drizzle's own symbol as well, which
+// Each carries its column map under Drizzle's own symbol (`Symbol.for("drizzle:Columns")`,
+// `Table.Symbol.Columns`, which drizzle's typings keep internal) as well, which
 // `getTableColumns` reads — a join step's columns are resolved through it.
 const withColumns = <T extends Record<string, unknown>>(table: T): T => {
     const columns = Object.fromEntries(Object.entries(table).filter(([key]) => key !== "_def"));
-    return Object.assign(table, { [Table.Symbol.Columns]: columns });
+    return Object.assign(table, { [Symbol.for("drizzle:Columns")]: columns });
 };
 
 const mockPostsTable = withColumns({

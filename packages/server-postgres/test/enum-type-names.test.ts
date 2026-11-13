@@ -16,7 +16,7 @@
  *   renaming either.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import {
     ensureTables,
@@ -32,7 +32,7 @@ const billingEvents = (labels: string[]): LegacyCollectionConfig => ({
     name: "Billing events",
     properties: {
         id: { name: "ID", type: "string", isId: "uuid" },
-        paymentProcessorStatusCode: { name: "Status code", type: "string", enum: labels }
+        paymentProcessorStatusCode: { name: "Status code", type: "string", enum: labels.map(label => ({ id: label, label })) }
     }
 });
 
@@ -85,16 +85,16 @@ describe("two columns whose enum types derive the same name", () => {
         name: "Orders",
         properties: {
             id: { name: "ID", type: "string", isId: "uuid" },
-            itemStatus: { name: "Item status", type: "string", enum: ["pending", "shipped"] }
+            itemStatus: { name: "Item status", type: "string", enum: [{ id: "pending", label: "pending" }, { id: "shipped", label: "shipped" }] }
         }
     };
-    const orderItems: LegacyCollectionConfig = {
+    const orderItems: LegacyPostgresCollectionConfig = {
         slug: "orders_item",
         table: "orders_item",
         name: "Order items",
         properties: {
             id: { name: "ID", type: "string", isId: "uuid" },
-            status: { name: "Status", type: "string", enum: ["in_stock", "backordered"] }
+            status: { name: "Status", type: "string", enum: [{ id: "in_stock", label: "in_stock" }, { id: "backordered", label: "backordered" }] }
         }
     };
 
@@ -111,7 +111,7 @@ describe("two columns whose enum types derive the same name", () => {
             name: slug,
             properties: {
                 id: { name: "ID", type: "string", isId: "uuid" },
-                [column]: { name: column, type: "string", enum: ["a", "b"] }
+                [column]: { name: column, type: "string", enum: [{ id: "a", label: "a" }, { id: "b", label: "b" }] }
             }
         });
         // Two different tables and columns, 66 bytes each, sharing their first 63.

@@ -134,19 +134,22 @@ column_name: "id",
 data_type: "uuid",
 udt_name: "uuid",
 is_nullable: "NO",
-column_default: null },
+column_default: null,
+atttypmod: null },
             { table_name: "posts",
 column_name: "id",
 data_type: "uuid",
 udt_name: "uuid",
 is_nullable: "NO",
-column_default: null },
+column_default: null,
+atttypmod: null },
             { table_name: "posts",
 column_name: "user_id",
 data_type: "uuid",
 udt_name: "uuid",
 is_nullable: "NO",
-column_default: null }
+column_default: null,
+atttypmod: null }
         ];
         const pks: PrimaryKeyRow[] = [
             { table_name: "users",
@@ -178,7 +181,8 @@ column_name: col,
 data_type: "uuid",
         udt_name: "uuid",
 is_nullable: "NO",
-column_default: null
+column_default: null,
+atttypmod: null
     });
 
     it("detects a pure junction table with exactly 2 FKs", () => {

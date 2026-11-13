@@ -22,7 +22,7 @@ import { pathToFileURL } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { REBASE_USER_ROLE } from "@rebasepro/common";
-import { isTableDef, isViewDef, type BackendBootstrapper, type DataDriver, type InitializedDriver } from "@rebasepro/types";
+import { isTableDef, isViewDef, type BackendBootstrapper, type DefaultRls, type DataDriver, type InitializedDriver } from "@rebasepro/types";
 import { createRebaseBackend } from "@rebasepro/server";
 
 import { defaultDatabaseSchemaVersion, loadTableSchema } from "../src/schema/load-tables";
@@ -97,7 +97,7 @@ describe("the schema version stamp", () => {
     it("is the same from `rebase db push` as from a provisioning boot, for one schema", async () => {
         const index: Record<string, unknown> = await import(pathToFileURL(path.join(schemaDir, "index.ts")).href);
         const tables = Object.values(index).filter(value => isTableDef(value) || isViewDef(value));
-        const defaultRls = [{ operation: "select" as const, access: "authenticated" as const }];
+        const defaultRls: DefaultRls = [{ operation: "select", access: "authenticated" }];
 
         const stamped: string[] = [];
         const backend = await createRebaseBackend({

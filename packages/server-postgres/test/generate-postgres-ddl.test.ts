@@ -12,7 +12,7 @@ describe("generatePostgresDdl", () => {
     };
 
     it("should generate a simple table with basic types", async () => {
-        const collections: LegacyCollectionConfig[] = [
+        const collections: LegacyPostgresCollectionConfig[] = [
             {
                 slug: "products",
                 table: "products",
@@ -55,7 +55,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate enum types", async () => {
-        const collections: LegacyCollectionConfig[] = [
+        const collections: LegacyPostgresCollectionConfig[] = [
             {
                 slug: "orders",
                 table: "orders",
@@ -63,7 +63,7 @@ describe("generatePostgresDdl", () => {
                 properties: {
                     status: {
                         type: "string",
-                        enum: ["pending", "shipped", "delivered"]
+                        enum: [{ id: "pending", label: "pending" }, { id: "shipped", label: "shipped" }, { id: "delivered", label: "delivered" }]
                     }
                 }
             }
@@ -335,7 +335,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate column default values", async () => {
-        const collections: LegacyCollectionConfig[] = [
+        const collections: LegacyPostgresCollectionConfig[] = [
             {
                 slug: "users_uuid",
                 table: "users_uuid",
@@ -374,7 +374,7 @@ describe("generatePostgresDdl", () => {
         // default on Postgres and the first insert relying on it failed with
         // `function cuid() does not exist`. Refused where the property has a
         // name instead.
-        const collections: LegacyCollectionConfig[] = [
+        const collections: LegacyPostgresCollectionConfig[] = [
             {
                 slug: "users_cuid",
                 table: "users_cuid",
@@ -423,7 +423,7 @@ describe("generatePostgresDdl", () => {
     });
 
     it("should generate advanced column types, constraints, and default values", async () => {
-        const collections: LegacyCollectionConfig[] = [
+        const collections: LegacyPostgresCollectionConfig[] = [
             {
                 slug: "items",
                 table: "items",
@@ -441,6 +441,7 @@ describe("generatePostgresDdl", () => {
                     int_arr: { type: "array", of: { type: "number", validation: { integer: true } } },
                     bool_arr: { type: "array", of: { type: "boolean" } },
                     num_arr: { type: "array", of: { type: "number" } },
+                    // @ts-expect-error a `reference` is a document-engine kind the Postgres model does not type; the planner reads one as a foreign key.
                     ref_val: { type: "reference", path: "other_collection" },
                     req_val: { type: "string", validation: { required: true } },
                     uniq_val: { type: "string", validation: { unique: true } }

@@ -118,7 +118,7 @@ describe("boot provisions related tables from compiled tables", () => {
         expect(secured.map(row => row.relname)).toEqual(expect.arrayContaining(["departments", "people", "tags"]));
 
         // A second boot: nothing to create, no policy to rewrite.
-        const queryable: Queryable = { query: async (text, values) => ({ rows: (await pg.query(text, values)).rows }) };
+        const queryable: Queryable = { query: async <T,>(text: string) => ({ rows: (await pg.query<T>(text)).rows }) };
         const again = await ensureTables(queryable, tables);
         expect(again.actions).toEqual([]);
         expect((await bootstrapper.ensureTablePolicies!(tables, driverResult)).applied).toBe(0);

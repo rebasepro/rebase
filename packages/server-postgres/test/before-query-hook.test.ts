@@ -119,8 +119,7 @@ function registryFor(): PostgresTableRegistry {
     registry.registerMultiple([ownersCollection(), docsCollection()]);
     registry.registerPgTable(ownersTable, "owners");
     registry.registerPgTable(docsTable, "docs");
-    registry.registerRelations?.(ownersRelations, "owners");
-    registry.registerRelations?.(docsRelations, "docs");
+    registry.registerRelations({ ownersRelations, docsRelations });
     return registry;
 }
 

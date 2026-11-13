@@ -492,7 +492,7 @@ describe("lookup detection", () => {
             }
         ],
         fks: [foreignKey("orders", "status_id", "statuses")],
-        rowCounts: rows === undefined ? {} : { statuses: rows }
+        rowCounts: rows === undefined ? undefined : { statuses: rows }
     });
 
     it("classifies a small referenced list", () => {

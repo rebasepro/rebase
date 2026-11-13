@@ -17,7 +17,7 @@
  * rendered — so the column stayed nullable.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
 import type { ColumnPlan, SchemaPlan } from "../src/schema/plan/types";
@@ -67,10 +67,11 @@ describe("the tenant link", () => {
     });
 
     it("applies to a `reference` used as the tenant too", () => {
-        const projects: LegacyCollectionConfig = {
+        const projects: LegacyPostgresCollectionConfig = {
             slug: "projects", table: "projects", name: "Projects", tenant: tenantOn("org"),
             properties: {
                 id: { name: "ID", type: "string", isId: "uuid" },
+                // @ts-expect-error a `reference` is a document-engine kind the Postgres model does not type; the planner's handling of one is what is under test.
                 org: { name: "Org", type: "reference", path: "orgs" }
             }
         };

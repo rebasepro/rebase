@@ -111,8 +111,7 @@ describe("what the read feeds", () => {
     it("a delete's beforeDelete judges the row being deleted, and its refusal keeps it", async () => {
         const driver = driverOver(db);
         await expect(driver.delete({
-            row: { id: "p1:::bob", path: "members", values: {} },
-            collection: members
+            row: { id: "p1:::bob", path: "members" }
         })).rejects.toThrow("cannot remove the owner");
 
         expect(judged.map(r => r.userId)).toEqual(["bob"]);
@@ -123,9 +122,9 @@ describe("what the read feeds", () => {
     it("a uniqueness check excluding one member still sees the others", async () => {
         const driver = driverOver(db);
         // alice holds `al`: bob taking it is not unique, whoever is excluded.
-        expect(await driver.checkUniqueField("members", "handle", "al", "p1:::bob", members)).toBe(false);
+        expect(await driver.checkUniqueField("members", "handle", "al", "p1:::bob")).toBe(false);
         // bob keeping his own is.
-        expect(await driver.checkUniqueField("members", "handle", "bo", "p1:::bob", members)).toBe(true);
+        expect(await driver.checkUniqueField("members", "handle", "bo", "p1:::bob")).toBe(true);
     });
 });
 

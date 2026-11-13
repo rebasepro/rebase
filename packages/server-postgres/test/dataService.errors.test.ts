@@ -444,7 +444,7 @@ name: specialChars }]);
 
     describe("Edge Case Data Types", () => {
         it("should handle boolean false values correctly", async () => {
-            const booleanCollection = {
+            const booleanCollection: LegacyCollectionConfig = {
                 ...testCollection,
                 properties: {
                     id: { type: "number" },
@@ -462,7 +462,7 @@ active: false };
         });
 
         it("should handle zero values correctly", async () => {
-            const numericCollection = {
+            const numericCollection: LegacyCollectionConfig = {
                 ...testCollection,
                 properties: {
                     id: { type: "number" },

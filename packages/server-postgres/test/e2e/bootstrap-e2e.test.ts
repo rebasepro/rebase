@@ -40,6 +40,7 @@ import { createBuiltinAuthAdapter } from "../../../server/src/auth/builtin-auth-
 import { configureJwt } from "../../../server/src/auth/jwt.js";
 import { errorHandler } from "../../../server/src/api/errors.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
+import { honoRouter } from "../helpers/hono-router.js";
 
 const JWT_SECRET = "bootstrap-e2e-secret-key-that-is-definitely-32-chars-long!!";
 // Satisfies the REAL strength validator — uppercase and a digit. The mocked
@@ -116,7 +117,7 @@ describe.each(SCENARIOS)("first-admin journey on an empty database — $name", (
         // Mounted exactly as init.ts mounts it — the direct route first, so it
         // shadows the router's own /config, as it does in production.
         app.get("/auth/config", async (c) => c.json(await adapter.getCapabilities()));
-        app.route("/auth", adapter.createAuthRoutes()!);
+        app.route("/auth", honoRouter(adapter.createAuthRoutes?.()));
     }, 180_000);
 
     afterAll(async () => {
@@ -257,7 +258,7 @@ describe("the users table a first boot creates", () => {
         });
         app = new Hono<HonoEnv>();
         app.onError(errorHandler);
-        app.route("/auth", adapter.createAuthRoutes()!);
+        app.route("/auth", honoRouter(adapter.createAuthRoutes?.()));
     }, 180_000);
 
     afterAll(async () => {

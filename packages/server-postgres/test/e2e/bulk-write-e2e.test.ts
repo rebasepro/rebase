@@ -45,6 +45,9 @@ const itemsCollection: LegacyCollectionConfig = {
     }
 };
 
+/** A row of `items`, as the updates write it. */
+type Item = { name: string; qty: number | null };
+
 describe("bulk update/delete (E2E)", () => {
     let container: PgContainer;
     let admin: pg.Client;
@@ -108,13 +111,12 @@ describe("bulk update/delete (E2E)", () => {
 
     describe("updateMany", () => {
         it("applies every update and returns the rows in order", async () => {
-            const written = await driver.updateMany({
+            const written = await driver.updateMany<Item>({
                 path: "items",
                 updates: [
                     { id: "a", values: { name: "ALPHA" } },
                     { id: "c", values: { name: "CHARLIE", qty: 30 } }
-                ],
-                collection: itemsCollection
+                ]
             });
 
             expect(written.map(r => r.id)).toEqual(["a", "c"]);
@@ -126,7 +128,7 @@ describe("bulk update/delete (E2E)", () => {
         });
 
         it("writes only the columns given, leaving the rest alone", async () => {
-            await driver.updateMany({
+            await driver.updateMany<Item>({
                 path: "items",
                 updates: [{ id: "b", values: { name: "BRAVO" } }],
             });
@@ -136,13 +138,12 @@ describe("bulk update/delete (E2E)", () => {
 
         it("rolls the whole batch back when one row fails", async () => {
             // The second update violates NOT NULL. The first must not survive.
-            await expect(driver.updateMany({
+            await expect(driver.updateMany<Item>({
                 path: "items",
                 updates: [
                     { id: "a", values: { name: "committed?" } },
                     { id: "b", values: { qty: null } }
-                ],
-                collection: itemsCollection
+                ]
             })).rejects.toThrow();
 
             expect(await rows()).toEqual([
@@ -154,18 +155,17 @@ describe("bulk update/delete (E2E)", () => {
 
         it("names the offending entry in the error", async () => {
             // "the batch failed" is unactionable at a thousand rows.
-            await expect(driver.updateMany({
+            await expect(driver.updateMany<Item>({
                 path: "items",
                 updates: [
                     { id: "a", values: { name: "ok" } },
                     { id: "b", values: { qty: null } }
-                ],
-                collection: itemsCollection
+                ]
             })).rejects.toThrow(/Update 1 of 2 \(id "b"\)/);
         });
 
         it("404s the batch on an id that matches no row, writing nothing", async () => {
-            await expect(driver.updateMany({
+            await expect(driver.updateMany<Item>({
                 path: "items",
                 updates: [
                     { id: "a", values: { name: "ok" } },
@@ -186,7 +186,7 @@ describe("bulk update/delete (E2E)", () => {
             };
             registry.registerMultiple([itemsCollection]);
 
-            await driver.updateMany({
+            await driver.updateMany<Item>({
                 path: "items",
                 updates: [{ id: "a", values: { name: "x" } }, { id: "b", values: { name: "y" } }],
             });

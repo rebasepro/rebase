@@ -18,7 +18,7 @@ import { boolean, integer, pgTable, serial, text } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
 import { col, defineTable, type User } from "@rebasepro/types";
 import { compileSchema } from "@rebasepro/common";
-import { createHistoryRoutes } from "@rebasepro/server";
+import { createHistoryRoutes, type HonoEnv } from "@rebasepro/server";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { buildTableRegistry } from "../src/model/build-registry";
@@ -94,8 +94,8 @@ async function boot(): Promise<void> {
     base.rlsUserRole = REBASE_USER_ROLE;
 }
 
-function app(user: User): Hono {
-    const router = new Hono();
+function app(user: User): Hono<HonoEnv> {
+    const router = new Hono<HonoEnv>();
     router.use("/*", async (c, next) => {
         c.set("driver", await base.withAuth(user));
         c.set("user", user);

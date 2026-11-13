@@ -142,6 +142,7 @@ tags: [{ id: 2 }] }
         it("should properly perform query during entity creation (insert)", async () => {
             await historyService.recordHistory({
                 tableName: "posts",
+                // @ts-expect-error a numeric id from an untyped caller: the service binds it as text regardless.
                 id: 1,
                 action: "create",
                 previousValues: undefined,

@@ -42,7 +42,7 @@ describe("generatePostgresDdl edge cases", () => {
                     properties: {
                         mood: {
                             type: "string",
-                            enum: ["it's", "won't"]
+                            enum: [{ id: "it's", label: "it's" }, { id: "won't", label: "won't" }]
                         }
                     }
                 }
@@ -66,7 +66,7 @@ describe("generatePostgresDdl edge cases", () => {
                     table: "phrases",
                     name: "Phrases",
                     properties: {
-                        mood: { type: "string", enum: ["happy", "sad"] }
+                        mood: { type: "string", enum: [{ id: "happy", label: "happy" }, { id: "sad", label: "sad" }] }
                     }
                 }
             ];
@@ -593,7 +593,7 @@ describe("generatePostgresDdl edge cases", () => {
                     properties: {
                         status: {
                             type: "string",
-                            enum: ["pending", "active", "closed"]
+                            enum: [{ id: "pending", label: "pending" }, { id: "active", label: "active" }, { id: "closed", label: "closed" }]
                         }
                     }
                 },
@@ -604,7 +604,7 @@ describe("generatePostgresDdl edge cases", () => {
                     properties: {
                         status: {
                             type: "string",
-                            enum: ["pending", "active", "closed"]
+                            enum: [{ id: "pending", label: "pending" }, { id: "active", label: "active" }, { id: "closed", label: "closed" }]
                         }
                     }
                 }
@@ -631,11 +631,11 @@ describe("generatePostgresDdl edge cases", () => {
                     properties: {
                         category: {
                             type: "string",
-                            enum: ["electronics", "clothing"]
+                            enum: [{ id: "electronics", label: "electronics" }, { id: "clothing", label: "clothing" }]
                         },
                         size: {
                             type: "string",
-                            enum: ["S", "M", "L"]
+                            enum: [{ id: "S", label: "S" }, { id: "M", label: "M" }, { id: "L", label: "L" }]
                         }
                     }
                 }
@@ -662,8 +662,8 @@ describe("generatePostgresDdl edge cases", () => {
                     table: "products",
                     name: "Products",
                     properties: {
-                        status: { type: "string", enum: ["a", "b"] },
-                        state: { type: "string", enum: ["a", "b"], columnName: "status" }
+                        status: { type: "string", enum: [{ id: "a", label: "a" }, { id: "b", label: "b" }] },
+                        state: { type: "string", enum: [{ id: "a", label: "a" }, { id: "b", label: "b" }], columnName: "status" }
                     }
                 }
             ];
@@ -681,13 +681,13 @@ describe("generatePostgresDdl edge cases", () => {
                     slug: "products",
                     table: "products",
                     name: "Products",
-                    properties: { status: { type: "string", enum: ["a", "b"] } }
+                    properties: { status: { type: "string", enum: [{ id: "a", label: "a" }, { id: "b", label: "b" }] } }
                 },
                 {
                     slug: "featured-products",
                     table: "products",
                     name: "Featured Products",
-                    properties: { status: { type: "string", enum: ["a", "b"] } }
+                    properties: { status: { type: "string", enum: [{ id: "a", label: "a" }, { id: "b", label: "b" }] } }
                 }
             ];
 

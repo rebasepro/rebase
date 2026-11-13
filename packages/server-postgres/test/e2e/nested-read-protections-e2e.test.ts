@@ -32,7 +32,7 @@ import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
 import pg from "pg";
 import { Hono } from "hono";
-import { col, defineTable, rel } from "@rebasepro/types";
+import { col, defineTable, rel, type RlsPosture } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
@@ -47,8 +47,8 @@ import type { AuthRepository } from "../../../server/src/auth/interfaces.js";
 const JWT_SECRET = "nested-read-protections-e2e-secret-long-enough-0123456789";
 const SERVICE_KEY = "nested-read-protections-e2e-service-key-0123456789abcdef";
 
-const publicRead = [{ operation: "select" as const, access: "public" as const }];
-const publicAll = [{ operation: "all" as const, access: "public" as const }];
+const publicRead: RlsPosture = [{ operation: "select", access: "public" }];
+const publicAll: RlsPosture = [{ operation: "all", access: "public" }];
 
 /** The protected table: every protection lives here, at the end of each include. */
 const people = defineTable("people", {

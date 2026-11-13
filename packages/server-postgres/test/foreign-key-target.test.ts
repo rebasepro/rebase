@@ -18,7 +18,7 @@
  *   overflows at 2^31.
  */
 import { PGlite } from "@electric-sql/pglite";
-import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
+import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
 import { renderDrizzleSchema } from "../src/schema/plan/render-drizzle";
@@ -53,7 +53,7 @@ const tags: LegacyCollectionConfig = {
 };
 
 /** Every way a column comes to point at a key: belongsTo, reference, and a junction. */
-const posts: LegacyCollectionConfig = {
+const posts: LegacyPostgresCollectionConfig = {
     slug: "posts",
     table: "posts",
     name: "Posts",
@@ -61,6 +61,7 @@ const posts: LegacyCollectionConfig = {
         postId: { name: "Post id", type: "string", isId: "uuid" },
         title: { type: "string" },
         author: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => authors } },
+        // @ts-expect-error a `reference` is a document-engine kind the Postgres model does not type; the planner's handling of one is what is under test.
         editor: { name: "Editor", type: "reference", path: "authors" },
         tags: { name: "Tags", type: "relation", relation: { kind: "manyToMany", target: () => tags } }
     }
@@ -93,7 +94,7 @@ const codeOrgs: LegacyCollectionConfig = {
         code: { name: "Code", type: "string", isId: true, columnType: "varchar", validation: { max: 12 } }
     }
 };
-const members: LegacyCollectionConfig = {
+const members: LegacyPostgresCollectionConfig = {
     slug: "members",
     table: "members",
     name: "Members",
@@ -101,6 +102,7 @@ const members: LegacyCollectionConfig = {
         id: { name: "ID", type: "string", isId: "uuid" },
         org: { name: "Org", type: "relation", relation: { kind: "belongsTo", target: () => uuidOrgs } },
         bigOrg: { name: "Big org", type: "relation", relation: { kind: "belongsTo", target: () => bigOrgs } },
+        // @ts-expect-error a `reference` is a document-engine kind the Postgres model does not type; the planner's handling of one is what is under test.
         serialOrg: { name: "Serial org", type: "reference", path: "serial_orgs" },
         codeOrg: { name: "Code org", type: "relation", relation: { kind: "belongsTo", target: () => codeOrgs } },
         orgs: { name: "Orgs", type: "relation", relation: { kind: "manyToMany", target: () => uuidOrgs } }

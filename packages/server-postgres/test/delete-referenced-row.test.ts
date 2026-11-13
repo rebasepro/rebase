@@ -74,7 +74,7 @@ afterEach(async () => {
 
 describe("deleting a row other rows still reference", () => {
     it("is a 409 naming the referencing table and constraint, under ON DELETE RESTRICT", async () => {
-        const error = await refusal(driverOver(db).delete({ row: { id: 1, path: "orgs", values: {} }, collection: orgs }));
+        const error = await refusal(driverOver(db).delete({ row: { id: 1, path: "orgs" } }));
         expect(error.statusCode).toBe(409);
         expect(error.code).toBe("PG_23001");
         expect(error.message).toContain('"projects"');
@@ -85,13 +85,13 @@ describe("deleting a row other rows still reference", () => {
     });
 
     it("is a 409 under the default NO ACTION too", async () => {
-        const error = await refusal(driverOver(db).delete({ row: { id: 2, path: "orgs", values: {} }, collection: orgs }));
+        const error = await refusal(driverOver(db).delete({ row: { id: 2, path: "orgs" } }));
         expect(error.statusCode).toBe(409);
         expect(error.code).toBe("PG_23503");
     });
 
     it("leaves a row nothing references deletable", async () => {
-        await driverOver(db).delete({ row: { id: 3, path: "orgs", values: {} }, collection: orgs });
+        await driverOver(db).delete({ row: { id: 3, path: "orgs" } });
         const left = await db.query<{ id: number }>("SELECT id FROM orgs ORDER BY id");
         expect(left.rows.map(r => r.id)).toEqual([1, 2]);
     });

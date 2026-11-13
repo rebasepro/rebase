@@ -1,5 +1,5 @@
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { UserService, RefreshTokenService, PasswordResetTokenService, Role } from "../src/auth/services";
+import { UserService, RefreshTokenService, PasswordResetTokenService } from "../src/auth/services";
 import { users, refreshTokens, passwordResetTokens, userIdentities } from "../src/schema/auth-schema";
 import { UserData } from "@rebasepro/server";
 

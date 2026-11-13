@@ -16,6 +16,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { Hono } from "hono";
 import { createBuiltinAuthAdapter } from "@rebasepro/server";
 import { PostgresAuthRepository } from "../src/auth/services";
+import { honoRouter } from "./helpers/hono-router";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 let pglite: PGlite;
@@ -82,7 +83,7 @@ describe("asking whether the users table is empty", () => {
         await seed(3);
         const adapter = createBuiltinAuthAdapter({ authRepository: repo, allowRegistration: false });
         const app = new Hono();
-        app.route("/auth", adapter.createAuthRoutes()!);
+        app.route("/auth", honoRouter(adapter.createAuthRoutes?.()));
 
         const res = await app.request("/auth/register", {
             method: "POST",

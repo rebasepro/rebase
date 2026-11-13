@@ -68,8 +68,7 @@ function driverOver(pglite: PGlite): PostgresBackendDriver {
     registry.registerMultiple([owners(), docs()]);
     registry.registerPgTable(ownersTable, "owners");
     registry.registerPgTable(docsTable, "docs");
-    registry.registerRelations?.(ownersRelations, "owners");
-    registry.registerRelations?.(docsRelations, "docs");
+    registry.registerRelations({ ownersRelations, docsRelations });
     const orm = drizzle(pglite, { schema: { owners: ownersTable, docs: docsTable, ownersRelations, docsRelations } });
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }
