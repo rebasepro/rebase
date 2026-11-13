@@ -965,6 +965,21 @@ One line each: what, and why. Grouped by area.
   hides the link from includes, filters, sorts and every description. Why: two
   spellings of one value with two sets of rules is a bypass (found on this
   branch, never shipped).
+- **A relation is as readable as every column its join reads** (R-1), on
+  every table it passes through: a `belongsTo` its key, a `hasMany` / `hasOne`
+  the target's foreign key, a `via` every column of every step. Why: the inverse
+  and `via` sides leaked a hidden key in 0.30.x too; one helper
+  (`relationJoinColumns`) now decides for every door.
+- **Many-to-many junctions are under the served-table rule**: a junction the
+  database does not protect withholds the tables whose relations use it (the
+  message names the junction); the related table stays served. Why: the
+  registry withholds tables, and an implicit junction is reached only through
+  its owners' relations.
+- **In-process writes keep 0.30's rules.** `.readOnly()`, per-field
+  `access.write` and `.private()` are API-boundary rules and are not enforced
+  for `context.data` / `rebase.data`; stamps, tenant and key immutability are,
+  for both spellings of a link. Why: a stricter interim check was reverted
+  after comparing with `main` — hooks keep writing what they wrote on 0.30.
 - **`strictWrites: false` means one thing**: an undeclared key goes to the
   driver. It never opens a declared column, stamp, tenant, key, relation
   target or `_pivot` rule (the `_pivot` gap was also in 0.30.x).

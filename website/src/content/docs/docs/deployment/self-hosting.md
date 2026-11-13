@@ -201,7 +201,9 @@ is there instead:
   it declares missing: that table is not served (a missing permissive policy
   is served, with a boot warning naming it). A request for it answers `503 TABLE_WITHHELD`, and the boot log
   names the SQL that protects it (or `rebase db push`). The other tables are
-  served, and the boot goes on. This holds with `REBASE_MIGRATE_ON_BOOT=none`
+  served, and the boot goes on. A many-to-many junction is checked the same
+  way: one the database does not protect withholds the tables whose relations
+  use it, and `TABLE_WITHHELD` names the junction. This holds with `REBASE_MIGRATE_ON_BOOT=none`
   too, and on a live schema refresh.
 
 Rows still change, as they would on any database: sign-ins, sessions, API key

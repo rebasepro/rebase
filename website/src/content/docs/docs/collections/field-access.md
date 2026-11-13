@@ -198,6 +198,13 @@ and a filter, sort or `fields` entry naming it answers `FIELD_NOT_READABLE`;
 behind a `.private()` key the relation does not exist for clients at all. The
 schema endpoint, OpenAPI and MCP describe the two together.
 
+The same holds for every relation, through whatever its join reads: a
+`hasMany` / `hasOne` reads the target's foreign key, a `via` every column its
+steps join on, on every table it passes through. A caller who may not read one
+of those columns does not get the relation in an `include` or a `_count`, gets
+`FIELD_NOT_READABLE` filtering or sorting through it (an unknown relation when
+the column is `.private()`), and does not see it described.
+
 `strictWrites: false` on a table only lets a key the table does not declare
 through to the driver. It never relaxes a rule on a declared column, a stamp,
 the tenant, the key, a relation target or `_pivot`.
@@ -265,9 +272,13 @@ posts and never reads back appears in the request body and not in the row.
 ## In-process writes
 
 In-process writes — `context.data` in a hook, `rebase.dataAsAdmin` in a hook,
-a function or a cron job — do not pass through the write check. That is what
-makes the rule enforceable at all: something has to be able to store the
-password hash.
+a function or a cron job — do not pass through the write check: `.readOnly()`,
+a per-field `access.write` and `.private()` are rules of the API boundary.
+That is what makes the rule enforceable at all: something has to be able to
+store the password hash. What does hold in process, for a column and for the
+link bound to it alike: server stamps win over a supplied value, a row cannot
+change tenant, and its key cannot change. Row-level security applies
+everywhere.
 
 Reads through `rebase.dataAsAdmin` hold the `admin` role, so a role rule does not
 hide anything from them. `[]` still does — including from `dataAsAdmin`. Use
