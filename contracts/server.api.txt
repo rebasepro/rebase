@@ -1529,6 +1529,7 @@ const RESERVED_QUERY_KEYS
 const RESUMABLE_UPLOAD_THRESHOLD
 const TABLE_KEY_ORDER
 const TENANT_INDEX_REASON
+const UNSERVED_TABLE
 const VIEW_KEY_ORDER
 function admitsEveryAdminRequest
 function aggregateAlias
@@ -1738,6 +1739,7 @@ function validationPattern
 function valueCodecOf
 function valueCodecOfType
 function vectorColumnKeys
+function viaJoinTableNames
 function warnDeprecated
 function warnOnTableDdl
 function withETag
