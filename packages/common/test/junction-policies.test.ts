@@ -1,22 +1,26 @@
 import { describe, it, expect } from "@jest/globals";
 import {
-    resolveJunctionSpecs,
-    getJunctionSecurityRules,
-    getJunctionCollectionConfig,
-    embedParentExpression
+    embedParentExpression,
+    junctionPolicyTable,
+    resolveTableJunctions,
+    tableJunctionRules,
+    type TableJunction
 } from "../src/util/junction-policies";
-import { policyToPostgres } from "../src/util/policy/policyToPostgres";
+import { compilePolicyExpression } from "../src/util/policy/policyToPostgres";
+import { policyTableResolver } from "../src/util/policy/policy-table";
 import { securityRuleToConditions } from "../src/util/policy/securityRuleToConditions";
+import { compileTables } from "../src/schema/compile-tables";
+import { collectionsToTableDefs, type LegacyPostgresCollectionConfig } from "../src/migrate";
 import { getPolicyNamesForRules } from "@rebasepro/utils";
-import { CollectionConfig, PostgresCollectionConfig, SecurityRule, policy } from "@rebasepro/types";
+import { SecurityRule, TableDescriptor, policy } from "@rebasepro/types";
 
 /** Build a minimal postgres collection with an m2m relation through a junction. */
 function makeCollections(options?: {
     postsRules?: SecurityRule[];
     tagsDeclaresToo?: boolean;
     disableDefaults?: boolean;
-}): { posts: CollectionConfig; tags: CollectionConfig } {
-    const tags: PostgresCollectionConfig = {
+}): { posts: LegacyPostgresCollectionConfig; tags: LegacyPostgresCollectionConfig } {
+    const tags: LegacyPostgresCollectionConfig = {
         slug: "tags",
         name: "Tags",
         table: "tags",
@@ -24,14 +28,14 @@ function makeCollections(options?: {
         properties: { id: { type: "string", isId: "uuid" }, name: { type: "string" } }
     };
 
-    const posts: CollectionConfig = {
+    const posts: LegacyPostgresCollectionConfig = {
         slug: "posts",
         name: "Posts",
         table: "posts",
         engine: "postgres",
         disableDefaultPolicies: options?.disableDefaults,
         securityRules: options?.postsRules,
-        properties: { id: { type: "string", isId: "uuid" }, title: { type: "string" }, author_id: { type: "string" } },
+        properties: { id: { type: "string", isId: "uuid" }, title: { type: "string" }, author_id: { type: "string" }, team_id: { type: "string" } },
         relations: [{
             kind: "manyToMany",
             relationName: "tags",
@@ -52,46 +56,57 @@ function makeCollections(options?: {
     return { posts, tags };
 }
 
+/** The descriptors each junction was resolved from, for {@link compileUsing}. */
+const describedBy = new WeakMap<TableJunction, TableDescriptor[]>();
+
+/** Lift and compile the collections, then resolve their junctions — what the planner reads. */
+function junctionsOf(collections: LegacyPostgresCollectionConfig[]): Map<string, TableJunction> {
+    const descriptors = compileTables(collectionsToTableDefs(collections).tables);
+    const junctions = resolveTableJunctions(descriptors);
+    for (const junction of junctions.values()) describedBy.set(junction, descriptors);
+    return junctions;
+}
+
 /** Compile a derived rule's USING clause the way the DDL generator does. */
-function compileUsing(rule: SecurityRule, junction: CollectionConfig, collections: CollectionConfig[]): string {
+function compileUsing(rule: SecurityRule, junction: TableJunction): string {
     const { usingExpr } = securityRuleToConditions(rule);
     expect(usingExpr).toBeTruthy();
-    return policyToPostgres(usingExpr!, junction, {
-        resolveCollection: (slug) => collections.find(c => c.slug === slug)
+    return compilePolicyExpression(usingExpr!, junctionPolicyTable(junction), {
+        resolveTable: policyTableResolver(describedBy.get(junction) ?? [])
     });
 }
 
 describe("resolveJunctionSpecs", () => {
     it("finds the junction a relation declares, with its endpoints and columns", () => {
         const { posts, tags } = makeCollections();
-        const specs = resolveJunctionSpecs([posts, tags]);
+        const specs = junctionsOf([posts, tags]);
 
         expect([...specs.keys()]).toEqual(["posts_tags"]);
         const spec = specs.get("posts_tags")!;
         expect(spec.schema).toBe("public");
-        expect(spec.endpoints[0].collection).toBe(posts);
+        expect(spec.endpoints[0].descriptor.slug).toBe("posts");
         expect(spec.endpoints[0].junctionColumn).toBe("post_id");
-        expect(spec.endpoints[1].collection).toBe(tags);
+        expect(spec.endpoints[1].descriptor.slug).toBe("tags");
         expect(spec.endpoints[1].junctionColumn).toBe("tag_id");
         expect(spec.declaringSides).toHaveLength(1);
     });
 
     it("aggregates both declaring sides into one spec when both collections declare it", () => {
         const { posts, tags } = makeCollections({ tagsDeclaresToo: true });
-        const specs = resolveJunctionSpecs([posts, tags]);
+        const specs = junctionsOf([posts, tags]);
 
         expect(specs.size).toBe(1);
-        expect(specs.get("posts_tags")!.declaringSides.map(s => s.collection.slug).sort())
+        expect(specs.get("posts_tags")!.declaringSides.map(s => s.descriptor.slug).sort())
             .toEqual(["posts", "tags"]);
     });
 });
 
-describe("getJunctionSecurityRules — baseline and read derivation", () => {
+describe("tableJunctionRules — baseline and read derivation", () => {
     it("always emits the locked server/admin baseline plus the endpoint-visibility read", () => {
         const { posts, tags } = makeCollections();
-        const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
+        const spec = junctionsOf([posts, tags]).get("posts_tags")!;
 
-        const rules = getJunctionSecurityRules(spec);
+        const rules = tableJunctionRules(spec);
         const names = rules.map(r => r.name);
 
         expect(names).toContain("posts_tags_default_admin_read");
@@ -101,11 +116,10 @@ describe("getJunctionSecurityRules — baseline and read derivation", () => {
 
     it("compiles the read rule to one EXISTS per endpoint, correlated on the FK columns", () => {
         const { posts, tags } = makeCollections();
-        const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
-        const junction = getJunctionCollectionConfig(spec);
+        const spec = junctionsOf([posts, tags]).get("posts_tags")!;
 
-        const read = getJunctionSecurityRules(spec).find(r => r.name === "posts_tags_default_edge_read")!;
-        const sql = compileUsing(read, junction, [posts, tags]);
+        const read = tableJunctionRules(spec).find(r => r.name === "posts_tags_default_edge_read")!;
+        const sql = compileUsing(read, spec);
 
         // Visibility delegates to the endpoints: plain subqueries over the real
         // tables, so each endpoint's own RLS filters them at query time.
@@ -119,9 +133,9 @@ describe("getJunctionSecurityRules — baseline and read derivation", () => {
 
     it("emits generated names the studio mapping machinery recognises", () => {
         const { posts, tags } = makeCollections();
-        const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
+        const spec = junctionsOf([posts, tags]).get("posts_tags")!;
 
-        const rules = getJunctionSecurityRules(spec);
+        const rules = tableJunctionRules(spec);
         const names = getPolicyNamesForRules(rules, "posts_tags");
 
         expect(names.has("posts_tags_default_admin_read")).toBe(true);
@@ -132,19 +146,21 @@ describe("getJunctionSecurityRules — baseline and read derivation", () => {
     });
 
     it("returns nothing when every declaring side opted out of default policies", () => {
-        const { posts, tags } = makeCollections({ disableDefaults: true });
-        const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
+        // The table model refuses a table with no rules and no baseline (deny-all), so
+        // the opted-out side states a rule that grants no edge write.
+        const { posts, tags } = makeCollections({ disableDefaults: true, postsRules: [{ operation: "select", access: "public" }] });
+        const spec = junctionsOf([posts, tags]).get("posts_tags")!;
 
-        expect(getJunctionSecurityRules(spec)).toEqual([]);
+        expect(tableJunctionRules(spec)).toEqual([]);
     });
 });
 
-describe("getJunctionSecurityRules — write inheritance", () => {
+describe("tableJunctionRules — write inheritance", () => {
     it("derives no write grant when the declaring side has no explicit update rules", () => {
         const { posts, tags } = makeCollections();
-        const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
+        const spec = junctionsOf([posts, tags]).get("posts_tags")!;
 
-        const names = getJunctionSecurityRules(spec).map(r => r.name);
+        const names = tableJunctionRules(spec).map(r => r.name);
         expect(names).not.toContain("posts_tags_default_edge_write");
     });
 
@@ -152,13 +168,12 @@ describe("getJunctionSecurityRules — write inheritance", () => {
         const { posts, tags } = makeCollections({
             postsRules: [{ operation: "update", ownerField: "author_id" }]
         });
-        const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
-        const junction = getJunctionCollectionConfig(spec);
+        const spec = junctionsOf([posts, tags]).get("posts_tags")!;
 
-        const write = getJunctionSecurityRules(spec).find(r => r.name === "posts_tags_default_edge_write")!;
+        const write = tableJunctionRules(spec).find(r => r.name === "posts_tags_default_edge_write")!;
         expect(write.operations).toEqual(["insert", "update", "delete"]);
 
-        const sql = compileUsing(write, junction, [posts, tags]);
+        const sql = compileUsing(write, spec);
         // The grant is an EXISTS against the owning row…
         expect(sql).toContain(`EXISTS (SELECT 1 FROM "public"."posts"`);
         // …correlated to the edge…
@@ -173,9 +188,9 @@ describe("getJunctionSecurityRules — write inheritance", () => {
         const { posts, tags } = makeCollections({
             postsRules: [{ operation: "all", ownerField: "author_id" }]
         });
-        const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
+        const spec = junctionsOf([posts, tags]).get("posts_tags")!;
 
-        const names = getJunctionSecurityRules(spec).map(r => r.name);
+        const names = tableJunctionRules(spec).map(r => r.name);
         expect(names).toContain("posts_tags_default_edge_write");
     });
 
@@ -190,9 +205,9 @@ describe("getJunctionSecurityRules — write inheritance", () => {
         const { posts, tags } = makeCollections({
             postsRules: [{ operation: "update", using: "author_id = rebase.uid() OR is_shared" }]
         });
-        const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
+        const spec = junctionsOf([posts, tags]).get("posts_tags")!;
 
-        const names = getJunctionSecurityRules(spec).map(r => r.name);
+        const names = tableJunctionRules(spec).map(r => r.name);
         expect(names).not.toContain("posts_tags_default_edge_write");
     });
 
@@ -202,12 +217,11 @@ describe("getJunctionSecurityRules — write inheritance", () => {
         const { posts, tags } = makeCollections({
             postsRules: [{ operation: "update", using: "author_id = rebase.uid()" }]
         });
-        const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
-        const junction = getJunctionCollectionConfig(spec);
+        const spec = junctionsOf([posts, tags]).get("posts_tags")!;
 
-        const write = getJunctionSecurityRules(spec).find(r => r.name === "posts_tags_default_edge_write");
+        const write = tableJunctionRules(spec).find(r => r.name === "posts_tags_default_edge_write");
         expect(write).toBeDefined();
-        const sql = compileUsing(write!, junction, [posts, tags]);
+        const sql = compileUsing(write!, spec);
         expect(sql).toContain(`EXISTS (SELECT 1 FROM "public"."posts"`);
         expect(sql).toContain(`"public"."posts_tags".post_id`);
         expect(sql).toContain("author_id");
@@ -230,9 +244,9 @@ describe("getJunctionSecurityRules — write inheritance", () => {
                 }
             ]
         });
-        const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
+        const spec = junctionsOf([posts, tags]).get("posts_tags")!;
 
-        const names = getJunctionSecurityRules(spec).map(r => r.name);
+        const names = tableJunctionRules(spec).map(r => r.name);
         // Granting writes while dropping the author's gate would be looser than
         // the parent itself — so nothing is granted.
         expect(names).not.toContain("posts_tags_default_edge_write");
@@ -245,11 +259,10 @@ describe("getJunctionSecurityRules — write inheritance", () => {
                 { operation: "update", mode: "restrictive", roles: ["editor"] }
             ]
         });
-        const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
-        const junction = getJunctionCollectionConfig(spec);
+        const spec = junctionsOf([posts, tags]).get("posts_tags")!;
 
-        const write = getJunctionSecurityRules(spec).find(r => r.name === "posts_tags_default_edge_write")!;
-        const sql = compileUsing(write, junction, [posts, tags]);
+        const write = tableJunctionRules(spec).find(r => r.name === "posts_tags_default_edge_write")!;
+        const sql = compileUsing(write, spec);
 
         expect(sql).toContain("author_id");
         // The restrictive roles gate travels with the grant.
@@ -263,11 +276,10 @@ describe("getJunctionSecurityRules — write inheritance", () => {
         });
         tags.securityRules =
             [{ operation: "update", roles: ["taxonomist"] }];
-        const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
-        const junction = getJunctionCollectionConfig(spec);
+        const spec = junctionsOf([posts, tags]).get("posts_tags")!;
 
-        const write = getJunctionSecurityRules(spec).find(r => r.name === "posts_tags_default_edge_write")!;
-        const sql = compileUsing(write, junction, [posts, tags]);
+        const write = tableJunctionRules(spec).find(r => r.name === "posts_tags_default_edge_write")!;
+        const sql = compileUsing(write, spec);
 
         expect(sql).toContain(`EXISTS (SELECT 1 FROM "public"."posts"`);
         expect(sql).toContain(`EXISTS (SELECT 1 FROM "public"."tags"`);

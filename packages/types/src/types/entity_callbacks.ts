@@ -82,14 +82,9 @@ export type CollectionCallbacks<M extends Record<string, unknown> = Record<strin
      *   addressed at a row this hook excludes answers "not found", which is the
      *   same answer the read gives.
      *
-     * ### Postgres only, for now
+     * ### Postgres only
      *
-     * Implemented by `@rebasepro/server-postgres`. A collection served by
-     * another engine that declares one is **refused at boot** rather than
-     * served with the hook silently inert — see `assertBeforeQueryIsPostgresOnly`.
-     * That is the same treatment a `search` block gets on a non-Postgres
-     * collection, and for the same reason: a security-shaped hook that does
-     * nothing is worse than one that is absent.
+     * Implemented by `@rebasepro/server-postgres`, the only server engine.
      *
      * @example
      * ```ts

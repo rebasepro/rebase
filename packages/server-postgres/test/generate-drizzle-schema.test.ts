@@ -164,7 +164,7 @@ validation: { required: true } },
     it("keeps a junction in public even when an endpoint lives in another schema", async () => {
         // The users collection is scaffolded with `schema: "rebase"`, so every
         // m2m onto it used to emit `rebaseSchema.table("post_editors", …)` here
-        // — while `resolveJunctionSpecs` (and therefore the CREATE TABLE and the
+        // — while `resolveTableJunctions` (and therefore the CREATE TABLE and the
         // derived policies) hardcodes `public`. RLS was enabled and policies
         // created on `public.post_editors`; the rows went to `rebase`. The three
         // generators have to agree, and public is what the other two say.

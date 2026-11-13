@@ -20,7 +20,6 @@ import {
     CollectionSubscriptionConfig,
     SingleSubscriptionConfig,
     RealtimeProvider,
-    DataTransformer,
     BackendConfig,
     BackendInstance,
     BackendFactory
@@ -49,7 +48,6 @@ export type {
     CollectionSubscriptionConfig,
     SingleSubscriptionConfig,
     RealtimeProvider,
-    DataTransformer,
     BackendConfig,
     BackendInstance,
     BackendFactory

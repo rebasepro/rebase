@@ -323,7 +323,7 @@ function buildContext(metadata: SchemaMetadata, tables: Map<string, TableMeta>):
  * - nothing references it. A junction with its own dependents is something rows
  *   point *at*, so it needs an identity of its own;
  * - it is in `public`. That is the only schema Rebase reads and creates
- *   junction tables in (`resolveJunctionSpecs`), so a `manyToMany` folded from
+ *   junction tables in (`resolveTableJunctions`), so a `manyToMany` folded from
  *   `crm.contacts_tags` would read and write an empty `public.contacts_tags`
  *   instead. Kept as a table, its rows stay where they are and are served.
  */

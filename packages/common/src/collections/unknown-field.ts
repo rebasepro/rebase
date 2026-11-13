@@ -1,7 +1,3 @@
-import type { CollectionConfig, Property } from "@rebasepro/types";
-import { fieldKeyForColumn, findRelation, resolveCollectionRelations } from "../util/relations";
-import { apiHiddenFieldNames } from "./field-access";
-
 /**
  * The answers a query gets for naming a field that does not exist — written
  * once, here, because two layers give them.
@@ -21,31 +17,6 @@ export interface UnknownFieldAnswer {
     message: string;
     code: string;
     details: Record<string, unknown>;
-}
-
-/**
- * The fields an unknown-field answer offers as valid, sorted: what a query on
- * this collection can name as a column. A relation contributes its foreign key
- * (`authorId`) when the key is on this table, and nothing otherwise. An
- * `excludeFromApi` field is never offered.
- *
- * Read off the collection rather than the table, so the REST check — which
- * holds no table — lists exactly what the driver lists.
- */
-export function queryableFieldNames(collection: CollectionConfig): string[] {
-    const hidden = apiHiddenFieldNames(collection);
-    const names = new Set<string>();
-    let relations: ReturnType<typeof resolveCollectionRelations> | undefined;
-    for (const [key, property] of Object.entries(collection.properties ?? {})) {
-        if ((property as Property | undefined)?.type === "relation") {
-            relations ??= resolveCollectionRelations(collection);
-            const relation = findRelation(relations, key);
-            if (relation?.kind === "belongsTo") names.add(fieldKeyForColumn(collection, relation.localKey));
-            continue;
-        }
-        names.add(key);
-    }
-    return [...names].filter(name => !hidden.has(name)).sort();
 }
 
 const validList = (validFields: string[]): string =>
@@ -118,16 +89,10 @@ export function unknownIncludeRelation(key: string, collectionName: string, vali
     };
 }
 
-/** The relations an unknown-relation answer offers, sorted — never an `excludeFromApi` one. */
-export function includableRelationNames(collection: CollectionConfig): string[] {
-    const hidden = apiHiddenFieldNames(collection);
-    return Object.keys(resolveCollectionRelations(collection)).filter(key => !hidden.has(key)).sort();
-}
-
 /**
  * An aggregate's `select` field or `groupBy` key that names no column.
  * `forWhat` is where it was named: `sum()`, `count()`, `groupBy`.
- * `validFields` is {@link queryableFieldNames}, never an `excludeFromApi` field.
+ * `validFields` is `queryableColumnKeys` (table/query-names.ts), never a private column.
  */
 export function unknownAggregateField(field: string, forWhat: string, validFields: string[]): UnknownFieldAnswer {
     return {
@@ -137,19 +102,7 @@ export function unknownAggregateField(field: string, forWhat: string, validField
     };
 }
 
-/**
- * The properties a `vector_search` can name, sorted: those declared
- * `{ type: "vector" }`, never an `excludeFromApi` one.
- */
-export function vectorPropertyNames(collection: CollectionConfig): string[] {
-    const hidden = apiHiddenFieldNames(collection);
-    return Object.entries(collection.properties ?? {})
-        .filter(([key, property]) => (property as Property | undefined)?.type === "vector" && !hidden.has(key))
-        .map(([key]) => key)
-        .sort();
-}
-
-/** A `vector_search` naming no vector property. `vectorProperties` is {@link vectorPropertyNames}. */
+/** A `vector_search` naming no vector property. `vectorProperties` is `vectorColumnKeys` (table/query-names.ts). */
 export function unknownVectorProperty(property: string, vectorProperties: string[]): UnknownFieldAnswer {
     return {
         message: `Unknown vector property "${property}". ` +

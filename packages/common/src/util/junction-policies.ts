@@ -1,23 +1,15 @@
 import {
-    CollectionConfig,
     JUNCTION_PIVOT_KEY,
     PolicyExpression,
     PolicyOperand,
-    Properties,
-    Property,
-    Relation,
     SecurityRule,
-    isPostgresCollectionConfig,
     policy
 } from "@rebasepro/types";
 import type { ColumnDescriptor, RelationDescriptor, TableDescriptor } from "@rebasepro/types";
 import { getPolicyOperations } from "@rebasepro/utils";
-import { resolveCollectionRelations } from "./relations";
-import { isManyToMany } from "@rebasepro/types";
 import { securityRuleToConditions } from "./policy/securityRuleToConditions";
 import { tableDefaultPoliciesDisabled } from "./auth-default-policies";
 import { claimCastOf, policyTableFromDescriptor, type PolicyColumn, type PolicyTable } from "./policy/policy-table";
-import { policyTableFromCollection } from "./policy/legacy-policy-table";
 
 /**
  * RLS derivation for many-to-many junction tables.
@@ -74,188 +66,11 @@ import { policyTableFromCollection } from "./policy/legacy-policy-table";
  * recognises these policies as generated instead of offering to "import" them.
  */
 
-/** One side of a junction: the collection and the FK column pointing at it. */
-export interface JunctionEndpoint {
-    collection: CollectionConfig;
-    /** Junction column holding this endpoint's key. */
-    junctionColumn: string;
-}
-
-/** A collection that declares the `through` relation (owns the edge semantics). */
-export interface JunctionDeclaringSide extends JunctionEndpoint {
-    relation: Relation;
-}
-
-export interface JunctionSpec {
-    /** Bare table name (schema stripped). */
-    table: string;
-    /** Schema the junction is created in — mirrors the CREATE TABLE path. */
-    schema: string;
-    /** The two endpoints, in [source, target] order of the first declaring relation. */
-    endpoints: [JunctionEndpoint, JunctionEndpoint];
-    /** Every collection that declares a relation through this table. */
-    declaringSides: JunctionDeclaringSide[];
-    /**
-     * The junction's own columns beyond the two keys — `through.properties`,
-     * merged across every declaring side. `{}` when there are none.
-     *
-     * See {@link ManyToManyRelation.through} for what they are; every side that
-     * names a key has to describe the same column, which is checked when the
-     * specs are resolved rather than left for `CREATE TABLE` to discover.
-     */
-    properties: Properties;
-}
-
 // Mirrors auth-default-policies: the server context or an admin.
 const SERVER_OR_ADMIN_EXPR: PolicyExpression = policy.or(
     policy.serverContext(),
     policy.rolesOverlap(["admin"])
 );
-
-/**
- * Walk every collection's resolved relations and aggregate the junction tables
- * they declare. Two collections may declare the same junction from opposite
- * sides (posts→tags and tags→posts through `posts_tags`); both become
- * `declaringSides` of one spec, so derived write grants consider both.
- */
-export function resolveJunctionSpecs(collections: CollectionConfig[]): Map<string, JunctionSpec> {
-    const specs = new Map<string, JunctionSpec>();
-
-    for (const collection of collections) {
-        const resolved = resolveCollectionRelations(collection);
-        for (const relation of Object.values(resolved)) {
-            // Narrowed rather than probed: only a many-to-many has a junction,
-            // and only after narrowing is `through` guaranteed complete.
-            if (!isManyToMany(relation)) continue;
-
-            const targetCollection: CollectionConfig | undefined = relation.target();
-            if (!targetCollection) continue;
-
-            const rawName = relation.through.table;
-            // The CREATE TABLE path strips a schema prefix from the name but
-            // still creates in "public"; the policies must target the same
-            // table, so mirror that behaviour exactly.
-            const table = rawName.includes(".") ? rawName.split(".").pop()! : rawName;
-            const schema = "public";
-
-            const source: JunctionDeclaringSide = {
-                collection,
-                junctionColumn: relation.through.sourceColumn,
-                relation
-            };
-            const target: JunctionEndpoint = {
-                collection: targetCollection,
-                junctionColumn: relation.through.targetColumn
-            };
-
-            const existing = specs.get(table);
-            if (!existing) {
-                specs.set(table, {
-                    table,
-                    schema,
-                    endpoints: [source, target],
-                    declaringSides: [source],
-                    properties: mergeJunctionPayload({}, relation.through.properties, table, collection)
-                });
-            } else {
-                // Merged whether or not this side is new: the same collection
-                // can reach one junction under two relation names, and the
-                // columns each of them asks for all have to exist.
-                existing.properties = mergeJunctionPayload(
-                    existing.properties, relation.through.properties, table, collection);
-                if (!existing.declaringSides.some(s => s.collection === collection)) {
-                    existing.declaringSides.push(source);
-                }
-            }
-        }
-    }
-
-    return specs;
-}
-
-/**
- * Fold one side's `through.properties` into the junction's, refusing a
- * disagreement rather than picking a winner.
- *
- * Both ends of a link may declare it — `posts.tags` and `tags.posts` are one
- * junction — and each end may name the payload. Only one table gets created, so
- * two descriptions of `role` that are not the same description are a question
- * with no correct answer: whichever won, one of the two collections would be
- * writing through a column it does not think it has. Compared structurally, so
- * two sides that spell the same property twice (the normal case, and the one
- * the docs recommend) are fine.
- */
-function mergeJunctionPayload(
-    into: Properties,
-    incoming: Properties | undefined,
-    table: string,
-    collection: CollectionConfig
-): Properties {
-    if (!incoming || Object.keys(incoming).length === 0) return into;
-    const merged: Properties = { ...into };
-    for (const [key, property] of Object.entries(incoming)) {
-        const already = merged[key as keyof Properties] as Property | undefined;
-        if (already && JSON.stringify(already) !== JSON.stringify(property)) {
-            throw new Error(
-                `The junction table "${table}" is declared from more than one side, and they disagree ` +
-                `about the payload column "${key}": "${collection.slug ?? collection.name}" describes it ` +
-                "differently than another declaring collection does. One table is created, so both " +
-                "`through.properties` blocks have to describe the same column — or only one side should " +
-                "declare it."
-            );
-        }
-        (merged as Record<string, Property>)[key] = property as Property;
-    }
-    return merged;
-}
-
-/**
- * A synthetic CollectionConfig standing in for the junction during policy
- * compilation and naming. Its two FK columns carry explicit `columnName`s so
- * `outerField` operands resolve to the exact columns the CREATE TABLE emitted,
- * whatever their casing.
- *
- * The payload columns are here too, exactly as authored. That is what lets one
- * reading of a `Property` serve the junction as well as a collection: the
- * schema planner plans these columns with the same function it plans a
- * collection's with, and the write path validates a `_pivot` against them with
- * the same validator a row's values go through. A second description of a
- * payload column anywhere is a second description that can disagree.
- */
-export function getJunctionCollectionConfig(spec: JunctionSpec): CollectionConfig {
-    return buildJunctionCollectionConfig({
-        table: spec.table,
-        schema: spec.schema,
-        keyColumns: spec.endpoints.map(endpoint => endpoint.junctionColumn),
-        properties: spec.properties
-    });
-}
-
-function buildJunctionCollectionConfig(args: {
-    table: string;
-    schema: string;
-    keyColumns: string[];
-    properties: Properties;
-}): CollectionConfig {
-    const properties: Record<string, unknown> = {};
-    for (const column of args.keyColumns) {
-        properties[column] = { type: "string", columnName: column };
-    }
-    // After the keys, so a payload property that collides with a key column
-    // cannot quietly replace it — `checkJunctionPayload` refuses that config at
-    // boot, and this ordering means the key column survives if one gets past.
-    for (const [key, property] of Object.entries(args.properties)) {
-        if (key === JUNCTION_PIVOT_KEY || key in properties) continue;
-        properties[key] = property;
-    }
-    return {
-        slug: args.table,
-        name: args.table,
-        table: args.table,
-        schema: args.schema,
-        properties
-    } as CollectionConfig;
-}
 
 /** `EXISTS (SELECT 1 FROM endpoint WHERE endpoint.pk = junction.fk [AND extra])`. */
 function existsEndpoint(endpoint: PolicyJunctionEndpoint, extra?: PolicyExpression): PolicyExpression {
@@ -452,30 +267,6 @@ export function junctionRules(spec: PolicyJunction): SecurityRule[] {
     }
 
     return rules;
-}
-
-/** The policy compiler's view of a legacy junction spec's endpoint. */
-function legacyEndpoint(endpoint: JunctionEndpoint): PolicyJunctionEndpoint {
-    const table = policyTableFromCollection(endpoint.collection);
-    // Only a Postgres collection's rules reach a junction's edge writes.
-    return {
-        table: isPostgresCollectionConfig(endpoint.collection) ? table : { ...table, rules: [] },
-        junctionColumn: endpoint.junctionColumn
-    };
-}
-
-/**
- * {@link junctionRules} for a legacy junction spec: the server's
- * `GET /api/schema/tables` still resolves junctions from the collections
- * tables were lowered into. Deleted with the lowering.
- */
-export function getJunctionSecurityRules(spec: JunctionSpec): SecurityRule[] {
-    return junctionRules({
-        table: spec.table,
-        schema: spec.schema,
-        endpoints: [legacyEndpoint(spec.endpoints[0]), legacyEndpoint(spec.endpoints[1])],
-        declaringSides: spec.declaringSides.map(legacyEndpoint)
-    });
 }
 
 // ── Junctions of compiled tables ─────────────────────────────────────────────

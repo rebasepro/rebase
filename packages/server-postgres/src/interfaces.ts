@@ -21,7 +21,6 @@ import {
     SingleSubscriptionConfig,
     RealtimeProvider,
     TableRegistryInterface,
-    DataTransformer,
     BackendConfig,
     BackendInstance,
     BackendFactory
@@ -77,7 +76,6 @@ export type {
     SingleSubscriptionConfig,
     RealtimeProvider,
     TableRegistryInterface,
-    DataTransformer,
     BackendConfig,
     BackendInstance,
     BackendFactory

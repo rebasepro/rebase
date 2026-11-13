@@ -2,9 +2,21 @@
   "//": "Every symbol that left @rebasepro/types or @rebasepro/common (or moved between packages) in the Postgres-first refactor: from/to are package specifiers; to: null means removed, and instead says what a project writes in its place. The migration codemod rewrites a user project imports from this table. tooling/scripts/move-kernel-symbols.mts appends to it; never edit a row by hand.",
   "moves": [
     {
+      "symbol": "apiHiddenFieldNames",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "apiHiddenKeys(descriptor) from @rebasepro/common."
+    },
+    {
       "symbol": "applyDefaultValuesOnCreate",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "assertBeforeQueryIsPostgresOnly",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "Nothing: Postgres is the only server engine."
     },
     {
       "symbol": "AuthContext",
@@ -15,6 +27,12 @@
       "symbol": "buildConditionContext",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "buildPropertyCallbacks",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "Column transforms: col.*().transform(...) on the table definition."
     },
     {
       "symbol": "canCreateEntity",
@@ -72,6 +90,30 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "DEFAULT_STRING_COLUMN_LENGTH",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "col.varchar({ length }) states the length on the column."
+    },
+    {
+      "symbol": "defaultUsersCollection",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "defineAuthTable for the user store; AUTH_SECRET_NAMES lists its secrets."
+    },
+    {
+      "symbol": "defineCollection",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "defineTable (backend/schema); the CMS customizes a table with customizeTable; Firestore uses defineFirestoreCollection; legacy fixtures defineLegacyCollection from @rebasepro/common/migrate."
+    },
+    {
+      "symbol": "EntityCallbackContext",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "TableHookProps[\"context\"] from @rebasepro/types."
+    },
+    {
       "symbol": "evaluateCondition",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
@@ -112,6 +154,18 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "getJunctionCollectionConfig",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "junctionPolicyTable(junction) from @rebasepro/common."
+    },
+    {
+      "symbol": "getJunctionSecurityRules",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "tableJunctionRules(junction) from @rebasepro/common."
+    },
+    {
       "symbol": "getLabelOrConfigFrom",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
@@ -142,9 +196,39 @@
       "to": "@rebasepro/cms"
     },
     {
+      "symbol": "hasFieldAccessRules",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "hasColumnAccessRules(descriptor) from @rebasepro/common."
+    },
+    {
+      "symbol": "includableRelationNames",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "includableRelations(descriptor) from @rebasepro/common."
+    },
+    {
       "symbol": "isPropertyBuilder",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "JunctionDeclaringSide",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "TableJunctionSide from @rebasepro/common."
+    },
+    {
+      "symbol": "JunctionEndpoint",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "TableJunctionEndpoint from @rebasepro/common."
+    },
+    {
+      "symbol": "JunctionSpec",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "TableJunction from @rebasepro/common."
     },
     {
       "symbol": "LiftNote",
@@ -182,6 +266,12 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "queryableFieldNames",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "queryableColumnKeys(descriptor) from @rebasepro/common."
+    },
+    {
       "symbol": "registerConditionOperations",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
@@ -200,6 +290,12 @@
       "symbol": "ResolveFilenameStringParams",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "resolveJunctionSpecs",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "resolveTableJunctions(descriptors) from @rebasepro/common."
     },
     {
       "symbol": "resolveProperties",
@@ -240,6 +336,18 @@
       "symbol": "resolveStorageSource",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "resolveStringColumnLength",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "col.varchar({ length }) states the length on the column."
+    },
+    {
+      "symbol": "restrictedFieldNames",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "restrictedKeys(descriptor, viewer, kind) from @rebasepro/common."
     },
     {
       "symbol": "sanitizeData",
@@ -292,6 +400,12 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "vectorPropertyNames",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "vectorColumnKeys(descriptor) from @rebasepro/common."
+    },
+    {
       "symbol": "ADMIN_COLLECTION_KEYS",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
@@ -322,6 +436,12 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "DataTransformer",
+      "from": "@rebasepro/types",
+      "to": null,
+      "instead": "Nothing: the Postgres driver's codecs read the column descriptor."
+    },
+    {
       "symbol": "EffectiveRoleController",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
@@ -330,6 +450,30 @@
       "symbol": "FilterPreset",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "hasForeignKeyOnTarget",
+      "from": "@rebasepro/types",
+      "to": null,
+      "instead": "Read RelationDescriptor.kind (hasOne | hasMany)."
+    },
+    {
+      "symbol": "InferCollectionConfigType",
+      "from": "@rebasepro/types",
+      "to": null,
+      "instead": "Infer a table's row with InferRow<typeof table>."
+    },
+    {
+      "symbol": "isManyToMany",
+      "from": "@rebasepro/types",
+      "to": null,
+      "instead": "Read RelationDescriptor.kind === \"manyToMany\"."
+    },
+    {
+      "symbol": "isToMany",
+      "from": "@rebasepro/types",
+      "to": null,
+      "instead": "Read RelationDescriptor.kind (hasMany | manyToMany | via)."
     },
     {
       "symbol": "McpAppModuleExport",
@@ -350,6 +494,12 @@
       "symbol": "nestAdminPropertyKeys",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "ResolvedForeignKeyOnTarget",
+      "from": "@rebasepro/types",
+      "to": null,
+      "instead": "Read RelationDescriptor.kind (hasOne | hasMany)."
     }
   ]
 }

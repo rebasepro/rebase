@@ -698,9 +698,6 @@ export interface EntityChildView<M extends Record<string, unknown> = Record<stri
 
 export type { WhereFilterOp, FilterValues, WireFilterValues } from "./filter-operators";
 
-
-export type InferCollectionConfigType<S extends CollectionConfig> = S extends CollectionConfig<infer M> ? M : never;
-
 /**
  * Configuration for authentication collections.
  *

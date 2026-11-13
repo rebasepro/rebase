@@ -1,10 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { col, defineTable, rel } from "@rebasepro/types";
-import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { compileTables } from "../src/schema/compile-tables";
-import { collectionsToTableDefs } from "../src/migrate";
-import { apiHiddenFieldNames, restrictedFieldNames } from "../src/collections/field-access";
 import {
     apiHiddenKeys,
     canReadColumn,
@@ -13,7 +10,6 @@ import {
     hasColumnAccessRules,
     restrictedKeys
 } from "../src/table/access";
-import { ALL } from "./schema/fixtures/legacy-capabilities";
 
 /**
  * Column access read from the descriptor: the same semantics as common's
@@ -97,35 +93,4 @@ describe("restrictedKeys / apiHiddenKeys", () => {
         expect(hasColumnAccessRules(membersT)).toBe(true);
         expect(hasColumnAccessRules(compileTables([bands])[0])).toBe(false);
     });
-});
-
-describe("access agrees with field-access on every lifted fixture", () => {
-    const fixtures: LegacyCollectionConfig[] = ALL;
-    const { tables, defaultRls } = collectionsToTableDefs(fixtures);
-    const descriptors = compileTables(tables, defaultRls ? { defaultRls } : {});
-    const viewers = [undefined, { roles: [] }, { roles: ["user"] }, { roles: ["editor"] }, { roles: ["admin"] }];
-
-    it.each(fixtures.map((collection, index) => [collection.slug, collection, index] as const))(
-        "%s",
-        (_slug, collection, index) => {
-            const descriptor = descriptors[index];
-            expect([...apiHiddenKeys(descriptor)].sort()).toEqual([...apiHiddenFieldNames(collection)].sort());
-            const sqlNames = new Set(descriptor.columns.map(c => c.column));
-            for (const viewer of viewers) {
-                for (const kind of ["read", "write"] as const) {
-                    const fromDescriptor = restrictedKeys(descriptor, viewer, kind);
-                    const legacy = restrictedFieldNames(collection, viewer, kind);
-                    // Every key and relation name agrees.
-                    expect(fromDescriptor.declared).toEqual(expect.arrayContaining(legacy.declared));
-                    // The legacy set names a column's SQL name only when `columnName` was
-                    // written; the descriptor always knows it. So: the legacy set is
-                    // contained, and anything more is the SQL name of a refused column.
-                    for (const name of legacy.refused) expect(fromDescriptor.refused.has(name)).toBe(true);
-                    for (const name of fromDescriptor.refused) {
-                        if (!legacy.refused.has(name)) expect(sqlNames.has(name)).toBe(true);
-                    }
-                }
-            }
-        }
-    );
 });

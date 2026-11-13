@@ -1,4 +1,4 @@
-import type { CollectionConfig, FilterValues, WhereFilterOp } from "./collections";
+import type { FilterValues, WhereFilterOp } from "./filter-operators";
 import type { TableHooks } from "../schema/hooks";
 import type { CompiledTable } from "../schema/compiled";
 import type { TableDescriptor } from "../schema/descriptor";
@@ -62,7 +62,6 @@ export interface FetchCollectionOptions<M extends Record<string, unknown> = Reco
     startAfter?: unknown;
     searchString?: string;
     databaseId?: string;
-    collection?: CollectionConfig;
 }
 
 /**
@@ -75,7 +74,6 @@ export interface SearchOptions<M extends Record<string, unknown> = Record<string
     order?: "desc" | "asc";
     limit?: number;
     databaseId?: string;
-    collection?: CollectionConfig;
 }
 
 /**
@@ -536,32 +534,6 @@ export interface TableRegistryInterface {
      * Returns whether this registry serves the table.
      */
     setTableHooks?(slug: string, hooks: TableHooks): boolean;
-}
-
-// =============================================================================
-// DATA TRANSFORMER INTERFACES
-// =============================================================================
-
-/**
- * Abstract data transformer interface.
- * Handles serialization/deserialization between frontend and database formats.
- */
-export interface DataTransformer {
-    /**
-     * Transform entity data for storage in the database
-     */
-    serializeToDatabase<M extends Record<string, unknown>>(
-        entity: M,
-        collection: CollectionConfig
-    ): Record<string, unknown>;
-
-    /**
-     * Transform database data back to entity format
-     */
-    deserializeFromDatabase<M extends Record<string, unknown>>(
-        data: Record<string, unknown>,
-        collection: CollectionConfig
-    ): Promise<M>;
 }
 
 // =============================================================================

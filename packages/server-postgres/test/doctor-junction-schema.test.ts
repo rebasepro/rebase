@@ -3,7 +3,7 @@
  * puts it.
  *
  * Junctions live in `public` whatever schema the declaring collection is in —
- * `resolveJunctionSpecs` says so, and boot and `db push` create them there. The
+ * `resolveTableJunctions` says so, and boot and `db push` create them there. The
  * doctor looked in the collection's own schema instead, so a correctly
  * provisioned `crm.contacts` with a `tags` many-to-many reported
  * `crm.contacts_tags` as missing and failed CI.

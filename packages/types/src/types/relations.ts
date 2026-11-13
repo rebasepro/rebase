@@ -289,7 +289,7 @@ export interface ManyToManyRelation extends RelationBase {
          * ```
          *
          * Both sides of the same junction may declare it, and both must agree:
-         * `resolveJunctionSpecs` refuses two declarations of the same payload
+         * `resolveTableJunctions` refuses two declarations of the same payload
          * key that do not describe the same column, because only one of them
          * could ever be created.
          */
@@ -508,30 +508,6 @@ export interface ResolvedVia extends ResolvedRelationBase {
     writable: boolean;
     /** The chain as authored — see {@link ViaRelation.joinPath}. Nothing to default. */
     joinPath: JoinStep[];
-}
-
-// ── Narrowing helpers ────────────────────────────────────────────────
-//
-// Consumers that only care about one axis — "does this list many rows",
-// "is there a column on the target" — should ask that question rather
-// than enumerate kinds, so adding a kind later does not silently skip them.
-
-/** Relations whose target row carries this collection's key. @group Models */
-export type ResolvedForeignKeyOnTarget = ResolvedHasOne | ResolvedHasMany;
-
-/** @group Models */
-export function hasForeignKeyOnTarget(relation: ResolvedRelation): relation is ResolvedForeignKeyOnTarget {
-    return relation.kind === "hasOne" || relation.kind === "hasMany";
-}
-
-/** @group Models */
-export function isManyToMany(relation: ResolvedRelation): relation is ResolvedManyToMany {
-    return relation.kind === "manyToMany";
-}
-
-/** @group Models */
-export function isToMany(relation: ResolvedRelation): boolean {
-    return relation.cardinality === "many";
 }
 
 /**

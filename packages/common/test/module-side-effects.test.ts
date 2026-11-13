@@ -21,9 +21,7 @@ import * as ts from "typescript";
 const SRC = path.resolve(__dirname, "../src");
 
 /** file (relative to src) → why its module-scope call is safe to drop with it. */
-const ALLOWED: Record<string, string> = {
-    "collections/default-collections.ts": "builds its exported collection objects with defineCollection, an identity function over the literal (resource handles become keys); it registers nothing"
-};
+const ALLOWED: Record<string, string> = {};
 
 function sources(dir: string): string[] {
     return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {

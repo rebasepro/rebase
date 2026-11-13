@@ -1,6 +1,3 @@
-import type { Properties } from "@rebasepro/types";
-import { defaultUsersCollection } from "./default-collections";
-
 /**
  * Which columns of the user store are the server's alone, and which properties
  * of a given auth collection hold one without saying so.
@@ -36,24 +33,16 @@ function isAuthCollection(collection: AuthSecretCandidate): boolean {
 }
 
 /**
- * The column names, and property keys, the default users collection marks
- * `excludeFromApi`.
- *
- * Both spellings, because a redeclaration is free to rename the property: one
- * project's copy says `password_hash` where the default says `passwordHash`, and
- * the column is the same either way. Read off {@link defaultUsersCollection}, so
- * a secret added there is covered on the same commit.
+ * The secrets of the built-in user store, in both spellings: the key and the
+ * column. A redeclaration is free to rename the key — one project's copy says
+ * `password_hash` where the default says `passwordHash` — and the column is the
+ * same either way. The auth adapter writes these columns
+ * (`builtin-auth-adapter`), and no caller may read or set them.
  */
-function defaultSecretNames(): Set<string> {
-    const properties: Properties = defaultUsersCollection.properties;
-    const names = new Set<string>();
-    for (const [key, property] of Object.entries(properties)) {
-        if (!property?.excludeFromApi) continue;
-        names.add(key);
-        if (property.columnName) names.add(property.columnName);
-    }
-    return names;
-}
+export const AUTH_SECRET_NAMES: ReadonlySet<string> = new Set([
+    "passwordHash", "password_hash",
+    "emailVerificationToken", "email_verification_token"
+]);
 
 /**
  * The keys of the properties on `collection` that hold an auth secret and do not
@@ -64,11 +53,10 @@ function defaultSecretNames(): Set<string> {
 export function authSecretsMissingExclusion(collection: AuthSecretCandidate): string[] {
     if (!collection.properties || !isAuthCollection(collection)) return [];
 
-    const secrets = defaultSecretNames();
     const missing: string[] = [];
     for (const [key, property] of Object.entries(collection.properties)) {
         if (!property || property.excludeFromApi) continue;
-        if (secrets.has(key) || secrets.has(property.columnName ?? key)) missing.push(key);
+        if (AUTH_SECRET_NAMES.has(key) || AUTH_SECRET_NAMES.has(property.columnName ?? key)) missing.push(key);
     }
     return missing;
 }

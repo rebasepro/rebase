@@ -1,11 +1,9 @@
-import type { CollectionConfig, Property } from "@rebasepro/types";
+import type { Property } from "@rebasepro/types";
 import {
     ADMIN_ROLE,
     canReadField,
     canWriteField,
-    effectiveAccess,
-    hasFieldAccessRules,
-    restrictedFieldNames
+    effectiveAccess
 } from "../src/collections/field-access";
 
 /**
@@ -93,119 +91,5 @@ describe("read and write are separate questions", () => {
     it("does not let a write rule withhold a read", () => {
         expect(canReadField(writeOnly, { roles: ["anon"] })).toBe(true);
         expect(canWriteField(writeOnly, { roles: ["anon"] })).toBe(false);
-    });
-});
-
-describe("restrictedFieldNames", () => {
-    const collection: CollectionConfig = {
-        slug: "staff",
-        name: "Staff",
-        properties: {
-            name: { type: "string" },
-            salary: { type: "number", access: { read: ["hr"] } },
-            passwordHash: { type: "string", columnName: "password_hash", excludeFromApi: true }
-        }
-    };
-
-    it("names both spellings a caller could send", () => {
-        const { refused } = restrictedFieldNames(collection, { roles: ["staff"] }, "read");
-        expect([...refused].sort()).toEqual(["passwordHash", "password_hash", "salary"]);
-    });
-
-    it("gives `declared` as the property keys alone, for removing from a known set", () => {
-        const { declared } = restrictedFieldNames(collection, { roles: ["staff"] }, "read");
-        expect(declared.sort()).toEqual(["passwordHash", "salary"]);
-    });
-
-    it("narrows for a caller who holds the role", () => {
-        const { declared } = restrictedFieldNames(collection, { roles: ["hr"] }, "read");
-        expect(declared).toEqual(["passwordHash"]);
-    });
-
-    it("asks the write half when told to", () => {
-        // `salary` restricts reading only, so nothing stops this caller writing
-        // it — a rule that leaked across directions would silently make every
-        // read restriction a write one too.
-        const { declared } = restrictedFieldNames(collection, { roles: ["staff"] }, "write");
-        expect(declared).toEqual(["passwordHash"]);
-    });
-});
-
-describe("restrictedFieldNames over a withheld to-one relation", () => {
-    const bands: CollectionConfig = {
-        slug: "bands",
-        name: "Bands",
-        table: "bands",
-        properties: { id: { type: "number", isId: "increment" }, label: { type: "string" } }
-    };
-    const collection: CollectionConfig = {
-        slug: "staff",
-        name: "Staff",
-        table: "staff",
-        properties: {
-            name: { type: "string" },
-            band: {
-                type: "relation",
-                access: { read: ["hr"] },
-                relation: { kind: "belongsTo", target: () => bands, localKey: "band_id" }
-            }
-        }
-    };
-
-    it("withholds the foreign key that names it, in both spellings", () => {
-        // `bandId: 7` names the band exactly as `band: { id: 7 }` does, so a
-        // filter on it is the same disclosure one predicate at a time.
-        const { refused } = restrictedFieldNames(collection, { roles: ["staff"] }, "read");
-        expect([...refused].sort()).toEqual(["band", "bandId", "band_id"]);
-    });
-
-    it("keeps the foreign key for a caller who may read the relation", () => {
-        expect(restrictedFieldNames(collection, { roles: ["hr"] }, "read").refused.size).toBe(0);
-    });
-
-    it("lists a foreign key that is itself a declared property among `declared`", () => {
-        const declaredKey: CollectionConfig = {
-            ...collection,
-            properties: { ...collection.properties, bandId: { type: "number", columnName: "band_id" } }
-        };
-        const { declared } = restrictedFieldNames(declaredKey, { roles: ["staff"] }, "read");
-        expect(declared.sort()).toEqual(["band", "bandId"]);
-    });
-
-    it("closes the foreign key to a write the relation refuses — and, for the trusted plane, only to `[]`", () => {
-        // The write refusal reads its `excluded` half off the trusted plane's
-        // answer, which satisfies every role list but the empty one.
-        const offices: CollectionConfig = { slug: "offices", name: "Offices", table: "offices", properties: {} };
-        const guarded: CollectionConfig = {
-            ...collection,
-            properties: {
-                ...collection.properties,
-                band: { ...collection.properties.band, access: { write: ["hr"] } },
-                office: {
-                    type: "relation",
-                    excludeFromApi: true,
-                    relation: { kind: "belongsTo", target: () => offices, localKey: "office_id" }
-                }
-            }
-        };
-        expect([...restrictedFieldNames(guarded, { roles: ["staff"] }, "write").refused].sort())
-            .toEqual(["band", "bandId", "band_id", "office", "officeId", "office_id"]);
-        expect([...restrictedFieldNames(guarded, undefined, "write").refused].sort())
-            .toEqual(["office", "officeId", "office_id"]);
-    });
-});
-
-describe("hasFieldAccessRules", () => {
-    it("is false for the collection that has none, which is almost all of them", () => {
-        expect(hasFieldAccessRules({ slug: "a", name: "A", properties: { a: { type: "string" } } }))
-            .toBe(false);
-    });
-
-    it("is true as soon as one property carries either spelling", () => {
-        expect(hasFieldAccessRules({
-            slug: "a",
-            name: "A",
-            properties: { a: { type: "string", excludeFromApi: true } }
-        })).toBe(true);
     });
 });

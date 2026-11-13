@@ -324,7 +324,7 @@ describe("CLI Helpers — Extended", () => {
             const includes = await includesOf([productsCollection, categoriesCollection]);
             expect(includes).toContain("public.products");
             expect(includes).toContain("catalog.categories");
-            // Junctions live in `public` (`resolveJunctionSpecs`), which is
+            // Junctions live in `public` (`resolveTableJunctions`), which is
             // where boot and `schema.sql` create them. Listing the target's
             // schema instead left the real junction on the exclude list, so
             // Atlas could not see it and planned to create it again.

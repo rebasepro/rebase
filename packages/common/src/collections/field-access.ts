@@ -1,5 +1,4 @@
-import type { CollectionConfig, FieldAccess, Property } from "@rebasepro/types";
-import { fieldKeyForColumn, findRelation, resolveCollectionRelations } from "../util/relations";
+import type { FieldAccess, Property } from "@rebasepro/types";
 
 /**
  * Field-level access control: one mechanism, read by every enforcement point.
@@ -105,92 +104,4 @@ export function canReadWithAccess(access: { read?: readonly string[] } | undefin
 export function canWriteField(property: Property | undefined, viewer: FieldViewer | undefined): boolean {
     const access = effectiveAccess(property);
     return access ? satisfies(access.write, viewer) : true;
-}
-
-/**
- * The names on this collection a caller may not touch, in the two spellings a
- * caller can write them in.
- *
- * `declared` is the property keys, which is what has to leave a *known-fields*
- * set. `refused` is those plus the physical column names behind them: a caller
- * who knows the table can send `password_hash` as readily as `passwordHash`, and
- * a rule that only knew the wire name would be one rename away from useless.
- *
- * A restricted to-one relation takes its foreign key with it. `bandId: 7` names
- * the band exactly as `band: { id: 7 }` does, and the row carries the column
- * beside the relation — so a rule on the relation that left the key alone
- * withheld the value from the row and still let `?bandId=7` ask for it.
- *
- * `kind` picks which half of the rule is read; nothing else differs.
- */
-export function restrictedFieldNames(
-    collection: CollectionConfig,
-    viewer: FieldViewer | undefined,
-    kind: "read" | "write"
-): { declared: string[]; refused: Set<string> } {
-    const allowed = kind === "read" ? canReadField : canWriteField;
-    return namesWhere(collection, property => !allowed(property, viewer));
-}
-
-/**
- * The names on this collection that the API does not have, in every spelling
- * a caller could write them in — the `excludeFromApi` properties, their column
- * names, and the foreign key of an excluded to-one relation.
- *
- * Not the same set as {@link restrictedFieldNames}. A field restricted by role
- * is public by name: OpenAPI and MCP's `describe_table` describe it, and refusing a
- * query on it with "not readable" tells the caller nothing they could not read
- * there. An `excludeFromApi` field is described nowhere, so a query naming one
- * has to be answered as a query naming a column that does not exist — anything
- * else confirms that it does.
- */
-export function apiHiddenFieldNames(collection: CollectionConfig): Set<string> {
-    return namesWhere(collection, property => Boolean(property?.excludeFromApi)).refused;
-}
-
-function namesWhere(
-    collection: CollectionConfig,
-    restricted: (property: Property) => boolean
-): { declared: string[]; refused: Set<string> } {
-    const declared: string[] = [];
-    const refused = new Set<string>();
-    const properties = collection.properties ?? {};
-    // Resolved only when a restricted property is a relation, which is rare:
-    // the read strip runs this on every row.
-    let relations: ReturnType<typeof resolveCollectionRelations> | undefined;
-
-    const restrict = (name: string) => {
-        if (name in properties && !declared.includes(name)) declared.push(name);
-        refused.add(name);
-    };
-
-    for (const [name, property] of Object.entries(properties)) {
-        if (!restricted(property as Property)) continue;
-        restrict(name);
-        const columnName = (property as Property).columnName;
-        if (columnName) refused.add(columnName);
-        if ((property as Property).type === "relation") {
-            relations ??= resolveCollectionRelations(collection);
-            const relation = findRelation(relations, name);
-            if (relation?.kind === "belongsTo") {
-                restrict(fieldKeyForColumn(collection, relation.localKey));
-                refused.add(relation.localKey);
-            }
-        }
-    }
-    return { declared, refused };
-}
-
-/**
- * True when nothing on this collection restricts a field, for either direction.
- *
- * Every read of every row runs through the strip, so the collection that has no
- * rules — which is almost all of them — has to cost one property walk and no
- * allocation.
- */
-export function hasFieldAccessRules(collection: CollectionConfig): boolean {
-    for (const property of Object.values(collection.properties ?? {})) {
-        if (effectiveAccess(property as Property)) return true;
-    }
-    return false;
 }
