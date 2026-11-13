@@ -14,6 +14,7 @@ import path from "node:path";
 
 import type { AstContext } from "./ast";
 import { aliasToRelative, type PathAlias } from "./path-aliases";
+import { resolveRelative } from "./modules";
 import type { PlanContext } from "./plan-context";
 import { note, planFile, relativeToRoot } from "./plan-context";
 import { BACKEND_GUARD_EXPORT, BACKEND_GUARD_SNIPPET } from "../../utils/backend-guard";
@@ -668,6 +669,76 @@ export function keptConfigModules(plan: PlanContext, configDir: string, collecti
     };
     if (fs.existsSync(configDir)) walk(configDir);
     return out.sort();
+}
+
+/**
+ * The kept modules of `config/` nothing will import once the run is written:
+ * no file outside `config/` (read as the run leaves it), no kept module that is
+ * itself imported, and not the kept `config/index.ts`. A module whose only
+ * importers were the collections is dead weight once they are tables — it goes
+ * in the printed `git rm` line instead of staying as "the project's own".
+ *
+ * @param kept the kept modules, absolute
+ * @param removed files the run removes or moves (collections, moved wiring, a dropped index), absolute
+ * @param indexKept whether `config/index.ts` stays (its imports are live: the package entry)
+ */
+export function unimportedConfigModules(
+    plan: PlanContext,
+    configDir: string,
+    kept: readonly string[],
+    removed: readonly string[],
+    indexKept: boolean,
+    aliases: readonly PathAlias[] = []
+): string[] {
+    const ignored = new Set(["node_modules", "dist", "build", ".git", "coverage", ".turbo", ".next"]);
+    const gone = (file: string): boolean => removed.some(target => file === target || !path.relative(target, file).startsWith(".."));
+    const inConfig = (file: string): boolean => !path.relative(configDir, file).startsWith("..");
+    const configPackage = readJson(path.join(configDir, "package.json"));
+    const packageName = configPackage && typeof configPackage.value.name === "string" ? configPackage.value.name : undefined;
+    const files = new Set<string>();
+    const walk = (dir: string): void => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (entry.name.startsWith(".") || ignored.has(entry.name)) continue;
+            const full = path.join(dir, entry.name);
+            if (gone(full)) continue;
+            if (entry.isDirectory()) walk(full);
+            else if (SOURCE_FILE.test(entry.name) && !entry.name.endsWith(".d.ts")) files.add(full);
+        }
+    };
+    walk(plan.root);
+    for (const file of plan.files.keys()) if (SOURCE_FILE.test(file) && !gone(file)) files.add(file);
+    const indexFile = ["index.ts", "index.js"].map(name => path.join(configDir, name)).find(file => fs.existsSync(file));
+    const targetsOf = (file: string): string[] => {
+        const planned = plan.files.get(file);
+        const text = blankComments(planned ? planned.content : fs.readFileSync(file, "utf8"));
+        const out: string[] = [];
+        for (const match of text.matchAll(SPECIFIER)) {
+            const specifier = match[1];
+            if (packageName && (specifier === packageName || specifier.startsWith(`${packageName}/`))) {
+                const sub = specifier.slice(packageName.length + 1);
+                if (sub) out.push(resolveRelative(path.join(configDir, "index.ts"), `./${sub}`).target);
+                else if (indexFile) out.push(indexFile);
+                continue;
+            }
+            const relative = /^\.{1,2}\//.test(specifier) ? specifier : aliasToRelative(aliases, file, specifier);
+            if (relative !== undefined) out.push(resolveRelative(file, relative).target);
+        }
+        return out;
+    };
+    const used = new Set<string>();
+    const queue: string[] = [];
+    const reach = (target: string): void => {
+        if (!kept.includes(target) || used.has(target)) return;
+        used.add(target);
+        queue.push(target);
+    };
+    for (const file of files) if (!inConfig(file)) targetsOf(file).forEach(reach);
+    if (indexKept && indexFile) targetsOf(indexFile).forEach(reach);
+    while (queue.length > 0) {
+        const next = queue.pop();
+        if (next !== undefined) targetsOf(next).forEach(reach);
+    }
+    return kept.filter(file => !used.has(file));
 }
 
 /** Where a relative specifier written in `fromFile` points, without its extension. */

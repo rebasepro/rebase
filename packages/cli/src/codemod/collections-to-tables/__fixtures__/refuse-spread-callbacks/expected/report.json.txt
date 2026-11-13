@@ -30,6 +30,10 @@
     {
       "file": "config",
       "message": "keeps 1 module(s) of the project's own (config/shared.ts): 0.31 stops reading config/collections, not config/. They stay where they are, importable as before; only what Rebase read is removed."
+    },
+    {
+      "file": "config",
+      "message": "config/shared.ts: nothing imports this once the migration is written (only the collections did, and their values are in the tables now); it is in the printed git rm line."
     }
   ],
   "manualSteps": [

@@ -48,6 +48,7 @@ import {
     findLegacyApiUses,
     readRawManifest,
     unmovedConfigFiles,
+    unimportedConfigModules,
     keptConfigModules,
     withoutRebaseReexports
 } from "./project-files";
@@ -551,6 +552,20 @@ async function migrateWithShims(options: MigrateOptions, shimDir: ShimDir): Prom
         plan.manualSteps.push(...sdk.report.manualSteps);
     }
     tableUseSteps(plan, tableBindings, file => plan.files.get(file)?.content ?? fs.readFileSync(file, "utf8"));
+
+    // Kept modules of config/ that only the collections imported: nothing needs them once the run is written.
+    if (configStays) {
+        const indexGoes = removed.includes(indexFile);
+        const unimported = unimportedConfigModules(plan, configDir, configLeft.map(file => path.join(root, file)),
+            [legacy.collectionsDir, ...movedWiring, ...(indexGoes ? [indexFile] : [])], !indexGoes && fs.existsSync(indexFile), readPathAliases(root));
+        if (unimported.length > 0) {
+            removed.push(...unimported);
+            report.notes.push({
+                file: relativeToRoot(plan, configDir),
+                message: `${unimported.map(file => relativeToRoot(plan, file)).join(", ")}: nothing imports ${unimported.length > 1 ? "these" : "this"} once the migration is written (only the collections did, and their values are in the tables now); ${unimported.length > 1 ? "they are" : "it is"} in the printed git rm line.`
+            });
+        }
+    }
 
     const unmoved = unmovedConfigFiles(plan, configDir, handled).filter(file => relocator.isInCollections(path.join(root, file)));
     if (unmoved.length > 0) {

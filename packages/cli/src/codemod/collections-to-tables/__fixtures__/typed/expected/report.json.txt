@@ -61,6 +61,10 @@
     {
       "file": "config",
       "message": "keeps 4 module(s) of the project's own (config/audit.ts, config/fragments.ts, config/locales.ts, config/notify.ts): 0.31 stops reading config/collections, not config/. They stay where they are, importable as before; only what Rebase read is removed."
+    },
+    {
+      "file": "config",
+      "message": "config/fragments.ts, config/locales.ts: nothing imports these once the migration is written (only the collections did, and their values are in the tables now); they are in the printed git rm line."
     }
   ],
   "manualSteps": [
@@ -100,5 +104,5 @@
     "identical": true,
     "differences": []
   },
-  "removeCommand": "git rm -r config/collections"
+  "removeCommand": "git rm -r config/collections config/fragments.ts config/locales.ts"
 }
