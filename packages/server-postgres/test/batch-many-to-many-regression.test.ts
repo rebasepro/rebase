@@ -514,17 +514,19 @@ title: "Post C" } }
 
     describe("JoinPath M2M (authors → posts via author_posts)", () => {
         it("should return posts for each author via joinPath", async () => {
-            // joinPath results are namespaced differently — parent data under parent table name
+            // joinPath results are namespaced differently — the parent under the
+            // alias a `via` read joins its source table as (`__via_src`, so a
+            // chain may revisit it), the target under its own table name
             const joinedRows = [
-                { authors: { id: 1,
+                { __via_src: { id: 1,
 name: "Alice" },
 posts: { id: 10,
 title: "Post X" } },
-                { authors: { id: 1,
+                { __via_src: { id: 1,
 name: "Alice" },
 posts: { id: 20,
 title: "Post Y" } },
-                { authors: { id: 2,
+                { __via_src: { id: 2,
 name: "Bob" },
 posts: { id: 30,
 title: "Post Z" } }
