@@ -358,11 +358,16 @@ function writableValues(
 ): Record<string, unknown> {
     const values = valuesObject(raw);
     asToolError(() => {
-        assertWriteRequestValid(values, table, { status, viewer: viewerOf(ctx) });
+        assertWriteRequestValid(values, table, { status, viewer: viewerOf(ctx), relatedTables: relatedTablesOf(ctx) });
         if (status === "new") assertNoFieldOpsOnCreate(values, "A create", table);
         else assertFieldOpsValid(values, table);
     });
     return values;
+}
+
+/** Any served table's descriptor by slug: what a relation in a write names. */
+function relatedTablesOf(ctx: McpToolContext): (slug: string) => TableDescriptor | undefined {
+    return (slug) => ctx.tables.find(table => table.slug === slug);
 }
 
 function valuesObject(raw: unknown): Record<string, unknown> {
@@ -394,7 +399,7 @@ async function createUser(
 
     const body = valuesObject(args.data);
     asToolError(() => {
-        assertUserCreationBodyValid(adapter, served, body, viewerOf(ctx));
+        assertUserCreationBodyValid(adapter, served, body, viewerOf(ctx), undefined, relatedTablesOf(ctx));
         assertNoFieldOpsOnCreate(body, "A create", served.table);
     });
     const driver = await scopedDriver(ctx);

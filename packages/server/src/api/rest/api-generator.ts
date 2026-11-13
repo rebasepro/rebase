@@ -364,12 +364,12 @@ export class RestApiGenerator {
                 if (operation.op === "create" && createsUsers(this.authAdapter, table)) {
                     // A user creation, as on `POST /users`: what it consumes,
                     // `password` included, is the adapter's to say.
-                    assertUserCreationBodyValid(this.authAdapter, served, operation.values, batchViewer);
+                    assertUserCreationBodyValid(this.authAdapter, served, operation.values, batchViewer, undefined, this.lookup);
                     assertNoFieldOpsOnCreate(operation.values, `Operation ${index}`, table);
                     userCreations.push({ index, adapter: this.authAdapter, served });
                     return;
                 }
-                assertKnownWriteFields(operation.values, table, { viewer: batchViewer });
+                assertKnownWriteFields(operation.values, table, { viewer: batchViewer, relatedTables: this.lookup });
                 // A create or an upsert may insert, so `required` holds for it,
                 // as it does on `POST` and `POST /bulk` — here, before the
                 // transaction opens, rather than as the INSERT's NOT NULL error
@@ -1160,11 +1160,11 @@ export class RestApiGenerator {
         // to) meant a typo on the users table was silently dropped and
         // answered 201, while the same typo on `posts` was a 400.
         if (!isAuthTable(table)) {
-            assertKnownWriteFields(body, table, { viewer: requestViewer(c) });
+            assertKnownWriteFields(body, table, { viewer: requestViewer(c), relatedTables: this.lookup });
             assertWriteValuesValid(body, table, { status: "new" });
             assertNoFieldOpsOnCreate(body, "A create", table);
         } else {
-            assertUserCreationBodyValid(this.authAdapter, served, body, requestViewer(c));
+            assertUserCreationBodyValid(this.authAdapter, served, body, requestViewer(c), undefined, this.lookup);
         }
 
         // A create on the auth collection is a user creation, through the
@@ -1213,7 +1213,7 @@ export class RestApiGenerator {
         const { path } = address;
         const table = address.served.table;
 
-        assertKnownWriteFields(body, table, { viewer: requestViewer(c) });
+        assertKnownWriteFields(body, table, { viewer: requestViewer(c), relatedTables: this.lookup });
         assertWriteValuesValid(body, table);
         // `{ views: { $inc: 1 } }` and the rest. Validated here, against the
         // table's own columns, so a `$push` on a number is a 400 naming
@@ -1681,9 +1681,9 @@ export class RestApiGenerator {
             rows.forEach((row, rowIndex) => {
                 if (userAdapter) {
                     // What a user creation consumes, `password` included.
-                    assertUserCreationBodyValid(userAdapter, served, row, requestViewer(c), rowIndex);
+                    assertUserCreationBodyValid(userAdapter, served, row, requestViewer(c), rowIndex, this.lookup);
                 } else {
-                    assertKnownWriteFields(row, table, { rowIndex, viewer: requestViewer(c) });
+                    assertKnownWriteFields(row, table, { rowIndex, viewer: requestViewer(c), relatedTables: this.lookup });
                     assertWriteValuesValid(row, table, { rowIndex, status: "new" });
                 }
                 // This route inserts (or upserts), and an operation over a
@@ -1738,7 +1738,7 @@ export class RestApiGenerator {
                     throw ApiError.badRequest("A filtered update needs `data`: an object of the fields to set.", "INVALID_BULK_BODY");
                 }
                 const data = body.data as Record<string, unknown>;
-                assertKnownWriteFields(data, table, { viewer: requestViewer(c) });
+                assertKnownWriteFields(data, table, { viewer: requestViewer(c), relatedTables: this.lookup });
                 assertWriteValuesValid(data, table, {});
                 assertFieldOpsValid(data, table, {});
                 if (!driver.updateWhere) {
@@ -1779,7 +1779,7 @@ export class RestApiGenerator {
                         "INVALID_BULK_BODY"
                     );
                 }
-                assertKnownWriteFields(entry.data as Record<string, unknown>, table, { rowIndex, viewer: requestViewer(c) });
+                assertKnownWriteFields(entry.data as Record<string, unknown>, table, { rowIndex, viewer: requestViewer(c), relatedTables: this.lookup });
                 assertWriteValuesValid(entry.data as Record<string, unknown>, table, { rowIndex });
                 assertFieldOpsValid(entry.data as Record<string, unknown>, table, { rowIndex });
             });

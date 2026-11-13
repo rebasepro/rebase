@@ -30,7 +30,7 @@ import type {
 import type { FieldViewer } from "@rebasepro/common";
 import { completeUserCreation } from "../../auth/admin-user-ops";
 import { ApiError } from "../errors";
-import { assertKnownWriteFields, assertWriteValuesValid } from "./write-validation";
+import { assertKnownWriteFields, assertWriteValuesValid, type RelatedTableLookup } from "./write-validation";
 import type { ServedTable } from "./served-table";
 
 /** Whether `table` is the auth table — its rows are the users. */
@@ -99,11 +99,13 @@ export function assertUserCreationBodyValid(
     served: ServedTable,
     body: Record<string, unknown>,
     viewer: FieldViewer,
-    rowIndex?: number
+    rowIndex?: number,
+    /** The related tables' descriptors, for the foreign key a `hasMany` / `hasOne` in the body sets. */
+    relatedTables?: RelatedTableLookup
 ): void {
     const contract = adapter?.describeUserCreationContract?.();
     if (!contract?.validate) return;
-    assertKnownWriteFields(body, served.table, { extraKnownFields: contract.extraFields, viewer, rowIndex });
+    assertKnownWriteFields(body, served.table, { extraKnownFields: contract.extraFields, viewer, rowIndex, relatedTables });
     assertWriteValuesValid(body, served.table, { rowIndex });
 }
 

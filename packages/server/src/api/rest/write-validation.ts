@@ -18,6 +18,7 @@ import {
     firstDuplicate,
     isColumnFieldOperation,
     isIntegerFamilyType,
+    keyForColumn,
     normalizeInclude,
     pivotTable,
     relationsOfKind,
@@ -189,6 +190,57 @@ export function assertNoClosedFields(
     );
 }
 
+/** Any table's descriptor by slug: what a relation's target names. */
+export type RelatedTableLookup = (slug: string) => TableDescriptor | undefined;
+
+/**
+ * Refuse a write of a `hasMany` / `hasOne` relation that sets a foreign key
+ * this caller may not set on the target.
+ *
+ * `PATCH /threads/1 { replies: [1, 2] }` writes `replies.thread_id` on rows 1
+ * and 2 (and clears it on the replies it drops): it is a write of the child's
+ * column, made from the parent. `PATCH /replies/2 { threadId: 1 }` answers
+ * `VALIDATION_EXCLUDED_FIELDS` when that column is `.readOnly()` or private,
+ * `FIELD_NOT_WRITABLE` when its `access.write` does not admit the caller — and
+ * so does this, with the same codes, for the column the relation writes. The
+ * rows themselves are still the child's row-level security's to admit.
+ *
+ * A many-to-many write sets the junction's two link columns, which have no
+ * rules of their own (the relation's `access.write` is the parent's, judged
+ * with its other fields); its `_pivot` columns are judged as columns.
+ *
+ * Fails closed: a body naming such a relation is refused when the target's
+ * descriptor cannot be found, because the column it writes cannot be judged.
+ */
+function assertRelationTargetsWritable(
+    values: Record<string, unknown>,
+    table: TableDescriptor,
+    where: string,
+    viewer: FieldViewer | undefined,
+    relatedTables: RelatedTableLookup | undefined
+): void {
+    for (const relation of table.relations) {
+        if (relation.kind !== "hasMany" && relation.kind !== "hasOne") continue;
+        if (!Object.hasOwn(values, relation.name)) continue;
+        const target = relatedTables?.(relation.target);
+        if (!target) {
+            throw ApiError.badRequest(
+                `${where}'${relation.name}' on table '${table.slug}' writes the foreign key of '${relation.target}', ` +
+                "whose rules this write cannot read, so it is refused. Write the key on the related rows themselves.",
+                "VALIDATION_EXCLUDED_FIELDS",
+                { collection: table.slug, fields: [relation.name] }
+            );
+        }
+        const foreignKey = keyForColumn(target, relation.foreignKey) ?? relation.foreignKey;
+        assertNoClosedFields(
+            { [foreignKey]: true },
+            target,
+            `${where}Writing '${relation.name}' on '${table.slug}' sets '${foreignKey}' on the rows of '${target.slug}': `,
+            viewer
+        );
+    }
+}
+
 /**
  * Refuse a field operation on a column this caller may not read.
  *
@@ -257,7 +309,17 @@ function assertFieldOpsReadable(
 export function assertKnownWriteFields(
     values: Record<string, unknown>,
     table: TableDescriptor,
-    options?: { rowIndex?: number; extraKnownFields?: readonly string[]; viewer?: FieldViewer }
+    options?: {
+        rowIndex?: number;
+        extraKnownFields?: readonly string[];
+        viewer?: FieldViewer;
+        /**
+         * The related tables' descriptors, for the foreign key a `hasMany` /
+         * `hasOne` write sets on them. A body naming such a relation is refused
+         * without it.
+         */
+        relatedTables?: RelatedTableLookup;
+    }
 ): void {
     // A table that describes no column has nothing to check against — "no
     // declared columns" is not the claim "no columns are allowed". The
@@ -270,6 +332,7 @@ export function assertKnownWriteFields(
     // this table does not declare", a convenience. The refusal below is a
     // security rule, and a convenience flag must not be able to turn it off.
     assertNoClosedFields(values, table, where, options?.viewer);
+    assertRelationTargetsWritable(values, table, where, options?.viewer, options?.relatedTables);
     assertFieldOpsReadable(values, table, where, options?.viewer);
 
     // The opt-out lets a key through that this table does not describe; the
@@ -998,8 +1061,8 @@ export function projectResponseFields<T extends Record<string, unknown>>(
 export function assertWriteRequestValid(
     values: Record<string, unknown>,
     table: TableDescriptor,
-    options?: { status?: "new" | "existing" | "copy"; viewer?: FieldViewer }
+    options?: { status?: "new" | "existing" | "copy"; viewer?: FieldViewer; relatedTables?: RelatedTableLookup }
 ): void {
-    assertKnownWriteFields(values, table, { viewer: options?.viewer });
+    assertKnownWriteFields(values, table, { viewer: options?.viewer, relatedTables: options?.relatedTables });
     assertWriteValuesValid(values, table, options);
 }
