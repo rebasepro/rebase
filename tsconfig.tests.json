@@ -204,7 +204,21 @@
     // `openRebase<Database>()` and `OpenedRebase<Database>`: typed accessors,
     // and a nonsense collection or field an error. Every assertion is a
     // `@ts-expect-error` or an annotation, so the file is inert unread.
-    "packages/server-postgres/test/open-rebase-types.type-test.ts"
+    "packages/server-postgres/test/open-rebase-types.type-test.ts",
+    // Five files whose fixtures hold a deliberate wrong shape, each marked with
+    // a `@ts-expect-error` (TEST-TYPES, 5fe88eaa88 / 885d85c349): a legacy
+    // `reference` property the Postgres model does not type, read by the
+    // planner as a foreign key (foreign-key-target, generate-postgres-ddl,
+    // tenant-foreign-key); a numeric id from an untyped caller
+    // (historyService); the retired `inverseRelationName` and an
+    // unclassifiable relation kind the resolver must refuse (relations).
+    // Unread, a directive is a comment: the day the model types `reference`
+    // or the resolver's input widens, nothing would notice.
+    "packages/server-postgres/test/foreign-key-target.test.ts",
+    "packages/server-postgres/test/generate-postgres-ddl.test.ts",
+    "packages/server-postgres/test/historyService.test.ts",
+    "packages/server-postgres/test/relations.test.ts",
+    "packages/server-postgres/test/tenant-foreign-key.test.ts"
   ],
   "exclude": [
     "**/node_modules",
