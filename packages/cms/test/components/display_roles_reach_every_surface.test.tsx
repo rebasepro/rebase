@@ -7,8 +7,7 @@ import {
     resolveEntitySlots,
     type EntityPreviewSlots
 } from "../../src/components/CollectionViewBinding/usePreviewSlots";
-import type { AdminCollection, EntityDisplay } from "@rebasepro/cms-types";
-import type { Entity } from "@rebasepro/types";
+import type { AdminCollection, EntityDisplay, Entity } from "@rebasepro/cms-types";
 import { fakeAuthController } from "../helpers/fakes";
 
 /**

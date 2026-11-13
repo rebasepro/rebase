@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { deepEqual as equal } from "fast-equals";
 
-import { RebaseData, StorageSource, User } from "@rebasepro/types";
-import { AuthController } from "@rebasepro/cms-types";
+import { StorageSource, User } from "@rebasepro/types";
+import { AuthController, RebaseData } from "@rebasepro/cms-types";
 
 /**
  * Client-side gate that decides whether a Firebase-authenticated user

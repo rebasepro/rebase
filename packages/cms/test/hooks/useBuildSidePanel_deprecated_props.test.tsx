@@ -19,9 +19,9 @@ import type {
     SideDialogsController,
     SidePanelBindingProps,
     UrlController,
-    CollectionRegistryController
+    CollectionRegistryController,
+    Entity
 } from "@rebasepro/cms-types";
-import type { Entity } from "@rebasepro/types";
 import { resetDeprecationWarningsForTests } from "@rebasepro/common";
 
 jest.mock("@rebasepro/app", () => {

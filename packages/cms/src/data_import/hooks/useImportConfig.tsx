@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Entity } from "@rebasepro/types";
-import { Property } from "@rebasepro/cms-types";
+import { Property, Entity } from "@rebasepro/cms-types";
 import { ImportConfig } from "../types";
 
 export const useImportConfig = (): ImportConfig => {

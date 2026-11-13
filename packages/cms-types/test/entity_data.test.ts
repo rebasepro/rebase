@@ -1,6 +1,7 @@
 import { buildRebaseData, wrapAsEntityData } from "../src/data/entity_data";
 import { buildSdkData, createAccessorSlugResolver } from "@rebasepro/common";
-import { TableAccessor, DataDriver, Entity, RebaseClientError, RebaseData, RebaseSdkData } from "@rebasepro/types";
+import { DataDriver, RebaseClientError, RebaseSdkData } from "@rebasepro/types";
+import { TableAccessor, Entity, RebaseData } from "@rebasepro/cms-types";
 import { sdkClient } from "./helpers/inert-driver";
 
 /**

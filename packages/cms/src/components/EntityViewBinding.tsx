@@ -3,7 +3,7 @@ import type { AdditionalFieldDelegateProps, AdminCollection, Property } from "@r
 import type { ResolvedFormField, ResolvedFormSection } from "@rebasepro/app";
 import type { FormContext } from "../types/fields";
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import { Entity } from "@rebasepro/types";
+import { Entity } from "@rebasepro/cms-types";
 import {
     AlignLeftIcon,
     cls,

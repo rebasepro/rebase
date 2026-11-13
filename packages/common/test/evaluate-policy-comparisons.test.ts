@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { policy } from "@rebasepro/types";
-import type { Entity, PolicyCompareOperator } from "@rebasepro/types";
+import type { PolicyCompareOperator } from "@rebasepro/types";
 
 import { evaluatePolicy, type PolicyEvalContext } from "../src/util/policy/evaluatePolicy";
 
@@ -22,12 +22,10 @@ import { evaluatePolicy, type PolicyEvalContext } from "../src/util/policy/evalu
  * only to pin that the early return still happens for every type.
  */
 
-const row = (values: Record<string, unknown>): Entity => ({ id: "e1", path: "things", values });
-
 const ctx = (values: Record<string, unknown>): PolicyEvalContext => ({
     uid: "u1",
     roles: [],
-    entity: row(values)
+    row: values
 });
 
 /** `<field> <op> <literal>`, evaluated against a row holding `fieldValue`. */
@@ -146,7 +144,7 @@ describe("comparisons that cannot be ordered", () => {
     });
 
     it("is `unknown` when the row is absent, whatever the operator", () => {
-        const noRow: PolicyEvalContext = { uid: "u1", roles: [], entity: null };
+        const noRow: PolicyEvalContext = { uid: "u1", roles: [], row: null };
 
         expect(evaluatePolicy(
             policy.compare(policy.field("v"), "gt", policy.literal(1)), noRow

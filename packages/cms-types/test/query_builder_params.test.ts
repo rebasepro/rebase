@@ -1,6 +1,9 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { TableAccessor } from "@rebasepro/types";
+import type { WhereFilterOp } from "@rebasepro/types";
+import { TableAccessor } from "@rebasepro/cms-types";
 import { QueryBuilder } from "../src/data/query_builder";
+
+/** A jest mock typed as the function it stands in for. */
+const mockOf = <F extends (...args: never[]) => unknown>() => jest.fn<ReturnType<F>, Parameters<F>>();
 
 /**
  * The admin accessor's builder: what it collects, and what it hands its
@@ -19,6 +22,9 @@ function getParams(qb: QueryBuilder): Record<string, unknown> {
     return Object.fromEntries(Object.entries(params));
 }
 
+/** An operator spelled as the REST layer spells it, which the builder stores as given. */
+const rawOperator = (operator: string): WhereFilterOp => operator as WhereFilterOp;
+
 /** The accessor's own builder methods, which a QueryBuilder never calls. */
 const notCalledByTheBuilder = (): never => {
     throw new Error("QueryBuilder does not call the accessor's builder methods");
@@ -34,12 +40,12 @@ function createMockCollection() {
         search: notCalledByTheBuilder,
         vectorSearch: notCalledByTheBuilder,
         include: notCalledByTheBuilder,
-        find: jest.fn<TableAccessor["find"]>(),
-        findById: jest.fn<TableAccessor["findById"]>(),
-        create: jest.fn<TableAccessor["create"]>(),
-        update: jest.fn<TableAccessor["update"]>(),
-        delete: jest.fn<TableAccessor["delete"]>(),
-        listen: jest.fn<NonNullable<TableAccessor["listen"]>>()
+        find: mockOf<TableAccessor["find"]>(),
+        findById: mockOf<TableAccessor["findById"]>(),
+        create: mockOf<TableAccessor["create"]>(),
+        update: mockOf<TableAccessor["update"]>(),
+        delete: mockOf<TableAccessor["delete"]>(),
+        listen: mockOf<NonNullable<TableAccessor["listen"]>>()
     };
 }
 
@@ -116,7 +122,7 @@ describe("QueryBuilder", () => {
 
         it("passes through short operators (eq, neq, gt, gte, lt, lte) directly", () => {
             const qb = new QueryBuilder(mockCollection);
-            qb.where("x", "gt", 5);
+            qb.where("x", rawOperator("gt"), 5);
             expect(getParams(qb).where).toEqual({ x: ["gt", 5] });
         });
 
@@ -128,7 +134,7 @@ describe("QueryBuilder", () => {
 
         it("passes through cs and csa operators", () => {
             const qb = new QueryBuilder(mockCollection);
-            qb.where("tags", "cs", "test");
+            qb.where("tags", rawOperator("cs"), "test");
             expect(getParams(qb).where).toEqual({ tags: ["cs", "test"] });
         });
     });

@@ -2,10 +2,9 @@
  * @jest-environment jsdom
  */
 import React from "react";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Entity } from "@rebasepro/cms-types";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
 
 /**
  * The card grid used to draw every loaded card, and loading the next page drew

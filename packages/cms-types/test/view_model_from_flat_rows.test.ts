@@ -1,6 +1,6 @@
 import { EntityRelation, buildRebaseData } from "@rebasepro/cms-types";
-import type { TableAccessor, DataDriver, RebaseData } from "@rebasepro/types";
-import type { CollectionConfig } from "@rebasepro/cms-types";
+import type { DataDriver } from "@rebasepro/types";
+import type { CollectionConfig, TableAccessor, RebaseData } from "@rebasepro/cms-types";
 import { collectionEntityDataOptions } from "../src/data/collection_view_model";
 
 /**

@@ -6,7 +6,6 @@
  *
  * @module
  */
-export * from "./relation-ref";
 export * from "./addressable-id";
 export * from "./column-name";
 export * from "./callback-client";

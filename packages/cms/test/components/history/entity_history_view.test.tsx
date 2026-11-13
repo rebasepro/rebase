@@ -10,8 +10,8 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
-import type { DataDriver, Entity } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { DataDriver } from "@rebasepro/types";
+import type { AdminCollection, Entity } from "@rebasepro/cms-types";
 import { Rebase, RlsSimulationContext } from "@rebasepro/app";
 import type { RlsSimulationController } from "@rebasepro/app";
 

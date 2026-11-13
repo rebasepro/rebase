@@ -1,7 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { setIn } from "@rebasepro/forms";
-import { RebaseData, Entity } from "@rebasepro/types";
-import { RebaseContext, AnalyticsController, AdminCollection } from "@rebasepro/cms-types";
+import { RebaseContext, AnalyticsController, AdminCollection, RebaseData, Entity } from "@rebasepro/cms-types";
 import { saveEntityWithCallbacks, SaveEntityWithCallbacksProps, useSnackbarController, useTranslation } from "@rebasepro/app";
 import { BoardItem } from "@rebasepro/ui";
 import { BoardDataController } from "../useBoardDataController";

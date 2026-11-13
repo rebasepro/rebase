@@ -14,8 +14,7 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { SelectedCellProps, DateProperty } from "@rebasepro/cms-types";
+import type { SelectedCellProps, DateProperty, Entity } from "@rebasepro/cms-types";
 import type { DataCollectionTableController, OnCellValueChangeParams } from "@rebasepro/app";
 
 if (typeof globalThis.ResizeObserver === "undefined") {

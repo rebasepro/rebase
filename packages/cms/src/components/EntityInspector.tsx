@@ -1,5 +1,4 @@
-import type { AdminCollection } from "@rebasepro/cms-types";
-import type { Entity } from "@rebasepro/types";
+import type { AdminCollection, Entity } from "@rebasepro/cms-types";
 import type { FormContext } from "../types/fields";
 import React, { Suspense, useEffect } from "react";
 import {

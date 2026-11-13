@@ -1,7 +1,6 @@
 import React, { useCallback, useContext } from "react";
 import { deepEqual as equal } from "fast-equals";
-import type { Entity, AuthState } from "@rebasepro/types";
-import type { AdminCollection, ResolvePropertyProps, Property } from "@rebasepro/cms-types";
+import type { AdminCollection, ResolvePropertyProps, Property, Entity, AuthState } from "@rebasepro/cms-types";
 import type { ResolvedFormField } from "@rebasepro/app";
 import { isHidden, useAuthController, useCustomizationController, useRebaseContext } from "@rebasepro/app";
 import { effectiveAccess } from "@rebasepro/cms-types";

@@ -2,7 +2,8 @@
  * @jest-environment jsdom
  */
 import { resolveClientListLimit } from "@rebasepro/types";
-import type { Entity, FindParams, FindResponse } from "@rebasepro/types";
+import type { FindParams } from "@rebasepro/types";
+import type { Entity, FindResponse } from "@rebasepro/cms-types";
 import { CollectionWindow, CollectionWindowState } from "../../src/hooks/data/collectionWindow";
 
 /**

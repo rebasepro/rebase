@@ -326,11 +326,11 @@ describe("S-6: access: \"registered\"", () => {
     it("is evaluated client-side as the database does: a guest refused, an account admitted", () => {
         const { usingExpr } = securityRuleToConditions(registered);
         if (!usingExpr) throw new Error("expected a USING clause");
-        expect(evaluatePolicy(usingExpr, { uid: "u1", isAnonymous: true, entity: null })).toBe(false);
-        expect(evaluatePolicy(usingExpr, { uid: "u1", isAnonymous: false, entity: null })).toBe(true);
+        expect(evaluatePolicy(usingExpr, { uid: "u1", isAnonymous: true, row: null })).toBe(false);
+        expect(evaluatePolicy(usingExpr, { uid: "u1", isAnonymous: false, row: null })).toBe(true);
         const authenticated = securityRuleToConditions({ operation: "select", access: "authenticated" }).usingExpr;
         if (!authenticated) throw new Error("expected a USING clause");
-        expect(evaluatePolicy(authenticated, { uid: "u1", isAnonymous: true, entity: null })).toBe(true);
+        expect(evaluatePolicy(authenticated, { uid: "u1", isAnonymous: true, row: null })).toBe(true);
     });
 
     it("compiles, and prints back as written", () => {

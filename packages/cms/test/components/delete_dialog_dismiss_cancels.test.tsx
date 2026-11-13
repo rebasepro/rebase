@@ -11,8 +11,7 @@
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { AdminCollection, EntitySelection } from "@rebasepro/cms-types";
+import type { AdminCollection, EntitySelection, Entity } from "@rebasepro/cms-types";
 
 type PendingDelete = { entity: Entity<Record<string, unknown>>; resolve: (ok: boolean) => void };
 const pending: PendingDelete[] = [];

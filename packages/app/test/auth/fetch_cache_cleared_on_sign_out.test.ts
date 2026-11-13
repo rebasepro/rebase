@@ -1,6 +1,6 @@
 import { renderHook, act } from "@testing-library/react";
-import type { AuthChangeEvent, Entity, RebaseSession } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AuthChangeEvent, RebaseSession } from "@rebasepro/types";
+import type { AdminCollection, Entity } from "@rebasepro/cms-types";
 import type { ClientAuth } from "../../src/auth/types";
 import { fakeAuthConfig, fakeClientAuth } from "../helpers/fakes";
 import { useRebaseAuthController } from "../../src/auth/useRebaseAuthController";

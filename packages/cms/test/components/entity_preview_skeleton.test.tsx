@@ -4,8 +4,7 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { render } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Entity } from "@rebasepro/cms-types";
 
 /**
  * A relation card that is still loading is drawn as the card it will be.

@@ -1,4 +1,6 @@
-import { TableAccessor, Entity, EntityValues, FindParams, FindResponse, LogicalCondition, RebaseData, SDKTableClient, type AggregateParams, type RefreshOptions, type ComputedSortField, type ByIdReadOptions, type SearchMatch, WhereFilterOp, WhereValueFor, isUnsupported, DataDriver } from "@rebasepro/types";
+import { FindParams, LogicalCondition, SDKTableClient, type AggregateParams, type RefreshOptions, type ComputedSortField, type ByIdReadOptions, type SearchMatch, WhereFilterOp, WhereValueFor, isUnsupported, DataDriver } from "@rebasepro/types";
+import { TableAccessor, FindResponse, RebaseData } from "../types/table_accessor";
+import { Entity, EntityValues } from "../types/entities";
 import { toSnakeCase } from "@rebasepro/utils";
 import { buildCompositeId, createDriverTableRows, etagOf, type DriverRowPage, type DriverTableRows, type PrimaryKeyInfo } from "@rebasepro/common";
 import { QueryBuilder } from "./query_builder";

@@ -1,4 +1,5 @@
-import { Entity, FindParams, MAX_LIST_LIMIT } from "@rebasepro/types";
+import { FindParams, MAX_LIST_LIMIT } from "@rebasepro/types";
+import { Entity } from "@rebasepro/cms-types";
 import { EntityPageAccessor, forEachEntityPage, walkEntityPages } from "../../util/entity_pages";
 
 /**

@@ -17,12 +17,9 @@ import {
     POLICY_EXPRESSION_KINDS,
     isPolicyShorthand,
     policy,
-    type AuthState,
-    type Entity,
     type PolicyCondition,
     type PolicyExpression,
-    type SecurityRule,
-    type User
+    type SecurityRule
 } from "@rebasepro/types";
 import {
     type LegacyCollectionConfig
@@ -63,11 +60,6 @@ const SPEC_RULES: SecurityRule[] = [
     { operation: "delete", roles: ["admin"] }
 ];
 
-const user = (uid: string, roles: string[] = []): AuthState<User> => ({
-    user: { uid, email: `${uid}@example.com`, displayName: uid, photoURL: null, providerId: "password", isAnonymous: false, roles }
-});
-const anonymous: AuthState<User> = { user: null };
-const row = (values: Record<string, unknown>): Entity => ({ id: "p1", path: "posts", values });
 /** A value from outside the type system — what a JS config or a stored rule can hold. */
 const loose = (json: string): PolicyCondition => JSON.parse(json);
 const withRules = (securityRules: SecurityRule[]): LegacyCollectionConfig => ({ ...posts, securityRules });

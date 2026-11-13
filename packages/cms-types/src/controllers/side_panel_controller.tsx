@@ -1,4 +1,4 @@
-import type { Entity } from "@rebasepro/types";
+import type { Entity } from "../types/entities";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**

@@ -5,8 +5,7 @@ import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import type { Entity } from "@rebasepro/types";
-import type { EntitySelectionController } from "@rebasepro/cms-types";
+import type { EntitySelectionController, Entity } from "@rebasepro/cms-types";
 
 /**
  * Removing rows from a junction-backed (linked) tab in bulk.

@@ -2,8 +2,7 @@
  * @jest-environment jsdom
  */
 import { renderHook } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Entity } from "@rebasepro/cms-types";
 
 /**
  * The record cache is what lets a record open with its values on screen while

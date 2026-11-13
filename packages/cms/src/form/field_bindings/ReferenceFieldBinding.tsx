@@ -3,8 +3,7 @@ import { useEntitySelectionDialog } from "../../hooks/useSelectionDialog";
 import type { FieldProps } from "../../types/fields";
 import React, { useCallback, useMemo } from "react";
 
-import { Entity } from "@rebasepro/types";
-import { EntityReference } from "@rebasepro/cms-types";
+import { EntityReference, Entity } from "@rebasepro/cms-types";
 import { ErrorView } from "@rebasepro/app";
 import { ReadOnlyFieldBinding } from "./ReadOnlyFieldBinding";
 import { FieldHelperText } from "../components/FieldHelperText";

@@ -2,7 +2,7 @@
 import type { FormContext } from "../types/fields";
 import type { EntityAction, AdminCollection } from "@rebasepro/cms-types";
 import React from "react";
-import { Entity } from "@rebasepro/types";
+import { Entity } from "@rebasepro/cms-types";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { getIcon, useTranslation } from "@rebasepro/app";
 import { entityActionName } from "../util/entity_actions";

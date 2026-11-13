@@ -1,4 +1,3 @@
-import type { Entity } from "@rebasepro/types";
 import type {
     EntitySelection,
     EntitySelectionController,
@@ -6,7 +5,8 @@ import type {
     RowSelection,
     SelectionController,
     TableController,
-    CollectionConfig
+    CollectionConfig,
+    Entity
 } from "@rebasepro/cms-types";
 import { entityOfRow, idOfRow, rowOfEntity } from "./entity_row";
 

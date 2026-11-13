@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { Entity } from "@rebasepro/types";
-import { ArrayProperty, DateProperty, NumberProperty, Property, ReferenceProperty, RelationProperty, StringProperty, EntityReference, EntityRelation } from "@rebasepro/cms-types";
+import { ArrayProperty, DateProperty, NumberProperty, Property, ReferenceProperty, RelationProperty, StringProperty, EntityReference, EntityRelation, Entity } from "@rebasepro/cms-types";
 import { TableSize, useCustomizationController } from "@rebasepro/app";
 import {
     VirtualTableInput,

@@ -2,6 +2,12 @@
   "//": "Every symbol that left @rebasepro/types or @rebasepro/common (or moved between packages) in the Postgres-first refactor: from/to are package specifiers; to: null means removed, and instead says what a project writes in its place. The migration codemod rewrites a user project imports from this table. tooling/scripts/move-kernel-symbols.mts appends to it; never edit a row by hand.",
   "moves": [
     {
+      "symbol": "FindResponse",
+      "from": "@rebasepro/client",
+      "to": null,
+      "instead": "FindResult from @rebasepro/types: what client.data.<table>.find() resolves to."
+    },
+    {
       "symbol": "defineCollection",
       "from": "@rebasepro/cms-types",
       "to": null,
@@ -122,6 +128,11 @@
     },
     {
       "symbol": "copyCarriesRelation",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "createRelationRef",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
     },
@@ -449,6 +460,11 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "RelationRef",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "RelationRefWithData",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
@@ -645,6 +661,18 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "ListenCollectionRequest",
+      "from": "@rebasepro/server",
+      "to": null,
+      "instead": "ListenCollectionProps from @rebasepro/types (a subscription's rows are plain rows)."
+    },
+    {
+      "symbol": "ListenEntityRequest",
+      "from": "@rebasepro/server",
+      "to": null,
+      "instead": "ListenOneProps from @rebasepro/types."
+    },
+    {
       "symbol": "ADMIN_COLLECTION_KEYS",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
@@ -701,6 +729,11 @@
     },
     {
       "symbol": "AuthCollectionConfig",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "AuthState",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
     },
@@ -852,6 +885,11 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "Entity",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "EntityChildView",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
@@ -868,6 +906,11 @@
     },
     {
       "symbol": "EntityRelation",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "EntityValues",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
     },
@@ -898,6 +941,11 @@
     },
     {
       "symbol": "FilterPreset",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "FindResponse",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
     },
@@ -1128,6 +1176,16 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "QueryBuilderInterface",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "RebaseData",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "ReferenceProperty",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
@@ -1222,6 +1280,16 @@
     },
     {
       "symbol": "StringPropertyValidationSchema",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "TableAccessor",
+      "from": "@rebasepro/types",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "TableTrashAccessor",
       "from": "@rebasepro/types",
       "to": "@rebasepro/cms-types"
     },

@@ -10,8 +10,6 @@ import { jest } from "@jest/globals";
 import { createCallContext } from "@rebasepro/common";
 import { wrapAsEntityData } from "@rebasepro/cms-types";
 import type {
-    Entity,
-    RebaseData,
     RebaseSdkData,
     StorageSource,
     User
@@ -38,7 +36,9 @@ import type {
     CollectionConfig,
     Property,
     ResolvedBelongsTo,
-    ResolvedManyToMany
+    ResolvedManyToMany,
+    Entity,
+    RebaseData
 } from "@rebasepro/cms-types";
 // The field bindings' own props (with `hideLabel` and the other form-only
 // flags), which `@rebasepro/cms-types`' plugin-facing `FieldProps` leaves out.

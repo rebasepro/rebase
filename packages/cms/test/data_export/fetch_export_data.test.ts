@@ -1,5 +1,6 @@
 import { describe, expect, test } from "@jest/globals";
-import { Entity, FindParams, FindResponse, resolveClientListLimit } from "@rebasepro/types";
+import { FindParams, resolveClientListLimit } from "@rebasepro/types";
+import { Entity, FindResponse } from "@rebasepro/cms-types";
 import { fetchAllEntitiesForExport, MAX_EXPORT_ROWS } from "../../src/data_export/export/fetch_export_data";
 
 /**

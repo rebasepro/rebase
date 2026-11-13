@@ -1,5 +1,4 @@
-import type { Entity } from "@rebasepro/types";
-import type { CollectionConfig } from "@rebasepro/cms-types";
+import type { CollectionConfig, Entity } from "@rebasepro/cms-types";
 import { buildCompositeId } from "@rebasepro/common";
 import { rowToViewModel, resolvePrimaryKeys } from "@rebasepro/cms-types";
 import { toWireRow } from "./wire_row";

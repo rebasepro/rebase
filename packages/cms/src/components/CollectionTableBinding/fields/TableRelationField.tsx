@@ -4,8 +4,8 @@ import React, { useCallback, useEffect } from "react";
 import { deepEqual as equal } from "fast-equals"
 
 import { RelationPreview } from "../../../preview";
-import { Entity, FilterValues } from "@rebasepro/types";
-import { CollectionSize, AdminCollection, getRelationFrom, getCollectionDataPath, Relation, EntityRelation, normalizeToEntityRelation } from "@rebasepro/cms-types";
+import { FilterValues } from "@rebasepro/types";
+import { CollectionSize, AdminCollection, getRelationFrom, getCollectionDataPath, Relation, EntityRelation, normalizeToEntityRelation, Entity } from "@rebasepro/cms-types";
 
 import { getPreviewSizeFrom } from "../../../preview/util";
 import { } from "@rebasepro/app";

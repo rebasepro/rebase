@@ -1,12 +1,12 @@
 import React, { useCallback, useMemo, useRef } from "react";
-import type { Entity } from "@rebasepro/types";
 import type {
     AdminCollection,
     CollectionCustomViewParams,
     CollectionSize,
     EntitySelectionController,
     EntityTableController,
-    ViewMode
+    ViewMode,
+    Entity
 } from "@rebasepro/cms-types";
 import { entityOfRow, idOfRow, selectionControllerOf, tableControllerOf } from "@rebasepro/app";
 

@@ -1,6 +1,7 @@
 import { buildRebaseData } from "../src/data/entity_data";
 import { buildRoutedRebaseData } from "../src/data/routed_data";
-import { TableAccessor, DataDriver } from "@rebasepro/types";
+import { DataDriver } from "@rebasepro/types";
+import { TableAccessor } from "@rebasepro/cms-types";
 
 // ── Mock driver ─────────────────────────────────────────────
 function createMockDriver(key: string): DataDriver {

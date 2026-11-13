@@ -1,5 +1,5 @@
-import { canCreateEntity, canEditEntity, canDeleteEntity, canReadCollection, checkOperation, CollectionConfig } from "@rebasepro/cms-types";
-import { AuthState, Entity, User, SecurityRule } from "@rebasepro/types";
+import { canCreateEntity, canEditEntity, canDeleteEntity, canReadCollection, checkOperation, CollectionConfig, AuthState, Entity } from "@rebasepro/cms-types";
+import { User, SecurityRule } from "@rebasepro/types";
 
 describe("Permissions Evaluator", () => {
 

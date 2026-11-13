@@ -4,8 +4,7 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Entity } from "@rebasepro/cms-types";
 
 /**
  * A reference or relation in a table cell tall enough for more than a line

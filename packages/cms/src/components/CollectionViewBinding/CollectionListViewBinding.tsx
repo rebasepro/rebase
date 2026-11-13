@@ -1,9 +1,8 @@
 
-import type { AuthState, OrderByTuple } from "@rebasepro/types";
+import type { OrderByTuple } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Entity } from "@rebasepro/types";
-import { CollectionSize, EntityAction, EntityActionClickProps, EntityTableController, EntitySelectionController, AdminCollection, resolveProperty } from "@rebasepro/cms-types";
-import type { PropertyConfig, Properties, Property } from "@rebasepro/cms-types";
+import { CollectionSize, EntityAction, EntityActionClickProps, EntityTableController, EntitySelectionController, AdminCollection, resolveProperty, Entity } from "@rebasepro/cms-types";
+import type { PropertyConfig, Properties, Property, AuthState } from "@rebasepro/cms-types";
 import {
     ArrowDownIcon,
     ArrowUpIcon,

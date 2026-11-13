@@ -8,11 +8,11 @@ import {
     type FindParams,
     type FindResult,
     type RebaseClient,
-    type RebaseData,
     unsupportedMethod
 } from "@rebasepro/types";
 import {
-    type CollectionConfig
+    type CollectionConfig,
+    type RebaseData
 } from "@rebasepro/cms-types";
 import { Rebase } from "../src/core/Rebase";
 import { CollectionResolverRegistrationContext } from "../src/contexts/CollectionResolverContext";

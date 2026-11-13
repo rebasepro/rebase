@@ -1,8 +1,7 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { deepEqual as equal } from "fast-equals";
 import { warnDeprecated } from "@rebasepro/common";
-import type { Entity } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Entity } from "@rebasepro/cms-types";
 import { Alert, Button, CenteredView, CircularProgressCenter } from "@rebasepro/ui";
 import { CollectionScopeProvider, entityOfRow, ErrorView, rowOfEntity, useFetch, usePermissions, useTranslation } from "@rebasepro/app";
 

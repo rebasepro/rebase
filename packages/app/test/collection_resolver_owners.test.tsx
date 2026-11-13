@@ -1,7 +1,7 @@
 import React, { useContext } from "react";
 import { render } from "@testing-library/react";
-import type { DataDriver, RebaseData } from "@rebasepro/types";
-import type { CollectionConfig } from "@rebasepro/cms-types";
+import type { DataDriver } from "@rebasepro/types";
+import type { CollectionConfig, RebaseData } from "@rebasepro/cms-types";
 import { CollectionResolverRegistrationContext, Rebase, useData } from "@rebasepro/app";
 import { fakeAuthController, fakeStorageSource, fakeUser } from "./helpers/fakes";
 

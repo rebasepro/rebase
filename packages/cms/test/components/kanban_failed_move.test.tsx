@@ -11,8 +11,7 @@
  */
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, renderHook } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { AdminCollection, AnalyticsController, RebaseContext } from "@rebasepro/cms-types";
+import type { AdminCollection, AnalyticsController, RebaseContext, Entity } from "@rebasepro/cms-types";
 import type { BoardItem } from "@rebasepro/ui";
 import type { BoardDataController } from "../../src/components/CollectionViewBinding/useBoardDataController";
 

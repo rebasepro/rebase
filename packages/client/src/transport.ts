@@ -1,4 +1,4 @@
-import { AggregateParams, FindParams as TypesFindParams, FindResponse as TypesFindResponse, IMPERSONATE_HEADER, type IncludeSpec, type LogicalCondition, RebaseApiError, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
+import { AggregateParams, FindParams as TypesFindParams, IMPERSONATE_HEADER, type IncludeSpec, type LogicalCondition, RebaseApiError, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
 import { RESERVED_QUERY_KEYS, resolveFindWindow, serializeFilter, serializeInclude, serializeLogicalCondition, serializeOrderBy } from "@rebasepro/common";
 
 // The canonical client error now lives in `@rebasepro/types` so every package
@@ -192,7 +192,6 @@ export const ANONYMOUS_SERVER_CLIENT_WARNING =
  * definition, was where the typing was lost.
  */
 export type FindParams<M extends Record<string, unknown> = Record<string, unknown>, Inc = IncludeSpec> = TypesFindParams<M, Inc>;
-export type FindResponse<T> = TypesFindResponse<T extends Record<string, unknown> ? T : Record<string, unknown>>;
 
 /**
  * Refuse a filter whose *value* is missing.

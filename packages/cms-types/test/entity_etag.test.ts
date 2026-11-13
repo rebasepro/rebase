@@ -7,8 +7,8 @@
  * and `update` had no way to send one. The entity now carries it as `etag`,
  * and `update(id, data, { ifMatch })` hands it to the SDK.
  */
-import { describe, expect, it, jest } from "@jest/globals";
-import type { Entity, SDKTableClient } from "@rebasepro/types";
+import type { SDKTableClient } from "@rebasepro/types";
+import type { Entity } from "@rebasepro/cms-types";
 import { wrapAsEntityData } from "../src/data/entity_data";
 import { withETag } from "@rebasepro/common";
 import { sdkClient } from "./helpers/inert-driver";

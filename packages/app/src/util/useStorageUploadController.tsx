@@ -3,9 +3,9 @@ import type { ArrayProperty, Property, StringProperty } from "@rebasepro/cms-typ
 import Compressor from "compressorjs";
 import { deepEqual as equal } from "fast-equals";
 
-import { resourceKeyOf, EntityValues, StorageSource, StorageSourceRegistry, UploadFileProps } from "@rebasepro/types";
+import { resourceKeyOf, StorageSource, StorageSourceRegistry, UploadFileProps } from "@rebasepro/types";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { resolveStorageFilenameString, resolveStoragePathString, resolveStorageSource, StorageConfig } from "@rebasepro/cms-types";
+import { resolveStorageFilenameString, resolveStoragePathString, resolveStorageSource, StorageConfig, EntityValues } from "@rebasepro/cms-types";
 import { useAuthController } from "../hooks";
 import { useStorageSources } from "../contexts/StorageSourcesContext";
 import { randomString } from "@rebasepro/utils";

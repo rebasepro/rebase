@@ -1,4 +1,5 @@
-import { Entity, FilterValues } from "@rebasepro/types";
+import { FilterValues } from "@rebasepro/types";
+import { Entity } from "@rebasepro/cms-types";
 
 /**
  * How many (collection, filters) pairs keep a scroll position. Past it, the

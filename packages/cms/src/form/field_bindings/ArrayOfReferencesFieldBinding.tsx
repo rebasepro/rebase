@@ -2,8 +2,7 @@ import { useEntitySelectionDialog } from "../../hooks/useSelectionDialog";
 
 import type { FieldProps } from "../../types/fields";
 import React, { useCallback, useMemo } from "react";
-import { Entity } from "@rebasepro/types";
-import { EntityReference } from "@rebasepro/cms-types";
+import { EntityReference, Entity } from "@rebasepro/cms-types";
 import { ReferencePreview } from "../../preview";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";

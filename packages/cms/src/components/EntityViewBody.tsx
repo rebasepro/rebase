@@ -1,6 +1,6 @@
 import type { AdminCollection, EntityCustomViewParams } from "@rebasepro/cms-types";
 import React, { Suspense, useMemo } from "react";
-import { Entity } from "@rebasepro/types";
+import { Entity } from "@rebasepro/cms-types";
 import { hasEntityId } from "../util/identity";
 import { CircularProgressCenter, cls, ErrorBoundary } from "@rebasepro/ui";
 import { createFormexStub } from "@rebasepro/app";

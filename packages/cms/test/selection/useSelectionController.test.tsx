@@ -1,6 +1,6 @@
 import { describe, expect, test } from "@jest/globals";
 import { act, renderHook } from "@testing-library/react";
-import { Entity } from "@rebasepro/types";
+import { Entity } from "@rebasepro/cms-types";
 import { useEntitySelectionController } from "../../src/components/CollectionViewBinding/useSelectionController";
 
 function entity(id: string, path = "orders"): Entity<any> {

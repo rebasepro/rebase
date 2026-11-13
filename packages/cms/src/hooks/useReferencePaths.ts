@@ -1,6 +1,5 @@
 import { useCallback } from "react";
-import type { Entity } from "@rebasepro/types";
-import type { EntityReference } from "@rebasepro/cms-types";
+import type { EntityReference, Entity } from "@rebasepro/cms-types";
 import { useCollectionScope } from "@rebasepro/app";
 import { resolveDataSource } from "@rebasepro/common";
 import { getReferenceFrom } from "@rebasepro/cms-types";

@@ -11,10 +11,9 @@
  * and one page. JSON still builds in memory: it is one `JSON.stringify`.
  */
 import React from "react";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Entity } from "@rebasepro/cms-types";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
 
 type Row = Record<string, unknown>;
 

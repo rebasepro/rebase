@@ -64,7 +64,7 @@ describe("policyToPostgres — existsIn (membership)", () => {
         });
         expect(evaluatePolicy(expr, { uid: "u1",
 roles: [],
-entity: null })).toBe("unknown");
+row: null })).toBe("unknown");
     });
 });
 
@@ -136,15 +136,15 @@ describe("policy.authenticated()", () => {
     });
 
     it("is false for an anonymous caller, in either spelling", () => {
-        expect(evaluatePolicy(policy.authenticated(), { uid: null, entity: null })).toBe(false);
-        expect(evaluatePolicy(policy.authenticated(), { uid: ANONYMOUS_USER_ID, entity: null })).toBe(false);
+        expect(evaluatePolicy(policy.authenticated(), { uid: null, row: null })).toBe(false);
+        expect(evaluatePolicy(policy.authenticated(), { uid: ANONYMOUS_USER_ID, row: null })).toBe(false);
         // The spelling the request path used to report. A client evaluating it
         // as "signed in" renders rows the database will refuse.
-        expect(evaluatePolicy(policy.authenticated(), { uid: "anon", entity: null })).toBe(false);
+        expect(evaluatePolicy(policy.authenticated(), { uid: "anon", row: null })).toBe(false);
     });
 
     it("is true for a signed-in caller", () => {
-        expect(evaluatePolicy(policy.authenticated(), { uid: "u1", entity: null })).toBe(true);
+        expect(evaluatePolicy(policy.authenticated(), { uid: "u1", row: null })).toBe(true);
     });
 
     it("negates honestly — no special case rewriting it to the server context", () => {
@@ -162,16 +162,16 @@ describe("policy.serverContext()", () => {
     });
 
     it("is false client-side for every caller — a client is never the server", () => {
-        expect(evaluatePolicy(policy.serverContext(), { uid: null, entity: null })).toBe(false);
-        expect(evaluatePolicy(policy.serverContext(), { uid: "u1", entity: null })).toBe(false);
+        expect(evaluatePolicy(policy.serverContext(), { uid: null, row: null })).toBe(false);
+        expect(evaluatePolicy(policy.serverContext(), { uid: "u1", row: null })).toBe(false);
     });
 
     it("keeps the default server-or-admin grant away from anonymous callers", () => {
         // The framework's own baseline policy, on every collection. With
         // `not(authenticated())` in place of `serverContext()` this is true.
         const serverOrAdmin = policy.or(policy.serverContext(), policy.rolesOverlap(["admin"]));
-        expect(evaluatePolicy(serverOrAdmin, { uid: null, roles: [], entity: null })).toBe(false);
-        expect(evaluatePolicy(serverOrAdmin, { uid: "u1", roles: ["admin"], entity: null })).toBe(true);
+        expect(evaluatePolicy(serverOrAdmin, { uid: null, roles: [], row: null })).toBe(false);
+        expect(evaluatePolicy(serverOrAdmin, { uid: "u1", roles: ["admin"], row: null })).toBe(true);
     });
 });
 
@@ -180,8 +180,8 @@ describe("authUid operand", () => {
         // Postgres compares against 'anonymous'; resolving to null here would
         // make the two disagree on exactly the rules that test for it.
         const notAnon = policy.compare(policy.authUid(), "neq", policy.literal(ANONYMOUS_USER_ID));
-        expect(evaluatePolicy(notAnon, { uid: null, entity: null })).toBe(false);
-        expect(evaluatePolicy(notAnon, { uid: "u1", entity: null })).toBe(true);
+        expect(evaluatePolicy(notAnon, { uid: null, row: null })).toBe(false);
+        expect(evaluatePolicy(notAnon, { uid: "u1", row: null })).toBe(true);
     });
 });
 

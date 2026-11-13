@@ -1,6 +1,7 @@
 
 import { useEffect, useState, useMemo } from "react";
-import { Entity, FilterValues, User } from "@rebasepro/types";
+import { FilterValues, User } from "@rebasepro/types";
+import { Entity } from "@rebasepro/cms-types";
 import { useData } from "./useData";
 import { isSchemaDriftError, useSchemaDriftContext } from "../../components/SchemaDriftBanner";
 import { toFindParams } from "./collectionQuery";

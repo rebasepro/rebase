@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Entity } from "@rebasepro/types";
+import { Entity } from "@rebasepro/cms-types";
 
 export interface DataOrderProps<M extends Record<string, any>> {
     data: Entity<M>[];

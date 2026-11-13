@@ -1,5 +1,4 @@
-import type { AdminCollection, EntityDisplayRole, Property } from "@rebasepro/cms-types";
-import type { Entity } from "@rebasepro/types";
+import type { AdminCollection, EntityDisplayRole, Property, Entity } from "@rebasepro/cms-types";
 import { ENTITY_DISPLAY_ROLES } from "@rebasepro/cms-types";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import {

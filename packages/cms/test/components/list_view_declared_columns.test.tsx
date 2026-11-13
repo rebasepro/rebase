@@ -16,10 +16,9 @@
  * number.
  */
 import React from "react";
-import type { AdminCollection, PostgresProperties } from "@rebasepro/cms-types";
+import type { AdminCollection, PostgresProperties, Entity } from "@rebasepro/cms-types";
 import { beforeAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, render } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
     class NoopResizeObserver { observe() { /* */ } unobserve() { /* */ } disconnect() { /* */ } }

@@ -1,5 +1,6 @@
 import { MAX_LIST_LIMIT } from "@rebasepro/types";
-import type { TableAccessor, Entity, FindParams } from "@rebasepro/types";
+import type { FindParams } from "@rebasepro/types";
+import type { TableAccessor, Entity } from "@rebasepro/cms-types";
 
 import { isConnectionLostError } from "../../util/realtime";
 

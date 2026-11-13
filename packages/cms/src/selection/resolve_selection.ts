@@ -1,5 +1,5 @@
-import { Entity, FindParams, OrderByTuple, SDKTableClient } from "@rebasepro/types";
-import { EntitySelection, RowSelection, SelectionQuery, CollectionConfig, resolvePrimaryKeys } from "@rebasepro/cms-types";
+import { FindParams, OrderByTuple, SDKTableClient } from "@rebasepro/types";
+import { EntitySelection, RowSelection, SelectionQuery, CollectionConfig, resolvePrimaryKeys, Entity } from "@rebasepro/cms-types";
 import { buildCompositeId } from "@rebasepro/common";
 import { getRelationIncludeParams } from "@rebasepro/app";
 import { EntityPageAccessor, walkEntityPages } from "../util/entity_pages";

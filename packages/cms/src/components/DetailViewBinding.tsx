@@ -3,8 +3,8 @@ import type { EntityCustomViewParams, AdminCollection } from "@rebasepro/cms-typ
 import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/cms-types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Entity, EntityStatus } from "@rebasepro/types";
-import { Property } from "@rebasepro/cms-types";
+import { EntityStatus } from "@rebasepro/types";
+import { Property, Entity } from "@rebasepro/cms-types";
 import { PluginProviderStack, useComponentOverride, CollectionScopeProvider, getAdminEntityChildViews } from "@rebasepro/app";
 
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";

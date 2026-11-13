@@ -16,7 +16,8 @@ import React from "react";
 import type { AdminCollection, FormexController } from "@rebasepro/cms-types";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, render } from "@testing-library/react";
-import { RebaseApiError, type Entity } from "@rebasepro/types";
+import { RebaseApiError } from "@rebasepro/types";
+import { type Entity } from "@rebasepro/cms-types";
 
 type Row = Record<string, unknown>;
 

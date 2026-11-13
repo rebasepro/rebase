@@ -1,5 +1,5 @@
-import type { EntityStatus, EntityValues } from "@rebasepro/types";
-import type { AdminCollection, RebaseContext } from "@rebasepro/cms-types";
+import type { EntityStatus } from "@rebasepro/types";
+import type { AdminCollection, RebaseContext, EntityValues } from "@rebasepro/cms-types";
 
 /**
  * One write, inside the collection's `browserCallbacks` — the semantics

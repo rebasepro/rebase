@@ -1,5 +1,5 @@
 import React from "react";
-import type { EntityValues } from "@rebasepro/types";
+import type { EntityValues } from "./entities";
 
 import type { FormexController } from "./formex";
 import type { AdminCollection } from "@rebasepro/cms-types";

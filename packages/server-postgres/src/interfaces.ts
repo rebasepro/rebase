@@ -6,7 +6,6 @@
  */
 
 import {
-    Entity,
     FilterValues,
     WhereFilterOp,
     DatabaseConnection,

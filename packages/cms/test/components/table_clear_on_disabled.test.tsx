@@ -13,8 +13,7 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { SelectedCellProps, Property, StringProperty } from "@rebasepro/cms-types";
+import type { SelectedCellProps, Property, StringProperty, Entity } from "@rebasepro/cms-types";
 import type { DataCollectionTableController, OnCellValueChangeParams } from "@rebasepro/app";
 
 if (typeof globalThis.ResizeObserver === "undefined") {

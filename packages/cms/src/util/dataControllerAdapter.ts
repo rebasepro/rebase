@@ -5,8 +5,7 @@
  */
 
 import { useMemo } from "react";
-import type { Entity } from "@rebasepro/types";
-import type { EntityTableController } from "@rebasepro/cms-types";
+import type { EntityTableController, Entity } from "@rebasepro/cms-types";
 import type { CollectionDataController } from "@rebasepro/ui";
 import { warnDeprecated } from "@rebasepro/common";
 

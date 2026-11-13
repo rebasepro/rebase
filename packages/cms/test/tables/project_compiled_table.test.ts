@@ -3,7 +3,8 @@
  * path from `defineTable` to the panel's collection, with no frontend config.
  */
 import { describe, expect, it } from "@jest/globals";
-import type { Entity, SecurityOperation, User } from "@rebasepro/types";
+import type { SecurityOperation, User } from "@rebasepro/types";
+import type { Entity } from "@rebasepro/cms-types";
 import { col, defineAuthTable, defineTable, rel } from "@rebasepro/types";
 import { compileTables } from "@rebasepro/common";
 import { checkOperation, getEntityChildViews, resolveCollectionRelations } from "@rebasepro/cms-types";

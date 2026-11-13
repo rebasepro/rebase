@@ -37,8 +37,8 @@ import {
     Tooltip,
     Typography
 } from "@rebasepro/ui";
-import { Entity, getDataSourceCapabilities, User } from "@rebasepro/types";
-import { PropertyConfig, AdminCollection, isPropertyBuilder, getSubcollections, EngineProperties, MapProperty, Properties, Property, getTableName } from "@rebasepro/cms-types";
+import { getDataSourceCapabilities, User } from "@rebasepro/types";
+import { PropertyConfig, AdminCollection, isPropertyBuilder, getSubcollections, EngineProperties, MapProperty, Properties, Property, getTableName, Entity } from "@rebasepro/cms-types";
 import { removeInitialAndTrailingSlashes } from "@rebasepro/app";
 import { isSchemaChangeCancelled } from "../../liveSchemaClient";
 import { CollectionEditorSchema } from "./CollectionYupValidation";

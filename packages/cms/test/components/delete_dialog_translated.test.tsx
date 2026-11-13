@@ -14,8 +14,7 @@ import path from "node:path";
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { AdminCollection, EntitySelection } from "@rebasepro/cms-types";
+import type { AdminCollection, EntitySelection, Entity } from "@rebasepro/cms-types";
 
 jest.mock("@rebasepro/app", () => {
     const overrides: Record<string, unknown> = {

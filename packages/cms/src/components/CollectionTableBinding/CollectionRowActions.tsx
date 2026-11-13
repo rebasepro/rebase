@@ -2,8 +2,7 @@
 import type { EntityAction, EntityActionClickProps, AdminCollection } from "@rebasepro/cms-types";
 import React, { MouseEvent, useCallback } from "react";
 
-import { Entity } from "@rebasepro/types";
-import { CollectionSize, EntitySelectionController } from "@rebasepro/cms-types";
+import { CollectionSize, EntitySelectionController, Entity } from "@rebasepro/cms-types";
 import {
     Badge,
     Checkbox,

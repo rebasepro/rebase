@@ -11,7 +11,6 @@
 
 import fc from "fast-check";
 import {
-    type Entity,
     PolicyCompareOperator,
     PolicyExpression,
     PolicyOperand,
@@ -172,7 +171,7 @@ export const innerPolicyExpression: fc.Arbitrary<PolicyExpression> = fc.letrec<{
 /**
  * Evaluation contexts spanning every branch the evaluator distinguishes:
  * signed in, anonymous (both spellings rebase has ever reported), and the
- * no-uid case a client presents. `entity: null` is included because
+ * no-uid case a client presents. `row: null` is included because
  * collection-level gating really does evaluate with no row in hand, and that is
  * where `field` operands go unresolvable.
  */
@@ -184,9 +183,8 @@ export const evalContext: fc.Arbitrary<PolicyEvalContext> = fc.record({
         fc.constant(undefined)
     ),
     roles: fc.array(roleName, { maxLength: 3 }),
-    entity: fc.oneof(
+    row: fc.oneof(
         fc.constant(null),
         fc.dictionary(snakeIdentifier, literalValue, { maxKeys: 4 })
-            .map((values): Entity => ({ id: "e1", path: "things", values }))
     )
 });

@@ -11,9 +11,9 @@ import { CollectionWindow } from "../../hooks/data/collectionWindow";
 import { useDataChangeVersion } from "../../hooks/data/dataChanges";
 import { getRelationIncludeParams } from "../../util/previews";
 import { copyRow, fromWireRow, toWireRow } from "../../util/wire_row";
-import { Entity, FilterValues, OrderBySpec, OrderByTuple, User, WhereFilterOp } from "@rebasepro/types";
+import { FilterValues, OrderBySpec, OrderByTuple, User, WhereFilterOp } from "@rebasepro/types";
 import { normalizeOrderBy, serializeOrderBy } from "@rebasepro/common";
-import { EntityTableController, RebaseContext, SelectedCellProps, AdminCollection, EntityReference, EntityRelation } from "@rebasepro/cms-types";
+import { EntityTableController, RebaseContext, SelectedCellProps, AdminCollection, EntityReference, EntityRelation, Entity } from "@rebasepro/cms-types";
 import { ScrollRestorationController } from "./useScrollRestoration";
 
 export const DEFAULT_PAGE_SIZE = 50;

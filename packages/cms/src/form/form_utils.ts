@@ -1,7 +1,7 @@
 
 import type { PropertyConfig, AdminCollection } from "@rebasepro/cms-types";
-import type { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
-import type { AuthController, CollectionRegistryController, CollectionConfig } from "@rebasepro/cms-types";
+import type { EntityStatus } from "@rebasepro/types";
+import type { AuthController, CollectionRegistryController, CollectionConfig, Entity, EntityValues } from "@rebasepro/cms-types";
 import { deepEqual as equal } from "fast-equals";
 import { getIn, setIn } from "@rebasepro/forms";
 import {

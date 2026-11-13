@@ -1,7 +1,7 @@
 
 import type { EntityCustomView, AdminCollection } from "@rebasepro/cms-types";
-import { Entity, SDKTableClient, User } from "@rebasepro/types";
-import { RebaseContext } from "@rebasepro/cms-types";
+import { SDKTableClient, User } from "@rebasepro/types";
+import { RebaseContext, Entity } from "@rebasepro/cms-types";
 import { useEffect, useState, useMemo } from "react";
 import { getNavigationEntriesFromPath } from "@rebasepro/app";
 import { useAdminContext } from "./useAdminContext";

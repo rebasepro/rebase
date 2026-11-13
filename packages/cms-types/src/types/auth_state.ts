@@ -1,4 +1,4 @@
-import type { User } from "../users";
+import type { User } from "@rebasepro/types";
 
 /**
  * The read-only slice of authentication state that property resolution needs.

@@ -1,7 +1,7 @@
 import jsonLogic from "json-logic-js";
 import {
     AuthState
-} from "@rebasepro/types";
+} from "../types/auth_state";
 import {
     ArrayProperty,
     ConditionRule,

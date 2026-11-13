@@ -1,7 +1,6 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Entity } from "@rebasepro/types";
-import { CollectionSize, EntityTableController, EntitySelectionController, AdminCollection } from "@rebasepro/cms-types";
+import { CollectionSize, EntityTableController, EntitySelectionController, AdminCollection, Entity } from "@rebasepro/cms-types";
 import { EditViewBinding } from "../EditViewBinding";
 import { DetailViewBinding } from "../DetailViewBinding";
 import {

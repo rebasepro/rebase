@@ -5,7 +5,7 @@ import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import type { Entity } from "@rebasepro/types";
+import type { Entity } from "@rebasepro/cms-types";
 
 /**
  * A record opened from a list opens with the row's values on screen while its

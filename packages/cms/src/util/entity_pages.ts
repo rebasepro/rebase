@@ -1,4 +1,5 @@
-import { Entity, FindParams } from "@rebasepro/types";
+import { FindParams } from "@rebasepro/types";
+import { Entity } from "@rebasepro/cms-types";
 
 /**
  * One page as a walk reads it. A collection accessor's `FindResponse` is one;

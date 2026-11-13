@@ -3,10 +3,9 @@ import { hasEntityId } from "../util/identity";
 import * as React from "react";
 import { useEffect, useMemo } from "react";
 
-import { Entity } from "@rebasepro/types";
 import type { PreviewSize } from "../types/components/PropertyPreviewProps";
 import { buildEnumLabel, getEntityImagePreviewPropertyKey } from "@rebasepro/app";
-import { enumToObjectEntries } from "@rebasepro/cms-types";
+import { enumToObjectEntries, Entity } from "@rebasepro/cms-types";
 import {
     ArrowRightToLineIcon,
     Chip,

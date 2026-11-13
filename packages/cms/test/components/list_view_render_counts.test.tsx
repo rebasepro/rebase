@@ -4,8 +4,7 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { AdminCollection, EntityAction } from "@rebasepro/cms-types";
+import type { AdminCollection, EntityAction, Entity } from "@rebasepro/cms-types";
 
 /**
  * The list view's rows are memoised, and a render of the list that changes no

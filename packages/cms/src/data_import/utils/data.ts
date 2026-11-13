@@ -1,6 +1,5 @@
 import { getPropertyInPath } from "../../util";
-import { Entity } from "@rebasepro/types";
-import { AuthController, AdminCollection, CollectionRegistryController, isPropertyBuilder, ArrayProperty, DataType, Properties, Property, EntityReference, GeoPoint, Vector } from "@rebasepro/cms-types";
+import { AuthController, AdminCollection, CollectionRegistryController, isPropertyBuilder, ArrayProperty, DataType, Properties, Property, EntityReference, GeoPoint, Vector, Entity } from "@rebasepro/cms-types";
 import { unflattenObject } from "./transforms";
 import { ColumnTarget, importColumns } from "./import_columns";
 import { inferTypeFromValue, readNumberExactly } from "@rebasepro/inference";

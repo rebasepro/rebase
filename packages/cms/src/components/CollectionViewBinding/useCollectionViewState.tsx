@@ -1,12 +1,12 @@
 import type { AdditionalFieldDelegate, EntityAction, AdminCollection, Property } from "@rebasepro/cms-types";
-import { Entity } from "@rebasepro/types";
 import {
     CollectionSize,
     EntitySelection,
     TableController,
     SelectionQuery,
     ViewMode,
-    getEntityChildViews
+    getEntityChildViews,
+    Entity
 } from "@rebasepro/cms-types";
 import { serializeSelectionQuery } from "../../selection";
 import type { UiFieldPreferences, UiTablePreferences } from "@rebasepro/types";

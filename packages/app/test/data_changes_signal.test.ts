@@ -1,4 +1,4 @@
-import type { Entity, RebaseData } from "@rebasepro/types";
+import type { Entity, RebaseData } from "@rebasepro/cms-types";
 import React from "react";
 import { fakeTableAccessor, rebaseDataOver } from "./helpers/fakes";
 import { act, renderHook } from "@testing-library/react";

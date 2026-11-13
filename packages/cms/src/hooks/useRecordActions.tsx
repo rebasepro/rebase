@@ -1,5 +1,4 @@
-import type { EntityAction, EntityActionClickProps, AdminCollection } from "@rebasepro/cms-types";
-import type { Entity } from "@rebasepro/types";
+import type { EntityAction, EntityActionClickProps, AdminCollection, Entity } from "@rebasepro/cms-types";
 import { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { getIcon, useCustomizationController, usePermissions, useSnackbarController, useTranslation } from "@rebasepro/app";

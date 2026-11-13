@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { col, defineTable } from "@rebasepro/types";
-import type { AuthState, SecurityRule, User } from "@rebasepro/types";
+import type { SecurityRule } from "@rebasepro/types";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import {
     SchemaDefinitionError,
@@ -16,13 +16,6 @@ import {
  * "unknown" exactly as it answers a raw rule, and nothing ever compiles a
  * policy from it.
  */
-
-function caller(roles: string[], uid = "u-1"): AuthState<User> {
-    return {
-        user: { uid, email: null, displayName: null, photoURL: null, providerId: "password", isAnonymous: false, roles }
-    };
-}
-const anonymous: AuthState<User> = { user: null };
 
 function table(securityRules: SecurityRule[]): LegacyCollectionConfig {
     return { name: "notes", slug: "notes", table: "notes", properties: { id: { name: "id", type: "string", isId: "uuid" } }, securityRules };

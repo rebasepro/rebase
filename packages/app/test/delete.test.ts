@@ -1,6 +1,5 @@
 import { deleteEntityWithCallbacks } from "../src/hooks/data/delete";
-import type { Entity, RebaseData } from "@rebasepro/types";
-import type { AdminCollection, RebaseContext, CollectionCallbacks } from "@rebasepro/cms-types";
+import type { AdminCollection, RebaseContext, CollectionCallbacks, Entity, RebaseData } from "@rebasepro/cms-types";
 import { fakeTableAccessor, rebaseDataOver } from "./helpers/fakes";
 
 /**

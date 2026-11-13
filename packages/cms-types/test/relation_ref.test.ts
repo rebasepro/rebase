@@ -1,5 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
-import { createRelationRef } from "../src/runtime/relation-ref";
+import { createRelationRef } from "@rebasepro/cms-types";
 
 describe("createRelationRef", () => {
     it("produces a canonical relation object with __type 'relation'", () => {

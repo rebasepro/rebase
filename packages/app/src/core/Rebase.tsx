@@ -5,8 +5,8 @@ import type { ComponentOverrideMap } from "@rebasepro/cms-types";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CenteredView, TooltipProvider, Typography } from "@rebasepro/ui";
-import { AccessSimulation, User, DataDriver, DataSourceDefinition, RebaseData, DEFAULT_DATA_SOURCE_KEY, StorageSource, StorageSourceDefinition, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
-import { RebaseContext, UNRENDERED_SLOTS, CollectionRegistryController, CollectionRegistry, collectionEntityDataOptions, buildRebaseData, wrapAsEntityData } from "@rebasepro/cms-types";
+import { AccessSimulation, User, DataDriver, DataSourceDefinition, DEFAULT_DATA_SOURCE_KEY, StorageSource, StorageSourceDefinition, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
+import { RebaseContext, UNRENDERED_SLOTS, CollectionRegistryController, CollectionRegistry, collectionEntityDataOptions, buildRebaseData, wrapAsEntityData, RebaseData } from "@rebasepro/cms-types";
 import { PluginProviderStack } from "./PluginProviderStack";
 import { PluginLifecycleManager } from "./PluginLifecycleManager";
 import { warnDeprecatedPluginKeys } from "./deprecated_plugin_keys";

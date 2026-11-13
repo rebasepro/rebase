@@ -101,7 +101,7 @@ describe("policy model: Postgres and JavaScript agree", () => {
     for (const caller of CALLERS) {
         for (const { name, expr } of EXPRESSIONS) {
             it(`${name} — ${caller.name}`, async () => {
-                const inJs = evaluatePolicy(expr, { uid: caller.uid, roles: caller.roles, entity: null });
+                const inJs = evaluatePolicy(expr, { uid: caller.uid, roles: caller.roles, row: null });
                 // "unknown" is a deliberate client-side abstention (raw SQL,
                 // existsIn); none of these expressions produce it.
                 expect(inJs).not.toBe("unknown");

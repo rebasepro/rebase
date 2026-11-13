@@ -20,7 +20,6 @@ import {
     ListenOneProps,
     RebaseCallContext,
     RebaseServerClient,
-    RebaseData,
     RebaseSdkData,
     RestFetchService,
     BatchWriteProps,
@@ -35,7 +34,6 @@ import {
     DeleteManyProps,
     DeleteWhereProps,
     LogicalCondition,
-    EntityValues,
     EntityStatus,
     TableColumnInfo,
     TableDescriptor,
@@ -1067,10 +1065,10 @@ export class PostgresBackendDriver implements DataDriver {
     private async applyTenantScope<M extends Record<string, unknown>>(
         table: RuntimeTable | undefined,
         path: string,
-        values: Partial<EntityValues<M>>,
+        values: Partial<M>,
         status: EntityStatus,
         previousValues: Record<string, unknown> | undefined
-    ): Promise<Partial<EntityValues<M>>> {
+    ): Promise<Partial<M>> {
         const tenant = table ? tenantOf(table.descriptor) : undefined;
         if (!tenant) return values;
 
@@ -1105,7 +1103,7 @@ export class PostgresBackendDriver implements DataDriver {
                 violations: [{ field, code, message }]
             });
         }
-        return decision.values as Partial<EntityValues<M>>;
+        return decision.values as Partial<M>;
     }
 
     /**
@@ -1249,10 +1247,10 @@ export class PostgresBackendDriver implements DataDriver {
     private async findUpsertTarget<M extends Record<string, unknown>>(
         path: string,
         table: RuntimeTable,
-        values: Partial<EntityValues<M>>,
+        values: Partial<M>,
         id: string | number | undefined,
         onConflict: readonly string[] | undefined
-    ): Promise<{ id: string; values: Partial<EntityValues<M>>; row: Record<string, unknown> } | undefined> {
+    ): Promise<{ id: string; values: Partial<M>; row: Record<string, unknown> } | undefined> {
         const primaryKeys = keysOfTable(table, this.registry);
         const key: Record<string, unknown> = { ...values };
         if (isPresentKey(id)) Object.assign(key, parseIdValues(id, primaryKeys));
@@ -1287,7 +1285,7 @@ export class PostgresBackendDriver implements DataDriver {
         for (const field of [...primaryKeys.map(info => info.fieldName), ...targetFields]) delete rest[field];
         return {
             id: deriveRowAddress(row, table, this.registry),
-            values: rest as Partial<EntityValues<M>>,
+            values: rest as Partial<M>,
             row
         };
     }
@@ -1316,10 +1314,10 @@ export class PostgresBackendDriver implements DataDriver {
      */
     private stampWrite<M extends Record<string, unknown>>(
         runtime: RuntimeTable | undefined,
-        values: Partial<EntityValues<M>>,
+        values: Partial<M>,
         status: EntityStatus,
         path: string
-    ): Partial<EntityValues<M>> {
+    ): Partial<M> {
         const table = runtime?.descriptor;
         if (!table) return values;
         // Stamped at the application layer, after the hooks, so every write
@@ -1341,7 +1339,7 @@ export class PostgresBackendDriver implements DataDriver {
             for (const key of createStampKeys(table)) delete stamped[key];
         }
         warnReplacedStamps(table, values as Record<string, unknown>, stamped, status);
-        return stamped as Partial<EntityValues<M>>;
+        return stamped as Partial<M>;
     }
 
     /**
@@ -1519,7 +1517,7 @@ export class PostgresBackendDriver implements DataDriver {
         // declares one.
         const writtenTable = runtime?.descriptor;
         if ((status === "new" || status === "copy") && writtenTable) {
-            updatedValues = applyCreateDefaults(writtenTable, updatedValues as Record<string, unknown>) as Partial<EntityValues<M>>;
+            updatedValues = applyCreateDefaults(writtenTable, updatedValues as Record<string, unknown>) as Partial<M>;
         }
 
         // Fetch previous values for callbacks AND history recording. Same walk
@@ -1606,7 +1604,7 @@ export class PostgresBackendDriver implements DataDriver {
         }
 
         /** The row as the hooks receive it, to tell what they wrote. */
-        const beforeHooks: Partial<EntityValues<M>> = updatedValues;
+        const beforeHooks: Partial<M> = updatedValues;
 
         // A `before*` callback is the application speaking, not the server
         // failing: a bare `throw` is the documented way to block a write, so it
@@ -1621,11 +1619,11 @@ export class PostgresBackendDriver implements DataDriver {
                 previousValues: previousValuesForHistory as Record<string, unknown> | undefined,
                 status,
                 context: contextForCallback
-            }) as Partial<EntityValues<M>>;
+            }) as Partial<M>;
         } catch (callbackError) {
             throw toCallbackError(callbackError, "beforeSave", path);
         }
-        const afterHooks: Partial<EntityValues<M>> = updatedValues;
+        const afterHooks: Partial<M> = updatedValues;
         if (status === "existing" && isPresentKey(id)) {
             assertKeyUnchanged(runtime, this.registry, id, updatedValues as Record<string, unknown>, path);
         }
@@ -1645,7 +1643,7 @@ export class PostgresBackendDriver implements DataDriver {
             updatedValues,
             status ?? "new",
             previousValuesForHistory as Record<string, unknown> | undefined
-        ) as Partial<EntityValues<M>>;
+        ) as Partial<M>;
 
         // A create that names its key is still a create. The persistence layer
         // reads an `id` as "update this row", so a new row's key travels inside
@@ -1661,7 +1659,7 @@ export class PostgresBackendDriver implements DataDriver {
             updatedValues = {
                 ...updatedValues,
                 ...parseIdValues(id, keysOfTable(runtime, this.registry))
-            } as Partial<EntityValues<M>>;
+            } as Partial<M>;
             writeId = undefined;
         }
 
@@ -2024,7 +2022,7 @@ export class PostgresBackendDriver implements DataDriver {
      */
     private async saveRowsTogether<M extends Record<string, unknown>>(
         path: string,
-        rows: readonly Partial<EntityValues<M>>[],
+        rows: readonly Partial<M>[],
         upsert: boolean,
         onConflict: readonly string[] | undefined,
         rule?: ConflictRule
@@ -2039,7 +2037,7 @@ export class PostgresBackendDriver implements DataDriver {
         const runtimeTable = resolved;
         const softDeleteField = resolveSoftDelete(runtimeTable)?.field;
         const prepared = rows.map(values => {
-            const withDefaults = applyCreateDefaults(runtimeTable.descriptor, values as Record<string, unknown>) as Partial<EntityValues<M>>;
+            const withDefaults = applyCreateDefaults(runtimeTable.descriptor, values as Record<string, unknown>) as Partial<M>;
             const stamped = this.stampWrite(resolved, withDefaults, "new", path) as Record<string, unknown>;
             const insertOnlyKeys = upsert
                 ? insertOnlyKeysOf(stamped, values, withDefaults as Record<string, unknown>, withDefaults as Record<string, unknown>, runtimeTable.descriptor)
@@ -2404,7 +2402,7 @@ export class PostgresBackendDriver implements DataDriver {
                 const operation = operations[i];
                 try {
                     const values = operation.values
-                        ? resolveBatchRefs(operation.values, named) as Partial<EntityValues<M>>
+                        ? resolveBatchRefs(operation.values, named) as Partial<M>
                         : undefined;
                     const rawId = operation.id !== undefined
                         ? resolveBatchRefs(operation.id, named)
@@ -2426,14 +2424,14 @@ export class PostgresBackendDriver implements DataDriver {
                         case "create":
                             row = await txDriver.save<M>({
                                 path: operation.path,
-                                values: values ?? ({} as Partial<EntityValues<M>>),
+                                values: values ?? ({} as Partial<M>),
                                 status: "new"
                             });
                             break;
                         case "upsert":
                             row = await txDriver.save<M>({
                                 path: operation.path,
-                                values: values ?? ({} as Partial<EntityValues<M>>),
+                                values: values ?? ({} as Partial<M>),
                                 status: "new",
                                 upsert: true,
                                 onConflict: operation.onConflict
@@ -2447,7 +2445,7 @@ export class PostgresBackendDriver implements DataDriver {
                             row = await txDriver.save<M>({
                                 path: operation.path,
                                 id: id!,
-                                values: values ?? ({} as Partial<EntityValues<M>>),
+                                values: values ?? ({} as Partial<M>),
                                 status: "existing",
                                 precondition: { check: stored => assertBatchRowFound(stored, id) }
                             });
@@ -2623,7 +2621,7 @@ export class PostgresBackendDriver implements DataDriver {
         if (softDelete) {
             await this.dataService.save(
                 targetPath,
-                { [softDelete.field]: new Date() } as Partial<EntityValues<M>>,
+                { [softDelete.field]: new Date() } as Partial<M>,
                 row.id,
                 undefined
             );

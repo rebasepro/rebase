@@ -1,5 +1,5 @@
 import React from "react";
-import { RebaseData } from "@rebasepro/types";
+import { RebaseData } from "@rebasepro/cms-types";
 
 /**
  * `null` outside `<Rebase>`, so {@link useData} can say so.

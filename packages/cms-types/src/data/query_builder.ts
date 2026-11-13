@@ -1,6 +1,6 @@
 import { FindParams, LogicalCondition, OrderByTuple, WhereFilterOp, WhereValueFor, type ComputedSortField } from "@rebasepro/types";
 import { normalizeOrderBy } from "@rebasepro/common";
-import type { FindResponse, QueryBuilderInterface, TableAccessor } from "@rebasepro/types";
+import type { FindResponse, QueryBuilderInterface, TableAccessor } from "../types/table_accessor";
 
 /**
  * The fluent query builder of the admin's accessor ({@link TableAccessor}):

@@ -1,7 +1,7 @@
 import { useUrlController } from "./_cms_internals";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Entity, UnmappedTable, User } from "@rebasepro/types";
-import { Property } from "@rebasepro/cms-types";
+import { UnmappedTable, User } from "@rebasepro/types";
+import { Property, Entity } from "@rebasepro/cms-types";
 import { deepEqual as equal } from "fast-equals";
 
 import { CollectionsConfigController, ImportedTable } from "./types/config_controller";

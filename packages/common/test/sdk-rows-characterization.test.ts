@@ -25,7 +25,7 @@ function fullDriver(rows: Row[] = [{ id: 1, title: "a" }, { id: 2, title: "b" }]
     const calls: Call[] = [];
     const record = (method: string, ...args: unknown[]) => { calls.push({ method, args }); };
     let listenFrame: ((rows: Row[]) => void) | undefined;
-    let listenOneFrame: ((row: Row | null | undefined) => void) | undefined;
+    let listenOneFrame: ((row: Row | null) => void) | undefined;
     const rest: RestFetchService = {
         async fetchCollectionForRest(path, options, include) {
             record("fetchCollectionForRest", path, options, include);
@@ -74,7 +74,7 @@ function fullDriver(rows: Row[] = [{ id: 1, title: "a" }, { id: 2, title: "b" }]
         driver,
         calls,
         push: (frame: Row[]) => listenFrame?.(frame),
-        pushOne: (frame: Row | null | undefined) => listenOneFrame?.(frame)
+        pushOne: (frame: Row | null) => listenOneFrame?.(frame)
     };
 }
 

@@ -3,8 +3,7 @@
 import type { FormContext } from "../types/fields";
 import type { EntityAction, EntityActionClickProps, SidePanelController, AdminCollection } from "@rebasepro/cms-types";
 import React, { useMemo } from "react";
-import { Entity } from "@rebasepro/types";
-import { RebaseContext } from "@rebasepro/cms-types";
+import { RebaseContext, Entity } from "@rebasepro/cms-types";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { copyEntityAction, deleteEntityAction, unlinkEntityAction } from "./common/default_entity_actions";
 import { entityActionName, mergeEntityActions, resolveEntityActionState } from "../util/entity_actions";

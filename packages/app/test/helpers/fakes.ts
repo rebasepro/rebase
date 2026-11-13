@@ -10,11 +10,7 @@
 import {
     type AuthClient,
     type AuthConfigDocument,
-    type TableAccessor,
-    type Entity,
-    type FindResponse,
     type RebaseClient,
-    type RebaseData,
     type RebaseSdkData,
     type RebaseSession,
     type SDKTableClient,
@@ -23,6 +19,12 @@ import {
     type User,
     unsupportedMethod
 } from "@rebasepro/types";
+import {
+    type TableAccessor,
+    type Entity,
+    type FindResponse,
+    type RebaseData
+} from "@rebasepro/cms-types";
 import type { AuthController } from "@rebasepro/cms-types";
 import type { ClientAuth } from "../../src/auth/types";
 

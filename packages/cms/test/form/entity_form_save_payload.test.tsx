@@ -4,8 +4,8 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { RebaseApiError, type Entity } from "@rebasepro/types";
-import { type PostgresProperties } from "@rebasepro/cms-types";
+import { RebaseApiError } from "@rebasepro/types";
+import { type PostgresProperties, type Entity } from "@rebasepro/cms-types";
 import type { AdminCollection, EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {

@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { RebaseData } from "@rebasepro/types";
+import { RebaseData } from "@rebasepro/cms-types";
 import { RebaseDataContext } from "../../contexts/RebaseDataContext";
 
 /**

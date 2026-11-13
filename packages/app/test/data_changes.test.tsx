@@ -1,7 +1,7 @@
 import React, { useContext } from "react";
 import { act, render, waitFor } from "@testing-library/react";
-import type { DataDriver, FetchCollectionProps, ListenCollectionProps, RebaseData } from "@rebasepro/types";
-import type { AdminCollection, RebaseContext, CollectionCallbacks } from "@rebasepro/cms-types";
+import type { DataDriver, FetchCollectionProps, ListenCollectionProps } from "@rebasepro/types";
+import type { AdminCollection, RebaseContext, CollectionCallbacks, RebaseData } from "@rebasepro/cms-types";
 import { Rebase } from "../src/core/Rebase";
 import { CollectionResolverRegistrationContext } from "../src/contexts/CollectionResolverContext";
 import { useData } from "../src/hooks/data/useData";

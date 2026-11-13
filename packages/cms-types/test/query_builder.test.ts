@@ -1,6 +1,9 @@
-import { describe, expect, it, jest } from "@jest/globals";
-import type { FindParams, FindResponse } from "@rebasepro/types";
+import type { FindParams } from "@rebasepro/types";
+import type { FindResponse } from "@rebasepro/cms-types";
 import { QueryBuilder } from "../src/data/query_builder";
+
+/** A jest mock typed as the function it stands in for. */
+const mockOf = <F extends (...args: never[]) => unknown>() => jest.fn<ReturnType<F>, Parameters<F>>();
 
 function findResponse(data: FindResponse["data"]): FindResponse {
     return { data,
@@ -12,8 +15,8 @@ hasMore: false } };
 
 function createMockCollection() {
     return {
-        find: jest.fn<(params?: FindParams) => Promise<FindResponse>>().mockResolvedValue(findResponse([])),
-        listen: jest.fn<(params: FindParams | undefined, onUpdate: (response: FindResponse) => void, onError?: (error: Error) => void) => () => void>()
+        find: mockOf<(params?: FindParams) => Promise<FindResponse>>().mockResolvedValue(findResponse([])),
+        listen: mockOf<(params: FindParams | undefined, onUpdate: (response: FindResponse) => void, onError?: (error: Error) => void) => () => void>()
             .mockReturnValue(() => {})
     };
 }

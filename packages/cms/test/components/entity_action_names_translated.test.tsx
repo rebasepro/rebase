@@ -4,8 +4,7 @@
 import React from "react";
 import { beforeAll, describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { EntityAction } from "@rebasepro/cms-types";
+import type { EntityAction, Entity } from "@rebasepro/cms-types";
 
 /**
  * The built-in record actions are named in the admin's language.

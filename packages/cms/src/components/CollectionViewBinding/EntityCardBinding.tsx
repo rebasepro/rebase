@@ -1,7 +1,6 @@
 
 import React, { useMemo } from "react";
-import { Entity } from "@rebasepro/types";
-import { CollectionSize, AdminCollection } from "@rebasepro/cms-types";
+import { CollectionSize, AdminCollection, Entity } from "@rebasepro/cms-types";
 import {
     Card,
     Checkbox,

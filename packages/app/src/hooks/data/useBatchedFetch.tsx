@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
-import type { TableAccessor, Entity, FindParams, FindResponse, RebaseData } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { FindParams } from "@rebasepro/types";
+import type { AdminCollection, TableAccessor, Entity, FindResponse, RebaseData } from "@rebasepro/cms-types";
 import { resolvePrimaryKeys } from "@rebasepro/cms-types";
 import { useData } from "./useData";
 import { isConnectionLostError } from "../../util/realtime";

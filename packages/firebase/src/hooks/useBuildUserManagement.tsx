@@ -4,11 +4,11 @@ import { deepEqual as equal } from "fast-equals";
 import { removeUndefined } from "@rebasepro/utils";
 import {
     DataDriver,
-    Entity,
     User
 } from "@rebasepro/types";
 import {
-    AuthController
+    AuthController,
+    Entity
 } from "@rebasepro/cms-types";
 import { FirebaseAccessGate } from "./useFirebaseAccessGate";
 

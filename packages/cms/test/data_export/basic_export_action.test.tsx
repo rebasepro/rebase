@@ -12,8 +12,7 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { Properties } from "@rebasepro/cms-types";
+import type { Properties, Entity } from "@rebasepro/cms-types";
 import { RebaseI18nProvider } from "@rebasepro/app";
 import { BasicExportAction } from "../../src/data_export/export/BasicExportAction";
 

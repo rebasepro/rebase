@@ -1,9 +1,9 @@
 import type { CollectionConfig } from "./collections";
 import type { QueryNarrowing, ReadOperation, ReadQuery } from "@rebasepro/types";
-import type { EntityStatus, EntityValues } from "@rebasepro/types";
+import type { EntityValues } from "./entities";
 import type { User } from "@rebasepro/types";
 import type { RebaseCallContext } from "@rebasepro/types";
-import type { GeneratedDatabase } from "@rebasepro/types";
+import type { GeneratedDatabase, EntityStatus } from "@rebasepro/types";
 
 /**
  * Lifecycle callbacks for entity CRUD operations.

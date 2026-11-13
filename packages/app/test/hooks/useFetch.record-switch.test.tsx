@@ -2,8 +2,7 @@
  * @jest-environment jsdom
  */
 import { act, renderHook } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Entity } from "@rebasepro/cms-types";
 
 /**
  * A view that reads one record and is handed another in place — an embedded

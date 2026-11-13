@@ -1,4 +1,4 @@
-import { EntityValues } from "@rebasepro/types";
+import { EntityValues } from "@rebasepro/cms-types";
 import { EditorAIController } from "@rebasepro/cms";
 
 export type GenerateParams<M extends Record<string, unknown>> = {

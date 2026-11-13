@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useState } from "react"
 
 import { Button, DialogActions, IconButton, Portal, Typography, XIcon } from "@rebasepro/ui";
 
-import { Entity, EntityValues } from "@rebasepro/types";
+import { Entity, EntityValues } from "@rebasepro/cms-types";
 import { PluginProviderStack, useTranslation } from "@rebasepro/app";
 import { Formex, FormexController, getIn, useCreateFormex } from "@rebasepro/forms";
 import { useDraggable } from "./useDraggable";

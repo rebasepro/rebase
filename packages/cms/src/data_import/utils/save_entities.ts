@@ -1,5 +1,4 @@
-import type { TableAccessor, Entity } from "@rebasepro/types";
-import type { CollectionConfig } from "@rebasepro/cms-types";
+import type { CollectionConfig, TableAccessor, Entity } from "@rebasepro/cms-types";
 import { findEntitiesByIds } from "../../util/find_entities_by_ids";
 
 /**

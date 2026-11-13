@@ -10,11 +10,9 @@ import {
     traverseValueProperty,
     Property,
     Properties,
-    EntityReference
-} from "@rebasepro/cms-types";
-import {
+    EntityReference,
     type Entity
-} from "@rebasepro/types";
+} from "@rebasepro/cms-types";
 
 // ─────────────────────────────────────────────────────────────
 // isPropertyBuilder

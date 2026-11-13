@@ -1,6 +1,5 @@
 import React, { useCallback, useContext } from "react";
-import type { AdditionalFieldDelegate, AdditionalFieldDelegateProps, AdminCollection } from "@rebasepro/cms-types";
-import type { Entity } from "@rebasepro/types";
+import type { AdditionalFieldDelegate, AdditionalFieldDelegateProps, AdminCollection, Entity } from "@rebasepro/cms-types";
 import { ROW_ACTIONS_COLUMN, rowOfEntity } from "@rebasepro/app";
 
 /**

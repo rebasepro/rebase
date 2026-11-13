@@ -1,8 +1,8 @@
 
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useData } from "./useData";
-import { Entity, FilterValues } from "@rebasepro/types";
-import { EntityRelation } from "@rebasepro/cms-types";
+import { FilterValues } from "@rebasepro/types";
+import { EntityRelation, Entity } from "@rebasepro/cms-types";
 import { getRelationIncludeParams } from "../../util/previews";
 import { CollectionWindow } from "./collectionWindow";
 import { useStableFilterValues } from "./useStableFilterValues";

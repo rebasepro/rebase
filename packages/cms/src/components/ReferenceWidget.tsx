@@ -2,8 +2,8 @@ import { useEntitySelectionDialog } from "../hooks/useSelectionDialog";
 
 import React, { useCallback, useMemo } from "react";
 
-import { Entity, FilterValues } from "@rebasepro/types";
-import { EntityReference } from "@rebasepro/cms-types";
+import { FilterValues } from "@rebasepro/types";
+import { EntityReference, Entity } from "@rebasepro/cms-types";
 import type { PreviewSize } from "../types/components/PropertyPreviewProps";
 import { ReferencePreview } from "../preview";
 import { Button, cls } from "@rebasepro/ui";

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "@jest/globals";
-import { type Entity, RebaseApiError } from "@rebasepro/types";
+import { RebaseApiError } from "@rebasepro/types";
+import { type Entity } from "@rebasepro/cms-types";
 import { ImportSaveError, saveImportedEntities } from "../../src/data_import/utils/save_entities";
 import { entityOf, importAccessor, importClient } from "./import_accessor";
 

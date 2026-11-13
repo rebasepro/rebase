@@ -20,8 +20,7 @@
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { AdminCollection, RebaseContext, SelectedCellProps, StringProperty } from "@rebasepro/cms-types";
+import type { AdminCollection, RebaseContext, SelectedCellProps, StringProperty, Entity } from "@rebasepro/cms-types";
 import type { DataCollectionTableController, OnCellValueChangeParams } from "@rebasepro/app";
 
 // jsdom has no ResizeObserver; the popup observes its own size to stay on screen.

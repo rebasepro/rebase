@@ -1,5 +1,6 @@
 
-import { Entity, FilterValues } from "@rebasepro/types";
+import { FilterValues } from "@rebasepro/types";
+import { Entity } from "@rebasepro/cms-types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CollectionWindow, CollectionWindowState, copyRow, fromWireRow, getRelationIncludeParams, toWireRow, useData, useDataChangeVersion, useRebaseContext } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/cms-types";

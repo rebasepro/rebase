@@ -1,6 +1,6 @@
 
 import React, { memo, useCallback, useMemo } from "react";
-import { Entity } from "@rebasepro/types";
+import { Entity } from "@rebasepro/cms-types";
 import { Checkbox, Chip, cls, defaultBorderMixin } from "@rebasepro/ui";
 import { StorageMarkdown } from "../../preview/components/StorageMarkdown";
 import { PropertyPreview } from "../../preview";

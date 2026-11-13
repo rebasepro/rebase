@@ -1,7 +1,7 @@
 
 import React, { MouseEventHandler, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Entity, FilterValues } from "@rebasepro/types";
-import { CollectionSize, AdminCollection } from "@rebasepro/cms-types";
+import { FilterValues } from "@rebasepro/types";
+import { CollectionSize, AdminCollection, Entity } from "@rebasepro/cms-types";
 
 import {
     CollectionRowActions,

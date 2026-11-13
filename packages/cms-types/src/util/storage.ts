@@ -1,4 +1,5 @@
-import { DEFAULT_STORAGE_SOURCE_KEY, EntityValues, StorageSource, StorageSourceRegistry } from "@rebasepro/types";
+import { DEFAULT_STORAGE_SOURCE_KEY, StorageSource, StorageSourceRegistry } from "@rebasepro/types";
+import { EntityValues } from "../types/entities";
 import { ArrayProperty, StorageConfig, StringProperty, UploadedFileContext } from "../types/properties";
 import { randomString } from "@rebasepro/utils";
 import { withDeprecatedAlias } from "./deprecation";

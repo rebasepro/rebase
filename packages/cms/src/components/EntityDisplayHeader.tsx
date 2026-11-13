@@ -1,5 +1,4 @@
-import type { AdminCollection, Property } from "@rebasepro/cms-types";
-import type { Entity } from "@rebasepro/types";
+import type { AdminCollection, Property, Entity } from "@rebasepro/cms-types";
 import React from "react";
 import { Chip, cls, Typography } from "@rebasepro/ui";
 

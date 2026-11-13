@@ -1,6 +1,7 @@
 import { buildRebaseData, wrapAsEntityData } from "../src/data/entity_data";
 import { buildSdkData } from "@rebasepro/common";
-import { TableAccessor, DataDriver, RebaseData, RebaseSdkData, SDKTableClient } from "@rebasepro/types";
+import { DataDriver, RebaseSdkData, SDKTableClient } from "@rebasepro/types";
+import { TableAccessor, RebaseData } from "@rebasepro/cms-types";
 
 /**
  * Both data namespaces expose collections through a dynamic index signature

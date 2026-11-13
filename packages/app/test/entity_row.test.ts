@@ -4,8 +4,7 @@
  * and the record a row it handed out stands for.
  */
 import { describe, expect, it } from "@jest/globals";
-import type { Entity } from "@rebasepro/types";
-import type { CollectionConfig } from "@rebasepro/cms-types";
+import type { CollectionConfig, Entity } from "@rebasepro/cms-types";
 import { EntityRelation } from "@rebasepro/cms-types";
 import { entityOfRow, idOfRow, rowOfEntity } from "../src/util/entity_row";
 

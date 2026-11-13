@@ -1,13 +1,13 @@
 import { useEntitySelectionDialog } from "../../hooks/useSelectionDialog";
 import type { FieldProps } from "../../types/fields";
 import type { RelationProperty } from "@rebasepro/cms-types";
-import { Entity, getDataSourceCapabilities } from "@rebasepro/types";
+import { getDataSourceCapabilities } from "@rebasepro/types";
 import React, { useCallback } from "react";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContainer";
 import { getIconForProperty } from "../../util/property_utils";
-import { getRelationFrom, resolveRelationProperty, getCollectionDataPath } from "@rebasepro/cms-types";
+import { getRelationFrom, resolveRelationProperty, getCollectionDataPath, Entity } from "@rebasepro/cms-types";
 
 import { ErrorView, useTranslation } from "@rebasepro/app";
 import { Button, cls, ExpandablePanel, fieldBackgroundMixin, PencilIcon, Typography } from "@rebasepro/ui";

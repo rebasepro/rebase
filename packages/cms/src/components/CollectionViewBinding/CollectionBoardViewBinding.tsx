@@ -1,7 +1,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Entity, MAX_LIST_LIMIT } from "@rebasepro/types";
-import { EntityTableController, EntitySelectionController, AdminCollection, resolveEnumValues, EnumValueConfig } from "@rebasepro/cms-types";
+import { MAX_LIST_LIMIT } from "@rebasepro/types";
+import { EntityTableController, EntitySelectionController, AdminCollection, resolveEnumValues, EnumValueConfig, Entity } from "@rebasepro/cms-types";
 import { BoardCardBinding } from "./BoardCardBinding";
 import {
     Alert,

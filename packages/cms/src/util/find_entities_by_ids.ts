@@ -1,6 +1,6 @@
 import { MAX_LIST_LIMIT } from "@rebasepro/types";
-import type { TableAccessor, Entity, WhereFor } from "@rebasepro/types";
-import type { CollectionConfig } from "@rebasepro/cms-types";
+import type { WhereFor } from "@rebasepro/types";
+import type { CollectionConfig, TableAccessor, Entity } from "@rebasepro/cms-types";
 import { getPrimaryKeys } from "@rebasepro/cms-types";
 
 /**

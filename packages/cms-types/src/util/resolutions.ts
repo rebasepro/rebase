@@ -1,7 +1,9 @@
 import {
-    AuthState,
     getDataSourceCapabilities
 } from "@rebasepro/types";
+import {
+    AuthState
+} from "../types/auth_state";
 import {
     ArrayProperty,
     EnumValueConfig,

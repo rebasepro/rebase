@@ -71,7 +71,7 @@ function ruleDecides(rule: SecurityRule, caller: RlsCaller, operation: SecurityO
         uid: caller.uid,
         roles: [...(caller.roles ?? [])],
         isAnonymous: caller.isAnonymous === true,
-        entity: null
+        row: null
     };
     const clause = (expr: PolicyExpression | null): TriState => expr === null ? false : evaluatePolicy(expr, ctx);
     const results: TriState[] = [];

@@ -4,8 +4,7 @@
  * which keep its `Entity` view model.
  */
 import { describe, expect, it, jest } from "@jest/globals";
-import type { Entity } from "@rebasepro/types";
-import type { EntitySelection, EntitySelectionController, EntityTableController, CollectionConfig } from "@rebasepro/cms-types";
+import type { EntitySelection, EntitySelectionController, EntityTableController, CollectionConfig, Entity } from "@rebasepro/cms-types";
 import { entitySelectionControllerOf, rowSelectionOf, selectionControllerOf, tableControllerOf } from "../src/util/controller_rows";
 import { rowOfEntity } from "../src/util/entity_row";
 

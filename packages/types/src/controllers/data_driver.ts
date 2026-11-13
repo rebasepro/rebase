@@ -1,5 +1,5 @@
 import { RebaseApiError } from "../errors";
-import type { EntityStatus, EntityValues } from "../types/entities";
+import type { EntityStatus } from "../types/entities";
 import type { FilterValues } from "../types/filter-operators";
 import type { OrderByTuple } from "../types/filter-operators";
 import type { RebaseCallContext } from "../call_context";
@@ -266,9 +266,9 @@ export type ListenCollectionProps<M extends Record<string, unknown> = Record<str
  */
 export interface SaveProps<M extends Record<string, unknown> = Record<string, unknown>> {
     path: string;
-    values: Partial<EntityValues<M>>;
+    values: Partial<M>;
     id?: string | number; // can be empty for new entities
-    previousValues?: Partial<EntityValues<M>>;
+    previousValues?: Partial<M>;
     status: EntityStatus;
     /**
      * Write the row with INSERT ... ON CONFLICT DO UPDATE on the primary key
@@ -343,7 +343,7 @@ export interface SaveManyProps<M extends Record<string, unknown> = Record<string
      * The rows to write. A row carrying its primary key updates (or, with
      * `upsert`, inserts-or-updates) that row; one without inserts.
      */
-    rows: Partial<EntityValues<M>>[];
+    rows: Partial<M>[];
     /** Apply every row as INSERT ... ON CONFLICT DO UPDATE. See {@link SaveProps.upsert}. */
     upsert?: boolean;
     /** The conflict target for those upserts. See {@link SaveProps.onConflict}. */
@@ -382,7 +382,7 @@ export interface WriteFilterProps<M extends Record<string, unknown> = Record<str
  */
 export interface UpdateWhereProps<M extends Record<string, unknown> = Record<string, unknown>> extends WriteFilterProps<M> {
     /** What to set on every row the filter matches; field operations (`$inc`, …) included. */
-    values: Partial<EntityValues<M>>;
+    values: Partial<M>;
 }
 
 /**
@@ -406,7 +406,7 @@ export interface UpdateManyProps<M extends Record<string, unknown> = Record<stri
      * `id`, so it cannot express "update exactly this row". This can, and it is
      * why bulk update is a separate driver method rather than a flag on that one.
      */
-    updates: { id: string | number; values: Partial<EntityValues<M>> }[];
+    updates: { id: string | number; values: Partial<M> }[];
 }
 
 /**
@@ -486,7 +486,7 @@ export interface BatchWriteOperation<M extends Record<string, unknown> = Record<
     path: string;
     /** Required for `update` and `delete`. May be a `$ref` marker; see `batchWrite`. */
     id?: unknown;
-    values?: Partial<EntityValues<M>>;
+    values?: Partial<M>;
     /** See {@link SaveProps.onConflict}. `upsert` only. */
     onConflict?: readonly string[];
     /** Names this operation's result, for a later `$ref`. */
@@ -523,10 +523,10 @@ export interface CallerSqlOptions {
  *
  * Implement this interface to connect a custom backend (or use a built-in
  * driver such as the Firestore one) and register it on
- * `<Rebase dataSources>`. Rebase wraps drivers via `buildRebaseData` and
- * routes collections to them by their `dataSource` key.
+ * `<Rebase dataSources>`. The SDK reads a driver through `buildSdkData`
+ * (`@rebasepro/common`), and tables are routed to it by their `dataSource` key.
  *
- * For *consuming* data in application code, use `RebaseData` /
+ * For *consuming* data in application code, use `client.data` /
  * `context.data` instead — this interface is only for providing it.
  *
  * @group Datasource

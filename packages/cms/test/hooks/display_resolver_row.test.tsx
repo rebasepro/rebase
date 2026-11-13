@@ -4,9 +4,8 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { render, renderHook, screen, waitFor } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
 import { EntityRelation } from "@rebasepro/cms-types";
-import type { AdminCollection, RebaseContext } from "@rebasepro/cms-types";
+import type { AdminCollection, RebaseContext, Entity } from "@rebasepro/cms-types";
 
 /**
  * Code in a collection config is handed the row as the server sends it, never

@@ -1,8 +1,10 @@
 import {
-    Entity,
-    EntityStatus,
-    EntityValues
+    EntityStatus
 } from "@rebasepro/types";
+import {
+    Entity,
+    EntityValues
+} from "../types/entities";
 import {
     EntityReference,
     EntityRelation
@@ -14,7 +16,6 @@ import {
 } from "../types/properties";
 import { DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "./one_of";
 import { mergeDeep } from "@rebasepro/utils";
-import type { RelationRef } from "@rebasepro/common";
 
 export function isPropertyBuilder(property?: Property) {
     return typeof property?.dynamicProps === "function";
@@ -381,6 +382,28 @@ export function traverseValueProperty(inputValue: unknown,
     }
 
     return value;
+}
+
+/**
+ * A reference to one row of a table: its address, and the marker every reader
+ * of a row recognises a relation value by.
+ *
+ * @group Data
+ */
+export interface RelationRef {
+    readonly id: string | number;
+    readonly path: string;
+    readonly __type: "relation";
+}
+
+/**
+ * Create a relation reference: `{ id, path, __type: "relation" }`, the one
+ * spelling of it.
+ *
+ * @group Data
+ */
+export function createRelationRef(id: string | number, path: string): RelationRef {
+    return { id, path, __type: "relation" };
 }
 
 /**

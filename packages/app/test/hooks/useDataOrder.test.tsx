@@ -2,8 +2,7 @@
  * @jest-environment jsdom
  */
 import { renderHook, waitFor } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Entity } from "@rebasepro/cms-types";
 
 /**
  * Pinning rows to the top of a table — the relation picker's dialog does it

@@ -4,8 +4,7 @@
 import React from "react";
 import { beforeAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { AdminCollection, EntityAction, EntityActionClickProps } from "@rebasepro/cms-types";
+import type { AdminCollection, EntityAction, EntityActionClickProps, Entity } from "@rebasepro/cms-types";
 
 /**
  * An entity action's `isEnabled` holds on a collection's rows, not only in the

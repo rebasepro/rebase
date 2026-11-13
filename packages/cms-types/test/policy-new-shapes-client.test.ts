@@ -6,14 +6,12 @@
  * (`policy-new-shapes.test.ts`).
  */
 import {
-    type AuthState,
-    type Entity,
     type PolicyCondition,
     type SecurityRule,
     type User
 } from "@rebasepro/types";
 import { evaluatePolicy, securityRuleToConditions } from "@rebasepro/common";
-import { checkOperation, compileRulePolicies, type CollectionConfig } from "@rebasepro/cms-types";
+import { checkOperation, compileRulePolicies, type CollectionConfig, type AuthState, type Entity } from "@rebasepro/cms-types";
 
 const SIGNED_IN = "(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')";
 
@@ -102,15 +100,15 @@ describe("the client-side evaluator on the new shapes", () => {
 
     it("answers unknown for a `null` shorthand value — `IS NULL` is evaluated by Postgres alone", () => {
         const { usingExpr } = securityRuleToConditions({ operation: "select", condition: { deletedAt: null } });
-        expect(evaluatePolicy(usingExpr!, { uid: "u1", entity: row({ deletedAt: null }) })).toBe("unknown");
+        expect(evaluatePolicy(usingExpr!, { uid: "u1", row: { deletedAt: null } })).toBe("unknown");
         const rules = withRules([{ operation: "delete", condition: { deletedAt: null } }]);
         expect(checkOperation(rules, user("u1"), row({ deletedAt: null }), "delete", { onUnknown: "deny" })).toBe(false);
     });
 
     it("evaluates shorthand pairs against the row", () => {
         const { usingExpr } = securityRuleToConditions({ operation: "select", condition: { status: "published", rank: 2 } });
-        expect(evaluatePolicy(usingExpr!, { entity: row({ status: "published", rank: 2 }) })).toBe(true);
-        expect(evaluatePolicy(usingExpr!, { entity: row({ status: "published", rank: 3 }) })).toBe(false);
-        expect(evaluatePolicy(usingExpr!, { entity: row({ status: "published" }) })).toBe("unknown");
+        expect(evaluatePolicy(usingExpr!, { row: { status: "published", rank: 2 } })).toBe(true);
+        expect(evaluatePolicy(usingExpr!, { row: { status: "published", rank: 3 } })).toBe(false);
+        expect(evaluatePolicy(usingExpr!, { row: { status: "published" } })).toBe("unknown");
     });
 });

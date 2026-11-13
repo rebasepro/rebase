@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useReducer } from "react";
-import type { TableAccessor, TableTrashAccessor, RebaseData } from "@rebasepro/types";
+import type { TableAccessor, TableTrashAccessor, RebaseData } from "@rebasepro/cms-types";
 import { toSnakeCase } from "@rebasepro/utils";
 
 /**

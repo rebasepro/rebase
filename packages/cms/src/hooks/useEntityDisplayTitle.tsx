@@ -1,5 +1,5 @@
-import type { AdminCollection } from "@rebasepro/cms-types";
-import type { Entity, EntityStatus } from "@rebasepro/types";
+import type { AdminCollection, Entity } from "@rebasepro/cms-types";
+import type { EntityStatus } from "@rebasepro/types";
 import { useEntityTitle } from "./useEntityDisplay";
 
 export interface UseEntityDisplayTitleParams<M extends Record<string, unknown>> {

@@ -1,8 +1,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { deepEqual as equal } from "fast-equals";
-import { Entity } from "@rebasepro/types";
-import { CollectionSize, EntityTableController, EntitySelectionController, AdminCollection } from "@rebasepro/cms-types";
+import { CollectionSize, EntityTableController, EntitySelectionController, AdminCollection, Entity } from "@rebasepro/cms-types";
 import { EntityCardBinding, EntityCardBindingProps } from "./EntityCardBinding";
 import {
     cls,

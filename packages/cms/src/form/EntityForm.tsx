@@ -1,13 +1,13 @@
 
 import type { FormContext } from "../types/fields";
 import React, { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
+import { EntityStatus } from "@rebasepro/types";
 import type { EntityFormProps } from "../types/components/EntityFormProps";
 import { deepEqual as equal } from "fast-equals";
 
 import { ErrorBoundary, isKeyHandled } from "@rebasepro/ui";
 import { useDebouncedCallback } from "@rebasepro/ui";
-import { getDefaultValuesFor, getCopyValues } from "@rebasepro/cms-types";
+import { getDefaultValuesFor, getCopyValues, Entity, EntityValues } from "@rebasepro/cms-types";
 import { hasEntityId } from "../util/identity";
 import { isDisabled, isReadOnly } from "@rebasepro/app";
 import { useAuthController, useCustomizationController, useTranslation } from "@rebasepro/app";

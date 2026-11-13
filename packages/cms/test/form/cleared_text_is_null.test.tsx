@@ -13,8 +13,7 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { AdminCollection, FormContext, PostgresProperties, StringProperty } from "@rebasepro/cms-types";
+import type { AdminCollection, FormContext, PostgresProperties, StringProperty, Entity } from "@rebasepro/cms-types";
 
 class ResizeObserverStub {
     observe() {}

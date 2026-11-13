@@ -112,7 +112,7 @@ function* rules(): Generator<SecurityRule> {
 }
 
 /** Who asks: an anonymous visitor, guests and account holders, with and without roles. */
-const CALLERS: Omit<PolicyEvalContext, "entity">[] = [
+const CALLERS: Omit<PolicyEvalContext, "row">[] = [
     { uid: null, roles: [] },
     // What an anonymous request carries in the database.
     { uid: null, roles: ["anon"] },
@@ -128,7 +128,7 @@ const ROWS = ["user-1", "guest-1", "someone-else"].flatMap(owner =>
     ["open", "closed"].flatMap(status => ["a", "b"].map(kind => ({ owner_id: owner, status, kind }))));
 
 const CONTEXTS: PolicyEvalContext[] = CALLERS.flatMap(caller =>
-    ROWS.map(values => ({ ...caller, entity: { id: "1", path: "notes", values } })));
+    ROWS.map(values => ({ ...caller, row: values })));
 
 function operationsOf(rule: SecurityRule): string[] {
     return rule.operations && rule.operations.length > 0 ? [...rule.operations] : [rule.operation ?? "all"];
@@ -155,7 +155,7 @@ function difference(rule: SecurityRule): string | undefined {
             const at = a.findIndex((value, index) => value !== b[index]);
             if (at >= 0) {
                 const ctx = CONTEXTS[at];
-                return `${operation} ${clause}: 0.30 ${String(a[at])}, now ${String(b[at])} for ${JSON.stringify({ ...ctx, entity: ctx.entity?.values })}`;
+                return `${operation} ${clause}: 0.30 ${String(a[at])}, now ${String(b[at])} for ${JSON.stringify(ctx)}`;
             }
         }
     }

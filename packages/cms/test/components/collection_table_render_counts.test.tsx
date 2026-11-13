@@ -2,11 +2,10 @@
  * @jest-environment jsdom
  */
 import React from "react";
-import type { AdditionalFieldDelegate } from "@rebasepro/cms-types";
+import type { AdditionalFieldDelegate, Entity } from "@rebasepro/cms-types";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { act, fireEvent, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import type { Entity } from "@rebasepro/types";
 
 /**
  * What the collection table draws again, and when.

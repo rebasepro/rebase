@@ -4,8 +4,7 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
-import type { AdminCollection, Property } from "@rebasepro/cms-types";
+import type { AdminCollection, Property, Entity } from "@rebasepro/cms-types";
 
 /**
  * A record header's `tags` role, filled by a property, renders through that

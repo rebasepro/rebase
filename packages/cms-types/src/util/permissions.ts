@@ -1,4 +1,6 @@
-import { AuthState, Entity, SecurityOperation, SecurityRule, User } from "@rebasepro/types";
+import { SecurityOperation, SecurityRule, User } from "@rebasepro/types";
+import { AuthState } from "../types/auth_state";
+import { Entity } from "../types/entities";
 import { CollectionConfig, isPostgresCollectionConfig } from "../types/collections";
 import { securityRuleToConditions } from "@rebasepro/common";
 import { evaluatePolicy, PolicyEvalContext, TriState } from "@rebasepro/common";
@@ -157,7 +159,7 @@ export function checkOperation<M extends Record<string, unknown>, USER extends U
         // account here: a document driver let a guest read, write and delete
         // the rows `registered()` withholds, whatever user it was handed.
         isAnonymous: authContext.user?.isAnonymous === true,
-        entity
+        row: entity?.values ?? null
     };
 
     let grantedByPermissive = false;

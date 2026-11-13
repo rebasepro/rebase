@@ -1,4 +1,4 @@
-import { RebaseData } from "@rebasepro/types";
+import { RebaseData } from "../types/table_accessor";
 import { toSnakeCase } from "@rebasepro/utils";
 
 /**

@@ -2,8 +2,7 @@ import { useEntitySelectionDialog } from "../../../hooks/useSelectionDialog";
 
 import React, { useId, useMemo, useState } from "react";
 import { VirtualTableWhereFilterOp } from "@rebasepro/ui";
-import { Entity } from "@rebasepro/types";
-import { EntityReference } from "@rebasepro/cms-types";
+import { EntityReference, Entity } from "@rebasepro/cms-types";
 import { ReferencePreview } from "../../../preview";
 import { Button, Checkbox, Label, Select, SelectItem } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";

@@ -334,7 +334,7 @@ describe("policy SQL — the shorthand and access + condition shapes", () => {
     it("evaluates a shorthand against a row as Postgres would", () => {
         fc.assert(fc.property(shorthand, evalContext, (s, ctx) => {
             const got = evaluatePolicy(policyConditionToExpression(s), ctx);
-            const values = ctx.entity?.values;
+            const values = ctx.row;
             const cells = Object.entries(s).map(([key, want]): TriState => {
                 if (want === null || !values) return "unknown";
                 const have = values[key];

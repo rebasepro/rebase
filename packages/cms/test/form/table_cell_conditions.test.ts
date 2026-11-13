@@ -1,8 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import type { AuthController, Properties, Property } from "@rebasepro/cms-types";
-import type { Entity } from "@rebasepro/types";
+import type { AuthController, Properties, Property, Entity } from "@rebasepro/cms-types";
 import { isDisabled } from "@rebasepro/app";
 import { cellValidationProperties, resolveCellProperty } from "../../src/form/resolve_cell_property";
 import { getEntitySchema, mapPropertyToZod } from "../../src/form/validation";

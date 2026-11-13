@@ -1,5 +1,5 @@
 import type { AdminCollection, EntityAction, EntityActionClickProps, EntitySelectionController } from "@rebasepro/cms-types";
-import { Entity } from "@rebasepro/types";
+import { Entity } from "@rebasepro/cms-types";
 import React, { useCallback, useContext } from "react";
 import { getIcon, useTranslation } from "@rebasepro/app";
 import { IconButton, Menu, MenuItem, MoreVerticalIcon, Separator, Tooltip } from "@rebasepro/ui";

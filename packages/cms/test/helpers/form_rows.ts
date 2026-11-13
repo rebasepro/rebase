@@ -3,7 +3,7 @@
  * `onSubmit` that resolves with `{ row, id }`. These fixtures hold records as
  * the admin does; these turn one into what the form takes.
  */
-import type { Entity } from "@rebasepro/types";
+import type { Entity } from "@rebasepro/cms-types";
 import { rowOfEntity } from "@rebasepro/app";
 
 /** The row of a record, as the form's `row` prop takes it — the form finds the record again from it. */

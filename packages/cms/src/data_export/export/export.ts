@@ -1,5 +1,4 @@
-import { Entity } from "@rebasepro/types";
-import { Properties, Property, EntityReference, EntityRelation } from "@rebasepro/cms-types";
+import { Properties, Property, EntityReference, EntityRelation, Entity } from "@rebasepro/cms-types";
 import { type ArrayValuesCount, escapeCsvFormula, getArrayValuesCount, getValueInPath, unescapeCsvFormula } from "@rebasepro/utils";
 
 interface Header {

@@ -1,4 +1,4 @@
-import { Entity } from "@rebasepro/types";
+import { Entity } from "@rebasepro/cms-types";
 
 import { FormContext } from "../fields";
 import { FormexController } from "./formex";

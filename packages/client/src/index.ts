@@ -56,7 +56,7 @@ export { RebaseClientError } from "./errors";
 export type { RebaseErrorCode } from "@rebasepro/types";
 
 // Query + table types (annotate SDK results; construct via the fluent API).
-export type { RebaseClientConfig, RealtimeClientOptions, FindParams, FindResponse } from "./transport";
+export type { RebaseClientConfig, RealtimeClientOptions, FindParams } from "./transport";
 export type { TableClient, RestoreOptions, TrashClient } from "./table";
 export type { FindResult, SDKTableClient, SDKQueryBuilderInterface, PaginationMeta } from "@rebasepro/types";
 

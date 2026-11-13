@@ -1,4 +1,4 @@
-import type { Entity } from "@rebasepro/types";
+import type { Entity } from "@rebasepro/cms-types";
 import type { ResolvedFormField } from "@rebasepro/app";
 import React from "react";
 import { CheckIcon, cls, CopyIcon, IconButton, iconSize, Tooltip, Typography } from "@rebasepro/ui";

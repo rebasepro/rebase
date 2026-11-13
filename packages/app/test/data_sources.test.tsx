@@ -4,7 +4,8 @@ import { Rebase } from "../src/core/Rebase";
 import { CollectionResolverRegistrationContext } from "../src/contexts/CollectionResolverContext";
 import { useDataSources } from "../src/contexts/DataSourcesContext";
 import { useData } from "../src/hooks/data/useData";
-import type { DataDriver, RebaseData } from "@rebasepro/types";
+import type { DataDriver } from "@rebasepro/types";
+import type { RebaseData } from "@rebasepro/cms-types";
 import { fakeAuthController, fakeClient, fakeStorageSource, fakeUser } from "./helpers/fakes";
 
 const storageSource = fakeStorageSource();

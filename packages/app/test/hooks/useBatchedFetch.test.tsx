@@ -3,8 +3,7 @@
  */
 import React from "react";
 import { act, render } from "@testing-library/react";
-import type { Entity, FindResponse } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Entity, FindResponse } from "@rebasepro/cms-types";
 import { findResponse } from "../helpers/fakes";
 
 /**

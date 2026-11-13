@@ -1,8 +1,7 @@
 import React from "react";
 import { render, act } from "@testing-library/react";
-import type { Entity } from "@rebasepro/types";
 import { useCollection } from "../src/hooks/data/useCollection";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, Entity } from "@rebasepro/cms-types";
 
 /**
  * A push that changed one row hands the rows it did not change through as the

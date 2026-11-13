@@ -4,9 +4,11 @@ import {
     canCreateEntity,
     canDeleteEntity,
     checkOperation,
-    CollectionConfig
+    CollectionConfig,
+    AuthState,
+    Entity
 } from "@rebasepro/cms-types";
-import { AuthState, Entity, SecurityRule, User } from "@rebasepro/types";
+import { SecurityRule, User } from "@rebasepro/types";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -377,7 +379,7 @@ mode: "permissive" } as SecurityRule
                 } as SecurityRule
             ]);
             const auth = makeAuthController();
-            // `canReadCollection` passes `entity: null`, so a row predicate is
+            // `canReadCollection` passes `row: null`, so a row predicate is
             // undecidable and the optimistic unknown->allow path answers instead
             // of the parser. Go through an entity-aware check so the predicate is
             // the thing under test, and pin both outcomes.
@@ -410,7 +412,7 @@ mode: "permissive" } as SecurityRule
                 } as SecurityRule
             ]);
             const auth = makeAuthController();
-            // Same trap as the parentheses case: with `entity: null` the answer
+            // Same trap as the parentheses case: with `row: null` the answer
             // came from unknown->allow, not from `!=`. Re-checking under
             // `onUnknown: "deny"` is what proves the `true` was decided by the
             // operator rather than handed over by the fallback.

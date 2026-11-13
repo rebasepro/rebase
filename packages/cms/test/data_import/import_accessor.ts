@@ -1,7 +1,8 @@
 /**
  * Typed stand-ins for the collection accessor an import writes through.
  */
-import type { Entity, FindParams, FindResponse } from "@rebasepro/types";
+import type { FindParams } from "@rebasepro/types";
+import type { Entity, FindResponse } from "@rebasepro/cms-types";
 import type { ImportAccessor } from "../../src/data_import/utils/save_entities";
 
 /** A method the test does not expect the import to call. */

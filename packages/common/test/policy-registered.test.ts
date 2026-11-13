@@ -51,7 +51,7 @@ describe("policy.registered()", () => {
 
     describe("evaluated in the client", () => {
         const evaluate = (ctx: { uid?: string | null; isAnonymous?: boolean }) =>
-            evaluatePolicy(policy.registered(), { ...ctx, entity: null });
+            evaluatePolicy(policy.registered(), { ...ctx, row: null });
 
         it("admits a real account", () => {
             expect(evaluate({ uid: "user-1" })).toBe(true);
@@ -73,7 +73,7 @@ describe("policy.registered()", () => {
          * guest that `registered()` turns away.
          */
         it("differs from authenticated() exactly where the guest is", () => {
-            const guest = { uid: "user-2", isAnonymous: true, entity: null };
+            const guest = { uid: "user-2", isAnonymous: true, row: null };
             expect(evaluatePolicy(policy.authenticated(), guest)).toBe(true);
             expect(evaluatePolicy(policy.registered(), guest)).toBe(false);
         });

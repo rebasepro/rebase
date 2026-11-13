@@ -1,5 +1,6 @@
 import React from "react";
-import { DataSourceDefinition, RebaseData } from "@rebasepro/types";
+import { DataSourceDefinition } from "@rebasepro/types";
+import { RebaseData } from "@rebasepro/cms-types";
 
 /**
  * The data-source configuration provided to `<Rebase>`: the declared

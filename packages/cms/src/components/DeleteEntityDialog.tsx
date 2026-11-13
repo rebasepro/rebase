@@ -1,4 +1,4 @@
-import { Entity } from "@rebasepro/types";
+import { Entity } from "@rebasepro/cms-types";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
 import {

@@ -7,7 +7,8 @@
  * to someone the database refuses.
  */
 import { describe, expect, it } from "@jest/globals";
-import type { Entity, SecurityOperation, TableDescriptor, User } from "@rebasepro/types";
+import type { SecurityOperation, TableDescriptor, User } from "@rebasepro/types";
+import type { Entity } from "@rebasepro/cms-types";
 import { checkOperation, canReadCollection } from "@rebasepro/cms-types";
 import { collectionFromTable } from "../../src/tables";
 import { anonymous, column, posts, rules, signedIn, table, tags, users, uuidId } from "./fixtures";

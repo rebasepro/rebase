@@ -1,6 +1,6 @@
 import * as React from "react";
 
-import { Entity } from "@rebasepro/types";
+import { Entity } from "@rebasepro/cms-types";
 import { cls, LinkIcon, Skeleton, Tooltip } from "@rebasepro/ui";
 import { useAnalyticsController } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/cms-types";

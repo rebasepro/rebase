@@ -1,10 +1,10 @@
-import { ANONYMOUS_USER_ID, isAnonymousUid, Entity, PolicyCompareOperator, PolicyExpression, PolicyOperand } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, isAnonymousUid, PolicyCompareOperator, PolicyExpression, PolicyOperand } from "@rebasepro/types";
 
 /**
  * Result of evaluating a policy client-side. `"unknown"` means the expression
  * could not be decided without more information — either a raw-SQL escape-hatch
  * node (which the client deliberately never guesses) or a row-column reference
- * with no entity in hand (e.g. list-level gating). Callers decide how to resolve
+ * with no row in hand (e.g. list-level gating). Callers decide how to resolve
  * `"unknown"`: fail-closed for an enforcement decision, optimistic for pure
  * visibility gating.
  */
@@ -32,8 +32,11 @@ export interface PolicyEvalContext {
      * not know keeps the behaviour it had.
      */
     isAnonymous?: boolean;
-    /** The row being evaluated, or null when no specific row is available. */
-    entity: Entity | null;
+    /**
+     * The row being evaluated — its columns by key — or null when no specific
+     * row is available (list-level gating).
+     */
+    row: Record<string, unknown> | null;
 }
 
 /**
@@ -128,8 +131,8 @@ function resolveOperand(operand: PolicyOperand, ctx: PolicyEvalContext): Resolve
             return { known: true, value: ctx.roles ?? [] };
         case "field":
             // Can't resolve a row column without the row.
-            if (!ctx.entity) return { known: false };
-            return { known: true, value: ctx.entity.values[operand.name] };
+            if (!ctx.row) return { known: false };
+            return { known: true, value: ctx.row[operand.name] };
         case "outerField":
             // Only meaningful inside an `existsIn` subquery (server-authoritative).
             return { known: false };
