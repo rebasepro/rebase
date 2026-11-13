@@ -507,17 +507,18 @@ collection, `defineFirestoreCollection` files, `ui-config.json`), writes
 adds `rebaseBackendGuard()` to a scaffold's `vite.config.ts`, then runs
 `rebase migrate sdk-calls`, which rewrites `.collection(` to `.table(`, the
 other SDK renames and the rule sources `existsIn` / `membership` in your code,
-and moves the imports of names 0.31 moved to another package (the admin
-panel's types and helpers to `@rebasepro/cms-types`, the migration lift to
-`@rebasepro/common/migrate` — [the list](/docs/upgrading/0-30-to-0-31-imports/)),
-adding the package to the importer's dependencies ("Dependencies added": run
-`pnpm install`). Bump every `@rebasepro` package to 0.31 before running it.
+and moves the imports of names 0.31 moved to another package
+([the list](/docs/upgrading/0-30-to-0-31-imports/)), adding the package to the
+importer's dependencies ("Dependencies added": run `pnpm install`). Bump every `@rebasepro` package to 0.31 before running it.
 Every run reads the result back: the generated SQL — DDL, policies, search,
 vector, triggers, views, the Drizzle schema — must be byte-identical, or every
 file is put back. What it cannot carry is refused with its file and line, and
 what it leaves to you is printed as numbered manual steps, ending with
 `rebase skills install` when the project holds agent skills. Your own modules in
-`config/` stay; the run prints the `git rm` line for what it replaced.
+`config/` stay; the run prints the `git rm` line for what it replaced. It also
+follows Firestore collections a function builds, path aliases, a panel mounted
+outside `App.tsx` and every unguarded static app ([the full list](/docs/upgrading/0-30-to-0-31/#108-tables-in-backendschema-replace-configcollections--run-the-codemod-first)).
+After the `git rm`, `--check` reports `already-migrated`.
 
 | Flag | Effect |
 |---|---|
@@ -526,9 +527,9 @@ what it leaves to you is printed as numbered manual steps, ending with
 | `--accept-rule-changes` | With `--check`: the rules under "Review before deploying" were reviewed. |
 | `--json` / `--force` / `--skip-sdk-calls` | The report as JSON (with `ruleChanges`); run on a dirty tree or over edited output; leave your code alone. |
 
-Read two lists in its SDK output: **"Rewritten by name — review"** (calls on an
-untyped receiver, rewritten by its name) and **"Left unchanged — check each"**
-(calls not proven to be the SDK: rename those that are, or they fail at runtime).
+Read two lists in its SDK output: **"Rewritten by name — review"** (untyped
+receivers, data slots, test doubles) and **"Left unchanged — check each"**
+(rename those that are the SDK; [a search](/docs/upgrading/0-30-to-0-31-by-hand/#sdk-calls-no-type-checker-sees) finds the rest).
 
 The SQL check proves the conversion faithful, not that a rule still means what
 it did. The last section of the output, **"Review before deploying: these rules

@@ -1,0 +1,126 @@
+---
+slug: docs/upgrading/0-30-to-0-31-by-hand
+title: What projects changed by hand for 0.31
+sidebar_label: 0.31 hand edits
+description: "The edits real projects needed after rebase migrate collections-to-tables: the toolchain floors of a project older than 0.30, row-shaped admin code, renamed relations in include, collection objects changed at run time, SDK calls no type checker sees, and storage access control."
+---
+
+# What projects changed by hand for 0.31
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+Nine existing projects were moved to 0.31 with `rebase migrate collections-to-tables`, on copies, then installed, type-checked, built, booted on a throwaway database and tested. The codemod did most of the work, and what it got wrong was fixed in it. This page lists what was still done by hand: the edits the type checker, the build or the tests forced, and which no section of the [upgrade guide](/docs/upgrading/0-30-to-0-31/) names on its own. Read it after the codemod's manual steps, before you deploy.
+
+## A project on a release before 0.30
+
+Apply the code changes of every guide between your release and 0.30 first ([Upgrading](/docs/upgrading/)). The codemod loads a 0.20–0.29 `config/`, and its SQL check passes, but it does not make the code changes those guides describe. The one that hit every older project is [`{ row, id }` for `{ entity }`](/docs/upgrading/0-27-to-0-29/#104-row-level-callbacks-get--row-id--for--entity) in admin code, below.
+
+The 0.31 packages also require a toolchain that a project pinned to an older release may not have. These are the published packages' peer dependencies and engines:
+
+| What | 0.31 needs | Required by |
+|---|---|---|
+| Node | `>=22.22.0` | `engines` of `@rebasepro/server` and the CLI |
+| TypeScript | `^6.0.0` | `@rebasepro/app` |
+| React, React DOM | `^19.2.7` | `@rebasepro/cms`, `app`, `ui`, `forms`, `cms-types` |
+| React Router | `^8.3.0` (`react-router-dom` no longer exists) | `@rebasepro/cms`, `app`, `studio` |
+| Vite | `^8.0.0`, with `@vitejs/plugin-react` 6 and `vite-plugin-svgr` 5 as the scaffold uses | `@rebasepro/app` (optional peer) |
+| Hono | `^4.13.5` | `@rebasepro/server` |
+| `nodemailer`, `ts-morph`, `google-auth-library`, the AWS S3 client | `^9.1.1`, exactly `28.0.0`, `^10.7.0`, `^3.1068.0`, when you use them | `@rebasepro/server` (optional peers) |
+
+`@rebasepro/server` depends on `@hono/node-server` 2: an `overrides` entry that pins it to 1.x breaks the server. React Router 8 moved `RouterProvider` and dropped the DOM package:
+
+```diff tsx no-verify
+-import { createBrowserRouter, RouterProvider } from "react-router-dom";
++import { createBrowserRouter } from "react-router";
++import { RouterProvider } from "react-router/dom";
+```
+
+TypeScript 6 no longer infers what older `tsconfig.json` files left implicit:
+
+- A backend program that includes `../config/**` needs `"rootDir": ".."` (it reports TS5011 without it). The emit stays where it was, `dist/backend/src/…`, which is what the start script runs.
+- `"moduleResolution": "node"` (node10) is deprecated: write `"bundler"`.
+- A side-effect import of a package with no types (`import "@fontsource/inter"`) is an error (TS2882). Declare it once, in a `.d.ts` the program includes: `declare module "@fontsource/*";`.
+
+Vite 8 builds with Rolldown: follow Vite's own migration guide for your config. The two edits migrated projects needed: a `build.target` written in capitals (`"ES2022"`) is refused, write `"es2022"`; and an `esbuild` block went, with what it configured moved to Vite 8's own options.
+
+## Admin code reads `{ row, id }`, not `({ entity })`
+
+Custom views, entity actions, display resolvers and additional fields take the row and its id. A function that destructures `({ entity })` reads `undefined`, and where it is untyped (code carried into a customization, a loose prop type) no type check says so.
+
+| Code | Receives |
+|---|---|
+| An entity view's `Builder` (`EntityCustomViewParams`) | `row`, `id`, `formContext` |
+| An entity action's `onClick`, `isEnabled`, `disabledReason` (`EntityActionClickProps`) | `row`, `id`, `path` |
+| A `display` resolver | `row`, `context` |
+| An additional field's `Builder` / `value` | `row`, `id`, `context` |
+
+```diff tsx
+-display: { subtitle: ({ entity }) => entity.values.company },
++display: { subtitle: ({ row }) => String(row.company ?? "") },
+```
+
+The codemod rewrites the hands whose body reads `entity` only as `entity.values.x`, `entity.values` or `entity.id` (to `row.x`, `row`, `id`) and lists every other one, with file and line, in one step. `formContext.entityId` is `id`. The full table of renames is [section 104 of the 0.27 → 0.29 guide](/docs/upgrading/0-27-to-0-29/#104-row-level-callbacks-get--row-id--for--entity).
+
+## A `belongsTo` key is a column, and a relation can be renamed
+
+A 0.30 relation property had no property for its foreign key. A 0.31 table declares the key as a column of its own, at the position it had (`companyId: col.uuid()`), beside the relation (`company: rel.belongsTo(() => companies)`). Code or tests that read the table's columns, or assert that no column owns the key, find it there now.
+
+A 0.30 collection could also serve the key under the relation's own key — a relation property `talent_id` whose key column is `talent_id`. A table keeps a column and a relation apart, so the column keeps the key (it still holds the id) and the codemod renames the relation to `<key>Relation`, with a note. The customization follows the rename. Code that included the relation does not:
+
+```diff ts
+-const { data } = await client.data.table("applications").find({ include: ["*"] });
+-const talent = data[0].talent_id;             // the related row, on 0.30
++const { data } = await client.data.table("applications").find({ include: ["talent_idRelation"] });
++const talent = data[0].talent_idRelation;     // the related row; talent_id is the id
+```
+
+Including the old key is a `400 UNKNOWN_RELATION`, so a caller you missed fails loudly. The codemod's note lists every relation it renamed; search your code for each old key used in `include`. See [Relations](/docs/collections/relations/#belongsto--the-key-is-on-this-table).
+
+## Collection objects changed at run time move into the customization
+
+Code in `App.tsx` that pushed onto the collection objects before passing them to `<RebaseCMS>` — a toolbar action, a record tab, an entity action added to a collection found by slug — has nothing to change on 0.31: the panel builds its collections from the tables the server serves, and a customization is frozen. Declare the same in the table's `customizeTable`:
+
+```diff tsx
+-const jobs = collections.find(c => c.slug === "jobs");
+-jobs.entityViews = [...(jobs.entityViews ?? []), applicantsView];
+-jobs.Actions = [ImportJobsButton];
++export const jobsCms = customizeTable<typeof jobs>("jobs", {
++    entityViews: [applicantsView],
++    Actions: [ImportJobsButton],
++});
+```
+
+A wrapper that took every collection and returned changed copies (`adminCollections(collections)`) becomes one over the customizations, spreading the same options onto each. What it read from a column's definition (a `url: true` on a property, say) a customization cannot see: list those fields in the frontend. See [`customizeTable`](/docs/frontend/customize-table/).
+
+## SDK calls no type checker sees
+
+On 0.31, `data.collection` is not a function: the data object reads it as the accessor of a table named `collection`, so `data.collection("rooms")` throws a `TypeError` when it runs. The type checker catches the call only where the receiver has the SDK's type. It does not catch it on:
+
+- a receiver typed `any` (`(rebase as any).dataAsAdmin`, an untyped `data` parameter);
+- a structural type your project declares over the SDK (`{ data: { collection(path: string): … } }`);
+- test doubles (`{ dataAsAdmin: { collection: () => fake } }`) and assertions over source text;
+- a guard such as `typeof data.collection !== "function"`, which silently takes the other branch on 0.31.
+
+The codemod rewrites the calls it can attribute and lists them under **"Rewritten by name — review"**: a receiver ending in `dataAsAdmin`, or in `data` with a literal table name, the `collection` member of a type a `data` / `dataAsAdmin` slot holds, and test doubles. Everything else is under **"Left unchanged — check each"**, and a guard is a manual step. Read both lists, then search for what is left:
+
+```bash
+grep -rnE "\.collection\(|collection\s*:|typeof [A-Za-z_.]+\.collection" \
+  --include="*.ts" --include="*.tsx" --exclude-dir=node_modules --exclude-dir=dist .
+```
+
+Every hit that is not the Firebase or Firestore SDK becomes `.table(` (a double's member `collection:` becomes `table:`). Code outside the project root — a site that bundles the client from another repository, a vendored copy of `@rebasepro/client` — is never read by the codemod: run `rebase migrate sdk-calls <dir>` on it, or the same search, then rebuild the vendored copy.
+
+## Your `config/` modules, and storage access control
+
+Your own modules in `config/` may stay ([section 109](/docs/upgrading/0-30-to-0-31/#109-there-is-no-config-package)). A module only the collections imported, whose fragments the tables now inline, goes in the printed `git rm` line; build files, Dockerfiles and deploy scripts that still build the config package by name are listed as a step, and the codemod does not edit them.
+
+0.31 reads `storageAuthorize` only from `backend/storage.ts`. When `config/index.ts` re-exported it from a module of another name, the codemod writes `backend/storage.ts` re-exporting it from there; when the index defines or renames it inline, a step says so. Do that step before you deploy: without the file, storage is served with no access control, and the boot only warns ("Storage is configured WITHOUT any access-control model").
+
+```diff ts
++// backend/storage.ts
++export { storageAuthorize } from "../config/storage-authorize";
+```
+
+## What `rebase verify` may report that 0.30 also had
+
+Most migrated projects got `cms-hidden-required` errors: a field the customization keeps off the form (`readOnly`, `hiddenInForm`) whose column is `NOT NULL` with no default, so creating that record from the panel fails. 0.30 failed the same way (a `readOnly` and `required` property); 0.31 says so. For each, mark the field `filledByServer` when a hook or stamp fills it on create, or make it editable.

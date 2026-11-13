@@ -205,6 +205,20 @@ of those columns does not get the relation in an `include` or a `_count`, gets
 `FIELD_NOT_READABLE` filtering or sorting through it (an unknown relation when
 the column is `.private()`), and does not see it described.
 
+A `via` through a table the server does not serve — one it withholds
+(`TABLE_WITHHELD`) or one its tables do not declare — is closed to every
+caller, trusted code included: its join columns count as unreadable and
+unwritable, so it is left out of `include`, and a filter, sort or path through
+it is refused (`FIELD_NOT_READABLE`, or `503 TABLE_WITHHELD` naming the
+withheld table).
+
+A `manyToMany` whose junction is a table you declared (`through` names a
+`defineTable`) is held to that table's column rules: a write that sets a link
+column `.readOnly()`, `.private()` or closed by `access.write` on the junction
+is refused (`VALIDATION_EXCLUDED_FIELDS` / `FIELD_NOT_WRITABLE`), and so is a
+`_pivot` field the junction closes. A junction Rebase creates has no rules of
+its own.
+
 `strictWrites: false` on a table only lets a key the table does not declare
 through to the driver. It never relaxes a rule on a declared column, a stamp,
 the tenant, the key, a relation target or `_pivot`.

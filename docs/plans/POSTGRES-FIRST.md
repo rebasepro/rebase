@@ -874,6 +874,12 @@ One line each: what, and why. Grouped by area.
   no relations into unserved tables, no hook flags; plain views to privileged
   callers only. `schemaTables.persons: "all"` restores the full view. MCP is a
   credential view through the same serializer and did not change.
+- **The caller of every admin and metadata surface is resolved through the
+  project's auth adapter** — `/schema/tables`, the OpenAPI document and the
+  admin gate ask the adapter the data routes ask (`rk_` / `rpt_` resolved
+  first). Why: they checked only the framework's JWT, so a custom-adapter
+  backend answered them 500 and its 0.31 panel, which loads its tables from
+  `/schema/tables`, did not load; the admin-gate half was also in 0.30.x.
 
 ### Migration
 
@@ -975,6 +981,22 @@ One line each: what, and why. Grouped by area.
   message names the junction); the related table stays served. Why: the
   registry withholds tables, and an implicit junction is reached only through
   its owners' relations.
+- **A `via` through a table the server does not serve is closed** — withheld or
+  undeclared, its join columns are readable and writable by nobody, trusted
+  plane included; the served-table check counts `via` steps as owners, so a
+  table whose `via` passes through a withheld table is withheld too. Why: the
+  `via` read through the withheld table and its column rules stopped counting.
+- **A declared junction's rules hold for `manyToMany` writes** (link columns
+  and `_pivot`), as for a to-many `via`; also in 0.30.x.
+- **Nine real projects were migrated on copies**, the hybrid Postgres +
+  Firestore one included: each installed against packed 0.31 packages,
+  type-checked, built, booted on a throwaway Postgres (every table read through
+  REST), tested and checked with `doctor --policies`. It proved the codemod plus
+  the hand edits it lists reach a building, booting, green project, and drove
+  some twenty codemod fixes and one package fix (the adapter resolution above).
+  It did not prove equality with any live database (`db push --dry-run` is a
+  rollout step), anything Firebase (no Firebase project was used), third-party
+  integrations, or the admin in a browser.
 - **In-process writes keep 0.30's rules.** `.readOnly()`, per-field
   `access.write` and `.private()` are API-boundary rules and are not enforced
   for `context.data` / `rebase.data`; stamps, tenant and key immutability are,

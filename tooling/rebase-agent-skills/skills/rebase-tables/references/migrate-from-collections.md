@@ -170,7 +170,20 @@ static text is refused); `auth: { collection }` in a custom backend entry; a
 `collections` boot option (→ `schemaDir`); a 0.30 `existsIn({ collection })`
 (keeps its table); a `dynamicProps` builder whose returns are object literals
 (rewritten to flat keys: `{ readOnly: true }`, not `{ admin: { readOnly: true } }`).
-Repeated manual steps are printed grouped, one step listing
+Also: Firestore collections a function builds (converted where each file
+holds its literal; a step names the rest), imports of `config/` through a
+tsconfig `paths` entry or a Vite alias, a `storageAuthorize` that
+`config/index.ts` re-exports (→ `backend/storage.ts`), a relation renamed to
+`<key>Relation` (the customization's presentation keys follow), values computed
+when `config/` loads (carried as their expression, never frozen), admin code
+destructuring `({ entity })` (→ `{ row, id }`, or listed), and the backend's
+emit path when `backend/tsconfig.json` stops including `../config`. Steps name
+the module that mounts the panel when it is not `App.tsx`, every static app of
+`rebase.json` without `rebaseBackendGuard()`, build/deploy files that still
+name the config package, and code importing the removed `collections` export
+or reading `config/collections` as text. A `config/` module nothing imports any
+more joins the `git rm` line; after that line, `--check` reports
+`already-migrated`. Repeated manual steps are printed grouped, one step listing
 every file; `--json` keeps each.
 
 ## SDK calls in your own code: `rebase migrate sdk-calls`
@@ -211,7 +224,8 @@ Then read the two lists in its output:
 
 - **Rewritten by name — review**: `.collection(` calls on a receiver with no
   type (`any`), rewritten because the receiver is named `dataAsAdmin` or is
-  `.data` with a literal table name. Confirm each is the SDK.
+  `.data` with a literal table name; the `collection` member of a type a
+  `data` / `dataAsAdmin` slot holds; test doubles. Confirm each is the SDK.
 - **Left unchanged — check each**: calls it did not prove to be the SDK, such
   as one through a type the project declares itself. One that *is* the SDK
   fails at runtime: rename it to `.table(` by hand.
@@ -220,6 +234,16 @@ Code that tests whether `collection` exists (`typeof data.collection ===
 "function"`, `"collection" in data`) is a manual step: it takes the other
 branch on the new release. A bundled or minified `.js` file is never edited:
 it is listed, so rebuild it (or replace a vendored client with the new build).
+
+After both lists, search the project (and any code outside it that bundles the
+client) for `.collection(`, `collection:` in test doubles and
+`typeof x.collection`: on the new release `data.collection` is the accessor of
+a table named `collection`, so calling it throws a `TypeError` that no type
+checker reports on an `any` or hand-written receiver. Every hit that is not the
+Firebase SDK becomes `.table(`. The docs page "What projects changed by hand
+for 0.31" (`/docs/upgrading/0-30-to-0-31-by-hand/`) lists the other edits real
+projects made: toolchain floors for projects older than 0.30, `include` of a
+renamed relation, collection objects changed at run time in `App.tsx`.
 
 ## The vocabulary, old → new
 

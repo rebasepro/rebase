@@ -223,6 +223,11 @@ options describes every table and rule to every signed-in caller; the
 default is `"granted"`. MCP connections are judged as a
 credential, by the same serializer.
 
+Who the caller is comes from the backend's auth adapter, the same one the data
+routes ask, so a backend with a [custom adapter](/docs/backend/auth-adapters/#the-adapter-decides-the-caller-everywhere)
+is served here (and at `/api/docs` and every admin surface) with the roles its
+adapter returns; a credential it does not recognise is a `401`.
+
 A credential holding neither `schema:read` nor a `data:*` scope gets
 `403 SCOPE_MISSING`. A backend with no authentication configured answers
 every request `404 SCHEMA_UNAVAILABLE`: there is no caller to redact for, and

@@ -73,6 +73,27 @@ export interface AuthAdapter {
 }
 ```
 
+### The adapter decides the caller everywhere
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`verifyRequest` is the one place the backend asks who sent a request. The data
+and functions routes ask it, and so do `GET /api/schema/tables`, the OpenAPI
+document at `/api/docs` and every admin surface under `/api/admin` (UI
+preferences, live schema editing, the schema editor, cron, logs, backups and
+the rest). An API key (`rk_`) or a platform token (`rpt_`) is still resolved by
+Rebase before the adapter is asked. A credential the adapter does not
+recognise is a `401`, never read as nobody; a request with no credential is
+nobody, which the schema endpoint and the document answer `401` (unless
+`schemaTables.public`) and the admin surfaces always answer `401`. The roles
+the adapter returns decide what the caller is described and whether an admin
+surface admits them (`403` when they lack its scope). An adapter that throws is
+the caller's refusal, never a `500`. See [Schema](/docs/backend/endpoints/#schema).
+
+Before 0.31 the schema endpoint, the document and the admin surfaces checked
+only the framework's JWT, so a backend with its own adapter answered them `500`
+and its admin panel did not load.
+
 ### The Authenticated User Payload
 
 Regardless of the external authentication provider chosen, your adapter must resolve successful token verifications to a uniform `AuthenticatedUser` object. The Rebase RLS Scope Injector maps these values directly to PostgreSQL session variables inside transactions:
