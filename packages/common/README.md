@@ -1,6 +1,6 @@
 # @rebasepro/common
 
-Shared utilities, collection registry, data driver adapter, and fluent query builder used across Rebase packages.
+The schema compiler, the table helpers, the data driver adapter and the fluent query builder shared across Rebase packages.
 
 ## Installation
 
@@ -16,7 +16,8 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 `@rebasepro/common` is the lowest-level shared logic layer in the Rebase frontend stack. It provides:
 
-- **Collection utilities** — collection registry, default collection definitions, path resolution
+- **The schema compiler** — `compileTables` / `compileSchema` turn `defineTable` results into the descriptors the backend serves
+- **Table helpers** — column codecs, write defaults and stamps, storage and user-column positions, field-operation bounds, read over a `TableDescriptor`
 - **Data driver adapter** — `buildRebaseData()` bridges any `DataDriver` implementation into a `RebaseData` proxy with typed collection accessors
 - **Query builder** — fluent `QueryBuilder` class plus `or()`, `and()`, `cond()` helpers for composing complex queries
 - **Entity/property utilities** — entity resolution, enum helpers, permission checks, reference/relation helpers, storage path utils, callback utilities
@@ -40,6 +41,7 @@ This package has no React dependency — it's pure TypeScript and can be used in
 | Export | Description |
 |---|---|
 | `compileTables(defs, options?)` | Compiles `defineTable` / `defineAuthTable` / `defineView` results into `TableDescriptor[]` — the form the backend serves, the SDK generator reads and the schema version hashes. Throws one `SchemaDefinitionError` naming every problem. New in 0.31. |
+| `compileSchema(defs, options?)` | The same descriptors as `compileTables`, each with its definition and its server-only parts (hooks, column transforms, auth lifecycle): the `CompiledTable`s a driver opens on (`openRebase({ tables })`, `openPostgresDriver(config, { tables })`). New in 0.31. |
 | `SchemaDefinitionError` | What the compiler throws: every table and key that is wrong, with what to write instead. New in 0.31. |
 
 ### Hooks
@@ -55,12 +57,25 @@ This package has no React dependency — it's pure TypeScript and can be used in
 |---|---|
 | `warnDeprecated(key, message)` | Prints `[Rebase] Deprecated: <message>` once per process per key. What Rebase's own deprecated aliases call, and usable by a plugin or library for its own. New in 0.25. |
 
-### Collections
+### Table helpers
+
+New in 0.31, each reading a `TableDescriptor`:
 
 | Export | Description |
 |---|---|
-| `CollectionRegistry` | Registry for managing collection definitions |
-| Default collections | Pre-built collection configurations |
+| `valueCodecOf`, `valueCodecOfType`, `restCodecOf` | How a column's value is written to and read from Postgres and the wire |
+| `fieldOperationBounds` | The bounds a field operation (`$inc`, `$push`, `$pull`) must respect |
+| `applyCreateDefaults`, `applyStamps` | The defaults and the `.onCreateNow()` / `.onUpdateUser()` … stamps a write gets, at any depth of a JSON column |
+| `storagePositions`, `storageAt`, `userReferencePositions`, `referencesUsers` | Where a table holds storage keys and user ids |
+| `checkTableOperation` | Whether a role may run an operation on a table |
+
+### Migration (`@rebasepro/common/migrate`)
+
+The lift from the 0.30 collection model (`collectionsToTableDefs`,
+`collectionToTableDef`, `LiftNote`, `LiftResult`, `LiftOptions`), a frozen copy
+of that model (`Legacy…` types) and `defineLegacyCollection`. What
+`rebase migrate collections-to-tables` runs; nothing on a runtime path imports
+it. New in 0.31.
 
 ### Utilities
 

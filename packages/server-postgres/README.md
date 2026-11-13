@@ -50,9 +50,9 @@ Implements the Rebase `DatabaseAdapter` / `BackendBootstrapper` interfaces for P
 |--------|-------------|
 | `createPostgresAdapter(config)` | Creates a `DatabaseAdapter` for use with `initializeRebaseBackend({ database: ... })`. Recommended API. |
 | `createPostgresBootstrapper(config)` | Lower-level `BackendBootstrapper` factory. Used internally by the adapter. |
-| `openPostgresDriver(pgConfig, init)` | Opens the data driver from explicit settings, reading no environment variable; `provision: false` opens it with no DDL. What the adapter runs at boot. New in 0.25. |
+| `openPostgresDriver(pgConfig, init)` | Opens the data driver on `init.tables` (`compileSchema`) from explicit settings, reading no environment variable; `provision: false` opens it with no DDL. What the adapter runs at boot. New in 0.25. |
 | `postgresDriverConfigFromEnv(config, env?)` | Reads `DATABASE_READ_URL`, `DATABASE_DIRECT_URL` and the `REALTIME_*` variables into a driver config, as the server's boot does. New in 0.25. |
-| `openRebase({ databaseUrl, tables, hooks })` | A project's data from a script, a test or a REPL: `dataAsAdmin`, `sql`, `withAuth(user)` and `close()`. No server, no DDL, no environment reads. `rebase console` is built on it. `collections` is the project's tables lowered with `lowerTables` from `@rebasepro/common` — the form it reads until it takes `defineTable` results directly. New in 0.25. |
+| `openRebase({ databaseUrl, tables, hooks })` | A project's data from a script, a test or a REPL: `dataAsAdmin`, `sql`, `withAuth(user)` and `close()`. No server, no DDL, no environment reads. `rebase console` is built on it. `tables` is the project's tables compiled with `compileSchema` from `@rebasepro/common`; `hooks` the global hooks `backend/hooks.ts` exports. New in 0.25. |
 | `createPostgresDatabaseConnection(url, schema?, poolConfig?)` | Creates a production-grade pooled Drizzle connection. Returns `{ db, pool, connectionString }`. |
 | `createDirectDatabaseConnection(url, schema?, poolConfig?)` | Non-pooled connection for LISTEN/NOTIFY and advisory locks (bypasses PgBouncer). |
 | `createReadReplicaConnection(url, schema?, poolConfig?)` | Read-only connection for routing reads to replicas. |
@@ -61,7 +61,7 @@ Implements the Rebase `DatabaseAdapter` / `BackendBootstrapper` interfaces for P
 | `DatabasePoolManager` | Per-branch/per-tenant dynamic pool management (used with `ADMIN_CONNECTION_STRING`). |
 | `PostgresTableRegistry` | Served table → Drizzle table registry with enum and relation tracking. |
 | `BranchService` | Database branching (one database per branch, copied from a template). |
-| `generateSchema(collections, options?)` | Generates the Drizzle schema code (`schema.generated.ts`) from the lowered tables; `rebase schema generate` runs it over `backend/schema`. |
+| `generateSchema(tables, options?)` | Generates the Drizzle schema code (`schema.generated.ts`) from the compiled tables; `rebase schema generate` runs it over `backend/schema`. |
 | `createAuthSchema(schemaName?)` | Drizzle tables for the auth system, in schema `rebase` by default: `users` (with `roles` as a `text[]` column), `refresh_tokens`, `password_reset_tokens`, `user_identities`, `mfa_factors`, `mfa_challenges`, `recovery_codes`, `magic_link_tokens`, `app_config`. |
 
 ## Quick Start
