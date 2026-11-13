@@ -228,6 +228,23 @@ describe("what the blog fixture says about routing", () => {
     }, 120_000);
 });
 
+describe("a backend tsconfig that reached ../config without a rootDir", () => {
+    it("moves the emit path too: tsc's implicit root was the project, it is backend/ once ../config is gone", async () => {
+        const dir = materialize("blog");
+        const collections = path.join(dir, "config", "collections");
+        for (const helper of ["slugify.ts", "actions.ts", "form-rules.ts", "tag-callbacks.ts"]) fs.renameSync(path.join(dir, "config", helper), path.join(collections, `_${helper}`));
+        const posts = path.join(collections, "posts.ts");
+        fs.writeFileSync(posts, fs.readFileSync(posts, "utf8").replace(`"../slugify"`, `"./_slugify"`).replace(`"../actions"`, `"./_actions"`).replace(`"../form-rules"`, `"./_form-rules"`));
+        const tags = path.join(collections, "tags.ts");
+        fs.writeFileSync(tags, fs.readFileSync(tags, "utf8").replace(`"../tag-callbacks"`, `"./_tag-callbacks"`));
+        const tsconfig = path.join(dir, "backend", "tsconfig.json");
+        fs.writeFileSync(tsconfig, fs.readFileSync(tsconfig, "utf8").replace(`,\n    "rootDir": ".."`, ""));
+        const report = await run(dir, { dryRun: true });
+        expect(report.files.find(file => file.path === "backend/tsconfig.json")?.content).not.toContain("../config");
+        expect(report.files.find(file => file.path === "backend/entrypoint.sh")?.content).toContain("exec node dist/src/index.js");
+    }, 120_000);
+});
+
 describe("a function storage path no template can name", () => {
     it("is refused, since any template would claim keys the function never writes", async () => {
         const dir = materialize("blog");

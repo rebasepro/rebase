@@ -271,6 +271,9 @@ export function planBackendTsconfig(plan: PlanContext, wanted: readonly string[]
         if (comments.length === 0 || comments.some(line => /config/.test(line))) lines.splice(block.start, block.end - block.start, ...ROOT_DIR_COMMENT);
         movedEmit = true;
     }
+    // No `rootDir` at all: tsc took the common directory of the inputs, which `../config/**`
+    // lifted to the project root. Without it that directory is backend/, so the emit moves the same way.
+    if (namesConfig && !/"rootDir"\s*:/.test(original)) movedEmit = true;
     text = lines.join("\n");
     planFile(plan, file, text, "backend/tsconfig.json");
     if (movedEmit) planEmitPathMove(plan);
