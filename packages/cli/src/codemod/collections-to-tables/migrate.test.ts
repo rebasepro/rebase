@@ -567,6 +567,10 @@ describe("Firestore collections built by a function", () => {
         expect(step?.detail).toContain("defineFirestoreCollection");
         expect(step?.detail).toContain("externalCollections");
         expect(step?.detail).toContain("`properties` → `fields`");
+        // The builder adds an `id` field to the file's export at run time: said, since the converted file does not carry it.
+        expect(step?.detail).toContain("changed copies of visits");
+        // An inner builder (`buildPageCollections()`, inside the outer one) is not a second step.
+        expect(report.manualSteps.filter(candidate => candidate.title.startsWith("Mount the Firestore collections"))).toHaveLength(1);
     }, 180_000);
 });
 

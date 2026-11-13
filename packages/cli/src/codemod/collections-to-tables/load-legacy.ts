@@ -82,6 +82,12 @@ export interface FirestoreBuilder {
     exportName: string;
     /** The slugs it returned, in order. */
     slugs: string[];
+    /**
+     * The slugs it returned as a different object than their file exports — a
+     * copy the builder changed at run time (added a field, say), which a
+     * conversion of the file alone does not carry.
+     */
+    changed: string[];
 }
 
 /** A module importer: the CLI's jiti importer (`createSchemaModuleImporter`), or a stand-in in tests. */
@@ -142,11 +148,19 @@ async function findBuiltFirestore(collectionsDir: string, indexFile: string | un
     }
     const builders: FirestoreBuilder[] = [];
     const reached = new Map<string, LegacyCollectionConfig>();
-    for (const collection of byFile.values()) reached.set(collection.slug, collection);
+    const exported = new Map<string, LegacyCollectionConfig>();
+    for (const collection of byFile.values()) {
+        reached.set(collection.slug, collection);
+        if (!exported.has(collection.slug)) exported.set(collection.slug, collection);
+    }
+    // A builder re-exported by an index is the same function: reported once, where it was met first.
+    const called = new Set<unknown>();
     for (const { file, mod } of loaded) {
         for (const [exportName, value] of Object.entries(mod)) {
+            if (called.has(value)) continue;
             // Only what names itself a collection builder is called: a module of config/ may export anything.
             if (typeof value !== "function" || value.length !== 0 || !/collection/i.test(exportName) || /^[A-Z]/.test(exportName)) continue;
+            called.add(value);
             let returned: unknown;
             try {
                 returned = value();
@@ -156,10 +170,18 @@ async function findBuiltFirestore(collectionsDir: string, indexFile: string | un
             const list = Array.isArray(returned) ? returned : [returned];
             const collections = list.filter(isFirestoreCollection);
             if (collections.length === 0) continue;
-            builders.push({ file, exportName, slugs: collections.map(collection => collection.slug) });
+            builders.push({
+                file,
+                exportName,
+                slugs: collections.map(collection => collection.slug),
+                changed: collections.filter(collection => exported.has(collection.slug) && exported.get(collection.slug) !== collection).map(collection => collection.slug)
+            });
             for (const collection of collections) if (!reached.has(collection.slug)) reached.set(collection.slug, collection);
         }
     }
+    // A builder whose collections another builder returns too (`buildContent()` inside `getAll()`) is part of that one's step.
+    const outer = builders.filter(builder => !builders.some(other => other !== builder && other.slugs.length > builder.slugs.length && builder.slugs.every(slug => other.slugs.includes(slug))));
+    builders.splice(0, builders.length, ...outer);
     const fileOf = new Map<string, string>();
     for (const [file, collection] of byFile) if (!fileOf.has(collection.slug)) fileOf.set(collection.slug, file);
     const built = [...reached.values()].map(collection => {

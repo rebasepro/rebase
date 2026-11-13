@@ -321,6 +321,7 @@ async function migrateWithShims(options: MigrateOptions, shimDir: ShimDir): Prom
             title: `Mount the Firestore collections ${builder.exportName}() built`,
             detail: `\`${builder.exportName}()\` builds ${builder.slugs.length} Firestore collection(s) at run time; the 0.30 loader never read its module, the app spread the result into \`collections\`, which the panel no longer takes.` +
                 describeBuilt(builder.slugs) +
+                (builder.changed.length > 0 ? ` It returns changed copies of ${builder.changed.join(", ")} (it adds to or rewrites what their files export at run time): carry that change into the converted collections by hand.` : "") +
                 ` Replace the call with \`externalCollections\` from ./cms. Its module tree goes with config/collections; where other code still imports it, it was copied as written (0.30 shape) next to that code — keep only what that code reads.`,
             file: relativeToRoot(plan, builder.file)
         });
