@@ -32,7 +32,7 @@
  *     pnpm check:schema-fresh
  *
  * The tables are read from `backend/schema` by the driver's own loader
- * (`loadTables`: the server's `loadBackendSchema`, lowered, in slug order), so
+ * (`loadTableSchema`: the server's `loadBackendSchema`, compiled, in slug order), so
  * this gate sees exactly what `rebase schema generate` generates from.
  *
  * Fixing a failure is `rebase schema stale --fix` in `app/backend`, then commit
@@ -42,7 +42,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadTables } from "../../packages/server-postgres/src/schema/load-tables.ts";
+import { loadTableSchema } from "../../packages/server-postgres/src/schema/load-tables.ts";
 import {
     findLegacyForeignKeyNames,
     describeLegacyForeignKeyNames,
@@ -76,16 +76,16 @@ for (const target of TARGETS) {
     // A schema the loader refuses (a module that does not import, a table
     // with no `rls`…) throws here, and the gate fails with it: there is no
     // way to say whether a file is fresh against tables that cannot be read.
-    let collections: Awaited<ReturnType<typeof loadTables>>;
+    let descriptors: Awaited<ReturnType<typeof loadTableSchema>>["descriptors"];
     try {
-        collections = await loadTables(target.tables);
+        descriptors = (await loadTableSchema(target.tables)).descriptors;
     } catch (error) {
         console.error(`✗ ${rel(target.tables)} could not be read — nothing was checked:\n`);
         console.error(error instanceof Error ? error.message : String(error));
         failed = true;
         continue;
     }
-    if (collections.length === 0) {
+    if (descriptors.length === 0) {
         // Loud rather than silent: zero tables makes every check below
         // vacuous, and a gate that passes because it found nothing to check is
         // worse than no gate.
@@ -95,11 +95,11 @@ for (const target of TARGETS) {
     }
 
     const source = fs.readFileSync(target.schema, "utf8");
-    const stale = findLegacyForeignKeyNames(source, collections);
-    const missing = findMissingGeneratedNames(source, collections);
+    const stale = findLegacyForeignKeyNames(source, descriptors);
+    const missing = findMissingGeneratedNames(source, descriptors);
 
     if (stale.length === 0 && missing.length === 0) {
-        console.log(`  ok   ${rel(target.schema)} — ${collections.length} table(s)`);
+        console.log(`  ok   ${rel(target.schema)} — ${descriptors.length} table(s)`);
         continue;
     }
 
