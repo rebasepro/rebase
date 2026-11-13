@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-import { backendImportMessage, bundleOutputSources, fileOfModuleId, findProjectBackendDir, htmlReferencedPaths, isModuleInDir, neverInlineUnder, realPath, referencedPaths } from "../src/backend_guard";
+import { backendImportMessage, bundleOutputSources, fileOfModuleId, findProjectBackendDir, assertInlineLimitKept, htmlReferencedPaths, isModuleInDir, neverInlineUnder, rebaseBackendGuard, realPath, referencedPaths } from "../src/backend_guard";
 
 /** The pieces of `rebaseBackendGuard` a build does not show one by one. */
 
@@ -154,5 +154,33 @@ describe("neverInlineUnder (FINAL-FIX-PRODUCT L-2)", () => {
         expect(byFunction("/p/frontend/a.png", bytes(1))).toBeUndefined();
         // Absent: Vite's own default limit decides.
         expect(byDefault("/p/frontend/a.png", bytes(1))).toBeUndefined();
+    });
+});
+
+describe("a plugin that replaces the guard's inline limit (security look 5, I-1)", () => {
+    /** The guard's own `config` result, as Vite would merge it. */
+    function guardLimit(): unknown {
+        const plugin = rebaseBackendGuard();
+        const hook = plugin.config;
+        const run = typeof hook === "function" ? hook : hook?.handler;
+        if (!run) throw new Error("the guard has a config hook");
+        const result: unknown = Reflect.apply(run, {}, [{}, { command: "build", mode: "production" }]);
+        if (typeof result !== "object" || result === null || !("build" in result)) throw new Error("the guard sets build");
+        const build: unknown = result.build;
+        if (typeof build !== "object" || build === null || !("assetsInlineLimit" in build)) throw new Error("the guard sets the limit");
+        return build.assetsInlineLimit;
+    }
+
+    it("fails the build, naming the guard, when another plugin overwrote it", () => {
+        const own = neverInlineUnder(undefined, () => false);
+        const overwritten = () => true;
+        expect(() => assertInlineLimitKept({ build: { assetsInlineLimit: overwritten } }, own)).toThrow(/rebase-backend-guard.*assetsInlineLimit/s);
+        expect(() => assertInlineLimitKept({ build: { assetsInlineLimit: 100_000_000 } }, own)).toThrow(/rebase-backend-guard/);
+    });
+
+    it("passes when the limit is still the guard's own", () => {
+        const own = neverInlineUnder(4096, () => false);
+        expect(() => assertInlineLimitKept({ build: { assetsInlineLimit: own } }, own)).not.toThrow();
+        expect(typeof guardLimit()).toBe("function");
     });
 });

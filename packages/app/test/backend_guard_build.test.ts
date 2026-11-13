@@ -23,6 +23,7 @@ interface Report {
     dev: Record<string, BuildResult>;
     mcpView: Record<string, BuildResult>;
     caseInsensitive: boolean;
+    inlineOverwrite: { guarded: BuildResult; control: BuildResult };
 }
 
 function isReport(value: unknown): value is Report {
@@ -151,6 +152,12 @@ describe("rebaseBackendGuard in a real build", () => {
         expect(guarded.ok).toBe(false);
         expect(guarded.error).toContain("[rebase-backend-guard]");
         expect(guarded.error).toContain("backend/data/large.json");
+    });
+
+    it("a plugin that replaces the guard's assetsInlineLimit fails the build, naming the guard (security look 5, I-1)", () => {
+        expect(report.inlineOverwrite.control.ok).toBe(true);
+        expect(report.inlineOverwrite.guarded.ok).toBe(false);
+        expect(report.inlineOverwrite.guarded.error).toContain("[rebase-backend-guard] Another Vite plugin replaced build.assetsInlineLimit");
     });
 
     it.each(SMALL_INLINED_FORMS)("%s: the control inlines the small backend file, the guarded build is refused", (form) => {

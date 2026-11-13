@@ -337,6 +337,8 @@ function backendGuardPlugin(options: RebaseBackendGuardOptions, inWorker: boolea
     /** `transform` also reads the project's own modules (anything outside `node_modules`). */
     const transformFilter: { id: RegExp } = { id: /(?!)/ };
     const refuse = (id: string | undefined): boolean => realBackend !== undefined && id !== undefined && isModuleInDir(id, realBackend);
+    /** The `build.assetsInlineLimit` this guard set, to tell whether a later plugin replaced it. */
+    let ownInlineLimit: AssetsInlineLimit | undefined;
 
     return {
         name: BACKEND_GUARD_PLUGIN_NAME,
@@ -349,7 +351,8 @@ function backendGuardPlugin(options: RebaseBackendGuardOptions, inWorker: boolea
             // unquoted `src`, `<meta content>`, a CSS `image-set()`). A file
             // under the backend is never inlined: it is emitted, and the net
             // refuses it. Everything else is the project's own setting.
-            const build = { assetsInlineLimit: neverInlineUnder(userConfig.build?.assetsInlineLimit, refuse) };
+            ownInlineLimit = neverInlineUnder(userConfig.build?.assetsInlineLimit, refuse);
+            const build = { assetsInlineLimit: ownInlineLimit };
             if (inWorker) return { build };
             // A worker is bundled by a build of its own, which runs
             // `worker.plugins` and nothing else: without this, a worker that
@@ -363,6 +366,7 @@ function backendGuardPlugin(options: RebaseBackendGuardOptions, inWorker: boolea
             };
         },
         configResolved(config: ResolvedConfig) {
+            if (!inWorker) assertInlineLimitKept(config, ownInlineLimit);
             viteRoot = config.root;
             // What Vite's CSS `@import` and `new URL(…, import.meta.url)`
             // handling resolve with: the alias and the file system, no plugin.
@@ -490,6 +494,24 @@ export function neverInlineUnder(limit: AssetsInlineLimit | undefined, isBackend
         if (typeof limit === "number") return content.length < limit;
         return undefined;
     };
+}
+
+/**
+ * Fail the build when another plugin replaced the guard's
+ * `build.assetsInlineLimit`: Vite merges the `config` of the plugins that run
+ * after this one over it, and one that sets the limit (to inline everything,
+ * say) would put backend files back into the bundle as `data:` URLs, silently.
+ * The project's own `vite.config` value is not this: the guard wraps it.
+ * Module-internal (exported for its test, not from an entry).
+ */
+export function assertInlineLimitKept(config: { build: { assetsInlineLimit?: unknown } }, own: AssetsInlineLimit | undefined): void {
+    if (own === undefined || config.build.assetsInlineLimit === own) return;
+    throw new Error(
+        `[${BACKEND_GUARD_PLUGIN_NAME}] Another Vite plugin replaced build.assetsInlineLimit after ${BACKEND_GUARD_PLUGIN_NAME} set it, ` +
+        "so a small file under backend/ could be inlined into the frontend bundle as a data: URL. Set the limit in your " +
+        "vite.config's build.assetsInlineLimit instead (the guard keeps it for every file outside backend/), or configure " +
+        "the plugin not to set it."
+    );
 }
 
 /**

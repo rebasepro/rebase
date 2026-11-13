@@ -221,7 +221,7 @@ async function main() {
     // The real path: on macOS the temporary directory is behind a symlink
     // (/var → /private/var), and Vite works in real paths.
     const base = fs.mkdtempSync(path.join(fs.realpathSync.native(os.tmpdir()), "rebase-backend-guard-"));
-    const results = { forms: {}, clean: undefined, dev: {}, mcpView: {}, caseInsensitive: caseInsensitive(base) };
+    const results = { forms: {}, clean: undefined, inlineOverwrite: undefined, dev: {}, mcpView: {}, caseInsensitive: caseInsensitive(base) };
     try {
         const forms = { ...FORMS };
         if (results.caseInsensitive) {
@@ -238,6 +238,16 @@ async function main() {
 
         const clean = project(base, "clean", CLEAN);
         results.clean = await tryBuild(clean, { guard: true });
+
+        // Security look 5, I-1: a plugin after the guard that sets
+        // assetsInlineLimit (to inline everything) would have put backend
+        // files back in as data: URLs. The guard refuses the build instead.
+        const inlineAll = { name: "inline-everything", config: () => ({ build: { assetsInlineLimit: 100_000_000 } }) };
+        const overwrite = project(base, "inline-overwrite", CLEAN);
+        results.inlineOverwrite = {
+            guarded: await tryBuild(overwrite, { guard: true, extraPlugins: [inlineAll] }),
+            control: await tryBuild(overwrite, { guard: true })
+        };
 
         // The MCP view: a second build of the project's App from the same
         // config file. The guard is in that file, so it guards the view: an
