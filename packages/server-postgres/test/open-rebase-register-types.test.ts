@@ -36,7 +36,7 @@ type Database = {
 };
 
 export async function script(): Promise<string[]> {
-    const rebase = await openRebase({ databaseUrl: "postgres://localhost/app", collections: [] });
+    const rebase = await openRebase({ databaseUrl: "postgres://localhost/app" });
     await rebase.dataAsAdmin.nonsenseCollection.find({}); // refused: nonsenseCollection
     await rebase.dataAsAdmin.posts.update("1", { status: "not-an-enum-value" }); // refused: not-an-enum-value
     await rebase.dataAsAdmin.posts.update("1", { bogus: 1 }); // refused: bogus

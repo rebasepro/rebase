@@ -16,7 +16,6 @@ import {
     type DataDriver,
     CollectionConfig,
     DEFAULT_DATA_SOURCE_KEY,
-    isRelationalCollectionConfig,
     type HistoryConfig,
     InitializedDriver,
     type DatabaseAdapterInitConfig,
@@ -56,7 +55,7 @@ import { collectJunctionLinks } from "./services/cdc/junction-tables";
 import { tableKeyColumns } from "./services/cdc/identity-columns";
 import type { RuntimeTable } from "./model/runtime-table";
 import { createChannelBus, resolveChannelBusSetting } from "./services/channel-bus";
-import { declaredDatabaseRls, declaredRlsPolicyShape, isChannelBusInstance, isPostgresCollectionConfig } from "@rebasepro/types";
+import { declaredDatabaseRls, declaredRlsPolicyShape, isChannelBusInstance } from "@rebasepro/types";
 import { configureUnknownFilterFields, type UnknownFilterFieldsMode } from "./utils/drizzle-conditions";
 import { isPooledPool, closeWithPool } from "./connection";
 import { ReadRouter, readReplicaLagMs, readRoutingOptionsFromEnv, sameDatabaseTarget, type ReadRoutingOptions } from "./read-routing";

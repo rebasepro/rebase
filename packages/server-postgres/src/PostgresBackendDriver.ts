@@ -1090,7 +1090,7 @@ export class PostgresBackendDriver implements DataDriver {
      * collection's RLS applies to it — exactly as it does inside the generated
      * policy's subquery. That is deliberate: if the two disagreed, the API
      * would refuse writes the database would have accepted, or accept writes it
-     * refuses. `validateCollectionConfig` is what makes sure the membership
+     * refuses. The membership table's own rules are what make sure the membership
      * collection is readable by its own members in the first place.
      */
     private async resolveCallerTenants(
@@ -3643,7 +3643,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
 
                 // Set the RLS GUCs and downgrade to the restricted user role so RLS
                 // binds every statement in this transaction — reads AND writes.
-                // This is user context: the collection's securityRules are the
+                // This is user context: the table's `rls` rules are the
                 // authorization model. The BASE driver never reaches here, so it
                 // stays on the owner connection and bypasses RLS — but note that
                 // `rebase.dataAsAdmin` is NOT the base driver: `init.ts` scopes it
