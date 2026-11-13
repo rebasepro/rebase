@@ -175,6 +175,11 @@ const SKIP_FILES = new Set([
     "website/public/llms.txt",
     "tooling/scripts/headless-guard/check-package-names.mjs",
     "tooling/scripts/deprecate-old-packages.sh",
+    // The 0.31 upgrade codemod's table of removed packages: it finds an import
+    // of `@rebasepro/server-mongo` in a user's project and says what to do
+    // instead, so — like the deprecation script — it cannot do its job without
+    // the old name. Only this table file, not the codemod directory.
+    "packages/cli/src/codemod/collections-to-tables/export-changes.ts",
     // The plan that retires `server-mongo` in 0.31: its Phase 1 is the removal,
     // and it cannot describe the removal without the name, any more than an
     // upgrade page can.
