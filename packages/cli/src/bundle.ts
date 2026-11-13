@@ -31,7 +31,7 @@ import {
     type RebaseBackendAppConfig
 } from "@rebasepro/types";
 import { compareMountOrder, resolveBackendPaths } from "./manifest";
-import { cmsDirectories } from "./commands/verify-cms";
+import { cmsDirectories } from "./utils/cms-directories";
 import { schemaDirArgs } from "./utils/schema-dir";
 import { loadProjectSchema, type ModuleAliases } from "./utils/project-schema";
 import { cliVersion } from "./utils/version";
