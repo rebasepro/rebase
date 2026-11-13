@@ -1,6 +1,6 @@
 import { describe, it, expect, jest } from "@jest/globals";
 import { compileTables } from "@rebasepro/common";
-import { col, defineAuthTable, defineTable, defineView, json, rel } from "@rebasepro/types";
+import { col, defineAuthTable, defineTable, defineView, json, rel, sql } from "@rebasepro/types";
 import { toPascalCase, toCamelCase, toSafeIdentifier, toTableAccessor, indent } from "../src/utils";
 import { generateTypedefs } from "../src/generate-types";
 import { generateSDK } from "../src/index";
@@ -10,7 +10,7 @@ import { block, compiledOnly, generate, keysOf, rawTable } from "./helpers/table
 
 const authors = defineTable("authors", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         name: col.text().notNull(),
         email: col.text()
     },
@@ -97,18 +97,18 @@ describe("column types", () => {
             columns: {
                 id: col.uuid().primaryKey().defaultRandom(),
                 bool: col.boolean(),
-                ts: col.timestamptz(),
+                ts: col.timestamp({ withTimezone: true }),
                 day: col.date(),
                 clock: col.time(),
                 geo: col.geopoint(),
-                vec: col.vector(3),
+                vec: col.vector({ dimensions: 3 }),
                 bin: col.bytea(),
                 count: col.integer(),
-                big: col.bigint(),
-                money: col.numeric(10, 2),
+                big: col.bigint({ mode: "number" }),
+                money: col.numeric({ precision: 10, scale: 2 }),
                 ratio: col.doublePrecision(),
-                name: col.varchar(80),
-                code: col.char(2),
+                name: col.varchar({ length: 80 }),
+                code: col.char({ length: 2 }),
                 file: col.storage({ path: "files/" }),
                 doc: col.jsonb()
             },
@@ -144,7 +144,7 @@ describe("column types", () => {
 
     it("types a temporal column as a string on a read and a string or Date on a write", () => {
         const ts = generate(defineTable("events", {
-            columns: { id: col.uuid().primaryKey().defaultRandom(), at: col.timestamptz().notNull() },
+            columns: { id: col.uuid().primaryKey().defaultRandom(), at: col.timestamp({ withTimezone: true }).notNull() },
             rls: "admin-only"
         }));
         expect(block(ts, "Row", "events")).toContain("at: string;");
@@ -163,7 +163,7 @@ describe("column types", () => {
 
         it("types a text `oneOf` as the union of its values", () => {
             const ts = generate(defineTable("posts", {
-                columns: { id: col.uuid().primaryKey().defaultRandom(), status: col.text().oneOf(["draft", "published"]) },
+                columns: { id: col.uuid().primaryKey().defaultRandom(), status: col.text({ enum: ["draft", "published"] }) },
                 rls: "admin-only"
             }));
             expect(ts).toContain('status?: "draft" | "published" | null;');
@@ -179,7 +179,7 @@ describe("column types", () => {
 
         it("types the items of a text array with a closed set", () => {
             const ts = generate(defineTable("posts", {
-                columns: { id: col.uuid().primaryKey().defaultRandom(), labels: col.array(col.text().oneOf(["a", "b"])) },
+                columns: { id: col.uuid().primaryKey().defaultRandom(), labels: col.text({ enum: ["a", "b"] }).array() },
                 rls: "admin-only"
             }));
             expect(ts).toContain('labels?: Array<"a" | "b"> | null;');
@@ -263,8 +263,8 @@ describe("column types", () => {
         const ts = generate(defineTable("articles", {
             columns: {
                 id: col.uuid().primaryKey().defaultRandom(),
-                tags: col.array(col.text()),
-                scores: col.array(col.integer()),
+                tags: col.text().array(),
+                scores: col.integer().array(),
                 files: col.storage({ path: "a/" }).multiple()
             },
             rls: "admin-only"
@@ -278,16 +278,16 @@ describe("column types", () => {
 describe("Insert: what a create may leave out", () => {
     const books = defineTable("books", {
         columns: {
-            id: col.integer().primaryKey().identity(),
+            id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
             title: col.text().notNull(),
             subtitle: col.text(),
             code: col.text().notNull().dbDefault(),
-            slug: col.text().notNull().defaultSql("gen_short_id()"),
+            slug: col.text().notNull().default(sql`gen_short_id()`),
             status: col.enum(["draft", "live"]).notNull().default("draft"),
-            createdAt: col.timestamptz().notNull().onCreateNow(),
+            createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
             createdBy: col.uuid().notNull().onCreateUser(),
             seq: col.serial().notNull(),
-            words: col.integer().generatedAs("0"),
+            words: col.integer().generatedAlwaysAs(sql`0`),
             locked: col.text().readOnly()
         },
         rls: "admin-only"
@@ -349,7 +349,7 @@ describe("Insert: what a create may leave out", () => {
 describe("Update: every column optional, the key not reassignable", () => {
     it("makes every writable column optional and leaves the key out", () => {
         const update = block(generate(defineTable("books", {
-            columns: { id: col.integer().primaryKey().identity(), title: col.text().notNull() },
+            columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), title: col.text().notNull() },
             rls: "admin-only"
         })), "Update", "books");
         expect(update).toContain("title?: string;");
@@ -358,12 +358,12 @@ describe("Update: every column optional, the key not reassignable", () => {
 });
 
 describe("relations and foreign keys", () => {
-    const numericAuthors = defineTable("authors", { columns: { id: col.integer().primaryKey().identity() }, rls: "admin-only" });
+    const numericAuthors = defineTable("authors", { columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity() }, rls: "admin-only" });
     const uuidAuthors = defineTable("authors", { columns: { id: col.uuid().primaryKey().defaultRandom() }, rls: "admin-only" });
 
     it("types a derived foreign key as the target's key, under its wire key", () => {
         const posts = defineTable("posts", {
-            columns: { id: col.integer().primaryKey().identity() },
+            columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity() },
             relations: { author: rel.belongsTo(() => numericAuthors, { localKey: "author_id" }) },
             rls: "admin-only"
         });
@@ -376,7 +376,7 @@ describe("relations and foreign keys", () => {
 
     it("types a link into a table outside the run by its own column, its row as an open record", () => {
         const posts = defineTable("posts", {
-            columns: { id: col.integer().primaryKey().identity() },
+            columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity() },
             relations: { author: rel.belongsTo(() => uuidAuthors) },
             rls: "admin-only"
         });
@@ -391,7 +391,7 @@ describe("relations and foreign keys", () => {
     // check reads both of.
     it("requires a NOT NULL link on create, under either of its names", () => {
         const posts = defineTable("posts", {
-            columns: { id: col.integer().primaryKey().identity() },
+            columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity() },
             relations: { author: rel.belongsTo(() => uuidAuthors, { localKey: "author_id", notNull: true }) },
             rls: "admin-only"
         });
@@ -403,8 +403,8 @@ describe("relations and foreign keys", () => {
     it("binds a declared foreign-key column, typed and placed by its declaration", () => {
         const posts = defineTable("posts", {
             columns: {
-                id: col.integer().primaryKey().identity(),
-                authorRef: col.uuid().column("author_id").notNull().describe("who wrote it"),
+                id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
+                authorRef: col.uuid("author_id").notNull().describe("who wrote it"),
                 title: col.text()
             },
             relations: { author: rel.belongsTo(() => uuidAuthors, { localKey: "author_id" }) },
@@ -418,7 +418,7 @@ describe("relations and foreign keys", () => {
 
     it("lists a column that is nothing but the link with the relations, as a derived one is", () => {
         const posts = defineTable("posts", {
-            columns: { id: col.integer().primaryKey().identity(), authorId: col.uuid(), title: col.text() },
+            columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), authorId: col.uuid(), title: col.text() },
             relations: { author: rel.belongsTo(() => uuidAuthors) },
             rls: "admin-only"
         });
@@ -429,7 +429,7 @@ describe("relations and foreign keys", () => {
         // `constraint: false` keeps a bare column: the server writes it by its
         // key, and does not map the relation's name onto it.
         const posts = defineTable("posts", {
-            columns: { id: col.integer().primaryKey().identity(), authorId: col.uuid() },
+            columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), authorId: col.uuid() },
             relations: { author: rel.belongsTo(() => uuidAuthors, { constraint: false, index: false }) },
             rls: "admin-only"
         });
@@ -439,9 +439,9 @@ describe("relations and foreign keys", () => {
     });
 
     it("types a relation as the target's own row, inlined — the shape a read serves", () => {
-        const tags = defineTable("tags", { columns: { id: col.integer().primaryKey().identity() }, rls: "admin-only" });
+        const tags = defineTable("tags", { columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity() }, rls: "admin-only" });
         const posts = defineTable("posts", {
-            columns: { id: col.integer().primaryKey().identity() },
+            columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity() },
             relations: { tags: rel.manyToMany(() => tags) },
             rls: "admin-only"
         });
@@ -456,7 +456,7 @@ describe("relations and foreign keys", () => {
             columns: { id: col.uuid().primaryKey().defaultRandom() },
             relations: {
                 tags: rel.manyToMany(() => tags, {
-                    pivot: { position: col.integer(), addedAt: col.timestamptz().notNull() }
+                    pivot: { position: col.integer(), addedAt: col.timestamp({ withTimezone: true }).notNull() }
                 })
             },
             rls: "admin-only"
@@ -471,10 +471,10 @@ describe("relations and foreign keys", () => {
     });
 
     it("writes a hasMany as the targets' keys and a hasOne by naming the target row", () => {
-        const profiles = defineTable("profiles", { columns: { id: col.integer().primaryKey().identity() }, rls: "admin-only" });
+        const profiles = defineTable("profiles", { columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity() }, rls: "admin-only" });
         const comments = defineTable("comments", { columns: { id: col.uuid().primaryKey().defaultRandom() }, rls: "admin-only" });
         const writers = defineTable("writers", {
-            columns: { id: col.integer().primaryKey().identity() },
+            columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity() },
             relations: {
                 profile: rel.hasOne(() => profiles, { foreignKey: "writer_id" }),
                 comments: rel.hasMany(() => comments, { foreignKey: "writer_id" })
@@ -555,11 +555,11 @@ describe("a private column is off every generated type", () => {
         credential: col.text().private(),
         attempts: col.integer().notNull().private(),
         lockedOut: col.boolean().private(),
-        rotatedAt: col.timestamptz().private(),
-        recoveryCodes: col.array(col.text()).private(),
+        rotatedAt: col.timestamp({ withTimezone: true }).private(),
+        recoveryCodes: col.text().array().private(),
         internalNotes: col.jsonb(json.object({ note: json.string() })).private(),
         closed: col.text().access({ read: [], write: [] }),
-        auditorId: col.uuid().column("auditor_id").private()
+        auditorId: col.uuid("auditor_id").private()
     };
     const vault = defineTable("vault", {
         columns: { id: col.uuid().primaryKey().defaultRandom(), label: col.text().notNull(), ...hidden },

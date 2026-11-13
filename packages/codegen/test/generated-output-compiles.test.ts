@@ -57,7 +57,7 @@ const ID = { key: "id", column: "id", type: { kind: "uuid" as const }, nullable:
 describe("the generated file compiles", () => {
     it("for a realistic schema with relations, enums, JSON documents and arrays", () => {
         const authors = defineTable("authors", {
-            columns: { id: col.integer().primaryKey().identity(), name: col.text().notNull() },
+            columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), name: col.text().notNull() },
             rls: "admin-only"
         });
         const tags = defineTable("tags", { columns: { id: col.uuid().primaryKey().defaultRandom() }, rls: "admin-only" });
@@ -68,9 +68,9 @@ describe("the generated file compiles", () => {
                 status: col.enum(["draft", "published"]),
                 level: col.integer().oneOf([1, 2]),
                 meta: col.jsonb(json.object({ views: json.number(), blocks: json.array(json.oneOf({ text: json.string() })) })),
-                labels: col.array(col.text()),
+                labels: col.text().array(),
                 geo: col.geopoint(),
-                createdAt: col.timestamptz().notNull().onCreateNow()
+                createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow()
             },
             relations: {
                 author: rel.belongsTo(() => authors, { notNull: true }),
@@ -389,9 +389,9 @@ describe("the generated include types", () => {
  * `tests/e2e/baas-typecheck/src/typed-sdk/probes.ts`.
  */
 describe("the generated write types, per relation kind", () => {
-    const profiles = defineTable("profiles", { columns: { id: col.integer().primaryKey().identity() }, rls: "admin-only" });
+    const profiles = defineTable("profiles", { columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity() }, rls: "admin-only" });
     const authors = defineTable("authors", {
-        columns: { id: col.integer().primaryKey().identity(), name: col.text().notNull() },
+        columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), name: col.text().notNull() },
         relations: {
             profile: rel.hasOne(() => profiles, { foreignKey: "author_id" }),
             profileVia: rel.via(() => profiles, { cardinality: "one", steps: [{ table: "profiles", on: { from: "id", to: "author_id" } }] }),
@@ -421,7 +421,7 @@ describe("the generated write types, per relation kind", () => {
         rls: "admin-only"
     });
     const comments = defineTable("comments", {
-        columns: { id: col.integer().primaryKey().identity(), body: col.text().notNull() },
+        columns: { id: col.integer().primaryKey().generatedByDefaultAsIdentity(), body: col.text().notNull() },
         relations: {
             post: rel.belongsTo(() => posts, { localKey: "post_id", notNull: true }),
             author: rel.belongsTo(() => authors, { localKey: "author_id", notNull: true })
@@ -434,8 +434,8 @@ describe("the generated write types, per relation kind", () => {
         columns: {
             id: col.uuid().primaryKey().defaultRandom(),
             title: col.text().notNull(),
-            moderatorId: col.integer().column("moderator_id").private(),
-            reviewerId: col.integer().column("reviewer_id").readOnly()
+            moderatorId: col.integer("moderator_id").private(),
+            reviewerId: col.integer("reviewer_id").readOnly()
         },
         relations: {
             moderator: rel.belongsTo(() => authors, { localKey: "moderator_id" }),
