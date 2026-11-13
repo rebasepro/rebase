@@ -75,7 +75,7 @@ function bootstrapper(options: { policies: "write" | "none" | "fail" }): Backend
     }
     return fakeBootstrapper({
         driver: fakeDataDriver({ admin: { planSchemaChange: async () => plan, executeSql: async () => [] } }),
-        collections: undefined
+        tables: undefined
     }, overrides);
 }
 

@@ -75,7 +75,7 @@ function planningBootstrapper(): BackendBootstrapper {
                         executeSql: async (sql: string) => { executed.push(sql); return []; }
                     }
                 }),
-                collections: undefined,
+                tables: undefined,
                 internals: {}
             };
         },

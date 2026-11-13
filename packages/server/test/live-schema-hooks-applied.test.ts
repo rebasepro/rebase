@@ -85,7 +85,7 @@ function bootstrapper(registry: DriverTableHooks): BackendBootstrapper {
             executeSql: async () => []
         }
     }), { registry });
-    return fakeBootstrapper({ driver, collections: undefined }, {
+    return fakeBootstrapper({ driver, tables: undefined }, {
         async initializeAuth() {
             const authRepository = {
                 getUserRoleIds: async (uid: string) => (uid === "admin-1" ? ["admin"] : []),

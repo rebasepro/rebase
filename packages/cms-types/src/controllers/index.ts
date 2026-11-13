@@ -2,6 +2,7 @@ export * from "./analytics_controller";
 export * from "./auth";
 export * from "./collection_registry";
 export * from "./customization_controller";
+export * from "./data_source_props";
 export * from "./dialogs_controller";
 export * from "./effective_role";
 export * from "./local_config_persistence";

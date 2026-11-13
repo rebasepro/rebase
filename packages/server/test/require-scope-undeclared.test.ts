@@ -83,7 +83,7 @@ async function world(scopes: Record<string, { label: string }>) {
     const store = new MemoryAuthStore();
     const repo = store.repo();
     const bootstrapper = fakeBootstrapper(
-        { driver: driver(), collections: undefined, realtimeProvider: fakeRealtimeProvider() },
+        { driver: driver(), tables: undefined, realtimeProvider: fakeRealtimeProvider() },
         {
             type: "postgres",
             async initializeAuth() {

@@ -52,7 +52,7 @@ export function fakeBootstrapper(
         type: "fake",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver: fakeDataDriver(), collections: [], internals: {}, ...init };
+            return { driver: fakeDataDriver(), tables: [], internals: {}, ...init };
         },
         ...overrides
     };

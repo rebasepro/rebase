@@ -1,6 +1,5 @@
 import {
     DeleteProps,
-    CollectionConfig,
     FetchCollectionProps,
     ListenCollectionProps,
     FetchOneProps,
@@ -394,6 +393,14 @@ export function channelErrorCode(message: ChannelMessage): string | undefined {
     const raw: unknown = message.payload?.error;
     if (raw && typeof raw === "object" && "code" in raw && typeof raw.code === "string") return raw.code;
     return undefined;
+}
+
+/**
+ * The name of the collection config an admin panel handed beside a data
+ * call's path, if it handed one: what a subscription key carries of it.
+ */
+function viewCollectionName(value: unknown): string | undefined {
+    return typeof value === "object" && value !== null && "name" in value && typeof value.name === "string" ? value.name : undefined;
 }
 
 export class RebaseWebSocketClient {
@@ -2155,15 +2162,14 @@ options }
         return response.database;
     }
 
-    async checkUniqueField(path: string, name: string, value: unknown, id?: string, collection?: CollectionConfig): Promise<boolean> {
+    async checkUniqueField(path: string, name: string, value: unknown, id?: string): Promise<boolean> {
         const response = await this.sendMessage({
             type: "CHECK_UNIQUE_FIELD",
             payload: {
                 path,
                 name,
                 value,
-                id,
-                collection
+                id
             }
         }) as { isUnique: boolean };
         return response.isUnique;
@@ -2864,12 +2870,13 @@ onError });
         // same rows. Listing fields by hand is what let that happen, so the key
         // now covers whatever `FetchCollectionProps` carries.
         //
-        // `collection` is the exception: it is the whole collection config,
-        // property thunks and all, so it contributes its name as before.
-        const { collection, ...query } = props as FetchCollectionProps & Record<string, unknown>;
+        // `collection` is the exception: the admin panel hands its collection
+        // config beside the path (the CMS's data-source props), property
+        // thunks and all, so it contributes its name, never the config.
+        const viewCollection: unknown = Reflect.get(props, "collection");
         const key = {
-            ...query,
-            collection: collection?.name
+            ...props,
+            collection: viewCollectionName(viewCollection)
         };
         // Use replacer function (not array) to sort keys at all levels for deterministic output
         return JSON.stringify(key, (_, value) => {

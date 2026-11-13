@@ -78,7 +78,7 @@ function capturingBootstrapper(seen: TableDescriptor[][]): BackendBootstrapper {
             seen.push((tables ?? []).map(table => structuredClone(table.descriptor)));
             return {
                 driver: stubDriver(),
-                collections: undefined,
+                tables: undefined,
                 internals: {}
             };
         }

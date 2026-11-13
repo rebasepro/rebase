@@ -1737,14 +1737,13 @@ colors: true }));
                             path,
                             name,
                             value,
-                            id,
-                            collection
+                            id
                         } = payload;
                         // "Does anybody hold this value" is a read of the field,
                         // answered for every row in the table.
                         if (typeof name === "string") assertReadRequest(path, { filter: { [name]: ["==", value] } });
                         const delegate = await getScopedDelegate();
-                        const isUnique = await delegate.checkUniqueField(path, name, value, id, collection);
+                        const isUnique = await delegate.checkUniqueField(path, name, value, id);
                         wsDebug("🔍 [WebSocket Server] CHECK_UNIQUE_FIELD result:", isUnique);
                         const response = {
                             type: "CHECK_UNIQUE_FIELD_SUCCESS",

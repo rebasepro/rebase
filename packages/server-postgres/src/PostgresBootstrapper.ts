@@ -664,7 +664,6 @@ export async function openPostgresDriver(
     pgConfig: PostgresDriverConfig,
     config: DatabaseAdapterInitConfig
 ): Promise<InitializedDriver & { internals: PostgresDriverInternals }> {
-    // `config.collections` is not read: the driver runs on `tables` alone.
     const { tables: declaredTables, introspectCollections, baas, schemaProvisioning, realtime } = config;
     // `false` keeps every DDL statement out of this open: the restricted
     // role, the branch table, channel-history tables, capture triggers.

@@ -110,7 +110,7 @@ const bootstrapper: BackendBootstrapper = {
     type: "postgres",
     isDefault: true,
     async initializeDriver(): Promise<InitializedDriver> {
-        return { driver: driver(), collections: undefined, internals: {}, realtimeProvider: fakeRealtimeProvider() };
+        return { driver: driver(), tables: undefined, internals: {}, realtimeProvider: fakeRealtimeProvider() };
     },
     async initializeAuth() {
         const authRepository = { getUserRoleIds: async () => ["admin"], getUserById: async () => ({ id: "admin-1" }) };

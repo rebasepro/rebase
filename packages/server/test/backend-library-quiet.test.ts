@@ -73,7 +73,7 @@ function bootstrapper(options: { fail?: boolean } = {}): BackendBootstrapper {
             await new Promise(resolve => setTimeout(resolve, 1));
             logger.warn("ROLE: the database role has the same name as a schema");
             if (options.fail) throw new Error("the driver could not open");
-            return { driver: driver(), collections: undefined, internals: {}, realtimeProvider: idleRealtime() };
+            return { driver: driver(), tables: undefined, internals: {}, realtimeProvider: idleRealtime() };
         },
         getAdmin: () => ({ executeSql: async () => [] })
     };

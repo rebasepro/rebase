@@ -102,7 +102,7 @@ function bootstrapper(rec: Recorded, options: { id?: string; isDefault?: boolean
         isDefault: options.isDefault ?? true,
         async initializeDriver(config: unknown): Promise<InitializedDriver> {
             rec.initConfigs.push(config as Record<string, unknown>);
-            return { driver, collections: undefined, internals: {}, realtimeProvider: inertRealtimeProvider() };
+            return { driver, tables: undefined, internals: {}, realtimeProvider: inertRealtimeProvider() };
         },
         async initializeAuth() {
             // Roles are re-read per request, so the repository answers them.

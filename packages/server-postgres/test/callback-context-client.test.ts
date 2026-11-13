@@ -103,7 +103,7 @@ function bootstrapperFor(driver: PostgresBackendDriver): BackendBootstrapper {
         type: "postgres",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collections: undefined, internals: { driver } };
+            return { driver, tables: undefined, internals: { driver } };
         }
     };
 }

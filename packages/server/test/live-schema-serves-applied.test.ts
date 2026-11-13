@@ -65,7 +65,7 @@ function bootstrapper(): BackendBootstrapper {
                 executeSql: async (sql: string) => { executed.push(sql); return []; }
             }
         }),
-        collections: undefined
+        tables: undefined
     }, {
         async initializeAuth() {
             const authRepository = {

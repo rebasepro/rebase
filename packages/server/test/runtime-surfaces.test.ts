@@ -132,7 +132,7 @@ const bootstrapper: BackendBootstrapper = {
         // without this the assertion below would pass for the wrong reason.
         return {
             driver: stubDriver(),
-            collections: [],
+            tables: [],
             internals: {},
             realtimeProvider: fakeRealtimeProvider()
         };

@@ -527,7 +527,7 @@ describe("storage upload body limit ordering", () => {
                 isDefault: true,
                 async initializeDriver() {
                     return { driver: fakeDataDriver(),
-collections: [],
+tables: [],
 internals: {} };
                 }
             }],

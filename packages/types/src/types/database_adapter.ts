@@ -22,9 +22,7 @@
 
 import type { DataDriver } from "../controllers/data_driver";
 import type { CompiledTable } from "../schema/compiled";
-import type { CollectionConfig } from "./collections";
 import type {
-    CollectionRegistryInterface,
     DatabaseAdmin,
     InitializedDriver,
     RealtimeProvider,
@@ -51,8 +49,8 @@ export interface DatabaseAdapter {
      *
      * This is the only **required** method.
      *
-     * @param config - Coordinator-provided config containing registered
-     *                 collections and the collection registry.
+     * @param config - Coordinator-provided config: the compiled tables the
+     *                 backend declares, and how the driver may open.
      */
     initializeDriver(config: DatabaseAdapterInitConfig): Promise<InitializedDriver>;
 
@@ -236,33 +234,19 @@ export interface DatabaseAdapter {
  */
 export interface DatabaseAdapterInitConfig {
     /**
-     * The collections the declared tables were lowered into. Not read by the
-     * Postgres driver, which runs on {@link tables} alone; the server still
-     * passes it, and it is removed with that call site.
-     */
-    collections?: CollectionConfig[];
-    /**
      * The tables the backend declares, compiled (`compileSchema`): each
-     * descriptor with its hooks, field-level hooks and definition. The input
-     * that replaces {@link collections}: a driver builds its runtime model of
-     * each table from this, never from the lowered collection. Required beside
-     * a non-empty {@link collections}; absent (or empty) when the driver
-     * introspects the database, which describes its own tables.
+     * descriptor with its hooks, field-level hooks and definition — what a
+     * driver builds its runtime model of each table from. Absent (or empty)
+     * when the driver introspects the database, which describes its own tables.
      */
     tables?: import("../schema/compiled").CompiledTable[];
     /**
      * The data-source key this driver serves — `(default)`, or a declared
-     * one such as `analytics`. A driver given every collection needs it to
-     * know which are its own: the ones whose `dataSource` names this key, or
-     * name none when this is the default.
+     * one such as `analytics`. A driver given every table needs it to know
+     * which are its own: the ones whose `database` names this key, or name
+     * none when this is the default.
      */
     dataSourceKey?: string;
-    /**
-     * The backend's shared collection registry. No bundled driver reads it —
-     * each builds and returns its own on `InitializedDriver.collectionRegistry`
-     * — so a caller opening a driver on its own (a script, a test) leaves it out.
-     */
-    collectionRegistry?: CollectionRegistryInterface;
     /**
      * Whether opening the driver may change the database (default `true`).
      *
@@ -283,15 +267,15 @@ export interface DatabaseAdapterInitConfig {
     /**
      * Whether this driver should describe its own schema.
      *
-     * True when the project declared no collections, so there is nothing to
-     * serve unless the driver reads the live database and reports what it found
-     * on `InitializedDriver.collections`. Drivers that cannot introspect may
+     * True when the project declared no tables, so there is nothing to serve
+     * unless the driver reads the live database and reports what it found on
+     * `InitializedDriver.tables`. Drivers that cannot introspect may
      * ignore it — `initializeRebaseBackend` fails the boot with their name
      * rather than serving nothing.
      *
      * This was a `mode: "cms" | "baas"` flag, which was never independent of
-     * `collections`: every consumer already required the list to be empty
-     * before acting on it, so the flag could only ever agree or contradict.
+     * the declared tables: every consumer already required the list to be
+     * empty before acting on it, so the flag could only ever agree or contradict.
      */
     introspectCollections?: boolean;
     /**

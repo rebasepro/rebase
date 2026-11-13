@@ -84,7 +84,7 @@ function recordingBootstrapper(provisioned: (readonly CompiledTable[])[]): Backe
         type: "postgres",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver: driver(), collections: undefined, internals: {}, realtimeProvider: inertRealtimeProvider() };
+            return { driver: driver(), tables: undefined, internals: {}, realtimeProvider: inertRealtimeProvider() };
         },
         async ensureTableSchema() {
             return { applied: 0 };

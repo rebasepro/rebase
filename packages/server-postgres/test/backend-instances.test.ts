@@ -144,7 +144,7 @@ function bootstrapper(name: string, db: PGlite): BackendBootstrapper {
         type: "postgres",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collections: undefined, internals: {}, realtimeProvider: realtime } as unknown as InitializedDriver;
+            return { driver, tables: undefined, internals: {}, realtimeProvider: realtime } as unknown as InitializedDriver;
         },
         async initializeAuth() {
             return { userService: repo, authRepository: repo };

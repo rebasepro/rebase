@@ -49,7 +49,7 @@ const bootstrapper: BackendBootstrapper = {
                 fetchCollection: async () => [],
                 admin: { executeSql: async () => [] }
             }),
-            collections: [],
+            tables: [],
             internals: {}
         };
     },

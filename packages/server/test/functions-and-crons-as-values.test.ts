@@ -65,7 +65,7 @@ function bootstrapper(): BackendBootstrapper {
         type: "fake",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collections: undefined, internals: {} };
+            return { driver, tables: undefined, internals: {} };
         },
         async initializeAuth() {
             return { userService: {}, authRepository: {} };

@@ -420,6 +420,21 @@ function assertBatchRowFound(stored: Record<string, unknown> | undefined, id: un
     });
 }
 
+/**
+ * A query without the `collection` an admin panel may hand beside a path.
+ *
+ * Not part of the driver contract — the table is the one `path` names — but
+ * the CMS's data-source props carry the panel's collection config, and a
+ * client hands its props over the socket whole, so one can arrive here. It is
+ * never read, and never kept with a subscription.
+ */
+function withoutViewCollection<Q extends object>(query: Q): Q {
+    if (!("collection" in query)) return query;
+    const copy = { ...query };
+    Reflect.deleteProperty(copy, "collection");
+    return copy;
+}
+
 export class PostgresBackendDriver implements DataDriver {
     key = "postgres";
     initialised = true;
@@ -899,12 +914,11 @@ export class PostgresBackendDriver implements DataDriver {
         // `fields`, `distinct`, `withDeleted` and `searchExplain` were accepted
         // and dropped — an `or(...)` read returned every row while `count`
         // with the same group answered 1.
-        // `collection` is not read: the table is the one `path` names.
-        { path, collection: _collection, startAfter, ...query }: FetchCollectionProps<M>
+        { path, startAfter, ...query }: FetchCollectionProps<M>
     ): Promise<Record<string, unknown>[]> {
 
         const rows = await this.dataService.fetchCollection<M>(path, {
-            ...query,
+            ...withoutViewCollection(query),
             startAfter: startAfter as Record<string, unknown> | undefined
         });
 
@@ -954,8 +968,7 @@ export class PostgresBackendDriver implements DataDriver {
         // was handed every row. Held back, as they always were here:
         // `vectorSearch`, which a subscription cannot serve, and `page` and
         // `withDeleted`, which the stored request has no field for.
-        // `collection` is not read: the table is the one `path` names.
-        { path, collection: _collection, startAfter, onUpdate, onError, vectorSearch: _vectorSearch, page: _page, withDeleted: _withDeleted, ...query }: ListenCollectionProps<M>,
+        { path, startAfter, onUpdate, onError, vectorSearch: _vectorSearch, page: _page, withDeleted: _withDeleted, ...query }: ListenCollectionProps<M>,
         authContext: SubscriptionAuthContext | undefined = this.user ? authContextOf(this.user) : undefined
     ): () => void {
         const subscriptionId = this.generateSubscriptionId();
@@ -964,7 +977,7 @@ export class PostgresBackendDriver implements DataDriver {
             type: "collection",
             path,
             collectionRequest: {
-                ...query,
+                ...withoutViewCollection(query),
                 startAfter: startAfter as Record<string, unknown> | undefined
             },
             authContext,

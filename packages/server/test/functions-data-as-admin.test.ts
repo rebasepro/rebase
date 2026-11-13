@@ -113,7 +113,7 @@ function fakeBootstrapper(rec: Recorder): BackendBootstrapper {
         type: "fake",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver: rec.base, collections: undefined, internals: {} };
+            return { driver: rec.base, tables: undefined, internals: {} };
         },
         // The owner-connection escape hatch behind `rebase.sql`.
         getAdmin() {

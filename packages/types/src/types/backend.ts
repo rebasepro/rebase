@@ -512,45 +512,6 @@ export interface RealtimeCounts {
 // =============================================================================
 
 /**
- * Abstract collection registry interface.
- * Manages registration and lookup of entity collections.
- */
-export interface CollectionRegistryInterface {
-    /**
-     * Register a collection
-     */
-    register(collection: CollectionConfig): void;
-
-    /**
-     * Get a collection by its path
-     */
-    getCollectionByPath(path: string): CollectionConfig | undefined;
-
-    /**
-     * Get all registered collections
-     */
-    getCollections(): CollectionConfig[];
-
-    /**
-     * Take the global table hooks declared on `initializeRebaseBackend({ hooks })`.
-     *
-     * A driver runs hooks from the registry it builds for itself, so this is
-     * how the backend's global ones reach it: the coordinator hands them over
-     * after `initializeDriver` returns. Optional so a registry for a driver
-     * that runs no hooks still type-checks, but a project that declares global
-     * hooks over a registry without it is refused at boot — hooks that never
-     * run look exactly like hooks that passed.
-     */
-    setGlobalHooks?(hooks: TableHooks): void;
-
-    /**
-     * Replace one table's own hooks after boot (`backend.setTableHooks`).
-     * Returns whether this registry serves the table.
-     */
-    setTableHooks?(slug: string, hooks: TableHooks): boolean;
-}
-
-/**
  * The table registry a data driver builds for itself and returns on
  * `InitializedDriver.collectionRegistry`: the compiled tables it serves, by
  * slug. The backend hands it the global hooks and later table hooks through
@@ -1348,10 +1309,8 @@ export interface BackendInstance extends BackendLifecycle {
      */
     realtimeProvider: RealtimeProvider;
 
-    /**
-     * Collection registry
-     */
-    collectionRegistry: CollectionRegistryInterface;
+    /** The driver's table registry. */
+    collectionRegistry: TableRegistryInterface;
 
     /**
      * The underlying database connection
@@ -1746,24 +1705,17 @@ export interface InitializedDriver {
     collectionRegistry?: TableRegistryInterface;
 
     /**
-     * Collections the driver derived from the live database schema.
-     *
-     * Set by drivers that introspect in `baas` mode; the server serves these
-     * instead of collections loaded from config files.
-     */
-    collections?: import("./collections").CollectionConfig[];
-
-    /**
      * The descriptors of the tables the driver derived from the live database
-     * schema: one per entry of {@link collections}, by slug, read from the
-     * catalogue (columns as Postgres types, relations from foreign keys, row-level
-     * security from `pg_policies`). What `GET /api/schema/tables` serves for a
-     * project that declares no tables. Set exactly when {@link collections} is.
+     * schema, read from the catalogue (columns as Postgres types, relations
+     * from foreign keys, row-level security from `pg_policies`): what the
+     * server serves, and `GET /api/schema/tables` describes, for a project
+     * that declares no tables. Set by drivers that introspect (`baas` mode);
+     * `undefined` means the driver never looked.
      */
     tables?: import("../schema/descriptor").TableDescriptor[];
 
     /**
-     * Tables the driver found while deriving {@link collections} and did not
+     * Tables the driver found while deriving {@link tables} and did not
      * serve, because row-level security is disabled on them and so they have
      * no authorization model (`baas.unprotectedTables` left at `"exclude"`).
      *

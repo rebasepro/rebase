@@ -32,12 +32,9 @@ import {
     DEFAULT_DATA_SOURCE_KEY,
     type CollectionConfig,
     type DataDriver,
-    type DeleteProps,
-    type FetchCollectionProps,
-    type FetchOneProps,
-    type RestFetchService,
-    type SaveProps
+    type RestFetchService
 } from "@rebasepro/types";
+import type { CmsDeleteProps, CmsFetchCollectionProps, CmsFetchOneProps, CmsSaveProps } from "@rebasepro/cms-types";
 import {
     buildCompositeId,
     fieldKeyForColumn,
@@ -338,7 +335,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
     };
 
     /** A save's values as the write tools take them, by the collection's config where it is known. */
-    const wireValues = (props: SaveProps, collection: string): Record<string, unknown> => {
+    const wireValues = (props: CmsSaveProps, collection: string): Record<string, unknown> => {
         const defined = Object.fromEntries(Object.entries(props.values).filter(([, value]) => value !== undefined));
         return toWireRow(defined, props.collection ?? configOf(collection) ?? NO_CONFIG, { included: false });
     };
@@ -351,7 +348,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
      * to the collection drops them, as it drops every row read. Not a page
      * that lists deleted rows: `get` answers none for those.
      */
-    const remember = (collection: string, page: Row[], config?: FetchCollectionProps["collection"], at = Date.now()) => {
+    const remember = (collection: string, page: Row[], config?: CmsFetchCollectionProps["collection"], at = Date.now()) => {
         const keys = config ? getDeclaredPrimaryKeys(config) : [];
         for (const row of page) {
             const id = keys.length > 1 ? buildCompositeId(row, keys) : row[keys[0]?.fieldName ?? "id"];
@@ -395,7 +392,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         return seed.page.total;
     };
 
-    const fetchCollection = async (props: FetchCollectionProps): Promise<Record<string, unknown>[]> => {
+    const fetchCollection = async (props: CmsFetchCollectionProps): Promise<Record<string, unknown>[]> => {
         const collection = collectionArg(props.path);
         const args = readArgs(props);
         const seeded = takeSeed(collection, args);
@@ -474,7 +471,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
      * for an absent row is an empty page rather than an error told apart by
      * its text.
      */
-    const fetchOne = (props: FetchOneProps): Promise<Record<string, unknown> | undefined> => {
+    const fetchOne = (props: CmsFetchOneProps): Promise<Record<string, unknown> | undefined> => {
         const collection = collectionArg(props.path);
         const key = `${collection}/${String(props.id)}`;
         const cached = rows.get(key);
@@ -541,7 +538,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         (await rows.get(`${collection}/${id}`)?.read.catch(() => undefined)) ?? undefined;
 
     /** A save, with whether the person's click started it (taken before anything is awaited). */
-    const saveRow = async (props: SaveProps, gesture: boolean): Promise<Record<string, unknown>> => {
+    const saveRow = async (props: CmsSaveProps, gesture: boolean): Promise<Record<string, unknown>> => {
         const collection = collectionArg(props.path);
         const data = wireValues(props, collection);
         const creating = props.status !== "existing";
@@ -566,7 +563,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         return row;
     };
 
-    const deleteRow = async (props: DeleteProps, gesture: boolean): Promise<void> => {
+    const deleteRow = async (props: CmsDeleteProps, gesture: boolean): Promise<void> => {
         const collection = collectionArg(props.row.path);
         const id = String(props.row.id);
         // Named before the write: it drops what was read of the collection.
@@ -586,15 +583,15 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         fetchOne,
         restFetchService,
 
-        async save(props: SaveProps): Promise<Record<string, unknown>> {
+        async save(props: CmsSaveProps): Promise<Record<string, unknown>> {
             return saveRow(props, fromClick());
         },
 
-        async delete(props: DeleteProps): Promise<void> {
+        async delete(props: CmsDeleteProps): Promise<void> {
             return deleteRow(props, fromClick());
         },
 
-        async count(props: FetchCollectionProps): Promise<number> {
+        async count(props: CmsFetchCollectionProps): Promise<number> {
             const collection = collectionArg(props.path);
             const args = pickRead(readArgs(props), ["where", "searchString", "deleted"]);
             const seeded = takeSeedCount(collection, args);
@@ -647,7 +644,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
 
     const confirmingDriver: DataDriver = {
         ...driver,
-        async save(props: SaveProps): Promise<Record<string, unknown>> {
+        async save(props: CmsSaveProps): Promise<Record<string, unknown>> {
             const gesture = fromClick();
             const collection = collectionArg(props.path);
             const creating = props.status !== "existing";
@@ -665,7 +662,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
                 ? { action: "create", collection }
                 : { action: "update", collection, id, ...(title && { title }) }, () => saveRow(props, gesture));
         },
-        async delete(props: DeleteProps): Promise<void> {
+        async delete(props: CmsDeleteProps): Promise<void> {
             const gesture = fromClick();
             const collection = collectionArg(props.row.path);
             const id = String(props.row.id);
@@ -691,7 +688,7 @@ function collectionArg(path: string): string {
 }
 
 /** A read's arguments, as the read tools take them. */
-function readArgs(props: FetchCollectionProps): Record<string, unknown> {
+function readArgs(props: CmsFetchCollectionProps): Record<string, unknown> {
     const where = props.filter ? wireFilter(props.filter, props.collection) : undefined;
     const orderBy = wireOrderBy(props, props.collection);
     return {
@@ -766,7 +763,7 @@ function wireFilter(filter: Record<string, unknown>, collection: CollectionConfi
 /** No properties, so {@link toWireRow} converts each value by what it is: a relation to its id, a date to ISO text. */
 const NO_CONFIG: CollectionConfig = { slug: "", name: "", properties: {} };
 
-function wireOrderBy(props: FetchCollectionProps, collection: CollectionConfig | undefined): string | unknown[] | undefined {
+function wireOrderBy(props: CmsFetchCollectionProps, collection: CollectionConfig | undefined): string | unknown[] | undefined {
     const keys = foreignKeys(collection);
     if (typeof props.orderBy === "string") {
         const field = keys.get(props.orderBy) ?? props.orderBy;

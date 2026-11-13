@@ -58,7 +58,7 @@ const bootstrapper: BackendBootstrapper = {
                 checkUniqueField: async () => true,
                 admin: { executeSql: async () => [] }
             },
-            collections: [],
+            tables: [],
             internals: {}
         };
     },

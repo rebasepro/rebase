@@ -259,7 +259,7 @@ can_write: true }
     it("leaves a join table with RLS off out of the schema relations are built from", async () => {
         const opened = await openPostgresDriver(
             { connection: connection.db, connectionString: container.connectionString },
-            { collections: [], introspectCollections: true, provision: false, realtime: false }
+            { introspectCollections: true, provision: false, realtime: false }
         );
         const { registry } = opened.internals;
         expect(registry.getPgTable("people")).toBeDefined();

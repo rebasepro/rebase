@@ -67,7 +67,7 @@ function fakeBootstrapper(driver: DataDriver): BackendBootstrapper {
         type: "fake",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collections: undefined, internals: {} };
+            return { driver, tables: undefined, internals: {} };
         }
     };
 }

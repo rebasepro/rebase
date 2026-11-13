@@ -58,7 +58,7 @@ const bootstrapper: BackendBootstrapper = {
                 fetchCollection: async () => [],
                 admin: { executeSql: async () => [] }
             }), { type: "fake", registry: { get: () => undefined, getCollections: () => [] } }),
-            collections: [],
+            tables: [],
             internals: {}
         };
     },

@@ -76,7 +76,7 @@ describe("data capabilities (E2E)", () => {
         const conn = createPostgresDatabaseConnection(container.connectionString);
         try {
             const bootstrapper = createPostgresBootstrapper({ connectionString: container.connectionString, connection: conn.db });
-            const driverResult = await bootstrapper.initializeDriver({ collections: [songs], tables: tablesFromCollections([songs]).tables, realtime: { subscribe: false, provision: false } });
+            const driverResult = await bootstrapper.initializeDriver({ tables: tablesFromCollections([songs]).tables, realtime: { subscribe: false, provision: false } });
             await bootstrapper.ensureTableSchema!(tablesFromCollections([songs]).tables, driverResult);
             await bootstrapper.ensureRlsRuntime!(driverResult);
             await bootstrapper.ensureTablePolicies!(tablesFromCollections([songs]).tables, driverResult);

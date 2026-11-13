@@ -102,7 +102,7 @@ async function provision(url: string, collections: LegacyCollectionConfig[], opt
     try {
         const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
         const driverResult = await bootstrapper.initializeDriver({
-            collections, tables: tablesFromCollections(collections).tables,
+            tables: tablesFromCollections(collections).tables,
             realtime: { subscribe: false, provision: false }
         });
         await bootstrapper.ensureTableSchema!(tablesFromCollections(collections).tables, driverResult);
@@ -230,7 +230,7 @@ describe("openRebase (E2E)", () => {
             try {
                 const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
                 const driverResult = await bootstrapper.initializeDriver({
-                    collections: [notesCollection], tables: tablesFromCollections([notesCollection]).tables,
+                    tables: tablesFromCollections([notesCollection]).tables,
                     provision: false,
                     realtime: false
                 });
@@ -403,7 +403,7 @@ describe("openRebase (E2E)", () => {
             try {
                 const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
                 const driverResult = await bootstrapper.initializeDriver({
-                    collections: [notesCollection], tables: tablesFromCollections([notesCollection]).tables,
+                    tables: tablesFromCollections([notesCollection]).tables,
                     provision: false,
                     realtime: false
                 });
@@ -433,7 +433,7 @@ describe("openRebase (E2E)", () => {
                 const conn = createPostgresDatabaseConnection(url);
                 try {
                     const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
-                    await bootstrapper.initializeDriver({ collections: [notesCollection], tables: tablesFromCollections([notesCollection]).tables, provision: false, realtime: false });
+                    await bootstrapper.initializeDriver({ tables: tablesFromCollections([notesCollection]).tables, provision: false, realtime: false });
                 } finally {
                     await conn.pool.end();
                 }

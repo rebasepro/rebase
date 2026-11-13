@@ -60,7 +60,7 @@ async function world() {
         return live(uid, sid);
     };
     const bootstrapper = fakeBootstrapper(
-        { driver: driver(), collections: undefined, realtimeProvider: fakeRealtimeProvider() },
+        { driver: driver(), tables: undefined, realtimeProvider: fakeRealtimeProvider() },
         {
             type: "postgres",
             async initializeAuth() {

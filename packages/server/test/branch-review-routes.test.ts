@@ -82,7 +82,7 @@ async function boot(options: { canDiff?: boolean; roles?: Record<string, { scope
         type: "fake",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver: stubDriver(options.canDiff ?? true), collections: [], internals: {} };
+            return { driver: stubDriver(options.canDiff ?? true), tables: [], internals: {} };
         },
         async initializeAuth() {
             const authRepository = {

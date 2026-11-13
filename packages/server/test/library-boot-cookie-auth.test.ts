@@ -65,7 +65,7 @@ emailVerified: true });
             return {
                 driver: fakeDataDriver({ fetchCollection: async () => [],
 admin: { executeSql: async () => [] } }),
-                collections: [],
+                tables: [],
                 internals: {}
             };
         },

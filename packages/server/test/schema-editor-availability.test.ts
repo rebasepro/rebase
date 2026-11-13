@@ -277,7 +277,7 @@ describe("the two schema-editor statuses agree", () => {
                 // can plan is one that has this method.
                 admin: { planSchemaChange: async () => emptyPlan }
             }),
-            collections: undefined
+            tables: undefined
         }, {
             // `/api/admin/*` resolves roles from the auth repository on every
             // request (a demoted admin must not keep an admin route), so the

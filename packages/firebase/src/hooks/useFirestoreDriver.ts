@@ -1,6 +1,6 @@
-import { DataDriver, DeleteProps, CollectionConfig, EntityReference, FetchCollectionProps, FetchOneProps, FilterValues, GeoPoint, ListenCollectionProps, ListenOneProps, LogicalCondition, OrderByTuple, SaveProps, WhereFilterOp } from "@rebasepro/types";
+import { DataDriver, CollectionConfig, EntityReference, FilterValues, GeoPoint, LogicalCondition, OrderByTuple, WhereFilterOp } from "@rebasepro/types";
 import { normalizeDriverOrderBy, toFilterTuples } from "@rebasepro/common";
-import { FilterCombination } from "@rebasepro/cms-types";
+import { FilterCombination, type CmsDeleteProps, type CmsFetchCollectionProps, type CmsFetchOneProps, type CmsListenCollectionProps, type CmsListenOneProps, type CmsSaveProps } from "@rebasepro/cms-types";
 import { User } from "firebase/auth";
 import {
     and as andClause,
@@ -377,7 +377,7 @@ export function useFirestoreDriver({
             collection,
             onUpdate,
             onError
-        }: ListenOneProps<M>): () => void => {
+        }: CmsListenOneProps<M>): () => void => {
         if (!firebaseApp) throw Error("useFirestoreDriver Firebase not initialised");
 
         const firestore = firestoreOf(firebaseApp, collection?.databaseId);
@@ -502,7 +502,7 @@ export function useFirestoreDriver({
         orderBy,
         order,
         collection
-    }: FetchCollectionProps<M>
+    }: CmsFetchCollectionProps<M>
     ): Promise<Record<string, unknown>[]> => {
 
         const databaseId = collection?.databaseId;
@@ -570,7 +570,7 @@ export function useFirestoreDriver({
             onUpdate,
             onError,
             collection
-        }: ListenCollectionProps<M>
+        }: CmsListenCollectionProps<M>
     ): () => void => {
 
         console.debug("Listening collection", {
@@ -636,7 +636,7 @@ export function useFirestoreDriver({
         path,
         id,
         collection
-    }: FetchOneProps<M>
+    }: CmsFetchOneProps<M>
     ): Promise<Record<string, unknown> | undefined> => {
         const resolvedPath = path;
         return getAndBuildEntity(resolvedPath, id, collection?.databaseId);
@@ -660,7 +660,7 @@ export function useFirestoreDriver({
             values: valuesProp,
             collection,
             status
-        }: SaveProps<M>): Promise<Record<string, unknown>> => {
+        }: CmsSaveProps<M>): Promise<Record<string, unknown>> => {
 
         if (!firebaseApp) throw Error("useFirestoreDriver Firebase not initialised");
 
@@ -720,7 +720,7 @@ export function useFirestoreDriver({
         {
             row,
             collection
-        }: DeleteProps<M>
+        }: CmsDeleteProps<M>
     ): Promise<void> => {
         if (!firebaseApp) throw Error("useFirestoreDriver Firebase not initialised");
 
@@ -768,7 +768,7 @@ export function useFirestoreDriver({
         orderBy,
         searchString,
         collection
-    }: FetchCollectionProps<any>): Promise<number> => {
+    }: CmsFetchCollectionProps<any>): Promise<number> => {
         if (!firebaseApp) throw Error("useFirestoreDriver Firebase not initialised");
         const databaseId = collection?.databaseId;
         const resolvedPath = path;

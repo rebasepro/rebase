@@ -14,8 +14,6 @@ export interface FetchOneProps<M extends Record<string, unknown> = Record<string
     path: string;
     id: string | number;
     databaseId?: string;
-    /** Ignored by the Postgres driver, which resolves the table from `path`; to be removed from the contract. */
-    collection?: CollectionConfig<M>
     /**
      * See {@link FetchCollectionProps.withDeleted}. A soft-deleted row is a 404
      * here by default, so `findById` and `find` agree about which rows exist —
@@ -181,8 +179,6 @@ export function resolveClientListLimit(
  */
 export interface FetchCollectionProps<M extends Record<string, unknown> = Record<string, unknown>> {
     path: string;
-    /** Ignored by the Postgres driver, which resolves the table from `path`; to be removed from the contract. */
-    collection?: CollectionConfig<M>;
     filter?: FilterValues<Extract<keyof M, string>>,
     /**
      * An `or(...)`/`and(...)` group, applied alongside `filter`.
@@ -282,8 +278,6 @@ export interface SaveProps<M extends Record<string, unknown> = Record<string, un
     values: Partial<EntityValues<M>>;
     id?: string | number; // can be empty for new entities
     previousValues?: Partial<EntityValues<M>>;
-    /** Ignored by the Postgres driver, which resolves the table from `path`; to be removed from the contract. */
-    collection?: CollectionConfig<M>;
     status: EntityStatus;
     /**
      * Write the row with INSERT ... ON CONFLICT DO UPDATE on the primary key
@@ -359,8 +353,6 @@ export interface SaveManyProps<M extends Record<string, unknown> = Record<string
      * `upsert`, inserts-or-updates) that row; one without inserts.
      */
     rows: Partial<EntityValues<M>>[];
-    /** Ignored by the Postgres driver, which resolves the table from `path`; to be removed from the contract. */
-    collection?: CollectionConfig<M>;
     /** Apply every row as INSERT ... ON CONFLICT DO UPDATE. See {@link SaveProps.upsert}. */
     upsert?: boolean;
     /** The conflict target for those upserts. See {@link SaveProps.onConflict}. */
@@ -392,8 +384,6 @@ export interface WriteFilterProps<M extends Record<string, unknown> = Record<str
     path: string;
     filter?: FilterValues<string>;
     logical?: LogicalCondition;
-    /** Ignored by the Postgres driver, which resolves the table from `path`; to be removed from the contract. */
-    collection?: CollectionConfig<M>;
 }
 
 /**
@@ -426,8 +416,6 @@ export interface UpdateManyProps<M extends Record<string, unknown> = Record<stri
      * why bulk update is a separate driver method rather than a flag on that one.
      */
     updates: { id: string | number; values: Partial<EntityValues<M>> }[];
-    /** Ignored by the Postgres driver, which resolves the table from `path`; to be removed from the contract. */
-    collection?: CollectionConfig<M>;
 }
 
 /**
@@ -445,8 +433,6 @@ export interface DeleteProps<M extends Record<string, unknown> = Record<string, 
      * `beforeDelete` that refused on a column by sending `values: {}`.
      */
     row: { id: string | number; path: string };
-    /** Ignored by the Postgres driver, which resolves the table from `path`; to be removed from the contract. */
-    collection?: CollectionConfig<M>;
     /**
      * Issue a real `DELETE` on a collection that declares
      * {@link PostgresCollectionConfig.softDelete}.
@@ -473,8 +459,6 @@ export interface DeleteProps<M extends Record<string, unknown> = Record<string, 
 export interface DeleteManyProps<M extends Record<string, unknown> = Record<string, unknown>> {
     path: string;
     ids: (string | number)[];
-    /** Ignored by the Postgres driver, which resolves the table from `path`; to be removed from the contract. */
-    collection?: CollectionConfig<M>;
     /** See {@link DeleteProps.hard}. */
     hard?: boolean;
 }
@@ -513,8 +497,6 @@ export interface BatchWriteOperation<M extends Record<string, unknown> = Record<
     /** Required for `update` and `delete`. May be a `$ref` marker; see `batchWrite`. */
     id?: unknown;
     values?: Partial<EntityValues<M>>;
-    /** Ignored by the Postgres driver, which resolves the table from `path`; to be removed from the contract. */
-    collection?: CollectionConfig<M>;
     /** See {@link SaveProps.onConflict}. `upsert` only. */
     onConflict?: readonly string[];
     /** Names this operation's result, for a later `$ref`. */
@@ -783,15 +765,13 @@ export interface DataDriver {
      * @param name of the property
      * @param value
      * @param id
-     * @param collection
      * @return `true` if there are no other fields besides the given entity
      */
     checkUniqueField(
         path: string,
         name: string,
         value: unknown,
-        id?: string | number,
-        collection?: CollectionConfig
+        id?: string | number
     ): Promise<boolean>;
 
     /**

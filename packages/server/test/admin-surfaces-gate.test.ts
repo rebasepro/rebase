@@ -99,7 +99,7 @@ const bootstrapper: BackendBootstrapper = {
     type: "fake",
     isDefault: true,
     async initializeDriver(): Promise<InitializedDriver> {
-        return { driver: stubDriver(), collections: [], internals: {} };
+        return { driver: stubDriver(), tables: [], internals: {} };
     },
     // Enough for the built-in auth adapter to be constructed. Nothing in these
     // tests logs in — the JWTs are minted directly.

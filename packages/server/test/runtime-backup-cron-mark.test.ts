@@ -42,7 +42,7 @@ function bootstrapper(): BackendBootstrapper {
         ...fakeDataDriver({ admin: { executeSql: async () => [] } }),
         withAuth: async (): Promise<DataDriver> => driver
     };
-    return fakeBootstrapper({ driver, collections: undefined }, {
+    return fakeBootstrapper({ driver, tables: undefined }, {
         async initializeAuth() {
             return { userService: {}, authRepository: {} };
         }

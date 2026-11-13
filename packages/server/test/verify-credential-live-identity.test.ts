@@ -54,7 +54,7 @@ function driver(): DataDriver & { withAuth(user: ScopeIdentity): Promise<DataDri
 
 function bootstrapper(store: MemoryAuthStore): BackendBootstrapper {
     const data = driver();
-    return fakeBootstrapper({ driver: data, collections: undefined, realtimeProvider: fakeRealtimeProvider() }, {
+    return fakeBootstrapper({ driver: data, tables: undefined, realtimeProvider: fakeRealtimeProvider() }, {
         type: "postgres",
         async initializeAuth() {
             const authRepository = store.repo();

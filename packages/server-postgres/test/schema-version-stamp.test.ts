@@ -83,7 +83,7 @@ function recordingBootstrapper(id: string, isDefault: boolean, stamped: string[]
         id,
         isDefault,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver, collections: undefined, internals: {} };
+            return { driver, tables: undefined, internals: {} };
         },
         ...(isDefault ? { async initializeAuth() { return { userService: repo, authRepository: repo }; } } : {}),
         async ensureTableSchema() { return { applied: 0 }; },
