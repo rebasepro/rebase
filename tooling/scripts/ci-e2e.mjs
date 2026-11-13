@@ -195,7 +195,7 @@ representative one once per published \`@rebasepro/server-postgres\`, with
 today's server over it, the pairing every managed project runs. The managed
 tier moves projects onto new images without anyone rebuilding them, so these
 are the regressions a fleet-wide upgrade turns into one simultaneous outage.
-The fixtures are frozen and hand-authored; see tests/fixtures/bundles/README.md.`
+The fixtures are frozen, recorded once and never regenerated; see tests/fixtures/bundles/README.md.`
             },
             {
                 run: "rls:check",

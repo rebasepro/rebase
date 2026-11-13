@@ -4,8 +4,8 @@ Every shape of bundle Rebase has shipped, frozen, and booted against the current
 runtime by `tooling/scripts/verify-bundle-corpus.mts`.
 
 ```bash
-createdb rebase_corpus
-pnpm run verify:corpus
+pnpm ci:e2e --lane selfhost          # starts a throwaway Postgres, runs it with the lane
+CORPUS_DATABASE_URL=postgres://… pnpm run verify:corpus   # against a database you provide
 ```
 
 ## Why this exists
@@ -26,8 +26,8 @@ fleet patches automatically defensible at all, and until now it did not exist.
 
 ## The rules
 
-**Fixtures are frozen. Do not regenerate them.** They are hand-authored rather
-than produced by `rebase build`, and that is the whole point: a fixture the
+**Fixtures are frozen. Do not regenerate them.** Each is recorded once and
+frozen by hand, never re-produced by `rebase build`, and that is the whole point: a fixture the
 builder regenerates moves whenever the builder moves, which is the one thing a
 regression corpus must not do. A bundle here is a historical artifact.
 
@@ -46,6 +46,13 @@ lands on a database some earlier runtime already wrote to.
 | `format1-cms` | bundle format 1 — `mode: "cms"`, a bundled admin at `entry.admin`, `entry.static` absent |
 | `format2-backend` | bundle format 2 — `kind: "backend"`, `entry.static` as a list |
 | `format2-static` | bundle format 2 — `kind: "static"`, no database at all |
+| `format3-tables` | bundle format 3, runtime contract 2 — `backend/schema` at `entry.tables`, functions, crons, `entry.uiConfig`; the reference app's backend as 0.31 builds it, booted, read and written (`posts`) |
+
+The three format-1/format-2 fixtures are refusal specimens: this runtime refuses
+them at manifest read with the codemod named, and that is what they assert.
+`format3-tables` is the first that boots, and the one the version-skew pass
+stages with each published driver in `DRIVER_SKEW` (empty until a released driver
+builds format 3 — every earlier driver lives only in bundles that are refused).
 
 `format1-cms` is the one carrying the most weight. New-bundle-on-old-runtime
 is caught for free by the `bundleFormat` gate; **old-bundle-on-new-runtime is
@@ -58,25 +65,28 @@ fixture is what proves the normalisation still runs.
 Record one per release; the value is entirely in how far back the oldest one
 goes.
 
-1. Copy the closest existing directory.
-2. Change `table` in its collections and in `backend/src/schema.generated.js` so
-   the new fixture owns its own tables.
-3. Set `schemaVersion` in the manifest to what the CLI computed at build time.
-4. Add an entry to `CORPUS` in `tooling/scripts/verify-bundle-corpus.mts`.
+1. Build the release's bundle once (`format3-tables` is the reference app's
+   backend built with `--no-vendor --no-static`), then freeze it by hand: no
+   `node_modules`, no source maps, a fixed `build.createdAt`.
+2. Rename the tables in its `backend/schema` (and every reference to them) so the
+   new fixture owns its own tables; `format3-tables` owns the reference app's.
+3. Set `schemaVersion` in the manifest to what the CLI computes for those tables.
+4. Add an entry to `CORPUS` in `tooling/scripts/verify-bundle-corpus.mts`, with
+   the `probe` table it is read from and written to.
 
 A bundle needs both halves of its schema story to work, and the failure modes are
 easy to miss:
 
-- `config/collections/*.js` — what the runtime serves. Without these it boots and
-  serves nothing.
-- `backend/src/schema.generated.js` — what the query layer resolves a collection
+- `backend/schema/*.js` (`entry.tables`) — the tables the runtime serves,
+  compiled from `defineTable`. Without them it boots and serves nothing.
+- `backend/src/schema.generated.js` — what the query layer resolves a table
   to. It must export `tables`, `enums` and `relations`; the individual `pgTable`
   exports are for drizzle-kit and for humans. **A bundle missing the `tables`
   export boots, answers `/health`, and 500s on the first read.**
 
 ## A note on the schema-version check
 
-It recomputes the hash from the bundle's collections rather than trusting
+It recomputes the hash from the bundle's tables rather than trusting
 `GET /api/meta/schema-version`. The endpoint returns the manifest's declared
 value verbatim whenever a bundle declares one, so comparing the two compares the
 manifest to itself — it passed a fixture whose declared version had been
