@@ -48,6 +48,7 @@
       "EffectiveRoleController",
       "EngineProperties",
       "EntityChildView",
+      "EntityDataOptions",
       "EntityReference",
       "EntityReferenceProps",
       "EntityRelation",
@@ -90,6 +91,7 @@
       "PropertyConditions",
       "PropertyTypeNotOnThisEngine",
       "PropertyValidationSchema",
+      "QueryBuilder",
       "ReferenceProperty",
       "Relation",
       "RelationBase",
@@ -105,6 +107,8 @@
       "ResolvedRelation",
       "ResolvedRelationBase",
       "ResolvedVia",
+      "RoutableData",
+      "RoutedRebaseDataParams",
       "SqlExpression",
       "StorageConfig",
       "StrictProperties",
@@ -120,6 +124,8 @@
       "ViaRelation",
       "applyDefaultValuesOnCreate",
       "buildConditionContext",
+      "buildRebaseData",
+      "buildRoutedRebaseData",
       "canCreateEntity",
       "canDeleteEntity",
       "canEditEntity",
@@ -194,7 +200,8 @@
       "unavailableStorageSource",
       "updateDateAutoValues",
       "updateUserAutoValues",
-      "withDeprecatedAlias"
+      "withDeprecatedAlias",
+      "wrapAsEntityData"
     ],
     "@rebasepro/cms": [
       "getRelationTargetPath",

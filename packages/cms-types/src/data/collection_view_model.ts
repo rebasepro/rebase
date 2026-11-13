@@ -14,9 +14,11 @@ import { type CollectionConfig } from "../types/collections";
 import { toWireKey } from "@rebasepro/utils";
 import {
     buildCompositeId,
-    type EntityDataOptions,
     type PrimaryKeyInfo
 } from "@rebasepro/common";
+import {
+    type EntityDataOptions
+} from "./entity_data";
 import {
     resolvePrimaryKeys
 } from "../util/collection_keys";

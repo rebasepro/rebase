@@ -1,5 +1,5 @@
-import { buildRebaseData, wrapAsEntityData } from "../src/data/buildRebaseData";
-import { buildSdkData } from "../src/data/sdk-data";
+import { buildRebaseData, wrapAsEntityData } from "../src/data/entity_data";
+import { buildSdkData } from "@rebasepro/common";
 import { TableAccessor, DataDriver, RebaseData, RebaseSdkData, SDKTableClient } from "@rebasepro/types";
 
 /**

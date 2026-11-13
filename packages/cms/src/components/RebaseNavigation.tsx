@@ -19,7 +19,8 @@ import {
     useTranslation,
     useUiPreferences
 } from "@rebasepro/app";
-import { buildRoutedRebaseData, resolveDataSource } from "@rebasepro/common";
+import { resolveDataSource } from "@rebasepro/common";
+import { buildRoutedRebaseData } from "@rebasepro/cms-types";
 import { CircularProgressCenter, lazyChunk } from "@rebasepro/ui";
 
 import type { AppView, CollectionCustomView, CollectionEditorOptions, EntityCustomView, EntityAction, RebasePlugin, AdminCollection, TableCustomization } from "@rebasepro/cms-types";

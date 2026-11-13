@@ -1,9 +1,7 @@
 import { TableAccessor, Entity, EntityValues, FindParams, FindResponse, LogicalCondition, RebaseData, SDKTableClient, type AggregateParams, type RefreshOptions, type ComputedSortField, type ByIdReadOptions, type SearchMatch, WhereFilterOp, WhereValueFor, isUnsupported, DataDriver } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
-import { etagOf } from "./row-etag";
+import { buildCompositeId, createDriverTableRows, etagOf, type DriverRowPage, type DriverTableRows, type PrimaryKeyInfo } from "@rebasepro/common";
 import { QueryBuilder } from "./query_builder";
-import { createDriverTableRows, type DriverRowPage, type DriverTableRows } from "./driver-rows";
-import { buildCompositeId, PrimaryKeyInfo } from "../util/identity";
 
 /**
  * What the admin's accessor (`RebaseData`) is told about a table it builds

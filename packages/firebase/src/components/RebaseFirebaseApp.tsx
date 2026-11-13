@@ -27,9 +27,9 @@ import {
     RebaseRoute
 } from "@rebasepro/cms";
 import { DEFAULT_DATA_SOURCE_KEY } from "@rebasepro/types";
-import { PropertyConfig, RebaseContext } from "@rebasepro/cms-types";
+import { PropertyConfig, RebaseContext, buildRebaseData } from "@rebasepro/cms-types";
 import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
-import { buildRebaseData, buildSdkData } from "@rebasepro/common";
+import { buildSdkData } from "@rebasepro/common";
 import { Route, Outlet, Navigate } from "react-router";
 
 import { RebaseFirebaseAppProps } from "./RebaseFirebaseAppProps";

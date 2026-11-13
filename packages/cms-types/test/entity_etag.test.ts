@@ -9,8 +9,8 @@
  */
 import { describe, expect, it, jest } from "@jest/globals";
 import type { Entity, SDKTableClient } from "@rebasepro/types";
-import { wrapAsEntityData } from "../src/data/buildRebaseData";
-import { withETag } from "../src/data/row-etag";
+import { wrapAsEntityData } from "../src/data/entity_data";
+import { withETag } from "@rebasepro/common";
 import { sdkClient } from "./helpers/inert-driver";
 
 type Row = Record<string, unknown>;

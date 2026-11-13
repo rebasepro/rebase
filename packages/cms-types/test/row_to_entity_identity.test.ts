@@ -3,10 +3,9 @@
  * columns. This is the seam where the address is minted — from the collection's
  * primary keys, not from anything the server wrote into the payload.
  */
-import { buildRebaseData } from "@rebasepro/common";
 import { collectionEntityDataOptions } from "../src/data/collection_view_model";
 import { DataDriver } from "@rebasepro/types";
-import { type CollectionConfig } from "@rebasepro/cms-types";
+import { type CollectionConfig, buildRebaseData } from "@rebasepro/cms-types";
 import { inertDriver } from "./helpers/inert-driver";
 
 const rows: Record<string, Record<string, unknown>[]> = {

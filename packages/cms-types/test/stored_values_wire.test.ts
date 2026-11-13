@@ -1,5 +1,4 @@
-import { type CollectionConfig, EntityReference, EntityRelation, GeoPoint, Vector } from "@rebasepro/cms-types";
-import { wrapAsEntityData } from "@rebasepro/common";
+import { type CollectionConfig, EntityReference, EntityRelation, GeoPoint, Vector, wrapAsEntityData } from "@rebasepro/cms-types";
 import type { FindParams } from "@rebasepro/types";
 import { collectionEntityDataOptions } from "../src/data/collection_view_model";
 import { sdkClient } from "./helpers/inert-driver";

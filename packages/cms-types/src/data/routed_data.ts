@@ -1,12 +1,12 @@
-import { RebaseData, RebaseSdkData } from "@rebasepro/types";
+import { RebaseData } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 
 /**
- * The data-layer shapes that can be routed: the Entity-shaped admin
- * {@link RebaseData}, the flat SDK {@link RebaseSdkData}, or just the flat
- * SDK's `.table(slug)` accessor, which is all the router needs.
+ * What the admin's router routes: its Entity-shaped {@link RebaseData}, or
+ * just a `.table(slug)` accessor of one, which is all the router needs. The
+ * SDK's rows are routed by `buildRoutedSdkData` (`@rebasepro/common`).
  */
-export type RoutableData = RebaseData | RebaseSdkData | Pick<RebaseSdkData, "table">;
+export type RoutableData = RebaseData | Pick<RebaseData, "table">;
 
 /**
  * Parameters for {@link buildRoutedRebaseData}.
@@ -44,7 +44,7 @@ export interface RoutedRebaseDataParams<T extends RoutableData = RebaseData> {
 }
 
 /**
- * Build a {@link RebaseData} that routes each table to the right
+ * Build the admin's {@link RebaseData} that routes each table to the right
  * backend based on its resolved data source.
  *
  * `.table(path)` (and dynamic `data.products`-style access) resolves the
@@ -60,7 +60,7 @@ export interface RoutedRebaseDataParams<T extends RoutableData = RebaseData> {
  *
  * @example
  * const data = buildRoutedRebaseData({
- *     defaultData: client.data,
+ *     defaultData: wrapAsEntityData(client.data, entityDataOptions),
  *     sources: { analytics: buildRebaseData(firestoreDriver) },
  *     resolveKey: (path) => resolveDataSource(registry.getCollection(path), defs).key
  * });

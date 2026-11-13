@@ -1,5 +1,5 @@
-import { buildRebaseData } from "../src/data/buildRebaseData";
-import { buildRoutedRebaseData } from "../src/data/buildRoutedRebaseData";
+import { buildRebaseData } from "../src/data/entity_data";
+import { buildRoutedRebaseData } from "../src/data/routed_data";
 import { TableAccessor, DataDriver } from "@rebasepro/types";
 
 // ── Mock driver ─────────────────────────────────────────────

@@ -41,6 +41,16 @@
       "instead": "Column transforms: col.*().transform(...) on the table definition."
     },
     {
+      "symbol": "buildRebaseData",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "buildRoutedRebaseData",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "canCreateEntity",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
@@ -158,6 +168,11 @@
       "from": "@rebasepro/common",
       "to": null,
       "instead": "TableHookProps[\"context\"] from @rebasepro/types."
+    },
+    {
+      "symbol": "EntityDataOptions",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
     },
     {
       "symbol": "enumToObjectEntries",
@@ -424,6 +439,11 @@
       "instead": "queryableColumnKeys(descriptor) from @rebasepro/common."
     },
     {
+      "symbol": "QueryBuilder",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "registerConditionOperations",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
@@ -527,6 +547,16 @@
       "instead": "restrictedKeys(descriptor, viewer, kind) from @rebasepro/common."
     },
     {
+      "symbol": "RoutableData",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "RoutedRebaseDataParams",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "rowToViewModel",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
@@ -597,6 +627,17 @@
       "from": "@rebasepro/common",
       "to": null,
       "instead": "History entries hold the stored (wire) row, which embeds no related row; the history routes serve an older entry's relation refs as keys. Nothing replaces it."
+    },
+    {
+      "symbol": "wrapAsEntityData",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "wrapAsSdkData",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "buildSdkData(driver) from @rebasepro/common: the SDK is built on the driver's rows; there is no Entity accessor to flatten."
     },
     {
       "symbol": "composeCallbacks",

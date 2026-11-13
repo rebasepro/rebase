@@ -7,7 +7,8 @@
  * shape the code receives.
  */
 import { jest } from "@jest/globals";
-import { createCallContext, wrapAsEntityData } from "@rebasepro/common";
+import { createCallContext } from "@rebasepro/common";
+import { wrapAsEntityData } from "@rebasepro/cms-types";
 import type {
     Entity,
     RebaseData,

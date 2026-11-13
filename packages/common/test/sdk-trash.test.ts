@@ -1,4 +1,3 @@
-import { wrapAsEntityData } from "../src/data/buildRebaseData";
 import { buildSdkData } from "../src/data/sdk-data";
 import { DataDriver, RebaseSdkData, SDKTableClient } from "@rebasepro/types";
 
@@ -154,14 +153,4 @@ describe("context.data.<slug>.trash", () => {
         expect(calls).toHaveLength(0);
     });
 
-    it("survives the admin boundary", async () => {
-        const { driver, calls } = recordingDriver();
-        const trash = wrapAsEntityData(buildSdkData(driver)).table("posts").trash;
-
-        expect((await trash?.find())?.data[0]).toMatchObject({ id: "p1", path: "posts" });
-        await trash?.purge("p1");
-
-        expect(calls.find((c) => c.method === "fetchCollection")?.props).toMatchObject({ withDeleted: "only" });
-        expect(calls.find((c) => c.method === "delete")?.props).toMatchObject({ hard: true });
-    });
 });

@@ -9,7 +9,7 @@
  */
 import type { Entity, FindResult } from "@rebasepro/types";
 import type { CollectionConfig } from "@rebasepro/cms-types";
-import { wrapAsEntityData } from "@rebasepro/common";
+import { wrapAsEntityData } from "@rebasepro/cms-types";
 import { collectionEntityDataOptions } from "../src/data/collection_view_model";
 import { sdkClient } from "./helpers/inert-driver";
 

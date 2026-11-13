@@ -1,5 +1,5 @@
-import { buildRebaseData, wrapAsEntityData } from "../src/data/buildRebaseData";
-import { buildSdkData } from "../src/data/sdk-data";
+import { buildRebaseData, wrapAsEntityData } from "../src/data/entity_data";
+import { buildSdkData, createAccessorSlugResolver } from "@rebasepro/common";
 import { TableAccessor, DataDriver, Entity, RebaseClientError, RebaseData, RebaseSdkData } from "@rebasepro/types";
 import { sdkClient } from "./helpers/inert-driver";
 
@@ -541,5 +541,45 @@ describe("buildSdkData bulk arguments", () => {
         const call = posts[method] as (arg: unknown) => Promise<unknown>;
         await expect(call.call(posts, "nope")).rejects.toBeInstanceOf(RebaseClientError);
         await expect(call.call(posts, "nope")).rejects.toMatchObject({ code: "INVALID_BULK_BODY" });
+    });
+});
+
+describe("the admin's accessor over a driver and over the SDK", () => {
+    it("buildRebaseData reads `my-notes` for `data.myNotes`", async () => {
+        const paths: string[] = [];
+        const driver: DataDriver = {
+            fetchCollection: jest.fn().mockImplementation(async ({ path }: { path: string }) => {
+                paths.push(path);
+                return [];
+            }),
+            fetchOne: jest.fn(),
+            save: jest.fn(),
+            delete: jest.fn(),
+            checkUniqueField: jest.fn()
+        };
+        const resolveAccessor = createAccessorSlugResolver(() => [{ slug: "my-notes" }]);
+        await buildRebaseData(driver, { resolveAccessor }).myNotes.find();
+        expect(paths).toEqual(["my-notes"]);
+    });
+
+    it("reads and purges the trash over the SDK", async () => {
+        const calls: { method: string; props: unknown }[] = [];
+        const driver: DataDriver = {
+            fetchCollection: jest.fn().mockImplementation(async (props: unknown) => {
+                calls.push({ method: "fetchCollection", props });
+                return [{ id: "p1", title: "gone", deletedAt: "2026-10-01T00:00:00.000Z" }];
+            }),
+            fetchOne: jest.fn(),
+            save: jest.fn(),
+            delete: jest.fn().mockImplementation(async (props: unknown) => { calls.push({ method: "delete", props }); }),
+            checkUniqueField: jest.fn()
+        };
+        const trash = wrapAsEntityData(buildSdkData(driver)).table("posts").trash;
+
+        expect((await trash?.find())?.data[0]).toMatchObject({ id: "p1", path: "posts" });
+        await trash?.purge("p1");
+
+        expect(calls.find((c) => c.method === "fetchCollection")?.props).toMatchObject({ withDeleted: "only" });
+        expect(calls.find((c) => c.method === "delete")?.props).toMatchObject({ hard: true });
     });
 });

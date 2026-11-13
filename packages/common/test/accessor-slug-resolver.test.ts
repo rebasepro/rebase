@@ -1,6 +1,5 @@
-import { buildRebaseData } from "../src/data/buildRebaseData";
 import { buildSdkData } from "../src/data/sdk-data";
-import { buildRoutedRebaseData } from "../src/data/buildRoutedRebaseData";
+import { buildRoutedSdkData } from "../src/data/buildRoutedSdkData";
 import { createAccessorSlugResolver, toTableAccessor } from "../src/data/table-accessor";
 import { DataDriver, RebaseSdkData, SDKTableClient } from "@rebasepro/types";
 
@@ -82,12 +81,6 @@ describe("server data proxies resolve through the collections first", () => {
         expect(paths).toEqual(["my-notes"]);
     });
 
-    it("buildRebaseData reads `my-notes` for `data.myNotes`", async () => {
-        const { driver, paths } = pathRecordingDriver();
-        await buildRebaseData(driver, { resolveAccessor }).myNotes.find();
-        expect(paths).toEqual(["my-notes"]);
-    });
-
     it("buildSdkData without a resolver keeps the snake_case rule", async () => {
         const { driver, paths } = pathRecordingDriver();
         await sdk(buildSdkData(driver), "myNotes").find();
@@ -98,7 +91,7 @@ describe("server data proxies resolve through the collections first", () => {
     it("the routed proxy resolves the same way", async () => {
         const { driver, paths } = pathRecordingDriver();
         const other = pathRecordingDriver();
-        const routed = buildRoutedRebaseData<RebaseSdkData>({
+        const routed = buildRoutedSdkData<RebaseSdkData>({
             defaultData: buildSdkData(driver, { resolveAccessor }),
             sources: { analytics: buildSdkData(other.driver, { resolveAccessor }) },
             resolveKey: (slug) => (slug === "my-notes" ? "analytics" : undefined),
