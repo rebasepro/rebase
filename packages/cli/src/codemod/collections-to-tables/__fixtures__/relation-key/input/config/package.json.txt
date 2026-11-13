@@ -1,0 +1,5 @@
+{
+  "name": "relkey-config",
+  "private": true,
+  "type": "module"
+}

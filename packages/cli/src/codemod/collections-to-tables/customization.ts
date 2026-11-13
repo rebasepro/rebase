@@ -615,6 +615,62 @@ function prune(value: unknown): unknown {
     return out;
 }
 
+/**
+ * The relations the lift renamed in one collection, old key → new key: a
+ * belongsTo that served its foreign key under its own key is `<key>Relation`
+ * now, and the column keeps the key.
+ */
+function relationRenames(notes: readonly LiftNote[], slug: string): Map<string, string> {
+    const out = new Map<string, string>();
+    for (const item of notes) {
+        if (item.collection !== slug || item.kind !== "renamed" || item.key === undefined) continue;
+        out.set(item.key, `${String(item.value)}Relation`);
+    }
+    return out;
+}
+
+/** The presentation options that name fields by key, as lists. */
+const FIELD_LIST_OPTIONS = ["listFields", "previewFields", "fieldOrder"] as const;
+
+/**
+ * Point the presentation of a renamed relation at its new key.
+ *
+ * The panel draws the relation in the column's place (the projection replaces
+ * a belongsTo's foreign-key column with the relation), so a customization that
+ * still names the column's key labels, lists and titles a field the panel does
+ * not have: every entry is skipped with a development warning. What the
+ * legacy property said — its name, its column in the list, the title it gave
+ * the record — is said of the relation.
+ */
+function renameRelationKeys(options: Record<string, unknown>, renames: ReadonlyMap<string, string>): void {
+    if (renames.size === 0) return;
+    const renameList = (value: unknown): unknown =>
+        Array.isArray(value) ? value.map(entry => (typeof entry === "string" ? renames.get(entry) ?? entry : entry)) : value;
+    const fields = options.fields;
+    if (isPlainObject(fields)) {
+        const out: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(fields)) {
+            const renamed = renames.get(key);
+            out[renamed !== undefined && !(renamed in fields) ? renamed : key] = value;
+        }
+        options.fields = out;
+    }
+    for (const key of FIELD_LIST_OPTIONS) if (options[key] !== undefined) options[key] = renameList(options[key]);
+    const display = options.display;
+    if (isPlainObject(display)) {
+        for (const [slot, source] of Object.entries(display)) {
+            if (typeof source === "string" && renames.has(source)) display[slot] = renames.get(source);
+        }
+    }
+    const form = options.form;
+    if (isPlainObject(form)) {
+        if (form.sidebar !== undefined) form.sidebar = renameList(form.sidebar);
+        if (Array.isArray(form.sections)) {
+            for (const section of form.sections) if (isPlainObject(section) && section.fields !== undefined) section.fields = renameList(section.fields);
+        }
+    }
+}
+
 /** What {@link planCustomizations} wrote, for the index and `App.tsx`. */
 export interface CustomizationOutput {
     /** The exported identifier and module of each customization, in the order given. */
@@ -648,6 +704,7 @@ export function planCustomizations(
             else applyFieldNote(plan, builder, item, fields);
         }
         builder.options.fields = prune(fields);
+        renameRelationKeys(builder.options, relationRenames(notes, entry.collection.slug));
         const options = orderedOptions(prune(builder.options) as Record<string, unknown>);
         if (builder.failed || Object.keys(options).length === 0) continue;
         const content = printModule(plan, builder, options);

@@ -1,0 +1,8 @@
+{
+    "name": "relkey-backend",
+    "type": "module",
+    "dependencies": {
+        "relkey-config": "*",
+        "@rebasepro/server": "workspace:*"
+    }
+}

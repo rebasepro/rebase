@@ -1,0 +1,14 @@
+{
+    "name": "relkey",
+    "private": true,
+    "type": "module",
+    "workspaces": [
+        "frontend",
+        "backend",
+        "config"
+    ],
+    "scripts": {
+        "db:push": "rebase db push --collections ../config/collections",
+        "build": "pnpm --filter \"./frontend\" --filter \"./config\" -r run build"
+    }
+}

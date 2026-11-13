@@ -1,0 +1,27 @@
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+import companiesCollection from "./companies";
+
+const membersCollection: PostgresCollectionConfig = {
+    name: "Members",
+    slug: "members",
+    securityRules: [{ operation: "select", access: "public" }],
+    admin: {
+        listProperties: ["email", "company_id"],
+        previewProperties: ["company_id"],
+        propertiesOrder: ["company_id", "email"],
+        display: { title: "company_id", subtitle: "email" },
+        form: { sections: [{ key: "who", fields: ["email", "company_id"] }] }
+    },
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        email: { name: "Email address", type: "string" },
+        // The company the member belongs to.
+        company_id: {
+            name: "Employer",
+            type: "relation",
+            relation: { kind: "belongsTo", target: () => companiesCollection, localKey: "company_id" }
+        }
+    }
+};
+
+export default membersCollection;

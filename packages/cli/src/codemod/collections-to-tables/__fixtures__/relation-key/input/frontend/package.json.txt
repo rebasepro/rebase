@@ -1,0 +1,8 @@
+{
+    "name": "relkey-frontend",
+    "type": "module",
+    "dependencies": {
+        "relkey-config": "*",
+        "@rebasepro/cms": "workspace:*"
+    }
+}

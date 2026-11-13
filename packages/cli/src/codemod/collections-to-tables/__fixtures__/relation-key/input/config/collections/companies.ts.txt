@@ -1,0 +1,13 @@
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+
+const companiesCollection: PostgresCollectionConfig = {
+    name: "Companies",
+    slug: "companies",
+    securityRules: [{ operation: "select", access: "public" }],
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        name: { name: "Name", type: "string" }
+    }
+};
+
+export default companiesCollection;

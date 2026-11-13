@@ -317,6 +317,27 @@ describe("a relation field's form default", () => {
     }, 120_000);
 });
 
+describe("a belongsTo that served its foreign key under its own key", () => {
+    it("renames the relation and points the customization's presentation of it at the new key", async () => {
+        const dir = materialize("relation-key");
+        const report = await run(dir, { dryRun: true });
+        expect(report.refusals).toEqual([]);
+        expect(report.manualSteps.map(step => step.title)).toContain("Relation renamed in members");
+        const table = report.files.find(entry => entry.path === "backend/schema/members.ts")?.content;
+        expect(table).toContain("company_idRelation: rel.belongsTo(");
+        // The panel draws the relation in the column's place: a customization naming
+        // `company_id` would label, list and title a field the panel does not have.
+        const content = report.files.find(entry => entry.path === "frontend/src/cms/members.tsx")?.content ?? "";
+        expect(content).toMatch(/company_idRelation: \{\s+name: "Employer"/);
+        expect(content).toContain(`listFields: ["email", "company_idRelation"]`);
+        expect(content).toContain(`previewFields: ["company_idRelation"]`);
+        expect(content).toContain(`fieldOrder: ["company_idRelation", "email"]`);
+        expect(content).toMatch(/title: "company_idRelation",\s+subtitle: "email"/);
+        expect(content).toMatch(/fields: \["email", "company_idRelation"\]/);
+        expect(content).not.toMatch(/"company_id"|\bcompany_id:/);
+    }, 120_000);
+});
+
 /**
  * The SQL check compiles both sides with this release's compiler, so it cannot
  * see a rule whose policy grants something different than on the previous
