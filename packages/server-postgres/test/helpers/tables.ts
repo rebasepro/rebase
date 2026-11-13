@@ -1,12 +1,14 @@
 import {
     SchemaDefinitionError,
-    collectionsToTableDefs,
     compileTable,
     compiledTable,
     lowerTables,
     resolveCollectionRelations,
     type SchemaDefinitionProblem
 } from "@rebasepro/common";
+import {
+    collectionsToTableDefs
+} from "@rebasepro/common/migrate";
 import { isTableDef, isViewDef } from "@rebasepro/types";
 import type {
     AnyCollectionConfig,

@@ -35,6 +35,9 @@
             "@rebasepro/common": [
                 "../../../packages/common/src"
             ],
+            "@rebasepro/common/migrate": [
+                "../../../packages/common/src/migrate"
+            ],
             "@rebasepro/utils": [
                 "../../../packages/utils/src"
             ],

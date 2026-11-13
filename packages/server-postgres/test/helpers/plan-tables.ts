@@ -7,11 +7,13 @@
  * this file holds only what the planner's oracles add on top of it.
  */
 import {
-    collectionsToTableDefs,
     compileSchema,
     lowerTables,
     relationalCollections
 } from "@rebasepro/common";
+import {
+    collectionsToTableDefs
+} from "@rebasepro/common/migrate";
 import {
     isPostgresCollectionConfig,
     type AnyTableDef,

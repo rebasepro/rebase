@@ -32,7 +32,9 @@ if (fs.existsSync(index)) {
         const { loadBackendSchema, compileLoadedSchema } = await import(pathToFileURL(loader).href);
         tables = compileLoadedSchema(await loadBackendSchema(path.dirname(index))).tables;
     } else {
-        const { collectionsToTableDefs, compileSchema } = await import(pathToFileURL(lifter).href);
+        // The lift is `@rebasepro/common/migrate`; the compiler is the package root beside it.
+        const { collectionsToTableDefs } = await import(pathToFileURL(lifter).href);
+        const { compileSchema } = await import(pathToFileURL(path.resolve(path.dirname(lifter), "..", "index.ts")).href);
         const lifted = collectionsToTableDefs((await import(pathToFileURL(index).href)).collections ?? []);
         tables = compileSchema(lifted.tables, lifted.defaultRls ? { defaultRls: lifted.defaultRls } : {});
     }

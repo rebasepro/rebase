@@ -33,7 +33,8 @@ import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { CollectionConfig } from "@rebasepro/types";
 import { generateTypedefs } from "@rebasepro/codegen";
-import { collectionsToTableDefs, compileTables } from "@rebasepro/common";
+import { compileTables } from "@rebasepro/common";
+import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { ensureCollectionTables, type Queryable } from "../../src/schema/ensure-collection-tables.js";

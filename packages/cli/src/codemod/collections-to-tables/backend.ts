@@ -15,11 +15,11 @@ import {
     printIndexModule,
     printTableSource,
     tableIdentifier,
-    type LiftResult,
     type PrintTarget,
     type TableSources
 } from "@rebasepro/common";
-import { isViewDef, type AnyTableDef, type AnyViewDef, type DefaultRls, type Property } from "@rebasepro/types";
+import type { LegacyProperty, LiftResult } from "@rebasepro/common/migrate";
+import { isViewDef, type AnyTableDef, type AnyViewDef, type DefaultRls } from "@rebasepro/types";
 
 import type { Member, PathSegment } from "./ast";
 import { collectReferences, leadingComments, memberOf, nodeAtPath, nodeText, postDeclarationAssignments, resolveObject, toPosix } from "./ast";
@@ -97,13 +97,13 @@ function functionNames(value: unknown): string[] {
     return Object.entries(value).filter(([, entry]) => typeof entry === "function").map(([name]) => name);
 }
 
-function collectTransformSites(properties: Record<string, Property>, segments: PathSegment[], prefix: string, out: TransformSite[]): void {
+function collectTransformSites(properties: Record<string, LegacyProperty>, segments: PathSegment[], prefix: string, out: TransformSite[]): void {
     for (const [key, property] of Object.entries(properties)) {
         visitProperty(property, [...segments, key], joinPath(prefix, key), out);
     }
 }
 
-function visitProperty(property: Property, segments: PathSegment[], transformPath: string, out: TransformSite[]): void {
+function visitProperty(property: LegacyProperty, segments: PathSegment[], transformPath: string, out: TransformSite[]): void {
     const names = functionNames(property.callbacks);
     if (names.length > 0) out.push({ segments, transformPath, names });
     if (property.type === "array") {

@@ -16,7 +16,14 @@ export default defineConfig(() => ({
         lib: {
             // ESM only — this is an ESM-first framework; no UMD/CJS output.
             formats: ["es"],
-            entry: path.resolve(__dirname, "src/index.ts"),
+            // The root, and `@rebasepro/common/migrate` (the legacy model and
+            // the lift: migration tooling, kept off the root so nothing at
+            // runtime reaches it). With `preserveModules` each lands at its
+            // own path: `index.es.js`, `migrate/index.es.js`.
+            entry: {
+                index: path.resolve(__dirname, "src/index.ts"),
+                "migrate/index": path.resolve(__dirname, "src/migrate/index.ts")
+            },
             name: "Rebase Util",
             // One file per source module (`preserveModules` below), so the
             // entry is `index.es.js` — the path package.json's `exports` names

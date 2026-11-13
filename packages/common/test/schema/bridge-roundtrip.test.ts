@@ -25,7 +25,7 @@
 import { describe, expect, it } from "@jest/globals";
 import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 
-import { collectionsToTableDefs } from "../../src/schema/lift-collection";
+import { collectionsToTableDefs } from "../../src/migrate";
 import { lowerTables } from "../../src/schema/lower-tables";
 import { ALL, DOCUMENT_RULES, documents, everything, notes } from "./fixtures/legacy-capabilities";
 

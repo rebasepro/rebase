@@ -20,7 +20,8 @@
 import { describe, expect, it } from "@jest/globals";
 import { col, defineAuthTable, defineTable, defineView, rel } from "@rebasepro/types";
 import type { AnyTableDef, AnyViewDef, ColumnDescriptor, DefaultRls, TableDescriptor } from "@rebasepro/types";
-import { collectionsToTableDefs, compileTables, isSchemaDefinitionError, lowerTables, compileSchema } from "@rebasepro/common";
+import { compileTables, isSchemaDefinitionError, lowerTables, compileSchema } from "@rebasepro/common";
+import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
 import type { ColumnPlan, SchemaPlan, TablePlan } from "../src/schema/plan/types";

@@ -51,6 +51,12 @@
       "import": "./dist/index.es.js",
       "default": "./dist/index.es.js"
     },
+    "./migrate": {
+      "types": "./dist/migrate/index.d.ts",
+      "development": "./dist/migrate/index.es.js",
+      "import": "./dist/migrate/index.es.js",
+      "default": "./dist/migrate/index.es.js"
+    },
     "./package.json": "./package.json"
   },
   "dependencies": {
@@ -76,7 +82,8 @@
     "vite": "^8.1.5"
   },
   "files": [
-    "dist"
+    "dist",
+    "migrate"
   ],
   "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
   "publishConfig": {
@@ -107,7 +114,8 @@
       "^@rebasepro/cms-types$": "<rootDir>/../cms-types/src/index.ts",
       "^@rebasepro/client$": "<rootDir>/../client/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
-      "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"
+      "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts",
+      "^@rebasepro/common/migrate$": "<rootDir>/src/migrate/index.ts"
     },
     "maxWorkers": 4
   }

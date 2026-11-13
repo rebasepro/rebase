@@ -3,7 +3,7 @@ import { col, defineTable, rel } from "@rebasepro/types";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { compileTables } from "../src/schema/compile-tables";
-import { collectionsToTableDefs } from "../src/schema/lift-collection";
+import { collectionsToTableDefs } from "../src/migrate";
 import { apiHiddenFieldNames, restrictedFieldNames } from "../src/collections/field-access";
 import {
     apiHiddenKeys,

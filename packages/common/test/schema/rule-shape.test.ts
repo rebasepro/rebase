@@ -4,7 +4,7 @@ import { getPolicyNameHash, isNewShapeRule } from "@rebasepro/utils";
 
 import { compileTables } from "../../src/schema/compile-tables";
 import { isSchemaDefinitionError, type SchemaDefinitionProblem } from "../../src/schema/errors";
-import { collectionsToTableDefs } from "../../src/schema/lift-collection";
+import { collectionsToTableDefs } from "../../src/migrate";
 import { printRls } from "../../src/schema/print-table";
 import { compileRulePolicies, evaluatePolicy, policyConditionToExpression, policyToPostgres, securityRuleToConditions } from "../../src/util/policy";
 

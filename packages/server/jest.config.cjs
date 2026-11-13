@@ -17,6 +17,8 @@ module.exports = {
     // This helps Jest resolve monorepo packages
     moduleNameMapper: {
         "^@rebasepro/client$": "<rootDir>/../client/src/index.ts",
+        // `@rebasepro/common/migrate` (the legacy model and the lift) is a subpath the bare-name pattern does not reach.
+        "^@rebasepro/common/migrate$": "<rootDir>/../common/src/migrate/index.ts",
         "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
         "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
         "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts",

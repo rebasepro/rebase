@@ -41,6 +41,9 @@
             "@rebasepro/common": [
                 "./packages/common/src"
             ],
+            "@rebasepro/common/migrate": [
+                "./packages/common/src/migrate"
+            ],
             "@rebasepro/client": [
                 "./packages/client/src"
             ],

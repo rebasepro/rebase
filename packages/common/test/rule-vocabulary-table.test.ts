@@ -10,8 +10,7 @@
  */
 import { policy, type CollectionConfig, type PolicyExpression, type SecurityRule, type TenantSource } from "@rebasepro/types";
 import { getPolicyNameHash, getPolicyNamesForRule, newShapeHashInput } from "@rebasepro/utils";
-import { collectionToTableDef } from "../src/schema/lift-collection";
-import { liftRuleSpelling, liftTenantSourceSpelling } from "../src/schema/lift-rule-spelling";
+import { collectionToTableDef, liftRuleSpelling, liftTenantSourceSpelling } from "../src/migrate";
 import { policyToPostgres } from "../src/util/policy";
 
 /** A value from outside the type system: a legacy config, a stored rule. */

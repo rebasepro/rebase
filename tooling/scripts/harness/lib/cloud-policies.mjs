@@ -34,7 +34,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..", "..", "..", "..");
 const COMPILER = path.join(REPO, "packages", "server-postgres", "src", "schema", "generate-postgres-ddl-logic.ts");
 const LOADER = path.join(REPO, "packages", "server", "src", "schema", "load-schema.ts");
-const LIFTER = path.join(REPO, "packages", "common", "src", "index.ts");
+const LIFTER = path.join(REPO, "packages", "common", "src", "migrate", "index.ts");
 const PRINTER = path.join(HERE, "print-cloud-policies.mjs");
 const MARKER = "@@rebase-cloud-policies@@";
 

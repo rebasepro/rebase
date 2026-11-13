@@ -14,6 +14,8 @@ module.exports = {
         "**/test/**/*.test.ts"
     ],
     moduleNameMapper: {
+        // `@rebasepro/common/migrate` (the legacy model and the lift) is a subpath the bare-name pattern does not reach.
+        "^@rebasepro/common/migrate$": "<rootDir>/../common/src/migrate/index.ts",
         "^@rebasepro/(.*)$": "<rootDir>/../$1/src"
     }
 };

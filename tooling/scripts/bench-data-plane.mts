@@ -29,7 +29,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createRequire } from "node:module";
 import { parseArgs } from "node:util";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "../../packages/common/src/migrate/index.ts";
 
 // The driver's own copy of pg, so the counter below wraps the client it uses.
 const require = createRequire(new URL("../../packages/server-postgres/package.json", import.meta.url));
@@ -74,7 +74,7 @@ pg.Client.prototype.query = function countedQuery(this: unknown, ...rest: unknow
 const { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase } =
     await import("../../packages/server-postgres/src/index.ts");
 const { logger, compileSchemaDefs } = await import("../../packages/server/src/index.ts");
-const { collectionsToTableDefs } = await import("../../packages/common/src/index.ts");
+const { collectionsToTableDefs } = await import("../../packages/common/src/migrate/index.ts");
 for (const level of ["info", "debug", "warn"] as const) (logger as unknown as Record<string, () => void>)[level] = () => undefined;
 
 // ── Collections ────────────────────────────────────────────────────────────
@@ -83,7 +83,7 @@ const adminOnly = [
     { operations: ["insert" as const, "update" as const, "delete" as const], roles: ["admin"] }
 ];
 
-const songs: CollectionConfig = {
+const songs: LegacyCollectionConfig = {
     name: "Songs", slug: "songs", table: "bench_songs", securityRules: adminOnly,
     properties: {
         id: { name: "Id", type: "number", isId: "manual", columnType: "bigint" },
@@ -131,9 +131,9 @@ const songs: CollectionConfig = {
         createdAt: { name: "Created", type: "date", autoValue: "on_create" },
         updatedAt: { name: "Updated", type: "date", autoValue: "on_update" }
     }
-} as CollectionConfig;
+} as LegacyCollectionConfig;
 
-const events: CollectionConfig = {
+const events: LegacyCollectionConfig = {
     name: "Events", slug: "events", table: "bench_events", securityRules: adminOnly,
     properties: {
         id: { name: "Id", type: "number", isId: true, columnType: "bigserial" },
@@ -146,9 +146,9 @@ const events: CollectionConfig = {
         sid: { name: "Visit", type: "string" },
         props: { name: "Props", type: "map", keyValue: true, properties: {}, columnType: "jsonb" }
     }
-} as CollectionConfig;
+} as LegacyCollectionConfig;
 
-const dailyScores: CollectionConfig = {
+const dailyScores: LegacyCollectionConfig = {
     name: "Daily scores", slug: "daily_scores", table: "bench_daily", securityRules: adminOnly,
     properties: {
         day: { name: "Day", type: "string", isId: "manual" },
@@ -160,7 +160,7 @@ const dailyScores: CollectionConfig = {
         won: { name: "Won", type: "boolean" },
         at: { name: "At", type: "date", autoValue: "on_create" }
     }
-} as CollectionConfig;
+} as LegacyCollectionConfig;
 
 const collections = [songs, events, dailyScores];
 // The driver runs on compiled tables; these legacy literals are lifted and compiled for it.

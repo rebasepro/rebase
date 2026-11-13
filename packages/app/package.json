@@ -156,6 +156,7 @@
     ],
     "moduleNameMapper": {
       "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
+      "^@rebasepro/common/migrate$": "<rootDir>/../common/src/migrate/index.ts",
       "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts",
       "^@rebasepro/cms-types$": "<rootDir>/../cms-types/src/index.ts"
     },

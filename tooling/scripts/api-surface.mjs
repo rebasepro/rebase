@@ -94,6 +94,15 @@ const EXTRA_ENTRY_POINTS = [
         pkg: "@rebasepro/server/schema",
         dts: "packages/server/dist/schema/index.d.ts",
         mustHaveMembers: ["col", "rel"]
+    },
+    // The migration from the legacy collection model: the frozen 0.30 model
+    // and the lift. `rebase migrate collections-to-tables` runs it against a
+    // project's own files, so a lift or a legacy type removed here breaks
+    // the migration path of every project still on collections.
+    {
+        pkg: "@rebasepro/common/migrate",
+        dts: "packages/common/dist/migrate/index.d.ts",
+        mustHaveMembers: ["LegacyPostgresCollectionConfig"]
     }
 ];
 

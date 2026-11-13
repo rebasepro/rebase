@@ -23,6 +23,7 @@ export default defineConfig({
     resolve: {
         alias: [
             { find: /^@rebasepro\/server\/functions$/, replacement: source("server/src/functions/index.ts") },
+            { find: /^@rebasepro\/common\/migrate$/, replacement: source("common/src/migrate/index.ts") },
             ...PACKAGES.map(name => ({ find: new RegExp(`^@rebasepro/${name}$`), replacement: source(`${name}/src/index.ts`) }))
         ]
     }

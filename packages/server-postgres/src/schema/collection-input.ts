@@ -10,7 +10,10 @@
  * server holds the edited definitions); when it is, delete this file. Boot
  * never comes here: the appliers take `CompiledTable[]`.
  */
-import { collectionsToTableDefs, compileSchema } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
+// The lift is migration tooling (`@rebasepro/common/migrate`); this file is
+// its last runtime caller, and goes with the editor's collection door.
+import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 import type { CollectionConfig, CompiledTable } from "@rebasepro/types";
 
 /**

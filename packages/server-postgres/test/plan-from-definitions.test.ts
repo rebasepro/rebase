@@ -11,7 +11,8 @@
  * longer a collection, nothing can hand it those fields: that half is true by
  * construction and was retired with the collection input.)
  */
-import { collectionsToTableDefs, lowerTables, type LoweredCollection } from "@rebasepro/common";
+import { lowerTables, type LoweredCollection } from "@rebasepro/common";
+import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 import type { CollectionConfig, SecurityRule } from "@rebasepro/types";
 
 import { loadPlanCorpus, type PlanCorpus } from "./helpers/plan-corpus";

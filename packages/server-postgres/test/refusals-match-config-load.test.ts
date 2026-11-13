@@ -23,7 +23,8 @@
  * (`collectionsToTableDefs`, which refuses what it cannot express) and the
  * compiler and lowering the loader runs.
  */
-import { collectionsToTableDefs, compileTables, isSchemaDefinitionError, lowerTables, type SchemaDefinitionProblem } from "@rebasepro/common";
+import { compileTables, isSchemaDefinitionError, lowerTables, type SchemaDefinitionProblem } from "@rebasepro/common";
+import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 import type { CollectionConfig } from "@rebasepro/types";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { refused } from "./fixtures/property-matrix-collections";

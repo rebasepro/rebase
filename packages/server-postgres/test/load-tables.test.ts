@@ -22,7 +22,6 @@ import path from "node:path";
 
 import type { CollectionConfig, CompiledTable } from "@rebasepro/types";
 import {
-    collectionsToTableDefs,
     isSchemaDefinitionError,
     compileSchema,
     sortTablesBySlug,
@@ -30,6 +29,9 @@ import {
     printTableModule,
     type PrintedTableImport
 } from "@rebasepro/common";
+import {
+    collectionsToTableDefs
+} from "@rebasepro/common/migrate";
 import { isSchemaLoadError } from "@rebasepro/server";
 
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";

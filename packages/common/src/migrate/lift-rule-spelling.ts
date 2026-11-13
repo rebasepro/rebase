@@ -17,7 +17,7 @@ import type { PolicyCondition, PolicyExpression, SecurityRule, TenantSource } fr
  * The node is rebuilt as `policy.existsIn` builds one (`kind`, `table`,
  * `where`), which is the key order that frozen spelling restores.
  *
- * @group Schema
+ * @group Migration
  */
 export function liftRuleSpelling(rule: SecurityRule): SecurityRule {
     if ("condition" in rule && rule.condition !== undefined && "check" in rule) {
@@ -40,7 +40,7 @@ export function liftRuleSpelling(rule: SecurityRule): SecurityRule {
 /**
  * A tenant source with a legacy `membership.collection` spelled `table`.
  *
- * @group Schema
+ * @group Migration
  */
 export function liftTenantSourceSpelling(source: TenantSource): TenantSource {
     if (!("membership" in source)) return source;

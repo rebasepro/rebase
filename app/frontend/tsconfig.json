@@ -53,6 +53,9 @@
       "@rebasepro/common": [
         "../../packages/common/src"
       ],
+      "@rebasepro/common/migrate": [
+        "../../packages/common/src/migrate"
+      ],
       "@rebasepro/cms": [
         "../../packages/cms/src"
       ],

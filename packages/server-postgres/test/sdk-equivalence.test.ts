@@ -18,7 +18,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { collectionsToTableDefs, compileTables, toTableAccessor, type AnySchemaDef } from "@rebasepro/common";
+import { compileTables, toTableAccessor, type AnySchemaDef } from "@rebasepro/common";
+import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 import { generateTypedefs } from "@rebasepro/codegen";
 import {
     isPostgresCollectionConfig,

@@ -3,7 +3,8 @@
  * prints what the preflight found.
  */
 import type { CollectionConfig, TableDescriptor } from "@rebasepro/types";
-import { collectionsToTableDefs, compileTables } from "@rebasepro/common";
+import { compileTables } from "@rebasepro/common";
+import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 import { managedTablesOf, preflightSchemasOf, preflightStatus, renderPreflightFindings } from "../src/schema/doctor-database";
 import type { PreflightFinding } from "../src/security/database-preflight";
 

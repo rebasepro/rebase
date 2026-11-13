@@ -17,6 +17,8 @@ module.exports = {
         // Before the generic rule below, which would otherwise pull in the real
         // component library: first match wins.
         "^@rebasepro/ui$": "<rootDir>/test/__mocks__/rebasepro-ui.js",
+        // `@rebasepro/common/migrate` (the legacy model and the lift) is a subpath the bare-name pattern does not reach.
+        "^@rebasepro/common/migrate$": "<rootDir>/../common/src/migrate/index.ts",
         "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts"
     }
 };

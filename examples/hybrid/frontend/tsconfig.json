@@ -26,6 +26,7 @@
       "@rebasepro/cms": ["../../../packages/cms/src"],
       "@rebasepro/cms-types": ["../../../packages/cms-types/src"],
       "@rebasepro/common": ["../../../packages/common/src"],
+      "@rebasepro/common/migrate": ["../../../packages/common/src/migrate"],
       "@rebasepro/firebase": ["../../../packages/firebase/src"],
       "@rebasepro/types": ["../../../packages/types/src"],
       "@rebasepro/ui": ["../../../packages/ui/src"],

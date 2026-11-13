@@ -20,11 +20,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { SchemaModuleImporter } from "@rebasepro/server";
-import { isPostgresCollectionConfig, resolveResourceRefs, type CollectionConfig, type SecurityRule } from "@rebasepro/types";
+import { isLegacyPostgresCollection, type LegacyCollectionConfig } from "@rebasepro/common/migrate";
+import { resolveResourceRefs, type SecurityRule } from "@rebasepro/types";
 
 /** A legacy collection, with the file it came from. */
 export interface LoadedCollection {
-    collection: CollectionConfig;
+    collection: LegacyCollectionConfig;
     /** The file, absolute. */
     file: string;
 }
@@ -40,7 +41,7 @@ export interface LegacyProject {
     /** The index's `defaultSecurityRules`, when it exports any. */
     defaultSecurityRules?: SecurityRule[];
     /** The index's `collections` array, when it exports one: the panel's navigation order. */
-    navigationOrder?: CollectionConfig[];
+    navigationOrder?: LegacyCollectionConfig[];
     /** Named exports of `<config>/index.ts`, when there is one (to find `callbacks`, `storageAuthorize`). */
     configIndexExports: string[];
 }
@@ -61,7 +62,7 @@ function isSecurityRuleList(value: unknown): value is SecurityRule[] {
     return Array.isArray(value) && value.every(rule => typeof rule === "object" && rule !== null);
 }
 
-function isCollection(value: unknown): value is CollectionConfig {
+function isCollection(value: unknown): value is LegacyCollectionConfig {
     return typeof value === "object" && value !== null && "slug" in value && typeof value.slug === "string";
 }
 
@@ -107,7 +108,7 @@ export async function loadLegacyProject(configDir: string, importModule: ModuleI
     }
 
     let defaultSecurityRules: SecurityRule[] | undefined;
-    let navigationOrder: CollectionConfig[] | undefined;
+    let navigationOrder: LegacyCollectionConfig[] | undefined;
     for (const name of ["index.ts", "index.js", "index.tsx"]) {
         const indexFile = path.join(collectionsDir, name);
         if (!fs.existsSync(indexFile)) continue;
@@ -137,7 +138,7 @@ export async function loadLegacyProject(configDir: string, importModule: ModuleI
     for (const entry of collections) entry.collection = resolveResourceRefs(entry.collection);
     if (defaultSecurityRules && defaultSecurityRules.length > 0) {
         for (const { collection } of collections) {
-            if (isPostgresCollectionConfig(collection) && !collection.securityRules?.length) {
+            if (isLegacyPostgresCollection(collection) && !collection.securityRules?.length) {
                 collection.securityRules = defaultSecurityRules;
             }
         }

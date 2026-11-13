@@ -1,5 +1,6 @@
 import { computeSchemaVersion, LEGACY_SCHEMA_VERSION_PREFIX, type CollectionConfig, type TableDescriptor } from "@rebasepro/types";
-import { collectionsToTableDefs, compileTables } from "@rebasepro/common";
+import { compileTables } from "@rebasepro/common";
+import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 import { missingExtensionIssues, schemaStampIssues } from "../src/schema/doctor";
 
 /**

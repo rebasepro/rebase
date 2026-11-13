@@ -18,8 +18,8 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { collectionsToTableDefs, isSchemaDefinitionError, type LiftResult } from "@rebasepro/common";
-import { isPostgresCollectionConfig, type CollectionConfig } from "@rebasepro/types";
+import { isSchemaDefinitionError } from "@rebasepro/common";
+import { collectionsToTableDefs, isLegacyPostgresCollection, type LegacyCollectionConfig, type LiftResult } from "@rebasepro/common/migrate";
 
 import { addSourceFile, createAstContext, findCollectionSite, postDeclarationAssignments, toPosix, type TsMorph } from "./ast";
 import { nameTables, planBackend } from "./backend";
@@ -141,7 +141,7 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
         }
     }
 
-    const postgres = entries.filter(entry => isPostgresCollectionConfig(entry.collection));
+    const postgres = entries.filter(entry => isLegacyPostgresCollection(entry.collection));
     const firestore = entries.filter(entry => entry.collection.engine === "firestore");
     for (const entry of entries) {
         if (!postgres.includes(entry) && !firestore.includes(entry)) {
@@ -493,7 +493,7 @@ function placeCollectionComments(
     });
 }
 
-function rank(order: readonly CollectionConfig[], collection: CollectionConfig): number {
+function rank(order: readonly LegacyCollectionConfig[], collection: LegacyCollectionConfig): number {
     const index = order.findIndex(candidate => candidate.slug === collection.slug);
     return index < 0 ? order.length : index;
 }

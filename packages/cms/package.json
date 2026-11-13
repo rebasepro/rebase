@@ -181,6 +181,7 @@
     ],
     "moduleNameMapper": {
       "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
+      "^@rebasepro/common/migrate$": "<rootDir>/../common/src/migrate/index.ts",
       "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts",
       "^react$": "<rootDir>/node_modules/react",
       "^react-dom$": "<rootDir>/node_modules/react-dom",

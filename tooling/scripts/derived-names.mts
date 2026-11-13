@@ -463,7 +463,8 @@ const linesOf = ({ surface, legacy }: Rendered): string[] => [...surface.entries
  * are one input now.)
  */
 async function tableShapedFixture(): Promise<FixtureInput> {
-    const { collectionsToTableDefs, compileSchema } = await import("@rebasepro/common");
+    const { compileSchema } = await import("@rebasepro/common");
+    const { collectionsToTableDefs } = await import("@rebasepro/common/migrate");
     const lifted = collectionsToTableDefs(FIXTURE);
     return compileSchema(lifted.tables, lifted.defaultRls !== undefined ? { defaultRls: lifted.defaultRls } : {});
 }

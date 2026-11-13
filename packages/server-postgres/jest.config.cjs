@@ -69,6 +69,8 @@ module.exports = {
         // `@rebasepro/server/schema` (what a schema file imports) is a
         // subpath the bare-name pattern below does not reach.
         "^@rebasepro/server/schema$": "<rootDir>/../server/src/schema/index.ts",
+        // `@rebasepro/common/migrate` (the legacy model and the lift) is a subpath the bare-name pattern does not reach.
+        "^@rebasepro/common/migrate$": "<rootDir>/../common/src/migrate/index.ts",
         "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts",
         // Strip the ESM ".js" suffix from relative TS imports.
         "^(\\.{1,2}/.*)\\.js$": "$1"

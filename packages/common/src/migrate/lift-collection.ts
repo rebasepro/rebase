@@ -1,12 +1,15 @@
 /**
- * The bridge from the legacy collection model to the table model: a
- * `PostgresCollectionConfig` rewritten as the `defineTable` / `defineAuthTable`
- * / `defineView` it is.
+ * The lift: a legacy collection (the frozen 0.30 model, `./legacy-model`)
+ * rewritten as the `defineTable` / `defineAuthTable` / `defineView` it is.
  *
- * Plain object-to-object conversion — no source text. It serves the legacy test
- * fixtures while the backend migrates (Stage B of docs/plans/POSTGRES-FIRST.md)
- * and is the semantic core of the codemod, which prints its result as source.
- * So it is total over the Postgres collection model and deterministic, and it
+ * Plain object-to-object conversion — no source text. It is the semantic core
+ * of `rebase migrate collections-to-tables`, which prints its result as
+ * source, and the test fixtures written as legacy literals go through it (so
+ * they double as its regression suite). It is migration tooling, not a
+ * runtime path (the one runtime caller left, server-postgres's transitional
+ * `schema/collection-input.ts`, leaves with the live editor's collection door).
+ *
+ * It is total over the Postgres collection model and deterministic, and it
  * never guesses: everything the server or the database acts on is carried
  * exactly, or the conversion is refused with a `SchemaDefinitionError` that
  * names the collection and property and says why.
@@ -38,18 +41,13 @@ import {
     defineAuthTable,
     defineTable,
     defineView,
-    isPostgresCollectionConfig,
     normalizeStorage,
     normalizeValidation,
     rel,
     type AnyTableDef,
     type AnyViewDef,
-    type AuthCollectionConfig,
     type AuthTableOptions,
     type BuilderKind,
-    type CollectionCallbacks,
-    type CollectionConfig,
-    type CollectionIndex,
     type ColumnAccess,
     type ColumnDef,
     type ColumnFlags,
@@ -57,39 +55,51 @@ import {
     type ColumnType,
     type ColumnsShape,
     type DefaultRls,
-    type EnumValues,
-    type IndexPredicate,
     type JsonShapeDef,
-    type PostgresCollectionConfig,
-    type Property,
-    type PropertyCallbacks,
-    type Relation,
     type RelationDef,
     type RelationsShape,
-    type ResolvedRelation,
     type RlsPosture,
     type SecurityRule,
-    type StorageConfig,
     type StorageOptions,
+    type TableConfig,
     type TableHooks,
     type TableIndex,
     type TableIndexKey,
     type TableIndexPredicate,
     type ValidationInput,
-    type VectorDistance,
-    type VectorIndexConfig,
     type VectorIndexOptions,
     type VectorMetric,
-    type ViewConfig,
-    type TableConfig
+    type ViewConfig
 } from "@rebasepro/types";
 import { generateForeignKeyName, toSnakeCase } from "@rebasepro/utils";
 
-import { fieldKeyForColumn, findRelation, getTableName, resolveCollectionRelations } from "../util/relations";
-import { resolveRelation } from "../util/resolve-relation";
-import { SchemaDefinitionError, isSchemaDefinitionError } from "./errors";
+import { SchemaDefinitionError, isSchemaDefinitionError } from "../schema/errors";
+import { legacyRuleMeaningChange, legacyRuleRefusal } from "../schema/resolve-rls";
+import {
+    isLegacyPostgresCollection,
+    type LegacyAuthCollectionConfig,
+    type LegacyCollectionCallbacks,
+    type LegacyCollectionConfig,
+    type LegacyCollectionIndex,
+    type LegacyEnumValues,
+    type LegacyIndexPredicate,
+    type LegacyPostgresCollectionConfig,
+    type LegacyProperty,
+    type LegacyPropertyCallbacks,
+    type LegacyRelation,
+    type LegacyResolvedRelation,
+    type LegacyStorageConfig,
+    type LegacyVectorDistance,
+    type LegacyVectorIndexConfig
+} from "./legacy-model";
+import {
+    findLegacyRelation,
+    legacyFieldKeyForColumn,
+    legacyTableName,
+    resolveLegacyCollectionRelations,
+    resolveLegacyRelation
+} from "./legacy-relations";
 import { liftRuleSpelling, liftTenantSourceSpelling } from "./lift-rule-spelling";
-import { legacyRuleMeaningChange, legacyRuleRefusal } from "./resolve-rls";
 
 // ── Notes ────────────────────────────────────────────────────────────────────
 
@@ -112,14 +122,14 @@ import { legacyRuleMeaningChange, legacyRuleRefusal } from "./resolve-rls";
  *   does, and what to write instead (see `legacyRuleMeaningChange`). The
  *   codemod lists these under "Review before deploying".
  *
- * @group Schema
+ * @group Migration
  */
 export type LiftNoteKind = "ui" | "browser" | "metadata" | "unknown" | "inert" | "derived" | "redundant" | "renamed" | "meaning";
 
 /**
  * One legacy field the conversion did not carry, and where it was.
  *
- * @group Schema
+ * @group Migration
  */
 export interface LiftNote {
     /** The collection's slug. */
@@ -141,7 +151,7 @@ export interface LiftNote {
 /**
  * What {@link collectionsToTableDefs} returns.
  *
- * @group Schema
+ * @group Migration
  */
 export interface LiftResult {
     /** One definition per collection, in the order given. */
@@ -155,7 +165,7 @@ export interface LiftResult {
 /**
  * What the lift needs besides the collections.
  *
- * @group Schema
+ * @group Migration
  */
 export interface LiftOptions {
     /**
@@ -193,10 +203,10 @@ const valueKindOf = (value: unknown): LiftNote["valueKind"] => {
  * storage path, a relation with no join path, a posture that would deny every
  * caller… — rather than writing something that means less.
  *
- * @group Schema
+ * @group Migration
  */
 export function collectionsToTableDefs(
-    collections: readonly CollectionConfig[],
+    collections: readonly LegacyCollectionConfig[],
     options: LiftOptions = {}
 ): LiftResult {
     // A default rule that would compile to something wider than it did on the
@@ -225,10 +235,10 @@ export function collectionsToTableDefs(
  * use {@link collectionsToTableDefs} to convert a set whose relations point at
  * each other.
  *
- * @group Schema
+ * @group Migration
  */
 export function collectionToTableDef(
-    collection: CollectionConfig,
+    collection: LegacyCollectionConfig,
     options: LiftOptions = {}
 ): { table: AnyTableDef | AnyViewDef; defaultRls?: DefaultRls; notCarried: LiftNote[] } {
     const { tables, defaultRls, notCarried } = collectionsToTableDefs([collection], options);
@@ -247,10 +257,10 @@ class LiftProblem extends Error {
 }
 
 /** A relation of the collection, under the key it is addressed by. */
-interface LegacyRelation {
+interface LiftedRelationEntry {
     key: string;
-    relation: Relation;
-    resolved: ResolvedRelation;
+    relation: LegacyRelation;
+    resolved: LegacyResolvedRelation;
 }
 
 /** What one `belongsTo` became. */
@@ -263,19 +273,19 @@ interface BelongsToPlan {
 
 class Lifter {
     readonly notes: LiftNote[] = [];
-    private readonly lifted = new Map<CollectionConfig, AnyDef>();
-    private readonly pendingTargets: CollectionConfig[] = [];
-    private readonly failed = new Set<CollectionConfig>();
+    private readonly lifted = new Map<LegacyCollectionConfig, AnyDef>();
+    private readonly pendingTargets: LegacyCollectionConfig[] = [];
+    private readonly failed = new Set<LegacyCollectionConfig>();
     private readonly defaults: readonly SecurityRule[];
 
-    constructor(private readonly collections: readonly CollectionConfig[], options: LiftOptions) {
+    constructor(private readonly collections: readonly LegacyCollectionConfig[], options: LiftOptions) {
         this.defaults = options.defaultSecurityRules ?? [];
     }
 
     liftAll(): AnyDef[] {
         const problems: { table: string; key?: string; message: string }[] = [];
         const out: AnyDef[] = [];
-        const attempt = (collection: CollectionConfig): AnyDef | undefined => {
+        const attempt = (collection: LegacyCollectionConfig): AnyDef | undefined => {
             if (this.failed.has(collection)) return undefined;
             try {
                 return this.lift(collection);
@@ -306,7 +316,7 @@ class Lifter {
     }
 
     /** The definition a collection converts to, converted once. */
-    private lift(collection: CollectionConfig): AnyDef {
+    private lift(collection: LegacyCollectionConfig): AnyDef {
         const cached = this.lifted.get(collection);
         if (cached) return cached;
         const def = new CollectionLift(this, collection).run();
@@ -315,7 +325,7 @@ class Lifter {
     }
 
     /** A thunk to the definition `target` converts to, queuing it when it is outside the set. */
-    targetThunk(target: CollectionConfig, from: string, key: string): () => AnyDef {
+    targetThunk(target: LegacyCollectionConfig, from: string, key: string): () => AnyDef {
         if (!this.lifted.has(target) && !this.pendingTargets.includes(target)) this.pendingTargets.push(target);
         return () => {
             const def = this.lifted.get(target);
@@ -327,9 +337,9 @@ class Lifter {
     }
 
     /** The collection a `reference` path names, as the planner finds it: by slug, then by table. */
-    resolvePath(path: string): CollectionConfig | undefined {
+    resolvePath(path: string): LegacyCollectionConfig | undefined {
         for (const collection of this.collections) {
-            if (collection.slug === path || getTableName(collection) === path) return collection;
+            if (collection.slug === path || legacyTableName(collection) === path) return collection;
         }
         return undefined;
     }
@@ -401,11 +411,11 @@ const IMPLICIT_ID_DEFAULT = "gen_random_uuid()::text";
 
 class CollectionLift {
     private readonly slug: string;
-    private readonly collection: PostgresCollectionConfig;
-    private readonly relations: LegacyRelation[] = [];
+    private readonly collection: LegacyPostgresCollectionConfig;
+    private readonly relations: LiftedRelationEntry[] = [];
     private readonly belongsTo = new Map<string, BelongsToPlan>();
     /** The relation each relation property addresses. */
-    private readonly addressed = new Map<string, LegacyRelation>();
+    private readonly addressed = new Map<string, LiftedRelationEntry>();
     /** Relation keys to `belongsTo` column keys, for `tenant` naming a relation. */
     private readonly foreignKeyColumns = new Map<string, string>();
     private readonly columns: Record<string, ColumnBuilder<unknown, BuilderKind, ColumnFlags>> = {};
@@ -415,11 +425,11 @@ class CollectionLift {
      * in `PostgresProperties` any more, and projects in the field still hold
      * them, so the conversion must read one.
      */
-    private readonly properties: Record<string, Property>;
+    private readonly properties: Record<string, LegacyProperty>;
 
-    constructor(private readonly lifter: Lifter, collection: CollectionConfig) {
+    constructor(private readonly lifter: Lifter, collection: LegacyCollectionConfig) {
         this.slug = collection.slug ?? "(unnamed)";
-        if (!isPostgresCollectionConfig(collection)) {
+        if (!isLegacyPostgresCollection(collection)) {
             throw new LiftProblem(this.slug, undefined,
                 `is a ${String(collection.engine)} collection. Only Postgres collections become tables; a Firestore collection becomes \`defineFirestoreCollection\` in the CMS.`);
         }
@@ -441,7 +451,7 @@ class CollectionLift {
         if (c.databaseId !== undefined) {
             this.refuse(undefined, "sets `databaseId`, which the table model has no field for. Declare the database in backend/resources.ts and name it with `database`.");
         }
-        const tableName = getTableName(c);
+        const tableName = legacyTableName(c);
         if (tableName.includes(".")) {
             this.refuse(undefined, `names its table "${tableName}" with a schema prefix. Write the schema in \`schema\` and the bare table name in \`table\`.`);
         }
@@ -468,15 +478,15 @@ class CollectionLift {
     /** Every relation, under the key and in the order `resolveCollectionRelations` gives them. */
     private collectRelations(): void {
         const c = this.collection;
-        let resolved: Record<string, ResolvedRelation>;
+        let resolved: Record<string, LegacyResolvedRelation>;
         try {
-            resolved = resolveCollectionRelations(c);
+            resolved = resolveLegacyCollectionRelations(c);
         } catch (error) {
             this.refuse(undefined, `has a relation that does not resolve: ${error instanceof Error ? error.message : String(error)}`);
         }
         const seen = new Set<string>();
         for (const relation of c.relations ?? []) {
-            const key = resolveRelation(relation, c).relationName;
+            const key = resolveLegacyRelation(relation, c).relationName;
             if (seen.has(key)) {
                 this.refuse(key, `declares the relation "${key}" twice in \`relations\`. Only the last one is used; keep one.`);
             }
@@ -502,7 +512,7 @@ class CollectionLift {
         for (const [propertyKey, property] of Object.entries(this.properties)) {
             if (property.type !== "relation") continue;
             const name = property.relation?.relationName ?? propertyKey;
-            const target = findRelation(resolved, name);
+            const target = findLegacyRelation(resolved, name);
             const entry = target ? this.relations.find(r => r.resolved === target) : undefined;
             if (!entry) {
                 this.refuse(propertyKey, `is a relation property, and no relation named "${name}" is declared. Declare it in \`relations\` or inline.`);
@@ -562,7 +572,7 @@ class CollectionLift {
             const isAddressed = [...this.addressed.values()].includes(entry);
             if (isAddressed) continue;
             const localKey = entry.resolved.localKey;
-            const owner = fieldKeyForColumn(c, localKey);
+            const owner = legacyFieldKeyForColumn(c, localKey);
             if (!(owner in properties) || properties[owner].type === "relation") {
                 this.refuse(entry.key,
                     `is a \`belongsTo\` declared only in \`relations\`, over the column "${localKey}", which no property declares. The planner creates neither that column nor a constraint for it, so the relation reads a column that does not exist. Declare the column as a property, or add a relation property for the link.`);
@@ -577,7 +587,7 @@ class CollectionLift {
         this.columns[key] = new ColumnBuilder<unknown, BuilderKind, ColumnFlags>(def);
     }
 
-    private noteUnknownPropertyFields(key: string, property: Property): void {
+    private noteUnknownPropertyFields(key: string, property: LegacyProperty): void {
         const typed = TYPED_PROPERTY_FIELDS[property.type] ?? [];
         for (const [field, value] of Object.entries(property)) {
             if (value === undefined || COMMON_PROPERTY_FIELDS.has(field) || typed.includes(field)) continue;
@@ -588,7 +598,7 @@ class CollectionLift {
     }
 
     /** A `relation` property: the foreign-key column a `belongsTo` plans here, or nothing. */
-    private liftRelationProperty(key: string, property: Extract<Property, { type: "relation" }>): void {
+    private liftRelationProperty(key: string, property: Extract<LegacyProperty, { type: "relation" }>): void {
         const entry = this.addressed.get(key);
         if (!entry) return;
         const resolved = entry.resolved;
@@ -608,7 +618,7 @@ class CollectionLift {
         this.rejectColumnFields(key, property, "belongsTo");
         const c = this.collection;
         const localKey = resolved.localKey;
-        const ownerKey = fieldKeyForColumn(c, localKey);
+        const ownerKey = legacyFieldKeyForColumn(c, localKey);
         const owner = ownerKey !== key ? this.properties[ownerKey] : undefined;
         const required = property.validation?.required === true;
         const unique = property.validation?.unique === true;
@@ -674,7 +684,7 @@ class CollectionLift {
      * relation. Its `access` and `excludeFromApi` are carried, onto the
      * relation's own `access` / `private` (see {@link relationFieldRules}).
      */
-    private rejectColumnFields(key: string, property: Property, kind: string): void {
+    private rejectColumnFields(key: string, property: LegacyProperty, kind: string): void {
         if (property.databaseDefault !== undefined) {
             this.refuse(key, `is a ${kind} relation property declaring \`databaseDefault\`. Declare the foreign-key column as a property of its own and put \`databaseDefault\` there.`);
         }
@@ -688,7 +698,7 @@ class CollectionLift {
      * relation's `access` / `private`: what `canReadRelation`, the include
      * refusal and nested-write access enforce.
      */
-    private relationFieldRules(entry: LegacyRelation): { access?: ColumnAccess; private?: true } {
+    private relationFieldRules(entry: LiftedRelationEntry): { access?: ColumnAccess; private?: true } {
         let found: { key: string; rules: { access?: ColumnAccess; private?: true } } | undefined;
         for (const [key, other] of this.addressed) {
             if (other !== entry) continue;
@@ -722,7 +732,7 @@ class CollectionLift {
      * becomes a column plus `rel.belongsTo({ index: false })` named
      * `<key>Relation`; see the equivalence test for the bytes that leaves.
      */
-    private liftReference(key: string, property: Extract<Property, { type: "reference" }>, primaryKey: boolean): void {
+    private liftReference(key: string, property: Extract<LegacyProperty, { type: "reference" }>, primaryKey: boolean): void {
         const target = property.path ? this.lifter.resolvePath(property.path) : undefined;
         if (property.defaultValue !== undefined) {
             this.note(key, "defaultValue", "inert", property.defaultValue, "A reference's default is a pointer object, which no column default can hold.");
@@ -748,7 +758,7 @@ class CollectionLift {
     }
 
     /** The fields every column carries, from the property. */
-    private commonColumnFields(key: string, property: Property, def: ColumnDef, primaryKey: boolean): ColumnDef {
+    private commonColumnFields(key: string, property: LegacyProperty, def: ColumnDef, primaryKey: boolean): ColumnDef {
         if (property.columnName !== undefined && property.columnName !== toSnakeCase(key)) def.column = property.columnName;
         def.primaryKey = primaryKey;
         def.notNull = primaryKey || property.validation?.required === true;
@@ -783,7 +793,7 @@ class CollectionLift {
     }
 
     /** Any column but a link: its type, key, default, rules and options. */
-    private liftScalar(key: string, property: Property, primaryKey: boolean): ColumnDef {
+    private liftScalar(key: string, property: LegacyProperty, primaryKey: boolean): ColumnDef {
         const def = this.commonColumnFields(key, property, baseDef(this.columnTypeOf(key, property, primaryKey)), primaryKey);
         this.liftDefault(key, property, def, primaryKey);
         this.liftTypedFields(key, property, def);
@@ -791,7 +801,7 @@ class CollectionLift {
     }
 
     /** The column type the planner gives a property (`columnPgType`). */
-    private columnTypeOf(key: string, property: Property, primaryKey: boolean): ColumnType {
+    private columnTypeOf(key: string, property: LegacyProperty, primaryKey: boolean): ColumnType {
         switch (property.type) {
             case "string": {
                 if (property.enum !== undefined) {
@@ -828,7 +838,7 @@ class CollectionLift {
     }
 
     /** The DEFAULT, in the planner's precedence: key strategy, stamp, SQL default, literal. */
-    private liftDefault(key: string, property: Property, def: ColumnDef, primaryKey: boolean): void {
+    private liftDefault(key: string, property: LegacyProperty, def: ColumnDef, primaryKey: boolean): void {
         const isId = "isId" in property ? property.isId : undefined;
         const literal = "defaultValue" in property ? property.defaultValue : undefined;
         const databaseDefault = property.databaseDefault;
@@ -879,7 +889,7 @@ class CollectionLift {
     }
 
     /** The options only some property types have. */
-    private liftTypedFields(key: string, property: Property, def: ColumnDef): void {
+    private liftTypedFields(key: string, property: LegacyProperty, def: ColumnDef): void {
         switch (property.type) {
             case "string": {
                 if (property.enum !== undefined) this.noteEnumLabels(key, property.enum);
@@ -928,7 +938,7 @@ class CollectionLift {
                 return;
             case "vector":
                 this.setRules(def, baseRules(property.validation));
-                if (property.index !== undefined) def.vectorIndex = liftVectorIndex(property.index);
+                if (property.index !== undefined) def.vectorIndex = liftVectorIndex(property.index, distance => this.refuse(key, unknownDistance(distance)));
                 if (property.defaultValue !== undefined) def.default = { kind: "literal", value: [...property.defaultValue.value] };
                 return;
             case "map": {
@@ -950,7 +960,7 @@ class CollectionLift {
      * server reads it (who may use the user picker), so it is carried, not
      * noted as presentation.
      */
-    private liftUserSelect(key: string, property: Extract<Property, { type: "string" }>, def: ColumnDef): void {
+    private liftUserSelect(key: string, property: Extract<LegacyProperty, { type: "string" }>, def: ColumnDef): void {
         if (property.userSelect === false) {
             this.note(key, "userSelect", "redundant", false, "States the default.");
             return;
@@ -970,7 +980,7 @@ class CollectionLift {
     }
 
     /** Notes an enum's presentation — a label that is not the id, a colour, a disabled flag — when it has any. */
-    private noteEnumLabels(key: string, values: EnumValues): void {
+    private noteEnumLabels(key: string, values: LegacyEnumValues): void {
         const entries: unknown[] = Array.isArray(values)
             ? values
             : Object.entries(values).map(([id, label]) => (typeof label === "string" ? { id, label } : { ...label, id }));
@@ -982,7 +992,7 @@ class CollectionLift {
         if (presentational) this.note(key, "enum", "ui", values, "The labels, colours and disabled flags of the values; the ids are carried.");
     }
 
-    private liftArray(key: string, property: Extract<Property, { type: "array" }>, def: ColumnDef): void {
+    private liftArray(key: string, property: Extract<LegacyProperty, { type: "array" }>, def: ColumnDef): void {
         const rules = arrayRules(property.validation, property.of);
         this.noteItemUniqueness(key, property);
         if (def.type.kind === "array") {
@@ -1049,7 +1059,7 @@ class CollectionLift {
      * is carried as the array's `uniqueItems` — the same rule, said where the
      * table model says it — which lowers back as the array's own flag.
      */
-    private noteItemUniqueness(key: string, property: Extract<Property, { type: "array" }>): void {
+    private noteItemUniqueness(key: string, property: Extract<LegacyProperty, { type: "array" }>): void {
         const of = Array.isArray(property.of) ? undefined : property.of;
         if (of?.validation?.uniqueInArray === true) {
             this.note(`${key}[]`, "validation.uniqueInArray", "derived", true, UNIQUE_ITEMS_REASON);
@@ -1057,12 +1067,12 @@ class CollectionLift {
     }
 
     /** A map column's shape: its declared fields, and whether it takes others. */
-    private mapShape(key: string, property: Extract<Property, { type: "map" }>): JsonShapeDef | undefined {
+    private mapShape(key: string, property: Extract<LegacyProperty, { type: "map" }>): JsonShapeDef | undefined {
         if (property.properties === undefined && !property.keyValue) return undefined;
         return this.objectNode(key, property);
     }
 
-    private objectNode(key: string, property: Extract<Property, { type: "map" }>, inArrayItem = false): JsonShapeDef {
+    private objectNode(key: string, property: Extract<LegacyProperty, { type: "map" }>, inArrayItem = false): JsonShapeDef {
         const fields: Record<string, JsonShapeDef> = {};
         for (const [field, nested] of Object.entries(property.properties ?? {})) {
             fields[field] = this.jsonNode(`${key}.${field}`, nested, false, inArrayItem);
@@ -1073,7 +1083,7 @@ class CollectionLift {
     }
 
     /** The item of an array held as JSON. */
-    private arrayItemShape(key: string, property: Extract<Property, { type: "array" }>): JsonShapeDef {
+    private arrayItemShape(key: string, property: Extract<LegacyProperty, { type: "array" }>): JsonShapeDef {
         if (property.oneOf !== undefined) {
             if (property.of !== undefined) this.note(key, "of", "inert", property.of, "`oneOf` decides the items; `of` is not read beside it.");
             const variants: Record<string, JsonShapeDef> = {};
@@ -1098,7 +1108,7 @@ class CollectionLift {
     }
 
     /** One nested property as a JSON node. */
-    private jsonNode(key: string, property: Property, arrayItem: boolean, itemField = false): JsonShapeDef {
+    private jsonNode(key: string, property: LegacyProperty, arrayItem: boolean, itemField = false): JsonShapeDef {
         this.noteUnknownPropertyFields(key, property);
         for (const field of ["columnName", "access", "excludeFromApi", "databaseDefault"] as const) {
             if (property[field] !== undefined) this.note(key, field, "inert", property[field], "Not read on a field inside a JSON document.");
@@ -1190,7 +1200,7 @@ class CollectionLift {
 
     // ── Storage, callbacks ──────────────────────────────────────────────────
 
-    private liftStorage(key: string, storage: StorageConfig): ReturnType<typeof normalizeStorage> {
+    private liftStorage(key: string, storage: LegacyStorageConfig): ReturnType<typeof normalizeStorage> {
         if (typeof storage.storagePath !== "string") {
             this.refuse(key, "computes its storage path with a function. The server needs the path as a template string (`\"users/{id}/\"`); the function can move to `customizeTable` beside it.");
         }
@@ -1216,7 +1226,7 @@ class CollectionLift {
     }
 
     /** Property callbacks as a column `.transform()`, called with the legacy props. */
-    private liftPropertyCallbacks(callbacks: PropertyCallbacks): ColumnTransform {
+    private liftPropertyCallbacks(callbacks: LegacyPropertyCallbacks): ColumnTransform {
         const collection = this.collection;
         const out: ColumnTransform = {};
         const { beforeSave, afterRead } = callbacks;
@@ -1244,7 +1254,7 @@ class CollectionLift {
     private liftRelations(): void {
         for (const entry of this.relations) {
             const { key, relation, resolved } = entry;
-            let target: CollectionConfig;
+            let target: LegacyCollectionConfig;
             try {
                 target = resolved.target();
             } catch (error) {
@@ -1322,7 +1332,7 @@ class CollectionLift {
         }
     }
 
-    private relationPropertyOf(entry: LegacyRelation): Extract<Property, { type: "relation" }> | undefined {
+    private relationPropertyOf(entry: LiftedRelationEntry): Extract<LegacyProperty, { type: "relation" }> | undefined {
         for (const [key, other] of this.addressed) {
             if (other !== entry) continue;
             const property = this.properties[key];
@@ -1331,7 +1341,7 @@ class CollectionLift {
         return undefined;
     }
 
-    private noteInertActions(key: string, relation: Relation): void {
+    private noteInertActions(key: string, relation: LegacyRelation): void {
         if (relation.onDelete !== undefined) this.note(key, "onDelete", "inert", relation.onDelete, `A ${relation.kind} relation plans no foreign key here; nothing reads it.`);
         if (relation.onUpdate !== undefined) this.note(key, "onUpdate", "inert", relation.onUpdate, `A ${relation.kind} relation plans no foreign key here; nothing reads it.`);
     }
@@ -1434,7 +1444,7 @@ class CollectionLift {
         return this.liftAuthOptions(auth);
     }
 
-    private liftAuthOptions(auth: AuthCollectionConfig): AuthTableOptions {
+    private liftAuthOptions(auth: LegacyAuthCollectionConfig): AuthTableOptions {
         const out: AuthTableOptions = {};
         if (auth.roles !== undefined) out.roles = auth.roles;
         if (auth.scopes !== undefined) out.scopes = auth.scopes;
@@ -1490,7 +1500,7 @@ class CollectionLift {
     }
 
     /** Collection callbacks as table hooks, called with the legacy props (the original collection as `collection`). */
-    private liftHooks(callbacks: CollectionCallbacks): TableHooks {
+    private liftHooks(callbacks: LegacyCollectionCallbacks): TableHooks {
         const collection = this.collection;
         const out: TableHooks = {};
         const { beforeQuery, afterRead, beforeSave, afterSave, afterSaveError, beforeDelete, afterDelete } = callbacks;
@@ -1560,14 +1570,14 @@ const baseDef = (type: ColumnType): ColumnDef => ({
     private: false
 });
 
-const isIdOf = (property: Property): boolean => "isId" in property && Boolean(property.isId);
+const isIdOf = (property: LegacyProperty): boolean => "isId" in property && Boolean(property.isId);
 
 /** The text between `sql\`` and `\``, or the value as written. */
 const sqlExpressionText = (value: string): string =>
     value.startsWith("sql`") && value.endsWith("`") && value.length >= 5 ? value.substring(4, value.length - 1) : value;
 
 /** The ids of an enum, in its order (`enumLabelsOf`). */
-function enumIds(values: EnumValues): string[] {
+function enumIds(values: LegacyEnumValues): string[] {
     if (Array.isArray(values)) {
         return values.map((entry: unknown) =>
             String(typeof entry === "object" && entry !== null && "id" in entry ? entry.id : entry));
@@ -1578,7 +1588,7 @@ function enumIds(values: EnumValues): string[] {
 const STRING_COLUMN_TYPES = new Set(["text", "varchar", "char", "uuid"]);
 
 /** `stringType` of the planner, enums aside. */
-function stringColumnType(key: string, property: Extract<Property, { type: "string" }>, slug: string): ColumnType {
+function stringColumnType(key: string, property: Extract<LegacyProperty, { type: "string" }>, slug: string): ColumnType {
     if (property.isId === "uuid" || property.columnType === "uuid") return { kind: "uuid" };
     const length = property.validation?.max ?? 255;
     if (property.columnType === "char") return { kind: "char", length };
@@ -1601,7 +1611,7 @@ const NUMBER_COLUMN_TYPES: Record<string, ColumnType> = {
 };
 
 /** `numberType` of the planner. */
-function numberColumnType(key: string, property: Extract<Property, { type: "number" }>, isId: boolean, slug: string): ColumnType {
+function numberColumnType(key: string, property: Extract<LegacyProperty, { type: "number" }>, isId: boolean, slug: string): ColumnType {
     if (property.isId === "increment") return { kind: "integer" };
     const numeric = (): ColumnType => {
         if (property.precision === undefined) return { kind: "numeric" };
@@ -1622,7 +1632,7 @@ function numberColumnType(key: string, property: Extract<Property, { type: "numb
 }
 
 /** The element type of a native array column (`arrayElementType`), or `undefined` for a JSON one. */
-function arrayElementKind(property: Extract<Property, { type: "array" }>): "text" | "integer" | "boolean" | "numeric" | undefined {
+function arrayElementKind(property: Extract<LegacyProperty, { type: "array" }>): "text" | "integer" | "boolean" | "numeric" | undefined {
     let columnType = property.columnType;
     if (!columnType && property.of && !Array.isArray(property.of)) {
         const of = property.of;
@@ -1645,7 +1655,7 @@ function arrayElementKind(property: Extract<Property, { type: "array" }>): "text
  * single column can restate it — a composite key, or an enum type the target
  * names after itself.
  */
-function keyTypeOf(target: CollectionConfig): ColumnType | undefined {
+function keyTypeOf(target: LegacyCollectionConfig): ColumnType | undefined {
     const properties = target.properties ?? {};
     const ids = Object.entries(properties).filter(([, property]) => isIdOf(property));
     if (ids.length > 1) return undefined;
@@ -1667,7 +1677,7 @@ function keyTypeOf(target: CollectionConfig): ColumnType | undefined {
 }
 
 /** A `defaultValue` as the literal a column default stores, or `undefined` when it is not one. */
-function literalValue(property: Property, value: unknown): unknown {
+function literalValue(property: LegacyProperty, value: unknown): unknown {
     switch (property.type) {
         case "string": return typeof value === "string" ? value : undefined;
         case "number": return typeof value === "number" ? value : undefined;
@@ -1686,25 +1696,25 @@ function literalValue(property: Property, value: unknown): unknown {
 
 type Rules = ValidationInput & Record<string, unknown>;
 
-function baseRules(validation: Property["validation"]): Rules {
+function baseRules(validation: LegacyProperty["validation"]): Rules {
     return validation?.requiredMessage !== undefined ? { requiredMessage: validation.requiredMessage } : {};
 }
 
-function stringRules(validation: Extract<Property, { type: "string" }>["validation"]): Rules {
+function stringRules(validation: Extract<LegacyProperty, { type: "string" }>["validation"]): Rules {
     if (!validation) return {};
     const { required: _required, unique: _unique, uniqueInArray: _inArray, ...rest } = validation;
     void _required; void _unique; void _inArray;
     return { ...rest };
 }
 
-function numberRules(validation: Extract<Property, { type: "number" }>["validation"]): Rules {
+function numberRules(validation: Extract<LegacyProperty, { type: "number" }>["validation"]): Rules {
     if (!validation) return {};
     const { required: _required, unique: _unique, uniqueInArray: _inArray, ...rest } = validation;
     void _required; void _unique; void _inArray;
     return { ...rest };
 }
 
-function dateRules(validation: Extract<Property, { type: "date" }>["validation"]): Rules {
+function dateRules(validation: Extract<LegacyProperty, { type: "date" }>["validation"]): Rules {
     if (!validation) return {};
     const { required: _required, unique: _unique, uniqueInArray: _inArray, ...rest } = validation;
     void _required; void _unique; void _inArray;
@@ -1725,7 +1735,7 @@ const UNIQUE_OUTSIDE_ARRAY = "`uniqueInArray` has an effect only on an array, it
  * Both are enforced by the server's write validation now, which is stronger
  * than the panel-only check they were.
  */
-function arrayRules(validation: Extract<Property, { type: "array" }>["validation"], of: Extract<Property, { type: "array" }>["of"]): Rules {
+function arrayRules(validation: Extract<LegacyProperty, { type: "array" }>["validation"], of: Extract<LegacyProperty, { type: "array" }>["of"]): Rules {
     const out: Rules = {};
     if (validation?.requiredMessage !== undefined) out.requiredMessage = validation.requiredMessage;
     if (validation?.min !== undefined) out.minItems = validation.min;
@@ -1743,14 +1753,31 @@ function arrayRules(validation: Extract<Property, { type: "array" }>["validation
     return out;
 }
 
-const METRIC_OF: Record<VectorDistance, VectorMetric> = { cosine: "cosine", l2: "l2", inner_product: "ip" };
+const METRIC_OF: Record<LegacyVectorDistance, VectorMetric> = { cosine: "cosine", l2: "l2", inner_product: "ip" };
 
-function liftVectorIndex(index: VectorIndexConfig | false): VectorIndexOptions | false {
+function isLegacyVectorDistance(value: unknown): value is LegacyVectorDistance {
+    return typeof value === "string" && Object.hasOwn(METRIC_OF, value);
+}
+
+/** Why an index `distance` that is not a pgvector distance is refused. */
+function unknownDistance(distance: unknown): string {
+    return `declares the vector index distance ${JSON.stringify(distance)}, which is not one of ${Object.keys(METRIC_OF).map(name => `"${name}"`).join(", ")}. ` +
+        "0.30 planned no operator class for it, so the index it meant was never built; write one of those, or drop `distance` for the default (cosine).";
+}
+
+/**
+ * A vector index as `.vectorIndex()` options. An unknown `distance` (the
+ * frozen type forbids it; a project loaded at run time can still hold one) is
+ * refused through `refuse`, never dropped: the planner refuses an unknown
+ * `metric`, and silently losing it would change which index is built.
+ */
+function liftVectorIndex(index: LegacyVectorIndexConfig | false, refuse: (distance: unknown) => never): VectorIndexOptions | false {
     if (index === false) return false;
     const out: VectorIndexOptions = {};
     if (index.method !== undefined) out.method = index.method;
     if (index.distance !== undefined) {
-        out.metric = typeof index.distance === "string" ? METRIC_OF[index.distance] : index.distance.map(distance => METRIC_OF[distance]);
+        const metricOf = (distance: unknown): VectorMetric => (isLegacyVectorDistance(distance) ? METRIC_OF[distance] : refuse(distance));
+        out.metric = Array.isArray(index.distance) ? index.distance.map(metricOf) : metricOf(index.distance);
     }
     if (index.m !== undefined) out.m = index.m;
     if (index.efConstruction !== undefined) out.efConstruction = index.efConstruction;
@@ -1758,7 +1785,7 @@ function liftVectorIndex(index: VectorIndexConfig | false): VectorIndexOptions |
     return out;
 }
 
-function liftIndex(index: CollectionIndex): TableIndex {
+function liftIndex(index: LegacyCollectionIndex): TableIndex {
     const [first, ...rest] = index.on.map((entry): string | TableIndexKey => {
         if (typeof entry === "string") return entry;
         const key: TableIndexKey = { column: entry.prop };
@@ -1777,7 +1804,7 @@ function liftIndex(index: CollectionIndex): TableIndex {
     return out;
 }
 
-function liftPredicate(predicate: IndexPredicate): TableIndexPredicate {
+function liftPredicate(predicate: LegacyIndexPredicate): TableIndexPredicate {
     if ("and" in predicate) {
         const [first, ...rest] = predicate.and.map(liftPredicate);
         return { and: [first, ...rest] };
@@ -1795,7 +1822,7 @@ function liftPredicate(predicate: IndexPredicate): TableIndexPredicate {
  * The `localKey` to write: the one the collection wrote, or the derived one
  * when the relation's key no longer derives it (a renamed relation).
  */
-function localKeyToPin(key: string, declared: string | undefined, resolved: ResolvedRelation): { localKey?: string } {
+function localKeyToPin(key: string, declared: string | undefined, resolved: LegacyResolvedRelation): { localKey?: string } {
     if (resolved.kind !== "belongsTo") return {};
     if (declared !== undefined || generateForeignKeyName(key) !== resolved.localKey) return { localKey: resolved.localKey };
     return {};

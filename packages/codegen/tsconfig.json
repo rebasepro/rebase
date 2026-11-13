@@ -24,6 +24,7 @@
     "paths": {
       "@rebasepro/types": ["../types/src"],
       "@rebasepro/common": ["../common/src"],
+      "@rebasepro/common/migrate": ["../common/src/migrate"],
       "@rebasepro/client": ["../client/src"]
     }
   },

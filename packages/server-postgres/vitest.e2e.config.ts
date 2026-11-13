@@ -68,6 +68,8 @@ export default defineConfig({
             // name does not reach — before the bare names, which it would not
             // match anyway.
             { find: /^@rebasepro\/server\/schema$/, replacement: fileURLToPath(new URL("../server/src/schema/index.ts", import.meta.url)) },
+            // The legacy model and the lift, which the test helpers import.
+            { find: /^@rebasepro\/common\/migrate$/, replacement: fileURLToPath(new URL("../common/src/migrate/index.ts", import.meta.url)) },
             ...workspaceDependencies().map(toSource)
         ]
     }

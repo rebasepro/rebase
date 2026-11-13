@@ -13,7 +13,7 @@
  * with: DDL under every option, policies, search, vector, triggers, views,
  * the Drizzle schema and the boot plans. A single byte of difference fails.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import type { ModuleImporter } from "./load-legacy";
 import type { VerificationResult } from "./types";
@@ -47,13 +47,14 @@ export function describeDifference(before: string, after: string, context = 3, l
  * @param schemaDir the migrated `backend/schema`, absolute
  */
 export async function verifyMigration(
-    legacy: readonly CollectionConfig[],
+    legacy: readonly LegacyCollectionConfig[],
     schemaDir: string,
     importModule: ModuleImporter
 ): Promise<VerificationResult> {
     const { renderSchemaOutputs } = await import("@rebasepro/server-postgres");
     const { compileLoadedSchema, loadBackendSchema } = await import("@rebasepro/server");
-    const { collectionsToTableDefs, compileSchema } = await import("@rebasepro/common");
+    const { compileSchema } = await import("@rebasepro/common");
+    const { collectionsToTableDefs } = await import("@rebasepro/common/migrate");
     let after: Record<string, string>;
     try {
         // Exactly as the server reads it: the index is authoritative, a sibling

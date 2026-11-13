@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
-import { collectionsToTableDefs } from "@rebasepro/common";
+import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 import { col, defineTable } from "@rebasepro/types";
 import type {
     AnyCollectionConfig,

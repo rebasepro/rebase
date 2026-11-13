@@ -3,7 +3,7 @@ import { col, defineTable } from "@rebasepro/types";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { compileTables } from "../src/schema/compile-tables";
-import { collectionsToTableDefs } from "../src/schema/lift-collection";
+import { collectionsToTableDefs } from "../src/migrate";
 import { getDeclaredPrimaryKeys } from "../src/util/identity";
 import { keyAddressInfo, keyColumns } from "../src/table/keys";
 import { columnByKey, columnBySqlName, columnMaps, columnNameOf, keyForColumn } from "../src/table/columns";

@@ -1,4 +1,5 @@
-import { collectionsToTableDefs, compileTables, type AnySchemaDef, type LiftOptions } from "@rebasepro/common";
+import { compileTables, type AnySchemaDef } from "@rebasepro/common";
+import { collectionsToTableDefs, type LiftOptions } from "@rebasepro/common/migrate";
 import { isRelationDef, isTableDef, isViewDef, type CollectionConfig, type TableDescriptor } from "@rebasepro/types";
 
 /**

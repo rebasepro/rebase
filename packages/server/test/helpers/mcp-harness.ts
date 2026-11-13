@@ -17,7 +17,8 @@
 import type { McpAppCompilerSource as McpRouteConfigAppCompiler } from "../../src/mcp/mcp-apps";
 import { Hono } from "hono";
 import type { AuthAdapter, CollectionConfig, DataDriver, TableDescriptor } from "@rebasepro/types";
-import { collectionsToTableDefs, compileTables, lowerTables, type AnySchemaDef } from "@rebasepro/common";
+import { compileTables, lowerTables, type AnySchemaDef } from "@rebasepro/common";
+import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 import { generateAccessToken } from "../../src/auth/jwt";
 import { createOAuthRoutes } from "../../src/mcp/oauth-routes";
 import { createMcpRoutes, createMcpWellKnownRoutes, type McpRoutesConfig } from "../../src/mcp/mcp-routes";

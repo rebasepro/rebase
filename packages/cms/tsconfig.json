@@ -39,6 +39,9 @@
       "@rebasepro/common": [
         "../common/src"
       ],
+      "@rebasepro/common/migrate": [
+        "../common/src/migrate"
+      ],
       "@rebasepro/types": [
         "../types/src"
       ],

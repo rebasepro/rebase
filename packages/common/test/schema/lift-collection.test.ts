@@ -11,7 +11,7 @@ import {
     type SecurityRule
 } from "@rebasepro/types";
 
-import { collectionToTableDef, collectionsToTableDefs, type LiftNote } from "../../src/schema/lift-collection";
+import { collectionToTableDef, collectionsToTableDefs, type LegacyVectorIndexConfig, type LiftNote } from "../../src/migrate";
 import { isSchemaDefinitionError } from "../../src/schema/errors";
 import { createCallContext } from "../../src/data/call-context";
 
@@ -492,6 +492,17 @@ describe("collectionToTableDef — refusals", () => {
         ["a view with tenant", () => [collection("t", { id: { type: "string", isId: true } }, { view: { query: "SELECT 1" }, tenant: { field: "id", from: { claim: "x" } } })], /serves a view and declares `tenant`/]
     ])("refuses %s", (_name, collections, pattern) => {
         expect(refusal(() => collectionsToTableDefs(collections()))).toEqual(expect.arrayContaining([expect.stringMatching(pattern)]));
+    });
+
+    it("refuses a vector index distance that is not a pgvector distance, rather than dropping it", () => {
+        // A project loaded at run time can hold what the frozen type forbids.
+        const loaded = (json: string): LegacyVectorIndexConfig => JSON.parse(json);
+        for (const index of [loaded("{\"distance\":\"hamming\"}"), loaded("{\"distance\":[\"cosine\",\"hamming\"]}")]) {
+            const t = collection("t", { id: uuidKey, embedding: { type: "vector", dimensions: 3, index } });
+            expect(refusal(() => collectionsToTableDefs([t]))).toEqual([
+                expect.stringMatching(/^t\.embedding: declares the vector index distance "hamming", which is not one of "cosine", "l2", "inner_product"/)
+            ]);
+        }
     });
 
     it("reports a collection once, however many relations point at it", () => {

@@ -82,6 +82,11 @@ export function workspaceSourceAliases(): { find: RegExp; replacement: string }[
             ...(name === "@rebasepro/server"
                 ? [{ find: /^@rebasepro\/server\/schema$/, replacement: fileURLToPath(new URL("../server/src/schema/index.ts", import.meta.url)) }]
                 : []),
+            // `@rebasepro/common/migrate` is the codemod's core: the legacy
+            // model and the lift.
+            ...(name === "@rebasepro/common"
+                ? [{ find: /^@rebasepro\/common\/migrate$/, replacement: fileURLToPath(new URL("../common/src/migrate/index.ts", import.meta.url)) }]
+                : []),
             { find: new RegExp(`^${name}$`), replacement: source }
         ]);
 }

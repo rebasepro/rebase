@@ -17,8 +17,7 @@
  */
 import path from "node:path";
 import type { Node, Statement } from "ts-morph";
-import type { LiftNote } from "@rebasepro/common";
-import type { EnumValues } from "@rebasepro/types";
+import type { LegacyEnumValues, LiftNote } from "@rebasepro/common/migrate";
 import { enumValueLabel, labelFromIdentifier, singularLabel } from "@rebasepro/utils";
 
 import type { Member, PathSegment } from "./ast";
@@ -249,7 +248,7 @@ function printable(plan: PlanContext, builder: Builder, value: unknown, segments
 }
 
 /** The enum labels a field needs: only values whose label or colour is not the derived one. */
-export function enumLabelsOf(values: EnumValues): Record<string, unknown> | undefined {
+export function enumLabelsOf(values: LegacyEnumValues): Record<string, unknown> | undefined {
     const entries: { id: string | number; label?: string; color?: unknown; disabled?: boolean }[] = Array.isArray(values)
         ? values.map(value => ({ ...value }))
         : Object.entries(values).map(([id, value]) => (typeof value === "string" ? { id, label: value } : { ...value, id }));
@@ -417,7 +416,7 @@ function applyFieldNote(plan: PlanContext, builder: Builder, item: LiftNote, fie
                 target.enumLabels = new RawSource(constant.labelsName);
                 return;
             }
-            const labels = enumLabelsOf(item.value as EnumValues);
+            const labels = enumLabelsOf(item.value as LegacyEnumValues);
             if (labels) target.enumLabels = labels;
             return;
         }

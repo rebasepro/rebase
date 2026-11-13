@@ -25,7 +25,8 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import type { CollectionConfig } from "@rebasepro/types";
-import { collectionsToTableDefs, printIndexModule, printTableModule, printTableSource } from "@rebasepro/common";
+import { printIndexModule, printTableModule, printTableSource } from "@rebasepro/common";
+import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 import { logger } from "@rebasepro/server";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";

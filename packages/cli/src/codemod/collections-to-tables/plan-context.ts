@@ -4,7 +4,7 @@
  */
 import path from "node:path";
 import type { SourceFile } from "ts-morph";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import type { AstContext, CollectionSite } from "./ast";
 import { toPosix } from "./ast";
@@ -14,7 +14,7 @@ import type { ManualStep, Note, Refusal } from "./types";
 
 /** One legacy collection with everything the planners read about it. */
 export interface CollectionEntry {
-    collection: CollectionConfig;
+    collection: LegacyCollectionConfig;
     /** The collection file, absolute. */
     file: string;
     /** Its AST. */
