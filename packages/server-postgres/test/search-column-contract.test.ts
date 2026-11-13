@@ -22,9 +22,8 @@ import {
 import { findGeneratedColumnConflicts, parseColumnMutations } from "../src/schema/generated-column-conflicts";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { planTableSchemaEnsure } from "../src/schema/ensure-tables";
-import { buildSearchColumnSpec } from "../src/schema/search-column";
 import { planColumnTypeFor } from "./helpers/plan-column";
-import { compileSet } from "./helpers/plan-tables";
+import { compileSet, searchSpecOf } from "./helpers/plan-tables";
 
 const collection: LegacyPostgresCollectionConfig = {
     slug: "talents",
@@ -48,7 +47,7 @@ const collection: LegacyPostgresCollectionConfig = {
 };
 
 const collections: LegacyCollectionConfig[] = [collection];
-const spec = buildSearchColumnSpec(collection)!;
+const spec = searchSpecOf(collection)!;
 
 const emptySchema = { tables: new Map<string, Set<string>>(), enums: new Set<string>(), constraints: new Set<string>() };
 
@@ -302,7 +301,7 @@ describe("searchExcludePatterns — what Atlas is told to keep its hands off", (
             ...collection,
             search: { ...collection.search!, fuzzy: true }
         };
-        const fuzzySpec = buildSearchColumnSpec(fuzzy)!;
+        const fuzzySpec = searchSpecOf(fuzzy)!;
         const patterns = searchExcludePatterns(compileSet([fuzzy]));
         expect(fuzzySpec.fuzzy).toBeDefined();
         expect(patterns).toContain(`public.talents.${fuzzySpec.fuzzy!.column}`);

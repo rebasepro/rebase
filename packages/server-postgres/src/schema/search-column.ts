@@ -1,5 +1,5 @@
 /**
- * The one place a collection's `search` block becomes SQL.
+ * The one place a table's `search` block becomes SQL.
  *
  * Four things describe a Postgres table in this codebase — the DDL generator,
  * the Drizzle schema generator, the runtime table builder for BaaS mode, and
@@ -44,16 +44,10 @@
  * typed without accents misses every row that carries them.
  */
 import {
-    CollectionConfig,
-    Property,
-    StringProperty,
-    ArrayProperty,
-    MapProperty,
     SearchConfig,
     SearchField,
     SearchMode,
     SearchWeight,
-    isPostgresCollectionConfig,
     DEFAULT_SEARCH_COLUMN,
     DEFAULT_SEARCH_MODE,
     DEFAULT_SEARCH_LANGUAGE,
@@ -66,7 +60,6 @@ import {
     type TableDescriptor
 } from "@rebasepro/types";
 import { createHash } from "node:crypto";
-import { getTableName } from "@rebasepro/common";
 import { toSnakeCase, toPostgresIdentifier } from "@rebasepro/utils";
 
 /** Schema-qualified so a collection outside `public` still resolves them. */
@@ -149,66 +142,6 @@ export class SearchConfigError extends Error {
     }
 }
 
-/** The `search` block of a collection, or undefined when it has none. */
-export const getSearchConfig = (collection: CollectionConfig): SearchConfig | undefined =>
-    isPostgresCollectionConfig(collection) ? collection.search : undefined;
-
-const columnNameOf = (propName: string, prop?: Property | null): string =>
-    prop && "columnName" in prop && typeof prop.columnName === "string" ? prop.columnName : toSnakeCase(propName);
-
-/**
- * Classify a property for search purposes.
- *
- * Deliberately narrower than the schema plan's `PgType`: search only cares
- * whether a value reaches text, and the mapping from property to *physical*
- * type is asserted against the plan in the contract test rather than duplicated
- * here.
- *
- * Returns null for anything that is not text-bearing, which the caller turns
- * into a boot error naming the property.
- */
-const classify = (prop: Property): { kind: FieldKind; reason?: string } | null => {
-    switch (prop.type) {
-        case "string": {
-            const sp = prop as StringProperty;
-            if (sp.enum) {
-                return { kind: "text", reason: "enum" };
-            }
-            if (sp.isId === "uuid" || sp.columnType === "uuid") {
-                return { kind: "text", reason: "uuid" };
-            }
-            return { kind: "text" };
-        }
-        case "map": {
-            const mp = prop as MapProperty;
-            // A `json` column is not `jsonb`, and the cast between them is not
-            // immutable. Declaring `columnType: "json"` puts the value out of
-            // reach of a generated column.
-            if (mp.columnType === "json") return { kind: "jsonb", reason: "json" };
-            return { kind: "jsonb" };
-        }
-        case "array": {
-            const ap = prop as ArrayProperty;
-            let colType = ap.columnType;
-            if (!colType && ap.of && !Array.isArray(ap.of)) {
-                const of = ap.of as Property;
-                if (of.type === "string") colType = "text[]";
-                else if (of.type === "number") colType = of.validation?.integer ? "integer[]" : "numeric[]";
-                else if (of.type === "boolean") colType = "boolean[]";
-            }
-            if (colType === "text[]") return { kind: "text_array" };
-            if (colType === "json") return { kind: "jsonb", reason: "json" };
-            if (colType === "integer[]" || colType === "boolean[]" || colType === "numeric[]") {
-                return { kind: "text_array", reason: "non_text_array" };
-            }
-            // Everything else lands in JSONB, which the JSON extractor handles.
-            return { kind: "jsonb" };
-        }
-        default:
-            return null;
-    }
-};
-
 const normalize = (inner: string, unaccent: boolean): string =>
     unaccent ? `${SEARCH_UNACCENT_FN}(${inner})` : inner;
 
@@ -231,22 +164,20 @@ const quote = (v: string): string => `'${v.replace(/'/g, "''")}'`;
 /**
  * What a `search` field's first segment names, as the spec builder reads it:
  * the column it starts at, how that column reaches text (`null`: it does
- * not), and the noun a refusal calls it by.
+ * not), and how a refusal names it.
  */
 interface SearchFieldHead {
     column: string;
     classified: { kind: FieldKind; reason?: string } | null;
-    /** `\`text\` column`, `\`number\` property` — for a refusal. */
+    /** `\`text\` column`, `\`integer[]\` column` — for a refusal. */
     label: string;
 }
 
-/** The table a spec is built for, read through one interface by both doors. */
+/** The table a spec is built for. */
 interface SearchSpecSource {
     slug: string;
     schema: string;
     table: string;
-    /** The noun a refusal uses for a field: "column" or "property". */
-    noun: string;
     /** The field a path starts at, or `undefined` when the table declares none of that key. */
     head(key: string): SearchFieldHead | undefined;
     /** Every key a path may start at, for a refusal. */
@@ -271,10 +202,9 @@ const resolveField = (
     const path = typeof entry === "string" ? entry : entry.path;
     const weight = (typeof entry === "string" ? undefined : entry.weight) ?? DEFAULT_SEARCH_WEIGHT;
     const where = `${source.slug}.search`;
-    const noun = source.noun;
 
     if (!path || typeof path !== "string") {
-        throw new SearchConfigError(`${where}: every entry in \`fields\` needs a ${noun} path.`);
+        throw new SearchConfigError(`${where}: every entry in \`fields\` needs a column path.`);
     }
 
     const [head, ...rest] = path.split(".");
@@ -282,7 +212,7 @@ const resolveField = (
     if (!field) {
         const known = source.knownKeys().join(", ");
         throw new SearchConfigError(
-            `${where}: "${path}" starts at ${noun} "${head}", which this table does not declare. Known ${noun === "column" ? "columns" : "properties"}: ${known}.`
+            `${where}: "${path}" starts at column "${head}", which this table does not declare. Known columns: ${known}.`
         );
     }
 
@@ -339,38 +269,6 @@ const resolveField = (
 };
 
 /**
- * Build the full spec for a collection, or undefined when it has not opted in.
- *
- * TRANSITIONAL (Postgres-first Stage B): the planner builds the spec from the
- * table descriptor ({@link buildTableSearchColumnSpec}). This door stays for
- * the readers outside the planner that still hold a collection (the query
- * builder's search, the doctor, introspection) until they move; both doors
- * build through one function, so they cannot disagree.
- *
- * Throws {@link SearchConfigError} on a config that cannot be honoured. Callers
- * at boot surface that as a startup failure — a search block that half-works is
- * worse than one that refuses.
- */
-export const buildSearchColumnSpec = (collection: CollectionConfig): SearchColumnSpec | undefined => {
-    const cfg = getSearchConfig(collection);
-    if (!cfg) return undefined;
-    const properties = collection.properties ?? {};
-    return searchColumnSpecFrom(cfg, {
-        slug: collection.slug,
-        schema: isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public",
-        table: getTableName(collection),
-        noun: "property",
-        head: key => {
-            const prop = properties[key] as Property | undefined;
-            if (!prop) return undefined;
-            return { column: columnNameOf(key, prop), classified: classify(prop), label: `\`${prop.type}\` property` };
-        },
-        knownKeys: () => Object.keys(properties),
-        collides: column => Boolean(properties[column])
-    });
-};
-
-/**
  * How a column reaches text, for search: the descriptor counterpart of
  * {@link classify}. `null` for a column that holds no text (a number, a date,
  * a geopoint document, a vector, bytes, a custom SQL type).
@@ -409,7 +307,6 @@ export const buildTableSearchColumnSpec = (table: TableDescriptor): SearchColumn
         slug: table.slug,
         schema: table.schema,
         table: table.table,
-        noun: "column",
         head: key => {
             const column = table.columns.find(candidate => candidate.key === key);
             if (!column) return undefined;
@@ -425,7 +322,7 @@ const searchColumnSpecFrom = (cfg: SearchConfig, source: SearchSpecSource): Sear
     const { slug, schema, table } = source;
     if (!Array.isArray(cfg.fields) || cfg.fields.length === 0) {
         throw new SearchConfigError(
-            `${slug}.search: \`fields\` is empty. Name the ${source.noun === "column" ? "columns" : "properties"} to index, or remove the \`search\` block to keep the default ILIKE behaviour.`
+            `${slug}.search: \`fields\` is empty. Name the columns to index, or remove the \`search\` block to keep the default ILIKE behaviour.`
         );
     }
 
@@ -433,7 +330,7 @@ const searchColumnSpecFrom = (cfg: SearchConfig, source: SearchSpecSource): Sear
 
     if (source.collides(column)) {
         throw new SearchConfigError(
-            `${slug}.search: the generated column "${column}" collides with a declared ${source.noun} of the same name. Set \`search.column\` to something else.`
+            `${slug}.search: the generated column "${column}" collides with a declared column of the same name. Set \`search.column\` to something else.`
         );
     }
 
@@ -474,7 +371,7 @@ const searchColumnSpecFrom = (cfg: SearchConfig, source: SearchSpecSource): Sear
         const fuzzyColumn = `${column}_text`;
         if (source.collides(fuzzyColumn)) {
             throw new SearchConfigError(
-                `${slug}.search: \`fuzzy\` needs the column "${fuzzyColumn}", which collides with a declared ${source.noun}. Set \`search.column\` to something else.`
+                `${slug}.search: \`fuzzy\` needs the column "${fuzzyColumn}", which collides with a declared column. Set \`search.column\` to something else.`
             );
         }
         spec.fuzzy = {
@@ -681,18 +578,13 @@ export const searchIndexNames = (spec: SearchColumnSpec): string[] =>
 // ── Keeping the generated columns out of responses ──────────────────────────
 
 /**
- * The generated column names a collection's search block adds, if any.
- *
- * These are physical columns on the table, so `SELECT *` returns them. They are
- * an index in column form — a list of lexeme positions, or a concatenation of
- * every searchable field on the row — and nothing outside the query planner has
- * any use for them. Left in, every list response carries a second, larger copy
- * of the row's text.
+ * The generated column names a table's search block adds, read from its
+ * descriptor: the search columns (`search_vector`, and the fuzzy column when there is one).
  */
-export const searchColumnNames = (collection: CollectionConfig): string[] => {
+export const tableSearchColumnNames = (table: TableDescriptor): string[] => {
     let spec: SearchColumnSpec | undefined;
     try {
-        spec = buildSearchColumnSpec(collection);
+        spec = buildTableSearchColumnSpec(table);
     } catch {
         // A malformed block is reported at boot, loudly. A read is the wrong
         // place to raise it a second time, and returning the row without the
@@ -704,25 +596,9 @@ export const searchColumnNames = (collection: CollectionConfig): string[] => {
 };
 
 /**
- * {@link searchColumnNames}, read from a table's descriptor: the generated
- * search columns (`search_vector`, and the fuzzy column when there is one).
- */
-export const tableSearchColumnNames = (table: TableDescriptor): string[] => {
-    let spec: SearchColumnSpec | undefined;
-    try {
-        spec = buildTableSearchColumnSpec(table);
-    } catch {
-        // As above: a malformed block is boot's to report.
-        return [];
-    }
-    if (!spec) return [];
-    return spec.fuzzy ? [spec.column, spec.fuzzy.column] : [spec.column];
-};
-
-/**
  * True for a column whose type only ever holds a search index.
  *
- * Independent of any collection config on purpose: an introspected database
+ * Independent of any table declaration on purpose: an introspected database
  * (BaaS mode) can carry a `tsvector` column this framework never created —
  * Pagila's `film.fulltext` is the canonical one — and it should not be returned
  * to callers either. `isDerivedIndexColumn` already keeps such a column out of
@@ -731,53 +607,4 @@ export const tableSearchColumnNames = (table: TableDescriptor): string[] => {
 export const isSearchIndexColumn = (column: { getSQLType?: () => string }): boolean => {
     const sqlType = typeof column?.getSQLType === "function" ? column.getSQLType().toLowerCase() : "";
     return sqlType === "tsvector" || sqlType === "tsquery";
-};
-
-/**
- * A drizzle select projection over `table` with the search columns dropped.
- *
- * Returns undefined when nothing needs dropping, so the common case keeps using
- * a plain `select()` and this stays invisible in the generated SQL.
- */
-export const visibleColumnProjection = <C extends { getSQLType?: () => string }>(
-    tableColumns: Record<string, C> | undefined,
-    collection?: CollectionConfig
-): Record<string, C> | undefined => {
-    const excluded = excludedColumnNames(tableColumns, collection);
-    if (!tableColumns || excluded.length === 0) return undefined;
-    const projection: Record<string, C> = {};
-    for (const [name, column] of Object.entries(tableColumns)) {
-        if (!excluded.includes(name)) projection[name] = column;
-    }
-    return projection;
-};
-
-/** The same exclusion as a drizzle `db.query` `columns` denylist. */
-export const hiddenColumnsOption = (
-    tableColumns: Record<string, { getSQLType?: () => string }> | undefined,
-    collection?: CollectionConfig
-): Record<string, false> | undefined => {
-    const excluded = excludedColumnNames(tableColumns, collection);
-    if (excluded.length === 0) return undefined;
-    return Object.fromEntries(excluded.map(name => [name, false as const]));
-};
-
-/**
- * The columns to keep out of a response, by name.
- *
- * `tableColumns` is whatever `getTableColumns` returned, which is `undefined`
- * for anything that is not a real drizzle table — a stub in a test, a derived
- * or nested path with no table behind it. Nothing to exclude is the right
- * answer there, and it has to be an answer rather than a throw: this runs on
- * the read path of every collection, opted in or not.
- */
-const excludedColumnNames = (
-    tableColumns: Record<string, { getSQLType?: () => string }> | undefined,
-    collection?: CollectionConfig
-): string[] => {
-    if (!tableColumns || typeof tableColumns !== "object") return [];
-    const byName = new Set(collection ? searchColumnNames(collection) : []);
-    return Object.keys(tableColumns).filter(
-        name => byName.has(name) || isSearchIndexColumn(tableColumns[name])
-    );
 };

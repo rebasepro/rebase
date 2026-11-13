@@ -15,9 +15,8 @@
  */
 import { col, defineTable, rel } from "@rebasepro/types";
 import { LegacyCollectionConfig, type LegacyCollectionIndex, type LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
-import { compileSchema, lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 import {
-    buildCollectionIndexSpecs,
     buildTableIndexSpecs,
     tableIndexStatement,
     deriveIndexName,
@@ -30,8 +29,7 @@ import {
 } from "../src/schema/table-index";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
-import { resolveColumnName } from "../src/schema/column-plan-helpers";
-import { compileSet } from "./helpers/plan-tables";
+import { compileSet, indexSpecsOf } from "./helpers/plan-tables";
 
 const posts = (indexes: LegacyCollectionIndex[], extra: Partial<LegacyPostgresCollectionConfig> = {}): LegacyPostgresCollectionConfig =>
     ({
@@ -52,7 +50,7 @@ const posts = (indexes: LegacyCollectionIndex[], extra: Partial<LegacyPostgresCo
         ...extra
     });
 
-const specs = (c: LegacyCollectionConfig) => buildCollectionIndexSpecs(c, resolveColumnName);
+const specs = (c: LegacyCollectionConfig) => indexSpecsOf(c);
 const one = (indexes: LegacyCollectionIndex[]) => specs(posts(indexes))[0];
 
 describe("resolution", () => {
@@ -78,7 +76,8 @@ describe("resolution", () => {
                 tagList: { type: "relation", name: "Tags", relation: { kind: "manyToMany", target: () => ({ slug: "tags", name: "Tags", table: "tags", properties: { id: { type: "string", isId: true } } }) } }
             }
         });
-        expect(() => specs(collection)).toThrow(/manyToMany relation, which has no column/);
+        // The compiler refuses it before any index is built.
+        expect(() => specs(collection)).toThrow(/`indexes\[0\]` names "tagList", which is no column key or `belongsTo` relation/);
     });
 
     it("defaults NULLS to what the direction implies", () => {
@@ -221,13 +220,13 @@ describe("rendering", () => {
 });
 
 describe("refusals", () => {
-    // Deliberately invalid: each refusal feeds a shape `CollectionIndex` does not admit, to the validator that refuses it.
+    // Deliberately invalid: each refusal feeds a shape the index type does not admit, to the validator that refuses it.
     const rejects = (indexes: unknown[], pattern: RegExp) =>
         expect(() => specs(posts(indexes as LegacyCollectionIndex[]))).toThrow(pattern);
 
-    it("names the collection and the array position", () => {
+    it("names the table and the array position", () => {
         try {
-            specs(posts([{ on: ["status"], reason: "ok" }, { on: ["nope"], reason: "r" }]));
+            specs(posts([{ on: ["status"], reason: "ok" }, { on: ["status", "status"], reason: "r" }]));
             throw new Error("should have thrown");
         } catch (err) {
             expect(err).toBeInstanceOf(TableIndexConfigError);
@@ -235,10 +234,8 @@ describe("refusals", () => {
         }
     });
 
-    it("refuses an unknown property", () => rejects([{ on: ["nope"], reason: "r" }], /not a property/));
-    it("refuses a missing reason", () => rejects([{ on: ["status"] }], /`reason` is required/));
-    it("refuses a blank reason", () => rejects([{ on: ["status"], reason: "   " }], /`reason` is required/));
-    it("refuses an empty key list", () => rejects([{ on: [], reason: "r" }], /at least one column/));
+    it("refuses an unknown column (the compiler, before any index is built)", () =>
+        rejects([{ on: ["nope"], reason: "r" }], /`indexes\[0\]` names "nope", which is no column key/));
 
     it(`refuses more than ${MAX_INDEX_KEYS} keys`, () =>
         rejects([{ on: ["id", "title", "status", "views", "email", "createdAt"], reason: "r" }], /the limit is 5/));
@@ -383,10 +380,8 @@ describe("buildTableIndexSpecs", () => {
     });
     const descriptor = compileSchema([authors, posts])[1].descriptor;
 
-    it("resolves keys, a belongsTo and a predicate to the SQL columns, as the lowered collection does", () => {
+    it("resolves keys, a belongsTo and a predicate to the SQL columns", () => {
         const fromTable = buildTableIndexSpecs(descriptor);
-        const lowered = lowerTables([authors, posts])[1];
-        expect(fromTable).toEqual(buildCollectionIndexSpecs(lowered, resolveColumnName));
         expect(fromTable[0].keys.map(key => [key.column, key.direction])).toEqual([["author_id", "asc"], ["created_at", "desc"]]);
         expect(fromTable[1]).not.toHaveProperty("reason");
         expect(fromTable[2].predicate).toEqual({ column: "status", op: "in", value: ["published", "pinned"] });

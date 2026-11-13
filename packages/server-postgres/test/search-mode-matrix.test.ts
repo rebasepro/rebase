@@ -47,13 +47,12 @@ import { pgTable, text, serial, customType } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
-import { buildSearchColumnSpec } from "../src/schema/search-column";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { FetchService } from "../src/services/FetchService";
 import type { PgColumnBuilderBase } from "drizzle-orm/pg-core";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { compileSet } from "./helpers/plan-tables";
+import { compileSet, searchSpecOf } from "./helpers/plan-tables";
 
 /** Five rows, chosen so each query below separates the configurations. */
 const ROWS: [string, string][] = [
@@ -118,7 +117,7 @@ beforeAll(async () => {
     const orm = drizzle(db);
     for (const v of VARIANTS) {
         const collection = collectionFor(v) as LegacyCollectionConfig;
-        const spec = v.search ? buildSearchColumnSpec(collection) : undefined;
+        const spec = v.search ? searchSpecOf(collection) : undefined;
         const columns: Record<string, PgColumnBuilderBase> = {
             id: serial("id").primaryKey(),
             name: text("name"),

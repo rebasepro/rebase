@@ -25,9 +25,8 @@ import { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasep
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
-import { buildCollectionIndexSpecs, foreignKeyIndexSpec, FOREIGN_KEY_INDEX_REASON } from "../src/schema/table-index";
-import { resolveColumnName } from "../src/schema/column-plan-helpers";
-import { compileSet, planCollections } from "./helpers/plan-tables";
+import { foreignKeyIndexSpec, FOREIGN_KEY_INDEX_REASON } from "../src/schema/table-index";
+import { compileSet, indexSpecsOf, planCollections } from "./helpers/plan-tables";
 
 const authors: LegacyCollectionConfig = {
     slug: "authors", table: "authors", name: "Authors",
@@ -250,10 +249,7 @@ describe("never a second index doing one job", () => {
 
 describe("the frozen name", () => {
     it("is what a declared plain index on the column derives", () => {
-        const [declared] = buildCollectionIndexSpecs(
-            { ...posts, indexes: [{ on: ["author"], reason: "anything — the reason is not in the name" }] },
-            resolveColumnName
-        );
+        const [declared] = indexSpecsOf({ ...posts, indexes: [{ on: ["author"], reason: "anything — the reason is not in the name" }] });
         expect(tableIndexes(collections, "posts")[0].indexName).toBe(declared.indexName);
     });
 

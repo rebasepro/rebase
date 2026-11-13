@@ -18,8 +18,7 @@ import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js"
 import { FixtureTableRegistry } from "../helpers/tables";
 import { FetchService } from "../../src/services/FetchService.js";
 import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logic.js";
-import { buildSearchColumnSpec } from "../../src/schema/search-column.js";
-import { compileSet } from "../helpers/plan-tables";
+import { compileSet, searchSpecOf } from "../helpers/plan-tables";
 
 const searched: LegacyPostgresCollectionConfig = {
     slug: "talents",
@@ -60,8 +59,8 @@ const fuzzied: LegacyPostgresCollectionConfig = {
     search: { language: "spanish", unaccent: true, fuzzy: true, fields: ["full_name"] }
 };
 
-const spec = buildSearchColumnSpec(searched)!;
-const fuzzySpec = buildSearchColumnSpec(fuzzied)!;
+const spec = searchSpecOf(searched)!;
+const fuzzySpec = searchSpecOf(fuzzied)!;
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
 
 const talentsTable = pgTable("talents", {

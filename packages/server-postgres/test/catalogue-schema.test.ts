@@ -21,7 +21,7 @@ import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { buildBaasSchema, readCatalogueSchema, type CatalogueSchema } from "../src/schema/catalogue-schema";
 import { compileIntrospectedTables, introspectSchema, type Queryable } from "../src/schema/introspect-runtime";
 import { introspectTables } from "../src/schema/introspect-tables";
-import { hiddenColumnsOption } from "../src/schema/search-column";
+import { hiddenColumnsOption } from "../src/services/hidden-columns";
 import { patchPgNumericToNumber } from "../src/utils/pg-numeric-number-patch";
 import { assertWritableColumns, tableKeys } from "../src/services/collection-helpers";
 import { buildRuntimeTable } from "../src/model/runtime-table";
@@ -186,10 +186,11 @@ describe("tables built from the live catalogue", () => {
 
     it("keeps a generated search column under its own name, so it stays hidden", () => {
         const columns = getTableColumns(catalogue.tables.posts);
-        // Not `searchVector`: `searchColumnNames` excludes it by the column name
+        // Not `searchVector`: `searchColumnNamesOf` excludes it by the column name
         // and the condition builder looks it up by the same.
         expect(Object.keys(columns)).toContain("search_vector");
-        expect(hiddenColumnsOption(columns, posts)).toEqual({ search_vector: false });
+        const postsTable = tablesFromCollections(collections).descriptors.find(table => table.slug === "posts");
+        expect(hiddenColumnsOption(columns, postsTable)).toEqual({ search_vector: false });
     });
 
     it("keys a junction table by its columns, which have no collection to name them", () => {

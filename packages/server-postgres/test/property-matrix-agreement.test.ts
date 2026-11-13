@@ -28,12 +28,11 @@
  * only to enumerate the columns; every fact below is read back out of a
  * generated file or a planned statement.
  */
-import type { LegacyCollectionConfig, LegacyProperty } from "@rebasepro/common/migrate";
-import { getTableName, getTableVarName } from "@rebasepro/common";
+import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
+import { columnByKey, getTableName, getTableVarName } from "@rebasepro/common";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { planTableSchemaEnsure, type ExistingSchema } from "../src/schema/ensure-tables";
-import { resolveColumnName } from "../src/schema/column-plan-helpers";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { everything } from "./fixtures/property-matrix-collections";
 import { compileSet, planCollections } from "./helpers/plan-tables";
@@ -119,8 +118,11 @@ const drizzleReference = (target: string): string => {
     const [varName, field] = target.split(".");
     const collection = tableVars.get(varName);
     if (!collection) throw new Error(`the matrix test cannot resolve the table variable \`${varName}\``);
-    const property = collection.properties?.[field] as LegacyProperty | undefined;
-    return `${qualifiedOf(collection)}.${resolveColumnName(field, property)}`;
+    // The compiled table names the column a key stands for; a key the table
+    // does not have (a junction's link column) is its own SQL name.
+    const table = compileSet([collection]).find(candidate => candidate.descriptor.slug === collection.slug);
+    const column = table ? columnByKey(table.descriptor, field)?.column : undefined;
+    return `${qualifiedOf(collection)}.${column ?? field}`;
 };
 
 /**

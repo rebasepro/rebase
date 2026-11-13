@@ -1,7 +1,7 @@
 /**
  * Planner fixtures the plan oracles share: how a frozen legacy corpus set is
  * lifted into table definitions (the input adjustments a set needs first, the
- * directory defaults it carried), compiled, and lowered.
+ * directory defaults it carried), and compiled.
  *
  * `test/helpers/tables.ts` is the package's fixture helper for driver tests;
  * this file holds only what the planner's oracles add on top of it.
@@ -26,6 +26,8 @@ import type {
     SecurityRule
 } from "@rebasepro/types";
 import { planSchema } from "../../src/schema/plan/plan-schema";
+import { buildTableSearchColumnSpec, type SearchColumnSpec } from "../../src/schema/search-column";
+import { buildTableIndexSpecs, type TableIndexSpec } from "../../src/schema/table-index";
 import type { PlanOptions, SchemaPlan } from "../../src/schema/plan/types";
 
 /**
@@ -157,6 +159,27 @@ function relationsOf(collection: LegacyCollectionConfig): { target: () => Legacy
     const inline = Object.values(collection.properties ?? {})
         .flatMap(property => (property.type === "relation" && property.relation ? [property.relation] : []));
     return [...(collection.relations ?? []), ...inline];
+}
+
+/**
+ * The search column the planner builds for a fixture collection: lifted,
+ * compiled, and read from its descriptor (`buildTableSearchColumnSpec`).
+ * `undefined` when it declares no search; throws what the compiler or the
+ * spec builder refuses.
+ */
+export function searchSpecOf(collection: LegacyCollectionConfig): SearchColumnSpec | undefined {
+    const [table] = compileSet([collection]);
+    return buildTableSearchColumnSpec(table.descriptor);
+}
+
+/**
+ * The indexes the planner builds for a fixture collection: lifted, compiled,
+ * and read from its descriptor (`buildTableIndexSpecs`).
+ */
+export function indexSpecsOf(collection: LegacyCollectionConfig): TableIndexSpec[] {
+    const table = compileSet([collection]).find(candidate => candidate.descriptor.slug === collection.slug);
+    if (!table) throw new Error(`the fixture "${collection.slug}" did not compile to a table`);
+    return buildTableIndexSpecs(table.descriptor);
 }
 
 /**

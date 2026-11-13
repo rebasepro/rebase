@@ -24,13 +24,12 @@ import { describe, it, expect } from "@jest/globals";
 import type { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { planTableSchemaEnsure, type ExistingSchema } from "../src/schema/ensure-tables";
 import {
-    buildSearchColumnSpec,
     searchColumnStamps,
     searchExtensionStatements,
     searchHelperFunctions,
     searchIndexStatements
 } from "../src/schema/search-column";
-import { compileSet } from "./helpers/plan-tables";
+import { compileSet, searchSpecOf } from "./helpers/plan-tables";
 
 const talents = (search: LegacyPostgresCollectionConfig["search"]): LegacyPostgresCollectionConfig => ({
     slug: "talents",
@@ -51,7 +50,7 @@ const hybrid = talents({ language: "spanish", mode: "hybrid", fields: ["full_nam
 /** For contrast: the change that genuinely *is* a column rebuild. */
 const folded = talents({ language: "spanish", unaccent: true, fields: ["full_name", "headline"] });
 
-const specOf = (c: LegacyCollectionConfig) => buildSearchColumnSpec(c)!;
+const specOf = (c: LegacyCollectionConfig) => searchSpecOf(c)!;
 const stampOf = (c: LegacyCollectionConfig) => searchColumnStamps(specOf(c))[0].fingerprint;
 
 /** A database that already has the table and a column built from `stamp`. */

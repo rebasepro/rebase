@@ -24,8 +24,8 @@ import {
     type Queryable
 } from "../src/schema/ensure-tables";
 import { generatePostgresSearchDdl } from "../src/schema/generate-postgres-ddl-logic";
-import { buildSearchColumnSpec, searchColumnStamps } from "../src/schema/search-column";
-import { compileSet } from "./helpers/plan-tables";
+import { searchColumnStamps } from "../src/schema/search-column";
+import { compileSet, searchSpecOf } from "./helpers/plan-tables";
 
 const talents = (fields: SearchConfig["fields"], extra: Partial<LegacyPostgresCollectionConfig["search"]> = {}): LegacyPostgresCollectionConfig => ({
     slug: "talents",
@@ -43,7 +43,7 @@ const before = talents(["full_name"]);
 const after = talents(["full_name", "headline"]);
 
 const stampOf = (collection: LegacyCollectionConfig): string =>
-    searchColumnStamps(buildSearchColumnSpec(collection)!)[0].fingerprint;
+    searchColumnStamps(searchSpecOf(collection)!)[0].fingerprint;
 
 /** A database that already has the table, the column, and a given stamp. */
 const withColumn = (stamp?: string): ExistingSchema => ({

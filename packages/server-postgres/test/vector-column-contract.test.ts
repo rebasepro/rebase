@@ -370,7 +370,7 @@ describe("boot provisions what the push provisions", () => {
         const searchable: LegacyCollectionConfig[] = [{
             ...collection,
             // `unaccent` is what makes a search block need an extension at all;
-            // a plain one needs none. See `buildSearchColumnSpec`.
+            // a plain one needs none. See `buildTableSearchColumnSpec`.
             search: { fields: ["title"], unaccent: true }
         }];
         const planned = planTableSchemaEnsure(compileSet(searchable), emptyDb).actions

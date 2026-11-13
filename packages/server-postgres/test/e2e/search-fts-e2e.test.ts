@@ -16,8 +16,7 @@ import pg from "pg";
 import { LegacyPostgresCollectionConfig, LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup";
 import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logic";
-import { buildSearchColumnSpec } from "../../src/schema/search-column";
-import { compileSet } from "../helpers/plan-tables";
+import { compileSet, searchSpecOf } from "../helpers/plan-tables";
 
 const talents: LegacyPostgresCollectionConfig = {
     slug: "talents",
@@ -43,7 +42,7 @@ const talents: LegacyPostgresCollectionConfig = {
     }
 };
 
-const spec = buildSearchColumnSpec(talents)!;
+const spec = searchSpecOf(talents)!;
 
 /** The query the condition builder compiles, as parameterized SQL. */
 const MATCH = `"${spec.column}" @@ websearch_to_tsquery('spanish', public.rebase_search_unaccent($1))`;

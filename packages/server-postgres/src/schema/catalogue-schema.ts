@@ -54,7 +54,7 @@ export function schemaOfTable(table: Pick<TableDescriptor, "schema">, fallback: 
  * Two exceptions, both columns no table declares:
  *
  *  - the generated search columns keep their raw names, because `search_vector`
- *    is how `searchColumnNames` excludes them from responses and how the
+ *    is how `searchColumnNamesOf` excludes them from responses and how the
  *    condition builder finds the one to match against;
  *  - a table no descriptor claims (a junction) is keyed by its **key** columns'
  *    names, which is also what the generated file does for them — but a
