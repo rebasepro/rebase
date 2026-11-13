@@ -14,7 +14,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ensureTables } from "../src/schema/ensure-tables";
-import { checkCollectionsVsDatabase } from "../src/schema/doctor";
+import { checkTablesVsDatabase } from "../src/schema/doctor";
 import { compileSet } from "./helpers/plan-tables";
 
 let mockDb: PGlite | undefined;
@@ -74,7 +74,7 @@ describe("the doctor on a collection outside public with a many-to-many", () => 
         );
         expect(junction.rows).toEqual([{ schema: "public" }]);
 
-        const phase = await checkCollectionsVsDatabase(compileSet([contacts, tags]), "postgres://doctor.test/db");
+        const phase = await checkTablesVsDatabase(compileSet([contacts, tags]), "postgres://doctor.test/db");
         const missing = phase.issues.filter(issue => issue.category === "missing_table");
         expect(missing).toEqual([]);
     });
@@ -86,7 +86,7 @@ describe("the doctor on a collection outside public with a many-to-many", () => 
         }, compileSet([contacts, tags]));
         await db.exec('DROP TABLE "public"."contacts_tags";');
 
-        const phase = await checkCollectionsVsDatabase(compileSet([contacts, tags]), "postgres://doctor.test/db");
+        const phase = await checkTablesVsDatabase(compileSet([contacts, tags]), "postgres://doctor.test/db");
         const missing = phase.issues.filter(issue => issue.category === "missing_table").map(issue => issue.table);
         expect(missing).toEqual(["contacts_tags"]);
     });

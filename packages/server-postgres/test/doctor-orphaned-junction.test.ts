@@ -12,7 +12,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ensureTables } from "../src/schema/ensure-tables";
-import { checkCollectionsVsDatabase } from "../src/schema/doctor";
+import { checkTablesVsDatabase } from "../src/schema/doctor";
 import { compileSet } from "./helpers/plan-tables";
 
 let mockDb: PGlite | undefined;
@@ -79,14 +79,14 @@ describe("the doctor's orphaned-junction check", () => {
     });
 
     const orphans = async (collections: LegacyCollectionConfig[]) =>
-        (await checkCollectionsVsDatabase(compileSet(collections), URL)).issues
+        (await checkTablesVsDatabase(compileSet(collections), URL)).issues
             .filter(issue => issue.category === "orphaned_junction");
 
     it("names a hand-made junction between two collection tables, as info, with the DROP shown", async () => {
         const db = await provision([posts, tags]);
         await db.exec(HAND_MADE_JUNCTION);
 
-        const phase = await checkCollectionsVsDatabase(compileSet([posts, tags]), URL);
+        const phase = await checkTablesVsDatabase(compileSet([posts, tags]), URL);
         const found = phase.issues.filter(issue => issue.category === "orphaned_junction");
         expect(found).toEqual([expect.objectContaining({
             severity: "info",

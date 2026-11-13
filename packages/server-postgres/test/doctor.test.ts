@@ -1,5 +1,5 @@
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
-import { checkCollectionsVsSchema, checkCollectionsVsSdk, expectedDataType, renderReport, runDoctor } from "../src/schema/doctor";
+import { checkTablesVsSchema, checkTablesVsSdk, expectedDataType, renderReport, runDoctor } from "../src/schema/doctor";
 import { generateTypedefs } from "@rebasepro/codegen";
 import { compileTables } from "@rebasepro/common";
 import { collectionsToTableDefs, LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
@@ -20,11 +20,11 @@ jest.mock("../src/schema/load-tables", () => ({
 }));
 
 // Re-export for testing — we need to access the internal helper
-// but since it's not exported, we test it indirectly via checkCollectionsVsSchema
+// but since it's not exported, we test it indirectly via checkTablesVsSchema
 
 describe("Rebase Schema Doctor", () => {
 
-    describe("checkCollectionsVsSchema", () => {
+    describe("checkTablesVsSchema", () => {
         const createTempSchemaFile = async (content: string): Promise<string> => {
             const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-test-"));
             const filePath = path.join(dir, "schema.generated.ts");
@@ -40,7 +40,7 @@ describe("Rebase Schema Doctor", () => {
                 properties: { name: { type: "string" } }
             }];
 
-            const result = await checkCollectionsVsSchema(compileSet(collections), "/nonexistent/path/schema.generated.ts");
+            const result = await checkTablesVsSchema(compileSet(collections), "/nonexistent/path/schema.generated.ts");
             expect(result.passed).toBe(false);
             expect(result.issues).toHaveLength(1);
             expect(result.issues[0].category).toBe("schema_stale");
@@ -63,7 +63,7 @@ describe("Rebase Schema Doctor", () => {
             const schemaPath = await createTempSchemaFile(expectedSchema);
 
             try {
-                const result = await checkCollectionsVsSchema(compileSet(collections), schemaPath);
+                const result = await checkTablesVsSchema(compileSet(collections), schemaPath);
                 expect(result.passed).toBe(true);
                 expect(result.issues).toHaveLength(0);
             } finally {
@@ -94,7 +94,7 @@ describe("Rebase Schema Doctor", () => {
             const schemaPath = await createTempSchemaFile(originalSchema);
 
             try {
-                const result = await checkCollectionsVsSchema(compileSet(updatedCollections), schemaPath);
+                const result = await checkTablesVsSchema(compileSet(updatedCollections), schemaPath);
                 expect(result.passed).toBe(false);
                 expect(result.issues.some(i => i.category === "schema_stale")).toBe(true);
             } finally {
@@ -103,7 +103,7 @@ describe("Rebase Schema Doctor", () => {
         });
 
         it("should return error for nonexistent schema file even with empty collections", async () => {
-            const result = await checkCollectionsVsSchema(compileSet([]), "/nonexistent/path");
+            const result = await checkTablesVsSchema(compileSet([]), "/nonexistent/path");
             // Schema file doesn't exist → error regardless of collection count
             expect(result.passed).toBe(false);
             expect(result.issues[0].category).toBe("schema_stale");
@@ -383,7 +383,7 @@ errors: 0 }
 
             try {
                 // Checked the way the loader hands them over: readdirSync order.
-                const result = await checkCollectionsVsSchema(compileSet([authors, articles]), schemaPath);
+                const result = await checkTablesVsSchema(compileSet([authors, articles]), schemaPath);
                 expect(result.issues).toHaveLength(0);
                 expect(result.passed).toBe(true);
             } finally {
@@ -398,7 +398,7 @@ errors: 0 }
             fs.writeFileSync(sdkPath, generateTypedefs([articlesTable, authorsTable]), "utf-8");
 
             try {
-                const result = await checkCollectionsVsSdk([authorsTable, articlesTable], sdkPath);
+                const result = await checkTablesVsSdk([authorsTable, articlesTable], sdkPath);
                 expect(result.issues).toHaveLength(0);
                 expect(result.passed).toBe(true);
             } finally {

@@ -206,7 +206,7 @@ const ARRAY_UDT_NAMES: Partial<Record<PgType["kind"], string>> = {
 
 // ── Phase 1: Collections ↔ Generated Schema ─────────────────────────────
 
-export async function checkCollectionsVsSchema(
+export async function checkTablesVsSchema(
     tables: readonly CompiledTable[],
     schemaFilePath: string
 ): Promise<DoctorPhase> {
@@ -264,7 +264,7 @@ issues };
 issues };
 }
 
-export async function checkCollectionsVsSdk(
+export async function checkTablesVsSdk(
     /** The tables' compiled descriptors — what `rebase generate-sdk` generates from. */
     descriptors: readonly TableDescriptor[],
     sdkFilePath: string
@@ -635,7 +635,7 @@ function defaultDatabaseTables(tables: readonly CompiledTable[]): CompiledTable[
     return tables.filter(t => !t.descriptor.database || t.descriptor.database === DEFAULT_DATA_SOURCE_KEY);
 }
 
-export async function checkCollectionsVsDatabase(
+export async function checkTablesVsDatabase(
     tables: readonly CompiledTable[],
     databaseUrl: string,
     options: {
@@ -1269,7 +1269,7 @@ export async function runDoctor(options: {
 
     // Phase 1: Collections ↔ Generated Schema
     out(chalk.gray("  Checking Tables → Generated Schema..."));
-    const collectionsToSchema = await checkCollectionsVsSchema(tables, options.schemaPath);
+    const collectionsToSchema = await checkTablesVsSchema(tables, options.schemaPath);
 
     // Phase 2: Collections ↔ Database (only if we have a DATABASE_URL)
     let schemaToDatabase: DoctorPhase;
@@ -1277,7 +1277,7 @@ export async function runDoctor(options: {
         out(chalk.gray("  Checking Tables → Database..."));
         try {
             const generated = await loadGeneratedTables(options.schemaPath);
-            schemaToDatabase = await checkCollectionsVsDatabase(tables, options.databaseUrl, {
+            schemaToDatabase = await checkTablesVsDatabase(tables, options.databaseUrl, {
                 generated: generated.tables,
                 schemaVersion: defaultDatabaseSchemaVersion(loaded)
             });
@@ -1320,7 +1320,7 @@ skipped: "DATABASE_URL not set" };
 
     // Phase 3: Collections ↔ SDK Types
     out(chalk.gray("  Checking Tables → SDK Types..."));
-    const collectionsToSdk = await checkCollectionsVsSdk(descriptors, options.sdkPath);
+    const collectionsToSdk = await checkTablesVsSdk(descriptors, options.sdkPath);
 
     const phases = [collectionsToSchema, schemaToDatabase, collectionsToSdk];
     const allIssues = phases.flatMap((p) => p.issues);

@@ -26,7 +26,7 @@ import { ensureTables } from "../src/schema/ensure-tables";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { readCatalogueSchema } from "../src/schema/catalogue-schema";
 import { describeSchemaDifference, diffGeneratedSchemaAgainstCatalogue } from "../src/schema/generated-schema-diff";
-import { checkCollectionsVsDatabase, generatedSchemaDriftIssues, runDoctor, type DoctorIssue } from "../src/schema/doctor";
+import { checkTablesVsDatabase, generatedSchemaDriftIssues, runDoctor, type DoctorIssue } from "../src/schema/doctor";
 import { compileSet } from "./helpers/plan-tables";
 
 let mockDb: PGlite | undefined;
@@ -137,7 +137,7 @@ describe("doctor and boot agree about schema drift", () => {
         const boot = await bootDifferences([authorsAfter], generated);
         expect(boot.map(d => `${d.kind} ${d.column}`).sort()).toEqual(["extra-column email", "nullability contact_email"]);
 
-        const phase = await checkCollectionsVsDatabase(compileSet([authorsAfter]), URL, { generated });
+        const phase = await checkTablesVsDatabase(compileSet([authorsAfter]), URL, { generated });
         expect(phase.passed).toBe(false);
         const nullability = phase.issues.find(i => i.category === "nullability_mismatch");
         const extra = phase.issues.find(i => i.category === "extra_column");
@@ -163,7 +163,7 @@ describe("doctor and boot agree about schema drift", () => {
         `);
         const generated = await generatedTables([authorsAfter]);
         expect(await bootDifferences([authorsAfter], generated)).toEqual([]);
-        const phase = await checkCollectionsVsDatabase(compileSet([authorsAfter]), URL, { generated });
+        const phase = await checkTablesVsDatabase(compileSet([authorsAfter]), URL, { generated });
         expect(phase.issues.filter(i => i.severity !== "info")).toEqual([]);
         expect(phase.passed).toBe(true);
     });

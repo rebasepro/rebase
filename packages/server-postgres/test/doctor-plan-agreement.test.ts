@@ -19,7 +19,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { ensureTables } from "../src/schema/ensure-tables";
-import { checkCollectionsVsDatabase, type DoctorIssue } from "../src/schema/doctor";
+import { checkTablesVsDatabase, type DoctorIssue } from "../src/schema/doctor";
 import { compileSet } from "./helpers/plan-tables";
 
 let mockDb: PGlite | undefined;
@@ -81,7 +81,7 @@ const orderLines: LegacyCollectionConfig = {
 
 const DATABASE_URL = "postgres://doctor.test/db";
 const issuesOf = async (collections: LegacyCollectionConfig[]): Promise<DoctorIssue[]> =>
-    (await checkCollectionsVsDatabase(compileSet(collections), DATABASE_URL)).issues;
+    (await checkTablesVsDatabase(compileSet(collections), DATABASE_URL)).issues;
 
 describe("the doctor against the database the planner built", () => {
     beforeEach(async () => {
