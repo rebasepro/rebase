@@ -573,13 +573,21 @@ transforms, storage files inside blocks, search over JSON paths. Builders:
 `valueField`, `variants`), `json.string`, `json.number`, `json.boolean`,
 `json.date`, `json.geopoint`, `json.storage`, `json.unknown`; modifiers
 `.required()`, `.validate()`, `.default()`, `.oneOf()`, `.onCreateNow()`,
-`.onUpdateNow()`, `.transform()`.
+`.onUpdateNow()`, `.onCreateUser()`, `.onUpdateUser()`, `.userId()`,
+`.transform()`. A document's top may be an object, an array, a scalar or a
+`json.oneOf`; `json.oneOf` and `json.unknown()` may sit at any depth, and
+stamps apply at any depth. `json.array(json.object({...})).validate({ uniqueBy:
+[...] })` **(gap)** carries the field-level `uniqueInArray`.
 
 ### `rel.*`
 
 As §4.3, plus **(gap)**: `sourceKey` on `hasOne`/`hasMany` (natural keys);
 `unique` on `belongsTo`; `onDelete` on `manyToMany`; `cardinality` on `via`.
-`orderBy` on `hasMany` is new with the spec and is implemented.
+`orderBy` on `hasMany` is new with the spec: the order an include, a
+single-parent relation read and a nested listing use when the caller names
+none. A caller's `orderBy` replaces it rather than extending it, the target's
+key ascending always ends it, and a per-parent include `limit` keeps the first
+rows of it. Relation names are matched exactly (no slug or snake_case retry).
 
 ### `rls`
 
@@ -587,7 +595,12 @@ As §4.3, plus **(gap)**: `sourceKey` on `hasOne`/`hasMany` (natural keys);
 as written, so a migrated rule must not be reshaped by a single key. Two forms
 the spec's example uses are added as *new* shapes with their own compilation:
 a plain-object `condition`/`check` (`{ status: "published" }` = equality on
-each key), and `access: "public" | "authenticated"` combined with `condition`.
+each key), and `access: "public" | "authenticated" | "registered"` combined
+with `condition` / `check`. `"registered"` **(gap)** is `"authenticated"`
+without anonymous guests. The compiler refuses every pair of clauses the
+`SecurityRule` union excludes and any invalid `access` / `mode` /
+`operation(s)` / `roles` value, so a cast or plain JavaScript cannot compile a
+rule that silently drops a clause.
 
 ## C. Project layout
 
@@ -603,9 +616,13 @@ each key), and `access: "public" | "authenticated"` combined with `condition`.
   format 3, runtime contract 2. Older bundles are refused with a message that
   names the codemod.
 - `frontend/src/cms/*.tsx` holds `customizeTable(...)` and
-  `defineFirestoreCollection(...)`. A gate forbids a value import from
-  `backend/**` in `frontend/**` (type imports only), which replaces what the
-  Vite collections plugin did to keep server hooks out of the browser bundle.
+  `defineFirestoreCollection(...)`. The frontend imports `backend/**` as types
+  only: `rebaseBackendGuard()` (`@rebasepro/app/vitePlugin`) fails `vite build`
+  and `vite dev` on a value import, and `rebase build` refuses a frontend whose
+  Vite config lacks it. This replaces what the Vite collections plugin did to
+  keep server hooks out of the browser bundle.
+- `frontend/src/cms/ui-config.json` holds the workspace's presentation saved in
+  development; `rebase build` ships it in the bundle (`entry.uiConfig`).
 
 ## D. Inside the backend
 
@@ -621,16 +638,20 @@ each key), and `access: "public" | "authenticated"` combined with `condition`.
      projection, `customizeTable`, Firestore isolation, codemod, templates,
      cloud and docs all build on this.
   2. **Stage B — the inside.** The runtime, the server and the planner move
-     onto descriptors subsystem by subsystem; legacy test fixtures are *lifted*
-     meanwhile and converted with the codemod; the CMS view-model types
-     (`Property`, CMS `CollectionConfig`) move to `@rebasepro/cms-types`,
-     Firestore's to `@rebasepro/firebase`; then the lowering, the lift and
-     every legacy type are deleted from the kernel.
+     onto descriptors subsystem by subsystem (done: no runtime path lowers a
+     table any more). Legacy test fixtures stay collection literals and are
+     *lifted* through `@rebasepro/common/migrate` (see G); the CMS view-model
+     types (`Property`, CMS `CollectionConfig`) move to `@rebasepro/cms-types`,
+     Firestore's to `@rebasepro/firebase`; the lowering is then deleted and
+     the kernel exports no legacy type. The lift stays, as migration tooling
+     only, in `@rebasepro/common/migrate`.
 - The schema-version hash is computed over descriptors, so every project
   restamps once and every generated SDK is reported stale once.
-- The server stops emitting the admin's view-model envelope
-  (`{ __type: "date" }`, relation refs); the CMS builds it from the wire row and
-  the descriptor.
+- **Planned, not done:** the server stops emitting the admin's view-model
+  envelope (`{ __type: "date" }`, relation refs); the CMS builds it from the
+  wire row and the descriptor. Today the Postgres driver still builds it
+  (`parseDataFromServer`, `toFlatRow`) for the socket refetch and relation
+  reads.
 
 ## E. Things to review first (unsure)
 
@@ -650,3 +671,169 @@ each key), and `access: "public" | "authenticated"` combined with `condition`.
 ## F. Checklist
 
 *(Ticked as slices land; the final report lists each line.)*
+
+## G. Decisions taken while building
+
+One line each: what, and why. Grouped by area.
+
+### Authoring surface
+
+- **Columns are spelled as Drizzle's `pg-core` spells them** (the owner asked:
+  "as close to drizzle as possible, so it is really easy for agents"). A
+  Drizzle spelling compiles with the same meaning or fails with what to write
+  instead; it never compiles to something else. The earlier spellings were
+  removed, not aliased; `tooling/scripts/drizzle-sweep.mts --verify` proved
+  every conversion compiles to the same descriptor.
+- **`.defaultNow()` is a database default only**; the server stamp stays
+  `.onCreateNow()`. Drizzle's meaning wins where the names collide.
+- **`.references()` is refused**, pointing at `rel.belongsTo`: foreign keys
+  stay in `relations` (D3), so a relation always has a name.
+- **Text `.oneOf()` is kept beside `col.text({ enum })`**: both are a CHECK
+  over TEXT; search skips such a column, as it skipped a legacy string enum.
+- **A relation inside a JSON document is refused by the lift**, and a vector
+  nested in `jsonb` cannot be declared (no JSON vector node): neither has a
+  Postgres meaning to generate.
+- **`uniqueBy` was added** for the field-level `uniqueInArray` (parity P-3).
+  REST enforces it; it is not in OpenAPI; absent and `null` values are not
+  compared; a `$push` checks the pushed items among themselves (no atomic SQL
+  bound, as for `uniqueItems`).
+- **A write to a relation declared only in `relations` is handled as a
+  relation**, never as an unknown column.
+- **Write path.** An update that does not send a JSON document leaves it alone
+  (the old code wrote a partial `{ updatedAt }` over it); an explicit `null`
+  stays `null`; column default + stamp: the stamp wins; nested default +
+  stamp: the default fills, the stamp overwrites; create stamps inside a
+  document an update sends are kept as sent; defaults are cloned per write.
+- **The key is the descriptor's answer**; the catalogue is read only for a
+  keyless introspected table. A `date` key sets `isDay`.
+- **Hooks run where the table is served.** Hooks attached to a collection
+  object passed at a call site no longer run (use `setTableHooks`); the
+  driver's own reads mask embedded relations one level deep with the target's
+  `afterRead`; column transforms skip keys the row does not carry; the built-in
+  auth adapter uses only its configured `authTableHooks`.
+
+### Access rules
+
+- **`access: "registered"`** (security review S-6): `authenticated()` minus
+  anonymous guests, for projects with anonymous sign-in.
+- **Rules that combine excluded clauses are refused** at compile and by the
+  lift (S-1); every clause of a rule is ANDed and an unknown `access` compiles
+  to false. Kept as meaningful: a lone `{ check }`; `roles` + `access: "public"`.
+- **A legacy rule whose meaning changes is carried as written** (same policy
+  name, same SQL check) and listed by the codemod under "Review before
+  deploying"; `--check` fails on it unless `--accept-rule-changes`. Reshaping it
+  silently would rename policies and hide the change; refusing it would block
+  every project with a bare `access: "authenticated"`.
+- **A live apply that changes `rls` writes the policies** of the changed
+  tables, or keeps serving what Postgres enforces and says so (S-4): the panel
+  never shows rules that are not in force.
+- **History is served as reads** (a leak already in 0.30.x): field access, then
+  `afterRead`; a hook that throws on an old snapshot fails the request;
+  whoever may read the row now may read its history; `updated_by` is kept; a
+  hard-deleted row's history is a 404; a driver without `serveStoredRows` gets
+  501. Known false refusal: reverting a `readOnly`, readable, masked column.
+- **The driver itself refuses restricted columns** in reads made on a caller's
+  behalf, in process included, as REST and the socket did; a socket nested
+  write it cannot judge is refused, not passed through.
+- **The frontend/backend boundary is a build plugin** (`rebaseBackendGuard()`,
+  S-2), not only a lint: the lint could not see aliases, globs or dynamic
+  imports, and the build can.
+
+### Schema endpoint
+
+- **`GET /api/schema/tables` describes a person only what their roles reach**
+  (S-3): the tables a permissive rule reaches, the rules that apply to them,
+  no relations into unserved tables, no hook flags; plain views to privileged
+  callers only. `schemaTables.persons: "all"` restores the full view. MCP is a
+  credential view through the same serializer and did not change.
+
+### Migration
+
+- **The lift survives as migration tooling only**, in
+  `@rebasepro/common/migrate`, with a frozen copy of the 0.30 model and
+  `defineLegacyCollection`; no runtime path imports it, and `@rebasepro/types`
+  exports no legacy model.
+- **Tests keep their legacy collection literals** and go through one helper
+  per package (lift, then compile): they double as the lift's regression
+  suite. About 550 test files are in the old vocabulary; converting them is
+  optional and not user-facing.
+- **`warnOnKeysTheAdminCannotResolve` is retired**: the panel reads served
+  descriptors and compiles no collection file.
+- **The codemod finishes the project**: it creates and mounts
+  `ui-config.json`, adds `rebaseBackendGuard()` to a scaffold's Vite config,
+  rewrites `existsIn` / `membership` sources, carries `uniqueInArray`,
+  `auth.actions` and relation `defaultValue`, and ends with
+  `rebase skills install` when skills are installed.
+- **Engine routing in provisioning is gone**; Postgres is the only server
+  engine.
+- **A restore into another cluster re-stamps the default-admin policies once**
+  on the first push or boot: the stamp hashes role OIDs. Same names, same SQL.
+
+### CMS defaults
+
+- **The projector sets a presentation key only when a table fact implies it**:
+  no forced `defaultViewMode: "table"` (the panel lands on the list, as on
+  0.30), no display slots guessed from column names, the tenant column shown.
+  Kept: audit stamps hidden from table columns, enum colours, `keyValue` for a
+  shapeless JSON column, labels.
+- **Relations without a foreign key are listed after the columns**; a migrated
+  project keeps its 0.30 order through `fieldOrder`, which the codemod writes.
+- **Every reader of a relation target gets the composed collection** (tabs,
+  pickers, previews); user preferences are not applied to a relation target,
+  as on 0.30.
+
+### Editor
+
+- **A save splits into `TablePatch` edits and UI preferences.** Description
+  and metadata are schema; column order is presentation only; default labels
+  are not stored; a new table without a primary key gets a uuid `id`.
+- **Firestore collections are edited in development** through a frontend
+  source editor that rewrites the `defineFirestoreCollection({...})` call in
+  place (parity P-4). Not offered: creating one (0.30 had no engine picker
+  either), deleting one (refused: delete the file and the
+  `externalCollections` entry), changing its slug (refused as a migration).
+- **"Import an existing table" adopts the database's own description**:
+  adoption plans no DDL, RLS off or no policies becomes `rls: "admin-only"`
+  (never lower), and the first policy step re-creates an identical policy once
+  to stamp it.
+- **A file changed under an edit has its own code**, 409
+  `SCHEMA_EDIT_STALE_FILE`, so the editor offers Reload instead of matching on
+  a message.
+- **Hooks edited in source run after a live apply** (the apply carries the
+  compiled tables). Open: a table a live apply adds is served by the Postgres
+  driver only after a restart.
+
+### MCP
+
+- **Tools are named for tables**; the local list tool is `query_table` (the
+  remote name), `list_tables` has no `title`, `describe_table` includes the
+  caller-redacted `rls` and the caller's presentation; the `#rebase-app` block
+  key is `tables`; the `collection-table` view is retired.
+- **View payload v3 carries each caller's UI preferences** (file, workspace,
+  user; none for an API key), folded by the panel's own composition (parity
+  P-1). The hosted connector and the tenant runtimes ship together.
+
+### Refused on purpose
+
+- **Narrowings (parity P-8)**, each refused with its reason: tuple JSON
+  arrays; `vector` / `binary` / `reference` inside a map; `databaseId` on a
+  Postgres collection; `isId: "cuid"` (broken on 0.30: no `cuid()` function);
+  a sole `isId` relation; `disableDefaultPolicies: true` with no rules
+  (deny-all).
+- **No longer read (P-9)**, each reported by the codemod: a view's
+  `securityRules` no longer feed the panel's permission preview; a plain
+  view's `roles` are inert; OpenAPI tags come from the slug, not the display
+  name; relation `overrides` beyond the admin block, `name`, `singularName`,
+  `description`, `metadata` and `icon` are not carried, and an override cannot
+  restyle the target's fields.
+
+### Names that still say "collection"
+
+Kept on purpose, because they are on the wire or in stored data, and renaming
+them breaks every client that is not upgraded in the same moment: the driver
+method names (`fetchCollection`, …); the realtime socket's frames; the upload
+form fields `collection` / `property`; `details.collection` in field-access
+errors; `SchemaReconcileColumn.collection`, `TablePlan.kind: "collection"` and
+the `SchemaChange` kinds; the stored `collections` column of saved MCP apps;
+the offline queue's names. The CMS keeps "collection" for what it draws (a
+table as the panel shows it, or a Firestore collection).
