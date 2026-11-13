@@ -1,7 +1,7 @@
 /**
  * The remediation for a policy Rebase owns.
  *
- * `ensureCollectionPolicies` drops and recreates every generated policy on each
+ * `ensureTablePolicies` drops and recreates every generated policy on each
  * boot, so the tool's usual advice — edit the policy — is not merely unhelpful
  * on a Rebase deployment, it is wrong in a way that looks right: the operator
  * runs the SQL, the finding disappears, and the next restart puts the hole back.

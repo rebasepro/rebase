@@ -1628,7 +1628,7 @@ export interface BackendBootstrapper {
      * Runs after auth initialization, because the generated policies call the
      * `auth.*` helper functions and `CREATE POLICY` validates they exist.
      */
-    ensureCollectionPolicies?(
+    ensureTablePolicies?(
         tables: readonly CompiledTable[],
         driverResult?: InitializedDriver,
         log?: (message: string) => void
@@ -1687,7 +1687,7 @@ export interface BackendBootstrapper {
      * Record the collections schema version this process just applied.
      *
      * Called only by the process that provisions, and only after both
-     * {@link ensureCollectionSchema} and {@link ensureCollectionPolicies} have
+     * {@link ensureCollectionSchema} and {@link ensureTablePolicies} have
      * run — a stamp written before the policies would claim a schema that is
      * only half in place, and the half that is missing is the one that fails
      * without an error.

@@ -336,9 +336,9 @@ export function adapterToBootstrapper(
             ? (collections, driverResult, log) =>
                 adapter.ensureCollectionSchema!(collections, driverResult, log)
             : undefined,
-        ensureCollectionPolicies: adapter.ensureCollectionPolicies
+        ensureTablePolicies: adapter.ensureTablePolicies
             ? (collections, driverResult, log) =>
-                adapter.ensureCollectionPolicies!(collections, driverResult, log)
+                adapter.ensureTablePolicies!(collections, driverResult, log)
             : undefined,
         ensureRlsRuntime: adapter.ensureRlsRuntime
             ? (driverResult) => adapter.ensureRlsRuntime!(driverResult)

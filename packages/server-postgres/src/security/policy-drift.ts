@@ -16,7 +16,7 @@
 import { RLS_UID_SQL, type CompiledTable } from "@rebasepro/types";
 import { ADMIN_REQUEST_POLICY_SUFFIX, toPostgresIdentifier } from "@rebasepro/utils";
 
-import { generatePostgresPoliciesDdl, planCollectionPolicies } from "../schema/generate-postgres-ddl-logic";
+import { generatePostgresPoliciesDdl, planTablePolicies } from "../schema/generate-postgres-ddl-logic";
 
 export interface PolicyRef {
     schema: string;
@@ -326,7 +326,7 @@ export async function resolveAdminPolicies(client: Queryable, expectation: Admin
 export function expectedPolicies(compiledTables: readonly CompiledTable[], adminRoleAvailable: boolean): PolicyRef[] {
     const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compiledTables));
     if (adminRoleAvailable) return expected;
-    const moved = new Set(planCollectionPolicies(compiledTables).flatMap(plan =>
+    const moved = new Set(planTablePolicies(compiledTables).flatMap(plan =>
         plan.policies.filter(policy => policy.adminTarget).map(policy => `${plan.schema}.${plan.table}.${policy.name}`)));
     return expected.map(p => moved.has(keyOf(p)) ? { ...p, roles: ["public"] } : p);
 }
@@ -337,7 +337,7 @@ export function expectedPolicies(compiledTables: readonly CompiledTable[], admin
  * when they are there in that shape. Keyed `schema.table.name`.
  */
 function adminRequestCompanions(compiledTables: readonly CompiledTable[]): Map<string, PolicyRef> {
-    const ddl = planCollectionPolicies(compiledTables, { adminRequestRoleAvailable: true })
+    const ddl = planTablePolicies(compiledTables, { adminRequestRoleAvailable: true })
         .flatMap(plan => plan.policies.filter(policy => policy.adminRequestTarget).flatMap(policy => policy.statements))
         .join("\n");
     return new Map(parseExpectedPolicies(ddl).map(p => [keyOf(p), p]));

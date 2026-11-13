@@ -145,13 +145,13 @@ export interface DatabaseAdapter {
      * Apply the collections' RLS policies (ENABLE ROW LEVEL SECURITY + the
      * `securityRules` compiled to `CREATE POLICY`) — the boot companion to the
      * policy half of `db push`. Idempotent; see
-     * `BackendBootstrapper.ensureCollectionPolicies`.
+     * `BackendBootstrapper.ensureTablePolicies`.
      *
      * Same forwarding requirement as `ensureCollectionSchema`: without the
      * policies, tables exist but every user-context read is denied (a public
      * collection answers 401).
      */
-    ensureCollectionPolicies?(
+    ensureTablePolicies?(
         tables: readonly CompiledTable[],
         driverResult?: InitializedDriver,
         log?: (message: string) => void,
@@ -166,7 +166,7 @@ export interface DatabaseAdapter {
      * either, so every policy on it failed to create and every user read was
      * denied — a collection declared on `database("analytics")` answered 401 on
      * a healthy-looking backend. Idempotent; runs before
-     * `ensureCollectionPolicies` on every non-default source.
+     * `ensureTablePolicies` on every non-default source.
      */
     ensureRlsRuntime?(driverResult?: InitializedDriver): Promise<void>;
 

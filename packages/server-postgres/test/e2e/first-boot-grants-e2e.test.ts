@@ -90,7 +90,7 @@ describe("first boot on an empty database (E2E)", () => {
             // The provisioning steps, in init.ts's order.
             await bootstrapper.ensureCollectionSchema!(tablesFromCollections([ordersCollection]).tables, driverResult);
             await bootstrapper.ensureRlsRuntime!(driverResult);
-            await bootstrapper.ensureCollectionPolicies!(tablesFromCollections([ordersCollection]).tables, driverResult);
+            await bootstrapper.ensureTablePolicies!(tablesFromCollections([ordersCollection]).tables, driverResult);
             await bootstrapper.finalizeSecurityPosture!(driverResult);
             const history = await bootstrapper.initializeHistory!(true, driverResult);
 

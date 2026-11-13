@@ -37,7 +37,7 @@ import { applyAuthContext, REBASE_USER_ROLE } from "../src/security/rls-enforcem
 import { isGeneratedPolicyName } from "../src/security/policy-drift";
 import type { RequestIdentity } from "../src/security/rls-settings";
 import { adminRequestRoleFor, REBASE_ADMIN_ROLE } from "@rebasepro/types";
-import { planCollectionPolicies } from "../src/schema/generate-postgres-ddl-logic";
+import { planTablePolicies } from "../src/schema/generate-postgres-ddl-logic";
 import {
     NEW_POLICY_SHAPE_CALLERS,
     NEW_POLICY_SHAPE_COLLECTIONS,
@@ -178,7 +178,7 @@ async function importedFromDatabase(db: PGlite): Promise<string[]> {
     return statements;
 }
 
-const currentPlans = () => planCollectionPolicies(compileSet(NEW_POLICY_SHAPE_COLLECTIONS));
+const currentPlans = () => planTablePolicies(compileSet(NEW_POLICY_SHAPE_COLLECTIONS));
 const currentStatements = () => currentPlans().flatMap(p => p.policyStatements);
 const createStatements = (statements: string[]) => statements.filter(s => /^CREATE POLICY/.test(s));
 

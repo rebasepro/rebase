@@ -250,7 +250,7 @@ export interface PolicyPlan {
      * Carried here rather than as a policy of the table, so `policies.sql`,
      * migrations and the generated Drizzle schema never hold it: only the boot
      * writes it, and only where it has checked that role is safe
-     * (`planCollectionPolicies`'s `adminRequestRoleAvailable`).
+     * (`planTablePolicies`'s `adminRequestRoleAvailable`).
      */
     adminRequestCompanion?: { name: string; using: string | null; withCheck: string | null };
     /**

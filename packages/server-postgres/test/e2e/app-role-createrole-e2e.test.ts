@@ -23,7 +23,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { ensureTables, type Queryable } from "../../src/schema/ensure-tables.js";
-import { ensureCollectionPolicies } from "../../src/schema/ensure-collection-policies.js";
+import { ensureTablePolicies } from "../../src/schema/ensure-policies.js";
 import { ensureAuthTablesExist } from "../../src/auth/ensure-tables.js";
 import {
     AppRoleSetupError,
@@ -90,7 +90,7 @@ describe.each([
         expect(posture.superuser).toBe(false);
         expect(posture.privileged).toBe(true);
         await ensureAppRole(runSql, ["public", "rebase"]);
-        const applied = await ensureCollectionPolicies(queryable, compileSet([notesCollection]));
+        const applied = await ensureTablePolicies(queryable, compileSet([notesCollection]));
         expect(applied.failures).toEqual([]);
 
         const registry = new FixtureTableRegistry();

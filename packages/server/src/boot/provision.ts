@@ -69,7 +69,7 @@ export interface ProvisionTarget {
         BackendBootstrapper,
         | "verifyConnection"
         | "ensureCollectionSchema"
-        | "ensureCollectionPolicies"
+        | "ensureTablePolicies"
         | "ensureRlsRuntime"
         | "readCollectionsSchemaVersion"
         | "stampCollectionsSchemaVersion"
@@ -319,7 +319,7 @@ export type CompiledTableOf = (slug: string) => CompiledTable | undefined;
 
 /**
  * What the driver's provisioning calls (`ensureCollectionSchema`,
- * `ensureCollectionPolicies`) are handed for these tables: the compiled
+ * `ensureTablePolicies`) are handed for these tables: the compiled
  * tables themselves — the driver plans from them before it opens, so it can
  * look nothing up.
  */
@@ -364,7 +364,7 @@ export async function provisionTablePolicies(
     if (options.introspecting) return { status: "skipped", reason: "tables are introspected" };
     if (tables.length === 0) return { status: "skipped", reason: "no tables" };
 
-    if (!target.bootstrapper.ensureCollectionPolicies) {
+    if (!target.bootstrapper.ensureTablePolicies) {
         // Whether "no RLS" means denied or exposed depends on the driver, so the
         // wording does not promise either.
         const reason = `${describeAdapter(target)} does not apply RLS policies at boot`;
@@ -379,7 +379,7 @@ export async function provisionTablePolicies(
 reason };
     }
 
-    const { applied } = await target.bootstrapper.ensureCollectionPolicies(
+    const { applied } = await target.bootstrapper.ensureTablePolicies(
         compiledFor(tables, compiledOf),
         target.driverResult as InitializedDriver,
         message => logger.debug(`policies: ${message}`)

@@ -66,7 +66,7 @@ function bootstrapper(id: string, isDefault: boolean, driver: DataDriver): Backe
         },
         ...(isDefault ? { async initializeAuth() { return { userService: repo, authRepository: repo }; } } : {}),
         async ensureCollectionSchema() { return { applied: 0 }; },
-        async ensureCollectionPolicies() { return { applied: 0 }; },
+        async ensureTablePolicies() { return { applied: 0 }; },
         getAdmin: () => driver.admin
     };
 }

@@ -1,6 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
 import { CollectionConfig, policy, type SecurityRule } from "@rebasepro/types";
-import { ensureCollectionPolicies } from "../src/schema/ensure-collection-policies";
+import { ensureTablePolicies } from "../src/schema/ensure-policies";
 import type { Queryable } from "../src/schema/ensure-tables";
 import { generatePostgresPoliciesDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
@@ -44,7 +44,7 @@ describe("a restrictive rule whose policy cannot be created", () => {
 
     it("stands in a gate that passes nothing, beside the grants it was meant to restrict", async () => {
         await withDb(table, async (pg, queryable) => {
-            const result = await ensureCollectionPolicies(queryable, compileSet([docs("rebase_missing_gate({org_id})")]));
+            const result = await ensureTablePolicies(queryable, compileSet([docs("rebase_missing_gate({org_id})")]));
 
             expect(result.failures.map(f => f.table)).toEqual(["public.docs"]);
             expect(result.failures[0].error).toMatch(/docs_org_gate/);
@@ -57,11 +57,11 @@ describe("a restrictive rule whose policy cannot be created", () => {
 
     it("does not drop a working gate it fails to replace", async () => {
         await withDb(table, async (pg, queryable) => {
-            await ensureCollectionPolicies(queryable, compileSet([docs("{org_id} = 'acme'")]));
+            await ensureTablePolicies(queryable, compileSet([docs("{org_id} = 'acme'")]));
             expect((await policiesOf(pg, "docs")).find(p => p.policyname === "docs_org_gate")?.qual)
                 .toMatch(/acme/);
 
-            await ensureCollectionPolicies(queryable, compileSet([docs("rebase_missing_gate({org_id})")]));
+            await ensureTablePolicies(queryable, compileSet([docs("rebase_missing_gate({org_id})")]));
             expect((await policiesOf(pg, "docs")).find(p => p.policyname === "docs_org_gate"))
                 .toMatchObject({ permissive: "RESTRICTIVE", qual: "false" });
         });
@@ -69,10 +69,10 @@ describe("a restrictive rule whose policy cannot be created", () => {
 
     it("is replaced by the real gate on the boot after it becomes creatable", async () => {
         await withDb(table, async (pg, queryable) => {
-            await ensureCollectionPolicies(queryable, compileSet([docs("rebase_missing_gate({org_id})")]));
+            await ensureTablePolicies(queryable, compileSet([docs("rebase_missing_gate({org_id})")]));
             await pg.exec("CREATE FUNCTION rebase_missing_gate(org text) RETURNS boolean LANGUAGE sql AS $$ SELECT org = 'acme' $$;");
 
-            const result = await ensureCollectionPolicies(queryable, compileSet([docs("rebase_missing_gate({org_id})")]));
+            const result = await ensureTablePolicies(queryable, compileSet([docs("rebase_missing_gate({org_id})")]));
             expect(result.failures).toEqual([]);
             expect((await policiesOf(pg, "docs")).find(p => p.policyname === "docs_org_gate")?.qual)
                 .toMatch(/rebase_missing_gate/);
@@ -95,11 +95,11 @@ describe("a policy whose name Postgres stores cut to 63 bytes", () => {
 
     it("is not dropped as an orphan by the next boot", async () => {
         await withDb(`CREATE TABLE "public"."${name}" ("id" TEXT PRIMARY KEY, "org_id" TEXT);`, async (pg, queryable) => {
-            await ensureCollectionPolicies(queryable, compileSet([longs]));
+            await ensureTablePolicies(queryable, compileSet([longs]));
             const created = await policiesOf(pg, name);
             expect(created.filter(p => p.permissive === "RESTRICTIVE")).toHaveLength(2);
 
-            const second = await ensureCollectionPolicies(queryable, compileSet([longs]));
+            const second = await ensureTablePolicies(queryable, compileSet([longs]));
             expect(second.orphansDropped).toBe(0);
             expect(second.unchanged).toBe(1);
             expect(await policiesOf(pg, name)).toEqual(created);
@@ -150,7 +150,7 @@ describe("rules whose compiled SQL Postgres used to refuse", () => {
             ]
         };
         await withDb('CREATE TABLE "public"."notes" ("id" TEXT PRIMARY KEY, "owner_id" TEXT);', async (pg, queryable) => {
-            const result = await ensureCollectionPolicies(queryable, compileSet([notes]));
+            const result = await ensureTablePolicies(queryable, compileSet([notes]));
             expect(result.failures).toEqual([]);
             const names = (await policiesOf(pg, "notes")).map(p => p.policyname);
             expect(names).toEqual(expect.arrayContaining(["notes_own", "notes_staff"]));

@@ -71,9 +71,9 @@ export function createPostgresAdapter(pgConfig: PostgresDriverConfig): DatabaseA
             ? (driverResult) => bootstrapper.ensureRlsRuntime!(driverResult)
             : undefined,
 
-        ensureCollectionPolicies: bootstrapper.ensureCollectionPolicies
+        ensureTablePolicies: bootstrapper.ensureTablePolicies
             ? (collections, driverResult, log) =>
-                bootstrapper.ensureCollectionPolicies!(collections, driverResult, log)
+                bootstrapper.ensureTablePolicies!(collections, driverResult, log)
             : undefined,
 
         finalizeSecurityPosture: bootstrapper.finalizeSecurityPosture

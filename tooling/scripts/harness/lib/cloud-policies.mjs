@@ -14,7 +14,7 @@
  *
  * - `backend/schema/index.ts` (0.31 on): loaded with `loadBackendSchema` and
  *   compiled with `compileLoadedSchema` — the one path boot, the runtime and
- *   the CLI take — and the result planned with `planCollectionPolicies`.
+ *   the CLI take — and the result planned with `planTablePolicies`.
  * - `config/collections/index.ts` (before): its `collections` export, lifted
  *   into tables (`collectionsToTableDefs`, the codemod's core), compiled, and
  *   planned the same way.

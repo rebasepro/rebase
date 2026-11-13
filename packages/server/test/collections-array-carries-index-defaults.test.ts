@@ -89,7 +89,7 @@ function recordingBootstrapper(provisioned: (readonly CompiledTable[])[]): Backe
         async ensureCollectionSchema() {
             return { applied: 0 };
         },
-        async ensureCollectionPolicies(tables: readonly CompiledTable[]) {
+        async ensureTablePolicies(tables: readonly CompiledTable[]) {
             provisioned.push(tables);
             return { applied: 0 };
         }

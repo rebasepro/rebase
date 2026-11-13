@@ -22,7 +22,7 @@ import { resolveRlsSettings, rlsConfigFromEnv } from "../src/security/rls-settin
 import { migrateRequestRoles } from "../src/security/request-role-migration";
 import { preflightDatabase } from "../src/security/database-preflight";
 import { REQUEST_ROLE_FUNCTION_SQL, RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
-import { ensureCollectionPolicies, readPolicyStamps } from "../src/schema/ensure-collection-policies";
+import { ensureTablePolicies, readPolicyStamps } from "../src/schema/ensure-policies";
 import { moveMigratedAdminPoliciesToPublic, stampPoliciesStoredAsRendered } from "../src/schema/migrate-policy-stamps";
 import { planPolicyPush } from "../src/schema/push-policy-plan";
 import { checkPolicyDrift, hasDrift } from "../src/security/policy-drift";
@@ -92,14 +92,14 @@ describe("the admin-request companions (rebase_admin_request)", () => {
     });
 
     it("are planned only where the boot made the role safe, and never written TO public", async () => {
-        const { planCollectionPolicies } = await import("../src/schema/generate-postgres-ddl-logic");
-        const companionNames = (options: Parameters<typeof planCollectionPolicies>[1]) =>
-            planCollectionPolicies(compileSet([tasks]), options).flatMap((plan) => plan.policies.filter((p) => p.adminRequestTarget).map((p) => p.name));
+        const { planTablePolicies } = await import("../src/schema/generate-postgres-ddl-logic");
+        const companionNames = (options: Parameters<typeof planTablePolicies>[1]) =>
+            planTablePolicies(compileSet([tasks]), options).flatMap((plan) => plan.policies.filter((p) => p.adminRequestTarget).map((p) => p.name));
         expect(companionNames({})).toEqual([]);
         expect(companionNames({ adminRequestRoleAvailable: true })).toHaveLength(4);
         expect(companionNames({ adminRoleAvailable: false, adminRequestRoleAvailable: true })).toEqual([]);
         for (const options of [{}, { adminRoleAvailable: false }, { adminRoleAvailable: false, adminRequestRoleAvailable: true }, { adminRequestRoleAvailable: true }]) {
-            const statements = planCollectionPolicies(compileSet([tasks]), options).flatMap((plan) => plan.policyStatements);
+            const statements = planTablePolicies(compileSet([tasks]), options).flatMap((plan) => plan.policyStatements);
             expect(statements.filter((s) => /USING \(true\)/.test(s) && !/TO "rebase_admin_request"/.test(s))).toEqual([]);
         }
         // policies.sql and migrations never create them.
@@ -496,7 +496,7 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
                 INSERT INTO public.tasks (owner_id) VALUES ('ada'), ('bob');
                 GRANT SELECT ON public.tasks TO rebase_user;
             `);
-            const outcome = await ensureCollectionPolicies(
+            const outcome = await ensureTablePolicies(
                 { query: <T,>(text: string) => pg.query<T>(text) }, compileSet([tasks]), undefined, { adminRoleAvailable: adminPoliciesLive }
             );
             expect(outcome.failures).toEqual([]);
@@ -543,7 +543,7 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
             `);
             const request = await settleAdminRequestRoles(run(pg), ["public"], resolveRlsSettings(undefined), { provision: true });
             expect(request.adminRoleFor).toBeUndefined();
-            const outcome = await ensureCollectionPolicies({ query: <T,>(text: string) => pg.query<T>(text) }, compileSet([tasks]));
+            const outcome = await ensureTablePolicies({ query: <T,>(text: string) => pg.query<T>(text) }, compileSet([tasks]));
             expect(outcome.failures).toEqual([]);
             const { rows } = await pg.query<{ roles: string }>(
                 "SELECT roles::text AS roles FROM pg_policies WHERE policyname = 'tasks_default_admin_read'"
@@ -588,7 +588,7 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
                 const { request, adminPoliciesLive } = await settleAdminSwitch(run(pg), ["public"], resolveRlsSettings(undefined), { provision: true });
                 expect(request.adminRoleFor).toBeUndefined();
                 expect(adminPoliciesLive).toBe(false);
-                const outcome = await ensureCollectionPolicies(
+                const outcome = await ensureTablePolicies(
                     { query: <T,>(text: string) => pg.query<T>(text) }, compileSet([tasks]), undefined, { adminRoleAvailable: adminPoliciesLive }
                 );
                 expect(outcome.failures).toEqual([]);
@@ -670,7 +670,7 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
                     GRANT SELECT ON public.tasks TO rebase_user;
                 `);
                 const client = { query: async <R,>(text: string, values?: unknown[]) => ({ rows: (await pg.query<R>(text, values)).rows }) };
-                await ensureCollectionPolicies(client, compileSet([tasks]));
+                await ensureTablePolicies(client, compileSet([tasks]));
                 const roles = async () => (await pg.query<{ roles: string }>(
                     "SELECT DISTINCT roles::text AS roles FROM pg_policies WHERE policyname LIKE 'tasks_default_admin_%'"
                 )).rows.map((r) => r.roles);

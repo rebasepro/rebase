@@ -20,7 +20,7 @@ import { writeSchemaFixture } from "./helpers/schema-source-fixture";
  * Studio's RLS editor and MCP showed the tightened rules — while Postgres kept
  * serving the rows under the old policies until the next boot. Now the
  * changed tables' policies are written in the same apply, through the boot
- * policy applier (`ensureCollectionPolicies`); where this backend cannot write
+ * policy applier (`ensureTablePolicies`); where this backend cannot write
  * them, the served `rls` stays what the database enforces and the result
  * says so (`policies.status: "deferred"`), with the message the Studio shows.
  */
@@ -67,7 +67,7 @@ function bootstrapper(options: { policies: "write" | "none" | "fail" }): Backend
         }
     };
     if (options.policies !== "none") {
-        overrides.ensureCollectionPolicies = async (tables: readonly CompiledTable[]) => {
+        overrides.ensureTablePolicies = async (tables: readonly CompiledTable[]) => {
             if (policyWrites.length > 0 && options.policies === "fail") throw new Error("permission denied for table posts");
             policyWrites.push(tables.map(table => table.descriptor));
             return { applied: 3 };

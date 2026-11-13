@@ -5,7 +5,7 @@
  * reads the collections into a {@link SchemaPlan} and `schema/plan/render-ddl.ts`
  * writes the files; what remains here is the public entry points those two are
  * reached through, plus the smaller plans (`planRelationalColumns`,
- * `planJunctionTables`, `planCollectionPolicies`) that other modules ask for as
+ * `planJunctionTables`, `planTablePolicies`) that other modules ask for as
  * slices of the same plan.
  *
  * It used to hold `getSqlColumnType` and a `CREATE TABLE` walk with its own
@@ -244,7 +244,7 @@ export const planJunctionTables = (tables: readonly CompiledTable[]): JunctionTa
             foreignKeys: table.columns.map(c => c.foreignKey).filter((fk): fk is ForeignKeyPlan => fk !== undefined)
         }));
 
-export interface CollectionPolicyPlan {
+export interface TablePolicyPlan {
     /** The table's schema (e.g. `public`, `rebase`). */
     schema: string;
     /** The bare table name, no schema prefix. */
@@ -264,7 +264,7 @@ export interface CollectionPolicyPlan {
     policies: PolicyApplyPlan[];
 }
 
-/** One policy of a {@link CollectionPolicyPlan}, as the statements that make it. */
+/** One policy of a {@link TablePolicyPlan}, as the statements that make it. */
 export interface PolicyApplyPlan {
     name: string;
     /** Written `TO rebase_admin` by the compiler's choice (`rls.adminPolicies`). */
@@ -286,7 +286,7 @@ export interface PolicyApplyPlan {
  * The same policies `policies.sql` carries, from the same plan, so boot and
  * `db push` produce identical RLS from identical collections.
  */
-export const planCollectionPolicies = (
+export const planTablePolicies = (
     tables: readonly CompiledTable[],
     options: {
         adminRoleAvailable?: boolean;
@@ -298,7 +298,7 @@ export const planCollectionPolicies = (
          */
         adminRequestRoleAvailable?: boolean;
     } = {}
-): CollectionPolicyPlan[] => {
+): TablePolicyPlan[] => {
     const plan = planOf(tables);
     // Collections first, then the junctions no collection declares.
     const ordered = [

@@ -21,7 +21,7 @@ import {
     generatePostgresTriggersDdl,
     generatePostgresVectorDdl,
     generatePostgresViewsDdl,
-    planCollectionPolicies,
+    planTablePolicies,
     planJunctionTables,
     planRelationalColumns,
     searchExcludePatterns,
@@ -152,7 +152,7 @@ export interface RenderSchemaOutputsOptions {
  * - `schema.generated.ts` / `schema.generated.no-policies.ts`: the Drizzle schema.
  * - `atlas-excludes.json`: the patterns that keep Atlas off the carved-out objects.
  * - `boot-ensure.json`: `planTableSchemaEnsure` against an empty database.
- * - `boot-policies.adminRole-*.adminRequestRole-*.json`: `planCollectionPolicies`
+ * - `boot-policies.adminRole-*.adminRequestRole-*.json`: `planTablePolicies`
  *   for the four role-availability combinations.
  * - `relational-columns.json`, `junction-tables.json`: the legacy-column slices.
  * - `plan.json`: `planSchema` itself, functions stripped.
@@ -200,7 +200,7 @@ export function renderSchemaOutputs(
             for (const adminRequestRoleAvailable of [false, true]) {
                 emit(
                     `boot-policies.adminRole-${adminRoleAvailable ? "on" : "off"}.adminRequestRole-${adminRequestRoleAvailable ? "on" : "off"}.json`,
-                    () => toStableJson(planCollectionPolicies(sorted, { adminRoleAvailable, adminRequestRoleAvailable }))
+                    () => toStableJson(planTablePolicies(sorted, { adminRoleAvailable, adminRequestRoleAvailable }))
                 );
             }
         }

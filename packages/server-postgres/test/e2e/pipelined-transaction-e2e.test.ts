@@ -83,7 +83,7 @@ async function provision(url: string): Promise<void> {
         const driverResult = await bootstrapper.initializeDriver({ collections: [notes], tables: tablesFromCollections([notes]).tables, realtime: { subscribe: false, provision: false } });
         await bootstrapper.ensureCollectionSchema!(tablesFromCollections([notes]).tables, driverResult);
         await bootstrapper.ensureRlsRuntime!(driverResult);
-        await bootstrapper.ensureCollectionPolicies!(tablesFromCollections([notes]).tables, driverResult);
+        await bootstrapper.ensureTablePolicies!(tablesFromCollections([notes]).tables, driverResult);
         await bootstrapper.finalizeSecurityPosture!(driverResult);
     } finally {
         await conn.pool.end();

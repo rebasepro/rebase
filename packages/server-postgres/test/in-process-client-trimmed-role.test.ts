@@ -58,7 +58,7 @@ function bootstrapper(db: PGlite): BackendBootstrapper {
         },
         async initializeAuth() { return { userService: repo, authRepository: repo }; },
         async ensureCollectionSchema() { return { applied: 0 }; },
-        async ensureCollectionPolicies() { return { applied: 0 }; },
+        async ensureTablePolicies() { return { applied: 0 }; },
         getAdmin: () => driver.admin
     };
 }

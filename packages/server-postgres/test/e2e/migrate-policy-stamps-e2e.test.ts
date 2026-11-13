@@ -24,7 +24,7 @@ import { fileURLToPath } from "url";
 import { execa } from "execa";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { loadTables } from "../../src/schema/load-tables.js";
-import { ensureCollectionPolicies } from "../../src/schema/ensure-collection-policies.js";
+import { ensureTablePolicies } from "../../src/schema/ensure-policies.js";
 import { pinSearchPath } from "../../src/connection.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -108,7 +108,7 @@ describe("db migrate stamps the policies it applies", () => {
         await client.connect();
         try {
             const collections = await loadTables(schemaDir);
-            return await ensureCollectionPolicies(client, collections);
+            return await ensureTablePolicies(client, collections);
         } finally {
             await client.end();
         }

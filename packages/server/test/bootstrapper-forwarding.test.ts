@@ -38,7 +38,7 @@ const CAPABILITIES = [
     "initializeWebsockets",
     "verifyConnection",
     "ensureCollectionSchema",
-    "ensureCollectionPolicies",
+    "ensureTablePolicies",
     "ensureRlsRuntime",
     "finalizeSecurityPosture",
     "readCollectionsSchemaVersion",
@@ -74,7 +74,7 @@ function fullyCapableAdapter(): DatabaseAdapter {
         initializeWebsockets: () => undefined,
         verifyConnection: async () => undefined,
         ensureCollectionSchema: async () => ({ applied: 0 }),
-        ensureCollectionPolicies: async () => ({ applied: 0 }),
+        ensureTablePolicies: async () => ({ applied: 0 }),
         ensureRlsRuntime: async () => undefined,
         finalizeSecurityPosture: async () => undefined,
         readCollectionsSchemaVersion: async () => null,
@@ -164,7 +164,7 @@ describe.each(WRAPPERS)("%s", (_name, wrap) => {
                 calls.push(`schema:${collections.length}`);
                 return { applied: 0 };
             },
-            ensureCollectionPolicies: async (collections: unknown[]) => {
+            ensureTablePolicies: async (collections: unknown[]) => {
                 calls.push(`policies:${collections.length}`);
                 return { applied: 0 };
             }
@@ -172,7 +172,7 @@ describe.each(WRAPPERS)("%s", (_name, wrap) => {
 
         const wrapped = wrap(adapter);
         void wrapped.ensureCollectionSchema?.([{}, {}], initialized(), () => undefined);
-        void wrapped.ensureCollectionPolicies?.([{}], initialized(), () => undefined);
+        void wrapped.ensureTablePolicies?.([{}], initialized(), () => undefined);
 
         expect(calls).toEqual(["schema:2", "policies:1"]);
     });

@@ -2268,7 +2268,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
          * `rebase.roles()`, and `CREATE POLICY` validates those functions exist.
          *
          * Runs through the same drizzle handle, one transaction per table under
-         * a lock budget (see `schema/ensure-collection-policies`). Failures are
+         * a lock budget (see `schema/ensure-policies`). Failures are
          * per-table and non-fatal: a table left un-policed stays RLS-enabled, so
          * it denies rather than leaks, and a table whose lock another session
          * held throughout is left exactly as it was.
@@ -2287,12 +2287,12 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
             await provisionRlsRuntime(driverResult);
         },
 
-        async ensureCollectionPolicies(
+        async ensureTablePolicies(
             tables: readonly CompiledTable[],
             driverResult?: InitializedDriver,
             log?: (message: string) => void
         ): Promise<{ applied: number }> {
-            const { ensureCollectionPolicies, describeRulesDropped } = await import("./schema/ensure-collection-policies");
+            const { ensureTablePolicies, describeRulesDropped } = await import("./schema/ensure-policies");
             const queryable = provisioningQueryable(driverResult);
             // The order this depends on is set by the caller, and a caller that
             // gets it wrong fails silently-but-permanently: `CREATE POLICY`
@@ -2310,7 +2310,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
             // The server-or-admin policies go TO rebase_admin only where this
             // driver's admin switch is live; no driver, no switch, TO public.
             const internals = driverResult?.internals as PostgresDriverInternals | undefined;
-            const outcome = await ensureCollectionPolicies(
+            const outcome = await ensureTablePolicies(
                 queryable,
                 tables,
                 log,

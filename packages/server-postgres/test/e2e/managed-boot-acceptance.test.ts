@@ -10,7 +10,7 @@
  * the schema up itself — both halves:
  *
  *   1. the collection TABLES  (`ensureTables`), and
- *   2. their RLS POLICIES     (`ensureCollectionPolicies`).
+ *   2. their RLS POLICIES     (`ensureTablePolicies`).
  *
  * Before this, only tables were ever wired in — and even that was dropped by
  * the adapter→bootstrapper wrapper — so a managed tenant came up 500ing every
@@ -33,7 +33,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { ensureTables, type Queryable } from "../../src/schema/ensure-tables.js";
-import { ensureCollectionPolicies } from "../../src/schema/ensure-collection-policies.js";
+import { ensureTablePolicies } from "../../src/schema/ensure-policies.js";
 import { ensureAuthTablesExist } from "../../src/auth/ensure-tables.js";
 import {
     detectConnectionPosture,
@@ -196,7 +196,7 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
 
         // 4. Policies (boot phase 2 — the code under test). Enables RLS and
         //    applies each collection's securityRules as CREATE POLICY.
-        const applied = await ensureCollectionPolicies(queryable, compileSet(collections));
+        const applied = await ensureTablePolicies(queryable, compileSet(collections));
         expect(applied.failures).toEqual([]);
         // Four declared collections plus the derived `orders_tiers` junction.
         expect(applied.tablesSecured).toBe(5);
@@ -365,7 +365,7 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
         expect(tablesAgain.actions).toEqual([]);
         expect(tablesAgain.failures).toEqual([]);
 
-        const again = await ensureCollectionPolicies(queryable, compileSet(collections));
+        const again = await ensureTablePolicies(queryable, compileSet(collections));
         expect(again.failures).toEqual([]);
         expect(again.tablesSecured).toBe(5);
         // Data still reads exactly the same after a second application.

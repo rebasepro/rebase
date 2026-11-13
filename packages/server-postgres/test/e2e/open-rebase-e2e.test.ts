@@ -107,7 +107,7 @@ async function provision(url: string, collections: CollectionConfig[], options: 
         });
         await bootstrapper.ensureCollectionSchema!(tablesFromCollections(collections).tables, driverResult);
         await bootstrapper.ensureRlsRuntime!(driverResult);
-        await bootstrapper.ensureCollectionPolicies!(tablesFromCollections(collections).tables, driverResult);
+        await bootstrapper.ensureTablePolicies!(tablesFromCollections(collections).tables, driverResult);
         await bootstrapper.finalizeSecurityPosture!(driverResult);
         if (options.history) await bootstrapper.initializeHistory!(true, driverResult);
     } finally {

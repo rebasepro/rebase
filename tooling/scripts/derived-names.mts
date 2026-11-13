@@ -34,7 +34,7 @@
  *   * `push` — `generatePostgresDdl` plus the two files Atlas is not shown,
  *     `generatePostgresSearchDdl` and `generatePostgresVectorDdl`; together,
  *     what `rebase db push` writes — and
- *   * `boot` — `planTableSchemaEnsure` / `planCollectionPolicies`, what the
+ *   * `boot` — `planTableSchemaEnsure` / `planTablePolicies`, what the
  *     managed runtime applies at boot against an empty database
  *
  * — and every identifier either one names is listed with the producers that name
@@ -360,7 +360,7 @@ async function renderFixture(fixture: FixtureInput): Promise<Rendered> {
         generatePostgresVectorDdl,
         generatePostgresTriggersDdl,
         generatePostgresViewsDdl,
-        planCollectionPolicies,
+        planTablePolicies,
         planRelationalColumns,
         planJunctionTables
     } = await import(`${ROOT}/packages/server-postgres/src/schema/generate-postgres-ddl-logic.ts`);
@@ -408,7 +408,7 @@ async function renderFixture(fixture: FixtureInput): Promise<Rendered> {
     }).actions) {
         readStatement(surface, "boot", action.sql);
     }
-    for (const plan of planCollectionPolicies(fixture)) {
+    for (const plan of planTablePolicies(fixture)) {
         for (const statement of plan.policyStatements) readStatement(surface, "boot", statement);
     }
     // The boot's admin-request companions — `TO rebase_admin_request USING
@@ -416,7 +416,7 @@ async function renderFixture(fixture: FixtureInput): Promise<Rendered> {
     // only once it has made that role, and which no file `db push` writes
     // carries. Planned again with both roles available; the policies they sit
     // beside come out identical, so only the companions are new lines.
-    for (const plan of planCollectionPolicies(fixture, { adminRoleAvailable: true, adminRequestRoleAvailable: true })) {
+    for (const plan of planTablePolicies(fixture, { adminRoleAvailable: true, adminRequestRoleAvailable: true })) {
         for (const statement of plan.policyStatements) readStatement(surface, "boot", statement);
     }
     // Views are applied at boot from the same plan, by the same renderer

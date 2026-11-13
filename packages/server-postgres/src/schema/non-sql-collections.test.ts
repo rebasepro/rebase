@@ -21,7 +21,7 @@ import { generateSchema } from "./generate-drizzle-schema-logic";
 import {
     generatePostgresDdl,
     generatePostgresPoliciesDdl,
-    planCollectionPolicies
+    planTablePolicies
 } from "./generate-postgres-ddl-logic";
 import { planTableSchemaEnsure, type ExistingSchema } from "./ensure-tables";
 import { getTableIncludesFromTables } from "../cli-helpers";
@@ -100,7 +100,7 @@ describe("the Postgres DDL generator", () => {
         const policies = generatePostgresPoliciesDdl(compileSet(all));
         expect(policies).not.toContain("exercises");
 
-        const plans = planCollectionPolicies(compileSet(all));
+        const plans = planTablePolicies(compileSet(all));
         expect(plans.map(p => p.qualified)).toEqual(["public.customers"]);
     });
 });

@@ -22,7 +22,7 @@ import { execa } from "execa";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { closeAppClients, withAppClient } from "../../src/cli-helpers";
 import { pinSearchPath } from "../../src/connection";
-import { ensureCollectionPolicies } from "../../src/schema/ensure-collection-policies";
+import { ensureTablePolicies } from "../../src/schema/ensure-policies";
 import { loadTables } from "../../src/schema/load-tables";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -191,7 +191,7 @@ describe("db push overhead E2E", () => {
         await boot.connect();
         try {
             const collections = await loadTables(schemaDir);
-            const outcome = await ensureCollectionPolicies(
+            const outcome = await ensureTablePolicies(
                 { query: async <T>(text: string) => ({ rows: (await boot.query(text)).rows as T[] }) },
                 collections
             );

@@ -84,7 +84,7 @@ import { assertNoCollectionsFlag, assertSchemaDirExists, DEFAULT_SCHEMA_DIR } fr
 import { DESIRED_STATE_URL, GENERATED_SQL_DIR, generatedSqlDir, prepareGeneratedSqlDir } from "./generated-sql";
 import { backupActionOf } from "./backup-argv";
 import { DRIVER_DB_SUBCOMMANDS, isDriverDbSubcommand } from "./db-subcommands";
-import type { TableLockResult } from "./schema/ensure-collection-policies";
+import type { TableLockResult } from "./schema/ensure-policies";
 import type { DeferredIndexBuild } from "./schema/plan/diff-plan";
 
 import { ACTIVE_BRANCH_DATABASE_ENV, planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
@@ -1328,7 +1328,7 @@ async function lockManagedTables(databaseUrl: string, schemaDir: string): Promis
     let unsecured: TableLockResult["unsecured"];
     let userRole: string;
     try {
-        const { lockCollectionTables } = await import("./schema/ensure-collection-policies");
+        const { lockTables } = await import("./schema/ensure-policies");
         const { loadTables } = await import("./schema/load-tables");
         const { readRecordedRequestRoles } = await import("./security/rls-enforcement");
         const { cliRlsSettings } = await import("./security/rls-settings");
@@ -1336,7 +1336,7 @@ async function lockManagedTables(databaseUrl: string, schemaDir: string): Promis
         ({ unsecured, userRole } = await withAppClient(databaseUrl, async client => {
             const runSql = async (text: string) => (await client.query(text)).rows as Record<string, unknown>[];
             const roles = cliRlsSettings(await readRecordedRequestRoles(runSql)).roles;
-            const locked = await lockCollectionTables(
+            const locked = await lockTables(
                 { query: async (text) => ({ rows: (await client.query(text)).rows }) },
                 tables
             );
@@ -1638,12 +1638,12 @@ async function moveAdminPoliciesToPublic(databaseUrl: string, schemaDir: string)
  */
 async function policiesToPublic(schemaDir: string, policiesSql: string): Promise<string> {
     const { loadTables } = await import("./schema/load-tables");
-    const { planCollectionPolicies } = await import("./schema/generate-postgres-ddl-logic");
+    const { planTablePolicies } = await import("./schema/generate-postgres-ddl-logic");
     const tables = await loadTables(schemaDir);
-    const fallback = new Map(planCollectionPolicies(tables, { adminRoleAvailable: false })
+    const fallback = new Map(planTablePolicies(tables, { adminRoleAvailable: false })
         .flatMap(plan => plan.policies.map(policy => [`${plan.qualified}.${policy.name}`, policy.statements] as const)));
     let sql = policiesSql;
-    for (const plan of planCollectionPolicies(tables)) {
+    for (const plan of planTablePolicies(tables)) {
         for (const policy of plan.policies) {
             if (!policy.adminTarget) continue;
             const replacement = fallback.get(`${plan.qualified}.${policy.name}`) ?? [];
@@ -1658,13 +1658,13 @@ async function policiesToPublic(schemaDir: string, policiesSql: string): Promise
 async function policyStamping(databaseUrl: string, schemaDir: string, policiesSql: string, adminRoleAvailable = true): Promise<PolicyStamping> {
     try {
         const { loadTables } = await import("./schema/load-tables");
-        const { planCollectionPolicies } = await import("./schema/generate-postgres-ddl-logic");
-        const { policyStampSql } = await import("./schema/ensure-collection-policies");
+        const { planTablePolicies } = await import("./schema/generate-postgres-ddl-logic");
+        const { policyStampSql } = await import("./schema/ensure-policies");
         // The rule the boot's connections follow: `search_path=public` unless
         // the URL pins one of its own, in which case this connection has it too.
         const { pinSearchPath } = await import("./connection");
         const tables = await loadTables(schemaDir);
-        const statements = stampableTables(planCollectionPolicies(tables, { adminRoleAvailable }), policiesSql)
+        const statements = stampableTables(planTablePolicies(tables, { adminRoleAvailable }), policiesSql)
             .map(plan => policyStampSql(plan))
             .filter((statement): statement is string => statement !== undefined);
         return { statements, searchPath: pinSearchPath(databaseUrl) === databaseUrl ? undefined : "public" };

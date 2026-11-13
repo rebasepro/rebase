@@ -39,7 +39,7 @@ import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
 import { applyAuthContext, REBASE_USER_ROLE } from "../src/security/rls-enforcement";
 import type { RequestIdentity } from "../src/security/rls-settings";
 import { adminRequestRoleFor, REBASE_ADMIN_ROLE } from "@rebasepro/types";
-import { planCollectionPolicies } from "../src/schema/generate-postgres-ddl-logic";
+import { planTablePolicies } from "../src/schema/generate-postgres-ddl-logic";
 import {
     POLICY_SHAPE_CALLERS,
     POLICY_SHAPE_COLLECTIONS,
@@ -203,7 +203,7 @@ async function importedFromDatabase(db: PGlite): Promise<string[]> {
     return statements;
 }
 
-const currentPlans = () => planCollectionPolicies(compileSet(POLICY_SHAPE_COLLECTIONS));
+const currentPlans = () => planTablePolicies(compileSet(POLICY_SHAPE_COLLECTIONS));
 const createStatements = (statements: string[]) => statements.filter(s => /^CREATE POLICY/.test(s));
 
 describe("hoisting row-independent policy predicates into initPlans", () => {
@@ -345,7 +345,7 @@ describe("the planner, under the injected baseline policy", () => {
             ALTER TABLE big ENABLE ROW LEVEL SECURITY;
             GRANT SELECT ON big TO ${REBASE_USER_ROLE};
         `);
-        for (const statement of planCollectionPolicies(compileSet([big]))[0].policyStatements) await db.exec(statement);
+        for (const statement of planTablePolicies(compileSet([big]))[0].policyStatements) await db.exec(statement);
         await db.exec("ANALYZE big;");
     });
 

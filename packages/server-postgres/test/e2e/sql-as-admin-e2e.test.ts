@@ -75,7 +75,7 @@ describe("sqlAsAdmin (E2E)", () => {
             const driverResult = await bootstrapper.initializeDriver({ collections: [tickets], tables: tablesFromCollections([tickets]).tables, realtime: { subscribe: false, provision: false } });
             await bootstrapper.ensureCollectionSchema!(tablesFromCollections([tickets]).tables, driverResult);
             await bootstrapper.ensureRlsRuntime!(driverResult);
-            await bootstrapper.ensureCollectionPolicies!(tablesFromCollections([tickets]).tables, driverResult);
+            await bootstrapper.ensureTablePolicies!(tablesFromCollections([tickets]).tables, driverResult);
             await bootstrapper.finalizeSecurityPosture!(driverResult);
         } finally {
             await conn.pool.end();

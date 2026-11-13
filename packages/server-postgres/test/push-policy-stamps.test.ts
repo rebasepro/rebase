@@ -1,8 +1,8 @@
 import { PGlite } from "@electric-sql/pglite";
 import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { applyPoliciesFile, stampableTables } from "../src/cli-push";
-import { ensureCollectionPolicies, policyStampSql } from "../src/schema/ensure-collection-policies";
-import { generatePostgresPoliciesDdl, planCollectionPolicies } from "../src/schema/generate-postgres-ddl-logic";
+import { ensureTablePolicies, policyStampSql } from "../src/schema/ensure-policies";
+import { generatePostgresPoliciesDdl, planTablePolicies } from "../src/schema/generate-postgres-ddl-logic";
 import type { Queryable } from "../src/schema/ensure-tables";
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
 import { compileSet } from "./helpers/plan-tables";
@@ -59,7 +59,7 @@ async function database(): Promise<{ db: PGlite; queryable: Queryable; ran: stri
 /** What `db push` does: the generated file, and the stamps for what it creates. */
 async function push(queryable: Queryable, collections: CollectionConfig[], searchPath: string | undefined) {
     const policiesSql = generatePostgresPoliciesDdl(compileSet(collections));
-    const statements = stampableTables(planCollectionPolicies(compileSet(collections)), policiesSql)
+    const statements = stampableTables(planTablePolicies(compileSet(collections)), policiesSql)
         .map(plan => policyStampSql(plan))
         .filter((s): s is string => s !== undefined);
     return applyPoliciesFile(queryable, policiesSql, { statements, searchPath });
@@ -73,7 +73,7 @@ describe("the boot after a db push", () => {
             expect(pushed).toEqual({ stamped: 2, stampError: undefined });
 
             ran.length = 0;
-            const boot = await ensureCollectionPolicies(queryable, compileSet([tiers, customers]));
+            const boot = await ensureTablePolicies(queryable, compileSet([tiers, customers]));
             expect(ran.filter(text => POLICY_DDL.test(text))).toEqual([]);
             expect(boot).toMatchObject({ policiesApplied: 0, tablesSecured: 2, unchanged: 2, failures: [], deferred: [] });
         } finally {
@@ -93,7 +93,7 @@ describe("the boot after a db push", () => {
             await push(queryable, [tiers, customers], "public");
 
             await db.exec("SET search_path TO public");
-            const boot = await ensureCollectionPolicies(queryable, compileSet([tiers, customers]));
+            const boot = await ensureTablePolicies(queryable, compileSet([tiers, customers]));
             expect(boot).toMatchObject({ policiesApplied: 0, unchanged: 2 });
         } finally {
             await db.close();
@@ -115,7 +115,7 @@ describe("the boot after a db push", () => {
     }, 30_000);
 
     it("stamps only tables whose statements the file carries verbatim", () => {
-        const plans = planCollectionPolicies(compileSet([tiers, customers]));
+        const plans = planTablePolicies(compileSet([tiers, customers]));
         // A file generated from other rules for `tiers`: its policies are not
         // the ones the plan describes, so a stamp would be a lie.
         const other = generatePostgresPoliciesDdl(compileSet([

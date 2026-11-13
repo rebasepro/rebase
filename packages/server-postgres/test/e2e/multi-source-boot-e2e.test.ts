@@ -231,7 +231,7 @@ describe("Two data sources, one routed collection (E2E)", () => {
                 connectionString: orderingUrl,
                 connection: conn.db
             });
-            const outcome = await bootstrapper.ensureCollectionPolicies!(
+            const outcome = await bootstrapper.ensureTablePolicies!(
                 compileSet([eventsCollection]),
                 undefined
             );

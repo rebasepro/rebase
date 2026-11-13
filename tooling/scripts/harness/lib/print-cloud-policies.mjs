@@ -26,7 +26,7 @@ const [kind, index, compiler, loader, lifter] = process.argv.slice(2);
 
 const policies = {};
 if (fs.existsSync(index)) {
-    const { planCollectionPolicies } = await import(pathToFileURL(compiler).href);
+    const { planTablePolicies } = await import(pathToFileURL(compiler).href);
     let tables;
     if (kind === "tables") {
         const { loadBackendSchema, compileLoadedSchema } = await import(pathToFileURL(loader).href);
@@ -38,7 +38,7 @@ if (fs.existsSync(index)) {
         const lifted = collectionsToTableDefs((await import(pathToFileURL(index).href)).collections ?? []);
         tables = compileSchema(lifted.tables, lifted.defaultRls ? { defaultRls: lifted.defaultRls } : {});
     }
-    for (const plan of planCollectionPolicies(tables)) {
+    for (const plan of planTablePolicies(tables)) {
         policies[plan.qualified] = plan.policyStatements;
     }
 }

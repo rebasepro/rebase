@@ -16,8 +16,8 @@
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig, PostgresCollectionConfig, SecurityOperation, SecurityRule } from "@rebasepro/types";
 import { applyPoliciesFile, stampableTables } from "../src/cli-push";
-import { lockCollectionTables, policyStampSql } from "../src/schema/ensure-collection-policies";
-import { generatePostgresPoliciesDdl, planCollectionPolicies } from "../src/schema/generate-postgres-ddl-logic";
+import { lockTables, policyStampSql } from "../src/schema/ensure-policies";
+import { generatePostgresPoliciesDdl, planTablePolicies } from "../src/schema/generate-postgres-ddl-logic";
 import { formatPolicyPushPlan, planPolicyPush, policyPlanChanges, type PolicyPushPlan } from "../src/schema/push-policy-plan";
 import { checkPolicyDrift, dropOrphanedPolicies, type Queryable } from "../src/security/policy-drift";
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
@@ -99,9 +99,9 @@ async function catalogue(db: PGlite): Promise<Catalogue> {
 
 /** What `rebase db push` does after Atlas, to row-level security, in its order. */
 async function push(client: Queryable, collections: CollectionConfig[]): Promise<void> {
-    await lockCollectionTables(client, compileSet(collections));
+    await lockTables(client, compileSet(collections));
     const policiesSql = generatePostgresPoliciesDdl(compileSet(collections));
-    const statements = stampableTables(planCollectionPolicies(compileSet(collections)), policiesSql)
+    const statements = stampableTables(planTablePolicies(compileSet(collections)), policiesSql)
         .map(plan => policyStampSql(plan))
         .filter((statement): statement is string => statement !== undefined);
     await applyPoliciesFile(client, policiesSql, { statements });
@@ -239,7 +239,7 @@ describe("the push's row-level security plan", () => {
     // stamp: every later dry run listed all of them as unstamped.
     it("plans nothing for unstamped policies its rules would store as they are", async () => {
         const declared = [collection("items", { securityRules: [{ name: "items_read", operation: "select", using: OWNER }] })];
-        await lockCollectionTables(client, compileSet(declared));
+        await lockTables(client, compileSet(declared));
         await client.query(generatePostgresPoliciesDdl(compileSet(declared)));
 
         const plan = await planPolicyPush(client, compileSet(declared));

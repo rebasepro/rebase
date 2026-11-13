@@ -131,7 +131,7 @@ export interface LiveSchemaRoutesConfig {
     getTables?: () => readonly TableDescriptor[];
     /**
      * Write the RLS policies of these collections to the database: the boot
-     * policy applier (the driver's `ensureCollectionPolicies`), called after
+     * policy applier (the driver's `ensureTablePolicies`), called after
      * an apply that changed some table's `rls`, with every collection the
      * default database stores (unchanged ones are no-ops: their policies are
      * stamped). Absent when this backend may not or cannot write policies

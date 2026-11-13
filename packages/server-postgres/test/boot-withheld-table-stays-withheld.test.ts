@@ -114,7 +114,7 @@ describe("boot keeps a table it could not lock withheld from the user role", () 
         expect(await reach("customers")).toEqual({ rls: false, select: true });
 
         // The policies step: `customers` cannot be locked, so it is closed.
-        await bootstrapper.ensureCollectionPolicies!(compileSet(collections), driverResult);
+        await bootstrapper.ensureTablePolicies!(compileSet(collections), driverResult);
         expect(await reach("customers")).toEqual({ rls: false, select: false });
         expect(await reach("tiers")).toEqual({ rls: true, select: true });
 

@@ -11,7 +11,7 @@
  *
  * The plan is the push's own steps, read instead of run:
  *
- * - **RLS switched on:** the tables `lockCollectionTables` switches on
+ * - **RLS switched on:** the tables `lockTables` switches on
  *   ({@link tablesRlsWouldEnable}).
  * - **Policies created and replaced:** `policies.sql`, which DROPs and CREATEs
  *   every declared policy, against the database as `checkPolicyDrift` reads
@@ -36,7 +36,7 @@ import {
     type PolicyRef,
     type Queryable
 } from "../security/policy-drift";
-import { probeRenderedPolicies, readPolicyStamps, tablesRlsWouldEnable } from "./ensure-collection-policies";
+import { probeRenderedPolicies, readPolicyStamps, tablesRlsWouldEnable } from "./ensure-policies";
 
 export interface PolicyPushPlan {
     /** Declared tables in the database with row-level security off, as `schema.table`: the push switches it on. */

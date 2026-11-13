@@ -155,7 +155,7 @@ describe("Two data sources, each listening on its own database (E2E)", () => {
                 connectionString: defaultUrl,
                 connection: defaultConn.db
             });
-            await defaultBootstrapper.ensureCollectionPolicies!(tablesFromCollections([postsCollection]).tables, undefined);
+            await defaultBootstrapper.ensureTablePolicies!(tablesFromCollections([postsCollection]).tables, undefined);
             defaultSource = partsOf(await defaultBootstrapper.initializeDriver!({
                 collections: ALL_COLLECTIONS,
                 dataSourceKey: "(default)",
@@ -166,7 +166,7 @@ describe("Two data sources, each listening on its own database (E2E)", () => {
                 directConnectionString: `${analyticsUrl}&application_name=analytics-direct`,
                 connection: analyticsConn.db
             });
-            await analyticsBootstrapper.ensureCollectionPolicies!(tablesFromCollections([eventsCollection]).tables, undefined);
+            await analyticsBootstrapper.ensureTablePolicies!(tablesFromCollections([eventsCollection]).tables, undefined);
             analyticsSource = partsOf(await analyticsBootstrapper.initializeDriver!({
                 collections: ALL_COLLECTIONS,
                 dataSourceKey: "analytics",

@@ -4,7 +4,7 @@
  * Tightening Posts' select rule from `access: "public"` to `roles: ["admin"]` in
  * the Studio RLS editor was planned with no changes and no statements, and
  * committed as `chore(schema): no change`. The policies changed only at the
- * next boot (`ensureCollectionPolicies`). The audit trail is the feature, and
+ * next boot (`ensureTablePolicies`). The audit trail is the feature, and
  * it recorded the opposite of what happened.
  */
 import type { CollectionConfig, SecurityRule } from "@rebasepro/types";

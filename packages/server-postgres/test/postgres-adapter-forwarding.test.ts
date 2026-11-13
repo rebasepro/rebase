@@ -12,7 +12,7 @@ import { tablesFromCollections } from "./helpers/tables";
  * `createPostgresAdapter` must surface the boot-time schema/RLS provisioning the
  * bootstrapper implements. The adapter wraps the bootstrapper and re-declares
  * the methods it exposes; when it omitted `ensureCollectionSchema` /
- * `ensureCollectionPolicies`, the runtime booted a managed tenant with no tables
+ * `ensureTablePolicies`, the runtime booted a managed tenant with no tables
  * (500 on every data route) or no policies (401 on every read). The bootstrapper
  * has always implemented both — this pins that the adapter does not drop them.
  */
@@ -24,11 +24,11 @@ describe("createPostgresAdapter forwards the schema-provisioning methods", () =>
     it("exposes both provisioning methods when the bootstrapper does", () => {
         const bootstrapper = createPostgresBootstrapper(config);
         expect(typeof bootstrapper.ensureCollectionSchema).toBe("function");
-        expect(typeof bootstrapper.ensureCollectionPolicies).toBe("function");
+        expect(typeof bootstrapper.ensureTablePolicies).toBe("function");
 
         const adapter = createPostgresAdapter(config);
         expect(typeof adapter.ensureCollectionSchema).toBe("function");
-        expect(typeof adapter.ensureCollectionPolicies).toBe("function");
+        expect(typeof adapter.ensureTablePolicies).toBe("function");
     });
 
     /**
@@ -48,14 +48,14 @@ describe("createPostgresAdapter forwards the schema-provisioning methods", () =>
         const log = jest.fn();
 
         let ensureCollectionSchema: jest.Mock;
-        let ensureCollectionPolicies: jest.Mock;
+        let ensureTablePolicies: jest.Mock;
 
         function stubBootstrapper(over: Partial<BackendBootstrapper> = {}) {
             const bootstrapper: BackendBootstrapper = {
                 type: "postgres",
                 initializeDriver: jest.fn(),
                 ensureCollectionSchema,
-                ensureCollectionPolicies,
+                ensureTablePolicies,
                 ...over
             };
             jest.spyOn(bootstrapperModule, "createPostgresBootstrapper").mockReturnValue(bootstrapper);
@@ -63,7 +63,7 @@ describe("createPostgresAdapter forwards the schema-provisioning methods", () =>
 
         beforeEach(() => {
             ensureCollectionSchema = jest.fn().mockResolvedValue({ applied: 3 });
-            ensureCollectionPolicies = jest.fn().mockResolvedValue({ applied: 7 });
+            ensureTablePolicies = jest.fn().mockResolvedValue({ applied: 7 });
         });
 
         afterEach(() => {
@@ -81,14 +81,14 @@ describe("createPostgresAdapter forwards the schema-provisioning methods", () =>
             expect(result).toEqual({ applied: 3 });
         });
 
-        it("hands ensureCollectionPolicies every argument and returns its result", async () => {
+        it("hands ensureTablePolicies every argument and returns its result", async () => {
             stubBootstrapper();
 
             const result = await createPostgresAdapter(config)
-                .ensureCollectionPolicies!(collections, driverResult, log);
+                .ensureTablePolicies!(collections, driverResult, log);
 
-            expect(ensureCollectionPolicies).toHaveBeenCalledTimes(1);
-            expect(ensureCollectionPolicies).toHaveBeenCalledWith(collections, driverResult, log);
+            expect(ensureTablePolicies).toHaveBeenCalledTimes(1);
+            expect(ensureTablePolicies).toHaveBeenCalledWith(collections, driverResult, log);
             expect(result).toEqual({ applied: 7 });
         });
 
@@ -98,13 +98,13 @@ describe("createPostgresAdapter forwards the schema-provisioning methods", () =>
             // decide whether boot provisioning is available at all.
             stubBootstrapper({
                 ensureCollectionSchema: undefined,
-                ensureCollectionPolicies: undefined
+                ensureTablePolicies: undefined
             });
 
             const adapter = createPostgresAdapter(config);
 
             expect(adapter.ensureCollectionSchema).toBeUndefined();
-            expect(adapter.ensureCollectionPolicies).toBeUndefined();
+            expect(adapter.ensureTablePolicies).toBeUndefined();
         });
 
         /**

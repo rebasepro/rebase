@@ -50,7 +50,7 @@ describe("a date in a composite key (E2E)", () => {
             const driverResult = await bootstrapper.initializeDriver({ collections: [scores], tables: tablesFromCollections([scores]).tables, realtime: { subscribe: false, provision: false } });
             await bootstrapper.ensureCollectionSchema!(tablesFromCollections([scores]).tables, driverResult);
             await bootstrapper.ensureRlsRuntime!(driverResult);
-            await bootstrapper.ensureCollectionPolicies!(tablesFromCollections([scores]).tables, driverResult);
+            await bootstrapper.ensureTablePolicies!(tablesFromCollections([scores]).tables, driverResult);
             await bootstrapper.finalizeSecurityPosture!(driverResult);
         } finally {
             await conn.pool.end();

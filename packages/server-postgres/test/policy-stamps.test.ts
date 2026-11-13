@@ -1,6 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
 import { CollectionConfig, SecurityRule } from "@rebasepro/types";
-import { ensureCollectionPolicies } from "../src/schema/ensure-collection-policies";
+import { ensureTablePolicies } from "../src/schema/ensure-policies";
 import type { Queryable } from "../src/schema/ensure-tables";
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
 import { checkPolicyDrift, hasDrift } from "../src/security/policy-drift";
@@ -86,12 +86,12 @@ describe("a boot that changes nothing", () => {
     it("issues no policy DDL and takes no table lock", async () => {
         const h = await harness();
         try {
-            const first = await ensureCollectionPolicies(h.queryable, compileSet([tiers(), customers]));
+            const first = await ensureTablePolicies(h.queryable, compileSet([tiers(), customers]));
             expect(first.policiesApplied).toBeGreaterThan(0);
             const before = { tiers: await h.policies("tiers"), customers: await h.policies("customers") };
 
             h.ran.length = 0;
-            const second = await ensureCollectionPolicies(h.queryable, compileSet([tiers(), customers]));
+            const second = await ensureTablePolicies(h.queryable, compileSet([tiers(), customers]));
 
             expect(h.ddl()).toEqual([]);
             // Three catalogue reads — whether `rebase_admin` exists, the
@@ -110,9 +110,9 @@ describe("a boot that changes nothing", () => {
     it("issues none on a handle that takes one statement per query either", async () => {
         const h = await harness(false);
         try {
-            await ensureCollectionPolicies(h.queryable, compileSet([tiers(), customers]));
+            await ensureTablePolicies(h.queryable, compileSet([tiers(), customers]));
             h.ran.length = 0;
-            const second = await ensureCollectionPolicies(h.queryable, compileSet([tiers(), customers]));
+            const second = await ensureTablePolicies(h.queryable, compileSet([tiers(), customers]));
             expect(h.ddl()).toEqual([]);
             expect(second.unchanged).toBe(2);
         } finally {
@@ -123,7 +123,7 @@ describe("a boot that changes nothing", () => {
     it("is not reported as drift: the stamp is a comment, which no drift check reads", async () => {
         const h = await harness();
         try {
-            await ensureCollectionPolicies(h.queryable, compileSet([tiers(), customers]));
+            await ensureTablePolicies(h.queryable, compileSet([tiers(), customers]));
             const { rows } = await h.db.query<{ stamp: string | null }>(
                 "SELECT obj_description(oid, 'pg_policy') AS stamp FROM pg_policy"
             );
@@ -148,17 +148,17 @@ describe("everything a boot used to repair, it still repairs", () => {
         collections: CollectionConfig[] = [tiers(), customers]
     ) {
         const h = await harness();
-        await ensureCollectionPolicies(h.queryable, compileSet([tiers(), customers]));
+        await ensureTablePolicies(h.queryable, compileSet([tiers(), customers]));
         const pristine = { tiers: await h.policies("tiers"), customers: await h.policies("customers") };
         const names = { tiers: Object.keys(pristine.tiers), customers: Object.keys(pristine.customers) };
         await tamper(h, names);
         h.ran.length = 0;
-        const result = await ensureCollectionPolicies(h.queryable, compileSet(collections));
+        const result = await ensureTablePolicies(h.queryable, compileSet(collections));
         const ddl = h.ddl();
         const after = { tiers: await h.policies("tiers"), customers: await h.policies("customers") };
         // And the boot after that is quiet again: the repair was stamped.
         h.ran.length = 0;
-        await ensureCollectionPolicies(h.queryable, compileSet(collections));
+        await ensureTablePolicies(h.queryable, compileSet(collections));
         const settled = h.ddl();
         await h.db.close();
         return { result, ddl, pristine, after, settled };
@@ -194,16 +194,16 @@ describe("everything a boot used to repair, it still repairs", () => {
         const after = tiers({ name: "tiers_read", operation: "select", roles: ["admin"] });
         const h = await harness();
         try {
-            await ensureCollectionPolicies(h.queryable, compileSet([before]));
+            await ensureTablePolicies(h.queryable, compileSet([before]));
             expect((await h.policies("tiers")).tiers_read).toBe("true");
 
             h.ran.length = 0;
-            await ensureCollectionPolicies(h.queryable, compileSet([after]));
+            await ensureTablePolicies(h.queryable, compileSet([after]));
             expect(touches(h.ddl(), "tiers")).toBe(true);
             expect((await h.policies("tiers")).tiers_read).not.toBe("true");
 
             h.ran.length = 0;
-            await ensureCollectionPolicies(h.queryable, compileSet([after]));
+            await ensureTablePolicies(h.queryable, compileSet([after]));
             expect(h.ddl()).toEqual([]);
         } finally {
             await h.db.close();

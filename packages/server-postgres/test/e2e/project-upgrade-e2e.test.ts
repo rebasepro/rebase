@@ -49,7 +49,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, PGVECTOR_IMAGE, type PgContainer } from "./pg-setup.js";
 import { ensureAuthTablesExist } from "../../src/auth/ensure-tables.js";
 import { ensureTables } from "../../src/schema/ensure-tables.js";
-import { ensureCollectionPolicies } from "../../src/schema/ensure-collection-policies.js";
+import { ensureTablePolicies } from "../../src/schema/ensure-policies.js";
 import { ensureAppRole } from "../../src/security/rls-enforcement.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
 import { FixtureTableRegistry } from "../helpers/tables";
@@ -204,7 +204,7 @@ describe.each(snapshots)("upgrading a project left by $name", (snapshot) => {
         await pool.end();
 
         await ensureTables(client, compileSet(collections));
-        await ensureCollectionPolicies(client, compileSet(collections));
+        await ensureTablePolicies(client, compileSet(collections));
     }, 300_000);
 
     afterAll(async () => {

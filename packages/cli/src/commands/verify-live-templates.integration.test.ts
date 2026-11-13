@@ -23,7 +23,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { ensureAppRole } from "@rebasepro/server-postgres";
 import { RLS_BOOTSTRAP_SQL } from "../../../server-postgres/src/schema/rls-bootstrap-sql";
 import { ensureTables } from "../../../server-postgres/src/schema/ensure-tables";
-import { ensureCollectionPolicies } from "../../../server-postgres/src/schema/ensure-collection-policies";
+import { ensureTablePolicies } from "../../../server-postgres/src/schema/ensure-policies";
 
 import { MANAGED_SERVER_MAX_CONNECTIONS } from "../dev-db/constraints";
 import { findFreePort } from "../dev-db/state";
@@ -88,7 +88,7 @@ describe.each<TemplatePreset>(["blog", "ecommerce", "blank"])("a fresh %s scaffo
             await client.query(RLS_BOOTSTRAP_SQL);
             await ensureTables(queryable, collections);
             await ensureAppRole(async (text) => (await client.query<Record<string, unknown>>(text)).rows, ["public", "rebase", "auth"]);
-            const applied = await ensureCollectionPolicies(queryable, collections);
+            const applied = await ensureTablePolicies(queryable, collections);
             expect(applied.failures).toEqual([]);
         } finally {
             await client.end();

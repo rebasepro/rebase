@@ -151,7 +151,7 @@ function bootstrapper(name: string, db: PGlite): BackendBootstrapper {
         async ensureCollectionSchema() {
             return { applied: 0 };
         },
-        async ensureCollectionPolicies() {
+        async ensureTablePolicies() {
             return { applied: 0 };
         },
         getAdmin: () => driver.admin,

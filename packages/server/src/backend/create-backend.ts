@@ -486,9 +486,9 @@ export function wrapDatabaseAdapter(dbAdapter: DatabaseAdapter): BackendBootstra
             ? (collections, driverResult, log) =>
                 dbAdapter.ensureCollectionSchema!(collections, driverResult, log)
             : undefined,
-        ensureCollectionPolicies: dbAdapter.ensureCollectionPolicies
+        ensureTablePolicies: dbAdapter.ensureTablePolicies
             ? (collections, driverResult, log) =>
-                dbAdapter.ensureCollectionPolicies!(collections, driverResult, log)
+                dbAdapter.ensureTablePolicies!(collections, driverResult, log)
             : undefined,
         ensureRlsRuntime: dbAdapter.ensureRlsRuntime
             ? (driverResult) => dbAdapter.ensureRlsRuntime!(driverResult)
@@ -2468,7 +2468,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 // where this process may not write policies.
                 applyPolicies: (() => {
                     const target = initializedTarget(provisionTarget);
-                    const ensure = target.bootstrapper.ensureCollectionPolicies;
+                    const ensure = target.bootstrapper.ensureTablePolicies;
                     if (!ensure || !provision.tables || provisioningDisabled()) return undefined;
                     return (tables: readonly CompiledTable[]) => ensure.call(
                         target.bootstrapper, tables, target.driverResult, (message: string) => logger.debug(`policies: ${message}`));

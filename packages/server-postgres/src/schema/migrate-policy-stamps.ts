@@ -26,8 +26,8 @@ import type { Queryable } from "../security/policy-drift";
 import { withAppClient } from "../cli-helpers";
 import { out, outWarn } from "../cli-output";
 import { pinSearchPath } from "../connection";
-import { planCollectionPolicies } from "./generate-postgres-ddl-logic";
-import { ensureCollectionPolicies, policyStampSql, probeRenderedPolicies, readPolicyStamps } from "./ensure-collection-policies";
+import { planTablePolicies } from "./generate-postgres-ddl-logic";
+import { ensureTablePolicies, policyStampSql, probeRenderedPolicies, readPolicyStamps } from "./ensure-policies";
 import { underSearchPath } from "./push-policy-plan";
 import { loadTables } from "./load-tables";
 
@@ -71,7 +71,7 @@ export async function stampPoliciesStoredAsRendered(
     options: { searchPath?: string; adminRoleAvailable?: boolean } = {}
 ): Promise<{ stamped: number }> {
     const { adminRoleAvailable } = options;
-    const plans = planCollectionPolicies(compiledTables, { adminRoleAvailable });
+    const plans = planTablePolicies(compiledTables, { adminRoleAvailable });
     if (plans.length === 0) return { stamped: 0 };
 
     const states = await underSearchPath(client, options.searchPath, () => readPolicyStamps(client, compiledTables, { adminRoleAvailable }));
@@ -125,8 +125,8 @@ export async function moveMigratedAdminPoliciesToPublic(
     compiledTables: readonly CompiledTable[],
     log?: (message: string) => void
 ): Promise<number> {
-    if (!planCollectionPolicies(compiledTables).some(plan => plan.policies.some(policy => policy.adminTarget))) return 0;
-    const outcome = await ensureCollectionPolicies(client, compiledTables, log, { adminRoleAvailable: false });
+    if (!planTablePolicies(compiledTables).some(plan => plan.policies.some(policy => policy.adminTarget))) return 0;
+    const outcome = await ensureTablePolicies(client, compiledTables, log, { adminRoleAvailable: false });
     if (outcome.failures.length > 0) {
         throw new Error(outcome.failures.map(f => `${f.table}: ${f.error}`).join("; "));
     }

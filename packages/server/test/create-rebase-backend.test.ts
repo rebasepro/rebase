@@ -112,7 +112,7 @@ function bootstrapper(rec: Recorded, options: { id?: string; isDefault?: boolean
             rec.schemaCalls++;
             return { applied: 0 };
         },
-        async ensureCollectionPolicies() {
+        async ensureTablePolicies() {
             rec.policyCalls++;
             return { applied: 0 };
         },

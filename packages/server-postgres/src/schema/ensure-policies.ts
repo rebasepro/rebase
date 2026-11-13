@@ -62,7 +62,7 @@
 import { createHash } from "node:crypto";
 import { REBASE_ADMIN_ROLE, type CompiledTable } from "@rebasepro/types";
 import { ADMIN_REQUEST_POLICY_SUFFIX, toPostgresIdentifier } from "@rebasepro/utils";
-import { planCollectionPolicies, type CollectionPolicyPlan } from "./generate-postgres-ddl-logic";
+import { planTablePolicies, type TablePolicyPlan } from "./generate-postgres-ddl-logic";
 import { isGeneratedPolicyName } from "../security/policy-drift";
 import { describeDriverError, type Queryable } from "./ensure-tables";
 import { assertSafeIdentifier } from "./plan/diff-plan";
@@ -168,7 +168,7 @@ const createdPolicyName = (statement: string): string | undefined => {
 };
 
 /** The policy names a plan creates, as Postgres stores them. */
-const plannedPolicyNames = (plan: CollectionPolicyPlan): Set<string> => {
+const plannedPolicyNames = (plan: TablePolicyPlan): Set<string> => {
     const expected = new Set<string>();
     for (const statement of plan.policyStatements) {
         const name = createdPolicyName(statement);
@@ -190,7 +190,7 @@ const plannedPolicyNames = (plan: CollectionPolicyPlan): Set<string> => {
  * drops and re-creates its own names, so "present before, not planned" is the
  * same set the old read-after-apply found.
  */
-const orphansOf = (plan: CollectionPolicyPlan, present: readonly string[]): string[] => {
+const orphansOf = (plan: TablePolicyPlan, present: readonly string[]): string[] => {
     const expected = plannedPolicyNames(plan);
     // An admin-request companion not planned is dropped too: it is planned only
     // where the boot made its role safe, and must not outlive that check.
@@ -198,7 +198,7 @@ const orphansOf = (plan: CollectionPolicyPlan, present: readonly string[]): stri
         && (isGeneratedPolicyName(name, plan.table) || ADMIN_REQUEST_POLICY_SUFFIX.test(name)));
 };
 
-const dropPolicySql = (plan: CollectionPolicyPlan, name: string): string =>
+const dropPolicySql = (plan: TablePolicyPlan, name: string): string =>
     `DROP POLICY IF EXISTS "${name}" ON "${plan.schema}"."${plan.table}"`;
 
 /** What every policy stamp starts with. See {@link policyStampSql}. */
@@ -231,7 +231,7 @@ const stampOf = (renderedHash: string, liveHash: string): string =>
     `${POLICY_STAMP_PREFIX}${sha256Hex(`${renderedHash}:${liveHash}`)}`;
 
 /** The policies a plan creates, by name, each with the hash of its `CREATE POLICY` statement. */
-const renderedHashes = (plan: CollectionPolicyPlan): Map<string, string> => {
+const renderedHashes = (plan: TablePolicyPlan): Map<string, string> => {
     const hashes = new Map<string, string>();
     for (const statement of plan.policyStatements) {
         const name = createdPolicyName(statement);
@@ -253,7 +253,7 @@ const renderedHashes = (plan: CollectionPolicyPlan): Map<string, string> => {
  * @param only the names to stamp, when not every policy on the table is known
  *        to be what its statement makes — see `stampPoliciesStoredAsRendered`.
  */
-export function policyStampSql(plan: CollectionPolicyPlan, only?: ReadonlySet<string>): string | undefined {
+export function policyStampSql(plan: TablePolicyPlan, only?: ReadonlySet<string>): string | undefined {
     const hashes = new Map([...renderedHashes(plan)].filter(([name]) => !only || only.has(name)));
     if (hashes.size === 0) return undefined;
     const target = `"${plan.schema}"."${plan.table}"`;
@@ -306,7 +306,7 @@ async function readLivePolicies(client: Queryable, schemas: string[]): Promise<M
  * Whether every policy the plan declares is on the table, stamped for exactly
  * the statement the plan would run and exactly the definition it holds now.
  */
-const policiesAreCurrent = (plan: CollectionPolicyPlan, present: Map<string, LivePolicy>): boolean => {
+const policiesAreCurrent = (plan: TablePolicyPlan, present: Map<string, LivePolicy>): boolean => {
     for (const [name, renderedHash] of renderedHashes(plan)) {
         const policy = present.get(name);
         if (!policy || policy.stamp !== stampOf(renderedHash, policy.live)) return false;
@@ -339,7 +339,7 @@ export async function readPolicyStamps(
 ): Promise<Map<string, Map<string, PolicyStampState>>> {
     // Stamped from the statement the boot or the push rendered: `TO public`
     // for the server-or-admin policies where the admin switch is not live.
-    const plans = planCollectionPolicies(compiledTables, { adminRoleAvailable: options.adminRoleAvailable });
+    const plans = planTablePolicies(compiledTables, { adminRoleAvailable: options.adminRoleAvailable });
     const live = await readLivePolicies(client, Array.from(new Set(plans.map(p => p.schema))));
     const states = new Map<string, Map<string, PolicyStampState>>();
     for (const plan of plans) {
@@ -385,7 +385,7 @@ export async function probeRenderedPolicies(
     options: { searchPath?: string; adminRoleAvailable?: boolean } = {}
 ): Promise<Map<string, boolean>> {
     const statements = new Map<string, string>();
-    for (const plan of planCollectionPolicies(compiledTables, { adminRoleAvailable: options.adminRoleAvailable })) {
+    for (const plan of planTablePolicies(compiledTables, { adminRoleAvailable: options.adminRoleAvailable })) {
         for (const statement of plan.policyStatements) {
             const name = createdPolicyName(statement);
             if (name) statements.set(`${plan.schema}.${plan.table}.${name}`, statement.trim());
@@ -451,7 +451,7 @@ async function readTableSecurity(client: Queryable, schemas: string[]): Promise<
  * Whether the catalogue says RLS is on for one table, read fresh. `false` when
  * it cannot be read, which sends the caller down the fail-closed path.
  */
-async function rlsIsOn(client: Queryable, plan: CollectionPolicyPlan): Promise<boolean> {
+async function rlsIsOn(client: Queryable, plan: TablePolicyPlan): Promise<boolean> {
     try {
         const { rows } = await client.query<{ rls: boolean }>(
             `SELECT c.relrowsecurity AS rls FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -483,7 +483,7 @@ type TableLock =
  */
 async function lockTable(
     client: Queryable,
-    plan: CollectionPolicyPlan,
+    plan: TablePolicyPlan,
     rlsOn: boolean,
     run: (sql: string) => Promise<unknown> = sql => client.query(sql)
 ): Promise<TableLock> {
@@ -521,7 +521,7 @@ async function lockTable(
  * unreachable rather than unprotected. `REVOKE` waits for no table lock a
  * reader holds, so it runs as a plain statement.
  */
-async function withdrawGrant(client: Queryable, plan: CollectionPolicyPlan, error: string): Promise<TableLock> {
+async function withdrawGrant(client: Queryable, plan: TablePolicyPlan, error: string): Promise<TableLock> {
     try {
         await client.query(revokeUserRoleSql(plan.schema, plan.table));
         return { locked: false, error, grantWithdrawn: true };
@@ -554,7 +554,7 @@ export interface TableLockResult {
  * A declared table that is not in the database is skipped — nothing can reach
  * a table that does not exist, and the step that creates it locks it.
  */
-export async function lockCollectionTables(
+export async function lockTables(
     client: Queryable,
     compiledTables: readonly CompiledTable[]
 ): Promise<TableLockResult> {
@@ -571,7 +571,7 @@ export async function lockCollectionTables(
 }
 
 /**
- * The declared tables {@link lockCollectionTables} would switch row-level
+ * The declared tables {@link lockTables} would switch row-level
  * security on for: those in the database with it off. What `db push
  * --dry-run` lists, read the way the push's lock step reads it.
  */
@@ -583,8 +583,8 @@ export async function tablesRlsWouldEnable(client: Queryable, compiledTables: re
 async function declaredTablesPresent(
     client: Queryable,
     compiledTables: readonly CompiledTable[]
-): Promise<{ plan: CollectionPolicyPlan; rls: boolean }[]> {
-    const plans = planCollectionPolicies(compiledTables);
+): Promise<{ plan: TablePolicyPlan; rls: boolean }[]> {
+    const plans = planTablePolicies(compiledTables);
     if (plans.length === 0) return [];
     const tables = await readTableSecurity(client, Array.from(new Set(plans.map(p => p.schema))));
     return plans.flatMap(plan => {
@@ -595,7 +595,7 @@ async function declaredTablesPresent(
 
 /** One declared table that exists, and what the catalogue said about it. */
 interface TableWork {
-    plan: CollectionPolicyPlan;
+    plan: TablePolicyPlan;
     rlsOn: boolean;
     orphans: string[];
     /** Whether the policy names on the table differ from the plan's. */
@@ -649,7 +649,7 @@ type AtomicOutcome =
  * it is exactly as it was before this boot — or, if RLS was off on it, closed
  * by revoking the user role's grant, like every table RLS cannot be enabled on.
  */
-export async function ensureCollectionPolicies(
+export async function ensureTablePolicies(
     client: Queryable,
     compiledTables: readonly CompiledTable[],
     log?: (message: string) => void,
@@ -664,7 +664,7 @@ export async function ensureCollectionPolicies(
         adminRoleAvailable?: boolean;
         /**
          * Whether the admin-only policies get their `TO rebase_admin_request
-         * USING (true)` companions — see `planCollectionPolicies`. Only a boot
+         * USING (true)` companions — see `planTablePolicies`. Only a boot
          * that has made that role safe (`settleAdminRequestGroup`) says so;
          * anywhere else they are not planned, and any in the database are
          * dropped as orphans.
@@ -677,7 +677,7 @@ export async function ensureCollectionPolicies(
         orphansDropped: 0, deferred: [], rulesDropped: []
     };
 
-    let plans = planCollectionPolicies(compiledTables, { adminRequestRoleAvailable: options.adminRequestRoleAvailable });
+    let plans = planTablePolicies(compiledTables, { adminRequestRoleAvailable: options.adminRequestRoleAvailable });
     if (plans.length === 0) return result;
     // The server-or-admin policies are written `TO rebase_admin`
     // (`rls.adminPolicies: "adminRole"`), and CREATE POLICY refuses a role that
@@ -690,7 +690,7 @@ export async function ensureCollectionPolicies(
     // (`adminRoleAvailable: false`), and gets the same: an existing
     // `rebase_admin` — another project's, a privileged push's — is not enough.
     if (options.adminRoleAvailable === false) {
-        plans = planCollectionPolicies(compiledTables, { adminRoleAvailable: false });
+        plans = planTablePolicies(compiledTables, { adminRoleAvailable: false });
     } else if (plans.some(plan => plan.policies.some(policy => policy.adminTarget))) {
         const run = async (text: string) => (await client.query<Record<string, unknown>>(text)).rows;
         const available = await ensureAdminPolicyRole(run).then(() => true, (err: unknown) => {
@@ -698,7 +698,7 @@ export async function ensureCollectionPolicies(
                 "the server-or-admin policies stay TO public, and signed-in users' owner-scoped reads keep scanning");
             return false;
         });
-        if (!available) plans = planCollectionPolicies(compiledTables, { adminRoleAvailable: false });
+        if (!available) plans = planTablePolicies(compiledTables, { adminRoleAvailable: false });
     }
     const lock = resolveBootLockOptions(options);
 

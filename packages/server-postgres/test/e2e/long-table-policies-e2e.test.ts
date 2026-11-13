@@ -71,7 +71,7 @@ async function boot(url: string, beforePolicies?: (observer: pg.Client) => Promi
         await bootstrapper.ensureCollectionSchema!(tablesFromCollections([collection]).tables, driverResult);
         await bootstrapper.ensureRlsRuntime!(driverResult);
         await beforePolicies?.(observer);
-        await bootstrapper.ensureCollectionPolicies!(tablesFromCollections([collection]).tables, driverResult);
+        await bootstrapper.ensureTablePolicies!(tablesFromCollections([collection]).tables, driverResult);
         await bootstrapper.finalizeSecurityPosture!(driverResult);
         const internals = driverResult.internals as { driver: PostgresBackendDriver; registry: PostgresTableRegistry };
         internals.registry.registerPgTable(drizzleTable, TABLE);

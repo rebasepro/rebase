@@ -47,8 +47,8 @@ function recordingAdapter(recorder: Recorder, over: Partial<DatabaseAdapter> = {
             recorder.schemaCalls++;
             return { applied: 1 };
         },
-        async ensureCollectionPolicies() {
-            recorder.order.push("ensureCollectionPolicies");
+        async ensureTablePolicies() {
+            recorder.order.push("ensureTablePolicies");
             recorder.policyCalls++;
             return { applied: 2 };
         },
@@ -114,7 +114,7 @@ describe("initializeRebaseBackend provisions the collection schema", () => {
         await boot(recordingAdapter(rec), { auth: { jwtSecret: "x".repeat(40) } });
 
         expect(rec.policyCalls).toBe(1);
-        expect(rec.order.indexOf("ensureCollectionPolicies")).toBeGreaterThan(rec.order.indexOf("initializeAuth"));
+        expect(rec.order.indexOf("ensureTablePolicies")).toBeGreaterThan(rec.order.indexOf("initializeAuth"));
     });
 
     it("tells the driver whether provisioning ran, so its drift check can be honest", async () => {
@@ -163,7 +163,7 @@ describe("initializeRebaseBackend provisions the collection schema", () => {
         const rec = recorder();
         const schemaless = recordingAdapter(rec);
         delete schemaless.ensureCollectionSchema;
-        delete schemaless.ensureCollectionPolicies;
+        delete schemaless.ensureTablePolicies;
 
         await expect(boot(schemaless)).resolves.not.toThrow();
     });

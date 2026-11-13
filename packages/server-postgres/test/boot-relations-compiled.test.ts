@@ -1,7 +1,7 @@
 /**
  * Boot provisions tables with relations from the compiled tables it is handed.
  *
- * The boot appliers (`ensureCollectionSchema`, `ensureCollectionPolicies` on
+ * The boot appliers (`ensureCollectionSchema`, `ensureTablePolicies` on
  * the bootstrapper) used to be handed the server's lowered collections and lift
  * them back into tables. The lift refuses every relation of a lowered
  * collection ("the relation its target … is not one of the tables being
@@ -99,7 +99,7 @@ describe("boot provisions related tables from compiled tables", () => {
 
         const runSql = async (text: string) => (await pg.query<Record<string, unknown>>(text)).rows;
         await ensureAppRole(runSql, ["public", "rebase"]);
-        const policies = await bootstrapper.ensureCollectionPolicies!(tables, driverResult);
+        const policies = await bootstrapper.ensureTablePolicies!(tables, driverResult);
         expect(policies.applied).toBeGreaterThan(0);
 
         const { rows: created } = await pg.query<{ table_name: string }>(
@@ -121,6 +121,6 @@ describe("boot provisions related tables from compiled tables", () => {
         const queryable: Queryable = { query: async (text, values) => ({ rows: (await pg.query(text, values)).rows }) };
         const again = await ensureTables(queryable, tables);
         expect(again.actions).toEqual([]);
-        expect((await bootstrapper.ensureCollectionPolicies!(tables, driverResult)).applied).toBe(0);
+        expect((await bootstrapper.ensureTablePolicies!(tables, driverResult)).applied).toBe(0);
     });
 });

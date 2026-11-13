@@ -44,7 +44,7 @@ function target(over: Partial<ProvisionTarget> = {}): ProvisionTarget {
         engine: "postgres",
         bootstrapper: {
             ensureCollectionSchema: jest.fn(async () => ({ applied: 0 })),
-            ensureCollectionPolicies: jest.fn(async () => ({ applied: 0 }))
+            ensureTablePolicies: jest.fn(async () => ({ applied: 0 }))
         },
         ...over
     };
@@ -216,7 +216,7 @@ describe("the driver result the schema hooks pass", () => {
         expect(db.execute).toHaveBeenCalled();
     });
 
-    it("reaches ensureCollectionPolicies the same way", async () => {
+    it("reaches ensureTablePolicies the same way", async () => {
         const db = drizzleHandle();
         let received: unknown;
 
@@ -228,7 +228,7 @@ describe("the driver result the schema hooks pass", () => {
         await provisionTablePolicies(
             [posts], lowered,
             target({
-                bootstrapper: { ensureCollectionPolicies: ensure },
+                bootstrapper: { ensureTablePolicies: ensure },
                 driverResult: { driver: fakeDataDriver(), internals: { db } }
             }),
             { env: {} }
@@ -344,7 +344,7 @@ describe("provisioning ownership", () => {
 
         const outcome = await provisionTablePolicies([posts], lowered, t, { provision: false });
 
-        expect(t.bootstrapper.ensureCollectionPolicies).not.toHaveBeenCalled();
+        expect(t.bootstrapper.ensureTablePolicies).not.toHaveBeenCalled();
         expect(outcome.status).toBe("skipped");
         expect(loggedAtDefaultLevel()).toContain("another process in this deployment owns them");
     });
