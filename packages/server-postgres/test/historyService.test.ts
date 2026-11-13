@@ -163,12 +163,16 @@ tags: [{ id: 2 }] }
             expect(text).not.toContain("ARRAY[");
             // The id is bound as text: entity_id is a varchar column, so a
             // numeric id has to be stringified or the insert fails outright.
+            // The table and id are bound a second time for the stamp's lookup
+            // of the row's latest entry (see `historyStampSql`).
             expect(params).toEqual([
                 "posts",
                 "1",
                 "create",
                 JSON.stringify({ title: "new" }),
-                "user-9"
+                "user-9",
+                "posts",
+                "1"
             ]);
         });
     });

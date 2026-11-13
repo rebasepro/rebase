@@ -52,6 +52,32 @@ export const HISTORY_SWEEP_INDEX = "idx_history_updated_at";
 const REDUNDANT_ENTITY_INDEX = "idx_history_entity";
 
 /**
+ * The `updated_at` a new history entry of one row is stamped with, as SQL over
+ * the row's table-name and id expressions: `clock_timestamp()` — the moment it
+ * is written, not the transaction's start that `NOW()` would give — and never
+ * at or before the row's latest entry (that entry plus one microsecond).
+ *
+ * The history list orders a row's entries by `updated_at` alone, so the
+ * stamp has to be strictly increasing per row: entries one transaction
+ * records (a `_batch` that creates a row, then updates it) fall in the same
+ * clock tick on a coarse clock — PGlite's is milliseconds — and the list put
+ * them in whatever order the scan met them. The order lives in the stored
+ * value, so it survives a dump and restore.
+ *
+ * One lookup per entry, on `(table_name, entity_id, updated_at DESC)` — the
+ * per-row index the table already has. Writers of one row are serialized by
+ * that row's own lock (an update or delete holds it until commit, and a
+ * create's row is invisible until then), and each statement reads the
+ * entries committed before it, so the previous writer's entry is seen.
+ *
+ * @internal
+ */
+export function historyStampSql(tableName: string, entityId: string): string {
+    return "GREATEST(clock_timestamp(), (SELECT h.updated_at + interval '1 microsecond' FROM rebase.entity_history h " +
+        `WHERE h.table_name = ${tableName} AND h.entity_id = ${entityId} ORDER BY h.updated_at DESC LIMIT 1))`;
+}
+
+/**
  * Auto-create the row history table if it doesn't exist.
  * This runs on startup when history is enabled, following the same
  * pattern as `ensureAuthTablesExist`.
@@ -114,11 +140,8 @@ export async function ensureHistoryTableExists(db: HistoryDb, options: BootLockO
         return { inTransaction: false, entryFormat: 1 };
     }
 
-    // The entry is stamped with `clock_timestamp()`, the moment it is written,
-    // not the column's `NOW()` default: inside a write's transaction `NOW()` is
-    // the transaction's start, so every entry one write records — a `_batch`
-    // that creates a row and then updates it — would share one `updated_at`,
-    // and the newest-first history list would order them by chance.
+    // The entry is stamped by `historyStampSql`: the moment it is written, and
+    // never at or before the row's latest entry — see there.
     //
     // The entry has to commit with the row it describes, so it is written on
     // the write's transaction — which runs as the request role, revoked from
@@ -140,7 +163,7 @@ export async function ensureHistoryTableExists(db: HistoryDb, options: BootLockO
             AS $fn$
                 INSERT INTO rebase.entity_history
                     (table_name, entity_id, action, changed_fields, "values", previous_values, updated_by, format, updated_at)
-                VALUES (p_table_name, p_entity_id, p_action, p_changed_fields, p_values, p_previous_values, p_updated_by, p_format, clock_timestamp())
+                VALUES (p_table_name, p_entity_id, p_action, p_changed_fields, p_values, p_previous_values, p_updated_by, p_format, ${historyStampSql("p_table_name", "p_entity_id")})
             $fn$
         `
             : `
@@ -154,7 +177,7 @@ export async function ensureHistoryTableExists(db: HistoryDb, options: BootLockO
             AS $fn$
                 INSERT INTO rebase.entity_history
                     (table_name, entity_id, action, changed_fields, "values", previous_values, updated_by, updated_at)
-                VALUES (p_table_name, p_entity_id, p_action, p_changed_fields, p_values, p_previous_values, p_updated_by, clock_timestamp())
+                VALUES (p_table_name, p_entity_id, p_action, p_changed_fields, p_values, p_previous_values, p_updated_by, ${historyStampSql("p_table_name", "p_entity_id")})
             $fn$
         `));
         await db.execute(sql.raw(`REVOKE ALL ON FUNCTION ${signature} FROM PUBLIC`));

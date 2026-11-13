@@ -10,7 +10,7 @@ export type {
 import type { RecordHistoryParams, FetchHistoryOptions, HistoryRetentionConfig } from "@rebasepro/types";
 import { firstSqlRow, sqlRows } from "@rebasepro/common";
 import { currentWriteScope } from "../services/write-transaction-scope";
-import { RECORD_HISTORY_FUNCTION, type HistoryDb, type HistoryTableState } from "./ensure-history-table";
+import { RECORD_HISTORY_FUNCTION, historyStampSql, type HistoryDb, type HistoryTableState } from "./ensure-history-table";
 
 /**
  * A Postgres history row is already the wire shape — `updated_at` comes back
@@ -178,16 +178,17 @@ export class HistoryService {
                 `));
             } else await this.db.execute(sql`
                 INSERT INTO rebase.entity_history
-                    (table_name, entity_id, action, changed_fields, "values", previous_values, updated_by${compact ? sql`, format` : sql``})
-                VALUES (
+                    (table_name, entity_id, action, changed_fields, "values", previous_values, updated_by${compact ? sql`, format` : sql``}, updated_at)
+                SELECT
                     ${tableName},
                     ${String(id)},
                     ${action},
-                    ${changedFields ? sql`ARRAY[${sql.join(changedFields.map(f => sql`${f}`), sql`, `)}]::text[]` : sql`NULL`},
-                    ${values ? sql`${JSON.stringify(values)}::jsonb` : sql`NULL`},
-                    ${storedPrevious ? sql`${JSON.stringify(storedPrevious)}::jsonb` : sql`NULL`},
-                    ${updatedBy ?? null}${format}
-                )
+                    ${changedFields ? sql`ARRAY[${sql.join(changedFields.map(f => sql`${f}`), sql`, `)}]::text[]` : sql`NULL::text[]`},
+                    ${values ? sql`${JSON.stringify(values)}::jsonb` : sql`NULL::jsonb`},
+                    ${storedPrevious ? sql`${JSON.stringify(storedPrevious)}::jsonb` : sql`NULL::jsonb`},
+                    ${updatedBy ?? null}::text${format},
+                    ${sql.raw(historyStampSql("p.table_name", "p.entity_id"))}
+                FROM (SELECT ${tableName}::text AS table_name, ${String(id)}::text AS entity_id) AS p
             `);
         } catch (error) {
             logger.error("Failed to record row history", { error });
