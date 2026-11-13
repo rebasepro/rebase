@@ -16,7 +16,7 @@ export { applyTableCustomization, applyTableCustomizations } from "./tables/appl
 export type { TableCollection } from "./tables/apply_customization";
 export { updateRecord } from "./tables/update_record";
 export { collectionFromTable, collectionsFromTables } from "./tables/project_table";
-export type { ProjectedCollection, TableProjectionContext } from "./tables/project_table";
+export type { ProjectedCollection, TableProjectionContext, TableProjectionOptions } from "./tables/project_table";
 export { composeCollections } from "./hooks/navigation/compose_collections";
 export type { CollectionSources } from "./hooks/navigation/compose_collections";
 export type {

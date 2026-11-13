@@ -27,6 +27,7 @@ import type { TableDescriptor, UiPreferences } from "@rebasepro/types";
 import { collectionsFromTables } from "../../tables/project_table";
 import { applyTableCustomizations, type TableCollection } from "../../tables/apply_customization";
 import { applyUiPreferences, uiConfigPreferences } from "./ui_preferences";
+import { registeredCollection } from "./registered_collection";
 
 /** What the composition produces: a served table's collection, or an external one. */
 export type PanelCollection = TableCollection | AdminCollection;
@@ -64,8 +65,19 @@ function describe(collection: PanelCollection): string {
  */
 export function composeCollections({ tables, tableCustomizations, externalCollections, uiConfig, workspacePreferences }: CollectionSources): PanelCollection[] {
     const shipped = uiConfigPreferences(uiConfig);
+    // A relation opens its target as the panel registers it, not as it was
+    // projected: the target's `customizeTable` (`hideFromEntityViews`, its
+    // display, its columns) is what a tab, a picker or a preview of it must
+    // read, as they read an authored collection's `target: () => other`. The
+    // thunks are called after the composition below has filled this map, and
+    // hand out the collection as the registry holds it (`registeredCollection`).
+    const composedBySlug = new Map<string, TableCollection>();
+    const targetCollection = (slug: string): AdminCollection | undefined => {
+        const composed = composedBySlug.get(slug);
+        return composed ? registeredCollection(composed) : undefined;
+    };
     const projected = tables.length > 0 || tableCustomizations.length > 0
-        ? applyTableCustomizations(collectionsFromTables(tables), tableCustomizations)
+        ? applyTableCustomizations(collectionsFromTables(tables, { targetCollection }), tableCustomizations)
             .map(collection => applyUiPreferences(collection, shipped.tables[collection.slug]))
             .map(collection => applyUiPreferences(collection, workspacePreferences?.tables[collection.slug]))
             .map((collection, index) =>
@@ -78,6 +90,7 @@ export function composeCollections({ tables, tableCustomizations, externalCollec
                 : collection)
         : [];
 
+    for (const collection of projected) composedBySlug.set(collection.slug, collection);
     const tableSlugs = new Map(projected.map(collection => [collection.slug, collection]));
 
     const external = new Map<string, AdminCollection>();
