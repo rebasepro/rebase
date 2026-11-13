@@ -1609,6 +1609,7 @@ function getEnumVarName
 function getTableVarName
 function grantExecuteToRequestRolesSql
 function hasColumnAccessRules
+function hasJoinAccessRules
 function includableRelations
 function includePaths
 function isAddressableId
@@ -1672,6 +1673,7 @@ function queryableColumnKeys
 function reconcileCursorOrder
 function redactSqlLiterals
 function referencesUsers
+function relationJoinColumns
 function relationOf
 function relationalCollections
 function relationsOfKind
@@ -1811,6 +1813,7 @@ type PageFinder
 type PaginationErrorCode
 type PrintTargetResolver
 type PrintableTable
+type RelatedTables
 type RelationOfKind
 type ResolvePolicyTable
 type RestCodec
