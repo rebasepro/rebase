@@ -4,8 +4,8 @@
  * Scaffolded by `rebase generate view __SLUG__` and listed in `./index.ts`.
  * It renders inside the admin shell, so the signed-in user, the sidebar, the
  * router and the data layer are already there: read rows with `useRows()`,
- * write them with `useRowWrites()`, and the collection's security rules and
- * callbacks apply.
+ * write them with `useRowWrites()`, and the table's `rls` rules and hooks
+ * apply.
  *
  * Replace the body with your screen. The `rebase-custom-views` agent skill
  * documents the contract and the design tokens.
@@ -29,7 +29,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 
-/** The collection this screen reads. Change it to the one you need. */
+/** The table this screen reads. Change it to the one you need. */
 const COLLECTION = "__COLLECTION__";
 
 export function __COMPONENT__() {
@@ -94,7 +94,7 @@ export function __COMPONENT__() {
                         <Typography variant="stat">{rows.length}</Typography>
                     </Card>
                     <Card className="p-4 flex flex-col gap-2 items-start">
-                        <Typography variant="caption" color="secondary">Collection</Typography>
+                        <Typography variant="caption" color="secondary">Table</Typography>
                         <Chip size="small">{COLLECTION}</Chip>
                     </Card>
                 </div>

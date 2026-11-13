@@ -52,14 +52,14 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         command: "cloud init",
         usage: "cloud init --claim [--name <name>] [--no-deploy]",
         summary:
-            "Provision a project on Rebase Cloud with no account, push this project's collections to it, and print "
+            "Provision a project on Rebase Cloud with no account, push this project's tables to it, and print "
             + "its live URL and a claim link. Whoever opens the link and signs in owns the project; unclaimed, it is "
             + "deleted after 72 hours. Sets REBASE_BASE_URL in .env and links this directory to the project; after "
             + "the deploy, also REBASE_API_TOKEN, a key the app accepts for reading and writing data.",
         flags: [
             ["--claim", "Required: provision an unclaimed project and print the link that claims it"],
             ["--name, -n <name>", "What to call the app. Default: a generated name"],
-            ["--no-deploy", "Provision and link only; push the collections later with `rebase cloud deploy`"]
+            ["--no-deploy", "Provision and link only; push the tables later with `rebase cloud deploy`"]
         ],
         examples: [
             "rebase cloud init --claim",

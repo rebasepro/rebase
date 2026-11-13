@@ -168,7 +168,7 @@ export function summarizeError(error: unknown, context: string): ErrorSummary {
                 hint:
                     `${truncate(inner)}\n`
                     + "  This is a platform-side permission, not something your project can grant. "
-                    + "Nothing in your code, collections or deploy flags will change it — "
+                    + "Nothing in your code, schema or deploy flags will change it — "
                     + "report it with the message above rather than retrying or changing the project.",
                 code: "platform_permission_denied",
                 platform: true,

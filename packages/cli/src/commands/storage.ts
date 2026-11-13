@@ -173,7 +173,7 @@ export function formatBytes(bytes: number): string {
 export function describeOrphanReport(report: OrphanReport, olderThanHours: number): string[] {
     const lines: string[] = [];
     const bytes = report.orphans.reduce((sum, orphan) => sum + (orphan.size ?? 0), 0);
-    lines.push(`  ${report.objects} file(s) in source "${report.storageId}", ${report.scanned.length} collection(s) read.`);
+    lines.push(`  ${report.objects} file(s) in source "${report.storageId}", ${report.scanned.length} table(s) read.`);
     if (report.orphans.length === 0) {
         lines.push("  No file older than " + `${olderThanHours}h is unused.`);
     } else {
@@ -285,7 +285,7 @@ async function scanForOrphans(
         state => state.status === "queued"
             ? "Waiting for the scan to start…"
             : `Scanning "${state.storageId}": ${state.progress.filesScanned} file(s) listed, ${state.progress.rowsScanned} row(s) read, ` +
-              `${state.progress.collectionsScanned}/${state.progress.collectionsTotal} collection(s)` +
+              `${state.progress.collectionsScanned}/${state.progress.collectionsTotal} table(s)` +
               (state.progress.unscanned.length > 0 ? `, ${state.progress.unscanned.length} unreadable` : "") + "…",
         quiet
     );
@@ -321,7 +321,7 @@ async function deleteFromScan(
             return progress.phase === "deleting"
                 ? `Deleting: ${progress.deleted} of ${progress.candidates} file(s)…`
                 : `Checking every row again before deleting: ${progress.rowsScanned} row(s) read, ` +
-                  `${progress.collectionsScanned}/${progress.collectionsTotal} collection(s)…`;
+                  `${progress.collectionsScanned}/${progress.collectionsTotal} table(s)…`;
         },
         quiet
     );
@@ -370,7 +370,7 @@ async function orphans(rawArgs: string[]): Promise<void> {
     }
     if (report.orphans.length === 0) return;
     if (report.unscanned.length > 0) {
-        console.error(chalk.red("✗ Not deleting: some collections could not be read, so a file they name would look unused."));
+        console.error(chalk.red("✗ Not deleting: some tables could not be read, so a file they name would look unused."));
         process.exit(1);
     }
     if (!flags["--yes"]) {
@@ -550,11 +550,11 @@ ${chalk.green.bold("move Options")}
   ${chalk.blue("--json")}            Print the counts as JSON
 
 ${chalk.green.bold("Notes")}
-  A file is unused when no string in any row of any collection names it —
-  a key, a URL, a ${chalk.blue("rebase-storage:")} reference in text — whatever property
+  A file is unused when no string in any row of any table names it —
+  a key, a URL, a ${chalk.blue("rebase-storage:")} reference in text — whatever column
   or source holds it. Files newer than ${chalk.blue("--older-than")} are left out: the admin
-  panel uploads a file before the row that names it is saved. Files your own
-  tables name, outside collections, are not seen: check before deleting.
+  panel uploads a file before the row that names it is saved. Files named only
+  by tables backend/schema does not declare are not seen: check before deleting.
 
   The scan runs on the backend in the background — a ${chalk.blue("storage.orphans")} job
   on the job queue, or inside the server process when there is none — and the

@@ -259,7 +259,7 @@ describe("describeFailure", () => {
         });
         const text = plain(describeFailure("Failed to create API key", error, "http://rebase.test"));
         expect(text).toContain("UNKNOWN_SCOPE_TARGET (400)");
-        expect(text).toContain("Collections: posts, authors");
+        expect(text).toContain("Tables: posts, authors");
         expect(text).toContain("Buckets: default");
         expect(text).not.toContain("Functions:");
     });

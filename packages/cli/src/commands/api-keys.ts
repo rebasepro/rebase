@@ -255,7 +255,7 @@ export function describeFailure(
     // The message names the target that is not there; what *is* there rides
     // in `details`, and is the thing to pick from.
     if (error.code === "UNKNOWN_SCOPE_TARGET" && isRecord(error.details)) {
-        for (const [kind, title] of [["collections", "Collections"], ["buckets", "Buckets"], ["functions", "Functions"]] as const) {
+        for (const [kind, title] of [["collections", "Tables"], ["buckets", "Buckets"], ["functions", "Functions"]] as const) {
             const names = error.details[kind];
             if (Array.isArray(names) && names.length > 0) {
                 lines.push(`  ${title}: ${names.map(String).join(", ")}`);
@@ -721,7 +721,7 @@ export const SCOPES_LIST_FLAGS = {} as const;
 const PLANES: ReadonlyArray<{ plane: ScopeSummary["plane"]; title: string; note: string }> = [
     { plane: "data", title: "Data", note: "narrow what a key reaches; row-level security still decides the rows" },
     { plane: "admin", title: "Admin", note: "nobody holds these unless a role grants them; the admin role holds all" },
-    { plane: "app", title: "App", note: "declared by this app under auth.scopes on the users collection" }
+    { plane: "app", title: "App", note: "declared by this app under auth.scopes on the users table" }
 ];
 
 /**
@@ -809,9 +809,9 @@ ${chalk.green.bold("get / revoke Options")}
 
 ${chalk.green.bold("Scopes")}
   A scope is ${chalk.blue("resource:action")}, optionally narrowed to one target:
-  ${chalk.blue("data:read:posts")} reads the posts collection and nothing else.
+  ${chalk.blue("data:read:posts")} reads the posts table and nothing else.
   Data   ${DATA_PLANE_SCOPES.join(", ")}
-         ${chalk.gray("target: a collection slug, a storage source id (default), a function name")}
+         ${chalk.gray("target: a table slug, a storage source id (default), a function name")}
   Admin  ${keyable.join(", ")}
   App    whatever the app declares under auth.scopes ${chalk.gray("(rebase api-keys scopes)")}
 

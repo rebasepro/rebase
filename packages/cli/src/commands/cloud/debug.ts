@@ -217,13 +217,13 @@ meaning: "unauthenticated reads are refused — row-level security is enforced" 
                 return {
                     verdict: "warn",
                     meaning:
-                        "this collection is readable with NO authentication — correct only if it is deliberately public"
+                        "this table is readable with NO authentication — correct only if it is deliberately public"
                 };
             }
             if (status === 404) {
                 return {
                     verdict: "warn",
-                    meaning: "no such collection on this deployment — check the name, or pass --collection"
+                    meaning: "no such table on this deployment — check the name, or pass --collection"
                 };
             }
             if (status >= 500) {
@@ -1472,7 +1472,7 @@ export function printDebugHelp(): void {
                 description: "Probe the live URL and explain every status code (the default)",
                 flags: [
                     ["--host <hostname>", "Probe this address instead of the project's own"],
-                    ["--collection <name>", "Collection for the unauth-read probe. Default: users"],
+                    ["--collection <name>", "Table for the unauth-read probe. Default: users"],
                     ["--function <name>", "Also assert this function loaded, against the listing"]
                 ]
             },
