@@ -99,6 +99,8 @@ describe("rebase migrate sdk-calls", () => {
         // A structural type of the project's own over the SDK: the call and the type's member, both listed.
         expect(fs.readFileSync(path.join(dir, "typed/src/structural.ts"), "utf8")).toContain(`dataAsAdmin: { table(slug: string)`);
         expect(fs.readFileSync(path.join(dir, "typed/src/structural.ts"), "utf8")).toContain(`rebase.dataAsAdmin.table("workspaces")`);
+        // The slot's object type spelled inline: member and call renamed together, the table computed.
+        expect(fs.readFileSync(path.join(dir, "typed/src/structural.ts"), "utf8")).toContain("context.data.table(`${root}/${id}/locales`)");
         // A `data: any` parameter called with a literal table.
         expect(fs.readFileSync(path.join(dir, "backend/functions/params.ts"), "utf8")).toContain(`data.table("archive").create(order)`);
         // Test doubles held by a data slot, and assertions over source text, in a test file.
@@ -131,7 +133,7 @@ describe("rebase migrate sdk-calls", () => {
         expect(untyped).toContain(`api.data.table("posts")`);
         expect(untyped).toContain(`api.data.collection(name)`);
         expect(untyped).toContain(`typeof data.table !== "function"`);
-        expect(report.byName.map(entry => `${entry.file}:${entry.line}`)).toEqual(["backend/functions/params.ts:3", "backend/functions/params.ts:4", "backend/functions/untyped.ts:5", "backend/functions/untyped.ts:6", "backend/functions/untyped.ts:7", "backend/functions/untyped.ts:11", "backend/test/doubles.test.ts:11", "backend/test/doubles.test.ts:12", "backend/test/doubles.test.ts:14", "backend/test/doubles.test.ts:18", "backend/test/doubles.test.ts:19", "backend/test/doubles.test.ts:23", "backend/test/doubles.test.ts:24", "typed/src/structural.ts:2", "typed/src/structural.ts:5", "typed/src/use.ts:6", "typed/web/feed.js:5"]);
+        expect(report.byName.map(entry => `${entry.file}:${entry.line}`)).toEqual(["backend/functions/params.ts:3", "backend/functions/params.ts:4", "backend/functions/untyped.ts:5", "backend/functions/untyped.ts:6", "backend/functions/untyped.ts:7", "backend/functions/untyped.ts:11", "backend/test/doubles.test.ts:11", "backend/test/doubles.test.ts:12", "backend/test/doubles.test.ts:14", "backend/test/doubles.test.ts:18", "backend/test/doubles.test.ts:19", "backend/test/doubles.test.ts:23", "backend/test/doubles.test.ts:24", "typed/src/structural.ts:2", "typed/src/structural.ts:5", "typed/src/structural.ts:9", "typed/src/structural.ts:10", "typed/src/use.ts:6", "typed/web/feed.js:5"]);
         expect(report.manualSteps.find(step => step.file === "backend/functions/untyped.ts")?.detail).toMatch(/^Line 13: code that tests whether `collection` exists/);
         // A minified bundle (a vendored build of the client) is never edited: its own option names are not the project's calls.
         expect(fs.readFileSync(path.join(dir, "typed/web/vendor/client.min.js"), "utf8")).toContain("e.maxCachedQueriesPerCollection");

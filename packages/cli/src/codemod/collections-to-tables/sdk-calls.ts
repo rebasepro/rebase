@@ -361,6 +361,20 @@ function holdsDataSlot(ctx: AstContext, node: Node): boolean {
     return false;
 }
 
+/** Whether the receiver's type declares `collection` in an object type a data slot holds (`context: { data: { collection(…) } }`). */
+function memberOfSlotType(ctx: AstContext, receiver: Node): boolean {
+    const { Node: N } = ctx.tsm;
+    try {
+        const declarations = receiver.getType().getProperty("collection")?.getDeclarations() ?? [];
+        return declarations.some(declaration => {
+            const literal = declaration.getParent();
+            return (N.isPropertySignature(declaration) || N.isMethodSignature(declaration)) && literal !== undefined && N.isTypeLiteral(literal) && holdsDataSlot(ctx, literal);
+        });
+    } catch {
+        return false;
+    }
+}
+
 /** A test file: under a test directory, or named `*.test.*` / `*.spec.*`. */
 function isTestFile(relative: string): boolean {
     return /(^|\/)(test|tests|__tests__|e2e)\//.test(relative) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(relative);
@@ -647,8 +661,10 @@ function rewriteFile(
     const isSdkByName = (receiver: Node, call: CallExpression): boolean => {
         const literal = call.getArguments()[0];
         const literalTable = literal !== undefined && (N.isStringLiteral(literal) || N.isNoSubstitutionTemplateLiteral(literal));
-        // Typed as something else (a structural type of the project's own): only the slot's own name decides.
-        if (typed && oracle.isSdkData(receiver) !== undefined) return isDataSlot(ctx, receiver, literalTable);
+        // Typed as something else (a structural type of the project's own): only the slot's own name decides —
+        // or the type's `collection` member being one this pass renames (an object type a data slot holds), so
+        // the call and its type stay in step.
+        if (typed && oracle.isSdkData(receiver) !== undefined) return isDataSlot(ctx, receiver, literalTable) || (isDataSlot(ctx, receiver, true) && memberOfSlotType(ctx, receiver));
         return isNamedSdkReceiver(ctx, receiver, literalTable) || isDataSlot(ctx, receiver, literalTable);
     };
     const byName = (node: Node, code: Node): void => {

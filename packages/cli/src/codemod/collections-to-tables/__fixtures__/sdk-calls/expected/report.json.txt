@@ -46,7 +46,7 @@
     },
     {
       "path": "typed/src/structural.ts",
-      "edits": 2
+      "edits": 4
     },
     {
       "path": "typed/src/use.ts",
@@ -58,7 +58,7 @@
     }
   ],
   "counts": {
-    "collection-call": 25,
+    "collection-call": 27,
     "table-hooks": 5,
     "rule-vocabulary": 4,
     "boot-options": 3,
@@ -194,6 +194,16 @@
       "file": "typed/src/structural.ts",
       "line": 5,
       "code": "rebase.dataAsAdmin.collection(\"workspaces\")"
+    },
+    {
+      "file": "typed/src/structural.ts",
+      "line": 9,
+      "code": "collection(path: string): { findById(id: string): Promise<unknown> }"
+    },
+    {
+      "file": "typed/src/structural.ts",
+      "line": 10,
+      "code": "context.data.collection(`${root}/${id}/locales`)"
     },
     {
       "file": "typed/src/use.ts",

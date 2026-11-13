@@ -4,3 +4,8 @@ type Admin = { dataAsAdmin: { table(slug: string): { findById(id: string): Promi
 export async function workspace(rebase: Admin, id: string) {
     return rebase.dataAsAdmin.table("workspaces").findById(id);
 }
+
+/** The slot's object type spelled inline: its member is renamed, so the call with a computed table is too. */
+export async function locale(context: { data: { table(path: string): { findById(id: string): Promise<unknown> } } }, root: string, id: string) {
+    return context.data.table(`${root}/${id}/locales`).findById("en");
+}
