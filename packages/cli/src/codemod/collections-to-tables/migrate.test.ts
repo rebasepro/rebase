@@ -190,6 +190,10 @@ describe("what the blog fixture says about routing", () => {
         expect(report.files.find(file => file.path === "backend/schema/tags.ts")?.content).toContain(`import { tagCallbacks } from "../../config/tag-callbacks";`);
         // 0.30's policy.existsIn({ collection }) keeps its table: 0.31's builder reads `table`, and the load restores 0.30's.
         expect(report.files.find(file => file.path === "backend/schema/tags.ts")?.content).toMatch(/kind: "existsIn",\s+table: "authors"/);
+        // dynamicProps return 0.31's flat shape: inline, and in the shared builder (its shared const included); nothing left to check.
+        expect(report.files.find(file => file.path === "frontend/src/cms/posts.tsx")?.content).toContain(`if (values?.status === "published") return { readOnly: true };`);
+        expect(report.files.find(file => file.path === "config/form-rules.ts")?.content).toContain("const READ_ONLY = { readOnly: true };");
+        expect(report.manualSteps.filter(step => step.title.includes("dynamicProps"))).toEqual([]);
         // A function storage path: its keys' template on the column (where the server enforces the limits), the function in the customization.
         expect(report.files.find(file => file.path === "backend/schema/authors.ts")?.content).toContain(`path: "{path}/avatar"`);
         expect(report.files.find(file => file.path === "frontend/src/cms/authors.tsx")?.content).toContain("path: ({ values, entityId }) => {");

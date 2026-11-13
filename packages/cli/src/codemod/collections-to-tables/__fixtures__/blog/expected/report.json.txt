@@ -41,6 +41,7 @@
     "update backend/src/index.ts",
     "create backend/storage.ts",
     "update backend/tsconfig.json",
+    "update config/form-rules.ts",
     "update frontend/src/App.tsx",
     "create frontend/src/cms/authors.tsx",
     "create frontend/src/cms/index.ts",
@@ -67,13 +68,7 @@
       "message": "keeps 4 module(s) of the project's own (config/actions.ts, config/form-rules.ts, config/slugify.ts, config/tag-callbacks.ts): 0.31 stops reading config/collections, not config/. They stay where they are, importable as before; only what Rebase read is removed."
     }
   ],
-  "manualSteps": [
-    {
-      "title": "Check fields.slug.dynamicProps of posts",
-      "detail": "`dynamicProps` returns a field customization now (flat keys: `hidden`, `fieldOrder`, …), not a partial property with an `admin` block. Check what it returns.",
-      "file": "frontend/src/cms/posts.tsx"
-    }
-  ],
+  "manualSteps": [],
   "verification": {
     "identical": true,
     "differences": []

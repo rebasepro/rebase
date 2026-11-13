@@ -31,7 +31,12 @@ const postsCollection = defineCollection({
                 { id: "draft", label: "Draft", color: "grayLight" },
                 { id: "published", label: "Live" }
             ],
-            defaultValue: "draft"
+            defaultValue: "draft",
+            // Inline, with an early return: read-only once published.
+            dynamicProps: ({ values }) => {
+                if (values?.status === "published") return { admin: { readOnly: true } };
+                return { admin: { readOnly: false } };
+            }
         },
         body: {
             name: "Body",

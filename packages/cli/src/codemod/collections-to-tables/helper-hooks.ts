@@ -46,7 +46,7 @@ export interface HelperHooks {
     unresolved?: string;
 }
 
-type Found = { literal: ObjectLiteralExpression; reason?: undefined } | { literal?: undefined; reason: string };
+export type Found = { literal: ObjectLiteralExpression; reason?: undefined } | { literal?: undefined; reason: string };
 
 function loadFile(plan: PlanContext, file: string): SourceFile | undefined {
     if (!fs.existsSync(file) || file.includes(`${path.sep}node_modules${path.sep}`)) return undefined;
@@ -96,7 +96,7 @@ function functionOf(plan: PlanContext, callee: Node): Node | string {
 }
 
 /** Follow an expression to the object literal it evaluates to. */
-function findLiteral(plan: PlanContext, node: Node, depth = 0): Found {
+export function findLiteral(plan: PlanContext, node: Node, depth = 0): Found {
     const { Node: N, SyntaxKind } = plan.ast.tsm;
     if (depth > 10) return { reason: "the helper refers to itself" };
     const current = unwrap(plan.ast, node);

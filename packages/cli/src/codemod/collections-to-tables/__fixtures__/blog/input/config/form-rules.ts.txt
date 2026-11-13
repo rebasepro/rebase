@@ -1,8 +1,16 @@
 /** Form rules several collections share, spread into their properties. */
 
-const READ_ONLY = { readOnly: true };
+const READ_ONLY = { admin: { readOnly: true } };
 
 /** Editable while the record is new, read-only once it exists. */
 export const fixedOnceCreated = {
     dynamicProps: ({ id }: { id?: string | number }) => (id === undefined ? {} : READ_ONLY)
 };
+
+/** Editable while the record is new or still a draft. */
+export function editableWhileDraft() {
+    return {
+        dynamicProps: ({ id, values }: { id?: string | number; values: Record<string, unknown> }) =>
+            id === undefined || values.status === "draft" ? {} : READ_ONLY
+    };
+}

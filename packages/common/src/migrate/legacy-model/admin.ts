@@ -23,7 +23,7 @@
 import type { User } from "@rebasepro/types";
 
 import type { LegacyFirebaseCollectionConfig, LegacyPostgresCollectionConfig } from "./collections";
-import type { LegacyArrayProperty, LegacyFirebaseProperty, LegacyMapProperty, LegacyPostgresProperty, LegacyProperty } from "./properties";
+import type { LegacyArrayProperty, LegacyFirebaseProperty, LegacyMapProperty, LegacyPostgresProperty, LegacyProperty, LegacyPropertyBuilderProps } from "./properties";
 
 /**
  * Every key of a collection's `admin` block at 0.30.
@@ -147,14 +147,23 @@ export type LegacyAdminPropertyOptions = { [K in LegacyAdminPropertyKey]?: unkno
  */
 export type LegacyWithAdminProperty<P extends LegacyProperty = LegacyProperty> =
     P extends LegacyMapProperty
-        ? Omit<P, "properties"> & { properties?: LegacyWithAdminProperties; admin?: LegacyAdminPropertyOptions }
+        ? Omit<P, "properties" | "dynamicProps"> & { properties?: LegacyWithAdminProperties; admin?: LegacyAdminPropertyOptions; dynamicProps?: LegacyWithAdminDynamicProps }
         : P extends LegacyArrayProperty
-            ? Omit<P, "of" | "oneOf"> & {
+            ? Omit<P, "of" | "oneOf" | "dynamicProps"> & {
                 of?: LegacyWithAdminProperty | LegacyWithAdminProperty[];
                 oneOf?: Omit<NonNullable<LegacyArrayProperty["oneOf"]>, "properties"> & { properties: LegacyWithAdminProperties };
                 admin?: LegacyAdminPropertyOptions;
+                dynamicProps?: LegacyWithAdminDynamicProps;
             }
-            : P & { admin?: LegacyAdminPropertyOptions };
+            : Omit<P, "dynamicProps"> & { admin?: LegacyAdminPropertyOptions; dynamicProps?: LegacyWithAdminDynamicProps };
+
+/**
+ * A 0.30 `dynamicProps` builder as `@rebasepro/cms-types` typed it: it returned
+ * a partial property that may carry an `admin` block (`{ admin: { readOnly: true } }`).
+ *
+ * @group Migration
+ */
+export type LegacyWithAdminDynamicProps = (props: LegacyPropertyBuilderProps) => { admin?: LegacyAdminPropertyOptions } & Partial<LegacyProperty>;
 
 /**
  * A property map whose properties may carry `admin` blocks.

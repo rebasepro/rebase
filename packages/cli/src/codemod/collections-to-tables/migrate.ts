@@ -351,6 +351,13 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
         }
     }
 
+    // Modules the panel's code imports in place, edited for it (a shared dynamicProps builder's 0.31 return shape).
+    for (const module of relocator.keptFrontendModules) {
+        if (relocator.keptBackendModules.has(module)) continue;
+        const content = relocator.editedSource(module);
+        if (content !== fs.readFileSync(module, "utf8")) planFile(plan, module, content, `${relativeToRoot(plan, module)} (dynamicProps return shape)`);
+    }
+
     // The project's own modules backend code imports in place: their collection-model types become table-model aliases.
     for (const module of relocator.keptBackendModules) {
         const content = relocator.keptBackendContent(module);

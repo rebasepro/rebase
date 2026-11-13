@@ -15,6 +15,7 @@ export const posts = defineTable("posts", {
         title: col.text().notNull(),
         // Unique, so a URL names one post.
         slug: col.text().unique(),
+        // Inline, with an early return: read-only once published.
         status: col.enum(["draft", "published"]).default("draft"),
         body: col.text(),
         cover: col.storage({ path: "posts/covers/", accept: ["image/*"] }),

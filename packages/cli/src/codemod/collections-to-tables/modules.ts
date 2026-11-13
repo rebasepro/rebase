@@ -90,11 +90,24 @@ export class Relocator {
     readonly helpers = new Map<string, HelperCopy>();
     /** Modules of the project's own in config/ that backend code the run writes imports in place. */
     readonly keptBackendModules = new Set<string>();
+    /** Modules outside config/collections the run edits in place for the panel (a shared `dynamicProps` builder). */
+    readonly keptFrontendModules = new Set<string>();
     /** Edits to a module's own text before it is copied or kept (a helper's callbacks as table hooks), by absolute path. */
     readonly sourceEdits = new Map<string, { start: number; end: number; text: string }[]>();
 
+    /**
+     * Queue edits to a module's own text (deduplicated by position), dropping
+     * any copy of it already made so the next one carries them.
+     */
+    addSourceEdits(file: string, edits: readonly { start: number; end: number; text: string }[]): void {
+        const queued = this.sourceEdits.get(file) ?? [];
+        for (const edit of edits) if (!queued.some(other => other.start === edit.start && other.end === edit.end)) queued.push(edit);
+        this.sourceEdits.set(file, queued);
+        for (const side of ["backend", "frontend"]) this.contents.delete(`${side}:${file}`);
+    }
+
     /** A module's text with its {@link sourceEdits} applied. */
-    private editedSource(file: string): string {
+    editedSource(file: string): string {
         let out = fs.readFileSync(file, "utf8");
         const edits = this.sourceEdits.get(file);
         if (edits) for (const edit of [...edits].sort((a, b) => b.start - a.start)) out = out.slice(0, edit.start) + edit.text + out.slice(edit.end);

@@ -33,6 +33,10 @@ export const postsCms = customizeTable<typeof posts>("posts", {
             dynamicProps: fixedOnceCreated.dynamicProps
         },
         status: {
+            dynamicProps: ({ values }) => {
+                if (values?.status === "published") return { readOnly: true };
+                return { readOnly: false };
+            },
             enumLabels: {
                 draft: {
                     label: "Draft",

@@ -21,7 +21,9 @@ import type { LegacyEnumValues, LiftNote } from "@rebasepro/common/migrate";
 import { enumValueLabel, labelFromIdentifier, singularLabel } from "@rebasepro/utils";
 
 import type { Member, PathSegment } from "./ast";
-import { collectReferences, nodeAtPath, nodeText, postDeclarationAssignments, resolveObject, spreadSource, toPosix, unwrap } from "./ast";
+import { collectReferences, memberOf, nodeAtPath, nodeText, postDeclarationAssignments, resolveObject, spreadSource, toPosix, unwrap } from "./ast";
+import { rewriteDynamicProps } from "./dynamic-props";
+import { findLiteral } from "./helper-hooks";
 import { memberFunctionText } from "./hooks";
 import { constantForEnum } from "./split-constants";
 import {
@@ -470,6 +472,7 @@ function applyFieldNote(plan: PlanContext, builder: Builder, item: LiftNote, fie
     }
     if (destination !== undefined) {
         target[destination] = printable(plan, builder, item.value, [...literal, item.field], `${label}.${item.field}`);
+        if (item.field === "dynamicProps" && target[destination] !== undefined && flattenDynamicProps(plan, builder, target, destination, [...literal, item.field])) return;
         if (item.field === "dynamicProps" && target[destination] !== undefined) {
             plan.manualSteps.push({
                 title: `Check fields.${key}.dynamicProps of ${builder.name.table}`,
@@ -480,6 +483,51 @@ function applyFieldNote(plan: PlanContext, builder: Builder, item: LiftNote, fie
         return;
     }
     note(plan, builder.entry, `${label}.${item.field}: ${item.reason} \`customizeTable\` has no option for it; not carried.`);
+}
+
+/**
+ * A `dynamicProps` builder carried into a customization, its returns rewritten
+ * to 0.31's flat shape (see `dynamic-props.ts`): in the printed function when
+ * it was written inline, in the defining module (its copy, or in place) when
+ * it came from a spread of a shared object. True when nothing is left to
+ * check by hand.
+ */
+function flattenDynamicProps(plan: PlanContext, builder: Builder, target: Record<string, unknown>, destination: string, segments: PathSegment[]): boolean {
+    const { Node: N } = plan.ast.tsm;
+    const printed = target[destination];
+    if (!(printed instanceof RawSource)) return false;
+    const located = locate(plan, builder.entry, segments);
+    if (located.member) {
+        // Written inline: rewrite the printed text (a scratch file of it, so a `const` it reads is not in scope and refuses).
+        const scratch = plan.ast.project.createSourceFile(`/__rebase_migrate__/dynamic-props-${builder.name.identifier}.ts`, `const __builder = ${printed.text};`, { overwrite: true });
+        try {
+            const fn = unwrap(plan.ast, scratch.getVariableDeclarationOrThrow("__builder").getInitializerOrThrow());
+            const rewrite = rewriteDynamicProps(plan.ast, fn, scratch, [fn]);
+            if (!rewrite.edits) return false;
+            const offset = "const __builder = ".length;
+            let text = printed.text;
+            for (const edit of [...rewrite.edits].sort((a, b) => b.start - a.start)) text = text.slice(0, edit.start - offset) + edit.text + text.slice(edit.end - offset);
+            target[destination] = new RawSource(text);
+            return true;
+        } finally {
+            plan.ast.project.removeSourceFile(scratch);
+        }
+    }
+    const spread = builder.entry.site ? spreadSource(plan.ast, builder.entry.site.literal, segments) : undefined;
+    if (!spread) return false;
+    const owner = findLiteral(plan, spread.spread);
+    if (!owner.literal) return false;
+    const member = memberOf(plan.ast, owner.literal, "dynamicProps");
+    const fn = member.node ? (member.node.method ?? (member.node.value ? unwrap(plan.ast, member.node.value) : undefined)) : undefined;
+    if (!fn || !(N.isArrowFunction(fn) || N.isFunctionExpression(fn) || N.isMethodDeclaration(fn))) return false;
+    const sf = fn.getSourceFile();
+    const rewrite = rewriteDynamicProps(plan.ast, fn, sf);
+    if (!rewrite.edits) return false;
+    if (rewrite.edits.length > 0) {
+        plan.relocator.addSourceEdits(sf.getFilePath(), rewrite.edits);
+        if (!plan.relocator.isInCollections(sf.getFilePath())) plan.relocator.keptFrontendModules.add(sf.getFilePath());
+    }
+    return true;
 }
 
 /**

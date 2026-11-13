@@ -247,7 +247,7 @@ function planTableModule(plan: PlanContext, entry: CollectionEntry, def: AnyTabl
     if (fromHelper && callbacksValue) {
         // `callbacks: softDeleteCallbacks("company")`: the helper's functions take table-hook props where they are written.
         const helper = carryHelperHooks(plan, callbacksValue, hookNames);
-        for (const [file, fileEdits] of helper.edits) plan.relocator.sourceEdits.set(file, [...(plan.relocator.sourceEdits.get(file) ?? []), ...fileEdits]);
+        for (const [file, fileEdits] of helper.edits) plan.relocator.addSourceEdits(file, fileEdits);
         for (const file of helper.files) if (!plan.relocator.isInCollections(file)) plan.relocator.keptBackendModules.add(file);
         sources.hooks = splices.token(nodeText(callbacksValue));
         carried.push({ member: { node: callbacksValue, value: callbacksValue }, carried: { text: "", todos: [] }, label: "hooks" });
