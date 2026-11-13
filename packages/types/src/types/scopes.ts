@@ -114,15 +114,15 @@ export interface ScopeDescription {
 export const BUILT_IN_SCOPE_DESCRIPTIONS: Readonly<Record<BuiltInScope, ScopeDescription>> = {
     "data:read": {
         label: "Read data",
-        description: "Read rows from collections, through the caller's row-level security."
+        description: "Read rows from tables, through the caller's row-level security."
     },
     "data:write": {
         label: "Create and update data",
-        description: "Create and update rows in collections, through the caller's row-level security."
+        description: "Create and update rows in tables, through the caller's row-level security."
     },
     "data:delete": {
         label: "Delete data",
-        description: "Delete rows from collections, through the caller's row-level security."
+        description: "Delete rows from tables, through the caller's row-level security."
     },
     "storage:read": {
         label: "Read files",
@@ -150,11 +150,11 @@ export const BUILT_IN_SCOPE_DESCRIPTIONS: Readonly<Record<BuiltInScope, ScopeDes
     },
     "schema:read": {
         label: "See the schema",
-        description: "Read the collection schema, plan schema changes and run the RLS audit."
+        description: "Read the schema, plan schema changes and run the RLS audit."
     },
     "schema:write": {
         label: "Change the schema",
-        description: "Apply schema changes: edits collection files and alters the database."
+        description: "Apply schema changes: edits schema files and alters the database."
     },
     "database:read": {
         label: "Inspect the database",
