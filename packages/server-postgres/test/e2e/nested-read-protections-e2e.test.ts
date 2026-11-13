@@ -15,7 +15,8 @@
  *   `FETCH_COLLECTION` / `FETCH_ONE`, `subscribe_collection` (first frame and the
  *   frame a later change sends), the in-process SDK on a caller-scoped driver;
  * - protections on the deepest table (`people`): a table `afterRead` hook, a
- *   column transform, a private column, a per-field `access.read`, soft delete,
+ *   column transform, a private column, a per-field `access.read` (and both on a
+ *   storage column, whose key a download is authorized by), soft delete,
  *   tenant scoping (a JWT claim);
  * - depth: `posts?include=author` (1), `comments?include=post.author` (2),
  *   `likes?include=comment.post.author` (3).
@@ -58,6 +59,10 @@ const people = defineTable("people", {
         phone: col.text().transform({ afterRead: ({ value }) => (value == null ? value : "PHONE-MASKED") }),
         salary: col.integer().access({ read: ["hr"] }),
         pin: col.text().private(),
+        // A file the caller may not read, and one no caller may: their storage
+        // keys are what a download is authorized by, so they must never leak.
+        photo: col.storage({ path: "people/photos" }).access({ read: ["hr"] }),
+        badge: col.storage({ path: "people/badges" }).private(),
         orgId: col.text(),
         deletedAt: col.timestamp({ withTimezone: true })
     },
@@ -105,6 +110,7 @@ const at = (value: unknown, key: string): unknown => (isRow(value) ? value[key] 
 /** Values the protections hide: none may appear in any answer, at any depth. */
 const HIDDEN = [
     "ada@real.example", "555-0100", "250000", "pin-ada",          // live person: masked / restricted / private
+    "people/photos/r4nd_ada.png", "people/badges/r4nd_ada.png",   // live person's restricted and private file keys
     "Bea", "bea@other.example", "pin-bea",                          // another tenant's person
     "Cid", "cid@trash.example", "pin-cid"                           // a soft-deleted person
 ];
@@ -123,6 +129,8 @@ function expectProtected(rows: Row[], authorOf: (row: Row) => unknown, label: st
     expect(ada, `${label}: Ada is reached`).toMatchObject({ name: "Ada", email: "MASKED", phone: "PHONE-MASKED" });
     expect(ada, `${label}: access.read`).not.toHaveProperty("salary");
     expect(ada, `${label}: private`).not.toHaveProperty("pin");
+    expect(ada, `${label}: restricted file`).not.toHaveProperty("photo");
+    expect(ada, `${label}: private file`).not.toHaveProperty("badge");
     if (byId.has(2)) expect(authorOf(byId.get(2) ?? {}) ?? null, `${label}: tenant`).toBeNull();
     if (byId.has(3)) expect(authorOf(byId.get(3) ?? {}) ?? null, `${label}: soft delete`).toBeNull();
     const text = JSON.stringify(rows);
@@ -222,9 +230,9 @@ describe("read protections at include depth 1, 2 and 3, on every door (E2E)", ()
         caller.uid = user.id;
         caller.token = await generateAccessToken(user.id, caller.roles, "aal1", caller.claims);
         await admin.query(`
-            INSERT INTO people (name, email, phone, salary, pin, org_id) VALUES
-                ('Ada', 'ada@real.example', '555-0100', 250000, 'pin-ada', 'a'),
-                ('Bea', 'bea@other.example', '555-0200', 1, 'pin-bea', 'b');
+            INSERT INTO people (name, email, phone, salary, pin, photo, badge, org_id) VALUES
+                ('Ada', 'ada@real.example', '555-0100', 250000, 'pin-ada', 'people/photos/r4nd_ada.png', 'people/badges/r4nd_ada.png', 'a'),
+                ('Bea', 'bea@other.example', '555-0200', 1, 'pin-bea', NULL, NULL, 'b');
             INSERT INTO people (name, email, phone, salary, pin, org_id, deleted_at) VALUES
                 ('Cid', 'cid@trash.example', '555-0300', 2, 'pin-cid', 'a', now());
             INSERT INTO posts (title, author_id) VALUES ('p1', 1), ('p2', 2), ('p3', 3);
