@@ -325,6 +325,47 @@ function isNamedSdkReceiver(ctx: AstContext, receiver: Node, literalTable: boole
     return false;
 }
 
+/** The names a data-surface slot goes by: `context.data`, `rebase.dataAsAdmin`, a `data` parameter. */
+const DATA_SLOTS = new Set(["data", "dataAsAdmin"]);
+
+/**
+ * Whether a receiver IS a data-surface slot by its spelling alone, whatever its
+ * type: an expression ending in `.dataAsAdmin` (or an identifier of that name),
+ * or one ending in `.data` (or a `data` identifier) when the call names its table
+ * with a string literal. A structural type of the project's own over the SDK
+ * (`{ dataAsAdmin: { collection(…) } }`) or a `data: any` parameter has no type
+ * that says "SDK", and a `.collection(` left on one is a TypeError on 0.31 that no
+ * type checker reports — so these are rewritten, and listed for review.
+ */
+function isDataSlot(ctx: AstContext, receiver: Node, literalTable: boolean): boolean {
+    const { Node: N } = ctx.tsm;
+    if (N.isNonNullExpression(receiver) || N.isParenthesizedExpression(receiver) || N.isAsExpression(receiver)) return isDataSlot(ctx, receiver.getExpression(), literalTable);
+    const name = N.isPropertyAccessExpression(receiver) ? receiver.getName() : N.isIdentifier(receiver) ? receiver.getText() : undefined;
+    if (name === "dataAsAdmin") return true;
+    return name === "data" && literalTable;
+}
+
+/** Whether a node is the value held by a data slot: `data: { … }`, `dataAsAdmin: { … }`, `const data = { … }` (through `as`/`satisfies`). */
+function holdsDataSlot(ctx: AstContext, node: Node): boolean {
+    const { Node: N } = ctx.tsm;
+    let current: Node = node;
+    let parent = current.getParent();
+    while (parent && (N.isAsExpression(parent) || N.isSatisfiesExpression(parent) || N.isParenthesizedExpression(parent))) {
+        current = parent;
+        parent = current.getParent();
+    }
+    if (!parent) return false;
+    if (N.isPropertyAssignment(parent) && parent.getInitializer() === current) return DATA_SLOTS.has(parent.getName());
+    if (N.isPropertySignature(parent) && parent.getTypeNode() === current) return DATA_SLOTS.has(parent.getName());
+    if (N.isVariableDeclaration(parent) && parent.getInitializer() === current) return DATA_SLOTS.has(parent.getName());
+    return false;
+}
+
+/** A test file: under a test directory, or named `*.test.*` / `*.spec.*`. */
+function isTestFile(relative: string): boolean {
+    return /(^|\/)(test|tests|__tests__|e2e)\//.test(relative) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(relative);
+}
+
 /** Whether an identifier names a `createRebaseClient(...)` result declared in its file. */
 function isFactoryResult(ctx: AstContext, identifier: Node): boolean {
     const { Node: N } = ctx.tsm;
@@ -531,6 +572,8 @@ export async function rewriteSdkCalls(root: string, options: RewriteSdkOptions =
             snippet: "rebase generate-sdk"
         });
     }
+    report.byName.sort((x, y) => x.file.localeCompare(y.file) || x.line - y.line);
+    report.left.sort((x, y) => x.file.localeCompare(y.file) || x.line - y.line);
     return { files: out, report };
 }
 
@@ -560,9 +603,14 @@ function rewriteFile(
     };
     /** No type and not on the list, but named as the SDK is: `dataAsAdmin`, or `.data` called with a literal table name. */
     const isSdkByName = (receiver: Node, call: CallExpression): boolean => {
-        if (typed && oracle.isSdkData(receiver) !== undefined) return false;
         const literal = call.getArguments()[0];
-        return isNamedSdkReceiver(ctx, receiver, literal !== undefined && N.isStringLiteral(literal));
+        const literalTable = literal !== undefined && (N.isStringLiteral(literal) || N.isNoSubstitutionTemplateLiteral(literal));
+        // Typed as something else (a structural type of the project's own): only the slot's own name decides.
+        if (typed && oracle.isSdkData(receiver) !== undefined) return isDataSlot(ctx, receiver, literalTable);
+        return isNamedSdkReceiver(ctx, receiver, literalTable) || isDataSlot(ctx, receiver, literalTable);
+    };
+    const byName = (node: Node, code: Node): void => {
+        report.byName.push({ file: relative, line: node.getStartLineNumber(), code: code.getText().split("\n")[0].slice(0, 120) });
     };
 
     // Imports: generated types (3), SDK type names (5), CollectionCallbacks with setTableHooks (9).
@@ -668,7 +716,12 @@ function rewriteFile(
             add(access.getNameNode(), "table", "collection-call");
             continue;
         }
-        if (name === "collection" && !isCall && !(typed && oracle.isSdkData(receiver) !== undefined) && isNamedSdkReceiver(ctx, receiver, false)) {
+        // A test double put in the slot: `ctx.data.collection = vi.fn()`, `const open = rebase.data.collection`.
+        const assignedDouble = name === "collection" && !isCall && parent !== undefined &&
+            ((N.isBinaryExpression(parent) && parent.getLeft() === access && parent.getOperatorToken().getKind() === SyntaxKind.EqualsToken) ||
+                (N.isVariableDeclaration(parent) && parent.getInitializer() === access)) &&
+            isDataSlot(ctx, receiver, true);
+        if (assignedDouble || (name === "collection" && !isCall && !(typed && oracle.isSdkData(receiver) !== undefined) && isNamedSdkReceiver(ctx, receiver, false))) {
             add(access.getNameNode(), "table", "collection-call");
             report.byName.push({ file: relative, line: access.getStartLineNumber(), code: (parent ?? access).getText().split("\n")[0].slice(0, 120) });
             continue;
@@ -680,6 +733,51 @@ function rewriteFile(
         if (name === "setCollectionCallbacks" && isCall) {
             add(access.getNameNode(), "setTableHooks", "table-hooks");
             continue;
+        }
+    }
+
+    // Test doubles of the data surface: a `collection` member of the object (or
+    // object type) a data slot holds — `{ dataAsAdmin: { collection: (name) => … } }`,
+    // `context: { data: { collection } }`, `const data = { collection(name) { … } }`.
+    const slotMembers = [
+        ...sf.getDescendantsOfKind(SyntaxKind.ObjectLiteralExpression).filter(object => holdsDataSlot(ctx, object)).flatMap(object => object.getProperties()),
+        ...sf.getDescendantsOfKind(SyntaxKind.TypeLiteral).filter(literal => holdsDataSlot(ctx, literal)).flatMap(literal => literal.getMembers())
+    ];
+    const renamedMembers = new Set<Node>();
+    for (const member of slotMembers) {
+        if (N.isShorthandPropertyAssignment(member) && member.getName() === "collection") {
+            add(member, "table: collection", "collection-call");
+        } else if ((N.isPropertyAssignment(member) || N.isMethodDeclaration(member) || N.isPropertySignature(member) || N.isMethodSignature(member)) && member.getName() === "collection") {
+            add(member.getNameNode(), "table", "collection-call");
+        } else {
+            continue;
+        }
+        renamedMembers.add(member);
+        byName(member, member);
+    }
+    if (isTestFile(relative)) {
+        // A double the codemod cannot tie to a slot (`makeContext({ collection: … })`): listed, not renamed.
+        for (const object of sf.getDescendantsOfKind(SyntaxKind.ObjectLiteralExpression)) {
+            for (const member of object.getProperties()) {
+                if (renamedMembers.has(member)) continue;
+                const isFunction = N.isMethodDeclaration(member) || N.isShorthandPropertyAssignment(member) ||
+                    (N.isPropertyAssignment(member) && (N.isArrowFunction(member.getInitializerOrThrow()) || N.isFunctionExpression(member.getInitializerOrThrow())));
+                if (!isFunction || !(N.isMethodDeclaration(member) || N.isShorthandPropertyAssignment(member) || N.isPropertyAssignment(member)) || member.getName() !== "collection") continue;
+                report.left.push({ file: relative, line: member.getStartLineNumber(), code: member.getText().split("\n")[0].slice(0, 120), reason: "left unchanged: a `collection` member of a test double not held by a `data` / `dataAsAdmin` slot — if it stands for the data surface, rename it `table`" });
+            }
+        }
+        // Assertions over source text: `'collection("contacts").find'`, `/\.collection\("x"\)/`.
+        const textual = [
+            ...sf.getDescendantsOfKind(SyntaxKind.StringLiteral),
+            ...sf.getDescendantsOfKind(SyntaxKind.NoSubstitutionTemplateLiteral),
+            ...sf.getDescendantsOfKind(SyntaxKind.RegularExpressionLiteral)
+        ];
+        for (const literal of textual) {
+            const text = literal.getText();
+            const next = text.replace(/(?<![\w$])collection(?=\\?\()/g, "table");
+            if (next === text) continue;
+            add(literal, next, "collection-call");
+            byName(literal, literal);
         }
     }
 

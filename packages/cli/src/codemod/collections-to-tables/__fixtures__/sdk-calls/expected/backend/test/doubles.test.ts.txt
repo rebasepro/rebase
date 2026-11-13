@@ -1,0 +1,27 @@
+import fs from "node:fs";
+import { describe, expect, it } from "vitest";
+
+function makeContext(value: unknown): unknown {
+    return value;
+}
+
+describe("orders", () => {
+    it("reads through test doubles of the data surface", () => {
+        const collection = (name: string) => ({ find: async () => ({ data: [name] }) });
+        const rebase = { sql: () => [], dataAsAdmin: { table: collection } };
+        const context = { data: { table: (name: string) => ({ findById: async () => name }) } };
+        const data = {
+            table(name: string) {
+                return { name };
+            }
+        };
+        const typed = rebase as unknown as { dataAsAdmin: { table: (name: string) => Record<string, unknown> } };
+        typed.dataAsAdmin.table = (name: string) => ({ name });
+        // Not held by a data slot: listed, not renamed.
+        const loose = makeContext({ collection: () => ({}) });
+        const source = fs.readFileSync("src/orders.ts", "utf8");
+        expect(source).toContain('data.table("orders").find');
+        expect(source).toMatch(/\.table\("orders"\)/);
+        expect([rebase, context, data, loose]).toHaveLength(4);
+    });
+});

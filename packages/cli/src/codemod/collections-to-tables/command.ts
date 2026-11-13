@@ -294,7 +294,7 @@ function printSdkSection(sdk: SdkRewriteReport): void {
         for (const added of sdk.dependencies) console.log(`    ${added.file}: ${chalk.green(`"${added.name}": "${added.version}"`)}`);
     }
     if (sdk.byName.length > 0) {
-        console.log(chalk.yellow(`  Rewritten by name — review (${sdk.byName.length}): the receiver has no type, so its name (\`dataAsAdmin\`, \`.data\` with a literal table) decided:`));
+        console.log(chalk.yellow(`  Rewritten by name — review (${sdk.byName.length}): no type says "SDK" (untyped, \`any\`, a structural type of your own, a test double), so the slot's name (\`dataAsAdmin\`, \`data\` with a literal table) decided. A \`.collection(\` left on the data surface is a TypeError on 0.31 that no type check reports:`));
         for (const entry of sdk.byName) console.log(`    ${entry.file}:${entry.line} ${chalk.gray(entry.code)}`);
     }
     if (sdk.left.length > 0) {
@@ -316,7 +316,11 @@ ${chalk.bold("Usage")}
   generated type names, batch operations, error codes, offline options, typed accessors,
   setCollectionCallbacks → setTableHooks (hook props adapted), storageAuthorize data, and the
   rule keys: existsIn({ collection: X }) and membership: { collection: X } → table: X.
-  A .collection( call whose receiver is not the SDK is left as written and listed.
+  A .collection( call whose receiver is not the SDK is left as written and listed. Where no type
+  says "SDK" (untyped, any, a structural type of the project's own), a receiver ending in
+  .dataAsAdmin, or in .data with a literal table name, is rewritten and listed for review — as are
+  test doubles a data/dataAsAdmin slot holds ({ dataAsAdmin: { collection: … } }) and, in test
+  files, source-text assertions (collection("x") in a string or regex).
   Generated SDK files are not rewritten: run rebase generate-sdk.
 
   Imports of names 0.31 moved to another package (the admin-panel helpers and types that left

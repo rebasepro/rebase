@@ -1,0 +1,6 @@
+// A `data` parameter with no type, as functions written against an older SDK have it.
+export async function archive(data: any, id: string) {
+    const order = await data.table("orders").findById(id);
+    await data.table("archive").create(order);
+    return order;
+}

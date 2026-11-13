@@ -3,7 +3,7 @@ import type { CreateRebaseClientResult } from "@rebasepro/client";
 /** The project's own structural client: its type is not the SDK, so its calls stay. */
 interface Finder { collection(slug: string): { find(): Promise<unknown[]> } }
 export async function own(client: { data: Finder }) {
-    return client.data.collection("posts").find();
+    return client.data.table("posts").find();
 }
 
 /** A receiver the list does not name, recognised by its type. */

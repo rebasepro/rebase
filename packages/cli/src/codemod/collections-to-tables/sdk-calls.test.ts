@@ -93,8 +93,24 @@ describe("rebase migrate sdk-calls", () => {
         expect(typedUse).toContain(`surface.table("posts")`);
         // Typed by the 0.30 package the project still has installed: `collection` declared by @rebasepro is the SDK too.
         expect(fs.readFileSync(path.join(dir, "typed/src/installed.ts"), "utf8")).toContain(`surface.table("posts")`);
-        // Spelled like a listed receiver, typed as the project's own interface: the type decides.
-        expect(typedUse).toContain(`client.data.collection("posts")`);
+        // Typed as the project's own interface, but a `.data` slot called with a literal table: a
+        // `.collection(` left there is a TypeError on 0.31 no type check reports, so it is rewritten and listed.
+        expect(typedUse).toContain(`client.data.table("posts")`);
+        // A structural type of the project's own over the SDK: the call and the type's member, both listed.
+        expect(fs.readFileSync(path.join(dir, "typed/src/structural.ts"), "utf8")).toContain(`dataAsAdmin: { table(slug: string)`);
+        expect(fs.readFileSync(path.join(dir, "typed/src/structural.ts"), "utf8")).toContain(`rebase.dataAsAdmin.table("workspaces")`);
+        // A `data: any` parameter called with a literal table.
+        expect(fs.readFileSync(path.join(dir, "backend/functions/params.ts"), "utf8")).toContain(`data.table("archive").create(order)`);
+        // Test doubles held by a data slot, and assertions over source text, in a test file.
+        const doubles = fs.readFileSync(path.join(dir, "backend/test/doubles.test.ts"), "utf8");
+        expect(doubles).toContain("dataAsAdmin: { table: collection }");
+        expect(doubles).toContain("data: { table: (name: string)");
+        expect(doubles).toContain("table(name: string) {");
+        expect(doubles).toContain("typed.dataAsAdmin.table = ");
+        expect(doubles).toContain(`'data.table("orders").find'`);
+        expect(doubles).toContain(`/\\.table\\("orders"\\)/`);
+        // A double no slot holds is listed, not renamed.
+        expect(doubles).toContain("makeContext({ collection: () => ({}) })");
         expect(report.typeAware).toBe(true);
         // Firestore's own collection() and a method of the project's own are left as written.
         const firestore = fs.readFileSync(path.join(dir, "frontend/src/firestore.ts"), "utf8");
@@ -102,7 +118,7 @@ describe("rebase migrate sdk-calls", () => {
         expect(firestore).toContain(`registry.collection("events")`);
         // A script the checker throws on: no answer by type, so `.data` with a literal table decides by name — the run goes on.
         expect(fs.readFileSync(path.join(dir, "typed/web/feed.js"), "utf8")).toContain(`e.data.table("posts")`);
-        expect(report.left.map(left => `${left.file}:${left.line}`)).toEqual(["backend/functions/untyped.ts:9", "frontend/src/firestore.ts:8", "typed/src/use.ts:6"]);
+        expect(report.left.map(left => `${left.file}:${left.line}`)).toEqual(["backend/functions/untyped.ts:9", "backend/test/doubles.test.ts:21", "frontend/src/firestore.ts:8"]);
         // The collections index's array as a boot option: the schema directory, and the import goes.
         const bootArray = fs.readFileSync(path.join(dir, "backend/src/boot-array.ts"), "utf8");
         expect(bootArray).toContain(`schemaDir: path.join(__dirname, "../schema")`);
@@ -115,7 +131,7 @@ describe("rebase migrate sdk-calls", () => {
         expect(untyped).toContain(`api.data.table("posts")`);
         expect(untyped).toContain(`api.data.collection(name)`);
         expect(untyped).toContain(`typeof data.table !== "function"`);
-        expect(report.byName.map(entry => `${entry.file}:${entry.line}`)).toEqual(["backend/functions/untyped.ts:5", "backend/functions/untyped.ts:6", "backend/functions/untyped.ts:7", "backend/functions/untyped.ts:11", "typed/web/feed.js:5"]);
+        expect(report.byName.map(entry => `${entry.file}:${entry.line}`)).toEqual(["backend/functions/params.ts:3", "backend/functions/params.ts:4", "backend/functions/untyped.ts:5", "backend/functions/untyped.ts:6", "backend/functions/untyped.ts:7", "backend/functions/untyped.ts:11", "backend/test/doubles.test.ts:11", "backend/test/doubles.test.ts:12", "backend/test/doubles.test.ts:14", "backend/test/doubles.test.ts:18", "backend/test/doubles.test.ts:19", "backend/test/doubles.test.ts:23", "backend/test/doubles.test.ts:24", "typed/src/structural.ts:2", "typed/src/structural.ts:5", "typed/src/use.ts:6", "typed/web/feed.js:5"]);
         expect(report.manualSteps.find(step => step.file === "backend/functions/untyped.ts")?.detail).toMatch(/^Line 13: code that tests whether `collection` exists/);
         // A minified bundle (a vendored build of the client) is never edited: its own option names are not the project's calls.
         expect(fs.readFileSync(path.join(dir, "typed/web/vendor/client.min.js"), "utf8")).toContain("e.maxCachedQueriesPerCollection");

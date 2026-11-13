@@ -1,6 +1,10 @@
 {
   "files": [
     {
+      "path": "backend/functions/params.ts",
+      "edits": 2
+    },
+    {
       "path": "backend/functions/untyped.ts",
       "edits": 4
     },
@@ -25,6 +29,10 @@
       "edits": 1
     },
     {
+      "path": "backend/test/doubles.test.ts",
+      "edits": 7
+    },
+    {
       "path": "frontend/src/client.ts",
       "edits": 13
     },
@@ -37,8 +45,12 @@
       "edits": 1
     },
     {
+      "path": "typed/src/structural.ts",
+      "edits": 2
+    },
+    {
       "path": "typed/src/use.ts",
-      "edits": 1
+      "edits": 2
     },
     {
       "path": "typed/web/feed.js",
@@ -46,7 +58,7 @@
     }
   ],
   "counts": {
-    "collection-call": 13,
+    "collection-call": 25,
     "table-hooks": 5,
     "rule-vocabulary": 4,
     "boot-options": 3,
@@ -66,16 +78,16 @@
       "reason": "left unchanged: receiver not recognised"
     },
     {
+      "file": "backend/test/doubles.test.ts",
+      "line": 21,
+      "code": "collection: () => ({})",
+      "reason": "left unchanged: a `collection` member of a test double not held by a `data` / `dataAsAdmin` slot — if it stands for the data surface, rename it `table`"
+    },
+    {
       "file": "frontend/src/firestore.ts",
       "line": 8,
       "code": "registry.collection(\"events\")",
       "reason": "left unchanged: receiver not recognised"
-    },
-    {
-      "file": "typed/src/use.ts",
-      "line": 6,
-      "code": "client.data.collection(\"posts\")",
-      "reason": "left unchanged: the receiver's type is not the SDK data surface"
     }
   ],
   "manualSteps": [
@@ -109,6 +121,16 @@
   "dependencies": [],
   "byName": [
     {
+      "file": "backend/functions/params.ts",
+      "line": 3,
+      "code": "data.collection(\"orders\")"
+    },
+    {
+      "file": "backend/functions/params.ts",
+      "line": 4,
+      "code": "data.collection(\"archive\")"
+    },
+    {
       "file": "backend/functions/untyped.ts",
       "line": 5,
       "code": "data.collection(\"users\")"
@@ -127,6 +149,56 @@
       "file": "backend/functions/untyped.ts",
       "line": 11,
       "code": "typeof data.collection"
+    },
+    {
+      "file": "backend/test/doubles.test.ts",
+      "line": 11,
+      "code": "collection"
+    },
+    {
+      "file": "backend/test/doubles.test.ts",
+      "line": 12,
+      "code": "collection: (name: string) => ({ findById: async () => name })"
+    },
+    {
+      "file": "backend/test/doubles.test.ts",
+      "line": 14,
+      "code": "collection(name: string) {"
+    },
+    {
+      "file": "backend/test/doubles.test.ts",
+      "line": 18,
+      "code": "collection: (name: string) => Record<string, unknown>"
+    },
+    {
+      "file": "backend/test/doubles.test.ts",
+      "line": 19,
+      "code": "typed.dataAsAdmin.collection = (name: string) => ({ name })"
+    },
+    {
+      "file": "backend/test/doubles.test.ts",
+      "line": 23,
+      "code": "'data.collection(\"orders\").find'"
+    },
+    {
+      "file": "backend/test/doubles.test.ts",
+      "line": 24,
+      "code": "/\\.collection\\(\"orders\"\\)/"
+    },
+    {
+      "file": "typed/src/structural.ts",
+      "line": 2,
+      "code": "collection(slug: string): { findById(id: string): Promise<unknown> }"
+    },
+    {
+      "file": "typed/src/structural.ts",
+      "line": 5,
+      "code": "rebase.dataAsAdmin.collection(\"workspaces\")"
+    },
+    {
+      "file": "typed/src/use.ts",
+      "line": 6,
+      "code": "client.data.collection(\"posts\")"
     },
     {
       "file": "typed/web/feed.js",

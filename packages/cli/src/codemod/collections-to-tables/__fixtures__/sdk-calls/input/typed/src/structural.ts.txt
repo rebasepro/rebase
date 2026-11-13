@@ -1,0 +1,6 @@
+/** A structural type of the project's own over the SDK: no type says "SDK", but the slot's name does. */
+type Admin = { dataAsAdmin: { collection(slug: string): { findById(id: string): Promise<unknown> } } };
+
+export async function workspace(rebase: Admin, id: string) {
+    return rebase.dataAsAdmin.collection("workspaces").findById(id);
+}
