@@ -77,7 +77,7 @@ Reaching a private Cloud SQL instance needs `--add-cloudsql-instances YOUR_PROJE
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 
-**The runtime creates missing tables at boot, including the ones `backend/schema` declares.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema — it creates missing tables, columns and enum types and applies their row-level security — so the first start against an empty instance comes up serving your collections.
+**The runtime creates missing tables at boot, including the ones `backend/schema` declares.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema — it creates missing tables, columns and enum types and applies their row-level security — so the first start against an empty instance comes up serving your tables.
 
 What `ensure` never does is change something that already exists: it does not alter a column type, drop anything, or edit an existing enum's labels, because a revision starting must not reshape a schema as a side effect of a deploy.
 

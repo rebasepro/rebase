@@ -232,7 +232,7 @@ rebase console
 rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
 ```
 
-`rebase` (`dataAsAdmin`, `sql`, `withAuth(user)`) and `collections` (the
+`rebase` (`dataAsAdmin`, `sql`, `withAuth(user)`) and `tables` (the
 project's tables, loaded from `backend/schema`) are in scope, and top-level
 `await` works. The database is resolved as `rebase db push`
 resolves it, and opening it changes nothing in it. With `-e`, the awaited result

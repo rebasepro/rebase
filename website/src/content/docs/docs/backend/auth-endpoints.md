@@ -41,7 +41,7 @@ All auth endpoints are mounted at `/api/auth/`:
 | `DELETE` | `/api/auth/sessions/:id` | Revoke one session: its refresh token, and the access token that device holds |
 | `GET` | `/api/auth/scopes` | Every [scope](/docs/backend/roles-and-scopes/) this backend knows, and the ones the caller holds |
 | `GET` | `/api/auth/keys` | The caller's own [personal API keys](/docs/backend/api-keys/#personal-keys) |
-| `POST` | `/api/auth/keys` | Create a personal key. `403 PERSONAL_KEYS_DISABLED` unless the users collection sets `auth.personalKeys` |
+| `POST` | `/api/auth/keys` | Create a personal key. `403 PERSONAL_KEYS_DISABLED` unless the users table sets `auth.personalKeys` |
 | `DELETE` | `/api/auth/keys/:id` | Revoke one of the caller's own keys |
 | `GET` | `/.well-known/jwks.json` | The public JWKS — mounted at the root, not under `basePath`, because that is where a verifier looks. Mounted whenever the backend mints its own tokens; an empty key set until [asymmetric signing](#asymmetric-tokens-and-jwks) is configured |
 | `POST` | `/api/auth/mfa/enroll` | Start TOTP enrolment (returns the secret and recovery codes) |
@@ -68,7 +68,7 @@ do. See [Roles and scopes](/docs/backend/roles-and-scopes/).
 | `DELETE` | `/api/admin/users/:uid` | Delete one user. Their sessions end, and every access token they hold is refused from that request on |
 | `POST` | `/api/admin/users/:uid/reset-password` | Reset a user's password without their current one. `rebase auth reset-password` calls it, and writes to the database directly only when the backend cannot be reached; either way the account's sessions end |
 | `DELETE` | `/api/admin/users/:uid/mfa` | Remove a user's second factors and recovery codes, and end their sessions — for someone who lost both |
-| `GET` | `/api/admin/roles` | `admin` and the roles the users collection declares, with their scopes |
+| `GET` | `/api/admin/roles` | `admin` and the roles the users table declares, with their scopes |
 | `POST` | `/api/admin/bootstrap` | Let the earliest-registered user claim the admin role while none exists. Refused in production — see [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 
 All data API endpoints require a valid `Authorization: Bearer <token>` header when `requireAuth: true` (the default).
@@ -79,7 +79,7 @@ A new password needs at least 8 characters, with an upper-case letter, a
 lower-case letter and a digit. Registration, reset and change refuse one that
 fails with `400 WEAK_PASSWORD`, listing each rule it broke, and so does an
 administrator choosing a password: `POST /api/admin/users`, a create on the
-users collection through the data API (`POST /api/data/users`, its `/bulk`, a
+users table through the data API (`POST /api/data/users`, its `/bulk`, a
 socket or MCP write), `PUT /api/admin/users/:uid` and
 `POST /api/admin/users/:uid/reset-password`. On a `/bulk`, the message starts
 `Row <n>: ` (counted from 0), like the bulk's other row errors.
@@ -233,7 +233,7 @@ complete a challenge.
 ### Inviting teammates by email
 
 Invite flows need to turn an email address into a user id, but the `users`
-collection is RLS-protected from the client. Instead of hand-rolling an admin
+table is RLS-protected from the client. Instead of hand-rolling an admin
 server function, opt into the built-in lookup:
 
 ```typescript no-verify

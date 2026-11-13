@@ -57,7 +57,7 @@ export interface AuthAdapter {
   initialize?(): Promise<void>;
   destroy?(): Promise<void>;
 
-  /** Custom user lifecycle hooks (e.g., hash passwords before collection writes) */
+  /** Custom user lifecycle hooks (e.g., hash passwords before users-table writes) */
   prepareUserCreation?(
     values: Record<string, unknown>,
     collectionAuth?: unknown

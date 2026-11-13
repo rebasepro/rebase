@@ -6,7 +6,7 @@ description: Add custom Hono API endpoints alongside your Rebase CRUD routes. Au
 
 ## Overview
 
-Custom functions let you add **arbitrary Hono API routes** alongside Rebase's auto-generated CRUD endpoints. They follow the same **file-based discovery** pattern as collections and cron jobs: drop a TypeScript file in your `functions/` directory, and Rebase mounts it automatically.
+Custom functions let you add **arbitrary Hono API routes** alongside Rebase's auto-generated CRUD endpoints. They follow the same **file-based discovery** pattern as cron jobs: drop a TypeScript file in your `functions/` directory, and Rebase mounts it automatically.
 
 Use custom functions for:
 
@@ -349,15 +349,15 @@ export default defineFunction((app, { rebase }) => {
 | **Runs as**         | The caller (`uid`, their roles)                | `{ uid: "service", roles: ["admin"] }`                            |
 | **RLS enforcement** | ✅ Yes (evaluated against the caller)          | ✅ Yes (evaluated against the service identity)                   |
 | **Ideal for...**    | General user CRUD, search, and queries          | Background jobs, system triggers, webhooks                        |
-| **API style**       | Driver-level methods (`fetchCollection`, `save`) | Fluent collection accessors (`rebase.dataAsAdmin.jobs.find`) |
+| **API style**       | Driver-level methods (`fetchCollection`, `save`) | Fluent table accessors (`rebase.dataAsAdmin.jobs.find`) |
 
 #### What `dataAsAdmin` is, precisely
 
 `rebase.dataAsAdmin` is **admin-scoped, not RLS-bypassing**. The driver is scoped once, at boot, with `withAuth({ uid: "service", roles: ["admin"] })`, so every read and write runs inside a transaction that has switched to the restricted `rebase_user` role with `app.uid = 'service'`. Your policies are evaluated — against that identity.
 
-For most projects the distinction never surfaces, because the default policies Rebase injects onto every collection admit `serverContext() OR rolesOverlap(['admin'])`, and the service identity clears the second arm. It surfaces the moment you write your own policies:
+For most projects the distinction never surfaces, because the default policies Rebase injects onto every table admit `serverContext() OR rolesOverlap(['admin'])`, and the service identity clears the second arm. It surfaces the moment you write your own policies:
 
-- **`policy.serverContext()` is false for it.** That helper compiles to `rebase.uid() IS NULL`, and this accessor's `uid` is `'service'`. A collection with `disableDefaultPolicies: true` whose only write rule is `serverContext()` will refuse a `dataAsAdmin` write with Postgres error `42501`, and a read against such a collection returns **zero rows with HTTP 200** — the silent direction. Write `rolesOverlap(["admin"])` (or add it alongside) when you mean "my backend".
+- **`policy.serverContext()` is false for it.** That helper compiles to `rebase.uid() IS NULL`, and this accessor's `uid` is `'service'`. A table with `disableDefaultPolicies: true` whose only write rule is `serverContext()` will refuse a `dataAsAdmin` write with Postgres error `42501`, and a read against such a collection returns **zero rows with HTTP 200** — the silent direction. Write `rolesOverlap(["admin"])` (or add it alongside) when you mean "my backend".
 - **Its reach equals an `admin` user's reach.** Granting the `admin` role to an application user grants them exactly the rows this accessor sees. It is not a private channel.
 
 ### 3. `getSql(c)` — SQL as the caller
@@ -379,7 +379,7 @@ export default defineFunction((app) => {
 });
 ```
 
-The statement runs in the caller's own transaction, as the restricted `rebase_user` role with their identity — the transaction the user-scoped driver opens — so your collections' security rules decide every row, exactly as they do for the SDK. A query that asks for every row gets the caller's.
+The statement runs in the caller's own transaction, as the restricted `rebase_user` role with their identity — the transaction the user-scoped driver opens — so your tables' `rls` rules decide every row, exactly as they do for the SDK. A query that asks for every row gets the caller's.
 
 - **Read-only by default.** Pass `{ write: true }` to insert, update or delete; the insert and update policies still apply.
 - **The query text is yours; values go in `params`** (`$1`, `$2`, …). The caller's identity lives in transaction settings, which SQL can change, so a statement that could — `SET`, `RESET`, `set_config`, `pg_settings`, `DO`, more than one statement — is refused with `400 SQL_NOT_ALLOWED` before it runs. Interpolating user input into the text is how that guard would be tested; don't.
@@ -493,7 +493,7 @@ Custom functions are loaded and mounted **after** `initializeRebaseBackend()` co
 1. **Bootstrappers** — Database connections, auth tables, realtime services
 2. **Auth routes** — `/api/auth/*`, `/api/admin/*`
 3. **Storage routes** — `/api/storage/*`
-4. **Data routes** — `/api/data/*` (CRUD for collections)
+4. **Data routes** — `/api/data/*` (CRUD for tables)
 5. **Custom functions** ← `/api/functions/*`
 6. **Cron jobs** — `/api/admin/cron/*`
 7. **WebSocket** — Realtime subscriptions

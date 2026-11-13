@@ -160,7 +160,7 @@ schema is not one anybody designed.
 In a
 [custom server](/docs/backend/custom-server/), the same decision is the
 `provision` option of `createRebaseBackend`: `true` in the process that owns the
-schema, and `{ collections: false, realtime: false }` in every other one, which
+schema, and `{ tables: false, realtime: false }` in every other one, which
 still keeps the framework's own tables. `REBASE_MIGRATE_ON_BOOT=none` turns the
 table schema off there as well. Background work is decided the same way:
 a process that never calls `start()` runs no cron scheduler and no job workers,
@@ -300,7 +300,7 @@ database. Every other process computes its own from the tables it loaded and
 compares. On a disagreement it says so, naming both:
 
 ```
-⚠️ [schema] The database was last provisioned from a different set of collections
+⚠️ [schema] The database was last provisioned from a different set of tables
    than this process was built from (database v2:6f2a…, this process v2:91cd…).
 ```
 

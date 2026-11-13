@@ -33,9 +33,9 @@ rebase db push
 `--database-url <url>` names the database, and `--docker` the compose one, started
 if needed. `generate`, `migrate`, `branch`, `backup` and `restore` take both too.
 
-It leaves alone what your collections do not describe: other tables and views,
-indexes you wrote, and the CHECK and EXCLUDE constraints on a collection's
-table, which a collection cannot declare. See
+It leaves alone what your table declarations do not describe: other tables and
+views, indexes you wrote, and the CHECK and EXCLUDE constraints on a declared
+table, which a declaration cannot express. See
 [`rebase db push`](/docs/cli/schema/#rebase-db-push) for what it applies and
 what it stops before.
 
@@ -78,7 +78,7 @@ records migrations.
 
 After that, `db migrate` applies what boot has not, and on a database
 `rebase dev` serves that is less than it looks. Boot adds each new table,
-column and enum value as soon as a collection changes, so by the time
+column and enum value as soon as a table's declaration changes, so by the time
 `db generate` writes the migration that adds a column, the column is already
 there: that `db migrate` stops on `already exists` again and names the
 `--baseline <version>` that records it. Every new property means another

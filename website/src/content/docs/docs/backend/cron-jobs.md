@@ -87,7 +87,7 @@ That's it. Rebase will:
 
 ### Cron jobs as values
 
-`crons` takes the jobs as a record from job id to definition, beside `collections`. A directory is one way to build it: `loadCrons(dir)` reads one into exactly that shape.
+`crons` takes the jobs as a record from job id to definition, beside `tables`. A directory is one way to build it: `loadCrons(dir)` reads one into exactly that shape.
 
 ```typescript
 import path from "path";
@@ -233,7 +233,7 @@ per tick — invisible, because every run is already recorded as failed.
 It was a second name for `ctx.rebase`, and its type re-exposed `client.data` —
 the alias `RebaseServerClient` deliberately omits so that the privileged plane
 has exactly one name. A reader who learned `client.data` here carried it into a
-collection callback, where `context.data` is the *user-scoped* plane: same
+table hook, where `context.data` is the *user-scoped* plane: same
 spelling, opposite privilege. Use `ctx.rebase.dataAsAdmin`.
 :::
 
@@ -250,7 +250,7 @@ rebase_user` with `app.uid = 'service'`, and **your policies are evaluated** —
 against that identity. It clears the built-in default policies through their
 `rolesOverlap(['admin'])` arm, which is why the difference rarely shows. It
 shows when you write your own: `policy.serverContext()` compiles to
-`rebase.uid() IS NULL` and is therefore **false** here, so a collection with
+`rebase.uid() IS NULL` and is therefore **false** here, so a table with
 `disableDefaultPolicies: true` whose only rule is `serverContext()` denies these
 writes and returns zero rows — HTTP 200, empty — for these reads.
 
@@ -416,7 +416,7 @@ CREATE TABLE IF NOT EXISTS rebase.cron_job_state (
 ```
 
 Each is created on boot if it is missing, so a database that predates one gains
-it on its next deploy. None of them is a collection, and the end-user role
+it on its next deploy. None of them is a declared table, and the end-user role
 `rebase_user` has no privilege on any of them: a writable `cron_job_state` would
 let a signed-in user pause a job for everyone, or hold its lease so that nothing
 runs it.

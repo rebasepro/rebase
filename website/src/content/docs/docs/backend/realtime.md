@@ -185,7 +185,7 @@ update is now the debounce window.
 
 ### The refetch is the REST read
 
-The refetch runs the same pipeline `GET /api/data/<collection>` runs, with the
+The refetch runs the same pipeline `GET /api/data/<table>` runs, with the
 same `include` handling. That is what makes `find({ q })` and `listen({ q })`
 return rows that are equal field for field.
 

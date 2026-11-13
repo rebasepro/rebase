@@ -82,7 +82,7 @@ import { createRebaseBackend, installUnhandledRejectionHandler, setDefaultBacken
 installUnhandledRejectionHandler();
 const backend = await createRebaseBackend({
     ...options,
-    // `false` or `{ collections: false, realtime: false }` in the cases
+    // `false` or `{ tables: false, realtime: false }` in the cases
     // the `provision` section below lists.
     provision: true
 });
@@ -246,7 +246,7 @@ Creating a backend can run DDL, so `createRebaseBackend` asks you to decide:
 |---|---|---|
 | `true` | Everything the backend serves: the declared tables and their RLS policies, change capture for realtime, the role requests run as, and the framework's own tables (API keys, cron runs, jobs, metrics). | a single-process deployment; what `initializeRebaseBackend` passes |
 | `false` | Nothing, at boot or later: the tables other backends make on first use (idempotency keys, cron claims) are not made either. The schema must already be there, applied by `rebase db push`, a migration, or another process. Missing auth tables refuse at boot; a missing optional table turns its feature off, named in the log. | a script, a test, a REPL, a process that only reads, a database only your change process may change |
-| `{ collections: false, realtime: false }` | The framework's tables and the role, but not the declared tables' schema or change capture. The key keeps its old name. | a process that does not own the schema in a split deployment |
+| `{ tables: false, realtime: false }` | The framework's tables and the role, but not the declared tables' schema or change capture. | a process that does not own the schema in a split deployment |
 
 It is an option rather than a later step on purpose. The driver reads the
 tables as it opens, and attaches change capture to the ones that exist then.

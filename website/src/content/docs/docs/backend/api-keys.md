@@ -86,7 +86,7 @@ A request made with a key passes two checks, and both must allow it:
    match it.
 
 So a key holding `data:read` can still get empty results. That is RLS working,
-not a bug. Grant the `service` role in the collection's security rules, or give
+not a bug. Grant the `service` role in the table's `rls` rules, or give
 the key the `admin` role.
 
 #### A service key reads zero rows until a rule grants `service`
@@ -124,7 +124,7 @@ rls: [
 #### The `admin` role
 
 `roles: ["admin"]` (`--roles admin` on the CLI) makes the key run as the `admin`
-RLS role too, so it clears the default admin policies of every collection that
+RLS role too, so it clears the default admin policies of every table that
 keeps them. Those policies cover `SELECT`, `INSERT`, `UPDATE` and `DELETE`, so
 row-level security does not limit the key's reads, writes or deletes: it can
 read, change and delete every row its scopes reach. The role also passes the
@@ -241,13 +241,13 @@ route answers `403 PERSONAL_KEYS_DISABLED`.
 
 ### Data
 
-`data:read`, `data:write` and `data:delete`, plain or narrowed to one collection
+`data:read`, `data:write` and `data:delete`, plain or narrowed to one table
 (`data:read:posts`). The operation comes from the HTTP method: `GET`, `HEAD`
 and `OPTIONS` read, `POST`, `PUT` and `PATCH` write, `DELETE` deletes.
 `POST /api/data/:slug/bulk/delete` counts as a delete, although it is a `POST`.
 
-On a nested path, the operation is checked against the collection the path ends
-at, and each collection it passes through needs `data:read`. A key holding
+On a nested path, the operation is checked against the table the path ends
+at, and each table it passes through needs `data:read`. A key holding
 `data:read:posts` alone is refused `/api/data/authors/1/posts` until it can also
 read `authors`.
 
@@ -286,7 +286,7 @@ keys as a person holding `keys:write`, or with the service key.
 ### Realtime
 
 A key authenticates the WebSocket too: send it in the `AUTHENTICATE` message.
-Fetches and subscriptions need `data:read` on their collection, saves
+Fetches and subscriptions need `data:read` on their table, saves
 `data:write`, deletes `data:delete`. A subscription to a nested path needs the
 plain scope. Channels (broadcast and presence) are refused for keys. The SQL
 editor and branch messages need `database:read` or `database:write`.
@@ -310,7 +310,7 @@ Every key is checked against whoever creates it, the same way on both routes:
 | Refusal | When |
 |---|---|
 | `400 INVALID_SCOPES` | A scope is malformed, unknown, or carries a target it does not take. `details.validScopes` lists the scopes a key may hold. It leaves out `keys:*`, which no key can hold |
-| `400 UNKNOWN_SCOPE_TARGET` | A target names a collection, storage source or function this backend does not serve |
+| `400 UNKNOWN_SCOPE_TARGET` | A target names a table, storage source or function this backend does not serve |
 | `400 KEY_MANAGEMENT_SCOPE` | `keys:read` or `keys:write` was asked for |
 | `403 SCOPE_EXCEEDS_CREATOR` | A scope the creator does not hold. A key never holds more than the account that made it |
 | `403 ROLE_EXCEEDS_CREATOR` | A service-key role the creator does not hold, when the creator is not an admin |
