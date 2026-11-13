@@ -575,6 +575,40 @@ describe("a component path written in a shared module", () => {
     }, 120_000);
 });
 
+describe("admin hands that destructure ({ entity })", () => {
+    it("are rewritten to ({ row, id }) where they read only entity.values / entity.id, and listed otherwise", async () => {
+        const dir = materialize("blog");
+        const posts = path.join(dir, "config", "collections", "posts.ts");
+        fs.writeFileSync(posts, fs.readFileSync(posts, "utf8").replace("onClick: ({ id }) => notify(`published ${id}`)", "onClick: ({ entity }) => notify(`published ${entity.id}: ${String(entity.values.title)}`)"));
+        fs.mkdirSync(path.join(dir, "frontend", "src", "views"), { recursive: true });
+        fs.writeFileSync(path.join(dir, "frontend", "src", "views", "PostStats.tsx"), [
+            "import type { EntityCustomViewParams } from \"@rebasepro/cms\";",
+            "",
+            "export function PostStats({ entity, formContext }: EntityCustomViewParams) {",
+            "    return `${String(entity.values.title)} ${entity.id} ${String(formContext)}`;",
+            "}",
+            "",
+            "export const PostPath = ({ entity }: EntityCustomViewParams) => describe(entity);",
+            "",
+            "function describe(value: unknown): string {",
+            "    return String(value);",
+            "}",
+            ""
+        ].join("\n"));
+        const report = await run(dir, { dryRun: true });
+        expect(report.refusals).toEqual([]);
+        const view = report.files.find(file => file.path === "frontend/src/views/PostStats.tsx")?.content ?? "";
+        expect(view).toContain("export function PostStats({ row, id, formContext }: EntityCustomViewParams) {");
+        expect(view).toContain("return `${String(row.title)} ${id} ${String(formContext)}`;");
+        expect(view).toContain("export const PostPath = ({ entity }: EntityCustomViewParams) => describe(entity);");
+        const cms = report.files.find(file => file.path === "frontend/src/cms/posts.tsx")?.content ?? "";
+        expect(cms).toContain("({ row, id }) => notify(`published ${id}: ${String(row.title)}`)");
+        const step = report.manualSteps.find(entry => entry.title === "Make the admin hands row-shaped");
+        expect(step?.detail).toContain("frontend/src/views/PostStats.tsx:7");
+        expect(step?.detail).not.toContain("PostStats.tsx:3");
+    }, 120_000);
+});
+
 describe("an additional field named in a column list", () => {
     it("is written `\"key\" as AdditionalFieldKey`, the spelling the column types require, in a customization", async () => {
         const dir = materialize("blog");

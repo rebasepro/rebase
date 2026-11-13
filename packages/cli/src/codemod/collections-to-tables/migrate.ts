@@ -28,6 +28,7 @@ import { planCustomizations, printCmsIndex } from "./customization";
 import { planFirestoreCollection } from "./firestore";
 import { findSplitConstants, planSplitConstants } from "./split-constants";
 import { rewriteSdkCalls } from "./sdk-calls";
+import { planRowShapedHands } from "./row-hands";
 import { refreshSkillsStep } from "./skills-step";
 import { Journal } from "./journal";
 import { createSchemaModuleImporter } from "../../utils/import-schema-module";
@@ -555,6 +556,8 @@ async function migrateWithShims(options: MigrateOptions, shimDir: ShimDir): Prom
         report.sdk = sdk.report;
         plan.manualSteps.push(...sdk.report.manualSteps);
     }
+    // Views, actions, display resolvers and additional fields destructuring `({ entity })`: row-shaped on 0.31.
+    if (frontendDir) planRowShapedHands(plan, frontendDir);
     tableUseSteps(plan, tableBindings, file => plan.files.get(file)?.content ?? fs.readFileSync(file, "utf8"));
 
     // Code that still reads what config/ loses, in a way no import rewrite fixes: names the index stopped exporting, config/collections read as files.
