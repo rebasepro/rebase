@@ -88,8 +88,8 @@ describe("applyDefaultValuesOnCreate", () => {
     });
 
     it("returns the values untouched when there are no properties", () => {
-        // Deliberately invalid: the guard under test must accept missing properties, which the signature excludes.
-        expect(applyDefaultValuesOnCreate({ a: 1 }, undefined as never)).toEqual({ a: 1 });
+        // @ts-expect-error the guard under test must accept missing properties, which the signature excludes
+        expect(applyDefaultValuesOnCreate({ a: 1 }, undefined)).toEqual({ a: 1 });
     });
 
     it("honours a falsy declared default", () => {

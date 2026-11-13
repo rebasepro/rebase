@@ -29,8 +29,8 @@ describe("getTableName", () => {
     });
 
     it("falls back to the name when there is no slug either", () => {
-        // Deliberately invalid: a collection without a slug, which the type requires, is the fallback under test.
-        expect(getTableName({ name: "Todo Items", properties: {} } as never))
+        // @ts-expect-error a collection without a slug, which the type requires, is the fallback under test
+        expect(getTableName({ name: "Todo Items", properties: {} }))
             .toBe("todo_items");
     });
 });

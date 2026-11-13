@@ -1,4 +1,4 @@
-import type { CollectionConfig, EnumValueConfig, StringProperty } from "@rebasepro/cms-types";
+import type { CollectionConfig, EnumValueConfig, EnumValues, StringProperty } from "@rebasepro/cms-types";
 import { resolvePropertyEnum, enumToObjectEntries, CollectionRegistry } from "@rebasepro/cms-types";
 
 /**
@@ -9,10 +9,15 @@ import { resolvePropertyEnum, enumToObjectEntries, CollectionRegistry } from "@r
  * every entry for `{ id, label }`, found neither on a string, and filtered the
  * dropdown down to nothing. Three readers of one field, one of them empty.
  */
+/** A bare list of values as `EnumValues`, the type it is not. */
+function bareList(values: string[]): EnumValues {
+    // @ts-expect-error a bare string list is outside `EnumValues`; the admin reads it all the same
+    return values;
+}
+
 describe("a string-array enum reaches the admin as its values", () => {
     // What a JS config hands over: the type does not describe it, the runtime gets it.
-    // Deliberately invalid, then: a bare string list is outside `EnumValues`.
-    const plain = ["draft", "published", "archived"] as never;
+    const plain: EnumValues = bareList(["draft", "published", "archived"]);
     const expected = [
         { id: "draft", label: "draft" },
         { id: "published", label: "published" },

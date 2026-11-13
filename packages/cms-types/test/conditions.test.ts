@@ -386,8 +386,8 @@ name: "Editor" }]
 createdAt: now },
                 path: "products",
                 entityId: "123",
-                // Deliberately invalid: object roles are the legacy shape, outside `User.roles`, that the code normalises.
-                authController: mockAuthController as never
+                // @ts-expect-error object roles are the legacy shape, outside `User.roles`, that the code normalises
+                authController: mockAuthController
             });
 
             expect(context.values.createdAt).toBe(now.getTime());
@@ -430,8 +430,8 @@ name: "Editor" }]
             const context = buildConditionContext({
                 path: "products",
                 entityId: "123",
-                // Deliberately invalid: object roles are the legacy shape, outside `User.roles`, that the code normalises.
-                authController: mockAuthController as never
+                // @ts-expect-error object roles are the legacy shape, outside `User.roles`, that the code normalises
+                authController: mockAuthController
             });
 
             // Roles are mapped from Role.id

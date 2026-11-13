@@ -13,8 +13,8 @@ label: "String" }
 
         it("should return undefined for null or undefined key", () => {
             expect(getLabelOrConfigFrom(enumValues, undefined)).toBeUndefined();
-            // Deliberately invalid: a stored null key, which the signature excludes, must find nothing.
-            expect(getLabelOrConfigFrom(enumValues, null as never)).toBeUndefined();
+            // @ts-expect-error a stored null key, which the signature excludes, must find nothing
+            expect(getLabelOrConfigFrom(enumValues, null)).toBeUndefined();
         });
 
         it("should find by string matching", () => {

@@ -83,8 +83,8 @@ describe("resolveRelation — defaults", () => {
     it("reports an unresolvable target instead of dropping the relation", () => {
         // The old resolver wrapped every relation in a try/catch and silently
         // omitted whatever it could not work out.
-        // Deliberately invalid: a thunk returning undefined is what the error under test reports.
-        expect(() => resolveRelation({ kind: "hasMany", relationName: "x", target: (() => undefined) as never }, posts))
+        // @ts-expect-error a thunk returning undefined is what the error under test reports
+        expect(() => resolveRelation({ kind: "hasMany", relationName: "x", target: () => undefined }, posts))
             .toThrow(/resolved to `undefined`/);
     });
 });
@@ -128,8 +128,8 @@ describe("resolveRelation — import cycles", () => {
     it("points at CJS interop when the thunk returns undefined", () => {
         // The other shape: the half-initialised module has no `default` yet, so
         // the thunk returns `undefined` rather than throwing.
-        // Deliberately invalid: the half-initialised module's undefined is what the error under test reports.
-        expect(() => resolveRelation({ kind: "belongsTo", target: (() => undefined) as never }, posts, "promoted_job"))
+        // @ts-expect-error the half-initialised module's undefined is what the error under test reports
+        expect(() => resolveRelation({ kind: "belongsTo", target: () => undefined }, posts, "promoted_job"))
             .toThrow(/'promoted_job' on 'posts'.*resolved to `undefined`.*import cycle/s);
     });
 
@@ -139,9 +139,9 @@ describe("resolveRelation — import cycles", () => {
         // second in a cycle: the namespace object, never replaced with a live
         // binding. The thunk is lazy, so by the time it runs `default` holds the
         // finished collection. Native ESM resolves the same thunk to `tags`.
-        // A loader artifact, not something a collection's type admits: the resolver unwraps it at runtime.
-        const namespace = { __esModule: true, default: tags } as never;
+        const namespace = { __esModule: true, default: tags };
 
+        // @ts-expect-error a loader artifact, not something a collection's type admits: the resolver unwraps it at runtime
         const r = resolveRelation({ kind: "belongsTo", relationName: "tag", target: () => namespace }, posts);
         expect(r).toMatchObject({ kind: "belongsTo", targetSlug: "tags", localKey: "tag_id" });
     });
@@ -152,9 +152,9 @@ describe("resolveRelation — import cycles", () => {
         // all call `target()` again, long after this. Passing the thunk through
         // as written would fix `targetSlug` and leave all of them holding the
         // namespace.
-        // A loader artifact, not something a collection's type admits: the resolver unwraps it at runtime.
-        const namespace = { __esModule: true, default: tags } as never;
+        const namespace = { __esModule: true, default: tags };
 
+        // @ts-expect-error a loader artifact, not something a collection's type admits: the resolver unwraps it at runtime
         const r = resolveRelation({ kind: "belongsTo", relationName: "tag", target: () => namespace }, posts);
         expect(r.target()).toBe(tags);
     });
@@ -168,9 +168,9 @@ describe("resolveRelation — import cycles", () => {
         // Unwrapping is only right because there is one reading of it. A
         // `default` that is not a collection is a genuinely wrong thunk, and has
         // to keep reaching the error.
-        // Deliberately invalid: a namespace whose default is not a collection must reach the error.
-        const namespace = { __esModule: true, default: { notACollection: true } } as never;
+        const namespace = { __esModule: true, default: { notACollection: true } };
 
+        // @ts-expect-error a namespace whose default is not a collection must reach the error
         expect(() => resolveRelation({ kind: "belongsTo", target: () => namespace }, posts, "tag"))
             .toThrow(/'tag' on 'posts'.*not a collection/s);
     });
@@ -179,9 +179,9 @@ describe("resolveRelation — import cycles", () => {
         // `target: () => import("./tags")` — one keystroke from the namespace
         // shape, and the case where "return the binding" is the actual fix
         // rather than a restatement of what the code already does.
-        // Deliberately invalid: a thunk returning a promise is the mistake the error under test names.
-        const target = (() => Promise.resolve(tags)) as never;
+        const target = () => Promise.resolve(tags);
 
+        // @ts-expect-error a thunk returning a promise is the mistake the error under test names
         expect(() => resolveRelation({ kind: "belongsTo", target }, posts, "tag"))
             .toThrow(/returned a promise.*target: \(\) => otherCollection/s);
     });

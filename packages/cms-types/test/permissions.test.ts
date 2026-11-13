@@ -622,11 +622,11 @@ ownerField: "owner_id" } as SecurityRule
             const byEngine = firestoreCollection(ownerRule);
             // `driver` is the deprecated spelling and is not on the Firestore
             // config type at all — which is precisely why it used to leave
-            // `engine` undefined and pick up Postgres capabilities. A cast
-            // is the only way to express the shape a real
-            // 0.12-era config still has on disk. Deliberately invalid, then.
+            // `engine` undefined and pick up Postgres capabilities. Spread into
+            // a variable, the extra key escapes the excess-property check, just
+            // as it does in the 0.12-era config still on disk.
             const byDriver = { ...makeCollection(ownerRule),
-driver: "firestore" } as never;
+driver: "firestore" };
             expect(canEditEntity(byEngine, auth, "products", entity))
                 .toBe(canEditEntity(byDriver, auth, "products", entity));
         });

@@ -130,8 +130,8 @@ roles: ["author"] }
 
     test("8. Unknown operation name in rule is silently ignored", () => {
         const collection = createMockCollection([
-            // Deliberately invalid: "read" is not an operation, and the check under test must ignore the rule.
-            { operation: "read" as never,
+            // @ts-expect-error "read" is not an operation, and the check under test must ignore the rule
+            { operation: "read",
 access: "public" } // "read" not a valid op
         ]);
         // "read" does not match "select", so it is never applied → denied

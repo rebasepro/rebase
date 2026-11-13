@@ -77,10 +77,10 @@ defaultValue: "draft" } as Property)).toBe("draft");
     it("allows null as defaultValue", () => {
         // `StringProperty["defaultValue"]` is `string | undefined`; the point of
         // this case is that an explicit null survives rather than being replaced.
-        // Deliberately invalid, then: the null a stored config can hold is outside the type.
         expect(getDefaultValueFor({ type: "string",
 name: "Status",
-defaultValue: null } as never)).toBeNull();
+            // @ts-expect-error the null a stored config can hold is outside the type
+            defaultValue: null })).toBeNull();
     });
 
     it("returns default values for map with nested properties", () => {
@@ -121,8 +121,8 @@ name: "Tags" } as Property
     });
 
     it("returns empty object for null/undefined", () => {
-        // Deliberately invalid: the guard under test must accept missing properties, which the signature excludes.
-        expect(getDefaultValuesFor(undefined as never)).toEqual({});
+        // @ts-expect-error the guard under test must accept missing properties, which the signature excludes
+        expect(getDefaultValuesFor(undefined)).toEqual({});
     });
 
     /**
@@ -324,8 +324,8 @@ name: "Tag" } as Property
 name: "Name" } as Property
         };
         const result = traverseValuesProperties(
-            // Deliberately invalid: the guard under test must accept null values, which the signature excludes.
-            null as never,
+            // @ts-expect-error the guard under test must accept null values, which the signature excludes
+            null,
             properties,
             (value) => value ?? "default"
         );

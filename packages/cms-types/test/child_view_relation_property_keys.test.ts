@@ -120,14 +120,14 @@ describe("getChildViewRelationPropertyKeys", () => {
     });
 
     it("claims nothing on an engine without relations", () => {
-        // Deliberately invalid: Firestore properties exclude relations (not even comparable), and the guard under test must ignore one.
         const docs: CollectionConfig = {
             slug: "docs", name: "Docs", engine: "firestore",
             properties: {
                 id: { type: "string" },
+                // @ts-expect-error Firestore properties exclude relations, and the guard under test must ignore one
                 related: { type: "relation", relation: { kind: "hasMany", target: () => applications, foreignKeyOnTarget: "doc_id" } }
             }
-        } as never;
+        };
 
         expect(getChildViewRelationPropertyKeys(docs).size).toBe(0);
     });

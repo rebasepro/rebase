@@ -154,8 +154,8 @@ color: "red" }
 
     it("returns undefined for non-object/non-array input", () => {
         // Edge case: string passed as enum (shouldn't happen but defensive)
-        // Deliberately invalid: the guard under test must refuse a bare string, which the signature excludes.
-        expect(resolveEnumValues("invalid" as never)).toBeUndefined();
+        // @ts-expect-error the guard under test must refuse a bare string, which the signature excludes
+        expect(resolveEnumValues("invalid")).toBeUndefined();
     });
 });
 
@@ -200,8 +200,8 @@ describe("getSubcollections", () => {
             slug: "posts",
             table: "posts",
             properties: {},
-            // Deliberately invalid: the builder may return nothing at runtime, which its type excludes.
-            childCollections: () => undefined as never
+            // @ts-expect-error the builder may return nothing at runtime, which its type excludes
+            childCollections: () => undefined
         };
         const result = getSubcollections(collection);
         expect(result).toEqual([]);

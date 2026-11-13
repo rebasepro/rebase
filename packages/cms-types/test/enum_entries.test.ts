@@ -28,8 +28,9 @@ color: "green" },
 color: "red" }
             };
             // The values lack `id` on purpose — supplying it is what this
-            // function does — so the fixture cannot be a well-typed `EnumValues`. Deliberately invalid, then.
-            const result = enumToObjectEntries(obj as never);
+            // function does — so the fixture cannot be a well-typed `EnumValues`.
+            // @ts-expect-error entries without `id` are outside `EnumValues`
+            const result = enumToObjectEntries(obj);
             expect(result).toEqual([
                 { id: "start",
 label: "Start",
