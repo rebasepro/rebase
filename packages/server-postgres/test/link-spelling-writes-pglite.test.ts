@@ -3,8 +3,8 @@
  * the driver judges it as one (SEC-FIX-3 D-1): the create stamps an update
  * drops, the user stamp a create sets, the key an update may not move — on a
  * real Postgres (PGlite), through the driver every door reaches, and the
- * in-process SDK's write check, which a caller-scoped driver arms with the
- * column write rules.
+ * in-process SDK, whose link spelling does exactly what its column spelling
+ * does.
  *
  * Before: `PATCH { creator: victim }` reattributed a row whose `createdBy` an
  * update cannot touch, because the stamps judged the column's name only and
@@ -14,7 +14,6 @@ import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { col, defineTable, rel } from "@rebasepro/types";
 import { buildSdkData, compileSchema } from "@rebasepro/common";
-import { assertColumnWriteRules } from "@rebasepro/server";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
@@ -34,12 +33,14 @@ const docs = defineTable("docs", {
         title: col.text(),
         createdBy: col.text().onCreateUser(),
         reviewerId: col.text().readOnly(),
-        approverId: col.text().access({ write: ["admin"] })
+        approverId: col.text().access({ write: ["admin"] }),
+        informantId: col.text().private()
     },
     relations: {
         creator: rel.belongsTo(() => people, { localKey: "created_by" }),
         reviewer: rel.belongsTo(() => people, { localKey: "reviewer_id" }),
-        approver: rel.belongsTo(() => people, { localKey: "approver_id" })
+        approver: rel.belongsTo(() => people, { localKey: "approver_id" }),
+        informant: rel.belongsTo(() => people, { localKey: "informant_id" })
     },
     rls: "admin-only"
 });
@@ -139,47 +140,33 @@ describe("a link written by name is its key column to the driver", () => {
     });
 });
 
-describe("the in-process SDK's write check (what a caller-scoped driver arms)", () => {
-    const callerSdk = (roles: string[]) => buildSdkData(driver, {
-        checkWrite: (slug, values) => {
-            const table = registry.getTable(slug)?.descriptor;
-            if (table) assertColumnWriteRules(values, table, { viewer: { roles }, relatedTables: target => registry.getTable(target)?.descriptor });
-        }
-    });
+/**
+ * The in-process door, per rule, so it cannot drift (SEC-FIX-3, aligned with
+ * `main`): the API boundary's column rules — `.readOnly()`, `access.write`,
+ * `.private()` — are not the in-process SDK's (it is the project's own server
+ * code, on `main` as before this change); the identity rules — the create
+ * stamps, key immutability (above), the tenant (e2e) — are the driver's, on
+ * every door. Whatever a rule does to the column's own name, it does to the
+ * link's.
+ */
+describe("the in-process SDK: a link name ≡ its key column, rule by rule", () => {
+    const sdk = () => buildSdkData(driver).table("docs");
+    const column = async (sql: string) => (await stored(`SELECT ${sql} AS value FROM docs WHERE id = 1`))[0]?.value;
 
     it.each([
-        ["update", (sdk: ReturnType<typeof callerSdk>) => sdk.table("docs").update(1, { reviewer: "victim" })],
-        ["create", (sdk: ReturnType<typeof callerSdk>) => sdk.table("docs").create({ title: "x", reviewerId: "victim" })],
-        ["createMany", (sdk: ReturnType<typeof callerSdk>) => sdk.table("docs").createMany?.([{ title: "x", reviewer: "victim" }])],
-        ["updateMany", (sdk: ReturnType<typeof callerSdk>) => sdk.table("docs").updateMany?.([{ id: 1, data: { reviewer: "victim" } }])],
-        ["updateWhere", (sdk: ReturnType<typeof callerSdk>) => sdk.table("docs").updateWhere?.({ where: { id: ["==", 1] } }, { reviewer: "victim" })],
-        ["batch", (sdk: ReturnType<typeof callerSdk>) => sdk.batch([{ op: "update", table: "docs", id: 1, values: { reviewer: "victim" } }])]
-    ])("refuses a closed key by its link on %s, and writes nothing", async (_door, write) => {
-        const before = await stored("SELECT id, reviewer_id FROM docs ORDER BY id");
-        let caught: unknown;
-        try {
-            await write(callerSdk(["editor"]));
-        } catch (error) {
-            caught = error;
-        }
-        expect(refusal(caught).code).toBe("VALIDATION_EXCLUDED_FIELDS");
-        expect(await stored("SELECT id, reviewer_id FROM docs ORDER BY id")).toEqual(before);
+        [".readOnly()", "reviewerId", "reviewer", "reviewer_id"],
+        ["access.write", "approverId", "approver", "approver_id"],
+        [".private()", "informantId", "informant", "informant_id"]
+    ])("%s is an API-boundary rule: both spellings write in process, alike", async (_rule, key, link, sql) => {
+        await sdk().update(1, { [key]: "u1" });
+        expect(await column(sql)).toBe("u1");
+        await sdk().update(1, { [link]: "u2" });
+        expect(await column(sql)).toBe("u2");
     });
 
-    it("answers a role-closed key as the column does, and admits the role", async () => {
-        let caught: unknown;
-        try {
-            await callerSdk(["editor"]).table("docs").update(1, { approver: "victim" });
-        } catch (error) {
-            caught = error;
-        }
-        expect(refusal(caught).code).toBe("FIELD_NOT_WRITABLE");
-        await callerSdk(["admin"]).table("docs").update(1, { approver: "victim" });
-        expect(await stored("SELECT approver_id FROM docs WHERE id = 1")).toEqual([{ approver_id: "victim" }]);
-    });
-
-    it("leaves the trusted plane (no check) alone", async () => {
-        await buildSdkData(driver).table("docs").update(1, { reviewer: "u2" });
-        expect(await stored("SELECT reviewer_id FROM docs WHERE id = 1")).toEqual([{ reviewer_id: "u2" }]);
+    it("an `.onCreateUser()` stamp is an identity rule: an update drops both spellings", async () => {
+        await sdk().update(1, { createdBy: "victim" });
+        await sdk().update(1, { creator: "victim" });
+        expect(await column("created_by")).toBe("author");
     });
 });

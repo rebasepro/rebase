@@ -353,9 +353,10 @@ function assertFieldOpsReadable(
  * server's stamps, the tenant and the key are the driver's to judge (it folds
  * a link onto its key column before them).
  *
- * The part of {@link assertKnownWriteFields} that is not about unknown keys:
- * the in-process SDK on a caller's driver asks this alone, since the driver
- * refuses a key no column answers to on its own.
+ * The part of {@link assertKnownWriteFields} that is not about unknown keys —
+ * the API boundary's column rules (REST, socket, MCP, `_batch`, history
+ * revert). The in-process SDK is server code and is not held to them; the
+ * identity rules (stamps, tenant, key) are the driver's, on every door.
  */
 export function assertColumnWriteRules(
     values: Record<string, unknown>,

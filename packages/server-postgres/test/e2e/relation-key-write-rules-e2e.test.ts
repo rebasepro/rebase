@@ -16,7 +16,9 @@
  * `belongsTo` bound to it, a to-one `via`, a `_pivot` field under
  * `strictWrites: false`) × rules (`.readOnly()`, `access.write`, `.private()`,
  * an `.onCreateUser()` stamp, the tenant) — every cell refuses or ignores
- * exactly as the column's own name does.
+ * exactly as the column's own name does on that door. The in-process SDK is
+ * server code: the API boundary's column rules are not its (as on `main`), the
+ * identity rules (stamps, tenant, key) are.
  *
  * Requires Docker.
  */
@@ -308,18 +310,6 @@ describe("a relation write from the parent is held to the child key's rules (E2E
             } catch (error) {
                 return mcpCode(error);
             }
-        },
-        "in-process SDK as the caller": async (who, values) => {
-            const driver = backend.driver;
-            if (!(driver instanceof PostgresBackendDriver)) throw new Error("not postgres");
-            const caller = callers[who];
-            const scoped = await driver.withAuth(testUser(caller.uid, caller.roles, { claims: caller.claims }));
-            try {
-                await scoped.data.table("docs").update(1, values);
-                return undefined;
-            } catch (error) {
-                return errorCode(error) ?? (error instanceof Error ? error.message : String(error));
-            }
         }
     };
 
@@ -342,11 +332,50 @@ describe("a relation write from the parent is held to the child key's rules (E2E
         });
     });
 
-    it("a caller the key's access.write admits writes the link (REST and the in-process SDK)", async () => {
+    it("a caller the key's access.write admits writes the link", async () => {
         expect(await doors["REST PATCH"]("moderator", { approver: "r2" })).toBeUndefined();
         expect((await docRow()).approver_id).toBe("r2");
-        expect(await doors["in-process SDK as the caller"]("moderator", { approver: "r1" })).toBeUndefined();
+        expect(await doors["REST PATCH"]("moderator", { approver: "r1" })).toBeUndefined();
         expect((await docRow()).approver_id).toBe("r1");
+    });
+
+    /** The in-process SDK on a caller-scoped driver (a hook's `context.data`), as `who`. */
+    async function sdkWrite(who: keyof typeof callers, path: string, id: number, values: Row): Promise<string | undefined> {
+        const driver = backend.driver;
+        if (!(driver instanceof PostgresBackendDriver)) throw new Error("not postgres");
+        const caller = callers[who];
+        const scoped = await driver.withAuth(testUser(caller.uid, caller.roles, { claims: caller.claims }));
+        try {
+            await scoped.data.table(path).update(id, values);
+            return undefined;
+        } catch (error) {
+            return errorCode(error) ?? (error instanceof Error ? error.message : String(error));
+        }
+    }
+
+    describe("the in-process SDK as the caller: a link name ≡ its key column, rule by rule", () => {
+        it.each([
+            [".readOnly()", "reviewerId", "reviewer", "reviewer_id"],
+            ["access.write", "approverId", "approver", "approver_id"],
+            [".private()", "informantId", "informant", "informant_id"]
+        ])("%s is an API-boundary rule, not the SDK's: both spellings write, alike", async (_rule, column, link, sql) => {
+            expect(await sdkWrite("editor", "docs", 1, { [column]: "r2" })).toBeUndefined();
+            expect((await docRow())[sql]).toBe("r2");
+            expect(await sdkWrite("editor", "docs", 1, { [link]: "r1" })).toBeUndefined();
+            expect((await docRow())[sql]).toBe("r1");
+        });
+
+        it("an update drops a create stamp by either spelling", async () => {
+            expect(await sdkWrite("editor", "docs", 1, { createdBy: "victim" })).toBeUndefined();
+            expect(await sdkWrite("editor", "docs", 1, { creator: "victim" })).toBeUndefined();
+            expect((await docRow()).created_by).toBe("author");
+        });
+
+        it("the tenant stays by either spelling", async () => {
+            expect(await sdkWrite("editor", "memos", 1, { orgId: "b" })).toBe("TENANT_IMMUTABLE");
+            expect(await sdkWrite("editor", "memos", 1, { org: "b" })).toBe("TENANT_IMMUTABLE");
+            expect((await admin.query("SELECT org_id FROM memos WHERE id = 1")).rows[0].org_id).toBe("a");
+        });
     });
 
     it("REST POST and bulk POST refuse a closed key by its link", async () => {

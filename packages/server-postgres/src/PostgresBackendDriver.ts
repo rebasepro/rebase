@@ -51,7 +51,7 @@ import {
 import { sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Client, DatabaseError, Pool, type PoolClient } from "pg";
-import { sqlRows, anonymousWriteRefusedBy, applyCreateDefaults, applyStamps, createStampKeys, hasColumnAccessRules, buildSdkData, callbackRefusal, createAccessorSlugResolver, classifyTable, detectJunctionTables, isSoftDeleteRestore, requireCallbackClient, resolveTenantWrite, stampModifier, tenantOf, toCallbackError, updateStampKeys, type SdkWriteCheck } from "@rebasepro/common";
+import { sqlRows, anonymousWriteRefusedBy, applyCreateDefaults, applyStamps, createStampKeys, hasColumnAccessRules, buildSdkData, callbackRefusal, createAccessorSlugResolver, classifyTable, detectJunctionTables, isSoftDeleteRestore, requireCallbackClient, resolveTenantWrite, stampModifier, tenantOf, toCallbackError, updateStampKeys } from "@rebasepro/common";
 import { PostgresTableRegistry } from "./model/PostgresTableRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues, tableKeys } from "./services/collection-helpers";
 import { isJunctionBackedRelation, isNestedPath, resolveNestedPath, splitPathSegments } from "./services/nested-path";
@@ -62,7 +62,7 @@ import { currentWriteDepth, inWriteFrame, type WriteFrame } from "./services/wri
 import { afterDelete, afterReadOnRow, afterReadOnRows, afterSave, afterSaveError, beforeDeleteVetoes, beforeSave, declaresAnyHook, hasAfterRead, hasBeforeQueryHook, hasBeforeSave, hasRowHook, requireHookTable, resolveTableHooks, type TableHookSet } from "./services/table-hooks";
 import { stripUnreadable } from "./services/row-pipeline";
 import { HistoryService } from "./history/HistoryService";
-import { ApiError, assertColumnWriteRules, logger, resolveBatchRefs } from "@rebasepro/server";
+import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
 import { extractPgError, isRoleSwitchingPermissionError, reachedDatabase } from "./utils/pg-error-utils";
 import { rowsOfResult } from "./utils/result-rows";
 import { applyAuthContext, authContextStatement } from "./security/rls-enforcement";
@@ -187,13 +187,6 @@ export class RoleSwitchUnavailableError extends Error {
         this.pgError = pgError;
     }
 }
-
-/**
- * The uid of the server's own identity (`SERVICE_IDENTITY` in
- * `@rebasepro/server`): what `rebase.dataAsAdmin` and the service key run as.
- * A driver scoped to it is the server speaking, not a caller.
- */
-const SERVICE_UID = "service";
 
 /**
  * Fold what a `beforeSave` returned into the values being saved.
@@ -3469,36 +3462,11 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
     ) {
         this.user = user;
         this.data = buildSdkData(this, {
-            resolveAccessor: createAccessorSlugResolver(() => delegate.registry?.tables()),
-            // `context.data` writes as the caller, so on the caller's terms:
-            // the column write rules every API door applies, by every
-            // spelling (a link by name, a relation that moves another table's
-            // key, a `_pivot` field). The service identity — what
-            // `dataAsAdmin` and a hook nested in one run as — is the server
-            // speaking, and is not held to them.
-            ...(user?.uid === SERVICE_UID ? {} : { checkWrite: this.columnWriteCheck() })
+            resolveAccessor: createAccessorSlugResolver(() => delegate.registry?.tables())
         });
 
         // Delegate admin ops to the base driver (no RLS wrapping for admin)
         this.admin = delegate.admin;
-    }
-
-    /**
-     * The column write rules of this caller, as the in-process SDK asks them
-     * before each write (see `SdkDataOptions.checkWrite`). A table this
-     * driver does not serve is left to the write itself, which refuses it.
-     */
-    private columnWriteCheck(): SdkWriteCheck {
-        const viewer = { roles: this.user?.roles ?? [] };
-        return (slug, values) => {
-            const registry = this.delegate.registry;
-            const table = registry?.getTable(slug)?.descriptor;
-            if (!table) return;
-            assertColumnWriteRules(values, table, {
-                viewer,
-                relatedTables: target => registry?.getTable(target)?.descriptor
-            });
-        };
     }
 
     /**

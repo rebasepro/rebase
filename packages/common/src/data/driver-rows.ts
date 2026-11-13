@@ -89,25 +89,7 @@ export interface DriverTableRowsOptions {
      * they live. Absent: the slug.
      */
     storedPath?: () => string;
-    /**
-     * Asked before every write with the values it would write — a create or
-     * an upsert as `"new"`, an update as `"existing"` — and expected to throw
-     * to refuse it. A caller-scoped server driver passes the column write
-     * rules (`.readOnly()`, `.private()`, `access.write`, by every spelling),
-     * so `context.data` writes on exactly the terms the API does. Absent, the
-     * driver alone judges the write.
-     */
-    checkWrite?: SdkWriteCheck;
 }
-
-/**
- * A check run before an in-process write: the table's slug, the values, and
- * whether they create (`"new"`) or update (`"existing"`) a row. Throws to
- * refuse the write. See {@link DriverTableRowsOptions.checkWrite}.
- *
- * @group Data
- */
-export type SdkWriteCheck = (slug: string, values: Record<string, unknown>, status: "new" | "existing") => void;
 
 /** A driver row, typed as the rows of the table it was read from. */
 function asRow<M extends Record<string, unknown>>(row: Record<string, unknown>): M {
@@ -127,9 +109,6 @@ export function createDriverTableRows<M extends Record<string, unknown> = Record
     options: DriverTableRowsOptions = {}
 ): DriverTableRows<M> {
     const storedPath = options.storedPath ?? (() => slug);
-    const check = (values: object, status: "new" | "existing"): void => {
-        options.checkWrite?.(slug, { ...values }, status);
-    };
 
     /**
      * One page of the table, and its count. `withDeleted: "only"` reads the
@@ -359,13 +338,11 @@ export function createDriverTableRows<M extends Record<string, unknown> = Record
             : undefined,
 
         async create(data: Partial<M>, id?: string | number): Promise<M> {
-            check(data, "new");
             return asRow<M>(await driver.save<M>({ path: storedPath(), values: data, id, status: "new" }));
         },
 
         createMany: driver.saveMany
             ? async (data, createOptions): Promise<M[]> => {
-                for (const row of data) check(row, "new");
                 const rows = await driver.saveMany!<M>({
                     path: storedPath(),
                     rows: data,
@@ -383,7 +360,6 @@ export function createDriverTableRows<M extends Record<string, unknown> = Record
             : undefined,
 
         async update(id: string | number, data: Partial<M>): Promise<M> {
-            check(data, "existing");
             return asRow<M>(await driver.save<M>({ path: storedPath(), values: data, id, status: "existing" }));
         },
 
@@ -400,7 +376,6 @@ export function createDriverTableRows<M extends Record<string, unknown> = Record
         // while looking exactly like it had.
         updateMany: driver.updateMany
             ? async (updates): Promise<M[]> => {
-                for (const update of updates) check(update.data, "existing");
                 const rows = await driver.updateMany!<M>({
                     path: storedPath(),
                     updates: updates.map(u => ({ id: u.id, values: u.data }))
@@ -417,7 +392,6 @@ export function createDriverTableRows<M extends Record<string, unknown> = Record
 
         updateWhere: driver.updateWhere
             ? async (query, data): Promise<M[]> => {
-                check(data, "existing");
                 const rows = await driver.updateWhere!<M>({
                     path: storedPath(),
                     filter: query.where ? deserializeFilter(query.where as Record<string, unknown>) : undefined,

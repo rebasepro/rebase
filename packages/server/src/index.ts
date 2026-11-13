@@ -257,7 +257,7 @@ export * from "./api/errors";
 // The one exception to "route builder stays internal": the sockets in the
 // driver packages are the other request boundary, and this is the rule they
 // have to apply to be that boundary rather than a way around it.
-export { assertColumnWriteRules, assertWriteRequestValid } from "./api/rest/write-validation";
+export { assertWriteRequestValid } from "./api/rest/write-validation";
 // Its read-side twin: a filter, sort or projection over a field the caller may
 // not read is refused at the socket for the reason it is refused at `GET` — it
 // reads the withheld value one predicate at a time.
