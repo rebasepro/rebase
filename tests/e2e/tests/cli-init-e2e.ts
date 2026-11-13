@@ -2,7 +2,7 @@ import { chromium } from "@playwright/test";
 import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
-import { execSync, spawn } from "child_process";
+import { execSync, spawn, spawnSync } from "child_process";
 // The one derivation of what a release ships, shared with the release pipeline
 // itself — see tooling/scripts/publishable-packages.mjs.
 import { publishablePackages } from "../../../tooling/scripts/publishable-packages.mjs";
@@ -652,10 +652,42 @@ export interface PgContainer {
     port: number;
 }
 
+/**
+ * Containers this process started and has not removed yet.
+ *
+ * Each scenario removes its container in a `finally`, which does not run
+ * when the process is ended another way: a `process.exit` before it, Ctrl-C,
+ * a cancelled CI job. The container is detached, so it outlived the run —
+ * two `rebase-test-postgres-*` were found after one failing run. The last
+ * resort below removes whatever is left when the process goes down.
+ */
+const runningContainers = new Set<string>();
+let containerReaperInstalled = false;
+
+function installContainerReaper(): void {
+    if (containerReaperInstalled) return;
+    containerReaperInstalled = true;
+    // `spawnSync`: an `exit` handler cannot await.
+    const reap = () => {
+        for (const name of runningContainers) spawnSync("docker", ["rm", "-f", "-v", name], { stdio: "ignore" });
+        runningContainers.clear();
+    };
+    process.once("exit", reap);
+    for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+        process.once(signal, () => {
+            reap();
+            // Re-raised with the default disposition, so the exit still reads as killed by the signal.
+            process.kill(process.pid, signal);
+        });
+    }
+}
+
 export async function startPgContainer(): Promise<PgContainer> {
     const containerName = `rebase-test-postgres-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     console.log(`Starting PostgreSQL container: ${containerName}...`);
+    installContainerReaper();
+    runningContainers.add(containerName);
 
     await execa("docker", [
         "run",
@@ -731,7 +763,9 @@ export async function startPgContainer(): Promise<PgContainer> {
 export async function stopPgContainer(containerName: string): Promise<void> {
     console.log(`Stopping and removing PostgreSQL container: ${containerName}...`);
     try {
-        await execa("docker", ["rm", "-f", containerName]);
+        // `-v`: the image's anonymous data volume goes with it, as `--rm` would drop it.
+        await execa("docker", ["rm", "-f", "-v", containerName]);
+        runningContainers.delete(containerName);
         console.log("Container removed successfully.");
     } catch (e: any) {
         console.error(`Failed to clean up container ${containerName}:`, e.message || e);

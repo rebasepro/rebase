@@ -16,6 +16,7 @@ import { spawnSync } from "child_process";
 import {
     execa,
     killTree,
+    listenersOn,
     getCleanEnv,
     packLocalPackages,
     rewritePackagesToTarballs,
@@ -249,8 +250,32 @@ async function run() {
         const editor = await api(base, "/api/admin/schema-editor/apply", { method: "POST" });
         check("schema editor is off", editor.status === 501, `status ${editor.status}`);
 
+        // The API document goes to the callers `GET /schema/tables` describes
+        // the tables to, each the document of what that endpoint describes to
+        // them, and the Swagger UI is off — unless REBASE_ENABLE_SWAGGER=true
+        // publishes both (checked after the SDK step, on a second boot).
         const swagger = await fetch(`${base}/api/swagger`);
-        check("swagger is served", swagger.ok, `status ${swagger.status}`);
+        check("Swagger UI is not served by default", swagger.status === 404, `status ${swagger.status}`);
+
+        const docsRes = await api(base, "/api/docs");
+        const docs = await docsRes.json().catch(() => ({})) as { openapi?: string; paths?: Record<string, unknown> };
+        const documented = Object.keys(docs.paths ?? {});
+        check("the API document answers a signed-in caller", docsRes.status === 200 && typeof docs.openapi === "string",
+            `status ${docsRes.status}`);
+        check("it documents the served tables", ["posts", "authors", "tags"].every((t) => documented.some((p) => p.includes(`/${t}`))),
+            documented.slice(0, 6).join(", "));
+        check("it documents nothing the API does not serve",
+            !documented.some((p) => p.includes("secrets") || p.includes("posts_tags")),
+            documented.filter((p) => p.includes("secrets") || p.includes("posts_tags")).join(", "));
+        check("its private copy is keyed on the caller",
+            (docsRes.headers.get("cache-control") ?? "").includes("private") && (docsRes.headers.get("vary") ?? "").includes("Authorization"),
+            `${docsRes.headers.get("cache-control")} / ${docsRes.headers.get("vary")}`);
+
+        const anonymousDocs = await fetch(`${base}/api/docs`);
+        const anonymousSchema = await fetch(`${base}/api/schema/tables`);
+        check("an anonymous caller is refused the document, as the schema endpoint refuses it",
+            anonymousDocs.status === 401 && anonymousSchema.status === 401,
+            `docs ${anonymousDocs.status}, schema/tables ${anonymousSchema.status}`);
 
         // ── 7. The SDK, with no collections defined anywhere ──────────────
         // The whole baas promise: a user never learns what a collection is.
@@ -294,15 +319,46 @@ process.exit(0);
         check("SDK reads and writes with zero collections configured", sdkOk);
         fs.rmSync(sdkScript, { force: true });
 
+        // ── 8. REBASE_ENABLE_SWAGGER=true publishes the document and the UI ─
+        console.log("\n📖 Step 8: Booting again with REBASE_ENABLE_SWAGGER=true...");
+        killTree(devProcess, "SIGTERM");
+        devProcess = undefined;
+        const freedBy = Date.now() + 30_000;
+        while (listenersOn(backendPort).size > 0 && Date.now() < freedBy) {
+            await new Promise((r) => setTimeout(r, 500));
+        }
+        await assertPortFree(backendPort);
+        devProcess = execa(path.join(projectPath, "node_modules", ".bin", "rebase"), ["dev", "--port", String(backendPort)], {
+            cwd: projectPath,
+            env: { ...cleanEnv, REBASE_ENABLE_SWAGGER: "true" },
+            stdio: "inherit",
+            detached: true
+        }) as unknown as { pid?: number; kill(signal?: string): void };
+        const upAgain = await waitForApi(`${base}/health`);
+        check("API boots again with swagger on", upAgain);
+        if (!upAgain) throw new Error("API never became healthy with REBASE_ENABLE_SWAGGER=true");
+
+        const swaggerOn = await fetch(`${base}/api/swagger`);
+        const swaggerHtml = await swaggerOn.text().catch(() => "");
+        check("Swagger UI is served with REBASE_ENABLE_SWAGGER=true",
+            swaggerOn.status === 200 && swaggerHtml.includes("swagger-ui"), `status ${swaggerOn.status}`);
+        const publicDocs = await fetch(`${base}/api/docs`);
+        check("and the document is published to an anonymous caller", publicDocs.status === 200, `status ${publicDocs.status}`);
+
         console.log(failures === 0 ? "\n✅ BaaS e2e passed" : `\n❌ ${failures} check(s) failed`);
-        if (failures > 0) process.exit(1);
     } finally {
         killTree(devProcess, "SIGTERM");
         await stopPgContainer(container.containerName);
     }
 }
 
-run().catch((err) => {
+// The exit status is set only after `run()` settles — its `finally` has
+// stopped the backend and removed the container. A `process.exit(1)` inside
+// the `try` skipped the `finally` and left the container running on every
+// failing run.
+run().then(() => {
+    if (failures > 0) process.exit(1);
+}, (err) => {
     console.error("Fatal error:", err);
     process.exit(1);
 });
