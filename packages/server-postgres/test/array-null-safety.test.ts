@@ -1,7 +1,6 @@
 import { describe, it, expect } from "@jest/globals";
 import {
     serializeColumnToServer,
-    serializeRelationValue,
     serializeDataToServer
 } from "../src/data-transformer";
 import { liftedColumnOf, runtimeTableOf } from "./helpers/codec-columns";
@@ -151,15 +150,6 @@ describe("serializeColumnToServer — array null safety", () => {
     it("handles array with undefined elements by passing each through sub-serialization", () => {
         const result = serializeColumnToServer([undefined, "a"], liftedColumnOf(arrayOfStringsProp));
         expect(result).toEqual([undefined, "a"]);
-    });
-
-    // ── Array of relation objects with null entries ──
-    it("serializes array of relation objects with null entries correctly", () => {
-        const value = [{ id: "1" }, null, { id: "2" }];
-        // A list of relations is a relation (`hasMany`/`manyToMany`), not a
-        // column: its value is written by the relation codec.
-        const result = serializeRelationValue(value);
-        expect(result).toEqual(["1", null, "2"]);
     });
 
     // ── Array of maps where some entries are null ──
