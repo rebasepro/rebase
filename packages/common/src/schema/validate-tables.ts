@@ -536,9 +536,18 @@ export function checkRuleFields(
             case "not":
                 walk(node.operand, clause, inExists);
                 return;
-            case "existsIn":
+            case "existsIn": {
+                const searched: unknown = node.table;
+                if (typeof searched !== "string" || searched.trim() === "") {
+                    const legacy = "collection" in node && typeof node.collection === "string" ? ` (it names \`collection: "${node.collection}"\`, the 0.30 key)` : "";
+                    refuse(
+                        `${label} has an \`existsIn\` in its \`${clause}\` with no table to search${legacy}. The policy would ` +
+                        "compile to a subquery over no table. Write `policy.existsIn({ table: \"<slug of the table to search>\", where })`."
+                    );
+                }
                 walk(node.where, clause, true);
                 return;
+            }
             case "compare":
                 checkOperand(node.left, clause, inExists);
                 checkOperand(node.right, clause, inExists);

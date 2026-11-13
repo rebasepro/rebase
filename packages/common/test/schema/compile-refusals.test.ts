@@ -225,6 +225,25 @@ describe("compileTables — refusals", () => {
             ]);
         });
 
+        it("refuses an existsIn with no table, naming the rule and the 0.30 key it may still carry", () => {
+            // As 0.31's builder returned it for 0.30's `policy.existsIn({ collection })`: the table dropped.
+            const where = policy.compare(policy.field("user_id"), "eq", policy.authUid());
+            const noTable = JSON.parse(JSON.stringify({ kind: "existsIn", where }));
+            const legacy = JSON.parse(JSON.stringify({ kind: "existsIn", collection: "team_members", where }));
+            const t = rawTable("t", {
+                columns: { id: id() },
+                rls: [
+                    { operation: "select", condition: policy.existsIn({ table: "team_members", where }) },
+                    { operation: "select", condition: noTable },
+                    { name: "members", operation: "update", condition: policy.true(), check: policy.or(legacy) }
+                ]
+            });
+            expect(problemsOf([t])).toEqual([
+                { table: "t", key: "rls[1]", message: expect.stringContaining("rule #1 has an `existsIn` in its `condition` with no table to search.") },
+                { table: "t", key: "rls[2]", message: expect.stringContaining("rule \"members\" has an `existsIn` in its `check` with no table to search (it names `collection: \"team_members\"`, the 0.30 key)") }
+            ]);
+        });
+
         it("refuses a shorthand condition naming a column the table does not have", () => {
             const t = rawTable("t", {
                 columns: { id: id(), status: col.text() },
