@@ -37,6 +37,7 @@ import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { testUser } from "./test-user.js";
+import { tablesFrom } from "../helpers/tables.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import { initializeRebaseBackend, _resetRebaseMock } from "../../../server/src/index.js";
 import { generateAccessToken } from "../../../server/src/auth/jwt.js";
@@ -244,7 +245,7 @@ describe("an include never embeds or counts a relation the caller may not read (
         backend = await initializeRebaseBackend({
             app,
             server,
-            collections: ALL,
+            ...tablesFrom(ALL),
             database: createPostgresAdapter({
                 connection: connection.db,
                 connectionString: container.connectionString
