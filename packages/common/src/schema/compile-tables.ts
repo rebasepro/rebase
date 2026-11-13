@@ -95,6 +95,26 @@ interface PreparedDef {
 /** The resolved target of a relation. */
 type TargetResolution = { ok: true; target: PreparedDef } | { ok: false; message: string };
 
+/**
+ * Whether a column declares a field-level hook anywhere: on itself, inside its
+ * JSON shape, or on its array element.
+ */
+function declaresFieldHook(def: ColumnDef): boolean {
+    const hook = (transform: ColumnDef["transform"]): boolean =>
+        transform !== undefined && (typeof transform.beforeSave === "function" || typeof transform.afterRead === "function");
+    const inShape = (shape: JsonShapeDef): boolean => {
+        if (hook(shape.transform)) return true;
+        switch (shape.kind) {
+            case "object": return Object.values(shape.fields).some(inShape);
+            case "array": return inShape(shape.of);
+            case "oneOf": return Object.values(shape.variants).some(inShape);
+            default: return false;
+        }
+    };
+    return hook(def.transform) || (def.json !== undefined && inShape(def.json))
+        || (def.element !== undefined && declaresFieldHook(def.element));
+}
+
 /** A junction table some relation claims, for the cross-table checks. */
 interface JunctionClaim {
     keys: string;
@@ -554,6 +574,17 @@ function compileOne(
                         refuse(
                             `the pivot column "${key}" is marked \`.primaryKey()\`. The junction's key is its two link ` +
                             "columns, which Rebase declares; a pivot column is payload the link carries. Drop `.primaryKey()`.",
+                            relationName
+                        );
+                    }
+                    if (declaresFieldHook(builder.def)) {
+                        // Field hooks run off a table's own columns; nothing
+                        // runs a pivot column's, so an `afterRead` there would
+                        // be a mask that never masks. Refused, not ignored.
+                        refuse(
+                            `the pivot column "${key}" declares \`.transform()\`, and a pivot column's field hooks never ` +
+                            "run: `_pivot` is served and written as stored. Mask it in the target table's `hooks.afterRead` " +
+                            "(it sees `_pivot`), or move the value onto a table of its own.",
                             relationName
                         );
                     }

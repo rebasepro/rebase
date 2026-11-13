@@ -12,8 +12,9 @@
  * the server by runs it exactly once, through {@link afterReadOnRows}: the
  * driver's fetches, the REST/SDK fetch service, the realtime initial fetch and
  * refetches, a write's own response. That one function also masks a row's
- * embedded relations one level deep with the TARGET table's hooks, so
- * `post.author.email` is the authors table's to mask, never served raw.
+ * embedded relations — at every level an `include` loaded — with each TARGET
+ * table's hooks, so `comment.post.author.email` is the authors table's to
+ * mask, never served raw.
  *
  * @module
  */
@@ -261,39 +262,70 @@ export async function afterReadOnRow(
 }
 
 /**
- * The tables a row's embedded relations are masked with: by relation name,
- * the target's hooks — kept only when the target runs an `afterRead`.
+ * Whether rows of `table` — or of any table an `include` can reach from it,
+ * at any depth — run an `afterRead`.
+ * A walk over the relation graph (cycles included); the answer is memoized
+ * per start table in `cache`, which lives for one call.
  */
-function embeddedTargets(registry: PostgresTableRegistry | undefined, set: TableHookSet): Map<string, TableHookSet> {
-    const targets = new Map<string, TableHookSet>();
-    if (!registry || !set.table) return targets;
-    for (const relation of set.table.relations.values()) {
-        // `getTable`: a relation whose target another data source serves is
-        // not this driver's to load, nor to mask.
-        const target = hookSetOf(registry, registry.getTable(relation.target));
-        if (target.table && hasAfterRead(target)) targets.set(relation.name, target);
+function masksReachable(
+    registry: PostgresTableRegistry,
+    start: RuntimeTable,
+    cache: Map<RuntimeTable, boolean>
+): boolean {
+    const known = cache.get(start);
+    if (known !== undefined) return known;
+    const visited = new Set<RuntimeTable>([start]);
+    const queue: RuntimeTable[] = [start];
+    let applies = false;
+    // `for…of` over an array sees the items pushed while it runs: a BFS.
+    for (const table of queue) {
+        if (hasAfterRead(hookSetOf(registry, table))) { applies = true; break; }
+        for (const relation of table.relations.values()) {
+            const target = registry.getTable(relation.target);
+            if (target && !visited.has(target)) {
+                visited.add(target);
+                queue.push(target);
+            }
+        }
     }
-    return targets;
+    cache.set(start, applies);
+    return applies;
 }
 
 /**
  * Whether {@link afterReadOnRows} would run anything for rows of this table:
- * its own `afterRead` on any tier, or an embedded relation's target's.
+ * its own `afterRead` on any tier, or that of any table an `include` reaches
+ * from it, at any depth.
  */
 export function afterReadApplies(registry: PostgresTableRegistry | undefined, set: TableHookSet): boolean {
-    return hasAfterRead(set) || embeddedTargets(registry, set).size > 0;
+    if (hasAfterRead(set)) return true;
+    if (!registry || !set.table) return false;
+    return masksReachable(registry, set.table, new Map());
 }
 
 /**
  * `afterRead` on rows leaving the server — THE read chain, for every path.
  *
- * Runs {@link afterReadOnRow} on each row, then masks each embedded relation
- * (an `include`d row or list — the target's own row) one level deep with the
- * target table's `afterRead`. `context` is asked for only
- * when a hook will run, so a table without hooks costs a map lookup.
+ * Runs {@link afterReadOnRow} on each row, then walks the row's embedded
+ * relations — whatever an `include` attached under a relation's name, a row
+ * or a list, to-one, to-many, many-to-many and `via` alike — and runs each
+ * TARGET table's chain on them, then theirs, down to the last level the
+ * include tree loaded. The walk follows the rows, so it is bounded by the
+ * include that produced them, never by a fixed depth; a self-referencing
+ * include (`parent.parent`) is walked level by level like any other. A
+ * many-to-many row's `_pivot` rides on the target row, so the target's
+ * hooks (global included) see it; a pivot column has no field hooks of its
+ * own (the compiler refuses `.transform()` there).
  *
- * `onHookRun` is called once, before the first hook runs: the driver notes
- * application code on the write scope there.
+ * An embedded row is handed to the hooks as a copy: a related row the
+ * loader shares between two parents is not masked twice, nor masked for one
+ * parent by a hook another level ran. An object that contains itself is
+ * refused (it could not be served anyway).
+ *
+ * `context` is asked for only when a hook will run, so a table without hooks
+ * (and none reachable) costs a map lookup per relation. `onHookRun` is called
+ * once, before the first hook runs: the driver notes application code on the
+ * write scope there.
  */
 export async function afterReadOnRows(
     registry: PostgresTableRegistry | undefined,
@@ -304,27 +336,50 @@ export async function afterReadOnRows(
     onHookRun?: () => void
 ): Promise<TableRow[]> {
     if (!rows || rows.length === 0) return rows;
-    const own = hasAfterRead(set);
-    const targets = embeddedTargets(registry, set);
-    if (!own && targets.size === 0) return rows;
+    const seen = new Map<RuntimeTable, boolean>();
+    const reaches = (target: RuntimeTable | undefined): boolean =>
+        target !== undefined && registry !== undefined && masksReachable(registry, target, seen);
+    if (!hasAfterRead(set) && !reaches(set.table)) return rows;
     onHookRun?.();
     const ctx = context();
 
-    const maskEmbedded = async (value: unknown, target: TableHookSet): Promise<unknown> => {
-        if (Array.isArray(value)) return Promise.all(value.map(item => maskEmbedded(item, target)));
-        if (!isRecord(value)) return value;
-        const targetPath = target.table?.slug ?? path;
-        return afterReadOnRow(target, value, targetPath, ctx);
-    };
-
-    return Promise.all(rows.map(async row => {
-        let out = own ? await afterReadOnRow(set, row, path, ctx) : row;
-        for (const [name, target] of targets) {
-            if (out[name] === undefined || out[name] === null) continue;
-            out = { ...out, [name]: await maskEmbedded(out[name], target) };
+    const maskRow = async (
+        hooks: TableHookSet,
+        original: TableRow,
+        rowPath: string,
+        ancestors: ReadonlySet<object>
+    ): Promise<TableRow> => {
+        if (ancestors.has(original)) {
+            throw new Error(
+                `A row of "${rowPath}" contains itself through its relations; it cannot be masked or served.`
+            );
+        }
+        // The top-level row is the caller's own; an embedded one is copied.
+        const row = ancestors.size === 0 ? original : { ...original };
+        let out = hasAfterRead(hooks) ? await afterReadOnRow(hooks, row, rowPath, ctx) : row;
+        if (!registry || !hooks.table) return out;
+        const within = new Set(ancestors).add(original);
+        for (const relation of hooks.table.relations.values()) {
+            const value = out[relation.name];
+            if (value === undefined || value === null) continue;
+            // `getTable`: a relation whose target another data source serves
+            // is not this driver's to load, nor to mask.
+            const targetTable = registry.getTable(relation.target);
+            if (!targetTable || !reaches(targetTable)) continue;
+            const target = hookSetOf(registry, targetTable);
+            const maskEmbedded = async (item: unknown): Promise<unknown> =>
+                isRecord(item) ? maskRow(target, item, targetTable.slug, within) : item;
+            out = {
+                ...out,
+                [relation.name]: Array.isArray(value)
+                    ? await Promise.all(value.map(maskEmbedded))
+                    : await maskEmbedded(value)
+            };
         }
         return out;
-    }));
+    };
+
+    return Promise.all(rows.map(row => maskRow(set, row, path, new Set())));
 }
 
 // ── Write ──────────────────────────────────────────────────────────────────

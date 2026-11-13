@@ -711,6 +711,25 @@ describe("compileTables — refusals", () => {
             }]);
         });
 
+        it("refuses a field hook on a pivot column, at any position (nothing would run it)", () => {
+            const tags = table("tags");
+            const pivots = {
+                own: col.text().transform({ afterRead: () => "***" }),
+                inJson: col.jsonb(json.object({ secret: json.string().transform({ afterRead: () => "***" }) })),
+                onElement: col.text().array().transform({ beforeSave: ({ value }) => value })
+            };
+            for (const [key, builder] of Object.entries(pivots)) {
+                const posts = rawTable("posts", {
+                    columns: { id: id() },
+                    relations: { tags: rel.manyToMany(() => tags, { pivot: { [key]: builder } }) },
+                    rls: "admin-only"
+                });
+                expect(problemsOf([tags, posts])).toEqual([{
+                    table: "posts", key: "tags", message: expect.stringContaining(`the pivot column "${key}" declares \`.transform()\``)
+                }]);
+            }
+        });
+
         it("refuses a col.custom() type that is not a type name, as the planner does", () => {
             const t = table("t", { id: id(), bad: rawColumn({ type: { kind: "other", sqlType: "inet DEFAULT now" } }) });
             expect(problemsOf([t])).toEqual([{

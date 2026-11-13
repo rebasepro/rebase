@@ -877,9 +877,9 @@ export class PostgresBackendDriver implements DataDriver {
      * silently skipped on every SDK/REST read, leaking raw data. This choke
      * point guarantees it runs there too, as on `fetchCollection`/`fetchOne`.
      *
-     * It also masks embedded relation data one level deep by running the TARGET
-     * table's `afterRead` (so `post.author.email` is masked by the authors
-     * table, not left raw).
+     * It also masks embedded relation data, at every level the include loaded,
+     * by running each TARGET table's `afterRead` (so `comment.post.author.email`
+     * is masked by the authors table, not left raw).
      */
     async applyAfterReadForRest(
         rows: Record<string, unknown>[],
