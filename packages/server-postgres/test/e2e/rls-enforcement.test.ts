@@ -115,7 +115,7 @@ const noticesCollection: LegacyCollectionConfig = {
     ]
 };
 
-function buildRegistry(): PostgresTableRegistry {
+function buildRegistry(): FixtureTableRegistry {
     const registry = new FixtureTableRegistry();
     registry.registerMultiple([
         tasksCollection, secretsCollection, docsCollection, noticesCollection, topicsCollection
@@ -135,11 +135,25 @@ describe("Unified RLS enforcement (E2E)", () => {
     let pool: pg.Pool;            // the app's connection (superuser worst case)
     let driver: PostgresBackendDriver;
     let realtime: RealtimeService;
-    let registry: PostgresTableRegistry;
+    let registry: FixtureTableRegistry;
     let runSql: RawSqlRunner;
 
     async function userDriver(uid: string) {
         return driver.withAuth(testUser(uid, []));
+    }
+    /**
+     * Run with `tasks` registered with these callbacks. The driver runs a
+     * table's hooks from the compiled table it was registered with — a
+     * collection handed to one `save` no longer brings its own — so the
+     * fixture is re-registered for the duration, then put back.
+     */
+    async function withTasksCallbacks<T>(callbacks: LegacyCollectionCallbacks, run: () => Promise<T>): Promise<T> {
+        registry.registerMultiple([{ ...tasksCollection, callbacks }]);
+        try {
+            return await run();
+        } finally {
+            registry.registerMultiple([tasksCollection]);
+        }
     }
     async function countAs(uid: string): Promise<number> {
         return (await userDriver(uid)).count({ path: "tasks", collection: tasksCollection });
@@ -437,35 +451,34 @@ describe("Unified RLS enforcement (E2E)", () => {
     it("scopes context.data to the caller when a callback runs on a user request", async () => {
         const seen: Array<{ trigger: string; visible: string[] }> = [];
 
-        const withCallback: LegacyCollectionConfig = {
-            ...tasksCollection,
-            callbacks: {
-                afterSave: async ({ context }) => {
-                    const rows = await context.data.tasks.findAll();
-                    seen.push({ trigger: "pending", visible: rows.map(r => String(r.id)).sort() });
-                }
+        const callbacks: LegacyCollectionCallbacks = {
+            afterSave: async ({ context }) => {
+                const rows = await context.data.tasks.findAll();
+                seen.push({ trigger: "pending", visible: rows.map(r => String(r.id)).sort() });
             }
         };
 
-        // user-a's own write. The callback must see only user-a's rows.
-        const a = await userDriver("user-a");
-        await a.save({
-            status: "new",
-            path: "tasks", collection: withCallback,
-            values: { id: "t-a-cb", title: "cb", owner_id: "user-a" }
-        });
+        await withTasksCallbacks(callbacks, async () => {
+            // user-a's own write. The callback must see only user-a's rows.
+            const a = await userDriver("user-a");
+            await a.save({
+                status: "new",
+                path: "tasks", collection: tasksCollection,
+                values: { id: "t-a-cb", title: "cb", owner_id: "user-a" }
+            });
 
-        expect(seen).toHaveLength(1);
-        expect(seen[0].visible).not.toContain("t-b");
-        expect(seen[0].visible).toContain("t-a-cb");
+            expect(seen).toHaveLength(1);
+            expect(seen[0].visible).not.toContain("t-b");
+            expect(seen[0].visible).toContain("t-a-cb");
 
-        // The same callback on a server-context write sees everything, because
-        // the base driver never switches role.
-        seen.length = 0;
-        await driver.save({
-            status: "new",
-            path: "tasks", collection: withCallback,
-            values: { id: "t-server-cb", title: "cb", owner_id: "user-b" }
+            // The same callback on a server-context write sees everything, because
+            // the base driver never switches role.
+            seen.length = 0;
+            await driver.save({
+                status: "new",
+                path: "tasks", collection: tasksCollection,
+                values: { id: "t-server-cb", title: "cb", owner_id: "user-b" }
+            });
         });
 
         expect(seen).toHaveLength(1);
@@ -487,26 +500,18 @@ describe("Unified RLS enforcement (E2E)", () => {
         // The hook reads ANOTHER collection: one reading its own would run its
         // own afterRead on every row it fetched, and recurse. `docs` is scoped
         // per owner — user-a sees `d-a` only, the owner connection sees both.
-        const registered = registry.getCollectionByPath("tasks");
-        if (!registered) throw new Error("tasks is registered in beforeAll");
-        // The registered config, seen as the hook slot this test swaps for one
-        // read: `callbacks` is readonly on the config type, not on the object.
-        const tasks: { callbacks?: LegacyCollectionCallbacks } = registered;
-        const previous = tasks.callbacks;
         const seen: string[][] = [];
-        tasks.callbacks = {
+        const callbacks: LegacyCollectionCallbacks = {
             afterRead: async ({ row, context }) => {
                 const docs = await context.data.docs.findAll();
                 seen.push(docs.map(d => String(d.id)).sort());
                 return row;
             }
         };
-        try {
+        await withTasksCallbacks(callbacks, async () => {
             const frame = await realtimeFetchAs("user-a") as Array<{ id: string }>;
             expect(frame.length).toBeGreaterThan(0);
-        } finally {
-            tasks.callbacks = previous;
-        }
+        });
 
         expect(seen.length).toBeGreaterThan(0);
         for (const visible of seen) expect(visible).toEqual(["d-a"]);
