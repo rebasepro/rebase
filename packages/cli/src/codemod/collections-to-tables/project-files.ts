@@ -483,6 +483,48 @@ export function findLegacyApiUses(root: string, configDir: string, skip: Readonl
     return scanSources(root, configDir, skip).apis.filter(use => !handled.has(use.api));
 }
 
+/**
+ * The text with every comment blanked to spaces, newlines kept, so offsets
+ * and line numbers still point into the original. Strings and template
+ * literals are skipped over (a `//` inside a URL is not a comment). The
+ * scaffold's example script ships its typed-SDK import commented out
+ * (`// import type { Database } from "../config/database.types"`): read
+ * as code, every such project got a manual step for a line that is not there.
+ */
+function blankComments(text: string): string {
+    const out = text.split("");
+    let index = 0;
+    const blank = (from: number, to: number): void => {
+        for (let at = from; at < to; at++) if (out[at] !== "\n") out[at] = " ";
+    };
+    while (index < text.length) {
+        const char = text[index];
+        const next = text[index + 1];
+        if (char === "/" && next === "/") {
+            const end = text.indexOf("\n", index);
+            const stop = end === -1 ? text.length : end;
+            blank(index, stop);
+            index = stop;
+        } else if (char === "/" && next === "*") {
+            const end = text.indexOf("*/", index + 2);
+            const stop = end === -1 ? text.length : end + 2;
+            blank(index, stop);
+            index = stop;
+        } else if (char === "\"" || char === "'" || char === "`") {
+            index++;
+            while (index < text.length && text[index] !== char) {
+                if (text[index] === "\\") index++;
+                else if (char !== "`" && text[index] === "\n") break;
+                index++;
+            }
+            index++;
+        } else {
+            index++;
+        }
+    }
+    return out.join("");
+}
+
 function scanSources(root: string, configDir: string, skip: ReadonlySet<string>): { importers: ConfigImporter[]; apis: LegacyApiUse[] } {
     const out: ConfigImporter[] = [];
     const apis: LegacyApiUse[] = [];
@@ -500,7 +542,7 @@ function scanSources(root: string, configDir: string, skip: ReadonlySet<string>)
                 continue;
             }
             if (!SOURCE_FILE.test(entry.name) || entry.name.endsWith(".d.ts") || skip.has(full)) continue;
-            const text = fs.readFileSync(full, "utf8");
+            const text = blankComments(fs.readFileSync(full, "utf8"));
             for (const legacy of LEGACY_APIS) {
                 for (const match of text.matchAll(legacy.pattern)) {
                     apis.push({ file: full, line: text.slice(0, match.index).split("\n").length, api: legacy.api, replacement: legacy.replacement });

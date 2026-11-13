@@ -71,6 +71,11 @@
       "file": "config/collections/tickets.ts"
     },
     {
+      "title": "Repoint the imports of scripts/report.ts",
+      "detail": "It imports from config/, which the migration replaces: line 8: \"../config/collections/tickets\" → backend/schema/tickets.ts. A collection is a table now (`defineTable` / `defineAuthTable`), and a backend entry passes `tables` / `schemaDir` instead of `collections` / `collectionsDir`.",
+      "file": "scripts/report.ts"
+    },
+    {
       "title": "Files of config/ nothing moved",
       "detail": "Nothing the codemod carried imports these, so they were not moved: config/fragments.ts. Move what is still used before deleting config/."
     }
