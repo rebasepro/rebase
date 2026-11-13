@@ -10,7 +10,7 @@
  */
 import { buildSdkData } from "@rebasepro/common";
 import { createCallContext, defineCron, defineFunction, rebase } from "@rebasepro/server";
-import type { TableHooks, DataDriver, RebaseSdkData, RegisteredDatabase } from "@rebasepro/types";
+import type { TableHooks, DataDriver, RebaseSdkData, RegisteredDatabase, TableDescriptor } from "@rebasepro/types";
 
 import type { Database } from "../src/typed-sdk/database.types";
 
@@ -122,7 +122,7 @@ export const helperProbes: TableHooks = {
  * from the registration like the one the server hands it, so it can be passed
  * to a callback that names the registered `context.data`.
  */
-export async function callContextProbes(driver: DataDriver): Promise<void> {
+export async function callContextProbes(driver: DataDriver, authors: TableDescriptor): Promise<void> {
     const context = createCallContext();
     const author = await context.data.authors.findById(1);
     const name: string | undefined = author?.name;
@@ -134,7 +134,7 @@ export async function callContextProbes(driver: DataDriver): Promise<void> {
     // Over a driver, as the refusal message tells a test to build it.
     const overDriver = createCallContext({ data: buildSdkData<Database>(driver) });
     await callbacks.beforeSave?.({
-        collection: { slug: "authors", name: "Authors", properties: {} },
+        table: authors,
         path: "authors",
         status: "new",
         values: {},
