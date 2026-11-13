@@ -937,6 +937,16 @@ function compileTenant(
         );
         ok = false;
     }
+    if ("membership" in tenant.from) {
+        const searched: unknown = tenant.from.membership.table;
+        if (typeof searched !== "string" || searched.trim() === "") {
+            refuse(
+                "`tenant.from.membership` names no table to read the memberships from, so the tenant test would search no table. " +
+                "Write `membership: { table: \"<slug of the memberships table>\", userField, tenantField }`."
+            );
+            ok = false;
+        }
+    }
     if (!ok) return undefined;
     const out: TenantDescriptor = { field: column.key, from: tenant.from };
     if (tenant.bypassRoles !== undefined) out.bypassRoles = [...tenant.bypassRoles];

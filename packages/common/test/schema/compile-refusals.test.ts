@@ -285,6 +285,14 @@ describe("compileTables — refusals", () => {
             }]);
         });
 
+        it("refuses a membership tenant source naming no table", () => {
+            const from = JSON.parse(JSON.stringify({ membership: { userField: "user_id", tenantField: "org_id" } }));
+            const t = rawTable("t", { columns: { id: id(), orgId: col.uuid() }, rls: "admin-only", tenant: { field: "orgId", from } });
+            expect(problemsOf([t])).toEqual([{
+                table: "t", message: expect.stringContaining("`tenant.from.membership` names no table to read the memberships from")
+            }]);
+        });
+
         it("refuses a softDelete field naming no column, or not a timestamp", () => {
             const t = (columns: AnyTableDef["config"]["columns"], softDelete: AnyTableDef["config"]["softDelete"]) =>
                 rawTable("t", { columns, rls: "admin-only", softDelete });
