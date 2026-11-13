@@ -39,8 +39,8 @@ const posts = defineTable("posts", {
         slug: col.text().notNull(),
         status: col.text().notNull().default("draft"),
         reviewer: col.text(),
-        createdAt: col.timestamptz().onCreateNow(),
-        publishDate: col.timestamptz()
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow(),
+        publishDate: col.timestamp({ withTimezone: true })
     },
     relations: { author: rel.belongsTo(() => authors, { notNull: true }) },
     rls: RLS
