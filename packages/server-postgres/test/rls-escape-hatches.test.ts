@@ -380,8 +380,8 @@ describe("the policy settings, declared on the database", () => {
     it("drop the injected baseline everywhere with defaultPolicies: false, unless a collection says otherwise", () => {
         database({ rls: { defaultPolicies: false } });
         expect(getEffectiveSecurityRules(posts).some((r) => r.name?.endsWith("_default_admin_read"))).toBe(false);
-        // A table that states `defaultPolicies: true` keeps it (the lift drops a 0.30
-        // `disableDefaultPolicies: false` as redundant, so the table is stated directly).
+        // A table that states `defaultPolicies: true` keeps it (what the lift writes for
+        // a 0.30 `disableDefaultPolicies: false`).
         const keeps = { ...liftedPolicyTable(posts).table, defaultPolicies: true };
         expect(tableEffectiveRules(keeps).some((r) => r.name?.endsWith("_default_admin_read"))).toBe(true);
     });

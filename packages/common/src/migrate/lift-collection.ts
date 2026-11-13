@@ -1353,7 +1353,7 @@ class CollectionLift {
         return this.foreignKeyColumns.get(field) ?? field;
     }
 
-    private rls(): { rls: RlsPosture; defaultPolicies?: false } {
+    private rls(): { rls: RlsPosture; defaultPolicies?: boolean } {
         const c = this.collection;
         const rules = c.securityRules;
         const defaults = this.lifter.defaultRules();
@@ -1380,7 +1380,12 @@ class CollectionLift {
             }
             return { rls: posture, defaultPolicies: false };
         }
-        if (c.disableDefaultPolicies === false) this.note(undefined, "disableDefaultPolicies", "redundant", false, "States the default.");
+        // 0.30: a collection's own `disableDefaultPolicies` decided before its
+        // database's `rls.defaultPolicies`, so an explicit `false` kept the
+        // baseline under `database({ rls: { defaultPolicies: false } })`.
+        // `defaultPolicies: true` says the same; dropping it would let the
+        // database's opt-out remove the table's admin policies.
+        if (c.disableDefaultPolicies === false) return { rls: posture, defaultPolicies: true };
         return { rls: posture };
     }
 
@@ -1405,7 +1410,7 @@ class CollectionLift {
             columns: this.columns,
             ...(Object.keys(this.relationDefs).length > 0 ? { relations: this.relationDefs } : {}),
             rls,
-            ...(defaultPolicies === false ? { defaultPolicies } : {})
+            ...(defaultPolicies !== undefined ? { defaultPolicies } : {})
         };
         if (c.tenant !== undefined) {
             config.tenant = {

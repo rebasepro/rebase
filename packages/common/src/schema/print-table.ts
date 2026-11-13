@@ -718,6 +718,7 @@ function descriptorDoc(descriptor: TableDescriptor, state: TableState, options: 
     if (relations) entries.push(["relations", relations]);
     entries.push(["rls", rlsOfDescriptor(descriptor.rls, `${state.label}.rls`)]);
     if (!descriptor.rls.defaultPolicies && descriptor.rls.posture === "rules") put("defaultPolicies", false);
+    else if (descriptor.rls.declaredDefaultPolicies) put("defaultPolicies", true);
     put("tenant", descriptor.tenant);
     put("softDelete", descriptor.softDelete);
     put("history", descriptor.history);

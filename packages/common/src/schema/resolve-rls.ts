@@ -32,7 +32,7 @@ export type RlsResolution =
  */
 export function resolveRls(
     posture: RlsPosture | unknown,
-    defaultPolicies: false | undefined,
+    defaultPolicies: boolean | undefined,
     defaultRls: DefaultRls | undefined
 ): RlsResolution {
     if (posture === "inherit") {
@@ -61,7 +61,7 @@ export function resolveRls(
                     "`defaultPolicies: false`, or replace \"admin-only\" with the rules that should apply."
             };
         }
-        return { ok: true, rls: { posture: "admin-only", rules: [], defaultPolicies: true } };
+        return { ok: true, rls: { posture: "admin-only", rules: [], defaultPolicies: true, ...(defaultPolicies === true ? { declaredDefaultPolicies: true } : {}) } };
     }
     if (Array.isArray(posture)) {
         if (posture.length === 0) {
@@ -87,7 +87,7 @@ export function resolveRls(
             }
             rules.push(rule);
         }
-        return { ok: true, rls: { posture: "rules", rules, defaultPolicies: defaultPolicies !== false } };
+        return { ok: true, rls: { posture: "rules", rules, defaultPolicies: defaultPolicies !== false, ...(defaultPolicies === true ? { declaredDefaultPolicies: true } : {}) } };
     }
     return {
         ok: false,

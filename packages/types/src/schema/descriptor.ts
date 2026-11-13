@@ -246,6 +246,13 @@ export interface RlsDescriptor {
     /** `false` when the injected admin baseline is switched off. */
     defaultPolicies: boolean;
     /**
+     * The table wrote `defaultPolicies: true`: the baseline is injected
+     * whatever its database's `rls.defaultPolicies` says. Absent, the
+     * database's declaration decides whether a `defaultPolicies: true` table
+     * gets it.
+     */
+    declaredDefaultPolicies?: true;
+    /**
      * The policies Postgres holds for the table, when the server includes them
      * (admins and `schema:read` holders): the Studio's RLS editor reads these.
      */

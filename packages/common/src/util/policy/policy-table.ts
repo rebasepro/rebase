@@ -109,7 +109,7 @@ export function claimCastOf(type: ColumnType): ClaimCastType {
  * A `belongsTo` link addresses its foreign key column (`localKey`), cast as
  * that column is — its type is the target's key type, so no lookup through
  * the target is needed. The baseline follows the database's declaration unless
- * the table wrote `defaultPolicies: false`. A view has no rules of its own
+ * the table wrote `defaultPolicies` (`false` drops it, `true` keeps it). A view has no rules of its own
  * (`posture: "view"`), and gets none here.
  *
  * @group Policies
@@ -141,7 +141,8 @@ export function policyTableFromDescriptor(descriptor: TableDescriptor): PolicyTa
         rules: descriptor.rls.posture === "rules" ? descriptor.rls.rules : [],
         ...(descriptor.rls.posture === "view"
             ? { defaultPolicies: false }
-            : descriptor.rls.defaultPolicies ? {} : { defaultPolicies: false }),
+            : !descriptor.rls.defaultPolicies ? { defaultPolicies: false }
+                : descriptor.rls.declaredDefaultPolicies ? { defaultPolicies: true } : {}),
         auth: descriptor.auth !== undefined,
         ...(descriptor.tenant ? { tenant: descriptor.tenant } : {})
     };

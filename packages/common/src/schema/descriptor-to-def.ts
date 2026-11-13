@@ -107,14 +107,15 @@ class ConversionProblem extends Error {
  * A descriptor's row-level security as a definition's `rls` (and
  * `defaultPolicies`), or a problem when no definition can say it.
  */
-function rlsOf(descriptor: TableDescriptor, rls: RlsDescriptor): { rls: RlsPosture; defaultPolicies?: false } {
+function rlsOf(descriptor: TableDescriptor, rls: RlsDescriptor): { rls: RlsPosture; defaultPolicies?: boolean } {
     const rules = rls.rules;
-    if (rls.posture === "admin-only") return { rls: "admin-only" };
+    const declared = rls.declaredDefaultPolicies ? { defaultPolicies: true } : {};
+    if (rls.posture === "admin-only") return { rls: "admin-only", ...declared };
     if (rules.length > 0) {
         const posture: RlsPosture = [rules[0], ...rules.slice(1)];
-        return rls.defaultPolicies ? { rls: posture } : { rls: posture, defaultPolicies: false };
+        return rls.defaultPolicies ? { rls: posture, ...declared } : { rls: posture, defaultPolicies: false };
     }
-    if (rls.defaultPolicies) return { rls: "admin-only" };
+    if (rls.defaultPolicies) return { rls: "admin-only", ...declared };
     throw new ConversionProblem({
         table: descriptor.name,
         message: "has row-level security with no rule and no admin baseline, so nobody may read a row. " +

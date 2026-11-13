@@ -58,9 +58,12 @@ export interface TableConfig<
     rls: RlsPosture;
     /**
      * `false` generates only the declared rules, without the injected admin
-     * baseline. Refused together with `rls: "admin-only"`.
+     * baseline. Refused together with `rls: "admin-only"`. `true` keeps the
+     * baseline even when the table's database switches it off for every
+     * table (`database({ rls: { defaultPolicies: false } })`). Absent, the
+     * database's declaration decides.
      */
-    defaultPolicies?: false;
+    defaultPolicies?: boolean;
     /** Scope every row to a tenant. */
     tenant?: TableTenant<NoInfer<Extract<keyof C, string>>>;
     /** Deleting stamps a timestamp column instead of removing the row. */
