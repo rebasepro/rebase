@@ -1,6 +1,5 @@
-import { createTableRelationsHelpers, extractTablesRelationalConfig, is, type TablesRelationalConfig } from "drizzle-orm";
-import { PgDialect, PgTable, type PgDatabase, type PgQueryResultHKT } from "drizzle-orm/pg-core";
-import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query";
+import { createTableRelationsHelpers, extractTablesRelationalConfig, type TablesRelationalConfig } from "drizzle-orm";
+import { PgDatabase, PgDialect, type PgQueryResultHKT } from "drizzle-orm/pg-core";
 
 /**
  * Give a drizzle database handle another relational schema (tables and
@@ -16,9 +15,9 @@ import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query
  * them, synchronously: a request sees the schema before the call or the one
  * after it, never a mixture.
  *
- * The dialect is a fresh `PgDialect`, which is what `drizzle(client, { schema })`
- * builds for a handle opened without a `casing` option (every driver handle
- * is).
+ * The builders' dialect is a fresh `PgDialect`, which is what
+ * `drizzle(client, { schema })` builds for a handle opened without a `casing`
+ * option (every driver handle is).
  *
  * @param db The handle, opened with a relational schema (`drizzle(client, { schema })`).
  * @param schema The drizzle tables and relations to serve from now on.
@@ -36,15 +35,19 @@ export function refreshRelationalSchema(
     refill(db._.fullSchema, schema);
     refill(db._.tableNamesMap, next.tableNamesMap);
 
-    const dialect = new PgDialect();
+    // The `db.query` builders, built the way the handle's constructor built
+    // them: a handle over the same session and the refilled objects builds one
+    // per table, and its builders replace the old ones. (Built through
+    // `PgDatabase` rather than `new RelationalQueryBuilder(…)`, whose
+    // `session` parameter is a session of the empty schema — the handle's
+    // session, typed by its own schema, is not one.)
+    const rebuilt = new PgDatabase<PgQueryResultHKT, Record<string, unknown>, TablesRelationalConfig>(
+        new PgDialect(),
+        db._.session,
+        { fullSchema: db._.fullSchema, schema: tables, tableNamesMap: db._.tableNamesMap }
+    );
     for (const name of Object.keys(db.query)) delete db.query[name];
-    for (const [name, config] of Object.entries(tables)) {
-        const table = schema[name];
-        if (!is(table, PgTable)) continue;
-        db.query[name] = new RelationalQueryBuilder(
-            db._.fullSchema, tables, db._.tableNamesMap, table, config, dialect, db._.session
-        );
-    }
+    Object.assign(db.query, rebuilt.query);
 }
 
 /** Replace every entry of `target` with those of `source`, keeping the object. */
