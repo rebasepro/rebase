@@ -143,7 +143,7 @@ Retention is enforced in two places:
 GET /api/data/:slug/:entityId/history
 ```
 
-Returns a list of history entries for a specific entity, ordered by most recent first:
+Returns a list of history entries for a specific entity, ordered by most recent first. <span class="since-badge" data-since="0.31">Since 0.31</span> Entries one transaction records — a create and the update after it in one `_batch`, a revert and the revert of it — come back in the order they were written: each entry's `updated_at` is later than the row's previous entry. An existing database gets this with its next provisioning boot, or a `REBASE_PROVISION_ONLY=true` run, which replaces the `rebase.record_history` function; a deployment that never provisions keeps the old ordering until then. Entries recorded before that keep their order.
 
 ```json
 {

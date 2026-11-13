@@ -185,6 +185,23 @@ A field operation also needs `read` on its field. An operation on a field you ma
 write but not read is refused with `FIELD_NOT_READABLE`: whether it passed a
 bound would tell you the value you are not allowed to see.
 
+### A link follows its key column
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+A `belongsTo` and the key column it is bound to are one field with two
+spellings. Writing `{ "reviewer": 7 }` is held to every rule of `reviewerId`
+(its write rule, `.readOnly()`, `.private()`, a create stamp, the tenant
+column); sending both with different values is `400 VALIDATION_INVALID_VALUE`.
+A caller who may not read `reviewerId` does not get `reviewer` in an `include`,
+and a filter, sort or `fields` entry naming it answers `FIELD_NOT_READABLE`;
+behind a `.private()` key the relation does not exist for clients at all. The
+schema endpoint, OpenAPI and MCP describe the two together.
+
+`strictWrites: false` on a table only lets a key the table does not declare
+through to the driver. It never relaxes a rule on a declared column, a stamp,
+the tenant, the key, a relation target or `_pivot`.
+
 ## Search
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
