@@ -80,7 +80,7 @@ function recursionError(frame: WriteFrame): ApiError {
         "CALLBACK_RECURSION",
         `Writes started by hooks nested more than ${MAX_WRITE_DEPTH} deep, so this one was refused and the whole write ` +
         `rolled back. The ${hook} hook of "${starter?.path ?? frame.path}" ${frame.operation}s "${frame.path}" through ` +
-        "`context.data`, which runs that collection's hooks again, and nothing in the chain stops it: " +
+        "`context.data`, which runs that table's hooks again, and nothing in the chain stops it: " +
         `${steps.join("; ")}. Make the hook's write conditional — act on \`status === "new"\` only, or skip it ` +
         "when `values` already hold what it would write.",
         { chain: steps, depth: MAX_WRITE_DEPTH }

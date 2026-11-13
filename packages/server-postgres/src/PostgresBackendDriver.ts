@@ -2355,8 +2355,8 @@ export class PostgresBackendDriver implements DataDriver {
     ): RuntimeTable {
         if (!table || isNestedPath(path)) {
             throw ApiError.badRequest(
-                `A filtered write addresses a collection, and "${path}" is ${table ? "a path through a relation" : "not one"}. ` +
-                "Write to the related collection with a filter on its link instead.",
+                `A filtered write addresses a table, and "${path}" is ${table ? "a path through a relation" : "not one"}. ` +
+                "Write to the related table with a filter on its link instead.",
                 "INVALID_FILTERED_WRITE"
             );
         }

@@ -421,7 +421,7 @@ export function rlsHandoverNotes(settings: RlsSettings): string[] {
         notes.push("sharedRole=ignore: other logins that can switch into the request role are not reported.");
     }
     if (!settings.defaultPolicies) {
-        notes.push("defaultPolicies=false: no collection gets the server-or-admin baseline; each collection's own rules are its whole policy.");
+        notes.push("defaultPolicies=false: no table gets the server-or-admin baseline; each table's own rules are its whole policy.");
     }
     return notes;
 }

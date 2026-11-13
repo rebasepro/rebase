@@ -578,7 +578,7 @@ function assertDistinctStoredPolicyNames(policies: PolicyPlan[]): void {
             `The security rules "${first.ruleKey}" and "${policy.ruleKey}" compile to the policies ` +
             `"${first.name}" and "${policy.name}", which Postgres stores under one name, "${stored}": it ` +
             "keeps only the first 63 bytes of an identifier, so the second would replace the first. " +
-            "Give one of the rules a shorter `name`, or the collection a shorter `table`."
+            "Give one of the rules a shorter `name`, or the table a shorter name."
         );
     }
 }
@@ -895,7 +895,7 @@ function assertNoTruncationCollisions(tables: TablePlan[], enums: EnumPlan[]): v
             `The ${what} and the ${first} both become "${schema}"."${toPostgresIdentifier(name)}" in Postgres, ` +
             "which keeps only the first 63 bytes of an identifier — and a table, a junction table and an enum " +
             "type share one namespace (every table owns a row type of its name). The push would fail with " +
-            "\"already exists\". Give the collection a shorter `table`, or the enum's property a shorter " +
+            "\"already exists\". Give the table a shorter name, or the enum's property a shorter " +
             "`columnName` (an enum type is named <table>_<column>)."
         );
     };

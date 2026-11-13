@@ -288,7 +288,7 @@ export function describeSchemaDriftCause(
         return [
             "  This runtime could not determine whether a schema-creation step ran",
             "  before this check (the caller predates that signal).",
-            "    • Look for a \"Collection schema:\" line above. No such line at all",
+            "    • Look for a \"schema:\" line above. No such line at all",
             "      means nothing tried to create these tables in this process."
         ];
     }
@@ -297,7 +297,7 @@ export function describeSchemaDriftCause(
             "  A schema-creation step DID run this boot and these tables are still",
             "  missing, so it did not create them — check the \"schema:\" lines above",
             "  for what it did instead, and for DDL errors.",
-            "    • A collection routed to another engine or data source is not",
+            "    • A table routed to another engine or data source is not",
             "      created here; that is reported separately at boot.",
             "    • Otherwise this is a bug worth reporting, with those lines."
         ];
@@ -457,14 +457,14 @@ function describeEnsureFailure(failure: { kind: string; target: string; error: s
             // because the alternative is a table that is permanently unindexed
             // and looks exactly like one that is not.
             return (
-                `🐢 [schema] Could not create an index on "${failure.target}" — the collection serves and returns ` +
+                `🐢 [schema] Could not create an index on "${failure.target}" — the table serves and returns ` +
                 "the same rows, but queries that would have used this index will scan instead. Boot is not failed " +
                 `over an index: ${failure.error}`
             );
         default:
             return (
                 `🔗 [schema] Could not add foreign key "${failure.target}" — the column exists and the ` +
-                `collection still serves, but rows are not policed by this constraint: ${failure.error}`
+                `table still serves, but rows are not policed by this constraint: ${failure.error}`
             );
     }
 }
@@ -853,7 +853,7 @@ export async function openPostgresDriver(
             if (catalogue.missing.length > 0) {
                 logger.warn(
                     `[PostgresRegistry] Data source "${sourceKey}" has no table yet for: ${catalogue.missing.join(", ")}. ` +
-                    "Their collections will answer \"table not found\" until the schema is provisioned."
+                    "They will answer \"table not found\" until the schema is provisioned."
                 );
             }
         }
@@ -1952,7 +1952,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
         const db = provisioningDb(driverResult);
         if (!db) {
             throw new Error(
-                "Cannot provision the collection schema: this Postgres adapter was created without a " +
+                "Cannot provision the schema: this Postgres adapter was created without a " +
                 "`connection`, and no initialized driver was supplied to fall back on. Pass `connection` " +
                 "to `createPostgresAdapter` (see `createPostgresDatabaseConnection`)."
             );
@@ -2295,7 +2295,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
                     ?? new Error(
                         code === "53300"
                             ? `PostgreSQL at ${hostInfo} has no free connection: ${reason} [53300]`
-                            : `Cannot reach PostgreSQL at ${hostInfo} to provision the collection schema.`,
+                            : `Cannot reach PostgreSQL at ${hostInfo} to provision the schema.`,
                         { cause: err }
                     );
             }
@@ -2478,7 +2478,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
                 logger.error(
                     `🔐 [rls] Could not enable row-level security on "${u.table}": ${u.error}. ` +
                     "Its privileges have been revoked from the request role, so the table is " +
-                    "unreachable rather than unprotected. Reads and writes to that collection will " +
+                    "unreachable rather than unprotected. Reads and writes to that table will " +
                     "fail until RLS can be enabled."
                 );
             }

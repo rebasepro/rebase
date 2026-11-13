@@ -435,7 +435,7 @@ export class FetchService {
         if (!spec) return undefined;
         if (!runtime || !collectionPath) {
             throw ApiError.badRequest(
-                `Cannot sort by '${orderBy}': an aggregate sort needs the collection it is written against, ` +
+                `Cannot sort by '${orderBy}': an aggregate sort needs the table it is written against, ` +
                 "and this query carries none.",
                 "ORDER_BY_FIELD_NOT_SORTABLE",
                 { field: orderBy }
@@ -457,7 +457,7 @@ export class FetchService {
         if (!idColumn) {
             throw ApiError.badRequest(
                 `Cannot sort by '${orderBy}' on table '${collectionPath}': the subquery correlates on a ` +
-                "single key column, and this collection has none or has a composite one.",
+                "single key column, and this table has none or has a composite one.",
                 "ORDER_BY_FIELD_NOT_SORTABLE",
                 { field: orderBy, collection: collectionPath }
             );

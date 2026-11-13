@@ -551,7 +551,7 @@ describe("the schema stamp", () => {
     it("lets a matching process boot quietly", async () => {
         const functions = await start({ REBASE_ROLE: "functions", REBASE_MIGRATE_ON_BOOT: "none" });
 
-        expect(functions.output()).not.toMatch(/different set of collections/);
+        expect(functions.output()).not.toMatch(/different set of tables/);
         expect((await fetch(`${functions.origin}/api/functions/echo/hello`)).status).toBe(200);
     }, 120_000);
 
@@ -566,7 +566,7 @@ describe("the schema stamp", () => {
             // Warns by default: mid-rollout disagreement is normal, and a
             // deployment that crash-loops through its own rollout has traded a
             // silent problem for a loud outage.
-            expect(functions.output()).toMatch(/different set of collections/);
+            expect(functions.output()).toMatch(/different set of tables/);
             expect(functions.output()).toContain("v2:0000000000000000");
             expect((await fetch(`${functions.origin}/api/functions/echo/hello`)).status).toBe(200);
         } finally {
@@ -584,7 +584,7 @@ describe("the schema stamp", () => {
                 REBASE_REQUIRE_SCHEMA_MATCH: "true"
             });
 
-            expect(said).toMatch(/different set of collections/);
+            expect(said).toMatch(/different set of tables/);
         } finally {
             await setStampedSchemaVersion(real!);
         }

@@ -246,7 +246,7 @@ export function columnTypeDriftMessage(drift: ColumnTypeDrift): string {
     const [schema, table] = drift.table.split(".");
     return (
         `Column "${drift.table}"."${drift.column}" is ${drift.actual} in the database, but this ` +
-        `collection declares ${drift.declared}. Boot does not change an existing column's type, so ` +
+        `table declares ${drift.declared}. Boot does not change an existing column's type, so ` +
         "the database keeps what it has and writes that match the declaration will be rejected by " +
         "Postgres. Change it deliberately, when you can watch it:\n" +
         `    ALTER TABLE "${schema}"."${table}" ALTER COLUMN "${drift.column}" ` +

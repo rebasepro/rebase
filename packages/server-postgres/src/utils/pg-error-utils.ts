@@ -332,7 +332,7 @@ export function pgFieldViolations(
  * migrates — the wrong way.
  */
 const SCHEMA_BEHIND =
-    "Check that the database is up to date with the collections: `rebase db push` in development, " +
+    "Check that the database is up to date with backend/schema: `rebase db push` in development, " +
     "or `rebase db migrate` where migrations are used.";
 
 /**

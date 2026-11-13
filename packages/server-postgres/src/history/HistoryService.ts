@@ -90,7 +90,7 @@ export class HistoryService {
     assertRecordable(collection: string): void {
         if (!this.unavailable) return;
         throw ApiError.serviceUnavailable(
-            `Collection "${collection}" keeps history (\`history: true\`), but this database is missing ` +
+            `Table "${collection}" keeps history (\`history: true\`), but this database is missing ` +
             `${this.unavailable} — no backend with history enabled has provisioned it. The write was refused ` +
             "rather than made without its audit entry; reads still work. Provision it by starting the backend " +
             "once with `history` enabled and `provision: true` (`rebase dev` does).",
@@ -198,7 +198,7 @@ export class HistoryService {
             // from a table they did not know they were writing to.
             throw new Error(
                 `Could not record the history entry for "${tableName}" (${String(id)}). ` +
-                "The write was rolled back: this collection declares `history: true`, and a row " +
+                "The write was rolled back: this table declares `history: true`, and a row " +
                 "that commits without its audit entry leaves a gap nothing can distinguish from " +
                 "\"no change was made\".",
                 { cause: error }

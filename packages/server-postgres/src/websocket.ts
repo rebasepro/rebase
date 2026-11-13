@@ -1531,7 +1531,7 @@ roles: verifiedUser.roles }
                     if (typeof request.path === "string" && isNestedPath(request.path)) {
                         throw ApiError.badRequest(
                             "An upsert is not accepted on a nested path: a row it matched would be moved " +
-                            "under this parent. Send the upsert to the collection directly.",
+                            "under this parent. Send the upsert to the table directly.",
                             "INVALID_CONFLICT_TARGET"
                         );
                     }
