@@ -52,6 +52,10 @@ export type {
 } from ${JSON.stringify(MIGRATE)};
 export type { SecurityRule } from "@rebasepro/types";
 export type EntityCallbackContext = RebaseCallContext;
+// 0.30's policy builder: the same as today's but for existsIn, which named its table \`collection\`.
+export declare const policy: Omit<typeof import("@rebasepro/types").policy, "existsIn"> & {
+    existsIn(args: { collection: string; where: import("@rebasepro/types").PolicyExpression }): import("@rebasepro/types").ExistsInPolicyExpression;
+};
 export declare function defineCollection<C extends LegacyWithAdminCollectionConfig>(collection: C): DefinedLegacyCollection<C>;
 `;
 
