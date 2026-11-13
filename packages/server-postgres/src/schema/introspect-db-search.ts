@@ -1,9 +1,9 @@
 /**
- * A collection's `search` block, read back out of the column it built.
+ * A table's `search` block, read back out of the column it built.
  *
  * A Rebase search column is `tsvector GENERATED ALWAYS AS (…) STORED`, stamped
  * with a fingerprint of the expression in its `COMMENT`. Introspection used to
- * emit it as an ordinary read-only string property, which the planner makes a
+ * emit it as an ordinary read-only text column, which the planner makes a
  * `text` column — so the first push after adopting a Rebase database planned
  * `ALTER COLUMN "search_vector" TYPE text … DROP EXPRESSION`, and search was
  * gone for whoever approved it.
@@ -21,17 +21,17 @@
 import {
     DEFAULT_SEARCH_COLUMN,
     DEFAULT_SEARCH_LANGUAGE,
-    type PostgresCollectionConfig,
-    type PostgresProperties,
-    type PostgresProperty,
-    type SearchConfig
+    type ColumnDescriptor,
+    type ColumnType,
+    type SearchConfig,
+    type TableDescriptor
 } from "@rebasepro/types";
-import { buildSearchColumnSpec, searchColumnStamps, SEARCH_STAMP_PREFIX } from "./search-column";
+import { buildTableSearchColumnSpec, searchColumnStamps, SEARCH_STAMP_PREFIX } from "./search-column";
 import type { TableColumn } from "./introspect-db-logic";
 
 /** What introspection makes of a table's search columns. */
 export interface ReconstructedSearch {
-    /** The generated columns that belong to the search block — never emitted as properties. */
+    /** The generated columns that belong to the search block — never emitted as columns. */
     columns: Set<string>;
     /** The table's `search` block, when the stamp confirmed it. */
     search?: SearchConfig;
@@ -41,17 +41,17 @@ export interface ReconstructedSearch {
 /** One `setweight(to_tsvector('<lang>'::regconfig, <text>), '<W>'::"char")`, deparsed. */
 const SEGMENT = /setweight\(to_tsvector\('((?:[^']|'')+)'::regconfig, ([\s\S]+?)\), '([A-D])'::"char"\)/g;
 
-/** A property with the column's shape, for the candidate block to resolve against. */
-function propertyFor(col: TableColumn): PostgresProperty | undefined {
+/**
+ * The column's type as the search builder classifies it, for the candidate
+ * block to resolve against: every string type reads as text, as the builder
+ * indexes them alike.
+ */
+function searchableTypeOf(col: TableColumn): ColumnType | undefined {
     if (col.data_type === "text" || col.data_type === "character varying" || col.data_type === "character") {
-        return { name: col.column_name, type: "string", columnName: col.column_name };
+        return { kind: "text" };
     }
-    if (col.udt_name === "_text") {
-        return { name: col.column_name, type: "array", columnName: col.column_name, of: { name: col.column_name, type: "string" } };
-    }
-    if (col.data_type === "jsonb") {
-        return { name: col.column_name, type: "map", columnName: col.column_name, keyValue: true };
-    }
+    if (col.udt_name === "_text") return { kind: "array", of: { kind: "text" } };
+    if (col.data_type === "jsonb") return { kind: "jsonb" };
     return undefined;
 }
 
@@ -65,7 +65,7 @@ export function reconstructSearchBlock(input: {
     columns: TableColumn[];
     /** column → `COMMENT ON COLUMN`. */
     comments: Map<string, string>;
-    /** column → the property key it is generated under. */
+    /** column → the column key it is generated under. */
     keyByColumn: Map<string, string>;
 }): ReconstructedSearch {
     const stamped = input.columns.filter(col =>
@@ -96,7 +96,7 @@ export function reconstructSearchBlock(input: {
             .find(name => byColumn.has(name) && !columns.has(name));
         if (!column) return unreadable("a field reads no column of this table");
         const key = input.keyByColumn.get(column);
-        if (!key) return unreadable(`the column "${column}" is not a property`);
+        if (!key) return unreadable(`the column "${column}" is not a declared column`);
         const jsonPath = [...inner.matchAll(/(?:->|#>)\s*'([^']+)'/g)]
             .flatMap(m => m[1].replace(/^\{|\}$/g, "").split(","));
         fields.push({ path: [key, ...jsonPath].join("."), weight });
@@ -113,23 +113,27 @@ export function reconstructSearchBlock(input: {
 
     // Compiled by the code that built the column, and kept only if it is the
     // same column: the fingerprint is a hash of the exact expression.
-    const properties: PostgresProperties = {};
+    const candidateColumns: ColumnDescriptor[] = [];
     for (const [column, key] of input.keyByColumn) {
         const col = byColumn.get(column);
-        const prop = col ? propertyFor(col) : undefined;
-        if (prop) properties[key] = prop;
+        const type = col ? searchableTypeOf(col) : undefined;
+        if (type) candidateColumns.push({ key, column, type, nullable: true });
     }
-    const candidate: PostgresCollectionConfig = {
-        slug: input.table,
+    const candidate: TableDescriptor = {
         name: input.table,
+        slug: input.table,
         table: input.table,
-        ...(input.schema !== "public" ? { schema: input.schema } : {}),
-        properties,
+        schema: input.schema,
+        kind: "table",
+        columns: candidateColumns,
+        primaryKey: [],
+        relations: [],
+        rls: { posture: "rules", rules: [], defaultPolicies: false },
         search
     };
     let fingerprints: Map<string, string>;
     try {
-        const spec = buildSearchColumnSpec(candidate);
+        const spec = buildTableSearchColumnSpec(candidate);
         if (!spec) return unreadable("no block compiles from it");
         fingerprints = new Map(searchColumnStamps(spec).map(stamp => [stamp.column, stamp.fingerprint]));
     } catch (err) {
