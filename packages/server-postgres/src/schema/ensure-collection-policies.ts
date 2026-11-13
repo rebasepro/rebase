@@ -7,8 +7,8 @@
  * runtime boots against, but a table with row-level security disabled and no
  * policies is not servable: authenticated requests run as the restricted
  * `rebase_user` role, so a read with no `SELECT` policy returns nothing (a
- * public collection answered 401) and a write with no `INSERT`/`UPDATE` policy
- * is denied. The policies live in the tables' `rls` (lowered to `securityRules`); nothing at
+ * public table answered 401) and a write with no `INSERT`/`UPDATE` policy
+ * is denied. The policies live in the tables' `rls`; nothing at
  * boot applied them. `rebase db push` does — but it drives Atlas against a
  * local `DATABASE_URL`, and a managed tenant's database is reachable only from
  * inside the cluster, by the runtime that is already connected to it. So the

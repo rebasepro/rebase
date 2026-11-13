@@ -24,17 +24,15 @@
 import {
     declaredDatabaseExtensions,
     REBASE_SCHEMA,
-    type CollectionConfig,
-    type CompiledTable
+    type CompiledTable,
+    type TableDescriptor
 } from "@rebasepro/types";
-import { getTableName, relationalCollections } from "@rebasepro/common";
 import { logger, isConcurrentDdlRace, isDuplicateObjectRace } from "@rebasepro/server";
 import { SEARCH_STAMP_PREFIX } from "./search-column";
 import { vectorExtensionHint } from "./vector-index";
 import { planJunctionTables, quoteSqlLiteral } from "./generate-postgres-ddl-logic";
 import { quoteRelation } from "./introspect-db-queries";
 import { planSchema } from "./plan/plan-schema";
-import { lowerCompiledTables } from "./lowered-tables";
 import { renderViewsDdl } from "./plan/render-ddl";
 import type { SchemaPlan } from "./plan/types";
 import {
@@ -165,20 +163,19 @@ export interface EnsureOutcome extends EnsurePlan {
     indexBuilds?: DeferredIndexOutcome;
 }
 
-/** The schema a collection lives in, validated before it reaches any DDL. */
-function schemaOf(collection: CollectionConfig): string {
-    const schema = (collection as { schema?: string }).schema || "public";
-    return assertSafeIdentifier(schema, "schema name");
+/** The schema a table lives in, validated before it reaches any DDL. */
+function schemaOf(table: TableDescriptor): string {
+    return assertSafeIdentifier(table.schema || "public", "schema name");
 }
 
 /**
  * Decide what to add. Pure — the caller supplies what exists and runs the
  * result.
  *
- * A plan and a diff: the collections are read once, by `planSchema`, into the
+ * A plan and a diff: the tables are read once, by `planSchema`, into the
  * same {@link SchemaPlan} `db push` renders `schema.sql` from, and the diff
  * subtracts what the database already has. Before that split this function had
- * its own reading of every `Property`, and the audit found twelve places where
+ * its own reading of every column, and the audit found twelve places where
  * it disagreed with the two generators — a required `author_id` that was
  * NOT NULL after a push and nullable after a boot among them, on the one path
  * with no developer in the loop.
@@ -548,8 +545,8 @@ function searchDriftMessage(drift: SearchColumnDrift[]): string {
 
 
 /**
- * Read what the database looks like, for the schemas a set of collections
- * lives in.
+ * Read what the database looks like, for the schemas a set of tables lives
+ * in.
  *
  * The same read `ensureCollectionTables` does at boot, exposed on its own for
  * the callers that want to *plan* against a real database without changing it —
@@ -560,17 +557,16 @@ export async function readSchemaFactsFor(
     client: Queryable,
     tables: readonly CompiledTable[]
 ): Promise<ExistingSchema> {
-    // B-PLAN-2 step 6: read the declared tables off the descriptors.
-    const relational = relationalCollections(lowerCompiledTables(tables));
+    const descriptors = tables.map(table => table.descriptor);
     const junctions = planJunctionTables(tables);
     const schemas = Array.from(new Set([
-        ...relational.map(schemaOf),
+        ...descriptors.map(schemaOf),
         ...junctions.map(junction => junction.schema)
     ]));
     // Row probes for the declared tables only: the classifier asks about the
-    // collections it is given, never about a table nobody declared.
+    // tables it is given, never about a table nobody declared.
     const declared = [
-        ...relational.map(collection => `${schemaOf(collection)}.${getTableName(collection)}`),
+        ...descriptors.map(descriptor => `${schemaOf(descriptor)}.${descriptor.table}`),
         ...junctions.map(junction => `${junction.schema}.${junction.table}`)
     ];
     return readExistingSchema(client, schemas, { probeTables: () => declared });
