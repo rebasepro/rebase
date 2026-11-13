@@ -203,24 +203,26 @@ beforeAll(async () => {
     for (const [name, target] of [
         ["@rebasepro/server-postgres", DRIVER_ROOT],
         ["@rebasepro/server", SERVER_ROOT],
+        ["@rebasepro/types", path.resolve(DRIVER_ROOT, "..", "types")],
         ["drizzle-orm", await fs.realpath(path.join(DRIVER_ROOT, "node_modules", "drizzle-orm"))],
         ["hono", await fs.realpath(path.join(SERVER_ROOT, "node_modules", "hono"))]
     ] as const) {
         await fs.symlink(target, path.join(modules, name), "dir");
     }
-    await fs.writeFile(path.join(projectDir, "config", "collections", "notes.js"), `
-export default {
-    name: "Notes",
-    singularName: "Note",
-    slug: "notes",
+    // The fixture's table, opened to every operation: this suite writes as
+    // well as reads.
+    await fs.writeFile(path.join(projectDir, "backend", "schema", "index.js"), `
+import { col, defineTable } from "@rebasepro/types";
+
+export const notes = defineTable("notes", {
     table: "split_notes",
     schema: "public",
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        title: { name: "Title", type: "string" }
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        title: col.text()
     },
-    securityRules: [{ operation: "all", access: "public" }]
-};
+    rls: [{ operation: "all", access: "public" }]
+});
 `);
     sqlFile = path.join(workDir, "rebase-provisioning.sql");
 
