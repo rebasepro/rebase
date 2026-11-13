@@ -32,7 +32,7 @@ function collection(slug: string): LegacyCollectionConfig {
     };
 }
 
-/** The descriptor an introspecting driver reports beside {@link collection}. */
+/** The descriptor an introspecting driver reports for a table it found. */
 function descriptor(slug: string): TableDescriptor {
     return {
         name: slug, slug, table: slug, schema: "public", kind: "table",
@@ -56,18 +56,17 @@ function stubDriver(): DataDriver {
 }
 
 /**
- * @param reports what initializeDriver reports back on `collections`:
+ * @param reports the slugs initializeDriver reports back on `tables`:
  *   an array = "I introspected and found these"; undefined = "I cannot introspect".
  */
-function fakeBootstrapper(reports: LegacyCollectionConfig[] | undefined): BackendBootstrapper {
+function fakeBootstrapper(reports: string[] | undefined): BackendBootstrapper {
     return {
         type: "fake",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
             return {
                 driver: stubDriver(),
-                collections: reports,
-                ...(reports ? { tables: reports.map(c => descriptor(c.slug)) } : {}),
+                ...(reports ? { tables: reports.map(descriptor) } : {}),
                 internals: {}
             };
         }
@@ -110,13 +109,13 @@ afterEach(() => {
 describe("no declared collections — derived from the database", () => {
     it("serves the collections the driver derived from the database", async () => {
         const { app, backend } = await boot({
-            bootstrappers: [fakeBootstrapper([collection("posts")])]
+            bootstrappers: [fakeBootstrapper(["posts"])]
         });
 
-        // The registry is the precise check: the auth middleware answers every
-        // /api/data/* path alike, so route probing alone can't tell which
-        // collections are actually registered.
-        expect(backend.collectionRegistry.getCollections().map(c => c.slug)).toEqual(["posts"]);
+        // The served tables are the precise check: the auth middleware answers
+        // every /api/data/* path alike, so route probing alone can't tell which
+        // tables are actually served.
+        expect(backend.services.tables().map(table => table.slug)).toEqual(["posts"]);
         expect(await mounted(app, "/api/data/posts")).toBe(true);
     });
 
@@ -127,10 +126,10 @@ describe("no declared collections — derived from the database", () => {
         // the flag and the data can no longer disagree.
         const { backend } = await boot({
             ...tablesFrom([collection("from_config")]),
-            bootstrappers: [fakeBootstrapper([collection("from_database")])]
+            bootstrappers: [fakeBootstrapper(["from_database"])]
         });
 
-        expect(backend.collectionRegistry.getCollections().map(c => c.slug)).toEqual(["from_config"]);
+        expect(backend.services.tables().map(table => table.slug)).toEqual(["from_config"]);
     });
 
     it("fails at boot when the driver cannot introspect, instead of serving nothing", async () => {

@@ -148,14 +148,14 @@ describe("the scaffolded users table", () => {
 
     it("keeps its password hash and verification token out of the document", async () => {
         const compiled = compileLoadedSchema(await loadBackendSchema(templateSchema));
-        const users = compiled.collections.find(collection => collection.slug === "users");
+        const users = compiled.descriptors.find(table => table.slug === "users");
         if (!users) throw new Error("the template's backend/schema exports no users table");
-        const properties = users.properties;
+        const privacy = (key: string) => users.columns.find(column => column.key === key)?.private;
 
-        expect(properties.passwordHash?.excludeFromApi).toBe(true);
-        expect(properties.emailVerificationToken?.excludeFromApi).toBe(true);
+        expect(privacy("passwordHash")).toBe(true);
+        expect(privacy("emailVerificationToken")).toBe(true);
 
-        const serialized = JSON.stringify(generateOpenApiSpec(tablesFromCollections([users]).descriptors));
+        const serialized = JSON.stringify(generateOpenApiSpec([users]));
 
         expect(serialized).not.toContain("passwordHash");
         expect(serialized).not.toContain("password_hash");

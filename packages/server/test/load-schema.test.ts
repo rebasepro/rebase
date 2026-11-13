@@ -103,10 +103,9 @@ export const defaultRls = [{ operation: "select", access: "public" }];
         const loaded = await loadBackendSchema(dir);
 
         expect(loaded.defaultRls).toEqual([{ operation: "select", access: "public" }]);
-        const { descriptors, collections } = compileLoadedSchema(loaded);
-        expect(descriptors[0].rls).toMatchObject({ posture: "rules", inherited: true });
-        expect(collections[0].slug).toBe("posts");
-        expect(collections[0].securityRules).toEqual([{ operation: "select", access: "public" }]);
+        const { descriptors } = compileLoadedSchema(loaded);
+        expect(descriptors[0].slug).toBe("posts");
+        expect(descriptors[0].rls).toMatchObject({ posture: "rules", inherited: true, rules: [{ operation: "select", access: "public" }] });
     });
 
     it("refuses a sibling table the index does not export, naming the file and the fix", async () => {

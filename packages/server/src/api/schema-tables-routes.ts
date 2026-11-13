@@ -2,7 +2,6 @@ import { Hono, type Context, type MiddlewareHandler } from "hono";
 import {
     SCHEMA_VERSION_HEADER,
     computeSchemaVersion,
-    type CollectionConfig,
     type TableDescriptor
 } from "@rebasepro/types";
 import type { HonoEnv } from "./types";
@@ -70,11 +69,11 @@ export interface SchemaTablesServiceConfig {
     /** The descriptors served. Its revision invalidates every cache. */
     tableRegistry: Pick<TableRegistry, "list" | "revision">;
     /**
-     * The collections the declared tables were lowered into: what the policy
-     * compiler reads. Introspected tables are not among them — Rebase did not
-     * generate their policies, so it serves none for them.
+     * The declared tables: what the policy compiler reads. Introspected tables
+     * are not among them — Rebase did not generate their policies, so it
+     * serves none for them.
      */
-    policySource: () => readonly CollectionConfig[];
+    policySource: () => readonly TableDescriptor[];
     /**
      * The schema version the bundle recorded at build time, quoted while the
      * registry is as it was when the service was created. Recomputed from the

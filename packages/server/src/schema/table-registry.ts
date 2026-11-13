@@ -14,12 +14,11 @@ export type RegisteredTable = Pick<CompiledTable, "descriptor" | "hooks" | "tran
  * The tables one backend serves, by slug: each one's compiled descriptor and,
  * for a declared table, its server-only code.
  *
- * Beside the collection registry, not instead of it: the data drivers still
- * read the collections the definitions were lowered into, while everything
- * built on the table model (`GET /api/schema/tables`, the schema version,
- * hooks' `table` argument, storage limits, the auth table, the RLS simulator)
- * reads these. Both are filled from the same compile at boot, so they cannot
- * disagree about which tables exist.
+ * Everything the server decides about a table reads this: `GET
+ * /api/schema/tables`, the schema version, hooks' `table` argument, storage
+ * limits, the auth table, the RLS simulator, the data routes, which data
+ * source a path is routed to. The data drivers hold their own copy of the same
+ * compiled tables, handed to them at boot.
  *
  * For a backend that introspects the database, the descriptors of the tables
  * introspection found (those that could be described; see
@@ -61,6 +60,16 @@ export class TableRegistry {
     /** The descriptor of the table served at `/api/data/<slug>`, if there is one. */
     get(slug: string): TableDescriptor | undefined {
         return this.bySlug.get(slug)?.descriptor;
+    }
+
+    /**
+     * The descriptor a path's first segment names: a slug, its kebab-case
+     * spelling (`blog-posts` for `blog_posts`, as URLs write it), or the SQL
+     * table name — the names a data path is addressed by.
+     */
+    named(segment: string): TableDescriptor | undefined {
+        const bySlug = this.get(segment) ?? (segment.includes("-") ? this.get(segment.replace(/-/g, "_")) : undefined);
+        return bySlug ?? this.list().find(table => table.table === segment);
     }
 
     /** Every table with its server-only code, in the order they were compiled. */

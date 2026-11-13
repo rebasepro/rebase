@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import fs from "node:fs";
 import path from "node:path";
-import { getGeneratedPolicyNames } from "@rebasepro/common";
-import type { LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
+import { policyTableFromDescriptor, tableGeneratedPolicyNames } from "@rebasepro/common";
+import type { TableDescriptor } from "@rebasepro/types";
 
 import { TableSourceEditor, TableSourceEditError } from "../src/api/table-source-editor";
 import { SCHEMA_FILES, readSchemaFile, writeSchemaFixture } from "./helpers/schema-source-fixture";
@@ -128,8 +128,8 @@ describe("relations", () => {
 });
 
 describe("rls", () => {
-    const policyNames = (collections: LegacyPostgresCollectionConfig[]) =>
-        [...getGeneratedPolicyNames(collections.find(collection => collection.slug === "posts")!)].sort();
+    const policyNames = (tables: TableDescriptor[]) =>
+        [...tableGeneratedPolicyNames(policyTableFromDescriptor(tables.find(table => table.slug === "posts")!))].sort();
 
     it("replaces one rule and leaves every other rule's text — and its policy's name — as it was", async () => {
         const before = await editor.compile(new Map(Object.entries(SCHEMA_FILES).map(([name, text]) => [path.join(fixture.dir, name), text])));
@@ -139,8 +139,8 @@ describe("rls", () => {
         expect(withoutLine(withoutLine(text, "        { operation: \"delete\", roles: [\"admin\", \"owner\"] }"), ""))
             .toBe(withoutLine(withoutLine(SCHEMA_FILES["posts.ts"], "        { operation: \"delete\", roles: [\"admin\"] }"), ""));
 
-        const namesBefore = policyNames(before.collections);
-        const namesAfter = policyNames(edit.schema.collections);
+        const namesBefore = policyNames(before.descriptors);
+        const namesAfter = policyNames(edit.schema.descriptors);
         const changed = namesBefore.filter(name => !namesAfter.includes(name));
         // Only the delete rule's policy is renamed; select, insert and update keep theirs.
         expect(changed).toHaveLength(1);

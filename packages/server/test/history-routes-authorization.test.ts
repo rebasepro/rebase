@@ -29,7 +29,6 @@
 
 import { Hono } from "hono";
 import { createHistoryRoutes, type HistoryService } from "../src/history/history-routes";
-import type { BackendCollectionRegistry } from "../src/collections/BackendCollectionRegistry";
 import type { ApiKeyMasked } from "@rebasepro/types";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
@@ -101,7 +100,7 @@ function mount(options: {
     // `history-served-as-read.test.ts`'s, over a real driver.
     const scopedDriver = fakeDataDriver({ fetchOne, save, serveStoredRows: async (_path: string, rows: Record<string, unknown>[]) => rows });
 
-    const registry: Pick<BackendCollectionRegistry, "getCollections"> = {
+    const registry: { getCollections: () => LegacyCollectionConfig[] } = {
         getCollections: () => [collection("posts"), collection("comments")]
     };
 

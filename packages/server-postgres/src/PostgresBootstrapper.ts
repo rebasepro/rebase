@@ -14,7 +14,6 @@ import {
     BootstrappedAuth,
     DatabaseAdmin,
     type DataDriver,
-    CollectionConfig,
     DEFAULT_DATA_SOURCE_KEY,
     type HistoryConfig,
     InitializedDriver,
@@ -32,7 +31,7 @@ import { buildTableRegistry } from "./model/build-registry";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { PostgresTableRegistry } from "./model/PostgresTableRegistry";
 import { createEmailService, type EmailConfig, type EmailService, logger } from "@rebasepro/server";
-import { compileDescribedTables, declaredSchemaOf, sqlRows } from "@rebasepro/common";
+import { declaredSchemaOf, sqlRows } from "@rebasepro/common";
 import { ensureAuthTablesExist } from "./auth/ensure-tables";
 import { assertAuthSchemaCompatible, probeAuthSchema, resolveAuthSchema } from "./auth/schema-version";
 import { AuthSchemaTables, PostgresAuthRepository, UserService } from "./auth/services";
@@ -42,7 +41,7 @@ import { HistoryService } from "./history/HistoryService";
 import { ensureHistoryIndexes, ensureHistoryTableExists, historyUnavailableReason, readHistoryTableState } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
 import { patchPgNumericToNumber } from "./utils/pg-numeric-number-patch";
-import { introspectSchema, lowerIntrospectedTables } from "./schema/introspect-runtime";
+import { compileIntrospectedTables, introspectSchema } from "./schema/introspect-runtime";
 import { introspectTables } from "./schema/introspect-tables";
 import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema";
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
@@ -690,9 +689,8 @@ export async function openPostgresDriver(
     // ── No declared collections: derive the schema from the database ──
     // No collection files and no generated drizzle schema exist, so read
     // the live database and build both from what is actually there.
-    let introspectedCollections: CollectionConfig[] | undefined;
-    // Their descriptors, read from the catalogue: what the server serves at
-    // `GET /api/schema/tables` for a project that declares no tables.
+    // The descriptors, read from the catalogue: what the server serves (and
+    // `GET /api/schema/tables` describes) for a project that declares no tables.
     let introspectedDescriptors: TableDescriptor[] | undefined;
     // The same tables compiled for the runtime: each descriptor as introspected,
     // beside the definition that states it. No hooks: nobody declared them.
@@ -764,23 +762,21 @@ export async function openPostgresDriver(
             );
         }
 
-        // The request-time collections, lowered from the descriptors at the
-        // boundary a declared table crosses at boot.
-        const lowered = lowerIntrospectedTables(introspected.tables);
-        for (const { table, reason } of lowered.dropped) {
+        // The tables the runtime runs on, compiled from the descriptors.
+        const servable = compileIntrospectedTables(introspected.tables);
+        for (const { table, reason } of servable.dropped) {
             logger.warn(`[PostgresRegistry] BaaS mode: not serving table "${table}": ${reason}`);
         }
-        introspectedDescriptors = lowered.tables;
-        introspectedCollections = lowered.collections;
-        introspectedCompiled = compileDescribedTables(lowered.tables, { rls: () => "admin-only" });
+        introspectedDescriptors = servable.tables;
+        introspectedCompiled = servable.compiled;
 
         // The Drizzle tables the query layer reads, from the same catalogue:
         // the served tables and the protected join tables their relations
-        // go through, keyed the way the collections above name their fields,
+        // go through, keyed the way the descriptors above name their columns,
         // with relations derived from the foreign keys.
         const schema = await introspectSchema(rawClient, pgSchemaName);
         const keep = new Set([
-            ...lowered.tables.map((t) => t.table),
+            ...servable.tables.map((t) => t.table),
             ...introspected.junctions.filter((j) => j.rlsEnabled).map((j) => j.table)
         ]);
         for (const table of [...schema.tablesMap.keys()]) {
@@ -789,7 +785,7 @@ export async function openPostgresDriver(
         ({ tables: introspectedTables, relations: introspectedRelations } =
             buildBaasSchema(schema.tablesMap, pgSchemaName, introspectedDescriptors));
         logger.info(
-            `🔍 [PostgresRegistry] BaaS mode: derived ${introspectedCollections.length} tables from schema "${pgSchemaName}" [${introspectedCollections.map(c => c.slug).join(", ")}]`
+            `🔍 [PostgresRegistry] BaaS mode: derived ${servable.tables.length} tables from schema "${pgSchemaName}" [${servable.tables.map(t => t.slug).join(", ")}]`
         );
     }
 
@@ -818,7 +814,7 @@ export async function openPostgresDriver(
     let ownCatalogue: Map<string, TableMeta> | undefined;
     let ownDescriptors: TableDescriptor[] = [];
     const sourceKey = config.dataSourceKey ?? DEFAULT_DATA_SOURCE_KEY;
-    if (!introspectedCollections && declaredTables && declaredTables.length > 0) {
+    if (!introspectedDescriptors && declaredTables && declaredTables.length > 0) {
         ownDescriptors = declaredTables
             .map(t => t.descriptor)
             .filter(d => (d.database ?? DEFAULT_DATA_SOURCE_KEY) === sourceKey);
@@ -925,7 +921,7 @@ export async function openPostgresDriver(
     //
     // In BaaS mode the registry holds what THIS database was introspected
     // for, so every registered collection is already this source's.
-    const introspectedHere = Boolean(introspectedCollections);
+    const introspectedHere = Boolean(introspectedDescriptors);
     const tablesOnThisSource = (): readonly RuntimeTable[] => {
         const all = registry.tables();
         if (introspectedHere) return all;
@@ -1743,9 +1739,8 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         driver,
         realtimeProvider: realtimeService,
         collectionRegistry: registry,
-        // Only set in baas mode — tells the server which collections the
-        // database turned out to have.
-        collections: introspectedCollections,
+        // Only set in baas mode — tells the server which tables the database
+        // turned out to have.
         tables: introspectedDescriptors,
         ...(skippedUnprotected && { unprotectedTables: skippedUnprotected }),
         internals

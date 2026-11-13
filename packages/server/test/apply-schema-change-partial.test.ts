@@ -97,13 +97,12 @@ describe("a DDL failure after the first statement", () => {
             await next();
         });
         app.route("/api/schema", createLiveSchemaRoutes({
-            getCollections: () => [{ slug: "posts", name: "posts", properties: {} }],
             getCompiledTables: () => [],
             getAdmin: () => admin,
             getRepository: () => repository(),
             previewSource: async () => ({
                 files: [],
-                schema: { defs: [], tables: [], descriptors: [], collections: [{ slug: "posts", name: "posts", properties: {} }] }
+                schema: { defs: [], tables: [], descriptors: [] }
             }),
             writeSource: async () => []
         }));

@@ -36,7 +36,6 @@ import {
     parseTablePatches,
     type AuthAdapter,
     type ClassifiedSchemaChanges,
-    type CollectionConfig,
     type CompiledTable,
     type DatabaseAdmin,
     type SchemaChangeFile,
@@ -81,15 +80,9 @@ export interface PreviewedSource {
 
 export interface LiveSchemaRoutesConfig {
     /**
-     * The collections the running server was built from — the `before` side.
-     * Read at request time, because the registry is assembled after the routes
-     * are mounted.
-     */
-    getCollections: () => CollectionConfig[];
-    /**
      * The tables the running server serves, compiled — the `before` side of
      * every plan and what a reconcile is planned against. Read at request time,
-     * like {@link getCollections}.
+     * because the registry is assembled after the routes are mounted.
      */
     getCompiledTables: () => readonly CompiledTable[];
     /** The driver's admin, for planning and for running the DDL. */
@@ -125,7 +118,7 @@ export interface LiveSchemaRoutesConfig {
     /**
      * The descriptors the running server serves — the `before` side of a
      * table's `rls`, kept on the served tables when an apply's policies could
-     * not be written. Read at request time, like {@link getCollections}.
+     * not be written. Read at request time, like {@link getCompiledTables}.
      */
     getTables?: () => readonly TableDescriptor[];
     /**
@@ -438,24 +431,19 @@ function filesCommittedBy(config: LiveSchemaRoutesConfig, source: PreviewedSourc
  * project that replays migrations needs this change recorded as one, or its
  * next environment is built without it.
  */
-/** Whether a lowered collection turns the injected admin baseline off (a Postgres collection's `disableDefaultPolicies`). */
-function disablesDefaultPolicies(collection: CollectionConfig): boolean {
-    const off: unknown = Reflect.get(collection, "disableDefaultPolicies");
-    return off === true;
-}
-
-/** What decides a table's policies, on a lowered collection. */
-function rlsIdentity(collection: CollectionConfig): string {
-    return JSON.stringify({ rules: collection.securityRules ?? [], off: disablesDefaultPolicies(collection) });
+/** What decides a table's policies: its declared rules, and whether the injected admin baseline is off. */
+function rlsIdentity(table: TableDescriptor): string {
+    const rules = table.rls.posture === "rules" ? table.rls.rules : [];
+    return JSON.stringify({ rules, off: table.rls.posture === "rules" && !table.rls.defaultPolicies });
 }
 
 /**
  * The slugs of the tables whose policies an edit changes: a table it adds,
  * or one whose rules or `defaultPolicies` differ.
  */
-export function rlsChangedSlugs(before: readonly CollectionConfig[], after: readonly CollectionConfig[]): string[] {
-    const previous = new Map(before.map(collection => [collection.slug, rlsIdentity(collection)]));
-    return after.filter(collection => previous.get(collection.slug) !== rlsIdentity(collection)).map(collection => collection.slug);
+export function rlsChangedSlugs(before: readonly TableDescriptor[], after: readonly TableDescriptor[]): string[] {
+    const previous = new Map(before.map(table => [table.slug, rlsIdentity(table)]));
+    return after.filter(table => previous.get(table.slug) !== rlsIdentity(table)).map(table => table.slug);
 }
 
 /** Whether the default database stores a table: the one the apply's DDL ran on. */
@@ -494,17 +482,15 @@ function policySummary(policies: SchemaEditPolicyOutcome): string {
 
 /**
  * The edited schema with the changed tables' `rls` as the database still
- * enforces it: the previous descriptor's `rls` and collection's rules, or,
- * for a table the edit created, closed (RLS is on, no policy grants a row).
+ * enforces it: the previous descriptor's `rls`, or, for a table the edit
+ * created, closed (RLS is on, no policy grants a row).
  */
 export function keepEnforcedRls(
     schema: EditedSchema,
     changed: readonly string[],
-    before: readonly CollectionConfig[],
     beforeTables: readonly TableDescriptor[]
 ): EditedSchema {
     const changedSet = new Set(changed);
-    const previousCollection = new Map(before.map(collection => [collection.slug, collection]));
     const previousTable = new Map(beforeTables.map(table => [table.slug, table]));
     const enforced = (descriptor: TableDescriptor): TableDescriptor => {
         if (!changedSet.has(descriptor.slug)) return descriptor;
@@ -514,16 +500,7 @@ export function keepEnforcedRls(
     return {
         ...schema,
         tables: schema.tables.map(table => (changedSet.has(table.descriptor.slug) ? { ...table, descriptor: enforced(table.descriptor) } : table)),
-        descriptors: schema.descriptors.map(enforced),
-        collections: schema.collections.map(collection => {
-            if (!changedSet.has(collection.slug)) return collection;
-            const previous = previousCollection.get(collection.slug);
-            return {
-                ...collection,
-                securityRules: previous?.securityRules ?? [],
-                disableDefaultPolicies: previous ? disablesDefaultPolicies(previous) : true
-            };
-        })
+        descriptors: schema.descriptors.map(enforced)
     };
 }
 
@@ -791,8 +768,6 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             // that turns out to be unapplicable is refused having touched
             // nothing.
             const source = await preview(patches);
-            const before = config.getCollections();
-            const after = source.schema.collections;
             const compiledBefore = config.getCompiledTables();
             const compiledAfter = source.schema.tables;
             const plan = sourceOnly
@@ -874,11 +849,11 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             // does not hold.
             let policies: SchemaEditPolicyOutcome | undefined;
             if (!sourceOnly && result.applied) {
-                const changed = rlsChangedSlugs(before, after);
+                const changed = rlsChangedSlugs(compiledBefore.map(table => table.descriptor), source.schema.descriptors);
                 let served = source.schema;
                 if (changed.length > 0) {
                     policies = await applyChangedPolicies(config, source.schema, changed);
-                    if (policies.status !== "applied") served = keepEnforcedRls(source.schema, changed, before, config.getTables?.() ?? []);
+                    if (policies.status !== "applied") served = keepEnforcedRls(source.schema, changed, config.getTables?.() ?? []);
                 }
                 await config.onApplied?.(served);
             }

@@ -14,19 +14,15 @@ import {
     type DataDriver,
     type InitializedDriver,
     type TableDescriptor,
-    type TableHooks
+    type TableHooks,
+    type TableRegistryInterface
 } from "@rebasepro/types";
-import {
-    type LegacyPostgresCollectionConfig
-} from "@rebasepro/common/migrate";
 import { createRebaseClient } from "@rebasepro/client";
-import { lowerTables, tableDefsFromDescriptors } from "@rebasepro/common";
 import type { HonoEnv } from "../src/api/types";
 import type { RebaseAuthConfig, SchemaTablesOptions } from "../src/backend/options";
 import { initializeRebaseBackend } from "../src/init";
 import { generateAccessToken } from "../src/auth/jwt";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
-import { BackendCollectionRegistry } from "../src/collections/BackendCollectionRegistry";
 
 /**
  * `GET /api/schema/tables` through the real router of a booted backend: who
@@ -165,7 +161,7 @@ function bootstrapper(introspected?: Introspected): BackendBootstrapper {
         type: "fake",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver: stubDriver(), collections: introspected?.collections ?? [], tables: introspected?.tables, internals: {} };
+            return { driver: stubDriver(), tables: introspected?.tables ?? [], internals: {} };
         },
         async initializeAuth() {
             return { userService: {}, authRepository: {} };
@@ -494,16 +490,15 @@ describe("ETag and 304", () => {
 
 // ── Introspection mode ───────────────────────────────────────────────────────
 
-/** What an introspecting driver reports: the collections it serves and their descriptors. */
+/** What an introspecting driver reports: the descriptors of the tables it serves. */
 interface Introspected {
-    collections: LegacyPostgresCollectionConfig[];
     tables: TableDescriptor[];
 }
 
 /**
- * What the Postgres driver's runtime introspection (`introspectTables`, then
- * `lowerIntrospectedTables`) hands back for two tables: descriptors read from
- * the catalogue — the policies as rules — and the collections lowered from them.
+ * What the Postgres driver's runtime introspection (`introspectTables`) hands
+ * back for two tables: descriptors read from the catalogue — the policies as
+ * rules.
  */
 function introspected(): Introspected {
     const tables: TableDescriptor[] = [
@@ -535,8 +530,7 @@ function introspected(): Introspected {
             rls: { posture: "rules", rules: [], defaultPolicies: false }
         }
     ];
-    const collections = lowerTables(tableDefsFromDescriptors(tables, { rls: () => "admin-only" }), { introspected: true });
-    return { collections, tables };
+    return { tables };
 }
 
 describe("introspection mode (no backend/schema)", () => {
@@ -566,8 +560,11 @@ describe("introspection mode (no backend/schema)", () => {
 
     it("lets global hooks boot, every introspected table having its descriptor", async () => {
         // A driver registry takes the hooks as declared (`setGlobalHooks`).
-        class HookRegistry extends BackendCollectionRegistry {
+        class HookRegistry implements TableRegistryInterface {
             globalHooks?: TableHooks;
+            getTable(): undefined {
+                return undefined;
+            }
             setGlobalHooks(hooks: TableHooks): void {
                 this.globalHooks = hooks;
             }
@@ -577,7 +574,7 @@ describe("introspection mode (no backend/schema)", () => {
         const withRegistry: BackendBootstrapper = {
             ...bootstrapper(fixture),
             async initializeDriver(): Promise<InitializedDriver> {
-                return { driver: stubDriver(), collections: fixture.collections, tables: fixture.tables, collectionRegistry: registry, internals: {} };
+                return { driver: stubDriver(), tables: fixture.tables, collectionRegistry: registry, internals: {} };
             }
         };
         await initializeRebaseBackend({
@@ -589,12 +586,6 @@ describe("introspection mode (no backend/schema)", () => {
             hooks: { beforeSave: ({ values }) => values }
         });
         expect(registry.globalHooks?.beforeSave).toBeDefined();
-    });
-
-    it("refuses to boot when a driver serves a table it did not describe", async () => {
-        const fixture = introspected();
-        await expect(boot({ introspected: { collections: fixture.collections, tables: fixture.tables.slice(0, 1) } }))
-            .rejects.toThrow(/Driver "fake" reported tables and descriptors that do not match; served without a descriptor: orders/);
     });
 });
 

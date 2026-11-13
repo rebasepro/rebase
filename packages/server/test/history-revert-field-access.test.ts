@@ -23,7 +23,6 @@
 
 import { Hono } from "hono";
 import { createHistoryRoutes, type HistoryService } from "../src/history/history-routes";
-import type { BackendCollectionRegistry } from "../src/collections/BackendCollectionRegistry";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
@@ -101,7 +100,7 @@ function mount(roles: string[] | undefined, entry = snapshot()) {
         fetchHistory: jest.fn().mockResolvedValue({ data: [], total: 0 }),
         fetchHistoryEntry: jest.fn().mockResolvedValue(entry)
     };
-    const registry: Pick<BackendCollectionRegistry, "getCollections"> = { getCollections: () => [orders, customers] };
+    const registry: { getCollections: () => LegacyCollectionConfig[] } = { getCollections: () => [orders, customers] };
 
     const fetchOne = jest.fn(async () => {
         const { stripe_intent: _excluded, internalNote, ...row } = CURRENT;

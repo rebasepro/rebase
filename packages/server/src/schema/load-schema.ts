@@ -9,10 +9,9 @@ import {
     type AnyViewDef,
     type CompiledTable,
     type DefaultRls,
-    type PostgresCollectionConfig,
     type TableDescriptor
 } from "@rebasepro/types";
-import { SchemaDefinitionError, compileSchema, compileTables, lowerTables, type SchemaDefinitionProblem } from "@rebasepro/common";
+import { SchemaDefinitionError, compileSchema, compileTables, type SchemaDefinitionProblem } from "@rebasepro/common";
 
 /**
  * The one definition of "the tables".
@@ -306,7 +305,7 @@ export async function loadBackendSchema(dir: string, options: LoadBackendSchemaO
 }
 
 /**
- * A loaded schema compiled and lowered, the same way for every caller.
+ * A loaded schema compiled, the same way for every caller.
  *
  * @group Schema
  */
@@ -318,19 +317,11 @@ export interface CompiledSchema {
     tables: CompiledTable[];
     /** The descriptors, in definition order: `tables[i].descriptor`. */
     descriptors: TableDescriptor[];
-    /**
-     * The definitions lowered into the collection objects today's registry,
-     * routes and drivers read; hooks receive their table's descriptor.
-     */
-    collections: PostgresCollectionConfig[];
 }
 
 /**
- * Compile table and view definitions to {@link CompiledSchema.tables} (and their
- * descriptors), and lower them into the collection objects the request-time
- * code not yet moved onto tables reads, with every hook wired to its table's
- * descriptor. The one way to lower: boot, the runtime and the CLI all
- * call this rather than `lowerTables` directly.
+ * Compile table and view definitions to {@link CompiledSchema.tables} and their
+ * descriptors. Boot, the runtime and the CLI all compile through this.
  *
  * @group Schema
  */
@@ -340,10 +331,7 @@ export function compileSchemaDefs(
 ): CompiledSchema {
     const options = defaultRls !== undefined ? { defaultRls } : {};
     const tables = compileSchema(defs, options);
-    const descriptors = tables.map(table => table.descriptor);
-    const bySlug = new Map(descriptors.map(descriptor => [descriptor.slug, descriptor]));
-    const collections = lowerTables(defs, { ...options, describe: slug => bySlug.get(slug) });
-    return { tables, descriptors, collections };
+    return { tables, descriptors: tables.map(table => table.descriptor) };
 }
 
 /**

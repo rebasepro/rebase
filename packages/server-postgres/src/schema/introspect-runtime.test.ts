@@ -1,8 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
-import { resolveCollectionRelations } from "@rebasepro/common";
 import type { TableDescriptor } from "@rebasepro/types";
 
-import { introspectSchema, lowerIntrospectedTables, Queryable } from "./introspect-runtime";
+import { compileIntrospectedTables, introspectSchema, Queryable } from "./introspect-runtime";
 import { describeTables, introspectTables, rlsRemediationSql } from "./introspect-tables";
 import type { ForeignKeyRow, PolicyRow, PrimaryKeyRow, SchemaMetadata, TableColumn, TableRow } from "./introspect-db-logic";
 import {
@@ -23,9 +22,9 @@ import {
  * Runtime introspection: what a backend with no `backend/schema` serves.
  *
  * The descriptors are read from the catalogue (`introspectTables`), and the
- * collections the request-time code reads are lowered from them
- * (`lowerIntrospectedTables`). The REST surface must not move by one key: the
- * keys asserted below are the ones the runtime has always served.
+ * runtime compiles them (`compileIntrospectedTables`). The REST surface must
+ * not move by one key: the keys asserted below are the ones the runtime has
+ * always served.
  */
 
 function column(overrides: Partial<TableColumn> & { table_name: string; column_name: string }): TableColumn {
@@ -161,14 +160,6 @@ describe("describeTables (runtime) — column types", () => {
         });
     });
 
-    it("serves a type Rebase does not create as the driver returns it — a list as an array, the rest as a string", () => {
-        const { collections } = lowerIntrospectedTables([t]);
-        const properties = collections[0].properties;
-        for (const key of ["aInet", "aCitext", "aInterval", "aTs", "aMoney", "aXml", "aRange", "aGeometry"]) {
-            expect({ key, type: properties[key]?.type }).toEqual({ key, type: "string" });
-        }
-        expect(properties.aInetArray?.type).toBe("array");
-    });
 });
 
 describe("describeTables (runtime) — keys, defaults, generated columns", () => {
@@ -268,27 +259,6 @@ describe("describeTables (runtime) — relations", () => {
         expect(tableOf(tables, "authors").relations).toEqual([]);
     });
 
-    it("lowers to the very property keys the REST surface has always had", () => {
-        const { collections } = lowerIntrospectedTables(tables);
-        const lowered = collections.find(c => c.slug === "posts");
-        expect(Object.keys(lowered?.properties ?? {})).toEqual(["id", "title", "author", "reviewer"]);
-        expect(lowered?.properties.author).toMatchObject({ type: "relation", validation: { required: true } });
-        expect(lowered?.securityRules).toBeUndefined();
-        expect(lowered?.disableDefaultPolicies).toBeUndefined();
-    });
-
-    /**
-     * Asserted through the resolver: `assertKnownWriteFields` learns an owning
-     * relation's foreign-key column from the resolved relation's `localKey`,
-     * which is what makes `author_id` writable on an introspected table.
-     */
-    it("emits a relation the resolver can read, so the foreign-key column is writable", () => {
-        const { collections } = lowerIntrospectedTables(tables);
-        const resolved = resolveCollectionRelations(collections.find(c => c.slug === "posts")!);
-        expect(Object.keys(resolved)).toEqual(["author", "reviewer"]);
-        expect(resolved.author).toMatchObject({ kind: "belongsTo", localKey: "author_id" });
-        expect(resolved.author.target().slug).toBe("authors");
-    });
 
     it("keeps a key column that is also a foreign key, and names its relation apart", () => {
         const [areaTag] = describeTables(metadata({
@@ -395,7 +365,7 @@ describe("describeTables (runtime) — row-level security", () => {
     });
 });
 
-describe("lowerIntrospectedTables", () => {
+describe("compileIntrospectedTables", () => {
     it("drops a descriptor no definition can state, and the relations into it, serving the rest", () => {
         const { tables } = describeTables(metadata({
             columns: [uuidKey("authors"), uuidKey("posts"), column({ table_name: "posts", column_name: "author_id", data_type: "uuid", udt_name: "uuid" })],
@@ -403,13 +373,13 @@ describe("lowerIntrospectedTables", () => {
             fks: [{ table_name: "posts", column_name: "author_id", foreign_table_name: "authors", foreign_column_name: "id" }]
         }));
         const broken = tables.map(t => t.slug === "authors" ? { ...t, schema: "not-an-identifier" } : t);
-        const lowered = lowerIntrospectedTables(broken);
+        const lowered = compileIntrospectedTables(broken);
         expect(lowered.dropped).toEqual([{ table: "authors", reason: expect.stringContaining("must be a plain SQL identifier") }]);
         expect(lowered.tables.map(t => t.slug)).toEqual(["posts"]);
         expect(lowered.tables[0].relations).toEqual([]);
         expect(byKey(lowered.tables[0]).authorId).toMatchObject({ column: "author_id" });
         expect(byKey(lowered.tables[0]).authorId.foreignKeyOf).toBeUndefined();
-        expect(Object.keys(lowered.collections[0].properties)).toEqual(["id", "authorId"]);
+        expect(lowered.compiled.map(table => table.descriptor)).toEqual(lowered.tables);
     });
 });
 

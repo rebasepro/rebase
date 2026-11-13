@@ -26,7 +26,6 @@ import {
     BootstrappedAuth,
     DatabaseAdapter,
     DataDriver,
-    CollectionConfig,
     HealthCheckResult,
     InitializedDriver,
     isSchemaEditingAdmin,
@@ -45,7 +44,7 @@ import {
     type TableDescriptor,
     type TableHooks
 } from "@rebasepro/types";
-import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, createAccessorSlugResolver, getEffectiveSecurityRules, warnOnTableDdl } from "@rebasepro/common";
+import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, createAccessorSlugResolver, policyTableFromDescriptor, tableEffectiveRules, warnOnTableDdl } from "@rebasepro/common";
 import { randomBytes } from "node:crypto";
 import type { Server } from "node:http";
 import nodePath from "node:path";
@@ -56,10 +55,8 @@ import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { createRebaseClient } from "@rebasepro/client";
 
-import { BackendCollectionRegistry } from "../collections/BackendCollectionRegistry";
 import { TableRegistry } from "../schema/table-registry";
 import { resolveDeclaredTables } from "../schema/declared-tables";
-import { introspectedDescriptors, type IntrospectedDriverResult } from "../schema/introspected-tables";
 import {
     logUnprovisionedTables,
     tablesStoredBy,
@@ -113,7 +110,7 @@ import { previewRemoteSchema } from "../schema-edit/remote-source";
 import { refuseWhenRepositoryIsAhead } from "../schema-edit/deployed-schema-guard";
 import type { EditedSchema, TableSourceEdit, TableSourceEditor } from "../api/table-source-editor";
 import type { PreviewedSource } from "../api/live-schema-routes";
-import type { CompiledTable, PostgresCollectionConfig } from "@rebasepro/types";
+import type { CompiledTable } from "@rebasepro/types";
 import { realpathSync } from "node:fs";
 import { replaceableRoutes, type ReplaceableRoutes } from "./replaceable-routes";
 import { createLocalGitRepository, findRepositoryRoot } from "../schema-edit/local-git-repository";
@@ -346,7 +343,6 @@ export interface RebaseBackend {
     metricsHistory?: MetricsHistory;
     storageRegistry?: StorageRegistry;
     storageController?: StorageController;
-    collectionRegistry: BackendCollectionRegistry;
     /** The cron scheduler. Its jobs are registered; `start()` starts its timers. */
     cronScheduler?: CronScheduler;
     /**
@@ -668,24 +664,19 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         });
     }
 
-    const collectionRegistry = new BackendCollectionRegistry();
-    // Declared data sources — drives engine resolution (capabilities) and the
-    // server-vs-direct transport distinction. Set before collections register
-    // so normalization can resolve each collection's engine.
+    // Declared data sources — the server-vs-direct transport distinction, and
+    // which data source a path is routed to.
     const dataSourceRegistry = createDataSourceRegistry(
         declaredDataSources.length > 0 ? declaredDataSources : undefined
     );
-    collectionRegistry.setDataSources(dataSourceRegistry);
 
     // ─── Declared tables ─────────────────────────────────────────────────
     //
     // `defineTable` is the one front door. The definitions are compiled here —
     // fail closed: a table with no usable `rls`, an `"inherit"` without
     // `defaultRls`, a relation outside the set, all refuse the boot with one
-    // `SchemaDefinitionError` — and lowered into the collection objects the
-    // registry, the routes, realtime, MCP and the drivers read today. The
-    // descriptors are kept beside them, by slug, for everything built on the
-    // table model.
+    // `SchemaDefinitionError`. The compiled tables are what the drivers are
+    // opened with and what the table registry serves.
     const declaredTables = await resolveDeclaredTables({
         tables: config.tables,
         defaultRls: config.defaultRls,
@@ -693,8 +684,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     });
     const tableRegistry = new TableRegistry();
     tableRegistry.replaceAll(declaredTables.tables);
-    /** The lowered tables whose compiled policies are served; replaced by a live schema apply. */
-    let servedPolicyCollections: PostgresCollectionConfig[] = declaredTables.collections;
+    /** The declared tables whose compiled policies are served; replaced by a live schema apply. */
+    let servedPolicyTables: readonly TableDescriptor[] = declaredTables.descriptors;
     /** The compiled tables served — what a live schema edit plans against; replaced by a live schema apply. */
     let servedCompiledTables: readonly CompiledTable[] = declaredTables.tables;
     if (declaredTables.source === "schemaDir") {
@@ -704,7 +695,6 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // Global table hooks — applied to every table, on all data paths: each
     // driver is handed them below (`handGlobalHooksTo`), as declared.
     const globalHooks = config.hooks;
-    let activeCollections: CollectionConfig[] = [...declaredTables.collections];
     // The auth table's secret columns are private in its descriptor whatever
     // the declaration says (the compiler sees to it); say so when the
     // declaration does not. See implicit-auth-secrets.ts.
@@ -758,8 +748,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
     /** What each bootstrapper's `initializeDriver` returned, by bootstrapper. */
     const driverResults = new Map<BackendBootstrapper, InitializedDriver>();
-    /** What each introspecting driver found: its collections and their descriptors. */
-    const introspectedResults: IntrospectedDriverResult[] = [];
+    /** The tables the introspecting drivers found, as each described them from its catalogue. */
+    const introspectedTables: TableDescriptor[] = [];
 
     // ─── Collection schema ───────────────────────────────────────────────
     //
@@ -834,9 +824,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         }
 
         const driverResult = await bootstrapper.initializeDriver({
-            collections: activeCollections,
             tables: declaredTables.tables,
-            collectionRegistry,
             introspectCollections,
             dataSourceKey: b.id || DEFAULT_DRIVER_ID,
             baas: config.baas,
@@ -882,14 +870,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // letting every request 404 against a server that claims to be healthy.
         if (introspectCollections) {
             const driverName = b.id || bootstrapper.type;
-            if (!driverResult.collections) {
+            if (!driverResult.tables) {
                 throw new Error(
                     `Driver "${driverName}" cannot derive tables from the database schema, ` +
                     "and this project declared none. Declare tables in backend/schema, or use a driver that " +
                     "implements introspection (e.g. @rebasepro/server-postgres)."
                 );
             }
-            if (driverResult.collections.length === 0) {
+            if (driverResult.tables.length === 0) {
                 logger.warn(
                     `Driver "${driverName}" found no tables to serve. The data API will not be mounted. ` +
                     "Create tables (migrations, SQL, any tool) and restart."
@@ -897,13 +885,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             }
         }
 
-        // These never passed through the config-time steps above, so apply them
-        // here — but only when the driver was asked to describe the schema. A
-        // project that declared its own collections must not have more injected
-        // into it by whatever the database happens to contain.
-        if (introspectCollections && driverResult.collections?.length) {
-            activeCollections = [...activeCollections, ...driverResult.collections];
-            introspectedResults.push({ driver: b.id || bootstrapper.type, collections: driverResult.collections, tables: driverResult.tables });
+        // Only when the driver was asked to describe the schema: a project
+        // that declared its own tables must not have more injected into it by
+        // whatever the database happens to contain.
+        if (introspectCollections && driverResult.tables?.length) {
+            introspectedTables.push(...driverResult.tables);
         }
         if (introspectCollections && driverResult.unprotectedTables?.length) {
             unprotectedTables.push(...driverResult.unprotectedTables);
@@ -923,14 +909,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
     const driverRegistry = DefaultDriverRegistry.create(delegates);
 
-    activeCollections.forEach(collection => collectionRegistry.register(collection));
-
     // What introspection found, as the drivers described it from the
     // catalogue: `GET /api/schema/tables` serves a database-only project to
     // the zero-config CMS, the schema version covers it, and a global hook
     // gets its table's descriptor.
-    if (introspectCollections && introspectedResults.length > 0) {
-        tableRegistry.replaceAll(introspectedDescriptors(introspectedResults));
+    if (introspectCollections && introspectedTables.length > 0) {
+        tableRegistry.replaceAll(introspectedTables);
     }
 
     const defaultDriver = driverRegistry.getOrDefault(defaultDriverId);
@@ -961,9 +945,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     const keyForCollectionPath = (collectionPath: string): string => {
         const slug = collectionPath.replace(/^\/+/, "").split("/")[0]?.split("?")[0];
         if (!slug) return DEFAULT_DRIVER_ID;
-        const collection = collectionRegistry.get(slug) ?? collectionRegistry.getCollectionByPath(slug);
-        if (!collection) return DEFAULT_DRIVER_ID;
-        return resolveDataSource(collection, dataSourceRegistry).key;
+        const table = tableRegistry.named(slug);
+        if (!table) return DEFAULT_DRIVER_ID;
+        return resolveDataSource({ dataSource: table.database }, dataSourceRegistry).key;
     };
 
     // ── Data-source misconfiguration check ────────────────────────────────
@@ -1314,7 +1298,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // What a key's scope target may name, read when a key is minted.
     let servedFunctionNames: string[] = [];
     const keyTargets: KeyTargets = {
-        collections: () => collectionRegistry.getRawCollections().map(collection => collection.slug),
+        collections: () => tableRegistry.list().map(table => table.slug),
         functions: () => servedFunctionNames,
         buckets: () => storageRegistry?.list() ?? [DEFAULT_STORAGE_SOURCE_KEY]
     };
@@ -1425,7 +1409,6 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         authLimiters,
         rateLimitStore: sharedRateLimitStore,
         apiKeyStore,
-        collections: () => collectionRegistry.getRawCollections(),
         tables: () => tableRegistry.list()
     };
     /**
@@ -2317,7 +2300,6 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                     allowMachineApply: config.liveSchema?.allowMachineApply
                         ?? parseEnvBoolean(process.env.REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY) === true
                 },
-                getCollections: () => collectionRegistry.getRawCollections(),
                 getCompiledTables: () => servedCompiledTables,
                 getAdmin: () => defaultDriver.admin,
                 // The token on the request names the uid only; the commit is
@@ -2736,20 +2718,22 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         storageSurface = storageStub;
     }
 
-    // Only the server-mediated collections get a backend surface. Collections
-    // on a direct/custom transport are client-only — the backend must not
-    // expose a (mis-engined) endpoint for them, nor *document* one: the routes
-    // were filtered and the OpenAPI document was not, so the one collection the
-    // backend deliberately refuses to serve was the one it advertised hardest.
-    const serverCollections = activeCollections.filter(
-        (collection) => resolveDataSource(collection, dataSourceRegistry).transport === "server"
-    );
+    // Only the server-mediated tables get a backend surface. A table on a
+    // direct/custom transport is client-only — the backend must not expose a
+    // (mis-engined) endpoint for it, nor *document* one: the routes were
+    // filtered and the OpenAPI document was not, so the one table the backend
+    // deliberately refuses to serve was the one it advertised hardest.
+    const servedOverServer = (tables: readonly TableDescriptor[]): string[] => tables
+        .filter(table => resolveDataSource({ dataSource: table.database }, dataSourceRegistry).transport === "server")
+        .map(table => table.slug);
+    /** The slugs of the tables the REST routes serve; replaced by a live schema apply. */
+    const serverSlugs = servedOverServer(tableRegistry.list());
 
     // The data group: the REST routes, or the stub that says there are none.
     let dataSurface: Hono<HonoEnv>;
     /** The REST routes, replaceable after a live schema apply. See `serveTables`. */
     let restRoutes: ReplaceableRoutes | undefined;
-    if (activeCollections.length > 0) {
+    if (tableRegistry.list().length > 0) {
         const dataRouter = new Hono<HonoEnv>();
         dataRouter.onError(errorHandler);
         // First, so everything after it knows where the group is mounted.
@@ -2791,8 +2775,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // a collection the author called public looks like broken RLS or a
             // missing table, and gets debugged as one (it has been). Say it once
             // at boot, where the operator is already reading, naming the switch.
-            const publicSelect = activeCollections
-                .filter(c => getEffectiveSecurityRules(c).some(rule =>
+            const publicSelect = declaredTables.descriptors
+                .filter(table => tableEffectiveRules(policyTableFromDescriptor(table)).some(rule =>
                     "access" in rule && rule.access === "public" &&
                     (rule.operation === "select" || rule.operation === "all" ||
                         (Array.isArray(rule.operations) && rule.operations.includes("select")))
@@ -2885,7 +2869,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         }
 
         const restGenerator = new RestApiGenerator(
-            { descriptors: tableRegistry.list(), served: serverCollections.map(collection => collection.slug) },
+            { descriptors: tableRegistry.list(), served: serverSlugs },
             defaultDriver,
             authAdapter,
             undefined,
@@ -2937,15 +2921,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
      *
      * The same population boot does, from the same compile: the descriptors
      * into the table registry (a new revision, which invalidates what
-     * `GET /api/schema/tables` and the contract cache), the lowered tables into
-     * the collection registry and the lists the routes read, with the auth
-     * table's secrets excluded before anything copies them — then the REST
-     * routes regenerated over them. The data driver keeps the tables it was
+     * `GET /api/schema/tables` and the contract cache) and the lists the
+     * routes read — then the REST routes regenerated over them. The data driver keeps the tables it was
      * opened with until the process restarts: refreshing its catalogue is the
      * driver's to offer.
      */
     editedTables.serve = (schema: EditedSchema): void => {
-        const collections: CollectionConfig[] = [...schema.collections];
         warnOnImplicitAuthSecrets(schema.tables);
         // The compiled tables, hooks and transforms with them: the hooks
         // edited in source are the ones that run from now on — in the table
@@ -2960,17 +2941,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 if (!runtimeHookSlugs.has(table.descriptor.slug)) registry.setTableHooks(table.descriptor.slug, table.hooks ?? {});
             }
         }
-        servedPolicyCollections = schema.collections;
+        servedPolicyTables = schema.descriptors;
         servedCompiledTables = schema.tables;
-        collectionRegistry.reset();
-        collections.forEach(collection => collectionRegistry.register(collection));
-        activeCollections = collections;
-        serverCollections.splice(0, serverCollections.length, ...collections.filter(
-            (collection) => resolveDataSource(collection, dataSourceRegistry).transport === "server"
-        ));
+        serverSlugs.splice(0, serverSlugs.length, ...servedOverServer(tableRegistry.list()));
         if (restRoutes) {
             restRoutes.replace(new RestApiGenerator(
-                { descriptors: tableRegistry.list(), served: serverCollections.map(collection => collection.slug) },
+                { descriptors: tableRegistry.list(), served: serverSlugs },
                 defaultDriver,
                 authAdapter,
                 undefined,
@@ -2989,7 +2965,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // a process that does not serve them would publish a spec for URLs it 404s.
     // The generator is loaded here; the routes are `mount()`'s, because the
     // document names the paths it mounted the data group at.
-    const openApiGenerator: OpenApiGenerator | undefined = surfaces.data && serverCollections.length > 0
+    const openApiGenerator: OpenApiGenerator | undefined = surfaces.data && serverSlugs.length > 0
         ? await loadOpenApiGenerator()
         : undefined;
 
@@ -3039,7 +3015,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     const scopedDefaultDriver = await scopeDataDriver(defaultDriver, serviceIdentity);
     // `rebase.dataAsAdmin.myNotes` is the collection whose generated accessor
     // is `myNotes`, whatever its slug's snake_case or its table is.
-    const resolveAccessor = createAccessorSlugResolver(() => collectionRegistry.getCollections());
+    const resolveAccessor = createAccessorSlugResolver(() => tableRegistry.list());
     const defaultData = buildSdkData(scopedDefaultDriver, { resolveAccessor });
 
     // Hand the storage authorize hook its trusted reader. Scoped as the service
@@ -3882,7 +3858,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         const { createSchemaTablesService, createSchemaTablesRoutes } = await import("../api/schema-tables-routes");
         const schemaTables = createSchemaTablesService({
             tableRegistry,
-            policySource: () => servedPolicyCollections,
+            policySource: () => servedPolicyTables,
             schemaVersion: config.schemaVersion
         });
 
@@ -4254,7 +4230,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
         if (surfaces.data) {
             app.route(`${basePath}/data`, groups.data());
-            if (announce && activeCollections.length === 0) {
+            if (announce && tableRegistry.list().length === 0) {
                 logger.info("No tables to serve — /data returns 404 NO_TABLES");
             }
             // ── OpenAPI / Swagger ─────────────────────────────────────────
@@ -4263,7 +4239,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // spec for URLs it 404s.
             mountOpenApiDocs(app, basePath, {
                 enableSwagger: config.enableSwagger,
-                serverTables: serverCollections.flatMap(collection => tableRegistry.get(collection.slug) ?? []),
+                serverTables: serverSlugs.flatMap(slug => tableRegistry.get(slug) ?? []),
                 requireAuth: resolveRequireAuth(config.auth),
                 adminGate: adminGate("schema:read"),
                 generate: openApiGenerator,
@@ -4541,7 +4517,6 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         metricsHistory,
         storageRegistry,
         storageController,
-        collectionRegistry,
         cronScheduler,
         jobQueue,
         routes,

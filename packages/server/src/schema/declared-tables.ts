@@ -3,13 +3,12 @@ import {
     type AnyViewDef,
     type CompiledTable,
     type DefaultRls,
-    type PostgresCollectionConfig,
     type TableDescriptor
 } from "@rebasepro/types";
 import { compileSchemaDefs, loadBackendSchema, type LoadBackendSchemaOptions } from "./load-schema";
 
 /**
- * The tables a backend serves, compiled and lowered at boot.
+ * The tables a backend serves, compiled at boot.
  *
  * @group Schema
  */
@@ -20,8 +19,6 @@ export interface DeclaredTables {
     tables: CompiledTable[];
     /** Their compiled descriptors, in definition order. */
     descriptors: TableDescriptor[];
-    /** Their lowering: what the registry, the routes and the drivers read. */
-    collections: PostgresCollectionConfig[];
     /** Where they came from, for the boot log. */
     source: "tables" | "schemaDir" | "none";
 }
@@ -32,8 +29,7 @@ export interface DeclaredTables {
  * the driver introspects the database.
  *
  * Every definition is compiled (fail closed: one `SchemaDefinitionError` with
- * every problem) and lowered through {@link compileSchemaDefs}, so hooks get
- * their table's descriptor.
+ * every problem) through {@link compileSchemaDefs}.
  *
  * @group Schema
  */
@@ -56,8 +52,8 @@ export async function resolveDeclaredTables(options: {
         defaultRls = loaded.defaultRls;
         if (defs.length > 0) source = "schemaDir";
     }
-    if (defs.length === 0) return { defs: [], tables: [], descriptors: [], collections: [], source: "none" };
+    if (defs.length === 0) return { defs: [], tables: [], descriptors: [], source: "none" };
 
-    const { tables, descriptors, collections } = compileSchemaDefs(defs, defaultRls);
-    return { defs, tables, descriptors, collections, source };
+    const { tables, descriptors } = compileSchemaDefs(defs, defaultRls);
+    return { defs, tables, descriptors, source };
 }

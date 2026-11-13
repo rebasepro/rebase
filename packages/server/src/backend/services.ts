@@ -18,7 +18,7 @@
  *
  * @module
  */
-import type { AuthAdapter, CollectionConfig, QueueRuntime, TableDescriptor, TopicRuntime } from "@rebasepro/types";
+import type { AuthAdapter, QueueRuntime, TableDescriptor, TopicRuntime } from "@rebasepro/types";
 import type { JwtService } from "../auth/jwt";
 import type { AccessControl } from "../auth/access";
 import type { AuthLimiters } from "../auth/rate-limiter";
@@ -51,11 +51,10 @@ export interface BackendServices {
      * `backend.verifyCredential`. Absent on a backend with no `auth`.
      */
     authAdapter?: AuthAdapter;
-    /** The collections this backend serves, as they are now — a live schema edit included. */
-    collections(): readonly CollectionConfig[];
     /**
-     * The compiled descriptors of the tables this backend declares, in
-     * definition order. Empty when it introspects the database.
+     * The descriptors of the tables this backend serves, as they are now — a
+     * live schema edit included: the declared ones in definition order, or
+     * those the drivers introspected.
      */
     tables(): readonly TableDescriptor[];
     /**

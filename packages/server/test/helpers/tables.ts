@@ -8,7 +8,6 @@ import type {
     AnyViewDef,
     CompiledTable,
     DefaultRls,
-    PostgresCollectionConfig,
     SecurityRule,
     TableDescriptor
 } from "@rebasepro/types";
@@ -26,7 +25,7 @@ import type { ServedTable } from "../../src/api/rest/served-table";
  * suite are still written as legacy collection literals. This turns them into
  * table definitions with `collectionsToTableDefs` (the bridge the codemod
  * uses), so every test boots through the real `tables` option and the real
- * compiler and lowering. A later slice converts the fixtures themselves to
+ * compiler. A later slice converts the fixtures themselves to
  * `defineTable` source and deletes this file.
  */
 
@@ -53,22 +52,18 @@ export function tablesFrom(
 }
 
 /**
- * What a fixture compiles to: the compiled tables, their descriptors, and the
- * collections they were lowered into (what the data driver is handed until
- * slice B-R7; removed with K8). `{ descriptors, collections }` is exactly what
- * `new RestApiGenerator(...)` takes.
+ * What a fixture compiles to: the compiled tables and their descriptors.
+ * `{ descriptors }` is what `new RestApiGenerator(...)` takes.
  */
 export interface FixtureTables {
     tables: CompiledTable[];
     descriptors: TableDescriptor[];
-    /** The definitions lowered back into collections (the kernel's runtime input; gone with the lowering). */
-    collections: PostgresCollectionConfig[];
 }
 
 /**
- * Lift legacy fixture collections, compile them and lower them — the boot's
- * own path (`compileSchemaDefs`) — for a test that builds routes, a validator
- * or a document from them rather than booting a backend.
+ * Lift legacy fixture collections and compile them — the boot's own path
+ * (`compileSchemaDefs`) — for a test that builds routes, a validator or a
+ * document from them rather than booting a backend.
  */
 export function tablesFromCollections(
     collections: readonly (LegacyCollectionConfig | LegacyAnyCollectionConfig)[],
@@ -120,7 +115,7 @@ function withRelationTargets(collections: readonly (LegacyCollectionConfig | Leg
     return out;
 }
 
-/** Compile and lower table definitions, as the boot does. */
+/** Compile table definitions, as the boot does. */
 export function compileTables(defs: readonly (AnyTableDef | AnyViewDef)[], defaultRls?: DefaultRls): FixtureTables {
     return compileSchemaDefs(defs, defaultRls);
 }

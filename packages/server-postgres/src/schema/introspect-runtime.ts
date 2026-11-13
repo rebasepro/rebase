@@ -2,9 +2,8 @@
  * Runtime introspection — what a backend with no `backend/schema` serves.
  *
  * `introspectTables` (`./introspect-tables`) describes every protected table
- * of the database as a `TableDescriptor`; this module turns those into what
- * the request-time code still reads — collections, lowered at the same
- * boundary a declared table crosses at boot — and reads the catalogue the
+ * of the database as a `TableDescriptor`; this module compiles those into the
+ * tables the runtime runs on (`compileIntrospectedTables`) and reads the catalogue the
  * runtime builds its Drizzle tables from (`introspectSchema`, shared with the
  * declared path in `catalogue-schema.ts`).
  *
@@ -12,8 +11,8 @@
  * `describeTables(…, { purpose: "generate" })` and prints the descriptors as
  * `backend/schema` source for a developer to edit and commit.
  */
-import type { PostgresCollectionConfig, TableDescriptor } from "@rebasepro/types";
-import { isSchemaDefinitionError, lowerTables, tableDefsFromDescriptors } from "@rebasepro/common";
+import type { CompiledTable, TableDescriptor } from "@rebasepro/types";
+import { compileDescribedTables, isSchemaDefinitionError } from "@rebasepro/common";
 
 import {
     TableRow,
@@ -47,9 +46,9 @@ export async function introspectSchema(
     pgSchema: string,
     /**
      * Read views and materialized views too, as tables to read from — what
-     * the runtime catalogue needs for collections that declare `view`. Off
-     * for introspection that turns relations into collections, where a view
-     * is not one.
+     * the runtime catalogue needs for tables declared with `defineView`. Off
+     * for introspection that turns relations into tables to serve, where a
+     * view is not one.
      */
     options: { views?: boolean } = {}
 ): Promise<IntrospectedSchema> {
@@ -159,17 +158,17 @@ export async function introspectSchema(
 }
 
 /**
- * What {@link lowerIntrospectedTables} returns.
+ * What {@link compileIntrospectedTables} returns.
  *
  * @group Schema
  */
-export interface LoweredIntrospection {
+export interface CompiledIntrospection {
     /** The descriptors served — every one given, unless it is in {@link dropped}. */
     tables: TableDescriptor[];
-    /** The request-time collections, one per descriptor of {@link tables}, in the same order. */
-    collections: PostgresCollectionConfig[];
+    /** The same tables compiled for the runtime, one per descriptor of {@link tables}, in the same order. */
+    compiled: CompiledTable[];
     /**
-     * Descriptors no collection could be lowered from, each with why: a table
+     * Descriptors no definition could be built from, each with why: a table
      * `defineTable` itself refuses (no columns, a schema name that is not a plain
      * identifier). They are not served; the relations into them are dropped.
      */
@@ -193,30 +192,28 @@ function withoutRelationsInto(descriptor: TableDescriptor, removed: ReadonlySet<
 }
 
 /**
- * The collections an introspected database is served through.
+ * The tables an introspected database is served through, compiled.
  *
- * Each descriptor becomes a definition (`tableDefsFromDescriptors`) and is
- * lowered (`lowerTables`, with `introspected: true` so a `{ kind: "other" }`
- * column passes its value through). The definitions carry `rls: "admin-only"`,
- * which lowers to no rule at all: Rebase generates no policy for a table it did
- * not declare, and the request-time code reads none — the database's own
- * policies decide every row, as they always have. The descriptors keep stating
- * those policies for `GET /api/schema/tables`.
+ * Each descriptor is kept as introspected, beside the definition that states
+ * it (`compileDescribedTables`). The definitions carry `rls: "admin-only"`:
+ * Rebase generates no policy for a table it did not declare, and the
+ * request-time code reads none — the database's own policies decide every
+ * row, as they always have. The descriptors keep stating those policies for
+ * `GET /api/schema/tables`.
  *
- * Never throws for one table: a descriptor that cannot be lowered is dropped
- * and named in {@link LoweredIntrospection.dropped}, and the rest are served.
+ * Never throws for one table: a descriptor no definition can be built from is
+ * dropped and named in {@link CompiledIntrospection.dropped}, and the rest are
+ * served.
  *
  * @group Schema
  */
-export function lowerIntrospectedTables(tables: readonly TableDescriptor[]): LoweredIntrospection {
-    const dropped: LoweredIntrospection["dropped"] = [];
+export function compileIntrospectedTables(tables: readonly TableDescriptor[]): CompiledIntrospection {
+    const dropped: CompiledIntrospection["dropped"] = [];
     let remaining = [...tables];
     for (;;) {
         try {
-            const bySlug = new Map(remaining.map(table => [table.slug, table]));
-            const defs = tableDefsFromDescriptors(remaining, { rls: () => "admin-only" });
-            const collections = lowerTables(defs, { introspected: true, describe: slug => bySlug.get(slug) });
-            return { tables: remaining, collections, dropped };
+            const compiled = compileDescribedTables(remaining, { rls: () => "admin-only" });
+            return { tables: remaining, compiled, dropped };
         } catch (error) {
             if (!isSchemaDefinitionError(error)) throw error;
             const reasons = new Map<string, string[]>();

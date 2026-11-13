@@ -10,7 +10,6 @@
  */
 import { Hono } from "hono";
 import type { DatabaseAdmin, SchemaReconcilePlan } from "@rebasepro/types";
-import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { EMPTY_ACCESS_MODEL } from "@rebasepro/types";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
@@ -59,7 +58,6 @@ function harness(over: Partial<LiveSchemaRoutesConfig> & { user?: HonoEnv["Varia
         await next();
     });
     app.route("/api/schema", createLiveSchemaRoutes({
-        getCollections: (): LegacyCollectionConfig[] => [{ slug: "voice_cache", name: "Voice cache", properties: {} }],
         getCompiledTables: () => [],
         getAdmin: () => admin,
         // A bundle deployment: no repository, and reconcile does not need one.

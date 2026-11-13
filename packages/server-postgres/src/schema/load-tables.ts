@@ -16,7 +16,7 @@
  */
 import fs from "fs";
 import path from "path";
-import { computeSchemaVersion, DEFAULT_DATA_SOURCE_KEY, type CompiledTable, type PostgresCollectionConfig, type TableDescriptor } from "@rebasepro/types";
+import { computeSchemaVersion, DEFAULT_DATA_SOURCE_KEY, type CompiledTable, type TableDescriptor } from "@rebasepro/types";
 import { compileLoadedSchema, loadBackendSchema } from "@rebasepro/server";
 import { outWarn } from "../cli-output";
 
@@ -53,12 +53,7 @@ export async function loadTables(schemaDir: string): Promise<CompiledTable[]> {
  */
 export interface LoadedTables {
     /**
-     * The tables lowered into collections, in slug order: read only by the
-     * console's `openRebase`, which still takes them beside `tables`.
-     */
-    collections: PostgresCollectionConfig[];
-    /**
-     * The compiled descriptors, in the same slug order: what the schema-version
+     * The compiled descriptors, in slug order: what the schema-version
      * stamp is computed over, and what `GET /api/schema/tables` serves.
      */
     descriptors: TableDescriptor[];
@@ -67,8 +62,8 @@ export interface LoadedTables {
 }
 
 /**
- * {@link loadTables}, with the descriptors beside the lowered collections —
- * for a command that compares the stamp the runtime wrote (the doctor).
+ * {@link loadTables}, with the descriptors beside the compiled tables — for a
+ * command that compares the stamp the runtime wrote (the doctor).
  *
  * @param schemaDir the schema directory, resolved against the working directory.
  */
@@ -91,7 +86,6 @@ export async function loadTableSchema(schemaDir: string): Promise<LoadedTables> 
     const compiled = compileLoadedSchema(loaded);
     const bySlug = (a: { slug: string }, b: { slug: string }): number => a.slug.localeCompare(b.slug);
     return {
-        collections: [...compiled.collections].sort(bySlug),
         descriptors: [...compiled.descriptors].sort(bySlug),
         tables: [...compiled.tables].sort((a, b) => bySlug(a.descriptor, b.descriptor))
     };

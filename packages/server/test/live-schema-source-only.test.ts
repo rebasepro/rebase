@@ -8,7 +8,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
 import path from "node:path";
-import type { LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import type { CompiledTable, DatabaseAdmin, SchemaChange, SchemaChangeFile, SchemaChangePlan, TablePatch } from "@rebasepro/types";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
@@ -25,11 +24,6 @@ const REMOVAL: SchemaChange = {
     detail: "\"sku\" was removed, which would drop column \"sku\" and the data in it.",
     sourceOnly: "column \"sku\" stays in the database.",
     kept: "column products.sku kept"
-};
-
-const products: LegacyPostgresCollectionConfig = {
-    slug: "products", name: "Products",
-    properties: { title: { type: "string" }, sku: { type: "string" } }
 };
 
 function harness(change = REMOVAL) {
@@ -64,13 +58,12 @@ function harness(change = REMOVAL) {
         await next();
     });
     app.route("/api/schema", createLiveSchemaRoutes({
-        getCollections: () => [products],
         getCompiledTables: () => [],
         getAdmin: () => admin,
         getRepository: () => repository,
         previewSource: async () => ({
             files: [{ path: "backend/schema/products.ts", contents: "…" }],
-            schema: { defs: [], tables: [], descriptors: [], collections: [{ ...products, properties: { title: { type: "string" } } }] }
+            schema: { defs: [], tables: [], descriptors: [] }
         }),
         writeSource: async (source) => { events.push("write-source"); return source.files; },
         onApplied: () => { events.push("served"); }
@@ -146,7 +139,6 @@ describe("deleting a table through the live door", () => {
         app.onError(errorHandler);
         app.use("/*", async (c, next) => { c.set("user", { uid: "u_1", roles: ["admin"] }); await next(); });
         app.route("/api/schema", createLiveSchemaRoutes({
-            getCollections: () => [],
             getCompiledTables: () => [],
             getAdmin: () => admin,
             getRepository: () => ({

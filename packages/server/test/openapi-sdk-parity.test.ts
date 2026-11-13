@@ -207,20 +207,19 @@ describe("the scaffold every `rebase init` produces", () => {
         const compiled = compileLoadedSchema(await loadBackendSchema(schemaDir));
         const wanted = new Set(["posts", "authors", "tags"]);
         return {
-            collections: compiled.collections.filter(collection => wanted.has(collection.slug)),
             descriptors: compiled.descriptors.filter(descriptor => wanted.has(descriptor.slug))
         };
     };
 
     it("documents the post's author key, its author and its tags", async () => {
-        const scaffoldSpec = openApiDocument(generateOpenApiSpec(tablesFromCollections((await scaffold()).collections).descriptors));
+        const scaffoldSpec = openApiDocument(generateOpenApiSpec((await scaffold()).descriptors));
         const documented = Object.keys(propertiesOf(scaffoldSpec, "Post"));
 
         expect(documented).toEqual(expect.arrayContaining(["authorId", "author", "tags"]));
     });
 
     it("gives the post's id one type in all three of its schemas", async () => {
-        const scaffoldSpec = openApiDocument(generateOpenApiSpec(tablesFromCollections((await scaffold()).collections).descriptors));
+        const scaffoldSpec = openApiDocument(generateOpenApiSpec((await scaffold()).descriptors));
         const types = ["Post", "PostInput", "PostUpdate"].map(
             schema => propertiesOf(scaffoldSpec, schema).id?.type
         );
@@ -229,8 +228,8 @@ describe("the scaffold every `rebase init` produces", () => {
     });
 
     it("describes the same fields as the SDK it ships beside", async () => {
-        const { collections, descriptors } = await scaffold();
-        const scaffoldSpec = openApiDocument(generateOpenApiSpec(tablesFromCollections(collections).descriptors));
+        const { descriptors } = await scaffold();
+        const scaffoldSpec = openApiDocument(generateOpenApiSpec(descriptors));
         const typedefs = generateTypedefs(descriptors);
 
         expect(new Set(Object.keys(propertiesOf(scaffoldSpec, "Post"))))

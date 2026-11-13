@@ -17,7 +17,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
 import path from "node:path";
-import type { LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { EMPTY_ACCESS_MODEL } from "@rebasepro/types";
 import type { CompiledTable, DatabaseAdmin, SchemaChangePlan, TablePatch } from "@rebasepro/types";
 import { HonoEnv } from "../src/api/types";
@@ -29,7 +28,6 @@ import type { SchemaEditRepository } from "../src/schema-edit/apply-schema-chang
 import { configureAccess } from "../src/auth/access";
 import { writeSchemaFixture } from "./helpers/schema-source-fixture";
 
-const collection = (slug: string): LegacyPostgresCollectionConfig => ({ slug, name: slug, properties: { id: { type: "string", isId: "uuid" } } });
 
 const okPlan = (over: Partial<SchemaChangePlan> = {}): SchemaChangePlan => ({
     files: [{ path: "backend/src/schema.generated.ts", contents: "export const tables = {};" }],
@@ -61,7 +59,7 @@ const SOURCE = "backend/schema/posts.ts";
 /** What the running server serves, compiled: the `before` side of every plan. */
 const SERVED_TABLES: readonly CompiledTable[] = [];
 
-const edited = (): EditedSchema => ({ defs: [], tables: [], descriptors: [], collections: [collection("posts")] });
+const edited = (): EditedSchema => ({ defs: [], tables: [], descriptors: [] });
 
 function harness(over: Partial<LiveSchemaRoutesConfig> & {
     plan?: SchemaChangePlan;
@@ -85,7 +83,6 @@ function harness(over: Partial<LiveSchemaRoutesConfig> & {
     };
 
     const config: LiveSchemaRoutesConfig = {
-        getCollections: () => [collection("posts")],
         getCompiledTables: () => SERVED_TABLES,
         getAdmin: () => admin,
         getRepository: () => repository,

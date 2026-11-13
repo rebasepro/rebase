@@ -1,6 +1,5 @@
 import {
   Entity,
-  CollectionConfig,
   EntityStatus,
   FilterValues,
   FetchCollectionProps,

@@ -19,7 +19,7 @@ import { eq, getTableColumns } from "drizzle-orm";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import { buildBaasSchema, readCatalogueSchema, type CatalogueSchema } from "../src/schema/catalogue-schema";
-import { introspectSchema, lowerIntrospectedTables, type Queryable } from "../src/schema/introspect-runtime";
+import { compileIntrospectedTables, introspectSchema, type Queryable } from "../src/schema/introspect-runtime";
 import { introspectTables } from "../src/schema/introspect-tables";
 import { hiddenColumnsOption } from "../src/schema/search-column";
 import { patchPgNumericToNumber } from "../src/utils/pg-numeric-number-patch";
@@ -317,21 +317,20 @@ describe("BaaS mode, where the database is the whole specification", () => {
         await pg?.close();
     });
 
-    it("serves every column under the same key the derived collection advertises", async () => {
+    it("serves every column under the same key the introspected descriptor advertises", async () => {
         const schema = await introspectSchema(pg, "public");
-        const lowered = lowerIntrospectedTables((await introspectTables(pg, "public", { unprotectedTables: "serve" })).tables);
-        const derived = lowered.collections;
-        const { tables } = buildBaasSchema(schema.tablesMap, "public", lowered.tables);
+        const servable = compileIntrospectedTables((await introspectTables(pg, "public", { unprotectedTables: "serve" })).tables);
+        const { tables } = buildBaasSchema(schema.tablesMap, "public", servable.tables);
 
-        const properties = Object.keys(derived[0].properties ?? {});
+        const keys = servable.tables[0].columns.map(column => column.key);
         const columns = Object.keys(getTableColumns(tables.customers));
 
         // The two halves of one answer, and they used to disagree: the derived
-        // collection names its fields `displayName` (the wire name) while the
-        // table was keyed `display_name`, so `normalizeScalarValues` found no
-        // property for the key it was handed and DROPPED the column from every
+        // table names its fields `displayName` (the wire name) while the
+        // Drizzle table was keyed `display_name`, so the row pipeline found no
+        // column for the key it was handed and DROPPED the column from every
         // response. A BaaS project served nothing but its single-word columns.
-        expect(columns.sort()).toEqual(properties.sort());
+        expect(columns.sort()).toEqual(keys.sort());
 
         const db = drizzle(pg, { schema: tables });
         await db.insert(tables.customers).values({

@@ -18,7 +18,7 @@ import type { McpAppCompilerSource as McpRouteConfigAppCompiler } from "../../sr
 import { Hono } from "hono";
 import type { AuthAdapter, DataDriver, TableDescriptor } from "@rebasepro/types";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
-import { compileTables, lowerTables, type AnySchemaDef } from "@rebasepro/common";
+import { compileTables, type AnySchemaDef } from "@rebasepro/common";
 import { collectionsToTableDefs } from "@rebasepro/common/migrate";
 import { generateAccessToken } from "../../src/auth/jwt";
 import { createOAuthRoutes } from "../../src/mcp/oauth-routes";
@@ -166,13 +166,10 @@ export function tablesOf(collections: readonly LegacyCollectionConfig[]): TableD
 
 /**
  * A schema as a backend boots it from `defineTable`s: the descriptors the
- * registry holds and the tables lowered for the data path, from one compile.
- * Spread into {@link buildApp}'s options.
+ * registry holds. Spread into {@link buildApp}'s options.
  */
-export function schemaOf(defs: readonly AnySchemaDef[]): { tables: TableDescriptor[]; collections: LegacyCollectionConfig[] } {
-    const tables = compileTables(defs);
-    const collections = lowerTables(defs, { describe: slug => tables.find(table => table.slug === slug) });
-    return { tables, collections };
+export function schemaOf(defs: readonly AnySchemaDef[]): { tables: TableDescriptor[] } {
+    return { tables: compileTables(defs) };
 }
 
 export const COLLECTIONS: LegacyCollectionConfig[] = [{

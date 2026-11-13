@@ -137,13 +137,13 @@ describe("the route's cache follows the registry", () => {
     };
 
     it("changes the ETag when the registry changes, and an old tag no longer answers 304", async () => {
-        const { descriptors: all, collections } = compileSchemaDefs([authors, posts]);
+        const { descriptors: all } = compileSchemaDefs([authors, posts]);
         const tableRegistry = new TableRegistry();
         tableRegistry.replaceAll(all);
         const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.route("/api/schema", createSchemaTablesRoutes({
-            service: createSchemaTablesService({ tableRegistry, policySource: () => collections }),
+            service: createSchemaTablesService({ tableRegistry, policySource: () => all }),
             available: true,
             authenticate: [anyone]
         }));

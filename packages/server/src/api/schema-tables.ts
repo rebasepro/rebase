@@ -4,7 +4,6 @@ import {
     scopeGrants,
     scopeGrantsAny,
     scopeTargets,
-    type CollectionConfig,
     type ColumnDescriptor,
     type JunctionPolicyDescriptor,
     type PolicyDescriptor,
@@ -17,15 +16,17 @@ import {
 } from "@rebasepro/types";
 import {
     canReadWithAccess,
-    compileRulePolicies,
-    getEffectiveSecurityRules,
-    getInjectedSecurityRules,
-    getJunctionCollectionConfig,
-    getJunctionSecurityRules,
-    getTableName,
-    resolveJunctionSpecs,
+    compileTableRulePolicies,
+    junctionPolicyTable,
+    policyTableFromDescriptor,
+    policyTableResolver,
+    resolveTableJunctions,
+    tableEffectiveRules,
+    tableInjectedRules,
+    tableJunctionRules,
     type CompiledRulePolicy,
-    type FieldViewer
+    type FieldViewer,
+    type PolicyTable
 } from "@rebasepro/common";
 import { logger } from "../utils/logger";
 
@@ -223,14 +224,11 @@ function asPolicy(compiled: CompiledRulePolicy, injected: boolean, rule: number 
 /**
  * Compile the policies of every table — what the schema planner writes into
  * Postgres and the Studio's RLS editor compares the live database against —
- * from the same `compileRulePolicies` / `getEffectiveSecurityRules` both read,
- * keyed by slug.
+ * from the same `compileTableRulePolicies` / `tableEffectiveRules` the planner
+ * reads, keyed by slug.
  *
- * Reads the collections the declared tables were lowered into: the policy
- * compiler still takes that shape (the lowering is temporary, and so is this
- * dependency on it). A table whose collection carries no rules of its own and
- * no posture — an introspected one — gets no entry: Rebase did not generate its
- * policies and cannot say what they are.
+ * Reads the declared tables' descriptors. Introspected tables are not among
+ * them: Rebase did not generate their policies and cannot say what they are.
  *
  * A rule that cannot be compiled (an `existsIn` naming a table this backend
  * does not hold) contributes no policy and is logged; the rest still are.
@@ -238,55 +236,53 @@ function asPolicy(compiled: CompiledRulePolicy, injected: boolean, rule: number 
  * @group Schema
  */
 export function compileServedPolicies(
-    collections: readonly CollectionConfig[],
+    tables: readonly TableDescriptor[],
     describedSlugs: ReadonlySet<string>
 ): Map<string, TablePolicies> {
-    const all = [...collections];
-    const resolveCollection = (slug: string): CollectionConfig | undefined =>
-        all.find(collection => collection.slug === slug || getTableName(collection) === slug);
-    const options = { ...COMPILE_OPTIONS, resolveCollection };
+    const options = { ...COMPILE_OPTIONS, resolveTable: policyTableResolver(tables) };
     const out = new Map<string, TablePolicies>();
 
-    const compile = (collection: CollectionConfig, rule: SecurityRule, injected: boolean, index: number | undefined): PolicyDescriptor[] => {
+    const compile = (table: PolicyTable, rule: SecurityRule, injected: boolean, index: number | undefined): PolicyDescriptor[] => {
         try {
-            return compileRulePolicies(collection, rule, options).map(policy => asPolicy(policy, injected, index));
+            return compileTableRulePolicies(table, rule, options).map(policy => asPolicy(policy, injected, index));
         } catch (error) {
             logger.debug("A rule could not be compiled for GET /api/schema/tables", {
-                table: getTableName(collection),
+                table: table.table,
                 error: error instanceof Error ? error.message : String(error)
             });
             return [];
         }
     };
 
-    for (const collection of all) {
-        if (!describedSlugs.has(collection.slug)) continue;
-        const explicit = collection.securityRules?.length ?? 0;
-        const injectedNames = new Set(getInjectedSecurityRules(collection).map(rule => rule.name));
-        const policies = getEffectiveSecurityRules(collection).flatMap((rule, index) => {
+    for (const descriptor of tables) {
+        if (!describedSlugs.has(descriptor.slug)) continue;
+        const table = policyTableFromDescriptor(descriptor);
+        const explicit = table.rules.length;
+        const injectedNames = new Set(tableInjectedRules(table).map(rule => rule.name));
+        const policies = tableEffectiveRules(table).flatMap((rule, index) => {
             const injected = index >= explicit || (rule.name !== undefined && injectedNames.has(rule.name));
-            return compile(collection, rule, injected, injected ? undefined : index);
+            return compile(table, rule, injected, injected ? undefined : index);
         });
-        out.set(collection.slug, { policies, junctions: [] });
+        out.set(descriptor.slug, { policies, junctions: [] });
     }
 
-    let specs: ReturnType<typeof resolveJunctionSpecs>;
+    let junctions: ReturnType<typeof resolveTableJunctions>;
     try {
-        specs = resolveJunctionSpecs(all);
+        junctions = resolveTableJunctions(tables);
     } catch (error) {
         logger.debug("The junction tables could not be resolved for GET /api/schema/tables", {
             error: error instanceof Error ? error.message : String(error)
         });
         return out;
     }
-    for (const spec of specs.values()) {
-        const junction = getJunctionCollectionConfig(spec);
-        const policies = getJunctionSecurityRules(spec).flatMap(rule => compile(junction, rule, true, undefined));
-        const entry: JunctionPolicyDescriptor = { table: spec.table, schema: spec.schema, policies };
-        const sides = new Set(spec.declaringSides.map(side => side.collection.slug));
+    for (const junction of junctions.values()) {
+        const table = junctionPolicyTable(junction);
+        const policies = tableJunctionRules(junction).flatMap(rule => compile(table, rule, true, undefined));
+        const entry: JunctionPolicyDescriptor = { table: junction.table, schema: junction.schema, policies };
+        const sides = new Set(junction.declaringSides.map(side => side.descriptor.slug));
         for (const slug of sides) {
-            const table = out.get(slug);
-            if (table && !table.junctions.some(existing => existing.table === entry.table)) table.junctions.push(entry);
+            const served = out.get(slug);
+            if (served && !served.junctions.some(existing => existing.table === entry.table)) served.junctions.push(entry);
         }
     }
     return out;

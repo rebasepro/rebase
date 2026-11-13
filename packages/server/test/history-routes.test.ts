@@ -13,13 +13,12 @@
 
 import { Hono } from "hono";
 import { createHistoryRoutes, type HistoryService } from "../src/history/history-routes";
-import type { BackendCollectionRegistry } from "../src/collections/BackendCollectionRegistry";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { tablesFromCollections } from "./helpers/tables";
 
-type Registry = Pick<BackendCollectionRegistry, "getCollections">;
+type Registry = { getCollections: () => LegacyCollectionConfig[] };
 
 function collection(slug: string, history = true): LegacyCollectionConfig {
     return {

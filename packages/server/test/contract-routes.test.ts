@@ -44,17 +44,17 @@ const posts = defineTable("posts", {
 });
 
 function served(defs: Parameters<typeof compileSchemaDefs>[0]) {
-    const { descriptors, collections } = compileSchemaDefs(defs);
+    const { descriptors } = compileSchemaDefs(defs);
     const tableRegistry = new TableRegistry();
     tableRegistry.replaceAll(descriptors);
-    return { tableRegistry, collections };
+    return { tableRegistry, descriptors };
 }
 
 function mount(defs: Parameters<typeof compileSchemaDefs>[0], options: { schemaVersion?: string; runtimeVersion?: string } = {}) {
-    const { tableRegistry, collections } = served(defs);
+    const { tableRegistry, descriptors } = served(defs);
     const schemaTables = createSchemaTablesService({
         tableRegistry,
-        policySource: () => collections,
+        policySource: () => descriptors,
         schemaVersion: options.schemaVersion
     });
     const app = new Hono<HonoEnv>();

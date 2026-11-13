@@ -25,7 +25,6 @@ import {
     type CompiledTable,
     type DefaultRls,
     type NewTable,
-    type PostgresCollectionConfig,
     type RelationDef,
     type RelationsShape,
     type TableDescriptor,
@@ -244,7 +243,6 @@ export interface EditedSchema {
      */
     tables: CompiledTable[];
     descriptors: TableDescriptor[];
-    collections: PostgresCollectionConfig[];
 }
 
 /**

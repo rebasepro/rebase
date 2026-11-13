@@ -1,7 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
 import type { AuthAdapter, AuthUserData, SchemaChangePlan, SchemaEditingAdmin, SQLAdmin, UserManagementAdapter } from "@rebasepro/types";
-import type { LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
@@ -34,7 +33,6 @@ const admin: SchemaEditingAdmin & Pick<SQLAdmin, "executeSql"> = {
     executeSql: async () => []
 };
 
-const tags: LegacyPostgresCollectionConfig = { slug: "tags", name: "Tags", table: "tags", properties: { name: { type: "string" } } };
 
 function apply(over: Partial<LiveSchemaRoutesConfig>, user: HonoEnv["Variables"]["user"] = TOKEN_USER) {
     const authors: ({ name: string; email: string } | undefined)[] = [];
@@ -52,13 +50,12 @@ function apply(over: Partial<LiveSchemaRoutesConfig>, user: HonoEnv["Variables"]
         await next();
     });
     app.route("/api/schema", createLiveSchemaRoutes({
-        getCollections: () => [tags],
         getCompiledTables: () => [],
         getAdmin: () => admin,
         getRepository: (author) => { authors.push(author); return repository; },
         previewSource: async () => ({
             files: [{ path: "backend/schema/tags.ts", contents: "export const tags = defineTable(…);" }],
-            schema: { defs: [], tables: [], descriptors: [], collections: [tags] }
+            schema: { defs: [], tables: [], descriptors: [] }
         }),
         writeSource: async (source) => source.files,
         ...over

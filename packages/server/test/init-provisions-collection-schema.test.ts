@@ -138,9 +138,8 @@ describe("initializeRebaseBackend provisions the collection schema", () => {
     it("does not create tables for a project that introspects its collections", async () => {
         // Declaring nothing means the database is the source of truth. Creating
         // anything here would push a schema into a database only meant to be
-        // read. An introspecting driver reports each table it found twice: the
-        // collection the driver serves, and the descriptor read from the
-        // catalogue (`InitializedDriver.tables`).
+        // read. An introspecting driver reports each table it found as the
+        // descriptor read from the catalogue (`InitializedDriver.tables`).
         const found = compileSchemaDefs([plainTable("found")]);
         const rec = recorder();
         await initializeRebaseBackend({
@@ -150,7 +149,7 @@ describe("initializeRebaseBackend provisions the collection schema", () => {
                 async initializeDriver(config) {
                     rec.order.push("initializeDriver");
                     rec.initConfig = config;
-                    return { internals: {}, driver: fakeDataDriver(), collections: found.collections, tables: found.descriptors };
+                    return { internals: {}, driver: fakeDataDriver(), tables: found.descriptors };
                 }
             })
         });

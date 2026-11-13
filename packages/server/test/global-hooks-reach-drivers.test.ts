@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { createServer } from "node:http";
 import { col, defineTable, type DatabaseAdapter, type TableDescriptor, type TableHooks } from "@rebasepro/types";
-import { type LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { jest } from "@jest/globals";
 import { CollectionRegistry, createCallContext } from "@rebasepro/common";
 
@@ -47,7 +46,7 @@ class DriverTableHooks {
     }
 }
 
-function adapter(options: { type?: string; registry?: CollectionRegistry | null; introspected?: LegacyPostgresCollectionConfig[]; tables?: TableDescriptor[]; driverRegistry?: DriverTableHooks } = {}): DatabaseAdapter {
+function adapter(options: { type?: string; registry?: CollectionRegistry | null; introspected?: TableDescriptor[]; driverRegistry?: DriverTableHooks } = {}): DatabaseAdapter {
     const registry = options.registry === undefined ? new HookRegistry() : options.registry;
     return {
         type: options.type ?? "postgres",
@@ -55,7 +54,7 @@ function adapter(options: { type?: string; registry?: CollectionRegistry | null;
             return {
                 internals: {},
                 driver: options.driverRegistry ? Object.assign(fakeDataDriver(), { registry: options.driverRegistry }) : fakeDataDriver(),
-                ...(options.introspected ? { collections: options.introspected, tables: options.tables } : {}),
+                ...(options.introspected ? { tables: options.introspected } : {}),
                 ...(registry ? { collectionRegistry: registry } : {})
             };
         },
@@ -135,30 +134,16 @@ describe("global hooks", () => {
     });
 
     it("reach a driver that serves introspected tables — whose own descriptors the driver hands them", async () => {
-        const introspectedLeads: LegacyPostgresCollectionConfig = {
-            name: "leads",
-            slug: "leads",
-            table: "leads",
-            schema: "public",
-            properties: { id: { type: "string", isId: "uuid", columnType: "uuid" } }
-        };
         const registry = new HookRegistry();
         const hooks: TableHooks = { afterRead: ({ values }) => values };
-        await boot(adapter({ registry, introspected: [introspectedLeads], tables: [leadsDescriptor] }), { tables: [], hooks });
+        await boot(adapter({ registry, introspected: [leadsDescriptor] }), { tables: [], hooks });
 
         expect(registry.globalHooks).toBe(hooks);
     });
 
-    it("refuse to boot when a driver serves an introspected table without its descriptor — a hook would have none to receive", async () => {
-        const introspectedLeads: LegacyPostgresCollectionConfig = {
-            name: "leads",
-            slug: "leads",
-            table: "leads",
-            schema: "public",
-            properties: { id: { type: "string", isId: "uuid" } }
-        };
-        await expect(boot(adapter({ introspected: [introspectedLeads] }), { tables: [], hooks: { afterRead: ({ values }) => values } }))
-            .rejects.toThrow(/introspected 1 table\(s\) and described none of them/);
+    it("refuse to boot when an introspecting driver describes no tables — a hook would have none to receive", async () => {
+        await expect(boot(adapter(), { tables: [], hooks: { afterRead: ({ values }) => values } }))
+            .rejects.toThrow(/cannot derive tables from the database schema/);
     });
 
     it("still boot a driver with no registry when none are declared", async () => {
