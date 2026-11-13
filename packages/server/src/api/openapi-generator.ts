@@ -107,7 +107,7 @@ export function generateOpenApiSpec(
      */
     const listQueryParameters = () => [
         { name: "limit", in: "query", schema: { type: "integer", default: defaultLimit, minimum: 1, maximum: maxLimit },
-            description: `Maximum number of records to return. Must be a whole number between 1 and ${maxLimit}; a larger one is rejected with 400 INVALID_LIMIT rather than trimmed, so a short page always means a short collection. Page past the ceiling with \`offset\`.` },
+            description: `Maximum number of records to return. Must be a whole number between 1 and ${maxLimit}; a larger one is rejected with 400 INVALID_LIMIT rather than trimmed, so a short page always means a short table. Page past the ceiling with \`offset\`.` },
         { name: "offset", in: "query", schema: { type: "integer", default: 0 },
             description: "Number of records to skip" },
         { name: "page", in: "query", schema: { type: "integer", minimum: 1 },
@@ -182,7 +182,7 @@ export function generateOpenApiSpec(
                 + "`{\"comments\":{\"limit\":5,\"where\":{\"published\":[\"==\",true]},"
                 + "\"orderBy\":\"created_at:desc\",\"fields\":\"id,body\",\"include\":{\"author\":true}}}`. "
                 + "A value starting with `{` is read as the JSON form. A name that is not a relation of "
-                + "the collection is a 400 UNKNOWN_RELATION, not a silently missing field.",
+                + "the table is a 400 UNKNOWN_RELATION, not a silently missing field.",
             example: "author,comments.author"
         },
         {
@@ -230,7 +230,7 @@ export function generateOpenApiSpec(
             schema: { type: "string" },
             description:
                 "Text search. By default a case-insensitive substring match OR-ed across the " +
-                "collection's top-level string properties. A collection declaring a `search` block " +
+                "table's top-level text columns. A table declaring a `search` block " +
                 "gets ranked full-text matching over the fields it names, and rows carry a `_score`."
         },
         // Vector search has been served here since vectors landed and was
@@ -273,7 +273,7 @@ export function generateOpenApiSpec(
             title: "Rebase API",
             version: "1.0.0",
             description:
-                "Auto-generated REST API from Rebase collection definitions. " +
+                "Auto-generated REST API from Rebase table definitions. " +
                 "This is the same API consumed by the `@rebasepro/client` SDK."
         },
         servers: [
@@ -415,7 +415,7 @@ description: "Whether more records exist beyond this page" },
     const softDeleteBehaviour = (collection: DocumentedTable): string | undefined => {
         const field = collection.table.softDelete?.field;
         if (!field) return undefined;
-        return `This collection soft-deletes: a delete moves the row to the trash by stamping \`${field}\`, ` +
+        return `This table soft-deletes: a delete moves the row to the trash by stamping \`${field}\`, ` +
             "and every read leaves it out unless it passes `?deleted=include` or `?deleted=only`. A PATCH " +
             `setting \`${field}\` back to \`null\` restores it. Pass \`?hard=true\` to delete for good.`;
     };
@@ -482,10 +482,10 @@ description: "Whether more records exist beyond this page" },
         paths["/data/_batch"] = {
             post: {
                 tags: ["Data"],
-                summary: "Write across collections in one transaction",
+                summary: "Write across tables in one transaction",
                 description:
-                    "All-or-nothing across collections — an order and its line items, a user and " +
-                    "their membership row. `/bulk` is one collection at a time, and sending the two " +
+                    "All-or-nothing across tables — an order and its line items, a user and " +
+                    "their membership row. `/bulk` is one table at a time, and sending the two " +
                     "halves as separate requests is exactly the sequence that can half-succeed.\n\n" +
                     "Operations run in order, each through the same pipeline its single-row route " +
                     "uses: the same validation, callbacks and row-level security, as the same role. " +
@@ -544,7 +544,7 @@ description: "Whether more records exist beyond this page" },
                     },
                     400: {
                         description:
-                            "Malformed body, an unknown collection or field, an illegal field operation " +
+                            "Malformed body, an unknown table or field, an illegal field operation " +
                             "or conflict target, a forward `$ref`, or more operations than the limit. " +
                             "Nothing was written",
                         content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
@@ -582,10 +582,10 @@ description: "Whether more records exist beyond this page" },
 
         schemas.BatchOperation = {
             type: "object",
-            required: ["op", "collection"],
+            required: ["op", "table"],
             properties: {
                 op: { type: "string", enum: ["create", "update", "upsert", "delete"] },
-                collection: { type: "string", description: "The collection slug this operation writes to." },
+                table: { type: "string", description: "The slug of the table this operation writes to." },
                 id: {
                     description:
                         "Required for `update` and `delete`. May instead be a reference marker — an " +
@@ -869,7 +869,7 @@ description: "Whether more records exist beyond this page" },
                             "guarantee — `validation.unique`, a `unique` index, or the primary key — " +
                             "or the request is refused with a 400 naming the targets that do exist. " +
                             "Left off, this is a plain insert and a duplicate key still raises. " +
-                            "Refused (400 `INVALID_CONFLICT_TARGET`) on the auth collection, whose rows are " +
+                            "Refused (400 `INVALID_CONFLICT_TARGET`) on the auth table, whose rows are " +
                             "the users: create them with a plain POST and change them with PATCH.",
                         example: "sku"
                     },
@@ -958,7 +958,7 @@ description: "Whether more records exist beyond this page" },
                                         type: "boolean",
                                         description:
                                             "Write each row as INSERT ... ON CONFLICT DO UPDATE. Refused " +
-                                            "(400 `INVALID_CONFLICT_TARGET`) on the auth collection, whose rows are the users."
+                                            "(400 `INVALID_CONFLICT_TARGET`) on the auth table, whose rows are the users."
                                     },
                                     onConflict: {
                                         type: "array",

@@ -229,7 +229,7 @@ export function assertServerEngine(engine: string, key: string): void {
         throw new BundleError(
             `Data source "${key}" declares engine "${engine}", but MongoDB support was removed ` +
             "and Postgres is the only server engine.",
-            `Move the collections to a Postgres database (declare "${key}" with no engine), ` +
+            `Move the tables to a Postgres database (declare "${key}" with no engine), ` +
             "or reach the data from the client with a direct-transport source."
         );
     }
@@ -281,7 +281,7 @@ export function resolveDataSourceConnection(env: EnvBag, definition: DataSourceD
             `Data source "${definition.key}" has no connection string — ` +
             `set ${`DATABASE_URL${suffix}`}.`,
             "Every declared server-transport data source needs its own connection; " +
-            "collections routed to it would otherwise silently use the default database."
+            "tables routed to it would otherwise silently use the default database."
         );
     }
 
@@ -354,11 +354,11 @@ engine: "postgres" }, ...serverSide];
         throw new BundleError(
             directDefault
                 ? `The default data source is declared with a non-server transport, so the backend ` +
-                  "holds no connection for it — but collections that name no data source still need one."
+                  "holds no connection for it — but tables that name no data source still need one."
                 : "No default data source is configured.",
             directDefault
                 ? `Give "${DEFAULT_DATA_SOURCE_KEY}" a server transport and set DATABASE_URL, or point ` +
-                  "every collection at an explicit dataSource."
+                  "every table at an explicit dataSource."
                 : `Declare a data source with key "${DEFAULT_DATA_SOURCE_KEY}", or set DATABASE_URL.`
         );
     }

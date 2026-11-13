@@ -538,7 +538,7 @@ function followUpFor(config: LiveSchemaRoutesConfig, statements: string[]): stri
     return [
         "This project keeps versioned migrations, and applying here does not write one — " +
         "a migration needs Atlas and a throwaway database, which a running server does not " +
-        "have. The collection has been committed, and `rebase db generate` writes the migration " +
+        "have. The schema change has been committed, and `rebase db generate` writes the migration " +
         "from it, so run that to record this change. Without it, the next environment " +
         "built by replaying migrations will not have it."
     ];
@@ -601,7 +601,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
                 canPlan: Boolean(config.previewSource),
                 code: off?.code ?? "SCHEMA_EDITOR_MISSING_DEPENDENCY",
                 reason: off?.message
-                    ?? "Rewriting collection source needs `ts-morph`, which is not installed " +
+                    ?? "Rewriting schema source needs `ts-morph`, which is not installed " +
                     `on this server. ${tsMorphInstallSentence()}`
             });
         }
@@ -972,7 +972,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             }
             if (plan.digest !== confirm) {
                 throw ApiError.conflict(
-                    "The database or the collections changed since that plan was made, so it was not " +
+                    "The database or the schema changed since that plan was made, so it was not " +
                     "applied. Review the new plan and confirm it.",
                     "SCHEMA_RECONCILE_STALE",
                     { plan }

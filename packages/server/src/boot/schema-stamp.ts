@@ -100,12 +100,12 @@ export interface SchemaStampInput {
  */
 export function decideSchemaStamp(input: SchemaStampInput): SchemaStampVerdict {
     if (input.supported === false) {
-        return { status: "skipped", reason: "this driver does not record a collections schema version" };
+        return { status: "skipped", reason: "this driver does not record a schema version" };
     }
     if (input.introspecting) {
         return {
             status: "skipped",
-            reason: "collections are derived from the database, so they cannot disagree with it"
+            reason: "the tables are derived from the database, so they cannot disagree with it"
         };
     }
     if (input.databaseVersion === null) {
@@ -167,14 +167,14 @@ export function describeMismatch(databaseVersion: string, processVersion: string
         return (
             `The database was stamped by a runtime before 0.31 (database ${databaseVersion}, this process ${processVersion}).\n` +
             `  The schema model changed in 0.31: versions are computed from the compiled tables (backend/schema), ` +
-            `not from collections, so every database reports this once and it says nothing about drift.\n` +
+            `not from backend/schema, so every database reports this once and it says nothing about drift.\n` +
             `  Restamp it by provisioning once with this runtime — boot the process that owns the schema ` +
             `(REBASE_ROLE=api, or the migration Job) with provisioning on, or run \`rebase db push\`. ` +
             `With REBASE_REQUIRE_SCHEMA_MATCH=true, restamp before rolling the other processes.`
         );
     }
     return (
-        `The database was last provisioned from a different set of collections than this process was built from ` +
+        `The database was last provisioned from a different set of tables than this process was built from ` +
         `(database ${databaseVersion}, this process ${processVersion}).\n` +
         `  A process running ahead of the schema queries columns that do not exist yet, and relies on RLS ` +
         `policies that have not been applied —\n` +
@@ -218,22 +218,22 @@ export async function enforceSchemaStamp(options: EnforceSchemaStampOptions): Pr
     const { tables, read, stamp, provisioned, introspecting } = options;
 
     if (introspecting) {
-        return { status: "skipped", reason: "collections are derived from the database, so they cannot disagree with it" };
+        return { status: "skipped", reason: "the tables are derived from the database, so they cannot disagree with it" };
     }
     if (!read && !stamp) {
-        return { status: "skipped", reason: "this driver does not record a collections schema version" };
+        return { status: "skipped", reason: "this driver does not record a schema version" };
     }
 
     const processVersion = computeSchemaVersion(tables);
 
     if (provisioned) {
-        if (!stamp) return { status: "skipped", reason: "this driver cannot record a collections schema version" };
+        if (!stamp) return { status: "skipped", reason: "this driver cannot record a schema version" };
         try {
             await stamp(processVersion);
-            logger.debug(`🔖 [schema] Stamped the collections schema version: ${processVersion}`);
+            logger.debug(`🔖 [schema] Stamped the schema version: ${processVersion}`);
         } catch (error) {
             logger.warn(
-                "⚠️ [schema] Could not record the collections schema version. Other processes cannot check " +
+                "⚠️ [schema] Could not record the schema version. Other processes cannot check " +
                 "themselves against this database until one boots that can.",
                 { error }
             );
@@ -241,7 +241,7 @@ export async function enforceSchemaStamp(options: EnforceSchemaStampOptions): Pr
         return { status: "match", version: processVersion };
     }
 
-    if (!read) return { status: "skipped", reason: "this driver cannot read a collections schema version" };
+    if (!read) return { status: "skipped", reason: "this driver cannot read a schema version" };
 
     let databaseVersion: string | null;
     try {
@@ -259,7 +259,7 @@ export async function enforceSchemaStamp(options: EnforceSchemaStampOptions): Pr
         // boot finishes — neither is a problem, and a warning on both would
         // train people to ignore the one that matters.
         logger.debug(
-            "🔖 [schema] This database carries no collections schema version yet — it will be stamped by the " +
+            "🔖 [schema] This database carries no schema version yet — it will be stamped by the " +
             "process that provisions it."
         );
     } else if (verdict.status === "mismatch") {

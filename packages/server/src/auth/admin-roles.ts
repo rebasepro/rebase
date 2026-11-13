@@ -96,7 +96,7 @@ export function scopeGuardProblem(scope: string, target?: string, declared?: rea
     }
     if (!builtIn && declared && !declared.includes(name)) {
         return `${call}: this backend declares no "${name}" scope, so nobody holds it — an administrator neither. ` +
-            `Declare it under auth.scopes on the users collection: "${name}": { label: "…" }.`;
+            `Declare it under auth.scopes on the users table: "${name}": { label: "…" }.`;
     }
     return null;
 }

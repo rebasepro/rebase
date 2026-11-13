@@ -280,7 +280,7 @@ export function scopeMissing(c: Context<HonoEnv>, scope: string, target?: string
         ? `This API key does not hold the "${wanted}" scope. Create a key that includes it.`
         : c.get("scopes")
             ? `This token does not hold the "${wanted}" scope. Reconnect and grant it.`
-            : `Your account does not hold the "${wanted}" scope. A role that lists it (auth.roles on the users collection) grants it; the admin role holds every scope.`;
+            : `Your account does not hold the "${wanted}" scope. A role that lists it (auth.roles on the users table) grants it; the admin role holds every scope.`;
     return new ApiError(403, "SCOPE_MISSING", message, { requiredScope: wanted });
 }
 

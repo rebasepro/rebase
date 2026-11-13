@@ -225,7 +225,7 @@ describe("a vector search", () => {
         const error = refusal(() => parseQueryOptions(search("internalEmbedding"), {}, { ...queryAccessFor([docs]), viewer: { roles: ["admin"] } }));
         expect(error.code).toBe("UNKNOWN_VECTOR_PROPERTY");
         expect(error.message).toBe(
-            "Unknown vector property \"internalEmbedding\". This collection's vector properties are: embedding, secretEmbedding."
+            "Unknown vector property \"internalEmbedding\". This table's vector columns are: embedding, secretEmbedding."
         );
     });
 

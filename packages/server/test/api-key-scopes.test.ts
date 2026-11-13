@@ -338,7 +338,7 @@ properties };
 
         const read = await app.request("/authors/1/posts");
         expect(read.status).toBe(403);
-        expect((await refusal(read)).message).toContain('"data:read" for collection "authors"');
+        expect((await refusal(read)).message).toContain('"data:read" for table "authors"');
 
         const write = await app.request("/authors/1/posts", {
             method: "POST",
@@ -357,7 +357,7 @@ properties };
         const res = await app.request("/projects/1/notes");
 
         expect(res.status).toBe(403);
-        expect((await refusal(res)).message).toContain('collection "internal_notes"');
+        expect((await refusal(res)).message).toContain('table "internal_notes"');
         expect(driver.fetchCollection).not.toHaveBeenCalled();
     });
 

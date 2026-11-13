@@ -119,7 +119,7 @@ export function assertScopesGrantable(
         if (unknown.length > 0) {
             throw new ApiError(400, "UNKNOWN_SCOPE_TARGET",
                 `These scopes name something this backend does not serve: ${unknown.join(", ")}. ` +
-                "A target is a collection slug, a storage source id or a function name.",
+                "A target is a table slug, a storage source id or a function name.",
                 {
                     scopes: unknown,
                     collections: targets.collections(),

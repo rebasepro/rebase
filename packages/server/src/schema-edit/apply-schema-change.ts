@@ -100,7 +100,7 @@ export class CommitRefusedError extends Error {
         super(
             `Nothing was changed — the commit was refused: ${detail}` +
             (restored
-                ? "\n  The collection source and the generated schema were put back as they were."
+                ? "\n  The schema source and the generated schema were put back as they were."
                 : "\n  The files written for this change could not be put back; check `git status` before retrying.")
         );
         this.name = "CommitRefusedError";

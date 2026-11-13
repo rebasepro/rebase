@@ -254,7 +254,7 @@ export function createGitHubRepository(options: GitHubRepositoryOptions): Schema
             if (listing.truncated) {
                 throw new Error(
                     `The repository ${owner}/${repo} is too large for GitHub to list in one request (the tree ` +
-                    "came back truncated), so the collection files cannot all be read. Nothing was changed."
+                    "came back truncated), so the schema files cannot all be read. Nothing was changed."
                 );
             }
             const prefix = `${dir.replace(/\/+$/, "")}/`;

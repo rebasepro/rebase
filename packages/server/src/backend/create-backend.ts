@@ -545,7 +545,7 @@ function resolveProvision(provision: boolean | ProvisionOptions | undefined): Re
         // A JavaScript caller can leave out what the types require; the answer
         // is still not ours to pick.
         throw new Error(
-            "createRebaseBackend needs `provision`: `true` to create what this backend serves (collection tables, " +
+            "createRebaseBackend needs `provision`: `true` to create what this backend serves (tables, " +
             "RLS policies, change capture, the framework's own tables), `false` to change nothing in the database."
         );
     }
@@ -2005,7 +2005,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     };
 
     /** Where a server with no editable source of its own can still edit collections. */
-    const LIVE_SCHEMA_REPOSITORY_HINT = "To edit collections from a deployment, name a repository to commit " +
+    const LIVE_SCHEMA_REPOSITORY_HINT = "To edit the schema from a deployment, name a repository to commit " +
         "them to: `liveSchema.repository`, or REBASE_LIVE_SCHEMA_REPOSITORY for a built bundle.";
 
     // The schema editor rewrites backend/schema, so it needs a schemaDir to
@@ -2806,13 +2806,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 // the docs, at the link, where it can be read once. The full
                 // text stays reachable at `debug`.
                 logger.info(
-                    `${publicSelect.length} collection(s) grant unfiltered reads (${publicSelect.join(", ")}) — ` +
+                    `${publicSelect.length} table(s) grant unfiltered reads (${publicSelect.join(", ")}) — ` +
                     "reads still require a token. Set AUTH_REQUIRE=false to let RLS alone decide: " +
                     "https://rebase.pro/docs/collections/security-rules"
                 );
                 logger.debug(
                     "`access: \"public\"` widens which ROWS a caller sees, not who may call, so an " +
-                    "unauthenticated read of a public collection answers 401 rather than returning rows. " +
+                    "unauthenticated read of a public table answers 401 rather than returning rows. " +
                     "Setting AUTH_REQUIRE=false (or `auth.requireAuth: false`) removes the API-level gate " +
                     "and delegates the decision entirely to the Postgres RLS policies — the usual choice " +
                     "for a public website reading its own backend."
@@ -3895,7 +3895,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             warnOnMount(
                 "meta",
                 "Contract endpoint disabled: no auth is configured (no adapter or no jwtSecret), " +
-                "and it would otherwise expose the full collection schema to anyone. " +
+                "and it would otherwise expose the full schema to anyone. " +
                 "`/api/meta/schema-version` is still served."
             );
         }

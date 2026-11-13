@@ -150,7 +150,7 @@ export async function runOrphanSweep(
         unscanned: report.unscanned.map(u => `${u.collection}: ${u.reason}`)
     };
     if (report.unscanned.length > 0) {
-        ctx.log(`Kept every file: ${report.unscanned.length} collection(s) could not be read (${result.unscanned.join("; ")}).`);
+        ctx.log(`Kept every file: ${report.unscanned.length} table(s) could not be read (${result.unscanned.join("; ")}).`);
         return result;
     }
     if (report.orphans.length === 0) {

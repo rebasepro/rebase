@@ -659,7 +659,7 @@ export class RestApiGenerator {
         const scope = `data:${operation}`;
         if (!scopeGrants(held, scope, collectionSlug)) {
             throw new ApiError(403, "SCOPE_MISSING",
-                `This credential does not hold "${scope}" for collection "${collectionSlug}". ` +
+                `This credential does not hold "${scope}" for table "${collectionSlug}". ` +
                 `A key needs "${scope}" or "${scope}:${collectionSlug}".`,
                 { requiredScope: `${scope}:${collectionSlug}` });
         }
@@ -767,7 +767,7 @@ export class RestApiGenerator {
             chain.push(target);
         }
         if (!relation) {
-            throw ApiError.notFound(`'${collectionPath}' names a collection, not a relation of one.`);
+            throw ApiError.notFound(`'${collectionPath}' names a table, not a relation of one.`);
         }
 
         return { path: [root.table.slug, ...segments.slice(1)].join("/"), chain, relation };
@@ -1671,7 +1671,7 @@ export class RestApiGenerator {
             }
             if (!driver.saveMany) {
                 throw ApiError.badRequest(
-                    "This collection's data source does not support bulk writes.",
+                    "This table's data source does not support bulk writes.",
                     "BULK_UNSUPPORTED"
                 );
             }
@@ -1768,7 +1768,7 @@ export class RestApiGenerator {
             }
             if (!driver.updateMany) {
                 throw ApiError.badRequest(
-                    "This collection's data source does not support bulk updates.",
+                    "This table's data source does not support bulk updates.",
                     "BULK_UNSUPPORTED"
                 );
             }
@@ -1860,7 +1860,7 @@ export class RestApiGenerator {
             }
             if (!driver.deleteMany) {
                 throw ApiError.badRequest(
-                    "This collection's data source does not support bulk deletes.",
+                    "This table's data source does not support bulk deletes.",
                     "BULK_UNSUPPORTED"
                 );
             }

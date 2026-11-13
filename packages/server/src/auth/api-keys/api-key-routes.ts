@@ -248,7 +248,7 @@ export function createPersonalKeyRoutes(options: PersonalKeyRouteOptions): Hono<
         router.all("/*", () => {
             throw ApiError.forbidden(
                 "Personal API keys are switched off on this backend. Set `personalKeys: true` in the " +
-                "auth block of the users collection to let accounts create them.",
+                "auth block of the users table to let accounts create them.",
                 "PERSONAL_KEYS_DISABLED"
             );
         });

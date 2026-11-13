@@ -237,7 +237,7 @@ roles: ["anon"] }));
         if (enforceAuth && !c.get("user") && !c.get("simulation")) {
             return refuse(c, ApiError.unauthenticated(
                 "Unauthorized: Authentication required. This is the API-level gate, not a row " +
-                "rule — a collection granting public reads still needs a caller. Set " +
+                "rule — a table granting public reads still needs a caller. Set " +
                 "AUTH_REQUIRE=false (or `auth.requireAuth: false`) to let RLS alone decide."
             ));
         }
