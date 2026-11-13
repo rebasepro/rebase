@@ -2,6 +2,7 @@ import {
     Entity,
     EntityRelation
 } from "@rebasepro/types";
+import type { RelationRef } from "../runtime/relation-ref";
 
 /**
  * Normalize a value into a proper EntityRelation instance.
@@ -53,24 +54,8 @@ export function normalizeToEntityRelation(value: unknown, propertyType?: string,
  * Relation reference types used throughout the server layer.
  * These replace the 50+ manual `{ id, path, __type: "relation" }` constructions.
  */
-export interface RelationRef {
-    readonly id: string | number;
-    readonly path: string;
-    readonly __type: "relation";
-}
-
 export interface RelationRefWithData extends RelationRef {
     readonly data: Entity;
-}
-
-/**
- * Create a lightweight relation stub for admin views.
- * Replaces inline `{ id, path, __type: "relation" }` object literals.
- */
-export function createRelationRef(id: string | number, path: string): RelationRef {
-    return { id,
-path,
-__type: "relation" };
 }
 
 /**

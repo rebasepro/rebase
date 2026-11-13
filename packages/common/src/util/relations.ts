@@ -188,10 +188,6 @@ export function getEnumVarName(tableName: string, propName: string): string {
     return `${tableVar}${propVar}`;
 }
 
-export function getColumnName(fullColumn: string): string {
-    return fullColumn.includes(".") ? fullColumn.split(".").pop()! : fullColumn;
-}
-
 /**
  * The field key a database column is served and addressed under.
  *
