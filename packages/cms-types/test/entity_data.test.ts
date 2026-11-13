@@ -1,8 +1,15 @@
 import { buildRebaseData, wrapAsEntityData } from "../src/data/entity_data";
 import { buildSdkData, createAccessorSlugResolver } from "@rebasepro/common";
-import { DataDriver, RebaseClientError, RebaseSdkData } from "@rebasepro/types";
+import { DataDriver, FindParams, RebaseClientError, RebaseSdkData } from "@rebasepro/types";
 import { TableAccessor, Entity, RebaseData } from "@rebasepro/cms-types";
 import { sdkClient } from "./helpers/inert-driver";
+
+/**
+ * A legacy PostgREST-encoded `where` (`{ price: "gte.100" }`): the accessor
+ * decodes it, but `FindParams["where"]` admits only `[op, value]` tuples, so
+ * it is handed over as what an untyped caller would send.
+ */
+const encodedWhere = (where: Record<string, string>): FindParams["where"] => where as FindParams["where"];
 
 /**
  * `RebaseData`'s dynamic index signature is a union of a collection accessor
@@ -132,8 +139,7 @@ name: "Camera" } }
             // `FindParams["where"]` only admits `[op, value]` tuples, so the
             // fixture cannot be well typed. Deliberately invalid, then.
             await at(data, "products").find({
-                where: { status: "eq.published",
-price: "gte.100" } as never
+                where: encodedWhere({ status: "eq.published", price: "gte.100" })
             });
 
             expect(driver.fetchCollection).toHaveBeenCalledWith(
@@ -154,7 +160,7 @@ price: "gte.100" } as never
 
             await at(data, "products").find({
                 // Deliberately invalid: as above, a legacy encoded string `where` cannot be typed.
-                where: { role: "in.(admin,editor)" } as never
+                where: encodedWhere({ role: "in.(admin,editor)" })
             });
 
             expect(driver.fetchCollection).toHaveBeenCalledWith(
