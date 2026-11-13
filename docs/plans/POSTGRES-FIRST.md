@@ -689,7 +689,95 @@ rule that silently drops a clause.
 
 ## F. Checklist
 
-*(Ticked as slices land; the final report lists each line.)*
+Filled by an independent parity review at HEAD on 13 Nov 2026. The lines still open are the release and rollout, and the
+items only a full verification run covers (the Playwright lane, `pnpm ci:e2e`, the cloud control plane's own program).
+
+Worktree `/Users/francesco/rebase/.claude/worktrees/pgfirst`, HEAD `38df6df65c` (559 commits on `main` = `7081747fad`).
+Uncommitted at review time: locale docs + `tooling/scripts/locale-sources.json` (background locale run); no product source.
+
+Marks: `[x]` proven (where + a test I RAN green at HEAD, or a probe I ran) · `[~]` done with a recorded deviation (Part II G line
+named) · `[ ]` not met (what is missing) · `[?]` could not verify here (why) — added marker, not counted as `[ ]`.
+"ran" = I ran that file at HEAD in this review (jest/vitest, `--maxWorkers=2`; Docker e2e through `locked.sh heavy`).
+
+### §1 Invariants
+- [x] 1.1 Every `PgType` — `col.*` in `packages/types/src/schema/columns.ts:998` (all spec rows + interval/inet/cidr/macaddr/point/line/halfvec/sparsevec/bit/custom). Proof: `server-postgres/test/plan-golden.test.ts` (ran; property-matrix + 11 real corpora byte-identical, `PLAN_GOLDEN_ALLOWED_DIFFERENCES = []`), `server-postgres/test/codecs-native-tables.test.ts`, `wire-read-values.test.ts` (ran).
+- [x] 1.2 Generated + identity — `.generatedAlwaysAs()`, `.generatedByDefaultAsIdentity()` (Drizzle spelling; `generatedAlwaysAsIdentity` refused). Proof: `types/test/schema/drizzle-spelling.test.ts` (ran, ts-jest type-checked), `common/test/schema/compile-tables.test.ts` (ran), plan-golden (ran).
+- [x] 1.3 Five relation kinds incl. self-relation — `rel.*` `packages/types/src/schema/relations.ts`. Proof: `server-postgres/test/relations-native-tables.test.ts` (ran: hasMany orderBy, sourceKey, constraint:false, via, manyToMany pivot), `self-referencing-relations.test.ts` (not run; native), `descriptor-plan-agreement.test.ts` (ran), `e2e/door-parity-e2e.test.ts` (ran, Docker).
+- [x] 1.4 `_pivot` read/write + `_count` — Proof: `relations-native-tables.test.ts` "writes `_pivot` … reads it back", "refuses a `_pivot` key …", "updates one link's pivot columns and tells the child list's subscribers" (ran, native `defineTable`); `_count`: `field-access-native-tables.test.ts` "is included and counted by role" (ran). (Closes first review P-5 for these.)
+- [x] 1.5 FTS `tsvector` — `search` on `defineTable`. Proof: `search-column.test.ts` (ran), `hooks-native-tables.test.ts` "run afterRead on a search" (ran), `field-access-native-tables` "cannot be searched" (ran).
+- [x] 1.6 pgvector HNSW/IVFFlat, 3 metrics — `col.vector(d, { index })`. Proof: `vector-index.test.ts` (ran), `field-access-native-tables` "a private vector column" (ran).
+- [x] 1.7 Storage S3/GCS/local, signed URLs, orphan sweep — `col.storage()`. Proof: `server/test/storage-local.test.ts`, `storage-s3.test.ts`, `storage-orphan-sweep.test.ts`, `storage-upload-path-limits.test.ts`, `storage-column-limits.test.ts`, `storage-orphan-scans-wiring.test.ts` (all ran). Resize: browser-side only; only projected (`cms/test/tables/column_property.test.ts`, ran) — the resize itself has no test on main or HEAD (note N-4).
+- [x] 1.8 Soft delete (trash, restore, hard) — Proof: `server-postgres/test/soft-delete.test.ts` (ran), `common/test/sdk-trash.test.ts` (ran), door-parity "history follows a row through the trash" (ran, Docker).
+- [x] 1.9 Tenant stamping — `tenant` on `defineTable`. Proof: `tenant-keep-trigger.test.ts` (ran); probe: `tenant.bypassRoles` reaches the descriptor (ran).
+- [x] 1.10 History, masked like a read — Proof: `server-postgres/test/history-served-as-read.test.ts` (ran), `server/test/history-routes-authorization.test.ts` (ran). Deviation documented (CHANGELOG + guide §132).
+- [x] 1.11 Row + field hooks, PII masking on REST / realtime / MCP / history / in-process — Proof: `hooks-native-tables.test.ts` (ran: seven hooks, global hooks order, nested `json.*.transform()` at every depth on write and every read, include masking incl. realtime frames), `nested-include-masking.test.ts`, `history-served-as-read.test.ts`, `mcp-rls-end-to-end.test.ts` (ran), `server/test/global-hooks-reach-drivers.test.ts` (ran).
+- [x] 1.12 Views + materialized views — `defineView`. Proof: `e2e/view-collections-e2e.test.ts` (ran, Docker: security_invoker, roles-only matview, refresh concurrently or not); probe: matview defaults `roles: ["admin"]`, plain view with `roles` refused (ran).
+- [x] 1.13 Studio schema editing incl. live apply without restart — Proof: `server/test/table-source-editor.test.ts`, `table-source-editor-safety.test.ts`, `live-schema-serves-applied.test.ts` (ran), `e2e/live-schema-refresh-e2e.test.ts` (ran, Docker).
+- [x] 1.14 Typed SDK codegen — Proof: `codegen/test/sdk-generator.test.ts`, `sdk-parity.test.ts` (ran, 122).
+- [x] 1.15 MCP (remote, local, plugin-review, mcp-apps) — tools renamed for tables (documented guide §122). Proof: `server-postgres/test/mcp-rls-end-to-end.test.ts` (ran), `server/test/mcp-apps.test.ts` (ran, incl. "the project's presentation, from its UI preferences" — P-1 closed), `mcp-apps/test/rebase-screen.test.tsx` + `tool-driver.test.ts` (ran), `packages/mcp/test/index.test.ts` (ran), `plugin-review/test/config.test.ts` + `ReviewQueueView.test.tsx` (ran).
+- [x] 1.16 Custom React views/fields/actions — `customizeTable` `fields.x.Field`, `entityActions`. Proof: `cms/test/tables/customize_table.test.tsx`, `customize_apply.test.tsx`, `customize_render.test.tsx` (ran).
+- [x] 2.1 `rls` omitted = compile-time AND boot-time error — Proof: `types/test/schema/schema-types.test.ts` `@ts-expect-error` "`rls` is required" (ran under ts-jest diagnostics); `server/test/load-schema.test.ts` "refuses a table whose rls was taken away", "refuses rls: \"inherit\" without a defaultRls" (ran); probe: compileTables refuses a table with no rls (ran).
+- [x] 2.2 Security in Postgres; `SET LOCAL ROLE`; no in-memory stand-in — Proof: `e2e/rls-enforcement.test.ts`, `e2e/declared-table-protection-e2e.test.ts` (ran, Docker), `introspected-servable-tables.test.ts` (ran).
+- [~] 3.1 server packages know no UI/Firestore/Mongo — no import of a UI package from `server`/`server-postgres` src (grep). Deviation NOT recorded in Part II G: `server-postgres/src/schema/introspect-db-customization.ts` emits `customizeTable` files (labels, icon, board, hide stamps) — same as main's introspection emitting `admin` blocks; history decoding still reads legacy `{__type}` envelopes of OLD stored entries (`server/src/history/history-routes.ts:189`). Both defensible; record them (note N-6).
+- [x] 3.2 `server-mongo` retired — package gone; guide §120, CHANGELOG.
+- [x] 4.1 Firestore first-class, cross-source refs both ways — Proof: `firebase/test/cross_engine_references.test.ts`, `define_firestore_collection.test.ts`, `firestore_data_source.test.ts` (ran), `cms-types/test/routing_integration.test.ts` (ran), `cms/test/hooks/useReferencePaths.test.tsx` (ran).
+- [~] 5.1 Deterministic codemod for `config/collections/*.ts` — `rebase migrate collections-to-tables`. Proof: `cli/.../migrate.test.ts` (ran: blog/typed/firestore fixtures, SQL byte-identical, idempotent), plan-golden (lift of `app` + presets, ran). BUT `corpus.test.ts` now SKIPS all 5 real projects (`app`, 3 presets, `saas`) because they are migrated — the end-to-end run on the richest legacy project is no longer exercised (gap S-2). Real-project runs: `~/.rebase-audits/pgfirst/migrate-real.md` (builder record, not re-run by me).
+
+### §2 Topology
+- [x] Kernel has zero UI and zero non-Postgres engine unions — `types/utils/common/client` src import no UI; Firestore only in the capability registry (kept, Part II G "registerDataSourceCapabilities stays in the kernel"). Proof: `pnpm check:baas-types` program (`tests/e2e/baas-typecheck/tsconfig.json`) — I ran `tsc -p` on it: 0 errors.
+- [x] `config/collections` + `/// <reference types="@rebasepro/cms-types" />` merging deleted — `app/config` gone; no reference directive left; loader refuses a legacy layout (`server/src/schema/load-schema.ts:222`). Proof: `load-schema.test.ts` (ran).
+- [x] Lazy string paths / thunks + their loader guards deleted — component slot is a component (guide §118); `check:headless` survives only as "schema + server packages load with no UI package" (rewritten, `tooling/scripts/headless-guard/check.mjs`). Retired tests `resolveComponentRef`, `component_ref`, `vitePlugin*` go with the code (spec §8 P4).
+- [~] `FirebaseProperties`, `MongoProperties`, `DistributiveOmit` gone from `@rebasepro/types`; Firestore types in `@rebasepro/firebase` — gone from types (grep 0). `FirebaseCollectionConfig` lives in `@rebasepro/cms-types` (Part II G "FirebaseCollectionConfig stays in @rebasepro/cms-types").
+- [x] Every backend data route backed by real RLS — `e2e/rls-enforcement.test.ts`, `declared-table-protection-e2e.test.ts` (ran, Docker); withheld table 503 `TABLE_WITHHELD` (Part II G F-2).
+
+### §3 Layout
+- [x] Mode A — `backend/schema/` optional (introspection), `functions/`, `crons/`, `drizzle/`, `rebase.json`. Proof: `server/test/load-schema.test.ts`, `introspected-servable-tables.test.ts` (ran); templates in `packages/cli/templates/template/backend`.
+- [x] Mode B — `frontend/src/cms/` with `customizeTable` + Firestore collections; `app/frontend/src/cms/*.tsx` + `ui-config.json` exist. Proof: `cms/test/tables/*` (ran).
+- [x] `app/config/` gone; frontend imports types from `backend/schema`; backend never imports frontend (build) — `rebaseBackendGuard()`. Proof: `app/test/backend_guard.test.ts` (ran), `tooling/scripts/test/frontend-backend-imports.test.mjs` (ran).
+
+### §4 Layer 1
+- [x] 4.1 `defineTable` (slug, schema, columns, relations, rls, tenant, softDelete, history, search, indexes, hooks), `defineAuthTable`, `defineView` — `packages/types/src/schema/table.ts`. Proof: `common/test/schema/print-table.test.ts` "reproduces the spec's §4.1 example, token for token" (ran), `codegen/test/spec-posts-fixture.test.ts` (exists); probe: description/metadata/tenant.bypassRoles/indexes.reason/strictWrites/history/column `.describe()` all reach the descriptor (ran).
+- [~] 4.2 Column builders — every row, Drizzle spelling — all rows present; spelling per owner 2026-11-12 (Part II G "Columns are spelled as Drizzle's pg-core"): `col.timestamp({ withTimezone })` for `timestamptz`, `.array()` method for `col.array(inner)`, name argument for `.column()`, `.generatedByDefaultAsIdentity()` for `.identity()`. Proof: `types/test/schema/drizzle-spelling.test.ts` (ran), `common/test/schema/drizzle-alignment.test.ts` (exists).
+- [~] 4.2 Universal modifiers — `.notNull()` (nullable default), `.unique()`, `.default()`/`sql` default, `.generatedAlwaysAs()`, `.readOnly()`, `.transform()`; `.defaultNow()` is a DB default only (G). Proof: `types/test/schema/columns.test.ts` (ran), `server/test/rest-table-rules.test.ts` (ran), `write-defaults-and-autovalues.test.ts` (ran).
+- [x] 4.3 `rel.belongsTo` (localKey, notNull, onDelete, onUpdate, index), `hasOne`, `hasMany` (foreignKey, orderBy), `manyToMany` (through, keys, pivot; junction + junction RLS), `via` — Proof: `relations-native-tables.test.ts` (ran), `common/test/schema/compile-refusals.test.ts` (ran), plan-golden (ran; junction policies pinned).
+- [x] 4.4.1 `rls: "admin-only" | SecurityRule[] | "inherit"`; inherit w/o `defaultRls` fails generate and boot — Proof: `load-schema.test.ts` (ran); probe `compileSchema` refuses inherit without defaultRls (ran).
+- [x] 4.4.2 `defineAuthTable` self-read + no self-escalation — Proof: `server-postgres/test/auth-default-policies.test.ts` "injects a self-read policy", "restrictive admin-write gate" (ran), `field-access-native-tables` "the auth table's secret columns" (ran), `server/test/auth-collection-write-validation.test.ts` (ran).
+- [x] 4.4.3 `defineView` security_invoker; materialized `roles` default `["admin"]` — Proof: `view-collections-e2e.test.ts` (ran, Docker), probe (ran).
+- [x] 4.4.4 Introspection skips a table without RLS with the exact remediation SQL — Proof: `introspected-servable-tables.test.ts` (ran; asserts `ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;`).
+
+### §5 Compiler and wire
+- [x] One IR → plan/policies, `schema.generated.ts`, REST + realtime + OpenAPI + `/mcp`, `GET /api/schema/tables`, codegen — lowering bridge deleted. Proof: plan-golden, `descriptor-plan-agreement` (ran), `server/test/openapi-table-rules.test.ts` (ran), `schema-tables-route.test.ts` (ran), `codegen/test/sdk-generator.test.ts` (ran).
+- [~] `GET /api/schema/tables` — authenticated callers; never hook source; a person sees only what they may reach — Part II G "describes a person only what their roles reach" (S-3), `schemaTables.persons: "all"`. Proof: `server/test/schema-tables-route.test.ts`, `schema-tables-serializer.test.ts` (ran).
+- [x] Consumers: zero-config `<RebaseCMS />`, `<RebaseStudio />`, MCP `show_table` / `mcp-apps` — Proof: `cms/test/tables/projected_defaults_parity.test.tsx` (ran), `studio/test/RebaseStudio-devViews.test.tsx`, `rls-editor-*`, `schema-visualizer-graph` (ran), `server/test/mcp-apps.test.ts` (ran).
+
+### §6 Layer 2
+- [~] 6.1 Zero-config defaults (labels, widgets per type, enum chips + palette, storage, date pickers, stamps read-only + hidden, JSON editor, relation pickers + tabs) — Proof: `cms/test/tables/project_table.test.ts`, `column_property.test.ts`, `labels.test.ts`, `relations.test.ts`, `projected_defaults_parity.test.tsx` (ran). Deviation (G "CMS defaults"): no forced view mode / display slots; tenant column shown. Audit stamps hidden from list columns is spec §6.1 but is a visible change for a migrated project and is NOT in CHANGELOG / upgrade guide (gap S-3).
+- [x] 6.1 Client-side permission reflection from structured `rls` — Proof: `cms/test/hooks/projected_rules_once.test.ts`, `cms/test/tables/rls.test.ts` (ran), `studio/test/policy-rules.test.ts` (ran).
+- [x] 6.2 `customizeTable` — every option of the example (name, icon, group, view modes, kanban, display, per-field overrides incl. direct component import, entity actions with `updateRecord`) — Proof: `cms/test/tables/customize_table.test.tsx` (ran; the §6.2 object literally), `customize_apply.test.tsx`, `customize_render.test.tsx` (ran).
+- [x] 6.3 `defineFirestoreCollection`, `useFirestoreDataSource`, `<RebaseCMS tableCustomizations externalCollections>`, cross-engine refs both ways — Proof: firebase tests above (ran).
+- [x] 6.4 Schema editor reads/writes `backend/schema/*.ts` only (+ Firestore files via the frontend editor, G "Firestore collections are edited in development") — Proof: `server/test/table-source-editor.test.ts`, `frontend-source-editor.test.ts` (ran), `cms/test/collection_editor/editor-table-patch-flows.test.tsx`, `split_edit.test.ts`, `firestore-edit.test.ts` (ran), `firebase/test/firestore_collection_edit_round_trip.test.ts` (ran).
+- [x] 6.4 UI layout persistence — JSON in dev, `rebase.ui_preferences` deployed — Proof: `cms/test/collection_editor/ui-config-file-flow.test.ts` (ran), `server-postgres/test/ui-preferences-store.test.ts` (ran), `server/test/ui-config-routes.test.ts` (ran), `app/test/ui_preferences.test.tsx` (ran).
+
+### §7 Parity table — see `reviews/parity-final.md` §"§7 table": 12 rows hold, 2 hold with a recorded deviation; 0 do not hold.
+- [x] §7 rows 1–14 ticked against the first review — every P-1…P-7 closed with a test I ran; P-8/P-9 recorded in Part II G (but not in CHANGELOG/guide — S-3).
+
+### §8 Phases
+- [x] P1 mongo retired; Firestore types isolated (see 3.2, §2 line 4 `[~]`).
+- [x] P2 builders + adapter + endpoint, tests across server-postgres and rls-check — `rls-check/src/remediation.test.ts` (ran, 154) + the server-postgres files above.
+- [~] P3 zero-config CMS + `customizeTable` + codemod (`tooling/scripts/` → shipped as `rebase migrate collections-to-tables` in `packages/cli/src/codemod/`), run on `app/` — app migrated (`app/backend/schema`, `app/frontend/src/cms`). "Unit + Playwright lanes green": not run by me (`[?]` for the Playwright half; separate verification run).
+- [x] P4 templates (`rebase init`, `--headless`), schema editor, codegen, docs, `llms.txt`; legacy loader and guards deleted — `packages/cli/templates/template/backend`, `website/public/llms.txt` has `defineTable` (3) and no `defineCollection`; `server/test/validate-templates.test.ts` (exists); `cms/test/collection_editor/split_edit.test.ts` "the %s template is a createTable the server accepts" (ran).
+
+### §9 — decisions (Part II A): entry point, builder vs Drizzle, FK style
+- [x] Recorded in Part II A; FK in `relations` (`.references()` refused, G).
+
+### Later instructions (Francesco)
+- [?] Docs and agent skills updated (English; five locales regenerated or fallback stated) — English: upgrade guide 0.30→0.31 (§108–140), `tooling/rebase-agent-skills/skills/rebase-tables/` exists. Locales: a background process is rewriting them now — not verifiable at this moment. One stale English line: `website/src/content/docs/docs/architecture/runtime-and-bundles.md:114` is fine (describes refused format-2 bundles).
+- [~] BaaS vocabulary is "table" everywhere user-visible — kept-on-purpose wire names listed in Part II G "Names that still say collection". Residues NOT covered by that list (note N-1): REST 400 `BULK_UNSUPPORTED` "This collection's data source …" (`server/src/api/rest/api-generator.ts:1745,1829`); schema-editor refusals "Collections are introspected …" / "edits collection source files" (`server/src/backend/create-backend.ts:2037-2044`); boot warn "collections schema version" (`server/src/boot/schema-stamp.ts:250`); `nested-path.ts:64` "collection/id/relation"; client console "collection subscription callback" (`client/src/websocket.ts:1621,2408,2682`); docs URL path `/docs/collections/*` (titles say table).
+- [x] `defineTable` columns as close to Drizzle as possible — `drizzle-spelling.test.ts` (ran, 44 type assertions).
+- [x] Internals off the legacy model; no compatibility layers — lowering deleted (`138e9dea61`), driver reads compiled tables, SDK on rows, lift only in `@rebasepro/common/migrate`; `@rebasepro/types` exports no legacy model (baas-typecheck ran). 
+- [~] Clear migration path (codemod + upgrade guide + rule-meaning review) — guide §"Review before deploying" + `--accept-rule-changes`; gaps: corpus test skips (S-2), some deliberate changes undocumented (S-3), `moved-imports.test.ts` red at HEAD (S-1).
+- [?] Cloud control plane (`saas`) follows — `saas/` on `feat/postgres-first-baas` (`30fa91e`, `ffa41f9` payload v3, `a8838ab` backend guard), `saas/backend/schema/` exists. Not run: separate compile/test (memory: saas is its own TS program).
+- [ ] Release + rollout — not done; not requested; gated on every gate holding (S-1 currently red).
 
 ## G. Decisions taken while building
 
@@ -857,6 +945,37 @@ One line each: what, and why. Grouped by area.
   does not provision served a declared table with RLS off; a parent's
   `hasMany` / `hasOne` write moved child rows whose key the caller may not
   write; `/api/docs` was public in development.
+
+- **Two §3.1 exceptions, both parity-preserving.** Introspection writes
+  `customizeTable` files (labels, icon, board, hidden stamps) as 0.30's
+  introspection wrote `admin` blocks
+  (`server-postgres/src/schema/introspect-db-customization.ts`); and the history
+  route decodes the legacy `{ __type }` envelopes of entries stored before this
+  release (`server/src/history/history-routes.ts`), so old entries are served
+  and reverted as wire rows. Why: dropping either would lose what a project had.
+- **F-2 as implemented: a declared table is served only when the database
+  protects it** — row-level security on, at least one declared policy present
+  by its planned name, and every declared restrictive policy present; else 503
+  `TABLE_WITHHELD`. A missing permissive policy is served with a boot warning;
+  undeclared policies are `rebase doctor`'s. Why: a restrictive policy missing
+  widens access, a permissive one missing only narrows it.
+- **A link is its key column.** A restriction on a `belongsTo`'s key column is
+  a restriction on the link: writing by relation name is held to the key's
+  rules, both spellings with different values is a 400, an unreadable key
+  hides the link from includes, filters, sorts and every description. Why: two
+  spellings of one value with two sets of rules is a bypass (found on this
+  branch, never shipped).
+- **`strictWrites: false` means one thing**: an undeclared key goes to the
+  driver. It never opens a declared column, stamp, tenant, key, relation
+  target or `_pivot` rule (the `_pivot` gap was also in 0.30.x).
+- **The docs URL path `/docs/collections/*` is kept** so existing links work;
+  the page titles say table.
+- **Bundle size: the eager set grew from 1338 to 1414 kB** (cms-shell 743 →
+  800 kB). Cause: the view-model helpers moved from `@rebasepro/common`
+  (preserved modules, `sideEffects: false`) to `@rebasepro/cms-types` (a
+  single-file dist), the boot-time table → collection projection, and
+  `customizeTable` in the index. The lever left: build `cms-types` as preserved
+  modules with `sideEffects: false` (its own slice).
 
 ### CMS defaults
 
