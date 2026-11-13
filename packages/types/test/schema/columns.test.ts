@@ -1,4 +1,4 @@
-import { col, isColumnBuilder, json, normalizeStorage, normalizeValidation, parseByteSize } from "../../src/schema";
+import { col, isColumnBuilder, json, normalizeStorage, normalizeValidation, parseByteSize, pgEnum, sql } from "../../src/schema";
 import type { ColumnDef, ColumnType } from "../../src/schema";
 import { bucket } from "../../src/types/resource_kinds";
 import { resetDeclaredResources } from "../../src/types/resources";
@@ -12,34 +12,36 @@ import { resetDeclaredResources } from "../../src/types/resources";
 const base = { notNull: false, primaryKey: false, unique: false, readOnly: false, private: false };
 
 describe("col.* — what each builder records", () => {
+    const sharedEnum = pgEnum("shared", ["a"]);
+
     it.each<[string, ColumnType, () => ColumnDef]>([
         ["uuid", { kind: "uuid" }, () => col.uuid().def],
         ["text", { kind: "text" }, () => col.text().def],
-        ["varchar()", { kind: "varchar", length: 255 }, () => col.varchar().def],
-        ["varchar(160)", { kind: "varchar", length: 160 }, () => col.varchar(160).def],
-        ["char()", { kind: "char", length: 255 }, () => col.char().def],
-        ["char(2)", { kind: "char", length: 2 }, () => col.char(2).def],
+        ["varchar()", { kind: "varchar", length: 255 }, () => col.varchar({ length: 255 }).def],
+        ["varchar(160)", { kind: "varchar", length: 160 }, () => col.varchar({ length: 160 }).def],
+        ["char()", { kind: "char", length: 255 }, () => col.char({ length: 255 }).def],
+        ["char(2)", { kind: "char", length: 2 }, () => col.char({ length: 2 }).def],
         ["enum", { kind: "enum", values: ["a", "b"] }, () => col.enum(["a", "b"]).def],
-        ["enum named", { kind: "enum", values: ["a"], name: "shared" }, () => col.enum(["a"], { name: "shared" }).def],
+        ["enum named", { kind: "enum", values: ["a"], name: "shared" }, () => sharedEnum().def],
         ["smallint", { kind: "smallint" }, () => col.smallint().def],
         ["integer", { kind: "integer" }, () => col.integer().def],
-        ["bigint", { kind: "bigint" }, () => col.bigint().def],
+        ["bigint", { kind: "bigint" }, () => col.bigint({ mode: "number" }).def],
         ["smallserial", { kind: "smallserial" }, () => col.smallserial().def],
         ["serial", { kind: "serial" }, () => col.serial().def],
-        ["bigserial", { kind: "bigserial" }, () => col.bigserial().def],
+        ["bigserial", { kind: "bigserial" }, () => col.bigserial({ mode: "number" }).def],
         ["real", { kind: "real" }, () => col.real().def],
         ["doublePrecision", { kind: "doublePrecision" }, () => col.doublePrecision().def],
         ["numeric()", { kind: "numeric" }, () => col.numeric().def],
-        ["numeric(10)", { kind: "numeric", precision: 10 }, () => col.numeric(10).def],
-        ["numeric(10, 2)", { kind: "numeric", precision: 10, scale: 2 }, () => col.numeric(10, 2).def],
+        ["numeric(10)", { kind: "numeric", precision: 10 }, () => col.numeric({ precision: 10 }).def],
+        ["numeric(10, 2)", { kind: "numeric", precision: 10, scale: 2 }, () => col.numeric({ precision: 10, scale: 2 }).def],
         ["boolean", { kind: "boolean" }, () => col.boolean().def],
-        ["timestamptz", { kind: "timestamptz" }, () => col.timestamptz().def],
+        ["timestamptz", { kind: "timestamptz" }, () => col.timestamp({ withTimezone: true }).def],
         ["date", { kind: "date" }, () => col.date().def],
         ["time", { kind: "time" }, () => col.time().def],
         ["jsonb", { kind: "jsonb" }, () => col.jsonb().def],
         ["json", { kind: "json" }, () => col.json().def],
-        ["array", { kind: "array", of: { kind: "integer" } }, () => col.array(col.integer()).def],
-        ["vector", { kind: "vector", dimensions: 3 }, () => col.vector(3).def],
+        ["array", { kind: "array", of: { kind: "integer" } }, () => col.integer().array().def],
+        ["vector", { kind: "vector", dimensions: 3 }, () => col.vector({ dimensions: 3 }).def],
         ["bytea", { kind: "bytea" }, () => col.bytea().def],
         ["geopoint", { kind: "jsonb" }, () => col.geopoint().def],
         ["storage", { kind: "text" }, () => col.storage({ path: "p/" }).def]
@@ -58,9 +60,9 @@ describe("col.* — what each builder records", () => {
     });
 
     it("keeps the element definition of an array, and a storage element's rules", () => {
-        const labels = col.array(col.text().oneOf(["a", "b"]));
+        const labels = col.text({ enum: ["a", "b"] }).array();
         expect(labels.def.element).toMatchObject({ type: { kind: "text" }, oneOf: ["a", "b"] });
-        const files = col.array(col.storage({ path: "f/" }));
+        const files = col.storage({ path: "f/" }).array();
         expect(files.def.storage).toEqual({ path: "f/" });
     });
 
@@ -73,24 +75,23 @@ describe("col.* — what each builder records", () => {
     });
 
     it("records the vector index, or `false` for none", () => {
-        expect(col.vector(3).def.vectorIndex).toBeUndefined();
-        expect(col.vector(3, { index: false }).def.vectorIndex).toBe(false);
-        expect(col.vector(3, { index: { method: "ivfflat", metric: ["l2", "ip"], lists: 100 } }).def.vectorIndex)
+        expect(col.vector({ dimensions: 3 }).def.vectorIndex).toBeUndefined();
+        expect(col.vector({ dimensions: 3, index: false }).def.vectorIndex).toBe(false);
+        expect(col.vector({ dimensions: 3, index: { method: "ivfflat", metric: ["l2", "ip"], lists: 100 } }).def.vectorIndex)
             .toEqual({ method: "ivfflat", metric: ["l2", "ip"], lists: 100 });
     });
 
     it("records a JSON shape when one is given", () => {
         expect(col.jsonb(json.object({ a: json.string() })).def.json).toEqual({ kind: "object", fields: { a: { kind: "string" } } });
         expect(col.json(json.array(json.number())).def.json).toEqual({ kind: "array", of: { kind: "number" } });
-        expect(col.jsonb<{ a: string }>().def.json).toBeUndefined();
+        expect(col.jsonb().$type<{ a: string }>().def.json).toBeUndefined();
     });
 });
 
 describe("col.* — modifiers", () => {
     it("records every universal modifier", () => {
         const transform = { beforeSave: ({ value }: { value: string }) => value.trim() };
-        const def: ColumnDef = col.text()
-            .column("legacy_name")
+        const def: ColumnDef = col.text("legacy_name")
             .notNull()
             .unique()
             .readOnly()
@@ -112,18 +113,18 @@ describe("col.* — modifiers", () => {
 
     it("records each kind of default", () => {
         expect(col.text().default("x").def.default).toEqual({ kind: "literal", value: "x" });
-        expect(col.timestamptz().default(new Date("2024-01-02T03:04:05.000Z")).def.default)
+        expect(col.timestamp({ withTimezone: true }).default(new Date("2024-01-02T03:04:05.000Z")).def.default)
             .toEqual({ kind: "literal", value: "2024-01-02T03:04:05.000Z" });
-        expect(col.text().defaultSql("gen_short_id()").def.default).toEqual({ kind: "sql", expression: "gen_short_id()" });
+        expect(col.text().default(sql`gen_short_id()`).def.default).toEqual({ kind: "sql", expression: "gen_short_id()" });
         expect(col.text().dbDefault().def.default).toEqual({ kind: "database" });
         expect(col.uuid().defaultRandom().def.default).toEqual({ kind: "random-uuid" });
-        expect(col.integer().identity().def.default).toEqual({ kind: "identity" });
-        expect(col.smallint().identity().def.default).toEqual({ kind: "identity" });
-        expect(col.bigint().identity().def.default).toEqual({ kind: "identity" });
+        expect(col.integer().generatedByDefaultAsIdentity().def.default).toEqual({ kind: "identity" });
+        expect(col.smallint().generatedByDefaultAsIdentity().def.default).toEqual({ kind: "identity" });
+        expect(col.bigint({ mode: "number" }).generatedByDefaultAsIdentity().def.default).toEqual({ kind: "identity" });
     });
 
     it("`.generatedAs()` makes the column read-only", () => {
-        expect(col.integer().generatedAs("a + b").def).toMatchObject({ generatedAs: "a + b", readOnly: true });
+        expect(col.integer().generatedAlwaysAs(sql`a + b`).def).toMatchObject({ generatedAs: "a + b", readOnly: true });
     });
 
     it("`.private()` records the flag", () => {
@@ -131,26 +132,26 @@ describe("col.* — modifiers", () => {
     });
 
     it("records the stamps", () => {
-        expect(col.timestamptz().onCreateNow().def.stamp).toEqual({ on: "create", value: "now" });
+        expect(col.timestamp({ withTimezone: true }).onCreateNow().def.stamp).toEqual({ on: "create", value: "now" });
         expect(col.date().onUpdateNow().def.stamp).toEqual({ on: "update", value: "now" });
         expect(col.uuid().onCreateUser().def.stamp).toEqual({ on: "create", value: "user" });
         expect(col.text().onUpdateUser().def.stamp).toEqual({ on: "update", value: "user" });
-        expect(col.timestamptz().onCreateNow().onCreateNow().def.stamp).toEqual({ on: "create", value: "now" });
+        expect(col.timestamp({ withTimezone: true }).onCreateNow().onCreateNow().def.stamp).toEqual({ on: "create", value: "now" });
     });
 
     it("refuses a second, different stamp", () => {
-        expect(() => col.timestamptz().onCreateNow().onUpdateNow())
+        expect(() => col.timestamp({ withTimezone: true }).onCreateNow().onUpdateNow())
             .toThrow("`.onUpdateNow()` on a column that already has `.onCreateNow()`: a column holds one stamp.");
         expect(() => col.uuid().onCreateUser().onUpdateUser()).toThrow(/already has `\.onCreateUser\(\)`/);
     });
 
     it("`.userId()` marks a text or uuid column as holding a user's id", () => {
-        for (const builder of [col.text(), col.varchar(64), col.char(36), col.uuid()]) {
+        for (const builder of [col.text(), col.varchar({ length: 64 }), col.char({ length: 36 }), col.uuid()]) {
             expect(builder.userId().def.semantic).toBe("user");
         }
         // It is a meaning, not a stamp: both may be said.
         expect(col.uuid().onCreateUser().userId().def).toMatchObject({ semantic: "user", stamp: { on: "create", value: "user" } });
-        expect(col.array(col.text().userId()).def.element?.semantic).toBe("user");
+        expect(col.text().userId().array().def.element?.semantic).toBe("user");
     });
 
     it("refuses `.userId()` at runtime on a column that cannot hold an id", () => {
@@ -161,9 +162,10 @@ describe("col.* — modifiers", () => {
     });
 
     it("records `.oneOf()` for text and numbers, and refuses anything else at runtime", () => {
-        expect(col.text().oneOf(["a", "b"]).def.oneOf).toEqual(["a", "b"]);
+        expect(col.text({ enum: ["a", "b"] }).def.oneOf).toEqual(["a", "b"]);
         expect(col.integer().oneOf([1, 2]).def.oneOf).toEqual([1, 2]);
-        expect(() => col.text().oneOf(JSON.parse("[true]"))).toThrow("`.oneOf()` takes strings or numbers.");
+        expect(() => col.integer().oneOf(JSON.parse("[true]"))).toThrow("`.oneOf()` takes strings or numbers.");
+        expect(() => col.text({ enum: JSON.parse("[true]") })).toThrow("`col.text({ enum })` takes a non-empty list of strings, got [true].");
     });
 
     it("`.access()` copies the role lists and keeps only the directions given", () => {
@@ -196,7 +198,7 @@ describe("col.* — modifiers", () => {
         const modified = plain.notNull().unique().default("x").validate({ min: 1 }).column("c").describe("d").readOnly().private();
         expect(modified).not.toBe(plain);
         expect(JSON.stringify(plain.def)).toBe(before);
-        const shared = col.timestamptz();
+        const shared = col.timestamp({ withTimezone: true });
         const a = shared.onCreateNow();
         const b = shared.onUpdateNow();
         expect([a.def.stamp, b.def.stamp, shared.def.stamp]).toEqual([{ on: "create", value: "now" }, { on: "update", value: "now" }, undefined]);
@@ -205,8 +207,8 @@ describe("col.* — modifiers", () => {
 
 describe("col.* — refusals", () => {
     it("refuses a non-positive or fractional varchar/char length", () => {
-        expect(() => col.varchar(0)).toThrow("`col.varchar(n)` takes a positive whole number of characters, got 0.");
-        expect(() => col.char(1.5)).toThrow("`col.char(n)` takes a positive whole number of characters, got 1.5.");
+        expect(() => col.varchar({ length: 0 })).toThrow("`col.varchar({ length })` takes a positive whole number of characters, got 0.");
+        expect(() => col.char({ length: 1.5 })).toThrow("`col.char({ length })` takes a positive whole number of characters, got 1.5.");
     });
 
     it("refuses an empty enum", () => {
@@ -218,12 +220,12 @@ describe("col.* — refusals", () => {
     });
 
     it("refuses a non-positive vector dimension", () => {
-        expect(() => col.vector(0)).toThrow("`col.vector(dimensions)` takes a positive whole number, got 0.");
-        expect(() => col.vector(2.5)).toThrow(/got 2.5/);
+        expect(() => col.vector({ dimensions: 0 })).toThrow("`col.vector({ dimensions })` takes a positive whole number, got 0.");
+        expect(() => col.vector({ dimensions: 2.5 })).toThrow(/got 2.5/);
     });
 
     it("refuses an array of arrays", () => {
-        expect(() => col.array(col.array(col.text()))).toThrow("`col.array()` of an array is not supported. Use `col.jsonb()` for nested lists.");
+        expect(() => col.array(col.text().array())).toThrow("`col.array()` of an array is not supported. Use `col.jsonb()` for nested lists.");
     });
 
     it("refuses a storage column without a path", () => {
@@ -289,14 +291,14 @@ describe("isColumnBuilder", () => {
 
 describe("col.custom", () => {
     it("records the type it names, verbatim, as `other`", () => {
-        expect(col.custom("inet").def).toEqual({ type: { kind: "other", sqlType: "inet" }, ...base });
-        expect(col.custom("  geometry(Point, 4326) ").notNull().def.type).toEqual({ kind: "other", sqlType: "geometry(Point, 4326)" });
-        expect(col.custom("citext").primaryKey().def).toMatchObject({ primaryKey: true, notNull: true });
+        expect(col.custom({ dataType: "inet" }).def).toEqual({ type: { kind: "other", sqlType: "inet" }, ...base });
+        expect(col.custom({ dataType: "  geometry(Point, 4326) " }).notNull().def.type).toEqual({ kind: "other", sqlType: "geometry(Point, 4326)" });
+        expect(col.custom({ dataType: "citext" }).primaryKey().def).toMatchObject({ primaryKey: true, notNull: true });
     });
 
     it("refuses a name that is empty or could end the DDL it is written into", () => {
-        expect(() => col.custom("")).toThrow(/takes the Postgres type/);
-        expect(() => col.custom("inet; DROP TABLE x")).toThrow(/holds no `;` and no comment/);
-        expect(() => col.custom("inet -- x")).toThrow(/holds no `;` and no comment/);
+        expect(() => col.custom({ dataType: "" })).toThrow(/takes the Postgres type/);
+        expect(() => col.custom({ dataType: "inet; DROP TABLE x" })).toThrow(/holds no `;` and no comment/);
+        expect(() => col.custom({ dataType: "inet -- x" })).toThrow(/holds no `;` and no comment/);
     });
 });

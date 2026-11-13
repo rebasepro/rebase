@@ -1,4 +1,4 @@
-import { col, defineAuthTable, defineTable, defineView, json, rel } from "../../src/schema";
+import { col, defineAuthTable, defineTable, defineView, json, rel, sql } from "../../src/schema";
 import type { ColumnKeyOf, InferInsert, InferRow, InferUpdate, JsonGeoPoint, RelationKeyOf, AnyTableDef, TableSlugOf, TableDef } from "../../src/schema";
 
 /**
@@ -39,16 +39,16 @@ export const posts = defineTable("posts", {
     columns: {
         id:          col.uuid().primaryKey().defaultRandom(),
         title:       col.text().notNull().validate({ min: 3, max: 200 }),
-        slug:        col.varchar(160).notNull().unique(),
+        slug:        col.varchar({ length: 160 }).notNull().unique(),
         status:      col.enum(["draft", "needs_review", "published", "archived"]).notNull().default("draft"),
         heroImage:   col.storage({ path: "posts/heroes/", accept: ["image/*"], maxBytes: "10MB" }),
-        embedding:   col.vector(1536, { index: { method: "hnsw", metric: "cosine" } }),
-        metadata:    col.jsonb<{ seoTitle?: string; canonicalUrl?: string }>(),
-        publishDate: col.timestamptz(),
+        embedding:   col.vector({ dimensions: 1536, index: { method: "hnsw", metric: "cosine" } }),
+        metadata:    col.jsonb().$type<{ seoTitle?: string; canonicalUrl?: string }>(),
+        publishDate: col.timestamp({ withTimezone: true }),
         orgId:       col.uuid().notNull(),
-        createdAt:   col.timestamptz().notNull().onCreateNow(),
-        updatedAt:   col.timestamptz().notNull().onUpdateNow(),
-        deletedAt:   col.timestamptz(),
+        createdAt:   col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
+        updatedAt:   col.timestamp({ withTimezone: true }).notNull().onUpdateNow(),
+        deletedAt:   col.timestamp({ withTimezone: true }),
         __order:     col.text(),
     },
 
@@ -104,23 +104,23 @@ const kinds = defineTable("kinds", {
     columns: {
         id: col.uuid().primaryKey(),
         text: col.text(),
-        varchar: col.varchar(10).notNull(),
-        char: col.char(2),
+        varchar: col.varchar({ length: 10 }).notNull(),
+        char: col.char({ length: 2 }),
         status: col.enum(["a", "b"]),
         small: col.smallint(),
         int: col.integer().notNull(),
-        big: col.bigint(),
+        big: col.bigint({ mode: "number" }),
         smallSerial: col.smallserial(),
         serial: col.serial(),
-        bigSerial: col.bigserial(),
+        bigSerial: col.bigserial({ mode: "number" }),
         real: col.real(),
         double: col.doublePrecision(),
-        numeric: col.numeric(10, 2),
+        numeric: col.numeric({ precision: 10, scale: 2 }),
         flag: col.boolean().notNull().default(false),
-        at: col.timestamptz(),
+        at: col.timestamp({ withTimezone: true }),
         day: col.date().notNull(),
         clock: col.time(),
-        doc: col.jsonb<{ a: number }>().notNull(),
+        doc: col.jsonb().$type<{ a: number }>().notNull(),
         loose: col.json(),
         shaped: col.jsonb(json.object({
             title: json.string().required(),
@@ -130,23 +130,23 @@ const kinds = defineTable("kinds", {
             kind: json.string().oneOf(["x", "y"]).required(),
             extra: json.unknown()
         })),
-        list: col.array(col.integer()).notNull(),
-        roles: col.array(col.text().oneOf(["admin", "editor"])),
-        embedding: col.vector(3),
+        list: col.integer().array().notNull(),
+        roles: col.text({ enum: ["admin", "editor"] }).array(),
+        embedding: col.vector({ dimensions: 3 }),
         bytes: col.bytea(),
         point: col.geopoint(),
         file: col.storage({ path: "f/" }),
         files: col.storage({ path: "f/" }).multiple(),
         priority: col.integer().oneOf([1, 2, 3]).notNull(),
         // Flags
-        generated: col.integer().generatedAs("1"),
+        generated: col.integer().generatedAlwaysAs(sql`1`),
         locked: col.text().notNull().readOnly(),
         secret: col.text().private(),
-        stampedAt: col.timestamptz().notNull().onCreateNow(),
+        stampedAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
         stampedBy: col.uuid().notNull().onCreateUser(),
-        identity: col.integer().notNull().identity(),
+        identity: col.integer().notNull().generatedByDefaultAsIdentity(),
         random: col.uuid().notNull().defaultRandom(),
-        sql: col.text().notNull().defaultSql("x()"),
+        sql: col.text().notNull().default(sql`x()`),
         external: col.text().notNull().dbDefault(),
         required: col.text().notNull()
     },
@@ -334,7 +334,7 @@ function refusedTables(): void {
 }
 
 function keyTypedOptions(): void {
-    const columns = { id: col.uuid().primaryKey(), orgId: col.uuid(), deletedAt: col.timestamptz() };
+    const columns = { id: col.uuid().primaryKey(), orgId: col.uuid(), deletedAt: col.timestamp({ withTimezone: true }) };
     defineTable("ok", {
         columns,
         relations: { author: rel.belongsTo(() => users) },
@@ -358,11 +358,11 @@ function kindRestrictedModifiers(): void {
     // @ts-expect-error defaultRandom is a uuid modifier
     col.text().defaultRandom();
     // @ts-expect-error identity is an integer modifier
-    col.numeric().identity();
+    col.numeric().generatedByDefaultAsIdentity();
     // @ts-expect-error identity is not for a serial, which has its own sequence
-    col.serial().identity();
+    col.serial().generatedByDefaultAsIdentity();
     // @ts-expect-error identity is not for text
-    col.text().identity();
+    col.text().generatedByDefaultAsIdentity();
     // @ts-expect-error onCreateNow is a temporal modifier
     col.text().onCreateNow();
     // @ts-expect-error onUpdateNow is a temporal modifier
@@ -370,14 +370,14 @@ function kindRestrictedModifiers(): void {
     // @ts-expect-error onCreateUser stores an id: text or uuid
     col.integer().onCreateUser();
     // @ts-expect-error onUpdateUser stores an id: text or uuid
-    col.timestamptz().onUpdateUser();
+    col.timestamp({ withTimezone: true }).onUpdateUser();
     // @ts-expect-error userId holds an id: text or uuid
     col.integer().userId();
     // @ts-expect-error userId holds an id, not a document
     col.jsonb().userId();
     // @ts-expect-error userId holds an id, not a file path
     col.storage({ path: "avatars/" }).userId();
-    col.varchar(36).notNull().userId();
+    col.varchar({ length: 36 }).notNull().userId();
     col.uuid().userId().onCreateUser();
     // @ts-expect-error a JSON number field holds no user id
     json.number().userId();
@@ -393,7 +393,7 @@ function kindRestrictedModifiers(): void {
     // @ts-expect-error a text column has no numeric rules
     col.text().validate({ positive: true });
     // @ts-expect-error an array takes item-count rules
-    col.array(col.text()).validate({ email: true });
+    col.text().array().validate({ email: true });
     // @ts-expect-error a default is of the column's type
     col.integer().default("1");
     // @ts-expect-error an enum default is one of its values
@@ -413,7 +413,7 @@ function kindRestrictedModifiers(): void {
     // @ts-expect-error a JSON default is of the field's type
     json.number().default("1");
     // A temporal default may be a Date.
-    col.timestamptz().default(new Date());
+    col.timestamp({ withTimezone: true }).default(new Date());
     col.text().validate({ matches: /x/, matchesMessage: "m", requiredMessage: "r" });
 }
 

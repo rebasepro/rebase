@@ -87,7 +87,7 @@ export function specRequiredLink(insert: (row: Spec["posts"]["Insert"]) => void)
 
 const authors = defineTable("authors", {
     columns: {
-        id: col.integer().primaryKey().identity(),
+        id: col.integer().primaryKey().generatedByDefaultAsIdentity(),
         name: col.text().notNull(),
         secret: col.text().private(),
         computed: col.text().readOnly()
