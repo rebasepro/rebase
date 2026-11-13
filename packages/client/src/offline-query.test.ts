@@ -11,7 +11,7 @@ import {
     runLocalQuery,
     sortRows
 } from "./offline-query";
-import { DEFAULT_LIST_LIMIT, EntityRelation } from "@rebasepro/types";
+import { DEFAULT_LIST_LIMIT } from "@rebasepro/types";
 import { resolveFindWindow } from "@rebasepro/common";
 import type { FindParams } from "./transport";
 
@@ -76,11 +76,10 @@ describe("local query engine", () => {
             expect(matchesOperator(row, "==", new Date("2026-07-01T00:00:00Z"))).toBe(true);
         });
 
-        it("compares a relation by the id it points at", () => {
-            const relation = new EntityRelation("u1", "users");
-            expect(matchesOperator(relation, "==", "u1")).toBe(true);
-            expect(matchesOperator(relation, "in", ["u1", "u2"])).toBe(true);
-            expect(matchesOperator(relation, "==", "u2")).toBe(false);
+        it("compares a relation by its key, which is what a row and a filter both hold", () => {
+            expect(matchesOperator("u1", "==", "u1")).toBe(true);
+            expect(matchesOperator("u1", "in", ["u1", "u2"])).toBe(true);
+            expect(matchesOperator("u1", "==", "u2")).toBe(false);
         });
 
         it("handles list membership and array columns", () => {

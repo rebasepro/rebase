@@ -135,9 +135,18 @@ export interface PendingMutation {
 /**
  * The layout of a {@link PendingMutation} this SDK writes and can replay.
  * Bump it with any change an older client would misread, so that client stops
- * at the entry instead of replaying it blindly.
+ * at the entry instead of replaying it blindly — and convert the entries of
+ * the older layouts as they are read (`offline-codec` `hydrateMutation`), so
+ * a user's unsynced writes are neither lost nor replayed in a shape the
+ * server no longer takes.
+ *
+ * - 1: payloads as handed to the client, the admin's view-model classes
+ *   tagged by `__type` (`{ __type: "relation", id }`, `GeoPoint`, `Vector`,
+ *   `reference`).
+ * - 2: payloads are wire values only — what the REST API documents. A
+ *   layout-1 entry is converted to them on read.
  */
-export const QUEUE_SCHEMA_VERSION = 1;
+export const QUEUE_SCHEMA_VERSION = 2;
 
 export interface OfflineStore {
     getCache(key: string): Promise<OfflineCacheEntry | undefined>;

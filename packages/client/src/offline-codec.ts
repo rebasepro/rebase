@@ -1,28 +1,28 @@
-import { EntityReference, EntityRelation, GeoPoint, Vector } from "@rebasepro/types";
 import type { PendingMutation } from "./offline-store";
 
 /**
- * Lossless round-tripping of rows through the offline store.
+ * Rows and queued writes through the offline store.
  *
- * Both persistence backends move values by structured clone, which keeps
- * `Date` but flattens every class instance to a plain object. For
- * `EntityReference`/`EntityRelation` that is harmless — they carry their own
- * `__type` discriminator, so {@link reviveTagged} can rebuild them — but
- * `GeoPoint` and `Vector` do not, and would come back out of the cache as
- * anonymous `{ latitude, longitude }` / `{ value }` bags. A row read from the
- * cache must be indistinguishable from the same row read from the network, so
- * those two are tagged on the way in and revived on the way out.
+ * Both persistence backends move values by structured clone. What goes in is
+ * wire values — the row a Rebase server serves, and the values a write sends
+ * (the admin converts its view model before it hands a write to the client) —
+ * so a clone gives back exactly what went in, `Date` included. The one thing
+ * a structured clone gets wrong is a key named `__proto__`, so rows are
+ * copied key by key on both sides ({@link setOwn}).
  *
- * Type tests here are structural rather than `instanceof`, because a structured
- * clone can arrive from another realm — an iframe, a worker, or the polyfill
- * the tests run against — where the constructor identity differs but the value
- * is the real thing. Only *plain* objects are walked; anything else is passed
- * through whole, so a class instance is never quietly reduced to `{}`.
+ * A queued write from before layout 2 (`QUEUE_SCHEMA_VERSION`) is the exception:
+ * the admin handed the client its view model then, and the store kept those
+ * values as plain objects tagged with their class (`{ __type: "relation",
+ * id, … }`, `{ __type: "GeoPoint", … }`, `{ __type: "Vector", value }`,
+ * `{ __type: "reference", id, … }`). Such an entry is a user's unsynced write,
+ * so it is converted to the wire values the server stored for it — a relation
+ * as its key, a point as `{ latitude, longitude }`, a vector as its numbers,
+ * a reference as its id — rather than dropped or replayed in a shape the
+ * server no longer accepts ({@link hydrateMutation}).
+ *
+ * Only *plain* objects are walked (tested structurally: a clone may come from
+ * another realm); anything else is passed through whole.
  */
-
-function isDate(value: unknown): value is Date {
-    return Object.prototype.toString.call(value) === "[object Date]";
-}
 
 /** An object literal — not a Date, RegExp, Map, or any class instance. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -44,69 +44,45 @@ export function setOwn(out: Record<string, unknown>, key: string, value: unknown
     Object.defineProperty(out, key, { value, enumerable: true, writable: true, configurable: true });
 }
 
-function dehydrateValue(value: unknown): unknown {
-    if (value === null || value === undefined) return value;
-    if (value instanceof GeoPoint) {
-        return { __type: "GeoPoint", latitude: value.latitude, longitude: value.longitude };
-    }
-    if (value instanceof Vector) return { __type: "Vector", value: [...value.value] };
-    // EntityReference/EntityRelation already serialize themselves via `__type`
-    // own properties, so a structured clone is enough for the reviver below.
-    if (value instanceof EntityReference || value instanceof EntityRelation) return value;
-    if (Array.isArray(value)) return value.map(dehydrateValue);
+/** A copy of a value, walked so that every key — `__proto__` too — stays an own property. */
+function copyValue(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(copyValue);
     if (isPlainObject(value)) {
         const out: Record<string, unknown> = {};
-        for (const [key, inner] of Object.entries(value)) setOwn(out, key, dehydrateValue(inner));
+        for (const [key, inner] of Object.entries(value)) setOwn(out, key, copyValue(inner));
         return out;
     }
     return value;
 }
 
 /**
- * The class instance a tagged plain object stands for, or the object itself.
- *
- * Only the offline store needs this: values the admin hands the client to
- * write (an `EntityRelation`, a `GeoPoint`, …) are queued and cached by
- * structured clone, which drops their prototypes. Nothing read from a Rebase
- * server carries a tag — the wire row has none.
+ * The wire value a tagged view-model value of a queue entry from before
+ * layout 2 stands for (see the module comment), or the value itself.
  */
-function reviveTagged(value: Record<string, unknown>): unknown {
+function wireOfTagged(value: Record<string, unknown>): unknown {
     switch (value.__type) {
+        case "relation":
         case "reference":
-            return new EntityReference({
-                id: String(value.id),
-                path: String(value.path),
-                driver: typeof value.driver === "string" ? value.driver : undefined,
-                databaseId: typeof value.databaseId === "string" ? value.databaseId : undefined
-            });
-        case "relation": {
-            const id = value.id;
-            if (typeof id !== "string" && typeof id !== "number") return value;
-            const data = value.data;
-            return new EntityRelation(id, String(value.path), isPlainObject(data) ? data : undefined);
-        }
+            return typeof value.id === "string" || typeof value.id === "number" ? value.id : value;
         case "GeoPoint":
             return typeof value.latitude === "number" && typeof value.longitude === "number"
-                ? new GeoPoint(value.latitude, value.longitude)
+                ? { latitude: value.latitude, longitude: value.longitude }
                 : value;
         case "Vector":
-            return Array.isArray(value.value) ? new Vector(value.value.map(Number)) : value;
+            return Array.isArray(value.value) ? value.value.map(Number) : value;
         default:
             return value;
     }
 }
 
-function hydrateValue(value: unknown): unknown {
-    if (value === null || value === undefined || isDate(value)) return value;
-    if (Array.isArray(value)) return value.map(hydrateValue);
-    if (typeof value === "object") {
-        const revived = isPlainObject(value) ? reviveTagged(value) : value;
-        // The reviver recognised it — hand back the class instance untouched
-        // rather than walking into its (now private) internals.
-        if (revived !== value) return revived;
-        if (!isPlainObject(value)) return value;
+/** {@link copyValue}, with each tagged view-model value as its wire value. */
+function wireOfLegacyValue(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(wireOfLegacyValue);
+    if (isPlainObject(value)) {
+        const converted = wireOfTagged(value);
+        if (converted !== value) return converted;
         const out: Record<string, unknown> = {};
-        for (const [key, inner] of Object.entries(value)) setOwn(out, key, hydrateValue(inner));
+        for (const [key, inner] of Object.entries(value)) setOwn(out, key, wireOfLegacyValue(inner));
         return out;
     }
     return value;
@@ -114,20 +90,18 @@ function hydrateValue(value: unknown): unknown {
 
 /** Prepare a row for the store. */
 export function dehydrateRow<T extends Record<string, unknown>>(row: T): Record<string, unknown> {
-    return dehydrateValue(row) as Record<string, unknown>;
+    return copyValue(row) as Record<string, unknown>;
 }
 
 /** Restore a row read back from the store. */
 export function hydrateRow<T extends Record<string, unknown>>(row: Record<string, unknown>): T {
-    return hydrateValue(row) as T;
+    return copyValue(row) as T;
 }
 
 /**
- * A queued write as the store keeps it, and back. Its payloads are rows, and
- * a row read back from the queue has to be the row that was queued: stored
- * raw, a pending `GeoPoint` came back after a reload as a bare
- * `{ latitude, longitude }`, was overlaid onto the server's rows, and was
- * written back to the cache that way.
+ * A queued write as the store keeps it, and back: its payloads are rows, each
+ * copied by {@link copyValue} — or, for an entry of an older layout, turned
+ * into wire values.
  */
 function mapMutation(op: PendingMutation, map: (value: unknown) => unknown): PendingMutation {
     const rows = (value: PendingMutation["data"]) => value === undefined ? value : map(value) as PendingMutation["data"];
@@ -150,10 +124,17 @@ function mapMutation(op: PendingMutation, map: (value: unknown) => unknown): Pen
 
 /** Prepare a queued write for the store. */
 export function dehydrateMutation(op: PendingMutation): PendingMutation {
-    return mapMutation(op, dehydrateValue);
+    return mapMutation(op, copyValue);
 }
 
-/** Restore a queued write read back from the store. */
+/**
+ * Restore a queued write read back from the store. An entry of layout 1 —
+ * written before the client held wire values only — has its view-model values
+ * converted to wire values and is stamped with the current layout, so it
+ * replays as the server stored such a write and is persisted that way the
+ * next time the entry is written back.
+ */
 export function hydrateMutation(op: PendingMutation): PendingMutation {
-    return mapMutation(op, hydrateValue);
+    if ((op.schemaVersion ?? 1) >= 2) return mapMutation(op, copyValue);
+    return { ...mapMutation(op, wireOfLegacyValue), schemaVersion: 2 };
 }

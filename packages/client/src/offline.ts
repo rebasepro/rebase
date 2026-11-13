@@ -334,7 +334,7 @@ function replaceMintedId(value: unknown, from: string | number, to: string | num
 /**
  * A plain object from any realm — a queued payload read back from the store is
  * a structured clone, whose `Object.prototype` need not be this one. A class
- * instance (a `GeoPoint`, a `Date`) is not walked.
+ * instance (a `Date`) is not walked.
  */
 function isPlainObject(value: unknown): value is AnyRow {
     if (value === null || typeof value !== "object") return false;

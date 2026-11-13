@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
-import { GeoPoint, type FindParams } from "@rebasepro/types";
+import type { FindParams } from "@rebasepro/types";
 import { OfflineManager } from "../src/offline";
 import { MemoryOfflineStore, type PendingMutation } from "../src/offline-store";
 import { fakeServer, frame, manager, networkError, restoreNavigator, setNavigatorOnLine } from "./support/offline-fake-server";
@@ -287,19 +287,21 @@ describe("the local database's bounds (L3)", () => {
 });
 
 describe("a queued write read back after a reload (L2)", () => {
-    it("keeps its class instances, as the cached rows do", async () => {
+    it("holds the wire values that were queued, a date as a date", async () => {
         const server = fakeServer();
         const store = new MemoryOfflineStore();
         const first = new OfflineManager({ store, syncIntervalMs: 0 }, () => server.client);
         setNavigatorOnLine(false);
-        await first.wrap("posts", server.client).create({ title: "pin", location: new GeoPoint(45.4, 9.2) });
+        const at = new Date("2026-07-01T00:00:00Z");
+        await first.wrap("posts", server.client).create({ title: "pin", location: { latitude: 45.4, longitude: 9.2 }, at });
         first.dispose();
 
         // The page reloads.
         const second = new OfflineManager({ store, syncIntervalMs: 0 }, () => server.client);
         const [queued] = await second.api.pending();
-        expect((queued.data as { location: unknown }).location).toBeInstanceOf(GeoPoint);
-        expect((queued.data as { location: GeoPoint }).location.latitude).toBe(45.4);
+        expect(queued.data).toMatchObject({ title: "pin", location: { latitude: 45.4, longitude: 9.2 } });
+        expect(Object.prototype.toString.call((queued.data as { at: unknown }).at)).toBe("[object Date]");
+        expect(queued.schemaVersion).toBe(2);
     });
 });
 

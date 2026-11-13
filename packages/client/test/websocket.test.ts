@@ -1135,68 +1135,7 @@ id: "1" }, jest.fn());
     // mergeEntities structural equality and normalization
     // -----------------------------------------------------------------------
     describe("mergeEntities structural equality and normalization", () => {
-        it("preserves row reference if only relation .data changes", () => {
-            const client = createClient();
-            jest.runAllTimers();
-            const ws = getWs();
-
-            const onUpdate = jest.fn<RowsListener>();
-            client.listenCollection({ path: "posts" }, onUpdate);
-
-            const subMsg = JSON.parse(ws.sentMessages[0]);
-            const subId = subMsg.payload.subscriptionId;
-
-            // Initial data contains a relation without .data
-            const initialEntity = {
-                id: "1",
-                title: "Hello",
-                author: { __type: "relation",
-id: "2",
-path: "users" }
-            };
-
-            ws.onmessage!({ data: JSON.stringify({
-                type: "collection_update",
-                subscriptionId: subId,
-                rows: [initialEntity],
-                pks: ID_PKS
-            }) });
-
-            expect(onUpdate).toHaveBeenCalledTimes(1);
-            const firstUpdate = onUpdate.mock.calls[0][0];
-            const cachedEntityInstance = firstUpdate[0];
-
-            onUpdate.mockClear();
-
-            // Next update contains EXACTLY the same relation, but WITH .data appended
-            const refetchedEntity = {
-                id: "1",
-                title: "Hello",
-                author: {
-                    __type: "relation",
-                    id: "2",
-                    path: "users",
-                    data: { id: "2",
-name: "Alice" }
-                }
-            };
-
-            ws.onmessage!({ data: JSON.stringify({
-                type: "collection_update",
-                subscriptionId: subId,
-                rows: [refetchedEntity],
-                pks: ID_PKS
-            }) });
-
-            expect(onUpdate).toHaveBeenCalledTimes(1);
-            const secondUpdate = onUpdate.mock.calls[0][0];
-
-            // Because the .data is purely denormalized cache, the identity of the relation
-            // is the same, so it should have preserved the SAME object reference!
-            expect(secondUpdate[0]).toBe(cachedEntityInstance);
-        });
-
-        it("does NOT preserve row reference if the relation ID changes", () => {
+        it("does NOT preserve row reference if the foreign key changes", () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
@@ -1210,9 +1149,7 @@ name: "Alice" }
             const initialEntity = {
                 id: "1",
                 title: "Hello",
-                author: { __type: "relation",
-id: "2",
-path: "users" }
+                authorId: "2"
             };
 
             ws.onmessage!({ data: JSON.stringify({
@@ -1230,9 +1167,7 @@ path: "users" }
             const newAuthorEntity = {
                 id: "1",
                 title: "Hello",
-                author: { __type: "relation",
-id: "3",
-path: "users" }
+                authorId: "3"
             };
 
             ws.onmessage!({ data: JSON.stringify({
@@ -1247,56 +1182,6 @@ path: "users" }
             expect(secondUpdate[0]).not.toBe(cachedEntityInstance);
         });
 
-        it("preserves relation identity inside array of relations", () => {
-            const client = createClient();
-            jest.runAllTimers();
-            const ws = getWs();
-
-            const onUpdate = jest.fn<RowsListener>();
-            client.listenCollection({ path: "posts" }, onUpdate);
-
-            const subId = JSON.parse(ws.sentMessages[0]).payload.subscriptionId;
-
-            const row = {
-                id: "1",
-                tags: [
-                    { __type: "relation",
-id: "10",
-path: "tags" },
-                    { __type: "relation",
-id: "11",
-path: "tags" }
-                ]
-            };
-            ws.onmessage!({ data: JSON.stringify({ type: "collection_update",
-subscriptionId: subId,
-rows: [row],
-pks: ID_PKS }) });
-
-            const firstInstance = onUpdate.mock.calls[0][0][0];
-            onUpdate.mockClear();
-
-            const entityWithData = {
-                id: "1",
-                tags: [
-                    { __type: "relation",
-id: "10",
-path: "tags",
-data: { id: "10" } },
-                    { __type: "relation",
-id: "11",
-path: "tags",
-data: { id: "11" } }
-                ]
-            };
-            ws.onmessage!({ data: JSON.stringify({ type: "collection_update",
-subscriptionId: subId,
-rows: [entityWithData],
-pks: ID_PKS }) });
-
-            const secondInstance = onUpdate.mock.calls[0][0][0];
-            expect(secondInstance).toBe(firstInstance);
-        });
     });
 
     // -----------------------------------------------------------------------

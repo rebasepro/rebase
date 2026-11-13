@@ -1,5 +1,4 @@
 import {
-    EntityRelation,
     FilterValues,
     FindResult,
     LogicalCondition,
@@ -58,19 +57,11 @@ function isNullish(value: unknown): boolean {
 }
 
 /**
- * Reduce a value to something comparable. Relations compare by the id they
- * point at — the column holds a foreign key, so that is what the server
- * compares too.
+ * Reduce a value to something comparable: a date by its instant. A relation
+ * is its key on a row and in a filter alike — the wire carries nothing else.
  */
 function toComparable(value: unknown): unknown {
     if (value instanceof Date) return value.getTime();
-    if (value instanceof EntityRelation) return value.id;
-    if (value && typeof value === "object") {
-        const record = value as Record<string, unknown>;
-        // A reference/relation that lost its prototype somewhere still
-        // compares by id.
-        if (typeof record.__type === "string" && "id" in record) return record.id;
-    }
     return value;
 }
 

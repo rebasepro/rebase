@@ -5,7 +5,7 @@ import { RebaseApiError } from "./transport";
 import type { TableClient } from "./table";
 import type { WriteOptions } from "@rebasepro/types";
 import type { FindParams } from "./transport";
-import { GeoPoint, type FindResult } from "@rebasepro/types";
+import type { FindResult } from "@rebasepro/types";
 import { matchesParams, runLocalQuery } from "./offline-query";
 import { fakeTableClient } from "../test/support/fake-table";
 
@@ -1457,9 +1457,9 @@ describe("a projected read", () => {
         expect(results.at(-1)?.partial).toBe(true);
     });
 
-    it("keeps a projected answer across a reload, values revived", async () => {
+    it("keeps a projected answer across a reload, values as the server sent them", async () => {
         const server = createProjectingServer();
-        server.rows.set("1", { ...server.rows.get("1"), where: new GeoPoint(41.9, 12.5) });
+        server.rows.set("1", { ...server.rows.get("1"), where: { latitude: 41.9, longitude: 12.5 } });
         const { posts, store } = server.manager();
         await posts.find({ fields: ["where"] });
 
@@ -1467,8 +1467,7 @@ describe("a projected read", () => {
         const reopened = server.manager(store).posts;
         const cached = await reopened.find({ fields: ["where"] });
 
-        expect(cached.data[0].where).toBeInstanceOf(GeoPoint);
-        expect(cached.data[0]).toEqual({ id: 1, where: new GeoPoint(41.9, 12.5) });
+        expect(cached.data[0]).toEqual({ id: 1, where: { latitude: 41.9, longitude: 12.5 } });
     });
 
     it("does not vouch for a whole row it carried only part of", async () => {

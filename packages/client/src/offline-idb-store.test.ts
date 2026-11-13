@@ -3,7 +3,6 @@ import { IndexedDBOfflineStore, PendingMutation } from "./offline-store";
 import { OfflineManager } from "./offline";
 import { RebaseApiError } from "./transport";
 import { dehydrateRow, hydrateRow } from "./offline-codec";
-import { EntityReference, EntityRelation, GeoPoint, Vector } from "@rebasepro/types";
 import type { TableClient } from "./table";
 import { fakeTableClient } from "../test/support/fake-table";
 
@@ -122,37 +121,29 @@ describe("IndexedDBOfflineStore", () => {
 
 describe("row codec round-trip", () => {
     /**
-     * Both stores move values by structured clone, which keeps `Date` but
-     * flattens class instances. A row read back from the cache has to be
-     * indistinguishable from the same row read from the network, or an app
-     * that calls `row.point.latitude` works online and throws offline.
+     * Both stores move values by structured clone, which keeps `Date`. What a
+     * row holds is wire values, so a row read back from the cache is the row
+     * that went in — a key named `__proto__` included (see offline-codec.test).
      */
-    it("survives the store as the same shapes it went in as", async () => {
+    it("survives the store as the same values it went in as", async () => {
         const store = new IndexedDBOfflineStore();
         const row = {
             id: "r1",
             at: new Date("2026-07-01T00:00:00Z"),
-            point: new GeoPoint(41.4, 2.2),
-            embedding: new Vector([0.1, 0.2]),
-            author: new EntityReference({ id: "u1", path: "users" }),
-            tag: new EntityRelation("t1", "tags"),
-            nested: { deep: [new GeoPoint(1, 2)] },
+            point: { latitude: 41.4, longitude: 2.2 },
+            embedding: [0.1, 0.2],
+            authorId: "u1",
+            nested: { deep: [{ latitude: 1, longitude: 2 }] },
+            // A document is kept as it is, whatever keys it holds.
+            doc: { __type: "relation", id: "t1" },
             plain: "text"
         };
 
         await store.setCache("codec|row|things|r1", { value: dehydrateRow(row), cachedAt: 1 });
         const back = hydrateRow((await store.getCache("codec|row|things|r1"))!.value as Record<string, unknown>);
 
-        expect(back.point).toBeInstanceOf(GeoPoint);
-        expect((back.point as GeoPoint).latitude).toBe(41.4);
-        expect(back.embedding).toBeInstanceOf(Vector);
-        expect((back.embedding as Vector).value).toEqual([0.1, 0.2]);
-        expect(back.author).toBeInstanceOf(EntityReference);
-        expect((back.author as EntityReference).pathWithId).toBe("users/u1");
-        expect(back.tag).toBeInstanceOf(EntityRelation);
-        expect(((back.nested as { deep: GeoPoint[] }).deep[0])).toBeInstanceOf(GeoPoint);
         expect(Object.prototype.toString.call(back.at)).toBe("[object Date]");
-        expect(back.plain).toBe("text");
+        expect({ ...back, at: undefined }).toEqual({ ...row, at: undefined });
     });
 });
 
@@ -337,5 +328,91 @@ describe("OfflineManager over IndexedDB", () => {
         expect(await second.sync()).toEqual({ flushed: 1, remaining: 0 });
         expect(table.get(String(row.id))).toMatchObject({ title: "persisted offline" });
         second.dispose();
+    });
+});
+
+describe("a queued write from an older SDK (queue layout 1)", () => {
+    beforeEach(clearOfflineQueue);
+
+    /**
+     * Before layout 2 the admin handed the client its view model, and the queue
+     * kept its classes tagged: a relation as `{ __type: "relation", id, … }`, a
+     * point, a vector, a reference. Such an entry is a user's unsynced write.
+     * It replays as the wire values the server stored for it then — never
+     * dropped, never sent in a shape the server now refuses.
+     */
+    it("is converted to wire values, replayed, and reported as layout 2", async () => {
+        const store = new IndexedDBOfflineStore();
+        const at = new Date("2026-07-01T00:00:00Z");
+        await store.enqueue("anon|0000000001", {
+            mutationId: "0000000001",
+            collection: "posts",
+            type: "create",
+            id: "p1",
+            data: {
+                id: "p1",
+                title: "written offline",
+                at,
+                author: { __type: "relation", id: "u1", path: "users", data: { id: "u1", path: "users", values: { name: "Ada" } } },
+                tags: [{ __type: "relation", id: 1, path: "tags" }, { __type: "relation", id: 2, path: "tags" }],
+                place: { __type: "GeoPoint", latitude: 41.4, longitude: 2.2 },
+                embedding: { __type: "Vector", value: [0.1, 0.2] },
+                owner: { __type: "reference", id: "o1", path: "owners" },
+                meta: { spot: { __type: "GeoPoint", latitude: 1, longitude: 2 } }
+            },
+            queuedAt: 1
+        });
+
+        const sent: Record<string, unknown>[] = [];
+        const fakeClient = fakeTableClient<Record<string, unknown>>({
+            async find() { return { data: [], meta: { total: 0, limit: 20, offset: 0, hasMore: false } }; },
+            async findById() { return undefined; },
+            async create(data: Record<string, unknown>) { sent.push(data); return data; },
+            async createMany() { throw new RebaseApiError("unused", { status: 500 }); },
+            async update() { throw new RebaseApiError("unused", { status: 500 }); },
+            async delete() { throw new RebaseApiError("unused", { status: 500 }); },
+            async count() { return 0; }
+        });
+        const manager = new OfflineManager({ store, syncIntervalMs: 0 }, () => fakeClient);
+        const pending = await manager.api.pending();
+        expect(pending.map((op) => op.schemaVersion)).toEqual([2]);
+        expect(await manager.sync()).toEqual({ flushed: 1, remaining: 0 });
+        manager.dispose();
+
+        expect(sent).toHaveLength(1);
+        expect(Object.prototype.toString.call(sent[0].at)).toBe("[object Date]");
+        expect({ ...sent[0], at: undefined }).toEqual({
+            id: "p1",
+            title: "written offline",
+            at: undefined,
+            author: "u1",
+            tags: [1, 2],
+            place: { latitude: 41.4, longitude: 2.2 },
+            embedding: [0.1, 0.2],
+            owner: "o1",
+            meta: { spot: { latitude: 1, longitude: 2 } }
+        });
+    });
+
+    it("a layout-2 entry is replayed as stored, a document's `__type` key included", async () => {
+        const store = new IndexedDBOfflineStore();
+        await store.enqueue("anon|0000000001", {
+            mutationId: "0000000001", collection: "posts", type: "create", id: "p2", schemaVersion: 2,
+            data: { id: "p2", doc: { __type: "relation", id: "kept" } }, queuedAt: 1
+        });
+        const sent: Record<string, unknown>[] = [];
+        const fakeClient = fakeTableClient<Record<string, unknown>>({
+            async find() { return { data: [], meta: { total: 0, limit: 20, offset: 0, hasMore: false } }; },
+            async findById() { return undefined; },
+            async create(data: Record<string, unknown>) { sent.push(data); return data; },
+            async createMany() { throw new RebaseApiError("unused", { status: 500 }); },
+            async update() { throw new RebaseApiError("unused", { status: 500 }); },
+            async delete() { throw new RebaseApiError("unused", { status: 500 }); },
+            async count() { return 0; }
+        });
+        const manager = new OfflineManager({ store, syncIntervalMs: 0 }, () => fakeClient);
+        await manager.sync();
+        manager.dispose();
+        expect(sent).toEqual([{ id: "p2", doc: { __type: "relation", id: "kept" } }]);
     });
 });

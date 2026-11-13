@@ -14,8 +14,9 @@ import { deliverFrame, heldRows, seedCollectionSubscription, SEEDED_SUBSCRIPTION
  *   to a 1,000-row live list was 1,000 stringify calls and ~96 KB of console
  *   text per frame, which a browser keeps for DevTools;
  * - every cached row and every incoming row was deep-copied before it was
- *   compared, to leave a relation's `data` out of the comparison — two copies
- *   per row per frame, most of which then compared equal.
+ *   compared, to leave the `data` of the admin's relation refs out of the
+ *   comparison (no server sends those any more) — two copies per row per
+ *   frame, most of which then compared equal.
  *
  * The diff is now written only while realtime debugging is switched on
  * (`globalThis.__REBASE_DEBUG_REALTIME__ = true`), and rows are compared in
@@ -47,17 +48,12 @@ function holding(cached: Record<string, unknown>[]) {
     };
 }
 
-/** A row with the shapes a frame carries: nested values, a date, a relation with its loaded row. */
-const row = (id: number, title: string, withData = false) => ({
+/** A row with the shapes a frame carries: nested values, a date, an included related row. */
+const row = (id: number, title: string) => ({
     id,
     title,
     meta: { tags: ["a", "b"], rank: id, published: new Date(Date.UTC(2026, 0, id % 28 + 1)) },
-    author: {
-        __type: "relation",
-        id: String(id % 10),
-        path: "users",
-        ...(withData ? { data: { id: String(id % 10), name: `user ${id % 10}` } } : {})
-    }
+    author: { id: String(id % 10), name: `user ${id % 10}` }
 });
 
 afterEach(() => {
@@ -99,15 +95,14 @@ describe("merging a refetched frame", () => {
         // in the merge enumerates a row that way.
         const entries = jest.spyOn(Object, "entries");
 
-        // The same rows, refetched — and now with each relation's row loaded,
-        // which a relation does not compare by.
-        receive(Array.from({ length: 100 }, (_, i) => row(i, "same", true)));
+        // The same rows, refetched.
+        receive(Array.from({ length: 100 }, (_, i) => row(i, "same")));
 
         expect(entries).not.toHaveBeenCalled();
         expect(held().every((merged, i) => merged === cached[i])).toBe(true);
     });
 
-    it("still sees a change inside a nested value, a date or a relation's key", () => {
+    it("still sees a change inside a nested value, a date or an included row", () => {
         const cached = [row(1, "x"), row(2, "x"), row(3, "x")];
         const { receive, held } = holding(cached);
         const changedDate = row(1, "x");

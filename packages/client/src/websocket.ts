@@ -2245,17 +2245,11 @@ options }
     /**
      * Recursively compare two values a refetch can carry for structural
      * equality: primitives, null, undefined, Date, RegExp, arrays and objects.
-     *
-     * A relation compares by the reference it holds, not by the row it happens
-     * to have loaded, so its `data` is left out on both sides. That used to be
-     * done by normalising each side into a copy first — two deep copies of
-     * every cached row on every frame, most of which then compared equal. It is
-     * done in place now, and an unchanged row costs no copy.
-     *
-     * `relationAware` is off for a relation's own fields: the copies never
-     * looked inside those either.
+     * In place — an unchanged row costs no copy. A row is wire values only, so
+     * a relation is its key, or the related row an `include` named, compared
+     * like any other value.
      */
-    private deepEqual(a: unknown, b: unknown, relationAware = true): boolean {
+    private deepEqual(a: unknown, b: unknown): boolean {
         // Same reference or same primitive
         if (a === b) return true;
 
@@ -2289,7 +2283,7 @@ options }
         if (aIsArray && bIsArray) {
             if (a.length !== b.length) return false;
             for (let i = 0; i < a.length; i++) {
-                if (!this.deepEqual(a[i], b[i], relationAware)) return false;
+                if (!this.deepEqual(a[i], b[i])) return false;
             }
             return true;
         }
@@ -2297,30 +2291,12 @@ options }
         // Object comparison
         const aObj = a as Record<string, unknown>;
         const bObj = b as Record<string, unknown>;
-        // A relation is equal only to a relation, and never by its `data`.
-        let skip: string | undefined;
-        let nested = relationAware;
-        if (relationAware) {
-            const aIsRelation = aObj.__type === "relation";
-            if (aIsRelation !== (bObj.__type === "relation")) return false;
-            if (aIsRelation) {
-                skip = "data";
-                nested = false;
-            }
-        }
-
-        let aCount = 0;
-        for (const key of Object.keys(aObj)) {
-            if (key === skip) continue;
-            aCount++;
+        const aKeys = Object.keys(aObj);
+        for (const key of aKeys) {
             if (!Object.prototype.hasOwnProperty.call(bObj, key)) return false;
-            if (!this.deepEqual(aObj[key], bObj[key], nested)) return false;
+            if (!this.deepEqual(aObj[key], bObj[key])) return false;
         }
-        let bCount = 0;
-        for (const key of Object.keys(bObj)) {
-            if (key !== skip) bCount++;
-        }
-        return aCount === bCount;
+        return aKeys.length === Object.keys(bObj).length;
     }
 
     /**
