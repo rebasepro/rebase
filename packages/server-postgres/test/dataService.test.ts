@@ -1,4 +1,5 @@
 import { DataService } from "../src/services/dataService";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { drizzleChainMock, type DrizzleChainMock } from "./helpers/drizzle-chain-mock";
 import { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -69,8 +70,7 @@ const tagsCollection: LegacyCollectionConfig = {
     properties: {
         id: { type: "number" },
         name: { type: "string" }
-    },
-    idField: "id"
+    }
 };
 
 const projectUsersCollection: LegacyCollectionConfig = {
@@ -78,11 +78,11 @@ const projectUsersCollection: LegacyCollectionConfig = {
     name: "Project Users",
     table: "project_users",
     properties: {
-        project_id: { type: "string" },
-        id: { type: "string" },
+        // A composite key: both columns are marked.
+        project_id: { type: "string", isId: true },
+        id: { type: "string", isId: true },
         email: { type: "string" }
-    },
-    primaryKeys: ["project_id", "id"]
+    }
 };
 
 const postsCollection: LegacyCollectionConfig = {
@@ -94,11 +94,9 @@ const postsCollection: LegacyCollectionConfig = {
         title: { type: "string" },
         author: {
             type: "relation",
-            relationName: "author"
         },
         tags: {
             type: "relation",
-            relationName: "tags"
         }
     },
     relations: [
@@ -118,8 +116,7 @@ const postsCollection: LegacyCollectionConfig = {
                 targetColumn: "tag_id"
             }
         }
-    ],
-    idField: "id"
+    ]
 };
 
 authorsCollection = {
@@ -131,7 +128,6 @@ authorsCollection = {
         name: { type: "string" },
         posts: {
             type: "relation",
-            relationName: "posts"
         }
     },
     relations: [
@@ -141,8 +137,7 @@ authorsCollection = {
             target: () => postsCollection,
             foreignKeyOnTarget: "author_id"
         }
-    ],
-    idField: "id"
+    ]
 };
 
 describe("DataService", () => {
@@ -209,8 +204,10 @@ describe("DataService", () => {
 
             expect(db.select).toHaveBeenCalled();
             expect(db.from).toHaveBeenCalled();
-            expect(db.where).toHaveBeenCalled();
             expect(db.limit).toHaveBeenCalledWith(1);
+            // Both parts of the address reach the WHERE clause, one per key column.
+            const where = new PgDialect().sqlToQuery(db.where.mock.calls[0][0]);
+            expect(where.params).toEqual(expect.arrayContaining(["proj1", "user1"]));
         });
     });
 
@@ -461,16 +458,14 @@ dataType: "number" },
             email: { type: "string" },
             name: { type: "string" },
             created_at: { type: "date" },
-            companies: { type: "relation",
-relationName: "companies" }
+            companies: { type: "relation" }
         },
         relations: [{
             kind: "hasMany",
             relationName: "companies",
             target: () => companiesCollection,
             foreignKeyOnTarget: "user_id"
-        }],
-        idField: "id"
+        }]
     };
 
     const companiesCollection: LegacyCollectionConfig = {
@@ -480,10 +475,8 @@ relationName: "companies" }
         properties: {
             id: { type: "number" },
             name: { type: "string" },
-            owner: { type: "relation",
-relationName: "owner" },
-            projects: { type: "relation",
-relationName: "projects" }
+            owner: { type: "relation" },
+            projects: { type: "relation" }
         },
         relations: [
             {
@@ -498,8 +491,7 @@ relationName: "projects" }
                 target: () => projectsCollection,
                 foreignKeyOnTarget: "company_id"
             }
-        ],
-        idField: "id"
+        ]
     };
 
     const projectsCollection: LegacyCollectionConfig = {
@@ -512,12 +504,9 @@ relationName: "projects" }
             description: { type: "string" },
             status: { type: "string" },
             priority: { type: "number" },
-            company: { type: "relation",
-relationName: "company" },
-            tasks: { type: "relation",
-relationName: "tasks" },
-            tags: { type: "relation",
-relationName: "tags" }
+            company: { type: "relation" },
+            tasks: { type: "relation" },
+            tags: { type: "relation" }
         },
         relations: [
             {
@@ -542,8 +531,7 @@ relationName: "tags" }
                     targetColumn: "tag_id"
                 }
             }
-        ],
-        idField: "id"
+        ]
     };
 
     const tasksCollection: LegacyCollectionConfig = {
@@ -553,10 +541,8 @@ relationName: "tags" }
         properties: {
             id: { type: "number" },
             title: { type: "string" },
-            project: { type: "relation",
-relationName: "project" },
-            assignee: { type: "relation",
-relationName: "assignee" }
+            project: { type: "relation" },
+            assignee: { type: "relation" }
         },
         relations: [
             {
@@ -571,8 +557,7 @@ relationName: "assignee" }
                 target: () => usersCollection,
                 localKey: "assignee_id"
             }
-        ],
-        idField: "id"
+        ]
     };
 
     const tagsCollection: LegacyCollectionConfig = {
@@ -582,8 +567,7 @@ relationName: "assignee" }
         properties: {
             id: { type: "number" },
             name: { type: "string" }
-        },
-        idField: "id"
+        }
     };
 
     const categoriesCollection: LegacyCollectionConfig = {
@@ -593,10 +577,8 @@ relationName: "assignee" }
         properties: {
             id: { type: "number" },
             name: { type: "string" },
-            parent: { type: "relation",
-relationName: "parent" },
-            children: { type: "relation",
-relationName: "children" }
+            parent: { type: "relation" },
+            children: { type: "relation" }
         },
         relations: [
             {
@@ -611,8 +593,7 @@ relationName: "children" }
                 target: () => categoriesCollection,
                 foreignKeyOnTarget: "parent_id"
             }
-        ],
-        idField: "id"
+        ]
     };
 
     beforeEach(() => {

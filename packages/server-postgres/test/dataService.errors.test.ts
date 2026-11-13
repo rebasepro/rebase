@@ -60,8 +60,7 @@ dataType: "number" },
         properties: {
             id: { type: "number" },
             name: { type: "string" }
-        },
-        idField: "id"
+        }
     };
 
     beforeEach(() => {

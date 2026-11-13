@@ -84,8 +84,7 @@ const tagsCollection: LegacyCollectionConfig = {
     properties: {
         id: { type: "number" },
         name: { type: "string" }
-    },
-    idField: "id"
+    }
 };
 
 const postsCollection: LegacyCollectionConfig = {
@@ -95,8 +94,7 @@ const postsCollection: LegacyCollectionConfig = {
     properties: {
         id: { type: "number" },
         title: { type: "string" },
-        tags: { type: "relation",
-relationName: "tags" }
+        tags: { type: "relation" }
     },
     relations: [
         {
@@ -109,8 +107,7 @@ relationName: "tags" }
                 targetColumn: "tag_id"
             }
         }
-    ],
-    idField: "id"
+    ]
 };
 
 const authorsCollection: LegacyCollectionConfig = {
@@ -120,8 +117,7 @@ const authorsCollection: LegacyCollectionConfig = {
     properties: {
         id: { type: "number" },
         name: { type: "string" }
-    },
-    idField: "id"
+    }
 };
 
 // Inverse M2M: tags → posts (from tag's perspective, "which posts use this tag?")
@@ -132,8 +128,7 @@ const tagsWithInversePosts: LegacyCollectionConfig = {
     properties: {
         id: { type: "number" },
         name: { type: "string" },
-        posts: { type: "relation",
-relationName: "posts" }
+        posts: { type: "relation" }
     },
     relations: [
         {
@@ -149,8 +144,7 @@ relationName: "posts" }
                 targetColumn: "post_id"
             }
         }
-    ],
-    idField: "id"
+    ]
 };
 
 // JoinPath-based M2M: authors → posts via author_posts
@@ -161,8 +155,7 @@ const authorsWithJoinPath: LegacyCollectionConfig = {
     properties: {
         id: { type: "number" },
         name: { type: "string" },
-        posts: { type: "relation",
-relationName: "posts" }
+        posts: { type: "relation" }
     },
     relations: [
         {
@@ -179,8 +172,7 @@ on: { from: "post_id",
 to: "id" } }
             ]
         }
-    ],
-    idField: "id"
+    ]
 };
 
 // ─── Test Data Generators ─────────────────────────────────────────────

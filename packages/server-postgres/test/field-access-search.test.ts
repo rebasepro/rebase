@@ -38,8 +38,7 @@ const collection: LegacyCollectionConfig = {
         notes: { type: "string", access: { read: ["hr"] } },
         passwordHash: { type: "string", columnName: "password_hash", excludeFromApi: true },
         age: { type: "number" }
-    },
-    idField: "id"
+    }
 };
 const [described] = tablesFromCollections([collection]).descriptors;
 

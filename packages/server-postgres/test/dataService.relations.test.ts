@@ -111,10 +111,8 @@ describe("DataService - Relation Types Tests", () => {
             id: { type: "number" },
             name: { type: "string" },
             email: { type: "string" },
-            orders: { type: "relation",
-relationName: "orders" },
-            profile: { type: "relation",
-relationName: "profile" }
+            orders: { type: "relation" },
+            profile: { type: "relation" }
         },
         relations: [
             {
@@ -129,8 +127,7 @@ relationName: "profile" }
                 target: () => userProfilesCollection,
                 foreignKeyOnTarget: "user_id"
             }
-        ],
-        idField: "id"
+        ]
     };
 
     const ordersCollection: LegacyCollectionConfig = {
@@ -140,10 +137,8 @@ relationName: "profile" }
         properties: {
             id: { type: "number" },
             total: { type: "number" },
-            customer: { type: "relation",
-relationName: "customer" },
-            products: { type: "relation",
-relationName: "products" }
+            customer: { type: "relation" },
+            products: { type: "relation" }
         },
         relations: [
             {
@@ -162,8 +157,7 @@ relationName: "products" }
                     targetColumn: "product_id"
                 }
             }
-        ],
-        idField: "id"
+        ]
     };
 
     const productsCollection: LegacyCollectionConfig = {
@@ -174,8 +168,7 @@ relationName: "products" }
             id: { type: "number" },
             name: { type: "string" },
             price: { type: "number" }
-        },
-        idField: "id"
+        }
     };
 
     const userProfilesCollection: LegacyCollectionConfig = {
@@ -185,8 +178,7 @@ relationName: "products" }
         properties: {
             id: { type: "number" },
             bio: { type: "string" },
-            user: { type: "relation",
-relationName: "user" }
+            user: { type: "relation" }
         },
         relations: [
             {
@@ -195,8 +187,7 @@ relationName: "user" }
                 target: () => customersCollection,
                 localKey: "user_id"
             }
-        ],
-        idField: "id"
+        ]
     };
 
     beforeEach(() => {
@@ -600,8 +591,7 @@ customerId: 1 }
                 properties: {
                     id: { type: "number" },
                     title: { type: "string" },
-                    authorProfile: { type: "relation",
-relationName: "authorProfile" }
+                    authorProfile: { type: "relation" }
                 },
                 relations: [
                     {
@@ -617,8 +607,7 @@ on: { from: "posts.author_id",
 to: "user_profiles.user_id" } }
                         ]
                     }
-                ],
-                idField: "id"
+                ]
             };
 
             it("should handle one-to-one owning relation via joinPath on write", async () => {
@@ -758,8 +747,7 @@ name: "John Doe" }]);
                 properties: {
                     id: { type: "number" },
                     name: { type: "string" },
-                    profile: { type: "relation",
-relationName: "profile" }
+                    profile: { type: "relation" }
                 },
                 relations: [
                     {
@@ -773,8 +761,7 @@ on: { from: "authors.id",
 to: "user_profiles.user_id" } }
                         ]
                     }
-                ],
-                idField: "id"
+                ]
             };
 
             it("should handle one-to-one inverse relation via joinPath on write", async () => {
@@ -906,8 +893,7 @@ product_id: 2 }
                 properties: {
                     id: { type: "number" },
                     title: { type: "string" },
-                    tags: { type: "relation",
-relationName: "tags" }
+                    tags: { type: "relation" }
                 },
                 relations: [
                     {
@@ -918,8 +904,7 @@ relationName: "tags" }
                             name: "Tags",
                             table: "tags",
                             properties: { id: { type: "number" },
-name: { type: "string" } },
-                            idField: "id"
+name: { type: "string" } }
                         }),
                         cardinality: "many",
                         joinPath: [
@@ -931,8 +916,7 @@ on: { from: "post_tags.tag_id",
 to: "tags.id" } }
                         ]
                     }
-                ],
-                idField: "id"
+                ]
             };
 
             it("should handle many-to-many owning relation via joinPath on write", async () => {
@@ -1011,8 +995,7 @@ name: "Big Customer" }]);
                 properties: {
                     id: { type: "number" },
                     name: { type: "string" },
-                    orders: { type: "relation",
-relationName: "orders" }
+                    orders: { type: "relation" }
                 },
                 relations: [
                     {
@@ -1030,8 +1013,7 @@ on: { from: "order_items.order_id",
 to: "orders.id" } }
                         ]
                     }
-                ],
-                idField: "id"
+                ]
             };
 
             it("should handle many-to-many inverse relation with through", async () => {
@@ -1077,8 +1059,7 @@ name: "Popular Product" }]);
                 properties: {
                     id: { type: "number" },
                     name: { type: "string" },
-                    posts: { type: "relation",
-relationName: "posts" }
+                    posts: { type: "relation" }
                 },
                 relations: [
                     {
@@ -1089,8 +1070,7 @@ relationName: "posts" }
                             name: "Posts",
                             table: "posts",
                             properties: { id: { type: "number" },
-title: { type: "string" } },
-                            idField: "id"
+title: { type: "string" } }
                         }),
                         cardinality: "many",
                         joinPath: [
@@ -1102,8 +1082,7 @@ on: { from: "post_tags.post_id",
 to: "posts.id" } }
                         ]
                     }
-                ],
-                idField: "id"
+                ]
             };
 
             it("should handle many-to-many inverse relation via joinPath on write", async () => {

@@ -225,7 +225,7 @@ describe("generatePostgresDdl edge cases", () => {
                 table: "profiles",
                 name: "Profiles",
                 properties: {
-                    owner: { type: "relation", relationName: "owner" }
+                    owner: { type: "relation" }
                 },
                 relations: [
                     {

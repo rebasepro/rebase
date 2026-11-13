@@ -898,7 +898,6 @@ describe("Duplicate relation deduplication regression", () => {
                 // Property referencing the same FK as the explicit relation
                 company: {
                     type: "relation",
-                    relationName: "company"
                 }
             },
             relations: [
@@ -960,7 +959,6 @@ describe("Duplicate relation deduplication regression", () => {
                 name: { type: "string" },
                 department: {
                     type: "relation",
-                    relationName: "department"
                 }
             },
             relations: [
@@ -1011,10 +1009,8 @@ describe("Duplicate relation deduplication regression", () => {
             name: "Messages",
             properties: {
                 content: { type: "string" },
-                sender: { type: "relation",
-relationName: "sender" },
-                recipient: { type: "relation",
-relationName: "recipient" }
+                sender: { type: "relation" },
+                recipient: { type: "relation" }
             },
             relations: [
                 {

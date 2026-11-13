@@ -89,7 +89,7 @@ describe("generatePostgresDdl", () => {
             name: "Posts",
             properties: {
                 title: { type: "string" },
-                author: { type: "relation", relationName: "author" }
+                author: { type: "relation" }
             },
             relations: [
                 {
@@ -126,7 +126,7 @@ describe("generatePostgresDdl", () => {
             name: "Posts",
             properties: {
                 title: { type: "string" },
-                author: { type: "relation", relationName: "author", validation: { required: true } }
+                author: { type: "relation", validation: { required: true } }
             },
             relations: [
                 {
@@ -160,8 +160,8 @@ describe("generatePostgresDdl", () => {
             name: "Posts",
             properties: {
                 title: { type: "string" },
-                author: { type: "relation", relationName: "author", validation: { required: true } },
-                editor: { type: "relation", relationName: "editor" }
+                author: { type: "relation", validation: { required: true } },
+                editor: { type: "relation" }
             },
             relations: [
                 { kind: "belongsTo", relationName: "author", target: () => usersCollection, localKey: "author_id" },
@@ -220,7 +220,7 @@ describe("generatePostgresDdl", () => {
             name: "Posts",
             properties: {
                 title: { type: "string" },
-                tags: { type: "relation", relationName: "tags" }
+                tags: { type: "relation" }
             },
             relations: [
                 {

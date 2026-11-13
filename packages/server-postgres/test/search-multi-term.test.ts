@@ -34,8 +34,7 @@ const collection: LegacyCollectionConfig = {
         first_name: { type: "string" },
         last_name: { type: "string" },
         email: { type: "string" }
-    },
-    idField: "id"
+    }
 };
 const [described] = tablesFromCollections([collection]).descriptors;
 
