@@ -52,7 +52,10 @@ export async function loadTables(schemaDir: string): Promise<CompiledTable[]> {
  * @group Schema
  */
 export interface LoadedTables {
-    /** Lowered into the planner's input, in slug order — see {@link loadTables}. */
+    /**
+     * The tables lowered into collections, in slug order: read only by the
+     * console's `openRebase`, which still takes them beside `tables`.
+     */
     collections: PostgresCollectionConfig[];
     /**
      * The compiled descriptors, in the same slug order: what the schema-version
@@ -107,8 +110,6 @@ export async function loadTableSchema(schemaDir: string): Promise<LoadedTables> 
  * @group Schema
  */
 export function defaultDatabaseSchemaVersion(loaded: LoadedTables): string {
-    const provisioned = new Set(loaded.collections
-        .filter(collection => !collection.dataSource || collection.dataSource === DEFAULT_DATA_SOURCE_KEY)
-        .map(collection => collection.slug));
-    return computeSchemaVersion(loaded.descriptors.filter(descriptor => provisioned.has(descriptor.slug)));
+    return computeSchemaVersion(loaded.descriptors.filter(descriptor =>
+        !descriptor.database || descriptor.database === DEFAULT_DATA_SOURCE_KEY));
 }
