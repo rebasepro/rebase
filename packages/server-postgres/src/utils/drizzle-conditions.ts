@@ -188,8 +188,10 @@ function junctionColumns(
     if (!junctionTable) {
         throw junctionTableMissing(junctionName);
     }
-    const sourceCol = columnAtKey(junctionTable, sourceKey);
-    const targetCol = columnAtKey(junctionTable, targetKey);
+    // By key or SQL name: a declared junction's catalogue table is keyed by
+    // its column keys, an implicit one's by the SQL names the relation uses.
+    const sourceCol = columnNamed(junctionTable, sourceKey);
+    const targetCol = columnNamed(junctionTable, targetKey);
     if (!sourceCol || !targetCol) {
         throw new Error(
             `Junction columns '${sourceKey}'/'${targetKey}' not found in '${junctionName}'`
@@ -2693,8 +2695,8 @@ whereConditions };
         if (!junctionTable) {
             throw junctionTableMissing(through.table);
         }
-        const junctionSourceCol = columnAtKey(junctionTable, through.sourceKey);
-        const junctionTargetCol = columnAtKey(junctionTable, through.targetKey);
+        const junctionSourceCol = columnNamed(junctionTable, through.sourceKey);
+        const junctionTargetCol = columnNamed(junctionTable, through.targetKey);
         if (!junctionSourceCol) {
             throw new Error(`Source column '${through.sourceKey}' not found in junction table '${through.table}'`);
         }
