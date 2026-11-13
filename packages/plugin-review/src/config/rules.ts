@@ -35,10 +35,11 @@ import type { StateFieldReview } from "./types";
  *
  * The policy's name is derived from the slug, `<slug>_review_pending_only`
  * (`-` written `_`), so it is the same on every push and every machine.
+ * The list is never empty, so it can also stand as a table's whole `rls`.
  *
  * @group Review
  */
-export function reviewRls(slug: string, review: StateFieldReview): SecurityRule[] {
+export function reviewRls(slug: string, review: StateFieldReview): [SecurityRule, ...SecurityRule[]] {
     const exempt: PolicyExpression[] = [
         policy.serverContext(),
         policy.rolesOverlap(["admin", ...(review.reviewerRoles ?? [])])

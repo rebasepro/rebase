@@ -9,7 +9,7 @@ import type {
 } from "../types/auth_hooks";
 import type { ColumnsShape } from "./columns";
 import { isColumnBuilder } from "./columns";
-import type { RelationsShape } from "./relations";
+import type { BelongsToDef, RelationsShape } from "./relations";
 import { isRelationDef } from "./relations";
 import type { TableHooks } from "./hooks";
 import type { RlsPosture, TableIndex, TableTenant } from "./table_options";
@@ -64,8 +64,11 @@ export interface TableConfig<
      * database's declaration decides.
      */
     defaultPolicies?: boolean;
-    /** Scope every row to a tenant. */
-    tenant?: TableTenant<NoInfer<Extract<keyof C, string>>>;
+    /**
+     * Scope every row to a tenant: a column key, or a `belongsTo` relation's
+     * name, which stands for its foreign-key column (as the compiler reads it).
+     */
+    tenant?: TableTenant<NoInfer<Extract<keyof C, string> | BelongsToKeys<R>>>;
     /** Deleting stamps a timestamp column instead of removing the row. */
     softDelete?: boolean | { field?: NoInfer<Extract<keyof C, string>> };
     /** Record every write in the history table. */
@@ -85,6 +88,16 @@ export interface TableConfig<
     /** Opaque data, served with the table's descriptor. */
     metadata?: Record<string, unknown>;
 }
+
+/**
+ * The names of the `belongsTo` relations in `R`: the relations that own a
+ * foreign-key column on this table, and so can stand for it.
+ *
+ * @group Schema
+ */
+export type BelongsToKeys<R extends RelationsShape> = {
+    [K in Extract<keyof R, string>]: R[K] extends BelongsToDef ? K : never
+}[Extract<keyof R, string>];
 
 /**
  * A table as authored: the result of `defineTable`.

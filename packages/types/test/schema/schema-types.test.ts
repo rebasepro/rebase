@@ -325,8 +325,6 @@ function refusedTables(): void {
     defineTable("empty", { columns: { id: col.uuid().primaryKey() }, rls: [] });
     // @ts-expect-error not a posture
     defineTable("open", { columns: { id: col.uuid().primaryKey() }, rls: "public" });
-    // @ts-expect-error `defaultPolicies` only switches the baseline off
-    defineTable("t", { columns: { id: col.uuid().primaryKey() }, rls: "admin-only", defaultPolicies: true });
     // @ts-expect-error `strictWrites` only switches strict writes off
     defineTable("t", { columns: { id: col.uuid().primaryKey() }, rls: "admin-only", strictWrites: true });
     // @ts-expect-error a column must be a builder
@@ -341,11 +339,17 @@ function keyTypedOptions(): void {
         rls: "admin-only",
         tenant: { field: "orgId", from: { claim: "org_id" } },
         softDelete: { field: "deletedAt" },
+        // `true` keeps the admin baseline when the database switches it off.
+        defaultPolicies: true,
         // A relation name stands for its foreign-key column.
         indexes: [{ columns: ["orgId", "author", { column: "deletedAt", direction: "desc", nulls: "last" }], include: ["id"], where: { column: "deletedAt", op: "is null" } }]
     });
-    // @ts-expect-error tenant.field names a column key
+    // A `belongsTo` stands for its foreign-key column in `tenant` too.
+    defineTable("t", { columns, relations: { author: rel.belongsTo(() => users) }, rls: "admin-only", tenant: { field: "author", from: { claim: "org_id" } } });
+    // @ts-expect-error tenant.field names a column key or a belongsTo
     defineTable("t", { columns, rls: "admin-only", tenant: { field: "org_id", from: { claim: "org_id" } } });
+    // @ts-expect-error a hasMany owns no column on this table
+    defineTable("t", { columns, relations: { posts: rel.hasMany(() => users) }, rls: "admin-only", tenant: { field: "posts", from: { claim: "org_id" } } });
     // @ts-expect-error softDelete.field names a column key
     defineTable("t", { columns, rls: "admin-only", softDelete: { field: "deleted_at" } });
     // @ts-expect-error indexes[].columns name column keys or relations
