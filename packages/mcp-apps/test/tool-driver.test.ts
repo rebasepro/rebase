@@ -73,7 +73,7 @@ const CUSTOMERS_TABLE = defineTable("customers", {
     rls: [{ operation: "all", access: "authenticated" }]
 });
 const ORDERS_TABLE = defineTable("orders", {
-    columns: { id: col.text().primaryKey(), status: col.text(), customerId: col.text().column("customer_id") },
+    columns: { id: col.text().primaryKey(), status: col.text(), customerId: col.text("customer_id") },
     relations: { customer: rel.belongsTo(() => CUSTOMERS_TABLE, { localKey: "customer_id" }) },
     rls: [{ operation: "all", access: "authenticated" }]
 });
