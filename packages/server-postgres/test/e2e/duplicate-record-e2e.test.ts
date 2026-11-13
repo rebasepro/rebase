@@ -137,11 +137,37 @@ const ALL_KINDS: RelationKind[] = ["belongsTo", "hasOne", "hasMany", "manyToMany
 /** The kinds a copy carries: its own foreign key, and links through a junction. */
 const COPY_CARRIES: ReadonlySet<RelationKind> = new Set(["belongsTo", "manyToMany"]);
 
-/** What the admin's Duplicate sends: the original without its key and without the links it cannot share. */
-function copyOf(row: Record<string, unknown>): Record<string, unknown> {
+/** The key of a related row as read with `include`: the row itself, or its key when only that came back. */
+function keyOf(value: unknown): unknown {
+    if (typeof value === "object" && value !== null && !Array.isArray(value) && "id" in value) return value.id;
+    return value;
+}
+
+/**
+ * The original as read, without its key and without the links it cannot
+ * share — the values the admin's copy form opens with, still in the read's
+ * shape: a to-one relation as the included row.
+ */
+function copyAsRead(row: Record<string, unknown>): Record<string, unknown> {
     const copy: Record<string, unknown> = { ...row };
     delete copy.id;
     for (const [key, { kind }] of Object.entries(RELATION_PROPERTIES)) if (!COPY_CARRIES.has(kind)) delete copy[key];
+    return copy;
+}
+
+/**
+ * What the admin's Duplicate sends: {@link copyAsRead} as wire values — each
+ * relation it carries as the related row's key, a to-many as a list of keys.
+ * `packages/cms/test/form/duplicate_wire_payload.test.tsx` pins that this is
+ * what the panel's copy form hands its data layer (`viewModelToWire`).
+ */
+function copyOf(row: Record<string, unknown>): Record<string, unknown> {
+    const copy = copyAsRead(row);
+    for (const key of Object.keys(RELATION_PROPERTIES)) {
+        if (!(key in copy)) continue;
+        const value = copy[key];
+        copy[key] = Array.isArray(value) ? value.map(keyOf) : keyOf(value);
+    }
     return copy;
 }
 
@@ -244,6 +270,7 @@ describe("Duplicating a record (every relation kind)", () => {
 
         const copy = copyOf(loaded);
         expect(copy).not.toHaveProperty("id");
+        expect(copy.editor).toBe("e-1");
         await driver.save({
             path: "authors",
             values: { ...copy, id: "a-2", name: "Ada (copy)" },
@@ -267,5 +294,25 @@ describe("Duplicating a record (every relation kind)", () => {
         for (const table of ["editors", "posts", "profiles", "tags", "badges", "awards"]) {
             expect({ table, added: added[table] }).toEqual({ table, added: [] });
         }
+    });
+
+    it("refuses a copy that sends a to-one relation as the included row, and writes nothing", async () => {
+        const loaded = await driver.fetchOne({ path: "authors", id: "a-1", include: Object.keys(RELATION_PROPERTIES) });
+        if (!loaded) throw new Error("the original did not read back");
+        const before = await snapshot(admin);
+
+        const asRead = copyAsRead(loaded);
+        expect(asRead.editor).toMatchObject({ id: "e-1" });
+        await expect(driver.save({
+            path: "authors",
+            values: { ...asRead, id: "a-3", name: "Ada (object)" },
+            status: "new"
+        })).rejects.toMatchObject({
+            statusCode: 400,
+            code: "VALIDATION_INVALID_VALUE",
+            message: expect.stringContaining("'authors.editor' links one 'editors' row")
+        });
+
+        expect(await snapshot(admin)).toEqual(before);
     });
 });
