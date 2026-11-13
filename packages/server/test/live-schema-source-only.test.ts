@@ -70,7 +70,7 @@ function harness(change = REMOVAL) {
         getRepository: () => repository,
         previewSource: async () => ({
             files: [{ path: "backend/schema/products.ts", contents: "…" }],
-            schema: { defs: [], descriptors: [], collections: [{ ...products, properties: { title: { type: "string" } } }] }
+            schema: { defs: [], tables: [], descriptors: [], collections: [{ ...products, properties: { title: { type: "string" } } }] }
         }),
         writeSource: async (source) => { events.push("write-source"); return source.files; },
         onApplied: () => { events.push("served"); }

@@ -76,6 +76,7 @@ import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-tables";
 import { readReconcileFacts } from "./schema/reconcile-schema";
+import { describeUnmappedTables } from "./schema/introspect-tables";
 import { onOwnSession, openSqlCursorOnPool, readWithinBudget, refuseOversizedRows, RESET_SESSION_STATEMENTS, runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
 import { PgNotifyListener } from "./services/pg-notify-listener";
 import { diffDatabaseBranch, mergeDatabaseBranch } from "./branching/branch-diff";
@@ -604,6 +605,10 @@ export class PostgresBackendDriver implements DataDriver {
                 tables,
                 options
             ),
+            // "Import an existing table": the undeclared tables, described.
+            describeUnmappedTables: (schema, mapped) => describeUnmappedTables({
+                query: async <R>(text: string, values?: unknown[]) => ({ rows: sqlRows<R>(await this.executeSql(text, { params: values })) })
+            }, schema, { mapped }),
             listen: (...args: Parameters<NonNullable<SQLAdmin["listen"]>>) => this.listen(...args),
             poolStats: () => this.poolStats(),
             sampleHealth: () => this.sampleHealth(),

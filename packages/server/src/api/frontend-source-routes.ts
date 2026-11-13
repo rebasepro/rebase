@@ -30,9 +30,10 @@ import { HonoEnv } from "./types";
  *   would write; nothing is written.
  * - `POST /apply` — the same, written.
  *
- * Refusals are 400s with the problems in `details.problems`, in the codes the
- * table routes use: `SCHEMA_EDIT_REFUSED`, `SCHEMA_EDIT_DOES_NOT_COMPILE`,
- * `INVALID_INPUT`.
+ * Refusals carry the problems in `details.problems`, in the codes the table
+ * routes use: 400 `SCHEMA_EDIT_REFUSED`, `SCHEMA_EDIT_DOES_NOT_COMPILE`,
+ * `INVALID_INPUT`, and 409 `SCHEMA_EDIT_STALE_FILE` for a file changed on disk
+ * since the panel read it.
  */
 
 /** The process's frontend source editor for the project `schemaDir` belongs to. */
@@ -41,9 +42,12 @@ export function createFrontendSourceEditor(schemaDir: string): FrontendSourceEdi
     return new FrontendSourceEditor(frontendSourceDirOf(root), { root });
 }
 
+/** A refusal as the answer that carries it: 409 for a file changed on disk since it was read, 400 otherwise. */
 function refusalsAsBadRequest<T>(run: () => Promise<T>): Promise<T> {
     return run().catch((error: unknown) => {
-        if (error instanceof FrontendSourceEditError) throw ApiError.badRequest(error.message, error.code, { problems: error.problems });
+        if (error instanceof FrontendSourceEditError) {
+            throw new ApiError(error.code === "SCHEMA_EDIT_STALE_FILE" ? 409 : 400, error.code, error.message, { problems: error.problems });
+        }
         throw error;
     });
 }

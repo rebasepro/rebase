@@ -1,6 +1,7 @@
 import type { SecurityRule } from "../types/security_rules";
 import type { SearchConfig } from "../types/search";
 import type { ColumnDef } from "./columns";
+import type { TableDescriptor } from "./descriptor";
 import type { JsonShape } from "./json";
 import type { BelongsToOptions, HasManyOptions, HasOptions, ManyToManyOptions, ViaOptions } from "./relations";
 import type { RlsPosture, TableIndex, TableTenant } from "./table_options";
@@ -23,6 +24,7 @@ import type { RlsPosture, TableIndex, TableTenant } from "./table_options";
  */
 export type TablePatch =
     | CreateTablePatch
+    | AdoptTablePatch
     | DeleteTablePatch
     | AddColumnPatch
     | ChangeColumnPatch
@@ -133,6 +135,26 @@ export interface NewTable extends Partial<TableOptionValues> {
 export interface CreateTablePatch {
     op: "createTable";
     table: NewTable;
+}
+
+/**
+ * Adopt a table the database already has and `backend/schema` does not
+ * declare ("Import an existing table"): write `backend/schema/<name>.ts` from
+ * the table's description as introspection reads it — what
+ * `GET /api/admin/schema-editor/unmapped-tables/:schema/:table` serves —
+ * through the one printer, and export it from the index.
+ *
+ * The description states the table exactly as the database has it (column
+ * types, defaults, keys, foreign keys as `belongsTo`, enums, types Rebase does
+ * not create as `col.custom()`), so planning the adopted table changes nothing
+ * in the database. Edits the person made on top of it follow as their own
+ * operations, naming the adopted table by its slug.
+ *
+ * @group Schema
+ */
+export interface AdoptTablePatch {
+    op: "adoptTable";
+    table: TableDescriptor;
 }
 
 /**
@@ -381,6 +403,37 @@ function columnProblems(value: unknown, where: string): string[] {
     return problems;
 }
 
+/** Problems with a table description sent to be adopted. */
+function adoptedTableProblems(spec: Record<string, unknown>): { key?: string; message: string }[] {
+    const out: { key?: string; message: string }[] = [];
+    for (const key of ["name", "slug", "table", "schema"] as const) {
+        const named = spec[key];
+        if (typeof named !== "string" || !SQL_IDENTIFIER.test(named)) out.push({ key, message: `\`${key}\` must be a SQL identifier.` });
+    }
+    if (spec.kind !== "table") out.push({ key: "kind", message: "only a table can be adopted (`kind: \"table\"`)." });
+    if (!Array.isArray(spec.columns) || spec.columns.length === 0) {
+        out.push({ key: "columns", message: "`columns` must list the table's columns, as introspection described them." });
+    } else {
+        for (const [index, column] of spec.columns.entries()) {
+            const key = isRecord(column) && typeof column.key === "string" ? column.key : `columns[${index}]`;
+            if (!isRecord(column) || typeof column.key !== "string" || !isRowKey(column.key)) out.push({ key, message: "a column must have a `key`." });
+            else if (typeof column.nullable !== "boolean") out.push({ key, message: "`nullable` must be a boolean." });
+            for (const message of columnProblems(column, `columns.${key}`)) out.push({ key, message });
+        }
+    }
+    if (!Array.isArray(spec.primaryKey) || spec.primaryKey.length === 0 || !spec.primaryKey.every(key => typeof key === "string")) {
+        out.push({ key: "primaryKey", message: "`primaryKey` must name the key column (or columns): a table without one cannot be declared." });
+    }
+    if (!Array.isArray(spec.relations) || !spec.relations.every(isRecord)) out.push({ key: "relations", message: "`relations` must be a list of relations." });
+    const rls = spec.rls;
+    if (!isRecord(rls) || (rls.posture !== "admin-only" && rls.posture !== "rules") || !Array.isArray(rls.rules) || !rls.rules.every(isRecord)) {
+        out.push({ key: "rls", message: "`rls` must be `{ posture, rules }`, as introspection described it." });
+    }
+    if (spec.hooks !== undefined) out.push({ key: "hooks", message: "hooks are code: write them in the table's file once it is adopted." });
+    if (spec.auth !== undefined || spec.view !== undefined) out.push({ message: "an auth table or a view is not adopted here: declare it in code." });
+    return out;
+}
+
 /** Problems with a relation sent on the wire. */
 function relationProblems(value: unknown, where: string): string[] {
     if (!isRecord(value)) return [`${where} must be a relation object.`];
@@ -495,6 +548,13 @@ function operationProblems(value: unknown, index: number): TablePatchProblem[] {
         return out;
     }
 
+    if (op === "adoptTable") {
+        const spec = value.table;
+        if (!isRecord(spec)) return [{ index, table: "", message: "`table` must be the description of the table to adopt, as `GET …/unmapped-tables/:schema/:table` serves it." }];
+        const name = typeof spec.slug === "string" ? spec.slug : "";
+        return adoptedTableProblems(spec).map(found => ({ index, table: name, ...(found.key !== undefined ? { key: found.key } : {}), message: found.message }));
+    }
+
     if (table === "") return [problem("`table` must be the slug of the table to edit.")];
 
     switch (op) {
@@ -556,7 +616,7 @@ function operationProblems(value: unknown, index: number): TablePatchProblem[] {
             return optionProblems(option, value.value, "value").map(message => problem(message, option));
         }
         default:
-            return [problem(`\`op\` ${JSON.stringify(op)} is not a schema edit. Send one of createTable, deleteTable, addColumn, changeColumn, renameColumn, removeColumn, moveColumn, addRelation, changeRelation, removeRelation, setRls, addRule, replaceRule, removeRule, setOption.`)];
+            return [problem(`\`op\` ${JSON.stringify(op)} is not a schema edit. Send one of createTable, adoptTable, deleteTable, addColumn, changeColumn, renameColumn, removeColumn, moveColumn, addRelation, changeRelation, removeRelation, setRls, addRule, replaceRule, removeRule, setOption.`)];
     }
 }
 

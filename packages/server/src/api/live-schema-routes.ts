@@ -67,7 +67,6 @@ import {
 } from "../schema-edit/schema-edit-permissions";
 import { requireScope } from "../auth/access";
 import type { EditedSchema, TableSourceEditError } from "./table-source-editor";
-import { compileSchemaDefs } from "../schema/load-schema";
 
 /**
  * A schema edit applied to a copy of `backend/schema` and compiled: the files
@@ -305,9 +304,9 @@ function isEditRefusal(error: unknown): error is TableSourceEditError {
     return error instanceof Error && error.name === "TableSourceEditError" && "code" in error && "problems" in error;
 }
 
-/** An edit the schema editor refused, as the 400 that says why. */
+/** An edit the schema editor refused, as the answer that says why: 409 for a file changed on disk since the preview, 400 otherwise. */
 function refusedEdit(error: TableSourceEditError): ApiError {
-    return ApiError.badRequest(error.message, error.code, { problems: error.problems });
+    return new ApiError(error.code === "SCHEMA_EDIT_STALE_FILE" ? 409 : 400, error.code, error.message, { problems: error.problems });
 }
 
 const isClassification = (value: unknown): value is ClassifiedSchemaChanges =>
@@ -353,7 +352,7 @@ async function planOrRefusal(
 function messageFor(patches: readonly TablePatch[], plan: SchemaChangePlan): string {
     if (plan.classified.changes.length > 0) return plan.message;
     const described = patches.map(describePatch);
-    const tables = [...new Set(patches.map(patch => (patch.op === "createTable" ? patch.table.name : patch.table)))];
+    const tables = [...new Set(patches.map(patch => (patch.op === "createTable" || patch.op === "adoptTable" ? patch.table.name : patch.table)))];
     const shown = described.length > 5 ? [...described.slice(0, 5), `and ${described.length - 5} more`] : described;
     return `chore(schema): edit ${tables.join(", ")} — ${shown.join(", ")}\n`;
 }
@@ -362,6 +361,7 @@ function messageFor(patches: readonly TablePatch[], plan: SchemaChangePlan): str
 function describePatch(patch: TablePatch): string {
     switch (patch.op) {
         case "createTable": return `create ${patch.table.name}`;
+        case "adoptTable": return `adopt ${patch.table.name}`;
         case "deleteTable": return `delete ${patch.table}`;
         case "addColumn": return `add column ${patch.key}`;
         case "changeColumn": return `change column ${patch.key}`;
@@ -458,14 +458,6 @@ export function rlsChangedSlugs(before: readonly CollectionConfig[], after: read
     return after.filter(collection => previous.get(collection.slug) !== rlsIdentity(collection)).map(collection => collection.slug);
 }
 
-/**
- * The edited definitions compiled, as boot compiles its own: what the planner
- * and the policy applier plan from.
- */
-function compiledEdit(schema: EditedSchema): CompiledTable[] {
-    return compileSchemaDefs(schema.defs, schema.defaultRls).tables;
-}
-
 /** Whether the default database stores a table: the one the apply's DDL ran on. */
 function onDefaultDatabase(table: CompiledTable): boolean {
     return table.descriptor.database === undefined || table.descriptor.database === "(default)";
@@ -484,8 +476,7 @@ async function applyChangedPolicies(
     try {
         // The edited definitions compiled, as boot compiles its own: the
         // policy applier plans from the compiled tables.
-        const tables = compiledEdit(after);
-        const { applied } = await config.applyPolicies(tables.filter(onDefaultDatabase));
+        const { applied } = await config.applyPolicies(after.tables.filter(onDefaultDatabase));
         return { status: "applied", tables: changed, statements: applied };
     } catch (err) {
         const error = err instanceof Error ? err.message : String(err);
@@ -515,13 +506,15 @@ export function keepEnforcedRls(
     const changedSet = new Set(changed);
     const previousCollection = new Map(before.map(collection => [collection.slug, collection]));
     const previousTable = new Map(beforeTables.map(table => [table.slug, table]));
+    const enforced = (descriptor: TableDescriptor): TableDescriptor => {
+        if (!changedSet.has(descriptor.slug)) return descriptor;
+        const previous = previousTable.get(descriptor.slug);
+        return { ...descriptor, rls: previous ? previous.rls : { posture: "rules", rules: [], defaultPolicies: false } };
+    };
     return {
         ...schema,
-        descriptors: schema.descriptors.map(descriptor => {
-            if (!changedSet.has(descriptor.slug)) return descriptor;
-            const previous = previousTable.get(descriptor.slug);
-            return { ...descriptor, rls: previous ? previous.rls : { posture: "rules", rules: [], defaultPolicies: false } };
-        }),
+        tables: schema.tables.map(table => (changedSet.has(table.descriptor.slug) ? { ...table, descriptor: enforced(table.descriptor) } : table)),
+        descriptors: schema.descriptors.map(enforced),
         collections: schema.collections.map(collection => {
             if (!changedSet.has(collection.slug)) return collection;
             const previous = previousCollection.get(collection.slug);
@@ -730,7 +723,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
         }
 
         const source = await preview(patches);
-        const plan = await planOrRefusal(admin, config.getCompiledTables(), compiledEdit(source.schema), config.commitPaths);
+        const plan = await planOrRefusal(admin, config.getCompiledTables(), source.schema.tables, config.commitPaths);
         return c.json({
             applicable: plan.classified.applicable,
             verdict: plan.classified.verdict,
@@ -801,7 +794,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             const before = config.getCollections();
             const after = source.schema.collections;
             const compiledBefore = config.getCompiledTables();
-            const compiledAfter = compiledEdit(source.schema);
+            const compiledAfter = source.schema.tables;
             const plan = sourceOnly
                 ? await planSourceOnly(admin, compiledBefore, compiledAfter, config.commitPaths)
                 : await planOrRefusal(admin, compiledBefore, compiledAfter, config.commitPaths);

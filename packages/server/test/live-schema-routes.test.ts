@@ -61,7 +61,7 @@ const SOURCE = "backend/schema/posts.ts";
 /** What the running server serves, compiled: the `before` side of every plan. */
 const SERVED_TABLES: readonly CompiledTable[] = [];
 
-const edited = (): EditedSchema => ({ defs: [], descriptors: [], collections: [collection("posts")] });
+const edited = (): EditedSchema => ({ defs: [], tables: [], descriptors: [], collections: [collection("posts")] });
 
 function harness(over: Partial<LiveSchemaRoutesConfig> & {
     plan?: SchemaChangePlan;
@@ -309,6 +309,19 @@ describe("POST /apply", () => {
         const res = await post("/apply", change);
         expect(res.status).toBe(400);
         expect(await res.json()).toMatchObject({ error: { code: "SCHEMA_CHANGE_FAILED", message: "posts.ts changed since the edit was prepared" } });
+    });
+});
+
+describe("a file changed on disk since the preview", () => {
+    it("is a 409 with its own code, which the editor's Reload keys on", async () => {
+        const { post } = harness({
+            writeSource: async () => {
+                throw new TableSourceEditError("SCHEMA_EDIT_STALE_FILE", "posts.ts changed since the edit was prepared (it was saved by something else meanwhile).", []);
+            }
+        });
+        const res = await post("/apply", change);
+        expect(res.status).toBe(409);
+        expect(await res.json()).toMatchObject({ error: { code: "SCHEMA_EDIT_STALE_FILE" } });
     });
 });
 

@@ -58,7 +58,7 @@ function apply(over: Partial<LiveSchemaRoutesConfig>, user: HonoEnv["Variables"]
         getRepository: (author) => { authors.push(author); return repository; },
         previewSource: async () => ({
             files: [{ path: "backend/schema/tags.ts", contents: "export const tags = defineTable(…);" }],
-            schema: { defs: [], descriptors: [], collections: [tags] }
+            schema: { defs: [], tables: [], descriptors: [], collections: [tags] }
         }),
         writeSource: async (source) => source.files,
         ...over

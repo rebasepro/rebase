@@ -22,6 +22,7 @@ import {
     type AnyViewDef,
     type ColumnDef,
     type ColumnsShape,
+    type CompiledTable,
     type DefaultRls,
     type NewTable,
     type PostgresCollectionConfig,
@@ -163,7 +164,7 @@ export class TableSourceEditor {
             const now = fs.existsSync(file.path) ? fs.readFileSync(file.path, "utf8") : undefined;
             if (now !== file.before) {
                 throw new TableSourceEditError(
-                    "SCHEMA_EDIT_REFUSED",
+                    "SCHEMA_EDIT_STALE_FILE",
                     `${file.path} changed since the edit was prepared (it was saved by something else meanwhile). ` +
                     "Nothing was written: make the edit again against the file as it is now.",
                     []
@@ -178,6 +179,11 @@ export class TableSourceEditor {
      */
     async describe(): Promise<TableSourceSummary[]> {
         return Workspace.read(this.schemaDir).tables().map(summarize);
+    }
+
+    /** The schema directory as it is on disk, compiled: the tables `backend/schema` declares now. */
+    async compileCurrent(): Promise<EditedSchema> {
+        return this.compile(Workspace.read(this.schemaDir).texts());
     }
 
     /** Compile the schema directory as `texts` would make it. */
@@ -231,6 +237,12 @@ export interface TableSourceFile {
 export interface EditedSchema {
     defs: (AnyTableDef | AnyViewDef)[];
     defaultRls?: DefaultRls;
+    /**
+     * The definitions compiled, as boot compiles its own: each descriptor
+     * with its hooks, transforms and auth hooks — what the planner plans from
+     * and what the server's registries serve after an apply.
+     */
+    tables: CompiledTable[];
     descriptors: TableDescriptor[];
     collections: PostgresCollectionConfig[];
 }
@@ -261,18 +273,29 @@ export interface TableSourceProblem {
 }
 
 /**
- * An edit the schema editor will not make. Nothing was written.
+ * Why the schema editor refused an edit:
  *
  * - `SCHEMA_EDIT_REFUSED` — the edit cannot be made as asked: the table is
  *   edited in code there, the column does not exist, a slug rename.
  * - `SCHEMA_EDIT_DOES_NOT_COMPILE` — the edit can be made, and the schema it
  *   leaves would not load: the problems say why.
+ * - `SCHEMA_EDIT_STALE_FILE` — a file the edit rewrites changed on disk since
+ *   the edit was prepared (an IDE save, another process): reload it and make
+ *   the edit again.
+ *
+ * @group Schema
+ */
+export type SchemaEditRefusalCode = "SCHEMA_EDIT_REFUSED" | "SCHEMA_EDIT_DOES_NOT_COMPILE" | "SCHEMA_EDIT_STALE_FILE";
+
+/**
+ * An edit the schema editor will not make, with its
+ * {@link SchemaEditRefusalCode}. Nothing was written.
  *
  * @group Schema
  */
 export class TableSourceEditError extends Error {
     constructor(
-        readonly code: "SCHEMA_EDIT_REFUSED" | "SCHEMA_EDIT_DOES_NOT_COMPILE",
+        readonly code: SchemaEditRefusalCode,
         message: string,
         readonly problems: readonly TableSourceProblem[]
     ) {
@@ -699,7 +722,7 @@ function refusal(message: string, table: string, key?: string): TableSourceEditE
 
 function asRefusal(error: unknown, index: number, patch: TablePatch): TableSourceEditError {
     if (error instanceof TableSourceEditError) return error;
-    const table = patch.op === "createTable" ? patch.table.name : patch.table;
+    const table = patch.op === "createTable" ? patch.table.name : patch.op === "adoptTable" ? patch.table.slug : patch.table;
     const message = error instanceof Error ? error.message : String(error);
     return refusal(`Edit ${index} (${patch.op} on "${table}"): ${message}`, table);
 }
@@ -987,6 +1010,8 @@ async function applyPatch(workspace: Workspace, patch: TablePatch, editor: Table
     switch (patch.op) {
         case "createTable":
             return createTable(workspace, patch.table);
+        case "adoptTable":
+            return adoptTable(workspace, patch.table);
         case "deleteTable":
             return deleteTable(workspace, patch.table, editor);
         case "addColumn": {
@@ -1250,7 +1275,43 @@ function createTable(workspace: Workspace, spec: NewTable): void {
         }
     });
     workspace.set(file, module);
+    exportFromIndex(workspace, identifier, file);
+}
 
+/**
+ * Write a table the database already has from its description, through the
+ * printer — every column type, default, key, foreign key and enum as
+ * introspection read it, so planning it changes nothing — and export it.
+ */
+function adoptTable(workspace: Workspace, descriptor: TableDescriptor): void {
+    const tables = workspace.tables();
+    const clash = tables.find(table => table.slug === descriptor.slug || table.name === descriptor.name);
+    if (clash) throw refusal(`There is already a table "${clash.name}" (slug "${clash.slug}") in backend/schema.`, descriptor.slug);
+    const file = path.join(workspace.dir, `${descriptor.name}.ts`);
+    if (workspace.has(file) || fs.existsSync(file)) throw refusal(`${file} already exists.`, descriptor.slug);
+    const identifier = tableIdentifier(descriptor.name);
+    if (tables.some(table => table.exportName === identifier)) {
+        throw refusal(`The schema index already exports \`${identifier}\`, the name the adopted table would be exported as.`, descriptor.slug);
+    }
+    for (const relation of descriptor.relations) {
+        if (relation.target === descriptor.slug || tables.some(table => table.slug === relation.target)) continue;
+        throw refusal(`The relation "${relation.name}" targets "${relation.target}", which is not a table in backend/schema.`, descriptor.slug, relation.name);
+    }
+    const module = printTableModule(descriptor, {
+        identifier,
+        specifier: builderSpecifier(workspace),
+        resolveTarget: target => {
+            const found = tables.find(table => table.slug === target.slug);
+            if (!found) return { identifier };
+            return { identifier: found.variable, importPath: relativeSpecifier(file, found.file) };
+        }
+    });
+    workspace.set(file, module);
+    exportFromIndex(workspace, identifier, file);
+}
+
+/** Export a table's file from the schema index, after the last export (creating the index when there is none). */
+function exportFromIndex(workspace: Workspace, identifier: string, file: string): void {
     const line = printIndexModule([{ identifier, importPath: relativeSpecifier(path.join(workspace.dir, "index.ts"), file) }]);
     const indexPath = workspace.indexFile();
     if (!indexPath) {

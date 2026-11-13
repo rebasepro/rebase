@@ -218,14 +218,14 @@ describe("stale files, failed checks", () => {
         const version = versionOf(HYBRID_EVENTS);
         fs.writeFileSync(file("events.ts"), `// saved in the IDE\n${HYBRID_EVENTS}`);
         await expect(editor.apply({ target: events, version, operations: [{ op: "set", path: ["name"], value: "X" }] }))
-            .rejects.toThrow(/changed since the edit was prepared/);
+            .rejects.toMatchObject({ code: "SCHEMA_EDIT_STALE_FILE", message: expect.stringMatching(/changed since the edit was prepared/) });
         expect(read("events.ts")).toBe(`// saved in the IDE\n${HYBRID_EVENTS}`);
     });
 
     it("refuses to write when the file changed between preview and write", async () => {
         const edit = await editor.preview({ target: events, operations: [{ op: "set", path: ["name"], value: "X" }] });
         fs.writeFileSync(file("events.ts"), `${HYBRID_EVENTS}// later\n`);
-        await expect(editor.write(edit)).rejects.toThrow(/changed since the edit was prepared/);
+        await expect(editor.write(edit)).rejects.toMatchObject({ code: "SCHEMA_EDIT_STALE_FILE", message: expect.stringMatching(/changed since the edit was prepared/) });
         expect(read("events.ts")).toBe(`${HYBRID_EVENTS}// later\n`);
     });
 

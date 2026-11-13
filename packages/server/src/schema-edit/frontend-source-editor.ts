@@ -5,7 +5,7 @@ import path from "node:path";
 import { Node, Project, ts, type CallExpression, type ObjectLiteralExpression, type SourceFile } from "ts-morph";
 import { printSchemaValue } from "@rebasepro/common";
 
-import { IDENTIFIER, isData, member, memberName, opaqueMembers, printKey, unwrapExpression, literalString } from "../api/table-source-editor";
+import { IDENTIFIER, isData, member, memberName, opaqueMembers, printKey, unwrapExpression, literalString, type SchemaEditRefusalCode } from "../api/table-source-editor";
 import { applyEdits, insertListItem, itemText, listShape, removeListItem, replaceNode, type TextEdit } from "./source-text";
 
 /**
@@ -134,7 +134,7 @@ export class FrontendSourceEditor {
         const { target } = request;
         const found = this.locate(target);
         if (request.version !== undefined && request.version !== versionOf(found.text)) {
-            throw new FrontendSourceEditError("SCHEMA_EDIT_REFUSED",
+            throw new FrontendSourceEditError("SCHEMA_EDIT_STALE_FILE",
                 `${this.relative(found.file)} changed since the edit was prepared (it was saved by something else meanwhile). ` +
                 "Nothing was written: reload, and make the edit again against the file as it is now.",
                 [{ table: target.value, message: "The file changed on disk." }]);
@@ -173,7 +173,7 @@ export class FrontendSourceEditor {
         for (const file of edit.files) {
             const now = fs.existsSync(file.path) ? fs.readFileSync(file.path, "utf8") : undefined;
             if (now !== file.before) {
-                throw new FrontendSourceEditError("SCHEMA_EDIT_REFUSED",
+                throw new FrontendSourceEditError("SCHEMA_EDIT_STALE_FILE",
                     `${this.relative(file.path)} changed since the edit was prepared (it was saved by something else meanwhile). ` +
                     "Nothing was written: reload, and make the edit again against the file as it is now.", []);
             }
@@ -348,13 +348,15 @@ export interface FrontendSourceProblem {
 
 /**
  * An edit the frontend source editor will not make. Nothing was written (or
- * what was written was restored).
+ * what was written was restored). The codes are the table editor's
+ * ({@link SchemaEditRefusalCode}) — a file changed on disk since the panel
+ * read it is `SCHEMA_EDIT_STALE_FILE` — and `INVALID_INPUT`.
  *
  * @group Schema
  */
 export class FrontendSourceEditError extends Error {
     constructor(
-        readonly code: "SCHEMA_EDIT_REFUSED" | "SCHEMA_EDIT_DOES_NOT_COMPILE" | "INVALID_INPUT",
+        readonly code: SchemaEditRefusalCode | "INVALID_INPUT",
         message: string,
         readonly problems: readonly FrontendSourceProblem[]
     ) {

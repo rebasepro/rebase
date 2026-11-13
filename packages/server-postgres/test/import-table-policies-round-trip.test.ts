@@ -1,12 +1,10 @@
 /**
- * A table's policies, imported into a collection and compiled back, are the
- * policies it had.
+ * A table's policies, imported and compiled back, are the policies it had.
  *
- * "Import from table" in the collection editor reads a table's metadata through
- * the driver's `fetchTableMetadata`, and `buildCollectionFromTableMetadata`
- * turns each policy into a `securityRules` entry — which `db push` then
- * compiles back into the database. Neither half described a policy the way the
- * other needed:
+ * "Import an existing table" describes the table through introspection
+ * (`describeUnmappedTables`), which turns each `pg_policies` row into a rule —
+ * which `db push` then compiles back into the database. The two halves once
+ * disagreed:
  *
  * - The metadata read `pg_policy`, not `pg_policies`: the command came back as
  *   `polcmd`'s one-letter code (`r`, `a`, `*`), which the importer did not
@@ -18,21 +16,21 @@
  *   WITH CHECK that had no USING beside it.
  *
  * So this runs the real round trip on PGlite: policies written by hand, read
- * through the driver, imported, compiled with the generator `db push` uses, and
- * created on a fresh copy of the table — and asks Postgres whether the two sets
- * of policies say the same thing.
+ * through the driver's metadata and through the import's description,
+ * compiled with the generator `db push` uses, and created on a fresh copy of
+ * the table — and asks Postgres whether the two sets of policies say the same
+ * thing.
  */
 import { describe, it, expect, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { buildCollectionFromTableMetadata } from "@rebasepro/common";
-import type { LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
-import { FixtureTableRegistry, tablesFromCollections } from "./helpers/tables";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 import { generatePolicyStatements } from "../src/schema/generate-postgres-ddl-logic";
+import { describeUnmappedTables } from "../src/schema/introspect-tables";
 
 const TABLE = `
     CREATE ROLE authenticated;
@@ -110,17 +108,13 @@ describe("importing a table's policies and compiling them back", () => {
 
     it("recreates every policy with the same mode, TO list, command and clauses", async () => {
         const source = await database(TABLE + POLICIES);
-        const metadata = await driverOver(source).fetchTableMetadata("orders");
-        const imported = buildCollectionFromTableMetadata("orders", metadata);
-
-        const collection: LegacyPostgresCollectionConfig = {
-            name: imported.name,
-            slug: imported.slug,
-            table: imported.table,
-            properties: imported.properties,
-            securityRules: imported.securityRules
-        };
-        const [table] = tablesFromCollections([collection]).descriptors;
+        const [imported] = await describeUnmappedTables(
+            { query: async <R>(text: string, values?: unknown[]) => ({ rows: (await source.query<R>(text, values)).rows }) },
+            "public",
+            { mapped: new Set() }
+        );
+        const table = imported.descriptor;
+        if (!table) throw new Error("orders was not described");
         const statements = table.rls.rules.flatMap(rule => generatePolicyStatements(table, rule));
 
         const target = await database(TABLE);

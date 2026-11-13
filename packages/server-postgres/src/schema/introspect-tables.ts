@@ -36,9 +36,10 @@ import type {
     RlsDescriptor,
     SearchConfig,
     SecurityRule,
-    TableDescriptor
+    TableDescriptor,
+    UnmappedTable
 } from "@rebasepro/types";
-import { getGeneratedPolicyNames, policyToSecurityRule } from "@rebasepro/common";
+import { classifyTable, getGeneratedPolicyNames, policyToSecurityRule } from "@rebasepro/common";
 import { firstFreeKey, toWireKey } from "@rebasepro/utils";
 
 import {
@@ -191,6 +192,82 @@ export async function introspectTables(
     const metadata = await readSchemaMetadata(client, schema);
     const { tables, skipped, junctions, unprotected } = describeTables(metadata, { purpose: "serve", ...options });
     return { tables, skipped, junctions, unprotected };
+}
+
+/**
+ * The tables of one Postgres schema that no declared table maps, each
+ * described for "Import an existing table" to adopt.
+ *
+ * Each table is described as `rebase schema introspect` writes it
+ * (`describeTables(…, { purpose: "generate" })`), alone: a foreign key to a
+ * declared table is a `belongsTo`, one to another undeclared table stays a
+ * plain column (its constraint is left as it is), and the generator's reverse
+ * links — relations of other tables — are not this table's to declare.
+ *
+ * Its `rls` is never weaker than what the database enforces: with row-level
+ * security off, or no policy at all, it is `"admin-only"`, and `rlsRaised`
+ * says so. A table with no primary key is listed with why it cannot be
+ * imported. Junction tables and Rebase's own tables are left out. Only
+ * `SELECT`s.
+ *
+ * @param mapped The SQL names of the tables already declared in `schema`.
+ * @group Schema
+ */
+export async function describeUnmappedTables(
+    client: QueryableClient,
+    schema: string,
+    options: { mapped: ReadonlySet<string> }
+): Promise<UnmappedTable[]> {
+    const metadata = await readSchemaMetadata(client, schema);
+    const tablesMap = buildTablesMap(metadata.tables, metadata.columns, metadata.pks, metadata.fks);
+    const joinTables = identifyJoinTables(tablesMap);
+    const candidates = metadata.tables
+        .map(row => row.table_name)
+        .filter(name => !options.mapped.has(name) && !joinTables.has(name) && classifyTable(name, schema) !== "rebase-internal");
+    const out: UnmappedTable[] = [];
+    for (const name of candidates) {
+        const row = metadata.tables.find(candidate => candidate.table_name === name);
+        const policies = metadata.policies?.filter(policy => policy.table_name === name) ?? [];
+        const base = { schema, table: name, rlsEnabled: row?.rls_enabled === true, policies: policies.length };
+        if ((tablesMap.get(name)?.pks.length ?? 0) === 0) {
+            out.push({
+                ...base,
+                notes: [],
+                unimportable: "it has no primary key, and a table is declared with the column (or columns) that identify a row. " +
+                    "Add one (`ALTER TABLE … ADD PRIMARY KEY (…)`) and import it again."
+            });
+            continue;
+        }
+        const described = describeTables(metadata, {
+            purpose: "generate",
+            joinTables,
+            leaveOut: new Set(candidates.filter(other => other !== name))
+        });
+        const found = described.tables.find(table => table.table === name);
+        if (!found) {
+            out.push({ ...base, notes: [], unimportable: "introspection could not describe it." });
+            continue;
+        }
+        const rlsRaised = !base.rlsEnabled
+            ? `Row-level security is off on "${name}", so today every request reaches every row. It is imported as "admin-only": ` +
+                "applying it switches row-level security on, and from then on only the server and admins reach its rows, until you add rules."
+            : policies.length === 0
+                ? `"${name}" has row-level security on and no policy. It is imported as "admin-only": ` +
+                    "applying it gives the server and admins its rows, and nobody else, until you add rules."
+                : undefined;
+        const descriptor: TableDescriptor = {
+            ...found,
+            relations: found.relations.filter(relation => relation.kind === "belongsTo"),
+            ...(rlsRaised ? { rls: { posture: "admin-only", rules: [], defaultPolicies: true } } : {})
+        };
+        out.push({
+            ...base,
+            descriptor,
+            ...(rlsRaised ? { rlsRaised } : {}),
+            notes: [...(described.notes.drift.get(name) ?? []), ...(described.notes.remark.get(name) ?? [])]
+        });
+    }
+    return out;
 }
 
 /**

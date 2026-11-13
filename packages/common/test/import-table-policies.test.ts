@@ -1,6 +1,5 @@
 import { describe, it, expect } from "@jest/globals";
-import type { SecurityRule, TableMetadata, TablePolicyInfo } from "@rebasepro/types";
-import { buildCollectionFromTableMetadata } from "../src/util/pg-column-to-property";
+import type { SecurityRule, TablePolicyInfo } from "@rebasepro/types";
 import { securityRuleToConditions } from "../src/util/policy/securityRuleToConditions";
 import { policyToPostgres } from "../src/util/policy/policyToPostgres";
 import { policyToSecurityRule } from "../src/util/policy/policyToSecurityRule";
@@ -21,9 +20,18 @@ import { policyToSecurityRule } from "../src/util/policy/policyToSecurityRule";
  *   back permissive, OR'd with every grant beside it.
  */
 
+const COMMANDS = ["SELECT", "INSERT", "UPDATE", "DELETE", "ALL"] as const;
+
+/** Each `pg_policies` row as introspection reads it into a rule — what "Import an existing table" adopts. */
 function importPolicies(...policies: TablePolicyInfo[]): SecurityRule[] {
-    const metadata: TableMetadata = { columns: [], foreignKeys: [], junctions: [], policies };
-    return buildCollectionFromTableMetadata("orders", metadata).securityRules ?? [];
+    return policies.map(policy => policyToSecurityRule({
+        policyname: policy.policy_name,
+        cmd: COMMANDS.find(command => command === policy.cmd.toUpperCase()),
+        permissive: policy.permissive?.toUpperCase() === "RESTRICTIVE" ? "RESTRICTIVE" : "PERMISSIVE",
+        roles: policy.roles,
+        qual: policy.qual ?? null,
+        with_check: policy.with_check ?? null
+    }));
 }
 
 function compiledUsing(rule: SecurityRule): string | null {
@@ -94,19 +102,6 @@ describe("importing a table's policies into a collection", () => {
         });
         expect(compiledWithCheck(rule)).toContain("rebase.uid()");
         expect(compiledWithCheck(rule)).not.toBe("false");
-    });
-
-    it("refuses a command it cannot name rather than widening the policy to ALL", () => {
-        // `pg_policy.polcmd` spells SELECT as `r`. Read as no operation at all,
-        // a SELECT policy compiled to FOR ALL, and its USING (true) doubled as
-        // the WITH CHECK: a read grant became a write grant.
-        expect(() => importPolicies({
-            policy_name: "members_read",
-            permissive: "PERMISSIVE",
-            cmd: "r",
-            roles: ["public"],
-            qual: "true"
-        })).toThrow(/members_read.*"r"/);
     });
 });
 

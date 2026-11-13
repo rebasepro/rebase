@@ -59,7 +59,6 @@ import { createRebaseClient } from "@rebasepro/client";
 import { BackendCollectionRegistry } from "../collections/BackendCollectionRegistry";
 import { TableRegistry } from "../schema/table-registry";
 import { resolveDeclaredTables } from "../schema/declared-tables";
-import { compileSchemaDefs } from "../schema/load-schema";
 import { introspectedDescriptors, type IntrospectedDriverResult } from "../schema/introspected-tables";
 import type { DriverCollectionOf } from "../schema/driver-seam";
 import {
@@ -2118,7 +2117,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         try {
             const editor = await loadTableSourceEditor(config.schemaDir);
             const editorModule = await import("../api/schema-editor-routes");
-            schemaEditorRoutes = editorModule.createSchemaEditorRoutes(editor);
+            schemaEditorRoutes = editorModule.createSchemaEditorRoutes(editor, { getAdmin: () => defaultDriver.admin });
         } catch (err) {
             if (tsMorphMissing(err)) {
                 schemaEditorOff = {
@@ -2145,6 +2144,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
      * the data surface once it is built (below). See `serveTables`.
      */
     const editedTables: { serve?: (schema: EditedSchema) => void } = {};
+    /** The tables whose hooks the deployment attached at runtime (`backend.setTableHooks`): a live apply leaves those. */
+    const runtimeHookSlugs = new Set<string>();
 
     /**
      * The missing `ts-morph`, said the first time the editor is asked for —
@@ -2974,9 +2975,21 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     editedTables.serve = (schema: EditedSchema): void => {
         const collections: CollectionConfig[] = [...schema.collections];
         enforceAuthSecretExclusion(collections);
-        tableRegistry.replaceAll(schema.descriptors);
+        // The compiled tables, hooks and transforms with them: the hooks
+        // edited in source are the ones that run from now on — in the table
+        // model (storage's read-hook check, the masking refusals) and in every
+        // driver, which runs them natively. A table whose hooks the deployment
+        // attached at runtime (`backend.setTableHooks`) keeps those.
+        const attached = new Map([...runtimeHookSlugs].map(slug => [slug, tableRegistry.table(slug)?.hooks ?? {}]));
+        tableRegistry.replaceAll(schema.tables);
+        for (const [slug, hooks] of attached) tableRegistry.setHooks(slug, hooks);
+        for (const registry of hookTargets()) {
+            for (const table of schema.tables) {
+                if (!runtimeHookSlugs.has(table.descriptor.slug)) registry.setTableHooks(table.descriptor.slug, table.hooks ?? {});
+            }
+        }
         servedPolicyCollections = schema.collections;
-        servedCompiledTables = compileSchemaDefs(schema.defs, schema.defaultRls).tables;
+        servedCompiledTables = schema.tables;
         collectionRegistry.reset();
         collections.forEach(collection => collectionRegistry.register(collection));
         activeCollections = collections;
@@ -3991,6 +4004,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     };
 
     const setTableHooks = (slug: string, hooks: TableHooks): void => {
+        runtimeHookSlugs.add(slug);
         // Assignment, not a merge — attaching hooks REPLACES whatever the
         // table declared. That is the right semantics (the caller is taking
         // ownership, and the cloud relies on it) and a silent one: a

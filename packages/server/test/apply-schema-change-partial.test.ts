@@ -103,7 +103,7 @@ describe("a DDL failure after the first statement", () => {
             getRepository: () => repository(),
             previewSource: async () => ({
                 files: [],
-                schema: { defs: [], descriptors: [], collections: [{ slug: "posts", name: "posts", properties: {} }] }
+                schema: { defs: [], tables: [], descriptors: [], collections: [{ slug: "posts", name: "posts", properties: {} }] }
             }),
             writeSource: async () => []
         }));

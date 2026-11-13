@@ -274,6 +274,8 @@ describe("writing", () => {
         const edit = await editor.preview([{ op: "addColumn", table: "tags", key: "color", column: { type: { kind: "text" } } }]);
         fs.writeFileSync(path.join(fixture.dir, "tags.ts"), `${SCHEMA_FILES["tags.ts"]}// saved by the IDE\n`);
         const refused = await refusalOf(editor.write(edit));
+        // A code of its own, which the editor's "Reload" keys on.
+        expect(refused.code).toBe("SCHEMA_EDIT_STALE_FILE");
         expect(refused.message).toMatch(/changed since the edit was prepared/);
         expect(readSchemaFile(fixture.dir, "tags.ts")).toContain("saved by the IDE");
     });

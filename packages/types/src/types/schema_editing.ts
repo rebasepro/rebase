@@ -11,6 +11,7 @@
  * Nothing here executes anything. These are the nouns.
  */
 import type { CompiledTable } from "../schema/compiled";
+import type { TableDescriptor } from "../schema/descriptor";
 
 /**
  * What a change will do to a live database.
@@ -211,6 +212,53 @@ export interface SchemaEditingAdmin {
             drop?: string[];
         }
     ): Promise<SchemaReconcilePlan>;
+
+    /**
+     * The tables of one Postgres schema that no declared table maps — what
+     * "Import an existing table" offers — each described as introspection
+     * reads it, ready to adopt (`adoptTable`). Junction tables and Rebase's
+     * own are left out. Only `SELECT`s.
+     *
+     * Optional so a driver that cannot answer stays a valid admin.
+     *
+     * @param schema The Postgres schema to read.
+     * @param mapped The SQL names of the tables already declared in it.
+     */
+    describeUnmappedTables?(schema: string, mapped: ReadonlySet<string>): Promise<UnmappedTable[]>;
+}
+
+/**
+ * A table the database has and no declared table maps, as "Import an
+ * existing table" reads it.
+ *
+ * @group Schema
+ */
+export interface UnmappedTable {
+    /** The Postgres schema holding it. */
+    schema: string;
+    /** The SQL table. */
+    table: string;
+    /** Row-level security is on (`relrowsecurity`). */
+    rlsEnabled: boolean;
+    /** How many policies the database holds on it. */
+    policies: number;
+    /**
+     * The table as introspection describes it — columns as their Postgres
+     * types, defaults, keys, foreign keys to declared tables as `belongsTo`,
+     * enums, the policies as rules — which `adoptTable` writes as its
+     * `defineTable` source. Absent when it cannot be imported.
+     *
+     * Its `rls` is never weaker than what the database enforces: a table whose
+     * row-level security is off, or that has no policy, is described
+     * `"admin-only"` ({@link rlsRaised} says so).
+     */
+    descriptor?: TableDescriptor;
+    /** Set when {@link descriptor}'s `rls` is `"admin-only"` because the database protects the table with no rule: the sentence the import shows. */
+    rlsRaised?: string;
+    /** Why it cannot be imported, when it cannot (no primary key, …). */
+    unimportable?: string;
+    /** What introspection noted: what a push would not reproduce exactly, and decisions the file states. */
+    notes: string[];
 }
 
 /** A column that exists in a collection's table and that no property declares. */
