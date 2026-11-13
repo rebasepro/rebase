@@ -191,8 +191,6 @@ function transformLink(declared: boolean, transform: ColumnTransform | undefined
     return undefined;
 }
 
-const DEFAULT_STRING_LENGTH = 255;
-
 /** The column types `.defaultNow()` applies to. */
 const TEMPORAL_KINDS: ReadonlySet<ColumnType["kind"]> = new Set(["timestamptz", "date", "time"]);
 

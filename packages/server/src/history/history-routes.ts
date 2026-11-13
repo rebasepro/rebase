@@ -11,13 +11,6 @@ import { assertNoClosedFields } from "../api/rest/write-validation";
 import type { RestTables, ServedTable } from "../api/rest/served-table";
 
 /**
- * The row snapshots a history entry stores. An update entry carries the row on
- * both sides of the write, each read under the *writer's* viewer, so each is a
- * copy of every column the writer could see.
- */
-const HISTORY_SNAPSHOT_KEYS = ["values", "previous_values"] as const;
-
-/**
  * History entries as this caller may see them: every snapshot served as a read
  * of the table serves the row.
  *
@@ -29,8 +22,10 @@ const HISTORY_SNAPSHOT_KEYS = ["values", "previous_values"] as const;
  *
  *  1. the field rules, here, from the descriptor: a column the caller may not
  *     read (`.private()`, `.access({ read })`, a withheld relation and its
- *     foreign key) leaves both snapshots ({@link HISTORY_SNAPSHOT_KEYS} —
- *     stripping one leaves the same value one key over) and `changed_fields`.
+ *     foreign key) leaves both snapshots (`values` and
+ *     `previous_values`: an update entry carries the row on both sides of the
+ *     write, each read under the writer's viewer, and stripping one leaves the
+ *     same value one key over) and `changed_fields`.
  *     So does a key the table has **no column for today**: a column dropped
  *     since, or a field an old `afterRead` once recorded. What rules applied
  *     to it is not known any more, so it is withheld (fail closed);

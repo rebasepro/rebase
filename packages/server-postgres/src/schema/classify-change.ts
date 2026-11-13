@@ -530,7 +530,7 @@ function classifyFields(
                     `"${oldKey}" is now "${name}" and keeps column ${columns} — no data moves. ` +
                     `API clients reading "${oldKey}" read "${name}" from now on.`
             });
-            classifyField(before, after, name, previous.get(oldKey)!, field, nextTables, changes, facts, plans, oldKey);
+            classifyField(before, after, name, previous.get(oldKey)!, field, nextTables, changes, facts, plans);
             continue;
         }
         const old = previous.get(name);
@@ -774,9 +774,7 @@ function classifyField(
     tables: Map<string, TableDescriptor>,
     changes: SchemaChange[],
     facts: SchemaFacts | undefined,
-    plans: Plans | undefined,
-    /** The key `before` had, when the key itself was renamed. */
-    beforeName = name
+    plans: Plans | undefined
 ): void {
     const slug = table.slug;
     // A relation's column is its foreign key, which the plan comparison

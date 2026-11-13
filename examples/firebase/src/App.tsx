@@ -26,9 +26,9 @@ function App() {
         const idTokenResult = await user?.firebaseUser?.getIdTokenResult();
         const userIsAdmin = idTokenResult?.claims.admin || user?.email?.endsWith("@rebase.pro");
 
-        console.log("Allowing access to", user);
+        console.log("Allowing access to", user, userIsAdmin ? "(admin)" : "(not an admin)");
 
-        // we allow access to every user in this case
+        // we allow access to every user in this case; return `userIsAdmin` to admit admins only
         return true;
     }, []);
 
