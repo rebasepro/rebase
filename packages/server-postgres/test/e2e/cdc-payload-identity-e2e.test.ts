@@ -25,6 +25,7 @@ import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper } from "../../src/PostgresBootstrapper.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
+import { tablesFromCollections } from "../helpers/tables.js";
 
 /** The trigger function as versions up to 0.23 installed it, verbatim. */
 const LEGACY_CDC_FUNCTION_SQL = `
@@ -189,7 +190,7 @@ describe("A database instrumented by an older version (E2E)", () => {
             process.env.REALTIME_CDC = cdcMode;
             await createPostgresBootstrapper({ connectionString: url, connection: connection.db })
                 .initializeDriver!({
-                    collections: [postsCollection, tagsCollection],
+                    ...tablesFromCollections([postsCollection, tagsCollection]),
                     dataSourceKey: "(default)",
                     realtime: { subscribe: false, provision: true }
                 });

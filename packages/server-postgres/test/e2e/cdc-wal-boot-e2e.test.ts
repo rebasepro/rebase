@@ -23,6 +23,7 @@ import { createPostgresBootstrapper } from "../../src/PostgresBootstrapper.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import type { RealtimeService } from "../../src/services/realtimeService.js";
 import { CDC_PUBLICATION } from "../../src/services/cdc/wal-cdc.js";
+import { tablesFromCollections } from "../helpers/tables.js";
 
 const ordersCollection: LegacyCollectionConfig = {
     name: "Orders",
@@ -54,7 +55,7 @@ async function boot(url: string, cdc: string, realtime: { subscribe: boolean; pr
         process.env.DATABASE_DIRECT_URL = url;
         process.env.REALTIME_CDC = cdc;
         const result = await createPostgresBootstrapper({ connectionString: url, connection: connection.db })
-            .initializeDriver!({ collections: [ordersCollection], dataSourceKey: "(default)", realtime });
+            .initializeDriver!({ ...tablesFromCollections([ordersCollection]), dataSourceKey: "(default)", realtime });
         return {
             result,
             end: async () => {

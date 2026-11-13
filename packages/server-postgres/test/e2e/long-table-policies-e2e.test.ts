@@ -65,7 +65,7 @@ async function boot(url: string, beforePolicies?: (observer: pg.Client) => Promi
     try {
         const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
         const driverResult = await bootstrapper.initializeDriver!({
-            collections: [collection],
+            ...tablesFromCollections([collection]),
             dataSourceKey: "(default)",
             realtime: { subscribe: false, provision: false }
         });

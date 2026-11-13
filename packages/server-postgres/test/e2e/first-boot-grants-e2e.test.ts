@@ -80,7 +80,7 @@ describe("first boot on an empty database (E2E)", () => {
         try {
             const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
             const driverResult = await bootstrapper.initializeDriver!({
-                collections: [ordersCollection],
+                ...tablesFromCollections([ordersCollection]),
                 dataSourceKey: "(default)",
                 realtime: { subscribe: false, provision: false }
             });

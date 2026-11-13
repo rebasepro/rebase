@@ -38,6 +38,7 @@ import { createPostgresBootstrapper } from "../../src/PostgresBootstrapper.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import { ensureTables, type Queryable } from "../../src/schema/ensure-tables.js";
 import { compileSet } from "../helpers/plan-tables";
+import { tablesFromCollections } from "../helpers/tables.js";
 
 // ── The project's collections ────────────────────────────────────────────────
 //
@@ -156,7 +157,7 @@ describe("Two data sources, one routed collection (E2E)", () => {
                 connection: defaultConn.db
             });
             await defaultBootstrapper.initializeDriver!({
-                collections: ALL_COLLECTIONS,
+                ...tablesFromCollections(ALL_COLLECTIONS),
                 dataSourceKey: "(default)",
                 realtime: { subscribe: false, provision: true }
             });
@@ -167,7 +168,7 @@ describe("Two data sources, one routed collection (E2E)", () => {
                 connection: analyticsConn.db
             });
             await analyticsBootstrapper.initializeDriver!({
-                collections: ALL_COLLECTIONS,
+                ...tablesFromCollections(ALL_COLLECTIONS),
                 dataSourceKey: "analytics",
                 realtime: { subscribe: false, provision: true }
             });

@@ -158,7 +158,7 @@ describe("Two data sources, each listening on its own database (E2E)", () => {
             });
             await defaultBootstrapper.ensureTablePolicies!(tablesFromCollections([postsCollection]).tables, undefined);
             defaultSource = partsOf(await defaultBootstrapper.initializeDriver!({
-                collections: ALL_COLLECTIONS,
+                ...tablesFromCollections(ALL_COLLECTIONS),
                 dataSourceKey: "(default)",
                 realtime: { subscribe: true, provision: true }
             }));
@@ -169,7 +169,7 @@ describe("Two data sources, each listening on its own database (E2E)", () => {
             });
             await analyticsBootstrapper.ensureTablePolicies!(tablesFromCollections([eventsCollection]).tables, undefined);
             analyticsSource = partsOf(await analyticsBootstrapper.initializeDriver!({
-                collections: ALL_COLLECTIONS,
+                ...tablesFromCollections(ALL_COLLECTIONS),
                 dataSourceKey: "analytics",
                 realtime: { subscribe: true, provision: true }
             }));

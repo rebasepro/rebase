@@ -27,6 +27,7 @@ import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.
 import { createPostgresBootstrapper } from "../../src/PostgresBootstrapper.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import type { RealtimeService } from "../../src/services/realtimeService.js";
+import { tablesFromCollections } from "../helpers/tables.js";
 
 const ordersCollection: LegacyCollectionConfig = {
     name: "Orders",
@@ -66,7 +67,7 @@ describe("split roles without change capture (E2E)", () => {
             process.env.REALTIME_CDC = "off";
             const result = await createPostgresBootstrapper({ connectionString: url, connection: connection.db })
                 .initializeDriver!({
-                    collections: [ordersCollection],
+                    ...tablesFromCollections([ordersCollection]),
                     dataSourceKey: "(default)",
                     realtime
                 });

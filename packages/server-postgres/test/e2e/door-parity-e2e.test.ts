@@ -226,7 +226,7 @@ describe("door parity: one operation, one answer (E2E)", () => {
             const out = await definition.run(args, {
                 driver: driver,
                 tables: TABLES,
-                collections: COLLECTIONS,
+                driverCollection: slug => COLLECTIONS.find(collection => collection.slug === slug),
                 caller: { ...USER, scopes: ["data:read", "data:write", "data:delete"], clientId: "door-parity" }
             });
             return { ok: true, ...(tool === "delete_row" ? {} : { row: out as Record<string, unknown> }) };
