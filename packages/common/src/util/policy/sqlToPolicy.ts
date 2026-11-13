@@ -19,7 +19,7 @@ import { toSnakeCase } from "@rebasepro/utils";
  * For anything it doesn't understand, it returns a `raw` expression, which
  * the evaluator treats as "unknown" (and usually optimistic true).
  *
- * **This output also round-trips back into DDL** via `policyToPostgres` (the
+ * **This output also round-trips back into DDL** via `compilePolicyExpression` (the
  * schema/policy generators), so decomposing a clause the parser only partly
  * understands is not a cosmetic mistake — it emits invalid SQL. When in doubt,
  * prefer `raw`: it is reproduced verbatim.

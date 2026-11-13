@@ -16,7 +16,7 @@
  */
 import { describe, it, expect } from "@jest/globals";
 import { policy, rewriteLegacyRlsFunctions, usesLegacyRlsFunctions } from "@rebasepro/types";
-import { policyToPostgres } from "../src/util/policy/policyToPostgres";
+import { policyToPostgres } from "./helpers/legacy-policies";
 import { sqlToPolicy, findAnonymousGrants } from "../src/util/policy/sqlToPolicy";
 import { policyToSecurityRule } from "../src/util/policy/policyToSecurityRule";
 

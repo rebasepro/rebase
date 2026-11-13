@@ -24,7 +24,7 @@ import { getPolicyNameHash, newShapeHashInput } from "@rebasepro/utils";
 import { toSnakeCase } from "@rebasepro/utils";
 import { sqlToPolicy } from "../../src/util/policy/sqlToPolicy";
 import { findAnonymousGrants } from "../../src/util/policy/sqlToPolicy";
-import { policyToPostgres } from "../../src/util/policy/policyToPostgres";
+import { policyToPostgres } from "../helpers/legacy-policies";
 import { evaluatePolicy, TriState } from "../../src/util/policy/evaluatePolicy";
 import { policyConditionToExpression } from "../../src/util/policy/policyCondition";
 import { securityRuleToConditions } from "../../src/util/policy/securityRuleToConditions";

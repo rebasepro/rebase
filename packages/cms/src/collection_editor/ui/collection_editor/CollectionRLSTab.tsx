@@ -1,6 +1,7 @@
 
 import { getPolicyNamesForRule, getPolicyNamesForRules } from "@rebasepro/utils";
-import { getGeneratedPolicyNamesOnce, getTableName, policyToSecurityRule } from "@rebasepro/common";
+import { getTableName, policyToSecurityRule } from "@rebasepro/common";
+import { getGeneratedPolicyNamesOnce } from "@rebasepro/cms-types";
 import React, { useState, useEffect, useMemo } from "react";
 
 /**

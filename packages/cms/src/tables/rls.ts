@@ -18,7 +18,7 @@ import type {
     TableDescriptor
 } from "@rebasepro/types";
 import { isRedactedSecurityRule, policy } from "@rebasepro/types";
-import { getEffectiveSecurityRules } from "@rebasepro/common";
+import { getEffectiveSecurityRules } from "@rebasepro/cms-types";
 
 /**
  * A rule as the evaluator should read it.

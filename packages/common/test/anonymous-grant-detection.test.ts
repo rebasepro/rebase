@@ -1,4 +1,5 @@
-import { policyToPostgres, sqlToPolicy, findAnonymousGrants } from "../src/index";
+import { sqlToPolicy, findAnonymousGrants } from "../src/index";
+import { policyToPostgres } from "./helpers/legacy-policies";
 import { policy, type PolicyExpression } from "@rebasepro/types";
 
 /**

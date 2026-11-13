@@ -20,7 +20,7 @@
  * camelCase table adopted from an existing project arrives spelled this way.
  */
 import { describe, it, expect } from "@jest/globals";
-import { policyToPostgres } from "../src/util/policy/policyToPostgres";
+import { policyToPostgres } from "./helpers/legacy-policies";
 import { policy, CollectionConfig } from "@rebasepro/types";
 
 /** A collection introspected from a camelCase database, plus two keyword columns. */
@@ -94,7 +94,7 @@ describe("policyToPostgres — column identifiers", () => {
                 where: policy.compare(policy.field("docId"), "eq", policy.outerField("createdAt"))
             }),
             legacyDocs,
-            { resolveCollection: (slug) => (slug === "members" ? members : undefined) }
+            { collections: [members] }
         );
         expect(sql).toContain(`"_ex0"."docId"`);
         expect(sql).toContain(`"public"."docs"."createdAt"`);

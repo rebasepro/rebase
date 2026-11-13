@@ -27,13 +27,15 @@ import {
 } from "@rebasepro/types";
 import { getPolicyNameHash, getPolicyNamesForRule, isNewShapeRule, newShapeHashInput } from "@rebasepro/utils";
 import {
-    compileRulePolicies,
     policyConditionToExpression,
     policyShorthandColumns,
-    policyToPostgres,
     policyToSecurityRule,
     sqlToPolicy
 } from "../src/util/policy";
+import {
+    compileRulePolicies,
+    policyToPostgres
+} from "./helpers/legacy-policies";
 
 const SIGNED_IN = "(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')";
 
@@ -220,7 +222,7 @@ describe("compiling the new shapes", () => {
                 org: { name: "Org", type: "relation", relation: { kind: "belongsTo", target: () => orgs, localKey: "org_id" } }
             }
         };
-        const [p] = compileRulePolicies(projects, { operation: "select", access: "public", condition: { org: "6f1c2a52-6a0e-4f3c-9a59-2a6f1d0c7a01" } });
+        const [p] = compileRulePolicies(projects, { operation: "select", access: "public", condition: { org: "6f1c2a52-6a0e-4f3c-9a59-2a6f1d0c7a01" } }, { collections: [orgs] });
         expect(p.using).toBe("org_id = '6f1c2a52-6a0e-4f3c-9a59-2a6f1d0c7a01'");
     });
 });

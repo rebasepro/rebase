@@ -135,6 +135,8 @@ const KERNEL_SPECIFIERS = new Set(["@rebasepro/types", "@rebasepro/common"]);
 export function recordMoves(map: MoveMap): MovedSymbolRecord[] {
     const records: MovedSymbolRecord[] = [];
     for (const move of map.symbols ?? []) {
+        // A rewrite onto a test helper moves nothing a project can import.
+        if (packageOf(move.to)?.area !== "src" && !move.specifier) continue;
         const from = bareName(move.from);
         const to = move.specifier ?? bareName(move.to);
         if (from === to && !move.as) continue;

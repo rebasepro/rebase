@@ -1,7 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 import type { SecurityRule, TablePolicyInfo } from "@rebasepro/types";
 import { securityRuleToConditions } from "../src/util/policy/securityRuleToConditions";
-import { policyToPostgres } from "../src/util/policy/policyToPostgres";
+import { policyToPostgres } from "./helpers/legacy-policies";
 import { policyToSecurityRule } from "../src/util/policy/policyToSecurityRule";
 
 /**

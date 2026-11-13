@@ -6,4 +6,3 @@ export * from "./evaluatePolicy";
 export * from "./policyToSecurityRule";
 export * from "./compileRulePolicies";
 export * from "./policy-table";
-export * from "./legacy-policy-table";

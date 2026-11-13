@@ -18,28 +18,10 @@ import {
     DEFAULT_TENANT_BYPASS_ROLES,
     isTenantClaimSource,
     policy,
-    type CollectionConfig,
-    type CollectionTenantConfig,
     type PolicyExpression,
     type SecurityRule,
     type TenantDescriptor
 } from "@rebasepro/types";
-
-/**
- * The collection's tenancy declaration, or nothing.
- *
- * Read through this rather than off the object, so the one shape check —
- * `tenant` is an object carrying a `field` and a `from` — is in one place. A
- * config that is *wrong* is refused by `validateCollectionConfig` with a
- * message; this is only asking whether there is one.
- */
-export function getTenantConfig(collection: CollectionConfig | undefined): CollectionTenantConfig | undefined {
-    const tenant = (collection as { tenant?: unknown } | undefined)?.tenant as CollectionTenantConfig | undefined;
-    if (!tenant || typeof tenant !== "object") return undefined;
-    if (typeof tenant.field !== "string" || !tenant.field) return undefined;
-    if (!tenant.from || typeof tenant.from !== "object") return undefined;
-    return tenant;
-}
 
 /** The roles tenancy does not apply to, defaulted. */
 export function tenantBypassRoles(tenant: Pick<TenantDescriptor, "bypassRoles">): readonly string[] {

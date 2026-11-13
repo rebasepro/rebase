@@ -5,9 +5,11 @@ import {
     SchemaDefinitionError,
     canReadField,
     canReadWithAccess,
-    compileRulePolicies,
     compileTables
 } from "../src";
+import {
+    compileRulePolicies
+} from "./helpers/legacy-policies";
 
 /**
  * The marker `GET /api/schema/tables` serves in place of a rule whose SQL it

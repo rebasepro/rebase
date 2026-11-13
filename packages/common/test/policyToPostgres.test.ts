@@ -1,5 +1,5 @@
 import { describe, it, expect } from "@jest/globals";
-import { policyToPostgres } from "../src/util/policy/policyToPostgres";
+import { policyToPostgres } from "./helpers/legacy-policies";
 import { evaluatePolicy } from "../src/util/policy/evaluatePolicy";
 import { findAnonymousGrants, sqlToPolicy } from "../src/util/policy/sqlToPolicy";
 import { ANONYMOUS_USER_ID, policy, CollectionConfig } from "@rebasepro/types";
@@ -19,7 +19,6 @@ const teamMembers: CollectionConfig = {
     }
 };
 
-const resolveCollection = (slug: string) => [documents, teamMembers].find(c => c.slug === slug);
 
 describe("policyToPostgres — existsIn (membership)", () => {
     it("compiles a correlated EXISTS subquery scoping reads to the caller's teams", () => {
@@ -31,7 +30,7 @@ describe("policyToPostgres — existsIn (membership)", () => {
             )
         });
 
-        const sql = policyToPostgres(expr, documents, { resolveCollection });
+        const sql = policyToPostgres(expr, documents, { collections: [teamMembers] });
 
         // Subquery over the join table, aliased.
         expect(sql).toContain(`EXISTS (SELECT 1 FROM "public"."team_members" "_ex0" WHERE`);
@@ -365,7 +364,7 @@ describe("policyToPostgres — row-independent parts become initPlans", () => {
         const sql = policyToPostgres(policy.existsIn({
             table: "team_members",
             where: policy.compare(policy.field("user_id"), "eq", policy.authUid())
-        }), documents, { resolveCollection });
+        }), documents, { collections: [teamMembers] });
         expect(sql).toBe(`EXISTS (SELECT 1 FROM "public"."team_members" "_ex0" WHERE ("_ex0".user_id)::text = (SELECT rebase.uid()))`);
     });
 

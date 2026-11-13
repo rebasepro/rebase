@@ -80,6 +80,11 @@
       "to": "@rebasepro/common/migrate"
     },
     {
+      "symbol": "compileRulePolicies",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "DEFAULT_ONE_OF_TYPE",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
@@ -154,6 +159,31 @@
       "to": "@rebasepro/cms-types"
     },
     {
+      "symbol": "getEffectiveSecurityRules",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getEffectiveSecurityRulesOnce",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getGeneratedPolicyNames",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getGeneratedPolicyNamesOnce",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "getInjectedSecurityRules",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "getJunctionCollectionConfig",
       "from": "@rebasepro/common",
       "to": null,
@@ -189,6 +219,12 @@
       "symbol": "getRelationTargetPath",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms"
+    },
+    {
+      "symbol": "getTenantConfig",
+      "from": "@rebasepro/common",
+      "to": null,
+      "instead": "tenantOf(descriptor) from @rebasepro/common reads a table's tenancy."
     },
     {
       "symbol": "hasEntityId",
@@ -231,6 +267,21 @@
       "instead": "TableJunction from @rebasepro/common."
     },
     {
+      "symbol": "LegacyPolicyCompileOptions",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "LegacyRulePolicyCompileOptions",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "legacyTableResolver",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
       "symbol": "LiftNote",
       "from": "@rebasepro/common",
       "to": "@rebasepro/common/migrate"
@@ -262,6 +313,16 @@
     },
     {
       "symbol": "PolicyClauses",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "policyTableFromCollection",
+      "from": "@rebasepro/common",
+      "to": "@rebasepro/cms-types"
+    },
+    {
+      "symbol": "policyToPostgres",
       "from": "@rebasepro/common",
       "to": "@rebasepro/cms-types"
     },

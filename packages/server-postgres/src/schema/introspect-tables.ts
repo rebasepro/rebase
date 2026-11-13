@@ -39,7 +39,7 @@ import type {
     TableDescriptor,
     UnmappedTable
 } from "@rebasepro/types";
-import { classifyTable, getGeneratedPolicyNames, policyToSecurityRule } from "@rebasepro/common";
+import { classifyTable, policyToSecurityRule, tableGeneratedPolicyNames } from "@rebasepro/common";
 import { firstFreeKey, toWireKey } from "@rebasepro/utils";
 
 import {
@@ -910,7 +910,7 @@ function inverseRelations(table: string, shape: TableShape, shapes: ReadonlyMap<
 
 /** The admin baseline's policy names (`<table>_default_admin_*`). */
 const adminBaselineNames = (table: string): Set<string> =>
-    getGeneratedPolicyNames({ name: table, slug: table, table, properties: {} });
+    tableGeneratedPolicyNames({ slug: table, table, columns: {}, links: {}, idKey: "id", rules: [], auth: false });
 
 /** A `pg_policies` row as the rule `db push` compiles back into it. */
 function ruleOf(policy: PolicyRow): SecurityRule {

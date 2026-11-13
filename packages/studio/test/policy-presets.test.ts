@@ -7,7 +7,7 @@ import {
     SIGNED_IN_SQL
 } from "../src/components/RLSEditor/policy-presets";
 import { policy, RLS_ROLES_SQL, RLS_UID_SQL } from "@rebasepro/types";
-import { policyToPostgres, REBASE_USER_ROLE } from "@rebasepro/common";
+import { compilePolicyExpression, REBASE_USER_ROLE } from "@rebasepro/common";
 
 /**
  * The RLS editor's presets are applied as raw `CREATE POLICY ... TO <roles>`
@@ -41,10 +41,10 @@ describe("the RLS editor's preset policies", () => {
     it("compiles its conditions with the compiler `db push` uses", () => {
         // Not string equality against a literal written here — that is the drift
         // this is meant to prevent. These must be what the framework emits.
-        expect(SIGNED_IN_SQL).toBe(policyToPostgres(policy.authenticated()));
-        expect(IS_ADMIN_SQL).toBe(policyToPostgres(policy.rolesOverlap(["admin"])));
+        expect(SIGNED_IN_SQL).toBe(compilePolicyExpression(policy.authenticated()));
+        expect(IS_ADMIN_SQL).toBe(compilePolicyExpression(policy.rolesOverlap(["admin"])));
         expect(OWNS_ROW_SQL).toBe(
-            policyToPostgres(policy.compare(policy.authUid(), "eq", policy.field("uid")))
+            compilePolicyExpression(policy.compare(policy.authUid(), "eq", policy.field("uid")))
         );
     });
 

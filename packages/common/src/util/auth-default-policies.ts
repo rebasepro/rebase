@@ -1,8 +1,7 @@
-import { CollectionConfig, SecurityRule, SecurityOperation, PolicyExpression, policy, declaredRlsPolicyShape, DEFAULT_DATA_SOURCE_KEY } from "@rebasepro/types";
+import { SecurityRule, SecurityOperation, PolicyExpression, policy, declaredRlsPolicyShape, DEFAULT_DATA_SOURCE_KEY } from "@rebasepro/types";
 import { tenantSecurityRule } from "./tenant";
 import { getPolicyNamesForRules } from "@rebasepro/utils";
 import type { PolicyTable } from "./policy/policy-table";
-import { policyTableFromCollection } from "./policy/legacy-policy-table";
 
 /**
  * Default RLS policies injected by the schema generator.
@@ -194,13 +193,8 @@ export function tableEffectiveRules(table: PolicyTable): SecurityRule[] {
     return [...explicit, ...injected];
 }
 
-/** {@link tableEffectiveRules} for a legacy collection (the CMS's, and the server's lowered ones). */
-export function getEffectiveSecurityRules(collection: CollectionConfig): SecurityRule[] {
-    return tableEffectiveRules(policyTableFromCollection(collection));
-}
-
 /**
- * The framework defaults that {@link getEffectiveSecurityRules} would add to a
+ * The framework defaults that {@link tableEffectiveRules} would add to a
  * collection, without the author's own rules.
  *
  * These policies appear in the database under names the author never wrote, and
@@ -227,11 +221,6 @@ export function tableInjectedRules(table: PolicyTable): SecurityRule[] {
     return tableEffectiveRules(table).slice(table.rules.length);
 }
 
-/** {@link tableInjectedRules} for a legacy collection (the CMS's, and the server's lowered ones). */
-export function getInjectedSecurityRules(collection: CollectionConfig): SecurityRule[] {
-    return tableInjectedRules(policyTableFromCollection(collection));
-}
-
 /**
  * Every policy name `rebase db push` would write for a collection.
  *
@@ -253,37 +242,3 @@ export function tableGeneratedPolicyNames(table: PolicyTable): Set<string> {
     return getPolicyNamesForRules(tableEffectiveRules(table), table.table);
 }
 
-/** {@link tableGeneratedPolicyNames} for a legacy collection (the CMS's). */
-export function getGeneratedPolicyNames(collection: CollectionConfig): Set<string> {
-    return tableGeneratedPolicyNames(policyTableFromCollection(collection));
-}
-
-/**
- * {@link getEffectiveSecurityRules} for a collection that may already carry
- * the injected rules: each injected rule is added only when the collection
- * does not hold a rule of its name.
- *
- * A collection the admin panel projects from a served table
- * (`GET /api/schema/tables`) already carries its effective rules — the panel
- * reflects permissions from them — so the panel's editors, which list what
- * Postgres holds, would otherwise show every injected policy twice. For a
- * collection declared in code the answer is the same as
- * `getEffectiveSecurityRules`'s. Every injected rule is named, and Postgres
- * admits one policy per name on a table.
- *
- * For the panel only: the policy generator reads `getEffectiveSecurityRules`.
- */
-export function getEffectiveSecurityRulesOnce(collection: CollectionConfig): SecurityRule[] {
-    const declared = collection.securityRules ?? [];
-    const held = new Set(declared.flatMap(rule => (rule.name ? [rule.name] : [])));
-    const injected = getInjectedSecurityRules(collection).filter(rule => !rule.name || !held.has(rule.name));
-    return [...declared, ...injected];
-}
-
-/**
- * {@link getGeneratedPolicyNames} over {@link getEffectiveSecurityRulesOnce}:
- * for the panel, whose collections may already carry their injected rules.
- */
-export function getGeneratedPolicyNamesOnce(collection: CollectionConfig): Set<string> {
-    return getPolicyNamesForRules(getEffectiveSecurityRulesOnce(collection), policyTableFromCollection(collection).table);
-}

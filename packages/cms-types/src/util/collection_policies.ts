@@ -1,13 +1,11 @@
 /**
- * The policy compiler's view of a legacy collection.
+ * The policy compiler's view of a CMS collection.
  *
- * The backend compiles rules against compiled tables
- * (`policyTableFromDescriptor`). The CMS's collection editor, and the server
- * code that still holds the collections tables were lowered into, call the
- * collection-shaped entry points (`policyToPostgres`, `compileRulePolicies`,
- * `getEffectiveSecurityRules`, …), which build this view and compile through
- * the same code. It moves to the CMS with the view model, and is deleted with
- * the lowering.
+ * The backend compiles rules against compiled tables (`policyTableFromDescriptor`,
+ * `compileTableRulePolicies`, `tableEffectiveRules` in `@rebasepro/common`). The
+ * panel's collection editor holds a collection view model, so it calls these
+ * collection-shaped entry points, which build a {@link PolicyTable} from the
+ * collection and compile through the same code.
  *
  * @module
  */
@@ -15,13 +13,29 @@ import {
     isPostgresCollectionConfig,
     type AuthCollectionConfig,
     type CollectionConfig,
+    type CollectionTenantConfig,
+    type PolicyExpression,
     type Property,
-    type ResolvedRelation
+    type ResolvedRelation,
+    type SecurityRule
 } from "@rebasepro/types";
-import { toSnakeCase } from "@rebasepro/utils";
-import { findRelation, getTableName, resolveCollectionRelations } from "../relations";
-import { getTenantConfig } from "../tenant";
-import type { ClaimCastType, PolicyColumn, PolicyTable, ResolvePolicyTable } from "./policy-table";
+import { getPolicyNamesForRules, toSnakeCase } from "@rebasepro/utils";
+import {
+    compilePolicyExpression,
+    compileTableRulePolicies,
+    findRelation,
+    getTableName,
+    resolveCollectionRelations,
+    tableEffectiveRules,
+    tableGeneratedPolicyNames,
+    tableInjectedRules,
+    type ClaimCastType,
+    type CompiledRulePolicy,
+    type PolicyColumn,
+    type PolicyTable,
+    type ResolvePolicyTable,
+    type RulePolicySwitches
+} from "@rebasepro/common";
 
 type ResolveCollection = (slug: string) => CollectionConfig | undefined;
 
@@ -48,7 +62,7 @@ export function policyTableFromCollection(collection: CollectionConfig, resolveC
     // rule-level callers (`getEffectiveSecurityRules`) never need a column.
     let keys: { columns: Record<string, PolicyColumn>; links: Record<string, PolicyColumn> } | undefined;
     const keysOf = () => (keys ??= collectionKeys(collection, resolveCollection));
-    const tenant = getTenantConfig(collection);
+    const tenant = tenantOfCollection(collection);
     const schema = isPostgresCollectionConfig(collection) ? collection.schema || undefined : undefined;
     return {
         slug: collection.slug,
@@ -225,4 +239,90 @@ function relationTarget(
         }
     }
     return resolveTargetCollection(relationTargetSlug(prop.relation?.target), resolveCollection);
+}
+
+/**
+ * The collection's tenancy declaration, or nothing: `tenant` is an object
+ * carrying a `field` and a `from`.
+ */
+function tenantOfCollection(collection: CollectionConfig): CollectionTenantConfig | undefined {
+    const tenant = isPostgresCollectionConfig(collection) ? collection.tenant : undefined;
+    if (!tenant || typeof tenant !== "object") return undefined;
+    if (typeof tenant.field !== "string" || !tenant.field) return undefined;
+    if (!tenant.from || typeof tenant.from !== "object") return undefined;
+    return tenant;
+}
+
+/** Compile options for a collection: a resolver for `existsIn` joins and relation targets. */
+export interface LegacyPolicyCompileOptions {
+    /** Resolve a collection by slug, for `existsIn` joins and relation targets. */
+    resolveCollection?: (slug: string) => CollectionConfig | undefined;
+}
+
+/** {@link compileRulePolicies}' options: the collection resolver and the role switches. */
+export interface LegacyRulePolicyCompileOptions extends LegacyPolicyCompileOptions, RulePolicySwitches {}
+
+/** `compilePolicyExpression` against a collection, for the panel's rule editor. */
+export function policyToPostgres(expr: PolicyExpression, collection?: CollectionConfig, options?: LegacyPolicyCompileOptions): string {
+    const resolveCollection = options?.resolveCollection;
+    return compilePolicyExpression(expr, collection ? policyTableFromCollection(collection, resolveCollection) : undefined, {
+        resolveTable: legacyTableResolver(resolveCollection)
+    });
+}
+
+/** `compileTableRulePolicies` against a collection. */
+export function compileRulePolicies(
+    collection: CollectionConfig,
+    rule: SecurityRule,
+    options?: LegacyRulePolicyCompileOptions
+): CompiledRulePolicy[] {
+    const resolveCollection = options?.resolveCollection;
+    return compileTableRulePolicies(policyTableFromCollection(collection, resolveCollection), rule, {
+        resolveTable: legacyTableResolver(resolveCollection),
+        ...(options?.adminRole !== undefined ? { adminRole: options.adminRole } : {}),
+        ...(options?.adminRequestRole !== undefined ? { adminRequestRole: options.adminRequestRole } : {})
+    });
+}
+
+/** `tableEffectiveRules` for a collection: its rules plus the injected baseline. */
+export function getEffectiveSecurityRules(collection: CollectionConfig): SecurityRule[] {
+    return tableEffectiveRules(policyTableFromCollection(collection));
+}
+
+/** `tableInjectedRules` for a collection: the framework defaults alone. */
+export function getInjectedSecurityRules(collection: CollectionConfig): SecurityRule[] {
+    return tableInjectedRules(policyTableFromCollection(collection));
+}
+
+/** `tableGeneratedPolicyNames` for a collection: every policy name `db push` writes for it. */
+export function getGeneratedPolicyNames(collection: CollectionConfig): Set<string> {
+    return tableGeneratedPolicyNames(policyTableFromCollection(collection));
+}
+
+/**
+ * {@link getEffectiveSecurityRules} for a collection that may already carry
+ * the injected rules: each injected rule is added only when the collection
+ * does not hold a rule of its name.
+ *
+ * A collection the admin panel projects from a served table
+ * (`GET /api/schema/tables`) already carries its effective rules — the panel
+ * reflects permissions from them — so the panel's editors, which list what
+ * Postgres holds, would otherwise show every injected policy twice. For a
+ * collection declared in code the answer is the same as
+ * `getEffectiveSecurityRules`'s. Every injected rule is named, and Postgres
+ * admits one policy per name on a table.
+ */
+export function getEffectiveSecurityRulesOnce(collection: CollectionConfig): SecurityRule[] {
+    const declared = collection.securityRules ?? [];
+    const held = new Set(declared.flatMap(rule => (rule.name ? [rule.name] : [])));
+    const injected = getInjectedSecurityRules(collection).filter(rule => !rule.name || !held.has(rule.name));
+    return [...declared, ...injected];
+}
+
+/**
+ * {@link getGeneratedPolicyNames} over {@link getEffectiveSecurityRulesOnce}:
+ * for the panel, whose collections may already carry their injected rules.
+ */
+export function getGeneratedPolicyNamesOnce(collection: CollectionConfig): Set<string> {
+    return getPolicyNamesForRules(getEffectiveSecurityRulesOnce(collection), policyTableFromCollection(collection).table);
 }

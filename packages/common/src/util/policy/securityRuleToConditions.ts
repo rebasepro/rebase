@@ -40,7 +40,7 @@ export interface RuleConditions {
  * SQL it withheld) desugars to a raw node for both clauses — still gated by
  * its `access` and `roles` — so the evaluator answers it "unknown", exactly as
  * it answers a raw rule. No policy is ever compiled from one:
- * `compileRulePolicies` refuses it before it gets here.
+ * `compileTableRulePolicies` refuses it before it gets here.
  */
 export function securityRuleToConditions(rule: SecurityRule, site: Pick<PolicyConditionSite, "table"> = {}): RuleConditions {
     return {

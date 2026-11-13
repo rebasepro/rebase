@@ -1,4 +1,4 @@
-import { getGeneratedPolicyNames } from "../src/util/auth-default-policies";
+import { getGeneratedPolicyNames } from "./helpers/legacy-policies";
 import { getPolicyNamesForRules } from "@rebasepro/utils";
 import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 

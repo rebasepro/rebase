@@ -7,7 +7,8 @@ import { compileTables } from "../../src/schema/compile-tables";
 import { isSchemaDefinitionError, type SchemaDefinitionProblem } from "../../src/schema/errors";
 import { collectionsToTableDefs } from "../../src/migrate";
 import { printRls } from "../../src/schema/print-table";
-import { compileRulePolicies, evaluatePolicy, policyConditionToExpression, policyToPostgres, securityRuleToConditions } from "../../src/util/policy";
+import { evaluatePolicy, policyConditionToExpression, securityRuleToConditions } from "../../src/util/policy";
+import { compileRulePolicies, policyToPostgres } from "../helpers/legacy-policies";
 
 /**
  * Security review S-1 and S-6.

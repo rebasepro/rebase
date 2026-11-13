@@ -40,7 +40,7 @@ export interface PolicyEvalContext {
  * Evaluates a {@link PolicyExpression} against a user + row, using three-valued
  * (Kleene) logic so that `"unknown"` sub-results propagate soundly.
  *
- * This is the JavaScript twin of {@link policyToPostgres}: both derive from the
+ * This is the JavaScript twin of `compilePolicyExpression`: both derive from the
  * same expression, so the admin UI matches database enforcement by construction
  * for every non-raw rule.
  */

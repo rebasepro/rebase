@@ -7,7 +7,7 @@
  * are the reason this file has tests.
  */
 import { policy as policyExpr } from "@rebasepro/types";
-import { policyToPostgres, REBASE_USER_ROLE } from "@rebasepro/common";
+import { compilePolicyExpression, REBASE_USER_ROLE } from "@rebasepro/common";
 
 export type PolicyCommand = "ALL" | "SELECT" | "INSERT" | "UPDATE" | "DELETE";
 
@@ -65,15 +65,15 @@ export function roleOptionsFor(
  * Preset conditions, compiled by the framework's own policy compiler rather
  * than written out here.
  *
- * `policyToPostgres` is the function `db push` generates policies with, so a
+ * `compilePolicyExpression` is the function `db push` generates policies with, so a
  * preset cannot drift from what the framework emits — and the one that matters
  * has drifted before: `authenticated()` used to compile to a bare
  * `IS NOT NULL`, which is true for anonymous visitors, and any copy of that
  * string sitting in a preset would still be handing out the old grant today.
  */
-export const SIGNED_IN_SQL = policyToPostgres(policyExpr.authenticated());
-export const IS_ADMIN_SQL = policyToPostgres(policyExpr.rolesOverlap(["admin"]));
-export const OWNS_ROW_SQL = policyToPostgres(
+export const SIGNED_IN_SQL = compilePolicyExpression(policyExpr.authenticated());
+export const IS_ADMIN_SQL = compilePolicyExpression(policyExpr.rolesOverlap(["admin"]));
+export const OWNS_ROW_SQL = compilePolicyExpression(
     policyExpr.compare(policyExpr.authUid(), "eq", policyExpr.field("uid"))
 );
 

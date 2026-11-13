@@ -1,10 +1,9 @@
-import { declaredRlsPolicyShape, isRedactedSecurityRule, DEFAULT_DATA_SOURCE_KEY, REBASE_ADMIN_REQUEST_ROLE, REBASE_ADMIN_ROLE, RLS_IS_REQUEST_ROLE_SQL, type CollectionConfig, type PolicyExpression, type SecurityOperation, type SecurityRule } from "@rebasepro/types";
+import { declaredRlsPolicyShape, isRedactedSecurityRule, DEFAULT_DATA_SOURCE_KEY, REBASE_ADMIN_REQUEST_ROLE, REBASE_ADMIN_ROLE, RLS_IS_REQUEST_ROLE_SQL, type PolicyExpression, type SecurityOperation, type SecurityRule } from "@rebasepro/types";
 import { adminRequestPolicyName, getPolicyNamesForRule } from "@rebasepro/utils";
 import { securityRuleToConditions } from "./securityRuleToConditions";
 import { policyShorthandColumns } from "./policyCondition";
-import { compilePolicyExpression, type LegacyPolicyCompileOptions, type PolicyCompileOptions } from "./policyToPostgres";
+import { compilePolicyExpression, type PolicyCompileOptions } from "./policyToPostgres";
 import type { PolicyTable } from "./policy-table";
-import { legacyTableResolver, policyTableFromCollection } from "./legacy-policy-table";
 
 /**
  * One Postgres policy a security rule compiles to: its name and the clauses
@@ -40,7 +39,7 @@ export interface CompiledRulePolicy {
     adminRequestTarget?: true;
 }
 
-/** The switches {@link compileTableRulePolicies} and {@link compileRulePolicies} share. */
+/** The switches {@link compileTableRulePolicies} reads. */
 export interface RulePolicySwitches {
     /**
      * The caller runs admin requests as a role inside `rebase_admin` (the
@@ -64,9 +63,6 @@ export interface RulePolicySwitches {
 /** Options for {@link compileTableRulePolicies}. */
 export interface RulePolicyCompileOptions extends PolicyCompileOptions, RulePolicySwitches {}
 
-/** Options for the legacy-collection {@link compileRulePolicies}. */
-export interface LegacyRulePolicyCompileOptions extends LegacyPolicyCompileOptions, RulePolicySwitches {}
-
 /**
  * The policies one security rule compiles to — one per operation.
  *
@@ -76,7 +72,7 @@ export interface LegacyRulePolicyCompileOptions extends LegacyPolicyCompileOptio
  *
  * The desugaring (`access` / `ownerField` / `roles` / structured condition /
  * raw SQL → `PolicyExpression`) is {@link securityRuleToConditions}, and the SQL
- * is {@link policyToPostgres}. What lives here is only the shape: which
+ * is {@link compilePolicyExpression}. What lives here is only the shape: which
  * operations a rule expands to, which clauses each operation takes, and the
  * deny-all fallback for a clause that compiled to nothing.
  */
@@ -155,24 +151,6 @@ export function compileTableRulePolicies(
             using: needsUsing ? "true" : null,
             withCheck: needsWithCheck ? "true" : null
         }];
-    });
-}
-
-/**
- * {@link compileTableRulePolicies} against a legacy collection: the CMS's
- * collection editor and the server code still holding lowered collections
- * call this. Moves with the CMS view model.
- */
-export function compileRulePolicies(
-    collection: CollectionConfig,
-    rule: SecurityRule,
-    options?: LegacyRulePolicyCompileOptions
-): CompiledRulePolicy[] {
-    const resolveCollection = options?.resolveCollection;
-    return compileTableRulePolicies(policyTableFromCollection(collection, resolveCollection), rule, {
-        resolveTable: legacyTableResolver(resolveCollection),
-        ...(options?.adminRole !== undefined ? { adminRole: options.adminRole } : {}),
-        ...(options?.adminRequestRole !== undefined ? { adminRequestRole: options.adminRequestRole } : {})
     });
 }
 

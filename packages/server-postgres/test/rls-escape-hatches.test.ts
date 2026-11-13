@@ -5,7 +5,8 @@
  * Postgres (PGlite).
  */
 import { PGlite } from "@electric-sql/pglite";
-import { compileRulePolicies, getEffectiveSecurityRules, revokeInternalTableSql } from "@rebasepro/common";
+import { revokeInternalTableSql, tableEffectiveRules } from "@rebasepro/common";
+import { compileRulePolicies, getEffectiveSecurityRules, liftedPolicyTable } from "./helpers/legacy-policies";
 import { resetDeclaredResources, database } from "@rebasepro/types";
 import { type LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import {
@@ -379,8 +380,10 @@ describe("the policy settings, declared on the database", () => {
     it("drop the injected baseline everywhere with defaultPolicies: false, unless a collection says otherwise", () => {
         database({ rls: { defaultPolicies: false } });
         expect(getEffectiveSecurityRules(posts).some((r) => r.name?.endsWith("_default_admin_read"))).toBe(false);
-        const keeps = { ...posts, disableDefaultPolicies: false } as LegacyCollectionConfig;
-        expect(getEffectiveSecurityRules(keeps).some((r) => r.name?.endsWith("_default_admin_read"))).toBe(true);
+        // A table that states `defaultPolicies: true` keeps it (the lift drops a 0.30
+        // `disableDefaultPolicies: false` as redundant, so the table is stated directly).
+        const keeps = { ...liftedPolicyTable(posts).table, defaultPolicies: true };
+        expect(tableEffectiveRules(keeps).some((r) => r.name?.endsWith("_default_admin_read"))).toBe(true);
     });
 
     it("let only the request roles pass a narrowed policy on a real table", async () => {

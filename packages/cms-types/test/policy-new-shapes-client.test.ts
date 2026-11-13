@@ -13,8 +13,8 @@ import {
     type SecurityRule,
     type User
 } from "@rebasepro/types";
-import { compileRulePolicies, evaluatePolicy, securityRuleToConditions } from "@rebasepro/common";
-import { checkOperation } from "@rebasepro/cms-types";
+import { evaluatePolicy, securityRuleToConditions } from "@rebasepro/common";
+import { checkOperation, compileRulePolicies } from "@rebasepro/cms-types";
 
 const SIGNED_IN = "(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')";
 

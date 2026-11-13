@@ -1,7 +1,6 @@
-import { ANONYMOUS_USER_IDS, CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, ExistsInPolicyExpression, RLS_IS_ANONYMOUS_SQL, RLS_JWT_SQL, RLS_ROLES_SQL, RLS_UID_SQL, rewriteLegacyRlsFunctions } from "@rebasepro/types";
+import { ANONYMOUS_USER_IDS, PolicyExpression, PolicyOperand, PolicyCompareOperator, ExistsInPolicyExpression, RLS_IS_ANONYMOUS_SQL, RLS_JWT_SQL, RLS_ROLES_SQL, RLS_UID_SQL, rewriteLegacyRlsFunctions } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import type { ClaimCastType, PolicyColumn, PolicyTable, ResolvePolicyTable } from "./policy-table";
-import { legacyTableResolver, policyTableFromCollection } from "./legacy-policy-table";
 
 /**
  * Options for {@link compilePolicyExpression}.
@@ -14,15 +13,6 @@ export interface PolicyCompileOptions {
      * back to a snake_cased slug.
      */
     resolveTable?: ResolvePolicyTable;
-}
-
-/**
- * Options for the legacy-collection entry points ({@link policyToPostgres},
- * `compileRulePolicies`), which the CMS still calls with a collection.
- */
-export interface LegacyPolicyCompileOptions {
-    /** Resolve a collection by slug, for `existsIn` joins and relation targets. */
-    resolveCollection?: (slug: string) => CollectionConfig | undefined;
 }
 
 /**
@@ -90,18 +80,6 @@ export function compilePolicyExpression(expr: PolicyExpression, table?: PolicyTa
         resolveTable: options?.resolveTable,
         alias: { n: 0 },
         inInitPlan: false
-    });
-}
-
-/**
- * {@link compilePolicyExpression} against a legacy collection. The CMS's
- * collection editor still holds one; the backend compiles against a
- * {@link PolicyTable}. Moves with the CMS view model.
- */
-export function policyToPostgres(expr: PolicyExpression, collection?: CollectionConfig, options?: LegacyPolicyCompileOptions): string {
-    const resolveCollection = options?.resolveCollection;
-    return compilePolicyExpression(expr, collection ? policyTableFromCollection(collection, resolveCollection) : undefined, {
-        resolveTable: legacyTableResolver(resolveCollection)
     });
 }
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 import { CollectionConfig, SecurityRule, policy } from "@rebasepro/types";
-import { compileRulePolicies } from "../src/util/policy/compileRulePolicies";
-import { policyToPostgres } from "../src/util/policy/policyToPostgres";
+import { compileRulePolicies } from "./helpers/legacy-policies";
+import { policyToPostgres } from "./helpers/legacy-policies";
 import { sqlToPolicy } from "../src/util/policy/sqlToPolicy";
 
 const orgs: CollectionConfig = {

@@ -1,7 +1,7 @@
 import { policy } from "@rebasepro/types";
 
 import { evaluatePolicy } from "../src/util/policy/evaluatePolicy";
-import { policyToPostgres } from "../src/util/policy/policyToPostgres";
+import { policyToPostgres } from "./helpers/legacy-policies";
 
 /**
  * Two different things are called "anonymous", and conflating them is the bug.

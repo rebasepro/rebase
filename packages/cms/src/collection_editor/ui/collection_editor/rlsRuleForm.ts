@@ -15,7 +15,8 @@ import type {
     SecurityRule,
     StructuredSecurityRule
 } from "@rebasepro/types";
-import { policyConditionToExpression, policyToPostgres } from "@rebasepro/common";
+import { policyConditionToExpression } from "@rebasepro/common";
+import { policyToPostgres } from "@rebasepro/cms-types";
 
 /**
  * Which form a declared rule is written in, as the RLS tab sees it.

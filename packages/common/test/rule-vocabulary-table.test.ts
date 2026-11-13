@@ -12,7 +12,7 @@ import { policy, type PolicyExpression, type SecurityRule, type TenantSource } f
 import { type LegacyCollectionConfig } from "@rebasepro/common/migrate";
 import { getPolicyNameHash, getPolicyNamesForRule, newShapeHashInput } from "@rebasepro/utils";
 import { collectionToTableDef, liftRuleSpelling, liftTenantSourceSpelling } from "../src/migrate";
-import { policyToPostgres } from "../src/util/policy";
+import { policyToPostgres } from "./helpers/legacy-policies";
 
 /** A value from outside the type system: a legacy config, a stored rule. */
 const legacyRule = (json: string): SecurityRule => JSON.parse(json);

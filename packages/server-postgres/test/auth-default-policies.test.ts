@@ -1,6 +1,6 @@
 import { LegacyCollectionConfig, LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { generatePostgresPoliciesDdl } from "../src/schema/generate-postgres-ddl-logic";
-import { getEffectiveSecurityRules, getInjectedSecurityRules } from "@rebasepro/common";
+import { getEffectiveSecurityRules, getInjectedSecurityRules } from "./helpers/legacy-policies";
 import { compileSet } from "./helpers/plan-tables";
 
 describe("auth collection default RLS policies", () => {
@@ -105,13 +105,15 @@ describe("auth collection default RLS policies", () => {
             name: "Users",
             auth: true,
             disableDefaultPolicies: true,
+            // The table model refuses an opt-out with no rules (deny-all), so the
+            // fixture keeps the ordinary "users may edit their own row" rule.
+            securityRules: [{ name: "users_own_row", operation: "all", ownerField: "id" }],
             properties: { id: { type: "string", isId: "uuid" } }
         };
 
         const rules = getEffectiveSecurityRules(collection);
-        expect(rules).toHaveLength(1);
-        expect(rules[0].name).toBe("users_require_admin_write");
-        expect(rules[0].mode).toBe("restrictive");
+        expect(rules.map(r => r.name)).toEqual(["users_own_row", "users_require_admin_write"]);
+        expect(rules[1].mode).toBe("restrictive");
 
         // The permissive conveniences really are gone — that is what the flag
         // is for.
@@ -126,10 +128,12 @@ describe("auth collection default RLS policies", () => {
             table: "products",
             name: "Products",
             disableDefaultPolicies: true,
+            // An opt-out with no rules is refused (deny-all): one rule, and nothing injected beside it.
+            securityRules: [{ name: "products_public_read", operation: "select", access: "public" }],
             properties: { name: { type: "string" } }
         };
 
-        expect(getEffectiveSecurityRules(collection)).toHaveLength(0);
+        expect(getEffectiveSecurityRules(collection).map(r => r.name)).toEqual(["products_public_read"]);
     });
 
     it("reports the surviving gate as injected, so the DDL can name it", () => {
@@ -142,6 +146,9 @@ describe("auth collection default RLS policies", () => {
             name: "Users",
             auth: true,
             disableDefaultPolicies: true,
+            // The table model refuses an opt-out with no rules (deny-all), so the
+            // fixture keeps the ordinary "users may edit their own row" rule.
+            securityRules: [{ name: "users_own_row", operation: "all", ownerField: "id" }],
             properties: { id: { type: "string", isId: "uuid" } }
         };
 

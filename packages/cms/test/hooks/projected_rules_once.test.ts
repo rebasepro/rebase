@@ -9,12 +9,14 @@ import type { AdminCollection } from "@rebasepro/cms-types";
 import { col, defineAuthTable, defineTable } from "@rebasepro/types";
 import type { SecurityRule } from "@rebasepro/types";
 import {
-    compileTables,
+    compileTables
+} from "@rebasepro/common";
+import {
     getEffectiveSecurityRules,
     getEffectiveSecurityRulesOnce,
     getGeneratedPolicyNames,
     getGeneratedPolicyNamesOnce
-} from "@rebasepro/common";
+} from "@rebasepro/cms-types";
 import { composeCollections } from "../../src/hooks/navigation/compose_collections";
 import { registeredCollection } from "../../src/hooks/navigation/registered_collection";
 

@@ -31,7 +31,8 @@ import { drizzle } from "drizzle-orm/pglite";
 import { sql as drizzleSql } from "drizzle-orm";
 import type { PostgresPolicy } from "@rebasepro/types";
 import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
-import { compileRulePolicies, policyToSecurityRule } from "@rebasepro/common";
+import { policyToSecurityRule } from "@rebasepro/common";
+import { compileRulePolicies } from "./helpers/legacy-policies";
 
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
 import { applyAuthContext, REBASE_USER_ROLE } from "../src/security/rls-enforcement";

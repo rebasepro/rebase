@@ -29,7 +29,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { sql as drizzleSql } from "drizzle-orm";
 import { policy, type PolicyExpression } from "@rebasepro/types";
 import { type LegacyCollectionConfig } from "@rebasepro/common/migrate";
-import { policyToPostgres } from "@rebasepro/common";
+import { policyToPostgres } from "../helpers/legacy-policies";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { RLS_BOOTSTRAP_SQL } from "../../src/schema/rls-bootstrap-sql.js";
 import { applyAuthContext, ensureAppRole, REBASE_USER_ROLE } from "../../src/security/rls-enforcement.js";
@@ -68,9 +68,6 @@ const teamMembersCollection: LegacyCollectionConfig = {
     slug: "teamMembers", name: "Team members", table: "team_members", properties: {}
 };
 
-const resolveCollection = (slug: string): LegacyCollectionConfig | undefined =>
-    slug === "teamMembers" ? teamMembersCollection : undefined;
-
 /** "Documents on a team the caller belongs to." */
 const MEMBERSHIP_POLICY: PolicyExpression = policy.existsIn({
     table: "teamMembers",
@@ -103,7 +100,7 @@ async function visibleTo(uid: string): Promise<string[]> {
 }
 
 async function installPolicy(name: string, expr: PolicyExpression): Promise<string> {
-    const compiled = policyToPostgres(expr, documentsCollection, { resolveCollection });
+    const compiled = policyToPostgres(expr, documentsCollection, { collections: [teamMembersCollection] });
     await admin.query(`DROP POLICY IF EXISTS ${name} ON public.documents`);
     await admin.query(`CREATE POLICY ${name} ON public.documents FOR SELECT TO public USING (${compiled})`);
     return compiled;
