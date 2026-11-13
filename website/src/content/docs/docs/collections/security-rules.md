@@ -289,7 +289,7 @@ correlated `EXISTS` subquery.
 | `policy.authenticated()` | a signed-in caller |
 | `policy.registered()` | a signed-in caller with an account, not a guest |
 | `policy.serverContext()` | `rebase.uid() IS NULL`; see the caution below |
-| `policy.existsIn({ table, where })` | a correlated `EXISTS` over another table |
+| `policy.existsIn({ table, where })` | a correlated `EXISTS` over another table; one with no `table` is refused when the schema compiles |
 | `policy.raw(sql)` | the SQL, inserted as written |
 
 | Operand | Means |

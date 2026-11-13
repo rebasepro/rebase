@@ -168,7 +168,9 @@ returns, e.g. `{path}/cv` — and the column's `maxBytes` / `accept` then apply
 to every upload under that template, stricter than 0.30; a function with no
 static text is refused); `auth: { collection }` in a custom backend entry; a
 `collections` boot option (→ `schemaDir`); a 0.30 `existsIn({ collection })`
-(keeps its table). Repeated manual steps are printed grouped, one step listing
+(keeps its table); a `dynamicProps` builder whose returns are object literals
+(rewritten to flat keys: `{ readOnly: true }`, not `{ admin: { readOnly: true } }`).
+Repeated manual steps are printed grouped, one step listing
 every file; `--json` keeps each.
 
 ## SDK calls in your own code: `rebase migrate sdk-calls`
