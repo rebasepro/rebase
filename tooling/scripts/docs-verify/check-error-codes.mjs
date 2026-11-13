@@ -35,6 +35,13 @@
  *      is a whole family rather than one string. The family is recorded, and
  *      the page has to declare it with rows for the SQLSTATEs that actually
  *      reach it (see {@link REQUIRED_FAMILY_ROWS}).
+ *   7. A **domain error forwarded** into `ApiError`: the schema editors throw
+ *      `new TableSourceEditError("SCHEMA_EDIT_STALE_FILE", …)`, and the route
+ *      answers `new ApiError(status, error.code, …)` after an `instanceof`
+ *      (or `error is …` guard) names the class. The code is written only at
+ *      the throw, so the class is found where it is forwarded
+ *      ({@link forwardedErrorClasses}) and its first-argument codes are read
+ *      everywhere it is constructed.
  *
  * ## Why the argument scan is balanced rather than regexed
  *
@@ -282,10 +289,33 @@ function findWrappers(source) {
     return [...wrappers].map(([name, spec]) => ({ name, ...spec }));
 }
 
+/**
+ * The error classes a file forwards into `ApiError` by their `code`: the file
+ * builds `new ApiError(…, <name>.code, …)` and names the class in an
+ * `instanceof` or an `error is <Class>` guard.
+ */
+export function forwardedErrorClasses(source) {
+    const stripped = stripComments(source);
+    const forwards = [...calls(stripped, /new ApiError\s*\(/g)].some(({ args }) => /^[A-Za-z_$][\w$]*\.code$/.test(args[1] ?? ""));
+    if (!forwards) return [];
+    const names = new Set();
+    for (const m of stripped.matchAll(/\b(?:instanceof|is)\s+([A-Z][\w$]*Error)\b/g)) {
+        if (m[1] !== "ApiError" && m[1] !== "Error") names.add(m[1]);
+    }
+    return [...names];
+}
+
 /** Collect every code one source file can put in a response. */
-export function collectFromSource(source, rel, record) {
+export function collectFromSource(source, rel, record, forwarded = []) {
     const stripped = stripComments(source);
     const constants = codeConstants(stripped);
+
+    for (const name of forwarded) {
+        for (const { args } of calls(stripped, new RegExp(`new ${name}\\s*\\(`, "g"))) {
+            const found = codeFromArgument(args[0], constants);
+            if (found) record(found, undefined, rel);
+        }
+    }
 
     for (const { args } of calls(stripped, /new ApiError\s*\(/g)) {
         const found = codeFromArgument(args[1], constants);
@@ -342,14 +372,11 @@ export function collectErrorCodes(root) {
         codes.set(found.code, existing);
     };
 
-    let scanned = 0;
-    for (const dir of SOURCE_DIRS) {
-        for (const file of walk(path.join(root, dir))) {
-            scanned++;
-            const rel = path.relative(root, file);
-            collectFromSource(fs.readFileSync(file, "utf8"), rel, record);
-        }
-    }
+    const sources = SOURCE_DIRS.flatMap(dir => [...walk(path.join(root, dir))])
+        .map(file => ({ rel: path.relative(root, file), source: fs.readFileSync(file, "utf8") }));
+    const forwarded = [...new Set(sources.flatMap(({ source }) => forwardedErrorClasses(source)))];
+    for (const { rel, source } of sources) collectFromSource(source, rel, record, forwarded);
+    const scanned = sources.length;
 
     // The map that decides a status when the thrown error carries none. Every
     // key is a code the server treats as real, whether or not a call site was
@@ -423,6 +450,13 @@ export function selfTest() {
         }
 
         const dbCode = (code: string) => new ApiError(409, \`PG_\${code}\`, "constraint");
+
+        export function stale() {
+            throw new EditorRefusalError("FORWARDED_CODE", "changed on disk");
+        }
+        function answer(error: unknown) {
+            if (error instanceof EditorRefusalError) throw new ApiError(error.code === "FORWARDED_CODE" ? 409 : 400, error.code, error.message);
+        }
     `;
 
     const seen = new Map();
@@ -430,7 +464,7 @@ export function selfTest() {
     collectFromSource(fixture, "<selftest>", (found) => {
         if (found.family !== undefined) seenFamilies.add(found.family);
         else seen.set(found.code, true);
-    });
+    }, forwardedErrorClasses(fixture));
 
     const missing = [
         "WRAPPED_CODE",
@@ -438,7 +472,8 @@ export function selfTest() {
         "ARROW_WRAPPED_CODE",
         "AFTER_PARENS_CODE",
         "COMPUTED_STATUS_CODE",
-        "NAMED_CONSTANT_CODE"
+        "NAMED_CONSTANT_CODE",
+        "FORWARDED_CODE"
     ].filter(code => !seen.has(code));
     if (missing.length > 0) {
         throw new Error(
