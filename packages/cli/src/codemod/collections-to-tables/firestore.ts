@@ -155,8 +155,10 @@ export function planFirestoreCollection(plan: PlanContext, entry: CollectionEntr
         const componentImports = new Map<string, string>();
         const taken = new Set(sf.getDescendantsOfKind(plan.ast.tsm.SyntaxKind.Identifier).map(identifier => identifier.getText()));
         for (const literal of sf.getDescendantsOfKind(plan.ast.tsm.SyntaxKind.StringLiteral)) {
-            const parent = literal.getParent();
-            if (!N.isPropertyAssignment(parent) || parent.getInitializer() !== literal || !COMPONENT_KEYS.has(parent.getName())) continue;
+            // `Field: "../X"`, or `Field: "../X" as any` (how 0.30 code got a path past the component type).
+            const written: Node = N.isAsExpression(literal.getParent()) ? literal.getParentOrThrow() : literal;
+            const parent = written.getParent();
+            if (!N.isPropertyAssignment(parent) || parent.getInitializer() !== written || !COMPONENT_KEYS.has(parent.getName())) continue;
             const value = literal.getLiteralValue();
             if (!value.startsWith("./") && !value.startsWith("../")) continue;
             let local = componentImports.get(value);
@@ -168,7 +170,7 @@ export function planFirestoreCollection(plan: PlanContext, entry: CollectionEntr
                 taken.add(local);
                 componentImports.set(value, local);
             }
-            edits.push({ start: literal.getStart(), end: literal.getEnd(), text: local });
+            edits.push({ start: written.getStart(), end: written.getEnd(), text: local });
         }
         const imports = sf.getImportDeclarations();
         const insertAt = imports.length > 0 ? imports[0].getStart() : 0;

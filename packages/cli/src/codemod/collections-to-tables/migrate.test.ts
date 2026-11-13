@@ -558,6 +558,8 @@ describe("Firestore collections built by a function", () => {
         // A component named by its path (0.30) is imported by value (0.31).
         expect(visits).toContain('import StoreField from "../../StoreField";');
         expect(visits).toContain("Field: StoreField");
+        expect(visits).toContain("Preview: StoreField");
+        expect(visits.match(/import StoreField/g)).toHaveLength(1);
         const index = fs.readFileSync(path.join(dir, "frontend/src/cms/index.ts"), "utf8");
         expect(index).toContain('import visitsCollection from "./remote/visits";');
         expect(index).toContain("export const externalCollections = [visitsCollection];");

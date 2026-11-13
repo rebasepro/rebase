@@ -6,7 +6,7 @@ const visitsCollection: FirebaseCollectionConfig = {
     slug: "visits",
     engine: "firestore",
     properties: {
-        when: { name: "When", type: "date" },
+        when: { name: "When", type: "date", admin: { Preview: "../../../frontend/src/StoreField" as any } },
         store: { name: "Store", type: "reference", path: "customers", admin: { Field: "../../../frontend/src/StoreField" } }
     }
 };
