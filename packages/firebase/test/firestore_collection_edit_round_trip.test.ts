@@ -166,7 +166,8 @@ describe("an edit in the collection editor reaches the definition and comes back
 
     it("adding and removing fields", () => {
         const { composed, saved, edited } = roundTrip(after => {
-            after.properties.channel = { name: "Channel", type: "string", multiline: true, validation: { required: true } };
+            // The editor writes presentation under `admin` (`update_property_for_widget`).
+            after.properties.channel = { name: "Channel", type: "string", admin: { multiline: true }, validation: { required: true } };
             delete after.properties.receivedAt;
         });
         expect(composed.properties).toEqual({

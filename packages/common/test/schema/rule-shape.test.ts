@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { TABLE_BRAND, col, policy, type AnyTableDef, type SecurityRule } from "@rebasepro/types";
+import { TABLE_BRAND, col, isTableDef, policy, type AnyTableDef, type SecurityRule } from "@rebasepro/types";
 import { type LegacyCollectionConfig, type LegacyPostgresCollectionConfig } from "@rebasepro/common/migrate";
 import { getPolicyNameHash, isNewShapeRule } from "@rebasepro/utils";
 
@@ -59,8 +59,8 @@ const docs: LegacyCollectionConfig = {
 /** What the shorthand `{ status: value }` desugars to. */
 const statusIs = (value: string) => policyConditionToExpression({ status: value });
 
-const usingOf = (rule: SecurityRule): string | undefined => compileRulePolicies(docs, rule)[0]?.using;
-const checkOf = (rule: SecurityRule): string | undefined => compileRulePolicies(docs, rule)[0]?.withCheck;
+const usingOf = (rule: SecurityRule): string | undefined => compileRulePolicies(docs, rule)[0]?.using ?? undefined;
+const checkOf = (rule: SecurityRule): string | undefined => compileRulePolicies(docs, rule)[0]?.withCheck ?? undefined;
 
 describe("S-1: combinations the SecurityRule union excludes are refused at compile", () => {
     const cases: [string, SecurityRule][] = [
@@ -244,7 +244,7 @@ describe("the migration lift notes every legacy rule whose policy now grants som
     it("bare `access: \"authenticated\"`: granted nothing, now every signed-in caller — carried as written", () => {
         const rule: SecurityRule = { operation: "select", access: "authenticated" };
         const { tables, notCarried } = collectionsToTableDefs([legacy([rule])]);
-        expect(tables[0].config.rls).toEqual([rule]);
+        expect(isTableDef(tables[0]) ? tables[0].config.rls : undefined).toEqual([rule]);
         const notes = notCarried.filter(note => note.kind === "meaning");
         expect(notes).toHaveLength(1);
         expect(notes[0]).toMatchObject({ collection: "notes", field: "securityRules[0]", value: rule });

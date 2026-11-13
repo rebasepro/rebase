@@ -46,6 +46,7 @@ describe("the lift of the legacy capability fixtures", () => {
         for (const def of tables) {
             for (const relation of Object.values(def.config.relations ?? {})) {
                 const target = relation.target();
+                if (!isTableDef(target)) throw new Error(`a relation of "${def.name}" targets something that is not a table`);
                 expect(target).toBe(byName.get(target.name));
                 expect(relation.target()).toBe(target);
             }

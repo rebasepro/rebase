@@ -9,6 +9,7 @@ import {
 } from "@rebasepro/types";
 import {
     type LegacyCollectionConfig,
+    type LegacyEnumValues,
     type LegacyPostgresCollectionConfig,
     type LegacyPostgresProperty
 } from "@rebasepro/common/migrate";
@@ -18,6 +19,22 @@ import { isSchemaDefinitionError } from "../../src/schema/errors";
 import { createCallContext } from "../../src/data/call-context";
 
 const uuidKey: LegacyPostgresProperty = { type: "string", isId: "uuid" };
+
+/**
+ * `enum: ["a", "b"]`, a bare list of values: what a JS config wrote, and what
+ * the lift reads (`enumIds`), though the frozen model never described it.
+ */
+function bareEnum(values: string[]): LegacyEnumValues {
+    // @ts-expect-error a bare string list is outside `LegacyEnumValues`; the lift accepts it all the same
+    return values;
+}
+
+/** The table a relation of a lifted definition points at. */
+function targetOf(relation: { target: () => unknown }): AnyTableDef {
+    const target = relation.target();
+    if (!isTableDef(target)) throw new Error("the relation's target is not a table definition");
+    return target;
+}
 
 function collection(slug: string, properties: LegacyPostgresCollectionConfig["properties"], extra: Partial<LegacyPostgresCollectionConfig> = {}): LegacyPostgresCollectionConfig {
     return { slug, name: slug, table: slug, properties, ...extra };
@@ -50,7 +67,7 @@ describe("collectionToTableDef — columns", () => {
     it.each<[string, LegacyPostgresProperty, Partial<ColumnDef>]>([
         ["text", { type: "string" }, {}],
         ["required + unique", { type: "string", validation: { required: true, unique: true } }, { notNull: true, unique: true }],
-        ["enum", { type: "string", enum: ["a", "b"] }, { type: { kind: "enum", values: ["a", "b"] } }],
+        ["enum", { type: "string", enum: bareEnum(["a", "b"]) }, { type: { kind: "enum", values: ["a", "b"] } }],
         ["enum record", { type: "string", enum: { x: "X" } }, { type: { kind: "enum", values: ["x"] } }],
         ["uuid column", { type: "string", columnType: "uuid" }, { type: { kind: "uuid" } }],
         ["varchar takes its length from `validation.max`", { type: "string", columnType: "varchar", validation: { max: 80 } }, { type: { kind: "varchar", length: 80 } }],
@@ -92,7 +109,7 @@ describe("collectionToTableDef — columns", () => {
         ["map properties", { type: "map", properties: { a: { type: "string", validation: { required: true } }, d: { type: "date", autoValue: "on_update" } } },
             { type: { kind: "jsonb" }, json: { kind: "object", fields: { a: { kind: "string", required: true }, d: { kind: "date", stamp: "update" } } } }],
         ["geopoint", { type: "geopoint" }, { type: { kind: "jsonb" }, semantic: "geopoint" }],
-        ["text[]", { type: "array", of: { type: "string", enum: ["x"] } }, { type: { kind: "array", of: { kind: "text" } }, element: def({ oneOf: ["x"] }) }],
+        ["text[]", { type: "array", of: { type: "string", enum: bareEnum(["x"]) } }, { type: { kind: "array", of: { kind: "text" } }, element: def({ oneOf: ["x"] }) }],
         ["integer[]", { type: "array", of: { type: "number", validation: { integer: true } } },
             { type: { kind: "array", of: { kind: "integer" } }, element: def({ type: { kind: "integer" }, validate: { integer: true } }) }],
         ["columnType boolean[]", { type: "array", columnType: "boolean[]" }, { type: { kind: "array", of: { kind: "boolean" } }, element: def({ type: { kind: "boolean" } }) }],
@@ -352,7 +369,7 @@ describe("collectionToTableDef — relations", () => {
         const { tables } = collectionsToTableDefs([posts]);
         const relations = tables[0].config.relations ?? {};
         expect(relations.author.target()).toBe(relations.editor.target());
-        expect(relations.author.target().name).toBe("authors");
+        expect(targetOf(relations.author).name).toBe("authors");
     });
 
     it("lifts a reference to a column plus an unindexed belongsTo, and an unresolved one to a column", () => {

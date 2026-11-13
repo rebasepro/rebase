@@ -2,7 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import { col, defineTable, defineView, json, policy } from "@rebasepro/types";
 
 import { compileTables } from "../src/schema/compile-tables";
-import { checkTableOperation } from "../src/table/rls";
+import { checkTableOperation, type CheckTableOperationOptions } from "../src/table/rls";
 import { referencesUsers, userReferencePositions } from "../src/table/users";
 import { formatJsonPath } from "../src/table/json-shape";
 
@@ -82,7 +82,12 @@ describe("checkTableOperation", () => {
 
     it("lets a restrictive rule veto, and a rule be rewritten before it is judged", () => {
         expect(checkTableOperation(guardedT, viewer, "insert")).toBe(true);
-        const rawAsFalse = { mapRule: (rule: (typeof guardedT.rls.rules)[number]) => rule.mode === "restrictive" ? { ...rule, condition: policy.false() } : rule };
+        // The restrictive rule is a bare `condition`, so swapping it for `false` keeps it a valid rule.
+        const rawAsFalse: CheckTableOperationOptions = {
+            mapRule: rule => rule.mode === "restrictive" && rule.condition !== undefined
+                ? { operation: rule.operation, mode: "restrictive", condition: policy.false() }
+                : rule
+        };
         expect(checkTableOperation(guardedT, viewer, "insert", rawAsFalse)).toBe(false);
         expect(checkTableOperation(plainT, { roles: [] }, "delete")).toBe(true);
     });

@@ -667,7 +667,7 @@ describe("a printed module under the repository's eslint config", () => {
             ? parsed[0].messages
             : undefined;
         if (!messages) throw new Error(`unexpected eslint output: ${output}`);
-        const rules = messages.map((message: unknown) =>
+        const rules: string[] = messages.map((message: unknown) =>
             typeof message === "object" && message !== null && "ruleId" in message ? String(message.ruleId) : "?");
         // `object-property-newline` asks for one property per line in every
         // object; the spec writes short objects on one line (`{ min: 3, max: 200 }`),

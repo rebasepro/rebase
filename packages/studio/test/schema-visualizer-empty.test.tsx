@@ -19,6 +19,13 @@ import { failedTables, LOADING_TABLES, NO_TABLES, unavailableTables } from "./he
 
 let tables: TableDescriptorsState = LOADING_TABLES;
 
+/** The English text of a key the catalogue declares optional; a missing one fails the test by name. */
+function english(key: keyof typeof en): string {
+    const text = en[key];
+    if (text === undefined) throw new Error(`en.ts has no "${key}"`);
+    return text;
+}
+
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => ({
         t: (key: string) => en[key as keyof typeof en] ?? key,
@@ -59,7 +66,7 @@ describe("SchemaVisualizer with nothing to draw", () => {
         tables = NO_TABLES;
         render(<SchemaVisualizer/>);
 
-        expect(screen.getByText(en.studio_schema_no_tables_declared)).toBeTruthy();
+        expect(screen.getByText(english("studio_schema_no_tables_declared"))).toBeTruthy();
         expect(screen.queryByText(/Loading schema/i)).toBeNull();
     });
 
@@ -78,16 +85,16 @@ describe("SchemaVisualizer when the server serves no schema", () => {
         tables = unavailableTables("predates-route");
         render(<SchemaVisualizer/>);
 
-        expect(screen.getByText(en.studio_schema_outdated_title)).toBeTruthy();
-        expect(screen.getByText(en.studio_schema_outdated_body)).toBeTruthy();
-        expect(screen.queryByText(en.studio_schema_no_tables_declared)).toBeNull();
+        expect(screen.getByText(english("studio_schema_outdated_title"))).toBeTruthy();
+        expect(screen.getByText(english("studio_schema_outdated_body"))).toBeTruthy();
+        expect(screen.queryByText(english("studio_schema_no_tables_declared"))).toBeNull();
     });
 
     it("says so when the backend has no auth to describe its tables to", () => {
         tables = unavailableTables("no-auth");
         render(<SchemaVisualizer/>);
 
-        expect(screen.getByText(en.studio_schema_no_auth_title)).toBeTruthy();
+        expect(screen.getByText(english("studio_schema_no_auth_title"))).toBeTruthy();
     });
 
     it("reports a failed request with a retry", () => {
