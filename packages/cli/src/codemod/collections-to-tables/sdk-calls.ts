@@ -291,7 +291,7 @@ function isListedReceiver(ctx: AstContext, receiver: Node, depth = 0): boolean {
 
 /**
  * Whether an untyped receiver is the SDK by its name: a `dataAsAdmin` property
- * (whatever owns it — `(rebase as any).dataAsAdmin`), reached directly, through
+ * (whatever owns it, a receiver cast to `any` included), reached directly, through
  * a `const`, or through a `const db = () => rebase.dataAsAdmin` call; or a
  * `.data` property, when the call names its table with a string literal.
  */
