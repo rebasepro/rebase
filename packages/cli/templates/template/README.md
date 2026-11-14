@@ -53,7 +53,7 @@ built bundle). Pin a port with `rebase dev --port 3001` if you need a stable one
 Uncomment `DATABASE_URL` in `.env` and run `pnpm dev` again. Nothing else
 changes. A `DATABASE_URL` that is already set is never touched.
 
-The migration commands work on either database. Install Ptah 0.27.0 or newer and put `ptah-compat` on `PATH`. Rebase keeps its Atlas-format migration history and uses `ptah-compat` to plan and apply it. The commands use a second empty database for planning: beside your own PostgreSQL server or, on the managed database, a throwaway in-memory PGlite.
+The migration commands work on either database. `pnpm install` includes `@stokaro/ptah@0.28.0`, whose `ptah-compat` CLI plans and applies Rebase's Atlas-format migration history. The commands use a second empty database for planning: beside your own PostgreSQL server or, on the managed database, a throwaway in-memory PGlite.
 
 ```bash
 pnpm run db:push

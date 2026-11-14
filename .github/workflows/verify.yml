@@ -350,9 +350,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Ptah
-        run: pnpm add --global --ignore-scripts @stokaro/ptah@0.28.0
-
       # Three server-postgres e2e files spawn the CLI and `rebase-server` as child
       # processes, which load built dist, and the CLI suite scaffolds a project
       # that consumes every package as built output (its `assertPackagesBuilt`
@@ -438,9 +435,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Install Ptah
-        run: pnpm add --global --ignore-scripts @stokaro/ptah@0.28.0
 
       # Three server-postgres e2e files spawn the CLI and `rebase-server` as child
       # processes, which load built dist, and the CLI suite scaffolds a project
@@ -532,9 +526,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Ptah
-        run: pnpm add --global --ignore-scripts @stokaro/ptah@0.28.0
-
       # Three server-postgres e2e files spawn the CLI and `rebase-server` as child
       # processes, which load built dist, and the CLI suite scaffolds a project
       # that consumes every package as built output (its `assertPackagesBuilt`
@@ -589,9 +580,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Install Ptah
-        run: pnpm add --global --ignore-scripts @stokaro/ptah@0.28.0
 
       # Three server-postgres e2e files spawn the CLI and `rebase-server` as child
       # processes, which load built dist, and the CLI suite scaffolds a project

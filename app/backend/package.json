@@ -15,6 +15,7 @@
     "@hono/node-server": "^2.0.12",
     "@rebasepro/server": "workspace:*",
     "@rebasepro/server-postgres": "workspace:*",
+    "@stokaro/ptah": "0.28.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.5",

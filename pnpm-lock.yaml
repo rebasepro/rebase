@@ -104,6 +104,9 @@ importers:
       '@rebasepro/server-postgres':
         specifier: workspace:*
         version: link:../../packages/server-postgres
+      '@stokaro/ptah':
+        specifier: 0.28.0
+        version: 0.28.0
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -1639,6 +1642,9 @@ importers:
       '@rebasepro/utils':
         specifier: workspace:*
         version: link:../utils
+      '@stokaro/ptah':
+        specifier: 0.28.0
+        version: 0.28.0
       arg:
         specifier: ^5.0.2
         version: 5.0.2
@@ -5530,6 +5536,41 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@stokaro/ptah-darwin-arm64@0.28.0':
+    resolution: {integrity: sha512-hEPfcUl2W53Z4sDhAHzd/HTjM/tIE00bnwmIPi6m518/qU+cSf75oFyswKuhMafUVr6jUi3P99sbfFtnWWqBrA==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@stokaro/ptah-darwin-x64@0.28.0':
+    resolution: {integrity: sha512-72H5zntCkujbBfZlA8Y5WVXBLsm3N8Rt7sVOeS2KO9Eb3qF1rOMmuvHvmzw+LsIuN0O/vwhRaFSy6nzOilK5kg==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@stokaro/ptah-linux-arm64@0.28.0':
+    resolution: {integrity: sha512-X32E6CZZJdvjRwbr30vahES1ekldJVh8vS2nja9EiRLiYNiEi+613hkpE/6gMWVXkKpD9JIqS3gjMr13XDhv2g==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@stokaro/ptah-linux-x64@0.28.0':
+    resolution: {integrity: sha512-L8Fbxbc4sb5bIcD54lrp0jF4T1ZWHY0SPhqfORc9yPGBOcEMZwydLvT9FsIPKE1/AayKqWwgsq+qa2RyXq+KbQ==}
+    cpu: [x64]
+    os: [linux]
+
+  '@stokaro/ptah-win32-arm64@0.28.0':
+    resolution: {integrity: sha512-uTaDCcPVcXUWPF2QmRoln5WCsXqLR8YXdjv7huRYRUDb299DYaNOuoGD9l9oNYFcS48zsSUlN+KCeyS0VJTp6Q==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@stokaro/ptah-win32-x64@0.28.0':
+    resolution: {integrity: sha512-AAsep8+Z6hVirBBi9CrnqlnVlULqWYPFMaJmzUQF8P0Jr/Ht9p8C2511exqR8kpYHPCNJFtZvitN872UKJxwHg==}
+    cpu: [x64]
+    os: [win32]
+
+  '@stokaro/ptah@0.28.0':
+    resolution: {integrity: sha512-asob7nTIFHEGoMW9NQlr+0jw2J+lGViSXplbFT+NXU4IDF/Nn1fRwg7EX2ug+oAksYw79LQnuU26BtX/DV87mw==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   '@svgr/babel-plugin-add-jsx-attribute@8.0.0':
     resolution: {integrity: sha512-b9MIk7yhdS1pMCZM8VeNfUlSKVRhsHZNMl5O9SfaX0l0t5wjdgu4IDzGB8bpnGBBOjGST3rRFVsaaEtI4W6f7g==}
@@ -15656,6 +15697,33 @@ snapshots:
       tslib: 2.8.1
 
   '@standard-schema/spec@1.1.0': {}
+
+  '@stokaro/ptah-darwin-arm64@0.28.0':
+    optional: true
+
+  '@stokaro/ptah-darwin-x64@0.28.0':
+    optional: true
+
+  '@stokaro/ptah-linux-arm64@0.28.0':
+    optional: true
+
+  '@stokaro/ptah-linux-x64@0.28.0':
+    optional: true
+
+  '@stokaro/ptah-win32-arm64@0.28.0':
+    optional: true
+
+  '@stokaro/ptah-win32-x64@0.28.0':
+    optional: true
+
+  '@stokaro/ptah@0.28.0':
+    optionalDependencies:
+      '@stokaro/ptah-darwin-arm64': 0.28.0
+      '@stokaro/ptah-darwin-x64': 0.28.0
+      '@stokaro/ptah-linux-arm64': 0.28.0
+      '@stokaro/ptah-linux-x64': 0.28.0
+      '@stokaro/ptah-win32-arm64': 0.28.0
+      '@stokaro/ptah-win32-x64': 0.28.0
 
   '@svgr/babel-plugin-add-jsx-attribute@8.0.0(@babel/core@7.29.7)':
     dependencies:

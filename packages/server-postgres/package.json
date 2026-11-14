@@ -90,5 +90,13 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "peerDependencies": {
+    "@stokaro/ptah": "0.28.0"
+  },
+  "peerDependenciesMeta": {
+    "@stokaro/ptah": {
+      "optional": true
+    }
+  }
 }

@@ -15,7 +15,7 @@ since 22.12.
 
 ### Install Ptah
 
-`rebase db push`, `rebase db generate`, and `rebase db migrate` use `ptah-compat`, the Atlas-compatible CLI from Ptah 0.27.0 or newer. Install Ptah and put `ptah-compat` on `PATH`. Existing migrations and `atlas.sum` keep their format. Use `--ptah-output` with `db generate` to export the additional PostgreSQL objects for a native Ptah comparison.
+`rebase db push`, `rebase db generate`, and `rebase db migrate` use `ptah-compat`, the Atlas-compatible CLI included in `@stokaro/ptah@0.28.0`. Generated projects install it with their other dependencies. If you use this driver separately, add `@stokaro/ptah` to your project. Existing migrations and `atlas.sum` keep their format. Use `--ptah-output` with `db generate` to export the additional PostgreSQL objects for a native Ptah comparison.
 
 When migration history contains functions, use a separate disposable PostgreSQL server for the dev URL. Ptah refuses to replay functions in the sibling dev database on a shared server. Set `REBASE_ATLAS_DEV_URL` to a Ptah `docker://postgres/<version>/dev` URL or to a server dedicated to these migrations; set `PTAH_DEV_SERVER_DISPOSABLE=1` only for a server that is disposable as a whole.
 
