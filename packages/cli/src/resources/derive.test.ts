@@ -124,7 +124,11 @@ describe("deriving", () => {
         expect(fn?.key).toBe(`hello_${process.pid}`);
         expect(fn?.options).toMatchObject({ portable: false });
         expect(fn?.options.requires).toEqual(["imports the Node built-in \"fs\""]);
-    });
+        // The cron imports `@rebasepro/server`, which the aliases resolve to its
+        // source: evaluating it transpiles the whole server, cold — about 4s on
+        // a laptop and 17s on a CI runner sharing its cores with the
+        // generate-view typecheck, past the suite's 15s default.
+    }, 60_000);
 
     it("reports a cron that will not load as one sentence, not a Zod dump", async () => {
         // A cron whose module scope validates the environment throws a
