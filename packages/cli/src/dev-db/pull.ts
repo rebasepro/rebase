@@ -38,6 +38,7 @@ import { execa } from "execa";
 import fs from "fs";
 import type { Client } from "pg";
 
+import { stripAttverFromArchive } from "./attver";
 import { banner, connectionErrorText, hostOf } from "./connection-banner";
 import { PGLITE_EXTENSIONS } from "./constraints";
 
@@ -927,6 +928,10 @@ export async function restoreCopy(plan: PullPlan, dumpFile: string): Promise<Res
     } finally {
         await client.end().catch(() => undefined);
     }
+
+    // A pg_dump older than the source server's minor writes its `pg_attver`
+    // attribute options, which the target may refuse — see attver.ts.
+    stripAttverFromArchive(dumpFile);
 
     // stderr is shown as it arrives and kept, for the count in its summary
     // line. Not rejected: every way this ends is judged by `restoreOutcome`.
