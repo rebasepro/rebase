@@ -19,6 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { AUTH_STATE, freshSession } from "../auth";
+import { moveMouseAway } from "./admin-helpers";
 import { failOnPageErrors, getApiBaseUrl, getAuthHeaders } from "./test-helpers";
 
 test.use({ storageState: AUTH_STATE });
@@ -65,7 +66,13 @@ test.describe("Studio: a presentation change is a UI preference", () => {
 
         // The schema editor lists the tables; picking one opens its editor.
         await page.goto("/schema");
-        await page.getByRole("main").getByRole("button", { name: "Tags", exact: true }).click();
+        const tags = page.getByRole("main").getByRole("button", { name: "Tags", exact: true });
+        await expect(tags).toBeVisible({ timeout: 15000 });
+        // A fresh page's pointer rests at its top-left corner, on the drawer,
+        // which expands over the schema editor's table list: the click on
+        // Tags would land on the drawer, and the pointer then keeps it open.
+        await moveMouseAway(page);
+        await tags.click();
         // The Studio's editor names the table inline, above its tabs.
         const nameInput = page.getByRole("textbox", { name: "Collection name" });
         await expect(nameInput).toBeVisible({ timeout: 15000 });
