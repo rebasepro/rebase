@@ -70,14 +70,13 @@ RUN pnpm install --shamefully-hoist --prod
 FROM node:22-alpine AS runtime
 
 ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
+ENV PATH="$PNPM_HOME/bin:$PNPM_HOME:$PATH"
 ENV NODE_ENV=production
 
 RUN corepack enable
 
 # Security: run as non-root
-COPY tooling/scripts/install-ptah.sh /tmp/install-ptah.sh
-RUN apk add --no-cache ca-certificates curl && sh /tmp/install-ptah.sh && rm /tmp/install-ptah.sh
+RUN pnpm add --global --ignore-scripts @stokaro/ptah@0.28.0
 RUN addgroup -g 1001 rebase && adduser -u 1001 -G rebase -s /bin/sh -D rebase
 
 WORKDIR /app
