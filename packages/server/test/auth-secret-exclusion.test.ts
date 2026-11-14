@@ -1,5 +1,5 @@
 import { describe, expect, it, jest, afterEach } from "@jest/globals";
-import { compileSchema } from "@rebasepro/common";
+import { compileSchema, restrictedKeys } from "@rebasepro/common";
 import { col, defineAuthTable, defineTable } from "@rebasepro/types";
 
 import { warnOnImplicitAuthSecrets } from "../src/auth/implicit-auth-secrets";
@@ -25,7 +25,9 @@ function redeclaredUsers() {
             id: col.uuid().primaryKey(),
             email: col.text(),
             password_hash: col.text(),
-            email_verification_token: col.text()
+            email_verification_token: col.text(),
+            email_change_token: col.text(),
+            tokens_valid_after: col.timestamp({ withTimezone: true })
         },
         rls: "admin-only"
     });
@@ -39,9 +41,12 @@ describe("warnOnImplicitAuthSecrets", () => {
         const users = tables[0].descriptor;
         expect(users.columns.find(column => column.key === "password_hash")?.private).toBe(true);
         expect(users.columns.find(column => column.key === "email_verification_token")?.private).toBe(true);
+        expect(users.columns.find(column => column.key === "email_change_token")?.private).toBe(true);
         expect(users.columns.find(column => column.key === "email")?.private).toBeUndefined();
+        // A bookkeeping stamp, not a secret.
+        expect(users.columns.find(column => column.key === "tokens_valid_after")?.private).toBeUndefined();
         expect(warnOnImplicitAuthSecrets(tables)).toEqual([
-            { slug: "users", columns: ["password_hash", "email_verification_token"] }
+            { slug: "users", columns: ["password_hash", "email_verification_token", "email_change_token"] }
         ]);
     });
 
@@ -79,5 +84,26 @@ describe("warnOnImplicitAuthSecrets", () => {
 
         expect(warnOnImplicitAuthSecrets(tables)).toEqual([]);
         expect(tables[0].descriptor.columns.find(column => column.key === "password_hash")?.private).toBeUndefined();
+    });
+
+    /**
+     * Auth creates its columns on any auth table, and the runtime reads every
+     * physical column, so a secret the table never declares is closed by name:
+     * to a write and a read, for the admin too.
+     */
+    it("closes an undeclared secret to every caller, and leaves an undeclared stamp alone", () => {
+        const users = defineAuthTable("users", {
+            columns: { id: col.uuid().primaryKey(), email: col.text() },
+            rls: "admin-only"
+        });
+        const [{ descriptor }] = compileSchema([users], {});
+        for (const kind of ["read", "write"] as const) {
+            const { refused } = restrictedKeys(descriptor, { roles: ["admin"] }, kind);
+            for (const name of ["passwordHash", "password_hash", "emailVerificationToken", "email_verification_token", "emailChangeToken", "email_change_token"]) {
+                expect({ kind, name, refused: refused.has(name) }).toEqual({ kind, name, refused: true });
+            }
+            expect(refused.has("tokensValidAfter")).toBe(false);
+            expect(refused.has("pendingEmail")).toBe(false);
+        }
     });
 });

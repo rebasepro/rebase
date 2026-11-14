@@ -37,11 +37,27 @@ function isAuthCollection(collection: AuthSecretCandidate): boolean {
  * column. A redeclaration is free to rename the key — one project's copy says
  * `password_hash` where the default says `passwordHash` — and the column is the
  * same either way. The auth adapter writes these columns
- * (`builtin-auth-adapter`), and no caller may read or set them.
+ * (`builtin-auth-adapter`), and no caller may read or set them — an admin
+ * included: nobody has a use for a hash.
+ *
+ * The class, not a list of the columns someone noticed: every credential or
+ * token auth keeps on the user row, and every hash of one. The password hash;
+ * the email-verification token; the hash of a pending email-change link. A
+ * bookkeeping stamp beside them (`tokens_valid_after`, `email_change_sent_at`,
+ * `pending_email`) is not a secret and is served like any column. The other
+ * credentials auth keeps — refresh, reset and magic-link tokens, MFA secrets,
+ * recovery codes, provider identities — live in its own side tables, which no
+ * door serves.
+ *
+ * A name here is withheld whether or not the table declares the column: the
+ * runtime reads every physical column, and auth creates these on any auth
+ * table (`ensureAuthTablesExist`), so a table that never mentions
+ * `email_change_token` still has one. See `restrictedKeys` / `apiHiddenKeys`.
  */
 export const AUTH_SECRET_NAMES: ReadonlySet<string> = new Set([
     "passwordHash", "password_hash",
-    "emailVerificationToken", "email_verification_token"
+    "emailVerificationToken", "email_verification_token",
+    "emailChangeToken", "email_change_token"
 ]);
 
 /**

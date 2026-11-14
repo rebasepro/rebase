@@ -1,6 +1,7 @@
 import type { ColumnAccess, ColumnDescriptor, RelationDescriptor, TableDescriptor } from "@rebasepro/types";
 
 import { canReadWithAccess, canWriteWithAccess, type FieldViewer } from "../collections/field-access";
+import { AUTH_SECRET_NAMES } from "../collections/auth-secrets";
 
 /**
  * Column- and relation-level access over a {@link TableDescriptor}: the same
@@ -381,7 +382,8 @@ const NO_RELATED: RelatedTables = () => undefined;
  * @group Table
  */
 export function hasColumnAccessRules(table: TableDescriptor): boolean {
-    return table.columns.some(column => columnAccess(column) !== undefined)
+    return table.auth !== undefined
+        || table.columns.some(column => columnAccess(column) !== undefined)
         || table.relations.some(relation => columnAccess(relation) !== undefined);
 }
 
@@ -401,6 +403,13 @@ function namesWhere(
         if (!restricted(column)) continue;
         restrict(column.key);
         refused.add(column.column);
+    }
+    // The auth table's secrets are closed to every caller, declared or not:
+    // auth creates the columns on any auth table and the runtime reads every
+    // physical column, so the descriptor alone would serve the ones a table
+    // never mentions (see `AUTH_SECRET_NAMES`).
+    if (table.auth !== undefined) {
+        for (const name of AUTH_SECRET_NAMES) refused.add(name);
     }
     for (const relation of table.relations) {
         const read = joins ? relationJoinColumns(table, relation, joins === NO_RELATED ? undefined : joins) : [boundKeyColumn(table, relation)];

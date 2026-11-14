@@ -17,14 +17,15 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { integer, pgTable, serial, text, uuid, vector } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, serial, text, timestamp, uuid, vector } from "drizzle-orm/pg-core";
 import { col, defineAuthTable, defineTable, rel, type DataDriver, type User } from "@rebasepro/types";
-import { compileSchema } from "@rebasepro/common";
+import { apiHiddenKeys, compileSchema } from "@rebasepro/common";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { buildTableRegistry } from "../src/model/build-registry";
 import { RealtimeService } from "../src/services/realtimeService";
 import { assertReadRequestReadable } from "../src/services/read-field-access";
+import { ColumnOrigins, withoutUnreadableColumns } from "../src/security/caller-sql-columns";
 import { withFieldViewer } from "../src/services/field-viewer";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 import { testUser } from "./helpers/spg-b-fixtures";
@@ -344,3 +345,179 @@ function refusalOf(read: () => unknown): { code?: string; message: string } {
     }
     throw new Error("not refused");
 }
+
+/**
+ * Every column auth owns on the user table, through every door that serves a
+ * row, for the user themself, another signed-in user the read policy admits,
+ * and an admin.
+ *
+ * The runtime's drizzle table is the catalogue — every physical column — while
+ * the row strip reads the descriptor, so a column auth creates and the table
+ * does not declare (the scaffold declares none of the email-change columns)
+ * reached every caller the read policy admitted: `emailChangeToken`, the hash
+ * of a pending email-change link, was served to the account itself. The auth
+ * table's secrets are refused by name, declared or not; bookkeeping columns
+ * (`tokensValidAfter`, `pendingEmail`, …) are served as before.
+ *
+ * The side tables (refresh, reset and magic-link tokens, MFA factors and
+ * challenges, recovery codes, identities) are `rebase-internal` and no door
+ * serves them.
+ */
+describe("every column auth owns, through every door", () => {
+    /** The scaffold's users table (`templates/template/backend/schema/users.ts`), with the rules left out. */
+    const accounts = defineAuthTable("users", {
+        columns: {
+            id: col.uuid().primaryKey().defaultRandom(),
+            email: col.text().notNull().unique(),
+            displayName: col.text(),
+            photoURL: col.text(),
+            roles: col.text().array(),
+            passwordHash: col.text().private(),
+            emailVerified: col.boolean().default(false),
+            emailVerificationToken: col.text().private(),
+            emailVerificationSentAt: col.timestamp({ withTimezone: true }),
+            metadata: col.jsonb(),
+            createdAt: col.timestamp({ withTimezone: true }),
+            updatedAt: col.timestamp({ withTimezone: true })
+        },
+        rls: "admin-only"
+    });
+    const notes = defineTable("notes", {
+        columns: { id: col.serial().primaryKey(), body: col.text(), ownerId: col.uuid("owner_id") },
+        relations: { owner: rel.belongsTo(() => accounts, { localKey: "owner_id" }) },
+        rls: "admin-only"
+    });
+
+    /** The table as the catalogue reads it: every column `ensureAuthTablesExist` creates, undeclared ones camelCased. */
+    const accountsPg = pgTable("users", {
+        id: uuid("id").primaryKey().defaultRandom(),
+        email: text("email"),
+        displayName: text("display_name"),
+        photoURL: text("photo_url"),
+        roles: text("roles").array(),
+        passwordHash: text("password_hash"),
+        emailVerified: boolean("email_verified"),
+        emailVerificationToken: text("email_verification_token"),
+        emailVerificationSentAt: timestamp("email_verification_sent_at", { withTimezone: true }),
+        isAnonymous: boolean("is_anonymous"),
+        metadata: jsonb("metadata"),
+        tokensValidAfter: timestamp("tokens_valid_after", { withTimezone: true }),
+        disabledAt: timestamp("disabled_at", { withTimezone: true }),
+        pendingEmail: text("pending_email"),
+        emailChangeToken: text("email_change_token"),
+        emailChangeSentAt: timestamp("email_change_sent_at", { withTimezone: true }),
+        createdAt: timestamp("created_at", { withTimezone: true }),
+        updatedAt: timestamp("updated_at", { withTimezone: true })
+    });
+    const notesPg = pgTable("notes", { id: serial("id").primaryKey(), body: text("body"), ownerId: uuid("owner_id") });
+
+    /** Each auth-owned column on the user table: its key in a served row, and whether it is a secret. */
+    const COLUMNS: ReadonlyArray<[key: string, column: string, secret: boolean]> = [
+        ["email", "email", false],
+        ["displayName", "display_name", false],
+        ["photoURL", "photo_url", false],
+        ["roles", "roles", false],
+        ["passwordHash", "password_hash", true],
+        ["emailVerified", "email_verified", false],
+        ["emailVerificationToken", "email_verification_token", true],
+        ["emailVerificationSentAt", "email_verification_sent_at", false],
+        ["isAnonymous", "is_anonymous", false],
+        ["metadata", "metadata", false],
+        ["tokensValidAfter", "tokens_valid_after", false],
+        ["disabledAt", "disabled_at", false],
+        ["pendingEmail", "pending_email", false],
+        ["emailChangeToken", "email_change_token", true],
+        ["emailChangeSentAt", "email_change_sent_at", false],
+        ["createdAt", "created_at", false],
+        ["updatedAt", "updated_at", false]
+    ];
+
+    const ANN = "00000000-0000-4000-8000-00000000000a";
+    const SELF = testUser({ uid: ANN, roles: ["user"] });
+    const OTHER = testUser({ uid: "00000000-0000-4000-8000-00000000000b", roles: ["user"] });
+
+    function registry() {
+        return buildTableRegistry({
+            compiledTables: compileSchema([accounts, notes]),
+            tables: { users: accountsPg, notes: notesPg }
+        });
+    }
+
+    function accountsDriver(): PostgresBackendDriver {
+        const tables = registry();
+        const orm = pgliteNodePg(db, { schema: { users: accountsPg, notes: notesPg } });
+        return new PostgresBackendDriver(orm, new RealtimeService(orm, tables), tables);
+    }
+
+    beforeEach(async () => {
+        await db.exec(`
+            DROP TABLE users;
+            CREATE TABLE users (
+                id uuid PRIMARY KEY, email text, display_name text, photo_url text, roles text[],
+                password_hash text, email_verified boolean, email_verification_token text,
+                email_verification_sent_at timestamptz, is_anonymous boolean, metadata jsonb,
+                tokens_valid_after timestamptz, disabled_at timestamptz, pending_email text,
+                email_change_token text, email_change_sent_at timestamptz,
+                created_at timestamptz, updated_at timestamptz
+            );
+            INSERT INTO users VALUES (
+                '${ANN}', 'ann@x.io', 'Ann', 'https://x.io/a.png', '{user}',
+                'scrypt$secret', true, 'verify-secret', now(), false, '{}',
+                now(), NULL, 'new@x.io', 'change-secret', now(), now(), now()
+            );
+            CREATE TABLE notes (id serial PRIMARY KEY, body text, owner_id uuid);
+            INSERT INTO notes (body, owner_id) VALUES ('hello', '${ANN}');
+        `);
+    });
+
+    /** Each door, as the caller `user` reaches it: the row it hands back for Ann. */
+    const doors: ReadonlyArray<[door: string, read: (user: User) => Promise<Record<string, unknown>>]> = [
+        ["SDK / MCP list", async user => (await (await accountsDriver().withAuth(user)).fetchCollection({ path: "users" }))[0]],
+        ["SDK / MCP get", async user => (await (await accountsDriver().withAuth(user)).fetchOne({ path: "users", id: ANN }))!],
+        ["REST list", async user => (await (await accountsDriver().withAuth(user)).restFetchService!.fetchCollectionForRest("users", {}))[0]],
+        ["REST get", async user => (await (await accountsDriver().withAuth(user)).restFetchService!.fetchOneForRest("users", ANN))!],
+        ["REST include", async user => {
+            const [note] = await (await accountsDriver().withAuth(user)).restFetchService!.fetchCollectionForRest("notes", {}, ["owner"]);
+            return note.owner as Record<string, unknown>;
+        }],
+        ["caller SQL", async user => {
+            const result = await db.query<Record<string, unknown>>("SELECT * FROM users");
+            const rows = result.rows.map(row => ({ ...row }));
+            const fields = result.fields.map(field => ({ name: field.name }));
+            const descriptors = registry().tables().map(table => table.descriptor);
+            const [row] = await withoutUnreadableColumns(rows, fields, { roles: user.roles }, descriptors, new ColumnOrigins(), async () => []);
+            return row;
+        }]
+    ];
+
+    for (const [door, read] of doors) {
+        for (const [who, user] of [["the user themself", SELF], ["another signed-in user", OTHER], ["an admin", ADMIN]] as const) {
+            it(`${door}, as ${who}: no secret, every bookkeeping column`, async () => {
+                const row = await read(user);
+                const sqlNamed = door === "caller SQL";
+                expect(row).toBeDefined();
+                for (const [key, column, secret] of COLUMNS) {
+                    const name = sqlNamed ? column : key;
+                    if (secret) {
+                        expect({ name, served: name in row }).toEqual({ name, served: false });
+                        expect(row).not.toHaveProperty(key);
+                        expect(row).not.toHaveProperty(column);
+                    } else {
+                        expect({ name, served: name in row }).toEqual({ name, served: true });
+                    }
+                }
+            });
+        }
+    }
+
+    it("the schema the API describes names no secret", () => {
+        const descriptor = compileSchema([accounts, notes])[0].descriptor;
+        const hidden = apiHiddenKeys(descriptor);
+        for (const [key, column, secret] of COLUMNS) {
+            if (!secret) continue;
+            expect(hidden.has(key) && hidden.has(column)).toBe(true);
+        }
+        expect(descriptor.columns.filter(column => column.private !== true).map(column => column.key))
+            .not.toEqual(expect.arrayContaining(["passwordHash"]));
+    });
+});
