@@ -21,6 +21,7 @@ import {
     renderPoliciesDdl,
     renderPolicyStatements,
     renderPostgresDdl,
+    renderPtahDdl,
     renderSearchDdl,
     renderTriggersDdl,
     renderViewsDdl,
@@ -70,6 +71,12 @@ export const generatePostgresDdl = (
 ): string => renderPostgresDdl(planSchema(tables), options);
 
 /** `.rebase/sql/policies.sql` — the RLS policies. Atlas has no model for a policy. */
+/** One declarative schema for Ptah, including Rebase's sidecar objects. */
+export const generatePtahDdl = (
+    tables: readonly CompiledTable[],
+    options: { extensions?: readonly string[] } = {}
+): string => renderPtahDdl(planSchema(tables, { databaseExtensions: options.extensions }));
+
 export const generatePostgresPoliciesDdl = (tables: readonly CompiledTable[]): string =>
     renderPoliciesDdl(planSchema(tables));
 

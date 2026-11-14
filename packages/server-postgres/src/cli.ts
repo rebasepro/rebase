@@ -9,12 +9,6 @@ import { resolveTsxLoader } from "./tsx-loader";
 import { formatRelativeTime } from "@rebasepro/utils";
 import type { BranchDiff, DatabaseAdmin } from "@rebasepro/types";
 import {
-    diagnoseMissingBin,
-    detectProjectPackageManager,
-    describeBuildScriptRemedy,
-    describeDevAddCommand,
-    describeReinstallCommand,
-    workspaceMemberDir,
     resolveLocalBin,
     getTableIncludes,
     atlasDevDatabaseUrl,
@@ -52,7 +46,7 @@ import {
     isSslNotEnabled,
     reportCommandFailure
 } from "./cli-errors";
-import { forAtlas, redactConnectionPasswords } from "./utils/connection-string";
+import { forAtlas, forManagedPGlitePtah, redactConnectionPasswords } from "./utils/connection-string";
 import { ADMIN_POLICY_ROLE_SQL, dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL, REQUEST_ROLE_FUNCTION_SQL } from "./schema/rls-bootstrap-sql";
 import { declaredRlsPolicyShape, REBASE_ADMIN_ROLE } from "@rebasepro/types";
 
@@ -314,17 +308,14 @@ function latestMigrationVersion(): string | null {
 }
 
 /**
- * Take Atlas's carve-outs back out of the migration `migrate diff` just wrote.
+ * Take Rebase's search and vector carve-outs back out of the migration
+ * `migrate diff` just wrote.
  *
- * The apply path hands Atlas `--exclude` and it never sees the search or vector
- * columns. The diff path has no such flag — `atlas migrate diff` rejects
- * `--exclude` outright, and an `atlas.hcl` `env` block's `exclude` is accepted
- * and then ignored — so Atlas replays the migration directory (which builds
- * both columns, because that DDL is appended to migrations), does not find them
- * in `schema.sql`, and plans `DROP COLUMN`. Applied, that would take search and
- * the embeddings away from every database the migration reaches.
+ * The apply path excludes these columns. The migration directory contains
+ * their appended DDL while `schema.sql` omits them, so a diff can plan their
+ * removal. Keep the existing collection-specific guard on generated files.
  *
- * Returns whether a migration Atlas just wrote is still there afterwards: a
+ * Returns whether a migration Ptah just wrote is still there afterwards: a
  * file whose only content was the spurious drop is deleted, because an empty
  * migration is worse than none — it takes a slot in the revision history and
  * the caller would append the carved-out DDL and the policies to it.
@@ -332,19 +323,13 @@ function latestMigrationVersion(): string | null {
  * @returns true when a new migration survives and may be appended to.
  */
 async function stripCarvedOutFromNewestMigration(schemaDir: string): Promise<boolean> {
-    // Both carve-outs, for one reason: they are the same problem. Search is out
-    // of Atlas's sight because its free tier will not parse a function; vector
-    // is out because Atlas resolves the desired state in a dev database that
-    // can never have pgvector. What follows from that is identical — the diff
-    // replays a migration directory holding objects `schema.sql` omits, and
-    // plans a drop for every one.
+    // Rebase appends search and vector DDL to migrations but omits it from
+    // schema.sql. Keep the existing collection-specific guard against drops.
     const patterns = [
         ...await getSearchExcludes(schemaDir),
         ...await getVectorExcludes(schemaDir),
         ...await getTriggerExcludes(schemaDir)
     ];
-    if (patterns.length === 0) return true;
-
     const newest = listMigrationFiles().at(-1);
     if (!newest) return false;
     const file = path.resolve(process.cwd(), "drizzle", "migrations", newest);
@@ -352,21 +337,21 @@ async function stripCarvedOutFromNewestMigration(schemaDir: string): Promise<boo
     const result = stripCarvedOutStatements(fs.readFileSync(file, "utf-8"), patterns);
 
     // Fail CLOSED, and loudly. A drop this could not rewrite stays in the file
-    // exactly as Atlas wrote it, and the file is one somebody applies next week
+    // exactly as Ptah wrote it, and the file is one somebody applies next week
     // — by which time the column is gone and nothing connects it to this run.
     // The destructive gate does not cover it either: that reads the *push*
     // plan. So `db generate` stops here rather than hand back a migration that
     // destroys a column the developer never asked to lose.
     if (result.unhandled.length > 0) {
         outError(chalk.red(
-            `\n  ✗ ${newest} drops an object Rebase manages outside Atlas, in a form the CLI`
+            `\n  ✗ ${newest} drops an object Rebase manages outside schema.sql, in a form the CLI`
         ));
         outError(chalk.red("    could not remove:"));
         for (const statement of result.unhandled) {
             outError(chalk.gray(`       ${statement.replace(/\s+/g, " ")}`));
         }
         outError(chalk.gray(
-            "    Left as Atlas wrote it. Delete those statements by hand before running\n" +
+            "    Left as Ptah wrote it. Delete those statements by hand before running\n" +
             "    `rebase db migrate` — and please report them: rewriting this is meant to\n" +
             "    be automatic."
         ));
@@ -379,7 +364,7 @@ async function stripCarvedOutFromNewestMigration(schemaDir: string): Promise<boo
         fs.rmSync(file);
         out(chalk.gray(
             `  ✓ Dropped ${newest} — it planned nothing but the removal of columns\n` +
-            "    Atlas cannot see and Rebase applies itself."
+            "    the migration input cannot see and Rebase applies itself."
         ));
     } else {
         fs.writeFileSync(file, result.sql, "utf-8");
@@ -474,6 +459,7 @@ async function reportDestructiveMigration(migrationSql: string, migrationFile: s
  */
 const DB_FLAGS = {
     "--schema-dir": String,
+    "--ptah-output": String,
     "--allow-destructive": Boolean,
     "--refuse-destructive": Boolean,
     "--dry-run": Boolean,
@@ -543,14 +529,13 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         await schemaCommand("generate", rawArgs, { nextStep: false });
         await generatePostgresDdlCommand(rawArgs);
         out("");
-        out(chalk.gray("  Step 2/2: Generating SQL migration files with Atlas..."));
+        out(chalk.gray("  Step 2/2: Generating SQL migration files with Ptah..."));
         out("");
         const migrationName = argsList._[0] || "migration";
         const migrationsBefore = listMigrationFiles();
         await runAtlas("migrate", ["diff", migrationName, "--dir", "file://drizzle/migrations", "--to", DESIRED_STATE_URL], schemaDir);
-        // The diff cannot be told to ignore the carved-out objects the way the
-        // apply can, so the drop it plans for them is taken back out of the
-        // file it just wrote. A migration that was nothing else is deleted.
+        // Keep the existing collection-specific guard for search and vector
+        // objects appended to migration files outside schema.sql.
         let wroteNewMigration = listMigrationFiles().length > migrationsBefore.length;
         if (wroteNewMigration) {
             wroteNewMigration = await stripCarvedOutFromNewestMigration(schemaDir);
@@ -682,7 +667,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             if (!finished.ok) {
                 outError(chalk.red(`\n  ✗ Could not finish ${newestSql}: ${finished.error}`));
                 outError(chalk.gray(
-                    "    Atlas's half of a migration creates the tables; the part that failed adds their\n" +
+                    "    The generated part of a migration creates the tables; the part that failed adds their\n" +
                     "    row-level security, policies, search, vector and trigger DDL. Applied alone, it\n" +
                     "    would serve the new tables with no row filtering."
                 ));
@@ -691,7 +676,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     : `    ${newestSql} could not be removed — delete it by hand before \`rebase db migrate\`.`));
                 if (finished.rehashError) {
                     outError(chalk.gray(
-                        `    Re-hashing failed too (${finished.rehashError}); run \`atlas migrate hash\` or generate again.`
+                        `    Re-hashing failed too (${finished.rehashError}); run \`ptah-compat migrate hash\` or generate again.`
                     ));
                 }
                 process.exit(1);
@@ -705,7 +690,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             // previous migration must not be reopened: it has already run
             // wherever this project is deployed.
             out(chalk.gray(
-                "  ℹ No migration written — nothing in this change is visible to Atlas.\n" +
+                "  ℹ No migration written — nothing in this change is visible to the migration input.\n" +
                 "    Search, vector, trigger and RLS DDL are applied by `rebase db push`, and at\n" +
                 "    boot by the schema ensure. For a migration-only deployment, add\n" +
                 `    ${GENERATED_SQL_DIR}/search.sql, vector.sql, triggers.sql and\n` +
@@ -746,7 +731,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             out("");
             out(chalk.gray(dryRun
                 ? "  Step 2/3: Planning the change against the database (nothing is applied)..."
-                : "  Step 2/3: Pushing schema to database with Atlas..."));
+                : "  Step 2/3: Pushing schema to database with Ptah..."));
             out("");
             const databaseUrl = process.env.DATABASE_URL;
             // Skipped under --dry-run: this creates the auth schema and its
@@ -2034,7 +2019,7 @@ max: 3 });
                         out(chalk.gray(`  ${rows.length} branch(es) are healthy — --older-than 14 also removes old ones.`));
                     }
                     if (!includeDevDiff && plan.devDiff.length > 0) {
-                        out(chalk.gray(`  ${plan.devDiff.length} Atlas scratch database(s) left over from db push;`));
+                        out(chalk.gray(`  ${plan.devDiff.length} migration scratch database(s) left over from db push;`));
                         out(chalk.gray("  --include-dev-diff removes those too."));
                     }
                     out("");
@@ -2055,10 +2040,10 @@ max: 3 });
                 keptActive();
                 if (includeDevDiff) {
                     for (const dbName of plan.devDiff) {
-                        out(`  ${chalk.red("●")} ${chalk.bold(dbName)} ${chalk.gray("— Atlas scratch database; will be dropped")}`);
+                        out(`  ${chalk.red("●")} ${chalk.bold(dbName)} ${chalk.gray("— migration scratch database; will be dropped")}`);
                     }
                 } else if (plan.devDiff.length > 0) {
-                    out(chalk.gray(`  (${plan.devDiff.length} Atlas scratch database(s) not listed — --include-dev-diff)`));
+                    out(chalk.gray(`  (${plan.devDiff.length} migration scratch database(s) not listed — --include-dev-diff)`));
                 }
                 out("");
 
@@ -2147,7 +2132,7 @@ ${chalk.green.bold("Options")}
                                     own \`rebase dev\`.
   ${chalk.blue.bold("--json")}                            diff: print the whole diff as JSON, with up
                                     to --sample-limit rows a table (default 100).
-  ${chalk.blue.bold("--include-dev-diff")}                Also prune the Atlas scratch databases
+  ${chalk.blue.bold("--include-dev-diff")}                Also prune the migration scratch databases
                                     \`db push\` leaves behind.
   ${chalk.blue.bold("--yes, -y")}                         Skip prune's confirmation prompt. Dropping a
                                     branch is not undoable, so this is the flag
@@ -2223,66 +2208,15 @@ async function runAtlas(
         omitPlanEcho?: boolean;
     } = {}
 ): Promise<string> {
-    const atlasBin = resolveLocalBin("atlas");
-    if (!atlasBin) {
-        // Two very different causes, and the advice for one is a loop for the
-        // other — see `diagnoseMissingBin`. This used to say "Install it with:
-        // pnpm add -D @ariga/atlas" unconditionally, which is the exact command
-        // that produces the far more common of the two states.
-        outError(chalk.red("\n✗ The atlas binary is missing, so the schema cannot be applied.\n"));
-
-        // Every remedy below is package-manager specific, and this used to print
-        // pnpm's unconditionally. npm 12 blocks a dependency's install scripts
-        // the same way pnpm 10 does, so an npm reader was handed `pnpm
-        // approve-builds` and a `"pnpm"` package.json key — correct advice, for
-        // somebody else. Read the lockfile and answer the reader in front of us.
-        const manager = detectProjectPackageManager();
-
-        const diagnosis = diagnoseMissingBin("@ariga/atlas");
-
-        if (diagnosis === "bin-link-missing") {
-            // The binary IS on disk; only the `node_modules/.bin` shim that
-            // points at it is not. pnpm produces this when it writes the link
-            // before the script that creates the target ("Failed to create bin
-            // … ENOENT"), and so does a tree copied without its symlinks.
-            // Sending this reader to `approve-builds` does nothing: nothing is
-            // blocked.
-            outError(chalk.yellow("  @ariga/atlas and its binary are both on disk — only the\n"
-                + "  node_modules/.bin/atlas link that puts it on PATH is missing.\n"));
-            outError(chalk.gray(
-                "  Usually a half-written install: the link is created before the script that\n"
-                + "  downloads the target, so an interrupted or copied tree keeps the binary and\n"
-                + "  loses the shim.\n"
-            ));
-            outError("  Fix it with:\n");
-            outError(chalk.bold(`    ${describeReinstallCommand(manager)}\n`));
-        } else if (diagnosis === "build-script-blocked") {
-            outError(chalk.yellow("  @ariga/atlas IS installed — only its binary is missing.\n"));
-            outError(chalk.gray(
-                "  It downloads that binary in a `preinstall` script, and pnpm 10+ and npm 12+\n" +
-                "  do not run a dependency's scripts unless you allow it. The install still\n" +
-                "  exits 0, so the only sign is a line several screens up: pnpm's\n" +
-                "  `Ignored build scripts: @ariga/atlas`, or npm's `install scripts blocked`.\n"
-            ));
-            outError("  Fix it with either:\n");
-            for (const line of describeBuildScriptRemedy("@ariga/atlas", manager)) {
-                outError(line ? chalk.bold(line) : "");
-            }
-            outError("");
-        } else {
-            outError(chalk.gray("  It is not installed in this project.\n"));
-            const member = workspaceMemberDir();
-            outError(member === null ? "  Install it with:\n" : "  Install it with (from the project root):\n");
-            outError(chalk.bold(`    ${describeDevAddCommand("@ariga/atlas", manager, member)}\n`));
-            outError(chalk.gray(
-                "  If the install then reports blocked or ignored build scripts, allow them too —\n" +
-                "  the package carries a `preinstall` script that fetches the binary.\n"
-            ));
-        }
+    const compatBin = resolveLocalBin("ptah-compat");
+    if (!compatBin) {
+        outError(chalk.red("\n✗ The ptah-compat binary is missing, so the schema cannot be applied.\n"));
+        outError(chalk.gray("  Install Ptah 0.27.0 or newer: https://docs.ptah.run/latest/start/install/"));
         process.exit(1);
     }
 
     const env = { ...process.env as Record<string, string> };
+    env.PTAH_ATLAS_ALLOW_UNMATCHED_EXCLUDE = "1";
     try {
         const dotenv = await import("dotenv");
         const envPaths = [
@@ -2339,18 +2273,17 @@ async function runAtlas(
     // everything above still connects with the URL as configured.
     const atlasUrl = forAtlas(databaseUrl);
     const atlasDevUrl = forAtlas(devDatabaseUrl);
+    const ptahUrl = managedDatabase() ? forManagedPGlitePtah(atlasUrl) : atlasUrl;
+    const ptahDevUrl = managedDatabase() && env.REBASE_PTAH_DEV_PGLITE === "1"
+        ? forManagedPGlitePtah(atlasDevUrl)
+        : atlasDevUrl;
 
-    // Everything Atlas must keep its hands off, in one list.
-    //
-    // Gathered only for the invocations that accept the flag — which is
-    // `schema apply` and nothing else. `atlas migrate diff` and `migrate apply`
-    // both reject `--exclude` outright with `unknown flag`, and passing it there
-    // took `rebase db generate` and `rebase db migrate` down for every project
-    // declaring a `search` block; the diff keeps the same objects out of the
-    // migration afterwards instead, with `stripCarvedOutStatements`. See
-    // `acceptsExcludeFlag`.
-    const excludes: string[] = [];
-    if (schemaDir && acceptsExcludeFlag(domain, args)) {
+    // Rebase owns policies, functions, and triggers outside schema.sql. Keep
+    // them out of Ptah's apply and migration diff; migrate apply takes no flag.
+    const excludes: string[] = acceptsExcludeFlag(domain, args)
+        ? ["*[type=policy]", "*[type=function]", "*[type=trigger]"]
+        : [];
+    if (schemaDir && domain === "schema" && args.includes("apply")) {
         // Search and vector objects are Rebase's, not Atlas's: the desired state
         // does not carry them, so an apply left to itself would drop them.
         excludes.push(...await getSearchExcludes(schemaDir));
@@ -2413,7 +2346,7 @@ async function runAtlas(
     }
 
     const atlasArgs = buildAtlasArgs({
-        domain, args, url: atlasUrl, devUrl: atlasDevUrl, excludes, singleSession: managedDatabase()
+        domain, args, url: ptahUrl, devUrl: ptahDevUrl, excludes, singleSession: managedDatabase()
     });
 
     // The managed database is one session every connection shares, so the
@@ -2436,7 +2369,7 @@ async function runAtlas(
     // for known, actionable failure modes (e.g. a dependency-drop that leaves
     // the schema half-applied) after the process exits. When capturing (used
     // for the destructive-change dry-run), pipe stdout and collect it instead.
-    const subprocess = execa(atlasBin, atlasArgs, {
+    const subprocess = execa(compatBin, atlasArgs, {
         cwd: process.cwd(),
         stdout: opts.captureStdout || opts.omitPlanEcho ? "pipe" : "inherit",
         stderr: "pipe",
@@ -2467,7 +2400,7 @@ async function runAtlas(
         // its own failure, so the scratch database outlives this command —
         // unless Atlas never got as far as planning, when it holds nothing.
         await scratchDatabase.afterAtlasFailure(stderrText);
-        outError(chalk.red(`\n✗ atlas ${domain} ${args.join(" ")} failed.\n`));
+        outError(chalk.red(`\n✗ ptah-compat ${domain} ${args.join(" ")} failed.\n`));
         // Surface actionable recovery guidance for recognized failures. The
         // Atlas-shaped ones first: they read the invocation as well as the
         // text, so they can tell `migrate apply` hitting an already-provisioned
@@ -2487,7 +2420,7 @@ async function runAtlas(
             outError(hint);
         }
         if (opts.throwOnFailure) {
-            throw Object.assign(new Error(`atlas ${domain} ${args.join(" ")} failed`), { alreadyReported: true });
+            throw Object.assign(new Error(`ptah-compat ${domain} ${args.join(" ")} failed`), { alreadyReported: true });
         }
         process.exit(1);
     }
@@ -2508,6 +2441,7 @@ async function generatePostgresDdlCommand(
         {
             "--schema-dir": String,
             "--output": String,
+            "--ptah-output": String,
             "-o": "--output"
         },
         {
@@ -2525,6 +2459,7 @@ async function generatePostgresDdlCommand(
 
     const schemaDir = argsList["--schema-dir"] || DEFAULT_SCHEMA_DIR;
     const outputPath = argsList["--output"] || path.join(GENERATED_SQL_DIR, "schema.sql");
+    const ptahOutputPath = argsList["--ptah-output"];
 
     // Only for the default location: an explicit `--output` is somebody's own
     // arrangement, and its directory is theirs to manage.
@@ -2548,7 +2483,8 @@ async function generatePostgresDdlCommand(
         await generateInProcess("Postgres DDL generator", "Postgres DDL", async ({ writePostgresDdl }) => {
             await writePostgresDdl({
                 schemaDir: path.resolve(process.cwd(), schemaDir),
-                outputPath: path.resolve(process.cwd(), outputPath)
+                outputPath: path.resolve(process.cwd(), outputPath),
+                ptahOutputPath: ptahOutputPath ? path.resolve(process.cwd(), ptahOutputPath) : undefined
             });
         });
         return;
@@ -2558,7 +2494,8 @@ async function generatePostgresDdlCommand(
         ddl.bin,
         ...ddl.args,
         `--schema-dir=${schemaDir}`,
-        `--output=${outputPath}`
+        `--output=${outputPath}`,
+        ...(ptahOutputPath ? [`--ptah-output=${ptahOutputPath}`] : [])
     ];
 
     try {

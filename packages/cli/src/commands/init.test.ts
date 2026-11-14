@@ -1543,28 +1543,15 @@ runtime: "managed" });
         expect(pkg.workspaces).toEqual(["backend"]);
     });
 
-    /**
-     * `rebase db push`, `db generate` and `db migrate` run the driver with
-     * `cwd: backend/` and need the `atlas` binary from that workspace's
-     * `node_modules/.bin`. The overlay ships `"db:migrate": "rebase db migrate"`,
-     * and `init --headless --introspect` ends on "You can now run `rebase db
-     * generate`", yet its backend did not install Atlas: both failed on "The
-     * atlas binary is missing", and the printed fix failed at the project root.
-     */
     it.each([
         ["template", TEMPLATE_DIR],
         ["baas overlay", overlay]
-    ])("%s: every db script it ships can find atlas in the backend", (_name, root) => {
+    ])("%s keeps Atlas out of new projects", (_name, root) => {
         const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
         const backend = JSON.parse(fs.readFileSync(path.join(root, "backend", "package.json"), "utf8"));
-        const shipped = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "backend", "package.json"), "utf8"));
-
-        const atlasScripts = Object.values<string>(pkg.scripts ?? {}).filter(script => /\brebase db (push|generate|migrate)\b/.test(script));
-        expect(atlasScripts.length).toBeGreaterThan(0);
-        // The same range the CMS backend ships, so `rebase upgrade` and the
-        // template gates see one Atlas, not two.
-        expect(backend.dependencies?.["@ariga/atlas"]).toBe(shipped.dependencies["@ariga/atlas"]);
-        expect(pkg.pnpm?.onlyBuiltDependencies).toContain("@ariga/atlas");
+        expect(backend.dependencies?.["@ariga/atlas"]).toBeUndefined();
+        expect(pkg.pnpm?.onlyBuiltDependencies).not.toContain("@ariga/atlas");
+        expect(pkg.allowScripts?.["@ariga/atlas"]).toBeUndefined();
     });
 
     /**
@@ -1814,47 +1801,6 @@ describe("choosing a free port for the local database", () => {
     it("still accepts a genuinely free port", async () => {
         // A probe that never says yes would "fix" this by scanning forever.
         expect(await isPortAvailable(await free())).toBe(true);
-    });
-});
-
-/**
- * The scaffold has to tell *both* supported package managers that
- * `@ariga/atlas` may run its install script, in each one's own dialect.
- *
- * pnpm 10 and npm 12 both refuse a dependency's lifecycle scripts unless the
- * project allowlists them, and `@ariga/atlas` downloads its binary in
- * `preinstall`. The scaffold has carried pnpm's key for a long time; npm's
- * (`allowScripts`) was missing, so on npm the install exited 0 with a warning,
- * `node_modules/.bin/atlas` never appeared, and `db:push` — the command the
- * quickstart points at for your own Postgres — failed on a binary nobody had
- * been told was skipped.
- *
- * Asserted as a pair rather than as two separate facts, because the failure is
- * silent on whichever manager gets forgotten and is only ever noticed by
- * somebody who already has a broken project.
- */
-describe("the template's install-script allowlists", () => {
-    const templates: Array<[string, string]> = [
-        ["template", path.join(findCliRoot(), "templates", "template", "package.json")],
-        ["baas overlay", path.join(findCliRoot(), "templates", "overlays", "baas", "package.json")]
-    ];
-
-    it.each(templates)("%s allows @ariga/atlas under both pnpm and npm", (_name, pkgPath) => {
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-        expect(pkg.pnpm?.onlyBuiltDependencies).toContain("@ariga/atlas");
-        expect(pkg.allowScripts?.["@ariga/atlas"]).toBe(true);
-    });
-
-    it.each(templates)("%s grants npm no more than it needs", (_name, pkgPath) => {
-        // The npm list is deliberately the shorter one. esbuild and sharp are in
-        // pnpm's for historical reasons; under npm their binaries arrive through
-        // platform optionalDependencies with no script running at all — verified
-        // on npm 12, where the blocked `postinstall` is only a fallback and
-        // `esbuild --version` answers anyway. Allowing a script that is not
-        // needed is a grant with no benefit, so this fails if one is added here
-        // without a reason.
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-        expect(Object.keys(pkg.allowScripts ?? {})).toEqual(["@ariga/atlas"]);
     });
 });
 

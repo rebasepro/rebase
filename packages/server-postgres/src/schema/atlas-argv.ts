@@ -1,24 +1,6 @@
 /**
- * The argv `runAtlas` hands the Atlas binary, as a pure function.
- *
- * Split out of `cli.ts` because the flags an Atlas subcommand accepts are not
- * uniform and getting one wrong is fatal rather than degraded: Atlas rejects an
- * unknown flag before doing any work, so a flag on the wrong subcommand takes
- * the whole command down.
- *
- * `--exclude` is the one that bit. Of the six invocations here, exactly one
- * accepts it. The guard this replaces was `args.includes("apply") ||
- * args.includes("diff")`, and reading it as a *subcommand* test is the trap:
- * `migrate apply` passes `args.includes("apply")` just as `schema apply` does.
- * So the flag went onto three invocations, two of which reject it, and both
- * `rebase db generate` and `rebase db migrate` exited 1 with `unknown flag:
- * --exclude` for every project declaring a `search` block.
- *
- * The domain is half the identity of an Atlas subcommand, and a guard that
- * looks only at `args` cannot tell `schema apply` from `migrate apply`.
- *
- * Nothing here touches a database or the filesystem, so the whole matrix is
- * unit-tested in `atlas-argv.test.ts`.
+ * The argv `runAtlas` hands ptah-compat, as a pure function. The accepted flags
+ * differ by domain and subcommand, so the matrix is tested in atlas-argv.test.ts.
  */
 
 export interface AtlasInvocation {
@@ -45,24 +27,11 @@ export interface AtlasInvocation {
 }
 
 /**
- * Does this Atlas invocation accept `--exclude`?
- *
- * Only `atlas schema apply` does, on the pinned 1.2.3. Measured against the
- * binary: `migrate diff` and `migrate apply` both answer `unknown flag:
- * --exclude`, and neither lists it in `--help` (`migrate apply` offers
- * `--url/--dir/--format/--revisions-schema/--dry-run/--lock-name/--lock-timeout/`
- * `--skip-lock/--baseline/--to-version/--tx-mode/--exec-order/--allow-dirty`).
- * Hence `domain === "schema"` and not just the subcommand.
- *
- * The `exclude` attribute of an `atlas.hcl` `env` block is not a way round it
- * either: measured, it is accepted and then ignored on the diff path, which is
- * the silent-no-match shape that costs the most time to notice.
- *
- * So the diff keeps the carved-out objects out of the migration afterwards
- * instead, with `stripCarvedOutStatements`.
+ * Ptah 0.27.0 accepts `--exclude` for schema apply and migrate diff. Migrate
+ * apply still rejects it. The domain must participate in this decision.
  */
 export function acceptsExcludeFlag(domain: string, args: string[]): boolean {
-    return domain === "schema" && args.includes("apply");
+    return domain === "schema" && args.includes("apply") || domain === "migrate" && args.includes("diff");
 }
 
 /**
@@ -110,13 +79,6 @@ export function buildAtlasArgs(invocation: AtlasInvocation): string[] {
     } else if (domain === "migrate") {
         if (args.includes("diff")) {
             argv.push("--dev-url", devUrl);
-        } else if (args.includes("set") && singleSession) {
-            // `migrate set` takes no `--skip-lock`, and with `--revisions-schema`
-            // it opens a second client for that schema: three connections, of
-            // which beside a running `rebase dev` the third was closed
-            // unanswered (`EOF`). Bound to the schema the table is in, Atlas
-            // reads and writes it on the connection it already has — two.
-            argv.push("--url", withSearchPath(url, "rebase"));
         } else if (readsRevisions(domain, args)) {
             argv.push("--url", url, "--revisions-schema", "rebase");
             // Measured against the pinned binary: `sql/migrate: baseline and
@@ -143,26 +105,6 @@ export function buildAtlasArgs(invocation: AtlasInvocation): string[] {
     }
 
     return argv;
-}
-
-/**
- * The URL with its `search_path` set to `schema`: an Atlas URL bound to that
- * schema. Every other parameter is kept as written. A URL that does not
- * parse is returned unchanged.
- */
-function withSearchPath(url: string, schema: string): string {
-    let parsed: URL;
-    try {
-        parsed = new URL(url);
-    } catch {
-        return url;
-    }
-    const params = Array.from(parsed.searchParams.entries()).filter(([key]) => key !== "search_path");
-    params.push(["search_path", schema]);
-    // By hand, as `forLibpq` re-serializes: URLSearchParams writes a space as
-    // `+`, which libpq does not read as one.
-    parsed.search = params.map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join("&");
-    return parsed.toString();
 }
 
 /**

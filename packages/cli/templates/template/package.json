@@ -40,11 +40,7 @@
     "pnpm": {
         "onlyBuiltDependencies": [
             "esbuild",
-            "sharp",
-            "@ariga/atlas"
+            "sharp"
         ]
-    },
-    "allowScripts": {
-        "@ariga/atlas": true
     }
 }

@@ -11,11 +11,11 @@
     "start:dev": "tsx src/index.ts"
   },
   "dependencies": {
-    "@ariga/atlas": "^1.2.3",
     "@aws-sdk/client-s3": "^3.1096.0",
     "@hono/node-server": "^2.0.12",
     "@rebasepro/server": "workspace:*",
     "@rebasepro/server-postgres": "workspace:*",
+    "@stokaro/ptah": "0.28.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.5",

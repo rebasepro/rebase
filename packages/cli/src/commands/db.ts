@@ -82,7 +82,7 @@ const REMOTE_DESTINATION_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
  * And `--schema-dir`, the schema directory: a path typed from the project root
  * must not be read from `backend/`. See `utils/path-flags.ts`.
  */
-export const LOCAL_PATH_FLAGS: readonly string[] = ["--out", "--output", "-o", "--schema-dir"];
+export const LOCAL_PATH_FLAGS: readonly string[] = ["--out", "--output", "-o", "--schema-dir", "--ptah-output"];
 
 /**
  * Rewrite local path arguments so they mean what the user typed.
@@ -114,7 +114,7 @@ export function absolutizeLocalPathArgs(
      * database name into a path while leaving the real dump path unresolved.
      */
     const VALUE_FLAGS = new Set([
-        "--out", "--output", "-o", "--target-db", "--exclude-schema", "--row-security-role"
+        "--out", "--output", "-o", "--target-db", "--exclude-schema", "--row-security-role", "--ptah-output"
     ]);
     const out = [...args];
 
@@ -647,7 +647,12 @@ export async function runDriverDbCommand(
     // Started after the managed database, stopped when the driver exits —
     // whatever it exits with.
     const atlasDev = await atlasDevDatabaseFor(rawArgs, prepared.database.kind, env);
-    if (atlasDev) env[ATLAS_DEV_URL_ENV] = atlasDev.url;
+    if (atlasDev) {
+        env[ATLAS_DEV_URL_ENV] = atlasDev.url;
+        // This PGlite instance exists only for this command and may be reset.
+        env.PTAH_DEV_SERVER_DISPOSABLE = "1";
+        env.REBASE_PTAH_DEV_PGLITE = "1";
+    }
     env[INVOCATION_CWD_ENV] = process.cwd();
 
     // Resolved against the directory the developer is standing in, before the
@@ -1720,10 +1725,11 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         ]
     },
     generate: {
-        usage: "rebase db generate [--schema-dir <dir>]",
+        usage: "rebase db generate [--schema-dir <dir>] [--ptah-output <file>]",
         summary: "Generate the Drizzle schema, the Postgres DDL and a SQL migration file from the tables in backend/schema.",
         notes: [
             "A migration that drops or narrows data is named when it is written. It is still written.",
+            "--ptah-output writes a separate desired-state SQL file for Ptah schema comparison.",
             `--schema-dir <dir>: ${SCHEMA_DIR_FLAG_HELP}.`,
             DATABASE_FLAGS_HELP
         ]

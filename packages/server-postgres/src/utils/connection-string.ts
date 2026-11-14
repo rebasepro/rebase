@@ -96,6 +96,13 @@ export function forAtlas(connectionString: string): string {
     return url.toString();
 }
 
+/** Select unnamed statements only for a managed PGlite URL handed to Ptah. */
+export function forManagedPGlitePtah(connectionString: string): string {
+    if (new URL(connectionString).searchParams.has("default_query_exec_mode")) return connectionString;
+    // Do not re-encode the query: pgx treats a `+` differently from `%20`.
+    return `${connectionString}${connectionString.includes("?") ? "&" : "?"}default_query_exec_mode=describe_exec`;
+}
+
 /**
  * A connection string with its password taken out, and the password.
  *
