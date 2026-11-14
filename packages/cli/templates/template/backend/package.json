@@ -7,7 +7,6 @@
         "build": "rebase schema generate && tsc && rebase normalize-imports dist"
     },
     "dependencies": {
-        "@ariga/atlas": "^1.2.3",
         "@rebasepro/server": "workspace:*",
         "@rebasepro/server-postgres": "workspace:*",
         "@rebasepro/types": "workspace:*",

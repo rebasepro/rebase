@@ -90,13 +90,5 @@
   },
   "files": [
     "dist"
-  ],
-  "peerDependencies": {
-    "@ariga/atlas": "^1.2.3"
-  },
-  "peerDependenciesMeta": {
-    "@ariga/atlas": {
-      "optional": true
-    }
-  }
+  ]
 }

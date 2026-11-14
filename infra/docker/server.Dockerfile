@@ -56,17 +56,6 @@ COPY packages/cms-types/package.json packages/cms-types/
 COPY packages/forms/package.json packages/forms/
 COPY packages/inference/package.json packages/inference/
 
-# The runtime never runs atlas — it is imported only by server-postgres's CLI
-# (migration authoring), never on the boot path, and the image only supports
-# REBASE_MIGRATE_ON_BOOT=ensure|none, neither of which shells out to it. Its
-# install script downloads a binary from a third-party host (atlasbinaries.com),
-# so building it here adds a network dependency and a supply-chain surface for a
-# tool the runtime cannot use. Mark it explicitly not-built so pnpm skips the
-# download AND does not fail asking for a decision (pnpm 11 errors on an
-# undecided ignored build). The package still installs, it just has no binary —
-# exactly right, because nothing in the runtime invokes one.
-RUN sed -i "s#'@ariga/atlas': true#'@ariga/atlas': false#" pnpm-workspace.yaml
-
 # `@rebasepro/cms...` is not a dependency of anything the server declares: the
 # views build reaches the admin through source aliases, so its packages' own
 # dependencies (react-router, prosemirror, …) have to be installed by name.

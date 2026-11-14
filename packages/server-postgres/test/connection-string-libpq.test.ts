@@ -1,4 +1,16 @@
-import { forAtlas, forLibpq } from "../src/utils/connection-string";
+import { forAtlas, forLibpq, forManagedPGlitePtah } from "../src/utils/connection-string";
+
+describe("forManagedPGlitePtah", () => {
+    it("preserves encoded options and passwords when adding the PGlite mode", () => {
+        const url = "postgres://u@127.0.0.1:5432/db?options=-c%20search_path%3Dextra&password=two%20words";
+        expect(forManagedPGlitePtah(url)).toBe(`${url}&default_query_exec_mode=describe_exec`);
+    });
+
+    it("keeps an explicit execution mode", () => {
+        const url = "postgres://u@127.0.0.1/db?default_query_exec_mode=cache_statement";
+        expect(forManagedPGlitePtah(url)).toBe(url);
+    });
+});
 
 /**
  * `sslmode=no-verify` is a node-postgres invention. libpq does not have it and

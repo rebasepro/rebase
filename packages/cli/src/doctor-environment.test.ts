@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { readAtlasBinaryState } from "./commands/doctor";
+import { readPtahBinaryState } from "./commands/doctor";
 import {
-    checkAtlasBinary,
+    checkPtahBinary,
     checkDuplicateSlugs,
     checkEnvSanity,
     checkNodeVersion,
@@ -184,112 +184,21 @@ describe("version skew", () => {
     });
 });
 
-/**
- * The atlas binary, which `db push`, `db generate` and `db migrate` shell out
- * to and whose absence is invisible until one of them runs.
- *
- * Three states with three different remedies — and the one that used to be
- * conflated is the third: a binary on disk with no `.bin` shim is not a blocked
- * build script, and telling that reader to approve builds sends them to a
- * command that does nothing.
- */
-describe("atlas binary", () => {
-    const base = { onPath: false,
-packageInstalled: true,
-binaryOnDisk: true,
-manager: "pnpm" };
-
-    it("says nothing when the binary is on PATH", () => {
-        expect(checkAtlasBinary({ ...base, onPath: true })).toEqual([]);
+describe("Ptah binary", () => {
+    it("reports the missing native CLI with an install guide", () => {
+        const [finding] = checkPtahBinary(false);
+        expect(finding.check).toBe("ptah");
+        expect(finding.message).toContain("db generate");
+        expect(finding.fix).toContain("docs.ptah.run");
+        expect(checkPtahBinary(true)).toEqual([]);
     });
 
-    it("says nothing when the state could not be read", () => {
-        expect(checkAtlasBinary(null)).toEqual([]);
-    });
-
-    it("tells an uninstalled project to install it, in its own package manager", () => {
-        const [finding] = checkAtlasBinary({ ...base, packageInstalled: false, manager: "npm" });
-        expect(finding.check).toBe("atlas");
-        expect(finding.message).toContain("not installed");
-        expect(finding.fix).toContain("npm add -D @ariga/atlas");
-    });
-
-    it("installs into the workspace member that runs it, where the root would refuse", () => {
-        // A scaffold is a workspace and `@ariga/atlas` belongs to `backend/`:
-        // `pnpm add -D` at its root fails with ERR_PNPM_ADDING_TO_ROOT.
-        const fixes = (["pnpm", "npm", "yarn", "bun"] as const).map(manager =>
-            checkAtlasBinary({ ...base, packageInstalled: false, manager, workspaceDir: "backend" })[0].fix);
-        expect(fixes).toEqual([
-            expect.stringContaining("pnpm --dir backend add -D @ariga/atlas"),
-            expect.stringContaining("npm install -D @ariga/atlas -w backend"),
-            expect.stringContaining("yarn --cwd backend add -D @ariga/atlas"),
-            expect.stringContaining("bun add -d @ariga/atlas --cwd backend")
-        ]);
-    });
-
-    it("names the allowlist when the package is there and the binary is not", () => {
-        const [finding] = checkAtlasBinary({ ...base, binaryOnDisk: false });
-        expect(finding.message).toContain("preinstall");
-        expect(finding.fix).toContain("allowBuilds");
-    });
-
-    it("asks for a re-install, not an allowlist, when only the .bin link is gone", () => {
-        const [finding] = checkAtlasBinary(base);
-        expect(finding.message).toContain("node_modules/.bin/atlas");
-        expect(finding.fix).toContain("--force");
-        // The wrong advice for this state, and the advice it used to give.
-        expect(finding.fix).not.toContain("approve-builds");
-    });
-});
-
-describe("atlas binary state on disk", () => {
-    /**
-     * pnpm's isolated layout — the scaffold default. `@ariga/atlas` is a
-     * dependency of the driver, not of the project, so it lives under `.pnpm/`
-     * and only the driver's own `node_modules` links to it. A directory walk
-     * from the project root never sees it; the doctor once told a healthy
-     * scaffold the binary was missing.
-     */
-    it("finds the binary through the driver under pnpm's isolated layout", () => {
-        const root = fs.mkdtempSync(path.join(os.tmpdir(), "doctor-atlas-"));
-        const store = path.join(root, "node_modules", ".pnpm");
-        const atlasDir = path.join(store, "@ariga+atlas@1.0.0", "node_modules", "@ariga", "atlas");
-        const driverDir = path.join(store, "@rebasepro+server-postgres@0.0.0", "node_modules", "@rebasepro", "server-postgres");
-        fs.mkdirSync(atlasDir, { recursive: true });
-        fs.mkdirSync(driverDir, { recursive: true });
-        fs.writeFileSync(path.join(atlasDir, "package.json"), JSON.stringify({ name: "@ariga/atlas", version: "1.0.0", bin: { atlas: "atlas" } }));
-        fs.writeFileSync(path.join(atlasDir, "atlas"), "#!/bin/sh\n");
-        fs.writeFileSync(path.join(driverDir, "package.json"), JSON.stringify({ name: "@rebasepro/server-postgres", version: "0.0.0", dependencies: { "@ariga/atlas": "1.0.0" } }));
-        // The driver's own node_modules links to atlas, and carries the .bin shim.
-        fs.mkdirSync(path.join(driverDir, "node_modules", "@ariga"), { recursive: true });
-        fs.symlinkSync(atlasDir, path.join(driverDir, "node_modules", "@ariga", "atlas"));
-        fs.mkdirSync(path.join(driverDir, "node_modules", ".bin"), { recursive: true });
-        fs.writeFileSync(path.join(driverDir, "node_modules", ".bin", "atlas"), "#!/bin/sh\n");
-        // The project depends on the driver only.
-        fs.mkdirSync(path.join(root, "node_modules", "@rebasepro"), { recursive: true });
-        fs.symlinkSync(driverDir, path.join(root, "node_modules", "@rebasepro", "server-postgres"));
-        fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "app", dependencies: { "@rebasepro/server-postgres": "0.0.0" } }));
-
-        const state = readAtlasBinaryState(root);
-        expect(state).not.toBeNull();
-        expect(state!.packageInstalled).toBe(true);
-        expect(state!.binaryOnDisk).toBe(true);
-        expect(state!.onPath).toBe(true);
+    it("finds a project-local Ptah binary", () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), "doctor-ptah-"));
+        const bin = path.join(root, "node_modules", ".bin");
+        fs.mkdirSync(bin, { recursive: true });
+        fs.writeFileSync(path.join(bin, process.platform === "win32" ? "ptah-compat.exe" : "ptah-compat"), "binary");
+        expect(readPtahBinaryState(root)).toBe(true);
         fs.rmSync(root, { recursive: true, force: true });
-    });
-
-    it("names backend/ as where the install goes in a workspace, and nothing at a plain project", () => {
-        const scaffold = fs.mkdtempSync(path.join(os.tmpdir(), "doctor-atlas-ws-"));
-        fs.writeFileSync(path.join(scaffold, "package.json"), JSON.stringify({ name: "app" }));
-        fs.writeFileSync(path.join(scaffold, "pnpm-workspace.yaml"), "packages:\n  - backend\n");
-        fs.mkdirSync(path.join(scaffold, "backend"));
-        fs.writeFileSync(path.join(scaffold, "backend", "package.json"), JSON.stringify({ name: "backend" }));
-        const plain = fs.mkdtempSync(path.join(os.tmpdir(), "doctor-atlas-plain-"));
-        fs.writeFileSync(path.join(plain, "package.json"), JSON.stringify({ name: "app" }));
-
-        expect(readAtlasBinaryState(scaffold)?.workspaceDir).toBe("backend");
-        expect(readAtlasBinaryState(plain)?.workspaceDir).toBeNull();
-        fs.rmSync(scaffold, { recursive: true, force: true });
-        fs.rmSync(plain, { recursive: true, force: true });
     });
 });

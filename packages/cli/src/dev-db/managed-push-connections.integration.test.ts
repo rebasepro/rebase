@@ -114,6 +114,8 @@ describe("db push against the managed database while a dev server holds connecti
             DATABASE_URL: url,
             REBASE_DEV_DATABASE_KIND: "managed",
             REBASE_ATLAS_DEV_URL: dev.url,
+            PTAH_DEV_SERVER_DISPOSABLE: "1",
+            REBASE_PTAH_DEV_PGLITE: "1",
             // The code under test, not the last build.
             TSX_TSCONFIG_PATH: path.join(REPO, "tsconfig.typecheck.json")
         }
@@ -145,8 +147,10 @@ describe("db push against the managed database while a dev server holds connecti
     it("on a database boot provisioned, names --baseline, leaves no revisions table outside `rebase`, and the baseline applies", async () => {
         // What boot does with the collection before any migration exists.
         await held[0].query("CREATE TABLE public.tasks (id uuid PRIMARY KEY, title varchar NOT NULL)");
-        const generated = await driver("db", "generate", "--schema-dir", schemaDir(), "init");
-        expect(generated.exitCode).toBe(0);
+        const ptahOutput = path.join(project, "backend", ".rebase", "sql", "ptah.sql");
+        const generated = await driver("db", "generate", "--schema-dir", schemaDir(), "--ptah-output", ptahOutput, "init");
+        expect(generated.exitCode, generated.all).toBe(0);
+        expect(fs.readFileSync(ptahOutput, "utf8")).toContain("CREATE TABLE");
         const version = newestVersion();
         expect(version).not.toBe("");
         // What it ends on says so before `db migrate` has to.
@@ -173,13 +177,13 @@ describe("db push against the managed database while a dev server holds connecti
         ));
         const before = await recorded();
         const generated = await driver("db", "generate", "--schema-dir", schemaDir(), "add_done");
-        expect(generated.exitCode).toBe(0);
+        expect(generated.exitCode, generated.all).toBe(0);
         const version = newestVersion();
         expect(before).not.toContain(version);
 
         const applied = await driver("db", "migrate");
         expect(applied.all).not.toContain("EOF");
-        expect(applied.exitCode).toBe(0);
+        expect(applied.exitCode, applied.all).toBe(0);
         expect(await recorded()).toEqual([...before, version]);
         const column = await held[0].query("SELECT 1 FROM information_schema.columns WHERE table_name = 'tasks' AND column_name = 'done'");
         expect(column.rowCount).toBe(1);
@@ -202,7 +206,7 @@ describe("db push against the managed database while a dev server holds connecti
         await held[0].query("ALTER TABLE public.tasks ADD COLUMN slug varchar");
         const before = await recorded();
         const generated = await driver("db", "generate", "--schema-dir", schemaDir(), "add_slug");
-        expect(generated.exitCode).toBe(0);
+        expect(generated.exitCode, generated.all).toBe(0);
         const version = newestVersion();
         expect(before).not.toContain(version);
 
@@ -216,5 +220,25 @@ describe("db push against the managed database while a dev server holds connecti
         expect(baselined.exitCode, baselined.all).toBe(0);
         expect(await recorded()).toEqual([...before, version]);
         expect(await revisionTables()).toEqual(["rebase"]);
+    });
+
+    it("keeps application query results correct during a Ptah plan", { timeout: 60000 }, async () => {
+        const plan = driver("db", "push", "--dry-run", "--schema-dir", schemaDir());
+        let finished = false;
+        let concurrentQueries = 0;
+        void plan.then(() => { finished = true; });
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const planWasRunning = !finished;
+
+        for (let value = 0; value < 200 && !finished; value += 1) {
+            const result = await held[0].query<{ value: number }>("SELECT $1::integer AS value", [value]);
+            expect(result.rows[0]?.value).toBe(value);
+            concurrentQueries += 1;
+        }
+
+        const result = await plan;
+        expect(result.exitCode, result.all).toBe(0);
+        expect(planWasRunning).toBe(true);
+        expect(concurrentQueries).toBeGreaterThan(10);
     });
 });

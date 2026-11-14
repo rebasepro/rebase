@@ -99,7 +99,7 @@ describe("ensureDevDatabaseExists", () => {
 
         await subject(URL, getDevDatabaseUrl(URL));
 
-        expect(warnings.join("\n")).toContain("Could not create the Atlas scratch database");
+        expect(warnings.join("\n")).toContain("Could not create the migration scratch database");
     });
 
     it("never throws — a push must not die here", async () => {

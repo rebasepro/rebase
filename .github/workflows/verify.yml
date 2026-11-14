@@ -350,6 +350,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Ptah
+        run: sudo sh tooling/scripts/install-ptah.sh
+
       # Three server-postgres e2e files spawn the CLI and `rebase-server` as child
       # processes, which load built dist, and the CLI suite scaffolds a project
       # that consumes every package as built output (its `assertPackagesBuilt`
@@ -435,6 +438,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Install Ptah
+        run: sudo sh tooling/scripts/install-ptah.sh
 
       # Three server-postgres e2e files spawn the CLI and `rebase-server` as child
       # processes, which load built dist, and the CLI suite scaffolds a project
@@ -526,6 +532,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Ptah
+        run: sudo sh tooling/scripts/install-ptah.sh
+
       # Three server-postgres e2e files spawn the CLI and `rebase-server` as child
       # processes, which load built dist, and the CLI suite scaffolds a project
       # that consumes every package as built output (its `assertPackagesBuilt`
@@ -580,6 +589,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Install Ptah
+        run: sudo sh tooling/scripts/install-ptah.sh
 
       # Three server-postgres e2e files spawn the CLI and `rebase-server` as child
       # processes, which load built dist, and the CLI suite scaffolds a project

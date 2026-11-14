@@ -103,6 +103,13 @@ describe("assertKnownFlags", () => {
         expect(() => assertKnownFlags("db", "push", line("db", "push", ...typed))).not.toThrow();
     });
 
+    it("accepts the Ptah output only on db generate", () => {
+        expect(() => assertKnownFlags("db", "generate", line("db", "generate", "--ptah-output", "ptah.sql")))
+            .not.toThrow();
+        expect(() => assertKnownFlags("db", "push", line("db", "push", "--ptah-output", "ptah.sql")))
+            .toThrow(/has no option --ptah-output/);
+    });
+
     it("accepts the short forms", () => {
         expect(() => assertKnownFlags("db", "push", line("db", "push", "--schema-dir", "./s", "-y"))).not.toThrow();
     });

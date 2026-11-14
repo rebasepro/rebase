@@ -72,7 +72,8 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
         "-y": "--yes"
     },
     "db generate": {
-        "--schema-dir": String
+        "--schema-dir": String,
+        "--ptah-output": String
     },
     // Bare positionals still pass through to `atlas migrate apply`, which takes
     // an optional amount; flags do not, apart from `--baseline`.

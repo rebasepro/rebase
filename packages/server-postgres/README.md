@@ -13,32 +13,11 @@ loaded with `import`. It needs Node `>=22.22.0` (its `engines` floor), where
 `require()` of it from a CJS file works too: Node has supported `require(esm)`
 since 22.12.
 
-### Allow `@ariga/atlas` to run its install script
+### Install Ptah
 
-`db push`, `db generate` and `db migrate` shell out to the `atlas` binary, and
-`@ariga/atlas` downloads that binary in a `preinstall` script. pnpm 10+ and npm
-12+ refuse a dependency's lifecycle scripts unless the project allowlists them —
-and the install still exits 0, so the only sign is
-`ERR_PNPM_IGNORED_BUILDS: @ariga/atlas` several screens up, followed by
-`Failed to create bin … ENOENT`. Nothing then fails until the first schema push.
+`rebase db push`, `rebase db generate`, and `rebase db migrate` use `ptah-compat`, the Atlas-compatible CLI from Ptah 0.27.0 or newer. Install Ptah and put `ptah-compat` on `PATH`. Existing migrations and `atlas.sum` keep their format. Use `--ptah-output` with `db generate` to export the additional PostgreSQL objects for a native Ptah comparison.
 
-A project scaffolded by `rebase init` already carries the entry. Adding this
-package to an existing project needs it:
-
-```yaml
-# pnpm-workspace.yaml
-allowBuilds:
-  "@ariga/atlas": true
-```
-
-```json
-// package.json, for npm
-{ "allowScripts": { "@ariga/atlas": true } }
-```
-
-`rebase doctor` reports the state of that binary, and tells the three apart:
-not installed, installed with its script blocked, and on disk with only the
-`node_modules/.bin` link missing.
+When migration history contains functions, use a separate disposable PostgreSQL server for the dev URL. Ptah refuses to replay functions in the sibling dev database on a shared server. Set `REBASE_ATLAS_DEV_URL` to a Ptah `docker://postgres/<version>/dev` URL or to a server dedicated to these migrations; set `PTAH_DEV_SERVER_DISPOSABLE=1` only for a server that is disposable as a whole.
 
 ## What This Package Does
 
@@ -100,6 +79,12 @@ process.on("SIGTERM", async () => {
   await pool.end();
 });
 ```
+
+## Ptah desired-state export
+
+`rebase db generate --ptah-output .rebase/sql/ptah.sql` writes a separate declarative schema from the table plan. The file includes policies, full-text search, vector indexes, and update triggers that Rebase keeps outside `schema.sql`. `db generate` still generates the usual Atlas-format migration through `ptah-compat`; the Ptah file is an additional output for `ptah schema compare --schema-file .rebase/sql/ptah.sql --db-url "$DB_URL"`.
+
+Vector columns require a declared `vector` database extension. The export refuses views until they can be represented as Ptah desired state. Rebase provisions database roles and auth objects separately; scope a comparison with Ptah's `--include` when the target database contains objects outside the exported table plan. Review any plan before applying it. See the [Ptah drift case study](https://blog.ptah.run/posts/rebase-postgresql-schema-drift-with-ptah/) for a measured example.
 
 ## From a script
 

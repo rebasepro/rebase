@@ -550,17 +550,17 @@ export function describeDevDatabaseFailure(err: unknown, devDbName: string): str
     const message = err instanceof Error ? err.message : String(err);
 
     const lines = [
-        chalk.yellow(`  ⚠  Could not create the Atlas scratch database "${devDbName}": ${message}`)
+        chalk.yellow(`  ⚠  Could not create the migration scratch database "${devDbName}": ${message}`)
     ];
     if (code === "42501") {
         lines.push(chalk.gray(
-            "     Atlas plans every change in a throwaway copy of the schema, and CREATE DATABASE\n" +
+            "     Ptah plans every change in a throwaway copy of the schema, and CREATE DATABASE\n" +
             "     is a privilege most managed providers withhold. Two ways forward:\n" +
             `       • GRANT the role CREATEDB:  ALTER ROLE "<role>" CREATEDB;\n` +
             `       • or create it once by hand:  CREATE DATABASE "${devDbName}";`
         ));
     } else {
-        lines.push(chalk.gray("     Atlas will fail next with `database \"" + devDbName + "\" does not exist (3D000)`, which is this."));
+        lines.push(chalk.gray("     Ptah will fail next with `database \"" + devDbName + "\" does not exist (3D000)`, which is this."));
     }
 
     return lines.join("\n");

@@ -17,8 +17,7 @@ import {
     findEnvFile,
     exitDependenciesNotInstalled
 } from "../utils/project";
-import { fileURLToPath, pathToFileURL } from "url";
-import { createRequire } from "module";
+import { fileURLToPath } from "url";
 import { scanTextForLibpqUrls, type LibpqUrlFinding } from "../utils/libpq-url";
 import { redactConnectionPasswords } from "../utils/redact";
 import { analyseFunctionsDirectory, summarisePortability } from "../function-portability";
@@ -34,13 +33,12 @@ import { DEV_DATABASE_KIND_ENV, devDatabaseKind, managedNotices, prepareDatabase
 import {
     checkDuplicateSlugs,
     checkEnvSanity,
-    checkAtlasBinary,
+    checkPtahBinary,
     checkNodeVersion,
     checkPackageManager,
     checkVersionSkew,
     LOCKFILES,
     parseEnvFile,
-    type AtlasBinaryState,
     type DeclaredDependency,
     type EnvironmentFinding
 } from "../doctor-environment";
@@ -208,112 +206,22 @@ export function collectEnvironmentFindings(
     // One `@rebasepro/*` package, two versions.
     findings.push(...checkVersionSkew(readDeclaredRebaseDeps(projectRoot)));
 
-    // The atlas binary, which every schema command shells out to and whose
+    // The Ptah binary, which database schema commands shell out to and whose
     // absence is invisible until one of them is run.
-    findings.push(...checkAtlasBinary(readAtlasBinaryState(projectRoot)));
+    findings.push(...checkPtahBinary(readPtahBinaryState(projectRoot)));
 
     return findings;
 }
 
-/**
- * What is actually on disk for `@ariga/atlas`, from the project's point of view.
- *
- * Three separate questions, because the three states they distinguish need
- * three different remedies — see `checkAtlasBinary`. Directories are searched
- * from the project root upwards and through the workspaces a scaffold has,
- * because `db push` runs from `backend/` and the install may be hoisted to the
- * root.
- */
-export function readAtlasBinaryState(projectRoot: string): AtlasBinaryState | null {
-    const roots = [projectRoot, path.join(projectRoot, "backend"), path.join(projectRoot, "config")];
-
-    const findUpwards = (starts: string[], relative: string): string | null => {
-        for (const start of starts) {
-            let dir = start;
-            for (let i = 0; i < 8; i++) {
-                const candidate = path.join(dir, "node_modules", relative);
-                if (fs.existsSync(candidate)) return candidate;
-                const parent = path.dirname(dir);
-                if (parent === dir) break;
-                dir = parent;
-            }
-        }
-        return null;
-    };
-
-    // `@ariga/atlas` is a dependency of `@rebasepro/server-postgres`, not of the
-    // project, so under pnpm's isolated layout — the scaffold default — it lives
-    // in `.pnpm/` and a directory walk over `node_modules/` never sees it.
-    // Resolve through the module graph the way the driver itself does.
-    const resolveFrom = (from: string, request: string): string | null => {
-        try {
-            return createRequire(pathToFileURL(from)).resolve(request);
-        } catch {
-            return null;
-        }
-    };
-    const bases = roots.map(dir => path.join(dir, "package.json")).filter(file => fs.existsSync(file));
-    const driverManifests = bases
-        .map(base => resolveFrom(base, "@rebasepro/server-postgres/package.json"))
-        .filter((file): file is string => file !== null);
-
-    let manifest: string | null = findUpwards(roots, path.join("@ariga", "atlas", "package.json"));
-    if (!manifest) {
-        for (const base of [...bases, ...driverManifests]) {
-            manifest = resolveFrom(base, "@ariga/atlas/package.json");
-            if (manifest) break;
-        }
-    }
-
-    // The `.bin` shim is written beside whichever package declared the
-    // dependency, so the driver's own directory is a search root too.
-    const onPath = findUpwards(
-        [...roots, ...driverManifests.map(file => path.dirname(file))],
-        path.join(".bin", "atlas")
-    ) !== null;
-
-    let binaryOnDisk = false;
-    if (manifest) {
-        try {
-            const pkg = JSON.parse(fs.readFileSync(manifest, "utf-8")) as {
-                bin?: string | Record<string, string>;
-            };
-            const dir = path.dirname(manifest);
-            const targets = typeof pkg.bin === "string"
-                ? [pkg.bin]
-                : Object.values(pkg.bin ?? {}).filter((t): t is string => typeof t === "string");
-            binaryOnDisk = targets.some(target => fs.existsSync(path.resolve(dir, target)));
-        } catch { /* unreadable manifest: treat the binary as absent */ }
-    }
-
-    return {
-        onPath,
-        packageInstalled: manifest !== null,
-        binaryOnDisk,
-        manager: readPackageManagerName(projectRoot),
-        workspaceDir: fs.existsSync(path.join(projectRoot, "backend", "package.json")) && isWorkspaceRoot(projectRoot)
-            ? "backend"
-            : null
-    };
-}
-
-/** Whether `dir` is a workspace root, where `pnpm add` refuses without `-w`. */
-function isWorkspaceRoot(dir: string): boolean {
-    if (fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) return true;
-    try {
-        const manifest: unknown = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"));
-        return typeof manifest === "object" && manifest !== null && "workspaces" in manifest;
-    } catch {
-        return false;
-    }
-}
-
-/** The reader's own package manager, from the lockfile beside their project. */
-function readPackageManagerName(projectRoot: string): string {
-    for (const [file, manager] of Object.entries(LOCKFILES)) {
-        if (fs.existsSync(path.join(projectRoot, file))) return manager;
-    }
-    return "pnpm";
+/** Whether this project can invoke native Ptah. */
+export function readPtahBinaryState(projectRoot: string): boolean {
+    const name = process.platform === "win32" ? "ptah-compat.exe" : "ptah-compat";
+    const directories = [
+        path.join(projectRoot, "node_modules", ".bin"),
+        path.join(projectRoot, "backend", "node_modules", ".bin"),
+        ...(process.env.PATH ?? "").split(path.delimiter)
+    ];
+    return directories.some(dir => dir.length > 0 && fs.existsSync(path.join(dir, name)));
 }
 
 /** The `engines.node` range of the CLI actually running. */

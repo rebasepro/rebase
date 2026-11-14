@@ -19,92 +19,22 @@ import dotenv from "dotenv";
 /** One thing that is wrong, and what to do about it. */
 export interface EnvironmentFinding {
     /** Which check produced it, for grouping in the report. */
-    check: "node" | "package-manager" | "tables" | "env" | "versions" | "atlas";
+    check: "node" | "package-manager" | "tables" | "env" | "versions" | "ptah";
     severity: "error" | "warning";
     message: string;
     fix: string;
 }
 
-// ── Atlas ────────────────────────────────────────────────────────────────
+// ── Ptah ─────────────────────────────────────────────────────────────────
 
-/** What is on disk for `@ariga/atlas`, read by `commands/doctor.ts`. */
-export interface AtlasBinaryState {
-    /** A `node_modules/.bin/atlas` the project's commands would find. */
-    onPath: boolean;
-    /** `@ariga/atlas/package.json` resolves from the project. */
-    packageInstalled: boolean;
-    /** The binary the package's `bin` names exists as a file. */
-    binaryOnDisk: boolean;
-    /** For the remedy: the reader's own package manager. */
-    manager: string;
-    /**
-     * The workspace member the install goes into (`backend` in a scaffold),
-     * or absent at a project that is no workspace. A scaffold's root refuses
-     * `pnpm add` without `-w`, and atlas belongs to the backend anyway.
-     */
-    workspaceDir?: string | null;
-}
-
-/** `@ariga/atlas` added as a dev dependency where the project keeps it. */
-function atlasAddCommand(manager: string, workspaceDir: string | null | undefined): string {
-    const pkg = "@ariga/atlas";
-    if (!workspaceDir) return `${manager} add -D ${pkg}`;
-    switch (manager) {
-        case "npm": return `npm install -D ${pkg} -w ${workspaceDir}`;
-        case "yarn": return `yarn --cwd ${workspaceDir} add -D ${pkg}`;
-        case "bun": return `bun add -d ${pkg} --cwd ${workspaceDir}`;
-        default: return `${manager} --dir ${workspaceDir} add -D ${pkg}`;
-    }
-}
-
-/**
- * Whether `db push`, `db generate` and `db migrate` can run at all.
- *
- * They shell out to `atlas`, and its absence is invisible until one of them is
- * run: `@ariga/atlas` downloads its platform binary in `preinstall`, pnpm 10+
- * and npm 12+ refuse a dependency's lifecycle scripts unless allowlisted, and
- * the install exits 0 either way. The scaffold allowlists it, so this is a
- * problem for the person who added `@rebasepro/server-postgres` to a project
- * they already had — five lines of `ERR_PNPM_IGNORED_BUILDS` and
- * `Failed to create bin … ENOENT`, several screens up, with nothing saying that
- * a schema push will fail later.
- *
- * Three states, because two of them need opposite advice. The package absent is
- * an install; the package present with no binary is an allowlist; the binary
- * present with no `.bin` shim is a re-install, and telling that reader their
- * build scripts are blocked sends them to a command that does nothing.
- */
-export function checkAtlasBinary(state: AtlasBinaryState | null): EnvironmentFinding[] {
-    if (!state || state.onPath) return [];
-
-    if (!state.packageInstalled) {
-        return [{
-            check: "atlas",
-            severity: "warning",
-            message: "The atlas binary is not on PATH and @ariga/atlas is not installed — "
-                + "`db push`, `db generate` and `db migrate` will fail.",
-            fix: `Install it: ${atlasAddCommand(state.manager, state.workspaceDir)}, and allow its install script.`
-        }];
-    }
-
-    if (!state.binaryOnDisk) {
-        return [{
-            check: "atlas",
-            severity: "warning",
-            message: "@ariga/atlas is installed and its binary is missing — its `preinstall` "
-                + "script was blocked, so `db push` and `db migrate` will fail.",
-            fix: "Allow the build script (pnpm: `allowBuilds` in pnpm-workspace.yaml or "
-                + "`pnpm approve-builds`; npm: `allowScripts` in package.json), then re-install."
-        }];
-    }
-
+/** The database commands require the native Ptah binary on PATH. */
+export function checkPtahBinary(onPath: boolean): EnvironmentFinding[] {
+    if (onPath) return [];
     return [{
-        check: "atlas",
+        check: "ptah",
         severity: "warning",
-        message: "The atlas binary is on disk but node_modules/.bin/atlas is missing, "
-            + "so nothing can invoke it.",
-        fix: "Re-resolve the tree so the link is recreated: `pnpm install --force`, or delete "
-            + "node_modules and install again."
+        message: "The ptah-compat binary is not on PATH; `db push`, `db generate` and `db migrate` will fail.",
+        fix: "Install Ptah 0.27.0 or newer: https://docs.ptah.run/latest/start/install/"
     }];
 }
 

@@ -535,20 +535,19 @@ In non-production mode, `loadEnv()` **auto-generates** `JWT_SECRET` and `REBASE_
 | `JWT_SECRET` set explicitly (nothing is generated in production) | `JWT_SECRET: is required` |
 | No localhost URLs (unless `ALLOW_LOCALHOST_IN_PRODUCTION=true`) | `Environment variable DATABASE_URL points at a local/loopback host...` |
 
-## Migrations and Atlas (there is no `drizzle.config.ts`)
+## Migrations and Ptah compatibility (there is no `drizzle.config.ts`)
 
 A project has no `drizzle.config.ts` and runs no `drizzle-kit`: do not create one.
-`db push`, `db generate` and `db migrate` drive [Atlas](https://atlasgo.io)
-(`@ariga/atlas`, a dependency of `backend/package.json`) from the tables:
+`db push`, `db generate` and `db migrate` drive `ptah-compat` from the tables:
 
 - The desired state is `.rebase/sql/schema.sql`, rendered from the tables on
   every run (see above). Migrations go to `backend/drizzle/migrations/`, with
-  Atlas's `atlas.sum` beside them.
-- Atlas plans against a second, empty database: `<db>_dev_diff` on a real server,
+  the Atlas-format `atlas.sum` beside them.
+- Ptah plans against a second, empty database: `<db>_dev_diff` on a real server,
   a throwaway in-memory PGlite on the managed one, or the one
   `REBASE_ATLAS_DEV_URL` names.
 - **Only tables declared in `backend/schema` (and their many-to-many junctions) are in
-  scope.** Every other table is excluded from the diff, so Atlas never drops it;
+  scope.** Every other table is excluded from the diff, so Ptah never drops it;
   the `rebase` schema (auth tables, RLS helpers, Atlas's revision table) is never
   touched. If the database cannot be read to build that list, the command fails
   rather than plan without it.

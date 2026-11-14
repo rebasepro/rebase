@@ -76,6 +76,8 @@ ENV NODE_ENV=production
 RUN corepack enable
 
 # Security: run as non-root
+COPY tooling/scripts/install-ptah.sh /tmp/install-ptah.sh
+RUN apk add --no-cache ca-certificates curl && sh /tmp/install-ptah.sh && rm /tmp/install-ptah.sh
 RUN addgroup -g 1001 rebase && adduser -u 1001 -G rebase -s /bin/sh -D rebase
 
 WORKDIR /app

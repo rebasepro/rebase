@@ -8,12 +8,12 @@ import { writePostgresDdl } from "./generate-files";
  * serve it the first version forever. One-shot generation runs in the driver's
  * own process instead; see `generate-files.ts`.
  */
-const runGeneration = async (schemaDir?: string, outputPath?: string) => {
+const runGeneration = async (schemaDir?: string, outputPath?: string, ptahOutputPath?: string) => {
     if (!schemaDir) {
         throw new Error("No schema directory provided.");
     }
     try {
-        await writePostgresDdl({ schemaDir: path.resolve(schemaDir), outputPath });
+        await writePostgresDdl({ schemaDir: path.resolve(schemaDir), outputPath, ptahOutputPath });
     } catch (error) {
         // A caller that reads nothing but this process's exit code must not
         // see 0 after an error was printed — see `writePostgresDdl`.
@@ -29,6 +29,9 @@ export const main = async () => {
     const outputPathArg = process.argv.find(arg => arg.startsWith("--output="));
     const outputPath = outputPathArg ? outputPathArg.split("=")[1] : undefined;
 
+    const ptahOutputPathArg = process.argv.find(arg => arg.startsWith("--ptah-output="));
+    const ptahOutputPath = ptahOutputPathArg ? ptahOutputPathArg.split("=")[1] : undefined;
+
     const watch = process.argv.includes("--watch");
 
     if (!schemaDir) {
@@ -38,6 +41,7 @@ export const main = async () => {
 
     const resolvedPath = path.resolve(process.cwd(), schemaDir);
     const resolvedOutputPath = outputPath ? path.resolve(process.cwd(), outputPath) : undefined;
+    const resolvedPtahOutputPath = ptahOutputPath ? path.resolve(process.cwd(), ptahOutputPath) : undefined;
 
     if (watch) {
         out(`Watching for changes in ${resolvedPath}...`);
@@ -50,8 +54,7 @@ export const main = async () => {
         // load with "Cannot find package 'chokidar'", and every self-hosted
         // container answered 500 with a stack trace about a file watcher.
         //
-        // Same reasoning the image already applies to @ariga/atlas: an
-        // authoring-only dependency does not belong on a boot path.
+        // An authoring-only dependency does not belong on a boot path.
         const { default: chokidar } = await import("chokidar");
         const watcher = chokidar.watch(resolvedPath, {
             persistent: true,
@@ -63,10 +66,10 @@ export const main = async () => {
             // A watch session outlives a bad edit: the cause is already on
             // stderr, and the next save is the retry. Only the one-shot run
             // below turns a failure into an exit code.
-            void runGeneration(resolvedPath, resolvedOutputPath).catch(() => undefined);
+            void runGeneration(resolvedPath, resolvedOutputPath, resolvedPtahOutputPath).catch(() => undefined);
         });
     } else {
-        await runGeneration(resolvedPath, resolvedOutputPath);
+        await runGeneration(resolvedPath, resolvedOutputPath, resolvedPtahOutputPath);
     }
 };
 
