@@ -66,6 +66,14 @@ export { compareMigrationVersions, migrationVersionOf } from "./schema/migrate-b
 export { isGeneratedPolicyName } from "./security/policy-drift";
 
 /**
+ * Every policy a boot writes for the tables, as data — name, command, roles
+ * and clauses. `rebase verify` reads it to find a policy Postgres would refuse
+ * to expand (42P17, "infinite recursion detected in policy").
+ */
+export { planPolicyDefinitions } from "./schema/generate-postgres-ddl-logic";
+export type { PlannedPolicy, PolicyPlanOptions } from "./schema/generate-postgres-ddl-logic";
+
+/**
  * Everything the schema pipeline emits for a collection set, as text — the
  * plan-golden corpus's renderer, and how `rebase migrate collections-to-tables`
  * proves a migration produces byte-identical SQL.
