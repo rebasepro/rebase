@@ -234,6 +234,7 @@ export default defineConfig({
                         { label: "Background Jobs", slug: "docs/backend/jobs" },
                         { label: "Custom Functions", slug: "docs/backend/custom-functions" },
                         { label: "Background Work", slug: "docs/backend/background-work" },
+                        { label: "Rate limits in functions", slug: "docs/backend/function-rate-limits" },
                         { label: "Runtime portability", slug: "docs/backend/runtime-portability" },
                         { label: "Typed server-side data", slug: "docs/backend/typed-server-data" },
                         { label: "Global Hooks", slug: "docs/backend/hooks" },

@@ -172,7 +172,7 @@ import { createRequireAuth } from "../auth/middleware";
 import { accessModelFromAuthTable, callerScopes, keyOwnerResolverFor, requireScope, requireScopeByMethod, type AccessControl, type KeyOwnerResolver } from "../auth/access";
 import { createScopeRoutes } from "../auth/scope-routes";
 import { verifyCredentialAgainst, type VerifiedCredential } from "../auth/verify-credential";
-import { AUTH_CONFIG_LIMIT, createAuthLimiters, createDataRateLimiter, createDataRateLimitCheck, DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT, type DataRateLimitConfig } from "../auth/rate-limiter";
+import { AUTH_CONFIG_LIMIT, createAuthLimiters, createDataRateLimiter, createDataRateLimitCheck, DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT, requestClientAddress, type DataRateLimitConfig } from "../auth/rate-limiter";
 import { MemoryRateLimitStore } from "../auth/rate-limit-store";
 import { createSqlRateLimitStore } from "../auth/sql-rate-limit-store";
 import { resolveRateLimitStoreKind } from "../auth/resolve-rate-limit-store";
@@ -1409,6 +1409,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         access,
         authLimiters,
         rateLimitStore: sharedRateLimitStore,
+        clientAddress: requestClientAddress,
         apiKeyStore,
         tables: () => tableRegistry.list()
     };

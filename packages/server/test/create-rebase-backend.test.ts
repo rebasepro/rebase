@@ -28,6 +28,8 @@ import {
 import { CronScheduler } from "../src/cron/cron-scheduler";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { _resetRebaseMock } from "../src/singleton";
+import { rateLimit } from "../src/functions";
+import { MemoryRateLimitStore } from "../src/auth/rate-limit-store";
 import { inertRealtimeProvider } from "./helpers/server-a-g3-realtime";
 import { tablesFrom } from "./helpers/tables";
 
@@ -242,6 +244,35 @@ describe("one group, mounted alone, at a path of the application's choosing", ()
     it("refuses a group whose surface is off, by name", async () => {
         const backend = await create({ surfaces: { data: false } });
         expect(() => backend.routes.data()).toThrow(/surfaces: \{ data: false \}/);
+    });
+});
+
+describe("a function's rateLimit counts in the backend's shared store", () => {
+    const invite = defineFunction((app) => {
+        app.post("/", rateLimit({ name: "invite", limit: 2, windowMs: 60_000 }), (c) => c.json({ ok: true }));
+    });
+
+    it("two replicas sharing a store grant one allowance between them", async () => {
+        // What REBASE_RATE_LIMIT_STORE=sql gives every replica: one store.
+        // Counted, because both replicas share this process, and with it the
+        // memory a limit falls back to: only the hits prove the store was used.
+        const inner = new MemoryRateLimitStore(60_000);
+        const hits: string[] = [];
+        const store = { hit: (key: string, windowMs: number, limit: number) => { hits.push(key); return inner.hit(key, windowMs, limit); } };
+        const replicaA = await create({ functions: { invite }, rateLimit: { store } });
+        const replicaB = await create({ functions: { invite }, rateLimit: { store } });
+        const post = (backend: RebaseBackend) => {
+            const app = new Hono<HonoEnv>();
+            app.route("/hooks", backend.routes.functions());
+            return app.request("/hooks/invite", { method: "POST" });
+        };
+
+        expect((await post(replicaA)).status).toBe(200);
+        expect((await post(replicaB)).status).toBe(200);
+        const third = await post(replicaA);
+        expect(third.status).toBe(429);
+        expect(await third.json()).toMatchObject({ error: { code: "RATE_LIMITED" } });
+        expect(hits.filter((k) => k.startsWith("fn:invite:"))).toHaveLength(3);
     });
 });
 

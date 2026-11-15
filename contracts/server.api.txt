@@ -323,7 +323,7 @@ interface BaasOptions { unprotectedTables }
 interface BackendConfig { connection, schema, type }
 interface BackendInstance { admin, connection, destroy, entityRepository, healthCheck, initialize, realtimeProvider, tableRegistry }
 interface BackendMountOptions { basePath }
-interface BackendServices { access, apiKeyStore, authAdapter, authLimiters, jwt, queues, rateLimitStore, tables, topics }
+interface BackendServices { access, apiKeyStore, authAdapter, authLimiters, clientAddress, jwt, queues, rateLimitStore, tables, topics }
 interface BackupRoutesConfig { getDestination, getSchedule, scheduledElsewhere, storageFor }
 interface BootOptions { bundle, bundleDir, bundleFallbackDir, handleSignals, listen, provisionSchema }
 interface BootedRuntime { app, backend, bundle, dataSources, env, port, server, shutdown }
@@ -1919,6 +1919,8 @@ class ApiError { badRequest, code, conflict, databaseUnavailable, details, expec
 const rebase { admin, apiKeys, apiPath, auth, backups, baseUrl, bucket, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, personalKeys, resolveToken, schema, setAuthTokenGetter, setOnUnauthorized, setToken, simulate, sql, sqlAsAdmin, storage, storageRegistry, ws }
 const requireAdmin
 const requireAuth
+function checkRateLimit
+function clientAddress
 function defineFunction
 function env
 function getApiKey
@@ -1939,6 +1941,7 @@ function isAdmin
 function isAuthenticated
 function isNodeRuntime
 function lazyResource
+function rateLimit
 function requireDriver
 function requireEnv
 function requireRole
@@ -1946,7 +1949,11 @@ function requireScope
 function runtimeKey
 function waitUntil
 interface ApiResponse { data, error, meta }
+interface CheckRateLimitOptions { key, limit, name, windowMs }
+interface FunctionRateLimit { limit, name, windowMs }
 interface FunctionUser { email, roles, uid }
+interface RateLimitDecision { allowed, remaining, retryAfterMs }
+interface RateLimitOptions { key, limit, message, name, windowMs }
 interface RebaseFunctionContext { rebase }
 interface UserProfile { displayName, email, emailVerified, isAnonymous, photoURL, providers, uid }
 type BackgroundWork

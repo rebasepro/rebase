@@ -24,6 +24,8 @@ import type { AccessControl } from "../auth/access";
 import type { AuthLimiters } from "../auth/rate-limiter";
 import type { RateLimitStore } from "../auth/rate-limit-store";
 import type { ApiKeyStore } from "../auth/api-keys/api-key-store";
+import type { Context } from "hono";
+import type { HonoEnv } from "../api/types";
 
 export interface BackendServices {
     /**
@@ -41,6 +43,13 @@ export interface BackendServices {
      * SQL, or `rateLimit.store` — when it has one.
      */
     rateLimitStore?: RateLimitStore;
+    /**
+     * Where a request comes from, by this deployment's proxy rule
+     * (`TRUSTED_PROXY_HOPS`): the address the auth limiters count by. Here so
+     * a function's `rateLimit` keys by the same address without importing the
+     * Node-only code that reads the socket.
+     */
+    clientAddress?: (c: Context<HonoEnv>) => string;
     /** Where this backend keeps its API keys (`rk_`), when it keeps any. */
     apiKeyStore?: ApiKeyStore;
     /**

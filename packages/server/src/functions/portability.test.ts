@@ -399,6 +399,9 @@ describe("the portable surface keeps its shape", () => {
         "isNodeRuntime",
         "lazyResource",
         "waitUntil",
+        "rateLimit",
+        "checkRateLimit",
+        "clientAddress",
         "ApiError"
     ];
 

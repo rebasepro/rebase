@@ -288,6 +288,10 @@ export default defineFunction((app) => {
 
 Every signed-in person holds every app scope, so for a person `requireScope` decides nothing: check in the handler whether this person may deploy this project. What the scope adds is a way to **narrow a key**: a key holding `project:deploy:p1` passes for `p1` only. A key also needs `functions:invoke`, or `functions:invoke:<name>`, before it reaches the function at all. See [App scopes](/docs/backend/roles-and-scopes/#app-scopes).
 
+### Rate limits
+
+A route that costs something per call takes `rateLimit` middleware, which counts across replicas. See [Rate limits in functions](/docs/backend/function-rate-limits/).
+
 ### Service Key Authentication
 
 Rebase supports a static `REBASE_SERVICE_KEY` defined in your `.env` for script or server-to-server calls.

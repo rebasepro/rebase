@@ -101,6 +101,10 @@ export type { FunctionUser, UserProfile } from "./context";
 // ── Route guards ─────────────────────────────────────────────────────────
 export { requireAuth, requireAdmin, requireRole, requireScope } from "./guards";
 
+// ── Rate limits ──────────────────────────────────────────────────────────
+export { rateLimit, checkRateLimit, clientAddress } from "./rate-limit";
+export type { RateLimitOptions, CheckRateLimitOptions, FunctionRateLimit, RateLimitDecision } from "./rate-limit";
+
 // ── Configuration ────────────────────────────────────────────────────────
 export { getEnv, env, requireEnv, runtimeKey, isNodeRuntime, lazyResource } from "./runtime-env";
 
