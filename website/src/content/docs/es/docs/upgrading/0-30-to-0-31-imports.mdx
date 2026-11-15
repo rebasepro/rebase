@@ -1,5 +1,5 @@
 ---
-sourceHash: 76892ff09614f331
+sourceHash: 7d2312f8dc855186
 slug: es/docs/upgrading/0-30-to-0-31-imports
 title: Importaciones que cambiaron de lugar en 0.31
 sidebar_label: Importaciones movidas en 0.31
@@ -42,12 +42,12 @@ Esta lista se genera a partir de `tooling/scripts/headless-guard/moved-symbols.j
 
 | Nombre | Era exportado por | Escriba en su lugar |
 |---|---|---|
-| `FindResponse` | `@rebasepro/client` | FindResult de @rebasepro/types: a lo que resuelve client.data.<table>.find(). |
+| `FindResponse` | `@rebasepro/client` | FindResult de @rebasepro/types: a lo que resuelve client.data.\<table>.find(). |
 | `defineCollection` | `@rebasepro/cms-types` | defineTable (backend/schema) + customizeTable para la presentación del panel; defineFirestoreCollection (@rebasepro/firebase) para Firestore; defineLegacyCollection (@rebasepro/common/migrate) para fixtures de 0.30. |
 | `apiHiddenFieldNames` | `@rebasepro/common` | apiHiddenKeys(descriptor) de @rebasepro/common. |
 | `assertBeforeQueryIsPostgresOnly` | `@rebasepro/common` | Nada: Postgres es el único motor de servidor. |
 | `buildPropertyCallbacks` | `@rebasepro/common` | Transformaciones de columna: col.*().transform(...) en la definición de la tabla. |
-| `DEFAULT_STRING_COLUMN_LENGTH` | `@rebasepro/common` | col.varchar({ length }) indica la longitud en la columna. |
+| `DEFAULT_STRING_COLUMN_LENGTH` | `@rebasepro/common` | col.varchar(\{ length \}) indica la longitud en la columna. |
 | `defaultUsersCollection` | `@rebasepro/common` | defineAuthTable para el almacén de usuarios; AUTH_SECRET_NAMES lista sus secretos. |
 | `defineCollection` | `@rebasepro/common` | defineTable (backend/schema); el CMS personaliza una tabla con customizeTable; Firestore usa defineFirestoreCollection; las fixtures legadas usan defineLegacyCollection de @rebasepro/common/migrate. |
 | `EntityCallbackContext` | `@rebasepro/common` | TableHookProps["context"] de @rebasepro/types. |
@@ -61,7 +61,7 @@ Esta lista se genera a partir de `tooling/scripts/headless-guard/moved-symbols.j
 | `JunctionSpec` | `@rebasepro/common` | TableJunction de @rebasepro/common. |
 | `queryableFieldNames` | `@rebasepro/common` | queryableColumnKeys(descriptor) de @rebasepro/common. |
 | `resolveJunctionSpecs` | `@rebasepro/common` | resolveTableJunctions(descriptors) de @rebasepro/common. |
-| `resolveStringColumnLength` | `@rebasepro/common` | col.varchar({ length }) indica la longitud en la columna. |
+| `resolveStringColumnLength` | `@rebasepro/common` | col.varchar(\{ length \}) indica la longitud en la columna. |
 | `restrictedFieldNames` | `@rebasepro/common` | restrictedKeys(descriptor, viewer, kind) de @rebasepro/common. |
 | `vectorPropertyNames` | `@rebasepro/common` | vectorColumnKeys(descriptor) de @rebasepro/common. |
 | `withRelationReferencesOnly` | `@rebasepro/common` | Las entradas de historial contienen la fila almacenada (wire), que no incrusta ninguna fila relacionada; las rutas de historial devuelven las referencias de relación de una entrada más antigua como claves. Nada lo reemplaza. |
@@ -71,7 +71,7 @@ Esta lista se genera a partir de `tooling/scripts/headless-guard/moved-symbols.j
 | `DataTransformer` | `@rebasepro/types` | Nada: los códecs del driver de Postgres leen el descriptor de columna. |
 | `deserializeCollections` | `@rebasepro/types` | Nada: GET /api/schema/tables entrega descriptores de tabla; las colecciones no se serializan. |
 | `hasForeignKeyOnTarget` | `@rebasepro/types` | Lea RelationDescriptor.kind (hasOne \| hasMany). |
-| `InferCollectionConfigType` | `@rebasepro/types` | Infiera la fila de una tabla con InferRow<typeof table>. |
+| `InferCollectionConfigType` | `@rebasepro/types` | Infiera la fila de una tabla con InferRow\<typeof table>. |
 | `initTextSearch` | `@rebasepro/types` | DataDriver ya no lo declara; el driver de Firestore (FirestoreDataDriver) declara el suyo propio. |
 | `isManyToMany` | `@rebasepro/types` | Lea RelationDescriptor.kind === "manyToMany". |
 | `isSerializedCollectionRef` | `@rebasepro/types` | Nada: GET /api/schema/tables entrega descriptores de tabla; las colecciones no se serializan. |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 76892ff09614f331
+sourceHash: 7d2312f8dc855186
 slug: de/docs/upgrading/0-30-to-0-31-imports
 title: In 0.31 verschobene Imports
 sidebar_label: In 0.31 verschobene Imports
@@ -42,12 +42,12 @@ Diese Liste basiert auf `tooling/scripts/headless-guard/moved-symbols.json`, der
 
 | Name | Wurde exportiert von | Stattdessen schreiben |
 |---|---|---|
-| `FindResponse` | `@rebasepro/client` | FindResult aus @rebasepro/types: worin client.data.<table>.find() aufgelöst wird. |
+| `FindResponse` | `@rebasepro/client` | FindResult aus @rebasepro/types: worin client.data.\<table>.find() aufgelöst wird. |
 | `defineCollection` | `@rebasepro/cms-types` | defineTable (backend/schema) + customizeTable für die Darstellung des Panels; defineFirestoreCollection (@rebasepro/firebase) für Firestore; defineLegacyCollection (@rebasepro/common/migrate) für 0.30-Fixtures. |
 | `apiHiddenFieldNames` | `@rebasepro/common` | apiHiddenKeys(descriptor) aus @rebasepro/common. |
 | `assertBeforeQueryIsPostgresOnly` | `@rebasepro/common` | Nichts: Postgres ist die einzige Server-Engine. |
 | `buildPropertyCallbacks` | `@rebasepro/common` | Spalten-Transformationen: col.*().transform(...) in der Tabellendefinition. |
-| `DEFAULT_STRING_COLUMN_LENGTH` | `@rebasepro/common` | col.varchar({ length }) gibt die Länge der Spalte an. |
+| `DEFAULT_STRING_COLUMN_LENGTH` | `@rebasepro/common` | col.varchar(\{ length \}) gibt die Länge der Spalte an. |
 | `defaultUsersCollection` | `@rebasepro/common` | defineAuthTable für den User-Store; AUTH_SECRET_NAMES listet dessen Secrets auf. |
 | `defineCollection` | `@rebasepro/common` | defineTable (backend/schema); das CMS passt eine Tabelle mit customizeTable an; Firestore verwendet defineFirestoreCollection; Legacy-Fixtures verwenden defineLegacyCollection aus @rebasepro/common/migrate. |
 | `EntityCallbackContext` | `@rebasepro/common` | TableHookProps["context"] aus @rebasepro/types. |
@@ -61,7 +61,7 @@ Diese Liste basiert auf `tooling/scripts/headless-guard/moved-symbols.json`, der
 | `JunctionSpec` | `@rebasepro/common` | TableJunction aus @rebasepro/common. |
 | `queryableFieldNames` | `@rebasepro/common` | queryableColumnKeys(descriptor) aus @rebasepro/common. |
 | `resolveJunctionSpecs` | `@rebasepro/common` | resolveTableJunctions(descriptors) aus @rebasepro/common. |
-| `resolveStringColumnLength` | `@rebasepro/common` | col.varchar({ length }) gibt die Länge der Spalte an. |
+| `resolveStringColumnLength` | `@rebasepro/common` | col.varchar(\{ length \}) gibt die Länge der Spalte an. |
 | `restrictedFieldNames` | `@rebasepro/common` | restrictedKeys(descriptor, viewer, kind) aus @rebasepro/common. |
 | `vectorPropertyNames` | `@rebasepro/common` | vectorColumnKeys(descriptor) aus @rebasepro/common. |
 | `withRelationReferencesOnly` | `@rebasepro/common` | History-Einträge enthalten die gespeicherte (Wire-)Zeile, die keine zugehörige Zeile einbettet; die History-Routen liefern die Relation-Refs eines älteren Eintrags als Schlüssel aus. Nichts ersetzt dies. |
@@ -71,7 +71,7 @@ Diese Liste basiert auf `tooling/scripts/headless-guard/moved-symbols.json`, der
 | `DataTransformer` | `@rebasepro/types` | Nichts: Die Codecs des Postgres-Treibers lesen den Spalten-Deskriptor. |
 | `deserializeCollections` | `@rebasepro/types` | Nichts: GET /api/schema/tables liefert Tabellen-Deskriptoren; Collections werden nicht serialisiert. |
 | `hasForeignKeyOnTarget` | `@rebasepro/types` | RelationDescriptor.kind (hasOne \| hasMany) auslesen. |
-| `InferCollectionConfigType` | `@rebasepro/types` | Die Zeile einer Tabelle mit InferRow<typeof table> ableiten. |
+| `InferCollectionConfigType` | `@rebasepro/types` | Die Zeile einer Tabelle mit InferRow\<typeof table> ableiten. |
 | `initTextSearch` | `@rebasepro/types` | DataDriver deklariert dies nicht mehr; der Firestore-Treiber (FirestoreDataDriver) deklariert seine eigene Methode. |
 | `isManyToMany` | `@rebasepro/types` | RelationDescriptor.kind === "manyToMany" abfragen. |
 | `isSerializedCollectionRef` | `@rebasepro/types` | Nichts: GET /api/schema/tables liefert Tabellen-Deskriptoren; Collections werden nicht serialisiert. |

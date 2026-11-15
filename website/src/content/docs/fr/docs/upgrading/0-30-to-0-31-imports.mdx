@@ -1,5 +1,5 @@
 ---
-sourceHash: 76892ff09614f331
+sourceHash: 7d2312f8dc855186
 slug: fr/docs/upgrading/0-30-to-0-31-imports
 title: Imports déplacés en 0.31
 sidebar_label: Imports déplacés en 0.31
@@ -42,12 +42,12 @@ Cette liste est générée à partir de `tooling/scripts/headless-guard/moved-sy
 
 | Nom | Était exporté par | Écrire à la place |
 |---|---|---|
-| `FindResponse` | `@rebasepro/client` | FindResult depuis @rebasepro/types : ce que renvoie la résolution de client.data.<table>.find(). |
+| `FindResponse` | `@rebasepro/client` | FindResult depuis @rebasepro/types : ce que renvoie la résolution de client.data.\<table>.find(). |
 | `defineCollection` | `@rebasepro/cms-types` | defineTable (backend/schema) + customizeTable pour la présentation du panneau ; defineFirestoreCollection (@rebasepro/firebase) pour Firestore ; defineLegacyCollection (@rebasepro/common/migrate) pour les fixtures 0.30. |
 | `apiHiddenFieldNames` | `@rebasepro/common` | apiHiddenKeys(descriptor) depuis @rebasepro/common. |
 | `assertBeforeQueryIsPostgresOnly` | `@rebasepro/common` | Rien : Postgres est le seul moteur serveur. |
 | `buildPropertyCallbacks` | `@rebasepro/common` | Transformations de colonnes : col.*().transform(...) sur la définition de la table. |
-| `DEFAULT_STRING_COLUMN_LENGTH` | `@rebasepro/common` | col.varchar({ length }) définit la longueur sur la colonne. |
+| `DEFAULT_STRING_COLUMN_LENGTH` | `@rebasepro/common` | col.varchar(\{ length \}) définit la longueur sur la colonne. |
 | `defaultUsersCollection` | `@rebasepro/common` | defineAuthTable pour le magasin d'utilisateurs ; AUTH_SECRET_NAMES liste ses secrets. |
 | `defineCollection` | `@rebasepro/common` | defineTable (backend/schema) ; le CMS personnalise une table avec customizeTable ; Firestore utilise defineFirestoreCollection ; les fixtures héritées utilisent defineLegacyCollection depuis @rebasepro/common/migrate. |
 | `EntityCallbackContext` | `@rebasepro/common` | TableHookProps["context"] depuis @rebasepro/types. |
@@ -61,7 +61,7 @@ Cette liste est générée à partir de `tooling/scripts/headless-guard/moved-sy
 | `JunctionSpec` | `@rebasepro/common` | TableJunction depuis @rebasepro/common. |
 | `queryableFieldNames` | `@rebasepro/common` | queryableColumnKeys(descriptor) depuis @rebasepro/common. |
 | `resolveJunctionSpecs` | `@rebasepro/common` | resolveTableJunctions(descriptors) depuis @rebasepro/common. |
-| `resolveStringColumnLength` | `@rebasepro/common` | col.varchar({ length }) définit la longueur sur la colonne. |
+| `resolveStringColumnLength` | `@rebasepro/common` | col.varchar(\{ length \}) définit la longueur sur la colonne. |
 | `restrictedFieldNames` | `@rebasepro/common` | restrictedKeys(descriptor, viewer, kind) depuis @rebasepro/common. |
 | `vectorPropertyNames` | `@rebasepro/common` | vectorColumnKeys(descriptor) depuis @rebasepro/common. |
 | `withRelationReferencesOnly` | `@rebasepro/common` | Les entrées d'historique conservent la ligne stockée (wire), qui n'intègre aucune ligne liée ; les routes d'historique renvoient les références de relations d'une ancienne entrée sous forme de clés. Rien ne le remplace. |
@@ -71,7 +71,7 @@ Cette liste est générée à partir de `tooling/scripts/headless-guard/moved-sy
 | `DataTransformer` | `@rebasepro/types` | Rien : les codecs du pilote Postgres lisent le descripteur de colonne. |
 | `deserializeCollections` | `@rebasepro/types` | Rien : GET /api/schema/tables renvoie les descripteurs de table ; les collections ne sont pas sérialisées. |
 | `hasForeignKeyOnTarget` | `@rebasepro/types` | Lire RelationDescriptor.kind (hasOne \| hasMany). |
-| `InferCollectionConfigType` | `@rebasepro/types` | Déduire la ligne d'une table avec InferRow<typeof table>. |
+| `InferCollectionConfigType` | `@rebasepro/types` | Déduire la ligne d'une table avec InferRow\<typeof table>. |
 | `initTextSearch` | `@rebasepro/types` | DataDriver ne le déclare plus ; le pilote Firestore (FirestoreDataDriver) déclare le sien. |
 | `isManyToMany` | `@rebasepro/types` | Lire RelationDescriptor.kind === "manyToMany". |
 | `isSerializedCollectionRef` | `@rebasepro/types` | Rien : GET /api/schema/tables renvoie les descripteurs de table ; les collections ne sont pas sérialisées. |

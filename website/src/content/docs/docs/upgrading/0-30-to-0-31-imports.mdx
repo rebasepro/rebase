@@ -41,12 +41,12 @@ This list is written from `tooling/scripts/headless-guard/moved-symbols.json`, t
 
 | Name | Was exported by | Write instead |
 |---|---|---|
-| `FindResponse` | `@rebasepro/client` | FindResult from @rebasepro/types: what client.data.<table>.find() resolves to. |
+| `FindResponse` | `@rebasepro/client` | FindResult from @rebasepro/types: what client.data.\<table>.find() resolves to. |
 | `defineCollection` | `@rebasepro/cms-types` | defineTable (backend/schema) + customizeTable for the panel's presentation; defineFirestoreCollection (@rebasepro/firebase) for Firestore; defineLegacyCollection (@rebasepro/common/migrate) for 0.30 fixtures. |
 | `apiHiddenFieldNames` | `@rebasepro/common` | apiHiddenKeys(descriptor) from @rebasepro/common. |
 | `assertBeforeQueryIsPostgresOnly` | `@rebasepro/common` | Nothing: Postgres is the only server engine. |
 | `buildPropertyCallbacks` | `@rebasepro/common` | Column transforms: col.*().transform(...) on the table definition. |
-| `DEFAULT_STRING_COLUMN_LENGTH` | `@rebasepro/common` | col.varchar({ length }) states the length on the column. |
+| `DEFAULT_STRING_COLUMN_LENGTH` | `@rebasepro/common` | col.varchar(\{ length \}) states the length on the column. |
 | `defaultUsersCollection` | `@rebasepro/common` | defineAuthTable for the user store; AUTH_SECRET_NAMES lists its secrets. |
 | `defineCollection` | `@rebasepro/common` | defineTable (backend/schema); the CMS customizes a table with customizeTable; Firestore uses defineFirestoreCollection; legacy fixtures defineLegacyCollection from @rebasepro/common/migrate. |
 | `EntityCallbackContext` | `@rebasepro/common` | TableHookProps["context"] from @rebasepro/types. |
@@ -60,7 +60,7 @@ This list is written from `tooling/scripts/headless-guard/moved-symbols.json`, t
 | `JunctionSpec` | `@rebasepro/common` | TableJunction from @rebasepro/common. |
 | `queryableFieldNames` | `@rebasepro/common` | queryableColumnKeys(descriptor) from @rebasepro/common. |
 | `resolveJunctionSpecs` | `@rebasepro/common` | resolveTableJunctions(descriptors) from @rebasepro/common. |
-| `resolveStringColumnLength` | `@rebasepro/common` | col.varchar({ length }) states the length on the column. |
+| `resolveStringColumnLength` | `@rebasepro/common` | col.varchar(\{ length \}) states the length on the column. |
 | `restrictedFieldNames` | `@rebasepro/common` | restrictedKeys(descriptor, viewer, kind) from @rebasepro/common. |
 | `vectorPropertyNames` | `@rebasepro/common` | vectorColumnKeys(descriptor) from @rebasepro/common. |
 | `withRelationReferencesOnly` | `@rebasepro/common` | History entries hold the stored (wire) row, which embeds no related row; the history routes serve an older entry's relation refs as keys. Nothing replaces it. |
@@ -70,7 +70,7 @@ This list is written from `tooling/scripts/headless-guard/moved-symbols.json`, t
 | `DataTransformer` | `@rebasepro/types` | Nothing: the Postgres driver's codecs read the column descriptor. |
 | `deserializeCollections` | `@rebasepro/types` | Nothing: GET /api/schema/tables serves table descriptors; collections are not serialized. |
 | `hasForeignKeyOnTarget` | `@rebasepro/types` | Read RelationDescriptor.kind (hasOne \| hasMany). |
-| `InferCollectionConfigType` | `@rebasepro/types` | Infer a table's row with InferRow<typeof table>. |
+| `InferCollectionConfigType` | `@rebasepro/types` | Infer a table's row with InferRow\<typeof table>. |
 | `initTextSearch` | `@rebasepro/types` | DataDriver no longer declares it; the Firestore driver (FirestoreDataDriver) declares its own. |
 | `isManyToMany` | `@rebasepro/types` | Read RelationDescriptor.kind === "manyToMany". |
 | `isSerializedCollectionRef` | `@rebasepro/types` | Nothing: GET /api/schema/tables serves table descriptors; collections are not serialized. |

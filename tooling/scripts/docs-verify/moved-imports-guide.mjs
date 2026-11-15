@@ -26,8 +26,23 @@ const END = "{/* moved-imports:end */}";
 
 /** @typedef {{ symbol: string, from: string, to: string | null, as?: string, instead?: string }} Move */
 
-/** @param {string} text */
-const cell = (text) => text.replace(/\|/g, "\\|").replace(/\n/g, " ");
+/**
+ * One table cell of MDX. Outside inline code, `<` opens a JSX tag and `{` an
+ * expression: a note naming `client.data.<table>.find()` or
+ * `col.varchar({ length })` stopped the website build at this page. Those
+ * characters are backslash-escaped, which MDX reads as the literal character
+ * (a character reference such as `&#123;` would put a `;` beside the
+ * parenthesis, which the docs gate reads as a removed badge's leftover); code
+ * spans are left as written.
+ *
+ * @param {string} text
+ */
+const cell = (text) => text
+    .replace(/\n/g, " ")
+    .split(/(`[^`]*`)/)
+    .map((part, i) => (i % 2 === 1 ? part : part.replace(/[<{}]/g, (ch) => `\\${ch}`)))
+    .join("")
+    .replace(/\|/g, "\\|");
 
 /**
  * The markdown block for a list of moves.

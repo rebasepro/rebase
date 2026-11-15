@@ -1,5 +1,5 @@
 ---
-sourceHash: 76892ff09614f331
+sourceHash: 7d2312f8dc855186
 slug: pt/docs/upgrading/0-30-to-0-31-imports
 title: Imports movidos no 0.31
 sidebar_label: Imports movidos no 0.31
@@ -42,12 +42,12 @@ Esta lista foi gerada a partir de `tooling/scripts/headless-guard/moved-symbols.
 
 | Nome | Era exportado por | Em vez disso, use |
 |---|---|---|
-| `FindResponse` | `@rebasepro/client` | FindResult de @rebasepro/types: para o que client.data.<table>.find() resolve. |
+| `FindResponse` | `@rebasepro/client` | FindResult de @rebasepro/types: para o que client.data.\<table>.find() resolve. |
 | `defineCollection` | `@rebasepro/cms-types` | defineTable (backend/schema) + customizeTable para a apresentação do painel; defineFirestoreCollection (@rebasepro/firebase) para Firestore; defineLegacyCollection (@rebasepro/common/migrate) para fixtures da versão 0.30. |
 | `apiHiddenFieldNames` | `@rebasepro/common` | apiHiddenKeys(descriptor) de @rebasepro/common. |
 | `assertBeforeQueryIsPostgresOnly` | `@rebasepro/common` | Nada: Postgres é o único mecanismo de servidor. |
 | `buildPropertyCallbacks` | `@rebasepro/common` | Transformações de coluna: col.*().transform(...) na definição da tabela. |
-| `DEFAULT_STRING_COLUMN_LENGTH` | `@rebasepro/common` | col.varchar({ length }) declara o comprimento na coluna. |
+| `DEFAULT_STRING_COLUMN_LENGTH` | `@rebasepro/common` | col.varchar(\{ length \}) declara o comprimento na coluna. |
 | `defaultUsersCollection` | `@rebasepro/common` | defineAuthTable para o repositório de usuários; AUTH_SECRET_NAMES lista seus segredos. |
 | `defineCollection` | `@rebasepro/common` | defineTable (backend/schema); o CMS personaliza uma tabela com customizeTable; Firestore usa defineFirestoreCollection; fixtures legadas usam defineLegacyCollection de @rebasepro/common/migrate. |
 | `EntityCallbackContext` | `@rebasepro/common` | TableHookProps["context"] de @rebasepro/types. |
@@ -61,7 +61,7 @@ Esta lista foi gerada a partir de `tooling/scripts/headless-guard/moved-symbols.
 | `JunctionSpec` | `@rebasepro/common` | TableJunction de @rebasepro/common. |
 | `queryableFieldNames` | `@rebasepro/common` | queryableColumnKeys(descriptor) de @rebasepro/common. |
 | `resolveJunctionSpecs` | `@rebasepro/common` | resolveTableJunctions(descriptors) de @rebasepro/common. |
-| `resolveStringColumnLength` | `@rebasepro/common` | col.varchar({ length }) declara o comprimento na coluna. |
+| `resolveStringColumnLength` | `@rebasepro/common` | col.varchar(\{ length \}) declara o comprimento na coluna. |
 | `restrictedFieldNames` | `@rebasepro/common` | restrictedKeys(descriptor, viewer, kind) de @rebasepro/common. |
 | `vectorPropertyNames` | `@rebasepro/common` | vectorColumnKeys(descriptor) de @rebasepro/common. |
 | `withRelationReferencesOnly` | `@rebasepro/common` | Entradas de histórico contêm a linha armazenada (wire), que não embute nenhuma linha relacionada; as rotas de histórico servem referências de relação de uma entrada mais antiga como chaves. Nada o substitui. |
@@ -71,7 +71,7 @@ Esta lista foi gerada a partir de `tooling/scripts/headless-guard/moved-symbols.
 | `DataTransformer` | `@rebasepro/types` | Nada: os codecs do driver Postgres leem o descritor de coluna. |
 | `deserializeCollections` | `@rebasepro/types` | Nada: GET /api/schema/tables serve descritores de tabela; collections não são serializadas. |
 | `hasForeignKeyOnTarget` | `@rebasepro/types` | Leia RelationDescriptor.kind (hasOne \| hasMany). |
-| `InferCollectionConfigType` | `@rebasepro/types` | Infira a linha de uma tabela com InferRow<typeof table>. |
+| `InferCollectionConfigType` | `@rebasepro/types` | Infira a linha de uma tabela com InferRow\<typeof table>. |
 | `initTextSearch` | `@rebasepro/types` | DataDriver não o declara mais; o driver do Firestore (FirestoreDataDriver) declara o seu próprio. |
 | `isManyToMany` | `@rebasepro/types` | Leia RelationDescriptor.kind === "manyToMany". |
 | `isSerializedCollectionRef` | `@rebasepro/types` | Nada: GET /api/schema/tables serve descritores de tabela; collections não são serializadas. |

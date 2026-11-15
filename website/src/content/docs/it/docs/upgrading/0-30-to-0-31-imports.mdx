@@ -1,5 +1,5 @@
 ---
-sourceHash: 76892ff09614f331
+sourceHash: 7d2312f8dc855186
 slug: it/docs/upgrading/0-30-to-0-31-imports
 title: Import spostati nella 0.31
 sidebar_label: Import spostati nella 0.31
@@ -42,12 +42,12 @@ Questo elenco è generato a partire da `tooling/scripts/headless-guard/moved-sym
 
 | Nome | Era esportato da | Scrivere invece |
 |---|---|---|
-| `FindResponse` | `@rebasepro/client` | FindResult da @rebasepro/types: ciò a cui si risolve client.data.<table>.find(). |
+| `FindResponse` | `@rebasepro/client` | FindResult da @rebasepro/types: ciò a cui si risolve client.data.\<table>.find(). |
 | `defineCollection` | `@rebasepro/cms-types` | defineTable (backend/schema) + customizeTable per la presentazione del pannello; defineFirestoreCollection (@rebasepro/firebase) per Firestore; defineLegacyCollection (@rebasepro/common/migrate) per le fixture della 0.30. |
 | `apiHiddenFieldNames` | `@rebasepro/common` | apiHiddenKeys(descriptor) da @rebasepro/common. |
 | `assertBeforeQueryIsPostgresOnly` | `@rebasepro/common` | Nulla: Postgres è l'unico engine del server. |
 | `buildPropertyCallbacks` | `@rebasepro/common` | Trasformazioni di colonna: col.*().transform(...) nella definizione della tabella. |
-| `DEFAULT_STRING_COLUMN_LENGTH` | `@rebasepro/common` | col.varchar({ length }) specifica la lunghezza sulla colonna. |
+| `DEFAULT_STRING_COLUMN_LENGTH` | `@rebasepro/common` | col.varchar(\{ length \}) specifica la lunghezza sulla colonna. |
 | `defaultUsersCollection` | `@rebasepro/common` | defineAuthTable per l'archivio utenti; AUTH_SECRET_NAMES ne elenca i secret. |
 | `defineCollection` | `@rebasepro/common` | defineTable (backend/schema); il CMS personalizza una tabella con customizeTable; Firestore usa defineFirestoreCollection; le fixture legacy usano defineLegacyCollection da @rebasepro/common/migrate. |
 | `EntityCallbackContext` | `@rebasepro/common` | TableHookProps["context"] da @rebasepro/types. |
@@ -61,7 +61,7 @@ Questo elenco è generato a partire da `tooling/scripts/headless-guard/moved-sym
 | `JunctionSpec` | `@rebasepro/common` | TableJunction da @rebasepro/common. |
 | `queryableFieldNames` | `@rebasepro/common` | queryableColumnKeys(descriptor) da @rebasepro/common. |
 | `resolveJunctionSpecs` | `@rebasepro/common` | resolveTableJunctions(descriptors) da @rebasepro/common. |
-| `resolveStringColumnLength` | `@rebasepro/common` | col.varchar({ length }) specifica la lunghezza sulla colonna. |
+| `resolveStringColumnLength` | `@rebasepro/common` | col.varchar(\{ length \}) specifica la lunghezza sulla colonna. |
 | `restrictedFieldNames` | `@rebasepro/common` | restrictedKeys(descriptor, viewer, kind) da @rebasepro/common. |
 | `vectorPropertyNames` | `@rebasepro/common` | vectorColumnKeys(descriptor) da @rebasepro/common. |
 | `withRelationReferencesOnly` | `@rebasepro/common` | Le voci della cronologia contengono la riga memorizzata (wire), che non incorpora alcuna riga correlata; le route della cronologia restituiscono i riferimenti alle relazioni di una voce precedente sotto forma di chiavi. Nessun sostituto. |
@@ -71,7 +71,7 @@ Questo elenco è generato a partire da `tooling/scripts/headless-guard/moved-sym
 | `DataTransformer` | `@rebasepro/types` | Nulla: i codec del driver Postgres leggono il descrittore di colonna. |
 | `deserializeCollections` | `@rebasepro/types` | Nulla: GET /api/schema/tables fornisce descrittori di tabella; le collection non vengono serializzate. |
 | `hasForeignKeyOnTarget` | `@rebasepro/types` | Leggere RelationDescriptor.kind (hasOne \| hasMany). |
-| `InferCollectionConfigType` | `@rebasepro/types` | Inferire la riga di una tabella con InferRow<typeof table>. |
+| `InferCollectionConfigType` | `@rebasepro/types` | Inferire la riga di una tabella con InferRow\<typeof table>. |
 | `initTextSearch` | `@rebasepro/types` | DataDriver non lo dichiara più; il driver Firestore (FirestoreDataDriver) ne dichiara uno proprio. |
 | `isManyToMany` | `@rebasepro/types` | Leggere RelationDescriptor.kind === "manyToMany". |
 | `isSerializedCollectionRef` | `@rebasepro/types` | Nulla: GET /api/schema/tables fornisce descrittori di tabella; le collection non vengono serializzate. |
