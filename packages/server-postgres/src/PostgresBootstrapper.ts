@@ -50,8 +50,9 @@ import type { TableMeta } from "./schema/introspect-db-logic";
 import { findServedTableProtection, warnNarrowedTables, withholdUnprotectedTables } from "./security/served-table-protection";
 import { assertAppRoleRestricted, assertRecordedRequestRoles, detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, ensureConnectionInheritsAdminRole, findExposedInternalTables, findOtherRoleMembers, findUngrantableTables, proveRoleSwitch, readRecordedRequestRoles, recordRequestRoles, revokeUserRoleSql, roleHoldsTableGrants, settleAdminSwitch, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type ManagedTable, type RawSqlRunner } from "./security/rls-enforcement";
 import { resolveRlsSettings, rlsConfigFromEnv, rlsHandoverNotes, type PostgresRlsConfig, type RlsSettings } from "./security/rls-settings";
-import { provisionTriggerCdc, removeTriggerCdc, settleInstalledCapture, type CdcTableRef } from "./services/cdc/trigger-cdc";
-import { provisionWalPublication, reportUnpublishedTables, walCaptureBlocker } from "./services/cdc/wal-cdc";
+import { provisionTriggerCdc, settleInstalledCapture, type CdcTableRef } from "./services/cdc/trigger-cdc";
+import { provisionWalPublication, reportUnpublishedTables, walCaptureBlocker, walFallbackNotice } from "./services/cdc/wal-cdc";
+import { retireTriggerCaptureIfUnused, TRIGGER_RETIREMENT_INTERVAL_MS } from "./services/cdc/capture-consumers";
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
 import { tableKeyColumns } from "./services/cdc/identity-columns";
 import type { RuntimeTable } from "./model/runtime-table";
@@ -1407,11 +1408,16 @@ export async function openPostgresDriver(
     // becomes the cross-instance channel, so the legacy per-mutation
     // LISTEN/NOTIFY is not started alongside it.
     // `realtime.cdc` (`REALTIME_CDC` at boot):
-    //   auto     → default: enable where the connection supports it;
-    //              silently fall back to app-level otherwise
+    //   auto     → default: stream from the WAL where the database allows
+    //              it (wal_level=logical, a role that may replicate, a free
+    //              slot), else trigger capture, else app-level — each
+    //              fallback an info line, not a warning
     //   trigger  → force trigger-based capture (warns if it can't)
-    //   wal      → prefer WAL logical replication (degrades to trigger)
+    //   wal      → WAL logical replication (warns, degrades to trigger)
     //   off      → app-level realtime only
+    // A WAL-streaming process that provisions takes the triggers off only
+    // once no other instance is listening on them — see
+    // `retireTriggerCaptureIfUnused`.
     const cdcMode = parseRealtimeCdcMode(pgConfig.realtime?.cdc ?? "auto", "realtime.cdc");
 
     // `auto` tries CDC but treats "can't" as a normal outcome (info log);
@@ -1477,7 +1483,7 @@ export async function openPostgresDriver(
         // the way — wal_level, a role that may not replicate, no free slot
         // — falls through to trigger capture below.
         let walActive = false;
-        if (cdcMode === "wal") {
+        if (cdcMode === "wal" || cdcMode === "auto") {
             try {
                 const blocker = await walCaptureBlocker(cdcRunSql);
                 if (blocker) throw new Error(blocker);
@@ -1485,10 +1491,8 @@ export async function openPostgresDriver(
                 if (realtimeSubscribes) await realtimeService.enableWalCdc(directUrl, cdcTables);
                 walActive = true;
             } catch (err) {
-                logger.warn(
-                    "⚠️ [CDC] REALTIME_CDC=wal, but changes cannot be streamed from the WAL — using trigger-based capture instead.",
-                    { detail: err instanceof Error ? err.message : String(err) }
-                );
+                const notice = walFallbackNotice(cdcMode);
+                logger[notice.level](notice.message, { detail: err instanceof Error ? err.message : String(err) });
             }
         }
 
@@ -1497,23 +1501,63 @@ export async function openPostgresDriver(
             if (realtimeProvisions && realtimeSubscribes) {
                 // This process streams the WAL, so the capture triggers now
                 // only cost every write a trigger and a NOTIFY: they come off,
-                // as with REALTIME_CDC=off. An instance still running trigger
-                // capture stops hearing writes made elsewhere until it is
-                // replaced; its own writes still reach its subscribers.
+                // as with REALTIME_CDC=off — but not while another instance
+                // still hears changes through them (a replica that found no
+                // free replication slot, an older version mid-rollout).
+                // Removing them then would leave it deaf to every write made
+                // elsewhere. They are kept, brought up to date, and retired
+                // by a periodic check once the last such listener is gone.
+                const ownName = realtimeService.listenerInstanceName;
+                let triggersKept = false;
                 try {
-                    const removed = await removeTriggerCdc(cdcRunSql);
-                    cdcFunctionCurrent = true;
-                    if (removed > 0) {
-                        logger.info(`ℹ️ [CDC] Removed ${removed} change-capture trigger(s): this process streams changes from the WAL instead.`);
+                    const retirement = await retireTriggerCaptureIfUnused(cdcRunSql, ownName);
+                    if ("removed" in retirement) {
+                        cdcFunctionCurrent = true;
+                        if (retirement.removed > 0) {
+                            logger.info(`ℹ️ [CDC] Removed ${retirement.removed} change-capture trigger(s): this process streams changes from the WAL instead.`);
+                        }
+                    } else {
+                        triggersKept = true;
+                        logger.info(
+                            "ℹ️ [CDC] Keeping the change-capture triggers: " +
+                            (retirement.consumers === undefined
+                                ? "could not tell whether another instance still listens on them."
+                                : `${retirement.consumers} other realtime connection(s) may still listen on them.`) +
+                            " They come off once none does."
+                        );
                     }
                 } catch (err) {
+                    triggersKept = true;
                     logger.warn(
-                        "⚠️ [CDC] Could not remove the change-capture triggers, so every write still runs one and a NOTIFY. The next boot tries again.",
+                        "⚠️ [CDC] Could not remove the change-capture triggers, so every write still runs one and a NOTIFY. This process tries again.",
                         { detail: err instanceof Error ? err.message : String(err) }
                     );
                 }
+                if (triggersKept) {
+                    // Kept for someone, so kept current: tables a later boot
+                    // step creates get one too, as in a provisioning-only process.
+                    try {
+                        await provisionTriggerCdc(cdcRunSql, cdcTables);
+                        cdcFunctionCurrent = true;
+                    } catch (err) {
+                        logger.warn(
+                            "⚠️ [CDC] Could not bring the kept change-capture triggers up to date.",
+                            { detail: err instanceof Error ? err.message : String(err) }
+                        );
+                    }
+                    realtimeService.scheduleTriggerCaptureRetirement(async () => {
+                        const retirement = await retireTriggerCaptureIfUnused(cdcRunSql, ownName);
+                        if (!("removed" in retirement)) return false;
+                        triggersKept = false;
+                        if (retirement.removed > 0) {
+                            logger.info(`ℹ️ [CDC] Removed ${retirement.removed} change-capture trigger(s): no other instance listens on them any more.`);
+                        }
+                        return true;
+                    }, TRIGGER_RETIREMENT_INTERVAL_MS);
+                }
                 provisionCdcForTables = async (tables) => {
                     reportUnpublishedTables(await provisionWalPublication(cdcRunSql, tables));
+                    if (triggersKept) await provisionTriggerCdc(cdcRunSql, tables);
                 };
             } else if (realtimeProvisions) {
                 // Provisioning alone: the consumers are other processes, and
@@ -1543,11 +1587,30 @@ export async function openPostgresDriver(
                 // Provisioning throws only when the connection can't create the
                 // trigger function (insufficient privilege); enableCdc throws when
                 // the LISTEN connection can't be established. Either → fall back.
+                // The LISTEN goes first: a WAL-streaming instance booting at the
+                // same moment takes the triggers off only when it sees nobody
+                // listening, and this connection is how it sees us.
+                // A LISTEN that fails still lets provisioning run, as it did
+                // when provisioning came first: other instances may hear
+                // through the triggers this one cannot.
+                let listenError: unknown;
+                if (realtimeSubscribes) {
+                    try {
+                        await realtimeService.enableCdc(directUrl);
+                    } catch (err) {
+                        listenError = err;
+                    }
+                }
                 if (realtimeProvisions) {
-                    await provisionTriggerCdc(cdcRunSql, cdcTables);
+                    try {
+                        await provisionTriggerCdc(cdcRunSql, cdcTables);
+                    } catch (err) {
+                        if (realtimeSubscribes && listenError === undefined) await realtimeService.stopCdc().catch(() => undefined);
+                        throw err;
+                    }
                     cdcFunctionCurrent = true;
                 }
-                if (realtimeSubscribes) await realtimeService.enableCdc(directUrl);
+                if (listenError !== undefined) throw listenError;
                 cdcEnabled = true;
                 // Boot steps that create their own tables (auth) run after
                 // this one and use it to instrument what they just created.

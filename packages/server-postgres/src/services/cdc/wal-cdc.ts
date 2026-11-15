@@ -51,6 +51,21 @@ export async function walCaptureBlocker(run: RawSqlRunner): Promise<string | und
     return undefined;
 }
 
+/**
+ * What a boot says when it tried WAL capture and could not use it, before it
+ * falls back to the capture triggers.
+ *
+ * `REALTIME_CDC=wal` asked for the WAL, so not getting it is a warning.
+ * `auto` — the default — tries the WAL wherever it might work, and most
+ * databases are not set up for logical decoding: there, falling back is the
+ * expected outcome and an info line.
+ */
+export function walFallbackNotice(mode: "auto" | "wal"): { level: "info" | "warn"; message: string } {
+    return mode === "wal"
+        ? { level: "warn", message: "⚠️ [CDC] REALTIME_CDC=wal, but changes cannot be streamed from the WAL — using trigger-based capture instead." }
+        : { level: "info", message: "ℹ️ [CDC] Changes cannot be streamed from the WAL here — using trigger-based capture (REALTIME_CDC=auto)." };
+}
+
 export interface WalPublicationResult {
     /** Tables in the publication, including ones an earlier boot added. */
     published: CdcTableRef[];

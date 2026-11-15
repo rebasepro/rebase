@@ -21,6 +21,7 @@ import { CdcListener, type CdcChangeEvent, type CdcSource } from "./cdc/CdcListe
 import { WalCdcListener } from "./cdc/WalCdcListener";
 import { CDC_PUBLICATION } from "./cdc/wal-cdc";
 import type { CdcTableRef } from "./cdc/trigger-cdc";
+import { REALTIME_LISTENER_APPLICATION_PREFIX, realtimeListenerApplicationName } from "./cdc/capture-consumers";
 import { PgNotifyListener } from "./pg-notify-listener";
 import { terminateIfBacklogged } from "./socket-liveness";
 import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collection-helpers";
@@ -35,13 +36,6 @@ import { unref } from "@rebasepro/utils";
 
 /** Channel name used for Postgres LISTEN/NOTIFY cross-instance realtime. */
 const PG_NOTIFY_CHANNEL = "rebase_entity_changes";
-
-/**
- * How every realtime LISTEN connection names itself (`application_name`,
- * followed by the instance id), so an instance can count the others serving
- * realtime on the same database.
- */
-const REALTIME_LISTENER_APPLICATION_PREFIX = "rebase-realtime:";
 
 /**
  * The id of a change that names no row — a `TRUNCATE`, a key too large to
@@ -740,8 +734,16 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     // ── Cross-instance LISTEN/NOTIFY ──
     /** Unique identifier for this process instance, used to skip own notifications. */
     private readonly instanceId = `inst_${randomUUID().slice(0, 8)}`;
-    /** What this instance's LISTEN connections report in `pg_stat_activity`. */
-    private readonly listenerApplicationName = `${REALTIME_LISTENER_APPLICATION_PREFIX}${this.instanceId}`;
+    /**
+     * The name this instance's realtime connections report in
+     * `pg_stat_activity` (`application_name`), each followed by what the
+     * connection is for — see {@link realtimeListenerApplicationName}. Other
+     * instances count these, and a WAL-streaming one reads them to tell
+     * whether anybody still LISTENs on the capture triggers.
+     */
+    readonly listenerInstanceName = `${REALTIME_LISTENER_APPLICATION_PREFIX}${this.instanceId}`;
+    /** While the capture triggers are kept for another instance, the timer that retires them once it is gone. */
+    private triggerRetirementTimer?: ReturnType<typeof setInterval>;
     /** The LISTEN connection on {@link PG_NOTIFY_CHANNEL}, outside the Drizzle pool. */
     private crossInstanceListener?: PgNotifyListener;
     /** Whether cross-instance broadcasting is active. */
@@ -2845,7 +2847,7 @@ roles: ["anon"] };
                     SELECT count(*)::int AS n FROM pg_stat_activity
                     WHERE datname = current_database()
                       AND starts_with(application_name, ${REALTIME_LISTENER_APPLICATION_PREFIX})
-                      AND application_name <> ${this.listenerApplicationName}`);
+                      AND NOT starts_with(application_name, ${this.listenerInstanceName})`);
                 const n = Number((result.rows?.[0] as { n?: unknown } | undefined)?.n ?? 0);
                 if (n > 0) {
                     this.foreignInstanceSeen = true;
@@ -3806,7 +3808,7 @@ lastSeen: Date.now() });
             connectionString,
             (events) => this.handleCdcEvents(events),
             () => this.resyncSubscriptions(),
-            this.listenerApplicationName
+            realtimeListenerApplicationName(this.listenerInstanceName, "cdc")
         ));
     }
 
@@ -3829,7 +3831,7 @@ lastSeen: Date.now() });
             onEvents: (events) => this.handleCdcEvents(events),
             onReconnect: () => this.resyncSubscriptions(),
             identityColumns: (schema, table) => identity.get(`${schema}.${table}`),
-            applicationName: this.listenerApplicationName
+            applicationName: realtimeListenerApplicationName(this.listenerInstanceName, "wal")
         }));
     }
 
@@ -3891,8 +3893,37 @@ lastSeen: Date.now() });
         this.junctionLinkMap = buildJunctionLinkMap(this.registry);
     }
 
+    /**
+     * Try `retire` every `intervalMs` until it answers true — how a
+     * WAL-streaming instance takes the capture triggers off once the last
+     * instance still listening on them is gone. Replaces any earlier schedule;
+     * stopped with the CDC listener.
+     */
+    scheduleTriggerCaptureRetirement(retire: () => Promise<boolean>, intervalMs: number): void {
+        this.cancelTriggerCaptureRetirement();
+        let running = false;
+        const timer = setInterval(() => {
+            if (running) return;
+            running = true;
+            void retire()
+                .then((done) => {
+                    if (done && this.triggerRetirementTimer === timer) this.cancelTriggerCaptureRetirement();
+                })
+                .catch((error) => this.debugLog("[CDC] Retiring the capture triggers failed; trying again later", error))
+                .finally(() => { running = false; });
+        }, intervalMs);
+        unref(timer);
+        this.triggerRetirementTimer = timer;
+    }
+
+    private cancelTriggerCaptureRetirement(): void {
+        if (this.triggerRetirementTimer) clearInterval(this.triggerRetirementTimer);
+        this.triggerRetirementTimer = undefined;
+    }
+
     /** Stop the CDC listener and clear its state. */
     async stopCdc(): Promise<void> {
+        this.cancelTriggerCaptureRetirement();
         this.cdcActive = false;
         if (this.cdcListener) {
             await this.cdcListener.stop();
@@ -4178,7 +4209,7 @@ lastSeen: Date.now() });
             onPayload: (payload) => this.handleCrossInstanceNotification(payload),
             onReconnect: () => this.resyncSubscriptions(),
             retryInitialConnect: true,
-            applicationName: this.listenerApplicationName
+            applicationName: realtimeListenerApplicationName(this.listenerInstanceName, "entity")
         });
         await this.crossInstanceListener.start();
         logger.info(`📡 [RealtimeService] Cross-instance realtime enabled (instanceId: ${this.instanceId})`);

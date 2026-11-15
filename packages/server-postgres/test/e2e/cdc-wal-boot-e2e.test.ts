@@ -9,7 +9,10 @@
  *  - a process that only provisions keeps the triggers, for a consumer that
  *    turns out unable to stream and falls back to LISTEN;
  *  - on a server without logical decoding it falls back to trigger capture
- *    rather than to no capture.
+ *    rather than to no capture;
+ *  - `auto`, the default, does the same — and a WAL-streaming process keeps
+ *    the triggers while another instance still listens on them, so that
+ *    instance does not go deaf, and retires them once it is gone.
  *
  * Requires Docker.
  */
@@ -24,6 +27,7 @@ import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import type { RealtimeService } from "../../src/services/realtimeService.js";
 import { CDC_PUBLICATION } from "../../src/services/cdc/wal-cdc.js";
 import { tablesFromCollections } from "../helpers/tables.js";
+import { retireTriggerCaptureIfUnused } from "../../src/services/cdc/capture-consumers.js";
 
 const ordersCollection: LegacyCollectionConfig = {
     name: "Orders",
@@ -172,6 +176,68 @@ describe("REALTIME_CDC=wal through the bootstrapper (E2E)", () => {
             expect(await rawWriteArrives(url, consumer, "consumed")).toBe(true);
         } finally {
             await consumer.end();
+        }
+    }, 60_000);
+
+    it("auto streams from the WAL on a database that allows it", async () => {
+        const url = logical.connectionString;
+        const before = await boot(url, "trigger", { subscribe: true, provision: true });
+        await before.end();
+        expect(await captureTriggers(url)).toBeGreaterThan(0);
+
+        const booted = await boot(url, "auto", { subscribe: true, provision: true });
+        try {
+            expect(await captureTriggers(url)).toBe(0);
+            expect(await slots(url)).toBe(1);
+            expect(await rawWriteArrives(url, booted, "auto-streamed")).toBe(true);
+        } finally {
+            await booted.end();
+        }
+        expect(await slots(url)).toBe(0);
+    }, 60_000);
+
+    it("auto keeps the triggers while another instance listens on them, and retires them once it is gone", async () => {
+        const url = logical.connectionString;
+        // An instance on trigger capture — a replica that found no free slot,
+        // or an older version mid-rollout.
+        const listener = await boot(url, "trigger", { subscribe: true, provision: true });
+        let streamer: Booted | undefined;
+        try {
+            streamer = await boot(url, "auto", { subscribe: true, provision: true });
+            expect(await slots(url)).toBe(1);
+            expect(await captureTriggers(url)).toBeGreaterThan(0);
+            // Both still hear a write made outside either of them.
+            expect(await rawWriteArrives(url, listener, "heard-by-trigger")).toBe(true);
+            expect(await rawWriteArrives(url, streamer, "heard-by-wal")).toBe(true);
+
+            await listener.end();
+            const ownName = (streamer.result.realtimeProvider as RealtimeService).listenerInstanceName;
+            const run = async (text: string) => query<Record<string, unknown>>(url, text);
+            // The listener's backend may take a moment to leave pg_stat_activity.
+            let retirement = await retireTriggerCaptureIfUnused(run, ownName);
+            for (let i = 0; i < 40 && !("removed" in retirement); i++) {
+                await new Promise((r) => setTimeout(r, 250));
+                retirement = await retireTriggerCaptureIfUnused(run, ownName);
+            }
+            expect("removed" in retirement && retirement.removed > 0).toBe(true);
+            expect(await captureTriggers(url)).toBe(0);
+            expect(await rawWriteArrives(url, streamer, "after-retirement")).toBe(true);
+        } finally {
+            await listener.end().catch(() => {});
+            await streamer?.end();
+        }
+    }, 90_000);
+
+    it("auto falls back to trigger capture on a server without logical decoding", async () => {
+        const url = replica.connectionString;
+        const booted = await boot(url, "auto", { subscribe: true, provision: true });
+        try {
+            expect((booted.result.realtimeProvider as RealtimeService).isCdcActive()).toBe(true);
+            expect(await captureTriggers(url)).toBeGreaterThan(0);
+            expect(await slots(url)).toBe(0);
+            expect(await rawWriteArrives(url, booted, "auto-via-trigger")).toBe(true);
+        } finally {
+            await booted.end();
         }
     }, 60_000);
 

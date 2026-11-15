@@ -68,9 +68,12 @@ and every client shares one bucket. See
 ## Realtime
 
 **Table subscriptions** work across instances when database-level change
-capture is on, which it is by default (`REALTIME_CDC=auto`): a trigger announces
-each committed write, and every instance's listener refetches for its own
-subscribers. If CDC is off, or `auto` could not provision it (the boot log says
+capture is on, which it is by default (`REALTIME_CDC=auto`): the write-ahead
+log (where the database allows logical decoding) or a trigger announces each
+committed write, and every instance's listener refetches for its own
+subscribers. Instances on WAL capture leave the triggers in place while any
+instance still listens on them, so a replica that fell back to triggers is
+never left deaf. If CDC is off, or `auto` could not provision it (the boot log says
 which), a subscription sees only the writes made through the instance its
 socket is connected to. See
 [Realtime](/docs/backend/realtime-cdc/).

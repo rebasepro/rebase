@@ -14,7 +14,7 @@ CDC is controlled by the `REALTIME_CDC` environment variable:
 
 | Value | Behavior |
 | --- | --- |
-| `auto` *(default)* | Enable database-level capture where the connection supports it; **silently fall back** to application-level realtime otherwise. Zero-config. |
+| `auto` *(default)* | Read changes from the WAL where the database allows it, else use the capture triggers, else fall back to application-level realtime. Each fallback is an informational log line, not a warning. Zero-config. See [Capture from the WAL](#capture-from-the-wal). |
 | `trigger` | Force trigger-based capture. Works on any PostgreSQL, including managed instances without logical replication. Warns (rather than silently falling back) if it can't provision. |
 | `wal` | Read changes from the write-ahead log through logical replication instead of triggers, so a write runs no trigger and sends no `NOTIFY`. Needs `wal_level=logical` and a role that may replicate; falls back to `trigger`, with a warning, when either is missing. See [Capture from the WAL](#capture-from-the-wal). |
 | `off` | Application-level realtime only. Use this to avoid the per-write trigger overhead on write-heavy workloads. A boot with `off` that owns the schema also **removes** the capture triggers and functions an earlier boot installed, and logs how many it took off; unset it and the next boot installs them again. |
@@ -49,7 +49,7 @@ If the connection can't support it, `auto` logs an informational line instead an
 
 ## Capture from the WAL
 
-`REALTIME_CDC=wal` reads changes from PostgreSQL's write-ahead log through logical replication (the built-in `pgoutput` plugin) instead of triggers. A write then runs no trigger and sends no `NOTIFY`, which matters once writes are concurrent: a transaction that called `NOTIFY` takes one lock for the whole server at commit and holds it through the disk flush, so under trigger capture those commits happen one at a time. Measured on PostgreSQL 18 with 32 concurrent writers and a 1&nbsp;ms disk flush, trigger capture held inserts to about a tenth of the rate WAL capture reached.
+`REALTIME_CDC=wal`, and `auto` wherever the database allows it, reads changes from PostgreSQL's write-ahead log through logical replication (the built-in `pgoutput` plugin) instead of triggers. A write then runs no trigger and sends no `NOTIFY`, which matters once writes are concurrent: a transaction that called `NOTIFY` takes one lock for the whole server at commit and holds it through the disk flush, so under trigger capture those commits happen one at a time. Measured on PostgreSQL 18 with 32 concurrent writers and a 1&nbsp;ms disk flush, trigger capture held inserts to about a tenth of the rate WAL capture reached.
 
 It needs:
 
@@ -58,14 +58,14 @@ It needs:
 - One free replication slot and WAL sender per server instance (`max_replication_slots` and `max_wal_senders`, both 10 by default).
 - A direct connection (`DATABASE_DIRECT_URL`): a pooler does not carry the replication protocol.
 
-When any of these is missing, the boot logs why and uses trigger capture instead.
+When any of these is missing, the boot logs why and uses trigger capture instead: a warning under `wal`, an informational line under `auto`, since most databases are not set up for logical decoding and that is the expected outcome there.
 
 What a boot does:
 
 - It creates a publication named `rebase_cdc` and adds every served table and every many-to-many junction table to it. Tables are only ever added, so an older version still running during a rolling deploy cannot take a newer table's table back out.
 - A table with no primary key, or with `REPLICA IDENTITY NOTHING`, is left out with a warning: PostgreSQL refuses `UPDATE` and `DELETE` on a published table that cannot say which row changed. Writes to it made outside Rebase are not captured.
 - Each instance streams the publication through its own **temporary** replication slot, which PostgreSQL drops when the connection closes, so an instance that crashes cannot leave a slot behind holding WAL until the disk fills. A reconnect starts a new slot, and every subscription refetches, because what committed in the gap is not replayed.
-- Once its stream is open, a boot that both provisions and consumes removes the capture triggers, as `off` does. During a rolling deploy away from trigger capture, instances still running it stop hearing writes made elsewhere until they are replaced; their own writes still reach their subscribers. A process that only provisions, such as the migration job of a [split deployment](/docs/deployment/split-processes/), keeps the triggers for consumers that cannot stream and fall back to them.
+- Once its stream is open, a boot that both provisions and consumes removes the capture triggers, as `off` does, but only when no other instance is still listening on them. An instance that fell back to trigger capture (it found no free replication slot, say) or an older version still running during a rolling deploy would otherwise stop hearing writes made elsewhere. Every realtime connection names itself in `application_name` (`rebase-realtime:<instance>:cdc`, `:wal` or `:entity`), so the boot reads `pg_stat_activity` to see who still listens. An older version's connection, which carries no suffix, counts as listening. While anyone listens, or when the check cannot be made, the triggers stay and are kept up to date. Every five minutes the instance checks again, and it removes them once nobody is listening. A process that only provisions, such as the migration job of a [split deployment](/docs/deployment/split-processes/), keeps the triggers for consumers that cannot stream and fall back to them.
 
 Writers keep their full speed under a burst, but one WAL sender decodes each slot, so past several thousand writes per second sustained, events can arrive late. A role with `REPLICATION` can read every row of a published table through a slot of its own; the stream stays inside the server, and subscribers still re-read each row under their own RLS.
 
