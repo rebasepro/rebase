@@ -7,6 +7,11 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+### Fixed
+
+- **`rebase migrate collections-to-tables` writes `.js` import extensions when the project's collections do.** A project whose collection files import each other as Node ESM does (`./users.js`) builds its backend with plain `tsc` and runs it on Node. In 0.31.0 the codemod wrote the schema index, the imports between tables, the customizations and the CMS index without the extension, so the compiled `backend/schema` could not be imported and the server failed at start-up. The codemod now follows the project's own spelling; a project that imports extensionless gets the same output as before.
+- **A schema module that fails on an extensionless relative import says what to write.** When a compiled `backend/schema/index.js` imports `./users` and Node's ESM loader refuses it, the start-up error now names the import, the spelling Node needs (`./users.js`), and that `rebase build` adds it.
+
 ## [0.31.0] - 2026-11-15
 
 0.31 makes the backend Postgres-first: the tables you declare with `defineTable` in `backend/schema/` are the only thing the backend knows about your data, and the admin panel renders what the server serves. `rebase migrate collections-to-tables` moves a project and proves the generated SQL unchanged. Every Breaking entry has its section in [Upgrading 0.30 → 0.31](https://rebase.pro/docs/upgrading/0-30-to-0-31/).
