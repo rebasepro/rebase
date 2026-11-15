@@ -1,5 +1,5 @@
 ---
-sourceHash: 9d048d537401732a
+sourceHash: b225492a194c9e7e
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Les groupes de commandes pour Rebase Cloud dans la CLI — auth, liaison de projet, déploiements, notifications, configuration, organisations, bases de données, ressources, calcul, stockage, clusters, facturation et utilisation.
@@ -326,10 +326,10 @@ Les lignes de vos propres tables suivent leur clé étrangère :
 
 Vérifiez lesquelles de vos liaisons sont en cascade avant de passer `--yes` : cette action est irréversible.
 
-La commande lit `REBASE_SERVICE_KEY` de la même manière que `env reveal` ; elle requiert donc d'être
-propriétaire ou administrateur (ou d'utiliser un jeton doté de la capacité `env` appartenant à l'un d'eux). La
-clé reste en mémoire et n'est transmise qu'à l'adresse propre du projet. Un projet exécutant un
-runtime plus ancien est averti qu'il doit utiliser une version plus récente.
+La commande passe par le proxy Studio de la console, qui détient la clé de l'application : la clé n'atteint jamais
+votre machine. Elle requiert un propriétaire ou un administrateur de l'organisation, sur un projet dont l'accès Studio
+est activé (`rebase cloud settings set --studio on`). Un projet sur un runtime plus ancien est averti qu'il lui en faut
+un plus récent. `rebase users guests --project <slug>` est la même commande dans la famille des commandes de projet.
 
 ## Ressources
 
@@ -368,7 +368,6 @@ rebase cloud storage             # list storage buckets
 rebase cloud storage create      # provision platform-managed storage
 rebase cloud storage attach      # attach your own S3-compatible bucket
 rebase cloud notifications [list] | add <url> | test <id> | remove <id>   # deploy, backup, billing and usage events to Slack, Discord or any URL
-rebase cloud webhooks            # retired: exits 1 (`command_retired`) and names `notifications`
 rebase cloud clusters list | add | verify | registry   # the clusters tenants run on; `add` registers one from a kubeconfig
 rebase cloud billing             # the billing account and card on file
 rebase cloud billing setup       # attach a card, one-time, opens a browser
@@ -430,3 +429,23 @@ projet revendiqué depuis un agent ne compte que les jours à partir de la reven
 `autoscale_not_charged` (des pods ont fonctionné au-delà de `--replicas` et cette plateforme ne les
 facture pas encore). La réponse pour un projet avec dimensionnement automatique comporte également `autoscale` :
 `extraPodSeconds` au-dessus du seuil de base, `amountEur` selon ses tarifs, et `charged`.
+
+## Deploy hooks, alertes et le reste
+
+<span class="since-badge" data-since="0.32">Since 0.32</span>
+
+```bash
+rebase cloud deploy-hooks [list] | create [--name <name>] [--branch <branch>] | revoke <id>   # secret URLs a git host or CI calls to deploy
+rebase cloud alerts [list] [--all] | ack <id> | snooze <id> --hours <1-168>   # the project's incidents
+rebase cloud deploy --git [<branch>]     # build on the control plane from the connected repository
+rebase cloud metrics --runtime           # requests, errors and latency, per surface
+rebase cloud metrics --history [--series cpu_millicores|memory_bytes|event_loop_delay_ms] [--minutes <n>]
+rebase cloud domains primary <domain>    # make a verified domain the canonical one
+rebase cloud settings set --studio on|off
+rebase cloud orgs rename <name> [--slug <slug>]
+rebase cloud orgs delete                 # refused while the organization has projects
+rebase cloud billing email <address>     # where invoices go
+rebase cloud clusters baseline <id> [--install]   # platform admins
+```
+
+`deploy-hooks create` affiche l'URL du hook une seule fois. `deploy --git` ne se combine pas avec les options d'un build local et, sur le runtime géré, demande `--eject`, car le plan de contrôle compile depuis les sources. `settings set --studio` est l'interrupteur que les commandes de projet (`rebase data`, `rebase users`, …) exigent activé pour `--project` : elles atteignent l'application via le proxy Studio de la console. Une commande dont la route du plan de contrôle n'est pas encore déployée répond `not_served` et la nomme. Les commandes destructives demandent d'abord confirmation et refusent avec `confirmation_required` quand personne ne peut répondre : passez `--yes`.

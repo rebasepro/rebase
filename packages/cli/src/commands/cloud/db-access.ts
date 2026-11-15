@@ -22,10 +22,16 @@ import {
     emit,
     keyValues,
     success,
-    reportError,
     confirmDestructive,
     fail
 } from "./context";
+import { reportCallError, type Unserved } from "./not-served";
+
+/** What `db access` says on a control plane that has no `db-access` function yet. */
+const DB_ACCESS_UNSERVED: Unserved = {
+    what: "external database access",
+    hint: "Nothing was changed. `rebase cloud db connect` opens a tunnel to the database from this machine."
+};
 
 /** What `db-access` answers. Mirrors `saas/backend/src/db/external-access.ts`. */
 export interface DbAccessStatus {
@@ -120,9 +126,23 @@ export async function dbAccessCommand(rawArgs: string[]): Promise<void> {
     if (action !== "enable" && (flags["--allow"] || flags["--schemas"] || flags["--tables"])) {
         fail("--allow, --schemas and --tables go with `enable`.", "Run `rebase cloud db access --help`.", "invalid_flags");
     }
+    // `enable` takes the whole desired state, so the addresses are required,
+    // and it opens the database to the network, so it asks first. Both before
+    // the login round-trip: neither needs one to be refused.
+    const allow = action === "enable" ? list(flags["--allow"]) : undefined;
+    if (action === "enable" && !allow) {
+        fail("Name the addresses the database may be reached from.", "e.g. --allow 34.89.253.13 (repeat it, or separate with commas).", "missing_allow");
+    }
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
+    if (action === "enable") {
+        await confirmDestructive({
+            yes: Boolean(flags["--yes"]),
+            prompt: `Open project ${projectRef || projectId}'s database to ${allow!.join(", ")}? `
+                + "A load balancer admits those addresses to a read-only role over TLS, and is billed while it exists."
+        });
+    }
 
     try {
         if (action === "status") {
@@ -135,10 +155,6 @@ path: projectId });
         }
 
         if (action === "enable") {
-            const allow = list(flags["--allow"]);
-            if (!allow) {
-                fail("Name the addresses the database may be reached from.", "e.g. --allow 34.89.253.13 (repeat it, or separate with commas).", "missing_allow");
-            }
             const status = await client.functions.invoke<DbAccessStatus>(
                 "db-access",
                 { allow,
@@ -188,6 +204,6 @@ path: `${projectId}/reveal` });
         }, { projectId,
 ...revealed });
     } catch (e) {
-        reportError(e, `Failed to ${action === "status" ? "read" : action} external database access`);
+        reportCallError(e, `Failed to ${action === "status" ? "read" : action} external database access`, DB_ACCESS_UNSERVED);
     }
 }

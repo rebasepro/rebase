@@ -24,7 +24,14 @@ import { DB_CONNECT_FLAGS } from "./db-connect";
 import { DB_ACCESS_FLAGS } from "./db-access";
 import { DEPLOY_FLAGS, LOGS_FLAGS } from "./deploy";
 import { ENV_SET_FLAGS } from "./env";
-import { COMPUTE_SET_FLAGS, BILLING_ACTIONS, CLUSTER_REGISTRY_FLAGS, CLUSTERS_ACTIONS } from "./resources";
+import {
+    COMPUTE_SET_FLAGS,
+    BILLING_ACTIONS,
+    CLUSTER_REGISTRY_FLAGS,
+    CLUSTERS_ACTIONS,
+    CLUSTER_BASELINE_FLAGS,
+    METRICS_FLAGS
+} from "./resources";
 import { LOGIN_FLAGS } from "./auth";
 import { CREATE_TOKEN_FLAGS } from "./tokens";
 import { INIT_FLAGS } from "./init";
@@ -39,6 +46,8 @@ import { GUESTS_ACTIONS, GUESTS_FLAGS } from "./guests";
 import { ACTIVITY_FLAGS } from "./activity";
 import { NOTIFICATIONS_ADD_FLAGS } from "./notifications";
 import { COMPUTE_WINDOW_FLAGS, EVENTS_FLAGS } from "./maintenance";
+import { DEPLOY_HOOKS_ACTIONS, DEPLOY_HOOKS_FLAGS } from "./deploy-hooks";
+import { ALERTS_ACTIONS, ALERTS_FLAGS } from "./alerts";
 
 /**
  * Which spec backs which page.
@@ -65,6 +74,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     deployments: null,
     "deployments list": { "--limit": Number, "--all": Boolean },
     "domains add": {},
+    "domains primary": {},
     "domains remove": {},
     "env set": ENV_SET_FLAGS,
     "env pull": { "--output": String, "--out": "--output" },
@@ -92,6 +102,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     logs: LOGS_FLAGS,
     status: null,
     "clusters verify": null,
+    "clusters baseline": CLUSTER_BASELINE_FLAGS,
     "clusters registry": CLUSTER_REGISTRY_FLAGS,
     // The graph. Neither listing nor pruning declares a flag of its own —
     // `prune`'s `--yes` is the global one.
@@ -126,7 +137,15 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     start: {},
     stop: {},
     restart: {},
-    metrics: null,
+    metrics: METRICS_FLAGS,
+    "deploy-hooks": DEPLOY_HOOKS_FLAGS,
+    "deploy-hooks create": DEPLOY_HOOKS_FLAGS,
+    "deploy-hooks revoke": {},
+    alerts: ALERTS_FLAGS,
+    "alerts ack": {},
+    // The page for one action documents that action's flag; `--all` is
+    // refused beside `snooze`.
+    "alerts snooze": { "--hours": String },
     cron: null,
     "cron list": CRON_LIST_FLAGS,
     "cron logs": CRON_LOGS_FLAGS,
@@ -543,7 +562,9 @@ describe("ACTION_HELP", () => {
         ["app-key", APP_KEY_ACTIONS],
         ["service-key", SERVICE_KEY_ACTIONS],
         ["guests", GUESTS_ACTIONS],
-        ["clusters", CLUSTERS_ACTIONS]
+        ["clusters", CLUSTERS_ACTIONS],
+        ["deploy-hooks", DEPLOY_HOOKS_ACTIONS],
+        ["alerts", ALERTS_ACTIONS]
     ])("%s's usage line names the actions it dispatches", (key, dispatched) => {
         expect(actionWordsIn(ACTION_HELP[key].usage).sort()).toEqual([...dispatched].sort());
     });

@@ -23,9 +23,9 @@ export const BRANCH_ACTION_FLAGS: Record<string, arg.Spec> = {
     list: {},
     info: {},
     diff: { "--json": Boolean, "--sample-limit": Number },
-    // `delete` does not ask, but `--yes` is what a script passes to every
-    // destructive command; refusing it would break that line for nothing.
+    // Dropping a branch is not undoable: `delete` asks, and `--yes` answers.
     delete: { "--force": Boolean, "--yes": Boolean, "-y": "--yes" },
+    merge: { "--on-conflict": String, "--skip-blocked": Boolean, "--sample-limit": Number, "--yes": Boolean, "-y": "--yes" },
     prune: { "--older-than": String, "--include-dev-diff": Boolean, "--yes": Boolean, "-y": "--yes" }
 };
 

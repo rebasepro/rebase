@@ -54,7 +54,7 @@ export const ROOT_FLAGS = {
  * literal under this name: `help-coverage.test.ts`, `printed-commands.test.ts`
  * and the docs verifier read it out of this file's source.
  */
-const namespacedCommands = ["init", "schema", "db", "console", "dev", "build", "start", "auth", "doctor", "verify", "skills", "api-keys", "storage", "cloud", "apps", "eject", "generate", "generate-sdk", "telemetry", "resources", "status", "upgrade", "migrate", "normalize-imports"];
+const namespacedCommands = ["init", "schema", "db", "console", "dev", "build", "start", "auth", "doctor", "verify", "skills", "api-keys", "storage", "cloud", "apps", "eject", "generate", "generate-sdk", "telemetry", "resources", "status", "upgrade", "migrate", "normalize-imports", "api", "data", "users", "cron", "logs", "functions", "rls"];
 
 /** The words a command group dispatches, and the other spellings it accepts for them. */
 interface CommandVocabulary {
@@ -81,6 +81,11 @@ async function commandVocabulary(command: string): Promise<CommandVocabulary> {
         case "skills": return { subcommands: (await import("./commands/skills")).SKILLS_SUBCOMMANDS, aliases: {} };
         case "api-keys": return { subcommands: (await import("./commands/api-keys")).API_KEYS_SUBCOMMANDS, aliases: {} };
         case "storage": return { subcommands: (await import("./commands/storage")).STORAGE_SUBCOMMANDS, aliases: {} };
+        case "data": return { subcommands: (await import("./commands/data")).DATA_SUBCOMMANDS, aliases: {} };
+        case "users": return { subcommands: (await import("./commands/users")).USERS_SUBCOMMANDS, aliases: {} };
+        case "cron": return { subcommands: (await import("./commands/cron")).CRON_SUBCOMMANDS, aliases: {} };
+        case "functions": return { subcommands: (await import("./commands/functions")).FUNCTIONS_SUBCOMMANDS, aliases: {} };
+        case "rls": return { subcommands: (await import("./commands/rls")).RLS_SUBCOMMANDS, aliases: {} };
         case "apps": return { subcommands: (await import("./commands/apps")).APPS_SUBCOMMANDS, aliases: {} };
         case "telemetry": return { subcommands: (await import("./commands/telemetry")).TELEMETRY_SUBCOMMANDS, aliases: {} };
         case "generate": return { subcommands: (await import("./commands/generate-view")).GENERATE_SUBCOMMANDS, aliases: {} };
@@ -475,6 +480,48 @@ async function dispatch(
             break;
         }
 
+        case "api": {
+            const { apiCommand } = await import("./commands/api");
+            await apiCommand(args);
+            break;
+        }
+
+        case "data": {
+            const { dataCommand } = await import("./commands/data");
+            await dataCommand(effectiveSubcommand, args);
+            break;
+        }
+
+        case "users": {
+            const { usersCommand } = await import("./commands/users");
+            await usersCommand(effectiveSubcommand, args);
+            break;
+        }
+
+        case "cron": {
+            const { cronCommand } = await import("./commands/cron");
+            await cronCommand(effectiveSubcommand, args);
+            break;
+        }
+
+        case "logs": {
+            const { logsCommand } = await import("./commands/logs");
+            await logsCommand(args);
+            break;
+        }
+
+        case "functions": {
+            const { functionsCommand } = await import("./commands/functions");
+            await functionsCommand(effectiveSubcommand, args);
+            break;
+        }
+
+        case "rls": {
+            const { rlsCommand } = await import("./commands/rls");
+            await rlsCommand(effectiveSubcommand, args);
+            break;
+        }
+
         default:
             // One line, with the correction, and no screen of help after it: the
             // sentence that says what happened must not scroll off the top of a
@@ -512,6 +559,7 @@ ${chalk.green.bold("Schema")}
   ${chalk.blue.bold("schema generate")}         Generate the Drizzle schema from backend/schema
   ${chalk.blue.bold("schema introspect")}       Introspect database → defineTable modules in backend/schema
   ${chalk.blue.bold("schema stale")}            Report generated schema files the tables have moved past
+  ${chalk.blue.bold("schema show")} ${chalk.gray("[table]")}     The tables and their columns ${chalk.gray("(--remote: as a running server serves them)")}
   ${chalk.blue.bold("schema")} ${chalk.gray("--help")}           Show schema command help
 
 ${chalk.green.bold("Database")}
@@ -531,8 +579,19 @@ ${chalk.green.bold("Generate")}
   ${chalk.blue.bold("generate view")} ${chalk.gray("<slug>")}    Scaffold a custom admin screen ${chalk.gray("(--collection: a record tab)")}
   ${chalk.blue.bold("generate-sdk")}            Generate a typed TypeScript SDK from the tables
 
+${chalk.green.bold("A running app")}  ${chalk.gray("(rebase dev, --url <server>, or --project <slug> on Rebase Cloud)")}
+  ${chalk.blue.bold("api")} ${chalk.gray("[METHOD] <path>")}     Send any request to the app's API with the project's credential
+  ${chalk.blue.bold("data")} ${chalk.gray("<action>")}           Rows: query, get, count, insert, update, delete, import, watch
+  ${chalk.blue.bold("users")} ${chalk.gray("<action>")}          Accounts: list, create, roles, reset-password, guests
+  ${chalk.blue.bold("cron")} ${chalk.gray("<action>")}           Scheduled jobs: list, logs, run now, enable, disable
+  ${chalk.blue.bold("logs")}                    The server's log, once or followed ${chalk.gray("(-f)")}
+  ${chalk.blue.bold("functions")} ${chalk.gray("<action>")}      Your backend/functions routes: list, invoke
+  ${chalk.blue.bold("rls simulate")}            What another role, user or key would see
+
 ${chalk.green.bold("Auth")}
   ${chalk.blue.bold("auth reset-password")}     Reset a user's password
+  ${chalk.blue.bold("auth login")}              Sign in to a running app as a person ${chalk.gray("(for rls simulate, --session)")}
+  ${chalk.blue.bold("auth emails")}             The development mailbox: captured sign-in and reset links
   ${chalk.blue.bold("auth")} ${chalk.gray("--help")}             Show auth command help
 
 ${chalk.green.bold("Diagnostics")}
@@ -551,6 +610,7 @@ ${chalk.green.bold("API Keys")}
   ${chalk.blue.bold("api-keys list")}           List the service API keys: kind, scopes, roles
   ${chalk.blue.bold("api-keys get")} ${chalk.gray("<id>")}       Show one key
   ${chalk.blue.bold("api-keys create")}         Create a service key holding the scopes you name
+  ${chalk.blue.bold("api-keys update")} ${chalk.gray("<id>")}    Change a key's scopes, roles, limit or expiry
   ${chalk.blue.bold("api-keys revoke")}         Revoke an API key
   ${chalk.blue.bold("api-keys scopes")}         List the scopes a key can hold
   ${chalk.blue.bold("api-keys")} ${chalk.gray("--help")}         Show API key command help

@@ -1,5 +1,5 @@
 ---
-sourceHash: 2883815081dc2c2a
+sourceHash: 79cc7825b045bc4d
 title: Commandes de base de données
 sidebar_label: Commandes de base de données
 description: Les commandes rebase db — push, generate et migrate, sauvegardes et restaurations, extraction d'une copie, chaîne de connexion, base de données de développement gérée et branches.
@@ -173,6 +173,16 @@ Chaque branche est une copie complète sur le disque, il est donc nécessaire de
 `diff` affiche les modifications apportées par une branche par rapport à la base de données dont elle est issue : tables, colonnes, contraintes, index, triggers, politiques RLS, types énumérés, vues et fonctions ajoutés, supprimés ou modifiés, ainsi que par table les lignes insérées, mises à jour et supprimées. Les lignes modifiées de manière autonome par le parent depuis lors sont comptabilisées à part, et les lignes modifiées des deux côtés sont considérées comme des conflits. `--json` affiche l'intégralité du diff, jusqu'à `--sample-limit` lignes par table (100 par défaut). Elle lit les deux bases de données et n'en modifie aucune ; la fusion s'effectue dans Studio — voir [Reviewing and merging a branch](/docs/backend/branching/#reviewing-and-merging-a-branch).
 
 `switch` enregistre la branche dans `.rebase/branch.json` et ne modifie jamais `.env`. Elle prévaut sur `DATABASE_URL` dans `.env` et cède le pas face à `--database-url` ou à un `DATABASE_URL` dans le shell ; ainsi, une option sur la ligne de commande a toujours la priorité sur un switch précédent. `delete` refuse de supprimer la branche sur laquelle vous vous trouvez, puisque chaque commande dans le checkout, suppression comprise, pointe vers elle : faites d'abord `switch --off`, puis supprimez-la. L'ensemble du workflow est détaillé dans [Database Branching](/docs/backend/branching/).
+
+#### `rebase db branch merge`
+
+<span class="since-badge" data-since="0.32">Since 0.32</span>
+
+```bash
+rebase db branch merge <name> [--on-conflict abort|branch|target] [--skip-blocked] [--yes]
+```
+
+Écrit les lignes qu'une branche a insérées, modifiées et supprimées dans la base de données dont elle est issue. La commande affiche d'abord le diff et demande confirmation, puis fusionne exactement ce diff : la fusion cite l'empreinte (fingerprint) du diff, donc une base parente modifiée depuis est refusée plutôt que fusionnée. `--on-conflict` tranche pour une ligne modifiée des deux côtés — `abort` (par défaut) n'écrit rien, `branch` prend la ligne de la branche, `target` garde celle de la base parente — et `--skip-blocked` fusionne les tables qui peuvent l'être et ignore les autres. Les changements de schéma et de politiques ne sont jamais fusionnés : les migrations s'en chargent. `delete` demande aussi confirmation, et `--yes` répond aux deux dans un script.
 
 :::note[Sur la base de données de développement gérée]
 `push`, `generate` et `migrate` fonctionnent ici comme sur n'importe quelle base de données.

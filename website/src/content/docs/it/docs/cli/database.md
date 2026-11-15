@@ -1,5 +1,5 @@
 ---
-sourceHash: 2883815081dc2c2a
+sourceHash: 79cc7825b045bc4d
 title: Comandi del database
 sidebar_label: Comandi del database
 description: I comandi rebase db — push, generate e migrate, backup e ripristini, estrazione di una copia, stringa di connessione, database di sviluppo gestito e branch.
@@ -315,6 +315,16 @@ variabile `DATABASE_URL` nella shell, garantendo che un flag da riga di comando 
 cambio di branch eseguito in precedenza. `delete` rifiuta l'eliminazione del branch attualmente attivo, poiché ogni comando
 nel checkout, inclusa l'eliminazione stessa, punta a esso: esegui prima `switch --off`,
 quindi procedi con l'eliminazione. L'intero flusso di lavoro è illustrato in [Database Branching](/docs/backend/branching/).
+
+#### `rebase db branch merge`
+
+<span class="since-badge" data-since="0.32">Since 0.32</span>
+
+```bash
+rebase db branch merge <name> [--on-conflict abort|branch|target] [--skip-blocked] [--yes]
+```
+
+Scrive le righe che un branch ha inserito, aggiornato ed eliminato nel database da cui è stato creato. Mostra prima il diff e chiede conferma, poi unisce esattamente quel diff: il merge nomina il fingerprint del diff, quindi un database padre cambiato nel frattempo viene rifiutato invece che unito. `--on-conflict` decide per una riga modificata da entrambe le parti — `abort` (il default) non scrive nulla, `branch` prende la riga del branch, `target` mantiene quella del padre — e `--skip-blocked` unisce le tabelle che si possono unire e salta le altre. Le modifiche a schema e policy non vengono mai unite: se ne occupano le migrazioni. Anche `delete` chiede conferma, e `--yes` risponde a entrambi in uno script.
 
 :::note[Sul database di sviluppo gestito]
 `push`, `generate` e `migrate` funzionano qui come su qualsiasi altro database.

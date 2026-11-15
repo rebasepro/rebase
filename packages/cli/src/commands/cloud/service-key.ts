@@ -23,13 +23,20 @@ import {
     emit,
     note,
     parseCloudArgs,
-    reportError,
     requireKnownAction,
     requireProject,
     requireSessionClient,
     success,
     type CloudClient
 } from "./context";
+import { reportCallError, type Unserved } from "./not-served";
+
+/** What `service-key` says on a control plane that has no `credentials` function yet. */
+const SERVICE_KEY_UNSERVED: Unserved = {
+    what: "service-key rotation",
+    hint: "Nothing was changed. `rebase cloud env reveal REBASE_SERVICE_KEY` still reads the current key."
+};
+
 
 export const SERVICE_KEY_FLAGS = {} as const;
 export const SERVICE_KEY_ACTIONS = ["rotate"] as const;
@@ -90,7 +97,7 @@ export async function serviceKeyCommand(rawArgs: string[]): Promise<void> {
         try {
             status = await readStatus(client, projectId);
         } catch (e) {
-            reportError(e, "Failed to read the service key's state");
+            reportCallError(e, "Failed to read the service key's state", SERVICE_KEY_UNSERVED);
         }
         emit(() => printStatus(status, label), status);
         return;
@@ -107,7 +114,7 @@ export async function serviceKeyCommand(rawArgs: string[]): Promise<void> {
             path: `${encodeURIComponent(projectId)}/service-key/rotate`
         });
     } catch (e) {
-        reportError(e, "Failed to rotate the service key");
+        reportCallError(e, "Failed to rotate the service key", SERVICE_KEY_UNSERVED);
     }
     emit(() => {
         success(`Issued service key generation ${rotation.generation} for ${label}.`);

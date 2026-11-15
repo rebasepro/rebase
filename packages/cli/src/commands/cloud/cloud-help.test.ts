@@ -244,6 +244,19 @@ describe("rebase cloud <group> --help", () => {
         for (const handler of allHandlers()) expect(handler).not.toHaveBeenCalled();
     });
 
+    it("prints the deployments page for `releases --help`, the spelling the dispatch has always taken", async () => {
+        await cloudCommand("releases", argv("releases", "--help"));
+        const printed = logSpy.mock.calls.map(c => String(c[0])).join("\n");
+        expect(printed).toContain("rebase cloud deployments");
+        expect(printed).not.toContain("Manage your apps on Rebase Cloud");
+    });
+
+    it("keeps the retired `webhooks` off the index, and still answers it with its refusal", async () => {
+        expect(CLOUD_GROUP_NAMES).not.toContain("webhooks");
+        await cloudCommand("webhooks", argv("webhooks", "list"));
+        expect(resources.webhooksCommand).toHaveBeenCalledTimes(1);
+    });
+
     it("still falls back to the index for a word that is not a group", async () => {
         await cloudCommand("nonesuch", argv("nonesuch", "--help"));
         expect(logSpy).toHaveBeenCalled();

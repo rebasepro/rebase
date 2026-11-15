@@ -1,5 +1,5 @@
 ---
-sourceHash: de4684f207c4a8fd
+sourceHash: d92634b4d2c8413c
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto se vincula e faz deploy, e o que o beta privado ainda não inclui.
@@ -478,9 +478,11 @@ exceto uma que reinicie o banco de dados, que aguardará uma janela de manutenç
 | `init`, `claim` | Com `--claim`: um backend ativo sem conta e um link para reivindicá-lo; `claim` imprime esse link novamente. Consulte [Um backend sem conta](/docs/deployment/cloud-agents/#a-backend-with-no-account) |
 | `projects` | Criar, listar, inspecionar, excluir |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Implantação e monitoramento |
+| `deploy-hooks` | URLs secretas que um host git ou uma CI chama para implantar o projeto: listar, criar (a URL aparece uma vez), revogar. <span class="since-badge" data-since="0.32">Since 0.32</span> |
 | `previews` | Builds servidos em endereço próprio via `deploy --preview`, e sua exclusão. Consulte [Visualizar uma alteração (Preview)](#visualizar-uma-alteração-preview) |
 | `start`, `stop`, `restart` | Pausar um projeto e reativá-lo. Um projeto interrompido mantém sua assinatura, a menos que a plataforma cobre projetos interrompidos apenas pelo armazenamento e taxa da plataforma; a linha **Billing** do console indica quando for esse o caso |
 | `status`, `metrics`, `debug` | O que ele está fazendo e por que eventualmente não está |
+| `alerts` | Os incidentes abertos do projeto, e reconhecer ou adiar um. <span class="since-badge" data-since="0.32">Since 0.32</span> |
 | `cron` | Cron jobs da aplicação implantada e suas execuções registradas, lidos com seu login do `rebase cloud`. Somente leitura |
 | `env` | Variáveis de ambiente. `list` nunca imprime valores; `--secret` é somente escrita |
 | `app-key` | A chave que `init --claim` gravou no `.env` como `REBASE_API_TOKEN`, transferida no momento da reivindicação; `rotate` a substitui e revoga a antiga. Proprietários e administradores |
@@ -497,7 +499,7 @@ exceto uma que reinicie o banco de dados, que aguardará uma janela de manutenç
 | `clusters` | Os clusters onde os tenants executam. Apenas administradores da plataforma |
 | `settings`, `orgs`, `billing` | Configurações do projeto, organizações, seus membros e convites, pagamento |
 | `activity` | O log de auditoria da organização: quem implantou, alterou uma variável de ambiente (por nome), um domínio, um backup, um membro ou um token. Proprietários e administradores. Consulte [Veja quem fez o quê](#veja-quem-fez-o-quê) |
-| `notifications`, `webhooks` | Para onde os eventos do projeto são enviados via POST: Slack, Discord ou qualquer URL https ([Cloud notifications](/docs/deployment/cloud-notifications/)). `webhooks` foi descontinuado e sai com código 1 e erro `command_retired` |
+| `notifications` | Para onde os eventos do projeto são enviados via POST: Slack, Discord ou qualquer URL https ([Cloud notifications](/docs/deployment/cloud-notifications/)) |
 
 Cada grupo nessa tabela responde a `--help` com uma página própria — uma linha de uso,
 suas flags e exemplos — e `--help` nunca executa o comando em si. Um teste mantém o

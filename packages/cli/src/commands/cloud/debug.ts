@@ -35,6 +35,7 @@
  */
 import arg from "arg";
 import chalk from "chalk";
+import { warnDeprecated } from "@rebasepro/common";
 import { unknownCommandMessage } from "../../utils/unknown-command";
 import {
     requireClient,
@@ -97,7 +98,7 @@ export interface ProbeSpec {
 }
 
 export interface ProbeTargets {
-    /** Collection used for the unauthenticated-read probe. */
+    /** Table used for the unauthenticated-read probe. */
     collection: string;
     /** Function to confirm exists, if the caller named one. */
     fn?: string;
@@ -223,7 +224,7 @@ meaning: "unauthenticated reads are refused — row-level security is enforced" 
             if (status === 404) {
                 return {
                     verdict: "warn",
-                    meaning: "no such table on this deployment — check the name, or pass --collection"
+                    meaning: "no such table on this deployment — check the name, or pass --table"
                 };
             }
             if (status >= 500) {
@@ -853,8 +854,8 @@ permissive: true });
    ═══════════════════════════════════════════════════════════════ */
 
 async function healthCommand(rawArgs: string[]): Promise<void> {
-    // Strict: `--collecton users` used to be dropped and the probe then ran
-    // against the default collection while reporting on the one asked for.
+    // Strict: `--tabel users` used to be dropped and the probe then ran
+    // against the default table while reporting on the one asked for.
     const { flags: parsed } = parseCloudArgs({
         spec: HEALTH_FLAGS,
         rawArgs,
@@ -863,7 +864,7 @@ async function healthCommand(rawArgs: string[]): Promise<void> {
         maxPositionals: 0
     });
     const targets: ProbeTargets = {
-        collection: parsed["--collection"] || "users",
+        collection: resolveProbeTable(parsed) || "users",
         // Optional: the listing endpoint proves the mount on its own. A name
         // here additionally asserts that this particular function loaded.
         fn: parsed["--function"]
@@ -941,6 +942,8 @@ export const REQUESTS_FLAGS = {
 
 /** What `debug health` parses. */
 export const HEALTH_FLAGS = {
+    "--table": String,
+    /** @deprecated Use `--table` instead. Accepted, with a warning, until a later release. */
     "--collection": String,
     "--function": String,
     // `--host` is read again inside `resolveOrigin`, which needs it before
@@ -948,6 +951,26 @@ export const HEALTH_FLAGS = {
     // decides whether the line is accepted at all.
     "--host": String
 } as const;
+
+/**
+ * The table `debug health` probes, from `--table` or its deprecated spelling
+ * `--collection`, which still works and warns once. Undefined when neither was
+ * given.
+ *
+ * "Table" is the word for the app's data; "collection" is the CMS's. Both
+ * spellings at once is refused unless they agree, since one of them would be
+ * ignored.
+ */
+export function resolveProbeTable(flags: { "--table"?: string; "--collection"?: string }): string | undefined {
+    const table = flags["--table"];
+    const collection = flags["--collection"];
+    if (collection === undefined) return table;
+    warnDeprecated("cli.cloud-debug-health-collection", "`rebase cloud debug health --collection` is deprecated; use `--table` instead.");
+    if (table !== undefined && table !== collection) {
+        fail("--table and --collection name the same thing; pass --table alone.", undefined, "usage");
+    }
+    return table ?? collection;
+}
 
 interface LogViewOptions {
     /** Keep only lines matching this. Omit to keep everything. */
@@ -1472,7 +1495,8 @@ export function printDebugHelp(): void {
                 description: "Probe the live URL and explain every status code (the default)",
                 flags: [
                     ["--host <hostname>", "Probe this address instead of the project's own"],
-                    ["--collection <name>", "Table for the unauth-read probe. Default: users"],
+                    ["--table <name>", "Table for the unauth-read probe. Default: users"],
+                    ["--collection <name>", "Deprecated spelling of --table. Still works, and warns"],
                     ["--function <name>", "Also assert this function loaded, against the listing"]
                 ]
             },

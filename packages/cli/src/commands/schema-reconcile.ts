@@ -18,17 +18,20 @@ import chalk from "chalk";
 import readline from "node:readline/promises";
 import { RebaseApiError } from "@rebasepro/client";
 import type { SchemaReconcilePlan } from "@rebasepro/types";
-import { requireProjectRoot, readEnvFile } from "../utils/project";
+import { PROJECT_TARGET_FLAGS } from "../utils/project-target";
+import { projectTarget } from "../utils/project-command";
 import { UsageError } from "../utils/args";
-import { cliUserAgent } from "../utils/version";
-import { describeFailure, requireBackendUrl } from "./api-keys";
+import { describeFailure } from "./api-keys";
 
-export const RECONCILE_USAGE = "rebase schema reconcile [--drop <table>.<column>]... [--yes]";
+export const RECONCILE_USAGE = "rebase schema reconcile [--drop <table>.<column>]... [--yes] [--url <server> | --project <slug>]";
 
-export function parseReconcileArgs(rawArgs: string[]): { drop: string[]; yes: boolean } {
-    const flags = arg({ "--drop": [String], "--yes": Boolean, "-y": "--yes" }, { argv: rawArgs.slice(2) });
+/** The flags `schema reconcile` takes: `--drop` and every project command's target flags. */
+const RECONCILE_FLAGS = { ...PROJECT_TARGET_FLAGS, "--drop": [String] } satisfies arg.Spec;
+
+export function parseReconcileArgs(rawArgs: string[]): { drop: string[]; yes: boolean; target: Record<string, unknown> } {
+    const flags = arg(RECONCILE_FLAGS, { argv: rawArgs.slice(2) });
     if (flags._.length > 0) throw new UsageError(`Unexpected argument "${flags._[0]}". Usage: ${RECONCILE_USAGE}`);
-    return { drop: flags["--drop"] ?? [], yes: flags["--yes"] === true };
+    return { drop: flags["--drop"] ?? [], yes: flags["--yes"] === true, target: flags };
 }
 
 /** The plan, as a person reviews it. Returned as lines so it can be tested. */
@@ -61,31 +64,23 @@ interface Backend {
     post<T>(path: string, body: unknown): Promise<T>;
 }
 
-/** The project's backend, holding the service key. */
-function connect(): Backend {
-    const projectRoot = requireProjectRoot();
-    const env = readEnvFile(projectRoot);
-    const serviceKey = env.SERVICE_KEY || env.REBASE_SERVICE_KEY;
-    if (!serviceKey) {
-        console.error(chalk.red("✗ REBASE_SERVICE_KEY not found in .env — required to change the database's schema."));
-        process.exit(1);
-    }
-    const baseUrl = requireBackendUrl(env, projectRoot).replace(/\/+$/, "");
+/**
+ * The project's backend, holding the service key — or the credential the
+ * target flags name (`--url`, `--project`, …), as every project command
+ * resolves it.
+ *
+ * Applying runs as a machine on purpose: the reconcile route takes the
+ * service key, and its plan's digest is the confirmation (see
+ * `api/live-schema-routes.ts`, which pins that decision).
+ */
+async function connect(flags: Readonly<Record<string, unknown>>): Promise<Backend> {
+    const target = await projectTarget(flags, { command: "schema reconcile" });
     return {
-        baseUrl,
+        baseUrl: target.label,
         async post<T>(path: string, body: unknown): Promise<T> {
             let response: Response;
             try {
-                response = await fetch(`${baseUrl}/api/admin/schema/reconcile${path}`, {
-                    method: "POST",
-                    headers: {
-                        "Authorization": `Bearer ${serviceKey}`,
-                        "Accept": "application/json",
-                        "Content-Type": "application/json",
-                        "User-Agent": cliUserAgent()
-                    },
-                    body: JSON.stringify(body)
-                });
+                response = await target.request(`/api/admin/schema/reconcile${path}`, { method: "POST", json: body });
             } catch (error: unknown) {
                 throw new RebaseApiError(error instanceof Error ? error.message : String(error), { status: 0, code: "NETWORK_ERROR" });
             }
@@ -115,8 +110,8 @@ function fail(action: string, error: unknown, baseUrl: string): never {
 }
 
 export async function schemaReconcileCommand(rawArgs: string[]): Promise<void> {
-    const { drop, yes } = parseReconcileArgs(rawArgs);
-    const backend = connect();
+    const { drop, yes, target } = parseReconcileArgs(rawArgs);
+    const backend = await connect(target);
 
     let plan: SchemaReconcilePlan;
     try {

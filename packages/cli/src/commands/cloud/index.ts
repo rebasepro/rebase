@@ -34,6 +34,8 @@ import { serviceKeyCommand } from "./service-key";
 import { guestsCommand } from "./guests";
 import { activityCommand } from "./activity";
 import { notificationsCommand } from "./notifications";
+import { deployHooksCommand } from "./deploy-hooks";
+import { alertsCommand } from "./alerts";
 import {
     statusCommand,
     metricsCommand,
@@ -111,6 +113,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--grep": String,
     "--host": String,
     "--hour": String,
+    "--hours": String,
     "--ingress-address": String,
     "--kubeconfig": String,
     "--level": String,
@@ -118,6 +121,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--live-timeout": String,
     "--memory": String,
     "--message": String,
+    "--minutes": String,
     "--month": String,
     "--name": String,
     "--older-than": String,
@@ -141,12 +145,15 @@ export const CLOUD_VALUE_FLAGS = {
     "--scale-to-zero": String,
     "--schemas": String,
     "--secret-access-key": String,
+    "--series": String,
     "--since": String,
     "--slug": String,
     "--source": String,
     "--spot": String,
     "--storage": String,
+    "--studio": String,
     "--subdomain": String,
+    "--table": String,
     "--tail": String,
     "--tables": String,
     "--target": String,
@@ -215,7 +222,9 @@ export const GROUP_ALIASES: Record<string, string> = {
     extension: "extensions",
     org: "orgs",
     preview: "previews",
-    project: "projects"
+    project: "projects",
+    // `releases` has always dispatched to `deployments`; its help page is that one.
+    releases: "deployments"
 };
 
 export const GROUP_HELP: Record<string, () => void> = {
@@ -396,6 +405,12 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "cron":
             await cronCommand(action, rawArgs);
             break;
+        case "deploy-hooks":
+            await deployHooksCommand(action, rawArgs);
+            break;
+        case "alerts":
+            await alertsCommand(action, rawArgs);
+            break;
 
         /* env / domains / extensions / settings */
         case "env":
@@ -427,6 +442,8 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
 
         /* other resources */
         case "webhooks":
+            // Retired, and so not on the index any more: it still answers, with
+            // the refusal that names where its two uses went.
             await webhooksCommand(action, rawArgs);
             break;
         case "notifications":
@@ -576,14 +593,16 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "stop", section: "Deploy & observe", description: "Stop the project. Downtime, so it confirms" },
     { action: "restart", section: "Deploy & observe", description: "Stop and start it again" },
     { action: "status", section: "Deploy & observe", description: "One glance: URL, last deploy, and what it is waiting on" },
-    { action: "metrics", section: "Deploy & observe", description: "Live CPU, memory and disk" },
+    { action: "metrics", section: "Deploy & observe", description: "Live CPU, memory and disk; requests and errors with --runtime; history with --history" },
     { action: "debug", section: "Deploy & observe", description: "Diagnose a misbehaving deployment. Read-only" },
     { action: "cron", section: "Deploy & observe", description: "The app's cron jobs and their run history. Read-only" },
+    { action: "deploy-hooks", section: "Deploy & observe", description: "URLs that build and ship the connected repository when POSTed to" },
+    { action: "alerts", section: "Deploy & observe", description: "What the platform has seen go wrong, and acknowledging or snoozing it" },
 
     { action: "env", section: "Config", description: "Environment variables" },
     { action: "domains", section: "Config", description: "Custom domains, their DNS records, and verification" },
     { action: "extensions", section: "Config", description: "The Postgres extension allowlist" },
-    { action: "settings", section: "Config", description: "Name, subdomain, repository, branch" },
+    { action: "settings", section: "Config", description: "Name, subdomain, repository, branch, Studio access" },
     { action: "app-key", section: "Config", args: "[rotate]", description: "The app key `init --claim` wrote into .env, and replacing it. Owners and admins" },
     { action: "service-key", section: "Config", args: "[rotate]", description: "REBASE_SERVICE_KEY, admin on the app's API: its state, and replacing it. Owners and admins" },
 
@@ -595,7 +614,6 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "guests", section: "Data", args: "[delete|prune]", description: "The guest users anonymous sign-in left behind: count them, delete one, delete the old ones. Owners and admins" },
 
     { action: "notifications", section: "Deploy & observe", description: "Send deploy, backup, billing and usage events to Slack, Discord or any URL" },
-    { action: "webhooks", section: "Other resources", description: "Retired: use `notifications`, or a WebhookDispatcher in your app's code" },
     // Both of these dispatch and have a page, and both were absent from this
     // list — so the command that names what a project costs, and the one that
     // names what it declares, were undiscoverable from `rebase cloud --help`,

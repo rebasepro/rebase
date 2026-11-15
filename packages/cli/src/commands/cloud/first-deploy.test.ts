@@ -106,7 +106,7 @@ describe("rebase cloud projects create", () => {
             url: "https://cp.example"
         });
 
-        await createProject(argv("projects", "create", "--name", "Shop", "--subdomain", "shop"));
+        await createProject(argv("projects", "create", "--name", "Shop", "--subdomain", "shop", "--yes"));
 
         // The whole point: two rows, from one command.
         expect(recorded.map(r => r.collection)).toEqual(["projects", "databases"]);
@@ -120,7 +120,7 @@ type: "managed" });
             url: "https://cp.example"
         });
 
-        await createProject(argv("projects", "create", "--name", "Shop", "--subdomain", "shop", "--db", "none"));
+        await createProject(argv("projects", "create", "--name", "Shop", "--subdomain", "shop", "--db", "none", "--yes"));
 
         expect(recorded.map(r => r.collection)).toEqual(["projects"]);
         // Opting out is allowed; leaving without the remedy is not.
@@ -135,7 +135,7 @@ type: "managed" });
 
         await createProject(argv(
             "projects", "create", "--name", "Shop", "--subdomain", "shop",
-            "--db", "byodb", "--connection-string", "postgres://u:p@h/db"
+            "--db", "byodb", "--connection-string", "postgres://u:p@h/db", "--yes"
         ));
 
         expect(recorded[1].data).toMatchObject({
@@ -179,6 +179,22 @@ type: "managed" });
         exit.mockRestore();
     });
 
+    it("asks before creating: off a terminal without --yes it refuses and creates nothing", async () => {
+        vi.mocked(context.requireClient).mockResolvedValue({
+            client: fakeClient(recorded),
+            url: "https://cp.example"
+        });
+        const exit = vi.spyOn(process, "exit").mockImplementation(() => {
+            throw new Error("__exit__");
+        });
+
+        await expect(createProject(argv("projects", "create", "--name", "Shop", "--subdomain", "shop")))
+            .rejects.toThrow("__exit__");
+
+        expect(recorded).toEqual([]);
+        exit.mockRestore();
+    });
+
     it("reports a project that was created when its database was not", async () => {
         const client = fakeClient(recorded, { refuseCreate: { databases: "permission denied for table databases" } });
         vi.mocked(context.requireClient).mockResolvedValue({
@@ -186,7 +202,7 @@ type: "managed" });
             url: "https://cp.example"
         });
 
-        await createProject(argv("projects", "create", "--name", "Shop", "--subdomain", "shop"));
+        await createProject(argv("projects", "create", "--name", "Shop", "--subdomain", "shop", "--yes"));
 
         // Not an exception: the project is real, and saying "create failed"
         // about it would be false. Half-succeeded is its own outcome.

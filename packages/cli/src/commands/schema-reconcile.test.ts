@@ -6,8 +6,13 @@ import { describeReconcilePlan, parseReconcileArgs } from "./schema-reconcile";
 describe("rebase schema reconcile", () => {
     it("reads every --drop, and --yes", () => {
         expect(parseReconcileArgs(["schema", "reconcile", "--drop", "a.b", "--drop", "a.c", "-y"]))
-            .toEqual({ drop: ["a.b", "a.c"], yes: true });
-        expect(parseReconcileArgs(["schema", "reconcile"])).toEqual({ drop: [], yes: false });
+            .toMatchObject({ drop: ["a.b", "a.c"], yes: true });
+        expect(parseReconcileArgs(["schema", "reconcile"])).toMatchObject({ drop: [], yes: false });
+    });
+
+    it("takes the target flags every project command takes", () => {
+        expect(parseReconcileArgs(["schema", "reconcile", "--url", "https://api.example.com"]).target["--url"]).toBe("https://api.example.com");
+        expect(parseReconcileArgs(["schema", "reconcile", "--project", "acme"]).target["--project"]).toBe("acme");
     });
 
     it("refuses a stray argument rather than reading it as a column", () => {

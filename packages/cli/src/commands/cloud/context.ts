@@ -1355,6 +1355,14 @@ export interface GroupHelp {
     options?: Array<[string, string]>;
     /** Closing paragraphs — the things a reader gets wrong more than once. */
     notes?: string[];
+    /**
+     * The options every command of this family takes, under "Global options".
+     * Defaults to the cloud family's ({@link GLOBAL_HELP_FLAGS}); the project
+     * commands (`rebase data`, `users`, …) pass their target flags.
+     */
+    globalFlags?: Array<[string, string]>;
+    /** The usage line's tail, for a command that is not a group of actions: `[METHOD] <path>`. */
+    usage?: string;
 }
 
 /**
@@ -1427,7 +1435,7 @@ export function printGroupHelp(page: GroupHelp): void {
             console.log(`${chalk.bold(`rebase ${page.command}`)} — ${page.title}`);
             console.log("");
             console.log(chalk.green.bold("Usage"));
-            console.log(`  rebase ${page.command} ${chalk.blue("<action>")} [options]`);
+            console.log(`  rebase ${page.command} ${chalk.blue(page.usage ?? "<action>")} [options]`);
 
             let section: string | undefined;
             for (const entry of page.actions) {
@@ -1457,7 +1465,7 @@ export function printGroupHelp(page: GroupHelp): void {
 
             console.log("");
             console.log(chalk.green.bold("Global options"));
-            for (const [flag, description] of GLOBAL_HELP_FLAGS) {
+            for (const [flag, description] of page.globalFlags ?? GLOBAL_HELP_FLAGS) {
                 console.log(`  ${chalk.blue(flag)}${pad(flag, HELP_COLUMN)}${chalk.gray(description)}`);
             }
 
@@ -1468,11 +1476,11 @@ export function printGroupHelp(page: GroupHelp): void {
             console.log("");
         },
         {
-            usage: `rebase ${page.command} <action> [options]`,
+            usage: `rebase ${page.command} ${page.usage ?? "<action>"} [options]`,
             summary: page.title,
             options: (page.options ?? []).map(([flag, description]) => ({ flag,
 description })),
-            globalFlags: GLOBAL_HELP_FLAGS.map(([flag, description]) => ({ flag,
+            globalFlags: (page.globalFlags ?? GLOBAL_HELP_FLAGS).map(([flag, description]) => ({ flag,
 description })),
             notes: page.notes ?? []
         }

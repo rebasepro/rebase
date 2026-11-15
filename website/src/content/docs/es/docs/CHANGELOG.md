@@ -11,6 +11,39 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+The CLI reaches a running app's whole API: rows, users, cron, files, functions, logs and the RLS simulator, on the local `rebase dev`, a server named with `--url`, or a Rebase Cloud project with `--project`. See [A running app](https://rebase.pro/docs/cli/project/).
+
+### Added
+
+- **`rebase api [METHOD] <path>`**: any route the app serves, with the project's credential, the answer printed as it came (`gh api`-shaped: `-f`/`-F` fields, `--input`, `-H`, `--include`). A field alone never turns the request into a write.
+- **`rebase data`**: `query` (filters in the API's own syntax, `--order-by`, `--fields`, `--include`, `--all`, `--format table|json|ndjson|csv`), `get`, `count`, `aggregate`, `insert`, `update` and `delete` (one row, or every row `--where` matches, after a count and a confirmation), `import` (JSON, NDJSON or CSV in bulk writes, `--upsert`), `history`, `revert` and `watch` (the realtime socket). Through the REST API, so row-level security, field access and hooks apply.
+- **`rebase users`**: `list`, `get`, `create`, `update` (`--role`, `--add-role`, `--remove-role`, `--disable`), `delete`, `reset-password`, `mfa-reset`, `roles` and `guests` (`list`, `delete`, `prune --older-than`). Granting a role, disabling and deleting ask first.
+- **`rebase cron`**: `list`, `get`, `logs`, `run`, `enable`, `disable` and `reset` on any target. On Rebase Cloud reads need log access and the rest an organization owner or admin with Studio on, through a short-lived platform token.
+- **`rebase logs`**: the server's log buffer, once or followed (`-f`), filtered by level, source and text; on a Cloud project it is `rebase cloud logs --runtime`.
+- **`rebase functions`**: `list`, and `invoke <name> [path]` with the fields, body and headers `rebase api` takes.
+- **`rebase rls simulate`**: what a role, a user or a service key would read, table by table, from the RLS simulator; `rls options` lists the identities. It answers an administrator's own session.
+- **`rebase auth login`**, `logout` and `whoami`: a person's session on a running app, kept in `~/.rebase/sessions.json` and sent with `--session` (by default for `rls simulate` and `auth keys`). `auth emails` prints the development mailbox and its links; `auth keys` manages your own personal API keys.
+- **`rebase storage` reads and writes stored files**: `ls`, `cp`, `rm`, `url` and `stat`, through the storage policies. The stored side of `cp` starts with a colon (`:avatars/me.png`, `media:avatars/me.png`).
+- **`rebase schema show [table]`**: the tables and their columns, relations and row-level security, from `backend/schema` or, with `--remote`, as the server describes them to the credential.
+- **`rebase db branch merge <name>`**: writes a branch's row changes onto the database it was made from, after showing the diff, against that diff's fingerprint; `--on-conflict` and `--skip-blocked`.
+- **`rebase api-keys update <id>`**: changes a service key's name, scopes, roles, rate limit or expiry; only what the line names is sent.
+- **Every project command takes the same target flags**: `--project <slug>` (Rebase Cloud, through the console's Studio proxy, which holds the app's key so the CLI never does), `--cloud` (the linked project), `--url <server>`, `--token <bearer>`, `--session`, `--anon`, `--json` and `--yes`. `api-keys`, `storage orphans|move` and `schema reconcile` take them too.
+- **`rebase cloud deploy-hooks`** (`list`, `create`, `revoke`), **`rebase cloud alerts`** (`list`, `ack`, `snooze --hours`), **`rebase cloud deploy --git [<branch>]`**, **`rebase cloud metrics --runtime`** and **`--history`**, **`rebase cloud domains primary <domain>`**, **`rebase cloud settings set --studio on|off`**, **`rebase cloud orgs rename`** and **`delete`**, **`rebase cloud billing email <address>`**, **`rebase cloud clusters baseline <id> [--install]`**.
+- **The local MCP server's `rebase_cloud_deploy`, `rebase_cloud_env_set`, `rebase_cloud_rollback` and `rebase_cloud_provision` take `confirm: true`.** Without it they answer what they would do and do nothing; a preview deploy and a preview variable need none.
+
+### Changed
+
+- **Destructive commands ask first; `--yes` answers for a script.** `api-keys revoke`, `storage move --delete-source`, `db branch delete`, `cloud env unset`, `cloud orgs members role`, `cloud orgs invites revoke`, `cloud compute set` (with the price quote), `cloud settings set --subdomain`, `cloud db access enable` and `cloud projects create`. With no terminal, or under `--json`, they refuse with `confirmation_required`: a script that ran any of them must now pass `--yes`.
+- **Cloud guests go through the console's Studio proxy.** `rebase cloud guests` used to reveal `REBASE_SERVICE_KEY` into the CLI's memory; it now needs an organization owner or admin on a project whose Studio access is on.
+- **A cloud command whose control-plane route is not deployed says so**, with the code `not_served`, instead of failing with a bare 404: `app-key`, `service-key`, `db access`, `orgs members invite`, `orgs invites`, `compute window|apply`, `events`, `notifications`, `usage`, `activity`, `billing invoices|upcoming`. `cloud status` and `cloud compute` leave the maintenance section out and list it in `notServed`.
+- **The local MCP server's branch tools accept any credential holding `database:write`**, the service key and `rk_` keys included; they asked `/auth/me` for an admin role, which only a person's token can answer.
+- **The cloud help index**: `rebase cloud releases --help` prints the deployments page, and the retired `webhooks` group is no longer listed (it still answers `command_retired`).
+
+### Deprecated
+
+- **`rebase cloud debug health --collection`** is `--table`; `--collection` still works and warns once.
+- **The `-p` short flag of the password reset** (`rebase auth reset-password`) still means `--password` and warns: everywhere else `-p` is `--project`.
+
 ### Fixed
 
 - **`rebase migrate collections-to-tables` writes `.js` import extensions when the project's collections do.** A project whose collection files import each other as Node ESM does (`./users.js`) builds its backend with plain `tsc` and runs it on Node. In 0.31.0 the codemod wrote the schema index, the imports between tables, the customizations and the CMS index without the extension, so the compiled `backend/schema` could not be imported and the server failed at start-up. The codemod now follows the project's own spelling; a project that imports extensionless gets the same output as before.

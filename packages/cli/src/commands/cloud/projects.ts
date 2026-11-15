@@ -363,6 +363,16 @@ message: "Subdomain:" });
         // the collection hook still enforces uniqueness on create.
     }
 
+    // A project is billed once it runs, and its subdomain is not editable in
+    // passing afterwards, so it is confirmed: `--yes` for scripts and agents,
+    // and off a terminal without it the command refuses rather than assume.
+    const databaseLabel = dbChoice === "managed" ? "a managed database" : dbChoice === "byodb" ? "your own database" : "no database";
+    await confirmDestructive({
+        yes: Boolean(args["--yes"]),
+        prompt: `Create project ${name} at ${subdomain} in org ${org}, with ${databaseLabel}? `
+            + "Its compute and managed database are billed from its first deploy."
+    });
+
     try {
         const user = await client.auth.getUser();
         if (!user) {

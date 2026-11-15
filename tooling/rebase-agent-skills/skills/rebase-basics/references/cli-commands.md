@@ -182,7 +182,7 @@ booting and prints that line.
 | `rebase db push` | Apply schema directly to database (development only). `--dry-run` prints the SQL; a change that drops data needs `--allow-destructive` |
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending SQL migrations. `--refuse-destructive` applies nothing when a pending file drops or narrows data; `--baseline <version>` for a database boot already created |
-| `rebase db branch` | Database branching (create, list, switch, delete, info, diff, prune) — needs a real PostgreSQL. `prune` asks first; with no terminal it needs `--yes`, and since 0.25 it exits 1 without it |
+| `rebase db branch` | Database branching (create, list, switch, delete, info, diff, merge, prune) — needs a real PostgreSQL. `merge <name>` shows the diff, asks, and writes the branch's row changes onto its parent (`--on-conflict abort\|branch\|target`, `--skip-blocked`); `delete`, `merge` and `prune` ask first, and with no terminal they need `--yes` |
 | `rebase db backup` | Write a backup of the current database (default `./backups` where you run `rebase`; unknown options are refused) |
 | `rebase db backups list` | List the backups taken so far |
 | `rebase db restore` | Restore the database from a backup |
@@ -275,7 +275,7 @@ rebase generate-sdk --schema-dir ./backend/schema --output ./generated/sdk
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--email` | `-e` | (required — or pass as positional arg) | User's email address |
-| `--password` | `-p` | one is generated and printed | New password |
+| `--password` | `-p` (deprecated: `-p` is `--project` elsewhere) | one is generated and printed | New password |
 
 ```bash
 # With flags
@@ -284,6 +284,31 @@ rebase auth reset-password --email user@example.com --password MyNewPass!
 # Positional args
 rebase auth reset-password user@example.com MyNewPass!
 ```
+
+### A running app
+
+Act on a running app through its own API, so row-level security, field access, hooks and storage policies apply. Every one takes the same target flags: none (the `REBASE_BASE_URL`, else the running `rebase dev`, with the service key from `.env`), `--url <server>`, `--project <slug>` (a Rebase Cloud project, through the console's Studio proxy — owners and admins, Studio on), `--cloud` (the linked project), `--token <bearer>`, `--session` (after `rebase auth login`), `--anon`; plus `--json` (also when piped) and `--yes` (destructive ones ask first, and refuse with `confirmation_required` when nobody can answer).
+
+| Command | Description |
+|---------|-------------|
+| `rebase api [METHOD] <path>` | Any route, with the project's credential: `-f k=v` / `-F k=typed` (query on GET, body otherwise — a field alone never writes), `--input <file>`, `-H`, `--include`. Non-2xx exits 1 |
+| `rebase data query <table>` | Rows: `--where status=eq.published` (the API's own filter syntax), `--order-by col:desc`, `--limit`, `--fields`, `--include`, `--all`, `--format table\|json\|ndjson\|csv` |
+| `rebase data get\|count\|aggregate <table>` | One row by id; a count with `--where`; `--select "count(),sum(total)" --group-by status` |
+| `rebase data insert\|update\|delete <table> [<id>]` | `--data '{…}'` or `--file`; update/delete take `--where` for many rows (count, then confirm) |
+| `rebase data import <table> --file rows.csv` | Bulk writes from JSON, NDJSON or CSV; `--upsert <column>` |
+| `rebase data history\|revert\|watch <table>` | Row history and revert (history on); `watch` tails changes over the realtime socket |
+| `rebase schema show [table] [--remote]` | The tables and their columns: from `backend/schema`, or as the server serves them. Read this before `data query` |
+| `rebase users list\|get\|create\|update\|delete\|reset-password\|mfa-reset\|roles\|guests` | Accounts; `create <email> --role admin`, `update <email> --add-role editor`, `guests prune --older-than 30d --yes` |
+| `rebase cron list\|get\|logs\|run\|enable\|disable\|reset` | Scheduled jobs; on Cloud, reads need log access and the rest owner/admin with Studio on |
+| `rebase logs [-f]` | The server's log buffer (`--level`, `--source`, `--search`); on `--project` it is `rebase cloud logs --runtime` |
+| `rebase functions list\|invoke <name> [path]` | Your `backend/functions` routes; `invoke` takes `rebase api`'s flags. `--anon` shows what a visitor gets |
+| `rebase storage ls\|cp\|rm\|url\|stat` | Stored files; the stored side starts with a colon: `rebase storage cp <file> :avatars/<name>` |
+| `rebase rls simulate --role anon` | What a role, user (`--user`) or key (`--key`) would read, table by table. Needs `rebase auth login` (an admin's own session) |
+| `rebase auth login\|logout\|whoami` | A person's session on the app, in `~/.rebase/sessions.json`; `--session` sends it |
+| `rebase auth emails [--latest] [--links]` | The dev mailbox: sign-in, reset and magic-link mail a server with no SMTP_HOST captured |
+| `rebase auth keys [list\|create\|revoke]` | Your own personal API keys (`auth.personalKeys: true`) |
+
+> **IMPORTANT FOR AGENTS:** `rebase schema show --remote` gives the real column names; `rebase data query <table> --json` then reads rows the way the app's users would (as the admin role with the service key — pass `--token` or `--session` to see a narrower view). `rebase auth emails --latest --links` hands you the link a sign-up or reset flow sent.
 
 ### Diagnostics
 
@@ -303,7 +328,8 @@ rebase auth reset-password user@example.com MyNewPass!
 | `rebase api-keys list` | List the service API keys: kind, scopes, roles |
 | `rebase api-keys get <id>` | Show one key |
 | `rebase api-keys create` | Create a service key: `--name`, and `--scopes data:read:posts,cron:write` (comma-separated or repeated) or `--full-access` (every scope you hold, less `keys:*`); optionally `--roles admin`, `--rate-limit`, `--expires-in <days>` or `--expires-at <ISO date>` |
-| `rebase api-keys revoke <id>` | Revoke a key |
+| `rebase api-keys update <id>` | Change a key's `--name`, `--scopes`, `--roles`, `--rate-limit` / `--no-rate-limit`, `--expires-in` / `--expires-at` / `--no-expiry`; only what you name changes |
+| `rebase api-keys revoke <id>` | Revoke a key (asks first; `--yes` for a script) |
 | `rebase api-keys scopes` | List every scope the backend knows, including the app's own, and which you hold |
 | `rebase api-keys --help` | Show API key command help |
 
@@ -322,7 +348,7 @@ rebase auth reset-password user@example.com MyNewPass!
 |---------|-------------|
 | `rebase generate view <slug>` | Scaffold a custom admin screen; `--collection <slug>` makes it a record tab (`--name`, `--icon`, `--dry-run`, `--force`) |
 | `rebase storage orphans` | List the stored files no row names (`--delete` to delete them) |
-| `rebase storage move` | Copy a folder of files to another storage source (`--from`, `--to`, `--prefix`, `--delete-source`) |
+| `rebase storage move` | Copy a folder of files to another storage source (`--from`, `--to`, `--prefix`, `--delete-source`, which asks first) |
 | `rebase migrate collections-to-tables [dir]` | Move a project from `config/collections` to `backend/schema` + `frontend/src/cms`, proven by byte-identical SQL. `--dry-run`, `--check`, `--json`, `--force`, `--skip-sdk-calls`. See `rebase-tables/references/migrate-from-collections.md` |
 | `rebase migrate sdk-calls [dir]` | Rewrite the project's own SDK calls for the rename: `data.collection("x")` → `data.table("x")` and the rest. `--dry-run`, `--json`, `--force` |
 | `rebase cloud …` | Rebase Cloud: `login`, `link`, `deploy`, `tokens create`, and more — `rebase cloud --help` (see the `rebase-cloud` skill) |

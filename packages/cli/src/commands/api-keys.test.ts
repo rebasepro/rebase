@@ -37,6 +37,11 @@ vi.mock("../utils/project", async importOriginal => {
     return {
         ...actual,
         requireProjectRoot: () => project.root,
+        // The commands find the project through the shared target module; a
+        // test that chdirs into a real project (the hint tests) gets the real lookup.
+        findProjectRoot: (start?: string) => (project.root === "/nonexistent/rebase-api-keys-test" && start === undefined
+            ? actual.findProjectRoot() ?? project.root
+            : project.root),
         readEnvFile: () => project.env
     };
 });
@@ -89,8 +94,8 @@ function maskedKey(overrides: Partial<ApiKeyMasked> = {}): ApiKeyMasked {
 
 describe("resolveRevokeKeyArgs", () => {
     it("reads the id as a positional or as --id", () => {
-        expect(resolveRevokeKeyArgs(argv("api-keys", "revoke", "key_123"))).toEqual({ id: "key_123" });
-        expect(resolveRevokeKeyArgs(argv("api-keys", "revoke", "--id", "key_123"))).toEqual({ id: "key_123" });
+        expect(resolveRevokeKeyArgs(argv("api-keys", "revoke", "key_123"))).toEqual({ id: "key_123", yes: false });
+        expect(resolveRevokeKeyArgs(argv("api-keys", "revoke", "--id", "key_123"))).toEqual({ id: "key_123", yes: false });
     });
 
     it("refuses an undeclared flag rather than sending a DELETE for it", () => {
@@ -99,13 +104,13 @@ describe("resolveRevokeKeyArgs", () => {
     });
 
     it("does not take --debug for the key to revoke", () => {
-        expect(resolveRevokeKeyArgs(argv("api-keys", "revoke", "--debug"))).toEqual({ id: undefined });
+        expect(resolveRevokeKeyArgs(argv("api-keys", "revoke", "--debug"))).toEqual({ id: undefined, yes: false });
     });
 
     it("is not shifted by a flag placed before the command", () => {
         // `slice(4)` started at "revoke", so the id was the word "revoke".
         expect(resolveRevokeKeyArgs(argv("--debug", "api-keys", "revoke", "key_123")))
-            .toEqual({ id: "key_123" });
+            .toEqual({ id: "key_123", yes: false });
     });
 
     it("refuses more arguments than it takes", () => {
@@ -457,9 +462,27 @@ describe("the commands against a server", () => {
     it("revoke deletes the key it names", async () => {
         respond = () => json(200, { success: true });
 
-        await apiKeysCommand("revoke", argv("api-keys", "revoke", "key_1"));
+        await apiKeysCommand("revoke", argv("api-keys", "revoke", "key_1", "--yes"));
 
         expect(sent.map(r => `${r.method} ${r.url}`)).toEqual(["DELETE http://rebase.test/api/admin/api-keys/key_1"]);
+    });
+
+    it("revoke asks first, and refuses with no terminal to ask on", async () => {
+        // Everything holding the key stops at once, and a revoked key cannot be restored.
+        respond = () => json(200, { success: true });
+
+        await expect(apiKeysCommand("revoke", argv("api-keys", "revoke", "key_1"))).rejects.toThrow("exit:1");
+
+        expect(sent).toEqual([]);
+    });
+
+    it("update sends only what the line names", async () => {
+        respond = () => json(200, { key: { id: "key_1", name: "CI", kind: "service", key_prefix: "rk_live_ab", scopes: ["data:read:posts"], roles: [], rate_limit: null, expires_at: null, created_at: "2026-11-15T00:00:00Z", last_used_at: null, revoked_at: null } });
+
+        await apiKeysCommand("update", argv("api-keys", "update", "key_1", "--scopes", "data:read:posts"));
+
+        expect(sent.map(r => `${r.method} ${r.url}`)).toEqual(["PUT http://rebase.test/api/admin/api-keys/key_1"]);
+        expect(sent[0].body).toEqual({ scopes: ["data:read:posts"] });
     });
 
     it("scopes prints the catalogue", async () => {

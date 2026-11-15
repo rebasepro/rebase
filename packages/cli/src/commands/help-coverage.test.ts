@@ -427,6 +427,13 @@ describe("every command the dispatch answers parses its flags strictly", () => {
         upgrade: "upgrade.ts",
         migrate: "migrate.ts",
         "normalize-imports": "normalize-imports.ts",
+        api: "api.ts",
+        data: "data.ts",
+        users: "users.ts",
+        cron: "cron.ts",
+        logs: "logs.ts",
+        functions: "functions.ts",
+        rls: "rls.ts",
         // The family's parse is `parseCloudArgs`, which lives here and wraps
         // `parseCommandArgs` with the global cloud flags merged in. Which of its
         // thirty dispatchers reach it is the sweep at the bottom of this file —

@@ -34,6 +34,7 @@ import {
     fail,
     note,
     parseCloudArgs,
+    freshAccessToken,
     reportError,
     requireClient,
     requireKnownAction,
@@ -83,22 +84,19 @@ function lastSeenBeforeOf(value: string | undefined): Date | undefined {
 
 type App = ReturnType<typeof createRebaseClient>;
 
-/** The project's own API, holding its service key. */
-async function connectToApp(client: CloudClient, origin: string, projectId: string): Promise<App> {
-    let serviceKey: string;
-    try {
-        const revealed = await client.functions.invoke<{ value: string }>(
-            "env-vars",
-            { projectId, key: "REBASE_SERVICE_KEY" },
-            { path: "reveal" }
-        );
-        serviceKey = revealed.value;
-    } catch (e) {
-        reportError(e, "Failed to read the project's service key");
-    }
+/**
+ * The project's own API, through the console's Studio proxy: the control
+ * plane attaches the app's service key on its own side, so no static secret
+ * reaches this machine. (This used to reveal `REBASE_SERVICE_KEY` into the
+ * CLI's memory, which is the thing `docs/platform-tokens.md` exists to avoid.)
+ * It answers an organization owner or admin, on a project whose Studio switch
+ * is on.
+ */
+async function connectToApp(client: CloudClient, url: string, projectId: string): Promise<App> {
+    const token = await freshAccessToken(client);
     return createRebaseClient({
-        baseUrl: origin,
-        token: serviceKey,
+        baseUrl: `${url.replace(/\/+$/, "")}/api/functions/studio/${encodeURIComponent(projectId)}/proxy`,
+        token,
         realtime: false,
         headers: { "User-Agent": cliUserAgent() },
         auth: { persistSession: false, autoRefresh: false }
@@ -112,6 +110,13 @@ async function connectToApp(client: CloudClient, origin: string, projectId: stri
  */
 function reportAppError(error: unknown, action: string, origin: string): never {
     if (error instanceof RebaseApiError) {
+        if (error.status === 403 && /Studio access is switched off/i.test(error.message)) {
+            fail(
+                "Studio access is switched off for this project, and `cloud guests` reaches the app through the console's Studio proxy.",
+                "An organization owner or admin can turn it on: `rebase cloud settings set --studio on`.",
+                "studio_disabled"
+            );
+        }
         if (error.status === 404 && isMissingRoute(error.message)) {
             fail(
                 `The app at ${origin} needs a newer runtime: it has no guest routes yet.`,
@@ -233,7 +238,7 @@ export async function guestsCommand(rawArgs: string[]): Promise<void> {
     }
 
     const origin = await resolveOrigin(rawArgs, client, url, projectId);
-    const app = await connectToApp(client, origin, projectId);
+    const app = await connectToApp(client, url, projectId);
     try {
         if (action === "delete") {
             const result = await app.admin.deleteGuest(id);

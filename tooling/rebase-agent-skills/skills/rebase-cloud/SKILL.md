@@ -29,7 +29,7 @@ namespace, and a mistyped one exits 1.
 ```bash
 rebase cloud login
 rebase cloud billing setup     # once per organization
-rebase cloud projects create --name "My App" --subdomain my-app --link
+rebase cloud projects create --name "My App" --subdomain my-app --link --yes   # creates billable resources: it asks first, --yes answers
 rebase cloud deploy
 ```
 

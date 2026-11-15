@@ -477,9 +477,11 @@ except one that restarts the database, which waits for a maintenance window.
 | `init`, `claim` | With `--claim`: a live backend with no account, and a link to claim it; `claim` prints that link again. See [A backend with no account](/docs/deployment/cloud-agents/#a-backend-with-no-account) |
 | `projects` | Create, list, inspect, delete |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
+| `deploy-hooks` | Secret URLs a git host or CI calls to deploy the project: list, create (the URL is shown once), revoke. <span class="since-badge" data-since="0.32">Since 0.32</span> |
 | `previews` | Builds served on their own address by `deploy --preview`, and deleting them. See [Preview a change](#preview-a-change) |
 | `start`, `stop`, `restart` | Pausing a project and bringing it back. A stopped project keeps its subscription, unless the platform bills stopped projects for storage and the platform fee only; the console's **Billing** row says so when it does |
 | `status`, `metrics`, `debug` | What it is doing, and why it is not |
+| `alerts` | The project's open incidents, and acknowledging or snoozing one. <span class="since-badge" data-since="0.32">Since 0.32</span> |
 | `cron` | The deployed app's cron jobs and their recorded runs, read with your `rebase cloud` login. Read-only |
 | `env` | Environment variables. `list` never prints values; `--secret` is write-only |
 | `app-key` | The key `init --claim` wrote into `.env` as `REBASE_API_TOKEN`, handed over at the claim; `rotate` replaces it and revokes the old one. Owners and admins |
@@ -496,7 +498,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `clusters` | The clusters tenants run on. Platform-admin only |
 | `settings`, `orgs`, `billing` | Project settings, organizations and their members and invitations, payment |
 | `activity` | The organization's audit log: who deployed, changed an environment variable (by name), a domain, a backup, a member or a token. Owners and admins. See [See who did what](#see-who-did-what) |
-| `notifications`, `webhooks` | Where the project's events are POSTed: Slack, Discord or any https URL ([Cloud notifications](/docs/deployment/cloud-notifications/)). `webhooks` is retired and exits 1 with code `command_retired` |
+| `notifications` | Where the project's events are POSTed: Slack, Discord or any https URL ([Cloud notifications](/docs/deployment/cloud-notifications/)) |
 
 Every group in that table answers `--help` with a page of its own — a usage line,
 its flags, and examples — and `--help` never runs the command. A test holds the

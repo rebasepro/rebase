@@ -24,13 +24,20 @@ import {
     fail,
     note,
     parseCloudArgs,
-    reportError,
     requireClient,
     requireKnownAction,
     requireProject,
     success,
     type CloudClient
 } from "./context";
+import { reportCallError, type Unserved } from "./not-served";
+
+/** What `notifications` says on a control plane that has no `notifications` function yet. */
+const NOTIFICATIONS_UNSERVED: Unserved = {
+    what: "notification webhooks",
+    hint: "Nothing was changed. `rebase cloud alerts` lists what the platform has seen go wrong with the project."
+};
+
 
 /** The events the control plane notifies about. */
 export const NOTIFICATION_EVENTS = [
@@ -130,7 +137,7 @@ export async function notificationsCommand(action: string | undefined, rawArgs: 
                 { path: "webhooks" }
             );
         } catch (e) {
-            reportError(e, "Failed to add the notification webhook");
+            reportCallError(e, "Failed to add the notification webhook", NOTIFICATIONS_UNSERVED);
         }
         emit(() => {
             success(`Notifications for ${events.join(", ")} now go to ${chalk.bold(created.webhook.url)} [${created.webhook.id}]`);
@@ -164,7 +171,7 @@ export async function notificationsCommand(action: string | undefined, rawArgs: 
             try {
                 await client.functions.invoke("notifications", undefined, { method: "DELETE", path: `webhooks/${encodeURIComponent(id)}` });
             } catch (e) {
-                reportError(e, "Failed to remove the notification webhook");
+                reportCallError(e, "Failed to remove the notification webhook", NOTIFICATIONS_UNSERVED);
             }
             success(`Notification webhook ${chalk.bold(id)} removed`);
             emit(() => {}, { success: true, id });
@@ -179,7 +186,7 @@ export async function notificationsCommand(action: string | undefined, rawArgs: 
                 { path: `webhooks/${encodeURIComponent(id)}/test` }
             );
         } catch (e) {
-            reportError(e, "Failed to send the test event");
+            reportCallError(e, "Failed to send the test event", NOTIFICATIONS_UNSERVED);
         }
         if (!result.success) {
             // A delivery the receiver refused is the answer, and a failure: exit 1.
@@ -202,7 +209,7 @@ export async function notificationsCommand(action: string | undefined, rawArgs: 
     try {
         webhooks = await listWebhooks(client, projectId);
     } catch (e) {
-        reportError(e, "Failed to list notification webhooks");
+        reportCallError(e, "Failed to list notification webhooks", NOTIFICATIONS_UNSERVED);
     }
     emit(
         () => {

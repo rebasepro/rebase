@@ -235,9 +235,29 @@ export function loadCliFlags(root) {
         return specs;
     };
 
+    /**
+     * The target flags every project command spreads into its spec
+     * (`...PROJECT_TARGET_FLAGS`, `packages/cli/src/utils/project-target.ts`):
+     * read where they are declared rather than required in each spec.
+     */
+    const projectTargetSpec = (() => {
+        const source = read(root, "packages/cli/src/utils/project-target.ts");
+        const at = source.search(/export const PROJECT_TARGET_FLAGS\s*=\s*\{/);
+        if (at === -1) return "";
+        const open = source.indexOf("{", at);
+        let depth = 1;
+        let i = open + 1;
+        for (; i < source.length && depth > 0; i++) {
+            if (source[i] === "{") depth++;
+            else if (source[i] === "}") depth--;
+        }
+        return source.slice(open + 1, i - 1);
+    })();
+
     /** `"--out": ` / `"-h": ` — object keys only, so alias targets are not double-counted. */
     const keys = source =>
-        argSpecs(source).flatMap(spec => [...spec.matchAll(/"(-{1,2}[A-Za-z][\w-]*)"\s*:/g)].map(m => m[1]));
+        argSpecs(source).flatMap(spec => [...`${spec}${/\.\.\.PROJECT_TARGET_FLAGS\b/.test(spec) ? projectTargetSpec : ""}`
+            .matchAll(/"(-{1,2}[A-Za-z][\w-]*)"\s*:/g)].map(m => m[1]));
 
     const flags = new Map();
     // A spec that declares no flags is still a spec: `rebase telemetry` parses
@@ -281,6 +301,12 @@ export function loadCliFlags(root) {
     // `rebase schema reconcile` parses `--drop` and `--yes` in its own module,
     // which `schema.ts` hands the argv to.
     add("schema", read(root, "packages/cli/src/commands/schema-reconcile.ts"));
+    // The same for the subcommands other modules answer on a group's behalf:
+    // `schema show`, `auth login|logout|whoami|emails|keys` and
+    // `storage ls|cp|rm|url|stat`.
+    add("schema", read(root, "packages/cli/src/commands/schema-show.ts"));
+    add("auth", read(root, "packages/cli/src/commands/auth-session.ts"));
+    add("storage", read(root, "packages/cli/src/commands/storage-objects.ts"));
 
     // `db backup` parses its own argv in the backup module rather than in the
     // driver's cli.ts, so without this the union is missing `--out` — the flag

@@ -22,12 +22,12 @@ import {
     note,
     noteBlank,
     parseCloudArgs,
-    reportError,
     requireClient,
     requireProject,
     success,
     type CloudClient
 } from "./context";
+import { isRouteNotServed, reportCallError, type Unserved } from "./not-served";
 
 export interface MaintenanceBatch {
     id: string;
@@ -70,17 +70,67 @@ export function parseDay(value: string): number | undefined {
     return i >= 0 ? i : undefined;
 }
 
-/** The project's maintenance status, or undefined from a control plane that has no maintenance function yet. */
+/** What a command says on a control plane that has no `maintenance` function yet. */
+export const MAINTENANCE_UNSERVED: Unserved = {
+    what: "maintenance windows",
+    hint: "Nothing was changed. On this control plane a database change from `rebase cloud compute set` is not held for a window."
+};
+
+/** What `events` says on a control plane that has no `maintenance` function yet. */
+export const EVENTS_UNSERVED: Unserved = {
+    what: "project events",
+    hint: "`rebase cloud deployments` lists the project's deploys, and `rebase cloud metrics` what it runs now."
+};
+
+/**
+ * What a read of the maintenance status came back with.
+ *
+ * Three outcomes rather than `undefined`, because the commands that show it as
+ * one section of a larger page say different things for them: a control plane
+ * without the function is noted as such, a failed read is left out quietly, as
+ * it always was.
+ */
+export type MaintenanceRead =
+    | { kind: "ok"; status: MaintenanceStatus }
+    | { kind: "not_served" }
+    | { kind: "failed" };
+
+/** The project's maintenance status, and whether the control plane serves it at all. */
+export async function readMaintenance(client: CloudClient, projectId: string): Promise<MaintenanceRead> {
+    try {
+        const status = await client.functions.invoke<MaintenanceStatus>("maintenance", undefined, {
+            method: "GET",
+            path: `projects/${encodeURIComponent(projectId)}`
+        });
+        return { kind: "ok", status };
+    } catch (error: unknown) {
+        return isRouteNotServed(error) ? { kind: "not_served" } : { kind: "failed" };
+    }
+}
+
+/** The project's maintenance status, or undefined when it could not be read. */
 export async function fetchMaintenance(client: CloudClient, projectId: string): Promise<MaintenanceStatus | undefined> {
+    const read = await readMaintenance(client, projectId);
+    return read.kind === "ok" ? read.status : undefined;
+}
+
+/**
+ * The status a command that is about maintenance needs, or a refusal: `not_served`
+ * on a control plane without the function, the failure itself otherwise.
+ */
+async function requireMaintenance(client: CloudClient, projectId: string): Promise<MaintenanceStatus> {
     try {
         return await client.functions.invoke<MaintenanceStatus>("maintenance", undefined, {
             method: "GET",
             path: `projects/${encodeURIComponent(projectId)}`
         });
-    } catch {
-        return undefined;
+    } catch (error: unknown) {
+        reportCallError(error, "Could not read the maintenance window", MAINTENANCE_UNSERVED);
     }
 }
+
+/** The line a page prints in place of its maintenance section on a control plane without it. */
+export const MAINTENANCE_NOT_SERVED_NOTE = "This control plane does not report maintenance windows yet, so none is shown.";
 
 /** One line for a waiting batch: "Database 0.16 → 0.5 vCPU — applies Sunday 9 November, 03:00 UTC". */
 export function describePending(open: MaintenanceBatch | null | undefined): string | undefined {
@@ -96,8 +146,7 @@ export async function computeApplyCommand(rawArgs: string[]): Promise<void> {
     const projectId = await requireProject(rawArgs, client);
     const ref = displayProjectRef(rawArgs);
 
-    const status = await fetchMaintenance(client, projectId);
-    if (!status) fail("This control plane does not schedule database changes yet.", undefined, "unsupported");
+    const status = await requireMaintenance(client, projectId);
     const open = status.open;
     if (!open || (open.state !== "pending" && open.state !== "notified")) {
         if (open?.state === "applying") {
@@ -115,7 +164,7 @@ export async function computeApplyCommand(rawArgs: string[]): Promise<void> {
     try {
         await client.functions.invoke("maintenance", {}, { path: `projects/${encodeURIComponent(projectId)}/apply` });
     } catch (error: unknown) {
-        reportError(error, "Could not apply the database change");
+        reportCallError(error, "Could not apply the database change", MAINTENANCE_UNSERVED);
     }
     emit(
         () => {
@@ -134,8 +183,7 @@ export async function computeWindowCommand(rawArgs: string[]): Promise<void> {
     const hourFlag = flags["--hour"];
 
     if (dayFlag === undefined && hourFlag === undefined) {
-        const status = await fetchMaintenance(client, projectId);
-        if (!status) fail("This control plane does not schedule database changes yet.", undefined, "unsupported");
+        const status = await requireMaintenance(client, projectId);
         emit(
             () => {
                 console.log("");
@@ -169,7 +217,7 @@ export async function computeWindowCommand(rawArgs: string[]): Promise<void> {
             path: `projects/${encodeURIComponent(projectId)}/window`
         });
     } catch (error: unknown) {
-        reportError(error, "Could not move the maintenance window");
+        reportCallError(error, "Could not move the maintenance window", MAINTENANCE_UNSERVED);
     }
     emit(() => success(`Maintenance window: ${res?.window?.label ?? `${DAYS[day]} ${hourFlag}:00 UTC`}.`), { window: res?.window ?? { day, hour: hourFlag } });
 }
@@ -189,7 +237,7 @@ export async function eventsCommand(rawArgs: string[]): Promise<void> {
         });
         events = res.events ?? [];
     } catch (error: unknown) {
-        reportError(error, "Could not read the project's events");
+        reportCallError(error, "Could not read the project's events", EVENTS_UNSERVED);
     }
     emit(
         () => {

@@ -317,6 +317,16 @@ switch made earlier. `delete` refuses the branch you are on, since every command
 in the checkout, the delete included, is pointed at it: `switch --off` first,
 then delete it. The whole workflow is on [Database Branching](/docs/backend/branching/).
 
+#### `rebase db branch merge`
+
+<span class="since-badge" data-since="0.32">Since 0.32</span>
+
+```bash
+rebase db branch merge <name> [--on-conflict abort|branch|target] [--skip-blocked] [--yes]
+```
+
+Writes the rows a branch inserted, updated and deleted onto the database it was made from. It prints the diff first and asks, then merges exactly that diff: the merge names the diff's fingerprint, so a parent that changed since is refused rather than merged. `--on-conflict` decides a row both sides changed — `abort` (the default) writes nothing, `branch` takes the branch's row, `target` keeps the parent's — and `--skip-blocked` merges the tables that can be and skips the rest. Schema and policy changes are never merged: migrations carry those. `delete` asks first too, and `--yes` answers both for a script.
+
 :::note[On the managed development database]
 `push`, `generate` and `migrate` work here as on any database.
 `push` and `generate` plan their work with Atlas, which needs a second

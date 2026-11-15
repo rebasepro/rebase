@@ -19,10 +19,17 @@ import {
     note,
     noteBlank,
     parseCloudArgs,
-    reportError,
     requireClient,
     requireProject
 } from "./context";
+import { reportCallError, type Unserved } from "./not-served";
+
+/** What `activity` says on a control plane that has no `audit` function yet. */
+const AUDIT_UNSERVED: Unserved = {
+    what: "the activity log",
+    hint: "`rebase cloud deployments` lists each project's deploys, with who triggered them."
+};
+
 
 export const ACTIVITY_FLAGS = {
     "--org": String,
@@ -159,7 +166,7 @@ export async function activityCommand(rawArgs: string[]): Promise<void> {
             { method: "GET", path: `org/${encodeURIComponent(org)}${query ? `?${query}` : ""}` }
         );
     } catch (e) {
-        reportError(e, "Failed to load the activity log");
+        reportCallError(e, "Failed to load the activity log", AUDIT_UNSERVED);
     }
     const events = res.events ?? [];
     const nextCursor = res.nextCursor ?? null;

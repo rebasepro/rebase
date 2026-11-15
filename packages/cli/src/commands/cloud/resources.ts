@@ -3,7 +3,14 @@ import fs from "fs";
  * `rebase cloud` resource subcommands: status, metrics, webhooks, storage,
  * clusters, billing.
  */
-import { computeApplyCommand, computeWindowCommand, describePending, fetchMaintenance } from "./maintenance";
+import {
+    computeApplyCommand,
+    computeWindowCommand,
+    describePending,
+    fetchMaintenance,
+    readMaintenance,
+    MAINTENANCE_NOT_SERVED_NOTE
+} from "./maintenance";
 import arg from "arg";
 import chalk from "chalk";
 import {
@@ -31,13 +38,16 @@ import {
     grantForLink,
     appKeyExpiryNote,
     projectDotenvSetsAppKey,
-    warn
+    warn,
+    confirmDestructive,
+    type CloudClient
 } from "./context";
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { firstRow, latestDeployment, fmtDate } from "./projects";
 import { wantsRawError } from "./errors";
 import { billingInvoices, billingUpcoming } from "./billing-invoices";
 import { switchOn } from "../../utils/args";
+import { reportCallError, type Unserved } from "./not-served";
 
 /* ─── status: quick project dashboard ──────────────────────────── */
 
@@ -283,7 +293,7 @@ maxPositionals: 0 });
             | undefined;
         if (!project) fail(`Project ${displayProjectRef(rawArgs)} not found.`, undefined, "not_found");
 
-        const [db, storage, deploy, baseDomain, maintenance] = await Promise.all([
+        const [db, storage, deploy, baseDomain, maintenanceRead] = await Promise.all([
             firstRow(client, "databases", projectId),
             // A control plane that does not have this route yet, or a lookup
             // that fails, yields `undefined` — which prints as a blank. A blank
@@ -294,8 +304,12 @@ path: projectId })
                 .catch(() => undefined),
             latestDeployment(client, projectId),
             fetchTenantBaseDomain(client, url),
-            fetchMaintenance(client, projectId)
+            // A control plane without the maintenance function leaves the
+            // section out and says so; the rest of the page is still the answer.
+            readMaintenance(client, projectId)
         ]);
+        const maintenance = maintenanceRead.kind === "ok" ? maintenanceRead.status : undefined;
+        const notServed = maintenanceRead.kind === "not_served" ? ["maintenance"] : [];
 
         const storageLine = describeStorageState(storage);
         const databaseLine = describeDatabaseState(db);
@@ -341,6 +355,7 @@ path: projectId })
                     console.log(`  ${chalk.bold(blocked.nextAction ?? "")}`);
                 }
                 console.log("");
+                if (notServed.length > 0) note(chalk.gray(MAINTENANCE_NOT_SERVED_NOTE));
             },
             {
                 projectId: String(project.id),
@@ -378,6 +393,9 @@ connectionStatus: db.connectionStatus ?? null } : null,
                 storage: storage ?? null,
                 // The database change waiting for its maintenance window, if any.
                 maintenance: maintenance ? { window: maintenance.window, pending: maintenance.open } : null,
+                // The sections this control plane does not serve yet, which is
+                // why they are null above rather than empty.
+                notServed,
                 // Present while the project is unclaimed: open `claimUrl` and
                 // sign in to keep it, before `expiresAt`.
                 unclaimed: grant
@@ -477,14 +495,97 @@ function cpuLine(m: TenantMetrics): string | undefined {
     return `${m.cpu} ${chalk.gray(`(${parts}, per instance)`)}`;
 }
 
+/** What `rebase cloud metrics` parses. Its page pairs against this. */
+export const METRICS_FLAGS = {
+    "--runtime": Boolean,
+    "--history": Boolean,
+    "--series": String,
+    "--minutes": String
+} as const;
+
+/**
+ * The series a runtime records, and so the ones `--history` may name.
+ *
+ * The runtime's own list (`METRIC_SERIES` in
+ * `packages/server/src/metrics/history-store.ts`), which is not exported;
+ * `cloud-api-commands.test.ts` holds the two together.
+ */
+export const HISTORY_SERIES = ["cpu_millicores", "memory_bytes", "event_loop_delay_ms"] as const;
+
+/** The longest window the runtime keeps: fourteen days, in minutes. */
+export const HISTORY_MAX_MINUTES = 20_160;
+
+/** What `/api/functions/metrics/:projectId/runtime` returns. Mirrors saas metrics.ts. */
+export interface RuntimeRollup {
+    projectId?: string;
+    at?: string;
+    /** `null` when the app could not be scraped: not deployed, starting, or metrics off. */
+    rollup?: {
+        uptimeSeconds?: number;
+        heapBytes?: number;
+        rssBytes?: number;
+        totalRequests?: number;
+        totalErrors?: number;
+        meanLatencyMs?: number;
+        surfaces?: { surface?: string; requests?: number; errors?: number; meanLatencyMs?: number }[];
+    } | null;
+}
+
+/** What `/api/functions/metrics/:projectId/history` returns. Mirrors saas metrics.ts. */
+export interface MetricHistory {
+    series?: string;
+    minutes?: number;
+    /** `null` when the history could not be read; `reason` says why. */
+    points?: { at: string; value: number; instances?: number }[] | null;
+    reason?: string;
+    retryable?: boolean;
+}
+
+/** The share of requests that failed, as a percentage with one decimal; undefined with no requests. */
+export function errorRate(requests: number | undefined, errors: number | undefined): string | undefined {
+    if (!requests) return undefined;
+    return `${(((errors ?? 0) / requests) * 100).toFixed(1)}%`;
+}
+
+/** `--series` and `--minutes`, checked: the series one the runtime records, the window 1 to 14 days in minutes. */
+export function resolveHistoryArgs(flags: { "--series"?: string; "--minutes"?: string }): { series: string; minutes: number } {
+    const series = flags["--series"] ?? "cpu_millicores";
+    if (!(HISTORY_SERIES as readonly string[]).includes(series)) {
+        fail(`--series ${series} is not a series the runtime records.`, `Use one of: ${HISTORY_SERIES.join(", ")}.`, "usage");
+    }
+    const raw = flags["--minutes"] ?? "60";
+    const minutes = Number(raw);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > HISTORY_MAX_MINUTES) {
+        fail(`--minutes takes a whole number from 1 to ${HISTORY_MAX_MINUTES} (got "${raw}").`, "The runtime keeps fourteen days.", "usage");
+    }
+    return { series, minutes };
+}
+
+/** A history value in the series' own unit, for a person. */
+function historyValue(series: string, value: number): string {
+    if (series === "memory_bytes") return `${(value / 1024 / 1024).toFixed(0)} MiB`;
+    if (series === "cpu_millicores") return `${Math.round(value)}m`;
+    return `${value.toFixed(1)} ms`;
+}
+
 export async function metricsCommand(rawArgs: string[]): Promise<void> {
-    parseCloudArgs({ spec: {},
+    const { flags } = parseCloudArgs({ spec: METRICS_FLAGS,
 rawArgs,
 commandWords: 2,
 command: "cloud metrics",
 maxPositionals: 0 });
+    if (flags["--runtime"] && flags["--history"]) {
+        fail("--runtime and --history are two different reports; pass one.", "Run `rebase cloud metrics --help`.", "usage");
+    }
+    if (!flags["--history"] && (flags["--series"] !== undefined || flags["--minutes"] !== undefined)) {
+        fail("--series and --minutes go with --history.", "e.g. `rebase cloud metrics --history --series memory_bytes --minutes 180`.", "usage");
+    }
+    // Checked before the client is built: a usage error needs no session.
+    const history = flags["--history"] ? resolveHistoryArgs(flags) : undefined;
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
+    if (flags["--runtime"]) return runtimeMetrics(client, projectId, displayProjectRef(rawArgs) || projectId);
+    if (history) return historyMetrics(client, projectId, displayProjectRef(rawArgs) || projectId, history);
     try {
         const [m, realtime] = await Promise.all([
             client.functions.invoke<TenantMetrics>("metrics", undefined, { method: "GET", path: projectId }),
@@ -590,6 +691,123 @@ maxPositionals: 0 });
     } catch (e) {
         reportError(e, "Failed to fetch metrics");
     }
+}
+
+/** `rebase cloud metrics --runtime`: what the app itself counted since it started. */
+async function runtimeMetrics(client: CloudClient, projectId: string, label: string): Promise<void> {
+    let res: RuntimeRollup;
+    try {
+        res = await client.functions.invoke<RuntimeRollup>("metrics", undefined, { method: "GET", path: `${projectId}/runtime` });
+    } catch (e) {
+        reportError(e, "Failed to fetch runtime metrics");
+    }
+    const r = res.rollup ?? null;
+    const rate = r ? errorRate(r.totalRequests, r.totalErrors) : undefined;
+    emit(
+        () => {
+            console.log("");
+            console.log(chalk.bold(`  📈 Runtime — project ${label}`));
+            console.log("");
+            if (!r) {
+                // Not zeroes: an app that could not be read is not an idle one.
+                console.log(chalk.gray("  No data yet: the app is not deployed, is still starting, or does not report metrics."));
+                console.log("");
+                return;
+            }
+            keyValues([
+                ["Requests", r.totalRequests !== undefined ? String(r.totalRequests) : undefined],
+                ["Errors (5xx)", r.totalErrors !== undefined ? `${r.totalErrors}${rate ? ` (${rate})` : ""}` : undefined],
+                ["Mean latency", r.meanLatencyMs !== undefined ? `${r.meanLatencyMs.toFixed(1)} ms` : undefined],
+                ["Up for", r.uptimeSeconds !== undefined ? `${Math.round(r.uptimeSeconds / 60)} min` : undefined],
+                ["Memory (RSS)", r.rssBytes !== undefined ? `${(r.rssBytes / 1024 / 1024).toFixed(0)} MiB` : undefined]
+            ]);
+            if (r.surfaces?.length) {
+                console.log("");
+                console.log(chalk.gray(`  ${"".padEnd(14)} ${"requests".padStart(9)}  ${"errors".padStart(7)}  ${"latency".padStart(9)}`));
+                for (const surface of r.surfaces) {
+                    console.log(
+                        `  ${(surface.surface ?? "?").padEnd(14)} ${String(surface.requests ?? 0).padStart(9)}  `
+                        + `${String(surface.errors ?? 0).padStart(7)}  ${`${(surface.meanLatencyMs ?? 0).toFixed(1)} ms`.padStart(9)}`
+                    );
+                }
+            }
+            console.log("");
+            note(chalk.gray("Counted by the running instance since it started; a restart begins again at zero."));
+            console.log("");
+        },
+        {
+            projectId,
+            at: res.at ?? null,
+            rollup: r,
+            errorRate: r && r.totalRequests ? (r.totalErrors ?? 0) / r.totalRequests : null
+        }
+    );
+}
+
+/** `rebase cloud metrics --history`: one series the runtime recorded, over a window. */
+async function historyMetrics(
+    client: CloudClient,
+    projectId: string,
+    label: string,
+    args: { series: string; minutes: number }
+): Promise<void> {
+    let res: MetricHistory;
+    try {
+        res = await client.functions.invoke<MetricHistory>("metrics", undefined, {
+            method: "GET",
+            path: `${projectId}/history?series=${encodeURIComponent(args.series)}&minutes=${args.minutes}`
+        });
+    } catch (e) {
+        reportError(e, "Failed to fetch metric history");
+    }
+    const points = Array.isArray(res.points) ? res.points : null;
+    const values = (points ?? []).map(p => p.value).filter(v => typeof v === "number" && Number.isFinite(v));
+    const summary = values.length
+        ? {
+            min: Math.min(...values),
+            max: Math.max(...values),
+            mean: values.reduce((a, b) => a + b, 0) / values.length,
+            latest: values[values.length - 1]
+        }
+        : null;
+    emit(
+        () => {
+            console.log("");
+            console.log(chalk.bold(`  🕘 ${args.series} — project ${label}, last ${args.minutes} min`));
+            console.log("");
+            if (!points) {
+                console.log(chalk.yellow(`  ${res.reason ?? "The control plane returned no history."}`));
+                console.log("");
+                return;
+            }
+            if (!summary) {
+                console.log(chalk.gray("  Nothing recorded in this window."));
+                console.log("");
+                return;
+            }
+            keyValues([
+                ["Samples", String(values.length)],
+                ["Latest", historyValue(args.series, summary.latest)],
+                ["Mean", historyValue(args.series, summary.mean)],
+                ["Min", historyValue(args.series, summary.min)],
+                ["Max", historyValue(args.series, summary.max)]
+            ]);
+            console.log("");
+            note(chalk.gray("Every sample is in the JSON (`--json`): its time, value and how many instances it covers."));
+            console.log("");
+        },
+        {
+            projectId,
+            series: res.series ?? args.series,
+            minutes: res.minutes ?? args.minutes,
+            points,
+            summary,
+            reason: points ? null : res.reason ?? null,
+            retryable: points ? null : res.retryable === true
+        }
+    );
+    // No history is a failed read, not an empty one: scripts branch on the code.
+    if (!points) process.exitCode = 1;
 }
 
 /* ─── webhooks (retired) ───────────────────────────────────────── */
@@ -956,7 +1174,7 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
 /* ─── clusters ─────────────────────────────────────────────────── */
 
 /** The action words `rebase cloud clusters` dispatches. No word means `list`. */
-export const CLUSTERS_ACTIONS = ["list", "add", "verify", "registry"] as const;
+export const CLUSTERS_ACTIONS = ["list", "add", "verify", "registry", "baseline"] as const;
 
 /**
  * `rebase cloud clusters` — list, register and verify the clusters tenants run on.
@@ -970,6 +1188,7 @@ export async function clustersCommand(action: string | undefined, rawArgs: strin
     if (action === "verify") return clustersVerifyCommand(rawArgs);
     if (action === "add") return clustersAddCommand(rawArgs);
     if (action === "registry") return clustersRegistryCommand(rawArgs);
+    if (action === "baseline") return clustersBaselineCommand(rawArgs);
     // `clusters verifyy` used to LIST the clusters and exit 0 — the one command
     // whose whole purpose is to answer a yes/no question about a specific one.
     requireKnownAction("clusters", action, CLUSTERS_ACTIONS);
@@ -1070,6 +1289,107 @@ async function clustersVerifyCommand(rawArgs: string[]): Promise<void> {
 
     // Non-zero so this is usable as a gate in a script or a runbook step.
     if (report.verdict === "unusable") process.exitCode = 1;
+}
+
+/** What `clusters baseline` parses. */
+export const CLUSTER_BASELINE_FLAGS = { "--install": Boolean } as const;
+
+/** What `GET /api/functions/cluster-baseline/:clusterId` answers. Mirrors saas k8s/baseline.ts. */
+export interface ClusterBaselineReport {
+    ready?: boolean;
+    components?: { name?: string; installed?: boolean; ready?: boolean; detail?: string }[];
+}
+
+/** Which cluster `clusters baseline` was asked about, and whether to install. */
+export function resolveClusterBaselineArgs(rawArgs: string[]): { id?: string; install: boolean; yes: boolean } {
+    const { flags, positionals } = parseCloudArgs({
+        spec: CLUSTER_BASELINE_FLAGS,
+        rawArgs,
+        commandWords: 2, // cloud clusters — `baseline` is the action positional
+        command: "cloud clusters baseline",
+        maxPositionals: 2
+    });
+    return { id: positionals[1], install: flags["--install"] === true, yes: flags["--yes"] === true };
+}
+
+/**
+ * The cluster baseline — ingress-nginx, cert-manager, CloudNativePG — on one
+ * cluster: what is installed and ready, and with `--install`, install what is
+ * missing. Platform-admin only, like the rest of `clusters`: installing
+ * operators is a cluster-wide act.
+ *
+ * The install runs in the background on the control plane; its progress lands
+ * on the cluster's row, which a later `clusters baseline <id>` reads back.
+ */
+async function clustersBaselineCommand(rawArgs: string[]): Promise<void> {
+    const { id, install, yes } = resolveClusterBaselineArgs(rawArgs);
+    if (!id) fail("Usage: rebase cloud clusters baseline <cluster-id> [--install]", undefined, "bad_request");
+    const { client } = await requireClient(rawArgs);
+    const path = encodeURIComponent(id);
+
+    if (install) {
+        await confirmDestructive({
+            yes,
+            prompt: `Install the missing baseline components (ingress-nginx, cert-manager, CloudNativePG) on cluster ${id}? They are applied cluster-wide.`
+        });
+        let started: { started?: boolean; clusterId?: string };
+        try {
+            started = await client.functions.invoke<{ started?: boolean; clusterId?: string }>("cluster-baseline", {}, { method: "POST", path });
+        } catch (error: unknown) {
+            reportError(error, "Could not start the baseline install");
+        }
+        emit(
+            () => {
+                success(`Installing the baseline on cluster ${id} in the background.`);
+                note(`Follow it with ${chalk.cyan(`rebase cloud clusters baseline ${id}`)}.`);
+            },
+            { clusterId: started.clusterId ?? id, started: started.started === true }
+        );
+        return;
+    }
+
+    let report: ClusterBaselineReport;
+    try {
+        report = await client.functions.invoke<ClusterBaselineReport>("cluster-baseline", undefined, { method: "GET", path });
+    } catch (error: unknown) {
+        reportError(error, "Could not read the cluster baseline");
+    }
+    // Where a background install left off, from the row it writes to. Best
+    // effort: the report above is the answer, this is how it got there.
+    let progress: { baselineStatus?: string | null; baselineMessage?: string | null } | undefined;
+    try {
+        const row = await client.data.table("clusters").findById(id);
+        if (row) {
+            progress = {
+                baselineStatus: typeof row.baselineStatus === "string" ? row.baselineStatus : null,
+                baselineMessage: typeof row.baselineMessage === "string" ? row.baselineMessage : null
+            };
+        }
+    } catch {
+        progress = undefined;
+    }
+    const components = report.components ?? [];
+    emit(
+        () => {
+            console.log("");
+            console.log(`  ${report.ready ? chalk.green(chalk.bold("READY")) : chalk.yellow(chalk.bold("INCOMPLETE"))}  ${chalk.gray(id)}`);
+            console.log("");
+            for (const c of components) {
+                const state = c.ready ? chalk.green("ready") : c.installed ? chalk.yellow("installed, not ready") : chalk.red("missing");
+                console.log(`  ${(c.name ?? "?").padEnd(16)} ${state}${c.detail ? chalk.gray(`  ${c.detail}`) : ""}`);
+            }
+            if (progress?.baselineStatus) {
+                console.log("");
+                keyValues([["Last install", progress.baselineStatus]]);
+            }
+            console.log("");
+            if (!report.ready) {
+                note(`Install what is missing with ${chalk.cyan(`rebase cloud clusters baseline ${id} --install`)}.`);
+                console.log("");
+            }
+        },
+        { clusterId: id, ready: report.ready === true, components, install: progress ?? null }
+    );
 }
 
 /**
@@ -1415,7 +1735,19 @@ maxPositionals: 0 });
  * the account — a help page describing a command that does not exist, and a typo
  * exiting 0.
  */
-export const BILLING_ACTIONS = ["setup", "checkout", "invoices", "upcoming"] as const;
+export const BILLING_ACTIONS = ["setup", "checkout", "invoices", "upcoming", "email"] as const;
+
+/** What `billing invoices` says on a control plane that has no invoice route yet. */
+const INVOICES_UNSERVED: Unserved = {
+    what: "invoices",
+    hint: "`rebase cloud billing` shows the billing account and the card on file; Stripe emails each invoice to the billing email."
+};
+
+/** What `billing upcoming` says on a control plane that has no preview route yet. */
+const UPCOMING_UNSERVED: Unserved = {
+    what: "a preview of the next invoice",
+    hint: "`rebase cloud compute` prints what a project is quoted per month."
+};
 
 export async function billingCommand(rawArgs: string[]): Promise<void> {
     // Parsed before the client is built: an unusable line should be refused
@@ -1425,7 +1757,7 @@ export async function billingCommand(rawArgs: string[]): Promise<void> {
         rawArgs,
         commandWords: 2, // cloud billing
         command: "cloud billing",
-        maxPositionals: 1
+        maxPositionals: 2
     });
     const action = parsed.positionals[0];
     requireKnownAction("billing", action, BILLING_ACTIONS);
@@ -1433,9 +1765,38 @@ export async function billingCommand(rawArgs: string[]): Promise<void> {
     if (limit !== undefined && action !== "invoices") {
         fail("`--limit` applies to `rebase cloud billing invoices` only.", undefined, "usage");
     }
+    const address = parsed.positionals[1];
+    if (address !== undefined && action !== "email") {
+        fail(`Too many arguments for \`rebase cloud billing${action ? ` ${action}` : ""}\`: ${address}`, "Run `rebase cloud billing --help`.", "usage");
+    }
+    if (action === "email" && !address?.trim()) {
+        fail("Name the address invoices go to.", "`rebase cloud billing email billing@example.com`.", "usage");
+    }
 
     const { client, url } = await requireClient(rawArgs);
     const org = getContextOrg(url);
+
+    // `rebase cloud billing email <address>` — where Stripe sends the invoices.
+    // Written to the billing account and to the Stripe customer; owner/admin.
+    if (action === "email") {
+        if (!org) fail("No active organization.", "Run `rebase cloud use` first.", "no_org");
+        let res: { billingEmail?: string | null };
+        try {
+            res = await client.functions.invoke<{ billingEmail?: string | null }>(
+                "stripe-billing",
+                { organizationId: org, billingEmail: address!.trim() },
+                { path: "billing-email" }
+            );
+        } catch (e) {
+            reportError(e, "Failed to change the billing email");
+        }
+        const billingEmail = res.billingEmail ?? address!.trim();
+        emit(
+            () => success(`Invoices for org ${org} now go to ${chalk.bold(billingEmail)}.`),
+            { org, billingEmail }
+        );
+        return;
+    }
 
     // `rebase cloud billing invoices|upcoming` — what Stripe has invoiced the
     // org, and what it will invoice next. Read-only; owner/admin only.
@@ -1445,7 +1806,8 @@ export async function billingCommand(rawArgs: string[]): Promise<void> {
             if (action === "invoices") await billingInvoices(client, org, limit);
             else await billingUpcoming(client, org);
         } catch (e) {
-            reportError(e, action === "invoices" ? "Failed to load invoices" : "Failed to load the next invoice");
+            if (action === "invoices") reportCallError(e, "Failed to load invoices", INVOICES_UNSERVED);
+            reportCallError(e, "Failed to load the next invoice", UPCOMING_UNSERVED);
         }
         return;
     }
@@ -1733,7 +2095,7 @@ export async function computeCommand(action: string | undefined, rawArgs: string
     // `DIAL_FLAGS`; `buildDialPatch` still reads the values itself, because
     // `--no-autoscale` is value-less. This parse is only the refusal: without
     // it `compute set --cpu-request 500m` set nothing and reported success.
-    parseCloudArgs({
+    const { flags: computeFlags } = parseCloudArgs({
         // The retired flag is parsed but not documented: `buildDialPatch` says
         // what became of it.
         spec: (action === "set" ? { ...COMPUTE_SET_FLAGS, [RETIRED_SCALE_TO_ZERO]: String } : {}) as Record<string, never>,
@@ -1757,7 +2119,9 @@ export async function computeCommand(action: string | undefined, rawArgs: string
         // fails because a price could not be fetched would be worse than one
         // without the price.
         let quote: ResourceQuote | undefined;
-        const maintenance = await fetchMaintenance(client, projectId);
+        const maintenanceRead = await readMaintenance(client, projectId);
+        const maintenance = maintenanceRead.kind === "ok" ? maintenanceRead.status : undefined;
+        const notServed = maintenanceRead.kind === "not_served" ? ["maintenance"] : [];
         try {
             // See the note at the other call site: the name is "pricing" and the
             // sub-path is an option, because the SDK encodes the name.
@@ -1813,6 +2177,7 @@ export async function computeCommand(action: string | undefined, rawArgs: string
                 }
                 console.log("");
                 noteBlank();
+                if (notServed.length > 0) note(chalk.gray(MAINTENANCE_NOT_SERVED_NOTE));
                 note("Empty means the platform default. Change one with:");
                 note(chalk.cyan("  rebase cloud compute set --cpu 500m --memory 2Gi"));
                 console.log("");
@@ -1835,7 +2200,8 @@ export async function computeCommand(action: string | undefined, rawArgs: string
                 dbAutoscaleMaxCpu: project!.dbAutoscaleMaxCpu ?? null,
                 dbAutoscaleMaxMemory: project!.dbAutoscaleMaxMemory ?? null,
                 storageMode: project!.storageMode ?? null,
-                maintenance: maintenance ? { window: maintenance.window, pending: maintenance.open } : null
+                maintenance: maintenance ? { window: maintenance.window, pending: maintenance.open } : null,
+                notServed
             }
         );
         return;
@@ -1844,6 +2210,23 @@ export async function computeCommand(action: string | undefined, rawArgs: string
     const built = buildDialPatch(rawArgs);
     if (built.error) fail(built.error, undefined, "bad_request");
     const patch = built.patch;
+
+    // A change of dials changes the invoice and rolls the app's pods, so it is
+    // confirmed, with what the control plane quotes for the new dials beside
+    // what it quotes now. Best effort: a control plane that cannot price them
+    // still gets the question, without the numbers.
+    const [quoteNow, quoteAfter] = await Promise.all([
+        quoteDials(client, project),
+        quoteDials(client, { ...project, ...patch })
+    ]);
+    const changes = Object.entries(patch).map(([field, value]) => `${field} → ${String(value)}`).join(", ");
+    const price = quoteAfter
+        ? ` Quoted €${quoteAfter.totalEur.toFixed(2)}/month${quoteNow ? ` (now €${quoteNow.totalEur.toFixed(2)})` : ""}.`
+        : "";
+    await confirmDestructive({
+        yes: Boolean(computeFlags["--yes"]),
+        prompt: `Change ${changes} on ${displayProjectRef(rawArgs) || projectId}?${price} The app rolls its pods now; a database change waits for the maintenance window.`
+    });
 
     try {
         await client.data.table("projects").update(projectId, patch);
@@ -1875,6 +2258,20 @@ export async function computeCommand(action: string | undefined, rawArgs: string
         },
         { updated: patch, maintenance: maintenance?.open ?? null }
     );
+}
+
+/**
+ * What the control plane quotes for a project's dials, or undefined when it
+ * cannot say. Never throws: a price is context for a question, not its answer.
+ */
+async function quoteDials(client: CloudClient, dials: Record<string, unknown>): Promise<ResourceQuote | undefined> {
+    try {
+        // The name is "pricing" and the sub-path an option: the SDK encodes the name.
+        const quote = await client.functions.invoke<ResourceQuote>("pricing", dials, { method: "POST", path: "quote" });
+        return typeof quote?.totalEur === "number" ? quote : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 /** What the control plane says a set of dials costs, itemised. */

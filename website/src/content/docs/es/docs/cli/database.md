@@ -1,5 +1,5 @@
 ---
-sourceHash: 2883815081dc2c2a
+sourceHash: 79cc7825b045bc4d
 title: Comandos de base de datos
 sidebar_label: Comandos de base de datos
 description: Los comandos de rebase db — push, generate y migrate, copias de seguridad y restauraciones, extracción de copias, la cadena de conexión, la base de datos de desarrollo administrada y ramas.
@@ -338,6 +338,16 @@ rama en la que se encuentra actualmente, ya que todos los comandos en el checkou
 incluida la eliminación, apuntan a ella: ejecute `switch --off` primero y luego
 elimínela. Todo el flujo de trabajo se encuentra en
 [Ramificación de bases de datos](/docs/backend/branching/).
+
+#### `rebase db branch merge`
+
+<span class="since-badge" data-since="0.32">Since 0.32</span>
+
+```bash
+rebase db branch merge <name> [--on-conflict abort|branch|target] [--skip-blocked] [--yes]
+```
+
+Escribe las filas que una rama insertó, actualizó y eliminó en la base de datos de la que se creó. Primero muestra el diff y pregunta, y luego fusiona exactamente ese diff: la fusión nombra la huella (fingerprint) del diff, así que una base padre que cambió desde entonces se rechaza en lugar de fusionarse. `--on-conflict` decide una fila que cambiaron ambos lados — `abort` (el valor por defecto) no escribe nada, `branch` toma la fila de la rama, `target` conserva la de la base padre — y `--skip-blocked` fusiona las tablas que se pueden fusionar y omite el resto. Los cambios de esquema y de políticas nunca se fusionan: de eso se encargan las migraciones. `delete` también pregunta antes, y `--yes` responde a ambos en un script.
 
 :::note[En la base de datos de desarrollo administrada]
 `push`, `generate` y `migrate` funcionan aquí como en cualquier otra base de

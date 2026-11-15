@@ -17,6 +17,7 @@ vi.mock("../utils/project", async importOriginal => {
     return {
         ...actual,
         requireProjectRoot: () => "/nonexistent/rebase-storage-test",
+        findProjectRoot: () => "/nonexistent/rebase-storage-test",
         readEnvFile: () => project.env
     };
 });
@@ -224,6 +225,12 @@ describe("rebase storage move", () => {
         expect(process.exitCode).toBe(1);
     });
 
+    it("asks before --delete-source deletes the originals, and refuses with no terminal to ask on", async () => {
+        // The originals go once their copies are verified, and nothing brings them back.
+        await expect(storageCommand("move", argv("storage", "move", "--to", "media", "--delete-source"))).rejects.toThrow(/exit/);
+        expect(calls).toEqual([]);
+    });
+
     it("lists the source again afterwards, and names every file the move left behind", async () => {
         // A walk that skipped files reported success over the half it moved.
         answers.push(
@@ -231,7 +238,7 @@ describe("rebase storage move", () => {
             { checked: 1, notMoved: [{ key: "a/2.png", reason: "still in the source, and the target has no copy of the same size" }], cursor: "v1" },
             { checked: 1, notMoved: [] }
         );
-        await storageCommand("move", argv("storage", "move", "--to", "media", "--delete-source"));
+        await storageCommand("move", argv("storage", "move", "--to", "media", "--delete-source", "--yes"));
 
         expect(calls.map(call => call.url.replace("http://rebase.test/api/admin/storage", ""))).toEqual(["/move", "/move/verify", "/move/verify"]);
         expect(calls[2].body).toMatchObject({ to: "media", cursor: "v1", deleteSource: true });

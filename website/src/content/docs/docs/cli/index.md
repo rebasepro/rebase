@@ -451,6 +451,12 @@ an error; warnings do not fail.
 A scaffolded project runs it for Claude Code after every edit under `backend/schema/`: see
 [`rebase skills install`](#rebase-skills-install).
 
+### Commands for a running app
+
+<span class="since-badge" data-since="0.32">Since 0.32</span>
+
+`rebase api`, `rebase data`, `rebase users`, `rebase cron`, `rebase logs`, `rebase functions`, `rebase rls simulate`, `rebase auth login` and `rebase storage ls|cp|rm|url|stat` act on a running app through its API: the local `rebase dev`, a server you name with `--url`, or a Rebase Cloud project with `--project`. See [A running app](/docs/cli/project/).
+
 ### `rebase auth`
 
 Authentication management commands:

@@ -203,7 +203,7 @@ describe("rebase cloud orgs members", () => {
     });
 
     it("changes a role through the data API, and relays the server's refusal", async () => {
-        const { out } = await run("members", "role", "ana@acme.test", "admin", "--json");
+        const { out } = await run("members", "role", "ana@acme.test", "admin", "--yes", "--json");
         expect(updateMember).toHaveBeenCalledWith("m-2", { role: "admin" });
         expect(JSON.parse(out)).toMatchObject({ role: "admin", previousRole: "member", changed: true });
 
@@ -211,7 +211,7 @@ describe("rebase cloud orgs members", () => {
             new Error("Only an organization's owner can grant or remove the owner role."),
             { status: 403 }
         ));
-        const refused = await run("members", "role", "ana@acme.test", "owner");
+        const refused = await run("members", "role", "ana@acme.test", "owner", "--yes");
         expect(refused.exited).toBe(true);
         expect(refused.out).toContain("Only an organization's owner can grant or remove the owner role.");
     });
@@ -226,10 +226,10 @@ describe("rebase cloud orgs invites", () => {
     });
 
     it("revokes by email or id", async () => {
-        const { out } = await run("invites", "revoke", "new@x.com", "--json");
+        const { out } = await run("invites", "revoke", "new@x.com", "--yes", "--json");
         expect(invoke).toHaveBeenCalledWith("invites", undefined, { method: "DELETE", path: "inv-1" });
         expect(JSON.parse(out).revoked.id).toBe("inv-1");
-        await run("invites", "revoke", "inv-1");
+        await run("invites", "revoke", "inv-1", "--yes");
         expect(invoke).toHaveBeenLastCalledWith("invites", undefined, { method: "DELETE", path: "inv-1" });
     });
 

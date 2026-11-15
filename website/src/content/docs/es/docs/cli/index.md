@@ -1,5 +1,5 @@
 ---
-sourceHash: db5795d457e22066
+sourceHash: 3dcd0c56a34458b0
 title: Referencia de la CLI
 sidebar_label: CLI
 description: Comandos de la CLI de Rebase para inicialización de proyectos, generación de esquemas, migraciones de bases de datos y generación de SDK.
@@ -306,6 +306,12 @@ Si las tablas son seguras para enviar a producción, en un único comando rápid
 `--json` imprime un objeto, `{ ok, schemaDir, steps, findings, summary }`: cada paso es `{ id, title, status, detail? }` (`status` es `passed`, `failed`, `warnings` o `skipped`), y cada hallazgo incluye `step`, `check` (un tipo kebab-case estable), `severity`, `message`, y cuando corresponda `fix`, `table`, `file`, `line` y la ruta separada por puntos (`path`) dentro de la tabla (`posts.rls[0]`) —para que un agente pueda reparar lo que rompió. `summary` cuenta `errors` y `warnings`. `--quiet` no imprime nada cuando todo pasa correctamente. Finaliza con código distinto de cero ante un error; las advertencias no provocan un fallo.
 
 Un proyecto creado con scaffolding lo ejecuta para Claude Code tras cada edición en `backend/schema/`: consulta [`rebase skills install`](#rebase-skills-install).
+
+### Comandos para una app en ejecución
+
+<span class="since-badge" data-since="0.32">Since 0.32</span>
+
+`rebase api`, `rebase data`, `rebase users`, `rebase cron`, `rebase logs`, `rebase functions`, `rebase rls simulate`, `rebase auth login` y `rebase storage ls|cp|rm|url|stat` actúan sobre una app en ejecución a través de su API: el `rebase dev` local, un servidor que indicas con `--url` o un proyecto de Rebase Cloud con `--project`. Consulta [Una app en ejecución](/docs/cli/project/).
 
 ### `rebase auth`
 

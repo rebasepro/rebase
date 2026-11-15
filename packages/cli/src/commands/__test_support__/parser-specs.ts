@@ -35,6 +35,17 @@ function braced(source: string, open: number): string {
     throw new Error("unbalanced braces");
 }
 
+/**
+ * The body of `PROJECT_TARGET_FLAGS` in `utils/project-target.ts`, found from
+ * a command file under `src/commands/`.
+ */
+function projectTargetSpec(commandFile: string): string {
+    const source = uncommented(fs.readFileSync(path.join(path.dirname(commandFile), "..", "utils", "project-target.ts"), "utf8"));
+    const declared = /export const PROJECT_TARGET_FLAGS\s*=\s*\{/.exec(source);
+    if (!declared) throw new Error("PROJECT_TARGET_FLAGS is not declared in utils/project-target.ts");
+    return braced(source, declared.index + declared[0].length - 1);
+}
+
 /** The parser calls in one file. Throws on a call it cannot read, so a new shape fails loudly. */
 export function parsedCommands(file: string): ParsedCommandSpec[] {
     const source = uncommented(fs.readFileSync(file, "utf8"));
@@ -54,10 +65,13 @@ export function parsedCommands(file: string): ParsedCommandSpec[] {
             if (!declared) throw new Error(`${path.basename(file)}: ${named} is not declared in this file`);
             spec = braced(source, declared.index + declared[0].length - 1);
         }
+        // A project command's spec spreads the shared target flags; read them
+        // from where they are declared rather than requiring a copy per spec.
+        const shared = /\.\.\.PROJECT_TARGET_FLAGS\b/.test(spec) ? projectTargetSpec(file) : "";
         out.push({
             command,
-            flags: [...spec.matchAll(/"(--[a-z][a-z0-9-]*)"\s*:\s*(?!")/g)].map(m => m[1]),
-            accepted: [...spec.matchAll(/"(--?[a-zA-Z][a-zA-Z0-9-]*)"\s*:/g)].map(m => m[1]),
+            flags: [...`${spec}${shared}`.matchAll(/"(--[a-z][a-z0-9-]*)"\s*:\s*(?!")/g)].map(m => m[1]),
+            accepted: [...`${spec}${shared}`.matchAll(/"(--?[a-zA-Z][a-zA-Z0-9-]*)"\s*:/g)].map(m => m[1]),
             file
         });
     }

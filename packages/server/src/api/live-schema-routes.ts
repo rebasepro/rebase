@@ -948,6 +948,12 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
         return c.json(plan);
     });
 
+    // Unlike `/apply`, this answers a machine — the service key, a key holding
+    // `schema:write` — on purpose (decided 2026-11-15): `rebase schema
+    // reconcile` runs with the service key, nothing is committed to a
+    // repository (so there is no author to require), and the plan's digest is
+    // the confirmation. A person-only check here would break that command;
+    // `test/live-schema-reconcile.test.ts` pins it.
     router.post("/reconcile/apply", requireScope("schema:write"), async (c) => {
         const { drop, confirm } = await readReconcileRequest(c);
         if (!confirm) {

@@ -65,6 +65,14 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
     // Before anything else runs.
     refuseRemovedCollectionsFlag(rawArgs.slice(2), `schema ${subcommand}`);
 
+    // Reads the local tables or a running server's description of them; with a
+    // target flag it needs no project at all.
+    if (subcommand === "show") {
+        const { schemaShowCommand } = await import("./schema-show");
+        await schemaShowCommand(rawArgs);
+        return;
+    }
+
     const projectRoot = requireProjectRoot();
 
     // Talks to the running backend, not the driver: on Rebase Cloud the
@@ -177,7 +185,18 @@ const SCHEMA_ACTION_HELP: Record<string, { usage: string; summary: string; notes
         notes: [
             "Plans on the running backend (the one `.env` and the cloud link point at), prints the plan, and applies it once you type yes.",
             "A column is dropped only when named: --drop voice_cache.wav. Each drop shows how many rows hold a value.",
-            "--yes skips the prompt, for a plan already read. Needs REBASE_SERVICE_KEY in .env."
+            "--yes skips the prompt, for a plan already read. Sends REBASE_SERVICE_KEY from .env by default.",
+            "Target flags: --url <server>, --project <slug> (Rebase Cloud), --cloud, --token <bearer>, --session, --anon, --json."
+        ]
+    },
+    show: {
+        usage: "rebase schema show [table] [--remote] [--schema-dir <dir>]",
+        summary: "The tables, or one table's columns, relations and row-level security.",
+        notes: [
+            "Reads backend/schema by default (--schema-dir <dir> names another directory).",
+            "--remote asks the running server instead (GET /api/schema/tables): what the API describes to this credential.",
+            "Target flags imply --remote: --project <slug> (Rebase Cloud), --cloud (the linked project), --url <server>,",
+            "--token <bearer>, --session (after `rebase auth login`), --anon. --json prints the descriptors; --yes is accepted and unused."
         ]
     },
     stale: {

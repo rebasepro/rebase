@@ -686,6 +686,10 @@ type RebaseClient = {
         getUser: () => Promise<{ uid: string; email: string | null; roles?: string[] }>;
         signInWithEmailAndPassword: (email: string, password: string) => Promise<{ user: { uid: string }; tokens: { accessToken: string } }>;
     };
+    /** `GET /api/auth/scopes`: what the credential holds — answered for a person, an `rk_` key and the service key alike. */
+    personalKeys: {
+        listScopes: () => Promise<{ held: string[] }>;
+    };
     data: {
         table: (slug: string) => {
             find: (opts: Record<string, unknown>) => Promise<unknown>;
@@ -1283,16 +1287,28 @@ async function findUserByEmail(
     }
 }
 
+/**
+ * Refuse the branch tools unless the credential may change databases.
+ *
+ * Read from `GET /api/auth/scopes`, which answers whatever credential the
+ * server was given — a person's token, an `rk_` key, the service key — with
+ * the scopes it holds. It used to read `/auth/me`, which answers a person's
+ * token only, so with the service key discovery supplies (or any key) every
+ * branch tool failed "Admin authorization failed" although the tools run the
+ * CLI against `DATABASE_URL` and the credential was an administrator's.
+ * `database:write` is what the server's own branch routes require.
+ */
 async function ensureAdmin(): Promise<void> {
     const client = await getClient();
+    let held: string[];
     try {
-        const user = await client.auth.getUser();
-        if (!user.roles?.includes("admin")) {
-            throw new Error("Access denied: User does not have the 'admin' role.");
-        }
+        ({ held } = await client.personalKeys.listScopes());
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         throw new Error(`Admin authorization failed: ${msg}`);
+    }
+    if (!held.some(scope => scope === "database:write" || scope.startsWith("database:write:"))) {
+        throw new Error("Admin authorization failed: the credential does not hold database:write, which branching needs.");
     }
 }
 
@@ -1909,12 +1925,14 @@ const CLOUD_TOOLS: ToolDef[] = [
             "for reading and writing data through its row-level security, expiring with the claim window. " +
             "Returns the live URL, the admin panel URL and a claim URL. Give the claim " +
             "URL to the user: whoever opens it and signs in owns the project. Unclaimed, it is deleted after 72 hours. " +
-            "Afterwards `rebase cloud` commands in the directory act on it without a login.",
+            "Afterwards `rebase cloud` commands in the directory act on it without a login. " +
+            "Creates a public project and writes .env, so it needs `confirm: true`: the first call says what it would do.",
         inputSchema: {
             type: "object",
             properties: {
                 name: { type: "string", maxLength: CLOUD_PROJECT_NAME_MAX, description: `What to call the app (optional, up to ${CLOUD_PROJECT_NAME_MAX} characters)` },
-                deploy: { type: "boolean", description: "Deploy the backend now. Default true; false provisions and links only" }
+                deploy: { type: "boolean", description: "Deploy the backend now. Default true; false provisions and links only" },
+                confirm: { type: "boolean", description: "true once the user has agreed to exactly this. Without it the tool says what it would do and does nothing" }
             },
             additionalProperties: false
         }
@@ -1940,7 +1958,8 @@ const CLOUD_TOOLS: ToolDef[] = [
         description:
             "Deploy this directory to its linked Rebase Cloud project (`rebase cloud deploy`). " +
             "Builds, uploads and follows the deployment to a terminal state, then checks the new version answers. Production " +
-            "changes. A deploy can take minutes; `wait: false` returns once it is triggered.",
+            "changes, so a production deploy needs `confirm: true` (a preview does not): the first call says what it would do. " +
+            "A deploy can take minutes; `wait: false` returns once it is triggered.",
         inputSchema: {
             type: "object",
             properties: {
@@ -1950,7 +1969,8 @@ const CLOUD_TOOLS: ToolDef[] = [
                 wait: { type: "boolean", description: "Follow it to the end (default true). false returns as soon as it is triggered" },
                 timeoutSeconds: { type: "integer", minimum: 30, maximum: 3600, description: "How long to follow it before giving up. Default: the CLI's 15 minutes" },
                 preview: { type: "boolean", description: "Serve this build on an address of its own and leave production alone" },
-                previewName: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9-]{0,23}$", description: "Name the preview, so later deploys with the same name update it. Implies preview" }
+                previewName: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9-]{0,23}$", description: "Name the preview, so later deploys with the same name update it. Implies preview" },
+                confirm: { type: "boolean", description: "true once the user has agreed to exactly this. Without it the tool says what it would do and does nothing" }
             },
             additionalProperties: false
         }
@@ -1993,14 +2013,16 @@ const CLOUD_TOOLS: ToolDef[] = [
         description:
             "Set one environment variable on the linked Rebase Cloud project (`rebase cloud env set KEY --stdin`). " +
             "The value is written through stdin, never put on a command line, and never returned; `secret: true` makes it " +
-            "write-only. It applies on the next deploy.",
+            "write-only. It applies on the next deploy. Production's needs `confirm: true` (previews' does not): the first " +
+            "call says what it would change.",
         inputSchema: {
             type: "object",
             properties: {
                 key: { type: "string", pattern: "^[A-Za-z_][A-Za-z0-9_]{0,127}$", description: "The variable's name" },
                 value: { type: "string", maxLength: 65536, description: "The value. Never echoed back" },
                 secret: { type: "boolean", description: "Write-only: it can be replaced and used, never read back" },
-                preview: { type: "boolean", description: "Set it for the project's previews only; production keeps its value" }
+                preview: { type: "boolean", description: "Set it for the project's previews only; production keeps its value" },
+                confirm: { type: "boolean", description: "true once the user has agreed to exactly this. Without it the tool says what it would do and does nothing" }
             },
             required: ["key", "value"],
             additionalProperties: false
@@ -2023,11 +2045,13 @@ const CLOUD_TOOLS: ToolDef[] = [
         name: "rebase_cloud_rollback",
         description:
             "Put a previous successful deployment of the linked Rebase Cloud project back into service (`rebase cloud rollback`). " +
-            "Production changes. Without `deploymentId`, the most recent rollbackable deployment that is not the live one.",
+            "Production changes, so it needs `confirm: true`: the first call says what it would do. " +
+            "Without `deploymentId`, the most recent rollbackable deployment that is not the live one.",
         inputSchema: {
             type: "object",
             properties: {
-                deploymentId: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$", description: "The deployment to return to, from rebase_cloud_deployments_list" }
+                deploymentId: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$", description: "The deployment to return to, from rebase_cloud_deployments_list" },
+                confirm: { type: "boolean", description: "true once the user has agreed to exactly this. Without it the tool says what it would do and does nothing" }
             },
             additionalProperties: false
         }
@@ -2047,7 +2071,7 @@ export interface CloudProvisionResult {
 }
 
 /** The arguments `rebase_cloud_provision` passes to the CLI, validated. Throws on a value argv must not carry. */
-export function cloudProvisionArgv(args: { name?: unknown; deploy?: unknown }): string[] {
+export function cloudProvisionArgv(args: { name?: unknown; deploy?: unknown; confirm?: unknown }): string[] {
     const argv = ["cloud", "init", "--claim", "--json"];
     if (args.name !== undefined) {
         if (typeof args.name !== "string" || args.name.length > CLOUD_PROJECT_NAME_MAX || [...args.name].some((ch) => ch.charCodeAt(0) < 32)) {
@@ -2060,6 +2084,14 @@ export function cloudProvisionArgv(args: { name?: unknown; deploy?: unknown }): 
         throw new Error("`deploy` must be a boolean.");
     }
     if (args.deploy === false) argv.push("--no-deploy");
+    if (args.confirm !== true) {
+        throw new ToolArgumentError(
+            `This would create a public Rebase Cloud project${typeof args.name === "string" && args.name.trim() ? ` named "${args.name.trim()}"` : ""}, `
+            + "write REBASE_BASE_URL and REBASE_API_TOKEN into this project's .env"
+            + `${args.deploy === false ? "" : ", and deploy the local backend to it"}. Nothing was done. `
+            + "Ask the user, then call rebase_cloud_provision again with the same arguments and `confirm: true`."
+        );
+    }
     return argv;
 }
 
@@ -2575,6 +2607,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         } else if (name === "rebase_db_branch_delete" || name === "rebase_db_branch_info") {
             const argsObj = args as { name: string };
             cmdArgs.push(assertValidBranchName(argsObj.name, "name"));
+            // `db branch delete` asks first, and refuses with no terminal; the
+            // tool call is the decision, made against a loopback database only
+            // (the write gate above), so it answers the prompt as before.
+            if (name === "rebase_db_branch_delete") cmdArgs.push("--yes");
         } else if (name === "rebase_db_branch_switch") {
             // Both optional, and mutually exclusive in effect: with neither the
             // command reports the active branch, which is the question asked

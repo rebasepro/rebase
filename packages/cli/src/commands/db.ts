@@ -1786,16 +1786,19 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         // to each other instead. It went two releases without learning `prune`,
         // `--from`, `--force` or `--older-than`, all four of which the dispatch
         // answers and the docs teach.
-        usage: "rebase db branch <create|list|switch|delete|info|diff|prune> [name]",
+        usage: "rebase db branch <create|list|switch|delete|info|diff|merge|prune> [name]",
         summary: "Database branching.",
         notes: [
             "create <name> [--from <source>] copies an existing database, files and all.",
             "switch <name> points this checkout at a branch; every later command uses it.",
             "switch with no name reports where you are; switch --off returns to the main database.",
             "diff <name> shows what the branch changed against the database it was made from: tables, columns, RLS policies, and the rows it inserted, updated and deleted. --json prints all of it, with up to --sample-limit <n> rows a table (default 100).",
+            "merge <name> writes the branch's row changes onto the database it was made from: it shows the diff, asks, and merges exactly what was shown (a parent that moved since is refused). Schema and policy changes are not merged — migrations carry those.",
+            "merge --on-conflict <abort|branch|target> decides a row both sides changed: write nothing (abort, the default), take the branch's, or keep the parent's. --skip-blocked merges the tables that can be and skips the rest. --sample-limit <n> rows are compared per table.",
+            "delete <name> asks before it drops the branch's database; --yes answers for you.",
             "prune [--older-than <14|14d|2w>] removes branches nothing is using, and the entries that drifted.",
             "prune --include-dev-diff also removes the Atlas scratch databases `db push` leaves behind.",
-            "prune asks before it drops anything; --yes, -y answers for you, which is the form a CI job wants.",
+            "delete, merge and prune ask first; --yes, -y answers for you, which is the form a CI job wants.",
             "--force disconnects other sessions first — Postgres refuses to copy or drop a database anything is connected to, usually your own `rebase dev`."
         ]
     },

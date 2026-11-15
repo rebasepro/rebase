@@ -11,32 +11,31 @@
 import chalk from "chalk";
 import readline from "node:readline/promises";
 import { RebaseApiError } from "@rebasepro/client";
-import { requireProjectRoot, readEnvFile } from "../utils/project";
+import { PROJECT_TARGET_FLAGS } from "../utils/project-target";
+import { projectTarget, startProjectCommand } from "../utils/project-command";
+import { confirmDestructive } from "./cloud/context";
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
-import { cliUserAgent } from "../utils/version";
-import { describeFailure, requireBackendUrl } from "./api-keys";
+import { describeFailure } from "./api-keys";
 
 /** Everything the switch below dispatches, for the did-you-mean. */
-export const STORAGE_SUBCOMMANDS = ["orphans", "move"] as const;
+export const STORAGE_SUBCOMMANDS = ["orphans", "move", "ls", "cp", "rm", "url", "stat"] as const;
 
 /** The flags `rebase storage orphans` takes. */
 export const ORPHANS_FLAGS = {
+    ...PROJECT_TARGET_FLAGS,
     "--source": String,
     "--older-than": Number,
-    "--delete": Boolean,
-    "--yes": Boolean,
-    "-y": "--yes",
-    "--json": Boolean
+    "--delete": Boolean
 } as const;
 
 /** The flags `rebase storage move` takes. */
 export const MOVE_FLAGS = {
+    ...PROJECT_TARGET_FLAGS,
     "--from": String,
     "--to": String,
     "--prefix": String,
-    "--delete-source": Boolean,
-    "--json": Boolean
+    "--delete-source": Boolean
 } as const;
 
 /** One stored object, as the backend lists it. */
@@ -98,33 +97,20 @@ interface Backend {
     request<T>(method: string, path: string, body?: unknown): Promise<T>;
 }
 
-/** The project's backend, holding the service key — the `admin` role, every scope. */
-function connect(): Backend {
-    const projectRoot = requireProjectRoot();
-    const env = readEnvFile(projectRoot);
-    const serviceKey = env.SERVICE_KEY || env.REBASE_SERVICE_KEY;
-    if (!serviceKey) {
-        console.error(chalk.red("✗ REBASE_SERVICE_KEY not found in .env — required for storage maintenance."));
-        process.exit(1);
-    }
-    // Only an address this project recorded or the developer named: the
-    // request carries the service key. See `resolveBackendAddress`.
-    const baseUrl = requireBackendUrl(env, projectRoot).replace(/\/+$/, "");
+/**
+ * The project's backend, holding the service key — the `admin` role, every
+ * scope — or whatever credential the target flags name, resolved the way
+ * every project command resolves it (`utils/project-target.ts`): the local
+ * `rebase dev`, `--url`, `REBASE_BASE_URL`, or `--project` for Rebase Cloud.
+ */
+async function connect(flags: Readonly<Record<string, unknown>>, command: string): Promise<Backend> {
+    const target = await projectTarget(flags, { command });
     return {
-        baseUrl,
+        baseUrl: target.label,
         async request<T>(method: string, path: string, body?: unknown): Promise<T> {
             let response: Response;
             try {
-                response = await fetch(`${baseUrl}/api/admin/storage${path}`, {
-                    method,
-                    headers: {
-                        "Authorization": `Bearer ${serviceKey}`,
-                        "Accept": "application/json",
-                        "User-Agent": cliUserAgent(),
-                        ...(body === undefined ? {} : { "Content-Type": "application/json" })
-                    },
-                    ...(body === undefined ? {} : { body: JSON.stringify(body) })
-                });
+                response = await target.request(`/api/admin/storage${path}`, { method, ...(body === undefined ? {} : { json: body }) });
             } catch (error: unknown) {
                 throw new RebaseApiError(error instanceof Error ? error.message : String(error), { status: 0, code: "NETWORK_ERROR" });
             }
@@ -344,7 +330,7 @@ async function orphans(rawArgs: string[]): Promise<void> {
     if (flags["--source"]) query.set("storageId", flags["--source"]);
     const sourceQuery = flags["--source"] ? `?${new URLSearchParams({ storageId: flags["--source"] })}` : "";
     const quiet = flags["--json"] === true;
-    const backend = connect();
+    const backend = await connect(flags, "storage orphans");
 
     const { report, scanId } = await scanForOrphans(backend, query, sourceQuery, quiet);
 
@@ -416,7 +402,14 @@ async function move(rawArgs: string[]): Promise<void> {
     if (!from && !to) {
         throw new UsageError("Name the sources: --from <source> --to <source>. The default source is \"(default)\", and either may be left out for it.");
     }
-    const backend = connect();
+    if (flags["--delete-source"]) {
+        // The originals go once each copy is verified, and nothing brings them back.
+        await confirmDestructive({
+            yes: flags["--yes"] === true,
+            prompt: `Copy ${flags["--prefix"] ? `${flags["--prefix"]} ` : "every file "}from ${from ?? "(default)"} to ${to ?? "(default)"}, deleting each original once its copy is in place?`
+        });
+    }
+    const backend = await connect(flags, "storage move");
     const counts = { copied: 0, exists: 0, failed: 0, deleted: 0 };
     const failures: MovedObject[] = [];
     let cursor: string | undefined;
@@ -519,6 +512,26 @@ export async function storageCommand(subcommand: string | undefined, rawArgs: st
         case "move":
             await move(rawArgs);
             break;
+        case "ls":
+            startProjectCommand(rawArgs);
+            await (await import("./storage-objects")).storageLs(rawArgs);
+            break;
+        case "cp":
+            startProjectCommand(rawArgs);
+            await (await import("./storage-objects")).storageCp(rawArgs);
+            break;
+        case "rm":
+            startProjectCommand(rawArgs);
+            await (await import("./storage-objects")).storageRm(rawArgs);
+            break;
+        case "url":
+            startProjectCommand(rawArgs);
+            await (await import("./storage-objects")).storageUrl(rawArgs);
+            break;
+        case "stat":
+            startProjectCommand(rawArgs);
+            await (await import("./storage-objects")).storageStat(rawArgs);
+            break;
         default:
             unknownCommand(subcommand, STORAGE_SUBCOMMANDS, "storage");
     }
@@ -526,14 +539,26 @@ export async function storageCommand(subcommand: string | undefined, rawArgs: st
 
 function printStorageHelp(): void {
     console.log(`
-${chalk.bold("rebase storage")} — Maintain stored files, through the running backend
+${chalk.bold("rebase storage")} — Stored files, through the running backend
 
 ${chalk.green.bold("Usage")}
   rebase storage ${chalk.blue("<command>")} [options]
 
 ${chalk.green.bold("Commands")}
+  ${chalk.blue.bold("ls")} ${chalk.gray("[:prefix]")}       List stored files and folders
+  ${chalk.blue.bold("cp")} ${chalk.gray("<from> <to>")}     Upload or download: the stored side starts with a colon ${chalk.gray("(:key, or <source>:key)")}
+  ${chalk.blue.bold("rm")} ${chalk.gray("<:key>")}          Delete a stored file ${chalk.gray("(asks first)")}
+  ${chalk.blue.bold("url")} ${chalk.gray("<:key>")}         A signed download link: whoever holds it reads the file until it expires
+  ${chalk.blue.bold("stat")} ${chalk.gray("<:key>")}        A stored file's metadata
   ${chalk.blue.bold("orphans")}           List the stored files no row names
   ${chalk.blue.bold("move")}              Copy a folder of files to another storage source, same keys
+
+${chalk.green.bold("ls, cp Options")}
+  ${chalk.blue("--limit, -n")}       At most this many entries ${chalk.gray("(ls)")}
+  ${chalk.blue("--page-token")}      Continue a listing ${chalk.gray("(ls)")}
+  ${chalk.blue("--content-type")}    The uploaded file's type ${chalk.gray("(cp; else inferred by the server)")}
+  ${chalk.blue("--public")}          Upload under the public prefix: a permanent, token-less URL ${chalk.gray("(cp)")}
+  ${chalk.blue("--force")}           Overwrite a local file on download ${chalk.gray("(cp)")}
 
 ${chalk.green.bold("orphans Options")}
   ${chalk.blue("--source")}          Storage source key ${chalk.gray("(default: the default source)")}
@@ -546,8 +571,16 @@ ${chalk.green.bold("move Options")}
   ${chalk.blue("--from")}            Source to copy from ${chalk.gray("(default: the default source)")}
   ${chalk.blue("--to")}              Source to copy to ${chalk.gray("(default: the default source)")}
   ${chalk.blue("--prefix")}          Folder to copy ${chalk.gray("(default: everything)")}
-  ${chalk.blue("--delete-source")}   Delete each file from the source once the target holds it
+  ${chalk.blue("--delete-source")}   Delete each file from the source once the target holds it ${chalk.gray("(asks first)")}
   ${chalk.blue("--json")}            Print the counts as JSON
+
+${chalk.green.bold("Target options")}  ${chalk.gray("(every command)")}
+  ${chalk.blue("--project <slug>")}  A Rebase Cloud project, through the console's Studio proxy
+  ${chalk.blue("--cloud")}           The Rebase Cloud project this directory is linked to
+  ${chalk.blue("--url <server>")}    A server at this address ${chalk.gray("(else REBASE_BASE_URL, then \`rebase dev\`)")}
+  ${chalk.blue("--token <bearer>")}  Send this bearer instead of the service key
+  ${chalk.blue("--session")}         Send the session \`rebase auth login\` stored
+  ${chalk.blue("--anon")}            Send no credential
 
 ${chalk.green.bold("Notes")}
   A file is unused when no string in any row of any table names it —
@@ -561,6 +594,6 @@ ${chalk.green.bold("Notes")}
   CLI shows its progress until it is done. ${chalk.blue("--delete")} deletes from that scan
   only; the backend reads every row again and asks for each file again first.
 
-  Both read ${chalk.blue("REBASE_SERVICE_KEY")} from .env and need the backend running.
+  They send ${chalk.blue("REBASE_SERVICE_KEY")} from .env unless a target option says otherwise, and need the backend running.
 `);
 }

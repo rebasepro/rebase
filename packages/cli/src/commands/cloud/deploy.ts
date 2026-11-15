@@ -1202,6 +1202,8 @@ export interface EjectContext {
     source: boolean;
     /** `--eject` was passed: leave the managed runtime on purpose. */
     eject: boolean;
+    /** `--git` was passed: the control plane builds the connected repository. */
+    git?: boolean;
 }
 
 /**
@@ -1235,6 +1237,15 @@ export function ejectRefusal(
 ): { message: string; hint: string; code: string } | undefined {
     if (!opts.managed || opts.eject) return undefined;
     const eject = "To eject on purpose, add `--eject`.";
+    if (opts.git) {
+        return {
+            message:
+                `${projectRef} runs on the managed runtime, and \`--git\` builds a container image from its ` +
+                "repository on the control plane — which ejects it from managed.",
+            hint: `Ship it to the managed runtime from a checkout with \`rebase cloud deploy\`. ${eject}`,
+            code: "managed_project"
+        };
+    }
     if (opts.source) {
         return {
             message:
@@ -1529,8 +1540,32 @@ export const DEPLOY_FLAGS = {
     /* Name the preview, so the next `--preview-name` deploy with the same name
        updates the same address. Implies `--preview`. */
     "--preview-name": String,
+    /* Build from the project's connected git repository on the control plane,
+       not from this directory. The positional is then the branch, not an app.
+       Refused beside every flag that describes a local build. */
+    "--git": Boolean,
     "-m": "--message"
 } as const;
+
+/**
+ * The flags that describe a build made on this machine, which `--git` — a
+ * build the control plane makes from the repository — cannot honour. Refused
+ * rather than ignored: either reading would ship something other than what the
+ * line asked for.
+ */
+export const LOCAL_BUILD_FLAGS = [
+    "--source",
+    "--bundle",
+    "--bundle-dir",
+    "--skip-type-check",
+    "--skip-schema",
+    "--no-static",
+    "--no-source",
+    "--no-verify",
+    "--allow-downgrade",
+    "--preview",
+    "--preview-name"
+] as const;
 
 /**
  * `rebase cloud deploy [app]` — its flags, and which app of this repository the
@@ -1626,6 +1661,11 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
                 + "beside a managed bundle. Pass one.",
             "usage"
         );
+    }
+
+    if (args["--git"]) {
+        await deployFromGit(rawArgs, projectRef, startedAt);
+        return;
     }
 
     // A preview is a bundle deploy aimed at another address. The container
@@ -1867,6 +1907,125 @@ following: true,
 status,
 ...(appKey ? { appKey: appKeyPayload(appKey) } : {}),
 ...warningPayload(warnings) }
+    });
+}
+
+/**
+ * `rebase cloud deploy --git [<branch>]` — the control plane builds the
+ * project's connected repository, as the hosted connector's `deploy` tool does,
+ * and this follows the deployment the way every other one is followed.
+ *
+ * Nothing on this machine is read, built or uploaded: the repository and its
+ * branch are the build's whole input. Without a branch, the control plane
+ * builds the one configured on the project (`rebase cloud settings`).
+ */
+async function deployFromGit(rawArgs: string[], projectRef: string, startedAt: number): Promise<void> {
+    // The same parse `deployCommand` made; with --git its positional is the branch.
+    const { flags: args, appName: branchArg } = resolveDeployArgs(rawArgs);
+    const local = LOCAL_BUILD_FLAGS.filter(flag => args[flag] !== undefined && args[flag] !== false);
+    if (local.length > 0) {
+        fail(
+            `--git cannot be combined with ${local.join(", ")}: the control plane builds the repository, and `
+                + `${local.length === 1 ? "that flag describes" : "those flags describe"} a build made here.`,
+            "Drop --git to build this directory, or drop the other flags to build the repository.",
+            "usage"
+        );
+    }
+    const branch = branchArg?.trim() || undefined;
+
+    const { client, url } = await requireClient(rawArgs);
+    const projectId = await resolveProjectRef(projectRef, client);
+    await requirePaymentMethod(client, projectId);
+
+    const { project, recent, readable } = await readDeployContext(client, projectId);
+    if (!readable && args["--eject"] !== true) {
+        fail(
+            `Could not read ${projectRef}, so this cannot tell whether it would eject the project from the managed runtime.`,
+            "Try again in a moment. If leaving the managed runtime is intended, pass `--eject`.",
+            "preflight_unreadable"
+        );
+    }
+    const projectRow = project as Record<string, unknown> | undefined;
+    const repo = pick(projectRow, "gitRepoUrl", "git_repo_url");
+    if (readable && !repo) {
+        fail(
+            `${projectRef} has no git repository connected, so there is nothing for --git to build.`,
+            "Connect one with `rebase cloud settings set --repo <url>`, or ship this directory with `rebase cloud deploy`.",
+            "no_git_repository"
+        );
+    }
+    const eject: EjectContext = {
+        managed: isManagedProject(project, recent[0]),
+        source: false,
+        eject: args["--eject"] === true,
+        git: true
+    };
+    const refusal = ejectRefusal(eject, projectRef);
+    if (refusal) fail(refusal.message, refusal.hint, refusal.code);
+    const warnings = deployWarnings(eject, projectRef);
+    for (const w of warnings) warn(w.message, w.hint);
+
+    const builds = branch ?? pick(projectRow, "gitBranch", "git_branch");
+    if (!isJsonMode()) {
+        console.log("");
+        console.log(chalk.gray(`  Building from git: ${repo ?? "the connected repository"}${builds ? ` (${builds})` : ""}.`));
+        console.log(chalk.gray("  This directory is NOT uploaded — the control plane clones the repository."));
+        console.log("");
+        console.log(`  🚀 Triggering deployment for project ${chalk.bold(projectRef)} from git...`);
+    }
+
+    const body: Record<string, unknown> = { projectId, client: "cli" };
+    if (branch) body.branch = branch;
+    if (args["--message"]) body.message = args["--message"];
+
+    let triggered: { deploymentId: string; deduplicated: boolean; hosts: DeployHost[] | undefined };
+    try {
+        const res = await client.functions.invoke<{
+            success: boolean;
+            deployment: { id: string | number };
+            deduplicated?: boolean;
+            hosts?: unknown;
+        }>("deploy", body);
+        if (!res?.deployment?.id) fail("Control plane did not return a deployment id.");
+        triggered = { deploymentId: String(res.deployment.id), deduplicated: res.deduplicated === true, hosts: deployHostsFrom(res) };
+    } catch (e) {
+        resolveTriggerFailure(e);
+    }
+    const { deploymentId, deduplicated, hosts } = triggered;
+    if (!isJsonMode()) console.log(chalk.gray(`  Deployment ${deploymentId} created.`));
+
+    const appsAt = (host: string | undefined): DeployedApp[] => sourceBuildApps(sourceBuildAppName(), host);
+    const json = { deploymentId, deduplicated, source: "git", branch: builds ?? null, ...warningPayload(warnings) };
+    if (args["--no-follow"]) {
+        await reportTriggered({ client, url, projectId, deploymentId, appsAt, registeredHosts: hosts, headline: "", json: { ...json, following: false } });
+        await recordDeploy({ followed: false, status: "not_followed", deduplicated, startedAt });
+        return;
+    }
+    if (!isJsonMode()) {
+        console.log(chalk.gray("  Streaming build logs (Ctrl-C to stop watching — the build keeps running):"));
+        console.log("");
+    }
+    const { status } = await streamBuildLogs(client, deploymentId, {
+        quiet: isJsonMode(),
+        timeoutMs: resolveDeployTimeout(args["--timeout"]),
+        projectId,
+        url,
+        announce: false,
+        failedApps: appsAt(undefined).map(a => a.name),
+        onTerminal: (ended) => recordDeploy({ followed: true, status: ended, deduplicated, startedAt })
+    });
+    await reportDeployed({
+        undo: ROLLBACK_HINT,
+        client,
+        url,
+        projectId,
+        projectRef,
+        deploymentId,
+        startedAt,
+        liveTimeoutMs: resolveLiveTimeout(args["--live-timeout"]),
+        appsAt,
+        registeredHosts: hosts,
+        json: { ...json, following: true, status }
     });
 }
 

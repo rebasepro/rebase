@@ -328,6 +328,7 @@ export default defineConfig({
                     collapsed: true,
                     items: [
                         { label: "CLI Commands", slug: "docs/cli" },
+                        { label: "A running app", slug: "docs/cli/project" },
                         { label: "Database Commands", slug: "docs/cli/database" },
                         { label: "rebase cloud", slug: "docs/cli/cloud" },
                         { label: "Schema Generation", slug: "docs/cli/schema" },

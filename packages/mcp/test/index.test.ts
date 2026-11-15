@@ -64,6 +64,10 @@ const mockClient = {
     auth: {
         getUser: vi.fn().mockResolvedValue({ uid: "admin-id", email: "admin@rebase.pro", roles: ["admin"] })
     },
+    // What `GET /api/auth/scopes` answers the credential: the branch tools ask it for database:write.
+    personalKeys: {
+        listScopes: vi.fn().mockResolvedValue({ scopes: [], held: ["database:read", "database:write", "users:read"] })
+    },
     data: {
         table: vi.fn(() => ({
             find: vi.fn().mockResolvedValue([{ id: "doc-1",
@@ -327,8 +331,8 @@ data: { title: "New Doc" } }
         const handler = toolCallHandler(server);
         expect(handler).toBeDefined();
 
-        // Make user a non-admin
-        mockClient.auth.getUser.mockResolvedValueOnce({ uid: "user-id", email: "user@rebase.pro", roles: ["user"] });
+        // A credential that may not change databases
+        mockClient.personalKeys.listScopes.mockResolvedValueOnce({ scopes: [], held: ["data:read"] });
 
         const resultErr = await handler({
             method: "tools/call",
@@ -338,10 +342,11 @@ data: { title: "New Doc" } }
             }
         });
         expect(resultErr.isError).toBe(true);
-        expect(resultErr.content[0].text).toContain("Admin authorization failed: Access denied: User does not have the 'admin' role.");
+        expect(resultErr.content[0].text).toContain("Admin authorization failed: the credential does not hold database:write");
 
-        // As an admin, it should execute the CLI command
-        mockClient.auth.getUser.mockResolvedValueOnce({ uid: "admin-id", email: "admin@rebase.pro", roles: ["admin"] });
+        // As a credential holding database:write — a person's admin token, an
+        // rk_ key or the service key — it executes the CLI command
+        mockClient.personalKeys.listScopes.mockResolvedValueOnce({ scopes: [], held: ["database:write"] });
         
         // Feed the spawned child some stdout, then a clean exit.
         mockSpawn.stdout.on.mockImplementation((event: string, callback: any) => {
@@ -626,7 +631,7 @@ describe("branch tools never hand a shell anything", () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        mockClient.auth.getUser.mockResolvedValue({ uid: "admin-id", email: "admin@rebase.pro", roles: ["admin"] });
+        mockClient.personalKeys.listScopes.mockResolvedValue({ scopes: [], held: ["database:write"] });
         mockSpawn.stdout.on.mockImplementation(() => mockSpawn.stdout);
         mockSpawn.on.mockImplementation((event: string, callback: any) => {
             if (event === "close") setTimeout(() => callback(0), 0);
@@ -669,6 +674,20 @@ describe("branch tools never hand a shell anything", () => {
         const [, argv, options] = vi.mocked(spawn).mock.calls.at(-1)!;
         expect(options).toMatchObject({ shell: false });
         expect(argv).toEqual(expect.arrayContaining(["rebase", "db", "branch", "list"]));
+    });
+    it("answers `db branch delete`'s prompt with --yes: the tool call is the decision, on a loopback database", async () => {
+        const saved = process.env.DATABASE_URL;
+        process.env.DATABASE_URL = "postgres://localhost:5432/app";
+        try {
+            await handler()({
+                method: "tools/call",
+                params: { name: "rebase_db_branch_delete", arguments: { name: "feature_x" } }
+            });
+        } finally {
+            if (saved === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = saved;
+        }
+        const [, argv] = vi.mocked(spawn).mock.calls.at(-1)!;
+        expect(argv).toEqual(expect.arrayContaining(["db", "branch", "delete", "feature_x", "--yes"]));
     });
 });
 
@@ -2359,7 +2378,7 @@ describe("rebase_cloud_provision", () => {
     const call = (args: Record<string, unknown>) =>
         toolCallHandler(server)({
             method: "tools/call",
-            params: { name: "rebase_cloud_provision", arguments: args }
+            params: { name: "rebase_cloud_provision", arguments: { confirm: true, ...args } }
         });
 
     beforeEach(() => vi.clearAllMocks());
@@ -2435,13 +2454,13 @@ describe("rebase_cloud_provision", () => {
     });
 
     it("keeps a name a value, never a flag, and refuses one argv must not carry", () => {
-        expect(cloudProvisionArgv({ name: "--url=https://evil.example" })).toEqual(
+        expect(cloudProvisionArgv({ name: "--url=https://evil.example", confirm: true })).toEqual(
             ["cloud", "init", "--claim", "--json", "--name=--url=https://evil.example"]
         );
-        expect(cloudProvisionArgv({ deploy: false })).toEqual(["cloud", "init", "--claim", "--json", "--no-deploy"]);
+        expect(cloudProvisionArgv({ deploy: false, confirm: true })).toEqual(["cloud", "init", "--claim", "--json", "--no-deploy"]);
         expect(() => cloudProvisionArgv({ name: "a\nb" })).toThrow();
         // The control plane's own limit, not a tighter one of this server's.
-        expect(cloudProvisionArgv({ name: "x".repeat(200) })).toContain(`--name=${"x".repeat(200)}`);
+        expect(cloudProvisionArgv({ name: "x".repeat(200), confirm: true })).toContain(`--name=${"x".repeat(200)}`);
         expect(() => cloudProvisionArgv({ name: "x".repeat(201) })).toThrow();
         expect(() => cloudProvisionArgv({ name: 42 })).toThrow();
         expect(() => cloudProvisionArgv({ deploy: "no" })).toThrow();

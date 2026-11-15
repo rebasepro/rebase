@@ -12,7 +12,7 @@
  *   scopes  — List the scopes this backend knows, and which the caller holds
  */
 import chalk from "chalk";
-import type arg from "arg";
+import arg from "arg";
 import { createRebaseClient, RebaseApiError } from "@rebasepro/client";
 import {
     ADMIN_SCOPES,
@@ -22,148 +22,30 @@ import {
     type ApiKeyMasked,
     type ApiKeyWithSecret,
     type CreateApiKeyRequest,
+    type UpdateApiKeyRequest,
     type ScopeSummary
 } from "@rebasepro/types";
-import {
-    requireProjectRoot,
-    readEnvFile
-} from "../utils/project";
+import { findProjectRoot } from "../utils/project";
+import { PROJECT_TARGET_FLAGS, cloudTargetNote, projectServiceKey, resolveBackendAddress } from "../utils/project-target";
+import { projectTarget } from "../utils/project-command";
+import { confirmDestructive } from "./cloud/context";
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
 import { cliUserAgent } from "../utils/version";
 import { serverUnreachableHint } from "../utils/dev-server";
-import fs from "fs";
-import path from "path";
 
 /** Everything the switch below dispatches, for the did-you-mean. */
-export const API_KEYS_SUBCOMMANDS = ["list", "get", "create", "revoke", "scopes"] as const;
+export const API_KEYS_SUBCOMMANDS = ["list", "get", "create", "update", "revoke", "scopes"] as const;
 
 /* ═══════════════════════════════════════════════════════════════
-   Env helper — reads SERVICE_KEY and PORT from .env
+   Where the backend is — shared with every project command
    ═══════════════════════════════════════════════════════════════ */
 
-/**
- * Was a hand-rolled `indexOf("=")` loop. It keyed `export KEY=value` as
- * `export KEY` and carried a trailing `# comment` into the value — so a key
- * that was present read as absent, or reached an `Authorization` header with a
- * comment attached and came back 401. See `readEnvFile`.
- */
-const loadEnv = readEnvFile;
-
-/**
- * Where this project's backend is — or why the CLI will not say.
- *
- * `configured` is an address the developer named; `running` is the one this
- * project's backend recorded when it bound, and is still serving on. There is
- * no third, guessed, answer: the request carries the project's service key —
- * the `admin` role, every scope — and an address the CLI only guessed is one it
- * would hand that key to without knowing whose server answers.
- */
-export type BackendAddress =
-    | {
-        url: string;
-        source: "configured" | "running";
-        /**
-         * Set when the address came from `.env` and is the cloud project this
-         * directory is linked to — which `rebase cloud init --claim` writes
-         * there for the app and the SDK, not as a choice of where local
-         * commands go. The command still goes there; {@link cloudTargetNote}
-         * says so.
-         */
-        cloudProject?: string;
-    }
-    | { url: null; reason: string };
-
-/** Whether a process with this pid is alive and ours to signal. */
-function isAlive(pid: number): boolean {
-    try {
-        process.kill(pid, 0);
-        return true;
-    } catch {
-        // ESRCH: gone. EPERM: alive, but another user's — not this project's backend.
-        return false;
-    }
-}
-
-/**
- * The address the service key may be sent to. Shared with `rebase storage`.
- *
- * In order:
- *
- *   1. `REBASE_BASE_URL`, in the shell or in `.env` — the developer said where.
- *   2. `.rebase/state.json`, which this project's backend writes when it binds
- *      and removes when it stops — and only while the pid it names is alive,
- *      because a backend that was killed leaves the file behind.
- *
- * Nothing else. `.env`'s `PORT` was the fallback, and every scaffold writes
- * `PORT=3001`: with `rebase dev` stopped, `rebase api-keys list` sent this
- * project's service key to whatever listened on 3001 — on the tester's machine,
- * another project's server. `.rebase-dev-url` is not enough on its own either:
- * a `rebase dev` that was killed leaves it behind, pointing at a port some
- * other server may have taken since.
- */
-export function resolveBackendAddress(env: Record<string, string>, projectRoot: string): BackendAddress {
-    const fromShell = process.env.REBASE_BASE_URL?.trim();
-    const configured = fromShell || env.REBASE_BASE_URL?.trim();
-    if (configured) {
-        const cloudProject = fromShell ? undefined : linkedCloudProjectAt(projectRoot, configured);
-        return cloudProject ? { url: configured, source: "configured", cloudProject } : { url: configured, source: "configured" };
-    }
-
-    const state = readBackendState(projectRoot);
-    if (state && isAlive(state.pid)) return { url: state.url, source: "running" };
-
-    const last = state ? ` The last one recorded here, at ${state.url} (pid ${state.pid}), has stopped.` : "";
-    return {
-        url: null,
-        reason: `This project's server is not running, so the service key was not sent anywhere.${last} ` +
-            "Start it with `rebase dev`. If it runs some other way — `rebase start`, a container — " +
-            "set REBASE_BASE_URL in .env to its address."
-    };
-}
-
-/** The slug of the cloud project `.rebase/cloud.json` links, when `url` is its address. */
-function linkedCloudProjectAt(projectRoot: string, url: string): string | undefined {
-    let link: unknown;
-    try {
-        link = JSON.parse(fs.readFileSync(path.join(projectRoot, ".rebase", "cloud.json"), "utf-8"));
-    } catch {
-        return undefined;
-    }
-    if (!isRecord(link) || link.mode === "direct" || typeof link.apiUrl !== "string") return undefined;
-    const bare = (u: string) => u.trim().replace(/\/+$/, "");
-    if (bare(link.apiUrl) !== bare(url)) return undefined;
-    const slug = typeof link.slug === "string" && link.slug ? link.slug : link.projectId;
-    return typeof slug === "string" && slug ? slug : "linked";
-}
-
-/**
- * What a local command says before it sends the service key to the cloud
- * project `.env` names (see `BackendAddress.cloudProject`), or undefined.
- */
-export function cloudTargetNote(address: BackendAddress): string | undefined {
-    if (address.url === null || !address.cloudProject) return undefined;
-    return `Sending this to ${address.url}: REBASE_BASE_URL in .env is the address of cloud project ${address.cloudProject} `
-        + "(`rebase cloud init --claim` writes it there for the app, the SDK and the MCP server), and that project does not "
-        + "take this project's local service key. To reach the local backend instead, run the command with "
-        + "REBASE_BASE_URL set to it in the shell, e.g. REBASE_BASE_URL=http://localhost:3001.";
-}
-
-/** What `.rebase/state.json` says about the backend that wrote it, or null. */
-function readBackendState(projectRoot: string): { url: string; pid: number } | null {
-    let parsed: unknown;
-    try {
-        parsed = JSON.parse(fs.readFileSync(path.join(projectRoot, ".rebase", "state.json"), "utf-8"));
-    } catch {
-        return null;
-    }
-    if (!isRecord(parsed) || typeof parsed.pid !== "number" || !Number.isInteger(parsed.pid) || parsed.pid <= 0) return null;
-    const url = typeof parsed.baseUrl === "string" && parsed.baseUrl.trim()
-        ? parsed.baseUrl.trim()
-        : typeof parsed.port === "number" ? `http://localhost:${parsed.port}` : null;
-
-    return url ? { url, pid: parsed.pid } : null;
-}
+// The address rules (REBASE_BASE_URL, then a live `rebase dev`, nothing
+// guessed) moved to `utils/project-target.ts` with the other project
+// commands; re-exported here for the callers and tests that import them
+// from this module.
+export { cloudTargetNote, resolveBackendAddress, type BackendAddress } from "../utils/project-target";
 
 /**
  * The address to send the service key to, or the end of the command.
@@ -198,32 +80,35 @@ interface Connection {
 type ServiceKeyVariable = "REBASE_SERVICE_KEY" | "SERVICE_KEY";
 
 /**
- * An SDK client for this project's backend, holding the service key.
+ * An SDK client for this project's backend, holding the service key — or the
+ * credential the target flags name, resolved as every project command
+ * resolves it (`--project`, `--cloud`, `--url`, `--token`, `--session`).
  *
  * The service key is the project's own machine identity — the `admin` role,
  * every scope — so it is what may list, mint and revoke service keys. It is a
- * static bearer token: no session to restore or refresh, and no socket.
+ * static bearer token: no session to restore or refresh, and no socket. An
+ * `rk_` key is refused on these routes whatever it holds.
+ *
+ * The line was already parsed strictly by the action's own spec, which
+ * declares the target flags; they are read again here only for their values.
  */
-function connect(): Connection {
-    const projectRoot = requireProjectRoot();
-    const env = loadEnv(projectRoot);
-    const keyVariable: ServiceKeyVariable = env.SERVICE_KEY ? "SERVICE_KEY" : "REBASE_SERVICE_KEY";
-    const serviceKey = env[keyVariable];
-
-    if (!serviceKey) {
-        console.error(chalk.red("✗ REBASE_SERVICE_KEY not found in .env — required to manage API keys."));
-        process.exit(1);
-    }
-    const baseUrl = requireBackendUrl(env, projectRoot);
-
+async function connect(rawArgs: string[]): Promise<Connection> {
+    const targetFlags = arg(PROJECT_TARGET_FLAGS, { argv: rawArgs.slice(2), permissive: true });
+    const target = await projectTarget(targetFlags, { command: "api-keys" });
+    const token = await target.bearer();
     const client = createRebaseClient({
-        baseUrl,
-        token: serviceKey,
+        baseUrl: target.baseUrl,
+        ...(token ? { token } : {}),
         realtime: false,
         headers: { "User-Agent": cliUserAgent() },
         auth: { persistSession: false, autoRefresh: false }
     });
-    return { client, baseUrl, keyVariable };
+    const keyVariable = target.credential === "service-key" ? projectServiceKey(findProjectRoot())?.variable : undefined;
+    return {
+        client,
+        baseUrl: target.label,
+        keyVariable: keyVariable === "SERVICE_KEY" ? "SERVICE_KEY" : "REBASE_SERVICE_KEY"
+    };
 }
 
 /**
@@ -300,6 +185,9 @@ export async function apiKeysCommand(subcommand: string | undefined, rawArgs: st
         case "create":
             await createKey(rawArgs);
             break;
+        case "update":
+            await updateKey(rawArgs);
+            break;
         case "revoke":
             await revokeKey(rawArgs);
             break;
@@ -361,7 +249,7 @@ export function describeKey(key: ApiKeyMasked, now: Date = new Date()): string[]
    ═══════════════════════════════════════════════════════════════ */
 
 /** The flags `rebase api-keys list` takes: none of its own. */
-export const LIST_KEYS_FLAGS = {} as const;
+export const LIST_KEYS_FLAGS = { ...PROJECT_TARGET_FLAGS } as const;
 
 async function listKeys(rawArgs: string[]): Promise<void> {
     parseCommandArgs({
@@ -372,7 +260,7 @@ async function listKeys(rawArgs: string[]): Promise<void> {
         maxPositionals: 0
     });
 
-    const connection = connect();
+    const connection = await connect(rawArgs);
     const { client } = connection;
     let keys: ApiKeyMasked[];
     try {
@@ -404,6 +292,7 @@ async function listKeys(rawArgs: string[]): Promise<void> {
 
 /** The flags `rebase api-keys get` takes. */
 export const GET_KEY_FLAGS = {
+    ...PROJECT_TARGET_FLAGS,
     "--id": String
 } as const;
 
@@ -430,7 +319,7 @@ async function getKey(rawArgs: string[]): Promise<void> {
         throw new UsageError("Key ID is required: rebase api-keys get <key-id> (`rebase api-keys list` shows them).");
     }
 
-    const connection = connect();
+    const connection = await connect(rawArgs);
     const { client } = connection;
     let key: ApiKeyMasked;
     try {
@@ -450,6 +339,7 @@ async function getKey(rawArgs: string[]): Promise<void> {
 
 /** The flags `rebase api-keys create` takes. */
 export const CREATE_KEY_FLAGS = {
+    ...PROJECT_TARGET_FLAGS,
     "--name": String,
     "--scopes": [String],
     "--full-access": Boolean,
@@ -613,7 +503,7 @@ export function grantableScopes(held: readonly string[]): string[] {
 
 async function createKey(rawArgs: string[]): Promise<void> {
     const plan = resolveCreateKeyArgs(rawArgs);
-    const connection = connect();
+    const connection = await connect(rawArgs);
     const { client } = connection;
 
     let scopes: string[];
@@ -660,11 +550,83 @@ async function createKey(rawArgs: string[]): Promise<void> {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   update
+   ═══════════════════════════════════════════════════════════════ */
+
+/** The flags `rebase api-keys update` takes. */
+export const UPDATE_KEY_FLAGS = {
+    ...PROJECT_TARGET_FLAGS,
+    "--id": String,
+    "--name": String,
+    "--scopes": [String],
+    "--roles": [String],
+    "--rate-limit": Number,
+    "--no-rate-limit": Boolean,
+    "--expires-in": String,
+    "--expires-at": String,
+    "--no-expiry": Boolean,
+    "-n": "--name"
+} satisfies arg.Spec;
+
+/**
+ * Which key, and what to change on it: only what the line names is sent, so
+ * an update never resets a field it did not mention. Exported for its tests.
+ */
+export function resolveUpdateKeyArgs(rawArgs: string[], now: Date = new Date()): { id?: string; change: UpdateApiKeyRequest } {
+    const { flags, positionals } = parseCommandArgs({
+        spec: UPDATE_KEY_FLAGS,
+        rawArgs,
+        commandWords: 2,
+        command: "api-keys update",
+        maxPositionals: 1
+    });
+    if (flags["--rate-limit"] !== undefined && flags["--no-rate-limit"]) {
+        throw new UsageError("--rate-limit sets a limit and --no-rate-limit removes it; give one.");
+    }
+    if ((flags["--expires-in"] !== undefined || flags["--expires-at"] !== undefined) && flags["--no-expiry"]) {
+        throw new UsageError("--expires-in/--expires-at set an expiry and --no-expiry removes it; give one.");
+    }
+    const change: UpdateApiKeyRequest = {};
+    if (flags["--name"] !== undefined) change.name = flags["--name"];
+    if (flags["--scopes"] !== undefined) change.scopes = splitList(flags["--scopes"]);
+    if (flags["--roles"] !== undefined) change.roles = splitList(flags["--roles"]);
+    if (flags["--rate-limit"] !== undefined) change.rate_limit = flags["--rate-limit"];
+    if (flags["--no-rate-limit"]) change.rate_limit = null;
+    const expiry = resolveExpiry(flags["--expires-in"], flags["--expires-at"], now);
+    if (expiry !== null) change.expires_at = expiry;
+    if (flags["--no-expiry"]) change.expires_at = null;
+    if (Object.keys(change).length === 0) {
+        throw new UsageError("Nothing to change: pass --name, --scopes, --roles, --rate-limit, --no-rate-limit, --expires-in, --expires-at or --no-expiry.");
+    }
+    return { id: flags["--id"] || positionals[0], change };
+}
+
+async function updateKey(rawArgs: string[]): Promise<void> {
+    const { id, change } = resolveUpdateKeyArgs(rawArgs);
+    if (!id) {
+        throw new UsageError("Key ID is required: rebase api-keys update <key-id> --scopes … (`rebase api-keys list` shows them).");
+    }
+    const connection = await connect(rawArgs);
+    let key: ApiKeyMasked;
+    try {
+        ({ key } = await connection.client.apiKeys.updateKey(id, change));
+    } catch (e: unknown) {
+        fail("Failed to update API key", e, connection);
+    }
+    console.log("");
+    console.log(chalk.bold.green("  ✓ API key updated"));
+    console.log("");
+    for (const line of describeKey(key)) console.log(line);
+    console.log("");
+}
+
+/* ═══════════════════════════════════════════════════════════════
    revoke
    ═══════════════════════════════════════════════════════════════ */
 
 /** The flags `rebase api-keys revoke` takes. */
 export const REVOKE_KEY_FLAGS = {
+    ...PROJECT_TARGET_FLAGS,
     "--id": String
 } as const;
 
@@ -678,7 +640,7 @@ export const REVOKE_KEY_FLAGS = {
  *
  * Exported so its tests can drive the real parser rather than a copy of it.
  */
-export function resolveRevokeKeyArgs(rawArgs: string[]): { id?: string } {
+export function resolveRevokeKeyArgs(rawArgs: string[]): { id?: string; yes: boolean } {
     const { flags, positionals } = parseCommandArgs({
         spec: REVOKE_KEY_FLAGS,
         rawArgs,
@@ -687,17 +649,20 @@ export function resolveRevokeKeyArgs(rawArgs: string[]): { id?: string } {
         maxPositionals: 1
     });
 
-    return { id: flags["--id"] || positionals[0] };
+    return { id: flags["--id"] || positionals[0], yes: flags["--yes"] === true };
 }
 
 async function revokeKey(rawArgs: string[]): Promise<void> {
-    const { id } = resolveRevokeKeyArgs(rawArgs);
+    const { id, yes } = resolveRevokeKeyArgs(rawArgs);
 
     if (!id) {
         throw new UsageError("Key ID is required: rebase api-keys revoke <key-id> (`rebase api-keys list` shows them).");
     }
 
-    const connection = connect();
+    const connection = await connect(rawArgs);
+    // Everything holding the key stops working at once, and a revoked key
+    // cannot be restored — only replaced.
+    await confirmDestructive({ yes, prompt: `Revoke API key ${id} on ${connection.baseUrl}? Anything using it stops working.` });
     const { client } = connection;
     try {
         await client.apiKeys.revokeKey(id);
@@ -716,7 +681,7 @@ async function revokeKey(rawArgs: string[]): Promise<void> {
    ═══════════════════════════════════════════════════════════════ */
 
 /** The flags `rebase api-keys scopes` takes: none of its own. */
-export const SCOPES_LIST_FLAGS = {} as const;
+export const SCOPES_LIST_FLAGS = { ...PROJECT_TARGET_FLAGS } as const;
 
 const PLANES: ReadonlyArray<{ plane: ScopeSummary["plane"]; title: string; note: string }> = [
     { plane: "data", title: "Data", note: "narrow what a key reaches; row-level security still decides the rows" },
@@ -760,7 +725,7 @@ async function listScopes(rawArgs: string[]): Promise<void> {
         maxPositionals: 0
     });
 
-    const connection = connect();
+    const connection = await connect(rawArgs);
     const { client } = connection;
     let catalogue: { scopes: ScopeSummary[]; held: string[] };
     try {
@@ -791,7 +756,8 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("list")}              List the service keys: kind, scopes, roles
   ${chalk.blue.bold("get")} ${chalk.gray("<id>")}          Show one key
   ${chalk.blue.bold("create")}            Create a service key
-  ${chalk.blue.bold("revoke")} ${chalk.gray("<id>")}       Revoke a key
+  ${chalk.blue.bold("update")} ${chalk.gray("<id>")}       Change a key's name, scopes, roles, limit or expiry
+  ${chalk.blue.bold("revoke")} ${chalk.gray("<id>")}       Revoke a key ${chalk.gray("(asks first; --yes skips)")}
   ${chalk.blue.bold("scopes")}            List the scopes this backend knows, and which you hold
 
 ${chalk.green.bold("create Options")}
@@ -804,8 +770,25 @@ ${chalk.green.bold("create Options")}
   ${chalk.blue("--expires-in")}      Days until the key expires
   ${chalk.blue("--expires-at")}      Expiry as an ISO date, e.g. 2027-01-31
 
-${chalk.green.bold("get / revoke Options")}
+${chalk.green.bold("update Options")}  ${chalk.gray("only what you name changes")}
+  ${chalk.blue("--name, -n")}        New name
+  ${chalk.blue("--scopes")}          Replace the scopes ${chalk.gray("(never more than you hold)")}
+  ${chalk.blue("--roles")}           Replace the roles
+  ${chalk.blue("--rate-limit")}      Requests per 15-min window; ${chalk.blue("--no-rate-limit")} back to the server's
+  ${chalk.blue("--expires-in")}      Days from now; ${chalk.blue("--expires-at")} an ISO date; ${chalk.blue("--no-expiry")} never
+
+${chalk.green.bold("get / update / revoke Options")}
   ${chalk.blue("--id")}              API key ID ${chalk.gray("(or the first argument)")}
+
+${chalk.green.bold("Target options")}  ${chalk.gray("(every command)")}
+  ${chalk.blue("--project <slug>")}  A Rebase Cloud project, through the console's Studio proxy
+  ${chalk.blue("--cloud")}           The Rebase Cloud project this directory is linked to
+  ${chalk.blue("--url <server>")}    A server at this address ${chalk.gray("(else REBASE_BASE_URL, then \`rebase dev\`)")}
+  ${chalk.blue("--token <bearer>")}  Send this bearer instead of the service key ${chalk.gray("(an rk_ key is always refused here)")}
+  ${chalk.blue("--session")}         Send the session \`rebase auth login\` stored ${chalk.gray("(an admin's)")}
+  ${chalk.blue("--anon")}            Send no credential
+  ${chalk.blue("--json")}            Accepted; these commands print text
+  ${chalk.blue("--yes")}             Skip the revoke prompt
 
 ${chalk.green.bold("Scopes")}
   A scope is ${chalk.blue("resource:action")}, optionally narrowed to one target:
@@ -822,6 +805,7 @@ ${chalk.green.bold("Examples")}
   rebase api-keys create -n "Mailer" --scopes "functions:invoke:send-email,storage:read:(default)"
   rebase api-keys create -n "Ops" --full-access --roles admin --expires-at 2027-01-31
   rebase api-keys get abc123-def456
-  rebase api-keys revoke abc123-def456
+  rebase api-keys update abc123-def456 --scopes data:read:posts --expires-in 30
+  rebase api-keys revoke abc123-def456 --yes
 `);
 }

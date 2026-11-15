@@ -455,7 +455,7 @@ export function resolveEnvKeyArg(rawArgs: string[], action: string): string | un
 }
 
 /** {@link resolveEnvKeyArg}, and whether `--preview` was given (`unset` and `reset` take it). */
-export function resolveEnvKeyArgs(rawArgs: string[], action: string): { key: string | undefined; preview: boolean } {
+export function resolveEnvKeyArgs(rawArgs: string[], action: string): { key: string | undefined; preview: boolean; yes: boolean } {
     const { flags, positionals } = parseCloudArgs({
         spec: action === "reveal" ? {} : ENV_PREVIEW_FLAGS,
         rawArgs,
@@ -463,11 +463,15 @@ export function resolveEnvKeyArgs(rawArgs: string[], action: string): { key: str
         command: `cloud env ${action}`,
         maxPositionals: 1
     });
-    return { key: positionals[0], preview: (flags as { "--preview"?: boolean })["--preview"] === true };
+    return {
+        key: positionals[0],
+        preview: (flags as { "--preview"?: boolean })["--preview"] === true,
+        yes: flags["--yes"] === true
+    };
 }
 
 async function unsetEnv(rawArgs: string[], action: string): Promise<void> {
-    const { key, preview } = resolveEnvKeyArgs(rawArgs, action);
+    const { key, preview, yes } = resolveEnvKeyArgs(rawArgs, action);
     // Refused before the login round-trip: an unusable line is unusable whether
     // or not there is a session behind it.
     if (!key) fail("Usage: rebase cloud env unset KEY [--preview]", undefined, "usage");
@@ -493,6 +497,14 @@ async function unsetEnv(rawArgs: string[], action: string): Promise<void> {
         );
         return;
     }
+
+    // Removing production's value deletes it: a secret is not shown again, and
+    // the next deploy runs without it. `--preview` asks nothing, because
+    // `env reset KEY --preview` undoes it.
+    await confirmDestructive({
+        yes,
+        prompt: `Remove ${key} from project ${displayProjectRef(rawArgs) || projectId}? Its value is deleted, and the next deploy runs without it.`
+    });
 
     try {
         const res = await client.functions.invoke<{ success: boolean; pendingRedeploy: true }>("env-vars", undefined, {
@@ -732,8 +744,8 @@ flags: [["--preview", "What previews run with instead of production's values"]] 
             },
             { action: "unset",
 args: "KEY",
-description: "Remove a variable",
-flags: [["--preview", "Only from previews: production keeps it"]] },
+description: "Remove a variable. Asks first; --yes skips the prompt",
+flags: [["--preview", "Only from previews: production keeps it. Asks nothing: `reset` undoes it"]] },
             { action: "reset",
 args: "KEY --preview",
 description: "Give previews production's value of KEY again",

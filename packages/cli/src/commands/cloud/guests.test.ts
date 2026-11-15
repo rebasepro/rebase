@@ -13,7 +13,8 @@ vi.mock("./context", async (importOriginal) => {
     return {
         ...actual,
         requireClient: vi.fn(),
-        requireProject: vi.fn(async () => "p1")
+        requireProject: vi.fn(async () => "p1"),
+        freshAccessToken: vi.fn(async () => "cp_session_token")
     };
 });
 vi.mock("./debug", async (importOriginal) => {
@@ -110,17 +111,28 @@ describe("parseAge", () => {
 });
 
 describe("rebase cloud guests", () => {
-    it("lists through the project's own address, holding its service key", async () => {
+    it("lists through the console's Studio proxy, never holding the app's service key", async () => {
+        // The control plane attaches the key on its own side; this used to
+        // reveal REBASE_SERVICE_KEY into the CLI's memory.
         const { out, exited } = await run();
 
         expect(exited).toBe(false);
         expect(JSON.parse(out)).toEqual({ guests: [GUEST], total: 1, limit: 25, offset: 0 });
-        expect(invoke).toHaveBeenCalledWith("env-vars", { projectId: "p1", key: "REBASE_SERVICE_KEY" }, { path: "reveal" });
+        expect(invoke).not.toHaveBeenCalledWith("env-vars", expect.anything(), expect.anything());
         expect(calls).toHaveLength(1);
-        expect(calls[0].url.origin).toBe(ORIGIN);
-        expect(calls[0].url.pathname).toBe("/api/admin/guests");
-        expect(calls[0].authorization).toBe(`Bearer ${SERVICE_KEY}`);
+        expect(calls[0].url.origin).toBe("https://cp.example");
+        expect(calls[0].url.pathname).toBe("/api/functions/studio/p1/proxy/api/admin/guests");
+        expect(calls[0].authorization).toBe("Bearer cp_session_token");
         expect(out).not.toContain(SERVICE_KEY);
+    });
+
+    it("says how to turn Studio on when the project has it switched off", async () => {
+        answer = () => json({ error: { code: "forbidden", message: "Studio access is switched off for this project." } }, 403);
+
+        const { out, exited } = await run();
+
+        expect(exited).toBe(true);
+        expect(JSON.parse(out).error.code).toBe("studio_disabled");
     });
 
     it("narrows the list with --limit and --older-than", async () => {
@@ -180,7 +192,7 @@ describe("rebase cloud guests delete", () => {
         const { out } = await run("delete", GUEST.uid, "--yes");
 
         expect(JSON.parse(out)).toEqual({ success: true });
-        expect(deletes().map(call => call.url.pathname)).toEqual([`/api/admin/guests/${GUEST.uid}`]);
+        expect(deletes().map(call => call.url.pathname)).toEqual([`/api/functions/studio/p1/proxy/api/admin/guests/${GUEST.uid}`]);
     });
 
     it("passes on the app's refusal of an account", async () => {

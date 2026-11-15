@@ -1,5 +1,5 @@
 ---
-sourceHash: 9d048d537401732a
+sourceHash: b225492a194c9e7e
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Os grupos de comandos do Rebase Cloud na CLI — autenticação, vinculação de projeto, deploys, notificações, configuração, organizações, bancos de dados, recursos, computação, armazenamento, clusters, faturamento e uso.
@@ -326,10 +326,10 @@ Linhas em suas próprias tabelas seguem sua chave estrangeira:
 
 Verifique quais de seus vínculos são em cascata antes de passar `--yes`: isso não pode ser desfeito.
 
-O comando lê `REBASE_SERVICE_KEY` da mesma forma que `env reveal` faz, portanto, requer um
-proprietário ou administrador (ou um token com a permissão `env` que pertença a um). A
-chave permanece na memória e vai apenas para o endereço do próprio projeto. Um projeto em um
-runtime mais antigo é avisado de que precisa de um mais recente.
+O comando passa pelo proxy do Studio do console, que guarda a chave da app, então a chave nunca chega à sua máquina.
+Requer um owner ou admin da organização, num projeto com o acesso do Studio ligado
+(`rebase cloud settings set --studio on`). Um projeto num runtime mais antigo é avisado de que precisa de um mais novo.
+`rebase users guests --project <slug>` é o mesmo comando na família de comandos de projeto.
 
 ## Resources
 
@@ -368,7 +368,6 @@ rebase cloud storage             # list storage buckets
 rebase cloud storage create      # provision platform-managed storage
 rebase cloud storage attach      # attach your own S3-compatible bucket
 rebase cloud notifications [list] | add <url> | test <id> | remove <id>   # deploy, backup, billing and usage events to Slack, Discord or any URL
-rebase cloud webhooks            # retired: exits 1 (`command_retired`) and names `notifications`
 rebase cloud clusters list | add | verify | registry   # the clusters tenants run on; `add` registers one from a kubeconfig
 rebase cloud billing             # the billing account and card on file
 rebase cloud billing setup       # attach a card, one-time, opens a browser
@@ -430,3 +429,23 @@ projeto reivindicado a partir de um agente conta apenas os dias a partir da reiv
 `autoscale_not_charged` (os pods rodaram acima de `--replicas` e esta plataforma ainda não os
 cobra). A resposta de um projeto com dimensionamento automático também traz `autoscale`:
 `extraPodSeconds` acima do piso, `amountEur` às suas taxas e `charged`.
+
+## Deploy hooks, alertas e o resto
+
+<span class="since-badge" data-since="0.32">Since 0.32</span>
+
+```bash
+rebase cloud deploy-hooks [list] | create [--name <name>] [--branch <branch>] | revoke <id>   # secret URLs a git host or CI calls to deploy
+rebase cloud alerts [list] [--all] | ack <id> | snooze <id> --hours <1-168>   # the project's incidents
+rebase cloud deploy --git [<branch>]     # build on the control plane from the connected repository
+rebase cloud metrics --runtime           # requests, errors and latency, per surface
+rebase cloud metrics --history [--series cpu_millicores|memory_bytes|event_loop_delay_ms] [--minutes <n>]
+rebase cloud domains primary <domain>    # make a verified domain the canonical one
+rebase cloud settings set --studio on|off
+rebase cloud orgs rename <name> [--slug <slug>]
+rebase cloud orgs delete                 # refused while the organization has projects
+rebase cloud billing email <address>     # where invoices go
+rebase cloud clusters baseline <id> [--install]   # platform admins
+```
+
+`deploy-hooks create` mostra a URL do hook uma única vez. `deploy --git` não se combina com as flags de um build local e, no runtime gerenciado, precisa de `--eject`, porque o control plane compila a partir do código-fonte. `settings set --studio` é o interruptor que os comandos de projeto (`rebase data`, `rebase users`, …) precisam ligado para `--project`: eles chegam à app pelo proxy do Studio do console. Um comando cuja rota do control plane ainda não foi implantada responde `not_served` e a nomeia. Comandos destrutivos perguntam antes e recusam com `confirmation_required` quando ninguém pode responder: passe `--yes`.

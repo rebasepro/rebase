@@ -18,12 +18,19 @@ import {
     fail,
     getContextOrg,
     parseCloudArgs,
-    reportError,
     requireClient,
     requireKnownAction,
     requireProject,
     type CloudClient
 } from "./context";
+import { reportCallError, type Unserved } from "./not-served";
+
+/** What `usage` says on a control plane that has no `usage` function yet. */
+const USAGE_UNSERVED: Unserved = {
+    what: "usage reports",
+    hint: "`rebase cloud metrics --runtime` shows the requests and errors the app has counted since it started."
+};
+
 
 export const USAGE_FLAGS = { "--month": String } as const;
 export const USAGE_ACTIONS = ["org"] as const;
@@ -188,7 +195,7 @@ export async function usageCommand(rawArgs: string[]): Promise<void> {
         try {
             usage = await readOrgUsage(client, org, month);
         } catch (e) {
-            reportError(e, "Failed to load usage");
+            reportCallError(e, "Failed to load usage", USAGE_UNSERVED);
         }
         emit(() => printOrg(usage), usage);
         return;
@@ -199,7 +206,7 @@ export async function usageCommand(rawArgs: string[]): Promise<void> {
     try {
         usage = await readProjectUsage(client, projectId, month);
     } catch (e) {
-        reportError(e, "Failed to load usage");
+        reportCallError(e, "Failed to load usage", USAGE_UNSERVED);
     }
     emit(() => printProject(usage, `project ${displayProjectRef(rawArgs) || projectId}`), usage);
 }

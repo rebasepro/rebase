@@ -33,6 +33,14 @@ import {
     warn,
     type CloudClient
 } from "./context";
+import { reportCallError, type Unserved } from "./not-served";
+
+/** What `app-key` says on a control plane that has no `credentials` function yet. */
+const APP_KEY_UNSERVED: Unserved = {
+    what: "app keys",
+    hint: "Nothing was changed. The app's own admin panel creates and revokes API keys meanwhile."
+};
+
 import { API_TOKEN_ENV, dotenvSets, upsertDotenv } from "./init";
 import { findProjectRoot } from "../../utils/project";
 
@@ -115,7 +123,7 @@ export async function appKeyCommand(rawArgs: string[]): Promise<void> {
         try {
             listed = await listKeys(client, projectId);
         } catch (e) {
-            reportError(e, "Failed to read the app's keys");
+            reportCallError(e, "Failed to read the app's keys", APP_KEY_UNSERVED);
         }
         emit(() => printKeys(listed.keys, label), listed);
         return;
@@ -130,7 +138,7 @@ export async function appKeyCommand(rawArgs: string[]): Promise<void> {
     try {
         answer = await rotateKey(client, projectId);
     } catch (e) {
-        reportError(e, "Failed to rotate the app key");
+        reportCallError(e, "Failed to rotate the app key", APP_KEY_UNSERVED);
     }
     if (!isRotated(answer)) {
         reportError(new Error("The control plane's answer did not carry a key."), "Failed to rotate the app key");

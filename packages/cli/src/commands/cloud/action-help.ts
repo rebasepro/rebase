@@ -105,12 +105,13 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     clusters: {
         command: "cloud clusters",
-        usage: "cloud clusters [list|add|verify|registry] [options]",
+        usage: "cloud clusters [list|add|verify|registry|baseline] [options]",
         summary: "The compute clusters tenants run on. Platform-admin only.",
         flags: [],
         examples: [
             "rebase cloud clusters",
             "rebase cloud clusters verify <cluster-id> --baseline",
+            "rebase cloud clusters baseline <cluster-id> --install",
             "rebase cloud clusters add --name gke-eu --provider gcp --region europe-west1 --kubeconfig ./kubeconfig",
             "rebase cloud clusters registry <cluster-id> --repository europe-west1-docker.pkg.dev/p/rlc-acme --push-service-account rlc-acme-push@p.iam.gserviceaccount.com --pull-key-file ./rlc-acme-pull.json"
         ]
@@ -151,15 +152,17 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ],
         examples: [
             "rebase cloud projects create --name \"Shop\" --subdomain shop --link",
-            "rebase cloud projects create --name Shop --subdomain shop --db none",
-            "rebase cloud projects create --name Shop --subdomain shop --db byodb --connection-string \"$DATABASE_URL\""
+            "rebase cloud projects create --name Shop --subdomain shop --db none --yes",
+            "rebase cloud projects create --name Shop --subdomain shop --db byodb --connection-string \"$DATABASE_URL\" --yes"
         ],
         notes: [
             "The subdomain cannot be changed in passing later — a typo here is a new project.",
             "A managed database is created at the project's FIRST DEPLOY, not here.",
             "--provider and --region are not a region picker. They record which of the control plane's "
                 + "registered deploy targets this project belongs to; the private beta has one, so both "
-                + "default to it and neither moves a project anywhere else."
+                + "default to it and neither moves a project anywhere else.",
+            "It asks before creating, because a project is billed once it runs. `--yes`, the global flag listed below, "
+                + "skips the question, and a script or agent must pass it: off a terminal the command refuses rather than assume."
         ]
     },
 
@@ -247,11 +250,14 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--allow-downgrade", "Deploy a bundle built on an older framework release than the project runs"],
             ["--preview", "Serve this build on an address of its own and leave production untouched"],
             ["--preview-name <name>", "Name the preview, so deploying the same name again updates the same address. Implies --preview"],
-            ["--eject", "Leave the managed runtime on purpose (ejects to a container image)"]
+            ["--eject", "Leave the managed runtime on purpose (ejects to a container image)"],
+            ["--git", "Have the control plane build the project's connected repository instead of this directory. The positional is then the branch"]
         ],
         examples: [
             "rebase cloud deploy",
             "rebase cloud deploy web --message \"add search\"",
+            "rebase cloud deploy --git",
+            "rebase cloud deploy --git release-2026-11",
             "rebase cloud deploy --preview",
             "rebase cloud deploy --preview-name new-quiz",
             "rebase cloud deploy --timeout 300 --json"
@@ -282,7 +288,11 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "A static app previewed on its own (`cloud deploy <app> --preview`) needs a control plane that serves "
                 + "static sites by themselves. Rebase Cloud does not yet, and refuses it with PREVIEW_STATIC_UNSERVED; "
                 + "nothing is published.",
-            "A control plane without previews refuses --preview with previews_unavailable, and nothing is deployed."
+            "A control plane without previews refuses --preview with previews_unavailable, and nothing is deployed.",
+            "--git uploads nothing: the control plane clones the repository connected in `rebase cloud settings`, at the branch "
+                + "named or the project's own, and the deploy is followed like any other. It is refused with no_git_repository "
+                + "when none is connected, beside any flag that describes a local build, and, on a project the managed runtime "
+                + "runs, without --eject (a source build leaves the managed runtime)."
         ]
     },
 
@@ -361,7 +371,9 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         examples: ["rebase cloud status", "rebase cloud status --project shop --json"],
         notes: [
             "Poll `status` only while blockedOn is null. Any other value names a command, and the "
-            + "state will not change until you run it."
+            + "state will not change until you run it.",
+            "A section the control plane does not serve yet (the maintenance window) is left out and noted; "
+            + "`notServed` in the JSON lists it."
         ]
     },
 
@@ -430,6 +442,24 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         flags: [["--baseline", "Also check ingress-nginx, cert-manager and CloudNativePG"]],
         examples: ["rebase cloud clusters verify gke-europe-west1 --baseline"],
         notes: ["Exits non-zero when the verdict is `unusable`, so it works as a gate."]
+    },
+
+    "clusters baseline": {
+        command: "cloud clusters baseline",
+        usage: "cloud clusters baseline <cluster-id> [--install] [--yes]",
+        summary:
+            "The cluster baseline — ingress-nginx, cert-manager and CloudNativePG — on one cluster: which components "
+            + "are installed and ready, and where the last install left off. With --install, install whatever is missing. "
+            + "Platform-admin only.",
+        flags: [["--install", "Install the missing components, in the background. Asks first"]],
+        examples: [
+            "rebase cloud clusters baseline gke-europe-west1",
+            "rebase cloud clusters baseline gke-europe-west1 --install --yes"
+        ],
+        notes: [
+            "The install runs on the control plane; run the command again without --install to follow it.",
+            "`clusters verify <id> --baseline` asks the different question of whether a deploy would work there."
+        ]
     },
 
     /* ── The leaves that were undiscoverable ───────────────────────────
@@ -508,7 +538,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ],
         examples: [
             "rebase cloud db access enable --allow 34.89.253.13",
-            "rebase cloud db access enable --allow 34.89.253.13 --tables rebase.metric_samples,rebase.cron_logs",
+            "rebase cloud db access enable --allow 34.89.253.13 --tables rebase.metric_samples,rebase.cron_logs --yes",
             "rebase cloud db access reveal --ca-out db-ca.pem",
             "rebase cloud db access disable --yes"
         ],
@@ -517,7 +547,8 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "The `rebase` schema holds users, password hashes and session tokens: it is never granted whole, and its credential tables never at all.",
             "Managed databases on GCP capacity only for now. Each project with access on has its own network load balancer, which is billed.",
             "The role holds up to 25 connections at once — enough for a dashboard that loads its widgets in parallel, one connection per query — and the app keeps the rest. A tool that opens more is refused the extra ones.",
-            "`disable` closes the address, drops the role and deletes its password. `--yes`, the global flag listed below, skips the confirmation."
+            "`enable` opens the database to the network and `disable` closes the address, drops the role and deletes its password: "
+                + "both ask first. `--yes`, the global flag listed below, skips the question, and is required off a terminal."
         ]
     },
 
@@ -569,6 +600,20 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         notes: [
             "At a zone apex use the A record this prints, not a CNAME: a CNAME is invalid at an apex.",
             "Verification is a separate command because DNS propagation is not instant."
+        ]
+    },
+
+    "domains primary": {
+        command: "cloud domains primary",
+        usage: "cloud domains primary <domain>",
+        summary:
+            "Make one of the project's verified domains its canonical host: the address links and redirects are built "
+            + "from. The project keeps serving its other domains.",
+        flags: [],
+        examples: ["rebase cloud domains primary app.example.com"],
+        notes: [
+            "Only a verified domain can be primary: run `domains verify <domain>` first.",
+            "Refused with not_served by a control plane that keeps a single domain per project."
         ]
     },
 
@@ -750,13 +795,14 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     billing: {
         command: "cloud billing",
-        usage: "cloud billing [setup|checkout|invoices|upcoming]",
+        usage: "cloud billing [setup|checkout|invoices|upcoming|email] [<address>]",
         summary:
             "The selected organization's billing. Bare, it prints the billing account, the card on "
             + "file and what the linked project costs per month; `setup` attaches a card (one-time, "
             + "opens a browser); `checkout` opens a Stripe session for one project; `invoices` lists "
             + "the issued invoices with Stripe's hosted page for each; `upcoming` previews the next "
-            + "invoice of every subscription. Organization-scoped, not project-scoped.",
+            + "invoice of every subscription; `email <address>` sets where Stripe sends the invoices. "
+            + "Organization-scoped, not project-scoped.",
         flags: [
             ["--limit <n>", "`invoices` only: how many to list, newest first. Default 24, at most 100"]
         ],
@@ -765,10 +811,13 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "rebase cloud billing setup",
             "rebase cloud billing checkout --project shop",
             "rebase cloud billing invoices --json",
-            "rebase cloud billing upcoming"
+            "rebase cloud billing upcoming",
+            "rebase cloud billing email billing@example.com"
         ],
         notes: [
             "`setup` comes before the first deploy: without a card the control plane answers 402, and `deploy` refuses before it builds.",
+            "`email` changes the billing account and the Stripe customer together; owners and admins of the organization.",
+            "A control plane that does not serve invoices, or the preview of the next one, refuses `invoices` or `upcoming` with not_served.",
             "A token reaches billing with the `billing` capability on the organization (`rebase cloud tokens create --can billing --org <id>`). "
             + "A token made before that capability existed still works for one release, and each answer warns that it will stop."
         ]
@@ -822,7 +871,9 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "The guest users anonymous sign-in left behind on the project. Without an action, counts them and lists "
             + "the ones last seen longest ago. `delete` removes one. `prune` removes the ones not seen for an age: "
             + "a dry run that prints how many would go, deleting only with --yes. Only guests can go: an account, "
-            + "or a guest that has become one, is refused by the app itself. Owners and admins.",
+            + "or a guest that has become one, is refused by the app itself. Owners and admins, on a project whose Studio "
+            + "access is on: the request goes through the console's Studio proxy, which holds the app's key so this machine never does. "
+            + "`rebase users guests --project <slug>` is the same command in the project family.",
         flags: [
             ["--older-than <age>", "With `prune`, or to count the list: not seen for this long, as 30d, 12h, 2w or 45m"],
             ["--limit <n>", "How many the list shows. Default: 25"]
@@ -949,7 +1000,8 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ],
         notes: [
             "The price is the control plane's own quote for these dials, itemised line by line — not a tier, and not a number this CLI computes.",
-            "`Waiting` is a database change a `set` scheduled for the maintenance window and has not applied yet; the project is billed at the size it runs until then."
+            "`Waiting` is a database change a `set` scheduled for the maintenance window and has not applied yet; the project is billed at the size it runs until then.",
+            "A control plane without maintenance windows leaves those lines out and says so; `notServed` in the JSON lists what it left out."
         ]
     },
 
@@ -1019,12 +1071,14 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ],
         examples: [
             "rebase cloud compute set --cpu 500m --memory 2Gi",
-            "rebase cloud compute set --replicas 2 --autoscale-max 6",
+            "rebase cloud compute set --replicas 2 --autoscale-max 6 --yes",
             "rebase cloud compute set --db-instances 2 --db-memory 4Gi",
             "rebase cloud compute set --db-autoscale-max-cpu 2 --db-autoscale-max-memory 8Gi"
         ],
         notes: [
             "Run `rebase cloud compute` first — it prints the current dials and the €/month this project is quoted.",
+            "It asks before changing anything, with the €/month the control plane quotes for the new dials beside what it quotes now. "
+                + "`--yes`, the global flag listed below, skips the question, and is required off a terminal.",
             "Applied immediately: the app rolls its pods and the subscription is prorated from today. A change that restarts the database is scheduled for the project's maintenance window, billed from when it is applied; apply it sooner with `rebase cloud compute apply`.",
             "The valid ranges are the target cluster's, not this CLI's — GKE Autopilot bills a 250m/512Mi floor and rewrites a memory:CPU ratio outside 1:1–6.5:1, a Hetzner node has neither constraint. The control plane refuses what it cannot honour and names the field."
         ]
@@ -1358,10 +1412,110 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     metrics: {
         command: "cloud metrics",
-        usage: "cloud metrics",
-        summary: "Live CPU, memory and disk for the project's running units, and each instance's realtime counts, as the control plane reports them.",
+        usage: "cloud metrics [--runtime | --history [--series <name>] [--minutes <n>]]",
+        summary:
+            "Live CPU, memory and disk for the project's running units, and each instance's realtime counts, as the control "
+            + "plane reports them. --runtime is what the app itself counted: requests, the 5xx error rate, mean latency, "
+            + "per surface. --history is one series the runtime recorded over a window.",
+        flags: [
+            ["--runtime", "Requests, errors, error rate and mean latency, from the app's own counters"],
+            ["--history", "A recorded series over a window instead of the live figures"],
+            ["--series <name>", "With --history: cpu_millicores (default), memory_bytes or event_loop_delay_ms"],
+            ["--minutes <n>", "With --history: how far back, 1 to 20160 (fourteen days). Default: 60"]
+        ],
+        examples: [
+            "rebase cloud metrics",
+            "rebase cloud metrics --runtime",
+            "rebase cloud metrics --history --series memory_bytes --minutes 1440 --json"
+        ],
+        notes: [
+            "--runtime counts from when the running instance started, so a restart begins again at zero. "
+                + "\"No data yet\" means the app is not deployed, still starting, or not reporting metrics, never an idle app.",
+            "--history exits 1, with the reason, when the history cannot be read: a runtime that keeps none, one too old to, or one not answering (`retryable`)."
+        ]
+    },
+
+    "deploy-hooks": {
+        command: "cloud deploy-hooks",
+        usage: "cloud deploy-hooks [list|create|revoke] [options]",
+        summary:
+            "URLs that build and ship the project's connected repository when something POSTs to them: a git host's "
+            + "webhook, a CMS's publish button, a CI step. `list` (the default) shows each hook's name, branch and when it "
+            + "was last used, never its URL.",
+        flags: [
+            ["--name <name>", "create: what to call it. Default: Deploy hook"],
+            ["--branch <branch>", "create: the branch it builds. Default: the project's configured branch"]
+        ],
+        examples: [
+            "rebase cloud deploy-hooks",
+            "rebase cloud deploy-hooks create --name github --branch main",
+            "rebase cloud deploy-hooks revoke 7 --yes"
+        ],
+        notes: [
+            "The URL is printed once, at `create`: it is the credential, and the control plane keeps only its hash.",
+            "A GitHub or GitLab push to another branch, a tag, or any other event is acknowledged and ignored.",
+            "Creating and revoking take the owner or admin role; any member may list. A project holds at most 20."
+        ]
+    },
+
+    "deploy-hooks create": {
+        command: "cloud deploy-hooks create",
+        usage: "cloud deploy-hooks create [--name <name>] [--branch <branch>]",
+        summary: "Mint a deploy hook and print its URL, once. POSTing to the URL builds and ships the connected repository.",
+        flags: [
+            ["--name <name>", "What to call it. Default: Deploy hook"],
+            ["--branch <branch>", "The branch it builds. Default: the project's configured branch"]
+        ],
+        examples: ["rebase cloud deploy-hooks create --name github --branch main --json"],
+        notes: ["`url` and `token` in the JSON are the only copy: store them where the caller of the hook reads secrets."]
+    },
+
+    "deploy-hooks revoke": {
+        command: "cloud deploy-hooks revoke",
+        usage: "cloud deploy-hooks revoke <id> [--yes]",
+        summary: "Delete a deploy hook: anything POSTing to its URL is refused from then on. Asks first.",
         flags: [],
-        examples: ["rebase cloud metrics", "rebase cloud metrics --json"]
+        examples: ["rebase cloud deploy-hooks revoke 7 --yes"]
+    },
+
+    alerts: {
+        command: "cloud alerts",
+        usage: "cloud alerts [list|ack|snooze] [<incidentId>] [options]",
+        summary:
+            "What the platform has seen go wrong with the project — a disk filling, an app restarting, a deploy failing — "
+            + "newest first. `list` (the default) shows the open ones; `ack` stops the reminders for everyone; `snooze` "
+            + "stops the emails for a while.",
+        flags: [
+            ["--all", "list: the resolved ones as well as the open ones"],
+            ["--hours <1-168>", "snooze: how long. Required"]
+        ],
+        examples: [
+            "rebase cloud alerts",
+            "rebase cloud alerts list --all --json",
+            "rebase cloud alerts ack 6f1c2a0e-…",
+            "rebase cloud alerts snooze 6f1c2a0e-… --hours 24"
+        ],
+        notes: [
+            "Any member of the organization may read, acknowledge and snooze. Only an open alert can be acknowledged or snoozed.",
+            "An organization-wide problem (a failed payment) belongs to no project, and is not listed here; the console shows it.",
+            "You still hear about an acknowledged or snoozed alert if it gets worse or is resolved."
+        ]
+    },
+
+    "alerts ack": {
+        command: "cloud alerts ack",
+        usage: "cloud alerts ack <incidentId>",
+        summary: "Acknowledge an open alert: reminders stop for everyone in the organization.",
+        flags: [],
+        examples: ["rebase cloud alerts ack 6f1c2a0e-…"]
+    },
+
+    "alerts snooze": {
+        command: "cloud alerts snooze",
+        usage: "cloud alerts snooze <incidentId> --hours <1-168>",
+        summary: "Snooze an open alert: nobody in the organization is emailed about it until the time is up, unless it is resolved.",
+        flags: [["--hours <1-168>", "How long, in hours. Required; at most a week"]],
+        examples: ["rebase cloud alerts snooze 6f1c2a0e-… --hours 24"]
     }
 };
 

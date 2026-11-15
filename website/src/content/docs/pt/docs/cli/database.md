@@ -1,5 +1,5 @@
 ---
-sourceHash: 2883815081dc2c2a
+sourceHash: 79cc7825b045bc4d
 title: Comandos de Banco de Dados
 sidebar_label: Comandos de Banco de Dados
 description: Os comandos rebase db — push, generate e migrate, backups e restaurações, extração de cópia, a string de conexão, o banco de dados de desenvolvimento gerenciado e branches.
@@ -317,6 +317,16 @@ tem precedência sobre o `DATABASE_URL` no `.env` e perde para `--database-url` 
 alternância feita anteriormente. O `delete` recusa a branch em que você está, já que todos os comandos
 no checkout, inclusive a exclusão, estão apontados para ela: use `switch --off` primeiro
 e, em seguida, exclua-a. O fluxo de trabalho completo está em [Database Branching](/docs/backend/branching/).
+
+#### `rebase db branch merge`
+
+<span class="since-badge" data-since="0.32">Since 0.32</span>
+
+```bash
+rebase db branch merge <name> [--on-conflict abort|branch|target] [--skip-blocked] [--yes]
+```
+
+Escreve as linhas que um branch inseriu, atualizou e apagou no banco de dados a partir do qual foi criado. Primeiro mostra o diff e pergunta, depois faz o merge exatamente desse diff: o merge cita o fingerprint do diff, então um banco pai que mudou desde então é recusado em vez de mesclado. `--on-conflict` decide uma linha que os dois lados alteraram — `abort` (o padrão) não escreve nada, `branch` fica com a linha do branch, `target` mantém a do banco pai — e `--skip-blocked` mescla as tabelas que podem ser mescladas e pula o resto. Mudanças de schema e de políticas nunca são mescladas: isso fica para as migrações. `delete` também pergunta antes, e `--yes` responde aos dois num script.
 
 :::note[No banco de dados de desenvolvimento gerenciado]
 `push`, `generate` e `migrate` funcionam aqui como em qualquer outro banco de dados.

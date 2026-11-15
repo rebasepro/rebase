@@ -2,14 +2,26 @@
  * `rebase cloud settings` — a project's editable configuration.
  *
  *   settings                 Show the current settings
- *   settings set [flags]     Update name / branch / repo / subdomain / platform rebuilds
+ *   settings set [flags]     Update name / branch / repo / subdomain / platform rebuilds / Studio access
  *
  * These are plain `projects` updates. A subdomain change is validated against
  * `check-subdomain` up front so the CLI fails with the real reason rather than a
  * generic collection error.
  */
 import chalk from "chalk";
-import { requireClient, requireProject, displayProjectRef, parseCloudArgs, emit, printGroupHelp, keyValues, success, fail, reportError } from "./context";
+import {
+    requireClient,
+    requireProject,
+    displayProjectRef,
+    parseCloudArgs,
+    emit,
+    printGroupHelp,
+    keyValues,
+    success,
+    fail,
+    reportError,
+    confirmDestructive
+} from "./context";
 
 interface ProjectSettings {
     id: string | number;
@@ -21,6 +33,7 @@ interface ProjectSettings {
     provider?: string;
     region?: string;
     platformRebuilds?: boolean | null;
+    studioEnabled?: boolean | null;
 }
 
 export async function settingsCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
@@ -66,7 +79,8 @@ maxPositionals: 0 });
                     ["Custom domain", p!.customDomain],
                     ["Provider", p!.provider],
                     ["Region", p!.region],
-                    ["Platform rebuilds", p!.platformRebuilds === false ? "off" : "on"]
+                    ["Platform rebuilds", p!.platformRebuilds === false ? "off" : "on"],
+                    ["Studio access", p!.studioEnabled === false ? "off" : "on"]
                 ]);
                 console.log("");
             },
@@ -79,7 +93,8 @@ maxPositionals: 0 });
                 customDomain: p!.customDomain ?? null,
                 provider: p!.provider ?? null,
                 region: p!.region ?? null,
-                platformRebuilds: p!.platformRebuilds !== false
+                platformRebuilds: p!.platformRebuilds !== false,
+                studioEnabled: p!.studioEnabled !== false
             }
         );
     } catch (e) {
@@ -103,6 +118,8 @@ export function buildSettingsPatch(args: {
     branch?: string;
     /** Already parsed with {@link parseOnOff}. */
     platformRebuilds?: boolean;
+    /** Already parsed with {@link parseOnOff}. */
+    studio?: boolean;
 }): Record<string, string | boolean> {
     const patch: Record<string, string | boolean> = {};
     if (args.name !== undefined) patch.name = args.name;
@@ -110,6 +127,7 @@ export function buildSettingsPatch(args: {
     if (args.repo !== undefined) patch.gitRepoUrl = args.repo;
     if (args.branch !== undefined) patch.gitBranch = args.branch;
     if (args.platformRebuilds !== undefined) patch.platformRebuilds = args.platformRebuilds;
+    if (args.studio !== undefined) patch.studioEnabled = args.studio;
     return patch;
 }
 
@@ -122,7 +140,11 @@ export const SET_SETTINGS_FLAGS = {
     /* Whether fleet upgrades rebuild this app from its source on each new
        framework release (on by default). Off keeps every deploy as built,
        and the platform deletes the copy of the source it holds. */
-    "--platform-rebuilds": String
+    "--platform-rebuilds": String,
+    /* Whether the console's Studio may reach this project's API with admin
+       rights. A consent switch: off, the control plane refuses to proxy at
+       once. Owners and admins only — the control plane enforces it. */
+    "--studio": String
 } as const;
 
 async function setSettings(rawArgs: string[]): Promise<void> {
@@ -149,15 +171,45 @@ async function setSettings(rawArgs: string[]): Promise<void> {
         platformRebuilds = parsed;
     }
 
+    let studio: boolean | undefined;
+    if (args["--studio"] !== undefined) {
+        const parsed = parseOnOff(args["--studio"]);
+        if (parsed === null) {
+            fail(`--studio takes on or off (got "${args["--studio"]}").`, undefined, "usage");
+        }
+        studio = parsed;
+    }
+
     const patch = buildSettingsPatch({
         name: args["--name"],
         subdomain: args["--subdomain"],
         repo: args["--repo"],
         branch: args["--branch"],
-        platformRebuilds
+        platformRebuilds,
+        studio
     });
     if (Object.keys(patch).length === 0) {
-        fail("Nothing to update.", "Pass --name, --subdomain, --repo, --branch, or --platform-rebuilds.", "usage");
+        fail("Nothing to update.", "Pass --name, --subdomain, --repo, --branch, --platform-rebuilds or --studio.", "usage");
+    }
+
+    if (typeof patch.subdomain === "string" && patch.subdomain) {
+        // A new subdomain moves the project's address: the old URL stops
+        // answering, and anything holding it (a frontend, a webhook, a
+        // bookmark) breaks. Asked only when it really changes.
+        let current: string | undefined;
+        try {
+            const row = (await client.data.table("projects").findById(projectId)) as ProjectSettings | undefined;
+            current = row?.subdomain;
+        } catch (e) {
+            reportError(e, "Failed to load settings");
+        }
+        if (current?.toLowerCase() !== patch.subdomain) {
+            await confirmDestructive({
+                yes: Boolean(args["--yes"]),
+                prompt: `Move project ${projectRef} from ${current ?? "its subdomain"} to ${patch.subdomain}? `
+                    + "The old address stops answering, and anything that calls it breaks."
+            });
+        }
     }
 
     try {
@@ -188,7 +240,7 @@ export function printSettingsHelp(): void {
         title: "Project configuration",
         actions: [
             { action: "show",
-description: "Name, subdomain, repository, branch and platform rebuilds as recorded" },
+description: "Name, subdomain, repository, branch, platform rebuilds and Studio access as recorded" },
             {
                 action: "set",
                 description: "Change one or more of them",
@@ -197,9 +249,14 @@ description: "Name, subdomain, repository, branch and platform rebuilds as recor
                     ["--subdomain <sub>", "The <slug>.rebase.website host"],
                     ["--repo <git url>", "Repository to build from"],
                     ["--branch <branch>", "Branch to build"],
-                    ["--platform-rebuilds <on|off>", "Rebuild this app on new framework releases (default on)"]
+                    ["--platform-rebuilds <on|off>", "Rebuild this app on new framework releases (default on)"],
+                    ["--studio <on|off>", "Let the console's Studio reach this project's API with admin rights (default on). Owners and admins"]
                 ]
             }
+        ],
+        notes: [
+            "A new --subdomain moves the project's address, so it asks first; --yes skips the question, and is required off a terminal.",
+            "--studio and --platform-rebuilds are the organization's consent: only its owners and admins may change them."
         ]
     });
 }

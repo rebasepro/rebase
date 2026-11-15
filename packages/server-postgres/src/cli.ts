@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import { out, outWarn, outError } from "./cli-output";
 import { resolveTsxLoader } from "./tsx-loader";
 import { formatRelativeTime } from "@rebasepro/utils";
-import type { BranchDiff, DatabaseAdmin } from "@rebasepro/types";
+import type { BranchDiff, BranchMergeResult, DatabaseAdmin } from "@rebasepro/types";
 import {
     diagnoseMissingBin,
     detectProjectPackageManager,
@@ -1774,6 +1774,8 @@ const BRANCH_FLAGS = {
     "--from": String,
     "--json": Boolean,
     "--sample-limit": Number,
+    "--on-conflict": String,
+    "--skip-blocked": Boolean,
     "--yes": Boolean,
     "-y": "--yes"
 } as const;
@@ -1861,6 +1863,17 @@ max: 3 });
     const db = drizzle(pool);
     const poolManager = new DatabasePoolManager(databaseUrl);
     const branchService = new BranchService(db, poolManager);
+    // The SQL and branch halves of an admin, on this command's own pools: a
+    // diff or a merge reads each database through `database`.
+    const branchAdmin = (): DatabaseAdmin => ({
+        executeSql: async (text, options) =>
+            (await poolManager.getPool(options?.database ?? poolManager.defaultDatabaseName).query(text, options?.params)).rows,
+        createBranch: (branchName, options) => branchService.createBranch(branchName, options),
+        deleteBranch: (branchName) => branchService.deleteBranch(branchName),
+        listBranches: () => branchService.listBranches(),
+        getBranchInfo: async (branchName) =>
+            await branchService.hasBranchRegistry() ? branchService.getBranchInfo(branchName) : undefined
+    });
 
     try {
         // The registry table, for the actions that write to it. `list` and
@@ -1924,6 +1937,20 @@ max: 3 });
                     out(chalk.gray("  Usage: rebase db branch delete <name>"));
                     process.exit(1);
                 }
+                const deleteFlags = arg(BRANCH_FLAGS, { argv: rawArgs.slice(3), permissive: true });
+                if (deleteFlags["--yes"] !== true) {
+                    // Dropping a branch is not undoable, and it may be the only
+                    // copy of an afternoon's work — the same reason prune asks.
+                    if (!process.stdin.isTTY) {
+                        outError(chalk.red(`  ✗ Branch "${name}" was not deleted: there is no terminal to confirm on.`));
+                        outError(chalk.gray("    Re-run with --yes to delete it."));
+                        process.exit(1);
+                    }
+                    if (!(await promptConfirm(`  Delete branch "${name}" and its database? (y/N) `))) {
+                        out(chalk.gray("  Nothing was changed."));
+                        break;
+                    }
+                }
                 out("");
                 out(chalk.bold(`  🗑️  Deleting branch "${name}"...`));
                 await branchService.deleteBranch(name, { force: rawArgs.includes("--force") });
@@ -1975,17 +2002,7 @@ max: 3 });
                 const parsed = arg(BRANCH_FLAGS, { argv: rawArgs.slice(3), permissive: true });
                 const { diffDatabaseBranch } = await import("./branching/branch-diff");
                 const { branchDiffReport } = await import("./branching/branch-diff-report");
-                // The SQL and branch halves of an admin, on this command's own
-                // pools: the diff reads each database through `database`.
-                const admin: DatabaseAdmin = {
-                    executeSql: async (text, options) =>
-                        (await poolManager.getPool(options?.database ?? poolManager.defaultDatabaseName).query(text, options?.params)).rows,
-                    createBranch: (branchName, options) => branchService.createBranch(branchName, options),
-                    deleteBranch: (branchName) => branchService.deleteBranch(branchName),
-                    listBranches: () => branchService.listBranches(),
-                    getBranchInfo: async (branchName) =>
-                        await branchService.hasBranchRegistry() ? branchService.getBranchInfo(branchName) : undefined
-                };
+                const admin = branchAdmin();
                 let diff: BranchDiff;
                 try {
                     diff = await diffDatabaseBranch(admin, name, { sampleLimit: parsed["--sample-limit"] });
@@ -2000,6 +2017,82 @@ max: 3 });
                     for (const line of branchDiffReport(diff)) out(`  ${line}`);
                     out("");
                 }
+                break;
+            }
+
+            case "merge": {
+                // Land a branch's rows on the database it was made from: the
+                // diff is computed and shown first, and the merge names that
+                // diff's fingerprint, so it writes exactly what was reviewed or
+                // nothing — a target that moved since is refused, not merged.
+                // Schema and policy changes are never merged (`db push` and
+                // migrations carry those); the result says how many there were.
+                const name = branchNameIn(rawArgs.slice(2));
+                if (!name || name.startsWith("-")) {
+                    outError(chalk.red("✗ Branch name is required."));
+                    out(chalk.gray("  Usage: rebase db branch merge <name> [--on-conflict abort|branch|target] [--skip-blocked] [--yes]"));
+                    process.exit(1);
+                }
+                const parsed = arg(BRANCH_FLAGS, { argv: rawArgs.slice(3), permissive: true });
+                const onConflict = parsed["--on-conflict"] ?? "abort";
+                if (onConflict !== "abort" && onConflict !== "branch" && onConflict !== "target") {
+                    outError(chalk.red(`  ✗ --on-conflict takes abort, branch or target (got "${onConflict}").`));
+                    process.exit(1);
+                }
+                const { diffDatabaseBranch, mergeDatabaseBranch } = await import("./branching/branch-diff");
+                const { branchDiffReport } = await import("./branching/branch-diff-report");
+                const admin = branchAdmin();
+                let diff: BranchDiff;
+                try {
+                    diff = await diffDatabaseBranch(admin, name, { sampleLimit: parsed["--sample-limit"] });
+                } catch (error: unknown) {
+                    outError(chalk.red(`  ✗ ${error instanceof Error ? error.message : String(error)}`));
+                    process.exit(1);
+                }
+                out("");
+                for (const line of branchDiffReport(diff)) out(`  ${line}`);
+                out("");
+                if (parsed["--yes"] !== true) {
+                    if (!process.stdin.isTTY) {
+                        outError(chalk.red(`  ✗ Branch "${name}" was not merged: there is no terminal to confirm on.`));
+                        outError(chalk.gray("    Read the diff above, then re-run with --yes to merge it."));
+                        process.exit(1);
+                    }
+                    if (!(await promptConfirm(`  Merge these rows from "${name}" into ${diff.targetDatabase}? (y/N) `))) {
+                        out(chalk.gray("  Nothing was merged."));
+                        out("");
+                        break;
+                    }
+                }
+                let result: BranchMergeResult;
+                try {
+                    result = await mergeDatabaseBranch(admin, name, {
+                        expectedFingerprint: diff.fingerprint,
+                        onConflict,
+                        skipBlocked: parsed["--skip-blocked"] === true,
+                        ...(parsed["--sample-limit"] !== undefined ? { maxRowsPerTable: parsed["--sample-limit"] } : {})
+                    });
+                } catch (error: unknown) {
+                    outError(chalk.red(`  ✗ ${error instanceof Error ? error.message : String(error)}`));
+                    process.exit(1);
+                }
+                if (parsed["--json"] === true) {
+                    out(JSON.stringify(result, null, 2));
+                    break;
+                }
+                for (const table of result.tables) {
+                    out(`  ${chalk.green("✓")} ${table.schema}.${table.table}  ${chalk.gray(`+${table.inserted} ~${table.updated} -${table.deleted}`)}`);
+                }
+                for (const skipped of result.skipped) {
+                    out(`  ${chalk.yellow("○")} ${skipped.schema}.${skipped.table}  ${chalk.gray(`not merged: ${typeof skipped.reason === "string" ? skipped.reason : JSON.stringify(skipped.reason)}`)}`);
+                }
+                if (result.conflictsKept > 0) out(chalk.gray(`  ${result.conflictsKept} row(s) both sides changed kept the target's version.`));
+                if (result.schemaChangesNotMerged > 0) {
+                    out(chalk.yellow(`  ${result.schemaChangesNotMerged} schema or policy change(s) on the branch were not merged: apply them with migrations.`));
+                }
+                for (const warning of result.warnings) out(chalk.yellow(`  ⚠ ${warning}`));
+                out(chalk.green(`  ✓ Merged "${name}" into ${result.targetDatabase}.`));
+                out("");
                 break;
             }
 
@@ -2132,6 +2225,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("delete")} <name>                     Delete a branch
   ${chalk.blue.bold("info")} <name>                       Show branch details
   ${chalk.blue.bold("diff")} <name> [--json]              What the branch changed: schema, policies, rows
+  ${chalk.blue.bold("merge")} <name>                      Write the branch's row changes onto its parent, after the diff
   ${chalk.blue.bold("prune")} [--older-than <14|14d|2w>]  Remove branches nothing is using
 
 ${chalk.green.bold("Why prune")}
@@ -2149,8 +2243,12 @@ ${chalk.green.bold("Options")}
                                     to --sample-limit rows a table (default 100).
   ${chalk.blue.bold("--include-dev-diff")}                Also prune the Atlas scratch databases
                                     \`db push\` leaves behind.
-  ${chalk.blue.bold("--yes, -y")}                         Skip prune's confirmation prompt. Dropping a
-                                    branch is not undoable, so this is the flag
+  ${chalk.blue.bold("--on-conflict")} <abort|branch|target> merge: a row both sides changed — write nothing
+                                    (abort, the default), take the branch's, or keep the parent's.
+  ${chalk.blue.bold("--skip-blocked")}                    merge: merge the tables that can be, skip the rest.
+  ${chalk.blue.bold("--sample-limit")} <n>                diff/merge: rows compared per table (default 100).
+  ${chalk.blue.bold("--yes, -y")}                         Skip delete's, merge's and prune's prompt. Dropping
+                                    a branch is not undoable, so this is the flag
                                     a CI job passes and a person usually should not.
 
 ${chalk.green.bold("Examples")}

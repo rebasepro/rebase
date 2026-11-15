@@ -180,10 +180,40 @@ export function cloudToolCall(
     selectedProject?: string
 ): CloudCall {
     const call = buildCloudToolCall(name, schema, rawArgs);
+    // After the arguments are read, so a malformed call hears what is wrong
+    // with it before it hears that it needs confirming.
+    requireConfirmed(name, validateToolArgs(name, schema, rawArgs));
     if (selectedProject && CLOUD_TOOLS_FOLLOWING_SELECTION.has(name)) {
         call.argv.push("--project", selectedProject);
     }
     return call;
+}
+
+/**
+ * The tools that change production, refused until the call says the user
+ * agreed: the hosted connector plans and then confirms the same three, and an
+ * MCP call has no terminal for the CLI's own prompt. The refusal is the plan —
+ * it says what would happen — and nothing is spawned.
+ */
+function requireConfirmed(name: CloudCommandTool, args: Record<string, unknown>): void {
+    if (args.confirm === true) return;
+    const preview = args.preview === true || typeof args.previewName === "string";
+    const again = `Ask the user, then call ${name} again with the same arguments and \`confirm: true\`.`;
+    if (name === "rebase_cloud_deploy" && !preview) {
+        throw new ToolArgumentError(
+            `This would deploy ${typeof args.app === "string" ? `the app "${args.app}"` : "this directory"} to the linked Rebase Cloud project's production. Nothing was done. ${again}`
+        );
+    }
+    if (name === "rebase_cloud_env_set" && args.preview !== true) {
+        throw new ToolArgumentError(
+            `This would set ${typeof args.key === "string" ? args.key : "the variable"} in production, applied on the next deploy. Nothing was done. ${again}`
+        );
+    }
+    if (name === "rebase_cloud_rollback") {
+        throw new ToolArgumentError(
+            `This would put ${typeof args.deploymentId === "string" ? `deployment ${args.deploymentId}` : "the last good deployment"} back into production. Nothing was done. ${again}`
+        );
+    }
 }
 
 function buildCloudToolCall(name: CloudCommandTool, schema: ToolInputSchema, rawArgs: unknown): CloudCall {
@@ -284,8 +314,9 @@ function buildCloudToolCall(name: CloudCommandTool, schema: ToolInputSchema, raw
             const argv = ["cloud", "rollback"];
             const id = str("deploymentId");
             if (id) argv.push(id);
-            // The tool call is the confirmation: an MCP call has no terminal to
-            // prompt on, and the CLI refuses to roll back without one or this.
+            // `confirm: true` was required above (`requireConfirmed`): the
+            // user agreed in the conversation, and the CLI's own prompt has no
+            // terminal to ask on.
             argv.push("--yes", "--json");
             return { argv, secrets: [], command: `rebase cloud rollback${id ? ` ${id}` : ""}`, tailLines: CLOUD_LOGS_DEFAULT_TAIL };
         }

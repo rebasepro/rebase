@@ -669,7 +669,8 @@ vi.mock("./context", async (importOriginal) => {
 import * as context from "./context";
 import type { CloudClient } from "./context";
 import { fakeCloudClient, type CollectionAnswers, type InvokeAnswer } from "../../../test/helpers/cloud-client";
-import { debugCommand } from "./debug";
+import { debugCommand, resolveProbeTable } from "./debug";
+import { resetDeprecationWarningsForTests } from "@rebasepro/common";
 import { cloudCommand, positionals } from "./index";
 
 function fakeClient(spec: {
@@ -860,6 +861,66 @@ headers: { "Content-Type": "application/json" } }
         // The function check rides on the listing, so no per-function request.
         expect(seen).toContain("/api/functions");
         expect(seen.some((p) => p.startsWith("/api/functions/"))).toBe(false);
+    });
+
+    /**
+     * "Table" is the word for an app's data; "collection" is the CMS's. The
+     * flag is `--table`, and `--collection` is its deprecated alias: it still
+     * works, and says once per process what to write instead.
+     */
+    describe("--table, and --collection as its deprecated alias", () => {
+        async function probedPaths(words: string[]): Promise<string[]> {
+            const seen: string[] = [];
+            vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+                seen.push(new URL(url).pathname);
+                return new Response("", { status: 401 });
+            }));
+            // A test helper that happens to be named like a hook; not React.
+            // eslint-disable-next-line react-hooks/rules-of-hooks
+            useClient(fakeClient({}));
+            const cap = captureStdout();
+            const exit = vi.spyOn(process, "exit").mockImplementation(() => { throw new ExitCalled(); });
+            await untilExit(() => debugCommand("health", ["node", "rebase", "cloud", "debug", "health", ...words, "--json"]));
+            cap.restore();
+            exit.mockRestore();
+            return seen;
+        }
+
+        beforeEach(() => resetDeprecationWarningsForTests());
+
+        /** The deprecation lines among what was warned (the fake client warns of its own). */
+        const deprecations = (warn: { mock: { calls: unknown[][] } }) =>
+            warn.mock.calls.map(c => String(c[0])).filter(line => line.includes("Deprecated"));
+
+        it("probes the table named on --table, and warns about nothing", async () => {
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+            const seen = await probedPaths(["--table", "documents"]);
+            expect(seen).toContain("/api/data/documents");
+            expect(deprecations(warn)).toEqual([]);
+            warn.mockRestore();
+        });
+
+        it("still probes the table named on --collection, and warns once however often it is used", async () => {
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+            expect(await probedPaths(["--collection", "documents"])).toContain("/api/data/documents");
+            expect(await probedPaths(["--collection", "posts"])).toContain("/api/data/posts");
+            expect(deprecations(warn)).toHaveLength(1);
+            expect(deprecations(warn)[0]).toContain("use `--table` instead");
+            warn.mockRestore();
+        });
+
+        it("refuses --table and --collection naming two different tables", async () => {
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+            const exit = vi.spyOn(process, "exit").mockImplementation(() => { throw new ExitCalled(); });
+            const cap = captureStdout();
+            expect(() => resolveProbeTable({ "--table": "a", "--collection": "b" })).toThrow(ExitCalled);
+            cap.restore();
+            exit.mockRestore();
+            warn.mockRestore();
+            expect(JSON.parse(cap.output().trim()).error.code).toBe("usage");
+            expect(resolveProbeTable({ "--table": "a", "--collection": "a" })).toBe("a");
+            expect(resolveProbeTable({})).toBeUndefined();
+        });
     });
 });
 

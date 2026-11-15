@@ -141,6 +141,16 @@ describe("reconciling the database with its collections", () => {
         expect((await res.json() as { error: { code: string } }).error.code).toBe("SCHEMA_RECONCILE_UNSUPPORTED");
     });
 
+    it("applies for the service key: a machine may reconcile, unlike live schema apply", async () => {
+        // Decided on purpose: `rebase schema reconcile` runs with the service
+        // key, and the digest is the confirmation. Adding /apply's person-only
+        // check here would break that command.
+        const { post, executed } = harness({ user: { uid: "service", roles: ["admin"] } });
+        const res = await post("/reconcile/apply", { confirm: "digest-relax" });
+        expect(res.status).toBe(200);
+        expect(executed).toEqual([RELAX]);
+    });
+
     it("lets schema:read plan and needs schema:write to apply", async () => {
         configureAccess({ model: { roles: { developer: { scopes: ["schema:read"] } }, scopes: {} } });
         try {

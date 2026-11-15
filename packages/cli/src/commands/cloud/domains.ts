@@ -4,6 +4,7 @@
  *   domains list               Every host, its status, and the DNS records it needs
  *   domains add <domain>       Register a host (starts, does not finish, setup)
  *   domains verify [domain]    Check the host's published DNS now; live only if it passes
+ *   domains primary <domain>   Make a verified host the canonical one
  *   domains remove <domain>    Stop serving a host
  *
  * A project's hosts are rows of the control plane's `project_domains` table,
@@ -262,6 +263,9 @@ export async function domainsCommand(action: string | undefined, rawArgs: string
         case "verify":
             await verifyDomain(rawArgs);
             break;
+        case "primary":
+            await primaryDomain(rawArgs);
+            break;
         case "remove":
         case "rm":
         case "delete":
@@ -452,6 +456,64 @@ function verifyOutcome(
     };
 }
 
+/**
+ * Make one verified host the project's canonical one: the address links and
+ * redirects are built from. The control plane keeps one primary per project and
+ * mirrors it into the project's single domain column.
+ */
+async function primaryDomain(rawArgs: string[]): Promise<void> {
+    const named = resolveDomainArg(rawArgs, "primary");
+    if (!named) fail("Usage: rebase cloud domains primary <domain>", "Name one of the project's verified domains.", "usage");
+    const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
+
+    let set: DomainSet;
+    try {
+        set = await loadDomains(client, projectId);
+    } catch (e) {
+        reportError(e, "Failed to load custom domains");
+    }
+    if (set.model === "column") {
+        fail(
+            "This control plane serves one custom domain per project, so there is no primary to choose.",
+            "`rebase cloud domains list` shows the one it serves.",
+            "not_served"
+        );
+    }
+    const target = pickDomain(set, named, "primary");
+    if (target.id === null) {
+        fail(
+            `${target.host} is held outside this project's host list, so it cannot be made primary.`,
+            `Add it to the list first: \`rebase cloud domains add ${target.host}\`, then \`rebase cloud domains verify ${target.host}\`.`,
+            "usage"
+        );
+    }
+    // The control plane refuses this too (an unverified primary would become
+    // the address every link is built from); said here with the remedy.
+    if (target.status !== "verified") {
+        fail(
+            `${target.host} is not verified yet, so it cannot be the primary host.`,
+            `Verify it first: \`rebase cloud domains verify ${target.host}\`.`,
+            "domain_not_verified"
+        );
+    }
+
+    let res: DomainRow & { unchanged?: boolean };
+    try {
+        res = await client.functions.invoke<DomainRow & { unchanged?: boolean }>("domains", {}, { path: `${projectId}/${target.id}/primary` });
+    } catch (e) {
+        reportError(e, "Failed to set the primary domain");
+    }
+    const unchanged = res.unchanged === true;
+    emit(
+        () => success(unchanged
+            ? `${target.host} already is the primary host of project ${projectRef}`
+            : `${target.host} is now the primary host of project ${projectRef}`),
+        { success: true, projectId, id: target.id, host: target.host, primary: true, changed: !unchanged }
+    );
+}
+
 async function removeDomain(rawArgs: string[]): Promise<void> {
     // Strict: detaching a host is destructive, and the permissive parse
     // accepted `domains remove --dry-run` by ignoring the flag and detaching
@@ -522,6 +584,9 @@ description: "Register a host" },
             { action: "verify",
 args: "[domain]",
 description: "Check a host's DNS and put it live" },
+            { action: "primary",
+args: "<domain>",
+description: "Make a verified host the canonical one, the address links are built from" },
             { action: "remove",
 args: "<domain>",
 description: "Stop serving a host" }

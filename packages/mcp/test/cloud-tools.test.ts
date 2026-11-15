@@ -47,20 +47,24 @@ const CLOUD = ALL_TOOLS.filter((t) => t.name.startsWith("rebase_cloud_"));
  * exclude others; together they must name every property of the schema.
  */
 const SAMPLES: Record<string, Array<Record<string, unknown>>> = {
-    rebase_cloud_provision: [{ name: "Todo app", deploy: false }],
+    rebase_cloud_provision: [{ name: "Todo app", deploy: false, confirm: true }],
     rebase_cloud_status: [{}],
     rebase_cloud_deploy: [
         { app: "web", bundle: true, message: "first cut", wait: true, timeoutSeconds: 600, previewName: "new-quiz" },
-        { preview: true, wait: false }
+        { preview: true, wait: false },
+        { app: "web", confirm: true }
     ],
     rebase_cloud_logs: [
         { source: "runtime", since: "5m", tail: 50, grep: "/5\\d\\d/", level: "error", previous: true, preview: "new-quiz" },
         { source: "build", tail: 20 }
     ],
     rebase_cloud_env_list: [{ preview: true }],
-    rebase_cloud_env_set: [{ key: "STRIPE_KEY", value: "sk_live_abc123", secret: true, preview: true }],
+    rebase_cloud_env_set: [
+        { key: "STRIPE_KEY", value: "sk_live_abc123", secret: true, preview: true },
+        { key: "STRIPE_KEY", value: "sk_live_abc123", confirm: true }
+    ],
     rebase_cloud_deployments_list: [{ limit: 5 }],
-    rebase_cloud_rollback: [{ deploymentId: "dep_42" }],
+    rebase_cloud_rollback: [{ deploymentId: "dep_42", confirm: true }],
     rebase_cloud_projects_list: [{}]
 };
 
@@ -96,12 +100,21 @@ describe("every cloud tool's schema against its handler's parsed input", () => {
             for (const sample of samples) expect(() => parseCloudToolArgs(name, sample)).not.toThrow();
         });
 
-        it("reads every property it declares: leaving one out changes the call", () => {
+        it("reads every property it declares: leaving one out changes the call, or refuses it", () => {
+            // A refusal is a change too: leaving out `confirm` turns a production
+            // deploy into the answer of what it would do.
+            const outcome = (args: Record<string, unknown>): string => {
+                try {
+                    return JSON.stringify(parseCloudToolArgs(name, args));
+                } catch (error) {
+                    return `refused: ${error instanceof Error ? error.message : String(error)}`;
+                }
+            };
             for (const key of keys) {
                 const changed = samples.some((sample) => {
                     if (!(key in sample) || schema.required?.includes(key)) return false;
                     const { [key]: _dropped, ...rest } = sample;
-                    return JSON.stringify(parseCloudToolArgs(name, rest)) !== JSON.stringify(parseCloudToolArgs(name, sample));
+                    return outcome(rest) !== outcome(sample);
                 });
                 const required = schema.required?.includes(key) ?? false;
                 expect(changed || required, `\`${key}\` is declared but the handler ignores it`).toBe(true);
@@ -196,14 +209,26 @@ describe("cloud tool argv", () => {
     });
 
     it("puts an env value on stdin, never on argv", () => {
-        const call = parseCloudToolArgs("rebase_cloud_env_set", { key: "STRIPE_KEY", value: "sk_live_abc123" });
+        const call = parseCloudToolArgs("rebase_cloud_env_set", { key: "STRIPE_KEY", value: "sk_live_abc123", confirm: true });
         expect(call.argv).toEqual(["cloud", "env", "set", "STRIPE_KEY", "--stdin", "--json"]);
         expect(call.argv.join(" ")).not.toContain("sk_live_abc123");
         expect(call.stdin).toBe("sk_live_abc123");
     });
 
-    it("confirms a rollback with --yes: the tool call is the confirmation", () => {
-        expect(parseCloudToolArgs("rebase_cloud_rollback", {}).argv).toEqual(["cloud", "rollback", "--yes", "--json"]);
+    it("confirms a rollback with --yes once the call carries confirm: true", () => {
+        expect(parseCloudToolArgs("rebase_cloud_rollback", { confirm: true }).argv).toEqual(["cloud", "rollback", "--yes", "--json"]);
+    });
+
+    it("answers what a production change would do, and does nothing, without confirm: true", () => {
+        // The hosted connector plans, then confirms, the same three; an MCP
+        // call has no terminal for the CLI's own prompt.
+        expect(() => parseCloudToolArgs("rebase_cloud_deploy", { app: "web" })).toThrow(/would deploy the app "web" to the linked Rebase Cloud project's production\. Nothing was done/);
+        expect(() => parseCloudToolArgs("rebase_cloud_env_set", { key: "K", value: "v" })).toThrow(/would set K in production/);
+        expect(() => parseCloudToolArgs("rebase_cloud_rollback", {})).toThrow(/confirm: true/);
+        expect(() => parseCloudToolArgs("rebase_cloud_provision", { name: "Todo" })).toThrow(/would create a public Rebase Cloud project named "Todo"/);
+        // What leaves production alone needs no confirmation.
+        expect(parseCloudToolArgs("rebase_cloud_deploy", { preview: true }).argv).toContain("--preview");
+        expect(parseCloudToolArgs("rebase_cloud_env_set", { key: "K", value: "v", preview: true }).argv).toContain("--preview");
     });
 
     it("refuses runtime-only log arguments on a build log, and a timeout on a deploy that does not wait", () => {
@@ -229,9 +254,9 @@ describe("cloud tool argv", () => {
     it("keeps deploys, env changes and rollbacks on the linked project, whatever is selected", () => {
         const id = "aca0185f-0000-4000-8000-000000000000";
         for (const [name, sample] of [
-            ["rebase_cloud_deploy", {}],
-            ["rebase_cloud_env_set", { key: "A", value: "b" }],
-            ["rebase_cloud_rollback", {}],
+            ["rebase_cloud_deploy", { confirm: true }],
+            ["rebase_cloud_env_set", { key: "A", value: "b", confirm: true }],
+            ["rebase_cloud_rollback", { confirm: true }],
             ["rebase_cloud_projects_list", {}]
         ] as const) {
             expect(parseCloudToolArgs(name, sample, id).argv).not.toContain("--project");
@@ -326,7 +351,7 @@ describe("running the cloud tools", () => {
 
     it("env set: writes the value to stdin, returns only its shape, and redacts an echo of it", async () => {
         cliPrints(JSON.stringify({ success: true, key: "STRIPE_KEY", secret: true, valueSet: true, pendingRedeploy: true, echoed: "sk_live_abc123" }));
-        const result = await call("rebase_cloud_env_set", { key: "STRIPE_KEY", value: "sk_live_abc123", secret: true });
+        const result = await call("rebase_cloud_env_set", { key: "STRIPE_KEY", value: "sk_live_abc123", secret: true, confirm: true });
         expect(spawnedArgv().join(" ")).not.toContain("sk_live_abc123");
         expect(mockSpawn.stdin.end).toHaveBeenCalledWith("sk_live_abc123");
         expect(result.isError).toBeFalsy();
@@ -336,7 +361,7 @@ describe("running the cloud tools", () => {
 
     it("env set: a refusal says why and never carries the value, even when the CLI's words do", async () => {
         cliPrints(JSON.stringify({ error: { code: "build_time_variable", message: "VITE_KEY=sk_live_abc123 is read at BUILD time" } }), 1);
-        const result = await call("rebase_cloud_env_set", { key: "VITE_KEY", value: "sk_live_abc123" });
+        const result = await call("rebase_cloud_env_set", { key: "VITE_KEY", value: "sk_live_abc123", confirm: true });
         expect(result.isError).toBe(true);
         expect(result.content[0].text).not.toContain("sk_live_abc123");
         expect(result.content[0].text).toContain("build_time_variable");
@@ -345,7 +370,7 @@ describe("running the cloud tools", () => {
 
     it("env set: an older CLI without --stdin is named, not retried with the value on argv", async () => {
         cliPrints(JSON.stringify({ error: { code: "usage", message: "Unknown or unexpected option: --stdin" } }), 1);
-        const result = await call("rebase_cloud_env_set", { key: "K", value: "v" });
+        const result = await call("rebase_cloud_env_set", { key: "K", value: "v", confirm: true });
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toMatch(/predates `env set --stdin`/);
         expect(vi.mocked(spawn)).toHaveBeenCalledTimes(1);
@@ -354,7 +379,7 @@ describe("running the cloud tools", () => {
     it("deploy: a failed deploy is an error whose build log is cut to its end", async () => {
         const logs = Array.from({ length: 500 }, (_, i) => `line ${i}`).join("\n");
         cliPrints(JSON.stringify({ error: { code: "deploy_failed", message: "backend failed", reason: "TS2345", logs } }), 1);
-        const result = await call("rebase_cloud_deploy", {});
+        const result = await call("rebase_cloud_deploy", { confirm: true });
         expect(result.isError).toBe(true);
         const text: string = result.content[0].text;
         expect(text).toContain("line 499");
@@ -365,7 +390,7 @@ describe("running the cloud tools", () => {
 
     it("deploy: a managed project's refusal points at bundle: true, and never at ejecting", async () => {
         cliPrints(JSON.stringify({ error: { code: "managed_project", message: "runs on the managed runtime", hint: "add `--eject`" } }), 1);
-        const result = await call("rebase_cloud_deploy", {});
+        const result = await call("rebase_cloud_deploy", { confirm: true });
         const text: string = result.content[0].text;
         const trusted = text.slice(0, text.indexOf("UNTRUSTED_DATA"));
         expect(trusted).toContain("bundle: true");
@@ -374,7 +399,7 @@ describe("running the cloud tools", () => {
 
     it("rollback: nothing to roll back to points at the deployment list", async () => {
         cliPrints(JSON.stringify({ error: { code: "deploy_not_rollbackable", message: "No rollbackable deployment found" } }), 1);
-        const result = await call("rebase_cloud_rollback", {});
+        const result = await call("rebase_cloud_rollback", { confirm: true });
         expect(spawnedArgv()).toEqual(expect.arrayContaining(["cloud", "rollback", "--yes", "--json"]));
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toContain("rebase_cloud_deployments_list");
@@ -397,14 +422,14 @@ describe("running the cloud tools", () => {
 
     it("output that is not JSON is an error, fenced, with secrets cut out", async () => {
         cliPrints("", 1, "Error: something broke near sk_live_abc123\n");
-        const result = await call("rebase_cloud_env_set", { key: "K", value: "sk_live_abc123" });
+        const result = await call("rebase_cloud_env_set", { key: "K", value: "sk_live_abc123", confirm: true });
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toContain("UNTRUSTED_DATA");
         expect(result.content[0].text).not.toContain("sk_live_abc123");
     });
 
     it("refuses bad arguments before spawning anything", async () => {
-        const result = await call("rebase_cloud_deploy", { app: "--eject" });
+        const result = await call("rebase_cloud_deploy", { app: "--eject", confirm: true });
         expect(result.isError).toBe(true);
         expect(spawn).not.toHaveBeenCalled();
     });

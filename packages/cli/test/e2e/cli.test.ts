@@ -409,7 +409,9 @@ env: cleanEnv });
             "db",
             "branch",
             "delete",
-            "e2e-test-branch"
+            "e2e-test-branch",
+            // It asks first since 0.32, and refuses with no terminal to ask on.
+            "--yes"
         ], {
             cwd: scaffoldedDir,
             stdio: "inherit",

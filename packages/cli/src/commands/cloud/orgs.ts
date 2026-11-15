@@ -1,5 +1,5 @@
 /**
- * `rebase cloud orgs` — list / create / members / invites.
+ * `rebase cloud orgs` — list / create / rename / delete / members / invites.
  *
  * Members: list, invite by email, remove, change a role. Inviting goes through
  * the control plane's `invites` function, which always opens an invitation —
@@ -26,12 +26,20 @@ import {
     note,
     requireInteractive,
     cloudRows,
+    cloudRow,
     requireCloudRow,
     requireSessionClient,
     confirmDestructive,
     warn,
     type CloudClient
 } from "./context";
+import { reportCallError, type Unserved } from "./not-served";
+
+/** What the invitation commands say on a control plane that has no `invites` function yet. */
+const INVITES_UNSERVED: Unserved = {
+    what: "invitations",
+    hint: "Nothing was sent or changed. `rebase cloud orgs members` still lists, removes and re-roles the members an organization has."
+};
 
 interface OrgRow {
     id: string | number;
@@ -49,6 +57,12 @@ export async function orgsCommand(subcommand: string | undefined, rawArgs: strin
             break;
         case "create":
             await createOrg(rawArgs);
+            break;
+        case "rename":
+            await renameOrg(rawArgs);
+            break;
+        case "delete":
+            await deleteOrg(rawArgs);
             break;
         case "members":
             await membersCommand(rawArgs);
@@ -162,6 +176,107 @@ message: "Organization name:" });
     } catch (e) {
         reportError(e, "Failed to create organization");
     }
+}
+
+/** What `rebase cloud orgs rename` parses. Its page is the group's own. */
+export const RENAME_ORG_FLAGS = {
+    "--slug": String,
+    "--org": String
+} as const;
+
+/**
+ * Rename an organization, and with `--slug` change its slug. A plain update of
+ * the `organizations` row: the control plane lets its owners and admins make
+ * it, and refuses a slug another organization holds.
+ */
+async function renameOrg(rawArgs: string[]): Promise<void> {
+    const { flags, positionals } = parseCloudArgs({
+        spec: RENAME_ORG_FLAGS,
+        rawArgs,
+        commandWords: 3, // cloud orgs rename
+        command: "cloud orgs",
+        maxPositionals: 1
+    });
+    const name = positionals[0]?.trim();
+    const slug = flags["--slug"]?.trim();
+    if (!name) fail("Name the organization's new name.", "`rebase cloud orgs rename \"Acme Inc\" [--slug acme]`.", "usage");
+    if (slug !== undefined && slugify(slug) !== slug) {
+        fail(`--slug ${slug} is not a slug.`, `Lowercase letters, digits and hyphens, e.g. ${slugify(slug) || "acme"}.`, "usage");
+    }
+    const { client, url } = await requireClient(rawArgs);
+    const org = orgFor(flags["--org"], url);
+    const patch: Record<string, string> = { name };
+    if (slug) patch.slug = slug;
+    try {
+        await client.data.table("organizations").update(org, patch);
+    } catch (e) {
+        // The server's words: not an owner or admin, or the slug is taken.
+        reportError(e, "Failed to rename the organization");
+    }
+    emit(() => success(`Organization ${org} is now ${chalk.bold(name)}${slug ? ` (${slug})` : ""}`), { success: true, id: org, ...patch });
+}
+
+/**
+ * Delete an organization. Asks first, and refuses while it still has projects:
+ * deleting each project is what tears down its namespace and database and
+ * cancels its subscription, and the control plane will not let an
+ * organization's deletion skip that. The check here names them before asking;
+ * the control plane's own refusal is the authority.
+ */
+async function deleteOrg(rawArgs: string[]): Promise<void> {
+    const { flags } = parseCloudArgs({
+        spec: { "--org": String },
+        rawArgs,
+        commandWords: 3, // cloud orgs delete
+        command: "cloud orgs",
+        maxPositionals: 0
+    });
+    const { client, url } = await requireClient(rawArgs);
+    const org = orgFor(flags["--org"], url);
+
+    let row: OrgRow | undefined;
+    let projects: Array<{ id: string | number; subdomain?: string; name?: string }>;
+    try {
+        row = cloudRow<OrgRow>(await client.data.table("organizations").findById(org));
+        projects = cloudRows<{ id: string | number; subdomain?: string; name?: string }>((await client.data.table("projects").find({
+            where: { organization: ["==", org] },
+            limit: 20
+        })).data);
+    } catch (e) {
+        reportError(e, "Failed to read the organization");
+    }
+    if (!row) fail(`No organization ${org} that you can see.`, "`rebase cloud orgs` lists yours.", "not_found");
+    const label = row.name ? `${row.name} (${org})` : org;
+    if (projects.length > 0) {
+        const names = projects.map((p) => String(p.subdomain ?? p.name ?? p.id)).sort();
+        fail(
+            `Organization ${label} still has ${projects.length}${projects.length === 20 ? "+" : ""} project(s): ${names.slice(0, 5).join(", ")}${names.length > 5 ? ", …" : ""}.`,
+            "Delete them first with `rebase cloud projects delete <slug>`: that is what tears down each one's database and cancels its subscription.",
+            "org_not_empty"
+        );
+    }
+
+    await confirmDestructive({
+        yes: Boolean(flags["--yes"]),
+        prompt: `Delete organization ${label}? Its members lose it, and this cannot be undone.`
+    });
+    try {
+        await client.data.table("organizations").delete(org);
+    } catch (e) {
+        // The server's words: not an owner or admin, or projects remain.
+        reportError(e, "Failed to delete the organization");
+    }
+    // The active organization no longer exists; leaving it selected would
+    // send every later command to an id that answers nothing.
+    const wasActive = getContextOrg(url) === org;
+    if (wasActive) setContextOrg(url, undefined);
+    emit(
+        () => {
+            success(`Deleted organization ${label}`);
+            if (wasActive) note(chalk.gray("It was the active organization; pick another with `rebase cloud use`."));
+        },
+        { success: true, deleted: org, wasActive }
+    );
 }
 
 /** A membership row with the person's email, when the caller may read it. */
@@ -283,7 +398,7 @@ async function membersCommand(rawArgs: string[]): Promise<void> {
         case "remove":
             return removeMember(rawArgs, flags["--org"], rest[0], Boolean(flags["--yes"]));
         case "role":
-            return changeRole(rawArgs, flags["--org"], rest[0], rest[1]);
+            return changeRole(rawArgs, flags["--org"], rest[0], rest[1], Boolean(flags["--yes"]));
     }
 }
 
@@ -347,7 +462,7 @@ async function inviteMember(rawArgs: string[], orgFlag: string | undefined, emai
     try {
         result = await client.functions.invoke<Result>("invites", { organizationId: org, email: email.trim().toLowerCase(), role });
     } catch (e) {
-        reportError(e, `Failed to invite ${email}`);
+        reportCallError(e, `Failed to invite ${email}`, INVITES_UNSERVED);
     }
     if (result.kind === "added") {
         // Only a control plane from before invitations-for-everyone adds
@@ -391,7 +506,13 @@ async function removeMember(rawArgs: string[], orgFlag: string | undefined, ref:
     emit(() => success(`Removed ${who} from org ${org}`), { org, removed: { userId: target.userId, email: target.email, role: target.role } });
 }
 
-async function changeRole(rawArgs: string[], orgFlag: string | undefined, ref: string | undefined, role: string | undefined): Promise<void> {
+async function changeRole(
+    rawArgs: string[],
+    orgFlag: string | undefined,
+    ref: string | undefined,
+    role: string | undefined,
+    yes: boolean
+): Promise<void> {
     if (!ref || !role) fail("Name the member and the role.", "`rebase cloud orgs members role <email|uid> <owner|admin|member>`.", "usage");
     const { client, url } = await requireClient(rawArgs);
     const org = orgFor(orgFlag, url);
@@ -407,6 +528,16 @@ async function changeRole(rawArgs: string[], orgFlag: string | undefined, ref: s
         emit(() => success(`${who} is already ${role} in org ${org}`), { org, userId: target.userId, email: target.email, role, changed: false });
         return;
     }
+    // A role is what someone may do to every project in the organization;
+    // owner is the one that may delete it. Asked every time, said loudest
+    // where owner is granted or taken away.
+    const ownership = role === "owner"
+        ? " They will be able to delete the organization and change anyone's role."
+        : target.role === "owner" ? " They stop being an owner." : "";
+    await confirmDestructive({
+        yes,
+        prompt: `Make ${who} ${role} in org ${org} (now ${target.role ?? "member"})?${ownership}`
+    });
     try {
         await client.data.table("organization-members").update(target.id, { role });
     } catch (e) {
@@ -471,7 +602,7 @@ async function invitesCommand(rawArgs: string[]): Promise<void> {
                 "forbidden"
             );
         }
-        reportError(e, "Failed to list invitations");
+        reportCallError(e, "Failed to list invitations", INVITES_UNSERVED);
     }
 
     if (action === "list") {
@@ -498,10 +629,14 @@ async function invitesCommand(rawArgs: string[]): Promise<void> {
 
     const target = pickInvite(listed.invites, ref, action);
     if (action === "revoke") {
+        await confirmDestructive({
+            yes: Boolean(flags["--yes"]),
+            prompt: `Revoke the invitation for ${target.email} (${target.role})? Its link stops working.`
+        });
         try {
             await client.functions.invoke("invites", undefined, { method: "DELETE", path: encodeURIComponent(target.id) });
         } catch (e) {
-            reportError(e, `Failed to revoke the invitation for ${target.email}`);
+            reportCallError(e, `Failed to revoke the invitation for ${target.email}`, INVITES_UNSERVED);
         }
         emit(() => success(`Revoked the invitation for ${target.email}; its link no longer works`), { org, revoked: target });
         return;
@@ -513,7 +648,7 @@ async function invitesCommand(rawArgs: string[]): Promise<void> {
             "invites", {}, { path: `${encodeURIComponent(target.id)}/resend` }
         );
     } catch (e) {
-        reportError(e, `Failed to resend the invitation for ${target.email}`);
+        reportCallError(e, `Failed to resend the invitation for ${target.email}`, INVITES_UNSERVED);
     }
     emit(
         () => {
@@ -551,6 +686,20 @@ description: "List organizations you belong to" },
                 ]
             },
             {
+                action: "rename",
+                args: "<name>",
+                description: "Rename the organization. Owners and admins",
+                flags: [
+                    ["--slug <slug>", "Change its slug too. Kept when omitted"],
+                    ["--org <id>", "The organization. Default: the active one"]
+                ]
+            },
+            {
+                action: "delete",
+                description: "Delete the organization. Refused while it has projects; asks first, --yes skips the prompt",
+                flags: [["--org <id>", "The organization. Default: the active one"]]
+            },
+            {
                 action: "members",
                 args: "[list]",
                 section: "Members",
@@ -574,7 +723,7 @@ description: "List organizations you belong to" },
                 action: "members role",
                 args: "<email|uid> <role>",
                 section: "Members",
-                description: "Change a member's role: owner, admin or member"
+                description: "Change a member's role: owner, admin or member. Asks first; --yes skips the prompt"
             },
             {
                 action: "invites",
@@ -586,7 +735,7 @@ description: "List organizations you belong to" },
                 action: "invites revoke",
                 args: "<id|email>",
                 section: "Invitations",
-                description: "Revoke a pending invitation; its link stops working"
+                description: "Revoke a pending invitation; its link stops working. Asks first; --yes skips the prompt"
             },
             {
                 action: "invites resend",
@@ -597,6 +746,7 @@ description: "List organizations you belong to" },
         ],
         notes: [
             "The active one is what `rebase cloud use` selects, and what billing is scoped to.",
+            "An organization with projects cannot be deleted: delete each project first, which is what tears down its database and cancels its subscription.",
             "Inviting and invitations take a `rebase cloud login` session, not REBASE_TOKEN, and the owner or admin role.",
             "The invitation link is printed because the control plane may send no email; the output says whether it did. "
                 + "Only an account that has verified the invited address can accept it."

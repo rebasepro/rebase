@@ -325,10 +325,10 @@ Rows in your own tables follow their foreign key:
 
 Check which of your links cascade before you pass `--yes`: it cannot be undone.
 
-The command reads `REBASE_SERVICE_KEY` the way `env reveal` does, so it takes an
-owner or admin (or a token with the `env` capability that belongs to one). The
-key stays in memory and goes only to the project's own address. A project on an
-older runtime is told it needs a newer one.
+The command goes through the console's Studio proxy, which holds the app's key, so the key never reaches your
+machine. It takes an organization owner or admin, on a project whose Studio access is on
+(`rebase cloud settings set --studio on`). A project on an older runtime is told it needs a newer one.
+`rebase users guests --project <slug>` is the same command in the project family.
 
 ## Resources
 
@@ -367,7 +367,6 @@ rebase cloud storage             # list storage buckets
 rebase cloud storage create      # provision platform-managed storage
 rebase cloud storage attach      # attach your own S3-compatible bucket
 rebase cloud notifications [list] | add <url> | test <id> | remove <id>   # deploy, backup, billing and usage events to Slack, Discord or any URL
-rebase cloud webhooks            # retired: exits 1 (`command_retired`) and names `notifications`
 rebase cloud clusters list | add | verify | registry   # the clusters tenants run on; `add` registers one from a kubeconfig
 rebase cloud billing             # the billing account and card on file
 rebase cloud billing setup       # attach a card, one-time, opens a browser
@@ -429,3 +428,23 @@ project claimed from an agent counts only the days from the claim on) and
 `autoscale_not_charged` (pods ran above `--replicas` and this platform does not
 charge them yet). An autoscaled project's answer also carries `autoscale`:
 `extraPodSeconds` above the floor, `amountEur` at its rates, and `charged`.
+
+## Deploy hooks, alerts and the rest
+
+<span class="since-badge" data-since="0.32">Since 0.32</span>
+
+```bash
+rebase cloud deploy-hooks [list] | create [--name <name>] [--branch <branch>] | revoke <id>   # secret URLs a git host or CI calls to deploy
+rebase cloud alerts [list] [--all] | ack <id> | snooze <id> --hours <1-168>   # the project's incidents
+rebase cloud deploy --git [<branch>]     # build on the control plane from the connected repository
+rebase cloud metrics --runtime           # requests, errors and latency, per surface
+rebase cloud metrics --history [--series cpu_millicores|memory_bytes|event_loop_delay_ms] [--minutes <n>]
+rebase cloud domains primary <domain>    # make a verified domain the canonical one
+rebase cloud settings set --studio on|off
+rebase cloud orgs rename <name> [--slug <slug>]
+rebase cloud orgs delete                 # refused while the organization has projects
+rebase cloud billing email <address>     # where invoices go
+rebase cloud clusters baseline <id> [--install]   # platform admins
+```
+
+`deploy-hooks create` prints the hook's URL once. `deploy --git` cannot be combined with the flags of a local build, and on the managed runtime it needs `--eject`, because the control plane builds from source. `settings set --studio` is the switch the project commands (`rebase data`, `rebase users`, …) need on for `--project`: they reach the app through the console's Studio proxy. A command whose control-plane route is not deployed yet answers `not_served` and names it. Destructive commands ask first and refuse with `confirmation_required` when nobody can answer: pass `--yes`.

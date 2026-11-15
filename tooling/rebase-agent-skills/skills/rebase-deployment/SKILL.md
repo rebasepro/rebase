@@ -31,7 +31,7 @@ custom domains and rollbacks. Sign up at
 ```bash
 rebase cloud login
 rebase cloud billing setup     # once per organization: a first deploy without a card is refused
-rebase cloud projects create --name "My App" --subdomain my-app --link
+rebase cloud projects create --name "My App" --subdomain my-app --link --yes   # creates billable resources: it asks first, --yes answers
 rebase cloud deploy
 ```
 

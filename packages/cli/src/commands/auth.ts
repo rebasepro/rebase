@@ -2,7 +2,10 @@
  * CLI command: rebase auth <action>
  *
  * Subcommands:
- *   reset-password — Reset a user's password
+ *   reset-password — Reset a user's password (HTTP first, the database as a fallback)
+ *   login, logout, whoami — a person's session on a running app (`auth-session.ts`)
+ *   emails — the development mailbox
+ *   keys — your own personal API keys
  */
 import chalk from "chalk";
 import path from "path";
@@ -27,8 +30,9 @@ import type { DevDatabaseSource } from "../dev-db/resolve";
 class ApiAnswered extends Error {}
 
 /** Everything the switch below dispatches, for the did-you-mean. */
-export const AUTH_SUBCOMMANDS = ["reset-password"] as const;
+export const AUTH_SUBCOMMANDS = ["reset-password", "login", "logout", "whoami", "emails", "keys"] as const;
 import { parseCommandArgs, wantsHelp } from "../utils/args";
+import { startProjectCommand } from "../utils/project-command";
 import { cloudTargetNote, resolveBackendAddress } from "./api-keys";
 
 /** A user as the admin API returns it, reduced to what this command needs. */
@@ -106,6 +110,36 @@ export async function authCommand(subcommand: string | undefined, rawArgs: strin
         case "reset-password":
             await resetPassword(rawArgs);
             break;
+        case "login": {
+            const { authLogin } = await import("./auth-session");
+            startProjectCommand(rawArgs);
+            await authLogin(rawArgs);
+            break;
+        }
+        case "logout": {
+            const { authLogout } = await import("./auth-session");
+            startProjectCommand(rawArgs);
+            await authLogout(rawArgs);
+            break;
+        }
+        case "whoami": {
+            const { authWhoami } = await import("./auth-session");
+            startProjectCommand(rawArgs);
+            await authWhoami(rawArgs);
+            break;
+        }
+        case "emails": {
+            const { authEmails } = await import("./auth-session");
+            startProjectCommand(rawArgs);
+            await authEmails(rawArgs);
+            break;
+        }
+        case "keys": {
+            const { authKeys } = await import("./auth-session");
+            startProjectCommand(rawArgs);
+            await authKeys(rawArgs);
+            break;
+        }
         default:
             unknownCommand(subcommand, AUTH_SUBCOMMANDS, "auth");
     }
@@ -150,6 +184,13 @@ export function resolveResetPasswordArgs(rawArgs: string[]): {
         command: "auth reset-password",
         maxPositionals: 2
     });
+
+    // Everywhere else in the CLI `-p` is `--project`. Here it has always been
+    // `--password`, and it keeps working — with one warning per run naming the
+    // spelling that will not change.
+    if (rawArgs.slice(2).includes("-p")) {
+        process.stderr.write(chalk.yellow("  ⚠ -p is deprecated in `rebase auth reset-password`: use --password (elsewhere -p means --project).\n"));
+    }
 
     // Both spellings are supported: `<email> [password]` and `--email/--password`.
     return {
@@ -589,20 +630,58 @@ resetPassword().catch((error) => {
 
 function printAuthHelp() {
     console.log(`
-${chalk.bold("rebase auth")} — Authentication management commands
+${chalk.bold("rebase auth")} — Authentication: a person's session on a running app, resets, the dev mailbox
 
 ${chalk.green.bold("Usage")}
   rebase auth ${chalk.blue("<command>")} [options]
 
 ${chalk.green.bold("Commands")}
-  ${chalk.blue.bold("reset-password")}    Reset a user's password
+  ${chalk.blue.bold("reset-password")}    Reset a user's password ${chalk.gray("(the running server, else the database directly)")}
+  ${chalk.blue.bold("login")}             Sign in to a running app as a person; the session is kept in ~/.rebase/sessions.json
+  ${chalk.blue.bold("logout")}            End that session, here and on the server
+  ${chalk.blue.bold("whoami")}            Who the server takes you to be, and the scopes you hold
+  ${chalk.blue.bold("emails")}            The development mailbox: the auth mail a server with no SMTP_HOST captured
+  ${chalk.blue.bold("keys")}              Your own personal API keys: list, create, revoke ${chalk.gray("(needs auth.personalKeys)")}
 
 ${chalk.green.bold("reset-password Options")}
   ${chalk.blue("--email, -e")}        User's email address
-  ${chalk.blue("--password, -p")}     New password (default: one is generated and printed)
+  ${chalk.blue("--password")}         New password (default: one is generated and printed)
+                     ${chalk.gray("-p still works for --password here, and warns: elsewhere -p means --project")}
+
+${chalk.green.bold("login Options")}
+  ${chalk.blue("--email <address>")}  Sign in with this account's password (asked for at a terminal)
+  ${chalk.blue("--password <pass>")}  The password, for scripts
+  ${chalk.blue("--code <code>")}      The second factor, when the account has two-factor authentication on
+  ${chalk.blue("--web")}              Sign in through the browser (the server's device sign-in) ${chalk.gray("— the default when it offers one")}
+  ${chalk.blue("--no-browser")}       Print the browser link instead of opening it
+
+${chalk.green.bold("emails Options")}
+  ${chalk.blue("--latest")}           Only the newest message
+  ${chalk.blue("--to <address>")}     Only messages to this address
+  ${chalk.blue("--links")}            Print only the links, one per line
+  ${chalk.blue("--clear")}            Empty the mailbox
+
+${chalk.green.bold("keys Options")}  ${chalk.gray("rebase auth keys [list|create|revoke <id>]")}
+  ${chalk.blue("--name <name>")}      The new key's name
+  ${chalk.blue("--scopes <scopes>")}  What it may do, e.g. data:read:posts (never more than you hold)
+  ${chalk.blue("--expires-in <days>")} When it stops working
+
+${chalk.green.bold("Target options")}  ${chalk.gray("(login, logout, whoami, emails, keys)")}
+  ${chalk.blue("--project <slug>")}   A Rebase Cloud project (login goes to the app's own address)
+  ${chalk.blue("--cloud")}            The Rebase Cloud project this directory is linked to
+  ${chalk.blue("--url <server>")}     A server at this address (else REBASE_BASE_URL, then \`rebase dev\`)
+  ${chalk.blue("--token <bearer>")}   Send this bearer instead (whoami, emails)
+  ${chalk.blue("--session")}          Send the stored session (whoami and keys do by default)
+  ${chalk.blue("--anon")}             Send no credential
+  ${chalk.blue("--json")}             Machine-readable output (also when piped)
+  ${chalk.blue("--yes")}              Skip confirmation prompts
 
 ${chalk.green.bold("Examples")}
   rebase auth reset-password user@example.com
   rebase auth reset-password --email user@example.com --password MyNewPass!
+  rebase auth login --email ada@example.com
+  rebase auth emails --latest --links
+
+${chalk.gray("rebase users reset-password does the same reset on any target (--url, --project); this one also works with the server stopped.")}
 `);
 }

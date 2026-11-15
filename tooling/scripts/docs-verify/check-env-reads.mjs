@@ -68,6 +68,9 @@ const NC = "[0m";
  */
 const NOT_OURS = new Map([
     ["NODE_ENV", "the platform's, and the page explains it in prose"],
+    // A test hook: the e2e suite keeps the sessions `rebase auth login`
+    // stores out of the home directory of whoever runs it.
+    ["REBASE_SESSIONS_FILE", "a test hook: where `rebase auth login` keeps sessions, for the suite"],
     ["DOTENV_CONFIG_PATH", "dotenv's own preload variable"],
     ["DOTENV_CONFIG_QUIET", "dotenv's own preload variable"],
     // libuv's: Node sizes its thread pool from it. Read only to learn how many

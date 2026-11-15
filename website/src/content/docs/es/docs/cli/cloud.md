@@ -1,5 +1,5 @@
 ---
-sourceHash: 9d048d537401732a
+sourceHash: b225492a194c9e7e
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Los grupos de comandos para Rebase Cloud en la CLI — autenticación, enlace de proyectos, despliegues, notificaciones, configuración, organizaciones, bases de datos, recursos, cómputo, almacenamiento, clústeres, facturación y uso.
@@ -326,10 +326,10 @@ Las filas en tus propias tablas respetan su clave foránea:
 
 Comprueba cuáles de tus enlaces están en cascada antes de pasar `--yes`: no se puede deshacer.
 
-El comando lee `REBASE_SERVICE_KEY` de la misma forma que lo hace `env reveal`, por lo que requiere un
-rol de propietario o administrador (o un token con la capacidad `env` que pertenezca a uno). La
-clave permanece en memoria y se envía únicamente a la dirección propia del proyecto. A un proyecto con un
-runtime más antiguo se le notificará que necesita uno más reciente.
+El comando pasa por el proxy de Studio de la consola, que guarda la clave de la app, así que la clave nunca llega a tu
+máquina. Requiere un propietario o administrador de la organización, en un proyecto con el acceso de Studio activado
+(`rebase cloud settings set --studio on`). A un proyecto con un runtime antiguo se le indica que necesita uno más nuevo.
+`rebase users guests --project <slug>` es el mismo comando en la familia de comandos de proyecto.
 
 ## Recursos
 
@@ -368,7 +368,6 @@ rebase cloud storage             # list storage buckets
 rebase cloud storage create      # provision platform-managed storage
 rebase cloud storage attach      # attach your own S3-compatible bucket
 rebase cloud notifications [list] | add <url> | test <id> | remove <id>   # deploy, backup, billing and usage events to Slack, Discord or any URL
-rebase cloud webhooks            # retired: exits 1 (`command_retired`) and names `notifications`
 rebase cloud clusters list | add | verify | registry   # the clusters tenants run on; `add` registers one from a kubeconfig
 rebase cloud billing             # the billing account and card on file
 rebase cloud billing setup       # attach a card, one-time, opens a browser
@@ -430,3 +429,23 @@ proyecto reclamado desde un agente cuenta solo los días a partir de la reclamac
 `autoscale_not_charged` (los pods se ejecutaron por encima de `--replicas` y esta plataforma no
 les aplica cargos todavía). La respuesta de un proyecto con autoescalado también incluye `autoscale`:
 `extraPodSeconds` por encima del mínimo base, `amountEur` a sus tarifas vigentes, y `charged`.
+
+## Deploy hooks, alertas y el resto
+
+<span class="since-badge" data-since="0.32">Since 0.32</span>
+
+```bash
+rebase cloud deploy-hooks [list] | create [--name <name>] [--branch <branch>] | revoke <id>   # secret URLs a git host or CI calls to deploy
+rebase cloud alerts [list] [--all] | ack <id> | snooze <id> --hours <1-168>   # the project's incidents
+rebase cloud deploy --git [<branch>]     # build on the control plane from the connected repository
+rebase cloud metrics --runtime           # requests, errors and latency, per surface
+rebase cloud metrics --history [--series cpu_millicores|memory_bytes|event_loop_delay_ms] [--minutes <n>]
+rebase cloud domains primary <domain>    # make a verified domain the canonical one
+rebase cloud settings set --studio on|off
+rebase cloud orgs rename <name> [--slug <slug>]
+rebase cloud orgs delete                 # refused while the organization has projects
+rebase cloud billing email <address>     # where invoices go
+rebase cloud clusters baseline <id> [--install]   # platform admins
+```
+
+`deploy-hooks create` muestra la URL del hook una sola vez. `deploy --git` no se puede combinar con las opciones de un build local y, en el runtime gestionado, necesita `--eject`, porque el plano de control compila desde el código fuente. `settings set --studio` es el interruptor que los comandos de proyecto (`rebase data`, `rebase users`, …) necesitan activado para `--project`: llegan a la app a través del proxy de Studio de la consola. Un comando cuya ruta del plano de control aún no está desplegada responde `not_served` y la nombra. Los comandos destructivos preguntan antes y se niegan con `confirmation_required` cuando nadie puede responder: pasa `--yes`.

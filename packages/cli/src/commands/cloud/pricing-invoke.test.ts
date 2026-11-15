@@ -32,7 +32,8 @@ describe("cloud compute pricing calls", () => {
         // Guards the two assertions below from passing vacuously if these
         // calls move or are renamed.
         expect(SOURCE).toContain("invoke<ResourceQuote>");
-        expect(SOURCE.match(/invoke<ResourceQuote>/g)!.length).toBe(2);
+        // `compute`, `billing`, and the quote `compute set` asks before it changes anything.
+        expect(SOURCE.match(/invoke<ResourceQuote>/g)!.length).toBe(3);
     });
 
     it("never puts a slash in the function name", () => {
@@ -41,7 +42,7 @@ describe("cloud compute pricing calls", () => {
 
     it("addresses the sub-path with the `path` option", () => {
         const calls = SOURCE.match(/invoke<ResourceQuote>\([\s\S]{0,220}?\)/g) ?? [];
-        expect(calls.length).toBe(2);
+        expect(calls.length).toBe(3);
         for (const call of calls) {
             expect(call).toContain('"pricing"');
             expect(call).toContain('path: "quote"');

@@ -1,5 +1,5 @@
 ---
-sourceHash: 2883815081dc2c2a
+sourceHash: 79cc7825b045bc4d
 title: Datenbankbefehle
 sidebar_label: Datenbankbefehle
 description: Die rebase db-Befehle — push, generate und migrate, Backups und Wiederherstellungen, Abrufen einer Kopie, der Verbindungs-String, die verwaltete Entwicklungsdatenbank und Branches.
@@ -317,6 +317,16 @@ hat Vorrang vor `DATABASE_URL` in `.env` und weicht `--database-url` oder einer
 zuvor vorgenommenen Wechsel hat. `delete` verweigert den Branch, auf dem du dich gerade befindest, da jeder Befehl
 im Checkout (einschließlich des Löschens) darauf ausgerichtet ist: Führe zuerst `switch --off` aus
 und lösche ihn dann. Der gesamte Workflow ist unter [Database Branching](/docs/backend/branching/) beschrieben.
+
+#### `rebase db branch merge`
+
+<span class="since-badge" data-since="0.32">Since 0.32</span>
+
+```bash
+rebase db branch merge <name> [--on-conflict abort|branch|target] [--skip-blocked] [--yes]
+```
+
+Schreibt die Zeilen, die ein Branch eingefügt, geändert und gelöscht hat, in die Datenbank, aus der er erstellt wurde. Es zeigt zuerst den Diff und fragt nach, dann wird genau dieser Diff gemergt: Der Merge nennt den Fingerprint des Diffs, daher wird eine inzwischen geänderte Elterndatenbank abgelehnt statt gemergt. `--on-conflict` entscheidet über eine Zeile, die beide Seiten geändert haben — `abort` (der Standard) schreibt nichts, `branch` übernimmt die Zeile des Branches, `target` behält die der Elterndatenbank —, und `--skip-blocked` mergt die Tabellen, die gemergt werden können, und überspringt den Rest. Schema- und Policy-Änderungen werden nie gemergt: Dafür sind Migrationen da. Auch `delete` fragt jetzt zuerst nach, und `--yes` beantwortet beides für ein Skript.
 
 :::note[Auf der verwalteten Entwicklungsdatenbank]
 `push`, `generate` und `migrate` funktionieren hier wie auf jeder Datenbank.
