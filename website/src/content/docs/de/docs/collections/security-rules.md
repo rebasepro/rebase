@@ -1,5 +1,5 @@
 ---
-sourceHash: acac0f12ed25af39
+sourceHash: 2ae2a242ddb74b52
 title: Row-Level-Security
 sidebar_label: Row-Level-Security
 description: "Jede Tabelle deklariert ihre RLS-Grundhaltung – admin-only, inherit oder eine Liste von Regeln – und Rebase kompiliert sie zu Postgres-Row-Level-Security-Policies. Regelformen, Kurzschreibweisen für Bedingungen, defaultRls und was fail-closed ist."
@@ -251,9 +251,11 @@ Reines SQL wird allein von Postgres durchgesetzt: Das CMS kann es nicht auswerte
 
 ## Einmal pro Anweisung ausgewertet
 
-Jeder Teil einer Regel, der die Zeile nicht liest – die ID des Aufrufers, eine Rollenprüfung, ein Claim, `serverContext()` –, wird innerhalb einer skalaren Unterabfrage kompiliert. Eine Owner-Regel wird zu `(user_id)::text = (SELECT rebase.uid())`. Postgres berechnet eine solche Unterabfrage einmal pro Anweisung statt einmal pro Zeile und plant so, als ob die Prüfung die Hälfte der Tabelle statt 1,5 % davon passiert, wodurch auch tiefe Seiten einer großen Tabelle auf ihrem Index bleiben. Wer was lesen oder schreiben darf, bleibt unverändert.
+Jeder Teil einer Regel, der die Zeile nicht liest – die ID des Aufrufers, eine Rollenprüfung, ein Claim, `serverContext()` –, wird innerhalb einer skalaren Unterabfrage kompiliert. Eine Owner-Regel wird zu `(user_id)::text = (SELECT rebase.uid())`. Postgres berechnet eine solche Unterabfrage einmal pro Anweisung statt einmal pro Zeile und plant so, als ob die Prüfung die Hälfte der Tabelle statt 1,5 % davon passiert, wodurch auch tiefe Seiten einer großen Tabelle auf ihrem Index bleiben. Wer was lesen oder schreiben darf, bleibt unverändert, mit einer Ausnahme (siehe unten).
 
 Reines SQL wird genauso behandelt, wenn Rebase seine Struktur lesen kann (`owner_id = rebase.uid()` tut dies). Alles andere wird unverändert eingefügt; kapseln Sie die Aufrufe daher selbst: `(SELECT rebase.uid())`.
+
+Weil die Policies jeder Tabelle jetzt eine Unterabfrage enthalten, darf eine Regel ihre eigene Tabelle nicht lesen, und die Regeln zweier Tabellen dürfen sich nicht gegenseitig lesen: Postgres weigert sich, eine Policy zu expandieren, deren Unterabfrage zu einer Tabelle zurückführt, die es gerade expandiert. Eine `team_members`-Regel mit `EXISTS (SELECT 1 FROM team_members …)` scheitert dann bei jeder Anweisung, die sie schützt, mit `infinite recursion detected in policy for relation "team_members"` (42P17) – für angemeldete Benutzer ebenso wie für den Service-Key und `dataAsAdmin`. `rebase verify` meldet jede solche Regel als Fehler. Verlagern Sie das Lesen in eine `SECURITY DEFINER`-Funktion mit `SET search_path = ''`, die Postgres nicht expandiert, legen Sie sie mit eigenem SQL an und rufen Sie sie aus der Regel auf: `using: "public.is_team_manager({team_id})"`.
 
 ## `authenticated()` und `registered()`
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: acac0f12ed25af39
+sourceHash: 2ae2a242ddb74b52
 title: Segurança a nível de linha
 sidebar_label: Segurança a nível de linha
 description: "Cada tabela declara sua postura de rls — admin-only, inherit ou uma lista de regras — e o Rebase a compila em políticas de row-level security do Postgres. Formatos de regra, condições abreviadas, defaultRls e o que falha em modo fechado."
@@ -333,11 +333,13 @@ Uma regra de proprietário (owner) se torna `(user_id)::text = (SELECT rebase.ui
 O Postgres computa essa subconsulta uma única vez por instrução em vez de uma vez por
 linha, planejando a execução como se a checagem passasse por metade da tabela em vez de
 1,5% dela, mantendo paginações profundas de tabelas grandes nos índices adequados. Quem
-pode ler ou gravar o quê permanece inalterado.
+pode ler ou gravar o quê permanece inalterado, com uma exceção descrita abaixo.
 
 O SQL puro recebe o mesmo tratamento quando o Rebase consegue interpretar sua estrutura
 (como em `owner_id = rebase.uid()`). Qualquer outra expressão é inserida exatamente como
 escrita; portanto, envolva as chamadas manualmente: `(SELECT rebase.uid())`.
+
+Como as políticas de cada tabela agora contêm uma subconsulta, uma regra não deve ler a própria tabela, e as regras de duas tabelas não devem ler uma à outra: o Postgres se recusa a expandir uma política cuja subconsulta leva de volta a uma tabela que ele já está expandindo. Uma regra de `team_members` com `EXISTS (SELECT 1 FROM team_members …)` falha então em toda instrução que protege com `infinite recursion detected in policy for relation "team_members"` (42P17), tanto para usuários autenticados quanto para a chave de serviço e `dataAsAdmin`. O `rebase verify` aponta cada regra assim como um erro. Mova a leitura para uma função `SECURITY DEFINER` com `SET search_path = ''`, que o Postgres não expande, crie-a com seu próprio SQL e chame-a a partir da regra: `using: "public.is_team_manager({team_id})"`.
 
 ## `authenticated()` e `registered()`
 

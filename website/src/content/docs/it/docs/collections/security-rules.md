@@ -1,5 +1,5 @@
 ---
-sourceHash: acac0f12ed25af39
+sourceHash: 2ae2a242ddb74b52
 title: Row-level security
 sidebar_label: Row-level security
 description: "Ogni tabella dichiara la propria postura rls — admin-only, inherit o un elenco di regole — e Rebase la compila in policy di row-level security di Postgres. Formati delle regole, condizioni sintetiche, defaultRls e cosa fallisce in sicurezza."
@@ -251,9 +251,11 @@ L'SQL grezzo viene applicato esclusivamente da Postgres: il CMS non è in grado 
 
 ## Valutazione una volta per istruzione
 
-Ogni elemento di una regola che non legge la riga — l'id del chiamante, un controllo sui ruoli, un claim, `serverContext()` — viene compilato all'interno di una sottoquery scalare. Una regola owner diventa `(user_id)::text = (SELECT rebase.uid())`. Postgres calcola questa sottoquery una sola volta per istruzione anziché una volta per riga, pianificando l'esecuzione come se il controllo superasse la metà della tabella invece dell'1,5%, garantendo che le pagine profonde di tabelle di grandi dimensioni continuino a utilizzare i relativi indici. Chi può leggere o scrivere cosa rimane invariato.
+Ogni elemento di una regola che non legge la riga — l'id del chiamante, un controllo sui ruoli, un claim, `serverContext()` — viene compilato all'interno di una sottoquery scalare. Una regola owner diventa `(user_id)::text = (SELECT rebase.uid())`. Postgres calcola questa sottoquery una sola volta per istruzione anziché una volta per riga, pianificando l'esecuzione come se il controllo superasse la metà della tabella invece dell'1,5%, garantendo che le pagine profonde di tabelle di grandi dimensioni continuino a utilizzare i relativi indici. Chi può leggere o scrivere cosa rimane invariato, con un'eccezione descritta più sotto.
 
 L'SQL grezzo riceve lo stesso trattamento quando Rebase è in grado di analizzarne la struttura (come accade per `owner_id = rebase.uid()`). Qualsiasi altra espressione viene inserita così come scritta; è quindi opportuno incapsulare autonomamente le chiamate: `(SELECT rebase.uid())`.
+
+Poiché le policy di ogni tabella contengono ora una sottoquery, una regola non deve leggere la propria tabella, e le regole di due tabelle non devono leggersi a vicenda: Postgres si rifiuta di espandere una policy la cui sottoquery riconduce a una tabella che sta già espandendo. Una regola di `team_members` con `EXISTS (SELECT 1 FROM team_members …)` fallisce quindi su ogni istruzione che protegge con `infinite recursion detected in policy for relation "team_members"` (42P17), sia per gli utenti autenticati sia per la service key e `dataAsAdmin`. `rebase verify` segnala ogni regola di questo tipo come errore. Sposta la lettura in una funzione `SECURITY DEFINER` con `SET search_path = ''`, che Postgres non espande, creala con il tuo SQL e richiamala dalla regola: `using: "public.is_team_manager({team_id})"`.
 
 ## `authenticated()` e `registered()`
 

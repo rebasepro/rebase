@@ -1,5 +1,5 @@
 ---
-sourceHash: acac0f12ed25af39
+sourceHash: 2ae2a242ddb74b52
 title: Seguridad a nivel de fila
 sidebar_label: Seguridad a nivel de fila
 description: "Cada tabla declara su postura de rls — admin-only, inherit o una lista de reglas — y Rebase la compila en políticas de seguridad a nivel de fila de Postgres. Formas de reglas, condiciones abreviadas, defaultRls y qué falla de forma cerrada."
@@ -324,11 +324,13 @@ de roles, un claim, `serverContext()`— se compila dentro de una subconsulta es
 propietario se convierte en `(user_id)::text = (SELECT rebase.uid())`. Postgres calcula dicha
 subconsulta una vez por sentencia en lugar de una vez por fila, y planifica como si la
 comprobación pasara la mitad de la tabla en lugar del 1.5% de ella, lo que mantiene las páginas profundas de una
-tabla grande en su índice. Quién puede leer o escribir qué permanece sin cambios.
+tabla grande en su índice. Quién puede leer o escribir qué permanece sin cambios, con una excepción que se explica abajo.
 
 El SQL sin formato recibe el mismo tratamiento cuando Rebase puede interpretar su estructura
 (`owner_id = rebase.uid()` lo hace). Cualquier otra cosa se inserta tal como se escribió, por lo que
 debes envolver las llamadas tú mismo: `(SELECT rebase.uid())`.
+
+Como las políticas de cada tabla contienen ahora una subconsulta, una regla no debe leer su propia tabla, y las reglas de dos tablas no deben leerse entre sí: Postgres se niega a expandir una política cuya subconsulta lleva de vuelta a una tabla que ya está expandiendo. Una regla de `team_members` con `EXISTS (SELECT 1 FROM team_members …)` falla entonces en cada sentencia que protege con `infinite recursion detected in policy for relation "team_members"` (42P17), tanto para usuarios con sesión como para la clave de servicio y `dataAsAdmin`. `rebase verify` informa de cada regla así como un error. Lleva la lectura a una función `SECURITY DEFINER` con `SET search_path = ''`, que Postgres no expande, créala con tu propio SQL y llámala desde la regla: `using: "public.is_team_manager({team_id})"`.
 
 ## `authenticated()` y `registered()`
 

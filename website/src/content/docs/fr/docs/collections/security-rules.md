@@ -1,5 +1,5 @@
 ---
-sourceHash: acac0f12ed25af39
+sourceHash: 2ae2a242ddb74b52
 title: Sécurité au niveau des lignes
 sidebar_label: Sécurité au niveau des lignes
 description: "Chaque table déclare sa posture rls — admin-only, inherit ou une liste de règles — et Rebase la compile en politiques de sécurité au niveau des lignes Postgres. Formes de règles, conditions raccourcies, defaultRls et verrouillage par défaut."
@@ -350,11 +350,13 @@ sous-requête scalaire. Une règle de propriétaire devient
 une seule fois par instruction plutôt qu'une fois par ligne, et planifie comme
 si la vérification correspondait à la moitié de la table plutôt qu'à 1,5 %, ce
 qui permet aux pages profondes d'une grande table d'utiliser leur index. Les
-droits d'accès en lecture et écriture restent inchangés.
+droits d'accès en lecture et écriture restent inchangés, à une exception près (voir ci-dessous).
 
 Le SQL brut reçoit le même traitement lorsque Rebase peut lire sa structure
 (c'est le cas de `owner_id = rebase.uid()`). Tout le reste est inséré tel quel,
 veillez donc à encapsuler vous-même les appels : `(SELECT rebase.uid())`.
+
+Comme les politiques de chaque table contiennent désormais une sous-requête, une règle ne doit pas lire sa propre table, et les règles de deux tables ne doivent pas se lire mutuellement : Postgres refuse d'étendre une politique dont la sous-requête ramène à une table qu'il est déjà en train d'étendre. Une règle de `team_members` avec `EXISTS (SELECT 1 FROM team_members …)` échoue alors sur chaque instruction qu'elle protège avec `infinite recursion detected in policy for relation "team_members"` (42P17), pour les utilisateurs connectés comme pour la clé de service et `dataAsAdmin`. `rebase verify` signale chacune de ces règles comme une erreur. Déplacez la lecture dans une fonction `SECURITY DEFINER` avec `SET search_path = ''`, que Postgres n'étend pas, créez-la avec votre propre SQL et appelez-la depuis la règle : `using: "public.is_team_manager({team_id})"`.
 
 ## `authenticated()` et `registered()`
 

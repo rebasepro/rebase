@@ -323,11 +323,22 @@ check, a claim, `serverContext()` — compiles inside a scalar subquery. An owne
 rule becomes `(user_id)::text = (SELECT rebase.uid())`. Postgres computes such a
 subquery once per statement rather than once per row, and plans as though the
 check passes half the table rather than 1.5% of it, which keeps deep pages of a
-large table on their index. Who may read or write what is unchanged.
+large table on their index. Who may read or write what is unchanged, with one exception below.
 
 Raw SQL gets the same treatment when Rebase can read its structure
 (`owner_id = rebase.uid()` does). Anything else is inserted as written, so wrap
 the calls yourself: `(SELECT rebase.uid())`.
+
+Because every table's policies now contain a subquery, a rule must not read its
+own table, and two tables' rules must not read each other: Postgres refuses to
+expand a policy whose subquery leads back to a table it is already expanding. A
+`team_members` rule with `EXISTS (SELECT 1 FROM team_members …)` then fails every
+statement it guards with `infinite recursion detected in policy for relation
+"team_members"` (42P17), for signed-in users, the service key and `dataAsAdmin`
+alike. `rebase verify` reports each such rule as an error. Move the read into a
+`SECURITY DEFINER` function with `SET search_path = ''`, which Postgres does not
+expand, create it with your own SQL, and call it from the rule:
+`using: "public.is_team_manager({team_id})"`.
 
 ## `authenticated()` and `registered()`
 
