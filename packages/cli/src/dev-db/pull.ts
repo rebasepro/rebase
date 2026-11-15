@@ -38,9 +38,10 @@ import { execa } from "execa";
 import fs from "fs";
 import type { Client } from "pg";
 
-import { type AttverStrip, stripAttverFromArchive } from "./attver";
+import { archiveEncoding, type AttverStrip, stripAttverFromArchive } from "./attver";
 import { banner, connectionErrorText, hostOf } from "./connection-banner";
 import { PGLITE_EXTENSIONS } from "./constraints";
+import { LOCAL_CONNECT_TIMEOUT_MS, LOCAL_QUERY_TIMEOUT_MS } from "./local-timeouts";
 
 /**
  * How one kind of personal-looking column is overwritten.
@@ -450,12 +451,14 @@ export function describeTarget(connectionString: string): string {
  * What the local database runs on.
  *
  * `pglite` is the managed development database: one PGlite session behind a
- * socket server. Two things a restore relies on are not there. The server runs
- * each protocol message on its own, so the `CopyData` that follows a `COPY …
- * FROM stdin` never reaches the backend waiting for it: the COPY fails on
- * "unexpected EOF", and the session stops answering anyone until the daemon
- * is killed. And every connection shares that one session, so what pg_restore
- * `SET`s for itself stays set for everyone after it disconnects.
+ * socket server. Three things a restore relies on are not there. The server
+ * runs each protocol message on its own, so the `CopyData` that follows a
+ * `COPY … FROM stdin` never reaches the backend waiting for it: the COPY fails
+ * on "unexpected EOF", and the session stops answering anyone until the daemon
+ * is killed. It cannot convert between encodings, so a dump in any encoding
+ * but UTF8 does the same at its first statement (see {@link encodingRefusal}).
+ * And every connection shares that one session, so what pg_restore `SET`s for
+ * itself stays set for everyone after it disconnects.
  */
 export type PullTargetEngine = "postgres" | "pglite";
 
@@ -599,7 +602,11 @@ const NOTHING_CHANGED = "Nothing was changed: the local database is as it was.";
 /** What the target database runs on, or why it could not be asked. */
 async function readTargetEngine(target: string): Promise<{ engine: PullTargetEngine } | { error: unknown }> {
     const { Client } = await import("pg");
-    const client = new Client({ connectionString: target, connectionTimeoutMillis: 10_000 });
+    const client = new Client({
+        connectionString: target,
+        connectionTimeoutMillis: LOCAL_CONNECT_TIMEOUT_MS,
+        query_timeout: LOCAL_QUERY_TIMEOUT_MS
+    });
     client.on("error", () => undefined);
     try {
         await client.connect();
@@ -912,6 +919,54 @@ export function clearStatements(schemas: readonly string[]): string[] {
  */
 const CLEAR_LOCK_TIMEOUT = "15s";
 
+/**
+ * How long one statement of {@link restoreCopy}'s may take before the pull
+ * stops waiting on the database: twice the short bound, 30s. It has to stay
+ * above {@link CLEAR_LOCK_TIMEOUT}, so that a lock the clear waits on is
+ * reported as the lock it is (`55P03`, "stop `rebase dev`"). This bound is for
+ * a database that answers nothing at all.
+ */
+const CLEAR_QUERY_TIMEOUT_MS = 2 * LOCAL_QUERY_TIMEOUT_MS;
+
+/**
+ * The one encoding the managed database restores a dump in.
+ *
+ * pg_restore starts every restore with the dump's own `SET client_encoding`.
+ * PGlite cannot convert. Sent `SET client_encoding = 'LATIN1'`, its daemon
+ * closed the connection and then answered nobody, on that connection or any
+ * later one, until `rebase db stop`. A pull from a LATIN1 database had
+ * already emptied the local one by then. Every statement after the SET failed
+ * on "no connection to the server".
+ */
+const MANAGED_ENCODING = "UTF8";
+
+/**
+ * Why the local database cannot take a dump written in `encoding`, or null
+ * when it can.
+ *
+ * Only the managed database refuses one. A Postgres target converts any
+ * encoding to its own as pg_restore writes, which is how a LATIN1 source has
+ * always pulled into Postgres in Docker. `encoding` is what
+ * {@link archiveEncoding} read from the dump's ENCODING entry. Null means the
+ * dump could not be read, and pg_restore is left to say what it makes of it,
+ * as before. {@link restoreCopy} asks this before it empties anything, so the
+ * outcome says the database is as it was.
+ */
+export function encodingRefusal(engine: PullTargetEngine, encoding: string | null): RestoreOutcome | null {
+    if (engine !== "pglite" || encoding === null) return null;
+    if (encoding.replace(/[-_]/g, "").toUpperCase() === MANAGED_ENCODING) return null;
+
+    return {
+        cleared: false,
+        started: false,
+        failure: `The managed development database cannot take this dump: pg_dump wrote it in the ${encoding} encoding `
+            + "(the source database's, unless PGCLIENTENCODING named another), and PGlite restores UTF8 only. "
+            + `The \`SET client_encoding = '${encoding}'\` a restore starts with leaves it answering nobody.`,
+        advice: "Pull into Postgres in Docker instead, which converts it: `rebase db pull --docker` with the same --from. "
+            + "Or set DATABASE_URL in .env to a Postgres you run, and pull into that."
+    };
+}
+
 /** Why emptying the local database failed, in the reader's terms, and what fixes it. */
 function clearFailure(error: unknown): RestoreOutcome {
     const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
@@ -941,17 +996,31 @@ function clearFailure(error: unknown): RestoreOutcome {
  * restored, and the database is as it was.
  *
  * On the managed database the dump must be one {@link dumpSource} took for it,
- * with its rows as INSERTs: a COPY would leave the daemon answering nobody, so
- * one is refused before anything is emptied. And afterwards its one session —
+ * with its rows as INSERTs, and written in UTF8: a COPY, or any other
+ * encoding, would leave the daemon answering nobody, so either is refused
+ * before anything is emptied. And afterwards its one session —
  * every connection's — is given back its own settings: pg_restore leaves
  * `search_path` empty and `row_security` off behind it, which a running
  * `rebase dev` would otherwise query under.
  */
 export async function restoreCopy(plan: PullPlan, dumpFile: string): Promise<RestoreOutcome> {
+    // Read from the dump, which is not the database: an encoding the managed
+    // database cannot take is refused while the database is still as it was.
+    const encoding = archiveEncoding(dumpFile);
     const { Client } = await import("pg");
-    const client = new Client({ connectionString: plan.target });
+    // Bounded, because a wedged managed database accepts the socket and then
+    // never answers (see local-timeouts.ts).
+    const client = new Client({
+        connectionString: plan.target,
+        connectionTimeoutMillis: LOCAL_CONNECT_TIMEOUT_MS,
+        query_timeout: CLEAR_QUERY_TIMEOUT_MS
+    });
     client.on("error", () => undefined);
     let engine: PullTargetEngine;
+    // ROLLBACK only once BEGIN has been sent. Before that there is nothing to
+    // roll back, and after a statement that timed out a ROLLBACK only waits
+    // out a second bound.
+    let begun = false;
     try {
         await client.connect();
         engine = engineOf((await client.query<{ version: string }>("SELECT version() AS version")).rows[0]?.version ?? "");
@@ -963,13 +1032,16 @@ export async function restoreCopy(plan: PullPlan, dumpFile: string): Promise<Res
                 advice: "Pull into Postgres in Docker instead: `rebase db pull --docker`."
             };
         }
+        const refused = encodingRefusal(engine, encoding);
+        if (refused) return refused;
         const { rows } = await client.query<{ schema: string }>("SELECT nspname AS \"schema\" FROM pg_namespace");
+        begun = true;
         await client.query("BEGIN");
         await client.query(`SET LOCAL lock_timeout = '${CLEAR_LOCK_TIMEOUT}'`);
         for (const statement of clearStatements(schemasToClear(rows, plan.schemas))) await client.query(statement);
         await client.query("COMMIT");
     } catch (error) {
-        await client.query("ROLLBACK").catch(() => undefined);
+        if (begun) await client.query("ROLLBACK").catch(() => undefined);
         return clearFailure(error);
     } finally {
         await client.end().catch(() => undefined);
@@ -1009,7 +1081,11 @@ export async function restoreCopy(plan: PullPlan, dumpFile: string): Promise<Res
  */
 async function resetSharedSession(target: string): Promise<void> {
     const { Client } = await import("pg");
-    const client = new Client({ connectionString: target, connectionTimeoutMillis: 10_000, query_timeout: 15_000 });
+    const client = new Client({
+        connectionString: target,
+        connectionTimeoutMillis: LOCAL_CONNECT_TIMEOUT_MS,
+        query_timeout: LOCAL_QUERY_TIMEOUT_MS
+    });
     client.on("error", () => undefined);
     try {
         await client.connect();

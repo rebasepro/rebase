@@ -26,6 +26,7 @@ import { argsFromCommand, commandWords } from "../utils/command-words";
 import { SCHEMA_DIR_FLAG_HELP, refuseMissingSchemaDir } from "../utils/path-flags";
 import { schemaDirArgs } from "../utils/schema-dir";
 import { recordEvent } from "../telemetry";
+import { LOCAL_CONNECT_TIMEOUT_MS, LOCAL_QUERY_TIMEOUT_MS } from "../dev-db/local-timeouts";
 import { DEV_DATABASE_KIND_ENV, devDatabaseKind, type PreparedDatabase } from "../dev-db/prepare";
 import { type DevDatabase } from "../dev-db/resolve";
 import type { AtlasDevDatabase } from "../dev-db/atlas-dev-database";
@@ -1193,12 +1194,21 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
  * Failure here is a warning, not an error. The data is restored and correct; a
  * missing grant is repaired by the next `rebase dev` or `rebase db push`, and
  * saying so beats unwinding a copy that is fine.
+ *
+ * Bounded, connection and statements both. It runs after a failed restore
+ * too, and the restore that failed may have left the managed database
+ * accepting connections and answering none. With no bound this waited on it
+ * for good, and the pull never printed the failure it had already found.
  */
 async function restoreAppRole(target: string): Promise<void> {
     const { Client } = await import("pg");
     const { provisionableSchemas } = await import("../dev-db/pull");
 
-    const client = new Client({ connectionString: target });
+    const client = new Client({
+        connectionString: target,
+        connectionTimeoutMillis: LOCAL_CONNECT_TIMEOUT_MS,
+        query_timeout: LOCAL_QUERY_TIMEOUT_MS
+    });
     client.on("error", () => undefined);
     try {
         // Inside the `try`: a refused connection is the same warning as a
@@ -1251,6 +1261,12 @@ async function restoreAppRole(target: string): Promise<void> {
  * arrive as it is — what state the local database is in now: emptied of what
  * could not be anonymized, or, when even that failed, holding real data that
  * has to be deleted before anything else.
+ *
+ * The connection is bounded, as every one a pull opens to the local database
+ * is: one that is never answered is reported as a copy that could not be
+ * anonymized. The statements are not bounded. Each one rewrites a whole
+ * table, and a bound would turn a slow pass over a big table into an emptied
+ * one.
  */
 async function anonymizeTarget(
     target: string,
@@ -1271,7 +1287,7 @@ async function anonymizeTarget(
         chalk.yellow(`  ${deleteIt}`)
     ];
 
-    const client = new Client({ connectionString: target });
+    const client = new Client({ connectionString: target, connectionTimeoutMillis: LOCAL_CONNECT_TIMEOUT_MS });
     client.on("error", () => undefined);
     try {
         await client.connect();

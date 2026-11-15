@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { blankAttverOptions, stripAttverFromArchive } from "./attver";
+import { archiveEncoding, blankAttverOptions, stripAttverFromArchive } from "./attver";
 
 /** The TABLE entry pg_restore refused in CI (2026-11-13): pg_dump from the runner, server postgres:18-alpine. */
 const CI_DEFINITION = [
@@ -173,19 +173,49 @@ function latin1ToString(bytes: Buffer): string {
     return bytes.toString("latin1");
 }
 
-describe("stripAttverFromArchive", () => {
-    const dirs: string[] = [];
-    afterEach(() => {
-        for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
-    });
-    function write(bytes: Buffer): string {
-        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "attver-"));
-        dirs.push(dir);
-        const file = path.join(dir, "dump.custom");
-        fs.writeFileSync(file, bytes);
-        return file;
-    }
+const dirs: string[] = [];
+afterEach(() => {
+    for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+});
+/** `bytes` in a file of its own, removed after the test. */
+function write(bytes: Buffer): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "attver-"));
+    dirs.push(dir);
+    const file = path.join(dir, "dump.custom");
+    fs.writeFileSync(file, bytes);
+    return file;
+}
 
+/**
+ * What a pull into the managed database asks before it empties anything:
+ * PGlite takes a restore in UTF8 only, and pg_restore SETs whatever encoding
+ * the dump's ENCODING entry names.
+ */
+describe("archiveEncoding", () => {
+    it("reads the encoding from the dump's ENCODING entry", () => {
+        expect(archiveEncoding(write(archive([], { encoding: "LATIN1" })))).toBe("LATIN1");
+        expect(archiveEncoding(write(archive([{ tag: "t", desc: "TABLE", defn: "CREATE TABLE public.t (id integer);\n" }])))).toBe("UTF8");
+        expect(archiveEncoding(write(archive([{ tag: "authors", desc: "TABLE", defn: CI_DEFINITION }], { encoding: "SJIS" })))).toBe("SJIS");
+    });
+
+    it("changes nothing in the dump, pg_attver or not", () => {
+        const before = archive([{ tag: "authors", desc: "TABLE", defn: CI_DEFINITION }], { encoding: "LATIN1" });
+        const file = write(before);
+
+        expect(archiveEncoding(file)).toBe("LATIN1");
+        expect(fs.readFileSync(file).equals(before)).toBe(true);
+    });
+
+    it("is null for a file it cannot read as a custom-format archive", () => {
+        const plain = Buffer.from("--\n-- PostgreSQL database dump\n--\nSET client_encoding = 'LATIN1';\n");
+        const truncated = archive([], { encoding: "LATIN1" }).subarray(0, 40);
+
+        expect(archiveEncoding(write(plain))).toBeNull();
+        expect(archiveEncoding(write(truncated))).toBeNull();
+    });
+});
+
+describe("stripAttverFromArchive", () => {
     it("blanks pg_attver in the TOC and leaves every data block where the TOC says it is", () => {
         const rows = Buffer.from("INSERT INTO public.authors VALUES (1, 'ALTER TABLE ONLY public.authors ALTER COLUMN id SET (pg_attver=1);', NULL);\n");
         const before = archive([

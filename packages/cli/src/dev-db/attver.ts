@@ -32,6 +32,10 @@
  * encodings (SJIS, BIG5, GBK, UHC, GB18030, JOHAB, SHIFT_JIS_2004) are not
  * ASCII-safe; a dump taken in one, through `PGCLIENTENCODING` or a
  * `client_encoding` in the connection string, is left as it was.
+ *
+ * The same read of the TOC also answers which encoding a dump is written in
+ * ({@link archiveEncoding}). A pull into the managed database asks that before
+ * it empties anything.
  */
 import fs from "fs";
 
@@ -174,9 +178,16 @@ export interface AttverStrip {
     dumpVersion: string | null;
 }
 
+/** What the archive's header and ENCODING entry say, as far as it was read; null for what was not. */
+interface ArchiveFacts {
+    serverVersion: string | null;
+    dumpVersion: string | null;
+    encoding: string | null;
+}
+
 type Plan =
-    | { ok: true; patches: Patch[]; serverVersion: string | null; dumpVersion: string | null }
-    | { ok: false; reason: string; serverVersion: string | null; dumpVersion: string | null };
+    | ({ ok: true; patches: Patch[] } & ArchiveFacts)
+    | ({ ok: false; reason: string } & ArchiveFacts);
 
 const NOT_AN_ARCHIVE = "it is not a pg_dump custom-format archive this can read";
 
@@ -185,7 +196,8 @@ function planPatches(fd: number, size: number, blank: (definition: Buffer) => Bu
     const reader = new ArchiveReader(fd, size);
     let serverVersion: string | null = null;
     let dumpVersion: string | null = null;
-    const refuse = (reason: string): Plan => ({ ok: false, reason, serverVersion, dumpVersion });
+    let encoding: string | null = null;
+    const refuse = (reason: string): Plan => ({ ok: false, reason, serverVersion, dumpVersion, encoding });
 
     if (reader.bytes(5).toString("latin1") !== "PGDMP") return refuse(NOT_AN_ARCHIVE);
     const major = reader.byte();
@@ -210,7 +222,6 @@ function planPatches(fd: number, size: number, blank: (definition: Buffer) => Bu
 
     // ReadToc, with the custom format's ReadExtraToc after each entry.
     const patches: Patch[] = [];
-    let encoding: string | null = null;
     let firstData = Number.POSITIVE_INFINITY;
     const entries = reader.int();
     if (entries < 0) return refuse(NOT_AN_ARCHIVE);
@@ -260,7 +271,34 @@ function planPatches(fd: number, size: number, blank: (definition: Buffer) => Bu
             : `it is written in the ${encoding} encoding, which this cannot edit safely; dump in the database's own encoding instead (unset PGCLIENTENCODING)`);
     }
 
-    return { ok: true, patches, serverVersion, dumpVersion };
+    return { ok: true, patches, serverVersion, dumpVersion, encoding };
+}
+
+/** Reads every definition as it is: what {@link archiveEncoding} walks the TOC with. */
+function unchanged(definition: Buffer): Buffer {
+    return definition;
+}
+
+/**
+ * The encoding a custom-format dump is written in, as its ENCODING entry
+ * names it (`LATIN1`, `UTF8`, …), or null when this cannot read the file as
+ * an archive.
+ *
+ * That entry is the `SET client_encoding` pg_restore starts every restore
+ * with: the source database's encoding, unless pg_dump ran with
+ * `PGCLIENTENCODING` naming another. The file is opened read-only and nothing
+ * in it changes.
+ */
+export function archiveEncoding(dumpFile: string): string | null {
+    const fd = fs.openSync(dumpFile, "r");
+    try {
+        return planPatches(fd, fs.fstatSync(fd).size, unchanged).encoding;
+    } catch (error) {
+        if (!(error instanceof RangeError)) throw error;
+        return null;
+    } finally {
+        fs.closeSync(fd);
+    }
 }
 
 /**
@@ -283,7 +321,7 @@ export function stripAttverFromArchive(
             plan = planPatches(fd, fs.fstatSync(fd).size, blank);
         } catch (error) {
             if (!(error instanceof RangeError)) throw error;
-            plan = { ok: false, reason: NOT_AN_ARCHIVE, serverVersion: null, dumpVersion: null };
+            plan = { ok: false, reason: NOT_AN_ARCHIVE, serverVersion: null, dumpVersion: null, encoding: null };
         }
         const versions = { serverVersion: plan.serverVersion, dumpVersion: plan.dumpVersion };
         if (!plan.ok) return { entries: 0, skipped: plan.reason, ...versions };

@@ -273,12 +273,27 @@ afterAll(async () => {
     await execa("docker", ["rm", "-f", "-v", container], { reject: false });
 });
 
-/** A whole-database pull of the source into `target`, the steps `rebase db pull` takes. */
-async function pullInto(target: string, name: string) {
+/** A whole-database pull of `source` into `target`, the steps `rebase db pull` takes. */
+async function pullInto(target: string, name: string, source = url("source")) {
     const dumpFile = path.join(work, `${name}.dump`);
-    const dumped = await dumpSource({ source: url("source"), target, anonymize: false, schemas: [] }, dumpFile);
+    const dumped = await dumpSource({ source, target, anonymize: false, schemas: [] }, dumpFile);
     if (!dumped.ok) throw new Error(dumped.lines.join("\n"));
     return restoreCopy(dumped.plan, dumpFile);
+}
+
+/** Rows only LATIN1 and UTF-8 spell differently. */
+const LATIN1_ROWS = [{ owner: "señor", note: "crème brûlée" }, { owner: "zoë", note: "façade" }];
+
+let latin1Created = false;
+/** A LATIN1 database on the container, `latin`, holding {@link LATIN1_ROWS}. Created once. */
+async function createLatin1Source(): Promise<void> {
+    if (latin1Created) return;
+    await sql(url("rebase"), "CREATE DATABASE latin ENCODING 'LATIN1' LC_COLLATE 'C' LC_CTYPE 'C' TEMPLATE template0");
+    await sql(url("latin"), `
+        CREATE TABLE public."cafés" (id serial PRIMARY KEY, "propriétaire" text NOT NULL, note text);
+        INSERT INTO public."cafés" ("propriétaire", note) VALUES ${LATIN1_ROWS.map(row => `('${row.owner}', '${row.note}')`).join(", ")};
+    `);
+    latin1Created = true;
 }
 
 describe("rebase db pull into the managed database", () => {
@@ -337,6 +352,32 @@ describe("rebase db pull into the managed database", () => {
         expect(outcome.failure).toContain("COPY");
         expect(outcome.advice).toContain("rebase db pull --docker");
         expect((await sql(managed, "SELECT count(*)::int AS n FROM public.events")).rows).toEqual([{ n: 2345 }]);
+    });
+
+    it("refuses a dump of a database that is not UTF8 before emptying anything, and keeps answering", async () => {
+        // What pulling one did: pg_restore's `SET client_encoding = 'LATIN1'`
+        // left the daemon answering nobody, after the copy had been emptied,
+        // and the command then hung on its next connection.
+        await createLatin1Source();
+
+        const outcome = await pullInto(managed, "latin1-managed", url("latin"));
+
+        expect(outcome).toMatchObject({ cleared: false, started: false });
+        expect(outcome.failure).toContain("LATIN1");
+        expect(outcome.advice).toContain("rebase db pull --docker");
+        expect((await sql(managed, "SELECT count(*)::int AS n FROM public.events")).rows).toEqual([{ n: 2345 }]);
+        expect(await sessionSettings(managed)).toEqual([]);
+    });
+
+    it("copies the same database into Postgres, which converts it to its own encoding", async () => {
+        await createLatin1Source();
+        await sql(url("rebase"), "CREATE DATABASE latin1_copy");
+
+        const outcome = await pullInto(url("latin1_copy"), "latin1-postgres", url("latin"));
+
+        expect(outcome.failure).toBeNull();
+        expect((await sql(url("latin1_copy"), 'SELECT "propriétaire" AS owner, note FROM public."cafés" ORDER BY id')).rows)
+            .toEqual(LATIN1_ROWS);
     });
 });
 

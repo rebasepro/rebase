@@ -23,6 +23,7 @@ import {
     describeTarget,
     dumpArgs,
     dumpEnv,
+    encodingRefusal,
     provisionableSchemas,
     replacementFor,
     restoreArgs,
@@ -476,6 +477,52 @@ describe("restoreOutcome", () => {
 
         expect(outcome.started).toBe(false);
         expect(outcome.failure).toMatch(/ENOENT/);
+    });
+});
+
+/**
+ * A pull from a LATIN1 database into the managed one emptied it and then
+ * restored nothing: pg_restore's first statement, `SET client_encoding =
+ * 'LATIN1'`, left the PGlite daemon answering nobody, and every statement
+ * after it failed on "no connection to the server". So a dump the managed
+ * database cannot take is refused before anything is emptied.
+ */
+describe("encodingRefusal", () => {
+    it("refuses a dump that is not UTF8 on the managed database, before anything is emptied", () => {
+        const refused = encodingRefusal("pglite", "LATIN1");
+
+        expect(refused).toMatchObject({ cleared: false, started: false });
+        expect(refused?.failure).toContain("LATIN1");
+        expect(describeRestoreFailure(refused ?? { cleared: true, started: true, failure: null, advice: null }, "prod/app").join("\n"))
+            .toContain("the local database is as it was");
+    });
+
+    it("names the ways to pull it that exist: Postgres in Docker, or the Postgres DATABASE_URL names", () => {
+        const advice = encodingRefusal("pglite", "LATIN1")?.advice ?? "";
+
+        expect(advice).toContain("rebase db pull --docker");
+        expect(advice).toContain("DATABASE_URL");
+        expect(advice).not.toContain("--to");
+    });
+
+    it("refuses every encoding but UTF8 on the managed database, SQL_ASCII included", () => {
+        for (const encoding of ["SQL_ASCII", "WIN1252", "EUC_JP", "LATIN9", "SJIS"]) {
+            expect(encodingRefusal("pglite", encoding)?.failure).toContain(encoding);
+        }
+    });
+
+    it("takes a UTF8 dump on the managed database, however the name is spelt", () => {
+        for (const encoding of ["UTF8", "utf8", "UTF-8"]) expect(encodingRefusal("pglite", encoding)).toBeNull();
+    });
+
+    it("leaves a dump in any encoding to a Postgres target, which converts it itself", () => {
+        for (const encoding of ["LATIN1", "SQL_ASCII", "WIN1252", "UTF8"]) expect(encodingRefusal("postgres", encoding)).toBeNull();
+    });
+
+    it("does not refuse a dump whose encoding could not be read", () => {
+        // Not a custom-format archive this Rebase reads: pg_restore says what
+        // it makes of it, as before.
+        expect(encodingRefusal("pglite", null)).toBeNull();
     });
 });
 
