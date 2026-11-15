@@ -21,7 +21,7 @@
 
 import type { MiddlewareHandler, Context } from "hono";
 import type { DataDriver, AuthAdapter, AuthenticatedUser } from "@rebasepro/types";
-import { ANONYMOUS_USER_ID } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, hasAdminRole } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import type { ApiKeyStore } from "./api-keys/api-key-store";
 import { scopeDataDriver, SERVICE_IDENTITY } from "./rls-scope";
@@ -77,12 +77,45 @@ export type AdapterVerdict = { user: AuthenticatedUser | null } | { refused: Api
  * refusal ({@link adapterRefusal}), never a 500.
  */
 export async function verifyWithAdapter(adapter: AuthAdapter, c: Context<HonoEnv>): Promise<AdapterVerdict> {
+    let user: AuthenticatedUser | null;
     try {
-        return { user: await adapter.verifyRequest(c.req.raw) };
+        user = await adapter.verifyRequest(c.req.raw);
     } catch (error) {
         // adapter.verifyRequest() threw — reject the request (fail closed).
         return { refused: adapterRefusal(error) };
     }
+    if (user) warnIfAdminFlagWithoutAdminRole(user);
+    return { user };
+}
+
+/** Whether {@link warnIfAdminFlagWithoutAdminRole} has spoken in this process. */
+let warnedAdminFlagWithoutAdminRole = false;
+
+/**
+ * Say once per process — not per request — that an auth adapter answered
+ * `isAdmin: true` for a user whose `roles` hold no `admin`.
+ *
+ * `AuthenticatedUser.isAdmin` is informational: every authorization decision
+ * reads `roles`, so such a user is not an administrator anywhere, whatever the
+ * flag says. A project's own adapter answered `isAdmin: true` with the roles
+ * `super_admin` and `dev`; its tables were admin-only, so `GET /schema/tables`
+ * described none of them to any staff token and the panel listed nothing, with
+ * nothing in the log. The built-in adapter derives the flag from the roles, so
+ * it never says this.
+ *
+ * Names the roles it saw and nothing about who the user is.
+ */
+function warnIfAdminFlagWithoutAdminRole(user: AuthenticatedUser): void {
+    if (warnedAdminFlagWithoutAdminRole || user.isAdmin !== true || hasAdminRole(user.roles)) return;
+    warnedAdminFlagWithoutAdminRole = true;
+    logger.warn(
+        `[AUTH-ADAPTER] The auth adapter returned a user with isAdmin: true whose roles are ` +
+        `${JSON.stringify(user.roles)}, without "admin". isAdmin is informational: every ` +
+        `decision reads roles, so this user is not an administrator here — admin-only tables are ` +
+        `left out of GET /schema/tables, and the admin panel does not list them. Return the "admin" ` +
+        `role from the adapter for administrators, or set schemaTables: { persons: "all" } if only ` +
+        `staff sign in. (Said once per process.)`
+    );
 }
 
 /** The request's `user` for an account the adapter recognised. */
