@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { pathToFileURL } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import {
     LEGACY_LAYOUT_REMEDY,
     isTableDef,
@@ -128,13 +128,40 @@ async function nativeImport(file: string): Promise<Record<string, unknown>> {
     return await import(pathToFileURL(file).href);
 }
 
+/**
+ * What Node's ESM loader needs when it failed on a relative import written
+ * without its extension (`export { users } from "./users"` in a compiled
+ * `index.js`): one sentence naming the import and its fix. Undefined for any
+ * other failure — including a module that is missing under every extension,
+ * where the extension is not what is wrong.
+ */
+function missingExtensionHint(error: unknown): string | undefined {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ERR_MODULE_NOT_FOUND") return undefined;
+    // Node names the module it looked for, resolved: `Cannot find module '/app/dist/schema/users' imported from /app/dist/schema/index.js`.
+    const match = /Cannot find module '([^']+)' imported from ([^\n]+)/.exec(error.message);
+    if (!match) return undefined;
+    const asPath = (text: string): string => (text.startsWith("file:") ? fileURLToPath(text) : text);
+    const missing = asPath(match[1]);
+    const importer = asPath(match[2].trim());
+    if (!path.isAbsolute(missing) || path.extname(missing) !== "") return undefined;
+    const found = [".js", ".ts", ".mjs", ".mts"].find(extension => fs.existsSync(missing + extension));
+    if (found === undefined) return undefined;
+    let written = path.relative(path.dirname(importer), missing).split(path.sep).join("/");
+    if (!written.startsWith("../")) written = `./${written}`;
+    const extension = found === ".mjs" || found === ".mts" ? ".mjs" : ".js";
+    return `The import \`${written}\` in ${path.basename(importer)} has no extension, which Node's ESM loader needs on a relative import: ` +
+        `write \`${written}${extension}\` in the source, or build with \`rebase build\`, which adds it.`;
+}
+
 async function importOrThrow(importModule: SchemaModuleImporter, file: string, role: string): Promise<Record<string, unknown>> {
     try {
         return await importModule(file);
     } catch (error) {
+        const hint = missingExtensionHint(error);
         throw new SchemaLoadError(
             `Could not import ${file} (${role}).\n\n` +
             `${error instanceof Error ? error.message : String(error)}\n\n` +
+            (hint !== undefined ? `${hint}\n\n` : "") +
             "Every module in backend/schema must import cleanly: a table that cannot be read is a route " +
             "without policies, or policies without a route. Fix the file, or delete it.",
             file,

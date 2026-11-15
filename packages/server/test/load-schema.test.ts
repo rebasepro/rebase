@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
+import { spawnSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { pathToFileURL } from "url";
 
 import { isSchemaDefinitionError, type SchemaDefinitionError } from "@rebasepro/common";
 import { LEGACY_LAYOUT_REMEDY } from "@rebasepro/types";
@@ -333,5 +335,54 @@ describe("loadBackendSchema — a caller-supplied importModule", () => {
         const error = caught;
         expect(error.file).toBe(path.join(path.resolve(dir), "broken.ts"));
         expect(error.message).toContain("the importer could not load it");
+    });
+});
+
+describe("loadBackendSchema — a compiled schema whose relative imports have no extension", () => {
+    // A backend built with a plain `tsc` and run on Node: Node's own ESM loader
+    // resolves no relative import without its extension. Jest resolves modules
+    // itself, so a child Node process does the import and its real error is
+    // rethrown, exactly as the runtime's native import() would throw it.
+    const nodeImport = async (file: string): Promise<Record<string, unknown>> => {
+        const script = "import(process.argv[1]).then(() => process.stdout.write('{}'), error => process.stdout.write(JSON.stringify({ code: error.code, message: error.message })));";
+        const probe = spawnSync(process.execPath, ["--input-type=module", "-e", script, pathToFileURL(file).href], { encoding: "utf8" });
+        const failure: unknown = JSON.parse(probe.stdout);
+        if (typeof failure === "object" && failure !== null && "message" in failure && typeof failure.message === "string") {
+            throw Object.assign(new Error(failure.message), { code: "code" in failure ? failure.code : undefined });
+        }
+        return {};
+    };
+
+    beforeEach(() => {
+        fs.writeFileSync(path.join(root, "package.json"), `{ "type": "module" }\n`);
+    });
+
+    it("says the import needs its extension, and that rebase build adds it — keeping Node's message", async () => {
+        write("index.js", `export { users } from "./users";\n`);
+        write("users.js", "export const users = 1;\n");
+
+        const error = await loadBackendSchema(dir, { projectRoot: false, importModule: nodeImport }).then(
+            () => { throw new Error("expected loadBackendSchema to fail"); },
+            (caught: unknown) => caught
+        );
+
+        if (!isSchemaLoadError(error)) throw error;
+        expect(error.file).toBe(path.join(path.resolve(dir), "index.js"));
+        expect(error.message).toContain(`Cannot find module '${path.join(fs.realpathSync(dir), "users")}'`);
+        expect(error.message).toContain("The import `./users` in index.js has no extension, which Node's ESM loader needs on a relative import: write `./users.js` in the source, or build with `rebase build`, which adds it.");
+        expect(error.message).toContain("Every module in backend/schema must import cleanly");
+    });
+
+    it("says nothing about extensions when the module is missing under every one", async () => {
+        write("index.js", `export { ghost } from "./ghost";\n`);
+
+        const error = await loadBackendSchema(dir, { projectRoot: false, importModule: nodeImport }).then(
+            () => { throw new Error("expected loadBackendSchema to fail"); },
+            (caught: unknown) => caught
+        );
+
+        if (!isSchemaLoadError(error)) throw error;
+        expect(error.message).toContain("Cannot find module");
+        expect(error.message).not.toContain("rebase build");
     });
 });
