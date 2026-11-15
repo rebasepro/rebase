@@ -25,6 +25,9 @@ export type { ConnectOptions } from "./introspect";
 
 export { CHECKS, runChecks } from "./checks";
 
+export { findPolicyRecursion } from "./policy-recursion";
+export type { PolicyRecursion, PolicyRecursionOptions, RecursionPolicy, RecursionStep, RoleContext } from "./policy-recursion";
+
 export {
     renderReport,
     renderJson,
