@@ -244,6 +244,111 @@ describe("rebase verify: RLS coverage", () => {
     });
 });
 
+describe("rebase verify: rules Postgres refuses to expand (42P17)", () => {
+    // The membership pattern a real project shipped: a read rule on your own
+    // rows, and writes allowed to a team's managers — read from this table.
+    const IS_MANAGER = "EXISTS (SELECT 1 FROM rebase.team_members tm WHERE tm.team_id = team_members.team_id " +
+        "AND tm.user_id = rebase.uid() AND tm.role IN ('owner', 'admin'))";
+    const teams = defineTable("teams", {
+        schema: "rebase",
+        columns: { id: col.uuid().primaryKey().defaultRandom(), ownerId: col.text().notNull() },
+        rls: [
+            { operation: "select", using: "teams.owner_id = rebase.uid() OR EXISTS (SELECT 1 FROM rebase.team_members tm WHERE tm.team_id = teams.id::text AND tm.user_id = rebase.uid())" },
+            { operation: "insert", ownerField: "owner_id" }
+        ]
+    });
+    const teamMembers = (writes: string) => defineTable("team_members", {
+        schema: "rebase",
+        columns: { id: col.uuid().primaryKey().defaultRandom(), teamId: col.text().notNull(), userId: col.text().notNull(), role: col.text() },
+        rls: [
+            { operation: "select", ownerField: "user_id" },
+            { operations: ["update", "delete"], using: writes }
+        ]
+    });
+
+    it("fails a write rule that reads its own table, naming the rule, the table and the remedy", async () => {
+        schema([teams, teamMembers(IS_MANAGER)]);
+        const report = await verify();
+        expect(report.ok).toBe(false);
+        const recursions = report.findings.filter(f => f.check === "rls-policy-recursion");
+        // One per policy: the rule's update and its delete.
+        expect(recursions).toEqual([
+            expect.objectContaining({
+                step: "rls",
+                severity: "error",
+                table: "team_members",
+                file: path.join("backend", "schema", "team_members.ts"),
+                path: "team_members.rls[1]"
+            }),
+            expect.objectContaining({ severity: "error", path: "team_members.rls[1]" })
+        ]);
+        expect(recursions.map(f => f.message.slice(0, f.message.indexOf(" reads ")))).toEqual([
+            "\"team_members\" rls[1] (update)",
+            "\"team_members\" rls[1] (delete)"
+        ]);
+        const [update] = recursions;
+        expect(update.message).toContain("reads its own table, rebase.team_members, in a sub-select");
+        expect(update.message).toContain("for relation \"team_members\"");
+        expect(update.message).toContain("every update of rebase.team_members");
+        expect(update.message).toContain("42P17");
+        expect(update.message).toContain("(SELECT rebase.uid())");
+        expect(update.fix).toContain("SECURITY DEFINER");
+        expect(update.fix).toContain("FROM rebase.team_members");
+        expect(report.steps.find(s => s.id === "rls")?.status).toBe("failed");
+    });
+
+    it("fails a write rule that reads a table whose read rule reads it back", async () => {
+        const members = defineTable("team_members", {
+            schema: "rebase",
+            columns: { id: col.uuid().primaryKey().defaultRandom(), teamId: col.text().notNull(), userId: col.text().notNull() },
+            rls: [
+                { operation: "select", ownerField: "user_id" },
+                { operation: "insert", withCheck: "EXISTS (SELECT 1 FROM rebase.teams t WHERE t.id::text = team_members.team_id AND t.owner_id = rebase.uid())" }
+            ]
+        });
+        schema([teams, members]);
+        const recursions = (await verify()).findings.filter(f => f.check === "rls-policy-recursion");
+        expect(recursions).toEqual([expect.objectContaining({ severity: "error", table: "team_members", path: "team_members.rls[1]" })]);
+        expect(recursions[0].message).toContain("reads rebase.teams in a sub-select, whose read policy");
+        expect(recursions[0].message).toContain("reads rebase.team_members back");
+        expect(recursions[0].message).toContain("every insert into rebase.team_members");
+    });
+
+    it("passes the same rule once the read is a SECURITY DEFINER function's", async () => {
+        schema([teams, teamMembers("rebase.is_team_manager(team_id)")]);
+        expect((await verify()).findings).toEqual([]);
+    });
+
+    it("passes a rule that reads another table whose rules do not read back", async () => {
+        const projects = defineTable("projects", {
+            columns: { id: col.uuid().primaryKey().defaultRandom(), ownerId: col.text().notNull() },
+            rls: [{ operation: "all", ownerField: "owner_id" }]
+        });
+        const notes = defineTable("notes", {
+            columns: { id: col.uuid().primaryKey().defaultRandom(), projectId: col.uuid().notNull(), userId: col.text().notNull() },
+            rls: [
+                { operation: "select", ownerField: "user_id" },
+                { operation: "insert", withCheck: "EXISTS (SELECT 1 FROM projects p WHERE p.id = notes.project_id AND p.owner_id = rebase.uid())" }
+            ]
+        });
+        schema([projects, notes]);
+        expect((await verify()).findings).toEqual([]);
+    });
+
+    it("points a rule a table inherits at defaultRls", async () => {
+        const groups = defineTable("groups", { columns: { id: col.uuid().primaryKey().defaultRandom(), parentId: col.uuid() }, rls: "inherit" });
+        schema([groups], [
+            { operation: "select", access: "public" },
+            { operation: "update", using: "EXISTS (SELECT 1 FROM groups g WHERE g.id = groups.parent_id AND g.owner = rebase.uid())" }
+        ]);
+        const recursions = (await verify()).findings.filter(f => f.check === "rls-policy-recursion");
+        expect(recursions).toEqual([expect.objectContaining({ table: "groups", path: "groups.rls", severity: "error" })]);
+        expect(recursions[0].message).toContain("defaultRls[1]");
+        // Its read rule is `USING (true)`: only the admin baseline is a sub-select.
+        expect(recursions[0].message).toContain("for admin requests");
+    });
+});
+
 describe("rebase verify: migration freshness", () => {
     function postgresBackend(migrations: Record<string, string>): void {
         const dir = path.join(root, "backend", "drizzle", "migrations");

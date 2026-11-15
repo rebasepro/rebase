@@ -19,6 +19,9 @@
  *    `organization_id` / `tenant_id` column whose rules (its own, or the
  *    `defaultRls` it inherits) let a role read every row regardless of it.
  *    `rls` itself is mandatory, so "no rules at all" is a step-1 error now.
+ *    And every compiled policy Postgres would refuse to expand (42P17): a
+ *    rule that reads its own table in a sub-select, or tables whose rules
+ *    read each other — `checkPolicyRecursion`.
  * 3. **CMS customizations** — every `customizeTable(...)` under
  *    `frontend/src/cms`, read statically (`verify-cms.ts`): a slug no table
  *    declares, a field that is not a column or relation of its table, a
@@ -38,11 +41,16 @@ import chalk from "chalk";
 import fs from "fs";
 import path from "path";
 import {
+    adminRequestRoleFor,
     parseEnvBoolean,
+    REBASE_ADMIN_REQUEST_ROLE,
+    REBASE_ADMIN_ROLE,
     type SecurityRule,
     type TableDescriptor
 } from "@rebasepro/types";
 import { isSchemaDefinitionError } from "@rebasepro/common";
+import type { PolicyRecursion } from "@rebasepro/rls-check";
+import type { PlannedPolicy } from "@rebasepro/server-postgres";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { failAsJson, findBackendDir, getActiveBackendPlugin, readEnvFile, requireProjectRoot } from "../utils/project";
 import { SCHEMA_DIR_FLAG_HELP, missingSchemaDir, refuseRemovedCollectionsFlag } from "../utils/path-flags";
@@ -323,6 +331,144 @@ function checkRls(verified: VerifiedSchema): VerifyFinding[] {
         });
     }
     return findings;
+}
+
+// ─── Step 2, continued: policies Postgres refuses to expand ───────────────────
+
+/** How the statements a policy of this command guards read in a finding. */
+function statementsOf(command: PolicyRecursion["command"], table: string): string {
+    switch (command) {
+        case "INSERT": return `every insert into ${table}`;
+        case "UPDATE": return `every update of ${table}`;
+        case "DELETE": return `every delete from ${table}`;
+        case "SELECT": return `every read of ${table}`;
+        default: return `every read and write of ${table}`;
+    }
+}
+
+const qualifiedName = (at: { schema: string; table: string }): string => `${at.schema}.${at.table}`;
+
+/**
+ * Where the rule a policy compiles from is written: `rls[i]` of its table, the
+ * `defaultRls` rule it inherits, or — for a policy Rebase derives (a junction's,
+ * the admin baseline) — the table alone.
+ */
+function ruleLocation(
+    descriptor: TableDescriptor | undefined,
+    planned: PlannedPolicy | undefined,
+    recursion: PolicyRecursion
+): { path: string; label: string } {
+    if (!descriptor) return { path: recursion.table, label: `policy "${recursion.policy}" of the junction table` };
+    const slug = descriptor.slug;
+    const fallback = { path: `${slug}.rls`, label: `policy "${recursion.policy}"` };
+    if (!planned || planned.injected || descriptor.rls.posture !== "rules") return fallback;
+    const rules = descriptor.rls.rules;
+    const index = planned.ruleKey.startsWith("#")
+        ? Number(planned.ruleKey.slice(1))
+        : rules.findIndex(rule => rule.name === planned.ruleKey);
+    if (!Number.isInteger(index) || index < 0 || index >= rules.length) return fallback;
+    return descriptor.rls.inherited
+        ? { path: `${slug}.rls`, label: `the rule it inherits from \`defaultRls\` (defaultRls[${index}])` }
+        : { path: `${slug}.rls[${index}]`, label: `rls[${index}]` };
+}
+
+/** One loop, in words: what the policy reads, and how that leads back to its table. */
+function describeLoop(recursion: PolicyRecursion): string {
+    const home = qualifiedName(recursion);
+    if (recursion.path.length === 1) return `its own table, ${home}, in a sub-select`;
+    const through = recursion.path.slice(1).map((step, i, steps) => {
+        const next = i + 1 < steps.length ? qualifiedName(steps[i + 1]) : home;
+        return `whose read policy "${step.policy}" reads ${next}`;
+    });
+    return `${qualifiedName(recursion.reads)} in a sub-select, ${through.join(", ")} back`;
+}
+
+/**
+ * The tables' policies, compiled as the boot writes them, read for a loop
+ * Postgres refuses to expand: a rule that reads its own table in a
+ * sub-select, or two tables whose rules read each other. Since 0.25 every
+ * `rebase.uid()` is compiled to `(SELECT rebase.uid())` and the admin policies
+ * are sub-selects as well, so such a rule fails on every statement it guards,
+ * with 42P17 — for users, the service key and `dataAsAdmin` alike — where it
+ * worked on 0.21. The analysis is `findPolicyRecursion` from
+ * `@rebasepro/rls-check`, over the compiled SQL rather than the rules, so a
+ * structured `existsIn` and a junction's derived policy are read as well as
+ * raw SQL.
+ */
+async function checkPolicyRecursion(verified: VerifiedSchema): Promise<VerifyFinding[]> {
+    const { planPolicyDefinitions, REBASE_USER_ROLE } = await import("@rebasepro/server-postgres");
+    const { findPolicyRecursion } = await import("@rebasepro/rls-check");
+    let policies: PlannedPolicy[];
+    try {
+        // A database the boot made both admin roles on: every policy, every companion.
+        policies = planPolicyDefinitions(verified.schema.compiled.tables, { adminRequestRoleAvailable: true });
+    } catch (error) {
+        return [{
+            step: "rls",
+            check: "rls-policy-plan",
+            severity: "error",
+            message: `The rules do not compile to policies: ${error instanceof Error ? error.message : String(error)}`,
+            fix: "Change the rules as the message says. The boot and `rebase db push` compile the same policies, and refuse them the same way."
+        }];
+    }
+
+    // The two roles a request runs as: the request role, and the admin request
+    // role that inherits it with both admin roles. The server context holds
+    // `rebase_admin` alone, a subset of the second.
+    const adminRequestRole = adminRequestRoleFor(REBASE_USER_ROLE);
+    const recursions = findPolicyRecursion(policies, {
+        contexts: [
+            { name: REBASE_USER_ROLE, roles: [REBASE_USER_ROLE] },
+            { name: adminRequestRole, roles: [adminRequestRole, REBASE_USER_ROLE, REBASE_ADMIN_ROLE, REBASE_ADMIN_REQUEST_ROLE] }
+        ],
+        // The search path Rebase pins on its connections, which the boot creates the policies under.
+        searchPath: ["public"]
+    });
+
+    // One finding per policy, in the order the tables and their rules are written.
+    const order = (at: { schema: string; table: string; policy: string }): number =>
+        policies.findIndex(p => p.schema === at.schema && p.table === at.table && p.name === at.policy);
+    const byPolicy = new Map<number, PolicyRecursion[]>();
+    for (const recursion of recursions) {
+        const at = order(recursion);
+        byPolicy.set(at, [...(byPolicy.get(at) ?? []), recursion]);
+    }
+
+    return [...byPolicy.entries()].sort(([a], [b]) => a - b).map(([at, loops]): VerifyFinding => {
+        const [first] = loops;
+        const descriptor = verified.descriptors.find(d => d.kind === "table" && d.schema === first.schema && d.table === first.table);
+        const planned: PlannedPolicy | undefined = policies[at];
+        const { path: rulePath, label } = ruleLocation(descriptor, planned, first);
+        const slug = descriptor?.slug ?? first.table;
+        const file = descriptor ? verified.files.get(slug) : undefined;
+        const home = qualifiedName(first);
+        const certain = loops.some(loop => loop.confidence === "certain");
+        // An admin request is subject to every policy a user's request is, and
+        // more, so a loop a user's request closes closes for admins too.
+        const who = loops.some(loop => loop.contexts.includes(REBASE_USER_ROLE))
+            ? ""
+            : " for admin requests (the service key, `dataAsAdmin` and admin users)";
+        const caveats = certain ? [] : [...new Set(loops.flatMap(loop => loop.caveats))];
+        const readTables = [...new Set(loops.map(loop => qualifiedName(loop.reads)))];
+        return {
+            step: "rls",
+            check: "rls-policy-recursion",
+            severity: certain ? "error" : "warning",
+            table: slug,
+            ...(file && { file }),
+            path: rulePath,
+            message: `"${slug}" ${label} (${first.command.toLowerCase()}) reads ${loops.map(describeLoop).join("; it also reads ")}, ` +
+                `so Postgres refuses ${statementsOf(first.command, home)}${who} with 42P17 ` +
+                `(infinite recursion detected in policy for relation "${first.table}"). ` +
+                "Before 0.25 such a rule could pass: since then the compiler writes `rebase.uid()` as `(SELECT rebase.uid())` and the admin policies as sub-selects, " +
+                "so a table's own policies contain a sub-select even where its rules have none." +
+                (caveats.length > 0 ? ` Not certain: ${caveats.join(" ")}` : ""),
+            fix: `Move the read of ${readTables.join(" and ")} into a \`SECURITY DEFINER\` function, which Postgres does not expand while it applies policies, ` +
+                "and call that function from the rule — e.g. `CREATE FUNCTION public.can_access(…) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER " +
+                `SET search_path = '' AS $$ SELECT EXISTS (SELECT 1 FROM ${readTables[0]} …) $$\`, then \`using: "public.can_access(…)"\`. ` +
+                "Leave the policies Rebase generates as they are."
+        };
+    });
 }
 
 // ─── Step 3: migration freshness ──────────────────────────────────────────────
@@ -632,6 +778,7 @@ export async function runVerify(options: VerifyOptions): Promise<VerifyReport> {
         schemaStep.detail = `${tables} table${tables === 1 ? "" : "s"}, compiled as the backend boots them`;
         rlsStep.detail = `${tables} table${tables === 1 ? "" : "s"}`;
         findings.push(...checkRls(verified));
+        findings.push(...await checkPolicyRecursion(verified));
         const cms = await checkCmsCustomizations(options.projectRoot, verified.descriptors);
         if (cms.directories.length === 0) {
             cmsStep.status = "skipped";
@@ -762,7 +909,8 @@ ${Object.entries(VERIFY_FLAG_HELP).map(([flag, help]) => `  ${chalk.blue(flag.pa
 
 ${chalk.green.bold("Steps")}
   1. Table definitions     backend/schema loads and compiles as the backend boots it
-  2. RLS coverage          owner and tenant columns are filtered on by the rules that read them
+  2. RLS coverage          owner and tenant columns are filtered on by the rules that read them,
+                           and no rule reads its own table back through a sub-select (42P17)
   3. CMS customizations    frontend/src/cms: each customizeTable names a table, its fields, and a form that can create
   4. Migration freshness   drizzle/migrations builds every declared table and column
   5. Live RLS audit        with --live: the rls-check catalogue against the project's database
