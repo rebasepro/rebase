@@ -1,5 +1,5 @@
 ---
-sourceHash: 3bff62ceb5aceb62
+sourceHash: fbdc423a29403c10
 title: Exécution sur une base de données existante ou partagée
 sidebar_label: Base de données existante ou partagée
 description: Exécutez Rebase sur une base de données PostgreSQL qu'il ne possède pas — un cluster partagé avec d'autres applications, un second projet Rebase, Supabase, ou une base de données verrouillée par un DBA — grâce aux paramètres rls, rebase doctor --database et rebase db request-role migrate.
@@ -301,8 +301,6 @@ Ou supprimez-les : chaque stratégie dont le nom se termine par `_ar_` suivi de 
 caractères hexadécimaux, et dont le rôle est `rebase_admin_request`.
 
 ### Un schéma `public` partagé
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Lorsque `public` contient des tables auxquelles Rebase ne devrait pas accéder :
 

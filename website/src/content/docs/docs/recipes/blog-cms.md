@@ -13,14 +13,10 @@ Build a blog backend with:
 
 ## Tables
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Three files in `backend/schema/`. They hold what the database and the API
 enforce; how the admin panel presents them comes after, in the frontend.
 
 ### Authors
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```ts
 // backend/schema/authors.ts
@@ -40,8 +36,6 @@ export const authors = defineTable("authors", {
 
 ### Categories
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 ```ts
 // backend/schema/categories.ts
 import { defineTable, col } from "@rebasepro/server/schema";
@@ -58,8 +52,6 @@ export const categories = defineTable("categories", {
 ```
 
 ### Articles
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```ts
 // backend/schema/articles.ts
@@ -147,8 +139,6 @@ scaffold, add `writer` to the role options of the `roles` column in
 
 ## How the panel shows them
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 The admin panel renders all three with no further code. These files in
 `frontend/src/cms/` add the icons, the enum colours and the editors:
 
@@ -186,8 +176,6 @@ export const authorsCms = customizeTable<typeof authors>("authors", {
 ```
 
 ## Setup
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 1. Save the three table files in `backend/schema/` and export them from
    `backend/schema/index.ts` — a `defineTable` the index does not export
@@ -244,8 +232,6 @@ for (const article of articles) {
 
 
 ## Related
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Tables](/docs/schema/) — the `defineTable` API this recipe uses
 - [Customizing a table](/docs/frontend/customize-table/) — the panel side

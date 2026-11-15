@@ -4,8 +4,6 @@ sidebar_label: Tables
 description: "Declare Postgres tables in backend/schema with defineTable: columns, relations and a mandatory row-level security posture. Each table becomes SQL, policies, REST, realtime and MCP routes, and SDK types."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A table is declared once, in TypeScript, in the `backend/schema/` directory.
 That declaration is the only thing the backend knows about your data. From it,
 Rebase generates the table and its row-level security policies in Postgres,
@@ -53,8 +51,6 @@ frontend. The upgrade guide for this release covers the move.
 :::
 
 ## The `backend/schema` directory
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```text
 backend/
@@ -115,8 +111,6 @@ against a table, without pulling backend code into the browser bundle.
 
 ## What a table becomes
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | From the declaration | Rebase generates |
 |---|---|
 | `columns`, `relations`, `indexes` | the `CREATE TABLE`, foreign keys, junction tables and indexes, written to `schema.sql` by `rebase db push` and `rebase db generate` |
@@ -137,8 +131,6 @@ The pipeline from declaration to database is described in
 
 ## `defineTable` options
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `defineTable(name, config)` takes the table's name and these keys:
 
 | Key | What it does |
@@ -151,7 +143,7 @@ The pipeline from declaration to database is described in
 | `schema` | The Postgres schema. `public` when omitted. |
 | `database` | A non-default Postgres database, declared in `backend/resources.ts`. See [Multiple sources](/docs/backend/multiple-sources/). |
 | `description` | What the table holds. Shown in OpenAPI and in the MCP tool descriptions. |
-| `defaultPolicies` | `false` generates only your rules, without the admin baseline policies. Refused with `rls: "admin-only"`. <span class="since-badge" data-since="0.31">Since 0.31</span> `true` keeps the baseline when the table's database switches it off for every table (`database({ rls: { defaultPolicies: false } })`). Left out, the database's setting decides. |
+| `defaultPolicies` | `false` generates only your rules, without the admin baseline policies. Refused with `rls: "admin-only"`. `true` keeps the baseline when the table's database switches it off for every table (`database({ rls: { defaultPolicies: false } })`). Left out, the database's setting decides. |
 | `tenant` | Scope every row to a tenant. See [Tenancy](/docs/collections/tenancy/). |
 | `softDelete` | `true` or `{ field }`: a delete stamps a timestamp instead of removing the row. See [Soft delete](/docs/collections/soft-delete/). |
 | `history` | `true` records every write in the history table. See [Entity history](/docs/backend/history/). |
@@ -166,8 +158,6 @@ Two more definitions share most of these keys:
 in, and [`defineView`](/docs/collections/views/) for SQL views.
 
 ## Names
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 The first argument of `defineTable` is the table's name, and it is the default
 for everything else:
@@ -193,8 +183,6 @@ table that is already deployed can rename columns. Set `slug` explicitly when it
 should differ from the table's name, and leave it alone afterwards.
 
 ## Primary keys
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 There is no implicit `id` column. Every table marks at least one column
 `.primaryKey()`:
@@ -228,8 +216,6 @@ default is supplied by the caller on create. A key column cannot be
 
 ## When a definition is refused
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A schema that would leave a table unprotected or unservable never reaches the
 database. It is refused at three points:
 
@@ -259,8 +245,6 @@ without a `defaultRls`. A table exported from a file next to `index.ts` but not
 from `index.ts` itself is refused too: the index is the list of tables.
 
 ## Next steps
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Columns](/docs/schema/columns/): every `col.*` builder and modifier
 - [JSON documents](/docs/schema/json/): typed and validated `jsonb` with `json.*`

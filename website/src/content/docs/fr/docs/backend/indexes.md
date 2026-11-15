@@ -1,11 +1,9 @@
 ---
-sourceHash: e086faac3624de8d
+sourceHash: f957d9b26ce4636f
 title: Index
 sidebar_label: Index
 description: Déclarez des index Postgres ordinaires sur une table — btree, GIN et BRIN, partiels, composites, couvrants et uniques — et découvrez pourquoi un index écrit à la main avait tendance à disparaître.
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Une table déclare les index dont ses requêtes ont besoin, aux côtés des colonnes qu'ils couvrent :
 
@@ -43,8 +41,6 @@ Cela est corrigé par la règle de propriété ci-dessous : un index que Rebase 
 
 ## La structure
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 | Champ | Type | Description |
 |-------|------|-------------|
 | `columns` | `(string \| { column, direction?, nulls? })[]` | **Requis.** Les colonnes clés, dans l'ordre. 1 à 5 entrées. |
@@ -55,8 +51,6 @@ Cela est corrigé par la règle de propriété ci-dessous : un index que Rebase 
 | `include` | `string[]` | btree uniquement. Colonnes de charge utile (payload) incluses pour les index-only scans. |
 
 ### `columns` prend des clés de colonne, jamais des noms SQL
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Le nom d'une relation `belongsTo` représente sa colonne de clé étrangère ; ainsi, la relation `author` correspond à la colonne `author_id` :
 
@@ -141,8 +135,6 @@ indexes: [{ columns: ["status"], include: ["title"], reason: "the status sidebar
 Il n'y a ni `gist` ni `hash` : chaque classe d'opérateurs gist intéressante est fournie dans une extension, et les index hash ne peuvent être ni uniques, ni composites, ni ordonnés. Cette restriction permet de maintenir l'ensemble du modèle sur la voie d'Atlas — `rebase db push` matérialise l'état souhaité dans une base de données temporaire vierge sur laquelle planifier, et `CREATE EXTENSION` ne peut pas figurer dans ce fichier. **La recherche par trigrammes correspond à [`search:`](/docs/backend/search) ; l'ANN correspond à une [colonne `col.vector()`](/docs/sdk/aggregates-and-search#the-index).** Un index nécessitant `gin_trgm_ops` ou `vector_cosine_ops` est refusé au moment du build plutôt qu'émis pour échouer plus tard face à une base de données que vous n'avez jamais vue.
 
 ### `reason`
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 C'est le seul champ qui n'a aucun équivalent SQL derrière lui, et il est facultatif — mais renseignez-le.
 
@@ -242,8 +234,6 @@ Les index sont de nouveaux objets sur des tables qui contiennent déjà des donn
 
 ## Ce qui est refusé, et quand
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Tous ces cas sont refusés lors de la compilation du schéma, avec indication de la table et de la position dans le tableau — un index qui n'existerait silencieusement pas est l'anomalie que toute cette fonctionnalité supprime :
 
 - une clé qui n'est ni une colonne ni une relation `belongsTo` de la table, ou une relation dont la clé étrangère réside sur l'autre table
@@ -257,8 +247,6 @@ Tous ces cas sont refusés lors de la compilation du schéma, avec indication de
 - une `reason` vide
 
 ## Voir aussi
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - [Recherche](/docs/backend/search) — recherche en texte intégral avec classement, qui construit son propre index GIN sur un `tsvector` généré
 - [Recherche vectorielle](/docs/sdk/aggregates-and-search#vector-search) — l'index ANN sur une colonne d'embeddings, configuré sur `col.vector()`

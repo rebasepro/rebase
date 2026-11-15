@@ -1,5 +1,5 @@
 ---
-sourceHash: 9c7b1e0ee0076030
+sourceHash: 118e606ac71718ef
 title: Authentifizierung & Login
 sidebar_label: Authentifizierung & Login
 description: Richten Sie den Auth-Controller, die Login-Ansicht und die Rollensimulation in Ihrem Rebase React-Frontend ein.
@@ -74,8 +74,6 @@ Die Login-Ansicht übernimmt:
 - Formularvalidierung und Fehlerzustände
 
 ## Rollenmodell
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Rollen werden als `text[]`-Array-Spalte in der Users-Tabelle gespeichert. Sie definieren die Rollen, die ein Benutzer innehaben kann, als geschlossene Menge auf dieser Spalte in der mit [`defineAuthTable`](/docs/schema/auth-table/) deklarierten Tabelle:
 

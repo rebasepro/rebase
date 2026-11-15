@@ -1,13 +1,11 @@
 ---
-sourceHash: c858a7a8e7622cee
+sourceHash: ae48e0b641989cf2
 title: "Rezept: Redaktionelles Publizieren"
 sidebar_label: Redaktionelles Publizieren
 description: "Betreiben Sie ein Blog oder einen Newsroom auf Rebase: Autoren und Redakteure, Review-Prozesse, geplante Veröffentlichungen, Entwürfe von Live-Beiträgen, Vorschauen, Übersetzungen, eine Medienbibliothek, Inhaltsblöcke, Feeds, redaktionelle Notizen und ein WordPress-Import."
 ---
 
 ## Übersicht
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Dieses Rezept baut den redaktionellen Teil einer Publikation auf Rebase auf. Jeder Teil
 ist ein dokumentierter Erweiterungspunkt, sodass Sie nur die Komponenten übernehmen können, die Sie benötigen:
@@ -38,8 +36,6 @@ das Admin-Panel sie darstellt – das Board, die Buttons, die Vorschauen – ist
 
 ## Medien
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Eine Zeile pro Bild, sodass ein Bild einmal hochgeladen und wiederverwendet wird, zusammen
 mit Alt-Text und Bildnachweis:
 
@@ -68,8 +64,6 @@ die Dateien selbst hochladen darf, wird über Ihre
 [Speicherautorisierung](/docs/backend/storage-authorization/) festgelegt.
 
 ## Beiträge
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```ts
 // backend/schema/posts.ts
@@ -253,8 +247,6 @@ Zugriff gewährt; die Hooks und die History der Tabelle werden bei diesen Speich
 
 ## Einen Live-Beitrag bearbeiten
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Das Bearbeiten eines veröffentlichten Beitrags ändert diesen direkt live, und die obigen Regeln
 hindern Autoren daran, ihn überhaupt zu bearbeiten. Um Änderungen vorzubereiten und in einem
 Schritt zu veröffentlichen, verwalten Sie diese in einer zweiten Tabelle mit denselben Spalten:
@@ -366,8 +358,6 @@ Artikelkomponente der Website in diesem Tab oder binden Sie die Vorschauseite de
 ausgelieferte statische Website kann nur von ihrem eigenen Origin aus in einen Frame eingebunden werden.
 
 ## Redaktionelle Notizen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Notizen zwischen Autor und Redakteur sind eigene Tabellenzeilen, die direkt am Beitrag angezeigt werden:
 

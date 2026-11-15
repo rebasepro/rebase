@@ -1,11 +1,9 @@
 ---
-sourceHash: f55095351eb33abe
+sourceHash: d482e63c42ac3a1a
 title: Accesso ai campi
 sidebar_label: Accesso ai campi
 description: "Permessi di lettura e scrittura per colonna in base al ruolo con .access(), colonne che non lasciano mai il server con .private() e colonne che i client non possono scrivere con .readOnly(). Un chiamante autorizzato dalle policy della riga non riceve comunque una colonna che i suoi ruoli non possono leggere."
 ---
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 La [sicurezza a livello di riga](/docs/collections/security-rules/) decide a quali **righe** accede un chiamante. Tre modificatori di colonna decidono quali **colonne di una riga raggiunta** può visualizzare e impostare:
 
@@ -35,8 +33,6 @@ La regola precedente non impone alcun filtro di riga su `select`, quindi ogni ch
 
 ## La regola
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 `.access()` accetta due elenchi opzionali, e un elenco omesso non equivale a un elenco vuoto: questa differenza costituisce l'intera funzionalità.
 
 | `read` / `write` | Significato |
@@ -58,8 +54,6 @@ Il codice server senza una richiesta sottostante — come una migrazione o l'ada
 Il `context.data` di un hook non appartiene a quel piano. All'interno di una richiesta legge con i ruoli del chiamante, perciò le regole di campo si applicano a ciò che legge esattamente come si applicano alla richiesta: il driver stesso rifiuta un filtro, un ordinamento, una proiezione, un'inclusione, una ricerca vettoriale, un aggregato o un controllo di unicità che specifichi una colonna che tali ruoli non possono leggere (`FIELD_NOT_READABLE`), e risponde a un nome `.private()` come risponderebbe a un refuso — esattamente come farebbero REST e il socket.
 
 ## `.private()` e `.readOnly()` sono lo stesso meccanismo
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `.private()` corrisponde a `.access({ read: [], write: [] })`, con una differenza: una colonna privata viene anche esclusa da OpenAPI, dai tipi dell'SDK e dagli schemi dei tool MCP, per cui nemmeno il suo nome è pubblico (vedi [Query](#query)). Una colonna non può essere contemporaneamente `.private()` e dichiarare `.access()`; lo schema viene rifiutato.
 
@@ -130,8 +124,6 @@ Un'operazione di campo richiede anche il permesso di `read` sul campo interessat
 
 ### Un collegamento segue la sua colonna chiave
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Un `belongsTo` e la colonna chiave a cui è associato sono un unico campo con due rappresentazioni. Scrivere `{ "reviewer": 7 }` è soggetto a ogni regola di `reviewerId` (la sua regola di scrittura, `.readOnly()`, `.private()`, un timestamp di creazione, la colonna tenant); inviare entrambi con valori diversi restituisce `400 VALIDATION_INVALID_VALUE`. Un chiamante che non può leggere `reviewerId` non riceve `reviewer` in un `include`, e un filtro, ordinamento o voce `fields` che vi faccia riferimento risponde con `FIELD_NOT_READABLE`; dietro una chiave `.private()`, la relazione non esiste affatto per i client. L'endpoint dello schema, OpenAPI e MCP li descrivono insieme.
 
 Lo stesso vale per ogni relazione, attraverso qualsiasi elemento la sua join legga: un `hasMany` / `hasOne` legge la foreign key della destinazione, un `via` legge ogni colonna su cui si uniscono i suoi passaggi, su ogni tabella che attraversa. Un chiamante che non può leggere una di queste colonne non ottiene la relazione in un `include` o in un `_count`, riceve `FIELD_NOT_READABLE` filtrando o ordinando attraverso di essa (una relazione sconosciuta quando la colonna è `.private()`), e non la vede descritta.
@@ -143,8 +135,6 @@ Un `manyToMany` la cui tabella di giunzione è dichiarata (`through` fa riferime
 `strictWrites: false` su una tabella consente solo a una chiave non dichiarata dalla tabella di passare al driver. Non allenta mai una regola su una colonna dichiarata, un timestamp, il tenant, la chiave, la destinazione di una relazione o `_pivot`.
 
 ## Ricerca
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 La ricerca di fallback — una tabella senza un blocco `search` — esegue il confronto con `ILIKE` sulle colonne di testo e ignora quelle che il chiamante non può leggere. Nulla trapela attraverso di essa.
 
@@ -183,8 +173,6 @@ Le scritture in-process — `context.data` in un hook, `rebase.dataAsAdmin` in u
 Le letture tramite `rebase.dataAsAdmin` detengono il ruolo `admin`, quindi una regola basata sui ruoli non nasconde loro nulla. `[]` continua comunque a farlo — anche nei confronti di `dataAsAdmin`. Usa [`rebase.sql()`](/docs/backend/custom-functions) se hai bisogno della colonna non elaborata.
 
 ## Validazione
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `.access()` su una colonna, e `access` su una relazione, sollevano un errore al caricamento del modulo a meno che `read` e `write` non siano elenchi di nomi di ruoli non vuoti: una stringa dove è previsto un elenco (`read: "admin"`) viene rifiutata anziché interpretata diversamente.
 

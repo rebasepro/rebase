@@ -1,5 +1,5 @@
 ---
-sourceHash: fb9fac4af8dcfaaf
+sourceHash: 5b1baf3816d33bb8
 slug: pt/docs/compatibility
 title: Compatibilidade
 description: O que o Rebase promete entre versões e o que não promete — os seis contratos versionados, como cada um falha e o que ainda pode mudar em uma versão minor.
@@ -37,8 +37,6 @@ estranho, não corromper algo silenciosamente. Quais subsistemas são quais é p
 e datado em vez de deixado para ser descoberto — a tabela abaixo é essa publicação.
 
 ## Prontidão por subsistema
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 **Última revisão em 14 de setembro de 2026, com base na 0.21.0.** Releia a cada minor;
 uma classificação que não mudou em três versões ou está consolidada ou foi esquecida,
@@ -140,8 +138,6 @@ runtime este projeto aceita. Nomeado `rebase` em vez de `runtime` deliberadament
 porque `runtime` já significa *quem possui o processo* (`managed` | `custom`) em uma aplicação.
 
 ### 2 — `BUNDLE_FORMAT_VERSION` (atualmente 3)
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 O layout em disco de um bundle compilado. Um runtime recusa um bundle cujo formato seja
 mais novo do que o seu e lê um mais antigo onde a estrutura permite, o que permite à
@@ -268,8 +264,6 @@ Mais dois sinais de identificação, nenhum dos quais bloqueia algo por conta pr
 
 ### 6 — Identificadores derivados de banco de dados
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Todo nome que este framework calcula por conta própria em vez de ser informado: uma coluna de
 chave estrangeira (foreign key), uma restrição (constraint) de chave estrangeira, uma tabela
 de junção e suas duas colunas de chave, um tipo enum, um nome de policy, a coluna em
@@ -341,8 +335,6 @@ tabelas por meio de códigos diferentes, e um projeto enviado com push uma vez e
 mais tarde não pode terminar com dois schemas.
 
 ## O que *não* está congelado
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Dito claramente, para que ninguém deduza uma promessa que nunca foi feita:
 

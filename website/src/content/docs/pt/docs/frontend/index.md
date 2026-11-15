@@ -1,5 +1,5 @@
 ---
-sourceHash: 15779772a2359662
+sourceHash: d90a1098b873980d
 title: Visão Geral do Frontend
 sidebar_label: Frontend
 description: "Construa e personalize o painel — Rebase CMS e Rebase Studio — com React: controllers, scaffold, roteamento e views."
@@ -65,8 +65,6 @@ você terá apenas as ferramentas de desenvolvedor. Para estruturar o shell manu
 
 ## Onde os arquivos do CMS ficam
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 ```text
 frontend/src/
 ├── App.tsx
@@ -88,8 +86,6 @@ removida do bundle, de modo que os hooks e o código de servidor do backend nunc
 navegador. O backend não importa nada do frontend.
 
 ## Props do RebaseCMS
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 <!-- rebase-cms-props:start -->
 | Prop | Descrição |

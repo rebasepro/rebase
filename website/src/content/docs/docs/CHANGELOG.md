@@ -7,6 +7,8 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-11-15
+
 0.31 makes the backend Postgres-first: the tables you declare with `defineTable` in `backend/schema/` are the only thing the backend knows about your data, and the admin panel renders what the server serves. `rebase migrate collections-to-tables` moves a project and proves the generated SQL unchanged. Every Breaking entry has its section in [Upgrading 0.30 → 0.31](https://rebase.pro/docs/upgrading/0-30-to-0-31/).
 
 ### Breaking

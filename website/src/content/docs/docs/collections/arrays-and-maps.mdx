@@ -6,8 +6,6 @@ description: "How the CMS draws array and jsonb columns — repeatable lists, mu
 
 import { FieldWidgetPreview } from '../../../../components/docs/FieldWidgetPreview';
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 An array column is a list the form repeats. A `jsonb` column is a document: the
 CMS builds a form for it when the column describes its shape with
 [`json.*`](/docs/schema/json/), and offers free key/value editing when it does
@@ -39,8 +37,6 @@ export const pages = defineTable("pages", {
 
 ## Arrays
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 An array column (`col.text().array()`) is a repeatable list of the item's field: `tags` above
 is a list of text inputs. `.validate({ minItems, maxItems, uniqueItems })` on the
 array sets how many items the form accepts.
@@ -53,8 +49,6 @@ A `col.storage().multiple()` column is a multi-file upload; see
 [File uploads](/docs/collections/file-uploads/#several-files).
 
 ## Documents with a shape
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `col.jsonb(json.object({ … }))` is a group of fields, one per key, each the field
 its `json.*` builder calls for: `json.string()` a text input, `json.number()` a
@@ -75,8 +69,6 @@ structured field: they are edited as free JSON.
 
 ## Documents without a shape
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `col.jsonb().$type<T>()` types the document for TypeScript, but `T` is erased when the
 code runs, so the server and the CMS know nothing about it. `settings` above is
 edited as free key/value pairs. Give the column a `json.*` shape when the CMS
@@ -85,8 +77,6 @@ should draw a form for it.
 <FieldWidgetPreview client:only="react" variant="key_value" />
 
 ## Customizing items and nested keys
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```tsx
 // frontend/src/cms/pages.tsx
@@ -146,8 +136,6 @@ skipped, with a warning in development. Nested options for a key, a variant or
 an item the document does not have are skipped the same way.
 
 ## Next steps
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [JSON documents](/docs/schema/json/): the `json.*` builders and what the server does with a shape
 - [Fields](/docs/collections/properties/): every other column type

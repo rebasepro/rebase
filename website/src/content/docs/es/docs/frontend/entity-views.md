@@ -1,5 +1,5 @@
 ---
-sourceHash: faf8f760aabce923
+sourceHash: f76fb5b27f8eb93c
 title: Entity Views
 sidebar_label: Entity Views
 description: Añade pestañas y vistas personalizadas a las páginas de detalles de entidades para previsualizaciones, analíticas, datos relacionados o interfaces de usuario personalizadas.
@@ -15,8 +15,6 @@ Las vistas de entidad te permiten añadir **pestañas** personalizadas a la pág
 - **Editores personalizados** (texto enriquecido, editores de mapas)
 
 ## Añadir vistas de entidad
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```tsx
 // frontend/src/cms/products.tsx
@@ -38,8 +36,6 @@ tablas comparten. Una vista registrada solo se muestra en las tablas que nombran
 `position: "start"` coloca la pestaña antes de la del formulario; de lo contrario, se coloca después.
 
 ## Construir una vista de entidad
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `Builder` es el componente en sí, importado por valor:
 
@@ -64,8 +60,6 @@ export function ArticlePreview({ row, modifiedValues }: EntityCustomViewParams) 
 ```
 
 ### EntityCustomViewParams
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 | Prop | Tipo | Descripción |
 |------|------|-------------|

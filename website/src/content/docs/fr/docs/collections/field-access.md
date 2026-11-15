@@ -1,11 +1,9 @@
 ---
-sourceHash: f55095351eb33abe
+sourceHash: d482e63c42ac3a1a
 title: Accès aux champs
 sidebar_label: Accès aux champs
 description: "Permissions de lecture et d'écriture par colonne selon le rôle avec .access(), colonnes qui ne quittent jamais le serveur avec .private(), et colonnes non modifiables par les clients avec .readOnly(). Un appelant autorisé par les stratégies de la ligne ne reçoit tout de même pas une colonne que ses rôles ne lui permettent pas de lire."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 La [sécurité au niveau des lignes](/docs/collections/security-rules/) détermine les **lignes** auxquelles un appelant a accès. Trois modificateurs de colonne déterminent les **colonnes d'une ligne accessible** qu'il voit et peut modifier :
 
@@ -35,8 +33,6 @@ La règle ci-dessus n'applique aucun filtre de ligne sur `select`, de sorte que 
 
 ## La règle
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 `.access()` accepte deux listes facultatives, et une liste omise n'est pas une liste vide — toute la fonctionnalité repose sur cette différence.
 
 | `read` / `write` | Signification |
@@ -58,8 +54,6 @@ Le code serveur sans requête sous-jacente — une migration, ou l'adaptateur d'
 Le `context.data` d'un hook ne fait pas partie de ce plan. Au sein d'une requête, il lit avec les rôles de l'appelant, de sorte que les règles de champ s'appliquent à ses lectures exactement comme elles s'appliquent à la requête : le pilote lui-même refuse tout filtre, tri, projection, inclusion (`include`), recherche vectorielle, agrégat ou test d'unicité qui cible une colonne que ces rôles ne peuvent pas lire (`FIELD_NOT_READABLE`), et traite le nom d'une colonne `.private()` comme une faute de frappe — tout comme pour REST et le socket.
 
 ## `.private()` et `.readOnly()` reposent sur le même mécanisme
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `.private()` équivaut à `.access({ read: [], write: [] })`, à une différence près : une colonne privée est également omise d'OpenAPI, des types du SDK et des schémas d'outils MCP, de sorte que son nom n'est pas public non plus (voir [Requêtes](#requêtes)). Une colonne ne peut pas être à la fois `.private()` et déclarer `.access()` ; le schéma est refusé.
 
@@ -130,8 +124,6 @@ Une opération sur un champ requiert également la permission `read` sur ce cham
 
 ### Un lien suit sa colonne clé
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Une relation `belongsTo` et la colonne clé à laquelle elle est liée représentent un seul et même champ avec deux écritures. Écrire `{ "reviewer": 7 }` est soumis à toutes les règles de `reviewerId` (sa règle d'écriture, `.readOnly()`, `.private()`, un horodatage de création, la colonne de tenant) ; envoyer les deux avec des valeurs différentes renvoie `400 VALIDATION_INVALID_VALUE`. Un appelant qui ne peut pas lire `reviewerId` n'obtient pas `reviewer` dans un `include`, et une entrée de filtre, de tri ou de `fields` qui la nomme répond par `FIELD_NOT_READABLE` ; derrière une clé `.private()`, la relation n'existe tout simplement pas pour les clients. Le point de terminaison du schéma, OpenAPI et MCP décrivent les deux ensemble.
 
 Il en va de même pour chaque relation, quel que soit ce que lit sa jointure : une relation `hasMany` / `hasOne` lit la clé étrangère de la cible, une relation `via` lit chaque colonne sur laquelle ses étapes se joignent, sur chaque table traversée. Un appelant qui ne peut pas lire l'une de ces colonnes n'obtient pas la relation dans un `include` ou un `_count`, reçoit une erreur `FIELD_NOT_READABLE` lors d'un filtrage ou d'un tri via celle-ci (une relation inconnue lorsque la colonne est `.private()`), et ne la voit pas décrite.
@@ -143,8 +135,6 @@ Une relation `manyToMany` dont la table de jonction est déclarée par vos soins
 `strictWrites: false` sur une table permet uniquement de transmettre au pilote une clé non déclarée par la table. Cela n'assouplit en aucun cas une règle sur une colonne déclarée, un horodatage, le tenant, la clé, une cible de relation ou un champ `_pivot`.
 
 ## Recherche
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 La recherche par défaut — pour une table sans bloc `search` — effectue une correspondance `ILIKE` sur vos colonnes de texte, et ignore celles que l'appelant ne peut pas lire. Rien ne fuite par ce biais.
 
@@ -183,8 +173,6 @@ Les écritures in-process — `context.data` dans un hook, `rebase.dataAsAdmin` 
 Les lectures via `rebase.dataAsAdmin` détiennent le rôle `admin`, de sorte qu'une règle de rôle ne leur masque rien. `[]` le fait toujours — y compris pour `dataAsAdmin`. Utilisez [`rebase.sql()`](/docs/backend/custom-functions) si vous avez besoin d'accéder à la colonne brute.
 
 ## Validation
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `.access()` sur une colonne, et `access` sur une relation, lèvent une exception au chargement du module sauf si `read` et `write` sont des listes de noms de rôles non vides : une chaîne de caractères fournie à la place d'une liste (`read: "admin"`) est refusée plutôt qu'interprétée autrement.
 

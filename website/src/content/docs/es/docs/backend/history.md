@@ -1,5 +1,5 @@
 ---
-sourceHash: 37c268f3d4b76c7f
+sourceHash: a0c661b1716664d6
 title: Historial de entidades
 sidebar_label: Historial de entidades
 description: Rastrea cada cambio en tus entidades con un registro de auditoría completo — quién cambió qué, cuándo y la entidad completa antes y después.
@@ -44,8 +44,6 @@ history: {
 ```
 
 ### Por tabla
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Marca qué tablas rastrean el historial con `history: true`:
 
@@ -143,7 +141,7 @@ La retención se aplica en dos lugares:
 GET /api/data/:slug/:entityId/history
 ```
 
-Devuelve una lista de entradas de historial para una entidad específica, ordenadas por la más reciente primero. <span class="since-badge" data-since="0.31">Desde 0.31</span> Las entradas que registra una transacción — una creación y la actualización posterior en un solo `_batch`, una reversión y su respectiva reversión — se devuelven en el orden en que se escribieron: el `updated_at` de cada entrada es posterior a la entrada previa de la fila. Una base de datos existente obtiene esto con su próximo arranque de aprovisionamiento, o con una ejecución con `REBASE_PROVISION_ONLY=true`, lo que reemplaza la función `rebase.record_history`; un despliegue que nunca se aprovisiona mantiene el orden anterior hasta entonces. Las entradas registradas antes de eso conservan su orden.
+Devuelve una lista de entradas de historial para una entidad específica, ordenadas por la más reciente primero. Las entradas que registra una transacción — una creación y la actualización posterior en un solo `_batch`, una reversión y su respectiva reversión — se devuelven en el orden en que se escribieron: el `updated_at` de cada entrada es posterior a la entrada previa de la fila. Una base de datos existente obtiene esto con su próximo arranque de aprovisionamiento, o con una ejecución con `REBASE_PROVISION_ONLY=true`, lo que reemplaza la función `rebase.record_history`; un despliegue que nunca se aprovisiona mantiene el orden anterior hasta entonces. Las entradas registradas antes de eso conservan su orden.
 
 ```json
 {
@@ -166,8 +164,6 @@ Devuelve una lista de entradas de historial para una entidad específica, ordena
 ```
 
 ### Las entradas se sirven como lecturas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Las entradas de historial se sirven de la misma manera que la fila: acceso a nivel de campo primero,
 luego `afterRead` (global, tabla, columna), dentro de la transacción de solo lectura del

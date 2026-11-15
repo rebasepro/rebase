@@ -1,5 +1,5 @@
 ---
-sourceHash: 3317ba94279d0cb8
+sourceHash: c3ddd891a53e23c1
 title: Estendere Rebase
 sidebar_label: Estendere Rebase
 description: Una guida alle decisioni per scegliere il meccanismo di estensione corretto — plugin, slot, override di componenti, viste entità, azioni e altro ancora.
@@ -18,8 +18,6 @@ Ogni meccanismo descritto di seguito si basa sullo stesso concetto fondamentale:
 Tutto ciò che si trova qui riguarda il **pannello di amministrazione**. Per il server — limitare una lettura, aggiungere una route, incorporare il driver nel proprio processo, `rebase eject` — consulta [Rebase non fa X](/docs/backend/extending), che fornisce una tabella simile per il backend.
 
 ## Tabella delle decisioni
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 | Desidero… | Meccanismo | Ambito | Riferimento |
 |---|---|---|---|
@@ -49,8 +47,6 @@ Ognuno dei meccanismi descritti di seguito ti fornisce un componente React senza
 ## I meccanismi nel dettaglio
 
 ### Plugin
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 **Ambito:** app.
 
@@ -103,8 +99,6 @@ Due modalità: **Eject** (sostituzione completa) o **Wrap** (estensione dell'ori
 
 ### Viste entità
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 **Ambito:** entità (aggiunge tab).
 
 Viste personalizzate che appaiono come tab nella pagina di dettaglio dell'entità. Sono definite per tabella in `customizeTable`, oppure registrate una sola volta su `<Rebase entityViews>` (o `<RebaseCMS entityViews>`) e richiamate tramite la relativa `key` nelle `entityViews` di una tabella.
@@ -112,8 +106,6 @@ Viste personalizzate che appaiono come tab nella pagina di dettaglio dell'entit�
 → [Viste entità](/docs/frontend/entity-views)
 
 ### Azioni entità
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 **Ambito:** entità.
 
@@ -133,7 +125,6 @@ Componenti React a livello di barra degli strumenti che ricevono `CollectionActi
 
 ### Modalità di visualizzazione personalizzate
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 **Ambito:** collezione (aggiunge una modalità di visualizzazione).
 
 Una mappa, un calendario, una galleria, una cronologia — un altro modo di renderizzare *le stesse righe*, offerto nel selettore di vista della collezione accanto a List, Table, Cards e Board.
@@ -208,7 +199,6 @@ La scelta della vista aggiorna `?__view=`, persiste a un ricaricamento della pag
 
 ### `formView`
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 **Ambito:** collezione.
 
 Sostituisce l'intero form predefinito dell'entità con un componente personalizzato, configurato con `formView: { Builder, includeActions }` in `customizeTable`; consulta [Sostituire il form](/docs/frontend/form-layout/#replacing-the-form). `includeActions` (predefinito `true`) mantiene i pulsanti Salva e Annulla nella barra.
@@ -248,8 +238,6 @@ Se ciò che desideri modificare è il comportamento del server piuttosto che ci�
 → [Rebase non fa X](/docs/backend/extending)
 
 ## Riepilogo delle precedenze
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 - **La proprietà `components` di una tabella ha la precedenza sui `components` globali** all'interno della sua collezione. Una sostituzione a livello di collezione sostituisce entrambi; un override con `wrap: true` a livello di collezione avvolge l'override globale, qualora presente. Consulta [Override dei componenti](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **Le `Actions` di collezione e lo slot `collection.actions` sono additivi** — i componenti `Actions` vengono renderizzati per primi, seguiti dai contributi dello slot.

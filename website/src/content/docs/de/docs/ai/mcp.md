@@ -1,5 +1,5 @@
 ---
-sourceHash: 43fd981d241b2237
+sourceHash: 8625c4e3b529e6b3
 title: MCP-Server
 sidebar_label: MCP-Server
 description: Verbinden Sie Claude Code, Cursor, Gemini CLI oder einen beliebigen MCP-Client mit einem Rebase-Projekt – die 53 bereitgestellten Tools, die Anmeldedaten zur Authentifizierung und das Loopback-Gate, das zwischen einem Agenten und der Produktion steht.
@@ -274,8 +274,6 @@ vollständige Anleitung zum Scoping von Schlüsseln.
 
 ### Eine Tabelle komplett unerreichbar machen
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Der Grund, warum ein Admin-Credential alles lesen kann, ist die Basisrichtlinie, die Rebase
 in jede Tabelle einfügt und die dem vertrauenswürdigen Serverkontext und der Rolle `admin`
 Zugriff gewährt. Eine Tabelle kann sich von dieser Basisrichtlinie abmelden und die volle
@@ -310,8 +308,6 @@ Sie wird erst wirksam, wenn `rebase schema generate` und eine Migration die Rich
 angewendet haben. Siehe [Row-Level Security](/docs/collections/security-rules).
 
 ## Das Loopback-Gate
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `rebase_project_add` akzeptiert jede `baseUrl`, und die CLI-Tools verbinden sich mit
 der `DATABASE_URL`, die das Projekt deklariert. Dieselbe Tool-Liste, die eine Scratch-Datenbank
@@ -554,8 +550,6 @@ das Gate es bei einem nicht-lokalen Ziel blockiert, finden Sie in der
 [MCP-Tool-Referenz](/docs/ai/mcp-tool-reference).
 
 ## Ressourcen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Neben Tools stellt der Server MCP-Ressourcen bereit, sodass ein Client Kontext über das
 Projekt abrufen kann, ohne einen Tool-Aufruf zu verbrauchen:

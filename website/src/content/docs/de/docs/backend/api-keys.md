@@ -1,5 +1,5 @@
 ---
-sourceHash: 8f9385dd3838df4f
+sourceHash: d357e5b6fe30364a
 title: API-Schlüssel
 sidebar_label: API-Schlüssel
 description: "Langlebige Schlüssel für Skripte, CI, Agenten und Integrationen: Service-Schlüssel und persönliche Schlüssel, die Scopes, die sie besitzen, wie sie mit Row-Level Security zusammenwirken und die Routen, die sie verwalten."
@@ -175,8 +175,6 @@ läuft, behält ihr gesamtes Budget. Das Simulieren oder Nachahmen eines Benutze
 Administrator auf dieselbe Weise angerechnet.
 
 ## Persönliche Schlüssel
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein persönlicher Schlüssel agiert **als sein Eigentümer**: mit dessen UID und dessen Rollen zum
 Zeitpunkt der jeweiligen Anfrage. Regeln im Owner-Stil treffen auf ihn zu, sodass er genau das liest,

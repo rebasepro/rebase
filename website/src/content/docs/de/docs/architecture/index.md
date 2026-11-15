@@ -1,5 +1,5 @@
 ---
-sourceHash: b58890f96ff100b4
+sourceHash: 9053234803842e2e
 title: Architektur-Übersicht
 sidebar_label: Architektur
 description: Erfahren Sie, wie Backend, Frontend, typisiertes SDK und Datenbank von Rebase zusammenwirken, um ein vollständiges Backend-as-a-Service zu bilden.
@@ -52,8 +52,6 @@ Der `createPostgresAdapter` übernimmt automatisch das Connection-Pooling der Da
 
 ### Tabellen-Deskriptoren
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Beim Start kompiliert das Backend die von `backend/schema/index.ts` exportierten Tabellen in
 **Deskriptoren**: jede Spalte mit ihrem Postgres-Typ, ihrer Nullability, ihren Validierungs- und
 Speicherregeln, den Relationen nach Slug und der Konfiguration der Row-Level Security. Ein
@@ -81,8 +79,6 @@ Bei **Multi-Instanz-Deployments** (z. B. Cloud Run mit mehreren Replikaten) häl
 Ähnlich wie Treiber werden Storage-Backends in einer Registry registriert. Sie können mehrere Storage-Provider (lokal, S3) verwenden und unterschiedliche Storage-Spalten mit `col.storage({ source })` an verschiedene Backends routen.
 
 ## Paketübersicht
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 | Paket | Rolle | Verwendet von |
 |-------|-------|---------------|

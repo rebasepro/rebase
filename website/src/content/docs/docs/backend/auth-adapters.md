@@ -75,8 +75,6 @@ export interface AuthAdapter {
 
 ### The adapter decides the caller everywhere
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `verifyRequest` is the one place the backend asks who sent a request. The data
 and functions routes ask it, and so do `GET /api/schema/tables`, the OpenAPI
 document at `/api/docs` and every admin surface under `/api/admin` (UI

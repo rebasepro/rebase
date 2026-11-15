@@ -1,5 +1,5 @@
 ---
-sourceHash: 1610ca294114442e
+sourceHash: d68196665de50636
 title: Rollen und Scopes
 sidebar_label: Rollen und Scopes
 description: "Was ein Aufrufer tun darf: die Datenebene, die jede Person besitzt, die Admin-Ebene, die durch Rollen gewährt wird, die Scopes, die eine App für sich selbst deklariert, und wie jedes Credential sie trägt."
@@ -82,8 +82,6 @@ er ein `target` deklariert, wie unten beschrieben.
 
 ## Rollen deklarieren
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Rollen werden in der [Benutzertabelle](/docs/schema/auth-table/) unter `auth.roles`
 deklariert. Eine Rolle ist ein Name, den die Datenbank sieht und auf den
 Row-Level-Security-Policies abgestimmt werden können, zuzüglich einer Liste von
@@ -155,8 +153,6 @@ const { roles } = await client.admin.listRoles();
 ```
 
 ## App-Scopes
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Eine App kann ihre eigenen Operationen als Scopes unter `auth.scopes` definieren:
 

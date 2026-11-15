@@ -103,15 +103,11 @@ Any active filters in the collection view are applied to the export. This lets y
 
 ### Export Configuration
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Export is available on every collection unless you turn it off. `exportable` in
 `customizeTable` configures it: `exportable: false` removes the **Export**
 button, and an `ExportConfig` keeps it and adds computed columns.
 
 ### Adding Computed Fields
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `additionalFields` adds columns that do not exist in the table; each is computed
 at export time, and may be async:

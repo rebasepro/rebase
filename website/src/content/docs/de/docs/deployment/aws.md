@@ -1,5 +1,5 @@
 ---
-sourceHash: d9b167443cc3fd35
+sourceHash: c117340992cb4446
 title: Bereitstellung von Rebase auf AWS
 description: Stellen Sie Ihre Rebase-Instanz sicher auf Amazon Web Services bereit, indem Sie RDS und AWS App Runner mit einem starken europäischen Fokus nutzen.
 sidebar_label: AWS
@@ -35,7 +35,7 @@ rebase build
 Für App Runner, das Images aus einer Registry bezieht, binden Sie das Bundle in ein abgeleitetes Image ein. Das sind lediglich drei Zeilen und legt exakt fest, was ausgeführt wird:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -80,8 +80,6 @@ App Runner ist der einfachste Weg, Container auf AWS auszuführen, ohne Orchestr
 AWS übernimmt die TLS-Terminierung, sodass Sie direkt eine `https`-URL erhalten.
 
 ## 4. Das Schema
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 **Die Runtime erstellt fehlende Tabellen beim Start automatisch, einschließlich derer, die `backend/schema` deklariert.** `REBASE_MIGRATE_ON_BOOT` steht standardmäßig auf `ensure`, was sich im gesamten Schema additiv verhält – es erstellt fehlende Tabellen, Spalten und Enum-Typen und wendet deren Row-Level Security an –, sodass der erste Start gegen eine leere RDS-Instanz direkt Ihre Tabellen bereitstellt.
 

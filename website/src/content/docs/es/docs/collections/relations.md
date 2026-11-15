@@ -1,11 +1,9 @@
 ---
-sourceHash: e0fcc045382336df
+sourceHash: 7f09b99cbb85db3d
 title: Relaciones
 sidebar_label: Relaciones
 description: "Vincula tablas con rel.belongsTo, hasOne, hasMany, manyToMany y via: claves foráneas vinculadas o derivadas, tablas de unión con columnas _pivot, reglas de eliminación, reglas de nomenclatura y uniones de múltiples saltos."
 ---
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Las `relations` de una tabla nombran los enlaces que tiene con otras tablas. Cada una es una llamada a `rel.*`, y su clave es el nombre de la relación: lo que solicita `include`, lo que lee una ruta anidada como `/api/data/users/1/posts`, y lo que una escritura nombra para establecer el enlace.
 
@@ -36,8 +34,6 @@ Las relaciones ya no son propiedades. La columna de clave foránea de un `belong
 
 ## Los cinco tipos
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | Tipo | La clave reside | Devuelve | Opciones |
 |---|---|---|---|
 | `rel.belongsTo` | en **esta** tabla | una fila | `localKey`, `notNull`, `unique`, `onDelete`, `onUpdate`, `index`, `constraint` |
@@ -56,8 +52,6 @@ Cada tipo también admite `access` y `private`, que deciden quién recibe las fi
 Consulta [Acceso a campos](/docs/collections/field-access/) para saber qué ve un cliente sin acceso.
 
 ## belongsTo — la clave está en esta tabla
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `belongsTo` coloca la clave foránea en la tabla que la declara. La columna SQL de la clave es `localKey`, y `<nombre de la relación en singular>_id` cuando se omite: `author` es `author_id`.
 
@@ -106,8 +100,6 @@ La columna de clave foránea se indexa a menos que se indique `index: false`: Po
 
 ## hasOne y hasMany — la clave está en el destino
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `hasMany` lee filas del destino que apuntan de vuelta a esta. `hasOne` es el mismo enlace con a lo sumo una fila en el otro extremo. Ninguno añade una columna aquí: el destino declara el `belongsTo` que contiene la clave.
 
 ```ts
@@ -139,8 +131,6 @@ El orden declarado se aplica a un include, a la lectura de relación de un únic
 
 ### Unión mediante una clave natural
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Por defecto, la clave del destino contiene la clave primaria de esta fila. Cuando los dos lados se unen mediante otro elemento (un identificador de identidad externa, un SKU), `sourceKey` nombra la columna en esta tabla:
 
 ```ts
@@ -163,8 +153,6 @@ export const talents = defineTable("talents", {
 La columna `sourceKey` debe ser única: un enlace que apunte a varias filas de origen no puede determinar a cuál pertenece una fila relacionada. Una fila cuyo `sourceKey` sea `NULL` no alcanza ninguna fila relacionada, y escribir a través de la relación genera un error.
 
 ## manyToMany — a través de una unión
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `manyToMany` vincula filas a través de una tabla de unión que Rebase crea, con su propia seguridad a nivel de fila. Eliminar un enlace borra la fila de la unión, nunca el destino.
 
@@ -218,8 +206,6 @@ El destino también puede ser una vista (`defineView`): `db push`, el arranque y
 
 ### `_pivot`: las columnas propias de la unión
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Las columnas `pivot` se leen y escriben bajo `_pivot`. Una lectura que incluye la relación sirve cada fila relacionada con las columnas de su enlace:
 
 ```json
@@ -238,13 +224,9 @@ Las columnas pivot admiten todos los modificadores de columna excepto `.primaryK
 
 ### `_count`: cuántas filas relacionadas hay
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Un include de una relación to-many (`hasMany`, `manyToMany`, un `via` to-many) puede solicitar el total junto con una página limitada de filas, servido bajo el `_count` de la fila. Se cuenta en la misma sentencia, bajo los mismos filtros y seguridad a nivel de fila. Consulta [Contar lo que un límite deja fuera](/docs/sdk/relations#counting-what-a-limit-leaves-out).
 
 ## via — una cadena de unión explícita
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `via` lee a través de joins que especificas explícitamente: varios saltos, claves compuestas o una condición que no sea una simple clave foránea.
 
@@ -280,8 +262,6 @@ Una cadena puede pasar a través de una tabla que la lectura ya contenga — un 
 
 ## Reglas de eliminación y actualización
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | Acción | Comportamiento |
 |---|---|
 | `"cascade"` | Eliminar o actualizar también las filas relacionadas |
@@ -293,8 +273,6 @@ Una cadena puede pasar a través de una tabla que la lectura ya contenga — un 
 Cuando `onDelete` no está configurado, un `belongsTo` que admite nulos vacía el puntero (`set null`), uno `NOT NULL` rechaza la eliminación (`restrict`) y un enlace `manyToMany` se elimina con cualquiera de las filas (`cascade`). `NOT NULL` indica que una fila no puede existir sin su padre; no indica que eliminar el padre deba eliminar la fila. Solicita `"cascade"` cuando eso sea lo que buscas: es el único valor que elimina filas que no especificaste.
 
 ## Nombres
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Cada nombre que usa una relación se deriva cuando no lo especificas. Las reglas son las mismas que ya tiene una base de datos desplegada, por lo que no cambian entre versiones.
 
@@ -313,8 +291,6 @@ El nombre de una relación `belongsTo` representa su columna de clave foránea d
 
 ## Lectura y escritura de relaciones
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Las relaciones no se incluyen en una lectura a menos que quien hace la llamada lo solicite:
 
 ```typescript
@@ -331,8 +307,6 @@ En el CMS, cada relación to-many se convierte en una pestaña debajo del regist
 
 ## Qué se rechaza
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `rel.via()` sin steps arroja un error cuando se carga el módulo. Cuando se compila el esquema, una tabla se rechaza por:
 
 - una relación cuyo destino no es una tabla o vista del esquema;
@@ -345,8 +319,6 @@ En el CMS, cada relación to-many se convierte en una pestaña debajo del regist
 - una columna pivot marcada con `.primaryKey()` (la clave de la unión son sus dos columnas de enlace) o que declare `.transform()` (los hooks de una columna pivot nunca se ejecutan; el `afterRead` del destino ve `_pivot`).
 
 ## Siguientes pasos
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Seguridad a nivel de fila](/docs/collections/security-rules/): quién accede a las filas en cada extremo
 - [Índices](/docs/backend/indexes/): el índice de clave foránea y los índices compuestos sobre relaciones

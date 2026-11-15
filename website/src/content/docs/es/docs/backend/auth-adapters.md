@@ -1,5 +1,5 @@
 ---
-sourceHash: 939f091d469cc389
+sourceHash: af22f01225487809
 title: Adaptadores de autenticación personalizados
 sidebar_label: Adaptadores de autenticación personalizados
 description: Reemplaza la autenticación integrada de Rebase con Clerk, Firebase Auth o tu propio proveedor de identidad implementando el contrato AuthAdapter.
@@ -75,8 +75,6 @@ export interface AuthAdapter {
 ```
 
 ### El adaptador decide quién realiza la llamada en todas partes
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `verifyRequest` es el único lugar donde el backend pregunta quién envió una solicitud. Las rutas de datos y funciones lo consultan, al igual que `GET /api/schema/tables`, el documento OpenAPI en `/api/docs` y cada superficie de administración bajo `/api/admin` (preferencias de interfaz de usuario, edición de esquemas en vivo, el editor de esquemas, cron, registros, copias de seguridad y demás). Una clave de API (`rk_`) o un token de plataforma (`rpt_`) siguen siendo resueltos por Rebase antes de consultar al adaptador. Una credencial que el adaptador no reconoce genera un `401`, nunca se interpreta como nadie; una solicitud sin credencial se considera nadie, ante lo cual el endpoint de esquema y el documento responden `401` (a menos que esté `schemaTables.public`) y las superficies de administración siempre responden `401`. Los roles que devuelve el adaptador determinan cómo se describe a quien realiza la llamada y si una superficie de administración lo admite (`403` cuando carece de su alcance). Un adaptador que lanza una excepción equivale al rechazo de quien realiza la llamada, nunca a un `500`. Consulta [Schema](/docs/backend/endpoints/#schema).
 

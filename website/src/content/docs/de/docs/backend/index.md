@@ -1,5 +1,5 @@
 ---
-sourceHash: 9be8187c5259c1dd
+sourceHash: f77c49012120dbf4
 title: Backend-Übersicht
 sidebar_label: Backend
 description: Das Rebase-Backend bietet einen vollständigen Server mit REST-API, Authentifizierung, Speicher, WebSocket-Echtzeit und Entitätshistorie – alles initialisiert mit einem einzigen Funktionsaufruf.
@@ -49,8 +49,6 @@ Dieser eine Aufruf ist eine Abkürzung für öffentliche Schritte: `installUnhan
 
 ## Wo sich die einzelnen Optionen befinden
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Dieser Aufruf entspricht der **ausgeklinkten (ejected)** Form – diejenige, die Sie nach `rebase eject` oder in einem benutzerdefinierten Server selbst schreiben. Ein neu erstelltes (scaffolded) Projekt besitzt diesen nicht: Die veröffentlichte Runtime startet das Projekt, und jede Option wird als Umgebungsvariable in `.env`, als Export aus `backend/storage.ts` oder `backend/hooks.ts` oder als Verzeichnis übergeben, das das Bundle in `rebase.json` deklariert.
 
 Beide Pfade führen zur selben `RebaseBackendConfig`. Hier ist die vollständige Übersicht.
@@ -85,8 +83,6 @@ Beide Pfade führen zur selben `RebaseBackendConfig`. Hier ist die vollständige
 
 ### Optionen ohne verwaltete Route
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Für diese gibt es weder eine Umgebungsvariable noch einen Modulexport. Sie sind nur über einen manuell geschriebenen `initializeRebaseBackend`-Aufruf erreichbar – `rebase eject` oder einen [benutzerdefinierten Server](/docs/backend/custom-server/):
 
 `rateLimit` · `jobs` · `csrf` · `cronPersistence` ·
@@ -118,8 +114,6 @@ Nach der Initialisierung werden folgende Routen eingebunden:
 ---
 
 ## Der Initialisierungs-Lebenszyklus
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Wenn Sie `initializeRebaseBackend()` aufrufen, löst das Framework eine sequentielle, fünfstufige Boot-Sequenz aus:
 
@@ -173,8 +167,6 @@ Beide Probes stammen aus der verwalteten Runtime. Ein ausgeklinktes `backend/src
 ---
 
 ## Konfigurationsreferenz
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```typescript
 interface RebaseBackendConfig {

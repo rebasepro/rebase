@@ -1,13 +1,11 @@
 ---
-sourceHash: a289b69be61220df
+sourceHash: c75bfea30303f60e
 title: Soft delete
 sidebar_label: Soft delete
 description: "softDelete su una tabella trasforma l'eliminazione in un timestamp, nasconde le righe contrassegnate da ogni lettura e le ripristina con un normale aggiornamento."
 ---
 
 ## Cosa cambia
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 Con `softDelete` abilitato, un'eliminazione **appone un timestamp su una colonna invece di rimuovere la riga**, e ogni lettura esclude le righe contrassegnate. Nient'altro dell'operazione cambia: è richiesta la stessa autorizzazione, `beforeDelete` può ancora porre il veto e `afterDelete` viene comunque eseguito. Dal punto di vista del chiamante la riga è stata eliminata; il modo in cui la tabella registra l'operazione riguarda esclusivamente questo flag.
 

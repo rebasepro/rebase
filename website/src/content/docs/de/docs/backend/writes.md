@@ -1,5 +1,5 @@
 ---
-sourceHash: b1b5ef4227e130d2
+sourceHash: 2229a4346ece8f3c
 title: Schreiben über REST
 sidebar_label: Schreiben über REST
 description: Idempotenz-Schlüssel, bedingte Schreibvorgänge mit ETag und If-Match, Feldoperationen, Upserts auf einem natürlichen Schlüssel, return=minimal und tabellenübergreifende Batches.
@@ -21,7 +21,7 @@ gilt alles in diesem Abschnitt auch für sie, mit Ausnahme von `?on_conflict=`.
 Der Body eines Schreibvorgangs muss ein JSON-Objekt sein. `null`, eine Zahl, ein String oder ein Array führt zu
 einem `400 BAD_REQUEST`.
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span> Ein Schreibvorgang akzeptiert die in der REST-API dokumentierten Werte und sonst nichts – dieselbe
+Ein Schreibvorgang akzeptiert die in der REST-API dokumentierten Werte und sonst nichts – dieselbe
 Struktur, die ein Lesevorgang zurückgibt: eine To-One-Relation (`belongsTo`, `hasOne`, ein To-One-
 `via`) als Schlüssel der verknüpften Zeile oder `null`, eine To-Many-Relation als Liste von Schlüsseln
 oder `{ id, _pivot? }`-Objekten, ein Datum als ISO-Text, einen Vektor als Liste von Zahlen,
@@ -235,8 +235,6 @@ würde jede „Neu in dieser Woche“-Abfrage zunichtemachen.
 
 #### Nicht auf der Auth-Tabelle
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Die Auth-Tabelle (die mit `defineAuthTable` deklarierte) verweigert einen Upsert an jeder
 Stelle – `?on_conflict=`, `/bulk` mit `upsert: true`, eine `_batch`-`upsert`-
 Operation, das `upsert()` des SDKs und der Realtime-Socket – mit einem `400`
@@ -268,7 +266,7 @@ wird als Skalar zurückgegeben; ein zusammengesetzter Schlüssel als Objekt sein
 
 ## Tabellenübergreifende Batches
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span> Jede Operation gibt ihre Tabelle als `table` an (zuvor `collection`).
+Jede Operation gibt ihre Tabelle als `table` an (zuvor `collection`).
 
 `POST /api/data/_batch` schreibt über Tabellen hinweg in einer einzigen Transaktion unter der
 Rolle des Aufrufers mit denselben Validierungen, Hooks und Zeilenebenen-Sicherheitsregeln (Row-Level Security),

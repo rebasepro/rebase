@@ -1,5 +1,5 @@
 ---
-sourceHash: 15a0356fd585a797
+sourceHash: b8f64996e4df9766
 title: Implantando o Rebase no Fly.io
 description: Saiba como implantar o Rebase globalmente ou restringi-lo a data centers europeus usando o Fly.io.
 sidebar_label: Fly.io
@@ -38,7 +38,7 @@ rebase build
 Faça o commit de um `Dockerfile` de três linhas na raiz do projeto:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -94,8 +94,6 @@ fly deploy
 Depois, `fly open`.
 
 ## 5. O schema
-
-<span class="since-badge" data-since="0.31">A partir da 0.31</span>
 
 **O runtime cria tabelas ausentes na inicialização, incluindo as declaradas por `backend/schema`.** O valor padrão de `REBASE_MIGRATE_ON_BOOT` é `ensure`, que é aditivo em todo o schema — ele cria tabelas, colunas e tipos enum ausentes e aplica a segurança a nível de linha (row-level security) deles —, de modo que a primeira inicialização em um banco de dados vazio já começa servindo suas tabelas.
 

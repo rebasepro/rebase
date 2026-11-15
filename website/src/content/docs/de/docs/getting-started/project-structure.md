@@ -1,5 +1,5 @@
 ---
-sourceHash: c6b361597710219f
+sourceHash: b26bc6f688a4ec9b
 title: Projektstruktur
 sidebar_label: Projektstruktur
 description: "Der Aufbau eines Rebase-Projekts — die Tabellen in backend/schema, die Backend-Module, die die Runtime liest, und die Anpassungen des Admin-Panels in frontend/src/cms — mit und ohne Panel."
@@ -27,8 +27,6 @@ in der Branche etwas anderes.
   Datenbank, ein Bucket, ein Topic. Deklariert in `backend/resources.ts`, gebunden über
   Umgebungsvariablen.
 :::
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `rebase init` erstellt eines von zwei Layouts als Gerüst. Beide haben dasselbe `backend/`;
 der Unterschied besteht darin, ob das Projekt das Admin-Panel enthält.
@@ -110,8 +108,6 @@ und eine Compose-Datei, die diese baut. Siehe [Custom-Server-Integration](/docs/
 :::
 
 ## Tabellen (`backend/schema/`)
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Tabellen sind die **Single Source of Truth** für Ihr Datenmodell:
 
@@ -207,8 +203,6 @@ einem Wert überein, ohne dass dieser dreimal angegeben werden muss.
 
 ### Wichtige Konzepte
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 - **`createRebaseClient`** — Erstellt den SDK-Client, der HTTP-Anfragen, WebSocket-Verbindungen und die Verwaltung von Auth-Tokens abwickelt. Rufen Sie ihn einmalig auf Modulebene auf: Innerhalb einer Komponente, selbst in einem `useMemo`, erstellt `<React.StrictMode>` in der Entwicklung einen zweiten Client
 - **`<RebaseCMS tableCustomizations>`** — das Panel rendert jede Tabelle, die das Backend unter `GET /api/schema/tables` bereitstellt; die `customizeTable`-Objekte aus `frontend/src/cms/` verändern das Aussehen einiger von ihnen, und `uiConfig` enthält das, was der Collection-Editor während der Entwicklung gespeichert hat. Siehe [Anpassen einer Tabelle](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
 - **`useRebaseAuthController`** — Hält den angemeldeten Benutzer und den Token-Lebenszyklus und wird von `<Rebase>` an alle darunterliegenden Komponenten weitergegeben
@@ -258,8 +252,6 @@ erreichen das Projekt nicht mehr. Diese Schnittstelle ist in
 [Custom-Server-Integration](/docs/backend/custom-server) dokumentiert.
 
 ## Wie sie zusammenhängen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 1. **Sie deklarieren** Tabellen in `backend/schema/`
 2. **Das Backend** kompiliert sie, erstellt die Tabellen sowie Policies und bindet REST-, Echtzeit- und MCP-Routen ein

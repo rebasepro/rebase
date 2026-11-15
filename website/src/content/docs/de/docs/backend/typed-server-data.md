@@ -1,11 +1,9 @@
 ---
-sourceHash: d08c6bb1dfd3357e
+sourceHash: f57a8ae030d7e978
 title: Typisierte serverseitige Daten
 sidebar_label: Typisierte serverseitige Daten
 description: "Registrieren Sie Ihren generierten Database-Typ einmalig, und context.data, rebase.dataAsAdmin sowie das rebase, das eine Funktion oder ein Cron erhält, werden davon typisiert: Zeilen, Filter, Sortierungen, Includes und Schreib-Inputs."
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Der Browser-Client wird typisiert, indem Sie Ihre generierte `Database` an
 `createRebaseClient<Database>()` übergeben (siehe [Generierung des typisierten SDKs](/docs/sdk#typed-sdk-generation)).
@@ -24,8 +22,6 @@ Es gibt zwei Möglichkeiten der Registrierung: über die generierte `Database`, 
 über Ihr `backend/schema`-Modul selbst, was keinen Codegen-Lauf erfordert.
 
 ## Die generierte `Database` registrieren
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```bash
 rebase generate-sdk --register
@@ -68,8 +64,6 @@ Daten zurückzukehren, entfernen Sie `registerDatabase` und löschen Sie `backen
 
 ## Das Schema ohne Codegen registrieren
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Ein Projekt, das nichts generiert hat, registriert stattdessen sein Schema-Modul
 und wird direkt über dessen `defineTable`-Aufrufe typisiert:
 
@@ -96,8 +90,6 @@ der Table-Hooks desselben Schemas, da das Typisieren der Hooks eines Schemas anh
 Schemas selbst einen Zyklus darstellt, den TypeScript verweigert.
 
 ## Was typisiert wird
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```ts
 // backend/schema/orders.ts — a hook

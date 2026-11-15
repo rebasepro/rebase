@@ -1,5 +1,5 @@
 ---
-sourceHash: 43fd981d241b2237
+sourceHash: 8625c4e3b529e6b3
 title: Servidor MCP
 sidebar_label: Servidor MCP
 description: Conecte o Claude Code, Cursor, Gemini CLI ou qualquer cliente MCP a um projeto Rebase — as 53 ferramentas que ele expõe, a credencial com a qual ele se autentica e o gate de loopback que fica entre um agente e a produção.
@@ -266,8 +266,6 @@ guia completo sobre definição de escopos de chaves.
 
 ### Tornando uma tabela totalmente inacessível
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 O motivo pelo qual uma credencial de admin lê tudo é a política de base que o Rebase
 injeta em cada tabela, concedendo acesso ao contexto de servidor confiável e à
 role `admin`. Uma tabela pode optar por sair dessa base e assumir total
@@ -301,8 +299,6 @@ após `rebase schema generate` e uma migração terem aplicado as políticas. Co
 [Segurança a nível de linha (RLS)](/docs/collections/security-rules).
 
 ## O gate de loopback
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `rebase_project_add` aceita qualquer `baseUrl`, e as ferramentas de CLI conectam-se com
 qualquer `DATABASE_URL` que o projeto declarar. A mesma lista de ferramentas que edita um
@@ -539,8 +535,6 @@ Cada uma delas, acompanhada de seus requisitos e da indicação se o gate a recu
 destino não local, está na [Referência de ferramentas MCP](/docs/ai/mcp-tool-reference).
 
 ## Recursos (Resources)
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Além das ferramentas, o servidor expõe recursos MCP para que um cliente possa obter o
 contexto do projeto sem precisar gastar uma chamada de ferramenta:

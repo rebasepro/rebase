@@ -1,5 +1,5 @@
 ---
-sourceHash: 3db2d10879df1c44
+sourceHash: 61ebfc32eadc2236
 title: Consultando relações
 sidebar_label: Relações
 description: "Inclua entidades relacionadas em uma consulta e leia uma tabela filha por meio de seu pai com os acessadores de relação do SDK."
@@ -238,8 +238,6 @@ tipo de linha escrito manualmente não possui relações para serem validadas, e
 do servidor atua como salvaguarda.
 
 ### Nomes de Relação
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Os nomes que você passa para `include()` são as chaves de `relations` da tabela:
 

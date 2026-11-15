@@ -1,5 +1,5 @@
 ---
-sourceHash: b16bc057fd9a76c0
+sourceHash: 8a68eb639e8102bb
 title: Komponenten-Overrides (Swizzling)
 sidebar_label: Komponenten-Overrides
 description: Standard-UI-Komponenten durch benutzerdefinierte Implementierungen auf Anwendungs- oder Collection-Ebene überschreiben.
@@ -58,8 +58,6 @@ function App() {
 
 ## Komponenten-Overrides auf Collection-Ebene
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Um Komponenten nur für eine einzelne Tabelle zu überschreiben, übergeben Sie `components` in deren
 `customizeTable`. Dies ist nützlich für den leeren Zustand (Empty State), die Karten oder das Formular einer
 bestimmten Tabelle. Jede `Component` ist die Komponente selbst, importiert nach Wert:
@@ -106,8 +104,6 @@ Ein String-Pfad oder ein Lazy-`() => import(…)`-Thunk in `Component` löst bei
 Moduls einen Fehler aus, zusammen mit dem Hinweis, was stattdessen zu schreiben ist.
 
 ### Wenn beide Gültigkeitsbereiche eine Komponente überschreiben
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Die beiden Gültigkeitsbereiche werden kombiniert. Der Override auf Anwendungsebene (`<Rebase components>`) wird zuerst auf die integrierte Komponente angewendet, und der Override der Tabelle (`components` in `customizeTable`) wird auf das Ergebnis angewendet:
 

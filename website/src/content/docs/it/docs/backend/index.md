@@ -1,5 +1,5 @@
 ---
-sourceHash: 9be8187c5259c1dd
+sourceHash: f77c49012120dbf4
 title: Panoramica del backend
 sidebar_label: Backend
 description: Il backend di Rebase fornisce un server completo con API REST, autenticazione, storage, WebSocket in tempo reale e cronologia delle entità — tutto inizializzato con una singola chiamata di funzione.
@@ -66,8 +66,6 @@ due backend in un unico processo, esegui i passaggi manualmente. Consulta
 
 ## Dove risiede ciascuna opzione
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Quella chiamata rappresenta la configurazione **ejected** — quella che scrivi manualmente dopo `rebase
 eject`, o in un server personalizzato. Un progetto generato tramite scaffolding non la possiede: il
 runtime distribuito avvia il progetto e ogni opzione viene fornita come variabile
@@ -106,8 +104,6 @@ Entrambi i percorsi raggiungono la stessa `RebaseBackendConfig`. Ecco la mappa c
 
 ### Opzioni senza percorso gestito
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Queste opzioni non dispongono di una variabile d'ambiente né di un export di modulo. Sono accessibili
 soltanto tramite una chiamata manuale a `initializeRebaseBackend` — `rebase eject`, o un
 [server personalizzato](/docs/backend/custom-server/):
@@ -142,8 +138,6 @@ Dopo l'inizializzazione, vengono montate queste route:
 ---
 
 ## Il ciclo di vita dell'inizializzazione
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Quando invochi `initializeRebaseBackend()`, il framework avvia una sequenza di boot sequenziale a 5 fasi:
 
@@ -214,8 +208,6 @@ alcun `/livez` fino a quando non ne viene aggiunto uno.
 ---
 
 ## Riferimento di configurazione
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```typescript
 interface RebaseBackendConfig {

@@ -1,11 +1,9 @@
 ---
-sourceHash: 80e40ea5912a48c8
+sourceHash: 5b835c7e865a4f8f
 title: Archivos de instrucciones para IA
 sidebar_label: Archivos de instrucciones para IA
 description: "Cada proyecto Rebase generado incluye ai-instructions.md junto con archivos de puntero para Claude, Cursor, Windsurf, Copilot y AGENTS.md con las cinco reglas que los asistentes rompen más frecuentemente: una única fuente de verdad, múltiples nombres de archivo."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Cada asistente requiere sus reglas en un archivo diferente. Claude Code lee
 `CLAUDE.md`, Cursor lee `.cursorrules`, Windsurf lee `.windsurfrules`,
@@ -83,8 +81,6 @@ que haya persistido el último proyecto en esa máquina. Consulta
 
 ## Por qué un puntero en lugar de una copia
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Los archivos de puntero prácticamente no contienen nada. Un archivo que hace
 referencia al real mantiene las convenciones en un solo lugar y tiene propiedades
 que una copia no ofrece:
@@ -112,8 +108,6 @@ Vale la pena conservar este patrón si haces un fork del scaffold, e incluso
 adoptarlo en repositorios que no sean proyectos Rebase.
 
 ## Con qué comienza `ai-instructions.md`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 El archivo generado es deliberadamente breve: apunta a
 [`rebase skills install`](/docs/ai/skills) para mayor detalle y luego establece las

@@ -1,11 +1,9 @@
 ---
-sourceHash: 8f8ab97f8302c1f8
+sourceHash: c26e358d70b93640
 title: Les relations dans le panneau d'administration
 sidebar_label: Les relations dans le panneau d'administration
 description: "Comment le CMS affiche les relations d'une table : un sélecteur pour un belongsTo, un onglet sous l'enregistrement pour chaque relation to-many, lignes exclusives vs partagées, les mêmes règles via REST, et les options customizeTable pour les champs de relation."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Le CMS lit les [relations](/docs/collections/relations/) d'une table à partir de son
 descripteur et affiche chacune d'elles en fonction de sa nature :
@@ -50,8 +48,6 @@ l'appelant n'a pas les droits de lecture sur la clé étrangère est également 
 
 ## Le segment de chemin correspond au nom de la relation
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Les lignes d'un onglet sont ciblées sous la forme `parent/parentId/relationName` :
 
 ```text
@@ -64,8 +60,6 @@ le slug de la cible. C'est ce qui permet à deux relations vers une même table 
 son propre nom, et obtient donc son propre onglet et son propre chemin.
 
 ## Lignes exclusives vs lignes partagées
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Ce qu'un onglet vous permet de faire dépend de la manière dont la relation est stockée :
 
@@ -80,8 +74,6 @@ Un onglet many-to-many propose **Add existing** et **Remove from this record**, 
 jamais une suppression qui retirerait la ligne des autres parents.
 
 ## Les mêmes règles via REST
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un onglet est une requête ordinaire restreinte à un parent, il accepte donc tout ce qu'une
 liste racine accepte (filtres, `orderBy`, `limit`, `offset`, `include`) et
@@ -107,16 +99,12 @@ qui existe déjà.
 
 ## Ce qui ne devient pas un onglet
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 - **Relations to-one** : un `belongsTo` ou un `hasOne` est un champ de l'enregistrement, pas
   une liste. L'écriture via un chemin to-one est rejetée.
 - **Une table avec `hideFromEntityViews`** dans son `customizeTable` n'est pas proposée
   sous forme d'onglet sur les enregistrements des tables qui lui sont associées.
 
 ## Personnaliser les champs de relation
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 ```tsx
 // frontend/src/cms/articles.tsx
@@ -154,8 +142,6 @@ dépendent du `customizeTable` propre à la table cible, et définir `fields`
 dans `overrides` lève une erreur.
 
 ## Prochaines étapes
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - [Relations](/docs/collections/relations/) : les cinq types, et comment déclarer chacun d'eux
 - [customizeTable](/docs/frontend/customize-table/#relations) : les options de relation dans la référence

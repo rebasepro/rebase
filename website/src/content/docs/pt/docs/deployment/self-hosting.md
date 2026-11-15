@@ -1,5 +1,5 @@
 ---
-sourceHash: cfc9a95285da2353
+sourceHash: db0130f92b3095af
 title: Auto-hospedagem
 sidebar_label: Auto-hospedagem
 description: Execute o Rebase em qualquer lugar com a imagem oficial do runtime e o bundle do seu projeto — Docker Compose, Fly, Railway ou uma VPS comum.
@@ -82,13 +82,11 @@ O comando `rebase build --no-vendor` desativa isso e produz um bundle que instal
 Para uma implantação real, prefira embutir ambos em uma imagem, o que também fixa com precisão o que é executado:
 
 ```dockerfile
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
 ## Criando o schema
-
-<span class="since-badge" data-since="0.31">Desde a 0.31</span>
 
 **O runtime cria as tabelas ausentes na inicialização, incluindo as que `backend/schema` declara.**
 O padrão de `REBASE_MIGRATE_ON_BOOT` é `ensure`, que é aditivo em todo o schema: ele cria tabelas, colunas e tipos enum ausentes, e aplica a segurança em nível de linha (RLS) correspondente. Uma primeira inicialização em um banco de dados vazio já sobe servindo suas tabelas, sem nenhuma etapa separada.
@@ -120,7 +118,7 @@ Com o provisionamento desativado, o runtime não cria nem altera nada: nenhuma t
 - **Tabelas de autenticação ou uma coluna lida pela autenticação ausentes:** a inicialização é recusada e lista cada uma delas.
 - **A role de requisição pode acessar uma tabela do framework** como `rebase.refresh_tokens` ou `rebase.api_keys`: a inicialização é recusada e exibe o comando `REVOKE` a ser executado. Uma inicialização com provisionamento remove esses privilégios por conta própria. Com o provisionamento desativado, nada faz isso.
 - **Uma tabela opcional ausente** (chaves de API, chaves de idempotência, reivindicações de cron, contadores de rate limit, presença, histórico de métricas): esse recurso é desativado e o log indica qual tabela é necessária.
-- <span class="since-badge" data-since="0.31">Desde a 0.31</span> **Uma tabela declarada que o banco de dados não protege** — segurança em nível de linha (RLS) desativada, nenhuma das políticas declaradas presente ou uma política restritiva declarada ausente: essa tabela não é servida (uma política permissiva ausente é servida, com um aviso na inicialização indicando-a). Uma requisição para ela responde `503 TABLE_WITHHELD`, e o log de inicialização informa o SQL que a protege (ou `rebase db push`). As outras tabelas continuam sendo servidas, e a inicialização prossegue. Uma junção many-to-many é verificada da mesma forma: uma que o banco de dados não protege retém as tabelas cujas relações a utilizam, e o erro `TABLE_WITHHELD` nomeia a junção. Uma tabela cuja relação `via` passa por uma tabela retida também é retida, e a mensagem indica a relação. Isso também se aplica com `REBASE_MIGRATE_ON_BOOT=none` e em uma atualização de schema em tempo real (live schema refresh).
+- **Uma tabela declarada que o banco de dados não protege** — segurança em nível de linha (RLS) desativada, nenhuma das políticas declaradas presente ou uma política restritiva declarada ausente: essa tabela não é servida (uma política permissiva ausente é servida, com um aviso na inicialização indicando-a). Uma requisição para ela responde `503 TABLE_WITHHELD`, e o log de inicialização informa o SQL que a protege (ou `rebase db push`). As outras tabelas continuam sendo servidas, e a inicialização prossegue. Uma junção many-to-many é verificada da mesma forma: uma que o banco de dados não protege retém as tabelas cujas relações a utilizam, e o erro `TABLE_WITHHELD` nomeia a junção. Uma tabela cuja relação `via` passa por uma tabela retida também é retida, e a mensagem indica a relação. Isso também se aplica com `REBASE_MIGRATE_ON_BOOT=none` e em uma atualização de schema em tempo real (live schema refresh).
 
 As linhas ainda sofrem alterações, como em qualquer banco de dados: logins, sessões, uso de chaves de API, chaves de idempotência, reivindicações de cron. A primeira conta de administrador (`REBASE_ADMIN_EMAIL`) é populada pela execução de provisionamento, não pelos processos de atendimento. A [Edição de schema ao vivo](/docs/backend/live-schema-editing) ainda pode commitar uma alteração no código-fonte, mas se recusa a aplicá-la ao banco de dados.
 
@@ -199,7 +197,7 @@ O runtime é um container comum escutando na porta `$PORT`, portanto qualquer pl
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.30.1 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.31.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -344,7 +342,7 @@ Tudo o que foi visto acima é um único container servindo todo o projeto, que �
 ## Atualização
 
 ```yaml
-image: rebasepro/server:0.30.1
+image: rebasepro/server:0.31.0
 ```
 
 Reinicie. Seu bundle permanece inalterado. Dentro de uma mesma versão major do contrato de runtime, um bundle que foi validado continuará funcionando — consulte [Compatibilidade](/docs/architecture/runtime-and-bundles/#compatibility).

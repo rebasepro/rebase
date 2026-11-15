@@ -291,8 +291,6 @@ whose role is `rebase_admin_request`.
 
 ### A shared `public` schema
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 When `public` holds tables Rebase should not reach:
 
 ```bash

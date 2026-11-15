@@ -1,5 +1,5 @@
 ---
-sourceHash: b16bc057fd9a76c0
+sourceHash: 8a68eb639e8102bb
 title: Reemplazos de componentes (Swizzling)
 sidebar_label: Reemplazos de componentes
 description: Sobrescribe componentes de interfaz predeterminados con implementaciones personalizadas a nivel de aplicación o colección.
@@ -58,8 +58,6 @@ function App() {
 
 ## Sobrescrituras de componentes a nivel de colección
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Para sobrescribir componentes solo para una tabla, pasa `components` en su
 `customizeTable`. Esto es útil para el estado vacío, las tarjetas o el formulario de una
 tabla en particular. Cada `Component` es el componente en sí, importado por valor:
@@ -106,8 +104,6 @@ Una ruta en formato string o un thunk diferido `() => import(…)` en `Component
 módulo se cargue, indicando qué escribir en su lugar.
 
 ### Cuándo ambos alcances sobrescriben un componente
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Los dos alcances se componen. La sobrescritura a nivel de aplicación (`<Rebase components>`) se aplica primero al componente integrado, y la de la tabla (`components` en `customizeTable`) se aplica al resultado:
 

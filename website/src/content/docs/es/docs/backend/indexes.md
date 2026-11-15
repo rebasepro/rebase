@@ -1,11 +1,9 @@
 ---
-sourceHash: e086faac3624de8d
+sourceHash: f957d9b26ce4636f
 title: Índices
 sidebar_label: Índices
 description: Declara índices estándar de Postgres en una tabla — btree, GIN y BRIN, parciales, compuestos, de cobertura y únicos — y por qué los escritos a mano solían desaparecer.
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Una tabla declara los índices que necesitan sus consultas, junto a las columnas que cubren:
 
@@ -55,8 +53,6 @@ eliminará.
 
 ## La estructura
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `columns` | `(string \| { column, direction?, nulls? })[]` | **Obligatorio.** Las columnas clave, en orden. 1–5 entradas. |
@@ -67,8 +63,6 @@ eliminará.
 | `include` | `string[]` | Solo btree. Columnas de carga útil (payload) incluidas para index-only scans. |
 
 ### `columns` toma claves de columna, nunca nombres SQL
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 El nombre de una relación `belongsTo` representa su columna de clave foránea, por lo que la relación
 `author` es la columna `author_id`:
@@ -189,8 +183,6 @@ materializa el estado deseado en una base de datos temporal vacía para planific
 emitirse para fallar más tarde contra una base de datos que nunca has visto.
 
 ### `reason`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Es el único campo que no tiene SQL detrás y es opcional; pero escríbelo.
 
@@ -392,8 +384,6 @@ los construyen de manera diferente:
 
 ## Qué se rechaza y cuándo
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Todo esto se rechaza cuando se compila el esquema, indicando la tabla y la
 posición en el array; un índice que silenciosamente no existe es el fallo
 que elimina toda esta funcionalidad:
@@ -410,8 +400,6 @@ que elimina toda esta funcionalidad:
 - un `reason` vacío
 
 ## Relacionado
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Search](/docs/backend/search) — búsqueda de texto completo clasificada, que construye su propio
   índice GIN sobre un `tsvector` generado

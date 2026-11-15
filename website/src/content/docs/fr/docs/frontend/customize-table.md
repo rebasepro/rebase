@@ -1,11 +1,9 @@
 ---
-sourceHash: 749d3a5f47923f4d
+sourceHash: a0e9a8a853fff9c0
 title: customizeTable
 sidebar_label: customizeTable
 description: "customizeTable définit en quoi la collection d'une table diffère de ce que le CMS dérive : libellés, icône, vues, kanban, emplacements d'affichage, disposition du formulaire, actions et options par champ avec des composants React importés par valeur. Chaque option, avec son type et son effet."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Si vous utilisez le CMS, chaque table servie par le backend possède déjà une
 collection dans le panneau, dérivée de la table elle-même (voir
@@ -78,8 +76,6 @@ nom lève une exception indiquant le nouveau nom à utiliser.
 
 ## Emplacement des fichiers
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 ```text
 frontend/src/cms/
 ├── index.ts        # export const tableCustomizations = [postsCms, …]
@@ -99,8 +95,6 @@ code frontend est la seule chose à ne pas écrire. Le backend n'importe jamais
 rien depuis le frontend.
 
 ## Le slug et le type
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Le premier argument est le slug de la table : le nom sous lequel elle a été
 définie, ou le `slug` qui lui a été attribué. Avec la table passée en paramètre
@@ -125,8 +119,6 @@ Sans l'argument de type, `customizeTable("posts", { … })` accepte les mêmes
 options, avec un typage plus souple.
 
 ## Ce qui est refusé, et ce qui est ignoré
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `customizeTable` vérifie ce que le compilateur ne peut pas voir lors du
 chargement du module, et lève une exception en indiquant ce qu'il faut écrire à
@@ -166,8 +158,6 @@ panneau affiche un avertissement par incohérence et l'ignore :
 Le reste de la personnalisation continue de s'appliquer.
 
 ## Options de table
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Chaque clé est facultative. Une clé omise conserve ce que le panneau a dérivé.
 
@@ -285,7 +275,7 @@ Chaque section prend :
 |---|---|---|
 | `entityActions` | `(string \| TableEntityAction)[]` | Actions sur un enregistrement. Un objet, ou la clé de l'une d'elles enregistrée sur `<RebaseCMS entityActions>`. Voir [Actions d'entité](/docs/frontend/entity-actions/). |
 | `disableDefaultActions` | `("edit" \| "copy" \| "delete")[]` | Actions intégrées que cette table ne propose pas. |
-| `resetPasswordAction` | `false \| TableEntityAction` | <span class="since-badge" data-since="0.31">Depuis 0.31</span> La table d'authentification uniquement (`defineAuthTable`) : `false` supprime l'action intégrée de réinitialisation de mot de passe, une action la remplace (proposée quel que soit ce que l'adaptateur d'authentification prend en charge : son backend est le vôtre). Ignoré, avec un avertissement, sur toute autre table. |
+| `resetPasswordAction` | `false \| TableEntityAction` | La table d'authentification uniquement (`defineAuthTable`) : `false` supprime l'action intégrée de réinitialisation de mot de passe, une action la remplace (proposée quel que soit ce que l'adaptateur d'authentification prend en charge : son backend est le vôtre). Ignoré, avec un avertissement, sur toute autre table. |
 | `entityViews` | `(string \| TableEntityView)[]` | Onglets supplémentaires sur un enregistrement. Voir [Vues d'entité](/docs/frontend/entity-views/). |
 | `Actions` | `Component[]` | Composants affichés dans la barre d'outils de la collection. |
 | `components` | `TableComponentOverrides` | Remplacements de composants délimités à la collection, chacun sous la forme `{ Component, wrap? }`. Voir [Remplacements de composants](/docs/frontend/component-overrides/#collection-level-component-overrides). |
@@ -293,8 +283,6 @@ Chaque section prend :
 | `fields` | `TableFields` | Options par champ, indexées par colonne ou relation. Ci-dessous. |
 
 ## Options de champ
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `fields.<key>` accepte les options que chaque champ prend en charge, plus celles
 propres au type de sa colonne. [Champs](/docs/collections/properties/) présente
@@ -446,8 +434,6 @@ Voir [Relations dans le panneau](/docs/collections/relations-in-the-admin-panel/
 
 ## Personnalisations, `ui-config.json` et préférences
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Ce que le panneau affiche pour une table est composé selon un ordre précis,
 chaque couche venant s'appliquer sur la précédente :
 
@@ -499,8 +485,6 @@ une table personnalisée deux fois, un `ui-config.json` qui n'est passé à aucu
 [`rebase verify`](/docs/cli/#rebase-verify).
 
 ## Étapes suivantes
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - [Comment les tables deviennent des collections](/docs/collections/) : ce que le panneau dérive avant toute personnalisation
 - [Champs](/docs/collections/properties/) : le widget et les options associés à chaque type de colonne

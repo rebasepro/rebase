@@ -321,7 +321,7 @@ export default defineFunction((app) => {
 
 `requireDriver(c)` is `getDriver(c)` without the `!` — it throws a message naming the wiring problem instead of failing twenty lines later on `undefined`.
 
-<span class="since-badge" data-since="0.31">Since 0.31</span> `fetchCollection` and `fetchOne` return the rows `GET /api/data/<table>` returns: dates as RFC 3339 strings, a `belongsTo` as its foreign key (`authorId`), and a related row only when `include` names it — `driver.fetchOne({ path: "articles", id, include: ["author"] })`.
+`fetchCollection` and `fetchOne` return the rows `GET /api/data/<table>` returns: dates as RFC 3339 strings, a `belongsTo` as its foreign key (`authorId`), and a related row only when `include` names it — `driver.fetchOne({ path: "articles", id, include: ["author"] })`.
 
 ### 2. `rebase.dataAsAdmin` — for trusted background work
 
@@ -410,8 +410,6 @@ export default defineFunction((app) => {
 It is `getSql(c)` with a different identity: the restricted request role, the admin arm of your policies, read-only unless `{ write: true }`, and the same `SQL_NOT_ALLOWED` guard. Unlike the owner's `rebase.sql()`, it cannot run DDL, and of the auth store it reaches only what an admin reaches through the users collection: sessions, keys and MFA secrets are withheld from the request role, and a password hash is dropped from the rows. A lone statement costs one round trip, as `rebase.sql()` does. From a script, `openRebase()` has it too.
 
 ### 4. `rebase.sql()` — owner SQL, and the one Node-only accessor
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 If you genuinely need an unconditional bypass, `rebase.sql()` is it: raw SQL on the owner connection, no policies, every row. It is the most privileged thing in a function's context — more so than the accessor with "admin" in its name.
 

@@ -1,11 +1,9 @@
 ---
-sourceHash: f385a35cc59df9c6
+sourceHash: acac0f12ed25af39
 title: Sécurité au niveau des lignes
 sidebar_label: Sécurité au niveau des lignes
 description: "Chaque table déclare sa posture rls — admin-only, inherit ou une liste de règles — et Rebase la compile en politiques de sécurité au niveau des lignes Postgres. Formes de règles, conditions raccourcies, defaultRls et verrouillage par défaut."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Chaque table définit qui accède à ses lignes dans sa clé `rls`. Rebase compile
 cela en sécurité au niveau des lignes Postgres : `ENABLE ROW LEVEL SECURITY` sur
@@ -47,8 +45,6 @@ niveau pour cette version couvre `defaultSecurityRules` et
 
 ## Les trois postures
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 | `rls` | Signification |
 |---|---|
 | `"admin-only"` | Sécurité au niveau des lignes activée, et uniquement les politiques de référence pour l'administrateur : le rôle `admin` et le propre code du serveur accèdent aux lignes. Tous les autres appelants n'obtiennent aucune ligne, et leurs écritures sont refusées. |
@@ -60,8 +56,6 @@ n'avez pas encore décidé qui doit y avoir accès. Rien n'est exposé tant que 
 n'écrivez pas les règles qui l'exposent.
 
 ### `defaultRls`
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `backend/schema/index.ts` peut exporter une posture pour les tables qui
 indiquent `rls: "inherit"` :
@@ -86,8 +80,6 @@ propres règles n'en prend aucune, et les deux listes ne sont jamais fusionnées
 `rebase db push` et le démarrage avec une erreur indiquant d'en exporter un.
 
 ## Politiques obtenues automatiquement par une table
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Les politiques appliquées à une table ne se limitent pas à ses propres règles :
 
@@ -121,8 +113,6 @@ Le DDL généré marque chaque politique injectée, et `rebase db push` restaure
 toute politique supprimée manuellement.
 
 ## Formes de règles
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Une règle adopte l'une des formes suivantes. En combiner deux au sein d'une même
 règle constitue une erreur de type, également rejetée par le compilateur, ce qui
@@ -177,8 +167,6 @@ before deploying » ; voir [le guide de mise à niveau](/docs/upgrading/0-30-to-
 
 ### Propriétaire
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 ```ts
 import { defineTable, col } from "@rebasepro/server/schema";
 
@@ -201,8 +189,6 @@ donne tout son sens à la comparaison.
 
 ### Accès public
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 `{ operation: "select", access: "public" }` génère `USING (true)` : aucun filtre
 de ligne en lecture, donc chaque appelant autorisé par l'API lit toutes les
 lignes.
@@ -221,8 +207,6 @@ deux se combinent avec `condition` et `check` comme `"public"`. Voir
 [`authenticated()` et `registered()`](#authenticated-et-registered).
 
 ### Conditions
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Une `condition` définit quelles lignes existantes sont couvertes par une règle ;
 un `check` définit quelles valeurs nouvelles ou modifiées elle autorise, et
@@ -329,8 +313,6 @@ le CMS les traite comme inconnus et reflète ce que le serveur renvoie.
 
 ### SQL brut
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 `using` et `withCheck` acceptent du SQL. `{column}` est résolu vers la colonne de
 la table, et l'appelant est accessible via `rebase.uid()`, `rebase.roles()`
 (rôles séparés par des virgules) et `rebase.jwt()` (les claims du token sous
@@ -361,8 +343,6 @@ permettent d'exprimer la même chose.
 
 ## Évalué une seule fois par instruction
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Chaque partie d'une règle qui ne lit pas la ligne — l'id de l'appelant, une
 vérification de rôles, un claim, `serverContext()` — est compilée au sein d'une
 sous-requête scalaire. Une règle de propriétaire devient
@@ -377,8 +357,6 @@ Le SQL brut reçoit le même traitement lorsque Rebase peut lire sa structure
 veillez donc à encapsuler vous-même les appels : `(SELECT rebase.uid())`.
 
 ## `authenticated()` et `registered()`
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Une requête sans aucune session se voit attribuer un identifiant sentinelle, de
 sorte que `rebase.uid()` n'est jamais `NULL` lors d'une requête, et
@@ -404,8 +382,6 @@ pour ces lectures. `rebase.sql()` est l'accesseur qui contourne les politiques.
 
 ## Permissif et restrictif
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Les règles permissives (par défaut) sont combinées avec un OU logique (ORed) :
 une ligne est accessible dès lors que l'une d'entre elles l'autorise. Les
 règles restrictives sont combinées avec un ET logique (ANDed) avec celles-ci :
@@ -416,8 +392,6 @@ raison : une règle `access: "public"` définie par ailleurs sur la table ne peu
 pas outrepasser la frontière du tenant.
 
 ## Ce qui se verrouille par défaut
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Une table ne peut pas devenir accessible par accident :
 
@@ -448,8 +422,6 @@ lisent `rebase.uid()`, `rebase.roles()` et `rebase.jwt()`.
 
 ## Requêtes sans session
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Une requête sans token n'atteint les politiques que si `AUTH_REQUIRE=false` ;
 dans le cas contraire, l'API renvoie d'abord une erreur 401. Elle s'exécute alors
 avec `rebase.uid()` défini sur `'anonymous'` et aucun rôle : les règles
@@ -476,8 +448,6 @@ export const contactMessages = defineTable("contact_messages", {
 ```
 
 ## Les lignes d'un côté, les colonnes de l'autre
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `rls` détermine à quelles lignes un appelant accède. Il n'a aucun impact sur les
 colonnes d'une ligne atteinte : une règle permettant à un employé de lire les
@@ -506,8 +476,6 @@ d'API ; une requête exécutée via `rebase.sql()` voit toutes les colonnes, car
 elle contourne la sécurité au niveau des lignes.
 
 ## Prochaines étapes
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - [Accès aux champs](/docs/collections/field-access/) : rôles de lecture et d'écriture par colonne
 - [Multi-tenance (Tenancy)](/docs/collections/tenancy/) : une frontière restrictive par tenant

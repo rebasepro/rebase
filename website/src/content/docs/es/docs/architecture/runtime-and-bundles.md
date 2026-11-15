@@ -1,13 +1,11 @@
 ---
-sourceHash: 47f5760918cfd724
+sourceHash: e341a90917c5ce77
 title: Runtime y bundles
 sidebar_label: Runtime y bundles
 description: Cómo un proyecto Rebase se divide en un bundle de proyecto y un runtime con versiones, y por qué esa separación es lo que hace posibles las actualizaciones, las aplicaciones multi-repo y el hosting gestionado.
 ---
 
 ## Las dos mitades de un despliegue
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Un despliegue de Rebase consta de dos partes, no de una:
 
@@ -60,7 +58,7 @@ de aceptar iniciar:
 ```jsonc
 {
   "bundleFormat": 3,
-  "runtime": { "range": "^1", "builtAgainst": "0.30.1", "contract": 2 },
+  "runtime": { "range": "^1", "builtAgainst": "0.31.0", "contract": 2 },
   "schemaVersion": "v2:3f0c9a1e7d2b5c48",
   "kind": "backend",
   "entry": {
@@ -77,7 +75,7 @@ de aceptar iniciar:
 }
 ```
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span> `bundleFormat`
+`bundleFormat`
 3 y contrato de runtime 2: el esquema es `entry.tables`, el directorio compilado
 `backend/schema`, junto a `entry.resources`, `entry.storage` y
 `entry.hooks`. `schemaVersion` comienza con `v2:` — se calcula a partir de las
@@ -102,8 +100,6 @@ ya tienes instaladas dentro del bundle para que no haya una segunda instalación
 un despliegue instala en su lugar el propio `package.json` del bundle.
 
 ## Compatibilidad
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Dos números de versión rigen si un bundle y un runtime pueden funcionar juntos,
 y deliberadamente no son la versión del paquete.
@@ -130,7 +126,7 @@ Por esto es que actualizar Rebase en un despliegue autoalojado es simplemente
 un cambio de etiqueta:
 
 ```yaml
-image: rebasepro/server:0.30.1   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.31.0   # a newer tag — your bundle is untouched
 ```
 
 ## El desarrollo utiliza la misma vía

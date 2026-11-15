@@ -1,10 +1,8 @@
 ---
-sourceHash: a8ca2780e6bbad15
+sourceHash: 97486e7c061d503d
 title: Modifica live dello schema
 description: Crea e modifica tabelle su un backend in esecuzione — la modifica viene scritta in backend/schema, prima committata nel tuo repository, poi applicata.
 ---
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 L'editor dello schema nel pannello di amministrazione riscrive i file delle tabelle in
 `backend/schema`. Questo funziona sulla tua macchina locale e da nessun'altra parte: i file di un
@@ -26,8 +24,6 @@ ogni altra superficie `/api/admin` che richiede uno scope. Un amministratore pos
 L'applicazione richiede anche un ulteriore requisito oltre allo scope — vedi [Chi può applicare](#chi-può-applicare).
 
 ## Le modifiche: `TablePatch`
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Ogni route che modifica lo schema accetta lo stesso corpo, `{ patches }`: un elenco
 di modifiche, ciascuna delle quali identifica la propria tabella tramite slug. Il tipo è `TablePatch`, proveniente da
@@ -77,8 +73,6 @@ account che possiede `schema:read`: un amministratore, o un ruolo che lo dichiar
 sulla macchina lo imposta per te in automatico.
 
 ## Pianifica prima di applicare
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `/plan` non ha effetti collaterali. Invia le modifiche e ti mostrerà cosa comportano:
 
@@ -185,8 +179,6 @@ e non vengono rifiutate:
   `safe`, e applicato con `ALTER COLUMN … SET DEFAULT` / `DROP DEFAULT`.
 
 ### Modifica solo del sorgente
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Una modifica rifiutata può comunque essere scritta in `backend/schema` e committata,
 lasciando il database così com'è — la rimozione di una colonna che non si intende più esporre è
@@ -331,8 +323,6 @@ Di conseguenza, un'applicazione non riuscita **non è un errore**. La risposta l
 
 ## Le regole hanno effetto nella stessa applicazione
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Una modifica alle `rls` di una tabella (o a una nuova tabella) viene resa effettiva nella stessa applicazione: le
 policy delle tabelle modificate vengono scritte nel database subito dopo il DDL,
 e la risposta indica l'esito sotto la voce `policies`:
@@ -352,8 +342,6 @@ Anche gli hook modificati nel codice sorgente diventano effettivi con l'applicaz
 tabelle compilate dello schema modificato senza necessità di riavvio.
 
 ## Servito senza riavvio
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Una modifica applicata dallo Studio viene resa disponibile immediatamente. Il driver Postgres rilegge
 le tabelle modificate dal database e le sostituisce: la data API,
@@ -381,8 +369,6 @@ propone il pulsante Ricarica; ripeti la modifica sul file nello stato in cui si 
 
 ## Dove funziona
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 La modifica live dello schema riscrive `backend/schema` con lo stesso editor utilizzato dai salvataggi
 del pannello in modalità solo sorgente (richiede l'installazione di `ts-morph`). La provenienza di tale
 sorgente determina dove può essere eseguito:
@@ -409,8 +395,6 @@ repository, `/api/admin/schema/status` risponderà con `enabled: false` e il cod
 esegui il deploy.
 
 ### Da un bundle compilato
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Un bundle non ha codice proprio da configurare, quindi viene abilitato tramite variabili
 di ambiente. Non cambia nulla per un bundle che non le imposta.
@@ -461,8 +445,6 @@ risultato e distribuiscilo. I caratteri di fine riga e gli spazi vuoti finali no
 come differenze.
 
 ### Commit su un repository remoto
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `liveSchema.repository` fa sì che il server effettui il commit di ogni modifica su un repository GitHub
 tramite la Git Data API anziché eseguire `git commit` in un

@@ -1,11 +1,9 @@
 ---
-sourceHash: e0fcc045382336df
+sourceHash: 7f09b99cbb85db3d
 title: Relationen
 sidebar_label: Relationen
 description: "Tabellen verknüpfen mit rel.belongsTo, hasOne, hasMany, manyToMany und via: gebundene oder abgeleitete Fremdschlüssel, Junction-Tabellen mit _pivot-Spalten, Löschregeln, Benennungsregeln und Multi-Hop-Joins."
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Die `relations` einer Tabelle benennen die Verknüpfungen, die sie zu anderen Tabellen hat. Jede davon ist ein `rel.*`-Aufruf, und ihr Schlüssel ist der Name der Relation: das, was `include` anfordert, was ein verschachtelter Pfad wie `/api/data/users/1/posts` liest, und was ein Schreibvorgang angibt, um die Verknüpfung zu setzen.
 
@@ -36,8 +34,6 @@ Relationen sind keine Properties mehr. Die Fremdschlüsselspalte eines `belongsT
 
 ## Die fünf Arten
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 | Art | Wo der Schlüssel liegt | Gibt zurück | Optionen |
 |---|---|---|---|
 | `rel.belongsTo` | in **dieser** Tabelle | eine Zeile | `localKey`, `notNull`, `unique`, `onDelete`, `onUpdate`, `index`, `constraint` |
@@ -56,8 +52,6 @@ Jede Art akzeptiert auch `access` und `private`, die festlegen, wer die Zeilen d
 Siehe [Feldzugriff](/docs/collections/field-access/) dafür, was ein Aufrufer ohne Zugriff sieht.
 
 ## belongsTo — der Schlüssel liegt in dieser Tabelle
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `belongsTo` platziert den Fremdschlüssel auf der deklarierenden Tabelle. Die SQL-Spalte des Schlüssels ist `localKey`, und `<Relationsname im Singular>_id`, wenn dieser weggelassen wird: `author` wird zu `author_id`.
 
@@ -106,8 +100,6 @@ Die Fremdschlüsselspalte wird indexiert, sofern nicht `index: false` gesetzt is
 
 ## hasOne und hasMany — der Schlüssel liegt auf dem Ziel
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `hasMany` liest Zeilen des Ziels, die auf diese zurückverweisen. `hasOne` ist dieselbe Verknüpfung mit höchstens einer Zeile auf der Gegenseite. Keines von beiden fügt hier eine Spalte hinzu: Das Ziel deklariert das `belongsTo`, das den Schlüssel enthält.
 
 ```ts
@@ -139,8 +131,6 @@ Die deklarierte Reihenfolge gilt für ein Include, das Lesen einer Relation eine
 
 ### Join über einen natürlichen Schlüssel
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Standardmäßig enthält der Schlüssel des Ziels den Primärschlüssel dieser Zeile. Wenn beide Seiten über etwas anderes verknüpft werden (eine externe Identitäts-ID, eine SKU), benennt `sourceKey` die Spalte in dieser Tabelle:
 
 ```ts
@@ -163,8 +153,6 @@ export const talents = defineTable("talents", {
 Die `sourceKey`-Spalte muss eindeutig sein: Eine Verknüpfung, die mehrere Quellzeilen adressiert, kann nicht bestimmen, zu welcher davon eine verknüpfte Zeile gehört. Eine Zeile, deren `sourceKey` `NULL` ist, erreicht keine verknüpften Zeilen, und das Schreiben über die Relation führt zu einem Fehler.
 
 ## manyToMany — über eine Junction-Tabelle
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `manyToMany` verknüpft Zeilen über eine Junction-Tabelle, die Rebase erstellt, mit eigener Row-Level Security. Das Entfernen einer Verknüpfung löscht die Junction-Zeile, niemals das Ziel.
 
@@ -218,8 +206,6 @@ Das Ziel kann auch ein View (`defineView`) sein: `db push`, Systemstart und `sch
 
 ### `_pivot`: die eigenen Spalten der Junction-Tabelle
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `pivot`-Spalten werden unter `_pivot` gelesen und geschrieben. Ein Lesevorgang, der die Relation einbindet, liefert jede verknüpfte Zeile mit den Spalten ihrer Verknüpfung aus:
 
 ```json
@@ -238,13 +224,9 @@ Pivot-Spalten akzeptieren jeden Spaltenmodifikator außer `.primaryKey()`: Der S
 
 ### `_count`: wie viele verknüpfte Zeilen
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Ein Include einer To-Many-Relation (`hasMany`, `manyToMany`, ein To-Many-`via`) kann neben einer limitierten Seite von Zeilen auch die Gesamtzahl anfordern, die unter `_count` der Zeile bereitgestellt wird. Sie wird in demselben Statement unter denselben Filtern und derselben Row-Level Security gezählt. Siehe [Zählen, was ein Limit auslässt](/docs/sdk/relations#counting-what-a-limit-leaves-out).
 
 ## via — eine explizite Join-Kette
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `via` liest über explizit definierte Joins: mehrere Hops, zusammengesetzte Schlüssel oder eine Bedingung, die kein einfacher Fremdschlüssel ist.
 
@@ -280,8 +262,6 @@ Eine Kette kann eine Tabelle durchlaufen, die der Lesevorgang bereits enthält �
 
 ## Lösch- und Aktualisierungsregeln
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 | Aktion | Verhalten |
 |---|---|
 | `"cascade"` | Auch die verknüpften Zeilen löschen oder aktualisieren |
@@ -293,8 +273,6 @@ Eine Kette kann eine Tabelle durchlaufen, die der Lesevorgang bereits enthält �
 Wenn `onDelete` nicht festgelegt ist, leert ein nullable `belongsTo` den Zeiger (`set null`), ein `NOT NULL`-Pointer lehnt das Löschen ab (`restrict`), und eine `manyToMany`-Verknüpfung wird mit jeder der beiden Zeilen gelöscht (`cascade`). `NOT NULL` besagt, dass eine Zeile ohne ihren übergeordneten Datensatz nicht existieren kann; es besagt nicht, dass das Löschen des übergeordneten Datensatzes auch die Zeile löschen soll. Geben Sie `"cascade"` an, wenn Sie genau das beabsichtigen: Es ist der einzige Wert, der Zeilen entfernt, die Sie nicht explizit benannt haben.
 
 ## Namen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Jeder Name, den eine Relation verwendet, wird abgeleitet, wenn Sie ihn nicht explizit angeben. Die Regeln entsprechen denen, die eine bereitgestellte Datenbank bereits anwendet, sodass sie sich zwischen Releases nicht ändern.
 
@@ -313,8 +291,6 @@ Der Name einer `belongsTo`-Relation steht überall dort für ihre Fremdschlüsse
 
 ## Relationen lesen und schreiben
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Relationen werden bei einem Lesevorgang standardmäßig nicht einbezogen, es sei denn, der Aufrufer fordert dies explizit an:
 
 ```typescript
@@ -331,8 +307,6 @@ Im CMS wird jede To-Many-Relation zu einem Tab unter dem Datensatz. Siehe [Relat
 
 ## Was abgelehnt wird
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `rel.via()` ohne Schritte wirft bereits beim Laden des Moduls einen Fehler. Bei der Kompilierung des Schemas wird eine Tabelle aus folgenden Gründen abgelehnt:
 
 - eine Relation, deren Ziel keine Tabelle oder View des Schemas ist;
@@ -345,8 +319,6 @@ Im CMS wird jede To-Many-Relation zu einem Tab unter dem Datensatz. Siehe [Relat
 - eine Pivot-Spalte, die mit `.primaryKey()` markiert ist (der Schlüssel der Junction-Tabelle besteht aus ihren beiden Verknüpfungsspalten) oder `.transform()` deklariert (Hooks von Pivot-Spalten werden nie ausgeführt; das `afterRead` des Ziels sieht `_pivot`).
 
 ## Nächste Schritte
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - [Row-Level Security](/docs/collections/security-rules/): Wer auf die Zeilen an beiden Enden zugreifen kann
 - [Indizes](/docs/backend/indexes/): Der Fremdschlüssel-Index und zusammengesetzte Indizes über Relationen

@@ -1,5 +1,5 @@
 ---
-sourceHash: 27f3eaf8b78d59e8
+sourceHash: 6ada998b1c8e4cc0
 title: Implantando o Rebase na Railway
 description: Implante o Rebase na Railway a partir da imagem de runtime publicada e do bundle do seu projeto. Mantenha o foco na UE.
 sidebar_label: Railway
@@ -34,7 +34,7 @@ rebase build
 Faça o commit de um `Dockerfile` de três linhas na raiz do repositório, para que a etapa de build da Railway seja apenas uma cópia em vez de uma compilação:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -68,8 +68,6 @@ A Railway define a variável `PORT` e o runtime vincula-se a ela, portanto não 
 2. Em **Public Networking**, clique em **Generate Domain** para obter uma URL `.up.railway.app`, ou vincule um domínio personalizado.
 
 ## 6. O schema
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 **O runtime cria tabelas ausentes na inicialização, incluindo aquelas declaradas em `backend/schema`.** `REBASE_MIGRATE_ON_BOOT` tem como padrão `ensure`, que é aditivo em todo o schema — ele cria tabelas, colunas e tipos enum ausentes e aplica sua segurança em nível de linha (row-level security) — portanto, a primeira inicialização em um banco de dados vazio já começa servindo suas tabelas.
 

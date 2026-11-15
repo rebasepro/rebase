@@ -1,13 +1,11 @@
 ---
-sourceHash: c858a7a8e7622cee
+sourceHash: ae48e0b641989cf2
 title: "Receita: Publicação editorial"
 sidebar_label: Publicação editorial
 description: "Execute um blog ou redação no Rebase: redatores e editores, revisão, publicação agendada, rascunhos de posts ativos, pré-visualizações, traduções, biblioteca de mídia, blocos de conteúdo, feeds, notas editoriais e importação do WordPress."
 ---
 
 ## Visão geral
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Esta receita desenvolve o lado editorial de uma publicação no Rebase. Cada parte é
 um ponto de extensão documentado, permitindo que você aproveite apenas as partes necessárias:
@@ -38,8 +36,6 @@ como o painel administrativo a apresenta — o quadro, os botões, as pré-visua
 
 ## Mídia
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Uma linha por imagem, para que uma imagem seja carregada uma única vez e reutilizada, com seu texto alternativo
 e crédito ao lado dela:
 
@@ -67,8 +63,6 @@ imagens que já estão na biblioteca. Quem pode fazer upload dos arquivos em si 
 pela sua [autorização de armazenamento](/docs/backend/storage-authorization/).
 
 ## Posts
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```ts
 // backend/schema/posts.ts
@@ -252,8 +246,6 @@ a operação, e os hooks e o histórico da tabela ainda continuam sendo executad
 
 ## Editando um post ativo
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Editar um post publicado altera-o ao vivo, e as regras acima impedem que um redator
 o edite. Para preparar alterações e publicá-las em uma única etapa, mantenha-as
 em uma segunda tabela com as mesmas colunas:
@@ -365,8 +357,6 @@ com `postMessage`. Um site estático servido pelo Rebase só pode ser incorporad
 sua própria origem.
 
 ## Notas editoriais
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Notas entre redator e editor são linhas próprias, exibidas no post:
 

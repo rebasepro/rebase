@@ -1,5 +1,5 @@
 ---
-sourceHash: 395db046e3ecafc8
+sourceHash: e275bf79725ed509
 title: Colonne aggiuntive
 sidebar_label: Colonne aggiuntive
 description: Aggiungi colonne calcolate/virtuali alle tabelle di collezione che derivano valori dai dati delle entità.
@@ -10,8 +10,6 @@ description: Aggiungi colonne calcolate/virtuali alle tabelle di collezione che 
 Le colonne aggiuntive consentono di visualizzare dati calcolati o derivati nella tabella della collezione senza archiviarli nel database.
 
 ## Definizione delle colonne aggiuntive
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 ```tsx
 // frontend/src/cms/products.tsx

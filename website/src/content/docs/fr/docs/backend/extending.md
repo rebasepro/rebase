@@ -1,5 +1,5 @@
 ---
-sourceHash: 8412da52cc99478c
+sourceHash: 0783ce9f040f4c00
 title: Rebase ne fait pas X
 sidebar_label: Étendre le serveur
 description: L'échelle d'extension côté serveur — déclaration, hook de table, fonction personnalisée, vos propres routes, votre propre serveur, eject — avec ce que chacun peut et ne peut pas atteindre.
@@ -86,8 +86,6 @@ d'accéder aux lignes d'une table en les contournant.
 [Hooks globaux](/docs/backend/hooks)
 
 ### Restreindre une lecture avec `beforeQuery`
-
-<span class="since-badge" data-since="0.31">Depuis la 0.31</span>
 
 `afterRead` accède aux lignes qui ont déjà été récupérées, il peut donc masquer une valeur
 mais ne peut pas empêcher la ligne d'être lue. `beforeQuery` intervient plus tôt : il reçoit

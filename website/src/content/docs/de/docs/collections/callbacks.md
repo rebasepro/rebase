@@ -1,11 +1,9 @@
 ---
-sourceHash: 067f45147f37ef16
+sourceHash: 283f536f508ee0b7
 title: Tabellen-Hooks
 sidebar_label: Tabellen-Hooks
 description: "Führen Sie serverseitigen Code in jeder Phase des Lebenszyklus einer Tabelle mit Hooks aus: Lesezugriffe einschränken, Felder maskieren, Schreibvorgänge validieren und vervollständigen, auf Speichervorgänge und Löschungen reagieren und einzelne Spalten transformieren."
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Die `hooks` einer Tabelle laufen auf dem Server bei jedem Schritt im Leben
 einer Zeile: vor einem Lesevorgang, bei jeder Zeile, die den Server verlässt,
@@ -57,8 +55,6 @@ auf.
 
 ## Die sieben Hooks
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 | Hook | Wann er ausgeführt wird | Rückgabewert |
 |---|---|---|
 | `beforeQuery` | bevor ein Lesevorgang kompiliert wird | ein Filter, der per AND mit der Leseabfrage verknüpft wird, oder nichts |
@@ -86,8 +82,6 @@ im Anfragepfad –, erreicht diese Hooks niemals. Das CMS verfügt für diesen F
 über eigene browserseitige Hooks, die in den CMS-Anpassungen beschrieben sind.
 
 ## `beforeQuery`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Wird ausgeführt, **bevor ein Lesevorgang kompiliert wird**, um einzugrenzen,
 welche Zeilen abgefragt werden. Geben Sie Bedingungen zurück, die per AND mit
@@ -139,8 +133,6 @@ was auch für SQL gelten muss, das als der jeweilige Aufrufer ausgeführt wird.
 
 ## `beforeSave`
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Wird ausgeführt, bevor eine Zeile geschrieben wird, und gibt die zu schreibenden
 Werte zurück. `values` enthält jeden Wert bei einer Erstellung und die geänderten
 Werte bei einer Aktualisierung; `previousValues` ist die Zeile im vorherigen
@@ -191,8 +183,6 @@ keinen Server-Code, und es ist dieselbe Klasse, die auch das typisierte SDK wirf
 
 ## `afterSave` und `afterSaveError`
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `afterSave` wird ausgeführt, nachdem die Zeile geschrieben wurde und vor dem
 Commit, in derselben Transaktion. Seine `values` entsprechen der Zeile im
 gespeicherten Zustand. Ein geworfener Fehler rollt den Speichervorgang zurück,
@@ -231,8 +221,6 @@ den gemeldeten Fehler übersteht. Ein von ihm geworfener Fehler wird protokollie
 und der Aufrufer erhält weiterhin den ursprünglichen Fehler des Speichervorgangs.
 
 ## `afterRead`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Wird für jede Zeile ausgeführt, die den Server verlässt – die Antwort eines
 Lesevorgangs, die Antwort eines Schreibvorgangs, ein Realtime-Frame, ein
@@ -292,8 +280,6 @@ die Spalte, bevor ein Hook ausgeführt wird, und halten sie auch aus Filtern her
 
 ## `beforeDelete` und `afterDelete`
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Beide erhalten die zu löschende Zeile als `values` und deren `id`.
 
 `beforeDelete` wird innerhalb der Transaktion des Löschvorgangs ausgeführt.
@@ -307,8 +293,6 @@ mit [Soft Delete](/docs/collections/soft-delete/) ist ein Löschvorgang eine
 Kennzeichnung (Stamp), und beide Hooks werden weiterhin ausgeführt.
 
 ## Feld-Hooks: `.transform()`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Das `.transform()` einer Spalte akzeptiert zwei Hooks auf Feldebene: `beforeSave`
 gibt den zu speichernden Wert zurück, und `afterRead` gibt den auszuliefernden
@@ -343,8 +327,6 @@ erfordern die [Validierungsregeln](/docs/schema/columns/#validation) `trim`,
 `lowercase` und `uppercase` keinen Code.
 
 ## Schreiben in andere Tabellen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `context.data` liest und schreibt jede Tabelle über ihren Slug, im Namen des
 Aufrufers und in derselben Transaktion wie der Schreibvorgang, der den Hook
@@ -381,8 +363,6 @@ Verschachtelungsgrenzen.
 
 ## Hooks für jede Tabelle
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Hooks, die für jede Tabelle gelten – PII-Maskierung über das gesamte Schema,
 ein globales Audit-Log –, werden als `hooks` aus `backend/hooks.ts` in derselben
 `TableHooks`-Struktur exportiert. Sie laufen vor den tabelleneigenen Hooks,
@@ -394,8 +374,6 @@ Backend registriert werden. Dies **ersetzt** die von der Tabelle deklarierten
 Hooks; um sie zu ergänzen, übergeben Sie `composeTableHooks(declared, yours)`.
 
 ## Hook-Sets kombinieren
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Eine Tabelle hat ein einzelnes `hooks`-Objekt. Wenn mehrere Anforderungen jeweils
 einen Hook benötigen – ein Slug-Generator, ein Audit-Trail, ein Mandanten-Scope –,
@@ -448,8 +426,6 @@ Lesen Sie seine Werte daher als `unknown` aus und prüfen Sie diese.
 
 ## Einen Hook testen
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Ein Hook ist eine einfache Funktion mit einem einzigen Props-Objekt, sodass ein
 Unit-Test ihn direkt aufrufen kann: `posts.config.hooks?.beforeSave?.(props)`.
 `createCallContext` aus `@rebasepro/server` baut das `context`-Prop nur mit den
@@ -459,8 +435,6 @@ Verwendung einen Fehler und nennt sich selbst. `table` ist der Deskriptor, den
 gegen eine echte Datenbank auszuführen, siehe [Skripte und die Konsole](/docs/backend/scripts/).
 
 ## Nächste Schritte
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - [Die `context.data`-API](/docs/collections/context-data-api/): Berechtigungen, Transaktionen und die Verbindung, die ein Hook belegt
 - [Globale Hooks](/docs/backend/hooks/): Hooks über alle Tabellen hinweg

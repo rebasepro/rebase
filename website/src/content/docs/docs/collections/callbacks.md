@@ -4,8 +4,6 @@ sidebar_label: Table hooks
 description: "Run server-side code at every step of a table's lifecycle with hooks: narrow reads, mask fields, validate and complete writes, react to saves and deletes, and transform single columns."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A table's `hooks` run on the server at each step of a row's life: before a
 read, on each row leaving the server, before and after a write, and before and
 after a delete. They run for every door into the table — REST, the SDK,
@@ -53,8 +51,6 @@ release lists the renames.
 
 ## The seven hooks
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | Hook | Runs | Returns |
 |---|---|---|
 | `beforeQuery` | before every read is compiled | a filter to AND into the read, or nothing |
@@ -82,8 +78,6 @@ the request path, never reaches these hooks. The CMS has browser-side hooks of
 its own for that case, described with the CMS customizations.
 
 ## `beforeQuery`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Runs **before a read is compiled**, to narrow which rows it asks for. Return
 conditions to AND into the query; return nothing to add none.
@@ -129,8 +123,6 @@ logic on top of it. Use [`rls`](/docs/collections/security-rules/) for anything
 that must hold for SQL run as the caller too.
 
 ## `beforeSave`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Runs before a row is written, and returns the values to write. `values` holds
 every value on a create and the changed ones on an update; `previousValues` is
@@ -179,8 +171,6 @@ code, and it is the same class the typed SDK throws.
 
 ## `afterSave` and `afterSaveError`
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `afterSave` runs after the row is written and before the commit, in the same
 transaction. Its `values` are the row as stored. A throw rolls the save back,
 together with everything the hook wrote through `context.data`:
@@ -215,8 +205,6 @@ one for the same caller, so a job it enqueues survives the failure it reports. A
 throw from it is logged, and the caller still gets the save's own error.
 
 ## `afterRead`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Runs on every row leaving the server — a read's response, a write's response,
 a realtime frame, an MCP result — and returns the row to serve. `values` is the
@@ -272,8 +260,6 @@ before any hook runs, and keep it out of filters too.
 
 ## `beforeDelete` and `afterDelete`
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Both receive the row being deleted as `values`, and its `id`.
 
 `beforeDelete` runs inside the delete's transaction. Throw to refuse the delete,
@@ -285,8 +271,6 @@ rolls the delete back. On a table with [soft delete](/docs/collections/soft-dele
 a delete is a stamp, and both hooks still run.
 
 ## Field hooks: `.transform()`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A column's `.transform()` takes two field-level hooks: `beforeSave` returns the
 value to store, and `afterRead` returns the value to serve. They run on the
@@ -322,8 +306,6 @@ need no code.
 
 ## Writing to other tables
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `context.data` reads and writes any table by its slug, as the caller and in the
 same transaction as the write that ran the hook:
 
@@ -356,8 +338,6 @@ covers the privileges it runs with, the transaction and nesting limits.
 
 ## Hooks for every table
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Hooks that apply to every table — PII masking across the schema, a global audit
 log — are exported as `hooks` from `backend/hooks.ts`, in the same
 `TableHooks` shape. They run before each table's own hooks, which run before
@@ -368,8 +348,6 @@ backend. That **replaces** the hooks the table declared; to add to them, pass
 `composeTableHooks(declared, yours)`.
 
 ## Combining hook sets
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A table has one `hooks` object. When several concerns each want a hook — a slug
 generator, an audit trail, a tenant scope — write each as its own set and
@@ -419,8 +397,6 @@ with the generic row, so read its values as `unknown` and check them.
 
 ## Testing a hook
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A hook is a plain function of one props object, so a unit test calls it:
 `posts.config.hooks?.beforeSave?.(props)`. `createCallContext` from
 `@rebasepro/server` builds the `context` prop with only the fields the test
@@ -429,8 +405,6 @@ descriptor `compileTables` from `@rebasepro/common` returns for the table. To ru
 hooks against a real database, see [Scripts and the Console](/docs/backend/scripts/).
 
 ## Next steps
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [The `context.data` API](/docs/collections/context-data-api/): privileges, transactions and the connection a hook holds
 - [Global hooks](/docs/backend/hooks/): hooks across every table

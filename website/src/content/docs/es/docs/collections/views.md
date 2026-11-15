@@ -1,11 +1,9 @@
 ---
-sourceHash: 8a72cff37e30800b
+sourceHash: d3c645c7930945a3
 title: Vistas
 sidebar_label: Vistas
 description: "Sirve una vista SQL o una vista materializada de solo lectura con defineView: vistas security_invoker gobernadas por las tablas que leen, vistas materializadas restringidas por roles, actualizadas bajo demanda, creadas mediante db push."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `defineView` sirve una consulta SQL como una tabla de solo lectura. Declara la consulta, las
 columnas que devuelve y la columna o columnas que identifican una fila:
@@ -39,8 +37,6 @@ tenga ese nombre.
 
 ## Opciones
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | Clave | Qué hace |
 |---|---|
 | `query` | **Obligatorio.** El `SELECT` que la define. |
@@ -62,8 +58,6 @@ y una fila necesita una dirección.
 
 ## Quién ve qué filas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Una vista normal se crea `WITH (security_invoker = true)`, por lo que se ejecuta **como el
 emisor de la llamada**: la seguridad a nivel de fila (RLS) de las tablas que lee decide qué
 ve cada emisor. Un usuario cuyas políticas le permiten ver sus propias canciones ve la vista de
@@ -73,8 +67,6 @@ políticas, ni nada que pudieran añadir. Consulta
 tablas subyacentes.
 
 ## Vistas materializadas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `materialized: true` almacena las filas, de modo que una lectura no ejecuta la consulta:
 
@@ -126,8 +118,6 @@ tener sus propios `indexes` (consulta [Índices](/docs/backend/indexes/)), const
 filas almacenadas; una vista normal lee los índices de sus tablas.
 
 ## Lo que una vista no puede tener
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `rls`, `history`, `softDelete`, `tenant` y `search` son rechazados cuando se
 compila el esquema: cada uno necesita una tabla en la que escribir o a la que adjuntar políticas.

@@ -6,8 +6,6 @@ description: "The field the CMS draws for each column type — text, markdown, e
 
 import { FieldWidgetPreview } from '../../../../components/docs/FieldWidgetPreview';
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Each column of a table is a field in the CMS. What the field is follows from
 the column: its type, its validation and its storage rules, all declared in
 [`backend/schema`](/docs/schema/columns/). How the field looks is yours to
@@ -74,8 +72,6 @@ export const productsCms = customizeTable<typeof products>("products", {
 
 ## Text
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A `col.text()`, `col.varchar({ length })`, `col.char({ length })` or `col.uuid()` column is a text
 input. `varchar(n)` and `char(n)` cap its length at `n`, and `.validate({ min,
 max, length, matches })` adds the rules the form checks before it saves.
@@ -114,8 +110,6 @@ draws a reference picker; see [Firestore](/docs/frontend/firebase/#from-a-table-
 
 ## Closed sets of values
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A `col.enum([...])` is a select, drawn elsewhere as a coloured chip. So is a text
 or number column with `.oneOf([...])`. Each value is labelled from its
 identifier (`needs_review` reads "Needs Review") and given a colour seeded by the
@@ -139,8 +133,6 @@ to its items.
 
 ## Numbers
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Every integer, serial, `real`, `doublePrecision` and `numeric` column is a
 number input. Integer and serial columns accept whole numbers only, and
 `.validate({ min, max, moreThan, lessThan, positive, negative })` adds bounds.
@@ -155,15 +147,11 @@ control that sets the value to `null`.
 
 ## Booleans
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A `col.boolean()` is a switch.
 
 <FieldWidgetPreview client:only="react" variant="boolean" />
 
 ## Dates and times
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A `col.timestamp({ withTimezone: true })` is a date and time picker, a `col.date()` a date picker and
 a `col.time()` a time of day. `mode` switches between `"date"` and
@@ -181,8 +169,6 @@ the server writes the acting user's id, whatever the request says.
 
 ## Files
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A `col.storage({ … })` column is an upload field with a preview, and
 `.multiple()` makes it a multi-file field. The bucket, the path, the accepted
 types and the size limit are declared on the column; the functions that run in
@@ -193,16 +179,12 @@ the browser are added with `storage` in `customizeTable`. See
 
 ## Arrays and JSON
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 An array column (`<item>.array()`) is a repeatable list of the item's field. A `jsonb` column
 with a [`json.*` shape](/docs/schema/json/) is a group of typed fields, lists and
 blocks; one without a shape is a key/value editor. See
 [Arrays and JSON](/docs/collections/arrays-and-maps/).
 
 ## Relations and references
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A `belongsTo` is a picker of the related row, shown in place of its foreign-key
 column; a to-many relation is a tab of the record. A text column with
@@ -214,16 +196,12 @@ See [Relations in the panel](/docs/collections/relations-in-the-admin-panel/).
 
 ## Geopoints, vectors and binary
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A `col.geopoint()` is a latitude and longitude field. A `col.vector({ dimensions })` is a
 vector input; `clearable` is its one option. A `col.bytea()` is a binary field,
 read and written as base64. None of them has type-specific options beyond
 those every field takes.
 
 ## Options every field takes
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Whatever the column type:
 
@@ -260,8 +238,6 @@ table's [row-level security](/docs/collections/security-rules/).
 :::
 
 ## Next steps
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/): every option, with its type
 - [Validation and conditions](/docs/collections/validation-and-conditions/): what the form checks, and fields that react to values

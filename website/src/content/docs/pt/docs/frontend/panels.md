@@ -1,5 +1,5 @@
 ---
-sourceHash: 7a427ea4f8f8b272
+sourceHash: 41940d8e882be98e
 title: Painéis em uma página própria
 sidebar_label: Painéis em suas próprias páginas
 description: "Exiba uma tabela, o formulário de um registro, um registro ou um valor em uma página própria: CollectionPanel, RecordForm, RecordDetail, FieldValue e CollectionsProvider, sem nenhuma estrutura de admin em torno deles."
@@ -39,8 +39,6 @@ outros, apenas o aviso de saída de página do navegador o protege. Envolva o pa
 deve exibir o login do Rebase primeiro.
 
 ## O que um painel exibe
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Um painel renderiza a tabela como o admin faz — a partir do descritor fornecido pelo
 servidor, com qualquer `customizeTable` que você tenha registrado. Estas props o restringem ao que

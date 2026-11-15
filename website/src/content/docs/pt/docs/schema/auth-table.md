@@ -1,11 +1,9 @@
 ---
-sourceHash: c7bebbe33f0a0611
+sourceHash: e70397bdea9251db
 title: A tabela de usuários
 sidebar_label: Tabela de usuários
 description: "defineAuthTable declara a tabela na qual a autenticação armazena os usuários: as colunas de que a autenticação precisa, uma política de auto-leitura, colunas de privilégio exclusivas para administradores e o modelo de acesso — roles, escopos de aplicativo, chaves pessoais e os hooks de ciclo de vida do usuário."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `defineAuthTable` declara a tabela que a autenticação lê e escreve. É um
 `defineTable` com três adições:
@@ -53,8 +51,6 @@ administradores gerenciam usuários, e cada usuário ainda lê sua própria linh
 
 ## As colunas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Declare as colunas que seu aplicativo lê ou apresenta, com os modificadores que desejar;
 a autenticação adiciona aquelas de que precisa e que você omitiu. Uma coluna declarada com a
 chave ou o nome SQL de uma coluna de autenticação (`email`, `displayName`, `roles`, `passwordHash`,
@@ -73,8 +69,6 @@ própria tabela de usuários também pode referenciar todas as colunas de autent
 
 ## O bloco `auth`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | Chave | O que faz |
 |---|---|
 | `roles` | As roles que um usuário pode ter, cada uma com um `name`, uma `description` opcional e os `scopes` de aplicativo e de plano de administração concedidos. O `admin` é integrado e não pode ser declarado. |
@@ -88,8 +82,6 @@ Os dois hooks permanecem no servidor; o descritor apenas informa quais deles exi
 aborda o que cada escopo concede e como chaves e tokens o restringem.
 
 ### `onCreateUser` e `onResetPassword`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```ts
 import { randomBytes } from "node:crypto";
@@ -136,8 +128,6 @@ Ambos os hooks recebem um contexto com:
 
 ## O que não é executado em operações de escrita da autenticação
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 O cadastro, o login via OAuth e o gerenciamento de usuários por administradores escrevem na tabela de usuários
 diretamente. Os [hooks](/docs/collections/callbacks/) da tabela não são executados para essas
 operações de escrita, portanto um e-mail de boas-vindas em `afterSave` nunca é disparado no cadastro. Configure-o
@@ -145,8 +135,6 @@ nos hooks de ciclo de vida de autenticação (`beforeUserCreate`, `afterUserCrea
 …) configurados no backend. Consulte [Autenticação](/docs/backend/authentication/).
 
 ## Próximos passos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Autenticação](/docs/backend/authentication/): métodos de login, tokens e os hooks de autenticação
 - [Roles e escopos](/docs/backend/roles-and-scopes/): declaração de roles e escopos de aplicativo

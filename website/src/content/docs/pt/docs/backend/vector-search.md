@@ -1,11 +1,9 @@
 ---
-sourceHash: 889a7fb508265011
+sourceHash: e793e044820ff8ab
 title: Busca Vetorial
 sidebar_label: Busca Vetorial
 description: Busca pelo vizinho mais próximo em uma coluna col.vector() por meio da API REST — os parâmetros de consulta, limites, embeddings longos demais para uma URL e como os filtros se comportam em um índice HNSW.
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Uma tabela com uma coluna `col.vector()` pode ser consultada por similaridade: as
 linhas mais próximas de um vetor de consulta, por uma distância pgvector calculada na consulta ao banco de dados.
@@ -15,8 +13,6 @@ GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_d
 ```
 
 ## Declarando a coluna
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```ts
 import { defineTable, col } from "@rebasepro/server/schema";

@@ -1,11 +1,9 @@
 ---
-sourceHash: c7bebbe33f0a0611
+sourceHash: e70397bdea9251db
 title: La tabla de usuarios
 sidebar_label: Tabla de usuarios
 description: "defineAuthTable declara la tabla donde auth almacena los usuarios: las columnas que necesita auth, una directiva de autolectura, columnas de privilegios solo para administradores y el modelo de acceso: roles, ámbitos de la aplicación, claves personales y los hooks del ciclo de vida del usuario."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `defineAuthTable` declara la tabla que lee y escribe la autenticación. Es un
 `defineTable` con tres elementos añadidos:
@@ -55,8 +53,6 @@ gestionan los usuarios y cada usuario sigue leyendo su propia fila.
 
 ## Las columnas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Declare las columnas que su aplicación lee o presenta, con los modificadores que
 desee; auth añade las que necesita y usted haya omitido. Una columna declarada con
 la clave o el nombre SQL de una columna de auth (`email`, `displayName`, `roles`,
@@ -78,8 +74,6 @@ hacer referencia a cada columna de auth, esté declarada o no.
 
 ## El bloque `auth`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | Clave | Qué hace |
 |---|---|
 | `roles` | Los roles que un usuario puede tener, cada uno con un `name`, una `description` opcional y los `scopes` del plano de administración y de la aplicación que concede. `admin` está integrado y no se puede declarar. |
@@ -94,8 +88,6 @@ ellos existen. [Roles y ámbitos](/docs/backend/roles-and-scopes/) explica qué
 concede cada ámbito y cómo las claves y tokens lo restringen.
 
 ### `onCreateUser` y `onResetPassword`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```ts
 import { randomBytes } from "node:crypto";
@@ -143,8 +135,6 @@ Ambos hooks reciben un contexto con:
 
 ## Qué no se ejecuta en las escrituras de auth
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 El registro, el inicio de sesión con OAuth y la gestión de usuarios por parte de
 un administrador escriben directamente en la tabla de usuarios. Los
 [hooks](/docs/collections/callbacks/) de la tabla no se ejecutan para esas
@@ -154,8 +144,6 @@ disparará al registrarse. Colóquelo en los hooks del ciclo de vida de auth
 backend. Consulte [Autenticación](/docs/backend/authentication/).
 
 ## Próximos pasos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Autenticación](/docs/backend/authentication/): métodos de inicio de sesión, tokens y los hooks de auth
 - [Roles y ámbitos](/docs/backend/roles-and-scopes/): declaración de roles y ámbitos de la aplicación

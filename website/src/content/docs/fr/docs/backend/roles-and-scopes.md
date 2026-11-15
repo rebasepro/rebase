@@ -1,5 +1,5 @@
 ---
-sourceHash: 1610ca294114442e
+sourceHash: d68196665de50636
 title: Rôles et scopes
 sidebar_label: Rôles et scopes
 description: "Ce qu'un appelant peut faire : le plan de données dont chaque personne dispose, le plan d'administration octroyé par les rôles, les scopes qu'une application déclare pour elle-même et comment chaque identifiant les transporte."
@@ -79,8 +79,6 @@ Les scopes du plan d'administration ne prennent aucune cible. Un scope d'applica
 
 ## Déclarer des rôles
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Les rôles sont déclarés sur la [table des utilisateurs](/docs/schema/auth-table/), sous
 `auth.roles`. Un rôle est un nom visible par la base de données, auquel les politiques
 de sécurité au niveau des lignes peuvent correspondre, accompagné d'une liste de scopes du plan d'administration et de l'application.
@@ -146,8 +144,6 @@ const { roles } = await client.admin.listRoles();
 ```
 
 ## Scopes de l'application
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Une application peut définir ses propres opérations sous forme de scopes, sous `auth.scopes` :
 

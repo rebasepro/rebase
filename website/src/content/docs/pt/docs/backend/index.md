@@ -1,5 +1,5 @@
 ---
-sourceHash: 9be8187c5259c1dd
+sourceHash: f77c49012120dbf4
 title: Visão Geral do Backend
 sidebar_label: Backend
 description: O backend do Rebase fornece um servidor completo com API REST, autenticação, armazenamento, tempo real via WebSocket e histórico de entidades — tudo inicializado com uma única chamada de função.
@@ -66,8 +66,6 @@ dois backends em um único processo, chame as etapas você mesmo. Consulte
 
 ## Onde cada opção fica
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Essa chamada é o formato **ejetado** — aquele que você mesmo escreve após `rebase
 eject`, ou em um servidor customizado. Um projeto gerado por scaffolding não a possui: o
 runtime publicado inicializa o projeto, e cada opção chega como uma variável de
@@ -106,8 +104,6 @@ Ambos os caminhos chegam à mesma `RebaseBackendConfig`. Este é o mapa completo
 
 ### Opções sem rota gerenciada
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Estas não possuem variável de ambiente e nem exportação de módulo. Elas são acessíveis
 apenas a partir de uma chamada manual a `initializeRebaseBackend` — `rebase eject`, ou um
 [servidor customizado](/docs/backend/custom-server/):
@@ -142,8 +138,6 @@ Após a inicialização, estas rotas são montadas:
 ---
 
 ## O Ciclo de Vida de Inicialização
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Quando você invoca `initializeRebaseBackend()`, o framework dispara uma sequência de inicialização de 5 etapas:
 
@@ -214,8 +208,6 @@ Ambas as sondas são do runtime gerenciado. Um `backend/src/index.ts` ejetado se
 ---
 
 ## Referência de Configuração
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```typescript
 interface RebaseBackendConfig {

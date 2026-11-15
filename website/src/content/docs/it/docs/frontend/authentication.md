@@ -1,5 +1,5 @@
 ---
-sourceHash: 9c7b1e0ee0076030
+sourceHash: 118e606ac71718ef
 title: Autenticazione e accesso
 sidebar_label: Autenticazione e accesso
 description: Configura l'auth controller, la vista di login e la simulazione dei ruoli nel tuo frontend React Rebase.
@@ -82,8 +82,6 @@ La vista di login gestisce:
 - Validazione dei moduli e stati di errore
 
 ## Modello dei ruoli
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 I ruoli sono memorizzati come colonna array `text[]` nella tabella degli utenti. Si definiscono i
 ruoli che un utente può ricoprire come un insieme chiuso su tale colonna, nella tabella dichiarata

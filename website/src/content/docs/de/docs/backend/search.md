@@ -1,5 +1,5 @@
 ---
-sourceHash: 72daf47d8a15bafe
+sourceHash: ceff4ba3bdacfb06
 title: Suche
 sidebar_label: Suche
 description: Wie sich .search() standardmäßig verhält und wie eine Tabelle die gerankte Volltextsuche über von Ihnen benannte Spalten aktiviert – einschließlich JSONB- und Array-Inhalten.
@@ -46,8 +46,6 @@ dies nicht.
 Eine Ein-Wort-Suche kompiliert zu genau demselben SQL wie zuvor.
 
 ## Aktivierung (Opt-in)
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Deklarieren Sie `search` auf einer Tabelle und benennen Sie die Spalten, die Sie indexiert haben möchten:
 
@@ -135,8 +133,6 @@ Der Startvorgang bricht ab, anstatt Anfragen zu bedienen, denn die Alternative i
 für Inhalte, die eindeutig in der Zeile vorhanden sind, nichts zurückgibt.
 
 ## Was Sie in `fields` angeben können
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein Pfad beginnt mit einem Spaltenschlüssel.
 

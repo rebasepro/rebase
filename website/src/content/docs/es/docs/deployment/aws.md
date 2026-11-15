@@ -1,5 +1,5 @@
 ---
-sourceHash: d9b167443cc3fd35
+sourceHash: c117340992cb4446
 title: Desplegar Rebase en AWS
 description: Despliegue su instancia de Rebase de forma segura en Amazon Web Services utilizando RDS y AWS App Runner con un fuerte enfoque europeo.
 sidebar_label: AWS
@@ -35,7 +35,7 @@ rebase build
 Para App Runner, que extrae imágenes desde un registro, integre el bundle en una imagen derivada. Son solo tres líneas y fija con exactitud lo que se ejecuta:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -80,8 +80,6 @@ Las últimas tres son la forma en que este despliegue obtiene un administrador: 
 AWS gestiona la terminación TLS, proporcionándole una URL `https` lista para usar.
 
 ## 4. El esquema
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 **El runtime crea las tablas que faltan durante el arranque, incluidas las que declara `backend/schema`.** `REBASE_MIGRATE_ON_BOOT` tiene como valor predeterminado `ensure`, el cual es aditivo en todo el esquema: crea las tablas, columnas y tipos enum que falten y aplica su seguridad a nivel de fila, de modo que el primer inicio frente a una instancia de RDS vacía comienza sirviendo sus tablas.
 

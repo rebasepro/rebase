@@ -58,8 +58,6 @@ between machines.
 
 ## Where the tables come from
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 There are none in code: with no `backend/schema/index.ts`, the backend declares no tables. The server reads your database schema at boot and serves
 the tables it finds, so the API follows your migrations: change the schema, and
 the endpoints change with it.
@@ -99,8 +97,6 @@ the managed runtime does not read it from any file or from the environment. Only
 :::
 
 ### Generating table files instead
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 If you would rather have the tables written down as TypeScript — for types, for
 hooks, for review — introspect them:
@@ -158,8 +154,6 @@ const { data: posts } = await rebase.data.table("posts").find({
   neither: the document is generated from the tables
 
 ## `404 NO_TABLES`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 If every data request answers with this:
 

@@ -1,11 +1,9 @@
 ---
-sourceHash: 57ee5c3ecdf49419
+sourceHash: 2e189939df0c022e
 title: Modos de visualização
 sidebar_label: Modos de visualização
 description: "Exiba as linhas de uma tabela como uma lista, uma planilha, cards ou um quadro kanban; escolha o que preenche o título, a imagem, o status e a data de cada registro; e defina a ordenação padrão, filtros e predefinições de filtro de um clique."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Toda coleção pode ser exibida de quatro maneiras, a partir do seletor em sua barra de ferramentas:
 
@@ -21,8 +19,6 @@ galeria) no mesmo seletor, acionados pela mesma barra de ferramentas: consulte
 [Modos de visualização personalizados](/docs/frontend/extending#custom-view-modes).
 
 ## Escolhendo as visualizações
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```ts
 // backend/schema/tasks.ts
@@ -83,8 +79,6 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 | `"xl"` | 160 | Miniaturas de imagem grandes |
 
 ## Kanban
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `kanban.columnField` define o nome da coluna pela qual o quadro faz o agrupamento. Ela deve conter um
 conjunto fechado de strings, um `col.enum([...])` ou uma coluna de texto com
@@ -149,8 +143,6 @@ quadro alimentado por um backend, é uma correção que se desfaz a cada execuç
 
 ## Slots de exibição
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Toda superfície que renderiza um registro usa alguns de seis slots: **title**,
 **subtitle**, **image**, **status**, **date** e **tags**. Uma linha de lista é image +
 title + subtitle + status + date, um card é o mesmo com a imagem no topo, um
@@ -207,8 +199,6 @@ array unido e uma relação como o primeiro entre `name`, `title`, `label` ou
 
 ## Filtros, predefinições e ordenação
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 ```tsx
 import { customizeTable } from "@rebasepro/cms";
 import type { tasks } from "../../../backend/schema/tasks";
@@ -239,8 +229,6 @@ solicitante pode ler é decidido pelo [row-level security](/docs/collections/sec
 da tabela, para cada chamador.
 
 ## Próximos passos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/): todas as opções
 - [Personalizando o admin](/docs/frontend/customizing/): seus próprios modos de visualização, páginas e ações

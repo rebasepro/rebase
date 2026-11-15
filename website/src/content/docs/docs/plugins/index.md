@@ -263,8 +263,6 @@ hooks: {
 
 ## Collection Modification
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Plugins can modify existing collections:
 
 ```typescript

@@ -1,5 +1,5 @@
 ---
-sourceHash: 15779772a2359662
+sourceHash: d90a1098b873980d
 title: Frontend-Übersicht
 sidebar_label: Frontend
 description: "Erstellen und passen Sie das Panel an — Rebase CMS und Rebase Studio — mit React: Controller, Scaffold, Routing und Ansichten."
@@ -65,8 +65,6 @@ haben Sie ausschließlich die Entwickler-Tools. Wie Sie die Shell stattdessen ma
 
 ## Wo die CMS-Dateien liegen
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 ```text
 frontend/src/
 ├── App.tsx
@@ -88,8 +86,6 @@ beim Bundling entfernt, sodass die Hooks und der Servercode des Backends den
 Browser nie erreichen. Das Backend importiert nichts aus dem Frontend.
 
 ## RebaseCMS-Props
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 <!-- rebase-cms-props:start -->
 | Prop | Beschreibung |

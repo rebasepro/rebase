@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f137cdb15196a3e
+sourceHash: 3e87d9e1b148c9f5
 title: Strumenti di Studio
 sidebar_label: Studio
 description: Rebase Studio fornisce strumenti per sviluppatori per la modifica visuale dello schema, query SQL, scripting JavaScript, gestione delle policy RLS e navigazione dello storage.
@@ -25,8 +25,6 @@ Passa da una all'altra con il controller della modalità admin o tramite l'inter
 ## Strumenti integrati di Studio
 
 ### Collection Editor
-
-<span class="since-badge" data-since="0.31">Dalla 0.31</span>
 
 Un editor visuale per una tabella e per il modo in cui il pannello la mostra. Un salvataggio è diviso in due:
 
@@ -65,8 +63,6 @@ import { RebaseStudio } from "@rebasepro/studio";
 Che un *salvataggio* vada a buon fine è una decisione del server, non del pannello: l'editor riscrive `backend/schema`, quindi è disabilitato con `NODE_ENV=production` (a meno che [la modifica dello schema in tempo reale](/docs/backend/live-schema-editing/) non specifichi un repository), in modalità `baas` e su un server privo di `schemaDir`. Il pannello interroga `GET /api/admin/schema-editor/status` e mostra il motivo ricevuto accanto al pulsante disabilitato.
 
 ### Strumenti integrati
-
-<span class="since-badge" data-since="0.31">Dalla 0.31</span>
 
 Ogni strumento che riconosce lo schema legge le tabelle fornite dal server da `GET /api/schema/tables`, con o senza il CMS nella pagina — così Studio può funzionare come console per un backend privo di pannello di amministrazione. Con un runtime precedente alla versione 0.31, che non dispone di questa route, gli strumenti sensibili allo schema indicano che è necessario aggiornare il runtime anziché tirare a indovinare; con un backend privo di autenticazione o in caso di errore della richiesta, ciascuno di essi ne segnala la causa. La console SQL, i log, lo storage e gli altri strumenti che non leggono lo schema funzionano comunque.
 

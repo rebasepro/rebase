@@ -1,5 +1,5 @@
 ---
-sourceHash: 145ba18b6f108fbd
+sourceHash: 72babf07dc797d77
 title: Déploiement
 sidebar_label: Déploiement
 description: Déployez votre projet Rebase en production à l'aide de Docker, de plateformes cloud ou d'installations manuelles.
@@ -109,8 +109,6 @@ Remplacez l'e-mail d'administration par le vôtre, connectez-vous et modifiez le
 mot de passe. Voir [Votre premier admin](#votre-premier-admin).
 
 ### Le schéma
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Le runtime crée les tables manquantes au démarrage, **y compris celles déclarées par `backend/schema`** —
 `REBASE_MIGRATE_ON_BOOT` a pour valeur par défaut `ensure`, qui est additif sur

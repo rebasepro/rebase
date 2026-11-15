@@ -1,5 +1,5 @@
 ---
-sourceHash: 41e067cb49021d45
+sourceHash: 9a0c7964e2f9eac6
 title: Custom Functions
 sidebar_label: Custom Functions
 description: Fügen Sie benutzerdefinierte Hono-API-Endpunkte neben Ihren Rebase-CRUD-Routen hinzu. Automatische Erkennung aus einem Verzeichnis mit vollem Zugriff auf die Backend-Instanz.
@@ -314,7 +314,7 @@ export default defineFunction((app) => {
 
 `requireDriver(c)` ist `getDriver(c)` ohne das `!` – es wirft einen Fehler mit einer Meldung, die das Konfigurationsproblem benennt, anstatt zwanzig Zeilen später an einem `undefined` zu scheitern.
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span> `fetchCollection` und `fetchOne` geben die Zeilen zurück, die auch `GET /api/data/<table>` zurückgibt: Datumsangaben als RFC-3339-Strings, ein `belongsTo` als dessen Fremdschlüssel (`authorId`) und eine verknüpfte Zeile nur dann, wenn `include` sie benennt – `driver.fetchOne({ path: "articles", id, include: ["author"] })`.
+`fetchCollection` und `fetchOne` geben die Zeilen zurück, die auch `GET /api/data/<table>` zurückgibt: Datumsangaben als RFC-3339-Strings, ein `belongsTo` als dessen Fremdschlüssel (`authorId`) und eine verknüpfte Zeile nur dann, wenn `include` sie benennt – `driver.fetchOne({ path: "articles", id, include: ["author"] })`.
 
 ### 2. `rebase.dataAsAdmin` – für vertrauenswürdige Hintergrundarbeiten
 
@@ -403,8 +403,6 @@ export default defineFunction((app) => {
 Es entspricht `getSql(c)` mit einer anderen Identität: die eingeschränkte Request-Rolle, der Admin-Zweig Ihrer Richtlinien, schreibgeschützt, sofern nicht `{ write: true }` übergeben wird, und derselbe `SQL_NOT_ALLOWED`-Schutz. Im Gegensatz zum Owner-basierten `rebase.sql()` kann es kein DDL ausführen, und vom Auth-Speicher erreicht es nur das, was ein Admin über die Users-Collection erreicht: Sessions, Keys und MFA-Geheimnisse werden der Request-Rolle vorenthalten, und ein Passwort-Hash wird aus den Zeilen entfernt. Ein einzelnes Statement verursacht einen Roundtrip, genau wie `rebase.sql()`. Aus einem Skript heraus bietet `openRebase()` dies ebenfalls.
 
 ### 4. `rebase.sql()` – Owner-SQL und der einzige reine Node-Accessor
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Wenn Sie wirklich eine bedingungslose Umgehung benötigen, ist `rebase.sql()` die Lösung: rohes SQL über die Owner-Verbindung, keine Richtlinien, alle Zeilen. Es ist das am stärksten privilegierte Element im Kontext einer Funktion – mehr noch als der Accessor mit "admin" im Namen.
 

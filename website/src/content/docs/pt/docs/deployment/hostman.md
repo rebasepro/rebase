@@ -1,5 +1,5 @@
 ---
-sourceHash: 690eccad01963163
+sourceHash: 848322a393579626
 title: Deploy do Rebase na Hostman
 description: Faça o deploy de um projeto rebase init na Hostman — App Platform com PostgreSQL Gerenciado e armazenamento S3, ou em um servidor cloud com o próprio arquivo Compose do seu projeto.
 sidebar_label: Hostman
@@ -64,7 +64,7 @@ COPY . .
 RUN npx -y pnpm@11 install --frozen-lockfile && npx -y pnpm@11 run build
 
 # The published runtime, with nothing added but the bundle
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY --from=build --chown=node:node /app/dist-bundle /bundle
 ```
 
@@ -126,8 +126,6 @@ Crie-o com **Ubuntu 24.04** e sua chave SSH e, em seguida, siga as [etapas de um
 Em um servidor, os uploads permanecem em seu disco: o arquivo Compose os mantém em um volume nomeado e define `FORCE_LOCAL_STORAGE=true`. Eles sobrevivem a reinicializações e novos deploys, mas não à perda do servidor; portanto, ative os backups de servidor da Hostman ou transfira-os para um bucket quando se tornarem críticos.
 
 ## O schema
-
-<span class="since-badge" data-since="0.31">A partir da 0.31</span>
 
 **O runtime cria as tabelas ausentes na inicialização, incluindo as que `backend/schema` declara.** `REBASE_MIGRATE_ON_BOOT` tem como padrão `ensure`, que é aditivo em todo o schema. Ele cria tabelas, colunas e tipos enum ausentes e aplica a segurança em nível de linha (RLS), para que uma nova tabela esteja ativa no próximo deploy.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 49c04468f92c50c8
+sourceHash: eb907148639a58a2
 title: Acciones de entidad
 sidebar_label: Acciones de entidad
 description: Agregue botones de acción personalizados a las entidades para archivar, publicar, exportar, clonar y más.
@@ -7,15 +7,11 @@ description: Agregue botones de acción personalizados a las entidades para arch
 
 ## Descripción general
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Las acciones de entidad son botones en un registro: publicar, archivar, clonar o desencadenar un
 flujo de trabajo externo. Se declaran por tabla en `customizeTable`, y
 `updateRecord` cubre la escritura que realiza la mayoría de ellas.
 
 ## Definición de acciones de entidad
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```tsx
 // frontend/src/cms/products.tsx
@@ -75,8 +71,6 @@ registrada una vez en `<RebaseCMS entityActions>` (o `<Rebase entityActions>`),
 para acciones que comparten varias tablas.
 
 ## `updateRecord`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `updateRecord(context, slug, id, patch, message?)` escribe `patch` en un
 registro y luego muestra `message` como una notificación de éxito cuando se proporciona.
@@ -148,8 +142,6 @@ Una acción deshabilitada que no explica el motivo parece dañada. `disabledReas
 En el registro, un botón cuyo `onClick` devuelve una promesa pendiente muestra un spinner y no se puede presionar de nuevo hasta que la promesa se resuelva. Si la acción lanza una excepción o su promesa se rechaza, el usuario ve el error en una notificación. La vista de solo lectura no tiene formulario, por lo que `formContext` es undefined allí.
 
 ## Acciones de colección
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `Actions` ubica componentes personalizados en la barra de herramientas de la colección, para operar
 sobre toda la colección o sobre las filas seleccionadas: como `PublishSelected` arriba. Es una

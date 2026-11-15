@@ -1,5 +1,5 @@
 ---
-sourceHash: 50d3082d86c52ae2
+sourceHash: af8850222953a27b
 title: Référence des outils MCP
 sidebar_label: Référence des outils MCP
 description: Tous les outils enregistrés par le serveur MCP Rebase, par groupe — ce dont chacun a besoin et ce qu'il fait, et ceux que la barrière de bouclage (loopback gate) refuse face à un projet non local.
@@ -10,8 +10,6 @@ Les outils que [`@rebasepro/mcp`](/docs/ai/mcp) met à disposition d'un assistan
 53 outils, répartis en dix groupes. Les outils marqués d'un ⚠ sont refusés sur les cibles non locales, sauf si vous choisissez de désactiver cette restriction.
 
 ## Schéma & base de données (13)
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Exécute la CLI Rebase dans le répertoire du projet actif.
 
@@ -33,8 +31,6 @@ Exécute la CLI Rebase dans le répertoire du projet actif.
 
 ## Planification de schéma (1)
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Demande au backend ce qu'une modification produirait, via `POST /api/admin/schema/plan`. Aucune CLI, et rien n'est écrit sur le disque — cela fonctionne sur la base de données de développement gérée, ce que les commandes reposant sur Atlas ne peuvent pas faire.
 
 | Outil | Requis | Description |
@@ -43,7 +39,7 @@ Demande au backend ce qu'une modification produirait, via `POST /api/admin/schem
 
 ## Lignes (5)
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span> Les mêmes noms que ceux utilisés par le `/mcp` distant ; ils s'appelaient auparavant `list_documents`, `get_document`, `create_document`, `update_document` et `delete_document`, avec un argument `collection`.
+Les mêmes noms que ceux utilisés par le `/mcp` distant ; ils s'appelaient auparavant `list_documents`, `get_document`, `create_document`, `update_document` et `delete_document`, avec un argument `collection`.
 
 | Outil | Requis | Description |
 |---|---|---|

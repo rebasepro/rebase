@@ -41,7 +41,7 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   (your app's "Forgot password"); the screen tells them so. It also names the host the authorization code is sent
   to, and says that host is not verified: anyone may register a client under
   any name, so the host is the part a person can check.
-- **Seventeen tools, three scopes.** <span class="since-badge" data-since="0.31">Since 0.31</span> The same [scopes](/docs/backend/roles-and-scopes/)
+- **Seventeen tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
   every credential uses. `data:read` offers `list_tables`, `describe_table`,
   `query_table`, `count_rows`, `aggregate_rows`, `get_row`, the three views,
   `show_table`, `show_record` and `show_app`, `show_app_guide`, and the experimental

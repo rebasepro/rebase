@@ -1,5 +1,5 @@
 ---
-sourceHash: faf8f760aabce923
+sourceHash: f76fb5b27f8eb93c
 title: Entity Views
 sidebar_label: Entity Views
 description: Aggiungi schede e viste personalizzate alle pagine di dettaglio delle entità per anteprime, analisi, dati correlati o UI personalizzata.
@@ -15,8 +15,6 @@ Le viste delle entità (Entity views) consentono di aggiungere **schede** (tabs)
 - **Editor personalizzati** (rich text, editor di mappe)
 
 ## Aggiungere Entity Views
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```tsx
 // frontend/src/cms/products.tsx
@@ -38,8 +36,6 @@ Una vista registrata viene mostrata solo sulle tabelle che ne specificano la chi
 `position: "start"` posiziona la scheda prima di quella del form; in caso contrario, viene posizionata dopo.
 
 ## Creare una Entity View
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `Builder` è il componente stesso, importato per valore:
 
@@ -64,8 +60,6 @@ export function ArticlePreview({ row, modifiedValues }: EntityCustomViewParams) 
 ```
 
 ### EntityCustomViewParams
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 | Prop | Type | Descrizione |
 |------|------|-------------|

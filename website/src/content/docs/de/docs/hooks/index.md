@@ -1,5 +1,5 @@
 ---
-sourceHash: b247fb716c8348a7
+sourceHash: d92fc6d34e2b4f26
 title: Hooks-Referenz
 sidebar_label: Hooks
 description: Von Rebase bereitgestellte React-Hooks für den Zugriff auf Authentifizierung, Daten, Navigation, Seitenleisten, Speicher und UI-Zustand.
@@ -10,8 +10,6 @@ description: Von Rebase bereitgestellte React-Hooks für den Zugriff auf Authent
 Rebase bietet React-Hooks für den Zugriff auf Framework-Funktionen aus jeder Komponente innerhalb des `<Rebase>`-Provider-Baums.
 
 ## `useRebaseContext`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Der Master-Hook – Zugriff auf alles:
 
@@ -60,8 +58,6 @@ function UserMenu() {
 ```
 
 ## Zeilen: `useRows`, `useRow`, `useRowCount`, `useAggregate`, `useRowWrites`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Lesen und Schreiben von Zeilen einer Collection in der Struktur, wie der Server sie sendet: Daten als ISO-Strings, ein belongsTo unter seiner Fremdschlüsselspalte (`author_id`). Dies ist dieselbe Struktur, die auch `client.data` und `context.data` zurückgeben, sodass sich mit diesen Hooks geschriebener Code wie Code liest, der gegen das SDK geschrieben wurde.
 

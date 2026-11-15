@@ -1,13 +1,11 @@
 ---
-sourceHash: ceb4d7703eefec3a
+sourceHash: 7f745fbf9e5bda12
 title: Campos
 sidebar_label: Campos
 description: "El campo que el CMS muestra para cada tipo de columna — texto, markdown, email, URL, select, multiselect, número, switch, fecha, subida de archivos, JSON, geopunto, vector, binario — y las opciones de customizeTable que modifican cada uno."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Cada columna de una tabla es un campo en el CMS. Qué es el campo se deriva de
 la columna: su tipo, su validación y sus reglas de almacenamiento, todo declarado en
@@ -75,8 +73,6 @@ export const productsCms = customizeTable<typeof products>("products", {
 
 ## Texto
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Una columna `col.text()`, `col.varchar({ length })`, `col.char({ length })` o `col.uuid()` es una entrada
 de texto (input). `varchar(n)` y `char(n)` limitan su longitud a `n`, y `.validate({ min,
 max, length, matches })` añade las reglas que el formulario comprueba antes de guardar.
@@ -115,8 +111,6 @@ muestra un selector de referencias; consulta [Firestore](/docs/frontend/firebase
 
 ## Conjuntos cerrados de valores
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Un `col.enum([...])` es un selector (select), representado en otros lugares como una etiqueta (chip) de color. Lo mismo aplica para una columna de texto
 o número con `.oneOf([...])`. Cada valor se etiqueta a partir de su
 identificador (`needs_review` se muestra como "Needs Review") y se le asigna un color generado a partir del
@@ -140,8 +134,6 @@ a sus elementos.
 
 ## Números
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Cada columna integer, serial, `real`, `doublePrecision` y `numeric` es un
 campo de entrada numérico. Las columnas integer y serial solo aceptan números enteros, y
 `.validate({ min, max, moreThan, lessThan, positive, negative })` añade límites.
@@ -156,15 +148,11 @@ control que restablece el valor a `null`.
 
 ## Booleanos
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Un `col.boolean()` es un interruptor (switch).
 
 <FieldWidgetPreview client:only="react" variant="boolean" />
 
 ## Fechas y horas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Un `col.timestamp({ withTimezone: true })` es un selector de fecha y hora, un `col.date()` un selector de fecha y
 un `col.time()` una hora del día. `mode` alterna entre `"date"` y
@@ -182,8 +170,6 @@ el servidor escribe el id del usuario que realiza la acción, independientemente
 
 ## Archivos
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Una columna `col.storage({ … })` es un campo de subida de archivos con vista previa, y
 `.multiple()` lo convierte en un campo para múltiples archivos. El bucket, la ruta, los tipos
 aceptados y el límite de tamaño se declaran en la columna; las funciones que se ejecutan en
@@ -194,16 +180,12 @@ el navegador se añaden con `storage` en `customizeTable`. Consulta
 
 ## Arrays y JSON
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Una columna de tipo array (`<item>.array()`) es una lista repetible del campo del elemento. Una columna `jsonb`
 con una [estructura `json.*`](/docs/schema/json/) es un grupo de campos tipados, listas y
 bloques; una sin estructura es un editor de clave/valor. Consulta
 [Arrays y JSON](/docs/collections/arrays-and-maps/).
 
 ## Relaciones y referencias
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Un `belongsTo` es un selector de la fila relacionada, mostrado en lugar de su columna
 de clave foránea; una relación uno a muchos (to-many) es una pestaña del registro. Una columna de texto con
@@ -215,16 +197,12 @@ Consulta [Relaciones en el panel](/docs/collections/relations-in-the-admin-panel
 
 ## Geopuntos, vectores y binarios
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Un `col.geopoint()` es un campo de latitud y longitud. Un `col.vector({ dimensions })` es un
 campo vectorial; `clearable` es su única opción. Un `col.bytea()` es un campo binario,
 leído y escrito como base64. Ninguno de ellos tiene opciones específicas de tipo más allá
 de las que admite cualquier campo.
 
 ## Opciones que admite cada campo
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Independientemente del tipo de columna:
 
@@ -261,8 +239,6 @@ debe definirse en la columna (`.notNull()`, `.validate()`, `.access()`) o en la
 :::
 
 ## Próximos pasos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/): cada opción, junto con su tipo
 - [Validación y condiciones](/docs/collections/validation-and-conditions/): qué comprueba el formulario y campos que reaccionan a los valores

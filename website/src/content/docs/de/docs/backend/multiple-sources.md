@@ -1,5 +1,5 @@
 ---
-sourceHash: bdf9409c94709498
+sourceHash: 27b170adac8e577c
 title: Mehrere Datenbanken und Buckets
 sidebar_label: Mehrere Quellen
 description: Tabellen an verschiedene Datenbanken und Storage-Spalten an verschiedene Buckets weiterleiten und jede einzelne über die Umgebung konfigurieren.
@@ -46,8 +46,6 @@ signups.subscription("send-welcome", async (event) => {
 `queue()` seit Version 0.18.
 
 Verweisen Sie dann über das Handle auf eine Tabelle – derselbe Name, nur einmal geschrieben:
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```ts
 // backend/schema/page_views.ts
@@ -149,8 +147,6 @@ weiterhin so bindet wie zum Zeitpunkt seiner Veröffentlichung. Verwenden Sie di
 an einer bereits veröffentlichten Art; verwenden Sie `registerResourceKind` nur für eine Art, die noch niemand veröffentlicht hat.
 
 ### Ressourcen an das Frontend übergeben
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Das Frontend importiert `backend/resources.ts` nicht: Ein Werte-Import von
 Inhalten unter `backend/` aus `frontend/` wird von `pnpm check:frontend-backend-imports` abgelehnt,

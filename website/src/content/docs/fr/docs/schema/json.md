@@ -1,11 +1,9 @@
 ---
-sourceHash: 23be8a1faf1d5f49
+sourceHash: a64928625cee8ee8
 title: Documents JSON
 sidebar_label: Documents JSON
 description: "Typez une colonne jsonb avec col.jsonb().$type<T>(), ou donnez-lui une structure avec json.* afin que le serveur valide les champs imbriqués, applique les valeurs par défaut et les horodatages, trouve les fichiers référencés par un document et recherche à l'intérieur de celui-ci."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Une colonne `jsonb` peut être déclarée de deux manières. `col.jsonb().$type<T>()` type le document
 pour TypeScript et n'indique rien au serveur à son sujet. `col.jsonb(shape)` prend une
@@ -50,8 +48,6 @@ un éditeur JSON générique.
 
 ## Constructeurs
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 | Constructeur | Contient | Type TypeScript |
 |---|---|---|
 | `json.string()` | une chaîne de caractères | `string` |
@@ -69,8 +65,6 @@ un éditeur JSON générique.
 `json.object(fields, { additional: true })` accepte également des clés qu'il ne nomme pas.
 
 ## Modificateurs
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 | Modificateur | S'applique à | Description |
 |---|---|---|
@@ -115,8 +109,6 @@ champ le remplit en premier.
 
 ## Tableaux et blocs typés
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 `json.array(of)` est une liste d'une même structure. `json.oneOf(variants)` est un bloc dont
 la clé `type` indique de quelle variante il s'agit et dont la clé `value` contient le contenu
 de cette variante. En tant qu'éléments d'un tableau, il s'agit de la structure d'un éditeur de blocs :
@@ -159,8 +151,6 @@ d'autres noms : `json.oneOf({ … }, { typeField: "kind", valueField: "data" })`
 
 ## `jsonb` ou `json`
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 `col.json()` prend les mêmes arguments que `col.jsonb()`. Il stocke le texte tel qu'il a été
 fourni, ordre des clés et espaces compris, et ne peut pas être indexé ou faire l'objet de recherches
 comme `jsonb`. Ne l'utilisez que si le texte exact a de l'importance ; sinon, utilisez
@@ -172,8 +162,6 @@ colonne de tableau : `col.text().array()`. Les listes imbriquées ont leur place
 d'un tableau est refusé.
 
 ## Prochaines étapes
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - [Colonnes](/docs/schema/columns/) : les constructeurs de colonnes et leurs règles de validation
 - [Recherche](/docs/backend/search/) : rechercher des chemins au sein d'un document

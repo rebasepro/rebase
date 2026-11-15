@@ -425,7 +425,7 @@ Every hook is awaited, and a throw from any of them undoes the whole write:
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/health` and `/api/health` | none | Liveness/readiness check |
-| `GET` | `/api/docs` | <span class="since-badge" data-since="0.31">Since 0.31</span> by default, the callers `GET /api/schema/tables` describes tables to (401 anonymous unless `schemaTables.public`); none when `enableSwagger` is `true`; the admin gate when it is `false` | The OpenAPI 3.0 JSON specification — by default only the tables, columns and relations the schema endpoint describes to that caller. `404 DOCS_UNAVAILABLE` when no authentication is configured |
+| `GET` | `/api/docs` | by default, the callers `GET /api/schema/tables` describes tables to (401 anonymous unless `schemaTables.public`); none when `enableSwagger` is `true`; the admin gate when it is `false` | The OpenAPI 3.0 JSON specification — by default only the tables, columns and relations the schema endpoint describes to that caller. `404 DOCS_UNAVAILABLE` when no authentication is configured |
 | `GET` | `/api/swagger` | none | Swagger UI. Served only when `enableSwagger` is `true` (`REBASE_ENABLE_SWAGGER=true`), and never in production |
 | `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from, and the runtime version — deliberately unauthenticated, and nothing that describes the schema |
 | `GET` | `/api/meta/contract` | `schema:read`: an admin, the service key, or an API key holding it | The schema version, the runtime and every table as an administrator sees it, for `rebase generate-sdk --from`. Fail-closed: `404` when no auth is configured |
@@ -446,8 +446,6 @@ Machine callers authenticate with a scoped key rather than a session:
 
 ## Schema Metadata
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 The tables the backend serves are described, per caller, at
 `GET /api/schema/tables` — the descriptors the CMS and the Studio render from.
 Any signed-in caller is served the tables it may see, redacted to what it may
@@ -460,7 +458,7 @@ GET /api/meta/contract
 ```
 
 ```json
-{ "schemaVersion": "v2:…", "runtime": { "version": "0.30.1", "contract": 2 }, "tables": [ … ] }
+{ "schemaVersion": "v2:…", "runtime": { "version": "0.31.0", "contract": 2 }, "tables": [ … ] }
 ```
 
 It needs the **`schema:read`** scope, which an admin holds, and on a deployment with no authentication configured it

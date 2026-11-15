@@ -1,11 +1,9 @@
 ---
-sourceHash: 23be8a1faf1d5f49
+sourceHash: a64928625cee8ee8
 title: JSON-Dokumente
 sidebar_label: JSON-Dokumente
 description: "Typisieren Sie eine jsonb-Spalte mit col.jsonb().$type<T>() oder geben Sie ihr eine Struktur mit json.*, damit der Server verschachtelte Felder validiert, Standardwerte und Zeitstempel anwendet, referenzierte Dateien findet und das Dokument durchsucht."
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Eine `jsonb`-Spalte kann auf zwei Arten deklariert werden. `col.jsonb().$type<T>()` typisiert das
 Dokument für TypeScript und teilt dem Server nichts darüber mit. `col.jsonb(shape)` nimmt eine
@@ -50,8 +48,6 @@ stattdessen einen generischen JSON-Editor.
 
 ## Builder
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 | Builder | Inhalt | TypeScript-Typ |
 |---|---|---|
 | `json.string()` | ein String | `string` |
@@ -69,8 +65,6 @@ stattdessen einen generischen JSON-Editor.
 `json.object(fields, { additional: true })` akzeptiert auch Schlüssel, die nicht explizit genannt werden.
 
 ## Modifikatoren
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 | Modifikator | Für | Funktion |
 |---|---|---|
@@ -114,8 +108,6 @@ ersetzt jeden übermittelten Wert, und das `.default()` eines Feldes befüllt es
 
 ## Arrays und typisierte Blöcke
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `json.array(of)` ist eine Liste einer bestimmten Struktur. `json.oneOf(variants)` ist ein Block,
 dessen `type`-Schlüssel angibt, um welche Variante es sich handelt, und dessen `value`-Schlüssel den
 Inhalt dieser Variante enthält. Als Elemente eines Arrays ergibt sich die Struktur eines Block-Editors:
@@ -158,8 +150,6 @@ andere Namen verwenden: `json.oneOf({ … }, { typeField: "kind", valueField: "d
 
 ## `jsonb` oder `json`
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `col.json()` akzeptiert dieselben Argumente wie `col.jsonb()`. Es speichert den Text genau so,
 wie er übergeben wurde, einschließlich Schlüsselreihenfolge und Leerzeichen, und kann nicht auf die
 gleiche Weise wie `jsonb` indiziert oder durchsucht werden. Verwenden Sie es nur, wenn der exakte Text
@@ -171,8 +161,6 @@ Array-Spalte besser geeignet: `col.text().array()`. Verschachtelte Listen gehör
 `.array()` eines Arrays wird abgewiesen.
 
 ## Nächste Schritte
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - [Spalten](/docs/schema/columns/): Die Spalten-Builder und ihre Validierungsregeln
 - [Suche](/docs/backend/search/): Durchsuchen von Pfaden innerhalb eines Dokuments

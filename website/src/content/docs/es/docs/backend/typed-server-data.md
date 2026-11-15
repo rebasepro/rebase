@@ -1,11 +1,9 @@
 ---
-sourceHash: d08c6bb1dfd3357e
+sourceHash: f57a8ae030d7e978
 title: Datos tipados del lado del servidor
 sidebar_label: Datos tipados del lado del servidor
 description: "Registra tu tipo Database generado una sola vez, y context.data, rebase.dataAsAdmin y el rebase que recibe una función o cron se tiparán a partir de él: filas, filtros, ordenamientos, includes y datos de entrada de escritura."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 El cliente del navegador se tipa pasando tu `Database` generada a
 `createRebaseClient<Database>()` (consulta [Generación de SDK tipado](/docs/sdk#typed-sdk-generation)).
@@ -24,8 +22,6 @@ Hay dos formas de registrar: la `Database` generada, que es exacta, o
 tu propio módulo `backend/schema`, que no necesita una ejecución de generación de código.
 
 ## Registrar la `Database` generada
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```bash
 rebase generate-sdk --register
@@ -68,8 +64,6 @@ sin tipar, elimina `registerDatabase` y borra `backend/generated/`.
 
 ## Registrar el esquema, sin codegen
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Un proyecto que no ha generado nada registra su módulo de esquema en su lugar,
 y se tipa directamente a partir de sus `defineTable`:
 
@@ -96,8 +90,6 @@ de los hooks de tabla de ese mismo esquema, porque tipar los hooks de un esquema
 propio esquema genera un ciclo que TypeScript rechaza.
 
 ## Qué tipa
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```ts
 // backend/schema/orders.ts — a hook

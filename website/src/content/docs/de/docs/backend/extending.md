@@ -1,5 +1,5 @@
 ---
-sourceHash: 8412da52cc99478c
+sourceHash: 0783ce9f040f4c00
 title: Rebase unterstützt X nicht
 sidebar_label: Server erweitern
 description: Die serverseitige Erweiterungsleiter – Deklaration, Tabellen-Hook, benutzerdefinierte Funktion, eigene Routen, eigener Server, Eject – und worauf die jeweilige Stufe zugreifen kann und worauf nicht.
@@ -86,8 +86,6 @@ an die Zeilen einer Tabelle zu gelangen, der an ihnen vorbeiführt.
 [Globale Hooks](/docs/backend/hooks)
 
 ### Einen Lesevorgang mit `beforeQuery` einschränken
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `afterRead` sieht Zeilen, die bereits abgerufen wurden. Es kann also einen Wert unkenntlich machen,
 aber nicht verhindern, dass die Zeile gelesen wird. `beforeQuery` läuft früher: Es erhält die

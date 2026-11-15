@@ -1,5 +1,5 @@
 ---
-sourceHash: d3b3f413d231c3d0
+sourceHash: 96d3468f540e7260
 title: SDK tipado — Primeros pasos
 sidebar_label: Primeros pasos
 description: Instala y configura el SDK tipado de Rebase para interactuar con tu backend desde cualquier aplicación JavaScript o TypeScript.
@@ -58,7 +58,7 @@ const client = createRebaseClient({
 | `fetch` | `typeof fetch` | Implementación personalizada de fetch (p. ej., para SSR) |
 | `onUnauthorized` | `() => Promise<boolean>` | Manejador personalizado para 401 — devuelve `true` para reintentar |
 | `realtime` | `boolean \| RealtimeClientOptions` | Abre el WebSocket (por defecto `true`) — establécelo en `false` en scripts de ejecución única. `{ affinity }` [nombra el grupo al que pertenece el socket](/docs/sdk/realtime#keeping-a-group-on-one-instance) |
-| `tables` | `Record<string, string>` | <span class="since-badge" data-since="0.31">Desde 0.31</span> Mapea nombres de accesores a slugs de tablas — el `tablesDictionary` generado |
+| `tables` | `Record<string, string>` | Mapea nombres de accesores a slugs de tablas — el `tablesDictionary` generado |
 | `offline` | `boolean \| OfflineConfig` | [Sincronización local-first](/docs/sdk/offline) — desactivada por defecto |
 | `impersonate` | `string` | Ejecuta cada petición como este usuario, por uid, para comprobar qué puede ver un usuario. Solo una sesión de administrador puede hacerlo: la API de datos, las funciones y el realtime se ejecutan como ese usuario, y cualquier otra ruta lo rechaza |
 | `debug` | `boolean` | Registra el progreso de la conexión en tiempo real con `console.debug` (por defecto `false`) — consulta [Registro de conexión](#registro-de-conexión) |
@@ -74,8 +74,6 @@ localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_de
 Se aplica a partir de la siguiente línea que el cliente registre, por lo que una página que ya esté conectada no necesita recargarse. Fuera del navegador, define `globalThis.__REBASE_DEBUG__ = true`. Los navegadores solo muestran `console.debug` en el nivel Detallado (Verbose).
 
 ## Generación del SDK tipado
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Genera un cliente totalmente tipado a partir de tus tablas:
 

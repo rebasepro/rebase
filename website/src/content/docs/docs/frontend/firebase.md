@@ -4,8 +4,6 @@ sidebar_label: Firebase
 description: "Show Firestore collections in the CMS next to your Postgres tables: defineFirestoreCollection, useFirestoreDataSource, externalCollections, and references that cross between Firestore documents and Postgres rows in both directions."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `@rebasepro/firebase` lets the CMS read and write Firestore collections in the
 browser, through the Firebase SDK, next to the tables your Rebase backend
 serves. One navigation, one search, one reference picker: an operator does not
@@ -24,8 +22,6 @@ decided by **Firebase Security Rules**, written and deployed in Firebase.
 
 ## Installation
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 ```bash
 pnpm add @rebasepro/firebase firebase
 ```
@@ -34,8 +30,6 @@ Peer dependencies: `firebase` (10, 11 or 12), `react` ≥ 19, `react-dom` ≥ 19
 optionally `typesense` for text search.
 
 ## Declare a Firestore collection
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```ts
 // frontend/src/cms/events.ts
@@ -89,8 +83,6 @@ checked against its keys. Presentation options a Firestore collection takes
 `customizeTable`, which is for tables.
 
 ## Mount it beside the tables
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Two steps: register Firestore as a data source on `<Rebase>`, and pass the
 collection to `<RebaseCMS externalCollections>`.
@@ -156,8 +148,6 @@ relation tabs or filters Firestore cannot run.
 
 ## Editing it in the collection editor
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 In development the [collection editor](/docs/studio/#collection-editor) edits
 Firestore collections too: a save rewrites the collection's
 `defineFirestoreCollection({...})` call in `frontend/src/cms` in place,
@@ -167,8 +157,6 @@ production Firestore collections are read-only in the editor. To delete one,
 remove its file and its `externalCollections` entry.
 
 ## From Firestore to a table
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `customerId: { type: "reference", target: "customers" }` points at the
 `customers` table. When an operator opens an event and clicks the customer chip,
@@ -182,8 +170,6 @@ matches it. A reference to a document in the same Firestore database is stored
 as a Firestore `DocumentReference`, as Firestore expects.
 
 ## From a table to Firestore
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A table column that holds a Firestore document's id is a plain text column on
 the backend. `referenceTo` in its `customizeTable` makes it a reference in the
@@ -223,8 +209,6 @@ and uuid columns; on any other type it is skipped, with a warning in
 development.
 
 ## A Firestore-only panel
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `RebaseFirebaseApp` is a complete panel over Firebase alone: Firebase Auth
 sign-in, routing and the collections you pass, with no Rebase backend at all.

@@ -1,13 +1,11 @@
 ---
-sourceHash: ee142b42a4f33d5c
+sourceHash: 963af8e4b34aac80
 title: Tableaux et champs JSON
 sidebar_label: Tableaux et JSON
 description: "Comment le CMS affiche les colonnes array et jsonb — listes répétables, sélections multiples, groupes structurés, éditeurs de blocs et documents clé/valeur libres — et comment customizeTable personnalise leurs éléments et clés imbriquées."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Une colonne de type tableau (array) est une liste que le formulaire répète. Une colonne `jsonb` est un document : le
 CMS génère un formulaire pour celui-ci lorsque la colonne décrit sa structure avec
@@ -40,8 +38,6 @@ export const pages = defineTable("pages", {
 
 ## Tableaux
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Une colonne de type tableau (`col.text().array()`) est une liste répétable du champ de l'élément : ci-dessus, `tags`
 est une liste de champs de texte. `.validate({ minItems, maxItems, uniqueItems })` sur
 le tableau définit le nombre d'éléments que le formulaire accepte.
@@ -54,8 +50,6 @@ Une colonne `col.storage().multiple()` est un téléversement de fichiers multip
 [Téléversements de fichiers](/docs/collections/file-uploads/#several-files).
 
 ## Documents avec une structure
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `col.jsonb(json.object({ … }))` est un groupe de champs, un par clé, chacun correspondant au champ
 demandé par son constructeur `json.*` : `json.string()` un champ texte, `json.number()` un
@@ -76,8 +70,6 @@ d'aucun champ structuré : ils sont édités sous forme de JSON libre.
 
 ## Documents sans structure
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 `col.jsonb().$type<T>()` type le document pour TypeScript, mais `T` est effacé lors de l'exécution
 du code, de sorte que le serveur et le CMS n'en savent rien. Ci-dessus, `settings` est
 édité sous forme de paires clé/valeur libres. Donnez à la colonne une structure `json.*`
@@ -86,8 +78,6 @@ lorsque le CMS doit afficher un formulaire pour celle-ci.
 <FieldWidgetPreview client:only="react" variant="key_value" />
 
 ## Personnalisation des éléments et des clés imbriquées
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 ```tsx
 // frontend/src/cms/pages.tsx
@@ -147,8 +137,6 @@ ignorés, avec un avertissement en mode développement. Les options imbriquées 
 un élément que le document ne possède pas sont ignorées de la même manière.
 
 ## Prochaines étapes
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - [Documents JSON](/docs/schema/json/) : les constructeurs `json.*` et ce que le serveur fait d'une structure
 - [Champs](/docs/collections/properties/) : tous les autres types de colonnes

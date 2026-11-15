@@ -6,8 +6,6 @@ description: Scope every row of a table to a site, organization or workspace wit
 
 ## What it does
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `tenant` on a table names the column that holds the tenant a row
 belongs to (a site, an organization, a workspace) and says where the caller's
 tenant comes from. From that one declaration Rebase generates:
@@ -28,8 +26,6 @@ Because Postgres enforces it, the admin panel, the REST API, the SDK and SQL
 run as the caller all see the same rows.
 
 ## One tenant per user: a claim
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 When each user belongs to exactly one tenant, put it on their session token
 and name the claim:
@@ -58,8 +54,6 @@ are written after custom claims so a hook cannot assert them, and a config
 that names one is refused.
 
 ## Several tenants per user: a membership table
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 When people work across tenants (an editor on two sites, a consultant in three
 organizations), keep the memberships in a table of their own:
@@ -139,8 +133,6 @@ SQL run as the caller gets the same answers from Postgres: the policy's
 move (`42501`). A caller in a bypass role is exempt from all three.
 
 ## The field
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - A text, `uuid`, enum or integer column (`numeric` too), or a `belongsTo`
   relation to the table of tenants. For a relation, its foreign-key column is

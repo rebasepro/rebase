@@ -1,5 +1,5 @@
 ---
-sourceHash: 37c268f3d4b76c7f
+sourceHash: a0c661b1716664d6
 title: Historique des entités
 sidebar_label: Historique des entités
 description: Suivez chaque modification apportée à vos entités avec une piste d'audit complète — qui a modifié quoi, quand, ainsi que l'entité complète avant/après.
@@ -44,8 +44,6 @@ history: {
 ```
 
 ### Par table
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Indiquez les tables qui suivent l'historique avec `history: true` :
 
@@ -143,7 +141,7 @@ La rétention est appliquée à deux endroits :
 GET /api/data/:slug/:entityId/history
 ```
 
-Renvoie une liste d'entrées d'historique pour une entité spécifique, triées de la plus récente à la plus ancienne. <span class="since-badge" data-since="0.31">Depuis 0.31</span> Les entrées enregistrées par une même transaction — une création et la mise à jour consécutive dans un même `_batch`, un rétablissement et son propre rétablissement — sont retournées dans l'ordre où elles ont été écrites : le `updated_at` de chaque entrée est postérieur à celui de l'entrée précédente de la ligne. Une base de données existante bénéficie de ce comportement lors de son prochain démarrage de provisionnement, ou lors d'une exécution de `REBASE_PROVISION_ONLY=true`, qui remplace la fonction `rebase.record_history` ; un déploiement qui ne provisionne jamais conserve l'ancien ordre jusque-là. Les entrées enregistrées avant cela conservent leur ordre.
+Renvoie une liste d'entrées d'historique pour une entité spécifique, triées de la plus récente à la plus ancienne. Les entrées enregistrées par une même transaction — une création et la mise à jour consécutive dans un même `_batch`, un rétablissement et son propre rétablissement — sont retournées dans l'ordre où elles ont été écrites : le `updated_at` de chaque entrée est postérieur à celui de l'entrée précédente de la ligne. Une base de données existante bénéficie de ce comportement lors de son prochain démarrage de provisionnement, ou lors d'une exécution de `REBASE_PROVISION_ONLY=true`, qui remplace la fonction `rebase.record_history` ; un déploiement qui ne provisionne jamais conserve l'ancien ordre jusque-là. Les entrées enregistrées avant cela conservent leur ordre.
 
 ```json
 {
@@ -166,8 +164,6 @@ Renvoie une liste d'entrées d'historique pour une entité spécifique, triées 
 ```
 
 ### Les entrées sont servies comme des lectures
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Les entrées d'historique sont servies de la même manière que la ligne : contrôle d'accès aux champs d'abord,
 puis `afterRead` (global, table, colonne), au sein de la transaction en lecture seule de l'appelant. Une colonne

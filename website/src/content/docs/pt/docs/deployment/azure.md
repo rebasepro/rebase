@@ -1,5 +1,5 @@
 ---
-sourceHash: 1fdfb40ed3615bbd
+sourceHash: 4377767287972898
 title: Implantando o Rebase no Microsoft Azure
 description: Faça o deploy da sua instância do Rebase com segurança no Azure usando o Azure Database for PostgreSQL e o Azure Container Apps.
 sidebar_label: Azure
@@ -35,7 +35,7 @@ rebase build
 O Container Apps faz o pull a partir de um registro, portanto, embute o bundle em uma imagem derivada. São apenas três linhas, e isso fixa exatamente o que será executado:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -81,8 +81,6 @@ As últimas três são a forma como este deploy obtém um administrador: em prod
 8. Conclua a criação. O Azure provisionará o contêiner e fornecerá uma URL de Aplicação protegida com TLS.
 
 ## 4. O schema
-
-<span class="since-badge" data-since="0.31">A partir da 0.31</span>
 
 **O runtime cria as tabelas ausentes na inicialização, incluindo aquelas que `backend/schema` declara.** `REBASE_MIGRATE_ON_BOOT` tem como padrão `ensure`, que é aditivo em todo o schema — ele cria tabelas, colunas e tipos enum ausentes e aplica a segurança em nível de linha (RLS) a eles — assim, a primeira inicialização em um servidor vazio já começa servindo suas tabelas.
 

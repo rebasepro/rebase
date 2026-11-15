@@ -1,5 +1,5 @@
 ---
-sourceHash: 145ba18b6f108fbd
+sourceHash: 72babf07dc797d77
 title: Implantação
 sidebar_label: Implantação
 description: Faça o deploy do seu projeto Rebase em produção usando Docker, plataformas em nuvem ou configurações manuais.
@@ -88,8 +88,6 @@ O `rebase init` grava todas essas variáveis no `.env` para você, incluindo uma
 Altere o e-mail do admin para o seu, faça login e altere a senha. Veja [Seu primeiro admin](#seu-primeiro-admin).
 
 ### O schema
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O runtime cria tabelas ausentes na inicialização, **incluindo as declaradas em `backend/schema`** — `REBASE_MIGRATE_ON_BOOT` tem como padrão `ensure`, que é aditivo em todo o schema e aplica row-level security junto a ele. Uma primeira execução do `docker compose up` contra um banco de dados vazio já inicializa servindo suas tabelas.
 

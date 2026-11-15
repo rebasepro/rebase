@@ -1,13 +1,11 @@
 ---
-sourceHash: c858a7a8e7622cee
+sourceHash: ae48e0b641989cf2
 title: "Ricetta: Pubblicazione editoriale"
 sidebar_label: Pubblicazione editoriale
 description: "Gestisci un blog o una redazione su Rebase: autori ed editori, revisione, pubblicazione programmata, bozze di post online, anteprime, traduzioni, libreria multimediale, blocchi di contenuto, feed, note editoriali e importazione da WordPress."
 ---
 
 ## Panoramica
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 Questa ricetta crea la parte editoriale di una pubblicazione su Rebase. Ogni parte è un punto di estensione documentato, così puoi prendere solo i componenti di cui hai bisogno:
 
@@ -31,8 +29,6 @@ Estende il modello dei ruoli della [ricetta Blog CMS](/docs/recipes/blog-cms/): 
 Ogni tabella corrisponde a un file in `backend/schema/`, esportato dal relativo `index.ts`; il modo in cui il pannello di amministrazione la presenta — la bacheca, i pulsanti, le anteprime — è configurato tramite `customizeTable` in `frontend/src/cms/`, passato a `<RebaseCMS tableCustomizations>`.
 
 ## Media
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 Una riga per immagine, in modo che una figura venga caricata una sola volta e riutilizzata, con il rispettivo testo alternativo e i crediti associati:
 
@@ -58,8 +54,6 @@ export const media = defineTable("media", {
 Un post punta a una riga della tabella media tramite una relazione, e il selettore della relazione elenca le immagini già presenti nella libreria. Chi sia autorizzato a caricare i file effettivi viene definito dalle impostazioni di [autorizzazione dello storage](/docs/backend/storage-authorization/).
 
 ## Post
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 ```ts
 // backend/schema/posts.ts
@@ -230,8 +224,6 @@ export default defineCron({
 
 ## Modificare un post online
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 Modificare direttamente un post pubblicato lo aggiorna all'istante in produzione, e le regole descritte sopra impediscono totalmente all'autore di modificarlo. Per preparare le modifiche e pubblicarle in un unico passaggio, memorizzale in una seconda tabella con le medesime colonne:
 
 ```ts
@@ -334,8 +326,6 @@ export default function PostPreview({ modifiedValues }: EntityCustomViewParams) 
 Per visualizzare l'anteprima con il design reale del sito, puoi renderizzare il componente articolo del sito all'interno di questa scheda, oppure inserire in un iframe la pagina di anteprima del sito trasmettendole i `modifiedValues` tramite `postMessage`. Nota che un sito statico servito direttamente da Rebase può essere inserito in un iframe solo dalla sua stessa origine.
 
 ## Note editoriali
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 Le note scambiate tra autore ed editore sono righe a sé stanti, mostrate all'interno della schermata del post:
 

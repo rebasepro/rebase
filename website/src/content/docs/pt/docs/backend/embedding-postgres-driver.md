@@ -1,5 +1,5 @@
 ---
-sourceHash: 82f7615bf6bd44b4
+sourceHash: 90e4ac2603a6ef96
 title: Embutindo o Driver Postgres
 sidebar_label: Embutindo o Driver Postgres
 description: Abra o driver de dados e o socket em tempo real do @rebasepro/server-postgres dentro do Express, Fastify ou Node puro, sem o servidor Rebase — réplicas de leitura, Drizzle e draining incluídos.
@@ -14,8 +14,6 @@ npm install @rebasepro/server-postgres @rebasepro/types express pg drizzle-orm
 ```
 
 ## Abrindo o driver e o socket
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `openPostgresDriver` e `postgresDriverConfigFromEnv` são exportados.
 

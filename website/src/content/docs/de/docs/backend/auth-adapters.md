@@ -1,5 +1,5 @@
 ---
-sourceHash: 939f091d469cc389
+sourceHash: af22f01225487809
 title: Benutzerdefinierte Auth-Adapter
 sidebar_label: Benutzerdefinierte Auth-Adapter
 description: Ersetzen Sie die integrierte Authentifizierung von Rebase durch Clerk, Firebase Auth oder Ihren eigenen Identity-Provider, indem Sie den AuthAdapter-Vertrag implementieren.
@@ -75,8 +75,6 @@ export interface AuthAdapter {
 ```
 
 ### Der Adapter bestimmt den Aufrufer überall
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `verifyRequest` ist die einzige Stelle, an der das Backend abfragt, wer eine Anfrage gesendet hat. Die Daten- und Funktions-Routen fragen dies ab, ebenso wie `GET /api/schema/tables`, das OpenAPI-Dokument unter `/api/docs` und jede Admin-Oberfläche unter `/api/admin` (UI-Einstellungen, Live-Schema-Bearbeitung, der Schema-Editor, Cron, Logs, Backups und der Rest). Ein API-Schlüssel (`rk_`) oder ein Plattform-Token (`rpt_`) wird weiterhin von Rebase aufgelöst, bevor der Adapter abgefragt wird. Ein Credential, das der Adapter nicht erkennt, führt zu einem `401`, niemals als „Niemand“ interpretiert; eine Anfrage ohne Credentials gilt als „Niemand“, worauf der Schema-Endpunkt und das Dokument mit `401` antworten (außer bei `schemaTables.public`) und die Admin-Oberflächen immer mit `401` antworten. Die vom Adapter zurückgegebenen Rollen entscheiden darüber, wie der Aufrufer beschrieben wird und ob eine Admin-Oberfläche ihn zulässt (`403`, wenn ihm der entsprechende Scope fehlt). Wenn ein Adapter einen Fehler wirft, gilt dies als Zurückweisung des Aufrufers, niemals als `500`. Siehe [Schema](/docs/backend/endpoints/#schema).
 

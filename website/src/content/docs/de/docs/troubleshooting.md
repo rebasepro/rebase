@@ -1,5 +1,5 @@
 ---
-sourceHash: ff162864c3d1600b
+sourceHash: 6403748b3ff6521b
 slug: de/docs/troubleshooting
 title: Fehlerbehebung
 description: Fehler, die das Starten oder Ausliefern eines Rebase-Backends verhindern – eine nicht erreichbare Datenbank, falsche Anmeldedaten, eine fehlende Erweiterung, RLS-Verweigerung, Schema-Drift, ein belegter Port, eine nicht ladbare Funktion – und wie die einzelnen Fehler aussehen.
@@ -62,13 +62,9 @@ Wenn Host und Port im Kasten nicht den Erwartungen entsprechen, ist die `DATABAS
 
 ## `SchemaDefinitionError` — das Schema kompiliert nicht
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Boot, `rebase db generate`, `db push`, `generate-sdk` und `doctor` kompilieren vor allem anderen die Tabellen, die `backend/schema/index.ts` exportiert, und stoppen, sobald eine Tabelle nicht kompiliert – kein `rls`, `"inherit"` ohne `defaultRls`, eine Relation zu einer Tabelle, die der Index nicht exportiert, ein `defineTable` in einer Geschwisterdatei, die der Index auslässt –, wobei jede Tabelle, jeder Schlüssel und jedes Problem auf einmal benannt werden. Beheben Sie jedes einzelne Problem; `rebase verify` gibt dieselbe Liste aus, ohne irgendetwas zu starten.
 
 ## `config/collections` wird verweigert
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein Projekt von vor Version 0.31 verwahrt sein Datenmodell in `config/collections`, was von nichts mehr gelesen wird: Die Runtime, jeder CLI-Befehl und ein Format-2-Bundle werden mit dem Hinweis auf `rebase migrate collections-to-tables` in der Meldung abgewiesen. Führen Sie dies auf einem sauberen Git-Tree aus; der Befehl schreibt das Projekt als `backend/schema` und `frontend/src/cms` um, verifiziert, dass das generierte SQL unverändert bleibt, und gibt die noch verbleibenden Schritte aus. Siehe [Upgrade von 0.30 auf 0.31](https://rebase.pro/docs/upgrading/0-30-to-0-31/).
 
@@ -83,8 +79,6 @@ database({ extensions: ["vector"] })
 Die Datenbank benötigt zudem ein Image, das die Bibliothek bereitstellt. Das vorgefertigte `pgvector/pgvector:pg18` des Scaffolds enthält sie; ein Standard-`postgres:18` nicht. Wenn die Installation selbst verweigert wird (`extension "vector" is not available` oder ein Berechtigungsfehler), ist die Konfiguration bereits korrekt und es fehlt lediglich die Bibliothek auf dem Server oder eine Rolle, die berechtigt ist, `CREATE EXTENSION vector;` auszuführen.
 
 ## Die Datenbank hat das Statement verweigert
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```
 DB_PERMISSION_DENIED — Permission denied by the database on "notes"
@@ -145,8 +139,6 @@ Der Dev-Server bindet den nächsten freien Port und meldet dies. Diese Meldung i
 Übergeben Sie `--port`, um einen festen Port zu erzwingen, oder stoppen Sie den anderen Prozess. In der Produktion gibt es keinen Neuversuch: Der konfigurierte Port ist der Port, und `EADDRINUSE` ist ein fataler Fehler.
 
 ## Das Backend ist abgestürzt und `rebase dev` läuft weiter
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein Backend, das beim Booten einen Fehler auslöst, stoppt den Watcher nicht – es gibt den Stacktrace aus und wartet auf eine Dateiänderung. Wenn sich das Backend nicht innerhalb von `REBASE_DEV_READY_TIMEOUT_MS` (standardmäßig 30 Sekunden) meldet, meldet `rebase dev` Folgendes:
 

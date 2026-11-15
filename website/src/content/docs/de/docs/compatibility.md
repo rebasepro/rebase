@@ -1,5 +1,5 @@
 ---
-sourceHash: fb9fac4af8dcfaaf
+sourceHash: 5b1baf3816d33bb8
 slug: de/docs/compatibility
 title: Kompatibilität
 description: Was Rebase über Versionen hinweg verspricht und was nicht – die sechs versionierten Verträge, wie jeder einzelne fehlschlägt und was sich in einer Minor-Version noch ändern kann.
@@ -41,8 +41,6 @@ welchen Status haben, wird veröffentlicht und datiert, anstatt es dem Zufall zu
 überlassen – die folgende Tabelle ist diese Veröffentlichung.
 
 ## Reifegrad nach Subsystem
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 **Zuletzt überarbeitet am 14. September 2026, bezogen auf 0.21.0.** Lesen Sie dies
 bei jeder Minor-Version erneut; eine Einstufung, die sich über drei Releases hinweg
@@ -154,8 +152,6 @@ welche Runtime-Versionen dieses Projekt akzeptiert. Bewusst `rebase` statt
 besitzt* (`managed` | `custom`).
 
 ### 2 — `BUNDLE_FORMAT_VERSION` (derzeit 3)
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Das On-Disk-Layout eines erstellten Bundles. Eine Runtime verweigert ein Bundle,
 dessen Format neuer ist als ihr eigenes, und liest ein älteres, sofern das Layout
@@ -295,8 +291,6 @@ beschränkt:
 
 ### 6 — Abgeleitete Datenbank-Bezeichner
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Jeder Name, den dieses Framework selbstständig ermittelt, anstatt ihn vorgegeben
 zu bekommen: eine Fremdschlüssel-Spalte, ein Fremdschlüssel-Constraint, eine
 Zwischentabelle (Junction Table) samt ihren zwei Schlüsselspalten, ein Enum-Typ,
@@ -383,8 +377,6 @@ Projekt, das einmal gepusht und später gebootet wird, darf nicht in zwei versch
 Schemas enden.
 
 ## Was *nicht* eingefroren ist
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Klar formuliert, damit niemand Zusagen hineininterpretiert, die nie gemacht wurden:
 

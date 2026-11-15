@@ -1,13 +1,11 @@
 ---
-sourceHash: 5037df8f9b275f93
+sourceHash: 2813a331b4153057
 title: Champs de téléversement de fichiers
 sidebar_label: Téléversements de fichiers
 description: "Comment le CMS affiche une colonne col.storage() sous la forme d'un champ de téléversement : les règles appliquées par le serveur à la colonne, les fonctions spécifiques au navigateur ajoutées par customizeTable, les champs pour fichier unique et fichiers multiples, et le cycle de vie des fichiers stockés."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un champ de fichier est une colonne [`col.storage()`](/docs/schema/columns/#storage-columns).
 La colonne contient du texte, la clé de l'objet dans le bucket (ou son URL, si
@@ -26,8 +24,6 @@ des fonctions : elles ne peuvent pas atteindre le serveur et ne modèlent donc q
 téléversements effectués depuis le CMS.
 
 ## Un seul fichier
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 ```ts
 // backend/schema/listings.ts
@@ -54,16 +50,12 @@ colonne de ce type remplit l'emplacement d'image de l'enregistrement dans les ca
 
 ## Plusieurs fichiers
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 `.multiple()` transforme la colonne en `TEXT[]` et le champ en téléversement multifichier,
 réorganisable par glisser-déposer. Chaque option s'applique à chaque fichier.
 
 <FieldWidgetPreview client:only="react" variant="multi_file_upload" />
 
 ## Options côté navigateur
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 ```tsx
 // frontend/src/cms/listings.tsx
@@ -107,8 +99,6 @@ de vider le champ.
 
 ## Ce que le serveur vérifie
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 `accept` et `maxBytes` sont appliqués par le serveur en fonction de **l'emplacement de destination
 du fichier**. Le `path` d'une colonne correspond à l'endroit où vont ses fichiers, et c'est donc
 également là que ses limites s'appliquent : tout téléversement dont la clé est un fichier situé
@@ -133,15 +123,11 @@ des octets : un fichier téléversé d'une autre manière est stocké tel qu'il 
 
 ## Où un fichier peut être placé
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 `path` est une valeur par défaut, pas une limite stricte : rien sur le serveur ne confine un téléversement
 à cet emplacement. Les autorisations d'écriture sont définies par des règles d'autorisation de stockage ; voir
 [Stockage](/docs/backend/storage/).
 
 ## Les fichiers ne sont jamais supprimés à votre place
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Vider un champ de fichier, remplacer son fichier ou supprimer la ligne conserve l'objet
 stocké là où il se trouve. Chaque téléversement dispose de sa propre clé, un remplacement écrit
@@ -154,8 +140,6 @@ ligne ne mentionne et les supprime avec `--delete` ; voir [la CLI](/docs/cli/#re
 
 ## Déplacer une colonne vers un autre bucket
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Un champ de fichier stocke la clé de l'objet, pas son bucket. Modifier la `source` d'une
 colonne fait pointer chaque valeur existante vers le nouveau bucket, où ces clés n'existent
 pas, de sorte que les aperçus des fichiers plus anciens renvoient « introuvable ». Copiez
@@ -164,8 +148,6 @@ d'abord les objets vers le nouveau bucket sous les mêmes clés, à l'aide de
 tels que `aws s3 sync` ou `gcloud storage cp`, ou conservez l'ancien bucket pour les fichiers existants.
 
 ## Prochaines étapes
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - [Colonnes](/docs/schema/columns/#storage-columns) : toutes les options de `col.storage()`
 - [Champs](/docs/collections/properties/) : les autres types de colonnes

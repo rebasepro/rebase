@@ -1,5 +1,5 @@
 ---
-sourceHash: c6b361597710219f
+sourceHash: b26bc6f688a4ec9b
 title: Estrutura do Projeto
 sidebar_label: Estrutura do Projeto
 description: "A estrutura de um projeto Rebase — as tabelas em backend/schema, os módulos de backend lidos pelo runtime e as personalizações do painel administrativo em frontend/src/cms — com e sem o painel."
@@ -27,8 +27,6 @@ diferente em outros lugares da indústria.
   um bucket, um tópico. Declarado em `backend/resources.ts`, vinculado por variáveis
   de ambiente.
 :::
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O `rebase init` cria uma estrutura inicial com um de dois layouts. Ambos têm o mesmo `backend/`; a
 diferença é se o projeto possui o painel administrativo.
@@ -110,8 +108,6 @@ que os compila. Consulte [Integração de Servidor Customizado](/docs/backend/cu
 :::
 
 ## Tabelas (`backend/schema/`)
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 As tabelas são a **fonte única da verdade** para o seu modelo de dados:
 
@@ -207,8 +203,6 @@ um único valor sem a necessidade de escrevê-lo três vezes.
 
 ### Conceitos-Chave
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 - **`createRebaseClient`** — Cria o cliente do SDK que gerencia requisições HTTP, conexões WebSocket e o gerenciamento de tokens de autenticação. Chame-o uma única vez, no escopo do módulo: dentro de um componente, mesmo em um `useMemo`, o `<React.StrictMode>` cria um segundo cliente em desenvolvimento
 - **`<RebaseCMS tableCustomizations>`** — o painel renderiza cada tabela que o backend disponibiliza em `GET /api/schema/tables`; os objetos `customizeTable` de `frontend/src/cms/` alteram a aparência de alguns deles, e `uiConfig` contém o que o editor de coleções salvou em desenvolvimento. Consulte [Personalizando uma tabela](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
 - **`useRebaseAuthController`** — Mantém o usuário autenticado e o ciclo de vida do token, e é o que o `<Rebase>` distribui para tudo abaixo dele
@@ -257,8 +251,6 @@ não afetam mais o projeto. Essa superfície está documentada em
 [Integração de Servidor Customizado](/docs/backend/custom-server).
 
 ## Como Eles se Conectam
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 1. **Você declara** tabelas em `backend/schema/`
 2. **O backend** as compila, cria as tabelas e políticas, e monta rotas REST, de tempo real e MCP

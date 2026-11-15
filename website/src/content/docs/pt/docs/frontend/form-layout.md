@@ -1,11 +1,9 @@
 ---
-sourceHash: 93694433369991ae
+sourceHash: 8e6d7b5d495d9275
 title: Layout do Formulário
 sidebar_label: Layout do Formulário
 description: "Organize o formulário de um registro: larguras de campos em uma grade de quatro colunas, seções com título e recolhíveis, a barra lateral de metadados e um componente que substitui o formulário gerado."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O formulário do registro é gerado a partir das colunas e relações da tabela:
 
@@ -60,8 +58,6 @@ export const ordersCms = customizeTable<typeof orders>("orders", {
 
 ## Largura do campo
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 A largura de um campo é um **span** em uma grade de quatro colunas; `4` representa a largura total da coluna principal. Os spans se ajustam à grade, o que faz com que dois campos se alinhem independentemente da ordem em que foram declarados.
 
 Escolha um span com base no conteúdo do campo, e não no seu tipo. Dois valores curtos que pertencem um ao outro compartilham uma linha: data de início e término, cidade e país, transportadora e código de rastreamento com `2` cada, ou um valor e seu qualificador em `3` + `1`. Números, booleanos e códigos curtos podem usar `1` ao lado de seus equivalentes. Tudo o que for longo para ler (nomes, URLs, e-mails, IDs, descrições, markdown, arquivos) mantém `4`. As linhas são preenchidas na ordem dos campos e nada expande um campo para fechar um espaço vazio, portanto, coloque os pares lado a lado e faça com que cada linha totalize 4.
@@ -69,8 +65,6 @@ Escolha um span com base no conteúdo do campo, e não no seu tipo. Dois valores
 Em layouts estreitos demais para duas colunas (o painel lateral, o painel dividido, um celular), a grade é reduzida a uma coluna e os spans são ignorados.
 
 ## Seções
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O `form.sections` agrupa a coluna principal sob títulos. Cada seção é `{ key, title?, fields, collapsed?, collapsible?, readVariant? }`. Uma seção com título pode ser recolhida; uma sem título não pode. `readVariant: "summary"` empilha os campos da seção como linhas de rótulo e valor na visualização somente leitura do registro; o padrão, `"grid"`, usa a grade do formulário.
 
@@ -80,15 +74,11 @@ Cada entrada é verificada em relação à tabela. Uma entrada que o servidor n�
 
 ## A barra lateral de metadados
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `form.sidebar` move campos para fora da coluna principal para uma barra lateral estreita ao lado dela: status, propriedade, datas de publicação, flags. A barra lateral não usa a grade, portanto o `span` é ignorado nela. Onde não houver espaço para uma barra lateral, ela é renderizada como uma seção inicial comum.
 
 `form.showRecordMeta` coloca o bloco somente leitura do registro (id, criado em, atualizado em) no rodapé da barra lateral. É `true` sempre que uma barra lateral é exibida. `sidebar: []` desativa a barra lateral derivada e mantém todos os campos na coluna principal. `hideIdFromForm` oculta completamente o id do formulário.
 
 ## Substituindo o formulário
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `formView` substitui o formulário gerado por um componente próprio, importado por valor. Ele recebe os mesmos `EntityCustomViewParams` que uma [visualização de entidade](/docs/frontend/entity-views/) recebe. `includeActions: true` mantém os botões Salvar e Descartar na barra do registro enquanto ele estiver na tela.
 
@@ -111,8 +101,6 @@ Para uma alteração menor, sobrescreva apenas uma parte do formulário (`Entity
 
 ## Outras opções de formulário
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | Opção | Efeito |
 |---|---|
 | `formAutoSave` | Salva conforme o visitante digita. |
@@ -121,8 +109,6 @@ Para uma alteração menor, sobrescreva apenas uma parte do formulário (`Entity
 | `localChangesBackup` | Mantém edições não salvas no armazenamento local: `"manual_apply"`, `"auto_apply"` ou `false`. |
 
 ## Relacionados
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Campos personalizados](/docs/frontend/custom-fields/): os campos que um layout organiza
 - [Visualizações de entidade](/docs/frontend/entity-views/): uma aba inteira própria ao lado do formulário

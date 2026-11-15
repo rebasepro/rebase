@@ -1,11 +1,9 @@
 ---
-sourceHash: 8f8ab97f8302c1f8
+sourceHash: c26e358d70b93640
 title: Relaciones en el panel de administración
 sidebar_label: Relaciones en el panel de administración
 description: "Cómo representa el CMS las relaciones de una tabla: un selector para belongsTo, una pestaña bajo el registro para cada relación to-many, filas propias frente a compartidas, las mismas reglas a través de REST y las opciones de customizeTable para campos de relación."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 El CMS lee las [relaciones](/docs/collections/relations/) de una tabla a partir de su
 descriptor y representa cada una según lo que es:
@@ -50,8 +48,6 @@ clave foránea el emisor no puede leer también se omite.
 
 ## El segmento de la ruta es el nombre de la relación
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Las filas de una pestaña se direccionan como `parent/parentId/relationName`:
 
 ```text
@@ -64,8 +60,6 @@ slug del destino. Esto es lo que permite que funcionen dos relaciones hacia la m
 tiene su propio nombre, por lo que cada una obtiene su propia pestaña y su propia ruta.
 
 ## Filas propias frente a filas compartidas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Lo que una pestaña te permite hacer depende de cómo se almacena la relación:
 
@@ -80,8 +74,6 @@ Una pestaña de muchos a muchos ofrece **Add existing** y **Remove from this rec
 nunca una eliminación que quitaría la fila de otros padres.
 
 ## Las mismas reglas a través de REST
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Una pestaña es una consulta ordinaria restringida a un padre, por lo que acepta todo lo que
 acepta una lista raíz (filtros, `orderBy`, `limit`, `offset`, `include`) y
@@ -107,16 +99,12 @@ que ya existe.
 
 ## Qué no se convierte en una pestaña
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 - **Relaciones to-one**: un `belongsTo` o un `hasOne` es un campo del registro, no
   una lista. La escritura a través de una ruta to-one se rechaza.
 - **Una tabla con `hideFromEntityViews`** en su `customizeTable` no se ofrece
   como pestaña en los registros de las tablas que se relacionan con ella.
 
 ## Personalización de campos de relación
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```tsx
 // frontend/src/cms/articles.tsx
@@ -154,8 +142,6 @@ propio `customizeTable` de la tabla de destino, y escribir `fields` dentro de `o
 arroja un error.
 
 ## Próximos pasos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Relaciones](/docs/collections/relations/): los cinco tipos y cómo declarar cada uno
 - [customizeTable](/docs/frontend/customize-table/#relations): opciones de relación en la referencia

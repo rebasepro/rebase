@@ -1,13 +1,11 @@
 ---
-sourceHash: 81fb68b88d544514
+sourceHash: f17526b0388b64e3
 title: Hooks globales del backend
 sidebar_label: Hooks globales
 description: "Aplica hooks de ciclo de vida transversales a cada tabla a nivel de servidor: exporta hooks desde backend/hooks.ts, con la misma estructura TableHooks que usan los propios hooks de una tabla."
 ---
 
 ## Descripción general
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Rebase ejecuta los hooks de tabla en dos niveles, ambos del tipo `TableHooks` de
 `@rebasepro/server/schema`:

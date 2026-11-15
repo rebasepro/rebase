@@ -1,11 +1,9 @@
 ---
-sourceHash: e0fcc045382336df
+sourceHash: 7f09b99cbb85db3d
 title: Relations
 sidebar_label: Relations
 description: "Vincule tabelas com rel.belongsTo, hasOne, hasMany, manyToMany e via: chaves estrangeiras vinculadas ou derivadas, tabelas de junção com colunas _pivot, regras de exclusão, regras de nomenclatura e joins multi-hop."
 ---
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 As `relations` de uma tabela nomeiam os vínculos que ela possui com outras tabelas. Cada uma é uma
 chamada `rel.*`, e sua chave é o nome da relação: o que o `include` solicita, o que
@@ -44,8 +42,6 @@ desta versão mostra o mapeamento.
 
 ## Os cinco tipos
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | Tipo | Onde a chave reside | Retorna | Opções |
 |---|---|---|---|
 | `rel.belongsTo` | **nesta** tabela | uma linha | `localKey`, `notNull`, `unique`, `onDelete`, `onUpdate`, `index`, `constraint` |
@@ -70,8 +66,6 @@ Consulte [Acesso a campos](/docs/collections/field-access/) para saber o que um 
 acesso visualiza.
 
 ## belongsTo — a chave está nesta tabela
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 O `belongsTo` coloca a chave estrangeira na tabela que o declara. A coluna SQL da chave é
 `localKey`, e `<nome da relação no singular>_id` quando esta for omitida:
@@ -133,8 +127,6 @@ leitura a partir do outro lado fará uma varredura (scan) nesta tabela. Consulte
 
 ## hasOne e hasMany — a chave está no destino
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 O `hasMany` lê linhas do destino que apontam de volta para esta tabela. O `hasOne` é o
 mesmo tipo de vínculo, mas com no máximo uma linha do outro lado. Nenhum dos dois adiciona uma coluna aqui: o
 destino declara o `belongsTo` que armazena a chave.
@@ -176,8 +168,6 @@ utilizando um offset ou um cursor.
 
 ### Fazendo join com uma chave natural
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Por padrão, a chave do destino armazena a chave primária desta linha. Quando os dois lados são
 unidos por outro identificador (um ID de identidade externa, um SKU), `sourceKey` indica
 a coluna nesta tabela:
@@ -204,8 +194,6 @@ origem não pode determinar a qual delas uma linha relacionada pertence. Uma lin
 `NULL` não alcança nenhuma linha relacionada, e tentar escrever através da relação gerará um erro.
 
 ## manyToMany — através de uma junção
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 O `manyToMany` vincula linhas por meio de uma tabela de junção criada pelo Rebase, com
 segurança em nível de linha (RLS) própria. A remoção de um vínculo exclui a linha da junção, nunca
@@ -268,8 +256,6 @@ junção como gerenciada. Uma view não declara `manyToMany` próprios.
 
 ### `_pivot`: as colunas próprias da junção
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 As colunas de `pivot` são lidas e escritas sob a chave `_pivot`. Uma leitura que inclui a
 relação retorna cada linha relacionada acompanhada das colunas do seu vínculo:
 
@@ -291,8 +277,6 @@ da junção é composta por suas duas colunas de vínculo.
 
 ### `_count`: quantas linhas relacionadas existem
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A inclusão de uma relação to-many (`hasMany`, `manyToMany`, um `via` to-many) pode
 solicitar o total em conjunto com uma página limitada de linhas, retornado sob a propriedade
 `_count` da linha. A contagem é feita na mesma instrução, sob os mesmos filtros e
@@ -300,8 +284,6 @@ regras de segurança em nível de linha (RLS). Consulte
 [Contando o que um limit deixa de fora](/docs/sdk/relations#counting-what-a-limit-leaves-out).
 
 ## via — uma cadeia explícita de joins
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `via` realiza a leitura por meio de joins que você define explicitamente: múltiplos saltos (hops), chaves compostas ou uma
 condição que não seja uma chave estrangeira simples.
@@ -349,8 +331,6 @@ não aceita um `via` e indicará isso explicitamente.
 
 ## Regras de exclusão e atualização
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | Ação | Comportamento |
 |---|---|
 | `"cascade"` | Exclui ou atualiza também as linhas relacionadas |
@@ -367,8 +347,6 @@ excluir a linha. Especifique `"cascade"` quando for esse o objetivo: é o único
 valor que remove linhas que você não nomeou explicitamente.
 
 ## Nomes
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Todos os nomes utilizados por uma relação são derivados quando você não os define explicitamente. As regras seguem
 o padrão já presente em um banco de dados implantado, garantindo que não mudem entre versões.
@@ -391,8 +369,6 @@ nomear uma coluna: em `indexes`, em `tenant` e no `ownerField` ou
 condição de uma regra.
 
 ## Lendo e escrevendo relações
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Relações não são incluídas em uma leitura a menos que o chamador solicite:
 
@@ -419,8 +395,6 @@ No CMS, cada relação to-many torna-se uma aba sob o registro. Consulte
 
 ## O que é recusado
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Um `rel.via()` sem steps lança um erro no carregamento do módulo. Durante a compilação
 do schema, uma tabela será recusada nos seguintes casos:
 
@@ -443,8 +417,6 @@ do schema, uma tabela será recusada nos seguintes casos:
   `afterRead` do destino tem acesso a `_pivot`).
 
 ## Próximos passos
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Row-level security](/docs/collections/security-rules/): quem acessa as linhas em cada ponta
 - [Índices](/docs/backend/indexes/): o índice de chave estrangeira e índices compostos sobre relações

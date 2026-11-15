@@ -235,7 +235,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REBASE_HISTORY` | Record [entity change history](/docs/backend/history). | `true` |
 | `REBASE_COMPRESSION` | gzip/brotli responses. | `true` |
 | `REBASE_MAX_BODY_SIZE` | Maximum request body, **in bytes** (`10485760`, not `10MB` — a value that is not a number refuses to boot rather than silently removing the limit). `0` turns the limit off. | `10485760` (10 MiB) |
-| `REBASE_ENABLE_SWAGGER` | The OpenAPI surface. Tri-state. <span class="since-badge" data-since="0.31">Since 0.31</span> Unset, in every environment: `/api/docs` is served to the callers `GET /api/schema/tables` describes tables to, each the document of the tables they are described, and there is no Swagger UI. `true` publishes the whole document to everyone, with the Swagger **UI** at `/api/swagger` outside production (never in production). `false` keeps the document behind the admin gate. | — |
+| `REBASE_ENABLE_SWAGGER` | The OpenAPI surface. Tri-state. Unset, in every environment: `/api/docs` is served to the callers `GET /api/schema/tables` describes tables to, each the document of the tables they are described, and there is no Swagger UI. `true` publishes the whole document to everyone, with the Swagger **UI** at `/api/swagger` outside production (never in production). `false` keeps the document behind the admin gate. | — |
 | `REBASE_METRICS` | Expose Prometheus metrics at `/metrics`. | `false` |
 | `REBASE_HSTS_INCLUDE_SUBDOMAINS` | Add `includeSubDomains` to the `Strict-Transport-Security` header, so browsers refuse plain HTTP on every subdomain of the host for six months — hosts this process does not serve included. Turn it on only when every subdomain of the domain is HTTPS-only. Anything but `true`/`false` refuses to boot. See [Security headers](/docs/deployment/self-hosting/#security-headers). | `false` |
 | `REBASE_METRICS_TOKEN` | Bearer token guarding `/metrics`. Unset leaves the endpoint open to anything that can reach the port — fine on a private network, not on a public one, and the boot logs say so. | — |
@@ -319,7 +319,7 @@ no usable credential refuses to boot. See
 |----------|-------------|---------|
 | `REBASE_LIVE_SCHEMA_REPOSITORY` | The GitHub repository to commit schema changes to, as `owner/name`. Setting it is what turns the feature on. | — |
 | `REBASE_LIVE_SCHEMA_BRANCH` | The branch the commit lands on. | `main` |
-| `REBASE_LIVE_SCHEMA_PATH` | <span class="since-badge" data-since="0.31">Since 0.31</span> Where `backend/schema` lives in that repository, repo-relative. A path that leaves the repository refuses to boot, and so does the removed `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH`. | `backend/schema` |
+| `REBASE_LIVE_SCHEMA_PATH` | Where `backend/schema` lives in that repository, repo-relative. A path that leaves the repository refuses to boot, and so does the removed `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH`. | `backend/schema` |
 | `REBASE_LIVE_SCHEMA_GITHUB_TOKEN` | A fine-grained token with read and write access to the repository's contents. Set this or the three `_GITHUB_APP_*` variables, not both. | — |
 | `REBASE_LIVE_SCHEMA_GITHUB_APP_ID` | A GitHub App's id, to commit as the app instead of with a token. | — |
 | `REBASE_LIVE_SCHEMA_GITHUB_APP_INSTALLATION_ID` | The app's installation on the repository. | — |
@@ -425,8 +425,6 @@ The environment is not valid:
 ```
 
 ## Backend Config Object
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 The `RebaseBackendConfig` passed to `initializeRebaseBackend()` provides programmatic control:
 

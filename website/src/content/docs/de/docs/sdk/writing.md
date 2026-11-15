@@ -1,5 +1,5 @@
 ---
-sourceHash: dc2857e881f65bd3
+sourceHash: c2767dda8fb3294a
 title: Daten schreiben
 sidebar_label: Daten schreiben
 description: create, upsert, update und delete mit dem SDK — Feldoperationen, bedingte Schreibvorgänge, Idempotenzschlüssel, Batch-Schreibvorgänge und tabellenübergreifendes Schreiben in einer einzigen Transaktion.
@@ -92,8 +92,6 @@ verhalten sich pro Zeile genauso und geben nur die Zeilen zurück, die sie gesch
 die beiden können nicht kombiniert werden (`INVALID_CONFLICT_RULE`).
 
 #### Nicht auf der Auth-Tabelle
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `upsert()` auf der Auth-Tabelle (die mit `defineAuthTable` deklarierte) wird mit
 einem 400 (`INVALID_CONFLICT_TARGET`) abgewiesen, ebenso wie `createMany` mit `upsert`
@@ -376,8 +374,6 @@ stillschweigend Einzelschreibvorgänge in einer Schleife auszuführen — was Ih
 noch den einzelnen Roundtrip bieten würde, weshalb Sie überhaupt einen Batch gewählt haben.
 
 ## Tabellenübergreifendes Schreiben
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `createMany` und ähnliche Methoden beziehen sich jeweils auf eine Tabelle. `client.batch()` ist die
 tabellenübergreifende Variante: eine Anfrage, eine Transaktion, alles oder nichts.

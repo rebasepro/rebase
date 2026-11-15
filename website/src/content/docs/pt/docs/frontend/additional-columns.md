@@ -1,5 +1,5 @@
 ---
-sourceHash: 395db046e3ecafc8
+sourceHash: e275bf79725ed509
 title: Colunas Adicionais
 sidebar_label: Colunas Adicionais
 description: Adicione colunas computadas/virtuais a tabelas de coleções que derivam valores de dados da entidade.
@@ -10,8 +10,6 @@ description: Adicione colunas computadas/virtuais a tabelas de coleções que de
 As colunas adicionais permitem exibir dados computados ou derivados na tabela da coleção sem armazená-los no banco de dados.
 
 ## Definindo Colunas Adicionais
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```tsx
 // frontend/src/cms/products.tsx

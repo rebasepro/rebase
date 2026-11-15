@@ -1,11 +1,9 @@
 ---
-sourceHash: 8f8ab97f8302c1f8
+sourceHash: c26e358d70b93640
 title: Relationen im Admin-Panel
 sidebar_label: Relationen im Admin-Panel
 description: "Wie das CMS die Relationen einer Tabelle darstellt: eine Auswahl für ein belongsTo, ein Tab unter dem Datensatz für jede To-Many-Relation, eigene versus geteilte Zeilen, dieselben Regeln über REST und die customizeTable-Optionen für Relationsfelder."
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Das CMS liest die [Relationen](/docs/collections/relations/) einer Tabelle aus ihrem
 Deskriptor und stellt jede entsprechend ihres Typs dar:
@@ -50,8 +48,6 @@ Fremdschlüssel dann als einfaches Feld, sodass der Wert sichtbar und bearbeitba
 
 ## Das Pfadsegment ist der Relationsname
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Die Zeilen eines Tabs werden über `parent/parentId/relationName` adressiert:
 
 ```text
@@ -64,8 +60,6 @@ der Slug des Ziels. Dadurch funktionieren zwei Relationen zur selben Tabelle: Je
 ihren eigenen Namen, sodass jede ihren eigenen Tab und ihren eigenen Pfad erhält.
 
 ## Eigene Zeilen versus geteilte Zeilen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Welche Aktionen in einem Tab möglich sind, hängt davon ab, wie die Relation gespeichert ist:
 
@@ -80,8 +74,6 @@ Ein Many-to-Many-Tab bietet **Add existing** und **Remove from this record** an 
 niemals ein Löschen, das die Zeile anderen übergeordneten Elementen entziehen würde.
 
 ## Dieselben Regeln über REST
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein Tab ist eine gewöhnliche Abfrage, die auf ein übergeordnetes Element eingegrenzt ist,
 daher akzeptiert er alles, was eine Root-Liste akzeptiert (Filter, `orderBy`, `limit`,
@@ -108,16 +100,12 @@ Weise binden Sie eine bereits vorhandene Zeile an.
 
 ## Was nicht zu einem Tab wird
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 - **To-One-Relationen**: Ein `belongsTo` oder ein `hasOne` ist ein Feld des Datensatzes,
   keine Liste. Schreibzugriffe über einen To-One-Pfad werden abgewiesen.
 - **Eine Tabelle mit `hideFromEntityViews`** in ihrem `customizeTable` wird nicht als Tab
   auf den Datensätzen von Tabellen angeboten, die sich auf sie beziehen.
 
 ## Relationsfelder anpassen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```tsx
 // frontend/src/cms/articles.tsx
@@ -155,8 +143,6 @@ eigenen `customizeTable` der Zieltabelle, und das Definieren von `fields` innerh
 wirft einen Fehler.
 
 ## Nächste Schritte
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - [Relationen](/docs/collections/relations/): Die fünf Arten und wie jede deklariert wird
 - [customizeTable](/docs/frontend/customize-table/#relations): Relationsoptionen in der Referenz

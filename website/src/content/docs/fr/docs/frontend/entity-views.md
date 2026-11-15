@@ -1,5 +1,5 @@
 ---
-sourceHash: faf8f760aabce923
+sourceHash: f76fb5b27f8eb93c
 title: Vues d'entités
 sidebar_label: Vues d'entités
 description: Ajoutez des onglets et des vues personnalisés aux pages de détail des entités pour des prévisualisations, des analyses, des données associées ou une interface utilisateur personnalisée.
@@ -15,8 +15,6 @@ Les vues d'entités vous permettent d'ajouter des **onglets** personnalisés à 
 - Des **éditeurs personnalisés** (texte enrichi, éditeurs de carte)
 
 ## Ajouter des vues d'entités
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 ```tsx
 // frontend/src/cms/products.tsx
@@ -38,8 +36,6 @@ plusieurs tables. Une vue enregistrée s'affiche uniquement sur les tables qui s
 `position: "start"` place l'onglet avant celui du formulaire ; sinon, il est placé après.
 
 ## Créer une vue d'entité
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `Builder` est le composant lui-même, importé par valeur :
 
@@ -64,8 +60,6 @@ export function ArticlePreview({ row, modifiedValues }: EntityCustomViewParams) 
 ```
 
 ### EntityCustomViewParams
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 | Prop | Type | Description |
 |------|------|-------------|

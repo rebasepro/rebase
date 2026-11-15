@@ -93,8 +93,6 @@ the two cannot be combined (`INVALID_CONFLICT_RULE`).
 
 #### Not on the auth table
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `upsert()` on the auth table (the one declared with `defineAuthTable`) is refused
 with a 400 (`INVALID_CONFLICT_TARGET`), and so is `createMany` with `upsert`
 there. Creating a user and changing one follow different rules — a create
@@ -376,8 +374,6 @@ than quietly looping single writes — which would give you neither the atomicit
 nor the single round trip you reached for a batch to get.
 
 ## Writing across tables
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `createMany` and friends are one table at a time. `client.batch()` is the
 cross-table form: one request, one transaction, all of it or none.

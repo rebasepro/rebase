@@ -1,5 +1,5 @@
 ---
-sourceHash: 395db046e3ecafc8
+sourceHash: e275bf79725ed509
 title: Colonnes supplémentaires
 sidebar_label: Colonnes supplémentaires
 description: Ajoutez des colonnes calculées/virtuelles aux tables de collection qui dérivent des valeurs à partir des données de l'entité.
@@ -10,8 +10,6 @@ description: Ajoutez des colonnes calculées/virtuelles aux tables de collection
 Les colonnes supplémentaires vous permettent d'afficher des données calculées ou dérivées dans la table de collection sans les stocker dans la base de données.
 
 ## Définir des colonnes supplémentaires
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 ```tsx
 // frontend/src/cms/products.tsx

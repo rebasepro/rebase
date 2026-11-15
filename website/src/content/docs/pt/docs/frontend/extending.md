@@ -1,5 +1,5 @@
 ---
-sourceHash: 3317ba94279d0cb8
+sourceHash: c3ddd891a53e23c1
 title: Estendendo o Rebase
 sidebar_label: Estendendo o Rebase
 description: Um guia de decisão para escolher o mecanismo de extensão correto — plugins, slots, substituições de componentes, visualizações de entidade, ações e muito mais.
@@ -21,8 +21,6 @@ adicionar uma rota, incorporar o driver em seu próprio processo, `rebase eject`
 para o backend.
 
 ## Tabela de Decisão
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 | Eu quero… | Mecanismo | Escopo | Referência |
 |---|---|---|---|
@@ -56,8 +54,6 @@ cor hardcoded fica invisível em um dos dois temas. Consulte
 ## Mecanismos em Detalhes
 
 ### Plugins
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 **Escopo:** app.
 
@@ -110,8 +106,6 @@ Dois modos: **Eject** (substituição completa) ou **Wrap** (incrementar o origi
 
 ### Visualizações de Entidade
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 **Escopo:** entidade (adiciona abas).
 
 Visualizações personalizadas que aparecem como abas na página de detalhes da entidade. Definidas por tabela em `customizeTable`, ou registradas uma vez em `<Rebase entityViews>` (ou `<RebaseCMS entityViews>`) e referenciadas por `key` nas `entityViews` de uma tabela.
@@ -119,8 +113,6 @@ Visualizações personalizadas que aparecem como abas na página de detalhes da 
 → [Visualizações de Entidade](/docs/frontend/entity-views)
 
 ### Ações de Entidade
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 **Escopo:** entidade.
 
@@ -140,7 +132,6 @@ Componentes React no nível da barra de ferramentas que recebem `CollectionActio
 
 ### Modos de visualização personalizados
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 **Escopo:** coleção (adiciona um modo de visualização).
 
 Um mapa, um calendário, uma galeria, uma linha do tempo — outra renderização das *mesmas linhas*,
@@ -231,7 +222,6 @@ e contagem de registros, estaria descrevendo uma consulta que ele não renderiza
 
 ### `formView`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 **Escopo:** coleção.
 
 Substitui todo o formulário padrão de entidade por um componente personalizado, definido com
@@ -276,8 +266,6 @@ painel mostra, esta é a página errada. O servidor possui seus próprios nívei
 → [O Rebase não faz X](/docs/backend/extending)
 
 ## Resumo de Precedência
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - **O `components` de uma tabela tem precedência sobre o `components` global** dentro de sua coleção. Uma substituição de coleção substitui ambos; uma substituição com `wrap: true` de coleção envolve a substituição global quando ela existe. Consulte [Substituições de Componentes](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **O `Actions` de coleção e o slot `collection.actions` são aditivos** — `Actions` são renderizados primeiro, seguidos pelas contribuições de slot.

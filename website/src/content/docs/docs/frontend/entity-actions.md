@@ -6,15 +6,11 @@ description: Add custom action buttons to entities for archiving, publishing, ex
 
 ## Overview
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Entity actions are buttons on a record: publish, archive, clone, or trigger an
 outside workflow. They are declared per table in `customizeTable`, and
 `updateRecord` covers the write most of them make.
 
 ## Defining Entity Actions
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```tsx
 // frontend/src/cms/products.tsx
@@ -74,8 +70,6 @@ registered once on `<RebaseCMS entityActions>` (or `<Rebase entityActions>`),
 for actions several tables share.
 
 ## `updateRecord`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `updateRecord(context, slug, id, patch, message?)` writes `patch` onto one
 record, then shows `message` as a success notification when given.
@@ -147,8 +141,6 @@ A disabled action that does not say why reads as broken. `disabledReason` receiv
 On the record, a button whose `onClick` returns a pending promise shows a spinner and cannot be pressed again until the promise settles. If the action throws or its promise rejects, the user sees the error in a notification. The read-only view has no form, so `formContext` is undefined there.
 
 ## Collection Actions
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `Actions` puts components of your own in the collection's toolbar, for work on
 the whole collection or on the selected rows: `PublishSelected` above. It is a

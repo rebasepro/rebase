@@ -1,11 +1,9 @@
 ---
-sourceHash: 3a1b51e6e2ae57fd
+sourceHash: 293c14de9200de9f
 title: Inferencia de tipos
 sidebar_label: Inferencia de tipos
 description: "InferRow, InferInsert e InferUpdate leen las columnas y modificadores de una tabla para tipar las filas que entrega y las escrituras que acepta: en hooks, en código de servidor y en un frontend que importe el tipo de la tabla."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Los tipos de TypeScript de una tabla se deducen a partir de su declaración. Nada
 se escribe dos veces: cambia una columna y todos los tipos derivados de ella cambiarán
@@ -46,8 +44,6 @@ el SDK y lo que reciben los hooks. Un timestamp es una cadena ISO, un `bigint` e
 
 ## Las reglas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | La columna | `InferRow` | `InferInsert` | `InferUpdate` |
 |---|---|---|---|
 | `.notNull()` o `.primaryKey()` | `T` | obligatorio, a menos que tenga un valor por defecto | opcional |
@@ -66,8 +62,6 @@ no existe un tipo de fila único que sea adecuado para un lector que tiene un ro
 otro que no. Un llamador sin el rol simplemente no recibe la columna.
 
 ## Claves foráneas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Una clave foránea `belongsTo` que declares en `columns` se tipa allí, con exactitud.
 Aquella que la relación deriva se añade como una clave opcional con el nombre de su
@@ -96,8 +90,6 @@ type Comment = InferRow<typeof comments>;
 
 ## Claves de una tabla
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `ColumnKeyOf<typeof posts>` es la unión de las claves de columna de una tabla, y
 `RelationKeyOf<typeof posts>` la unión de sus nombres de relación. Ambos funcionan
 también en vistas. Utilízalos para tipar código que reciba una columna o una relación
@@ -114,8 +106,6 @@ type PostRelation = RelationKeyOf<typeof posts>; // never, for a table without r
 
 ## Los hooks se tipan automáticamente
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Los [hooks](/docs/collections/callbacks/) de una tabla se tipan a partir de sus columnas
 sin necesidad de ninguna anotación: `values` en `beforeSave` es un `Partial` del tipo
 de inserción, mientras que `previousValues` y las filas de `afterRead` y de los hooks
@@ -125,8 +115,6 @@ recibe el tipo de dicha columna como `value`: `T | null`, o `T` cuando se escrib
 `T | undefined`, o `T` después de `.required()`.
 
 ## En un frontend
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Un frontend puede importar el **tipo** de una tabla desde `backend/schema`, pero nunca su valor:
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f137cdb15196a3e
+sourceHash: 3e87d9e1b148c9f5
 title: Herramientas de Studio
 sidebar_label: Studio
 description: Rebase Studio proporciona herramientas de desarrollo para la edición visual de esquemas, consultas SQL, scripting en JavaScript, gestión de políticas RLS y exploración de almacenamiento.
@@ -39,8 +39,6 @@ al leerlo.
 ## Herramientas integradas de Studio
 
 ### Editor de colecciones
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Un editor visual para una tabla y cómo la muestra el panel. El guardado se divide en dos:
 
@@ -133,8 +131,6 @@ El panel consulta `GET /api/admin/schema-editor/status` y muestra el motivo
 devuelto junto al botón deshabilitado.
 
 ### Herramientas integradas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Cada herramienta que conoce el esquema lee las tablas que sirve el servidor
 desde `GET /api/schema/tables`, con o sin el CMS en la página — por lo que

@@ -1,5 +1,5 @@
 ---
-sourceHash: 4c9e8266acfba86f
+sourceHash: c89ca78335485a65
 title: Le point de terminaison MCP distant
 sidebar_label: Point de terminaison MCP distant
 description: Servez MCP depuis un backend déployé sur /mcp, afin que les utilisateurs de votre application puissent connecter Claude ou Cursor en leur propre nom — OAuth avec un écran de consentement, dix-sept outils sous trois portées, chaque appel soumis à leur propre sécurité au niveau des lignes.
@@ -42,7 +42,7 @@ Sans `REBASE_PUBLIC_URL`, un secret JWT ou un pilote de données capable de rest
   (le « Mot de passe oublié » de votre application) ; l'écran le lui signale. Il mentionne également l'hôte auquel le code d'autorisation est envoyé,
   et précise que cet hôte n'est pas vérifié : n'importe qui pouvant enregistrer un client sous
   n'importe quel nom, l'hôte est la partie qu'une personne peut vérifier.
-- **Dix-sept outils, trois portées.** <span class="since-badge" data-since="0.31">Depuis 0.31</span> Les mêmes [portées](/docs/backend/roles-and-scopes/)
+- **Dix-sept outils, trois portées.** Les mêmes [portées](/docs/backend/roles-and-scopes/)
   que chaque identifiant utilise. `data:read` propose `list_tables`, `describe_table`,
   `query_table`, `count_rows`, `aggregate_rows`, `get_row`, les trois vues,
   `show_table`, `show_record` et `show_app`, `show_app_guide`, ainsi que les commandes expérimentales

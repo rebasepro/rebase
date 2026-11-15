@@ -33,7 +33,7 @@ rebase build
 Cloud Run pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -74,8 +74,6 @@ Cloud Run injects `PORT` and the runtime binds to it, so there is no port to con
 Reaching a private Cloud SQL instance needs `--add-cloudsql-instances YOUR_PROJECT:REGION:INSTANCE` and a socket-style `DATABASE_URL`; a public instance with an authorized network needs neither.
 
 ## 4. The schema
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 **The runtime creates missing tables at boot, including the ones `backend/schema` declares.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema — it creates missing tables, columns and enum types and applies their row-level security — so the first start against an empty instance comes up serving your tables.
 

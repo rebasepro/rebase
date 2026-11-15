@@ -4,8 +4,6 @@ sidebar_label: Field access
 description: "Per-column read and write permissions by role with .access(), columns that never leave the server with .private(), and columns clients cannot write with .readOnly(). A caller the row's policies let through still does not receive a column their roles cannot read."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 [Row-level security](/docs/collections/security-rules/) decides which **rows** a
 caller reaches. Three column modifiers decide which **columns of a reached row**
 they see and may set:
@@ -38,8 +36,6 @@ reads every staff row. Only a caller holding `hr` gets the `salary` column of
 one, and nobody sets it over HTTP.
 
 ## The rule
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `.access()` takes two optional lists, and an omitted list is not an empty one —
 the difference is the whole feature.
@@ -77,8 +73,6 @@ cannot read (`FIELD_NOT_READABLE`), and answers a `.private()` name as it
 answers a typo — the same as REST and the socket.
 
 ## `.private()` and `.readOnly()` are the same mechanism
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `.private()` is `.access({ read: [], write: [] })`, with one difference: a
 private column is also left out of OpenAPI, the SDK types and the MCP tool
@@ -187,8 +181,6 @@ bound would tell you the value you are not allowed to see.
 
 ### A link follows its key column
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A `belongsTo` and the key column it is bound to are one field with two
 spellings. Writing `{ "reviewer": 7 }` is held to every rule of `reviewerId`
 (its write rule, `.readOnly()`, `.private()`, a create stamp, the tenant
@@ -225,8 +217,6 @@ through to the driver. It never relaxes a rule on a declared column, a stamp,
 the tenant, the key, a relation target or `_pivot`.
 
 ## Search
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 The fallback search — a table with no `search` block — matches `ILIKE` across
 your text columns, and it skips the ones the caller cannot read. Nothing leaks
@@ -300,8 +290,6 @@ hide anything from them. `[]` still does — including from `dataAsAdmin`. Use
 [`rebase.sql()`](/docs/backend/custom-functions) if you need the raw column.
 
 ## Validation
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `.access()` on a column, and `access` on a relation, throw when the module
 loads unless `read` and `write` are lists of non-empty role names: a string

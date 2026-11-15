@@ -1,5 +1,5 @@
 ---
-sourceHash: f09c52453f45b58d
+sourceHash: 0c26c39cd66cd6e6
 title: Découpage en plusieurs processus
 sidebar_label: Processus découpés
 description: Exécutez un même bundle sous la forme de plusieurs processus coopérants — une API, une couche de fonctions, un worker — à partir de la même image de runtime publiée, afin qu'une fonction personnalisée lourde ne concurrence plus l'API de données.
@@ -273,7 +273,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.30.1"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.31.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Seul le tag vaut généralement la peine d'être figé : le dépôt est hérité, il s'agit donc d'un

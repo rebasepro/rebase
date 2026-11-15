@@ -1,11 +1,9 @@
 ---
-sourceHash: 362c7b70fede8ad5
+sourceHash: 2564e6bc51f454da
 title: Personnaliser l'administration
 sidebar_label: Personnaliser l'administration
 description: Comment personnaliser l'administration Rebase — blocs de construction, hooks et emplacements, avec des recettes testées pour les singletons, les paramètres par utilisateur, les actions groupées, les vues calendrier, les tableaux de bord et les écrans de connexion personnalisés.
 ---
-
-<span class="since-badge" data-since="0.31">Depuis la version 0.31</span>
 
 L'interface d'administration est construite à partir d'éléments que vous pouvez vous-même utiliser. Pour la personnaliser, vous écrivez un composant React classique et vous le placez à un endroit spécifique. C'est tout le modèle :
 
@@ -31,8 +29,6 @@ Des exemples fonctionnels et testés sont intégrés dans `@rebasepro/cms`, de s
 Le fichier `README.md` situé à côté constitue la référence complète des blocs de construction, hooks et emplacements.
 
 ## Exemple : un singleton
-
-<span class="since-badge" data-since="0.31">Depuis la version 0.31</span>
 
 Un singleton n'est pas un type de table spécial. C'est une table ordinaire dont la page ouvre toujours la même ligne. Lorsqu'on lui transmet un identifiant, `RecordForm` modifie cet enregistrement, et le crée avec cet identifiant la première fois, évitant ainsi tout besoin de pré-remplissage (seeding).
 
@@ -84,8 +80,6 @@ La même structure avec `id={user.uid}` (obtenu via `useAuthController()`) const
 Pour n'afficher que certains champs, passez `fields={["siteName"]}`. Pour les organiser vous-même, passez `layout` avec des composants `<FormField name="…"/>` dans votre propre JSX. Dans les deux cas, le formulaire ne valide que ce qu'il affiche — voir [Panneaux dans votre propre page](/docs/frontend/panels).
 
 ## Emplacements
-
-<span class="since-badge" data-since="0.31">Depuis la version 0.31</span>
 
 | Pour ajouter… | Placez un composant dans |
 |---|---|

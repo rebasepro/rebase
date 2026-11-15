@@ -4,8 +4,6 @@ sidebar_label: Relations in the admin panel
 description: "How the CMS draws a table's relations: a picker for a belongsTo, a tab under the record for every to-many relation, owned versus shared rows, the same rules over REST, and the customizeTable options for relation fields."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 The CMS reads a table's [relations](/docs/collections/relations/) from its
 descriptor and draws each one by what it is:
 
@@ -49,8 +47,6 @@ foreign key the caller may not read is left out too.
 
 ## The path segment is the relation name
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A tab's rows are addressed as `parent/parentId/relationName`:
 
 ```text
@@ -63,8 +59,6 @@ target's slug. That is what lets two relations to the same table work: each has
 its own name, so each gets its own tab and its own path.
 
 ## Owned rows versus shared rows
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 What a tab lets you do depends on how the relation is stored:
 
@@ -79,8 +73,6 @@ A many-to-many tab offers **Add existing** and **Remove from this record**, and
 never a delete that would take the row away from other parents.
 
 ## The same rules over REST
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A tab is an ordinary query narrowed to one parent, so it accepts everything a
 root list does (filters, `orderBy`, `limit`, `offset`, `include`) and
@@ -106,16 +98,12 @@ that already exists.
 
 ## What does not become a tab
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 - **To-one relations**: a `belongsTo` or a `hasOne` is a field of the record, not
   a list. Writing through a to-one path is rejected.
 - **A table with `hideFromEntityViews`** in its `customizeTable` is not offered
   as a tab on the records of tables that relate to it.
 
 ## Customizing relation fields
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```tsx
 // frontend/src/cms/articles.tsx
@@ -153,8 +141,6 @@ target table's own `customizeTable`, and writing `fields` inside `overrides`
 throws.
 
 ## Next steps
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Relations](/docs/collections/relations/): the five kinds, and how to declare each
 - [customizeTable](/docs/frontend/customize-table/#relations): relation options in the reference

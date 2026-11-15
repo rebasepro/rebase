@@ -1,5 +1,5 @@
 ---
-sourceHash: 4c9e8266acfba86f
+sourceHash: c89ca78335485a65
 title: El endpoint remoto de MCP
 sidebar_label: Endpoint remoto de MCP
 description: "Sirve MCP desde un backend desplegado en /mcp, para que las personas que usan tu aplicación puedan conectar Claude o Cursor en su propio nombre: OAuth con pantalla de consentimiento, diecisiete herramientas bajo tres alcances, cada llamada bajo su propia seguridad a nivel de fila."
@@ -42,7 +42,7 @@ a un solo usuario, el endpoint se niega a montarse y explica el motivo en el reg
   ("Olvidé mi contraseña" de tu aplicación); la pantalla se lo indica. También nombra el host al que se envía el código de autorización
   y advierte que dicho host no está verificado: cualquiera puede registrar un cliente bajo
   cualquier nombre, por lo que el host es la parte que una persona puede verificar.
-- **Diecisiete herramientas, tres alcances.** <span class="since-badge" data-since="0.31">Desde 0.31</span> Los mismos [alcances](/docs/backend/roles-and-scopes/)
+- **Diecisiete herramientas, tres alcances.** Los mismos [alcances](/docs/backend/roles-and-scopes/)
   que utiliza cada credencial. `data:read` ofrece `list_tables`, `describe_table`,
   `query_table`, `count_rows`, `aggregate_rows`, `get_row`, las tres vistas,
   `show_table`, `show_record` y `show_app`, `show_app_guide`, y los experimentales

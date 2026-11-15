@@ -1,5 +1,5 @@
 ---
-sourceHash: b16bc057fd9a76c0
+sourceHash: 8a68eb639e8102bb
 title: Override dei componenti (Swizzling)
 sidebar_label: Override dei componenti
 description: Esegui l'override dei componenti UI predefiniti con implementazioni personalizzate a livello di applicazione o di collezione.
@@ -58,8 +58,6 @@ function App() {
 
 ## Override dei componenti a livello di collezione
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Per eseguire l'override dei componenti per una sola tabella, passa `components` nel suo `customizeTable`. Questo è utile per lo stato vuoto (empty state), le schede (card) o il form di una particolare tabella. Ciascun `Component` è il componente stesso, importato per valore: il file viene eseguito solo nel browser.
 
 ```tsx
@@ -100,8 +98,6 @@ export function ProductsEmptyState({ OriginalComponent, ...props }: {
 Un percorso stringa o un thunk lazy `() => import(…)` in `Component` genera un errore al caricamento del modulo, indicando cosa scrivere al suo posto.
 
 ### Quando entrambi gli ambiti eseguono l'override di un componente
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 I due ambiti si compongono. L'override a livello di app (`<Rebase components>`) viene applicato per primo al componente integrato, e quello della tabella (`components` in `customizeTable`) viene applicato al risultato:
 

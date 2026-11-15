@@ -1,5 +1,5 @@
 ---
-sourceHash: 395db046e3ecafc8
+sourceHash: e275bf79725ed509
 title: Columnas adicionales
 sidebar_label: Columnas adicionales
 description: Agregue columnas calculadas/virtuales a las tablas de colecciones que derivan valores de los datos de la entidad.
@@ -10,8 +10,6 @@ description: Agregue columnas calculadas/virtuales a las tablas de colecciones q
 Las columnas adicionales le permiten mostrar datos calculados o derivados en la tabla de la colección sin almacenarlos en la base de datos.
 
 ## Definición de columnas adicionales
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```tsx
 // frontend/src/cms/products.tsx

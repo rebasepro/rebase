@@ -1,11 +1,9 @@
 ---
-sourceHash: e0fcc045382336df
+sourceHash: 7f09b99cbb85db3d
 title: Relations
 sidebar_label: Relations
 description: "Liez des tables avec rel.belongsTo, hasOne, hasMany, manyToMany et via : clés étrangères liées ou dérivées, tables de jonction avec colonnes _pivot, règles de suppression, règles de nommage et jointures multi-sauts."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Les `relations` d'une table nomment les liens qu'elle entretient avec d'autres tables. Chacune est un appel à `rel.*`, et sa clé est le nom de la relation : ce que demande `include`, ce qu'un chemin imbriqué tel que `/api/data/users/1/posts` lit, et ce qu'une écriture spécifie pour définir le lien.
 
@@ -36,8 +34,6 @@ Les relations ne sont plus des propriétés. La colonne de clé étrangère d'un
 
 ## Les cinq types
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 | Type | Emplacement de la clé | Retourne | Options |
 |---|---|---|---|
 | `rel.belongsTo` | sur **cette** table | une ligne | `localKey`, `notNull`, `unique`, `onDelete`, `onUpdate`, `index`, `constraint` |
@@ -56,8 +52,6 @@ Chaque type accepte également `access` et `private`, qui déterminent qui reço
 Consultez [Accès aux champs](/docs/collections/field-access/) pour savoir ce que voit un appelant sans accès.
 
 ## belongsTo — la clé est sur cette table
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `belongsTo` place la clé étrangère sur la table déclarante. La colonne SQL de la clé est `localKey`, et `<nom de la relation au singulier>_id` lorsque cette option est omise : `author` devient `author_id`.
 
@@ -106,8 +100,6 @@ La colonne de clé étrangère est indexée sauf si `index: false` : Postgres in
 
 ## hasOne et hasMany — la clé est sur la cible
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 `hasMany` lit les lignes de la cible qui pointent vers celle-ci. `hasOne` représente le même lien avec au plus une ligne du côté distant. Aucun des deux n'ajoute de colonne ici : la cible déclare le `belongsTo` qui contient la clé.
 
 ```ts
@@ -139,8 +131,6 @@ L'ordre déclaré s'applique à un include, à la lecture d'une relation à pare
 
 ### Jointure sur une clé naturelle
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Par défaut, la clé de la cible contient la clé primaire de cette ligne. Lorsque les deux côtés sont joints sur autre chose (un identifiant d'identité externe, un SKU), `sourceKey` nomme la colonne sur cette table :
 
 ```ts
@@ -163,8 +153,6 @@ export const talents = defineTable("talents", {
 La colonne `sourceKey` doit être unique : un lien qui adresse plusieurs lignes sources ne peut pas déterminer à laquelle appartient une ligne associée. Une ligne dont le `sourceKey` est `NULL` n'atteint aucune ligne associée, et écrire à travers la relation génère une erreur.
 
 ## manyToMany — via une table de jonction
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `manyToMany` relie les lignes via une table de jonction créée par Rebase, disposant de sa propre sécurité au niveau des lignes (RLS). La suppression d'un lien supprime la ligne de jonction, jamais la cible.
 
@@ -218,8 +206,6 @@ La cible peut également être une vue (`defineView`) : `db push`, le démarrage
 
 ### `_pivot` : les colonnes propres à la jonction
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Les colonnes `pivot` sont lues et écrites sous `_pivot`. Une lecture qui inclut la relation renvoie chaque ligne associée accompagnée des colonnes de son lien :
 
 ```json
@@ -238,13 +224,9 @@ Les colonnes de pivot acceptent tous les modificateurs de colonne sauf `.primary
 
 ### `_count` : le nombre de lignes associées
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Un include d'une relation to-many (`hasMany`, `manyToMany`, un `via` to-many) peut demander le total aux côtés d'une page limitée de lignes, renvoyé sous le champ `_count` de la ligne. Ce total est calculé dans la même instruction, sous les mêmes filtres et la même sécurité au niveau des lignes. Consultez [Compter ce qu'une limite exclut](/docs/sdk/relations#counting-what-a-limit-leaves-out).
 
 ## via — une chaîne de jointures explicite
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `via` effectue la lecture à travers des jointures explicites : plusieurs sauts, des clés composites, ou une condition qui n'est pas une simple clé étrangère.
 
@@ -280,8 +262,6 @@ Une chaîne peut traverser une table que la lecture contient déjà — un `via`
 
 ## Règles de suppression et de mise à jour
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 | Action | Comportement |
 |---|---|
 | `"cascade"` | Supprime ou met à jour également les lignes associées |
@@ -293,8 +273,6 @@ Une chaîne peut traverser une table que la lecture contient déjà — un `via`
 Lorsque `onDelete` n'est pas défini, un `belongsTo` nullable vide le pointeur (`set null`), un `belongsTo` `NOT NULL` refuse la suppression (`restrict`), et un lien `manyToMany` est supprimé avec l'une ou l'autre des lignes (`cascade`). `NOT NULL` indique qu'une ligne ne peut pas exister sans son parent ; cela ne signifie pas que supprimer le parent doit supprimer la ligne. Spécifiez `"cascade"` si c'est ce que vous souhaitez : c'est la seule valeur qui supprime des lignes que vous n'avez pas explicitement désignées.
 
 ## Noms
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Chaque nom utilisé par une relation est dérivé lorsque vous ne l'écrivez pas. Ces règles correspondent à celles déjà appliquées par une base de données déployée, afin qu'elles ne changent pas d'une version à l'autre.
 
@@ -313,8 +291,6 @@ Le nom d'une relation `belongsTo` représente sa colonne de clé étrangère par
 
 ## Lecture et écriture des relations
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Les relations ne sont pas incluses dans une lecture à moins que l'appelant ne le demande :
 
 ```typescript
@@ -331,8 +307,6 @@ Dans le CMS, chaque relation to-many devient un onglet sous l'enregistrement. Co
 
 ## Ce qui est refusé
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 `rel.via()` sans `steps` lève une exception lors du chargement du module. Lors de la compilation du schéma, une table est refusée pour :
 
 - une relation dont la cible n'est ni une table ni une vue du schéma ;
@@ -345,8 +319,6 @@ Dans le CMS, chaque relation to-many devient un onglet sous l'enregistrement. Co
 - une colonne pivot marquée `.primaryKey()` (la clé de la jonction est constituée de ses deux colonnes de liaison) ou déclarant `.transform()` (les hooks d'une colonne pivot ne s'exécutent jamais ; le `afterRead` de la cible voit `_pivot`).
 
 ## Prochaines étapes
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - [Sécurité au niveau des lignes (RLS)](/docs/collections/security-rules/) : qui accède aux lignes à chaque extrémité
 - [Index](/docs/backend/indexes/) : l'index de clé étrangère et les index composites sur les relations

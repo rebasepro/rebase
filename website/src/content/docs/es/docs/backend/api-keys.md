@@ -1,5 +1,5 @@
 ---
-sourceHash: 8f9385dd3838df4f
+sourceHash: d357e5b6fe30364a
 title: Claves de API
 sidebar_label: Claves de API
 description: "Claves de larga duración para scripts, CI, agentes e integraciones: claves de servicio y claves personales, los alcances que poseen, cómo se combinan con la seguridad a nivel de fila y las rutas que las administran."
@@ -176,8 +176,6 @@ gasta su propia cuota, no la de la clave: la integración que se ejecuta con esa
 todo su presupuesto. Simular o suplantar a un usuario se cobra al administrador de la misma manera.
 
 ## Claves personales
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Una clave personal actúa **como su propietario**: su uid y sus roles tal como están en
 cada solicitud. Las reglas de tipo propietario coinciden con ella, por lo que lee exactamente

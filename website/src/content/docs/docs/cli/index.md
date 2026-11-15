@@ -24,8 +24,6 @@ Or run any command without installing it: `pnpm dlx @rebasepro/cli <command>`.
 
 ### `rebase init`
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Initialize a new Rebase project:
 
 ```bash
@@ -92,7 +90,7 @@ application image to build yourself. Useful flags:
 | `--no-static` | Do not fold the frontend into the backend bundle (each static app still gets its own bundle) |
 | `--skip-static-build` | Fold the frontend as already built, without running its build command |
 
-<span class="since-badge" data-since="0.31">Since 0.31</span> A frontend — every static app of `rebase.json` with a Vite config — whose config does not use `rebaseBackendGuard()` (from
+A frontend — every static app of `rebase.json` with a Vite config — whose config does not use `rebaseBackendGuard()` (from
 `@rebasepro/app/vitePlugin`) is refused: it is what keeps server code out of the
 browser bundle, and it keeps Vite from inlining a backend file as a `data:` URL
 (it fails the build, naming itself, when another plugin replaces its
@@ -188,8 +186,6 @@ read from `backend/`.
 
 ### `rebase schema generate` / `rebase schema stale`
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 ```bash
 rebase schema generate       # backend/schema → backend/src/schema.generated.ts
 rebase schema stale          # name what differs from the tables, exit 1 if anything does
@@ -223,8 +219,6 @@ depth on [Schema Generation](/docs/cli/schema/).
 
 ### `rebase console`
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A Node REPL with the project's data open, or one snippet run with `-e`:
 
 ```bash
@@ -241,8 +235,6 @@ is printed as JSON on stdout and a throw exits `1`. Flags: `--eval`/`-e`,
 [Scripts and the Console](/docs/backend/scripts/).
 
 ### `rebase migrate`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 One-way moves from a layout this release no longer reads:
 `rebase migrate collections-to-tables` (`config/collections` → `backend/schema`
@@ -359,8 +351,6 @@ and to remove a provisioned database the code no longer names, see
 
 ### `rebase generate-sdk`
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 ```bash
 rebase generate-sdk
 ```
@@ -438,8 +428,6 @@ rebase verify --json
 rebase verify --live
 rebase verify --live --database-url postgresql://…
 ```
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Whether the tables are safe to ship, in one fast command for CI and for an
 AI agent's hooks. Offline by default, and it never changes anything.

@@ -1,13 +1,11 @@
 ---
-sourceHash: 47f5760918cfd724
+sourceHash: e341a90917c5ce77
 title: Runtime und Bundles
 sidebar_label: Runtime & Bundles
 description: Wie ein Rebase-Projekt in ein Projekt-Bundle und eine versionierte Runtime aufgeteilt wird und warum diese Trennung Upgrades, Multi-Repo-Apps und Managed Hosting ermöglicht.
 ---
 
 ## Die zwei Hälften eines Deployments
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein Rebase-Deployment besteht aus zwei Dingen, nicht nur einem:
 
@@ -49,7 +47,7 @@ Es lohnt sich, das Manifest zu verstehen, denn es ist genau das, was eine Runtim
 ```jsonc
 {
   "bundleFormat": 3,
-  "runtime": { "range": "^1", "builtAgainst": "0.30.1", "contract": 2 },
+  "runtime": { "range": "^1", "builtAgainst": "0.31.0", "contract": 2 },
   "schemaVersion": "v2:3f0c9a1e7d2b5c48",
   "kind": "backend",
   "entry": {
@@ -66,7 +64,7 @@ Es lohnt sich, das Manifest zu verstehen, denn es ist genau das, was eine Runtim
 }
 ```
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span> `bundleFormat` 3 und Runtime-Vertrag (runtime contract) 2: Das Schema ist `entry.tables`, das kompilierte `backend/schema`-Verzeichnis, neben `entry.resources`, `entry.storage` und `entry.hooks`. `schemaVersion` beginnt mit `v2:` — sie wird aus den kompilierten Tabellen berechnet.
+`bundleFormat` 3 und Runtime-Vertrag (runtime contract) 2: Das Schema ist `entry.tables`, das kompilierte `backend/schema`-Verzeichnis, neben `entry.resources`, `entry.storage` und `entry.hooks`. `schemaVersion` beginnt mit `v2:` — sie wird aus den kompilierten Tabellen berechnet.
 
 `kind` ist entweder `backend` — startet den Server plus alle statischen Apps in `entry.static` — oder `static`, was diese Assets und sonst nichts ausliefert: keine Datenbank, keine Authentifizierung. Ob ein Backend seine Tabellen im Code deklariert oder sie aus der Live-Datenbank introspektiert, ist keine dritte Art (`kind`); es hängt einfach davon ab, ob `entry.tables` vorhanden ist.
 
@@ -81,8 +79,6 @@ docker run -v ./dist-bundle:/bundle rebasepro/server   # anywhere
 
 ## Kompatibilität
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Zwei Versionsnummern bestimmen, ob ein Bundle und eine Runtime zusammenarbeiten können, und es handelt sich dabei bewusst nicht um die Paketversion.
 
 **`bundleFormat`** ist das On-Disk-Layout. Eine Runtime verweigert ein neueres Format, anstatt es nur teilweise zu laden. Ein älteres Bundle auf einer neueren Runtime funktioniert weiterhin, sofern das Layout dies zulässt — das ist der Zweck dieser Trennung — mit einer Ausnahme: **Ein Bundle im Format 1 oder Format 2 wird von einer 0.31-Runtime verweigert**. Diese Bundles enthalten `config/collections` — `defineCollection`-Objekte — und eine Runtime, die nur `backend/schema` liest, hat keine Möglichkeit, diese einzulesen; das Starten eines solchen Bundles würde die Datenbank introspektieren, anstatt die deklarierten Tabellen bereitzustellen. Die Fehlermeldung benennt die Lösung: Führen Sie [`rebase migrate collections-to-tables`](/docs/cli/schema/#rebase-migrate) auf dem Quellcode des Projekts aus und bauen Sie das Bundle anschließend neu.
@@ -92,7 +88,7 @@ Zwei Versionsnummern bestimmen, ob ein Bundle und eine Runtime zusammenarbeiten 
 Aus diesem Grund ist ein Upgrade von Rebase in einem selbst gehosteten Deployment lediglich eine Änderung des Tags:
 
 ```yaml
-image: rebasepro/server:0.30.1   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.31.0   # a newer tag — your bundle is untouched
 ```
 
 ## Die Entwicklung nutzt denselben Pfad

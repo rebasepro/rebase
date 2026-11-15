@@ -13,8 +13,6 @@ unless you opt out.
 
 ## Schema & database (13)
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Spawn the Rebase CLI in the active project directory.
 
 | Tool | Required | Description |
@@ -35,8 +33,6 @@ Spawn the Rebase CLI in the active project directory.
 
 ## Schema planning (1)
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Asks the backend what a change would do, over `POST /api/admin/schema/plan`. No
 CLI, and nothing written to disk — it works on the managed development database,
 which the Atlas-backed commands cannot.
@@ -47,7 +43,7 @@ which the Atlas-backed commands cannot.
 
 ## Rows (5)
 
-<span class="since-badge" data-since="0.31">Since 0.31</span> The same names the remote `/mcp` uses; they were `list_documents`, `get_document`, `create_document`, `update_document` and `delete_document`, with a `collection` argument.
+The same names the remote `/mcp` uses; they were `list_documents`, `get_document`, `create_document`, `update_document` and `delete_document`, with a `collection` argument.
 
 | Tool | Required | Description |
 |---|---|---|

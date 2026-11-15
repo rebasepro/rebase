@@ -1,11 +1,9 @@
 ---
-sourceHash: 80e40ea5912a48c8
+sourceHash: 5b835c7e865a4f8f
 title: Fichiers d'instructions pour l'IA
 sidebar_label: Fichiers d'instructions pour l'IA
 description: Chaque projet Rebase généré inclut ai-instructions.md ainsi que des fichiers pointeurs pour Claude, Cursor, Windsurf, Copilot et AGENTS.md reprenant les cinq règles les plus enfreintes par les assistants — une source unique de vérité, plusieurs noms de fichiers.
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Chaque assistant attend ses règles dans un fichier différent. Claude Code lit
 `CLAUDE.md`, Cursor lit `.cursorrules`, Windsurf lit `.windsurfrules`,
@@ -84,8 +82,6 @@ cette machine a persisté. Voir
 
 ## Pourquoi un pointeur plutôt qu'une copie
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Les fichiers pointeurs ne contiennent presque rien. Un fichier qui référence le
 véritable document conserve les conventions en un seul endroit, et présente des
 avantages qu'une copie n'a pas :
@@ -113,8 +109,6 @@ Ce modèle mérite d'être conservé si vous forkez le scaffolding, et mérite
 d'être adopté dans des dépôts qui ne sont pas du tout des projets Rebase.
 
 ## Le contenu initial de `ai-instructions.md`
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Le fichier généré est délibérément court — il renvoie à
 [`rebase skills install`](/docs/ai/skills) pour plus de détails, puis énonce les

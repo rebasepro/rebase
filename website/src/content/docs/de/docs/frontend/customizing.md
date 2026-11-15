@@ -1,11 +1,9 @@
 ---
-sourceHash: 362c7b70fede8ad5
+sourceHash: 2564e6bc51f454da
 title: Admin anpassen
 sidebar_label: Admin anpassen
 description: So passen Sie den Rebase-Admin an – Bausteine, Hooks und Orte, mit getesteten Rezepten für Singletons, benutzerspezifische Einstellungen, Massenaktionen, Kalenderansichten, Dashboards und eigene Login-Bildschirme.
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Die Admin-Oberfläche ist aus Komponenten aufgebaut, die Sie selbst verwenden können. Um sie anzupassen, schreiben Sie eine gewöhnliche React-Komponente und platzieren sie an einem bestimmten Ort. Das ist das gesamte Modell:
 
@@ -31,8 +29,6 @@ Funktionsfähige, getestete Beispiele werden direkt mit `@rebasepro/cms` ausgeli
 Die `README.md` daneben dient als vollständige Referenz für Bausteine, Hooks und Orte.
 
 ## Beispiel: Ein Singleton
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein Singleton ist keine spezielle Art von Tabelle. Es ist eine ganz normale Tabelle, deren Seite immer dieselbe Zeile öffnet. Wird `RecordForm` eine ID übergeben, bearbeitet es diesen Datensatz und erstellt ihn beim ersten Mal unter dieser ID, sodass kein Seeding erforderlich ist.
 
@@ -84,8 +80,6 @@ Das gleiche Muster mit `id={user.uid}` (aus `useAuthController()`) ergibt eine S
 Um nur einige der Felder anzuzeigen, übergeben Sie `fields={["siteName"]}`. Um sie selbst anzuordnen, übergeben Sie `layout` mit `<FormField name="…"/>` in Ihrem eigenen JSX. In beiden Fällen validiert das Formular nur das, was es anzeigt – siehe [Panels auf einer eigenen Seite](/docs/frontend/panels).
 
 ## Orte
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 | Um Folgendes hinzuzufügen … | Platzieren Sie eine Komponente in |
 |---|---|

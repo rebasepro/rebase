@@ -1,5 +1,5 @@
 ---
-sourceHash: ff162864c3d1600b
+sourceHash: 6403748b3ff6521b
 slug: fr/docs/troubleshooting
 title: Dépannage
 description: Les erreurs qui empêchent un backend Rebase de démarrer ou de répondre — base de données inaccessible, mauvais identifiants, extension manquante, refus RLS, dérive de schéma, port occupé, fonction qui ne se charge pas — et à quoi ressemble chacune d'entre elles.
@@ -88,8 +88,6 @@ l'hôte auquel vous finirez par vous connecter ne sera pas celui que vous avez s
 
 ## `SchemaDefinitionError` — le schéma ne compile pas
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Le démarrage, `rebase db generate`, `db push`, `generate-sdk` et `doctor` compilent les
 tables exportées par `backend/schema/index.ts` avant toute chose, et s'arrêtent dès qu'une
 table ne compile pas — absence de `rls`, `"inherit"` sans `defaultRls`, une relation vers une table que
@@ -98,8 +96,6 @@ table, clé et problème d'un coup. Corrigez chacun d'eux ; `rebase verify` affi
 sans rien démarrer.
 
 ## `config/collections` est refusé
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un projet antérieur à la version 0.31 conserve son modèle de données dans `config/collections`, que
 plus rien ne lit : le runtime, chaque commande CLI et un bundle au format 2 sont
@@ -124,8 +120,6 @@ la configuration est déjà correcte et ce qui manque est la bibliothèque sur l
 ou un rôle autorisé à exécuter `CREATE EXTENSION vector;`.
 
 ## La base de données a refusé l'instruction
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 ```
 DB_PERMISSION_DENIED — Permission denied by the database on "notes"
@@ -210,8 +204,6 @@ Passez `--port` pour en fixer un, ou arrêtez l'autre processus. En production, 
 de nouvelle tentative : le port configuré est le port utilisé, et `EADDRINUSE` est fatal.
 
 ## Le backend a planté et `rebase dev` a continué de tourner
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un backend qui lève une exception au démarrage n'arrête pas le watcher — il affiche la trace de pile et
 attend une modification de fichier. Lorsque le backend ne s'est pas annoncé dans le délai de

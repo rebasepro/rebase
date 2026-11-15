@@ -1,11 +1,9 @@
 ---
-sourceHash: e086faac3624de8d
+sourceHash: f957d9b26ce4636f
 title: Índices
 sidebar_label: Índices
 description: Declare índices comuns do Postgres em uma tabela — btree, GIN e BRIN, parciais, compostos, de cobertura e únicos — e por que um índice escrito manualmente costumava desaparecer.
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Uma tabela declara os índices que suas consultas precisam, ao lado das colunas que eles cobrem:
 
@@ -54,8 +52,6 @@ e em cada tenant, enquanto um manual não é —, mas nada os removerá nesse me
 
 ## A estrutura
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | Campo | Tipo | Descrição |
 |-------|------|-------------|
 | `columns` | `(string \| { column, direction?, nulls? })[]` | **Obrigatório.** As colunas-chave, em ordem. 1–5 entradas. |
@@ -66,8 +62,6 @@ e em cada tenant, enquanto um manual não é —, mas nada os removerá nesse me
 | `include` | `string[]` | Apenas btree. Colunas de carga útil carregadas para varreduras somente de índice (index-only scans). |
 
 ### `columns` aceita chaves de coluna, nunca nomes SQL
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O nome de uma relação `belongsTo` representa sua coluna de chave estrangeira, logo a relação
 `author` é a coluna `author_id`:
@@ -188,8 +182,6 @@ coluna [`col.vector()`](/docs/sdk/aggregates-and-search#the-index).** Um índice
 emitido para falhar depois contra um banco de dados que você nunca viu.
 
 ### `reason`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 É o único campo sem SQL por trás e é opcional — mas escreva-o.
 
@@ -391,8 +383,6 @@ os constroem de maneira diferente:
 
 ## O que é recusado, e quando
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Tudo isso é recusado quando o schema é compilado, indicando o nome da tabela e a
 posição no array — um índice que silenciosamente não existe é a falha
 que toda essa funcionalidade elimina:
@@ -409,8 +399,6 @@ que toda essa funcionalidade elimina:
 - um `reason` vazio
 
 ## Relacionados
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Search](/docs/backend/search) — busca textual ranqueada, que constrói seu próprio índice
   GIN sobre um `tsvector` gerado

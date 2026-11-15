@@ -1,5 +1,5 @@
 ---
-sourceHash: 8412da52cc99478c
+sourceHash: 0783ce9f040f4c00
 title: Rebase no hace X
 sidebar_label: Extender el servidor
 description: La escala de extensiones del lado del servidor — declaración, hook de tabla, función personalizada, tus propias rutas, tu propio servidor, eject — con lo que cada uno puede y no puede alcanzar.
@@ -86,8 +86,6 @@ acceder a las filas de una tabla esquivándolos.
 [Hooks globales](/docs/backend/hooks)
 
 ### Restringir una lectura con `beforeQuery`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `afterRead` ve las filas que ya han sido obtenidas, por lo que puede redactar un valor
 pero no puede evitar que la fila sea leída. `beforeQuery` se ejecuta antes: recibe la

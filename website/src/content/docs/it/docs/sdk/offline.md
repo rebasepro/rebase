@@ -1,5 +1,5 @@
 ---
-sourceHash: 1b875d11f8a07037
+sourceHash: c343d961821c04f2
 title: Sincronizzazione offline e local-first
 sidebar_label: Offline
 description: "Abilita il motore di sincronizzazione local-first dell'SDK tipizzato di Rebase: un database locale di righe, scritture offline istantanee con rollback e live query reattive."
@@ -77,8 +77,6 @@ Le scritture vengono rieseguite nell'ordine in cui sono state effettuate, tra le
 Ogni scrittura in coda corrisponde a una richiesta per impostazione predefinita, quindi 500 righe digitate offline richiedono 500 round trip per essere smaltite. Con `replayBatchSize` impostato (fino a 1 000), una serie di creazioni consecutive offline in una tabella viene rieseguita come un'unica `createMany`. Vengono raggruppate solo le creazioni con un ID generato dall'SDK come stringa, e mai quelle che fanno riferimento a un'altra riga della stessa sequenza. Se il server rifiuta o rimanda la serie per qualsiasi motivo diverso da una perdita di connessione, non viene scritto nulla (una scrittura massiva è un'unica transazione) e la sequenza viene rieseguita una scrittura alla volta, come avverrebbe per impostazione predefinita.
 
 ### Scritture accodate da una versione precedente
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 La coda memorizza una scrittura sotto forma di valori inviati (chiavi per le relazioni, elenchi di numeri per i vettori, `{ latitude, longitude }` per i punti geografici, testo ISO per le date) e le righe memorizzate nella cache come righe del server. Una scrittura accodata offline dalla versione precedente dell'SDK, che le memorizzava come classi (`EntityRelation`, `GeoPoint`, `Vector`), viene convertita in tali valori quando viene riletta e rieseguita come di consueto: nulla di quanto accodato prima dell'aggiornamento va perso. Un SDK più vecchio che incontra una scrittura accodata da questa versione la lascia in coda.
 
@@ -245,7 +243,7 @@ createRebaseClient({
 
 ## Configurazione
 
-<span class="since-badge" data-since="0.31">Da 0.31</span> `maxCachedRowsPerTable` e `maxCachedQueriesPerTable` erano precedentemente `…PerCollection`.
+`maxCachedRowsPerTable` e `maxCachedQueriesPerTable` erano precedentemente `…PerCollection`.
 
 ```typescript
 createRebaseClient({

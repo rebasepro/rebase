@@ -1,5 +1,5 @@
 ---
-sourceHash: 41e067cb49021d45
+sourceHash: 9a0c7964e2f9eac6
 title: Funciones personalizadas
 sidebar_label: Funciones personalizadas
 description: Añade endpoints de API de Hono personalizados junto con tus rutas CRUD de Rebase. Descubiertos automáticamente desde un directorio, con acceso total a la instancia del backend.
@@ -314,7 +314,7 @@ export default defineFunction((app) => {
 
 `requireDriver(c)` es `getDriver(c)` sin el `!` — lanza un mensaje indicando el problema de configuración en lugar de fallar veinte líneas más adelante por un `undefined`.
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span> `fetchCollection` y `fetchOne` devuelven las filas que devuelve `GET /api/data/<table>`: fechas como cadenas RFC 3339, un `belongsTo` como su clave foránea (`authorId`), y una fila relacionada solo cuando `include` la especifica — `driver.fetchOne({ path: "articles", id, include: ["author"] })`.
+`fetchCollection` y `fetchOne` devuelven las filas que devuelve `GET /api/data/<table>`: fechas como cadenas RFC 3339, un `belongsTo` como su clave foránea (`authorId`), y una fila relacionada solo cuando `include` la especifica — `driver.fetchOne({ path: "articles", id, include: ["author"] })`.
 
 ### 2. `rebase.dataAsAdmin` — para trabajo en segundo plano de confianza
 
@@ -403,8 +403,6 @@ export default defineFunction((app) => {
 Es `getSql(c)` con una identidad diferente: el rol de solicitud restringido, la rama de administrador de tus políticas, de solo lectura a menos que se indique `{ write: true }`, y la misma protección `SQL_NOT_ALLOWED`. A diferencia del `rebase.sql()` del propietario, no puede ejecutar DDL, y del almacén de autenticación solo alcanza lo que un admin alcanza a través de la colección de usuarios: las sesiones, claves y secretos de MFA se ocultan al rol de solicitud, y los hashes de contraseña se eliminan de las filas. Una sentencia individual cuesta un viaje de ida y vuelta (round trip), al igual que `rebase.sql()`. Desde un script, `openRebase()` también dispone de él.
 
 ### 4. `rebase.sql()` — SQL de propietario, y el único descriptor exclusivo de Node
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Si realmente necesitas una omisión incondicional, `rebase.sql()` es la solución: SQL sin procesar en la conexión del propietario, sin políticas, todas las filas. Es el elemento con más privilegios en el contexto de una función — incluso más que el descriptor que lleva "admin" en su nombre.
 

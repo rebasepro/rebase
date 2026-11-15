@@ -1,5 +1,5 @@
 ---
-sourceHash: 71a134ba2ec7ae97
+sourceHash: d5713d30b794c000
 title: Autenticação
 sidebar_label: Autenticação
 description: Configure autenticação JWT, provedores OAuth, e-mail SMTP, proteção contra bots e a tabela de usuários no backend Rebase.
@@ -23,8 +23,6 @@ O Rebase inclui um sistema completo de autenticação de backend:
 - **Auto-bootstrapping** — Fora de produção, o primeiro usuário recebe automaticamente a role de admin; uma implantação de produção define seu admin com `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD`
 
 ## Configuração
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 :::note[Onde isso é configurado]
 **Runtime gerenciado:** ambiente — `JWT_SECRET`, `AUTH_*`, `SMTP_*`, `CAPTCHA_*` e os pares `*_CLIENT_ID` / `*_CLIENT_SECRET` dos provedores, um para cada um dos doze provedores ([as variáveis](#as-variáveis-de-ambiente-the-environment-spellings); o da Apple usa quatro chaves, não um par). A tabela de usuários é o [`defineAuthTable`](#a-tabela-de-usuários-the-users-table) exportado de `backend/schema/index.ts`.
@@ -529,8 +527,6 @@ SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'));
 ```
 
 ## A tabela de usuários {#the-users-table}
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Os usuários são armazenados na tabela declarada com `defineAuthTable` em
 `backend/schema`. Trata-se de uma tabela comum com as colunas que a autenticação exige,

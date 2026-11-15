@@ -1,5 +1,5 @@
 ---
-sourceHash: 9b25ea3a0b2cb11a
+sourceHash: be11c8b493d773a7
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend bereitstellt – Daten, Auth, Storage, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -29,8 +29,6 @@ kann, ohne hier zu erscheinen.
 | **dev** | Nur außerhalb der Produktionsumgebung eingebunden |
 
 ## Data
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Wird pro Tabelle generiert, sodass die Pfade Ihre Slugs anstelle einer festen
 Liste enthalten. `:slug` ist der Slug einer Tabelle (ihr Name, es sei denn, `defineTable` legt `slug` fest).
@@ -92,7 +90,7 @@ Präfix mit einem einfachen `404 NO_TABLES`. Siehe [Backend only](/docs/getting-
 | `POST` | `/api/auth/magic-link/verify` | none (ein Link-Token) | [Authentifizierung](/docs/backend/authentication/) |
 | `POST` | `/api/auth/otp` | none | Einmalcodes per E-Mail |
 | `POST` | `/api/auth/otp/verify` | none (ein Code) | Einmalcodes per E-Mail |
-| `POST` | `/api/auth/device` | none | <span class="since-badge" data-since="0.31">Seit 0.31</span> [Geräte-Anmeldung](/docs/backend/device-sign-in/). Deaktiviert, sofern das Backend sie nicht aktiviert |
+| `POST` | `/api/auth/device` | none | [Geräte-Anmeldung](/docs/backend/device-sign-in/). Deaktiviert, sofern das Backend sie nicht aktiviert |
 | `POST` | `/api/auth/device/token` | none (ein Gerätecode) | [Geräte-Anmeldung](/docs/backend/device-sign-in/): das Polling des Geräts |
 | `GET` | `/api/auth/device/:userCode` | session | [Geräte-Anmeldung](/docs/backend/device-sign-in/): was die Genehmigungsseite anzeigt |
 | `POST` | `/api/auth/device/approve` | session (`aal2` mit einem zweiten Faktor) | [Geräte-Anmeldung](/docs/backend/device-sign-in/) |
@@ -173,19 +171,19 @@ eine Tabelle beschränkter Schlüssel hat hierauf keinen Zugriff. Siehe [Rollen 
 | `POST` | `/api/admin/schema/reconcile/plan` | `schema:read` | Plant das Lockern von `NOT NULL` und das Löschen der in `drop` genannten, nicht deklarierten Spalten für [schema reconcile](/docs/cli/schema/#rebase-schema-reconcile); wendet niemals Änderungen an |
 | `POST` | `/api/admin/schema/reconcile/apply` | `schema:write` | Wendet einen Reconcile-Plan an, aber nur, wenn dessen `digest` mit dem übermittelten `confirm` übereinstimmt |
 | `GET` | `/api/admin/schema-editor/status` | `schema:read` | Ob der Editor verfügbar ist, und der Grund, falls nicht |
-| `GET` | `/api/admin/schema-editor/tables` | `schema:read` | <span class="since-badge" data-since="0.31">Seit 0.31</span> Jede von `backend/schema/index.ts` exportierte Tabelle so, wie der Editor sie liest, einschließlich der im Code bearbeiteten Elemente (schreibgeschützt) und warum – [Live-Schema-Bearbeitung](/docs/backend/live-schema-editing/#the-edits-tablepatch) |
-| `POST` | `/api/admin/schema-editor/preview` | `schema:write` | <span class="since-badge" data-since="0.31">Seit 0.31</span> `{ patches: TablePatch[] }`: die Dateien, die die Bearbeitung schreiben würde, kompiliert; schreibt nichts |
-| `POST` | `/api/admin/schema-editor/apply` | `schema:write` | <span class="since-badge" data-since="0.31">Seit 0.31</span> Dieselbe Bearbeitung, geschrieben nach `backend/schema`; die Datenbank wird nicht berührt |
-| `GET` | `/api/admin/schema-editor/unmapped-tables` | `schema:read` | <span class="since-badge" data-since="0.31">Seit 0.31</span> Tabellen, die in der Datenbank vorhanden sind, aber von `backend/schema` nicht deklariert werden: `{ tables: [{ schema, table, rlsEnabled, policies, unimportable? }] }` |
-| `GET` | `/api/admin/schema-editor/unmapped-tables/:schema/:table` | `schema:read` | <span class="since-badge" data-since="0.31">Seit 0.31</span> Eine davon beschrieben: `{ table: { …, descriptor, rlsRaised?, notes } }`, für „Bestehende Tabelle importieren“. `404`, wenn unbekannt oder bereits deklariert, `400 SCHEMA_EDIT_REFUSED` ohne Primärschlüssel |
-| `GET` | `/api/admin/schema-editor/frontend/calls` | `schema:read` | <span class="since-badge" data-since="0.31">Seit 0.31</span> Die `defineFirestoreCollection`-Aufrufe in `frontend/src/cms`, die der Editor umschreiben kann (nur Entwicklung) |
-| `POST` | `/api/admin/schema-editor/frontend/preview` | `schema:write` | <span class="since-badge" data-since="0.31">Seit 0.31</span> Die Dateien, die eine Bearbeitung eines dieser Aufrufe schreiben würde; schreibt nichts |
-| `POST` | `/api/admin/schema-editor/frontend/apply` | `schema:write` | <span class="since-badge" data-since="0.31">Seit 0.31</span> Dieselbe Bearbeitung, direkt vor Ort geschrieben. `409 SCHEMA_EDIT_STALE_FILE`, wenn sich die Datei auf der Festplatte geändert hat |
-| `GET` | `/api/admin/ui-config` | session | <span class="since-badge" data-since="0.31">Seit 0.31</span> Die UI-Einstellungen des Workspaces pro Tabelle, die des Aufrufers selbst und die Information, ob der Aufrufer die des Workspaces bearbeiten darf – siehe [Studio](/docs/studio/#collection-editor) |
-| `PUT` | `/api/admin/ui-config/workspace/:slug` | `schema:write` | <span class="since-badge" data-since="0.31">Seit 0.31</span> Ein `UiTablePreferences`-Delta in die Workspace-Einstellungen einer Tabelle zusammenführen (`replace` ersetzt). Wird nach `frontend/src/cms/ui-config.json` geschrieben, wenn der Server den Projektquellcode beschreiben darf, andernfalls nach `rebase.ui_preferences` |
-| `DELETE` | `/api/admin/ui-config/workspace/:slug` | `schema:write` | <span class="since-badge" data-since="0.31">Seit 0.31</span> Entfernt die Workspace-Einstellungen einer Tabelle |
-| `PUT` | `/api/admin/ui-config/user/:slug` | session (eine Person) | <span class="since-badge" data-since="0.31">Seit 0.31</span> Die eigenen Einstellungen des Aufrufers für eine Tabelle. Ein API-Schlüssel hat keine: `403 UI_PREFERENCES_NEED_A_PERSON` |
-| `DELETE` | `/api/admin/ui-config/user/:slug` | session (eine Person) | <span class="since-badge" data-since="0.31">Seit 0.31</span> Entfernt die eigenen Einstellungen des Aufrufers für eine Tabelle |
+| `GET` | `/api/admin/schema-editor/tables` | `schema:read` | Jede von `backend/schema/index.ts` exportierte Tabelle so, wie der Editor sie liest, einschließlich der im Code bearbeiteten Elemente (schreibgeschützt) und warum – [Live-Schema-Bearbeitung](/docs/backend/live-schema-editing/#the-edits-tablepatch) |
+| `POST` | `/api/admin/schema-editor/preview` | `schema:write` | `{ patches: TablePatch[] }`: die Dateien, die die Bearbeitung schreiben würde, kompiliert; schreibt nichts |
+| `POST` | `/api/admin/schema-editor/apply` | `schema:write` | Dieselbe Bearbeitung, geschrieben nach `backend/schema`; die Datenbank wird nicht berührt |
+| `GET` | `/api/admin/schema-editor/unmapped-tables` | `schema:read` | Tabellen, die in der Datenbank vorhanden sind, aber von `backend/schema` nicht deklariert werden: `{ tables: [{ schema, table, rlsEnabled, policies, unimportable? }] }` |
+| `GET` | `/api/admin/schema-editor/unmapped-tables/:schema/:table` | `schema:read` | Eine davon beschrieben: `{ table: { …, descriptor, rlsRaised?, notes } }`, für „Bestehende Tabelle importieren“. `404`, wenn unbekannt oder bereits deklariert, `400 SCHEMA_EDIT_REFUSED` ohne Primärschlüssel |
+| `GET` | `/api/admin/schema-editor/frontend/calls` | `schema:read` | Die `defineFirestoreCollection`-Aufrufe in `frontend/src/cms`, die der Editor umschreiben kann (nur Entwicklung) |
+| `POST` | `/api/admin/schema-editor/frontend/preview` | `schema:write` | Die Dateien, die eine Bearbeitung eines dieser Aufrufe schreiben würde; schreibt nichts |
+| `POST` | `/api/admin/schema-editor/frontend/apply` | `schema:write` | Dieselbe Bearbeitung, direkt vor Ort geschrieben. `409 SCHEMA_EDIT_STALE_FILE`, wenn sich die Datei auf der Festplatte geändert hat |
+| `GET` | `/api/admin/ui-config` | session | Die UI-Einstellungen des Workspaces pro Tabelle, die des Aufrufers selbst und die Information, ob der Aufrufer die des Workspaces bearbeiten darf – siehe [Studio](/docs/studio/#collection-editor) |
+| `PUT` | `/api/admin/ui-config/workspace/:slug` | `schema:write` | Ein `UiTablePreferences`-Delta in die Workspace-Einstellungen einer Tabelle zusammenführen (`replace` ersetzt). Wird nach `frontend/src/cms/ui-config.json` geschrieben, wenn der Server den Projektquellcode beschreiben darf, andernfalls nach `rebase.ui_preferences` |
+| `DELETE` | `/api/admin/ui-config/workspace/:slug` | `schema:write` | Entfernt die Workspace-Einstellungen einer Tabelle |
+| `PUT` | `/api/admin/ui-config/user/:slug` | session (eine Person) | Die eigenen Einstellungen des Aufrufers für eine Tabelle. Ein API-Schlüssel hat keine: `403 UI_PREFERENCES_NEED_A_PERSON` |
+| `DELETE` | `/api/admin/ui-config/user/:slug` | session (eine Person) | Entfernt die eigenen Einstellungen des Aufrufers für eine Tabelle |
 | `GET` | `/api/admin/dev/emails` | dev + `users:write` | E-Mails, die der Development-Transport abgefangen hat, anstatt sie zu senden |
 | `DELETE` | `/api/admin/dev/emails` | dev + `users:write` | Leert das Postfach für abgefangene E-Mails |
 
@@ -194,8 +192,6 @@ unter ihren Pfaden vor Version 0.17 ohne das `/admin`-Segment bereitgestellt. Di
 für Projekte gedacht, die noch nicht migriert wurden; schreiben Sie neuen Code für den kanonischen Pfad.
 
 ## Schema
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 | Methode | Pfad | Gate | Mehr |
 |---|---|---|---|
@@ -282,7 +278,7 @@ Session, ein API-Schlüssel oder der Service-Key – und beantwortet alle andere
 |---|---|---|---|
 | `GET` | `/livez` | none | Nur Liveness: Läuft dieser Prozess. Berührt die Datenbank nicht, weshalb dies der Probe-Pfad ist, den ein Container verwenden sollte – `RUNTIME_LIVENESS_PATH` |
 | `GET` | `/health`, `/api/health` | none | Liveness und Readiness. Meldet jede konfigurierte Datenquelle, nicht nur die Standardquelle |
-| `GET` | `/api/docs` | <span class="since-badge" data-since="0.31">Seit 0.31</span> standardmäßig die Zielgruppe des Schema-Endpunkts (401 für Anonyme, es sei denn `schemaTables.public`, 403 für Credentials ohne Schema- oder Data-Scope); none, wenn `enableSwagger` auf `true` steht; das Admin-Gate, wenn `false` | Das OpenAPI 3.0-Dokument der Tabellen, die `GET /api/schema/tables` für den Aufrufer beschreibt (alle bei `enableSwagger: true`). `404 DOCS_UNAVAILABLE`, wenn keine Authentifizierung konfiguriert ist |
+| `GET` | `/api/docs` | standardmäßig die Zielgruppe des Schema-Endpunkts (401 für Anonyme, es sei denn `schemaTables.public`, 403 für Credentials ohne Schema- oder Data-Scope); none, wenn `enableSwagger` auf `true` steht; das Admin-Gate, wenn `false` | Das OpenAPI 3.0-Dokument der Tabellen, die `GET /api/schema/tables` für den Aufrufer beschreibt (alle bei `enableSwagger: true`). `404 DOCS_UNAVAILABLE`, wenn keine Authentifizierung konfiguriert ist |
 | `GET` | `/api/swagger` | none | Swagger UI. Nur wenn `enableSwagger` auf `true` steht, und niemals in der Produktionsumgebung |
 | `GET` | `/api/meta/schema-version` | none | Der Schema-Hash, aus dem dieses Backend erstellt wurde, und die Runtime-Version, sonst nichts |
 | `GET` | `/api/meta/contract` | `schema:read` | `{ schemaVersion, runtime: { version, contract }, tables }` – jede Tabelle so, wie ein Administrator sie sieht; die Eingabe für `rebase generate-sdk --from`. `404`, wenn keine Auth konfiguriert ist |

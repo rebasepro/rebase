@@ -1,11 +1,9 @@
 ---
-sourceHash: 8a72cff37e30800b
+sourceHash: d3c645c7930945a3
 title: Viste
 sidebar_label: Viste
 description: "Fornisci una vista SQL o una vista materializzata in sola lettura con defineView: viste security_invoker regolate dalle tabelle da cui leggono, viste materializzate limitate dai ruoli, aggiornate su richiesta, create da db push."
 ---
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `defineView` espone una query SQL come tabella in sola lettura. Dichiara la query, le
 colonne che restituisce e la colonna o le colonne che identificano una riga:
@@ -39,8 +37,6 @@ lo stesso nome.
 
 ## Opzioni
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 | Chiave | Descrizione |
 |---|---|
 | `query` | **Obbligatorio.** Il `SELECT` di definizione. |
@@ -62,8 +58,6 @@ e una riga ha bisogno di un indirizzo.
 
 ## Chi vede quali righe
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Una vista semplice viene creata `WITH (security_invoker = true)`, quindi viene eseguita **come il
 chiamante**: la row-level security delle tabelle da cui legge decide cosa vede ciascun
 chiamante. Un utente i cui criteri mostrano solo le proprie canzoni vedrà la vista delle
@@ -73,8 +67,6 @@ criteri e nulla che essi possano aggiungere. Consulta
 tabelle sottostanti.
 
 ## Viste materializzate
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `materialized: true` memorizza le righe, quindi una lettura non esegue la query:
 
@@ -126,8 +118,6 @@ avere propri `indexes` (consulta [Indici](/docs/backend/indexes/)), creati sulle
 righe memorizzate; una vista semplice legge gli indici delle sue tabelle.
 
 ## Cosa non può avere una vista
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `rls`, `history`, `softDelete`, `tenant` e `search` vengono rifiutati durante la
 compilazione dello schema: ciascuno richiede una tabella in cui scrivere o a cui associare criteri.

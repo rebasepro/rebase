@@ -4,8 +4,6 @@ sidebar_label: Row-level security
 description: "Every table declares its rls posture — admin-only, inherit or a list of rules — and Rebase compiles it to Postgres row-level security policies. Rule forms, shorthand conditions, defaultRls and what fails closed."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Every table says who reaches its rows, in its `rls` key. Rebase compiles that
 into Postgres row-level security: `ENABLE ROW LEVEL SECURITY` on the table and
 one `CREATE POLICY` per rule and operation. Postgres then filters every
@@ -44,8 +42,6 @@ release covers `defaultSecurityRules` and `disableDefaultPolicies`.
 
 ## The three postures
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | `rls` | Means |
 |---|---|
 | `"admin-only"` | Row-level security on, and only the admin baseline policies: the `admin` role and the server's own code reach rows. Every other caller gets no rows, and their writes are refused. |
@@ -57,8 +53,6 @@ who should see it yet. Nothing is exposed until you write the rules that expose
 it.
 
 ### `defaultRls`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `backend/schema/index.ts` may export one posture for the tables that say
 `rls: "inherit"`:
@@ -83,8 +77,6 @@ exported stops `rebase db generate`, `rebase db push` and boot with an error
 that says to export one.
 
 ## Policies a table gets without writing them
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 The policies on a table are more than its own rules:
 
@@ -111,8 +103,6 @@ The generated DDL marks every injected policy, and `rebase db push` restores one
 dropped by hand.
 
 ## Rule forms
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A rule is one of these forms. Mixing two in one rule is a type error, and the
 compiler refuses it too, so JavaScript and casts are caught: `access` beside
@@ -161,8 +151,6 @@ deploying"; see [the upgrade guide](/docs/upgrading/0-30-to-0-31/#review-before-
 
 ### Owner
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 ```ts
 import { defineTable, col } from "@rebasepro/server/schema";
 
@@ -184,8 +172,6 @@ whatever the request sent, which is what makes the comparison mean something.
 
 ### Public access
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `{ operation: "select", access: "public" }` generates `USING (true)`: no row
 filter on reads, so every caller the API lets in reads every row.
 
@@ -201,8 +187,6 @@ anonymous sign-in. Both combine with `condition` and `check` like `"public"`.
 See [`authenticated()` and `registered()`](#authenticated-and-registered).
 
 ### Conditions
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A `condition` says which existing rows a rule covers; a `check` says which new
 or updated values it allows, and defaults to the condition. Both take the
@@ -306,8 +290,6 @@ treats them as unknown and reflects what the server reports.
 
 ### Raw SQL
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `using` and `withCheck` take SQL. `{column}` resolves to the table's column, and
 the caller is available as `rebase.uid()`, `rebase.roles()` (comma-separated
 roles) and `rebase.jwt()` (the token's claims as `jsonb`):
@@ -336,8 +318,6 @@ shorthand or a structured condition wherever one can say the same thing.
 
 ## Evaluated once per statement
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Every part of a rule that does not read the row — the caller's id, a roles
 check, a claim, `serverContext()` — compiles inside a scalar subquery. An owner
 rule becomes `(user_id)::text = (SELECT rebase.uid())`. Postgres computes such a
@@ -350,8 +330,6 @@ Raw SQL gets the same treatment when Rebase can read its structure
 the calls yourself: `(SELECT rebase.uid())`.
 
 ## `authenticated()` and `registered()`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A request with no session at all is given a sentinel id, so `rebase.uid()` is
 never `NULL` on a request, and `policy.authenticated()` (like
@@ -376,8 +354,6 @@ bypasses policies.
 
 ## Permissive and restrictive
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Permissive rules (the default) are ORed: a row is reached when any one of them
 admits it. Restrictive rules are ANDed with them: every restrictive rule must
 also pass. A permissive rule widens access; a restrictive one can only narrow
@@ -385,8 +361,6 @@ it. Tenancy is a restrictive rule for that reason: an `access: "public"` rule
 elsewhere on the table cannot take the tenant boundary off.
 
 ## What fails closed
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A table cannot become reachable by accident:
 
@@ -411,8 +385,6 @@ and claims. That is what `rebase.uid()`, `rebase.roles()` and `rebase.jwt()`
 read.
 
 ## Requests without a session
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A request with no token reaches the policies only when `AUTH_REQUIRE=false`;
 otherwise the API answers 401 first. It then runs with `rebase.uid()` set to
@@ -439,8 +411,6 @@ export const contactMessages = defineTable("contact_messages", {
 
 ## Rows here, columns next door
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `rls` decides which rows a caller reaches. It has nothing to say about the
 columns of a row they do reach: a rule that lets an employee read their team's
 rows lets them read every column of those rows, salary included. Per-column
@@ -466,8 +436,6 @@ applied by the server, so they cover every API route; a query run through
 `rebase.sql()` sees every column, as it bypasses row-level security.
 
 ## Next steps
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Field access](/docs/collections/field-access/): per-column read and write roles
 - [Tenancy](/docs/collections/tenancy/): one restrictive boundary per tenant

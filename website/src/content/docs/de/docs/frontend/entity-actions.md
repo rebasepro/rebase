@@ -1,5 +1,5 @@
 ---
-sourceHash: 49c04468f92c50c8
+sourceHash: eb907148639a58a2
 title: Entitätsaktionen
 sidebar_label: Entitätsaktionen
 description: Fügen Sie Entitäten benutzerdefinierte Aktionsschaltflächen zum Archivieren, Veröffentlichen, Exportieren, Klonen und mehr hinzu.
@@ -7,13 +7,9 @@ description: Fügen Sie Entitäten benutzerdefinierte Aktionsschaltflächen zum 
 
 ## Übersicht
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Entitätsaktionen sind Schaltflächen auf einem Datensatz: Veröffentlichen, Archivieren, Klonen oder das Auslösen eines externen Workflows. Sie werden pro Tabelle in `customizeTable` deklariert, und `updateRecord` deckt den Schreibvorgang ab, den die meisten von ihnen ausführen.
 
 ## Definieren von Entitätsaktionen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```tsx
 // frontend/src/cms/products.tsx
@@ -69,8 +65,6 @@ export const productsCms = customizeTable<typeof products>("products", {
 Mit der Tabelle als Typargument ist `row` in `onClick`, `isEnabled` und `disabledReason` der Zeilentyp der Tabelle, sodass `row?.status` gegen die Werte der Spalte geprüft wird. Ein Eintrag kann auch ein String sein: der `key` einer Aktion, die einmalig auf `<RebaseCMS entityActions>` (oder `<Rebase entityActions>`) registriert wurde, für Aktionen, die sich mehrere Tabellen teilen.
 
 ## `updateRecord`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `updateRecord(context, slug, id, patch, message?)` schreibt `patch` auf einen Datensatz und zeigt anschließend `message` als Erfolgsbenachrichtigung an, falls angegeben.
 
@@ -137,8 +131,6 @@ Eine deaktivierte Aktion, die den Grund nicht angibt, wirkt fehlerhaft. `disable
 Auf dem Datensatz zeigt eine Schaltfläche, deren `onClick` ein ausstehendes Promise zurückgibt, einen Spinner an und kann nicht erneut geklickt werden, bis das Promise aufgelöst ist. Wenn die Aktion einen Fehler auslöst oder ihr Promise abgelehnt wird, sieht der Benutzer den Fehler in einer Benachrichtigung. Die schreibgeschützte Ansicht hat kein Formular, daher ist `formContext` dort `undefined`.
 
 ## Collection-Aktionen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `Actions` platziert eigene Komponenten in der Symbolleiste der Collection, um Aktionen auf der gesamten Collection oder auf den ausgewählten Zeilen auszuführen: wie `PublishSelected` oben. Es ist eine Liste, sodass mehrere kombiniert werden können.
 

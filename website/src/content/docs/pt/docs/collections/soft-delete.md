@@ -1,13 +1,11 @@
 ---
-sourceHash: a289b69be61220df
+sourceHash: c75bfea30303f60e
 title: Soft delete
 sidebar_label: Soft delete
 description: "O softDelete em uma tabela transforma a exclusão em um timestamp, oculta linhas marcadas de todas as leituras e as restaura com uma atualização comum."
 ---
 
 ## O que muda
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Com o `softDelete` ativado, uma exclusão **marca uma coluna em vez de remover a linha**,
 e toda leitura filtra as linhas marcadas. Nada mais na operação

@@ -6,8 +6,6 @@ description: "softDelete on a table turns delete into a timestamp, hides stamped
 
 ## What it changes
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 With `softDelete` on, a delete **stamps a column instead of removing the row**,
 and every read filters the stamped rows out. Nothing else about the operation
 moves: the same permission is required, `beforeDelete` can still veto it and

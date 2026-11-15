@@ -1,11 +1,9 @@
 ---
-sourceHash: 749d3a5f47923f4d
+sourceHash: a0e9a8a853fff9c0
 title: customizeTable
 sidebar_label: customizeTable
 description: "customizeTable define como a collection de uma tabela difere daquilo que o CMS deriva: rótulos, ícone, visualizações, kanban, slots de exibição, layout de formulário, ações e opções por campo com componentes React importados por valor. Cada opção, com seu tipo e efeito."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Se você usa o CMS, cada tabela servida pelo backend já possui uma collection no
 painel, derivada da própria tabela (consulte
@@ -77,8 +75,6 @@ indicando o novo.
 
 ## Onde os arquivos ficam
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 ```text
 frontend/src/cms/
 ├── index.ts        # export const tableCustomizations = [postsCms, …]
@@ -96,8 +92,6 @@ código do frontend é a única coisa que você não deve escrever. O backend nu
 do frontend.
 
 ## O slug e o tipo
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O primeiro argumento é o slug da tabela: o nome sob o qual ela foi definida, ou o
 `slug` atribuído a ela. Com a tabela como argumento de tipo, o slug, cada chave
@@ -121,8 +115,6 @@ argumento de tipo, `customizeTable("posts", { … })` aceita as mesmas opções,
 com tipagem fraca.
 
 ## O que é recusado e o que é ignorado
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O `customizeTable` verifica o que o compilador não consegue ver quando o módulo é carregado e
 lança um erro indicando o que escrever em vez disso:
@@ -159,8 +151,6 @@ desenvolvimento, o painel exibe um aviso por discrepância e a ignora:
 O restante da customização continua sendo aplicado.
 
 ## Opções de tabela
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Cada chave é opcional. Uma chave omitida mantém o que o painel derivou.
 
@@ -278,7 +268,7 @@ Cada seção aceita:
 |---|---|---|
 | `entityActions` | `(string \| TableEntityAction)[]` | Ações em um registro. Um objeto ou a chave de um registrado em `<RebaseCMS entityActions>`. Consulte [Ações de entidade](/docs/frontend/entity-actions/). |
 | `disableDefaultActions` | `("edit" \| "copy" \| "delete")[]` | Ações nativas que esta tabela não oferece. |
-| `resetPasswordAction` | `false \| TableEntityAction` | <span class="since-badge" data-since="0.31">Desde 0.31</span> Apenas para a tabela de autenticação (`defineAuthTable`): `false` remove a ação nativa de redefinição de senha, uma ação a substitui (oferecida independentemente do suporte do adaptador de autenticação: o backend é seu). Ignorado, com um aviso, em qualquer outra tabela. |
+| `resetPasswordAction` | `false \| TableEntityAction` | Apenas para a tabela de autenticação (`defineAuthTable`): `false` remove a ação nativa de redefinição de senha, uma ação a substitui (oferecida independentemente do suporte do adaptador de autenticação: o backend é seu). Ignorado, com um aviso, em qualquer outra tabela. |
 | `entityViews` | `(string \| TableEntityView)[]` | Abas extras em um registro. Consulte [Visualizações de entidade](/docs/frontend/entity-views/). |
 | `Actions` | `Component[]` | Componentes renderizados na barra de ferramentas da collection. |
 | `components` | `TableComponentOverrides` | Substituições de componentes com escopo de collection, cada uma no formato `{ Component, wrap? }`. Consulte [Substituições de componentes](/docs/frontend/component-overrides/#collection-level-component-overrides). |
@@ -286,8 +276,6 @@ Cada seção aceita:
 | `fields` | `TableFields` | Opções por campo, indexadas por coluna ou relação. Abaixo. |
 
 ## Opções de campo
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `fields.<key>` aceita as opções que qualquer campo aceita, mais aquelas do seu
 tipo de coluna. [Campos](/docs/collections/properties/) mostra cada um com o componente (widget) que
@@ -439,8 +427,6 @@ Consulte [Relações no painel](/docs/collections/relations-in-the-admin-panel/)
 
 ## Customizações, `ui-config.json` e preferências
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 O que o painel exibe para uma tabela é composto em uma ordem fixa, cada camada sobrepondo
 a anterior:
 
@@ -485,8 +471,6 @@ customizadas em duplicidade, um `ui-config.json` que não foi passado para nenhu
 sem `rebaseBackendGuard()`. Consulte [`rebase verify`](/docs/cli/#rebase-verify).
 
 ## Próximos passos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Como tabelas se tornam collections](/docs/collections/): o que o painel deriva antes de tudo isso
 - [Campos](/docs/collections/properties/): o widget e as opções de cada tipo de coluna

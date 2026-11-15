@@ -6,8 +6,6 @@ description: CRUD operations, fluent query builder, filter operators, sorting, c
 
 ## Accessing tables
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Access any table through `client.data.<tableName>` (camelCase, auto-converted to snake_case) or `client.data.table<Record<string, unknown>>("slug")` (explicit slug):
 
 ```typescript

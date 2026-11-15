@@ -1,5 +1,5 @@
 ---
-sourceHash: 72daf47d8a15bafe
+sourceHash: ceff4ba3bdacfb06
 title: Busca
 sidebar_label: Busca
 description: Como o .search() se comporta por padrão e como uma tabela adota a busca de texto completo ranqueada sobre as colunas que você especificar — incluindo conteúdo JSONB e de arrays.
@@ -46,8 +46,6 @@ aceita.
 Uma busca de uma única palavra compila exatamente para o mesmo SQL de sempre.
 
 ## Habilitando a busca avançada
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Declare `search` em uma tabela, nomeando as colunas que você deseja indexar:
 
@@ -135,8 +133,6 @@ que essa verificação veio substituir: uma coluna que continua indexando o conj
 não retorna nada para um conteúdo claramente presente na linha.
 
 ## O que você pode nomear em `fields`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Um caminho começa com a chave de uma coluna.
 

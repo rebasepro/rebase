@@ -1,11 +1,9 @@
 ---
-sourceHash: e951bd1fd3fc48e0
+sourceHash: 84bd0f15d2a016c7
 title: Validación y condiciones
 sidebar_label: Validación y condiciones
 description: "Cómo el formulario del CMS muestra las reglas de una columna (obligatorio, longitud, patrón, límites, único), dónde se comprueban esas reglas y los campos condicionales que pasan a ser obligatorios, deshabilitados u ocultos a partir de los propios valores del registro."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Las reglas de una columna se declaran una vez, en la columna, y el servidor las
 aplica en cada escritura que llega a la API. El CMS lee las mismas reglas del
@@ -37,8 +35,6 @@ la columna con `.notNull()` y `.validate({ … })`, y el CMS las lee.
 
 ## Qué comprueba el formulario
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | En la columna | En el formulario |
 |---|---|
 | `.notNull()` | Obligatorio, con `requiredMessage` como error cuando se especifique. No es obligatorio donde nadie escribe el valor: una clave generada, una marca de tiempo (stamp), una columna generada o `.readOnly()`. |
@@ -57,8 +53,6 @@ Cada regla está listada, con su significado exacto, en
 
 ## Dónde se ejecuta la validación
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 El servidor comprueba las reglas de una columna en el límite de la petición
 (REST, el socket en tiempo real y MCP) sobre lo que envió el emisor, antes de que
 se ejecute `beforeSave`, y responde a una escritura que incumple una regla con un
@@ -73,8 +67,6 @@ valor una vez que se edita: un valor almacenado que incumpla una regla añadida
 posteriormente no mostrará ningún error hasta que alguien edite esa celda.
 
 ## Campos condicionales
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Un campo puede reaccionar a los propios valores del registro: volverse obligatorio,
 deshabilitado, de solo lectura u oculto. Hay dos formas, ambas en `customizeTable`:
@@ -140,15 +132,11 @@ que la base de datos impone para todos.
 
 ## Etiquetas para un conjunto cerrado
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Los valores de un `col.enum([...])` o un `.oneOf([...])` pertenecen a la columna.
 Sus etiquetas, colores y orden pertenecen al CMS, definidos con `enumLabels` y
 `enumOrder`; consulta [conjuntos cerrados](/docs/collections/properties/#closed-sets-of-values).
 
 ## Próximos pasos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Columnas](/docs/schema/columns/#validation): cada regla de validación
 - [Campos](/docs/collections/properties/): los campos a los que se aplican estas reglas

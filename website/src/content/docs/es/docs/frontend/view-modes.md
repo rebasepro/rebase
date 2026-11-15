@@ -1,11 +1,9 @@
 ---
-sourceHash: 57ee5c3ecdf49419
+sourceHash: 2e189939df0c022e
 title: Modos de vista
 sidebar_label: Modos de vista
 description: "Muestre las filas de una tabla como una lista, una hoja de cálculo, tarjetas o un tablero kanban; elija qué llena el título, la imagen, el estado y la fecha de cada registro; y configure la ordenación predeterminada, los filtros y los ajustes preestablecidos de filtro con un solo clic."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Cada colección se puede mostrar de cuatro formas, desde el selector en su barra de herramientas:
 
@@ -21,8 +19,6 @@ galería) en el mismo selector, gestionados por la misma barra de herramientas: 
 [Modos de vista personalizados](/docs/frontend/extending#custom-view-modes).
 
 ## Elección de las vistas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```ts
 // backend/schema/tasks.ts
@@ -83,8 +79,6 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 | `"xl"` | 160 | Miniaturas de imágenes grandes |
 
 ## Kanban
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `kanban.columnField` indica la columna por la que se agrupa el tablero. Debe
 contener un conjunto cerrado de cadenas, un `col.enum([...])` o una columna de texto
@@ -149,8 +143,6 @@ en un tablero alimentado por un backend, es una solución que se revierte a sí 
 
 ## Slots de visualización
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Cada superficie que dibuja un registro utiliza algunos de estos seis slots: **title**,
 **subtitle**, **image**, **status**, **date** y **tags**. Una fila de lista es imagen +
 título + subtítulo + estado + fecha, una tarjeta es lo mismo con la imagen en la parte superior, un
@@ -207,8 +199,6 @@ array unido y una relación como el primero de `name`, `title`, `label` o
 
 ## Filtros, ajustes preestablecidos y ordenación
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 ```tsx
 import { customizeTable } from "@rebasepro/cms";
 import type { tasks } from "../../../backend/schema/tasks";
@@ -239,8 +229,6 @@ llamador puede leer lo decide la [seguridad a nivel de fila](/docs/collections/s
 de la tabla, para cada llamador.
 
 ## Próximos pasos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/): todas las opciones
 - [Personalización del panel de administración](/docs/frontend/customizing/): sus propios modos de vista, páginas y acciones

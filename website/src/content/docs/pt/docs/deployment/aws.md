@@ -1,5 +1,5 @@
 ---
-sourceHash: d9b167443cc3fd35
+sourceHash: c117340992cb4446
 title: Implantando o Rebase na AWS
 description: Faça o deploy da sua instância do Rebase de forma segura na Amazon Web Services utilizando RDS e AWS App Runner com um forte foco europeu.
 sidebar_label: AWS
@@ -35,7 +35,7 @@ rebase build
 Para o App Runner, que obtém imagens a partir de um registro, incorpore o bundle em uma imagem derivada. São apenas três linhas que fixam com precisão o que será executado:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -80,8 +80,6 @@ As três últimas variáveis são a forma pela qual esta implantação obtém um
 A AWS gerencia o encerramento de TLS (TLS termination), fornecendo uma URL `https` pronta para uso.
 
 ## 4. O schema
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 **O runtime cria as tabelas ausentes durante a inicialização, incluindo aquelas declaradas por `backend/schema`.** O valor padrão de `REBASE_MIGRATE_ON_BOOT` é `ensure`, que é aditivo em todo o schema — ele cria tabelas, colunas e tipos enum ausentes e aplica suas políticas de segurança em nível de linha (row-level security) — de modo que a primeira inicialização em uma instância vazia do RDS já entra no ar servindo suas tabelas.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 27f3eaf8b78d59e8
+sourceHash: 6ada998b1c8e4cc0
 title: Desplegar Rebase en Railway
 description: Despliega Rebase en Railway a partir de la imagen de runtime publicada y el bundle de tu proyecto. Mantén el enfoque en la UE.
 sidebar_label: Railway
@@ -34,7 +34,7 @@ rebase build
 Haz commit de un `Dockerfile` de tres líneas en la raíz del repositorio, de modo que el paso de compilación de Railway sea una copia en lugar de una compilación:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -68,8 +68,6 @@ Railway establece `PORT` y el runtime se vincula a él, por lo que no hay ningú
 2. En **Public Networking**, haz clic en **Generate Domain** para obtener una URL `.up.railway.app`, o asocia un dominio personalizado.
 
 ## 6. El esquema
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 **El runtime crea las tablas que falten al arrancar, incluidas las que declara `backend/schema`.** `REBASE_MIGRATE_ON_BOOT` tiene como valor predeterminado `ensure`, el cual es aditivo en todo el esquema: crea las tablas, columnas y tipos enum faltantes y aplica su seguridad a nivel de fila, por lo que el primer inicio con una base de datos vacía arranca sirviendo tus tablas.
 

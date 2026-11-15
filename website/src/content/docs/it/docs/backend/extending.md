@@ -1,5 +1,5 @@
 ---
-sourceHash: 8412da52cc99478c
+sourceHash: 0783ce9f040f4c00
 title: Rebase non supporta X
 sidebar_label: Estendere il server
 description: La scala di estensione lato server — dichiarazione, hook di tabella, funzione personalizzata, rotte personalizzate, server personalizzato, eject — con ciò che ciascun livello può e non può raggiungere.
@@ -86,8 +86,6 @@ per accedere alle righe di una tabella che possa aggirarli.
 [Hook globali](/docs/backend/hooks)
 
 ### Restringere una lettura con `beforeQuery`
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `afterRead` intercetta righe che sono già state recuperate, quindi può oscurare un valore
 ma non può impedire che la riga venga letta. `beforeQuery` viene eseguito prima: riceve la

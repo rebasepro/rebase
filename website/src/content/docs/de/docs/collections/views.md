@@ -1,11 +1,9 @@
 ---
-sourceHash: 8a72cff37e30800b
+sourceHash: d3c645c7930945a3
 title: Views
 sidebar_label: Views
 description: "Einen SQL-View oder einen Materialized View mit defineView schreibgeschützt bereitstellen: security_invoker-Views, gesteuert durch die gelesenen Tabellen, Materialized Views rollenabhängig beschränkt, bei Bedarf aktualisiert, erstellt via db push."
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `defineView` stellt eine SQL-Abfrage als schreibgeschützte Tabelle bereit. Deklarieren Sie die Abfrage, die zurückgegebenen Spalten und die Spalte oder Spalten, die eine Zeile identifizieren:
 
@@ -30,8 +28,6 @@ Exportieren Sie ihn wie eine Tabelle aus `backend/schema/index.ts`. Er lässt si
 
 ## Optionen
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 | Schlüssel | Beschreibung |
 |---|---|
 | `query` | **Erforderlich.** Das definierende `SELECT`. |
@@ -52,13 +48,9 @@ Ein View hat mindestens eine `.primaryKey()`-Spalte: Ein View besitzt keinen eig
 
 ## Wer welche Zeilen sieht
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Ein regulärer View wird `WITH (security_invoker = true)` erstellt, läuft also **als der Aufrufer**: Die Row-Level Security der Tabellen, die er liest, entscheidet, was der jeweilige Aufrufer sieht. Ein Benutzer, dessen Richtlinien ihm seine eigenen Songs anzeigen, sieht im View nur seine eigenen Songs. Aus diesem Grund hat ein View kein `rls`: Es gibt nichts, woran Richtlinien angehängt werden könnten, und nichts, was sie hinzufügen könnten. Siehe [Row-Level Security](/docs/collections/security-rules/) für die Richtlinien auf den darunterliegenden Tabellen.
 
 ## Materialized Views
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `materialized: true` speichert die Zeilen, sodass ein Lesevorgang die Abfrage nicht erneut ausführt:
 
@@ -96,8 +88,6 @@ POST /api/data/langs/refresh
 `concurrently` liefert weiterhin die alten Zeilen aus, während die neuen berechnet werden. Dies erfordert den Unique Index, den Rebase auf den `.primaryKey()`-Spalten erstellt, sodass diese im Ergebnis der Abfrage eindeutig sein müssen. Um nach einem Zeitplan zu aktualisieren, rufen Sie `refresh()` aus einem [Cron-Job](/docs/backend/cron-jobs/) auf. Ein Materialized View kann eigene `indexes` besitzen (siehe [Indizes](/docs/backend/indexes/)), die auf seinen gespeicherten Zeilen aufbauen; ein regulärer View nutzt die Indizes seiner Tabellen.
 
 ## Was ein View nicht haben kann
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `rls`, `history`, `softDelete`, `tenant` und `search` werden beim Kompilieren des Schemas abgelehnt: Jedes davon benötigt eine Tabelle, in die geschrieben werden kann oder an die Richtlinien angehängt werden können. `roles` bei einem regulären View wird beim Laden des Moduls abgelehnt, ebenso wie eine leere `query`. `indexes` bei einem regulären View wird beim Kompilieren des Schemas abgelehnt.
 

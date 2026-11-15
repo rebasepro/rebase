@@ -1,5 +1,5 @@
 ---
-sourceHash: 49c04468f92c50c8
+sourceHash: eb907148639a58a2
 title: Azioni sulle entità (Entity Actions)
 sidebar_label: Azioni sulle entità
 description: Aggiungi pulsanti di azione personalizzati alle entità per l'archiviazione, la pubblicazione, l'esportazione, la clonazione e altro ancora.
@@ -7,13 +7,9 @@ description: Aggiungi pulsanti di azione personalizzati alle entità per l'archi
 
 ## Panoramica
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 Le azioni sulle entità sono pulsanti presenti su un record: pubblicare, archiviare, clonare o avviare un flusso di lavoro esterno. Vengono dichiarate per tabella in `customizeTable`, e `updateRecord` gestisce la scrittura eseguita dalla maggior parte di esse.
 
 ## Definizione delle azioni sulle entità
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 ```tsx
 // frontend/src/cms/products.tsx
@@ -69,8 +65,6 @@ export const productsCms = customizeTable<typeof products>("products", {
 Utilizzando la tabella come argomento di tipo, `row` in `onClick`, `isEnabled` e `disabledReason` corrisponde al tipo di riga della tabella, pertanto `row?.status` viene controllato rispetto ai valori della colonna. Una voce può anche essere una stringa: la `key` di un'azione registrata una sola volta su `<RebaseCMS entityActions>` (o `<Rebase entityActions>`), utile per le azioni condivise da più tabelle.
 
 ## `updateRecord`
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 `updateRecord(context, slug, id, patch, message?)` applica la `patch` su un singolo record, quindi mostra `message` come notifica di successo quando specificato.
 
@@ -137,8 +131,6 @@ Un'azione disabilitata che non ne spiega il motivo sembra malfunzionante. `disab
 Sul record, un pulsante il cui `onClick` restituisce una promise in sospeso mostra uno spinner e non può essere premuto nuovamente fino al completamento della promise. Se l'azione genera un errore o la sua promise viene rifiutata, l'utente visualizza l'errore in una notifica. La vista di sola lettura non ha un form, quindi `formContext` vi risulta `undefined`.
 
 ## Azioni sulla collezione (Collection Actions)
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 `Actions` inserisce componenti personalizzati nella barra degli strumenti della collezione, per operare sull'intera collezione o sulle righe selezionate: come `PublishSelected` nell'esempio precedente. Trattandosi di un array, è possibile comporne diverse.
 

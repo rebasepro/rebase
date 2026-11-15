@@ -1,5 +1,5 @@
 ---
-sourceHash: 0c385399c3a984b7
+sourceHash: 19a897df04526a75
 title: "Ricetta: Blog CMS"
 sidebar_label: Blog CMS
 description: Crea un CMS completo per blog con articoli, autori, categorie, rich text editing e caricamento immagini — tabelle in backend/schema, presentazione in frontend/src/cms.
@@ -14,13 +14,9 @@ Crea un backend per un blog con:
 
 ## Tabelle
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Tre file in `backend/schema/`. Definiscono ciò che il database e l'API impongono; il modo in cui il pannello di amministrazione li presenta viene dopo, nel frontend.
 
 ### Autori
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 ```ts
 // backend/schema/authors.ts
@@ -40,8 +36,6 @@ export const authors = defineTable("authors", {
 
 ### Categorie
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 ```ts
 // backend/schema/categories.ts
 import { defineTable, col } from "@rebasepro/server/schema";
@@ -58,8 +52,6 @@ export const categories = defineTable("categories", {
 ```
 
 ### Articoli
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 ```ts
 // backend/schema/articles.ts
@@ -138,8 +130,6 @@ Il workflow è definito dalla colonna `status` e dalle regole sopra indicate, ed
 
 ## Come vengono mostrati nel pannello
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Il pannello di amministrazione esegue il rendering di tutti e tre senza ulteriore codice. Questi file in `frontend/src/cms/` aggiungono le icone, i colori degli enum e gli editor:
 
 ```tsx
@@ -176,8 +166,6 @@ export const authorsCms = customizeTable<typeof authors>("authors", {
 ```
 
 ## Configurazione
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 1. Salva i tre file delle tabelle in `backend/schema/` ed esportali da `backend/schema/index.ts` — una `defineTable` non esportata dall'index bloccherà l'avvio.
 2. Salva i file di personalizzazione in `frontend/src/cms/` e aggiungili a `<RebaseCMS tableCustomizations={[articlesCms, authorsCms]}>` in `App.tsx`.
@@ -227,8 +215,6 @@ for (const article of articles) {
 
 
 ## Correlati
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 - [Tabelle](/docs/schema/) — l'API `defineTable` utilizzata in questa ricetta
 - [Personalizzare una tabella](/docs/frontend/customize-table/) — la parte relativa al pannello

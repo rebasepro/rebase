@@ -1,11 +1,9 @@
 ---
-sourceHash: 80e40ea5912a48c8
+sourceHash: 5b835c7e865a4f8f
 title: File di istruzioni per l'IA
 sidebar_label: File di istruzioni per l'IA
 description: Ogni progetto Rebase creato include ai-instructions.md più file puntatore per Claude, Cursor, Windsurf, Copilot e AGENTS.md che contengono le cinque regole violate più spesso dagli assistenti — un'unica fonte di verità, molteplici nomi di file.
 ---
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Ogni assistente richiede le proprie regole in un file diverso. Claude Code legge
 `CLAUDE.md`, Cursor legge `.cursorrules`, Windsurf legge `.windsurfrules`,
@@ -82,8 +80,6 @@ qualunque cosa sia stata salvata dall'ultimo progetto utilizzato su quella macch
 
 ## Perché un puntatore invece di una copia
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 I file puntatore non contengono quasi nulla. Un file che fa riferimento a quello reale mantiene le
 convenzioni in un unico posto e presenta proprietà che una copia non ha:
 
@@ -107,8 +103,6 @@ Questo pattern merita di essere mantenuto se fai un fork dello scaffold, e vale 
 repository che non sono affatto progetti Rebase.
 
 ## Cosa contiene inizialmente `ai-instructions.md`
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Il file generato dallo scaffold è volutamente breve — rimanda a
 [`rebase skills install`](/docs/ai/skills) per approfondire, e poi elenca le regole che

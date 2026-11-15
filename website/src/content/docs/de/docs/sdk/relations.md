@@ -1,5 +1,5 @@
 ---
-sourceHash: 3db2d10879df1c44
+sourceHash: 61ebfc32eadc2236
 title: Relationen abfragen
 sidebar_label: Relationen
 description: "Verknüpfte Entitäten in eine Abfrage einbeziehen und eine untergeordnete Tabelle über deren übergeordnete Tabelle mit den Relations-Accessoren des SDKs lesen."
@@ -197,8 +197,6 @@ const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 Ohne ein generiertes `Database` bleibt `include` ein einfaches `string[]` oder ein Baum: Ein manuell geschriebener Zeilentyp enthält keine Relationen, gegen die geprüft werden könnte, und der 400er-Fehler des Servers dient als Auffangnetz.
 
 ### Relationsnamen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Die Namen, die Sie an `include()` übergeben, sind die Schlüssel der `relations` der Tabelle:
 

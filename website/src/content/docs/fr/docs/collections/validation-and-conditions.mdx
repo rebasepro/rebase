@@ -1,11 +1,9 @@
 ---
-sourceHash: e951bd1fd3fc48e0
+sourceHash: 84bd0f15d2a016c7
 title: Validation et conditions
 sidebar_label: Validation & conditions
 description: "Comment le formulaire du CMS affiche les règles d'une colonne — obligatoire, longueur, motif, limites, unicité — où ces règles sont vérifiées, et les champs conditionnels qui deviennent obligatoires, désactivés ou masqués à partir des valeurs de l'enregistrement lui-même."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Les règles d'une colonne sont déclarées une seule fois, sur la colonne, et appliquées
 par le serveur lors de chaque écriture atteignant l'API. Le CMS lit ces mêmes
@@ -38,8 +36,6 @@ la colonne avec `.notNull()` et `.validate({ … })`, et le CMS les lit.
 
 ## Ce que le formulaire vérifie
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 | Sur la colonne | Dans le formulaire |
 |---|---|
 | `.notNull()` | Requis, avec `requiredMessage` comme message d'erreur lorsqu'il est défini. Non requis lorsque personne ne saisit la valeur : une clé générée, un horodatage (stamp), une colonne générée ou `.readOnly()`. |
@@ -58,8 +54,6 @@ Chaque règle est répertoriée, avec sa signification exacte, sur la page
 
 ## Où s'exécute la validation
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Le serveur vérifie les règles d'une colonne au niveau de la frontière de requête
 (REST, le socket temps réel et MCP) sur ce que l'appelant a envoyé, avant
 l'exécution de `beforeSave`, et répond à une écriture enfreignant une règle par une
@@ -75,8 +69,6 @@ règle ajoutée ultérieurement n'affiche aucune erreur tant que personne ne mod
 cette cellule.
 
 ## Champs conditionnels
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un champ peut réagir aux valeurs de l'enregistrement lui-même : devenir
 obligatoire, désactivé, en lecture seule ou masqué. Il existe deux façons de
@@ -143,16 +135,12 @@ de la table, que la base de données applique pour tout le monde.
 
 ## Libellés pour un ensemble fermé
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Les valeurs d'un `col.enum([...])` ou d'un `.oneOf([...])` appartiennent à la
 colonne. Leurs libellés, couleurs et ordre appartiennent au CMS, définis avec
 `enumLabels` et `enumOrder` ; voir les
 [ensembles fermés de valeurs](/docs/collections/properties/#closed-sets-of-values).
 
 ## Prochaines étapes
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - [Colonnes](/docs/schema/columns/#validation) : toutes les règles de validation
 - [Champs](/docs/collections/properties/) : les champs auxquels ces règles s'appliquent

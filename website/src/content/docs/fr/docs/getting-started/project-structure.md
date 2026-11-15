@@ -1,5 +1,5 @@
 ---
-sourceHash: c6b361597710219f
+sourceHash: b26bc6f688a4ec9b
 title: Structure du projet
 sidebar_label: Structure du projet
 description: "La structure d'un projet Rebase — les tables dans backend/schema, les modules backend lus par le runtime, et les personnalisations du panneau d'administration dans frontend/src/cms — avec et sans le panneau."
@@ -26,8 +26,6 @@ Chacun d'entre eux a un sens précis ici, et la plupart ont un sens différent a
   un bucket, un topic. Déclarée dans `backend/resources.ts`, liée par des variables
   d'environnement.
 :::
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `rebase init` génère l'une des deux structures suivantes. Les deux partagent le même `backend/` ; la
 différence réside dans la présence ou non du panneau d'administration dans le projet.
@@ -109,8 +107,6 @@ compose pour les construire. Voir [Intégration d'un serveur personnalisé](/doc
 :::
 
 ## Tables (`backend/schema/`)
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Les tables sont l'**unique source de vérité** pour votre modèle de données :
 
@@ -206,8 +202,6 @@ une seule valeur sans qu'elle ait besoin d'être écrite trois fois.
 
 ### Concepts clés
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 - **`createRebaseClient`** — Crée le client SDK qui gère les requêtes HTTP, les connexions WebSocket et la gestion des jetons d'authentification. Appelez-le une seule fois, à la racine du module : à l'intérieur d'un composant, même dans un `useMemo`, `<React.StrictMode>` instancie un second client en développement
 - **`<RebaseCMS tableCustomizations>`** — le panneau affiche chaque table que le backend sert à l'adresse `GET /api/schema/tables` ; les objets `customizeTable` provenant de `frontend/src/cms/` modifient l'apparence de certaines d'entre elles, et `uiConfig` transmet ce que l'éditeur de collections a enregistré en développement. Voir [Personnaliser une table](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
 - **`useRebaseAuthController`** — Conserve l'utilisateur connecté ainsi que le cycle de vie des jetons, et c'est ce que `<Rebase>` distribue à tous les éléments situés en dessous de lui
@@ -256,8 +250,6 @@ n'atteignent plus le projet. Cette surface est documentée dans
 [Intégration d'un serveur personnalisé](/docs/backend/custom-server).
 
 ## Comment ils s'articulent
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 1. **Vous déclarez** les tables dans `backend/schema/`
 2. **Le backend** les compile, crée les tables et les politiques, et monte les routes REST, temps réel et MCP

@@ -1,13 +1,11 @@
 ---
-sourceHash: ceb4d7703eefec3a
+sourceHash: 7f745fbf9e5bda12
 title: Felder
 sidebar_label: Felder
 description: "Das Feld, das das CMS für jeden Spaltentyp darstellt – Text, Markdown, E-Mail, URL, Select, Multi-Select, Zahl, Schalter, Datum, Datei-Upload, JSON, Geopoint, Vektor, Binär – und die customizeTable-Optionen zur jeweiligen Anpassung."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Jede Spalte einer Tabelle ist ein Feld im CMS. Welche Art von Feld es ist, ergibt sich
 aus der Spalte: ihr Typ, ihre Validierung und ihre Speicherregeln, die alle in
@@ -75,8 +73,6 @@ export const productsCms = customizeTable<typeof products>("products", {
 
 ## Text
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Eine `col.text()`-, `col.varchar({ length })`-, `col.char({ length })`- oder `col.uuid()`-Spalte ist ein
 Texteingabefeld. `varchar(n)` und `char(n)` begrenzen die Länge auf `n`, und `.validate({ min,
 max, length, matches })` fügt Regeln hinzu, die das Formular vor dem Speichern prüft.
@@ -115,8 +111,6 @@ stellt eine Referenzauswahl dar; siehe [Firestore](/docs/frontend/firebase/#from
 
 ## Feste Wertemengen (Enums)
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Ein `col.enum([...])` ist ein Select-Feld, das an anderer Stelle als farbiger Chip dargestellt wird. Dasselbe gilt für eine
 Text- oder Zahlenspalte mit `.oneOf([...])`. Jeder Wert erhält eine Beschriftung anhand seines
 Bezeichners (`needs_review` wird zu „Needs Review“) und eine vom Wert abgeleitete Farbe,
@@ -140,8 +134,6 @@ auch für dessen Elemente.
 
 ## Zahlen
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Jede Integer-, Serial-, `real`-, `doublePrecision`- und `numeric`-Spalte ist ein
 Zahleneingabefeld. Integer- und Serial-Spalten akzeptieren nur ganze Zahlen, und
 `.validate({ min, max, moreThan, lessThan, positive, negative })` fügt Begrenzungen hinzu.
@@ -156,15 +148,11 @@ Steuerelement hinzu, das den Wert auf `null` setzt.
 
 ## Boolscher Wert
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Ein `col.boolean()` ist ein Schalter (Switch).
 
 <FieldWidgetPreview client:only="react" variant="boolean" />
 
 ## Datum und Uhrzeit
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein `col.timestamp({ withTimezone: true })` ist eine Datums- und Uhrzeitauswahl, ein `col.date()` eine Datumsauswahl und
 ein `col.time()` eine Uhrzeitauswahl. `mode` wechselt zwischen `"date"` und
@@ -182,8 +170,6 @@ Der Server schreibt die ID des ausführenden Benutzers, unabhängig vom Inhalt d
 
 ## Dateien
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Eine `col.storage({ … })`-Spalte ist ein Upload-Feld mit Vorschau, und
 `.multiple()` macht daraus ein Mehrfachdatei-Feld. Der Bucket, der Pfad, die akzeptierten
 Dateitypen und das Größenlimit werden an der Spalte deklariert; die Funktionen, die im
@@ -194,16 +180,12 @@ Browser ausgeführt werden, werden mit `storage` in `customizeTable` hinzugefüg
 
 ## Arrays und JSON
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Eine Array-Spalte (`<item>.array()`) ist eine wiederholbare Liste des Element-Felds. Eine `jsonb`-Spalte
 mit einer [`json.*`-Struktur](/docs/schema/json/) ist eine Gruppe aus typisierten Feldern, Listen und
 Blöcken; eine ohne Struktur ist ein Schlüssel-Wert-Editor. Siehe
 [Arrays und JSON](/docs/collections/arrays-and-maps/).
 
 ## Relationen und Referenzen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein `belongsTo` ist eine Auswahl für die verknüpfte Zeile, die anstelle der Foreign-Key-Spalte
 angezeigt wird; eine To-Many-Relation wird als Reiter (Tab) des Datensatzes dargestellt. Eine Textspalte mit
@@ -215,16 +197,12 @@ Siehe [Relationen im Panel](/docs/collections/relations-in-the-admin-panel/).
 
 ## Geopoints, Vektoren und Binärdaten
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Ein `col.geopoint()` ist ein Feld für Breiten- und Längengrad. Ein `col.vector({ dimensions })` ist eine
 Vektoreingabe; `clearable` ist dessen einzige Option. Ein `col.bytea()` ist ein Binärfeld,
 das als Base64 gelesen und geschrieben wird. Keines dieser Felder hat typspezifische Optionen über
 diejenigen hinaus, die jedes Feld unterstützt.
 
 ## Optionen, die jedes Feld unterstützt
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Unabhängig vom Spaltentyp:
 
@@ -261,8 +239,6 @@ muss, gehört an die Spalte (`.notNull()`, `.validate()`, `.access()`) oder in d
 :::
 
 ## Nächste Schritte
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/): jede Option mit ihrem Typ
 - [Validierung und Bedingungen](/docs/collections/validation-and-conditions/): was das Formular prüft und Felder, die auf Werte reagieren

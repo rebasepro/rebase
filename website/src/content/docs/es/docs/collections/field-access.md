@@ -1,11 +1,9 @@
 ---
-sourceHash: f55095351eb33abe
+sourceHash: d482e63c42ac3a1a
 title: Acceso a campos
 sidebar_label: Acceso a campos
 description: "Permisos de lectura y escritura por columna según el rol con .access(), columnas que nunca salen del servidor con .private() y columnas que los clientes no pueden escribir con .readOnly(). Un emisor de llamada al que las políticas de fila le permiten el paso sigue sin recibir una columna que sus roles no pueden leer."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 La [seguridad a nivel de fila](/docs/collections/security-rules/) decide a qué **filas** accede un
 emisor de llamada. Tres modificadores de columna deciden qué **columnas de una fila alcanzada**
@@ -39,8 +37,6 @@ al que la API permita el paso lee todas las filas de staff. Solo un emisor de ll
 obtiene la columna `salary` de una fila, y nadie puede establecerla mediante HTTP.
 
 ## La regla
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `.access()` recibe dos listas opcionales, y omitir una lista no equivale a una lista vacía;
 esa diferencia es la base de toda la funcionalidad.
@@ -78,8 +74,6 @@ que dichos roles no pueden leer (`FIELD_NOT_READABLE`), y responde a un nombre `
 como si fuera una errata, de la misma forma que REST y el socket.
 
 ## `.private()` y `.readOnly()` son el mismo mecanismo
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `.private()` equivale a `.access({ read: [], write: [] })`, con una diferencia: una
 columna privada también queda excluida de OpenAPI, de los tipos del SDK y de los
@@ -189,8 +183,6 @@ un límite le revelaría el valor que no tiene permitido ver.
 
 ### Un enlace sigue a su columna clave
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Un `belongsTo` y la columna clave a la que está vinculado son un mismo campo con dos
 formas de escritura. Escribir `{ "reviewer": 7 }` está sujeto a todas y cada una de las reglas de `reviewerId`
 (su regla de escritura, `.readOnly()`, `.private()`, un sello de creación, la
@@ -227,8 +219,6 @@ llegue al driver. Nunca relaja una regla sobre una columna declarada, un sello,
 el tenant, la clave, un destino de relación o `_pivot`.
 
 ## Búsqueda
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 La búsqueda de respaldo — una tabla sin un bloque `search` — busca coincidencias `ILIKE`
 en sus columnas de texto y omite aquellas que el emisor de llamada no puede leer. Nada se
@@ -302,8 +292,6 @@ les oculta nada. `[]` sí lo sigue haciendo — incluso para `dataAsAdmin`. Util
 [`rebase.sql()`](/docs/backend/custom-functions) si necesita consultar la columna directamente.
 
 ## Validación
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `.access()` en una columna, y `access` en una relación, lanzan una excepción al cargar
 el módulo a menos que `read` y `write` sean listas de nombres de roles no vacíos: un string

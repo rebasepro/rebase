@@ -1,5 +1,5 @@
 ---
-sourceHash: 3bff62ceb5aceb62
+sourceHash: fbdc423a29403c10
 title: Betrieb auf einer bestehenden oder geteilten Datenbank
 sidebar_label: Bestehende oder geteilte Datenbank
 description: Führen Sie Rebase auf einer PostgreSQL-Datenbank aus, die es nicht selbst besitzt – einem mit anderen Apps geteilten Cluster, einem zweiten Rebase-Projekt, Supabase oder einer von einem DBA abgesicherten Datenbank – mithilfe der rls-Einstellungen, rebase doctor --database und rebase db request-role migrate.
@@ -305,8 +305,6 @@ Oder löschen Sie diese: jede Policy, deren Name auf `_ar_` gefolgt von acht
 Hexadezimalziffern endet und deren Rolle `rebase_admin_request` ist.
 
 ### Ein geteiltes `public`-Schema
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Wenn `public` Tabellen enthält, auf die Rebase nicht zugreifen soll:
 

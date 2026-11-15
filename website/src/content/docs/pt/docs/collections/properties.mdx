@@ -1,13 +1,11 @@
 ---
-sourceHash: ceb4d7703eefec3a
+sourceHash: 7f745fbf9e5bda12
 title: Campos
 sidebar_label: Campos
 description: "O campo que o CMS renderiza para cada tipo de coluna — texto, markdown, e-mail, URL, seleção, seleção múltipla, número, switch, data, upload de arquivo, JSON, geopoint, vetor, binário — e as opções de customizeTable que alteram cada um."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Cada coluna de uma tabela é um campo no CMS. O que o campo é decorre
 da coluna: seu tipo, sua validação e suas regras de armazenamento, todos declarados em
@@ -75,8 +73,6 @@ export const productsCms = customizeTable<typeof products>("products", {
 
 ## Texto
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Uma coluna `col.text()`, `col.varchar({ length })`, `col.char({ length })` ou `col.uuid()` é um campo de
 entrada de texto. `varchar(n)` e `char(n)` limitam seu comprimento a `n`, e `.validate({ min,
 max, length, matches })` adiciona as regras que o formulário verifica antes de salvar.
@@ -115,8 +111,6 @@ renderiza um seletor de referência; consulte [Firestore](/docs/frontend/firebas
 
 ## Conjuntos fechados de valores
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Um `col.enum([...])` é um select, renderizado em outros lugares como um chip colorido. O mesmo vale para uma coluna
 de texto ou número com `.oneOf([...])`. Cada valor é rotulado a partir de seu
 identificador (`needs_review` é exibido como "Needs Review") e recebe uma cor derivada do
@@ -140,8 +134,6 @@ aos seus itens.
 
 ## Números
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Toda coluna inteira (integer), serial, `real`, `doublePrecision` e `numeric` é um
 campo de entrada numérica. Colunas integer e serial aceitam apenas números inteiros, e
 `.validate({ min, max, moreThan, lessThan, positive, negative })` adiciona limites.
@@ -156,15 +148,11 @@ controle que define o valor como `null`.
 
 ## Booleanos
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Um `col.boolean()` é um switch.
 
 <FieldWidgetPreview client:only="react" variant="boolean" />
 
 ## Datas e horas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Um `col.timestamp({ withTimezone: true })` é um seletor de data e hora, um `col.date()` um seletor de data e
 um `col.time()` uma hora do dia. `mode` alterna entre `"date"` e
@@ -182,8 +170,6 @@ o servidor grava o id do usuário que está agindo, independentemente do que a r
 
 ## Arquivos
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Uma coluna `col.storage({ … })` é um campo de upload com pré-visualização, e
 `.multiple()` o torna um campo de múltiplos arquivos. O bucket, o caminho, os
 tipos aceitos e o limite de tamanho são declarados na coluna; as funções que executam no
@@ -194,16 +180,12 @@ navegador são adicionadas com `storage` em `customizeTable`. Consulte
 
 ## Arrays e JSON
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Uma coluna de array (`<item>.array()`) é uma lista repetível do campo do item. Uma coluna `jsonb`
 com uma [estrutura `json.*`](/docs/schema/json/) é um grupo de campos tipados, listas e
 blocos; uma sem estrutura definida é um editor de chave/valor. Consulte
 [Arrays e JSON](/docs/collections/arrays-and-maps/).
 
 ## Relações e referências
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Um `belongsTo` é um seletor da linha relacionada, exibido no lugar de sua coluna
 de chave estrangeira; uma relação para muitos (to-many) é uma aba do registro. Uma coluna de texto com
@@ -215,16 +197,12 @@ Consulte [Relações no painel](/docs/collections/relations-in-the-admin-panel/)
 
 ## Geopoints, vetores e binários
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Um `col.geopoint()` é um campo de latitude e longitude. Um `col.vector({ dimensions })` é um
 campo de entrada de vetor; `clearable` é sua única opção. Um `col.bytea()` é um campo binário,
 lido e gravado como base64. Nenhum deles possui opções específicas de tipo além
 daquelas aceitas por todos os campos.
 
 ## Opções aceitas por todos os campos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Independentemente do tipo de coluna:
 
@@ -261,8 +239,6 @@ pertencem à coluna (`.notNull()`, `.validate()`, `.access()`) ou à
 :::
 
 ## Próximos passos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/): cada opção, com seu tipo
 - [Validação e condições](/docs/collections/validation-and-conditions/): o que o formulário verifica e campos que reagem a valores

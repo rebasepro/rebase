@@ -1,11 +1,9 @@
 ---
-sourceHash: d08c6bb1dfd3357e
+sourceHash: f57a8ae030d7e978
 title: Données côté serveur typées
 sidebar_label: Données côté serveur typées
 description: "Enregistrez votre type Database généré une seule fois, et context.data, rebase.dataAsAdmin ainsi que le rebase reçu par une fonction ou un cron sont typés à partir de celui-ci : lignes, filtres, tris, includes et entrées d'écriture."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis la version 0.31</span>
 
 Le client navigateur est typé en passant votre `Database` générée à
 `createRebaseClient<Database>()` (voir [Génération du SDK typé](/docs/sdk#typed-sdk-generation)).
@@ -24,8 +22,6 @@ Il existe deux manières de procéder à l'enregistrement : la `Database` géné
 votre module `backend/schema` lui-même, qui ne nécessite aucune exécution de génération de code.
 
 ## Enregistrer la `Database` générée
-
-<span class="since-badge" data-since="0.31">Depuis la version 0.31</span>
 
 ```bash
 rebase generate-sdk --register
@@ -68,8 +64,6 @@ non typées, retirez `registerDatabase` et supprimez `backend/generated/`.
 
 ## Enregistrer le schéma, sans génération de code
 
-<span class="since-badge" data-since="0.31">Depuis la version 0.31</span>
-
 Un projet qui n'a rien généré enregistre plutôt son module de schéma,
 et se retrouve directement typé à partir de ses `defineTable` :
 
@@ -96,8 +90,6 @@ des hooks de table de ce même schéma, car typer les hooks d'un schéma à part
 schéma constitue une référence circulaire que TypeScript refuse.
 
 ## Ce qui est typé
-
-<span class="since-badge" data-since="0.31">Depuis la version 0.31</span>
 
 ```ts
 // backend/schema/orders.ts — un hook

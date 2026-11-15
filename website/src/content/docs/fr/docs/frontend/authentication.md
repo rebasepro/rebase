@@ -1,5 +1,5 @@
 ---
-sourceHash: 9c7b1e0ee0076030
+sourceHash: 118e606ac71718ef
 title: Authentification et connexion
 sidebar_label: Authentification et connexion
 description: Configurez le contrôleur d'authentification, la vue de connexion et la simulation de rôles dans votre frontend React Rebase.
@@ -74,8 +74,6 @@ La vue de connexion gère :
 - La validation du formulaire et les états d'erreur
 
 ## Modèle de rôles
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Les rôles sont stockés sous forme de colonne de type tableau `text[]` dans la table des utilisateurs. Vous définissez les rôles qu'un utilisateur peut détenir sous forme d'ensemble fermé sur cette colonne, dans la table déclarée avec [`defineAuthTable`](/docs/schema/auth-table/) :
 

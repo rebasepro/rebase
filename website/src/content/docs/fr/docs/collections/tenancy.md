@@ -1,13 +1,11 @@
 ---
-sourceHash: 9338d2b094861fba
+sourceHash: 5c1d614961675bb5
 title: Tenancy
 sidebar_label: Tenancy
 description: Isolez chaque ligne d'une table à un site, une organisation ou un espace de travail avec une seule déclaration de tenant, appliquée par la sécurité au niveau des lignes (RLS) de Postgres.
 ---
 
 ## Ce que cela fait
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Sur une table, `tenant` désigne la colonne qui contient le tenant auquel
 appartient une ligne (un site, une organisation, un espace de travail) et indique d'où
@@ -32,8 +30,6 @@ Comme Postgres l'applique, le panneau d'administration, l'API REST, le SDK et le
 exécuté en tant qu'appelant voient tous les mêmes lignes.
 
 ## Un tenant par utilisateur : un claim
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Lorsque chaque utilisateur appartient à un seul et unique tenant, placez-le sur son
 jeton de session et indiquez le nom du claim :
@@ -61,8 +57,6 @@ ils sont écrits après les claims personnalisés de sorte qu'un hook ne peut pa
 définir, et toute configuration qui en nomme un est refusée.
 
 ## Plusieurs tenants par utilisateur : une table d'appartenance
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Lorsque des utilisateurs interviennent sur plusieurs tenants (un éditeur sur deux sites,
 un consultant dans trois organisations), conservez les appartenances dans une table dédiée :
@@ -144,8 +138,6 @@ la clause `WITH CHECK` de la politique refuse un tenant tiers, et un déclencheu
 contournement est exempté de ces trois vérifications.
 
 ## Le champ
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - Une colonne de type texte, `uuid`, énumération ou entier (`numeric` également),
   ou une relation `belongsTo` vers la table des tenants. Pour une relation, sa

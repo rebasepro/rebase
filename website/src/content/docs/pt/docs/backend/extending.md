@@ -1,5 +1,5 @@
 ---
-sourceHash: 8412da52cc99478c
+sourceHash: 0783ce9f040f4c00
 title: O Rebase não faz X
 sidebar_label: Estendendo o servidor
 description: A escada de extensão do lado do servidor — declaração, hook de tabela, função customizada, suas próprias rotas, seu próprio servidor, eject — com o que cada um pode e não pode alcançar.
@@ -86,8 +86,6 @@ acessar as linhas de uma tabela contornando-os.
 [Hooks globais](/docs/backend/hooks)
 
 ### Restringindo uma leitura com `beforeQuery`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O `afterRead` vê linhas que já foram buscadas, portanto ele pode ocultar um valor,
 mas não pode impedir que a linha seja lida. O `beforeQuery` executa antes: ele recebe a

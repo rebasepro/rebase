@@ -1,11 +1,9 @@
 ---
-sourceHash: 889a7fb508265011
+sourceHash: e793e044820ff8ab
 title: Vektorsuche
 sidebar_label: Vektorsuche
 description: Nächste-Nachbarn-Suche über eine col.vector()-Spalte über die REST-API – die Abfrageparameter, Schwellenwerte, Embeddings, die zu lang für eine URL sind, und wie sich Filter auf einem HNSW-Index verhalten.
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Eine Tabelle mit einer `col.vector()`-Spalte kann nach Ähnlichkeit durchsucht werden: die am nächsten liegenden
 Zeilen zu einem Abfragevektor, bestimmt durch eine in der Datenbankabfrage berechnete pgvector-Distanz.
@@ -15,8 +13,6 @@ GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_d
 ```
 
 ## Deklarieren der Spalte
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```ts
 import { defineTable, col } from "@rebasepro/server/schema";

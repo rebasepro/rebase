@@ -1,13 +1,11 @@
 ---
-sourceHash: 45064786f1785a65
+sourceHash: a76d8213b1ba989b
 title: Interroger les données
 sidebar_label: Interroger les données
 description: Opérations CRUD, query builder fluide, opérateurs de filtrage, tri, sélection de colonnes et agrégats avec le SDK typé Rebase.
 ---
 
 ## Accéder aux tables
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Accédez à n'importe quelle table via `client.data.<tableName>` (en camelCase, automatiquement converti en snake_case) ou `client.data.table<Record<string, unknown>>("slug")` (slug explicite) :
 

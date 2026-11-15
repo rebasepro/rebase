@@ -77,8 +77,6 @@ Each queued write is one request by default, so 500 rows typed offline take 500 
 
 ### Writes queued by an earlier version
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 The queue stores a write as the values it sends — keys for relations, number
 lists for vectors, `{ latitude, longitude }` for points, ISO text for dates —
 and cached rows as the server's rows. A write queued offline by the previous
@@ -267,7 +265,7 @@ session.
 
 ## Configuration
 
-<span class="since-badge" data-since="0.31">Since 0.31</span> `maxCachedRowsPerTable` and `maxCachedQueriesPerTable` were `…PerCollection`.
+`maxCachedRowsPerTable` and `maxCachedQueriesPerTable` were `…PerCollection`.
 
 ```typescript
 createRebaseClient({

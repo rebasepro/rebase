@@ -109,8 +109,6 @@ docker compose up -d db
 
 ## Introspect an Existing Database (Optional)
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 If you are connecting to an existing database with pre-existing tables, you can introspect it to generate a `defineTable` file for each one:
 
 ```bash
@@ -130,8 +128,6 @@ When you open the frontend URL `rebase dev` printed, you'll see the login screen
 `rebase init` also wrote `REBASE_ADMIN_EMAIL` and a generated `REBASE_ADMIN_PASSWORD` into `.env`. Those are not your credentials here: `rebase dev` ignores them and says so at boot. They belong to a production boot — `docker compose up`, or anything with `NODE_ENV=production` — where this bootstrap window is closed, because the server answers on a hostname before you have typed anything. See [Your first admin](/docs/getting-started/deployment#your-first-admin).
 
 ## Define Your First Table
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Create a file in `backend/schema/`:
 
@@ -162,8 +158,6 @@ export { products } from "./products";
 ```
 
 ## Create the Table
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Save the file. That is the whole step: `rebase dev` regenerates
 `backend/src/schema.generated.ts` and the SDK types in `generated/sdk/` from your
@@ -203,8 +197,6 @@ It runs on the
 managed database as on your own.
 
 ## Database Commands Reference
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 | Command | Description |
 |---------|-------------|

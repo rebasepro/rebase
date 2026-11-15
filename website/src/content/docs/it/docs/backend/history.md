@@ -1,5 +1,5 @@
 ---
-sourceHash: 37c268f3d4b76c7f
+sourceHash: a0c661b1716664d6
 title: Cronologia entità
 sidebar_label: Cronologia entità
 description: "Traccia ogni modifica apportata alle tue entità con un audit trail completo: chi ha modificato cosa, quando e l'entità completa prima e dopo."
@@ -44,8 +44,6 @@ history: {
 ```
 
 ### Per tabella
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Indica quali tabelle devono tracciare la cronologia con `history: true`:
 
@@ -143,7 +141,7 @@ La retention viene applicata in due punti:
 GET /api/data/:slug/:entityId/history
 ```
 
-Restituisce un elenco di voci della cronologia per un'entità specifica, ordinate a partire dalla più recente. <span class="since-badge" data-since="0.31">Da 0.31</span> Le voci registrate da un'unica transazione — una create e l'update successivo in un unico `_batch`, un revert e il relativo revert — vengono restituite nell'ordine in cui sono state scritte: il timestamp `updated_at` di ciascuna voce è successivo a quello della voce precedente della riga. Un database esistente riceve questo comportamento al successivo avvio di provisioning, o con un'esecuzione di `REBASE_PROVISION_ONLY=true`, che sostituisce la funzione `rebase.record_history`; una distribuzione che non esegue mai il provisioning mantiene il vecchio ordinamento fino a quel momento. Le voci registrate prima di allora mantengono il loro ordine.
+Restituisce un elenco di voci della cronologia per un'entità specifica, ordinate a partire dalla più recente. Le voci registrate da un'unica transazione — una create e l'update successivo in un unico `_batch`, un revert e il relativo revert — vengono restituite nell'ordine in cui sono state scritte: il timestamp `updated_at` di ciascuna voce è successivo a quello della voce precedente della riga. Un database esistente riceve questo comportamento al successivo avvio di provisioning, o con un'esecuzione di `REBASE_PROVISION_ONLY=true`, che sostituisce la funzione `rebase.record_history`; una distribuzione che non esegue mai il provisioning mantiene il vecchio ordinamento fino a quel momento. Le voci registrate prima di allora mantengono il loro ordine.
 
 ```json
 {
@@ -166,8 +164,6 @@ Restituisce un elenco di voci della cronologia per un'entità specifica, ordinat
 ```
 
 ### Le voci vengono fornite come letture
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Le voci della cronologia vengono fornite esattamente come la riga: prima l'accesso ai campi,
 poi `afterRead` (globale, di tabella, di colonna), all'interno della transazione in sola lettura

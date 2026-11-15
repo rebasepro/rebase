@@ -1,5 +1,5 @@
 ---
-sourceHash: b16bc057fd9a76c0
+sourceHash: 8a68eb639e8102bb
 title: Substituição de Componentes (Swizzling)
 sidebar_label: Substituição de Componentes
 description: Substitua componentes de UI padrão por implementações personalizadas no nível da aplicação ou da coleção.
@@ -58,8 +58,6 @@ function App() {
 
 ## Substituições de Componentes no Nível de Coleção
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Para substituir componentes para apenas uma tabela, passe `components` em seu
 `customizeTable`. Isso é útil para o estado vazio (empty state), os cards ou o formulário de
 uma tabela específica. Cada `Component` é o próprio componente, importado por valor:
@@ -106,8 +104,6 @@ Um caminho em string ou um thunk lazy `() => import(…)` em `Component` lança 
 quando o módulo carrega, informando o que deve ser escrito no lugar.
 
 ### Quando ambos os escopos substituem um componente
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Os dois escopos se compõem. A substituição no nível da aplicação (`<Rebase components>`) é aplicada primeiro ao componente nativo, e a da tabela (`components` em `customizeTable`) é aplicada ao resultado:
 

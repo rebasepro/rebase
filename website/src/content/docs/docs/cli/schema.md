@@ -6,8 +6,6 @@ description: Generate Drizzle ORM schemas from the tables in backend/schema, cre
 
 ## Overview
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Rebase uses a **schema-as-code** pipeline where the tables you declare with
 `defineTable` in `backend/schema/` are the single source of truth. The CLI
 transforms them through a deterministic pipeline:
@@ -21,8 +19,6 @@ This page covers every CLI command involved in that pipeline.
 ## The Pipeline
 
 ### 1. Tables → Drizzle Schema
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 The tables `backend/schema/index.ts` exports describe columns, types, relations,
 enums and row-level security. Every command below reads them through the loader
@@ -50,8 +46,6 @@ The `db migrate` command applies pending migrations to your PostgreSQL database.
 ## Commands
 
 ### `rebase schema generate`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Generate a Drizzle ORM schema file from your tables:
 
@@ -97,8 +91,6 @@ does.
 
 ### `rebase schema reconcile`
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Relax and drop what boot will not, after you have read the plan:
 
 ```bash
@@ -115,8 +107,6 @@ rebase schema reconcile --drop voice_cache.wav  # and drop a column no table dec
 Boot only ever adds, so after you remove a column from its `defineTable` its column stays in the database, with its data. A `NOT NULL` column with no default then makes every insert fail, and boot's log names this command for it: without `--drop` to keep the data, with it to remove the column. Deploy the table change first, because reconcile plans against what the backend runs. It needs `REBASE_SERVICE_KEY` in `.env`. Locally, `rebase db push` covers the same through its destructive-change gate.
 
 ### `rebase schema introspect`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Write `defineTable` files from an existing PostgreSQL database:
 
@@ -434,8 +424,6 @@ It names an **orphaned junction**: a `public` table shaped like a many-to-many j
 
 ### `rebase generate-sdk`
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Generate a typed SDK from your tables:
 
 ```bash
@@ -496,8 +484,6 @@ maps back to the slug.
 
 ### `rebase migrate`
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `rebase migrate collections-to-tables [dir]` moves `config/collections` to
 `backend/schema` (one `defineTable` per collection, every column explicit at
 its original position, in the Drizzle spelling, and `index.ts` with
@@ -542,8 +528,6 @@ changes: the database already matches these tables.", and
 
 ## Development Workflow
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 The fast-iteration workflow for development:
 
 ```bash
@@ -556,8 +540,6 @@ rebase db push
 ```
 
 ## Production Workflow
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 The safe, reviewable workflow for production:
 

@@ -4,8 +4,6 @@ sidebar_label: customizeTable
 description: "customizeTable states how one table's collection differs from what the CMS derives: labels, icon, views, kanban, display slots, form layout, actions, and per-field options with React components imported by value. Every option, with its type and effect."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 If you use the CMS, every table the backend serves already has a collection in
 the panel, derived from the table itself (see
 [how tables become collections](/docs/collections/)). `customizeTable` states
@@ -76,8 +74,6 @@ with the new one.
 
 ## Where the files live
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 ```text
 frontend/src/cms/
 ├── index.ts        # export const tableCustomizations = [postsCms, …]
@@ -95,8 +91,6 @@ frontend code is the one thing not to write. The backend never imports anything
 from the frontend.
 
 ## The slug and the type
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 The first argument is the table's slug: the name it was defined under, or the
 `slug` it was given. With the table as the type argument, the slug, every key
@@ -120,8 +114,6 @@ type argument, `customizeTable("posts", { … })` accepts the same options,
 loosely typed.
 
 ## What is refused, and what is skipped
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `customizeTable` checks what the compiler cannot see when the module loads, and
 throws with what to write instead:
@@ -158,8 +150,6 @@ development the panel prints one warning per mismatch, and skips it:
 The rest of the customization still applies.
 
 ## Table options
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Every key is optional. A key you leave out keeps what the panel derived.
 
@@ -277,7 +267,7 @@ Each section takes:
 |---|---|---|
 | `entityActions` | `(string \| TableEntityAction)[]` | Actions on a record. An object, or the key of one registered on `<RebaseCMS entityActions>`. See [Entity actions](/docs/frontend/entity-actions/). |
 | `disableDefaultActions` | `("edit" \| "copy" \| "delete")[]` | Built-in actions this table does not offer. |
-| `resetPasswordAction` | `false \| TableEntityAction` | <span class="since-badge" data-since="0.31">Since 0.31</span> The auth table only (`defineAuthTable`): `false` removes the built-in reset-password action, an action replaces it (offered whatever the auth adapter supports: its backend is yours). Ignored, with a warning, on any other table. |
+| `resetPasswordAction` | `false \| TableEntityAction` | The auth table only (`defineAuthTable`): `false` removes the built-in reset-password action, an action replaces it (offered whatever the auth adapter supports: its backend is yours). Ignored, with a warning, on any other table. |
 | `entityViews` | `(string \| TableEntityView)[]` | Extra tabs on a record. See [Entity views](/docs/frontend/entity-views/). |
 | `Actions` | `Component[]` | Components rendered in the collection's toolbar. |
 | `components` | `TableComponentOverrides` | Collection-scoped component overrides, each `{ Component, wrap? }`. See [Component overrides](/docs/frontend/component-overrides/#collection-level-component-overrides). |
@@ -285,8 +275,6 @@ Each section takes:
 | `fields` | `TableFields` | Per-field options, keyed by column or relation. Below. |
 
 ## Field options
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `fields.<key>` takes the options every field takes, plus those of its column
 type. [Fields](/docs/collections/properties/) shows each with the widget it
@@ -438,8 +426,6 @@ See [Relations in the panel](/docs/collections/relations-in-the-admin-panel/).
 
 ## Customizations, `ui-config.json` and preferences
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 What the panel shows for a table is composed in a fixed order, each layer over
 the one before it:
 
@@ -485,8 +471,6 @@ customized twice, a `ui-config.json` no `<RebaseCMS>` is passed, and a Vite
 config without `rebaseBackendGuard()`. See [`rebase verify`](/docs/cli/#rebase-verify).
 
 ## Next steps
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [How tables become collections](/docs/collections/): what the panel derives before any of this
 - [Fields](/docs/collections/properties/): each column type's widget and options

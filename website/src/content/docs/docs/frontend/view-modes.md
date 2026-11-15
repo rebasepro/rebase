@@ -4,8 +4,6 @@ sidebar_label: View Modes
 description: "Show a table's rows as a list, a spreadsheet, cards or a kanban board; choose what fills each record's title, image, status and date; and set the default sort, filters and one-click filter presets."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Every collection can be shown four ways, from the switcher in its toolbar:
 
 - **Table**: a virtualized spreadsheet with inline editing, sorting, filtering
@@ -20,8 +18,6 @@ gallery) in the same switcher, driven by the same toolbar: see
 [Custom view modes](/docs/frontend/extending#custom-view-modes).
 
 ## Choosing the views
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```ts
 // backend/schema/tasks.ts
@@ -82,8 +78,6 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 | `"xl"` | 160 | Large image thumbnails |
 
 ## Kanban
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `kanban.columnField` names the column the board groups by. It must hold one
 closed set of strings, a `col.enum([...])` or a text column with
@@ -148,8 +142,6 @@ board fed by a backend it is a fix that undoes itself every run.
 
 ## Display slots
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Every surface that draws a record uses some of six slots: **title**,
 **subtitle**, **image**, **status**, **date** and **tags**. A list row is image +
 title + subtitle + status + date, a card is the same with the image on top, a
@@ -206,8 +198,6 @@ array joined, and a relation as the first of `name`, `title`, `label` or
 
 ## Filters, presets and sort
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 ```tsx
 import { customizeTable } from "@rebasepro/cms";
 import type { tasks } from "../../../backend/schema/tasks";
@@ -238,8 +228,6 @@ caller may read is decided by the table's
 [row-level security](/docs/collections/security-rules/), for every caller.
 
 ## Next steps
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/): every option
 - [Customizing the admin](/docs/frontend/customizing/): your own view modes, pages and actions

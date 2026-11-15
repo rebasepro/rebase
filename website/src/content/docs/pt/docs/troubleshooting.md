@@ -1,5 +1,5 @@
 ---
-sourceHash: ff162864c3d1600b
+sourceHash: 6403748b3ff6521b
 slug: pt/docs/troubleshooting
 title: Solução de problemas
 description: As falhas que impedem um backend Rebase de iniciar ou responder requisições — um banco de dados inacessível, credenciais incorretas, uma extensão ausente, uma recusa de RLS, desvio de esquema (schema drift), uma porta ocupada, uma função que não carrega — e como cada uma delas se parece.
@@ -88,8 +88,6 @@ silenciosamente a estrutura da URL e o host ao qual você acaba se conectando n�
 
 ## `SchemaDefinitionError` — o esquema não compila
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 A inicialização, `rebase db generate`, `db push`, `generate-sdk` e `doctor` compilam as
 tabelas exportadas por `backend/schema/index.ts` antes de qualquer outra coisa, e interrompem a execução quando qualquer
 tabela não compilar — ausência de `rls`, `"inherit"` sem `defaultRls`, uma relação
@@ -98,8 +96,6 @@ deixa de fora — listando todas as tabelas, chaves e problemas de uma só vez. 
 o comando `rebase verify` reporta a mesma lista sem iniciar nada.
 
 ## `config/collections` foi recusado
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Um projeto anterior à versão 0.31 mantém seu modelo de dados em `config/collections`, o qual
 nada mais lê: o runtime, todos os comandos da CLI e um bundle de formato 2
@@ -124,8 +120,6 @@ a configuração já está correta e o que está faltando é a biblioteca no
 servidor ou uma role com permissão para executar `CREATE EXTENSION vector;`.
 
 ## O banco de dados recusou a instrução
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```
 DB_PERMISSION_DENIED — Permission denied by the database on "notes"
@@ -210,8 +204,6 @@ Passe `--port` para fixar uma porta ou encerre o outro processo. Em produção, 
 novas tentativas: a porta configurada é a porta utilizada, e o erro `EADDRINUSE` é fatal.
 
 ## O backend travou e o `rebase dev` continuou em execução
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Um backend que lança um erro na inicialização não interrompe o observador (watcher) — ele imprime a stack e
 aguarda uma alteração de arquivo. Quando o backend não se anuncia dentro de

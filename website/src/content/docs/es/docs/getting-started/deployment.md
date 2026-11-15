@@ -1,5 +1,5 @@
 ---
-sourceHash: 145ba18b6f108fbd
+sourceHash: 72babf07dc797d77
 title: Despliegue
 sidebar_label: Despliegue
 description: Despliega tu proyecto Rebase en producción utilizando Docker, plataformas en la nube o configuraciones manuales.
@@ -88,8 +88,6 @@ El bundle se monta en modo de solo lectura. `rebase build` instala las dependenc
 Cambia el correo del administrador por el tuyo, inicia sesión y cambia la contraseña. Consulta [Tu primer administrador](#tu-primer-administrador).
 
 ### El esquema
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 El runtime crea las tablas que faltan durante el arranque, **incluidas las que declara `backend/schema`**: `REBASE_MIGRATE_ON_BOOT` tiene por defecto el valor `ensure`, el cual es aditivo en todo el esquema y aplica la seguridad a nivel de fila (RLS) junto con él. Un primer `docker compose up` contra una base de datos vacía se iniciará sirviendo tus tablas.
 

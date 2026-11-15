@@ -1,11 +1,9 @@
 ---
-sourceHash: 3a1b51e6e2ae57fd
+sourceHash: 293c14de9200de9f
 title: Inferência de tipos
 sidebar_label: Inferência de tipos
 description: "InferRow, InferInsert e InferUpdate leem as colunas e modificadores de uma tabela para tipar as linhas que ela fornece e as gravações que aceita — em hooks, no código do servidor e em um frontend que importa o tipo da tabela."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Os tipos TypeScript de uma tabela são lidos a partir de sua declaração. Nada é escrito
 duas vezes: altere uma coluna e todos os tipos derivados dela mudarão junto.
@@ -45,8 +43,6 @@ e uma chave estrangeira é a própria chave.
 
 ## As regras
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | A coluna | `InferRow` | `InferInsert` | `InferUpdate` |
 |---|---|---|---|
 | `.notNull()` ou `.primaryKey()` | `T` | obrigatório, a menos que tenha um valor padrão | opcional |
@@ -65,8 +61,6 @@ não existe um tipo único de linha que seja adequado para um leitor que possui 
 que não possui. Um chamador sem a role simplesmente não recebe a coluna.
 
 ## Chaves estrangeiras
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Uma chave estrangeira `belongsTo` declarada em `columns` é tipada ali, exatamente.
 Uma chave que a relação deriva é adicionada como uma chave opcional nomeada a partir de sua coluna em
@@ -95,8 +89,6 @@ type Comment = InferRow<typeof comments>;
 
 ## Chaves de uma tabela
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `ColumnKeyOf<typeof posts>` é a união das chaves de coluna de uma tabela, e
 `RelationKeyOf<typeof posts>` a união dos nomes de suas relações. Ambos funcionam
 em views também. Use-os para tipar código que recebe uma coluna ou uma relação por nome.
@@ -113,8 +105,6 @@ type PostRelation = RelationKeyOf<typeof posts>; // never, for a table without r
 
 ## Os hooks são tipados para você
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Os [hooks](/docs/collections/callbacks/) de uma tabela são tipados a partir de suas colunas
 sem nenhuma anotação: `values` em `beforeSave` é um `Partial` do tipo de
 inserção, `previousValues` e as linhas de `afterRead` e dos hooks de exclusão são o
@@ -123,8 +113,6 @@ tipo da linha. O `.transform()` de uma coluna recebe o tipo dessa coluna como `v
 campo JSON recebe `T | undefined`, ou `T` após `.required()`.
 
 ## Em um frontend
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Um frontend pode importar o **tipo** de uma tabela de `backend/schema`, nunca o seu valor:
 

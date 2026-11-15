@@ -1,5 +1,5 @@
 ---
-sourceHash: acc55c3c58895863
+sourceHash: 5c1f59b5ea8496bf
 title: Ambiente & Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -233,7 +233,7 @@ Um projeto que foi ejetado assume essas decisões em seu próprio código.
 | `REBASE_HISTORY` | Registra o [histórico de alterações de entidades](/docs/backend/history). | `true` |
 | `REBASE_COMPRESSION` | Respostas compactadas com gzip/brotli. | `true` |
 | `REBASE_MAX_BODY_SIZE` | Corpo máximo da requisição, **em bytes** (`10485760`, não `10MB` — um valor que não seja número recusa a inicialização em vez de remover o limite silenciosamente). `0` desativa o limite. | `10485760` (10 MiB) |
-| `REBASE_ENABLE_SWAGGER` | A superfície OpenAPI. Três estados (tri-state). <span class="since-badge" data-since="0.31">Desde 0.31</span> Não definida, em todos os ambientes: `/api/docs` é servido aos chamadores aos quais `GET /api/schema/tables` descreve tabelas, cada um recebendo o documento das tabelas descritas para si, e não há Swagger UI. `true` publica o documento completo para todos, com a **UI** do Swagger em `/api/swagger` fora de produção (nunca em produção). `false` mantém o documento restrito ao acesso de administrador. | — |
+| `REBASE_ENABLE_SWAGGER` | A superfície OpenAPI. Três estados (tri-state). Não definida, em todos os ambientes: `/api/docs` é servido aos chamadores aos quais `GET /api/schema/tables` descreve tabelas, cada um recebendo o documento das tabelas descritas para si, e não há Swagger UI. `true` publica o documento completo para todos, com a **UI** do Swagger em `/api/swagger` fora de produção (nunca em produção). `false` mantém o documento restrito ao acesso de administrador. | — |
 | `REBASE_METRICS` | Expõe métricas do Prometheus em `/metrics`. | `false` |
 | `REBASE_HSTS_INCLUDE_SUBDOMAINS` | Adiciona `includeSubDomains` ao cabeçalho `Strict-Transport-Security`, para que os navegadores recusem HTTP simples em todos os subdomínios do host por seis meses — incluindo hosts que este processo não atende. Ative somente quando todos os subdomínios do domínio forem exclusivamente HTTPS. Qualquer valor diferente de `true`/`false` recusa a inicialização. Consulte [Cabeçalhos de segurança](/docs/deployment/self-hosting/#security-headers). | `false` |
 | `REBASE_METRICS_TOKEN` | Token Bearer protegendo `/metrics`. Não definido deixa o endpoint aberto a qualquer entidade que possa alcançar a porta — aceitável em uma rede privada, não em uma pública, e os logs de inicialização alertam sobre isso. | — |
@@ -316,7 +316,7 @@ uma credencial utilizável recusa a inicialização. Consulte
 |----------|-----------|--------|
 | `REBASE_LIVE_SCHEMA_REPOSITORY` | O repositório do GitHub no qual comitar as alterações de schema, como `owner/name`. Defini-lo é o que ativa o recurso. | — |
 | `REBASE_LIVE_SCHEMA_BRANCH` | A branch na qual o commit é aplicado. | `main` |
-| `REBASE_LIVE_SCHEMA_PATH` | <span class="since-badge" data-since="0.31">Desde 0.31</span> Onde `backend/schema` reside nesse repositório, relativo à raiz do repositório. Um caminho que saia do repositório recusa a inicialização, assim como a variável removida `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH`. | `backend/schema` |
+| `REBASE_LIVE_SCHEMA_PATH` | Onde `backend/schema` reside nesse repositório, relativo à raiz do repositório. Um caminho que saia do repositório recusa a inicialização, assim como a variável removida `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH`. | `backend/schema` |
 | `REBASE_LIVE_SCHEMA_GITHUB_TOKEN` | Um token fine-grained com acesso de leitura e escrita ao conteúdo do repositório. Defina este ou as três variáveis `_GITHUB_APP_*`, não ambos. | — |
 | `REBASE_LIVE_SCHEMA_GITHUB_APP_ID` | O ID de um GitHub App, para comitar como o app em vez de usar um token. | — |
 | `REBASE_LIVE_SCHEMA_GITHUB_APP_INSTALLATION_ID` | A instalação do aplicativo no repositório. | — |
@@ -422,8 +422,6 @@ The environment is not valid:
 ```
 
 ## Objeto de Configuração do Backend
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O `RebaseBackendConfig` passado para `initializeRebaseBackend()` fornece controle programático:
 

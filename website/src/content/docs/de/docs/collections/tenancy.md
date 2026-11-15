@@ -1,13 +1,11 @@
 ---
-sourceHash: 9338d2b094861fba
+sourceHash: 5c1d614961675bb5
 title: Mandantenfähigkeit
 sidebar_label: Mandantenfähigkeit
 description: Beschränken Sie jede Zeile einer Tabelle mit einer einzigen Tenant-Deklaration auf eine Site, Organisation oder einen Workspace, durchgesetzt durch Postgres-Row-Level-Security.
 ---
 
 ## Funktionsweise
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `tenant` an einer Tabelle benennt die Spalte, die den Mandanten enthält, zu dem eine Zeile
 gehört (eine Site, eine Organisation, ein Workspace), und gibt an, woher der Mandant
@@ -29,8 +27,6 @@ Da Postgres dies durchsetzt, sehen das Admin-Panel, die REST-API, das SDK und al
 Aufrufer ausgeführtes SQL alle dieselben Zeilen.
 
 ## Ein Mandant pro Benutzer: ein Claim
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Wenn jeder Benutzer zu genau einem Mandanten gehört, hinterlegen Sie ihn auf dessen Session-Token
 und benennen Sie den Claim:
@@ -59,8 +55,6 @@ werden nach benutzerdefinierten Claims geschrieben, sodass ein Hook sie nicht fe
 die einen solchen benennt, wird abgewiesen.
 
 ## Mehrere Mandanten pro Benutzer: eine Membership-Tabelle
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Wenn Personen mandantenübergreifend arbeiten (ein Editor auf zwei Sites, ein Berater in drei
 Organisationen), führen Sie die Mitgliedschaften in einer eigenen Tabelle:
@@ -140,8 +134,6 @@ Als Aufrufer ausgeführtes SQL erhält dieselben Antworten von Postgres: Das
 Verschiebung zurück (`42501`). Ein Aufrufer in einer Bypass-Rolle ist von allen dreien ausgenommen.
 
 ## Das Feld
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - Eine Spalte vom Typ Text, `uuid`, Enum oder Integer (auch `numeric`) oder eine `belongsTo`-Relation
   zur Mandantentabelle. Bei einer Relation ist deren Fremdschlüsselspalte

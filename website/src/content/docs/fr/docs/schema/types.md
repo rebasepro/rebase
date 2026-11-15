@@ -1,11 +1,9 @@
 ---
-sourceHash: 3a1b51e6e2ae57fd
+sourceHash: 293c14de9200de9f
 title: Inférence de types
 sidebar_label: Inférence de types
 description: "InferRow, InferInsert et InferUpdate lisent les colonnes et les modificateurs d'une table pour typer les lignes qu'elle renvoie et les écritures qu'elle accepte — dans les hooks, dans le code serveur et dans un frontend qui importe le type de la table."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Les types TypeScript d'une table sont déduits de sa déclaration. Rien n'est écrit
 deux fois : modifiez une colonne, et chaque type qui en découle change avec elle.
@@ -45,8 +43,6 @@ les hooks reçoivent. Un horodatage est une chaîne ISO, un `bigint` est un `num
 
 ## Les règles
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 | La colonne | `InferRow` | `InferInsert` | `InferUpdate` |
 |---|---|---|---|
 | `.notNull()` ou `.primaryKey()` | `T` | requis, sauf s'il a une valeur par défaut | optionnel |
@@ -65,8 +61,6 @@ il n'existe pas de type de ligne unique adapté à la fois à un lecteur qui dé
 autre qui ne l'a pas. Un appelant sans ce rôle ne reçoit tout simplement pas la colonne.
 
 ## Clés étrangères
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Une clé étrangère `belongsTo` que vous déclarez dans `columns` y est typée avec exactitude.
 Celle dérivée par la relation est ajoutée sous forme de clé optionnelle nommée d'après sa colonne en
@@ -95,8 +89,6 @@ type Comment = InferRow<typeof comments>;
 
 ## Clés d'une table
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 `ColumnKeyOf<typeof posts>` est l'union des clés de colonne d'une table, et
 `RelationKeyOf<typeof posts>` l'union des noms de ses relations. Les deux fonctionnent
 également sur les vues. Utilisez-les pour typer le code qui prend une colonne ou une relation par son nom.
@@ -113,8 +105,6 @@ type PostRelation = RelationKeyOf<typeof posts>; // never, for a table without r
 
 ## Les hooks sont typés pour vous
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Les [hooks](/docs/collections/callbacks/) d'une table sont typés à partir de ses colonnes
 sans aucune annotation : `values` dans `beforeSave` est un `Partial` du type
 d'insertion, `previousValues` ainsi que les lignes de `afterRead` et des hooks de suppression sont du
@@ -123,8 +113,6 @@ type de la ligne. Le `.transform()` d'une colonne reçoit le type de cette colon
 d'un champ JSON reçoit `T | undefined`, ou `T` après `.required()`.
 
 ## Dans un frontend
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un frontend peut importer le **type** d'une table depuis `backend/schema`, jamais sa valeur :
 

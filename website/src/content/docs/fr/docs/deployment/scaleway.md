@@ -1,5 +1,5 @@
 ---
-sourceHash: 0664758f56d33104
+sourceHash: dc3620dc82d2a013
 title: Déployer Rebase sur Scaleway
 description: Découvrez comment déployer Rebase sur Scaleway pour une infrastructure cloud sécurisée et basée en France à l'aide de Serverless Containers.
 sidebar_label: Scaleway
@@ -34,7 +34,7 @@ rebase build
 Serverless Containers télécharge l'image depuis un registre, intégrez donc le bundle dans une image dérivée. Trois lignes suffisent, et cela fige exactement ce qui s'exécute :
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -79,8 +79,6 @@ Scaleway provisionne le conteneur et vous fournit un endpoint public (ex. `https
 *Pour une conformité stricte des données, vérifiez que les informations de votre Organisation Scaleway reflètent bien votre entité juridique européenne.*
 
 ## 4. Le schéma
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 **Le runtime crée les tables manquantes au démarrage, y compris celles déclarées par `backend/schema`.** `REBASE_MIGRATE_ON_BOOT` a pour valeur par défaut `ensure`, qui fonctionne de manière additive sur l'ensemble du schéma — cela crée les tables, colonnes et types enum manquants et applique leur sécurité au niveau des lignes (RLS) — ainsi, le premier démarrage sur une base de données vide commence directement à servir vos tables.
 

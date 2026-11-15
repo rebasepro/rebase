@@ -1,11 +1,9 @@
 ---
-sourceHash: e086faac3624de8d
+sourceHash: f957d9b26ce4636f
 title: Indici
 sidebar_label: Indici
 description: Dichiara i normali indici Postgres su una tabella — btree, GIN e BRIN, parziali, compositi, covering e univoci — e perché quelli scritti a mano tendevano a scomparire.
 ---
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Una tabella dichiara gli indici di cui le sue query hanno bisogno, accanto alle colonne che coprono:
 
@@ -54,8 +52,6 @@ e su ogni tenant, mentre uno scritto a mano no — ma nel frattempo nulla andrà
 
 ## La struttura
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 | Campo | Tipo | Descrizione |
 |-------|------|-------------|
 | `columns` | `(string \| { column, direction?, nulls? })[]` | **Obbligatorio.** Le colonne chiave, in ordine. Da 1 a 5 elementi. |
@@ -66,8 +62,6 @@ e su ogni tenant, mentre uno scritto a mano no — ma nel frattempo nulla andrà
 | `include` | `string[]` | Solo btree. Colonne di payload trasportate per scansioni index-only. |
 
 ### `columns` accetta chiavi di colonna, mai nomi SQL
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Il nome di una relazione `belongsTo` rappresenta la sua colonna foreign-key, quindi la relazione
 `author` corrisponde alla colonna `author_id`:
@@ -188,8 +182,6 @@ materializza lo stato desiderato in un database di scratch minimale su cui piani
 essere generato per poi fallire in seguito su un database mai visto prima.
 
 ### `reason`
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 È l'unico campo che non ha una controparte SQL ed è facoltativo — ma ti raccomandiamo di scriverlo.
 
@@ -391,8 +383,6 @@ li costruiscono con modalità differenti:
 
 ## Cosa viene rifiutato, e quando
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Tutti i seguenti casi vengono rifiutati in fase di compilazione dello schema, indicando la tabella e la
 posizione nell'array — un indice che silenziosamente non esiste è proprio il problema
 che questa funzionalità elimina:
@@ -409,8 +399,6 @@ che questa funzionalità elimina:
 - un valore `reason` vuoto
 
 ## Risorse correlate
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 - [Search](/docs/backend/search) — full-text indicizzato con ranking, che costruisce il proprio indice GIN
   su un `tsvector` generato

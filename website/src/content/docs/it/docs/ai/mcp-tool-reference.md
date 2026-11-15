@@ -1,5 +1,5 @@
 ---
-sourceHash: 50d3082d86c52ae2
+sourceHash: af8850222953a27b
 title: Riferimento degli strumenti MCP
 sidebar_label: Riferimento degli strumenti MCP
 description: Tutti gli strumenti registrati dal server MCP di Rebase, divisi per gruppo — cosa richiede ed esegue ciascuno di essi, e quali vengono rifiutati dal loopback gate per i progetti non locali.
@@ -10,8 +10,6 @@ Gli strumenti che [`@rebasepro/mcp`](/docs/ai/mcp) offre a un assistente. Le mod
 53 strumenti, divisi in dieci gruppi. Gli strumenti contrassegnati con ⚠ vengono rifiutati per le destinazioni non locali, a meno che non si scelga di disattivare questa protezione (opt-out).
 
 ## Schema e database (13)
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Esegue la CLI di Rebase nella directory del progetto attivo.
 
@@ -33,8 +31,6 @@ Esegue la CLI di Rebase nella directory del progetto attivo.
 
 ## Pianificazione dello schema (1)
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Chiede al backend cosa comporterebbe una modifica, tramite `POST /api/admin/schema/plan`. Nessuna CLI e niente scritto su disco: funziona sul database di sviluppo gestito, cosa che i comandi basati su Atlas non possono fare.
 
 | Strumento | Richiesto | Descrizione |
@@ -43,7 +39,7 @@ Chiede al backend cosa comporterebbe una modifica, tramite `POST /api/admin/sche
 
 ## Righe (5)
 
-<span class="since-badge" data-since="0.31">Da 0.31</span> Gli stessi nomi utilizzati dall'endpoint remoto `/mcp`; in precedenza erano `list_documents`, `get_document`, `create_document`, `update_document` e `delete_document`, con un argomento `collection`.
+Gli stessi nomi utilizzati dall'endpoint remoto `/mcp`; in precedenza erano `list_documents`, `get_document`, `create_document`, `update_document` e `delete_document`, con un argomento `collection`.
 
 | Strumento | Richiesto | Descrizione |
 |---|---|---|

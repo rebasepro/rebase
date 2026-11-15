@@ -1,11 +1,9 @@
 ---
-sourceHash: f7689301748e2ce5
+sourceHash: fc0bdfb0ae7ceb1b
 title: Tables dans le CMS
 sidebar_label: Tables dans le CMS
 description: "Comment le CMS affiche chaque table Postgres sans aucune configuration frontend : libellés, widget associé à chaque type de colonne, champs obligatoires et en lecture seule, relations, emplacements d'affichage et contrôles Créer, Modifier et Supprimer respectant la sécurité au niveau des lignes de la table."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Si vous utilisez le CMS, vous n'avez pas besoin de lui décrire vos tables. Lorsqu'un utilisateur se connecte, le panneau demande au backend les tables que cette personne est autorisée à voir, et affiche chacune d'elles sous la forme d'une **collection** : une page dans la navigation comprenant une vue tabulaire, un formulaire, des filtres et les lignes associées à l'enregistrement. Une table est l'objet backend que vous déclarez dans [`backend/schema`](/docs/schema/) ; une collection est la manière dont le panneau l'affiche.
 
@@ -26,8 +24,6 @@ Le panneau lisait auparavant `config/collections` via un plugin Vite. Il lit dé
 
 ## D'où viennent les tables
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 `<RebaseCMS>` appelle `client.schema.tables()`, qui lit `GET /api/schema/tables`. La réponse est la liste des descripteurs de tables, expurgée pour l'appelant : une table qu'il ne peut pas lire est absente, tout comme une colonne que ses rôles ne peuvent pas lire (voir [Accès aux champs](/docs/collections/field-access/)). Le code des hooks ne quitte jamais le serveur ; le descripteur indique uniquement quels hooks existent.
 
 - Le panneau fait la demande dès qu'un utilisateur est connecté, et la renouvelle lorsque l'utilisateur connecté ou ses rôles changent. Aucune table n'est envoyée à un visiteur déconnecté.
@@ -37,8 +33,6 @@ Le panneau lisait auparavant `config/collections` via un plugin Vite. Il lit dé
 Les mêmes descripteurs pilotent le Studio et les applications MCP, garantissant que tous les trois partagent la même définition d'une table.
 
 ## Libellés
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Chaque libellé est dérivé d'un identifiant, de sorte qu'une table soit lisible de la même manière pour chaque appelant et à chaque chargement :
 
@@ -54,8 +48,6 @@ Chaque libellé est dérivé d'un identifiant, de sorte qu'une table soit lisibl
 Les libellés de la table proviennent du nom sous lequel elle a été définie, et non de son slug ou de son nom SQL. `ID`, `IDs`, `URL`, `URLs`, `UUID`, `API` et `IP` conservent leurs majuscules. La mise au singulier ne modifie que le dernier mot et ne touche pas aux mots qui se terminent simplement par un `s` (`Status`, `Analysis`, `Address`).
 
 ## Le champ attribué à chaque colonne
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 | Colonne | Champ dans le formulaire | Remarques |
 |---|---|---|
@@ -87,8 +79,6 @@ Chaque type de colonne, son widget et les options permettant de le modifier sont
 
 ## Champs obligatoires, valeurs par défaut et champs en lecture seule
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 | La colonne | Dans le formulaire |
 |---|---|
 | `.notNull()` | obligatoire, avec le `requiredMessage` de `.validate()` lorsqu'il existe |
@@ -108,8 +98,6 @@ L'identifiant de l'enregistrement ainsi que ses horodatages `.onCreateNow()` et 
 
 ## Relations
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 - Un `belongsTo` est un sélecteur de la ligne associée, à la place de sa colonne de clé étrangère : le formulaire affiche **Author**, et non **Author ID**. Il est obligatoire lorsque la clé étrangère est `NOT NULL` sans valeur par défaut. Une clé étrangère faisant partie de la clé primaire reste un champ distinct, aux côtés du sélecteur.
 - Un `hasOne` est un sélecteur de l'unique ligne associée.
 - Un `hasMany`, un `manyToMany` et un `via` de type « to-many » sont des **onglets** de l'enregistrement, listant les lignes associées. Le sélecteur à côté de l'onglet est masqué.
@@ -119,8 +107,6 @@ L'identifiant de l'enregistrement ainsi que ses horodatages `.onCreateNow()` et 
 Voir [Relations dans le panneau d'administration](/docs/collections/relations-in-the-admin-panel/).
 
 ## Emplacements d'affichage
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Chaque surface affichant un enregistrement utilise une partie de six emplacements : title, subtitle, image, status, date et tags (voir [emplacements d'affichage](/docs/frontend/view-modes/#display-slots)). Un emplacement n'est rempli à partir d'une colonne que lorsque celle-ci y a manifestement sa place ; la première colonne correspondante, dans l'ordre de déclaration, est retenue :
 
@@ -135,8 +121,6 @@ Un emplacement qu'aucune colonne ne remplit est laissé à l'interprétation pro
 
 ## Qui voit quels contrôles
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Le panneau masque **Créer**, **Modifier** et **Supprimer** lorsque l'utilisateur connecté n'est pas autorisé à effectuer ces actions. Il prend cette décision en évaluant la sécurité au niveau des lignes (row-level security) de la table dans le navigateur, avec le même modèle de stratégies que celui compilé pour Postgres :
 
 - les règles que vous avez déclarées dans `rls`, ainsi que les stratégies que Rebase ajoute à leurs côtés : la base de référence administrateur (sauf si `defaultPolicies: false`), la politique d'auto-lecture et de contrôle d'écriture administrateur de la table des utilisateurs, et la règle de partitionnement multi-locataire (tenancy) (voir [stratégies attribuées à une table](/docs/collections/security-rules/#policies-a-table-gets-without-writing-them)) ;
@@ -148,13 +132,9 @@ Cela détermine uniquement ce qui est affiché. Chaque écriture est à nouveau 
 
 ## Ordre et valeurs par défaut
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Les tables apparaissent dans la navigation dans l'ordre où le backend les transmet, c'est-à-dire l'ordre dans lequel elles sont exportées depuis `backend/schema/index.ts`. Chacune s'ouvre dans la vue tabulaire. `customizeTable` permet de configurer `group`, `icon`, `defaultViewMode` et le reste ; `<RebaseCMS navigationGroupMappings>` organise les groupes à travers les tables.
 
 ## Chargement et erreurs
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - **Pendant le chargement des tables**, une route menant à une collection affiche l'état de chargement, et non « collection introuvable », et un lien direct s'ouvre dès que la collection existe.
 - **Si les tables ne peuvent pas être chargées**, la page d'accueil et la route de la collection indiquent ce qui a échoué et proposent de réessayer. Lorsque le serveur n'accepte plus la session, le message invite à se reconnecter.
@@ -164,13 +144,9 @@ Les personnalisations qui désignent une table non fournie à l'appelant sont ig
 
 ## Grand nombre de tables
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Rien ne limite le nombre de tables. Le panneau a besoin de chaque collection pour construire la navigation, les descripteurs sont donc récupérés après la connexion, et ce dont l'ouverture d'une collection a besoin (la table, les vues d'enregistrements, le formulaire) n'est chargé qu'à ce moment-là. Un schéma volumineux ralentit davantage `rebase db push` que le panneau : avec 400 tables ou plus, un push prend plusieurs dizaines de secondes ; voir [combien de temps prend un push](/docs/cli/schema#rebase-db-push).
 
 ## Prochaines étapes
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/) : modifier l'un des éléments ci-dessus, par table
 - [Champs](/docs/collections/properties/) : le widget et les options de chaque type de colonne

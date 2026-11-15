@@ -1,11 +1,9 @@
 ---
-sourceHash: 80e40ea5912a48c8
+sourceHash: 5b835c7e865a4f8f
 title: KI-Anweisungsdateien
 sidebar_label: KI-Anweisungsdateien
 description: Jedes per Gerüst erstellte Rebase-Projekt liefert ai-instructions.md sowie Pointer-Dateien für Claude, Cursor, Windsurf, Copilot und AGENTS.md aus, die die fünf Regeln enthalten, die Assistenten am häufigsten verletzen – eine Single Source of Truth, viele Dateinamen.
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Jeder Assistent erwartet seine Regeln in einer anderen Datei. Claude Code liest
 `CLAUDE.md`, Cursor liest `.cursorrules`, Windsurf liest `.windsurfrules`,
@@ -82,8 +80,6 @@ zurück, was das letzte Projekt auf diesem Rechner persistiert hat. Siehe
 
 ## Warum ein Pointer statt einer Kopie
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Die Pointer-Dateien enthalten fast nichts. Eine Datei, die die eigentliche Datei referenziert,
 behält die Konventionen an einem zentralen Ort und hat Eigenschaften, die eine Kopie nicht besitzt:
 
@@ -107,8 +103,6 @@ Dieses Muster lohnt sich beizubehalten, wenn Sie das Gerüst forken, und lohnt s
 Repositories zu übernehmen, die überhaupt keine Rebase-Projekte sind.
 
 ## Womit `ai-instructions.md` beginnt
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Die per Gerüst erstellte Datei ist bewusst kurz gehalten – sie verweist für Details auf
 [`rebase skills install`](/docs/ai/skills) und nennt dann die Regeln, die Assistenten so oft

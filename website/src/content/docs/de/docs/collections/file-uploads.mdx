@@ -1,13 +1,11 @@
 ---
-sourceHash: 5037df8f9b275f93
+sourceHash: 2813a331b4153057
 title: Datei-Upload-Felder
 sidebar_label: Datei-Uploads
 description: "Wie das CMS eine col.storage()-Spalte als Upload-Feld darstellt: die Regeln, die der Server für die Spalte erzwingt, die reinen Browser-Funktionen, die customizeTable hinzufügt, Einzel- und Mehrdatei-Felder und was mit gespeicherten Dateien passiert."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein Dateifeld ist eine [`col.storage()`](/docs/schema/columns/#storage-columns)-Spalte.
 Die Spalte enthält Text, den Schlüssel des Objekts im Bucket (oder dessen URL,
@@ -27,8 +25,6 @@ Die Optionen der Spalte sind serialisierbar, sodass sie im Deskriptor der Tabell
 daher wirken sie sich nur auf Uploads aus, die über das CMS getätigt werden.
 
 ## Eine Datei
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```ts
 // backend/schema/listings.ts
@@ -55,16 +51,12 @@ Spalten füllt den Bild-Slot des Datensatzes in Karten und Listen.
 
 ## Mehrere Dateien
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `.multiple()` macht die Spalte zu einem `TEXT[]` und das Feld zu einem Multi-Datei-Upload,
 dessen Reihenfolge per Drag & Drop geändert werden kann. Jede Option gilt für jede Datei.
 
 <FieldWidgetPreview client:only="react" variant="multi_file_upload" />
 
 ## Browserseitige Optionen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```tsx
 // frontend/src/cms/listings.tsx
@@ -109,8 +101,6 @@ fügt ein Steuerelement hinzu, das das Feld leert.
 
 ## Was der Server prüft
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `accept` und `maxBytes` werden vom Server anhand dessen erzwungen, **wo die Datei
 abgelegt wird**. Der `path` einer Spalte ist der Ort, an den ihre Dateien gelangen,
 daher gelten dort auch ihre Beschränkungen: Jeder Upload, dessen Schlüssel eine Datei
@@ -138,15 +128,11 @@ gespeichert, wie sie gesendet wurde.
 
 ## Wo eine Datei abgelegt werden darf
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `path` ist ein Standardwert, keine feste Grenze: Nichts auf dem Server beschränkt
 einen Upload zwingend darauf. Wer wohin schreiben darf, ist eine Autorisierungsregel
 für den Speicher; siehe [Storage](/docs/backend/storage/).
 
 ## Dateien werden nie automatisch gelöscht
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Das Leeren eines Dateifelds, das Ersetzen seiner Datei oder das Löschen der Zeile
 belässt das gespeicherte Objekt dort, wo es ist. Jeder Upload erhält einen eigenen
@@ -161,8 +147,6 @@ siehe [die CLI](/docs/cli/#rebase-storage).
 
 ## Eine Spalte in einen anderen Bucket verschieben
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Ein Dateifeld speichert den Schlüssel des Objekts, nicht dessen Bucket. Das Ändern
 der `source` einer Spalte verweist alle vorhandenen Werte auf den neuen Bucket, in
 dem diese Schlüssel nicht existieren, sodass die Vorschau älterer Dateien mit „not found“
@@ -172,8 +156,6 @@ oder mit den eigenen Werkzeugen des Anbieters wie `aws s3 sync` oder `gcloud sto
 oder behalten Sie den alten Bucket für die bestehenden Dateien bei.
 
 ## Nächste Schritte
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - [Spalten](/docs/schema/columns/#storage-columns): alle `col.storage()`-Optionen
 - [Felder](/docs/collections/properties/): die anderen Spaltentypen

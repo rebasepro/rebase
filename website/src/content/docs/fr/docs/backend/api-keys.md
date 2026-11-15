@@ -1,5 +1,5 @@
 ---
-sourceHash: 8f9385dd3838df4f
+sourceHash: d357e5b6fe30364a
 title: Clés API
 sidebar_label: Clés API
 description: "Clés de longue durée pour les scripts, la CI, les agents et les intégrations : clés de service et clés personnelles, les scopes qu'elles détiennent, leur articulation avec la sécurité au niveau des lignes (RLS), et les routes qui les gèrent."
@@ -176,8 +176,6 @@ conserve l'intégralité de son budget. La simulation ou l'usurpation d'identit�
 décomptée auprès de l'administrateur de la même manière.
 
 ## Clés personnelles
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Une clé personnelle agit **au nom de son propriétaire** : son uid, et ses rôles tels qu'ils sont lors
 de chaque requête. Les règles de type propriétaire lui correspondent, elle lit donc exactement ce que son propriétaire

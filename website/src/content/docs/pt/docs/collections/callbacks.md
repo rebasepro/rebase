@@ -1,11 +1,9 @@
 ---
-sourceHash: 067f45147f37ef16
+sourceHash: 283f536f508ee0b7
 title: Hooks de tabela
 sidebar_label: Hooks de tabela
 description: "Execute código no lado do servidor em cada etapa do ciclo de vida de uma tabela com hooks: restrinja leituras, mascare campos, valide e complete escritas, reaja a salvamentos e exclusões, e transforme colunas individuais."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Os `hooks` de uma tabela são executados no servidor em cada etapa da vida de uma linha: antes de uma
 leitura, em cada linha que sai do servidor, antes e depois de uma escrita, e antes e
@@ -54,8 +52,6 @@ versão lista as renomeações.
 
 ## Os sete hooks
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | Hook | Executa | Retorna |
 |---|---|---|
 | `beforeQuery` | antes de cada leitura ser compilada | um filtro para combinar com AND na leitura, ou nada |
@@ -83,8 +79,6 @@ caminho da requisição, nunca atinge esses hooks. O CMS possui hooks próprios 
 para esse caso, descritos junto com as customizações do CMS.
 
 ## `beforeQuery`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Executa **antes de uma leitura ser compilada**, para restringir quais linhas ela solicita. Retorne
 condições para combinar com AND na consulta; retorne nada para não adicionar nenhuma.
@@ -130,8 +124,6 @@ aplicação sobre ela. Use [`rls`](/docs/collections/security-rules/) para qualq
 que também deva ser válida para SQL executado como o chamador.
 
 ## `beforeSave`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Executa antes de uma linha ser escrita e retorna os valores a serem gravados. `values` contém
 todos os valores em uma criação e os modificados em uma atualização; `previousValues` é
@@ -180,8 +172,6 @@ e essa é a mesma classe que o SDK tipado lança.
 
 ## `afterSave` e `afterSaveError`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `afterSave` executa após a linha ser escrita e antes do commit, na mesma
 transação. Seus `values` são a linha como armazenada. Um erro lançado (throw) reverte o salvamento,
 juntamente com tudo o que o hook escreveu por meio de `context.data`:
@@ -216,8 +206,6 @@ instância nova para o mesmo chamador, portanto um job enfileirado por ele sobre
 erro lançado por ele é registrado em log, e o chamador ainda recebe o erro do próprio salvamento.
 
 ## `afterRead`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Executa em cada linha que sai do servidor — a resposta de uma leitura, a resposta de uma escrita,
 um quadro de tempo real (realtime frame), um resultado MCP — e retorna a linha a ser servida. `values` é a
@@ -273,8 +261,6 @@ antes que qualquer hook seja executado e a mantêm fora dos filtros também.
 
 ## `beforeDelete` e `afterDelete`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Ambos recebem a linha que está sendo excluída como `values`, e seu `id`.
 
 `beforeDelete` executa dentro da transação de exclusão. Lance um erro (throw) para recusar a exclusão,
@@ -286,8 +272,6 @@ reverte a exclusão. Em uma tabela com [soft delete](/docs/collections/soft-dele
 uma exclusão é uma marcação de data/hora (stamp), e ambos os hooks ainda assim são executados.
 
 ## Hooks de campo: `.transform()`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O `.transform()` de uma coluna aceita dois hooks em nível de campo: `beforeSave` retorna o
 valor a ser armazenado, e `afterRead` retorna o valor a ser servido. Eles são executados no
@@ -323,8 +307,6 @@ não precisam de código.
 
 ## Escrevendo em outras tabelas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `context.data` lê e escreve em qualquer tabela pelo seu slug, como o chamador e na
 mesma transação que a escrita que executou o hook:
 
@@ -357,8 +339,6 @@ aborda os privilégios com os quais ele executa, a transação e os limites de a
 
 ## Hooks para todas as tabelas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Hooks que se aplicam a todas as tabelas — mascaramento de PII em todo o schema, um log
 global de auditoria — são exportados como `hooks` de `backend/hooks.ts`, no mesmo
 formato `TableHooks`. Eles são executados antes dos hooks da própria tabela, que por sua vez executam antes
@@ -369,8 +349,6 @@ backend. Isso **substitui** os hooks que a tabela declarou; para adicioná-los a
 `composeTableHooks(declared, yours)`.
 
 ## Combinando conjuntos de hooks
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Uma tabela tem um único objeto `hooks`. Quando várias preocupações precisam de um hook — um gerador
 de slug, uma trilha de auditoria, um escopo de tenant —, escreva cada uma como seu próprio conjunto e
@@ -420,8 +398,6 @@ com a linha genérica; portanto, leia seus valores como `unknown` e faça a vali
 
 ## Testando um hook
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Um hook é uma função simples com um objeto de props, portanto um teste unitário o chama assim:
 `posts.config.hooks?.beforeSave?.(props)`. `createCallContext` de
 `@rebasepro/server` constrói a prop `context` apenas com os campos fornecidos pelo
@@ -430,8 +406,6 @@ descritor retornado por `compileTables` de `@rebasepro/common` para a tabela. Pa
 hooks contra um banco de dados real, consulte [Scripts e o Console](/docs/backend/scripts/).
 
 ## Próximos passos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [A API `context.data`](/docs/collections/context-data-api/): privilégios, transações e a conexão retida por um hook
 - [Hooks globais](/docs/backend/hooks/): hooks em todas as tabelas

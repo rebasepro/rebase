@@ -1,13 +1,11 @@
 ---
-sourceHash: ee142b42a4f33d5c
+sourceHash: 963af8e4b34aac80
 title: Arrays e campos JSON
 sidebar_label: Arrays e JSON
 description: "Como o CMS renderiza colunas array e jsonb — listas repetíveis, seleções múltiplas, grupos estruturados, editores de blocos e documentos livres de chave/valor — e como o customizeTable personaliza seus itens e chaves aninhadas."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Uma coluna do tipo array é uma lista que o formulário repete. Uma coluna `jsonb` é um documento: o
 CMS constrói um formulário para ela quando a coluna descreve sua estrutura com
@@ -40,8 +38,6 @@ export const pages = defineTable("pages", {
 
 ## Arrays
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Uma coluna array (`col.text().array()`) é uma lista repetível do campo do item: `tags` acima
 é uma lista de campos de entrada de texto. O método `.validate({ minItems, maxItems, uniqueItems })` no
 array define quantos itens o formulário aceita.
@@ -54,8 +50,6 @@ Uma coluna `col.storage().multiple()` é um upload de múltiplos arquivos; consu
 [Upload de arquivos](/docs/collections/file-uploads/#several-files).
 
 ## Documentos com estrutura
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `col.jsonb(json.object({ … }))` é um grupo de campos, um por chave, cada um sendo o campo
 que seu construtor `json.*` requer: `json.string()` é um campo de texto, `json.number()` um
@@ -76,8 +70,6 @@ campo estruturado: eles são editados como JSON livre.
 
 ## Documentos sem estrutura
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `col.jsonb().$type<T>()` tipa o documento para o TypeScript, mas `T` é apagado quando o
 código é executado, portanto o servidor e o CMS não sabem nada sobre ele. `settings` acima é
 editado como pares livres de chave/valor. Forneça à coluna uma estrutura `json.*` quando o CMS
@@ -86,8 +78,6 @@ deve renderizar um formulário para ela.
 <FieldWidgetPreview client:only="react" variant="key_value" />
 
 ## Personalizando itens e chaves aninhadas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```tsx
 // frontend/src/cms/pages.tsx
@@ -147,8 +137,6 @@ ignorados, com um aviso em desenvolvimento. Opções aninhadas para uma chave, v
 item que o documento não possui são ignoradas da mesma forma.
 
 ## Próximos passos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Documentos JSON](/docs/schema/json/): os construtores `json.*` e o que o servidor faz com uma estrutura
 - [Campos](/docs/collections/properties/): todos os outros tipos de coluna

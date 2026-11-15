@@ -1,11 +1,9 @@
 ---
-sourceHash: 96c18e52b3f61548
+sourceHash: 8b1976a4b6c5e595
 title: Login por dispositivo
 sidebar_label: Login por dispositivo
 description: "Permita que um terminal ou outro dispositivo sem navegador faça login por meio de um: um código curto, um link e uma aprovação por um usuário autenticado. O grant de autorização de dispositivo da RFC 8628, como o rebase cloud login o utiliza."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Um terminal, um aplicativo de TV ou um script não tem navegador próprio, e digitar
 uma senha neles é algo a ser evitado. O login por dispositivo transfere esse trabalho

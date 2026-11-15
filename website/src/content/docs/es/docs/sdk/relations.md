@@ -1,5 +1,5 @@
 ---
-sourceHash: 3db2d10879df1c44
+sourceHash: 61ebfc32eadc2236
 title: Consultar relaciones
 sidebar_label: Relaciones
 description: "Incluye entidades relacionadas en una consulta y lee una tabla secundaria a través de su principal con los accesores de relaciones del SDK."
@@ -238,8 +238,6 @@ tipo de fila escrito a mano no contiene relaciones contra las cuales verificar, 
 400 del servidor actúa como mecanismo de seguridad.
 
 ### Nombres de relaciones
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Los nombres que pasas a `include()` son las claves de `relations` de la tabla:
 

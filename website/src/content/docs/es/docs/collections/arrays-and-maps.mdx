@@ -1,13 +1,11 @@
 ---
-sourceHash: ee142b42a4f33d5c
+sourceHash: 963af8e4b34aac80
 title: Arrays y campos JSON
 sidebar_label: Arrays y JSON
 description: "Cómo el CMS dibuja columnas de tipo array y jsonb —listas repetibles, selecciones múltiples, grupos estructurados, editores de bloques y documentos libres de clave/valor— y cómo customizeTable personaliza sus elementos y claves anidadas."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Una columna de tipo array es una lista que el formulario repite. Una columna `jsonb` es un documento: el
 CMS crea un formulario para ella cuando la columna describe su estructura con
@@ -40,8 +38,6 @@ export const pages = defineTable("pages", {
 
 ## Arrays
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Una columna de tipo array (`col.text().array()`) es una lista repetible del campo del elemento: `tags` arriba
 es una lista de entradas de texto. `.validate({ minItems, maxItems, uniqueItems })` en el
 array define cuántos elementos acepta el formulario.
@@ -54,8 +50,6 @@ Una columna `col.storage().multiple()` es una subida de múltiples archivos; con
 [Subida de archivos](/docs/collections/file-uploads/#several-files).
 
 ## Documentos con estructura
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `col.jsonb(json.object({ … }))` es un grupo de campos, uno por clave, correspondiendo cada uno al campo
 que su constructor `json.*` solicita: `json.string()` una entrada de texto, `json.number()` un
@@ -76,8 +70,6 @@ campo estructurado: se editan como JSON libre.
 
 ## Documentos sin estructura
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `col.jsonb().$type<T>()` tipa el documento para TypeScript, pero `T` se elimina cuando el
 código se ejecuta, por lo que el servidor y el CMS no saben nada sobre él. `settings` arriba se
 edita como pares clave/valor libres. Asigna a la columna una estructura `json.*` cuando el CMS
@@ -86,8 +78,6 @@ deba dibujar un formulario para ella.
 <FieldWidgetPreview client:only="react" variant="key_value" />
 
 ## Personalizar elementos y claves anidadas
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```tsx
 // frontend/src/cms/pages.tsx
@@ -147,8 +137,6 @@ omiten, mostrando una advertencia en desarrollo. Las opciones anidadas para una 
 un elemento que el documento no tiene se omiten de la misma manera.
 
 ## Próximos pasos
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Documentos JSON](/docs/schema/json/): los constructores `json.*` y qué hace el servidor con una estructura
 - [Campos](/docs/collections/properties/): todos los demás tipos de columna

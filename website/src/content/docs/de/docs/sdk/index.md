@@ -1,5 +1,5 @@
 ---
-sourceHash: d3b3f413d231c3d0
+sourceHash: 96d3468f540e7260
 title: Typisiertes SDK — Erste Schritte
 sidebar_label: Erste Schritte
 description: Installieren und konfigurieren Sie das typisierte Rebase-SDK, um von jeder JavaScript- oder TypeScript-Anwendung aus mit Ihrem Backend zu interagieren.
@@ -55,7 +55,7 @@ const client = createRebaseClient({
 | `fetch` | `typeof fetch` | Benutzerdefinierte fetch-Implementierung (z. B. für SSR) |
 | `onUnauthorized` | `() => Promise<boolean>` | Benutzerdefinierter 401-Handler — `true` zurückgeben, um den Versuch zu wiederholen |
 | `realtime` | `boolean \| RealtimeClientOptions` | WebSocket öffnen (Standard `true`) — in Einmalskripten auf `false` setzen. `{ affinity }` [benennt die Gruppe, zu der der Socket gehört](/docs/sdk/realtime#keeping-a-group-on-one-instance) |
-| `tables` | `Record<string, string>` | <span class="since-badge" data-since="0.31">Seit 0.31</span> Ordnet Accessor-Namen den Tabellen-Slugs zu — das generierte `tablesDictionary` |
+| `tables` | `Record<string, string>` | Ordnet Accessor-Namen den Tabellen-Slugs zu — das generierte `tablesDictionary` |
 | `offline` | `boolean \| OfflineConfig` | [Local-First-Synchronisierung](/docs/sdk/offline) — standardmäßig deaktiviert |
 | `impersonate` | `string` | Führt jede Anfrage als dieser Benutzer aus (per uid), um zu prüfen, was ein Benutzer sehen kann. Nur für die Sitzung eines Administrators zulässig: Die Daten-API, Funktionen und Realtime laufen als dieser Benutzer, und jede andere Route lehnt die Anfrage ab |
 | `debug` | `boolean` | Protokolliert den Fortschritt der Realtime-Verbindung mit `console.debug` (Standard `false`) — siehe [Verbindungsprotokollierung](#verbindungsprotokollierung) |
@@ -71,8 +71,6 @@ localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_de
 Dies gilt ab der nächsten Zeile, die der Client protokolliert, sodass eine bereits verbundene Seite nicht neu geladen werden muss. Außerhalb eines Browsers setzen Sie `globalThis.__REBASE_DEBUG__ = true`. Browser zeigen `console.debug` nur auf der Stufe „Ausführlich“ (Verbose) an.
 
 ## Typisierte SDK-Generierung
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Generieren Sie einen vollständig typisierten Client aus Ihren Tabellen:
 

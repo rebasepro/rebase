@@ -46,8 +46,6 @@ signups.subscription("send-welcome", async (event) => {
 
 Then point a table at one, by handle — the same name, spelled once:
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 ```ts
 // backend/schema/page_views.ts
 import { defineTable, col } from "@rebasepro/server/schema";
@@ -148,8 +146,6 @@ binding the way it did when it was published. Use it for every correction to a
 shipped kind; use `registerResourceKind` only for a kind nobody has published.
 
 ### Handing them to the frontend
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 The frontend does not import `backend/resources.ts`: a value import of
 anything under `backend/` from `frontend/` is refused by

@@ -1,5 +1,5 @@
 ---
-sourceHash: d3b3f413d231c3d0
+sourceHash: 96d3468f540e7260
 title: SDK typé — Prise en main
 sidebar_label: Prise en main
 description: Installez et configurez le SDK typé Rebase pour interagir avec votre backend depuis n'importe quelle application JavaScript ou TypeScript.
@@ -55,7 +55,7 @@ const client = createRebaseClient({
 | `fetch` | `typeof fetch` | Implémentation personnalisée de fetch (ex. pour le SSR) |
 | `onUnauthorized` | `() => Promise<boolean>` | Gestionnaire 401 personnalisé — retourner `true` pour réessayer |
 | `realtime` | `boolean \| RealtimeClientOptions` | Ouvre le WebSocket (par défaut `true`) — définir sur `false` dans les scripts ponctuels. `{ affinity }` [nomme le groupe auquel appartient le socket](/docs/sdk/realtime#keeping-a-group-on-one-instance) |
-| `tables` | `Record<string, string>` | <span class="since-badge" data-since="0.31">Depuis 0.31</span> Mappe les noms d'accesseurs aux slugs de table — le `tablesDictionary` généré |
+| `tables` | `Record<string, string>` | Mappe les noms d'accesseurs aux slugs de table — le `tablesDictionary` généré |
 | `offline` | `boolean \| OfflineConfig` | [Synchronisation local-first](/docs/sdk/offline) — désactivée par défaut |
 | `impersonate` | `string` | Exécute chaque requête en tant que cet utilisateur, par uid, pour vérifier ce qu'un utilisateur donné peut voir. Seule la session d'un administrateur le permet : l'API de données, les fonctions et le realtime s'exécutent en tant que cet utilisateur, et toutes les autres routes refusent |
 | `debug` | `boolean` | Journalise la progression de la connexion temps réel avec `console.debug` (par défaut `false`) — voir [Journalisation de la connexion](#journalisation-de-la-connexion) |
@@ -71,8 +71,6 @@ localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_de
 Cela s'applique dès la prochaine ligne journalisée par le client ; une page déjà connectée n'a donc pas besoin d'être rechargée. En dehors d'un navigateur, définissez `globalThis.__REBASE_DEBUG__ = true`. Les navigateurs n'affichent `console.debug` qu'au niveau Verbeux.
 
 ## Génération du SDK typé
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Générez un client entièrement typé à partir de vos tables :
 

@@ -1,11 +1,9 @@
 ---
-sourceHash: e951bd1fd3fc48e0
+sourceHash: 84bd0f15d2a016c7
 title: Validierung und Bedingungen
 sidebar_label: Validierung & Bedingungen
 description: "Wie das CMS-Formular die Regeln einer Spalte anzeigt – erforderlich, Länge, Muster, Grenzen, eindeutig –, wo diese Regeln überprüft werden und bedingte Felder, die anhand der Werte des Datensatzes erforderlich, deaktiviert oder ausgeblendet werden."
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Die Regeln einer Spalte werden einmalig an der Spalte deklariert und vom Server
 bei jedem Schreibvorgang erzwungen, der die API erreicht. Das CMS liest dieselben
@@ -39,8 +37,6 @@ sie aus.
 
 ## Was das Formular überprüft
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 | An der Spalte | Im Formular |
 |---|---|
 | `.notNull()` | Erforderlich, mit `requiredMessage` als Fehlermeldung, sofern angegeben. Nicht erforderlich, wenn niemand den Wert eingibt: ein generierter Schlüssel, ein Zeitstempel, eine generierte oder `.readOnly()`-Spalte. |
@@ -59,8 +55,6 @@ Jede Regel ist mit ihrer genauen Bedeutung unter
 
 ## Wo die Validierung stattfindet
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Der Server überprüft die Regeln einer Spalte an der Schnittstelle der Anfrage
 (REST, der Realtime-Socket und MCP) anhand der vom Aufrufer gesendeten Daten,
 bevor `beforeSave` ausgeführt wird. Er beantwortet Schreibvorgänge, die gegen
@@ -76,8 +70,6 @@ gegen eine später hinzugefügte Regel verstößt, zeigt so lange keinen Fehler 
 bis jemand diese Zelle bearbeitet.
 
 ## Bedingte Felder
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein Feld kann auf die eigenen Werte des Datensatzes reagieren: als erforderlich,
 deaktiviert, schreibgeschützt oder ausgeblendet definiert werden. Es gibt zwei
@@ -147,16 +139,12 @@ für jedermann erzwingt.
 
 ## Labels für ein geschlossenes Set
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Die Werte eines `col.enum([...])` oder eines `.oneOf([...])` gehören zur Spalte.
 Ihre Labels, Farben und Reihenfolge gehören zum CMS und werden mit `enumLabels`
 und `enumOrder` festgelegt; siehe [geschlossene
 Wertemengen](/docs/collections/properties/#closed-sets-of-values).
 
 ## Nächste Schritte
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - [Spalten](/docs/schema/columns/#validation): Alle Validierungsregeln
 - [Felder](/docs/collections/properties/): Die Felder, für die diese Regeln gelten

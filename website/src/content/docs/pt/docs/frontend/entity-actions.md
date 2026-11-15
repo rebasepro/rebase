@@ -1,5 +1,5 @@
 ---
-sourceHash: 49c04468f92c50c8
+sourceHash: eb907148639a58a2
 title: Ações de Entidade
 sidebar_label: Ações de Entidade
 description: Adicione botões de ação personalizados a entidades para arquivamento, publicação, exportação, clonagem e muito mais.
@@ -7,15 +7,11 @@ description: Adicione botões de ação personalizados a entidades para arquivam
 
 ## Visão Geral
 
-<span class="since-badge" data-since="0.31">A partir da versão 0.31</span>
-
 Ações de entidade são botões em um registro: publicar, arquivar, clonar ou disparar um
 fluxo de trabalho externo. Elas são declaradas por tabela em `customizeTable`, e
 o `updateRecord` cobre a escrita que a maioria delas realiza.
 
 ## Definindo Ações de Entidade
-
-<span class="since-badge" data-since="0.31">A partir da versão 0.31</span>
 
 ```tsx
 // frontend/src/cms/products.tsx
@@ -75,8 +71,6 @@ registrada uma vez em `<RebaseCMS entityActions>` (ou `<Rebase entityActions>`),
 para ações compartilhadas por várias tabelas.
 
 ## `updateRecord`
-
-<span class="since-badge" data-since="0.31">A partir da versão 0.31</span>
 
 `updateRecord(context, slug, id, patch, message?)` grava o `patch` em um
 registro e, em seguida, exibe a `message` como uma notificação de sucesso, quando fornecida.
@@ -148,8 +142,6 @@ Uma ação desativada que não explica o motivo parece quebrada. `disabledReason
 No registro, um botão cujo `onClick` retorna uma promise pendente exibe um indicador de carregamento (spinner) e não pode ser clicado novamente até que a promise seja resolvida. Se a ação lançar um erro ou sua promise for rejeitada, o usuário verá o erro em uma notificação. A visualização somente leitura não possui formulário, portanto `formContext` é indefinido nela.
 
 ## Ações de Coleção
-
-<span class="since-badge" data-since="0.31">A partir da versão 0.31</span>
 
 `Actions` insere componentes próprios na barra de ferramentas da coleção, para ações sobre
 toda a coleção ou sobre as linhas selecionadas: como `PublishSelected` acima. Trata-se de uma

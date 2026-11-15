@@ -1,13 +1,11 @@
 ---
-sourceHash: c858a7a8e7622cee
+sourceHash: ae48e0b641989cf2
 title: "Recette : Publication éditoriale"
 sidebar_label: Publication éditoriale
 description: "Gérez un blog ou une salle de rédaction sur Rebase : rédacteurs et éditeurs, révision, publication planifiée, brouillons d'articles en ligne, prévisualisations, traductions, médiathèque, blocs de contenu, flux, notes éditoriales et import WordPress."
 ---
 
 ## Vue d'ensemble
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Cette recette met en place le volet éditorial d'une publication sur Rebase. Chaque partie est un point d'extension documenté, ce qui vous permet de ne conserver que les fonctionnalités dont vous avez besoin :
 
@@ -31,8 +29,6 @@ Elle étend le modèle de rôles de la [recette CMS de blog](/docs/recipes/blog-
 Chaque table est un fichier dans `backend/schema/`, exporté depuis son `index.ts` ; la manière dont le panneau d'administration la présente — le tableau, les boutons, les aperçus — est une configuration `customizeTable` dans `frontend/src/cms/`, transmise à `<RebaseCMS tableCustomizations>`.
 
 ## Médias
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Une ligne par image, de sorte qu'une image est téléversée une seule fois et réutilisée, avec son texte alternatif et ses crédits à côté :
 
@@ -58,8 +54,6 @@ export const media = defineTable("media", {
 Un article pointe vers une ligne de média grâce à une relation, et le sélecteur de relation liste les images déjà présentes dans la bibliothèque. Les utilisateurs autorisés à téléverser les fichiers eux-mêmes sont définis par votre [autorisation de stockage](/docs/backend/storage-authorization/).
 
 ## Articles
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 ```ts
 // backend/schema/posts.ts
@@ -230,8 +224,6 @@ export default defineCron({
 
 ## Modifier un article en ligne
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Modifier un article publié le modifie directement en production, et les règles ci-dessus empêchent un rédacteur de le modifier. Pour préparer des modifications et les publier en une seule étape, conservez-les dans une seconde table dotée des mêmes colonnes :
 
 ```ts
@@ -334,8 +326,6 @@ export default function PostPreview({ modifiedValues }: EntityCustomViewParams) 
 Pour prévisualiser avec le design réel du site, effectuez le rendu du composant d'article du site dans cet onglet, ou intégrez la page d'aperçu du site dans un iframe et envoyez-lui `modifiedValues` à l'aide de `postMessage`. Un site statique hébergé par Rebase ne peut être intégré dans une frame que depuis sa propre origine.
 
 ## Notes éditoriales
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Les notes entre rédacteur et éditeur sont des lignes distinctes, affichées sur l'article :
 

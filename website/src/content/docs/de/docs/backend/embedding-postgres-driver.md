@@ -1,5 +1,5 @@
 ---
-sourceHash: 82f7615bf6bd44b4
+sourceHash: 90e4ac2603a6ef96
 title: Einbetten des Postgres-Treibers
 sidebar_label: Einbetten des Postgres-Treibers
 description: Öffnen Sie den Datentreiber und den Realtime-Socket von @rebasepro/server-postgres in Express, Fastify oder reinem Node, ganz ohne Rebase-Server – einschließlich Read-Replicas, Drizzle und Draining.
@@ -14,8 +14,6 @@ npm install @rebasepro/server-postgres @rebasepro/types express pg drizzle-orm
 ```
 
 ## Öffnen des Treibers und des Sockets
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `openPostgresDriver` und `postgresDriverConfigFromEnv` werden exportiert.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 4fc45b4d1d08afde
+sourceHash: 1e919257566479bf
 title: REST API
 sidebar_label: REST API
 description: Automatisch generierte REST-API-Endpunkte für jede Tabelle mit Filterung, Sortierung, Paginierung und Einbindung von Relationen.
@@ -351,7 +351,7 @@ Auf jeden Hook wird gewartet (awaited), und ein Fehler (throw) in einem von ihne
 | Methode | Pfad | Auth | Beschreibung |
 |---------|------|------|--------------|
 | `GET` | `/health` und `/api/health` | keine | Liveness-/Readiness-Prüfung |
-| `GET` | `/api/docs` | <span class="since-badge" data-since="0.31">Seit 0.31</span> standardmäßig die Aufrufer, für die `GET /api/schema/tables` Tabellen beschreibt (401 für anonyme Aufrufer, außer `schemaTables.public`); keine, wenn `enableSwagger` `true` ist; das Admin-Gate, wenn es `false` ist | Die OpenAPI 3.0 JSON-Spezifikation — standardmäßig nur die Tabellen, Spalten und Relationen, die der Schema-Endpunkt für diesen Aufrufer beschreibt. `404 DOCS_UNAVAILABLE`, wenn keine Authentifizierung konfiguriert ist |
+| `GET` | `/api/docs` | standardmäßig die Aufrufer, für die `GET /api/schema/tables` Tabellen beschreibt (401 für anonyme Aufrufer, außer `schemaTables.public`); keine, wenn `enableSwagger` `true` ist; das Admin-Gate, wenn es `false` ist | Die OpenAPI 3.0 JSON-Spezifikation — standardmäßig nur die Tabellen, Spalten und Relationen, die der Schema-Endpunkt für diesen Aufrufer beschreibt. `404 DOCS_UNAVAILABLE`, wenn keine Authentifizierung konfiguriert ist |
 | `GET` | `/api/swagger` | keine | Swagger UI. Wird nur bereitgestellt, wenn `enableSwagger` `true` ist (`REBASE_ENABLE_SWAGGER=true`), und niemals in der Produktion |
 | `GET` | `/api/meta/schema-version` | keine | Der Schema-Hash, aus dem dieses Backend erstellt wurde, und die Runtime-Version — bewusst unauthentifiziert und enthält nichts, was das Schema beschreibt |
 | `GET` | `/api/meta/contract` | `schema:read`: ein Administrator, der Service-Schlüssel oder ein API-Schlüssel, der diese Berechtigung hält | Die Schema-Version, die Runtime und jede Tabelle, wie ein Administrator sie sieht, für `rebase generate-sdk --from`. Fail-closed: `404`, wenn keine Authentifizierung konfiguriert ist |
@@ -368,8 +368,6 @@ Maschinelle Aufrufer authentifizieren sich mit einem Key mit Scopes statt mit ei
 
 ## Schema-Metadaten
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Die vom Backend bereitgestellten Tabellen werden pro Aufrufer unter `GET /api/schema/tables` beschrieben — die Deskriptoren, aus denen das CMS und das Studio rendern. Jedem angemeldeten Aufrufer werden die Tabellen bereitgestellt, die er sehen darf, bereinigt um das, was er lesen darf; [Endpunkte](/docs/backend/endpoints/#schema) enthält die Matrix.
 
 Das gesamte Schema, wie ein Administrator es sieht, wird bereitgestellt unter:
@@ -379,7 +377,7 @@ GET /api/meta/contract
 ```
 
 ```json
-{ "schemaVersion": "v2:…", "runtime": { "version": "0.30.1", "contract": 2 }, "tables": [ … ] }
+{ "schemaVersion": "v2:…", "runtime": { "version": "0.31.0", "contract": 2 }, "tables": [ … ] }
 ```
 
 Es erfordert den Scope **`schema:read`**, den ein Administrator besitzt, und auf einem Deployment ohne konfigurierte Authentifizierung wird es gar nicht bereitgestellt (404 `CONTRACT_UNAVAILABLE`), anstatt das Schema für jedermann offenzulegen. Schema-Versionen beginnen seit 0.31 mit `v2:`: Sie werden aus den kompilierten Tabellen berechnet, sodass sich die Version jedes Projekts einmalig geändert hat. Der Geschwister-Endpunkt gibt einen Versions-String zurück, der für das Schema steht, ohne es zu beschreiben, und ist bewusst ohne Anmeldedaten erreichbar — was von CI-Jobs gepollt wird:

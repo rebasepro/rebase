@@ -1,5 +1,5 @@
 ---
-sourceHash: 9c7b1e0ee0076030
+sourceHash: 118e606ac71718ef
 title: Autenticação & Login
 sidebar_label: Autenticação & Login
 description: Configure o controlador de autenticação, a tela de login e a simulação de papéis no seu frontend React do Rebase.
@@ -74,8 +74,6 @@ A tela de login gerencia:
 - Validação de formulários e estados de erro
 
 ## Modelo de Papéis (Roles)
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Os papéis são armazenados como uma coluna de array `text[]` na tabela de usuários. Você define os papéis que um usuário pode ter como um conjunto fechado nessa coluna, na tabela declarada com [`defineAuthTable`](/docs/schema/auth-table/):
 

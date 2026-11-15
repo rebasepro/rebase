@@ -1,5 +1,5 @@
 ---
-sourceHash: 3db2d10879df1c44
+sourceHash: 61ebfc32eadc2236
 title: Interroger les relations
 sidebar_label: Relations
 description: "Inclure des entités liées dans une requête et lire une table enfant via son parent grâce aux accesseurs de relations du SDK."
@@ -197,8 +197,6 @@ const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 Sans type `Database` généré, `include` reste un simple `string[]` ou un arbre : un type de ligne écrit à la main ne contient aucune relation par rapport à laquelle effectuer la vérification, et l'erreur 400 du serveur sert alors de filet de sécurité.
 
 ### Noms des relations
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Les noms que vous passez à `include()` sont les clés des `relations` de la table :
 

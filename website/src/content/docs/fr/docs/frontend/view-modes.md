@@ -1,11 +1,9 @@
 ---
-sourceHash: 57ee5c3ecdf49419
+sourceHash: 2e189939df0c022e
 title: Modes d'affichage
 sidebar_label: Modes d'affichage
 description: "Affichez les lignes d'une table sous forme de liste, de feuille de calcul, de cartes ou de tableau kanban ; choisissez ce qui remplit le titre, l'image, le statut et la date de chaque enregistrement ; et définissez le tri par défaut, les filtres et les préréglages de filtres en un clic."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Chaque collection peut être affichée de quatre manières, depuis le sélecteur situé dans sa barre d'outils :
 
@@ -21,8 +19,6 @@ une galerie) dans le même sélecteur, pilotés par la même barre d'outils : vo
 [Modes d'affichage personnalisés](/docs/frontend/extending#custom-view-modes).
 
 ## Choisir les vues
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 ```ts
 // backend/schema/tasks.ts
@@ -83,8 +79,6 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 | `"xl"` | 160 | Grandes vignettes d'images |
 
 ## Kanban
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `kanban.columnField` désigne la colonne utilisée pour regrouper le tableau. Elle doit contenir un
 ensemble fermé de chaînes de caractères, un `col.enum([...])` ou une colonne texte avec
@@ -149,8 +143,6 @@ tableau alimenté par un backend, c'est une solution qui s'annule à chaque exé
 
 ## Emplacements d'affichage
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Chaque surface affichant un enregistrement utilise certains de ces six emplacements : **title**,
 **subtitle**, **image**, **status**, **date** et **tags**. Une ligne de liste équivaut à image +
 titre + sous-titre + statut + date, une carte correspond à la même chose avec l'image au-dessus, un
@@ -207,8 +199,6 @@ tableau joint, et une relation sous forme du premier champ disponible parmi `nam
 
 ## Filtres, préréglages et tri
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 ```tsx
 import { customizeTable } from "@rebasepro/cms";
 import type { tasks } from "../../../backend/schema/tasks";
@@ -239,8 +229,6 @@ appelant a le droit de lire est déterminé par la [sécurité au niveau des lig
 de la table, pour chaque appelant.
 
 ## Prochaines étapes
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/) : toutes les options
 - [Personnaliser l'administration](/docs/frontend/customizing/) : vos propres modes d'affichage, pages et actions

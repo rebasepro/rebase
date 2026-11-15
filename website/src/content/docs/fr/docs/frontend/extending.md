@@ -1,5 +1,5 @@
 ---
-sourceHash: 3317ba94279d0cb8
+sourceHash: c3ddd891a53e23c1
 title: Étendre Rebase
 sidebar_label: Étendre Rebase
 description: Un guide de décision pour choisir le bon mécanisme d'extension — plugins, slots, surcharges de composants, vues d'entités, actions, et plus encore.
@@ -18,8 +18,6 @@ Chaque mécanisme ci-dessous repose sur le même principe fondamental : un compo
 Tout ce qui est décrit ici concerne le **panneau d'administration**. Pour le serveur — restreindre une lecture, ajouter une route, intégrer le pilote dans votre propre processus, `rebase eject` — consultez [Rebase ne gère pas X](/docs/backend/extending), qui présente un tableau similaire pour le backend.
 
 ## Tableau de décision
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 | Je souhaite… | Mécanisme | Portée | Référence |
 |---|---|---|---|
@@ -49,8 +47,6 @@ Chaque mécanisme ci-dessous vous fournit un composant React sans imposer son co
 ## Les mécanismes en détail
 
 ### Plugins
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 **Portée :** app.
 
@@ -103,8 +99,6 @@ Deux modes : **Eject** (remplacement complet) ou **Wrap** (enrichissement de l'o
 
 ### Vues d'entités
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 **Portée :** entity (ajoute des onglets).
 
 Vues personnalisées qui apparaissent sous forme d'onglets dans la page de détail d'une entité. Définies par table dans `customizeTable`, ou enregistrées une seule fois sur `<Rebase entityViews>` (ou `<RebaseCMS entityViews>`) et référencées par leur `key` dans le `entityViews` d'une table.
@@ -112,8 +106,6 @@ Vues personnalisées qui apparaissent sous forme d'onglets dans la page de déta
 → [Vues d'entités](/docs/frontend/entity-views)
 
 ### Actions d'entité
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 **Portée :** entity.
 
@@ -133,7 +125,6 @@ Composants React au niveau de la barre d'outils recevant les `CollectionActionsP
 
 ### Modes de vue personnalisés
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 **Portée :** collection (ajoute un mode de vue).
 
 Une carte, un calendrier, une galerie, une chronologie — un autre rendu *des mêmes lignes*, proposé dans le sélecteur de vue de la collection aux côtés de Liste, Table, Cartes et Kanban.
@@ -208,7 +199,6 @@ Choisir la vue met à jour `?__view=`, persiste après un rechargement et est co
 
 ### `formView`
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 **Portée :** collection.
 
 Remplace l'intégralité du formulaire d'entité par défaut par un composant personnalisé, défini avec `formView: { Builder, includeActions }` dans `customizeTable` ; voir [Remplacer le formulaire](/docs/frontend/form-layout/#replacing-the-form). `includeActions` (`true` par défaut) conserve les boutons Enregistrer et Abandonner dans la barre.
@@ -248,8 +238,6 @@ Si ce que vous souhaitez modifier concerne le comportement du serveur plutôt qu
 → [Rebase ne gère pas X](/docs/backend/extending)
 
 ## Résumé de l'ordre de priorité
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - **Les `components` d'une table prévalent sur les `components` globaux** au sein de sa collection. Un remplacement au niveau de la collection remplace les deux ; une surcharge de collection avec `wrap: true` enveloppe la surcharge globale lorsqu'elle existe. Voir [Surcharges de composants](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **Les `Actions` de collection et le slot `collection.actions` sont cumulatifs** — les `Actions` sont rendues en premier, suivies des contributions du slot.

@@ -1,11 +1,9 @@
 ---
-sourceHash: 6995a63f34afa39a
+sourceHash: fd678be79444f91f
 title: Firestore junto a Postgres
 sidebar_label: Firebase
 description: "Muestra colecciones de Firestore en el CMS junto a tus tablas de Postgres: defineFirestoreCollection, useFirestoreDataSource, externalCollections y referencias cruzadas entre documentos de Firestore y filas de Postgres en ambas direcciones."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `@rebasepro/firebase` permite al CMS leer y escribir colecciones de Firestore en el
 navegador, a través del SDK de Firebase, junto a las tablas que sirve tu backend
@@ -26,8 +24,6 @@ mediante las **Reglas de seguridad de Firebase**, escritas y desplegadas en Fire
 
 ## Instalación
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 ```bash
 pnpm add @rebasepro/firebase firebase
 ```
@@ -36,8 +32,6 @@ Dependencias peer: `firebase` (10, 11 o 12), `react` ≥ 19, `react-dom` ≥ 19 
 opcionalmente, `typesense` para búsqueda de texto.
 
 ## Declarar una colección de Firestore
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```ts
 // frontend/src/cms/events.ts
@@ -91,8 +85,6 @@ una colección de Firestore (icono, grupo, vistas) son las del modelo de colecci
 del panel, no `customizeTable`, que está destinado a tablas.
 
 ## Montarla junto a las tablas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Dos pasos: registrar Firestore como fuente de datos en `<Rebase>` y pasar la
 colección a `<RebaseCMS externalCollections>`.
@@ -158,8 +150,6 @@ nunca se les ofrezcan pestañas de relaciones ni filtros que Firestore no pueda 
 
 ## Editarla en el editor de colecciones
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 En desarrollo, el [editor de colecciones](/docs/studio/#collection-editor) también edita
 colecciones de Firestore: al guardar, se reescribe directamente la llamada a
 `defineFirestoreCollection({...})` de la colección en `frontend/src/cms`,
@@ -169,8 +159,6 @@ muestran como de solo lectura. En producción, las colecciones de Firestore son 
 lectura en el editor. Para eliminar una, borra su archivo y su entrada en `externalCollections`.
 
 ## De Firestore a una tabla
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `customerId: { type: "reference", target: "customers" }` apunta a la
 tabla `customers`. Cuando un operador abre un evento y hace clic en el chip del cliente,
@@ -184,8 +172,6 @@ coincidirá con él. Una referencia a un documento en la misma base de datos de 
 como un `DocumentReference` de Firestore, tal como este espera.
 
 ## De una tabla a Firestore
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Una columna de tabla que contiene el ID de un documento de Firestore es una simple columna
 de texto en el backend. `referenceTo` en su `customizeTable` la convierte en una referencia
@@ -224,8 +210,6 @@ como texto, y el backend sigue viendo una columna de texto. `referenceTo` se apl
 de texto y uuid; en cualquier otro tipo se omite, mostrando una advertencia en desarrollo.
 
 ## Un panel exclusivo para Firestore
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `RebaseFirebaseApp` es un panel completo únicamente sobre Firebase: inicio de sesión
 con Firebase Auth, enrutamiento y las colecciones que le pases, sin ningún backend de Rebase.

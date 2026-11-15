@@ -1,5 +1,5 @@
 ---
-sourceHash: 27f3eaf8b78d59e8
+sourceHash: 6ada998b1c8e4cc0
 title: Eseguire il deploy di Rebase su Railway
 description: Esegui il deploy di Rebase su Railway a partire dall'immagine runtime pubblicata e dal bundle del tuo progetto. Mantieni la conformità europea.
 sidebar_label: Railway
@@ -34,7 +34,7 @@ rebase build
 Effettua il commit di un `Dockerfile` di tre righe nella root del repository, in modo che il passaggio di build di Railway sia una semplice copia anziché una compilazione:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -68,8 +68,6 @@ Railway imposta `PORT` e il runtime vi si associa, quindi non c'è alcuna porta 
 2. Sotto **Public Networking**, fai clic su **Generate Domain** per un URL `.up.railway.app`, oppure collega un dominio personalizzato.
 
 ## 6. Lo schema
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 **Il runtime crea le tabelle mancanti all'avvio, incluse quelle dichiarate da `backend/schema`.** `REBASE_MIGRATE_ON_BOOT` ha come valore predefinito `ensure`, che è additivo sull'intero schema: crea tabelle, colonne e tipi enum mancanti e applica la relativa row-level security, consentendo al primo avvio su un database vuoto di iniziare subito a gestire le tue tabelle.
 

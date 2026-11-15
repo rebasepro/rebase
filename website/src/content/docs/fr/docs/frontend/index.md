@@ -1,5 +1,5 @@
 ---
-sourceHash: 15779772a2359662
+sourceHash: d90a1098b873980d
 title: Vue d'ensemble du Frontend
 sidebar_label: Frontend
 description: "Construisez et personnalisez le panneau d'administration — Rebase CMS et Rebase Studio — avec React : contrôleurs, scaffold, routage et vues."
@@ -66,8 +66,6 @@ vous n'avez que les outils de développement. Pour agencer le shell manuellement
 
 ## Emplacement des fichiers du CMS
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 ```text
 frontend/src/
 ├── App.tsx
@@ -89,8 +87,6 @@ effacé du bundle, de sorte que les hooks et le code serveur du backend n'atteig
 le navigateur. Le backend n'importe rien depuis le frontend.
 
 ## Propriétés de RebaseCMS
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 <!-- rebase-cms-props:start -->
 | Prop | Description |

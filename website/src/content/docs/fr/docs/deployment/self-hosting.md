@@ -1,5 +1,5 @@
 ---
-sourceHash: cfc9a95285da2353
+sourceHash: db0130f92b3095af
 title: Auto-hébergement
 sidebar_label: Auto-hébergement
 description: Exécutez Rebase n'importe où avec l'image runtime officielle et le bundle de votre projet — Docker Compose, Fly, Railway ou un simple VPS.
@@ -82,13 +82,11 @@ Comme elles sont déjà présentes, vous pouvez monter le bundle en lecture seul
 Pour un déploiement réel, préférez intégrer les deux directement dans une image, ce qui fige également avec exactitude ce qui est exécuté :
 
 ```dockerfile
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
 ## Création du schéma
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 **Le runtime crée les tables manquantes au démarrage, y compris celles déclarées par `backend/schema`.**
 `REBASE_MIGRATE_ON_BOOT` est défini par défaut sur `ensure`, ce qui est purement additif sur l'ensemble du schéma : il crée les tables, colonnes et types enum manquants, et applique leur sécurité au niveau des lignes (RLS). Un premier démarrage sur une base de données vide se termine en servant vos tables, sans étape distincte.
@@ -120,7 +118,7 @@ Lorsque le provisioning est désactivé, le runtime ne crée et ne modifie rien 
 - **Tables d'authentification manquantes, ou colonne lue par l'authentification manquante :** le démarrage est refusé et chacune d'elles est listée.
 - **Le rôle des requêtes peut accéder à une table du framework** telle que `rebase.refresh_tokens` ou `rebase.api_keys` : le démarrage est refusé et affiche la commande `REVOKE` à exécuter. Un démarrage avec provisioning retire ces privilèges de lui-même. Lorsque le provisioning est désactivé, rien ne le fait.
 - **Une table optionnelle est manquante** (clés d'API, clés d'idempotence, réservations de cron, compteurs de limitation de débit, présence, historique des métriques) : cette fonctionnalité est désactivée, et les logs indiquent quelle table est requise.
-- <span class="since-badge" data-since="0.31">Depuis 0.31</span> **Une table déclarée que la base de données ne protège pas** — sécurité au niveau des lignes (RLS) désactivée, aucune des politiques déclarées n'est présente, ou une politique restrictive déclarée est manquante : cette table n'est pas servie (une politique permissive manquante est servie, avec un avertissement au démarrage qui la nomme). Une requête la ciblant répond `503 TABLE_WITHHELD`, et les logs de démarrage indiquent le SQL qui la protège (ou suggèrent `rebase db push`). Les autres tables sont servies et le démarrage continue. Une table de jonction many-to-many est vérifiée de la même manière : une jonction non protégée par la base de données bloque la mise à disposition des tables dont les relations l'utilisent, et `TABLE_WITHHELD` nomme la jonction. Une table dont la relation `via` transite par une table retenue est également retenue, et le message mentionne la relation. Cela s'applique également avec `REBASE_MIGRATE_ON_BOOT=none` ainsi que lors d'un rafraîchissement à chaud du schéma.
+- **Une table déclarée que la base de données ne protège pas** — sécurité au niveau des lignes (RLS) désactivée, aucune des politiques déclarées n'est présente, ou une politique restrictive déclarée est manquante : cette table n'est pas servie (une politique permissive manquante est servie, avec un avertissement au démarrage qui la nomme). Une requête la ciblant répond `503 TABLE_WITHHELD`, et les logs de démarrage indiquent le SQL qui la protège (ou suggèrent `rebase db push`). Les autres tables sont servies et le démarrage continue. Une table de jonction many-to-many est vérifiée de la même manière : une jonction non protégée par la base de données bloque la mise à disposition des tables dont les relations l'utilisent, et `TABLE_WITHHELD` nomme la jonction. Une table dont la relation `via` transite par une table retenue est également retenue, et le message mentionne la relation. Cela s'applique également avec `REBASE_MIGRATE_ON_BOOT=none` ainsi que lors d'un rafraîchissement à chaud du schéma.
 
 Les lignes continuent d'évoluer, comme sur n'importe quelle base de données : connexions, sessions, utilisation des clés d'API, clés d'idempotence, réservations de cron. Le premier compte administrateur (`REBASE_ADMIN_EMAIL`) est initialisé par l'exécution du provisioning, non par les processus servant le trafic. L'[édition de schéma en direct](/docs/backend/live-schema-editing) peut toujours valider (commit) une modification dans le code source, mais refuse de l'appliquer à la base de données.
 
@@ -199,7 +197,7 @@ Le runtime est un conteneur standard écoutant sur `$PORT`, de sorte que tout ce
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.30.1 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.31.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -344,7 +342,7 @@ Tout ce qui précède utilise un conteneur unique servant l'intégralité du pro
 ## Mise à niveau
 
 ```yaml
-image: rebasepro/server:0.30.1
+image: rebasepro/server:0.31.0
 ```
 
 Redémarrez. Votre bundle reste inchangé. Au sein d'une même version majeure du contrat de runtime, un bundle validé continue de fonctionner — voir [Compatibility](/docs/architecture/runtime-and-bundles/#compatibility).

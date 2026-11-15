@@ -1,5 +1,5 @@
 ---
-sourceHash: 49c04468f92c50c8
+sourceHash: eb907148639a58a2
 title: Actions d'entité
 sidebar_label: Actions d'entité
 description: Ajoutez des boutons d'action personnalisés aux entités pour archiver, publier, exporter, cloner, et plus encore.
@@ -7,15 +7,11 @@ description: Ajoutez des boutons d'action personnalisés aux entités pour archi
 
 ## Vue d'ensemble
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Les actions d'entité sont des boutons sur un enregistrement : publier, archiver, cloner ou déclencher un
 workflow externe. Elles sont déclarées par table dans `customizeTable`, et
 `updateRecord` gère l'écriture que la plupart d'entre elles effectuent.
 
 ## Définir des actions d'entité
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 ```tsx
 // frontend/src/cms/products.tsx
@@ -75,8 +71,6 @@ enregistrée une seule fois sur `<RebaseCMS entityActions>` (ou `<Rebase entityA
 pour les actions partagées par plusieurs tables.
 
 ## `updateRecord`
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `updateRecord(context, slug, id, patch, message?)` écrit `patch` sur un
 enregistrement, puis affiche `message` sous forme de notification de succès lorsqu'il est fourni.
@@ -148,8 +142,6 @@ Une action désactivée qui n'indique pas pourquoi semble défectueuse. `disable
 Sur l'enregistrement, un bouton dont le `onClick` retourne une promesse en attente affiche un indicateur de chargement et ne peut pas être cliqué à nouveau tant que la promesse n'est pas résolue. Si l'action lève une exception ou si sa promesse est rejetée, l'utilisateur voit l'erreur dans une notification. La vue en lecture seule ne comporte pas de formulaire, donc `formContext` y est indéfini.
 
 ## Actions de collection
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `Actions` place vos propres composants dans la barre d'outils de la collection, pour agir sur
 l'ensemble de la collection ou sur les lignes sélectionnées : voir `PublishSelected` plus haut. Il s'agit d'une

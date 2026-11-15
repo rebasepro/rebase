@@ -1,11 +1,9 @@
 ---
-sourceHash: 3a1b51e6e2ae57fd
+sourceHash: 293c14de9200de9f
 title: Inferenza dei tipi
 sidebar_label: Inferenza dei tipi
 description: "InferRow, InferInsert e InferUpdate leggono le colonne e i modificatori di una tabella per tipizzare le righe restituite e le scritture accettate — negli hook, nel codice server e in un frontend che importa il tipo della tabella."
 ---
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 I tipi TypeScript di una tabella vengono ricavati direttamente dalla sua dichiarazione. Nulla viene scritto due volte: modificando una colonna, ogni tipo da essa derivato cambierà di conseguenza.
 
@@ -42,8 +40,6 @@ Questi sono tipi di trasmissione (wire types): ciò che REST restituisce, ciò c
 
 ## Le regole
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 | La colonna | `InferRow` | `InferInsert` | `InferUpdate` |
 |---|---|---|---|
 | `.notNull()` o `.primaryKey()` | `T` | obbligatorio, a meno che non abbia un valore predefinito | opzionale |
@@ -58,8 +54,6 @@ Una colonna temporale accetta anche una `Date` in `InferInsert` e `InferUpdate`,
 `.access()` non modifica i tipi. Hanno un'unica forma per ogni chiamante e non esiste un singolo tipo di riga valido sia per un lettore che possiede un ruolo sia per uno che non lo possiede. Un chiamante senza il ruolo semplicemente non riceve la colonna.
 
 ## Foreign key
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Una foreign key `belongsTo` dichiarata in `columns` viene tipizzata esattamente lì. Una derivata dalla relazione viene aggiunta come chiave opzionale denominata come la sua colonna in camelCase — `author_id` diventa `authorId` — tipizzata come `string | number | null`. Dichiara la colonna quando desideri il suo tipo esatto; i tipi generati dall'SDK sono precisi in entrambi i casi.
 
@@ -84,8 +78,6 @@ type Comment = InferRow<typeof comments>;
 
 ## Chiavi di una tabella
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 `ColumnKeyOf<typeof posts>` è l'unione delle chiavi di colonna di una tabella, e `RelationKeyOf<typeof posts>` l'unione dei nomi delle sue relazioni. Entrambi funzionano anche sulle viste. Usali per tipizzare il codice che accetta una colonna o una relazione per nome. Provengono da `@rebasepro/types`, dal momento che `@rebasepro/server/schema` non li riesporta:
 
 ```ts
@@ -98,13 +90,9 @@ type PostRelation = RelationKeyOf<typeof posts>; // never, for a table without r
 
 ## Gli hook sono tipizzati automaticamente
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Gli [hook](/docs/collections/callbacks/) di una tabella sono tipizzati a partire dalle sue colonne senza alcuna annotazione: `values` in `beforeSave` è un `Partial` del tipo di inserimento, `previousValues` e le righe di `afterRead` e degli hook di eliminazione corrispondono al tipo di riga. Il metodo `.transform()` di una colonna riceve il tipo di quella colonna come `value`: `T | null`, oppure `T` quando `.notNull()` viene specificato prima di `.transform()`. Il metodo `.transform()` di un campo JSON riceve `T | undefined`, oppure `T` dopo `.required()`.
 
 ## In un frontend
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Un frontend può importare il **tipo** di una tabella da `backend/schema`, mai il suo valore:
 

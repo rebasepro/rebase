@@ -1,13 +1,11 @@
 ---
-sourceHash: 507990241e43f026
+sourceHash: 65f05732c36bd742
 title: Schema as Code
 sidebar_label: Schema as Code
 description: Wie Rebase die TypeScript-Tabellen in backend/schema als Single Source of Truth für Ihr Datenbankschema, Ihre API, Ihr SDK und Ihr Admin-Panel verwendet.
 ---
 
 ## Die Kernidee
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 In Rebase sind die **Tabellen, die Sie mit `defineTable` in `backend/schema/` deklarieren, die Single Source of Truth**. Daraus generiert Rebase:
 
@@ -25,8 +23,6 @@ Das bedeutet, dass Ihr Schema:
 
 ## Visuelle Bearbeitung mit AST-Manipulation
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Rebase bietet außerdem einen **visuellen Schema-Editor** im Studio. Wenn jemand diesen verwendet, um eine Spalte hinzuzufügen:
 
 1. Das Studio modifiziert die Datenbank **nicht** direkt
@@ -40,8 +36,6 @@ Wie eine Tabelle im Panel *aussieht*, ist nicht Teil davon: Labels, Icons und An
 Dieser „UI as Code Generator“-Ansatz bedeutet, dass visuelle Bearbeitungen denselben sauberen TypeScript-Code erzeugen, den ein Entwickler von Hand schreiben würde.
 
 ## Schema-Generierungs-Pipeline
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ihre Tabellen werden einmal gelesen und zweimal ausgegeben – als Drizzle-Schema, über das der laufende Server Abfragen durchführt, und als SQL, das die gewünschte Datenbank beschreibt. Es ist das SQL, an das die Datenbank angepasst wird – und zwar durch [Atlas](https://atlasgo.io), das Ihr gewünschtes Schema mit dem Live-Schema abgleicht (diff) und die Änderung plant:
 
@@ -77,8 +71,6 @@ Ihre Tabellen werden einmal gelesen und zweimal ausgegeben – als Drizzle-Schem
 `db push` ist der Entwicklungs-Workflow; `db generate` + `db migrate` ist der überprüfbare Workflow, der in der Produktion verwendet werden sollte. Beide nutzen dasselbe generierte SQL, sodass keine Unstimmigkeiten darüber entstehen können, was Ihre Tabellen bedeuten. Zudem schreiben beide das SQL vor dem Lesen frisch aus den Tabellen, sodass keine veraltete Kopie in Ihrem Repository verbleibt. Die Migrationen sind das, was Sie committen. Siehe [Schema Generation](/docs/cli/schema) für alle Flags.
 
 ### Beispiel
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ausgehend von dieser Tabelle:
 
@@ -159,8 +151,6 @@ Wenn Rebase das Datenbankschema aktualisiert, ordnet es die von Ihnen deklariert
 5. **Index-Zugehörigkeit nach Name**: Indizes sind das einzige Objekt, das *auf* einer zugeordneten Tabelle existiert, sodass eine Tabellenfilterung sie nicht schützen kann – und früher plante ein Push `DROP INDEX` für jeden Index, der im Soll-Zustand fehlte, was jeden manuell erstellten Index betraf. Rebase benennt die von ihm generierten Indizes nun nach dem Schema `<table>_<columns>_ix_<7 hex>` (`_ux_` bei Eindeutigkeit), ein Format, das kein anderer Namensgenerator hier erzeugt, und schließt alles andere namentlich aus dem Diff aus. Ein Index, den Sie von Hand geschrieben haben oder der durch Introspektion hinzugefügt wurde, wird niemals angetastet; eine Deklaration, die Sie löschen, wird weiterhin entfernt, was genau so beabsichtigt ist. Siehe **[Indexes](/docs/backend/indexes)**.
 
 ## Nächste Schritte
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - **[Tables](/docs/schema/)** – Alle `defineTable`-Optionen
 - **[Columns](/docs/schema/columns/)** – Detaillierte Spaltentyps-Zuordnungen

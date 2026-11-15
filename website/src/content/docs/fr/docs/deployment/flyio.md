@@ -1,5 +1,5 @@
 ---
-sourceHash: 15a0356fd585a797
+sourceHash: b8f64996e4df9766
 title: Déployer Rebase sur Fly.io
 description: Découvrez comment déployer Rebase mondialement ou restreindre son déploiement aux centres de données européens avec Fly.io.
 sidebar_label: Fly.io
@@ -38,7 +38,7 @@ rebase build
 Commitez un `Dockerfile` de trois lignes à la racine du projet :
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -94,8 +94,6 @@ fly deploy
 Puis `fly open`.
 
 ## 5. Le schéma
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 **Le runtime crée les tables manquantes au démarrage, y compris celles déclarées par `backend/schema`.** `REBASE_MIGRATE_ON_BOOT` a pour valeur par défaut `ensure`, qui est additif sur l'ensemble du schéma — il crée les tables, colonnes et types enum manquants et applique leur sécurité au niveau des lignes (row-level security) — de sorte que le premier démarrage sur une base de données vide est directement prêt à servir vos tables.
 

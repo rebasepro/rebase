@@ -36,8 +36,6 @@ migrated to `"cms"` on read.
 
 ### Collection Editor
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A visual editor for a table and how the panel shows it. A save is split in two:
 
 - **Schema facts** — a column's type, nullability, default, validation, enum
@@ -119,8 +117,6 @@ in `baas` mode, and on a server with no `schemaDir`. The panel asks
 disabled button.
 
 ### Built-in tools
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Every tool that knows the schema reads the tables the server serves, from
 `GET /api/schema/tables`, with or without the CMS on the page — so Studio works

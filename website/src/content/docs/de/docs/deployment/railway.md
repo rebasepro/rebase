@@ -1,5 +1,5 @@
 ---
-sourceHash: 27f3eaf8b78d59e8
+sourceHash: 6ada998b1c8e4cc0
 title: Rebase auf Railway bereitstellen
 description: Stellen Sie Rebase auf Railway über das veröffentlichte Runtime-Image und Ihr Projekt-Bundle bereit. Behalten Sie den EU-Fokus bei.
 sidebar_label: Railway
@@ -34,7 +34,7 @@ rebase build
 Committen Sie ein dreizeiliges `Dockerfile` im Root-Verzeichnis des Repositories, damit der Build-Schritt von Railway nur ein Kopiervorgang und keine Kompilierung ist:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -68,8 +68,6 @@ Railway setzt `PORT` und die Runtime bindet daran, sodass kein Port konfiguriert
 2. Klicken Sie unter **Public Networking** auf **Generate Domain** für eine `.up.railway.app`-URL oder binden Sie eine benutzerdefinierte Domain an.
 
 ## 6. Das Schema
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 **Die Runtime erstellt beim Booten fehlende Tabellen, einschließlich derjenigen, die `backend/schema` deklariert.** `REBASE_MIGRATE_ON_BOOT` ist standardmäßig auf `ensure` gesetzt, was über das gesamte Schema hinweg additiv ist – es erstellt fehlende Tabellen, Spalten und Enum-Typen und wendet deren Row-Level Security an –, sodass der erste Start gegen eine leere Datenbank direkt mit Ihren Tabellen bereitsteht.
 

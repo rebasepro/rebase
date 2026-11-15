@@ -1,5 +1,5 @@
 ---
-sourceHash: 0c385399c3a984b7
+sourceHash: 19a897df04526a75
 title: "Recette : CMS de Blog"
 sidebar_label: CMS de Blog
 description: Créez un CMS de blog complet avec articles, auteurs, catégories, édition en texte enrichi et téléversement d'images — tables dans backend/schema, présentation dans frontend/src/cms.
@@ -14,14 +14,10 @@ Créez un backend de blog avec :
 
 ## Tables
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Trois fichiers dans `backend/schema/`. Ils définissent ce que la base de données
 et l'API appliquent ; la façon dont le panneau d'administration les présente vient après, dans le frontend.
 
 ### Auteurs
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```ts
 // backend/schema/authors.ts
@@ -41,8 +37,6 @@ export const authors = defineTable("authors", {
 
 ### Catégories
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 ```ts
 // backend/schema/categories.ts
 import { defineTable, col } from "@rebasepro/server/schema";
@@ -59,8 +53,6 @@ export const categories = defineTable("categories", {
 ```
 
 ### Articles
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```ts
 // backend/schema/articles.ts
@@ -148,8 +140,6 @@ scaffold, ajoutez `writer` aux options de rôle de la colonne `roles` dans
 
 ## Comment le panneau les affiche
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Le panneau d'administration affiche ces trois tables sans aucun code supplémentaire. Ces fichiers dans
 `frontend/src/cms/` ajoutent les icônes, les couleurs d'enum et les éditeurs :
 
@@ -187,8 +177,6 @@ export const authorsCms = customizeTable<typeof authors>("authors", {
 ```
 
 ## Configuration
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 1. Enregistrez les trois fichiers de tables dans `backend/schema/` et exportez-les depuis
    `backend/schema/index.ts` — un `defineTable` non exporté par l'index
@@ -245,8 +233,6 @@ for (const article of articles) {
 
 
 ## En savoir plus
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Tables](/docs/schema/) — l'API `defineTable` utilisée dans cette recette
 - [Personnaliser une table](/docs/frontend/customize-table/) — côté panneau d'administration

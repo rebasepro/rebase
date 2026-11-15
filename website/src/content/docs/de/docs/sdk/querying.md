@@ -1,13 +1,11 @@
 ---
-sourceHash: 45064786f1785a65
+sourceHash: a76d8213b1ba989b
 title: Daten abfragen
 sidebar_label: Daten abfragen
 description: CRUD-Operationen, Fluent Query Builder, Filteroperatoren, Sortierung, Spaltenauswahl und Aggregate mit dem typisierten Rebase SDK.
 ---
 
 ## Zugriff auf Tabellen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Greifen Sie über `client.data.<tableName>` (camelCase, wird automatisch in snake_case umgewandelt) oder `client.data.table<Record<string, unknown>>("slug")` (expliziter Slug) auf jede Tabelle zu:
 

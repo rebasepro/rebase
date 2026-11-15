@@ -1,13 +1,11 @@
 ---
-sourceHash: 9338d2b094861fba
+sourceHash: 5c1d614961675bb5
 title: Tenancy
 sidebar_label: Tenancy
 description: Defina o escopo de cada linha de uma tabela para um site, organização ou workspace com uma única declaração de tenant, aplicada pelo row-level security do Postgres.
 ---
 
 ## O que ele faz
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `tenant` em uma tabela define a coluna que armazena o tenant ao qual uma linha
 pertence (um site, uma organização, um workspace) e especifica de onde o tenant do
@@ -29,8 +27,6 @@ Como o Postgres aplica essas restrições, o painel de administração, a API RE
 executado como o chamador veem todos as mesmas linhas.
 
 ## Um tenant por usuário: uma claim
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Quando cada usuário pertence a exatamente um tenant, inclua-o em seu token de sessão
 e especifique o nome da claim:
@@ -59,8 +55,6 @@ são gravadas após as claims customizadas, logo um hook não pode sobrescrevê-
 que utiliza uma delas será recusada.
 
 ## Vários tenants por usuário: uma tabela de membros
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Quando as pessoas trabalham em vários tenants (um editor em dois sites, um consultor em três
 organizações), mantenha as associações em uma tabela própria:
@@ -140,8 +134,6 @@ da política recusa um tenant externo, e um trigger `BEFORE UPDATE` recusa uma
 transferência (`42501`). Um chamador em uma role de bypass fica isento de todos os três casos.
 
 ## O campo
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - Uma coluna de texto, `uuid`, enum ou inteiro (`numeric` também), ou uma relação
   `belongsTo` para a tabela de tenants. No caso de uma relação, sua coluna de chave estrangeira é

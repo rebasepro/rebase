@@ -1,11 +1,9 @@
 ---
-sourceHash: 23be8a1faf1d5f49
+sourceHash: a64928625cee8ee8
 title: Documenti JSON
 sidebar_label: Documenti JSON
 description: "Tipizza una colonna jsonb con col.jsonb().$type<T>(), oppure assegnale una forma con json.* in modo che il server convalidi i campi annidati, applichi valori predefiniti e stamp, individui i file referenziati da un documento e cerchi al suo interno."
 ---
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Una colonna `jsonb` può essere dichiarata in due modi. `col.jsonb().$type<T>()` tipizza il documento
 solo per TypeScript e non fornisce alcuna informazione al server. `col.jsonb(shape)` accetta una
@@ -50,8 +48,6 @@ un editor JSON generico.
 
 ## Costruttori
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | Costruttore | Contiene | Tipo TypeScript |
 |---|---|---|
 | `json.string()` | una stringa | `string` |
@@ -69,8 +65,6 @@ un editor JSON generico.
 `json.object(fields, { additional: true })` accetta anche chiavi non esplicitamente definite.
 
 ## Modificatori
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 | Modificatore | Applicabile a | Cosa fa |
 |---|---|---|
@@ -114,8 +108,6 @@ dalla scrittura, e il `.default()` di un campo lo popola preventivamente.
 
 ## Array e blocchi tipizzati
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `json.array(of)` è una lista di un'unica forma. `json.oneOf(variants)` è un blocco la cui
 chiave `type` indica quale variante rappresenta e la cui chiave `value` contiene il
 contenuto di tale variante. Come elementi di un array, rappresenta la forma tipica di un editor a blocchi:
@@ -158,8 +150,6 @@ già nomi differenti: `json.oneOf({ … }, { typeField: "kind", valueField: "dat
 
 ## `jsonb` o `json`
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `col.json()` accetta gli stessi argomenti di `col.jsonb()`. Memorizza il testo esattamente come
 è stato fornito, inclusi l'ordine delle chiavi e gli spazi bianchi, e non può essere indicizzato o cercato
 nel modo in cui lo permette `jsonb`. Usalo solo quando il testo esatto è rilevante;
@@ -171,8 +161,6 @@ Un elenco di valori semplici che Postgres deve indicizzare è spesso preferibile
 un array non è consentito.
 
 ## Passaggi successivi
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Columns](/docs/schema/columns/): i costruttori di colonne e le relative regole di convalida
 - [Search](/docs/backend/search/): ricerca nei percorsi all'interno di un documento

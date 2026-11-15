@@ -1,13 +1,11 @@
 ---
-sourceHash: a289b69be61220df
+sourceHash: c75bfea30303f60e
 title: Soft delete
 sidebar_label: Soft delete
 description: "softDelete en una tabla convierte la eliminación en una marca de tiempo, oculta las filas marcadas de cada lectura y las restaura con una actualización ordinaria."
 ---
 
 ## Qué cambia
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Con `softDelete` activado, una eliminación **marca una columna en lugar de eliminar la fila**,
 y cada lectura filtra y excluye las filas marcadas. Nada más de la operación

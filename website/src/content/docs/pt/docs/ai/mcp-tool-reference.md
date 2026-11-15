@@ -1,5 +1,5 @@
 ---
-sourceHash: 50d3082d86c52ae2
+sourceHash: af8850222953a27b
 title: Referência das ferramentas MCP
 sidebar_label: Referência das ferramentas MCP
 description: Todas as ferramentas que o servidor MCP do Rebase registra, por grupo — o que cada uma precisa e faz, e quais o loopback gate recusa em projetos não locais.
@@ -13,8 +13,6 @@ decide o que ⚠ significa estão na página do [servidor MCP](/docs/ai/mcp).
 não locais, a menos que você desative essa restrição.
 
 ## Schema e banco de dados (13)
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Executa a CLI do Rebase no diretório do projeto ativo.
 
@@ -36,8 +34,6 @@ Executa a CLI do Rebase no diretório do projeto ativo.
 
 ## Planejamento de schema (1)
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Pergunta ao backend o que uma alteração faria, via `POST /api/admin/schema/plan`. Sem
 CLI e sem nada gravado em disco — funciona no banco de dados de desenvolvimento gerenciado,
 o que os comandos baseados em Atlas não conseguem fazer.
@@ -48,7 +44,7 @@ o que os comandos baseados em Atlas não conseguem fazer.
 
 ## Linhas (5)
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span> Os mesmos nomes que o `/mcp` remoto usa; antes eram `list_documents`, `get_document`, `create_document`, `update_document` e `delete_document`, com um argumento `collection`.
+Os mesmos nomes que o `/mcp` remoto usa; antes eram `list_documents`, `get_document`, `create_document`, `update_document` e `delete_document`, com um argumento `collection`.
 
 | Ferramenta | Obrigatório | Descrição |
 |---|---|---|

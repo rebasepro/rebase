@@ -1,10 +1,8 @@
 ---
-sourceHash: a8ca2780e6bbad15
+sourceHash: 97486e7c061d503d
 title: Live-Schema-Bearbeitung
 description: Tabellen für ein laufendes Backend erstellen und ändern – die Bearbeitung wird in backend/schema geschrieben, zuerst in Ihr Repository committet und dann angewendet.
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Der Schema-Editor im Admin-Panel schreibt die Tabellendateien in
 `backend/schema` neu. Das funktioniert auf Ihrem Rechner und sonst nirgends: Die
@@ -28,8 +26,6 @@ besitzt beide. Das Anwenden erfordert außerdem noch eines mehr als den Scope �
 [Wer anwenden darf](#wer-anwenden-darf).
 
 ## Die Bearbeitungen: `TablePatch`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Jede Route, die das Schema ändert, akzeptiert denselben Body, `{ patches }`: eine
 Liste von Bearbeitungen, von denen jede ihre Tabelle per Slug benennt. Der Typ ist
@@ -83,8 +79,6 @@ zurückgibt – für einen Account mit `schema:read`: ein Admin oder eine Rolle,
 die dies deklariert. Nichts auf dem Rechner setzt dies automatisch für Sie.
 
 ## Planen vor dem Anwenden
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `/plan` hat keine Nebeneffekte. Senden Sie die Bearbeitungen per POST, und es
 teilt Ihnen mit, was sie bedeuten:
@@ -200,8 +194,6 @@ kann. Zwei Bearbeitungen, die wie Änderungen aussehen und nicht abgelehnt werde
   `DROP DEFAULT` angewendet.
 
 ### Nur Quellcode bearbeiten
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Eine abgelehnte Änderung kann dennoch in `backend/schema` geschrieben und committet
 werden, wobei die Datenbank unverändert bleibt – das Entfernen einer Spalte, die Sie
@@ -360,8 +352,6 @@ genau das:
 
 ## Regeln werden im selben Apply wirksam
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Eine Änderung am `rls` einer Tabelle (oder eine neue Tabelle) wird im selben Apply
 durchgesetzt: Die Policies der geänderten Tabellen werden direkt nach dem DDL in
 die Datenbank geschrieben, und die Antwort gibt unter `policies` an, was passiert
@@ -383,8 +373,6 @@ Im Quellcode bearbeitete Hooks werden ebenfalls mit dem Apply wirksam: Der Serve
 führt die kompilierten Tabellen des bearbeiteten Schemas ohne Neustart aus.
 
 ## Bereitstellung ohne Neustart
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Eine über das Studio angewendete Änderung wird sofort bereitgestellt. Der
 Postgres-Treiber liest die geänderten Tabellen aus der Datenbank zurück und
@@ -416,8 +404,6 @@ ihrem aktuellen Zustand durch.
 
 ## Wo dies funktioniert
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Die Live-Schema-Bearbeitung schreibt `backend/schema` mit demselben Editor neu,
 den auch die Source-Only-Speichervorgänge des Panels verwenden (erfordert die
 Installation von `ts-morph`). Woher dieser Quellcode stammt, entscheidet darüber,
@@ -445,8 +431,6 @@ und dem Code `SCHEMA_EDITOR_DISABLED`: Bearbeiten Sie `backend/schema` in der
 Entwicklungsumgebung, committen Sie und führen Sie ein Deployment durch.
 
 ### Aus einem gebauten Bundle
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein Bundle besitzt keinen eigenen Code zur Konfiguration, daher erfolgt das
 Opt-in über Umgebungsvariablen. Für ein Bundle, das diese nicht setzt, ändert
@@ -502,8 +486,6 @@ Version aus, die das Deployment nutzt, committen Sie das Ergebnis und deployen
 Sie es. Zeilenumbrüche und nachgestellte Leerzeichen zählen nicht als Unterschied.
 
 ### Committen in ein Remote-Repository
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `liveSchema.repository` veranlasst den Server dazu, jede Änderung über die Git
 Data API in ein GitHub-Repository zu committen, anstatt `git commit` in einem

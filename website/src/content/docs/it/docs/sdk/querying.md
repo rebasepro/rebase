@@ -1,13 +1,11 @@
 ---
-sourceHash: 45064786f1785a65
+sourceHash: a76d8213b1ba989b
 title: Interrogazione dei dati
 sidebar_label: Interrogazione dei dati
 description: Operazioni CRUD, fluent query builder, operatori di filtro, ordinamento, selezione delle colonne e aggregazioni con l'SDK tipizzato di Rebase.
 ---
 
 ## Accesso alle tabelle
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Accedi a qualsiasi tabella tramite `client.data.<tableName>` (camelCase, convertito automaticamente in snake_case) o `client.data.table<Record<string, unknown>>("slug")` (slug esplicito):
 

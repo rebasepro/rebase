@@ -1,11 +1,9 @@
 ---
-sourceHash: 067f45147f37ef16
+sourceHash: 283f536f508ee0b7
 title: Hooks de tabla
 sidebar_label: Hooks de tabla
 description: "Ejecute código del lado del servidor en cada paso del ciclo de vida de una tabla con hooks: restrinja lecturas, enmascare campos, valide y complete escrituras, reaccione a guardados y eliminaciones, y transforme columnas individuales."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Los `hooks` de una tabla se ejecutan en el servidor en cada paso de la vida de
 una fila: antes de una lectura, en cada fila que sale del servidor, antes y
@@ -55,8 +53,6 @@ actualización para esta versión lista los cambios de nombre.
 
 ## Los siete hooks
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | Hook | Cuándo se ejecuta | Qué devuelve |
 |---|---|---|
 | `beforeQuery` | antes de que se compile cada lectura | un filtro para agregar con AND a la lectura, o nada |
@@ -86,8 +82,6 @@ propios hooks del lado del navegador para ese caso, descritos en las
 personalizaciones del CMS.
 
 ## `beforeQuery`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Se ejecuta **antes de que se compile una lectura**, para restringir qué filas
 solicita. Devuelva condiciones para agregar con AND a la consulta; no devuelva
@@ -137,8 +131,6 @@ La seguridad a nivel de fila (Row-level security) es el modelo de autorización;
 cumplirse para el SQL ejecutado como el emisor de la llamada.
 
 ## `beforeSave`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Se ejecuta antes de que se escriba una fila y devuelve los valores a escribir.
 `values` contiene cada valor en una creación y los modificados en una
@@ -190,8 +182,6 @@ cargan código del servidor, y es la misma clase que lanza el SDK tipado.
 
 ## `afterSave` y `afterSaveError`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `afterSave` se ejecuta después de que se escribe la fila y antes del commit, en
 la misma transacción. Sus `values` son la fila tal como se almacenó. Lanzar un
 error revierte el guardado, junto con todo lo que el hook escribió mediante
@@ -230,8 +220,6 @@ Si lanza un error, este se registra en los logs y el emisor de la llamada sigue
 recibiendo el error propio del guardado.
 
 ## `afterRead`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Se ejecuta en cada fila que sale del servidor (la respuesta de una lectura, la
 respuesta de una escritura, un frame en tiempo real, un resultado de MCP) y
@@ -291,8 +279,6 @@ los filtros.
 
 ## `beforeDelete` y `afterDelete`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Ambos reciben la fila que se está eliminando como `values`, y su `id`.
 
 `beforeDelete` se ejecuta dentro de la transacción de eliminación. Lance un
@@ -306,8 +292,6 @@ Lanzar un error revierte la eliminación. En una tabla con
 temporal y ambos hooks aún se ejecutan.
 
 ## Hooks de campo: `.transform()`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 El método `.transform()` de una columna acepta dos hooks a nivel de campo:
 `beforeSave` devuelve el valor a almacenar y `afterRead` devuelve el valor a
@@ -343,8 +327,6 @@ mayúsculas/minúsculas, las [reglas de validación](/docs/schema/columns/#valid
 
 ## Escribir en otras tablas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `context.data` lee y escribe en cualquier tabla mediante su slug, como el emisor
 de la llamada y en la misma transacción que la escritura que ejecutó el hook:
 
@@ -378,8 +360,6 @@ privilegios con los que se ejecuta, la transacción y los límites de anidamient
 
 ## Hooks para cada tabla
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Los hooks que se aplican a todas las tablas (enmascaramiento de PII en todo el
 esquema, un registro de auditoría global) se exportan como `hooks` desde
 `backend/hooks.ts`, con la misma estructura de `TableHooks`. Se ejecutan antes
@@ -391,8 +371,6 @@ Los hooks también se pueden adjuntar después del arranque con
 tabla declaró; para agregarlos a ellos, pase `composeTableHooks(declared, yours)`.
 
 ## Combinar conjuntos de hooks
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Una tabla tiene un único objeto `hooks`. Cuando varias responsabilidades
 requieren un hook cada una (un generador de slugs, una pista de auditoría, un
@@ -444,8 +422,6 @@ debe leer sus valores como `unknown` y validarlos.
 
 ## Probar un hook
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Un hook es una función común que recibe un único objeto de props, por lo que una
 prueba unitaria lo llama: `posts.config.hooks?.beforeSave?.(props)`.
 `createCallContext` de `@rebasepro/server` construye la prop `context`
@@ -456,8 +432,6 @@ hooks contra una base de datos real, consulte
 [Scripts y la Consola](/docs/backend/scripts/).
 
 ## Próximos pasos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [La API de `context.data`](/docs/collections/context-data-api/): privilegios, transacciones y la conexión que retiene un hook
 - [Hooks globales](/docs/backend/hooks/): hooks en todas las tablas

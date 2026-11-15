@@ -1,5 +1,5 @@
 ---
-sourceHash: 50d3082d86c52ae2
+sourceHash: af8850222953a27b
 title: MCP-Tool-Referenz
 sidebar_label: MCP-Tool-Referenz
 description: Alle vom Rebase-MCP-Server registrierten Tools nach Gruppen geordnet – was jedes einzelne benötigt und tut, und welche das Loopback-Gate bei einem nicht-lokalen Projekt verweigert.
@@ -13,8 +13,6 @@ entscheidet, was ⚠ bedeutet, erfahren Sie auf der Seite [MCP-Server](/docs/ai/
 verweigert, sofern Sie dies nicht explizit deaktivieren.
 
 ## Schema & Datenbank (13)
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Startet die Rebase-CLI im aktiven Projektverzeichnis.
 
@@ -36,8 +34,6 @@ Startet die Rebase-CLI im aktiven Projektverzeichnis.
 
 ## Schema-Planung (1)
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Fragt das Backend über `POST /api/admin/schema/plan`, welche Auswirkungen eine Änderung hätte. Keine
 CLI und keine Schreibvorgänge auf der Festplatte – dies funktioniert auf der verwalteten Entwicklungsdatenbank,
 was die Atlas-basierten Befehle nicht können.
@@ -48,7 +44,7 @@ was die Atlas-basierten Befehle nicht können.
 
 ## Zeilen (5)
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span> Dieselben Namen, die auch das Remote-`/mcp` verwendet; zuvor hießen sie `list_documents`, `get_document`, `create_document`, `update_document` und `delete_document` mit einem `collection`-Argument.
+Dieselben Namen, die auch das Remote-`/mcp` verwendet; zuvor hießen sie `list_documents`, `get_document`, `create_document`, `update_document` und `delete_document` mit einem `collection`-Argument.
 
 | Tool | Erforderlich | Beschreibung |
 |---|---|---|

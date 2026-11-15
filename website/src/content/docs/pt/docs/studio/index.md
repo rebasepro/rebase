@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f137cdb15196a3e
+sourceHash: 3e87d9e1b148c9f5
 title: Ferramentas do Studio
 sidebar_label: Studio
 description: O Rebase Studio oferece ferramentas de desenvolvedor para edição visual de esquemas, consultas SQL, scripts JavaScript, gerenciamento de políticas RLS e navegação de armazenamento.
@@ -36,8 +36,6 @@ migrado para `"cms"` durante a leitura.
 ## Ferramentas Nativas do Studio
 
 ### Editor de Coleções (Collection Editor)
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Um editor visual para uma tabela e como o painel a exibe. Um salvamento é dividido em dois:
 
@@ -120,8 +118,6 @@ no modo `baas`, e em um servidor sem `schemaDir`. O painel consulta
 botão desativado.
 
 ### Ferramentas integradas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Toda ferramenta que reconhece o esquema lê as tabelas fornecidas pelo servidor, a partir de
 `GET /api/schema/tables`, com ou sem o CMS na página — assim o Studio funciona

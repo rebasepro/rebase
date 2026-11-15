@@ -1,5 +1,5 @@
 ---
-sourceHash: ff162864c3d1600b
+sourceHash: 6403748b3ff6521b
 slug: es/docs/troubleshooting
 title: Solución de problemas
 description: Los fallos que impiden que un backend de Rebase se inicie o preste servicio — una base de datos inaccesible, credenciales incorrectas, una extensión faltante, un rechazo de RLS, desfase de esquema (schema drift), un puerto ocupado, una función que no carga — y el aspecto de cada uno de ellos.
@@ -62,13 +62,9 @@ Comprueba las credenciales en `DATABASE_URL`. Una contraseña que contenga `@`, 
 
 ## `SchemaDefinitionError` — el esquema no compila
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 El arranque, `rebase db generate`, `db push`, `generate-sdk` y `doctor` compilan las tablas que exporta `backend/schema/index.ts` antes que cualquier otra cosa, y se detienen cuando alguna tabla no compila — sin `rls`, `"inherit"` sin `defaultRls`, una relación con una tabla que el index no exporta, un `defineTable` en un archivo hermano que el index omite —, nombrando cada tabla, clave y problema a la vez. Corrige cada uno; `rebase verify` reporta la misma lista sin iniciar nada.
 
 ## Se rechaza `config/collections`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Un proyecto anterior a la versión 0.31 mantiene su modelo de datos en `config/collections`, el cual ya nada lee: el runtime, cada comando de la CLI y un bundle format-2 son rechazados con `rebase migrate collections-to-tables` en el mensaje. Ejecútalo en un árbol de git limpio; reescribe el proyecto como `backend/schema` y `frontend/src/cms`, demuestra que el SQL generado no ha cambiado y muestra los pasos que te quedan por hacer. Consulta [Actualización de 0.30 a 0.31](https://rebase.pro/docs/upgrading/0-30-to-0-31/).
 
@@ -83,8 +79,6 @@ database({ extensions: ["vector"] })
 La base de datos también necesita una imagen que incluya la biblioteca. La del scaffold, `pgvector/pgvector:pg18`, la incluye; una `postgres:18` genérica no. Si la instalación en sí es rechazada (`extension "vector" is not available`, o un error de permisos), la configuración ya es correcta y lo que falta es la biblioteca en el servidor o un rol autorizado para ejecutar `CREATE EXTENSION vector;`.
 
 ## La base de datos rechazó la sentencia
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```
 DB_PERMISSION_DENIED — Permission denied by the database on "notes"
@@ -145,8 +139,6 @@ El entorno de desarrollo se vincula al siguiente puerto libre y lo notifica. El 
 Pasa `--port` para fijar uno, o detén el otro proceso. En producción no hay reintentos: el puerto configurado es el puerto, y `EADDRINUSE` es fatal.
 
 ## El backend falló y `rebase dev` siguió ejecutándose
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Un backend que lanza una excepción en el arranque no detiene el watcher: imprime la traza de error y espera un cambio de archivo. Cuando el backend no se ha anunciado dentro de `REBASE_DEV_READY_TIMEOUT_MS` (30 segundos por defecto), `rebase dev` reporta esto:
 

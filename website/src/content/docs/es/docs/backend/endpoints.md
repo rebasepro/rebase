@@ -1,5 +1,5 @@
 ---
-sourceHash: 9b25ea3a0b2cb11a
+sourceHash: be11c8b493d773a7
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada ruta HTTP que monta un backend de Rebase — datos, autenticación, almacenamiento, administración, meta — con el control de acceso en cada una y la página que la explica.
@@ -29,8 +29,6 @@ nueva superficie sin que aparezca aquí.
 | **dev** | Montado solo fuera de producción |
 
 ## Data
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Generado por tabla, por lo que las rutas llevan sus slugs en lugar de una lista
 fija. `:slug` es el slug de una tabla (su nombre, a menos que `defineTable` establezca `slug`).
@@ -92,7 +90,7 @@ como un único `404 NO_TABLES`. Consulte [Backend only](/docs/getting-started/he
 | `POST` | `/api/auth/magic-link/verify` | none (un token de enlace) | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/otp` | none | Códigos de un solo uso por correo electrónico |
 | `POST` | `/api/auth/otp/verify` | none (un código) | Códigos de un solo uso por correo electrónico |
-| `POST` | `/api/auth/device` | none | <span class="since-badge" data-since="0.31">Desde 0.31</span> [Device sign-in](/docs/backend/device-sign-in/). Desactivado a menos que el backend lo active |
+| `POST` | `/api/auth/device` | none | [Device sign-in](/docs/backend/device-sign-in/). Desactivado a menos que el backend lo active |
 | `POST` | `/api/auth/device/token` | none (un código de dispositivo) | [Device sign-in](/docs/backend/device-sign-in/): el sondeo del dispositivo |
 | `GET` | `/api/auth/device/:userCode` | session | [Device sign-in](/docs/backend/device-sign-in/): lo que muestra la página de aprobación |
 | `POST` | `/api/auth/device/approve` | session (`aal2` con un segundo factor) | [Device sign-in](/docs/backend/device-sign-in/) |
@@ -173,19 +171,19 @@ limitado a una tabla no tiene acceso a nada de esto. Consulte [Roles and scopes]
 | `POST` | `/api/admin/schema/reconcile/plan` | `schema:read` | Planifica flexibilizar `NOT NULL` y eliminar las columnas no declaradas nombradas en `drop`, para [schema reconcile](/docs/cli/schema/#rebase-schema-reconcile); nunca aplica ninguno |
 | `POST` | `/api/admin/schema/reconcile/apply` | `schema:write` | Aplica un plan de conciliación, solo si su `digest` coincide con el `confirm` enviado |
 | `GET` | `/api/admin/schema-editor/status` | `schema:read` | Si el editor está disponible y el motivo cuando no lo está |
-| `GET` | `/api/admin/schema-editor/tables` | `schema:read` | <span class="since-badge" data-since="0.31">Desde 0.31</span> Cada tabla que `backend/schema/index.ts` exporta tal como la lee el editor, con lo que se edita en código (solo lectura) y el motivo — [Live schema editing](/docs/backend/live-schema-editing/#the-edits-tablepatch) |
-| `POST` | `/api/admin/schema-editor/preview` | `schema:write` | <span class="since-badge" data-since="0.31">Desde 0.31</span> `{ patches: TablePatch[] }`: los archivos que la edición escribiría, compilados; no escribe nada |
-| `POST` | `/api/admin/schema-editor/apply` | `schema:write` | <span class="since-badge" data-since="0.31">Desde 0.31</span> La misma edición, escrita en `backend/schema`; no se modifica la base de datos |
-| `GET` | `/api/admin/schema-editor/unmapped-tables` | `schema:read` | <span class="since-badge" data-since="0.31">Desde 0.31</span> Tablas que tiene la base de datos y `backend/schema` no declara: `{ tables: [{ schema, table, rlsEnabled, policies, unimportable? }] }` |
-| `GET` | `/api/admin/schema-editor/unmapped-tables/:schema/:table` | `schema:read` | <span class="since-badge" data-since="0.31">Desde 0.31</span> Una de ellas descrita: `{ table: { …, descriptor, rlsRaised?, notes } }`, para "Import an existing table". `404` cuando es desconocida o ya está declarada, `400 SCHEMA_EDIT_REFUSED` sin una clave primaria |
-| `GET` | `/api/admin/schema-editor/frontend/calls` | `schema:read` | <span class="since-badge" data-since="0.31">Desde 0.31</span> Las llamadas a `defineFirestoreCollection` en `frontend/src/cms` que el editor puede reescribir (solo desarrollo) |
-| `POST` | `/api/admin/schema-editor/frontend/preview` | `schema:write` | <span class="since-badge" data-since="0.31">Desde 0.31</span> Los archivos que escribiría una edición de una de esas llamadas; no escribe nada |
-| `POST` | `/api/admin/schema-editor/frontend/apply` | `schema:write` | <span class="since-badge" data-since="0.31">Desde 0.31</span> La misma edición, escrita en el lugar. `409 SCHEMA_EDIT_STALE_FILE` cuando el archivo cambió en el disco |
-| `GET` | `/api/admin/ui-config` | session | <span class="since-badge" data-since="0.31">Desde 0.31</span> Las preferencias de interfaz de usuario del espacio de trabajo por tabla, las propias del llamador y si el llamador puede escribir las del espacio de trabajo — consulte [Studio](/docs/studio/#collection-editor) |
-| `PUT` | `/api/admin/ui-config/workspace/:slug` | `schema:write` | <span class="since-badge" data-since="0.31">Desde 0.31</span> Combina un delta de `UiTablePreferences` en las preferencias del espacio de trabajo de una tabla (`replace` reemplaza). Escrito en `frontend/src/cms/ui-config.json` donde el servidor pueda escribir en el código fuente del proyecto; de lo contrario, en `rebase.ui_preferences` |
-| `DELETE` | `/api/admin/ui-config/workspace/:slug` | `schema:write` | <span class="since-badge" data-since="0.31">Desde 0.31</span> Elimina las preferencias del espacio de trabajo de una tabla |
-| `PUT` | `/api/admin/ui-config/user/:slug` | session (una persona) | <span class="since-badge" data-since="0.31">Desde 0.31</span> Las preferencias propias del llamador para una tabla. Una clave de API no tiene ninguna: `403 UI_PREFERENCES_NEED_A_PERSON` |
-| `DELETE` | `/api/admin/ui-config/user/:slug` | session (una persona) | <span class="since-badge" data-since="0.31">Desde 0.31</span> Elimina las preferencias propias del llamador para una tabla |
+| `GET` | `/api/admin/schema-editor/tables` | `schema:read` | Cada tabla que `backend/schema/index.ts` exporta tal como la lee el editor, con lo que se edita en código (solo lectura) y el motivo — [Live schema editing](/docs/backend/live-schema-editing/#the-edits-tablepatch) |
+| `POST` | `/api/admin/schema-editor/preview` | `schema:write` | `{ patches: TablePatch[] }`: los archivos que la edición escribiría, compilados; no escribe nada |
+| `POST` | `/api/admin/schema-editor/apply` | `schema:write` | La misma edición, escrita en `backend/schema`; no se modifica la base de datos |
+| `GET` | `/api/admin/schema-editor/unmapped-tables` | `schema:read` | Tablas que tiene la base de datos y `backend/schema` no declara: `{ tables: [{ schema, table, rlsEnabled, policies, unimportable? }] }` |
+| `GET` | `/api/admin/schema-editor/unmapped-tables/:schema/:table` | `schema:read` | Una de ellas descrita: `{ table: { …, descriptor, rlsRaised?, notes } }`, para "Import an existing table". `404` cuando es desconocida o ya está declarada, `400 SCHEMA_EDIT_REFUSED` sin una clave primaria |
+| `GET` | `/api/admin/schema-editor/frontend/calls` | `schema:read` | Las llamadas a `defineFirestoreCollection` en `frontend/src/cms` que el editor puede reescribir (solo desarrollo) |
+| `POST` | `/api/admin/schema-editor/frontend/preview` | `schema:write` | Los archivos que escribiría una edición de una de esas llamadas; no escribe nada |
+| `POST` | `/api/admin/schema-editor/frontend/apply` | `schema:write` | La misma edición, escrita en el lugar. `409 SCHEMA_EDIT_STALE_FILE` cuando el archivo cambió en el disco |
+| `GET` | `/api/admin/ui-config` | session | Las preferencias de interfaz de usuario del espacio de trabajo por tabla, las propias del llamador y si el llamador puede escribir las del espacio de trabajo — consulte [Studio](/docs/studio/#collection-editor) |
+| `PUT` | `/api/admin/ui-config/workspace/:slug` | `schema:write` | Combina un delta de `UiTablePreferences` en las preferencias del espacio de trabajo de una tabla (`replace` reemplaza). Escrito en `frontend/src/cms/ui-config.json` donde el servidor pueda escribir en el código fuente del proyecto; de lo contrario, en `rebase.ui_preferences` |
+| `DELETE` | `/api/admin/ui-config/workspace/:slug` | `schema:write` | Elimina las preferencias del espacio de trabajo de una tabla |
+| `PUT` | `/api/admin/ui-config/user/:slug` | session (una persona) | Las preferencias propias del llamador para una tabla. Una clave de API no tiene ninguna: `403 UI_PREFERENCES_NEED_A_PERSON` |
+| `DELETE` | `/api/admin/ui-config/user/:slug` | session (una persona) | Elimina las preferencias propias del llamador para una tabla |
 | `GET` | `/api/admin/dev/emails` | dev + `users:write` | Correos que el transporte de desarrollo capturó en lugar de enviar |
 | `DELETE` | `/api/admin/dev/emails` | dev + `users:write` | Vacía el buzón capturado |
 
@@ -194,8 +192,6 @@ sirven en sus rutas anteriores a la versión 0.17 sin el segmento `/admin`. Esos
 para proyectos que no han migrado; escriba el código nuevo utilizando la ruta canónica.
 
 ## Schema
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 | Método | Ruta | Gate | Más |
 |---|---|---|---|
@@ -282,7 +278,7 @@ inventario de los endpoints personalizados de una implementación no es público
 |---|---|---|---|
 | `GET` | `/livez` | none | Comprobación de actividad (liveness) únicamente: indica si este proceso se está ejecutando. No consulta la base de datos, razón por la cual es la ruta de sondeo que debería usar un contenedor — `RUNTIME_LIVENESS_PATH` |
 | `GET` | `/health`, `/api/health` | none | Actividad y disponibilidad (liveness y readiness). Informa sobre cada fuente de datos configurada, no solo la predeterminada |
-| `GET` | `/api/docs` | <span class="since-badge" data-since="0.31">Desde 0.31</span> la audiencia del endpoint de esquema de forma predeterminada (401 anónimo a menos que sea `schemaTables.public`, 403 para una credencial sin un scope de esquema o datos); none cuando `enableSwagger` es `true`; el gate de administración cuando es `false` | El documento OpenAPI 3.0 de las tablas que `GET /api/schema/tables` describe al llamador (todas ellas con `enableSwagger: true`). `404 DOCS_UNAVAILABLE` cuando no hay autenticación configurada |
+| `GET` | `/api/docs` | la audiencia del endpoint de esquema de forma predeterminada (401 anónimo a menos que sea `schemaTables.public`, 403 para una credencial sin un scope de esquema o datos); none cuando `enableSwagger` es `true`; el gate de administración cuando es `false` | El documento OpenAPI 3.0 de las tablas que `GET /api/schema/tables` describe al llamador (todas ellas con `enableSwagger: true`). `404 DOCS_UNAVAILABLE` cuando no hay autenticación configurada |
 | `GET` | `/api/swagger` | none | Swagger UI. Solo cuando `enableSwagger` es `true`, y nunca en producción |
 | `GET` | `/api/meta/schema-version` | none | El hash del esquema a partir del cual se construyó este backend y la versión del runtime, y nada más |
 | `GET` | `/api/meta/contract` | `schema:read` | `{ schemaVersion, runtime: { version, contract }, tables }` — cada tabla tal como la ve un administrador, la entrada de `rebase generate-sdk --from`. `404` cuando no hay autenticación configurada |

@@ -1,11 +1,9 @@
 ---
-sourceHash: 3a1b51e6e2ae57fd
+sourceHash: 293c14de9200de9f
 title: Typinferenz
 sidebar_label: Typinferenz
 description: "InferRow, InferInsert und InferUpdate lesen die Spalten und Modifikatoren einer Tabelle aus, um die Zeilen, die sie ausliefert, und die Schreibvorgänge, die sie akzeptiert, zu typisieren – in Hooks, im Server-Code und in einem Frontend, das den Typ der Tabelle importiert."
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Die TypeScript-Typen einer Tabelle werden aus ihrer Deklaration abgeleitet. Nichts wird doppelt geschrieben: Ändert sich eine Spalte, ändern sich alle davon abgeleiteten Typen automatisch mit.
 
@@ -42,8 +40,6 @@ Dies sind Wire-Typen: was REST zurückgibt, was das SDK liefert und was Hooks em
 
 ## Die Regeln
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 | Die Spalte | `InferRow` | `InferInsert` | `InferUpdate` |
 |---|---|---|---|
 | `.notNull()` oder `.primaryKey()` | `T` | erforderlich, sofern kein Standardwert vorhanden ist | optional |
@@ -58,8 +54,6 @@ Eine zeitbezogene Spalte akzeptiert in `InferInsert` und `InferUpdate` wie bei e
 `.access()` ändert die Typen nicht. Sie haben für jeden Aufrufer dieselbe Form, und es gibt keinen einzelnen Zeilentyp, der sowohl für einen lesenden Zugriff mit einer bestimmten Rolle als auch ohne Rolle passend wäre. Ein Aufrufer ohne die entsprechende Rolle erhält die Spalte schlichtweg nicht.
 
 ## Fremdschlüssel
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein `belongsTo`-Fremdschlüssel, der in `columns` deklariert wird, ist dort exakt typisiert. Ein von der Relation abgeleiteter Schlüssel wird als optionaler Schlüssel hinzugefügt, der nach seiner Spalte in camelCase benannt ist – `author_id` wird zu `authorId` – typisiert als `string | number | null`. Deklarieren Sie die Spalte, wenn Sie ihren genauen Typ benötigen; die generierten SDK-Typen sind in beiden Fällen exakt.
 
@@ -84,8 +78,6 @@ type Comment = InferRow<typeof comments>;
 
 ## Schlüssel einer Tabelle
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `ColumnKeyOf<typeof posts>` ist die Union der Spaltenschlüssel einer Tabelle und `RelationKeyOf<typeof posts>` die Union ihrer Relationsnamen. Beide funktionieren auch bei Views. Verwenden Sie sie, um Code zu typisieren, der eine Spalte oder Relation über den Namen entgegennimmt. Sie stammen aus `@rebasepro/types`, woraus `@rebasepro/server/schema` sie nicht erneut exportiert:
 
 ```ts
@@ -98,13 +90,9 @@ type PostRelation = RelationKeyOf<typeof posts>; // never, for a table without r
 
 ## Hooks werden automatisch typisiert
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Die [Hooks](/docs/collections/callbacks/) einer Tabelle werden ohne zusätzliche Typannotationen anhand ihrer Spalten typisiert: `values` in `beforeSave` ist ein `Partial` des Insert-Typs, `previousValues` sowie die Zeilen von `afterRead` und den Delete-Hooks entsprechen dem Row-Typ. Das `.transform()` einer Spalte empfängt den Typ dieser Spalte als `value`: `T | null` oder `T`, wenn `.notNull()` vor `.transform()` angegeben ist. Das `.transform()` eines JSON-Felds erhält `T | undefined` oder `T` nach `.required()`.
 
 ## Im Frontend
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein Frontend darf den **Typ** einer Tabelle aus `backend/schema` importieren, niemals jedoch deren Wert:
 

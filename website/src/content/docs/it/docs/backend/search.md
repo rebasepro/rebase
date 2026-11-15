@@ -1,5 +1,5 @@
 ---
-sourceHash: 72daf47d8a15bafe
+sourceHash: ceff4ba3bdacfb06
 title: Ricerca
 sidebar_label: Ricerca
 description: Come si comporta .search() per impostazione predefinita e come una tabella può abilitare la ricerca full-text con ranking sulle colonne specificate — inclusi contenuti JSONB e array.
@@ -46,8 +46,6 @@ lo fa.
 Una ricerca con una sola parola compila esattamente nello stesso SQL di sempre.
 
 ## Abilitare la ricerca avanzata (Opting in)
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Dichiara `search` su una tabella, specificando le colonne che desideri indicizzare:
 
@@ -135,8 +133,6 @@ vuole evitare: una colonna che continua a indicizzare il vecchio insieme di camp
 non restituisce nulla per contenuti chiaramente presenti nella riga.
 
 ## Cosa è possibile indicare in `fields`
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Un percorso inizia con la chiave di una colonna.
 

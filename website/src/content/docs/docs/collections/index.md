@@ -4,8 +4,6 @@ sidebar_label: Tables in the CMS
 description: "How the CMS shows every Postgres table with no frontend configuration: labels, the widget each column type gets, required and read-only fields, relations, display slots, and Create, Edit and Delete controls that follow the table's row-level security."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 If you use the CMS, you do not describe your tables to it. When someone signs
 in, the panel asks the backend for the tables that person may see, and shows
 each one as a **collection**: a page in the navigation with a table view, a
@@ -36,8 +34,6 @@ the tables the backend serves, and the presentation lives in
 
 ## Where the tables come from
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `<RebaseCMS>` calls `client.schema.tables()`, which reads
 `GET /api/schema/tables`. The answer is the list of table descriptors, redacted
 for the caller: a table they may not read is absent, and so is a column their
@@ -55,8 +51,6 @@ The same descriptors drive the Studio and the MCP apps, so the three agree on
 what a table is.
 
 ## Labels
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Every label is derived from an identifier, so a table reads the same for every
 caller and on every load:
@@ -76,8 +70,6 @@ singular changes only the last word, and leaves words that merely end in `s`
 alone (`Status`, `Analysis`, `Address`).
 
 ## The field each column gets
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 | Column | Field in the form | Notes |
 |---|---|---|
@@ -118,8 +110,6 @@ Each column type, its widget, and the options that change it are on
 
 ## Required, defaults and read-only fields
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | The column | In the form |
 |---|---|
 | `.notNull()` | required, with the `requiredMessage` of `.validate()` when it has one |
@@ -142,8 +132,6 @@ in the read-only block at the foot of the form's rail.
 
 ## Relations
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 - A `belongsTo` is a picker of the related row, in place of its foreign-key
   column: the form shows **Author**, not **Author ID**. It is required when the
   foreign key is `NOT NULL` with no default. A foreign key that is part of the
@@ -159,8 +147,6 @@ in the read-only block at the foot of the form's rail.
 See [Relations in the panel](/docs/collections/relations-in-the-admin-panel/).
 
 ## Display slots
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Every surface that draws a record uses some of six slots: title, subtitle,
 image, status, date and tags (see [display slots](/docs/frontend/view-modes/#display-slots)).
@@ -179,8 +165,6 @@ the title: the first short text field). `display` in `customizeTable` sets any
 slot explicitly.
 
 ## Who sees which controls
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 The panel hides **Create**, **Edit** and **Delete** when the signed-in user may
 not do them. It decides by evaluating the table's row-level security in the
@@ -204,16 +188,12 @@ write that should not have happened.
 
 ## Order and defaults
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Tables appear in the navigation in the order the backend serves them, the order
 they are exported from `backend/schema/index.ts`. Each opens in the table view.
 `customizeTable` sets `group`, `icon`, `defaultViewMode` and the rest; `<RebaseCMS
 navigationGroupMappings>` arranges groups across tables.
 
 ## Loading and errors
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - **While the tables load**, a route to a collection shows the loading state,
   not "collection not found", and a deep link opens once the collection exists.
@@ -230,8 +210,6 @@ warning in development. See
 
 ## Many tables
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Nothing caps the number of tables. The panel needs every collection to draw the
 navigation, so the descriptors are fetched after sign-in, and what opening a
 collection needs (the table, the record views, the form) loads only then. A
@@ -240,8 +218,6 @@ push takes tens of seconds; see
 [how long a push takes](/docs/cli/schema#rebase-db-push).
 
 ## Next steps
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/): change any of the above, per table
 - [Fields](/docs/collections/properties/): every column type's widget and options

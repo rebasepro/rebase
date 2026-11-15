@@ -4,8 +4,6 @@ sidebar_label: Vector Search
 description: Nearest-neighbour search over a col.vector() column through the REST API — the query parameters, thresholds, embeddings too long for a URL, and how filters behave on an HNSW index.
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A table with a `col.vector()` column can be searched by similarity: the nearest
 rows to a query vector, by a pgvector distance computed in the database query.
 
@@ -14,8 +12,6 @@ GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_d
 ```
 
 ## Declaring the column
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```ts
 import { defineTable, col } from "@rebasepro/server/schema";

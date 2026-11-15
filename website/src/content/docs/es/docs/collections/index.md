@@ -1,11 +1,9 @@
 ---
-sourceHash: f7689301748e2ce5
+sourceHash: fc0bdfb0ae7ceb1b
 title: Tablas en el CMS
 sidebar_label: Tablas en el CMS
 description: "Cómo muestra el CMS cada tabla de Postgres sin configuración en el frontend: etiquetas, el widget que recibe cada tipo de columna, campos obligatorios y de solo lectura, relaciones, display slots y controles de Crear, Editar y Eliminar que respetan la seguridad a nivel de fila (RLS) de la tabla."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Si usas el CMS, no necesitas describirle tus tablas. Cuando alguien inicia
 sesión, el panel solicita al backend las tablas que esa persona puede ver y
@@ -38,8 +36,6 @@ las tablas que sirve el backend, y la presentación reside en
 
 ## De dónde provienen las tablas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `<RebaseCMS>` llama a `client.schema.tables()`, que lee
 `GET /api/schema/tables`. La respuesta es la lista de descriptores de tablas,
 redactada para quien realiza la llamada: una tabla que no puede leer no
@@ -61,8 +57,6 @@ tres coinciden en lo que es una tabla.
 
 ## Etiquetas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Cada etiqueta se deriva de un identificador, por lo que una tabla se lee igual
 para cualquier usuario y en cada carga:
 
@@ -82,8 +76,6 @@ modifica las palabras que simplemente terminan en `s` (`Status`, `Analysis`,
 `Address`).
 
 ## El campo que recibe cada columna
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 | Columna | Campo en el formulario | Notas |
 |---|---|---|
@@ -124,8 +116,6 @@ en [Campos](/docs/collections/properties/).
 
 ## Campos obligatorios, valores predeterminados y de solo lectura
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | La columna | En el formulario |
 |---|---|
 | `.notNull()` | obligatorio, con el `requiredMessage` de `.validate()` si lo tiene |
@@ -148,8 +138,6 @@ muestran en el bloque de solo lectura al pie de la barra lateral del formulario.
 
 ## Relaciones
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 - Un `belongsTo` es un selector de la fila relacionada, en lugar de su columna
   de clave foránea: el formulario muestra **Author**, no **Author ID**. Es
   obligatorio cuando la clave foránea es `NOT NULL` sin valor predeterminado. Una
@@ -169,8 +157,6 @@ Consulta [Relaciones en el panel](/docs/collections/relations-in-the-admin-panel
 
 ## Display slots
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Cada superficie que dibuja un registro utiliza algunos de seis slots: title,
 subtitle, image, status, date y tags (consulta [display slots](/docs/frontend/view-modes/#display-slots)).
 Un slot se completa a partir de una columna solo cuando la columna claramente
@@ -189,8 +175,6 @@ registro por parte del panel (para el título: el primer campo de texto corto).
 `display` en `customizeTable` define cualquier slot de forma explícita.
 
 ## Quién ve qué controles
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 El panel oculta **Create**, **Edit** y **Delete** cuando el usuario que inició
 sesión no tiene permiso para realizarlos. Lo decide evaluando la seguridad a
@@ -216,8 +200,6 @@ escritura rechazada, nunca una escritura que no debió haber ocurrido.
 
 ## Orden y valores predeterminados
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Las tablas aparecen en la navegación en el orden en que las sirve el backend, es
 decir, el orden en que se exportan desde `backend/schema/index.ts`. Cada una se
 abre en la vista de tabla. `customizeTable` configura `group`, `icon`,
@@ -225,8 +207,6 @@ abre en la vista de tabla. `customizeTable` configura `group`, `icon`,
 grupos entre las tablas.
 
 ## Carga y errores
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - **Mientras las tablas se cargan**, una ruta a una colección muestra el estado
   de carga, no "colección no encontrada", y un enlace profundo (deep link) se
@@ -244,8 +224,6 @@ llamada se ignoran, mostrando una advertencia en desarrollo. Consulta
 
 ## Muchas tablas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Nada limita la cantidad de tablas. El panel necesita todas las colecciones para
 renderizar la navegación, por lo que los descriptores se obtienen tras iniciar
 sesión, y lo necesario para abrir una colección (la tabla, las vistas de
@@ -255,8 +233,6 @@ tarda decenas de segundos; consulta
 [cuánto tarda un push](/docs/cli/schema#rebase-db-push).
 
 ## Próximos pasos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/): modifica cualquiera de los puntos anteriores, por tabla
 - [Fields](/docs/collections/properties/): widget y opciones para cada tipo de columna

@@ -1,11 +1,9 @@
 ---
-sourceHash: f55095351eb33abe
+sourceHash: d482e63c42ac3a1a
 title: Acesso a campos
 sidebar_label: Acesso a campos
 description: "Permissões de leitura e gravação por coluna por função com .access(), colunas que nunca saem do servidor com .private() e colunas que clientes não podem gravar com .readOnly(). Um chamador liberado pelas políticas da linha ainda assim não recebe uma coluna que suas funções não possam ler."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 A [segurança a nível de linha (Row-level security)](/docs/collections/security-rules/) decide quais **linhas** um
 chamador acessa. Três modificadores de coluna decidem quais **colunas de uma linha acessada**
@@ -39,8 +37,6 @@ permitir lê todas as linhas de staff. Apenas um chamador que possua a função 
 `salary`, e ninguém pode defini-la via HTTP.
 
 ## A regra
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `.access()` aceita duas listas opcionais, e uma lista omitida não é o mesmo que uma lista vazia —
 essa diferença é a essência do recurso.
@@ -78,8 +74,6 @@ agregações ou testes de unicidade que indiquem uma coluna que essas funções 
 digitação — assim como no REST e no socket.
 
 ## `.private()` e `.readOnly()` são o mesmo mecanismo
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `.private()` é o equivalente a `.access({ read: [], write: [] })`, com uma diferença: uma
 coluna privada também é deixada de fora do OpenAPI, dos tipos do SDK e dos esquemas de ferramentas
@@ -183,8 +177,6 @@ o valor que você não tem permissão para ver.
 
 ### Uma relação vinculada segue sua coluna de chave
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Um `belongsTo` e a coluna de chave à qual ele está vinculado são o mesmo campo com duas representações.
 Gravar `{ "reviewer": 7 }` está sujeito a todas as regras de `reviewerId` (sua regra de gravação,
 `.readOnly()`, `.private()`, stamp de criação, coluna de tenant); enviar ambos com valores diferentes
@@ -217,8 +209,6 @@ pela tabela. Ela nunca afrouxa uma regra em uma coluna declarada, stamp, tenant,
 ou `_pivot`.
 
 ## Busca
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 A busca padrão (fallback) — em tabelas sem bloco `search` — executa correspondências com `ILIKE` em
 suas colunas de texto e ignora aquelas que o chamador não pode ler. Nada vaza por meio dela.
@@ -286,8 +276,6 @@ nada delas. `[]` ainda oculta — inclusive de `dataAsAdmin`. Use [`rebase.sql()
 se precisar da coluna bruta.
 
 ## Validação
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `.access()` em uma coluna, e `access` em uma relação, geram um erro ao carregar o módulo, a menos que
 `read` e `write` sejam listas de nomes de funções não vazios: fornecer uma string onde se espera uma

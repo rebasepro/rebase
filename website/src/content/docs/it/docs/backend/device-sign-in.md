@@ -1,11 +1,9 @@
 ---
-sourceHash: 96c18e52b3f61548
+sourceHash: 8b1976a4b6c5e595
 title: Accesso da dispositivo
 sidebar_label: Accesso da dispositivo
 description: "Consenti a un terminale o a un altro dispositivo senza browser di accedere tramite uno di essi: un codice breve, un link e l'approvazione di un utente autenticato. Il device authorization grant di RFC 8628, come utilizzato da rebase cloud login."
 ---
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Un terminale, un'app per TV o uno script non dispongono di un proprio browser, e digitare una password al loro interno è una cosa da evitare. L'accesso da dispositivo delega il lavoro a un browser in cui l'utente ha già effettuato l'accesso: il dispositivo mostra un codice breve e un link, la persona lo approva da lì e al dispositivo viene restituita una sessione. Segue l'RFC 8628, l'OAuth 2.0 device authorization grant; è il modo in cui `rebase cloud login` accede a Rebase Cloud.
 

@@ -6,8 +6,6 @@ description: "Run a blog or newsroom on Rebase: writers and editors, review, sch
 
 ## Overview
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 This recipe builds the editorial side of a publication on Rebase. Each part is
 a documented extension point, so you can take only the parts you need:
 
@@ -37,8 +35,6 @@ the admin panel presents it — the board, the buttons, the previews — is a
 
 ## Media
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 One row per image, so a picture is uploaded once and reused, with its alt text
 and credit beside it:
 
@@ -66,8 +62,6 @@ images already in the library. Who may upload the files themselves is set by
 your [storage authorization](/docs/backend/storage-authorization/).
 
 ## Posts
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```ts
 // backend/schema/posts.ts
@@ -251,8 +245,6 @@ through, and the table's hooks and history still run on these saves.
 
 ## Editing a live post
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Editing a published post changes it live, and the rules above stop a writer
 from editing it at all. To prepare changes and publish them in one step, keep
 them in a second table with the same columns:
@@ -364,8 +356,6 @@ this tab, or frame the site's preview page and send it `modifiedValues` with
 origin.
 
 ## Editorial notes
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Notes between writer and editor are rows of their own, shown on the post:
 

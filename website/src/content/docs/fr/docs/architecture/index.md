@@ -1,5 +1,5 @@
 ---
-sourceHash: b58890f96ff100b4
+sourceHash: 9053234803842e2e
 title: Vue d'ensemble de l'architecture
 sidebar_label: Architecture
 description: Comprenez comment le backend, le frontend, le SDK typé et la base de données de Rebase s'intègrent pour former un Backend-as-a-Service complet.
@@ -52,8 +52,6 @@ Le `createPostgresAdapter` gère automatiquement le pool de connexions à la bas
 
 ### Descripteurs de tables
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Au démarrage, le backend compile les tables exportées par `backend/schema/index.ts` en **descripteurs** : chaque colonne avec son type Postgres, sa nullabilité, ses règles de validation et de stockage, les relations par slug, et la posture de sécurité au niveau des lignes (row-level security). Tout problème sur une table entraîne le refus du démarrage avec une seule erreur `SchemaDefinitionError` énumérant chaque problème. Les descripteurs sont la base sur laquelle s'appuient REST, le temps réel, MCP et le document OpenAPI, sur laquelle la version du schéma est calculée, et ce que `GET /api/schema/tables` transmet au panneau d'administration et au Studio, caviardé en fonction de l'appelant. Le code des hooks ne quitte jamais le serveur. Un backend sans `backend/schema` introspecte la base de données pour générer ces mêmes descripteurs à la place.
 
 ### Service temps réel
@@ -73,8 +71,6 @@ Pour les **déploiements multi-instances** (par ex. Cloud Run avec plusieurs ré
 Tout comme les pilotes, les backends de stockage sont enregistrés dans un registre. Vous pouvez avoir plusieurs fournisseurs de stockage (local, S3) et router différentes colonnes de stockage vers différents backends à l'aide de `col.storage({ source })`.
 
 ## Carte des packages
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 | Package | Rôle | Utilisé par |
 |---------|------|-------------|

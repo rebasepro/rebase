@@ -1,13 +1,11 @@
 ---
-sourceHash: 47f5760918cfd724
+sourceHash: e341a90917c5ce77
 title: Runtime e bundle
 sidebar_label: Runtime & Bundle
 description: Come un progetto Rebase si suddivide in un bundle di progetto e un runtime con versione, e perché questa separazione rende possibili aggiornamenti, app multi-repo e hosting gestito.
 ---
 
 ## Le due metà di un deployment
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Un deployment di Rebase è composto da due elementi distinti:
 
@@ -62,7 +60,7 @@ prima di consentire l'avvio:
 ```jsonc
 {
   "bundleFormat": 3,
-  "runtime": { "range": "^1", "builtAgainst": "0.30.1", "contract": 2 },
+  "runtime": { "range": "^1", "builtAgainst": "0.31.0", "contract": 2 },
   "schemaVersion": "v2:3f0c9a1e7d2b5c48",
   "kind": "backend",
   "entry": {
@@ -79,7 +77,7 @@ prima di consentire l'avvio:
 }
 ```
 
-<span class="since-badge" data-since="0.31">Da 0.31</span> `bundleFormat`
+`bundleFormat`
 3 e runtime contract 2: lo schema è `entry.tables`, la directory compilata
 `backend/schema`, accanto a `entry.resources`, `entry.storage` ed
 `entry.hooks`. `schemaVersion` inizia con `v2:` — viene calcolato a partire
@@ -106,8 +104,6 @@ invece il `package.json` del bundle stesso.
 
 ## Compatibilità
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Due numeri di versione stabiliscono se un bundle e un runtime possono funzionare
 insieme, e volutamente non coincidono con la versione del pacchetto.
 
@@ -133,7 +129,7 @@ Ecco perché aggiornare Rebase in un deployment self-hosted richiede solo una
 modifica del tag:
 
 ```yaml
-image: rebasepro/server:0.30.1   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.31.0   # a newer tag — your bundle is untouched
 ```
 
 ## Lo sviluppo utilizza lo stesso percorso

@@ -1,13 +1,11 @@
 ---
-sourceHash: 5037df8f9b275f93
+sourceHash: 2813a331b4153057
 title: Campos de subida de archivos
 sidebar_label: Subidas de archivos
 description: "Cómo el CMS dibuja una columna col.storage() como un campo de subida: las reglas que el servidor aplica sobre la columna, las funciones exclusivas del navegador que añade customizeTable, campos para uno y múltiples archivos, y qué sucede con los archivos almacenados."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Un campo de archivo es una columna [`col.storage()`](/docs/schema/columns/#storage-columns).
 La columna contiene texto, la clave del objeto en el bucket (o su URL, si
@@ -26,8 +24,6 @@ de la tabla y el servidor aplica las que puede de ellas. Las opciones de
 forma a las subidas realizadas desde el CMS.
 
 ## Un archivo
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```ts
 // backend/schema/listings.ts
@@ -54,16 +50,12 @@ columna de este tipo ocupa la ranura de imagen del registro en tarjetas y listas
 
 ## Varios archivos
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `.multiple()` convierte la columna en un `TEXT[]` y el campo en una subida de
 múltiples archivos, reordenable arrastrando. Cada opción se aplica a cada archivo.
 
 <FieldWidgetPreview client:only="react" variant="multi_file_upload" />
 
 ## Opciones del lado del navegador
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```tsx
 // frontend/src/cms/listings.tsx
@@ -107,8 +99,6 @@ vacía el campo.
 
 ## Qué comprueba el servidor
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `accept` y `maxBytes` son aplicados por el servidor en función de **dónde cae el
 archivo**. El `path` de una columna es adonde van sus archivos, por lo que también
 es donde se aplican sus límites: toda subida cuya clave sea un archivo directamente
@@ -133,15 +123,11 @@ los bytes sean enviados: un archivo subido de otra manera se almacena tal como s
 
 ## Adónde puede ir un archivo
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `path` es un valor predeterminado, no un límite estricto: nada en el servidor confina
 una subida a él. Quién puede escribir en qué lugar es una regla de autorización de
 almacenamiento; consulta [Almacenamiento](/docs/backend/storage/).
 
 ## Los archivos nunca se eliminan por ti
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Vaciar un campo de archivo, reemplazar su archivo o eliminar la fila deja el
 objeto almacenado donde está. Cada subida obtiene su propia clave, por lo que un
@@ -155,8 +141,6 @@ y los elimina con `--delete`; consulta [la CLI](/docs/cli/#rebase-storage).
 
 ## Mover una columna a otro bucket
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Un campo de archivo almacena la clave del objeto, no su bucket. Modificar el `source`
 de una columna hace que cada valor existente apunte al nuevo bucket, donde esas
 claves no existen, por lo que las vistas previas de archivos más antiguos responderán
@@ -166,8 +150,6 @@ propias del proveedor, tales como `aws s3 sync` o `gcloud storage cp`, o bien co
 el bucket anterior para los archivos existentes.
 
 ## Pasos siguientes
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Columnas](/docs/schema/columns/#storage-columns): todas las opciones de `col.storage()`
 - [Campos](/docs/collections/properties/): los demás tipos de columna

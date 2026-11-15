@@ -57,7 +57,7 @@ const client = createRebaseClient({
 | `fetch` | `typeof fetch` | Custom fetch implementation (e.g. for SSR) |
 | `onUnauthorized` | `() => Promise<boolean>` | Custom 401 handler — return `true` to retry |
 | `realtime` | `boolean \| RealtimeClientOptions` | Open the WebSocket (default `true`) — set `false` in one-shot scripts. `{ affinity }` [names the group the socket belongs to](/docs/sdk/realtime#keeping-a-group-on-one-instance) |
-| `tables` | `Record<string, string>` | <span class="since-badge" data-since="0.31">Since 0.31</span> Maps accessor names to table slugs — the generated `tablesDictionary` |
+| `tables` | `Record<string, string>` | Maps accessor names to table slugs — the generated `tablesDictionary` |
 | `offline` | `boolean \| OfflineConfig` | [Local-first sync](/docs/sdk/offline) — off by default |
 | `impersonate` | `string` | Run every request as this user, by uid, to check what one user can see. Only an administrator's session may: the data API, functions and realtime run as that user, and every other route refuses |
 | `debug` | `boolean` | Log the realtime connection's progress with `console.debug` (default `false`) — see [Connection logging](#connection-logging) |
@@ -73,8 +73,6 @@ localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_de
 It applies from the next line the client logs, so a page that is already connected does not need a reload. Outside a browser, set `globalThis.__REBASE_DEBUG__ = true`. Browsers show `console.debug` only at the Verbose level.
 
 ## Typed SDK Generation
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Generate a fully typed client from your tables:
 

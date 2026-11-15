@@ -1,5 +1,5 @@
 ---
-sourceHash: bdf9409c94709498
+sourceHash: 27b170adac8e577c
 title: Múltiples bases de datos y buckets
 sidebar_label: Múltiples fuentes
 description: Enruta tablas a diferentes bases de datos y columnas de almacenamiento a diferentes buckets, y configura cada una desde el entorno.
@@ -39,8 +39,6 @@ signups.subscription("send-welcome", async (event) => {
 `database()`, `bucket()` y `topic()` se pueden declarar desde la versión 0.17, y `queue()` desde la 0.18.
 
 Luego apunta una tabla a uno de ellos mediante su handle — el mismo nombre, escrito una sola vez:
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```ts
 // backend/schema/page_views.ts
@@ -118,8 +116,6 @@ amendResourceKind("database", {
 La modificación se aplica solo a las lecturas a través de esta copia, por lo que un driver más antiguo sigue vinculando de la misma forma en que lo hacía cuando se publicó. Úsalo para cada corrección de un tipo ya publicado; usa `registerResourceKind` únicamente para un tipo que nadie haya publicado todavía.
 
 ### Pasarlos al frontend
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 El frontend no importa `backend/resources.ts`: `pnpm check:frontend-backend-imports` rechaza cualquier importación de valores de algo bajo `backend/` desde `frontend/`, porque enviaría módulos del servidor al navegador. Y no es necesario que lo haga. El proveedor `<Rebase>` lee los buckets que sirve el backend desde `GET /api/storage/sources` y conecta cada uno, y cada tabla que sirve el backend, independientemente de la base de datos en la que resida, es accesible a través de la API.
 

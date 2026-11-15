@@ -1,5 +1,5 @@
 ---
-sourceHash: 145ba18b6f108fbd
+sourceHash: 72babf07dc797d77
 title: Deployment
 sidebar_label: Deployment
 description: Stellen Sie Ihr Rebase-Projekt mit Docker, Cloud-Plattformen oder manuellen Setups in der Produktion bereit.
@@ -88,8 +88,6 @@ Das Bundle wird schreibgeschützt (read-only) gemountet. `rebase build` installi
 Ändern Sie die Admin-E-Mail auf Ihre eigene, melden Sie sich an und ändern Sie das Passwort. Siehe [Ihr erster Administrator](#ihr-erster-administrator).
 
 ### Das Schema
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Die Runtime erstellt fehlende Tabellen beim Start, **einschließlich der in `backend/schema` deklarierten** — `REBASE_MIGRATE_ON_BOOT` ist standardmäßig auf `ensure` gesetzt, was additiv auf das gesamte Schema wirkt und Row-Level Security gleich mit anwendet. Ein erstes `docker compose up` mit einer leeren Datenbank stellt Ihre Tabellen direkt bereit.
 

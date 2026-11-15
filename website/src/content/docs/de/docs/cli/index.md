@@ -1,5 +1,5 @@
 ---
-sourceHash: d0b65c1ecccde6ba
+sourceHash: db5795d457e22066
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schema-Generierung, Datenbankmigrationen und SDK-Generierung.
@@ -24,8 +24,6 @@ Oder führen Sie einen beliebigen Befehl aus, ohne ihn zu installieren: `pnpm dl
 ## Befehle
 
 ### `rebase init`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Initialisiert ein neues Rebase-Projekt:
 
@@ -84,7 +82,7 @@ Das Bundle ist das Artefakt, das Sie deployen — das Runtime-Image lädt es, so
 | `--no-static` | Bindet das Frontend nicht in das Backend-Bundle ein (jede statische App erhält weiterhin ihr eigenes Bundle) |
 | `--skip-static-build` | Bindet das Frontend im bereits gebauten Zustand ein, ohne dessen Build-Befehl auszuführen |
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span> Ein Frontend — jede statische App aus `rebase.json` mit einer Vite-Konfiguration —, dessen Konfiguration nicht `rebaseBackendGuard()` (aus `@rebasepro/app/vitePlugin`) verwendet, wird abgelehnt: Dies stellt sicher, dass Server-Code nicht im Browser-Bundle landet, und verhindert, dass Vite eine Backend-Datei als `data:`-URL inline einbindet (es schlägt beim Build unter Nennung des eigenen Namens fehl, wenn ein anderes Plugin dessen `build.assetsInlineLimit` überschreibt). `frontend/src/cms/ui-config.json` wird als `entry.uiConfig` in das Bundle übernommen — die Workspace-Darstellung, die ein deploytes Backend ausliefert.
+Ein Frontend — jede statische App aus `rebase.json` mit einer Vite-Konfiguration —, dessen Konfiguration nicht `rebaseBackendGuard()` (aus `@rebasepro/app/vitePlugin`) verwendet, wird abgelehnt: Dies stellt sicher, dass Server-Code nicht im Browser-Bundle landet, und verhindert, dass Vite eine Backend-Datei als `data:`-URL inline einbindet (es schlägt beim Build unter Nennung des eigenen Namens fehl, wenn ein anderes Plugin dessen `build.assetsInlineLimit` überschreibt). `frontend/src/cms/ui-config.json` wird als `entry.uiConfig` in das Bundle übernommen — die Workspace-Darstellung, die ein deploytes Backend ausliefert.
 
 Abhängigkeiten werden standardmäßig per Vendoring gebündelt, damit eine neue Instanz keine Installationsdauer von 35–55 Sekunden verursacht. Ein Verzeichnisbaum, der auf der Festplatte mehr als 2 GB groß wird, wird stattdessen verworfen, da das Upload-Limit komprimiert 1 GB beträgt.
 
@@ -134,8 +132,6 @@ Der ausgeklinkte Server speichert lokale Uploads weiterhin im Verzeichnis `uploa
 
 ### `rebase schema generate` / `rebase schema stale`
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 ```bash
 rebase schema generate       # backend/schema → backend/src/schema.generated.ts
 rebase schema stale          # benennt Abweichungen von den Tabellen, Exit-Code 1 bei Abweichungen
@@ -164,8 +160,6 @@ Jeder dieser Befehle wird unter [Datenbank-Befehle](/docs/cli/database/) beschri
 
 ### `rebase console`
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Eine Node-REPL mit Zugriff auf die Projektdaten oder Ausführung eines einzelnen Snippets mit `-e`:
 
 ```bash
@@ -176,8 +170,6 @@ rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
 `rebase` (`dataAsAdmin`, `sql`, `withAuth(user)`) und `tables` (die Tabellen des Projekts, geladen aus `backend/schema`) befinden sich im Scope, und Top-Level-`await` wird unterstützt. Die Datenbank wird genauso aufgelöst wie bei `rebase db push`, und das Öffnen der Konsole ändert nichts an den Daten. Mit `-e` wird das per `await` abgewartete Ergebnis als JSON auf stdout ausgegeben; bei einem Fehler bricht der Befehl mit Exit-Code `1` ab. Flags: `--eval`/`-e`, `--schema-dir`, `--database-url`, `--docker`. Siehe [Skripte und die Konsole](/docs/backend/scripts/).
 
 ### `rebase migrate`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Einweg-Migrationen von einem Layout, das von diesem Release nicht mehr unterstützt wird: `rebase migrate collections-to-tables` (`config/collections` → `backend/schema` und `frontend/src/cms`) sowie `rebase migrate sdk-calls` (`data.collection("x")` → `data.table("x")` in Ihrem eigenen Code). Deren Flags, was sie schreiben und der Abschnitt „Vor dem Deployment prüfen“ finden sich unter [Schema-Generierung](/docs/cli/schema/#rebase-migrate).
 
@@ -247,8 +239,6 @@ Um abzugleichen, was die Plattform für ein Projekt vorhält im Vergleich zu dem
 
 ### `rebase generate-sdk`
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 ```bash
 rebase generate-sdk
 ```
@@ -302,8 +292,6 @@ rebase verify --json
 rebase verify --live
 rebase verify --live --database-url postgresql://…
 ```
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Prüft in einem schnellen Befehl für CI und für Hooks von KI-Agents, ob die Tabellen bereit für den Produktiveinsatz sind. Standardmäßig offline und ändert niemals Daten.
 

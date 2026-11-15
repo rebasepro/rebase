@@ -1,5 +1,5 @@
 ---
-sourceHash: dd9c77451521c040
+sourceHash: 24eb3a62199fe58b
 title: Habilidades de agentes
 sidebar_label: Habilidades de agentes
 description: rebase skills install escribe 24 habilidades de referencia de Rebase en tu repositorio, en la distribución que tu asistente de IA espera — Cursor, Claude Code, Windsurf, Gemini CLI y Antigravity.
@@ -149,8 +149,6 @@ El comando también funciona fuera de un proyecto de Rebase, recurriendo al dire
 trabajo actual; esto es útil para un repositorio de frontend independiente que se comunica con un backend de Rebase.
 
 ## Las 24 habilidades
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 | Habilidad | Cubre |
 |---|---|

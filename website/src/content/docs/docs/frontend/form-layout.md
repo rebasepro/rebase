@@ -4,8 +4,6 @@ sidebar_label: Form Layout
 description: "Arrange a record's form: field widths on a four-column grid, titled and collapsible sections, the metadata rail, and a component that replaces the generated form."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 The record form is generated from the table's columns and relations:
 
 - the id and the creation and update stamps go to a read-only metadata rail;
@@ -65,8 +63,6 @@ export const ordersCms = customizeTable<typeof orders>("orders", {
 
 ## Field width
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A field's width is a **span** over a four-column grid; `4` is the full width of
 the main column. Spans snap to the grid, which is what makes two fields line up
 whatever order they were declared in.
@@ -84,8 +80,6 @@ the grid collapses to one column and spans are ignored.
 
 ## Sections
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `form.sections` groups the main column under headings. Each section is
 `{ key, title?, fields, collapsed?, collapsible?, readVariant? }`. A titled
 section can be collapsed; an untitled one cannot. `readVariant: "summary"`
@@ -102,8 +96,6 @@ this caller, because they may not read that column, is skipped.
 
 ## The metadata rail
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `form.sidebar` moves fields out of the main column into a narrow rail beside it:
 status, ownership, publication dates, flags. The rail does not use the grid, so
 `span` is ignored there. Where there is no room for a rail it renders as an
@@ -115,8 +107,6 @@ the derived rail off and keeps every field in the main column. `hideIdFromForm`
 hides the id from the form altogether.
 
 ## Replacing the form
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `formView` swaps the generated form for a component of your own, imported by
 value. It receives the same `EntityCustomViewParams` an
@@ -145,8 +135,6 @@ fields yourself with `<RecordForm>` and `<FormField>` in a page of your own
 
 ## Other form options
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | Option | Effect |
 |---|---|
 | `formAutoSave` | Save as the visitor types. |
@@ -155,8 +143,6 @@ fields yourself with `<RecordForm>` and `<FormField>` in a page of your own
 | `localChangesBackup` | Keep unsaved edits in local storage: `"manual_apply"`, `"auto_apply"` or `false`. |
 
 ## Related
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Custom fields](/docs/frontend/custom-fields/): the fields a layout arranges
 - [Entity views](/docs/frontend/entity-views/): a whole tab of your own next to the form

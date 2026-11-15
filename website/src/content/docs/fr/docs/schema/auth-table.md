@@ -1,11 +1,9 @@
 ---
-sourceHash: c7bebbe33f0a0611
+sourceHash: e70397bdea9251db
 title: La table des utilisateurs
 sidebar_label: Table des utilisateurs
 description: "defineAuthTable déclare la table dans laquelle l'authentification stocke les utilisateurs : les colonnes nécessaires à l'authentification, une politique d'auto-lecture, des colonnes de privilèges réservées aux administrateurs, et le modèle d'accès — rôles, scopes applicatifs, clés personnelles et hooks de cycle de vie des utilisateurs."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `defineAuthTable` déclare la table que l'authentification lit et écrit. Il
 s'agit d'un `defineTable` auquel s'ajoutent trois éléments :
@@ -53,8 +51,6 @@ les administrateurs gèrent les utilisateurs, et chaque utilisateur peut toujour
 
 ## Les colonnes
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Déclarez les colonnes que votre application lit ou présente, avec les modificateurs de votre choix ;
 l'authentification ajoute celles dont elle a besoin et que vous avez omises. Une colonne déclarée portant la clé
 ou le nom SQL d'une colonne d'authentification (`email`, `displayName`, `roles`, `passwordHash`,
@@ -73,8 +69,6 @@ la table des utilisateurs elle-même peut également désigner chaque colonne d'
 
 ## Le bloc `auth`
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 | Clé | Description |
 |---|---|
 | `roles` | Les rôles qu'un utilisateur peut détenir, chacun avec un `name`, une `description` facultative et les `scopes` applicatifs et d'administration qu'il accorde. `admin` est intégré par défaut et ne peut pas être déclaré. |
@@ -88,8 +82,6 @@ Les deux hooks restent sur le serveur ; le descripteur indique uniquement lesque
 détaille ce que chaque scope accorde et la façon dont les clés et jetons peuvent les restreindre.
 
 ### `onCreateUser` et `onResetPassword`
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 ```ts
 import { randomBytes } from "node:crypto";
@@ -136,8 +128,6 @@ Les deux hooks reçoivent un contexte contenant :
 
 ## Ce qui ne s'exécute pas lors des écritures d'authentification
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 L'inscription, la connexion OAuth et la gestion des utilisateurs par un administrateur écrivent
 directement dans la table des utilisateurs. Les [hooks](/docs/collections/callbacks/) de la table ne s'exécutent pas pour ces
 écritures ; un e-mail de bienvenue dans `afterSave` ne sera donc jamais déclenché lors de l'inscription. Placez-le plutôt dans les
@@ -145,8 +135,6 @@ hooks de cycle de vie de l'authentification (`beforeUserCreate`, `afterUserCreat
 …) configurés sur le backend. Consultez [Authentification](/docs/backend/authentication/).
 
 ## Prochaines étapes
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - [Authentification](/docs/backend/authentication/) : méthodes de connexion, jetons et hooks d'authentification
 - [Rôles et scopes](/docs/backend/roles-and-scopes/) : déclaration des rôles et des scopes applicatifs

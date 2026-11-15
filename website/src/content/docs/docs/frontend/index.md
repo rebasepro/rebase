@@ -64,8 +64,6 @@ you have the developer tools alone. To lay the shell out by hand instead, see
 
 ## Where the CMS files live
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 ```text
 frontend/src/
 ├── App.tsx
@@ -87,8 +85,6 @@ erased from the bundle, so the backend's hooks and server code never reach the
 browser. The backend imports nothing from the frontend.
 
 ## RebaseCMS props
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 <!-- rebase-cms-props:start -->
 | Prop | Description |

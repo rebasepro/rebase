@@ -4,8 +4,6 @@ sidebar_label: Views
 description: "Serve a SQL view or a materialized view read-only with defineView: security_invoker views governed by the tables they read, materialized views gated by roles, refreshed on demand, created by db push."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `defineView` serves a SQL query as a read-only table. Declare the query, the
 columns it returns, and the column or columns that identify a row:
 
@@ -38,8 +36,6 @@ has the name.
 
 ## Options
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | Key | What it does |
 |---|---|
 | `query` | **Required.** The defining `SELECT`. |
@@ -61,8 +57,6 @@ and a row needs an address.
 
 ## Who sees which rows
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A plain view is created `WITH (security_invoker = true)`, so it runs **as the
 caller**: the row-level security of the tables it reads decides what each
 caller sees. A user whose policies show them their own songs sees the view of
@@ -72,8 +66,6 @@ policies to, and nothing they could add. See
 tables underneath.
 
 ## Materialized views
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `materialized: true` stores the rows, so a read does not run the query:
 
@@ -125,8 +117,6 @@ carry `indexes` of its own (see [Indexes](/docs/backend/indexes/)), built on its
 stored rows; a plain view reads the indexes of its tables.
 
 ## What a view cannot have
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `rls`, `history`, `softDelete`, `tenant` and `search` are refused when the
 schema is compiled: each needs a table to write to or to attach policies to.

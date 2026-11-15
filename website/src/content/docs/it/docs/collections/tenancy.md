@@ -1,13 +1,11 @@
 ---
-sourceHash: 9338d2b094861fba
+sourceHash: 5c1d614961675bb5
 title: Tenancy
 sidebar_label: Tenancy
 description: Limita ogni riga di una tabella a un sito, a un'organizzazione o a un workspace con una sola dichiarazione di tenant, applicata tramite la row-level security di Postgres.
 ---
 
 ## Cosa fa
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `tenant` su una tabella indica il nome della colonna che contiene il tenant a
 cui appartiene una riga (un sito, un'organizzazione, un workspace) e specifica da dove proviene
@@ -29,8 +27,6 @@ Poiché è Postgres ad applicarlo, il pannello di amministrazione, l'API REST, l
 eseguito come chiamante vedono tutti le stesse righe.
 
 ## Un tenant per utente: un claim
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Quando ciascun utente appartiene esattamente a un tenant, inseriscilo nel suo token di sessione
 e indica il nome del claim:
@@ -59,8 +55,6 @@ scritti dopo i custom claim, quindi un hook non può asserirli, e una configuraz
 che ne indica uno viene rifiutata.
 
 ## Diversi tenant per utente: una tabella di appartenenza
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Quando le persone lavorano su più tenant (un editor su due siti, un consulente in tre
 organizzazioni), mantieni le appartenenze in una tabella dedicata:
@@ -140,8 +134,6 @@ della policy rifiuta un tenant estraneo, e un trigger `BEFORE UPDATE` rifiuta un
 spostamento (`42501`). Un chiamante con un ruolo di bypass è esente da tutti e tre i controlli.
 
 ## Il campo
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 - Una colonna di tipo text, `uuid`, enum o integer (anche `numeric`), o una relazione
   `belongsTo` verso la tabella dei tenant. Per una relazione, la colonna di foreign-key è

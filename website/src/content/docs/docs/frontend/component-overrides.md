@@ -57,8 +57,6 @@ function App() {
 
 ## Collection-Level Component Overrides
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 To override components for one table only, pass `components` in its
 `customizeTable`. This is useful for the empty state, the cards or the form of a
 particular table. Each `Component` is the component itself, imported by value:
@@ -105,8 +103,6 @@ A string path or a lazy `() => import(…)` thunk in `Component` throws when the
 module loads, with what to write instead.
 
 ### When both scopes override a component
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 The two scopes compose. The app-level override (`<Rebase components>`) is applied to the built-in component first, and the table's (`components` in `customizeTable`) is applied to the result:
 

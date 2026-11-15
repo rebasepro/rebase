@@ -1,11 +1,9 @@
 ---
-sourceHash: 96c18e52b3f61548
+sourceHash: 8b1976a4b6c5e595
 title: Connexion par appareil
 sidebar_label: Connexion par appareil
 description: "Permettez à un terminal ou à un autre appareil sans navigateur de se connecter via un autre appareil : un code court, un lien et une approbation par un utilisateur connecté. Le flux d'autorisation d'appareil de la RFC 8628, tel qu'utilisé par rebase cloud login."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un terminal, une application pour téléviseur ou un script ne disposent pas de leur propre navigateur, et y saisir un mot de passe est la chose à éviter. La connexion par appareil délègue le travail à un navigateur où la personne est déjà connectée : l'appareil affiche un code court et un lien, la personne l'approuve à cet endroit, et l'appareil reçoit une session en réponse. Cela suit la RFC 8628, le flux d'autorisation d'appareil OAuth 2.0 (Device Authorization Grant) ; c'est ainsi que `rebase cloud login` se connecte à Rebase Cloud.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: fb9fac4af8dcfaaf
+sourceHash: 5b1baf3816d33bb8
 slug: fr/docs/compatibility
 title: Compatibilité
 description: Ce que Rebase garantit d'une version à l'autre et ce qu'il ne garantit pas — les six contrats versionnés, la manière dont chacun échoue, et ce qui peut encore changer dans une version mineure.
@@ -41,8 +41,6 @@ des données. La maturité de chaque sous-système est publiée et datée plutô
 découvrir par soi-même — le tableau ci-dessous en constitue la publication.
 
 ## État de préparation par sous-système
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 **Dernière révision le 14 septembre 2026, par rapport à la version 0.21.0.** Relisez-le à chaque version mineure ; une évaluation qui n'a pas bougé depuis trois versions est soit stabilisée, soit oubliée, et cette note est là pour s'assurer que la différence soit vérifiée.
 
@@ -119,8 +117,6 @@ grep -n "AUTH_SCHEMA_VERSION =" packages/server-postgres/src/auth/schema-version
 Une plage semver, lue comme le champ `engines` d'un `package.json` : les versions de runtime acceptées par ce projet. Nommé délibérément `rebase` plutôt que `runtime`, car `runtime` désigne déjà *qui détient le processus* (`managed` | `custom`) sur une application.
 
 ### 2 — `BUNDLE_FORMAT_VERSION` (actuellement 3)
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 La disposition sur disque d'un bundle compilé. Un runtime refuse un bundle dont le format est plus récent que le sien, et lit un format plus ancien lorsque la structure le permet, ce qui permet à l'offre managée de basculer un tenant sur une nouvelle image sans que personne n'ait à recompiler son projet.
 
@@ -215,8 +211,6 @@ Deux signaux d'identification supplémentaires, dont aucun ne constitue une barr
 
 ### 6 — Identifiants de base de données dérivés
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Chaque nom que ce framework détermine par lui-même au lieu qu'on le lui indique : une colonne de clé étrangère, une contrainte de clé étrangère, une table de jonction et ses deux colonnes de clés, un type enum, un nom de policy, le passage en `snake_case` d'une clé de colonne en `camelCase`. Depuis la version 0.31, les tables sont déclarées via `defineTable`, qui dérive exactement les mêmes noms que ceux qu'une collection dérivait pour un schéma équivalent ; `rebase migrate collections-to-tables` le prouve projet par projet en comparant le SQL généré octet par octet.
 
 > **Un identifiant dérivé est figé dès l'instant où une version l'émet.**
@@ -244,8 +238,6 @@ Toute ligne modifiée ou supprimée échoue en tant que rupture de contrat, affi
 Cela garantit également que `rebase db push` et le boot-ensure du runtime managé dérivent exactement les *mêmes* noms, ce qui constitue un second contrat dissimulé dans le premier : ils compilent les mêmes tables via du code différent, et un projet poussé une première fois puis démarré plus tard ne doit pas se retrouver avec deux schémas distincts.
 
 ## Ce qui n'est *pas* figé
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Exprimé clairement, pour que personne n'en déduise une promesse qui n'a jamais été faite :
 

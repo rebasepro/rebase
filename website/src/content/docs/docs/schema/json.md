@@ -4,8 +4,6 @@ sidebar_label: JSON documents
 description: "Type a jsonb column with col.jsonb().$type<T>(), or give it a shape with json.* so the server validates nested fields, applies defaults and stamps, finds the files a document references and searches inside it."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A `jsonb` column can be declared two ways. `col.jsonb().$type<T>()` types the document
 for TypeScript and tells the server nothing about it. `col.jsonb(shape)` takes a
 shape built with `json.*`, which types the document the same way and also
@@ -49,8 +47,6 @@ instead.
 
 ## Builders
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | Builder | Holds | TypeScript type |
 |---|---|---|
 | `json.string()` | a string | `string` |
@@ -68,8 +64,6 @@ instead.
 `json.object(fields, { additional: true })` also accepts keys it does not name.
 
 ## Modifiers
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 | Modifier | On | What it does |
 |---|---|---|
@@ -113,8 +107,6 @@ write sent, and a field's `.default()` fills it first.
 
 ## Arrays and typed blocks
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `json.array(of)` is a list of one shape. `json.oneOf(variants)` is a block whose
 `type` key says which variant it is and whose `value` key holds that variant's
 content. As the items of an array, it is the shape of a block editor:
@@ -157,8 +149,6 @@ other names: `json.oneOf({ … }, { typeField: "kind", valueField: "data" })`.
 
 ## `jsonb` or `json`
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `col.json()` takes the same arguments as `col.jsonb()`. It stores the text it was
 given, key order and whitespace included, and cannot be indexed or searched the
 way `jsonb` can. Use it only when the exact text matters; otherwise use
@@ -170,8 +160,6 @@ column: `col.text().array()`. Nested lists belong in `jsonb`: `.array()` of
 an array is refused.
 
 ## Next steps
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Columns](/docs/schema/columns/): the column builders and their validation rules
 - [Search](/docs/backend/search/): searching paths inside a document

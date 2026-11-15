@@ -1,5 +1,5 @@
 ---
-sourceHash: 8f9385dd3838df4f
+sourceHash: d357e5b6fe30364a
 title: Chaves de API
 sidebar_label: Chaves de API
 description: "Chaves de longa duração para scripts, CI, agentes e integrações: chaves de serviço e chaves pessoais, os escopos que elas possuem, como elas se compõem com a segurança em nível de linha (RLS) e as rotas que as gerenciam."
@@ -176,8 +176,6 @@ mantém todo o seu orçamento de requisições. A simulação ou personificaçã
 administrador da mesma forma.
 
 ## Chaves pessoais
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Uma chave pessoal atua **como seu proprietário**: seu uid e seus papéis conforme estiverem no
 momento de cada requisição. Regras baseadas em propriedade correspondem a ela, portanto ela lê exatamente o que seu proprietário

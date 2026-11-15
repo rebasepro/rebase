@@ -1,5 +1,5 @@
 ---
-sourceHash: b16bc057fd9a76c0
+sourceHash: 8a68eb639e8102bb
 title: Surcharges de composants (Swizzling)
 sidebar_label: Surcharges de composants
 description: Remplacez les composants d'interface par défaut par des implémentations personnalisées au niveau de l'application ou de la collection.
@@ -58,8 +58,6 @@ function App() {
 
 ## Surcharges de composants au niveau de la collection
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Pour surcharger les composants d'une seule table, transmettez `components` dans son `customizeTable`. C'est utile pour l'état vide (empty state), les cartes ou le formulaire d'une table particulière. Chaque `Component` est le composant lui-même, importé par valeur : le fichier s'exécute uniquement dans le navigateur.
 
 ```tsx
@@ -100,8 +98,6 @@ export function ProductsEmptyState({ OriginalComponent, ...props }: {
 Un chemin sous forme de chaîne de caractères ou un thunk différé `() => import(…)` dans `Component` lèvera une erreur au chargement du module, en indiquant ce qu'il convient d'écrire à la place.
 
 ### Lorsque les deux portées surchargent un composant {#when-both-scopes-override-a-component}
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Les deux portées se composent. La surcharge au niveau de l'application (`<Rebase components>`) est d'abord appliquée au composant intégré, puis celle de la table (`components` dans `customizeTable`) est appliquée au résultat :
 

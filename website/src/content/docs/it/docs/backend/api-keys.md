@@ -1,5 +1,5 @@
 ---
-sourceHash: 8f9385dd3838df4f
+sourceHash: d357e5b6fe30364a
 title: Chiavi API
 sidebar_label: Chiavi API
 description: "Chiavi a lunga durata per script, CI, agenti e integrazioni: chiavi di servizio e chiavi personali, gli scope associati, come si integrano con la row-level security e le route che le gestiscono."
@@ -175,8 +175,6 @@ conserva l'intero budget. La simulazione o l'impersonificazione di un utente vie
 all'amministratore allo stesso modo.
 
 ## Chiavi personali
-
-<span class="since-badge" data-since="0.31">Dalla 0.31</span>
 
 Una chiave personale agisce **come il suo proprietario**: il suo uid e i suoi ruoli per come sono al
 momento di ciascuna richiesta. Le regole basate sul proprietario corrispondono, quindi legge esattamente

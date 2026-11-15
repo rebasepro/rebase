@@ -1,5 +1,5 @@
 ---
-sourceHash: 87e4ee6ea63add18
+sourceHash: 7357057de2408250
 title: Scripts y la Consola
 sidebar_label: Scripts y la Consola
 description: Abra los datos de un proyecto desde un script, una prueba o un REPL con openRebase, o desde la terminal con rebase console. Sin servidor, sin cambios en el esquema.
@@ -24,8 +24,6 @@ obtiene del servidor, `dataAsAdmin` y `sql`, por lo que un fragmento de código
 se traslada entre una función, un script y la consola sin cambios.
 
 ## `rebase console`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Ejecútelo en su proyecto:
 
@@ -89,8 +87,6 @@ otro cliente o detenga `rebase dev` y ejecútelo de nuevo.
 
 ### Opciones
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | Flag | Qué hace |
 |---|---|
 | `--eval`, `-e` | Ejecuta este código en lugar del REPL, imprime su resultado esperado con await como JSON y sale con 1 si lanza un error |
@@ -99,8 +95,6 @@ otro cliente o detenga `rebase dev` y ejecútelo de nuevo.
 | `--docker` | Usa la base de datos de docker compose, iniciándola si es necesario |
 
 ## `openRebase`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `openRebase` de `@rebasepro/server-postgres` es lo que llama la consola. Úselo
 en un script, un seed, una corrección de datos o una prueba. En un proyecto

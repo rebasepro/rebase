@@ -1,5 +1,5 @@
 ---
-sourceHash: 517637e2cfd34608
+sourceHash: a5eff26fca2535c7
 title: "Recette : Intégration de webhooks"
 sidebar_label: Webhooks
 description: Utilisez les hooks de table pour envoyer des webhooks à des services externes lorsque les données changent, sans maintenir la transaction d'écriture ouverte.
@@ -17,8 +17,6 @@ Deux caractéristiques de ces hooks déterminent la façon dont cette recette es
 Par conséquent : ne faites jamais de `await` sur une requête HTTP sortante dans un hook. Mettez-la en file d'attente.
 
 ## Notification Slack lors d'une nouvelle commande
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `WebhookDispatcher` est exporté depuis `@rebasepro/server`. `enqueueEntityChange` retourne immédiatement — le POST a lieu une fois l'écriture validée (commit), jamais pour une écriture annulée (rollback) — et le dispatcher valide la destination, signe le payload, applique un délai limite à chaque tentative et réessaie en cas d'échec.
 
@@ -79,8 +77,6 @@ Seul l'identifiant du webhook est stocké sur la tâche, ainsi son secret de sig
 `setTableHooks` **remplace** les hooks déclarés par la table `orders`. Si elle en déclare déjà, conservez-les : passez `composeTableHooks(declared, { afterSave })`, avec `composeTableHooks` issu de `@rebasepro/common` et `declared` étant les propres `hooks` de la table (`orders.config.hooks`). Consultez [Combiner des ensembles de hooks](/docs/collections/callbacks/#combining-hook-sets).
 
 ### Sans file d'attente de tâches
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Omettez `jobQueue` — ou exécutez votre code là où le backend n'a pas de file d'attente de jobs — et les distributions sont mises en file d'attente en mémoire, dans le processus à l'origine de la modification. C'est plus simple, et cela suffit pour une notification que vous pouvez vous permettre de perdre :
 

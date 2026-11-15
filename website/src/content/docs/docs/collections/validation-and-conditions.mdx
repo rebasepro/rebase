@@ -4,8 +4,6 @@ sidebar_label: Validation & conditions
 description: "How the CMS form shows a column's rules — required, length, pattern, bounds, unique — where those rules are checked, and conditional fields that become required, disabled or hidden from the record's own values."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A column's rules are declared once, on the column, and enforced by the server
 on every write that reaches the API. The CMS reads the same rules from the
 table's descriptor and checks them in the form before it saves, so an operator
@@ -36,8 +34,6 @@ the column with `.notNull()` and `.validate({ … })`, and the CMS reads them.
 
 ## What the form checks
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | On the column | In the form |
 |---|---|
 | `.notNull()` | Required, with `requiredMessage` as the error when given. Not required where nobody types the value: a generated key, a stamp, a generated or `.readOnly()` column. |
@@ -56,8 +52,6 @@ Every rule is listed, with its exact meaning, on
 
 ## Where validation runs
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 The server checks a column's rules at the request boundary (REST, the realtime
 socket and MCP) on what the caller sent, before `beforeSave` runs, and answers a
 write that breaks a rule with a 400 naming every failing field. Server code that
@@ -71,8 +65,6 @@ value that breaks a rule added later shows no error until someone edits that
 cell.
 
 ## Conditional fields
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A field can react to the record's own values: become required, disabled,
 read-only or hidden. There are two ways, both in `customizeTable`:
@@ -137,15 +129,11 @@ database enforces for anyone.
 
 ## Labels for a closed set
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 The values of a `col.enum([...])` or a `.oneOf([...])` are the column's. Their
 labels, colours and order are the CMS's, set with `enumLabels` and `enumOrder`;
 see [closed sets](/docs/collections/properties/#closed-sets-of-values).
 
 ## Next steps
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Columns](/docs/schema/columns/#validation): every validation rule
 - [Fields](/docs/collections/properties/): the fields these rules apply to

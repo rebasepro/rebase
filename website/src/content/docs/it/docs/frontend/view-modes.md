@@ -1,11 +1,9 @@
 ---
-sourceHash: 57ee5c3ecdf49419
+sourceHash: 2e189939df0c022e
 title: Modalità di visualizzazione
 sidebar_label: Modalità di visualizzazione
 description: "Mostra le righe di una tabella come elenco, foglio di calcolo, schede o bacheca kanban; scegli cosa inserire nel titolo, immagine, stato e data di ogni record; imposta l'ordinamento predefinito, i filtri e i preset di filtri con un clic."
 ---
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Ogni collezione può essere visualizzata in quattro modi, tramite il selettore nella sua barra degli strumenti:
 
@@ -21,8 +19,6 @@ galleria) nello stesso selettore, gestite dalla medesima barra degli strumenti: 
 [Modalità di visualizzazione personalizzate](/docs/frontend/extending#custom-view-modes).
 
 ## Scelta delle visualizzazioni
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 ```ts
 // backend/schema/tasks.ts
@@ -83,8 +79,6 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 | `"xl"` | 160 | Miniature di immagini grandi |
 
 ## Kanban
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `kanban.columnField` indica la colonna in base alla quale la bacheca raggruppa gli elementi. Deve contenere un
 insieme chiuso di stringhe, un `col.enum([...])` o una colonna di testo con
@@ -149,8 +143,6 @@ bacheca alimentata da un backend, invece, è una soluzione che si annulla a ogni
 
 ## Slot di visualizzazione
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Ogni superficie che disegna un record utilizza alcuni dei sei slot disponibili: **title**,
 **subtitle**, **image**, **status**, **date** e **tags**. Una riga di elenco è composta da image +
 title + subtitle + status + date, una scheda è identica ma con l'immagine in alto, un
@@ -207,8 +199,6 @@ array unito e una relazione come il primo tra `name`, `title`, `label` o
 
 ## Filtri, preset e ordinamento
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 ```tsx
 import { customizeTable } from "@rebasepro/cms";
 import type { tasks } from "../../../backend/schema/tasks";
@@ -239,8 +229,6 @@ un chiamante può leggere è stabilito dalla [row-level security](/docs/collecti
 della tabella, per ogni chiamante.
 
 ## Passaggi successivi
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/): tutte le opzioni
 - [Personalizzazione dell'admin](/docs/frontend/customizing/): modalità di visualizzazione, pagine e azioni personalizzate

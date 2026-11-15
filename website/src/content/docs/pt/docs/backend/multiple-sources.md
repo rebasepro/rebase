@@ -1,5 +1,5 @@
 ---
-sourceHash: bdf9409c94709498
+sourceHash: 27b170adac8e577c
 title: Múltiplos Bancos de Dados e Buckets
 sidebar_label: Múltiplas Fontes
 description: Direcione tabelas para diferentes bancos de dados e colunas de armazenamento para diferentes buckets, e configure cada um a partir do ambiente.
@@ -46,8 +46,6 @@ signups.subscription("send-welcome", async (event) => {
 `queue()` desde a 0.18.
 
 Em seguida, aponte uma tabela para um deles, por handle — o mesmo nome, escrito uma única vez:
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```ts
 // backend/schema/page_views.ts
@@ -149,8 +147,6 @@ vinculando da forma como fazia quando foi publicado. Use isso para qualquer corr
 tipo já lançado; use `registerResourceKind` apenas para um tipo que ninguém publicou.
 
 ### Disponibilizando-os para o frontend
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O frontend não importa `backend/resources.ts`: uma importação de valor de
 qualquer item sob `backend/` a partir de `frontend/` é recusada por

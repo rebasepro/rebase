@@ -1,5 +1,5 @@
 ---
-sourceHash: 7a427ea4f8f8b272
+sourceHash: 41940d8e882be98e
 title: Paneles en tu propia página
 sidebar_label: Paneles en tus propias páginas
 description: "Muestra una tabla, el formulario de un registro, un registro o un valor en tu propia página: CollectionPanel, RecordForm, RecordDetail, FieldValue y CollectionsProvider, sin un shell de administración a su alrededor."
@@ -39,8 +39,6 @@ demás, solo el aviso del navegador para abandonar la página lo protege. Envuel
 debe mostrar primero el inicio de sesión de Rebase.
 
 ## Qué muestra un panel
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Un panel dibuja la tabla como lo hace el admin: a partir del descriptor que sirve
 el servidor, con cualquier `customizeTable` que hayas registrado. Estas props lo adaptan a lo que

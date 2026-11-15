@@ -10,8 +10,6 @@ Additional columns let you display computed or derived data in the collection ta
 
 ## Defining Additional Columns
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 ```tsx
 // frontend/src/cms/products.tsx
 import React from "react";

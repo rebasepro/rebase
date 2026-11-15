@@ -1,5 +1,5 @@
 ---
-sourceHash: 9be8187c5259c1dd
+sourceHash: f77c49012120dbf4
 title: Aperçu du backend
 sidebar_label: Backend
 description: Le backend Rebase fournit un serveur complet avec API REST, authentification, stockage, temps réel via WebSocket et historique des entités — le tout initialisé avec un simple appel de fonction.
@@ -59,8 +59,6 @@ Ce simple appel est un raccourci regroupant des étapes publiques : `installUnha
 
 ## Où se trouve chaque option
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Cet appel représente la configuration **éjectée** — celle que vous écrivez vous-même après `rebase eject`, ou dans un serveur personnalisé. Un projet généré à partir d'un template ne la possède pas : le runtime publié démarre le projet, et chaque option arrive sous la forme d'une variable d'environnement dans `.env`, d'un export depuis `backend/storage.ts` ou `backend/hooks.ts`, ou d'un répertoire déclaré par le bundle dans `rebase.json`.
 
 Les deux approches aboutissent à la même `RebaseBackendConfig`. En voici la cartographie complète.
@@ -95,8 +93,6 @@ Les deux approches aboutissent à la même `RebaseBackendConfig`. En voici la ca
 
 ### Options sans équivalent managé
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Celles-ci ne disposent d'aucune variable d'environnement ni d'aucun export de module. Elles ne sont accessibles que depuis un appel manuel à `initializeRebaseBackend` — lors d'un `rebase eject`, ou dans un [serveur personnalisé](/docs/backend/custom-server/) :
 
 `rateLimit` · `jobs` · `csrf` · `cronPersistence` ·
@@ -128,8 +124,6 @@ Après l'initialisation, les routes suivantes sont montées :
 ---
 
 ## Le cycle de vie de l'initialisation
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Lorsque vous appelez `initializeRebaseBackend()`, le framework déclenche une séquence de démarrage séquentielle en 5 étapes :
 
@@ -183,8 +177,6 @@ Ces deux sondes appartiennent au runtime managé. Un fichier `backend/src/index.
 ---
 
 ## Référence de configuration
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 ```typescript
 interface RebaseBackendConfig {

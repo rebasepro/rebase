@@ -4,8 +4,6 @@ sidebar_label: Indexes
 description: Declare ordinary Postgres indexes on a table — btree, GIN and BRIN, partial, composite, covering and unique — and why a hand-written one used to disappear.
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A table declares the indexes its queries need, beside the columns they cover:
 
 ```ts
@@ -54,8 +52,6 @@ them in the meantime.
 
 ## The shape
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | Field | Type | Description |
 |-------|------|-------------|
 | `columns` | `(string \| { column, direction?, nulls? })[]` | **Required.** The key columns, in order. 1–5 entries. |
@@ -66,8 +62,6 @@ them in the meantime.
 | `include` | `string[]` | btree only. Payload columns carried for index-only scans. |
 
 ### `columns` takes column keys, never SQL names
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A `belongsTo` relation's name stands for its foreign-key column, so the relation
 `author` is the column `author_id`:
@@ -188,8 +182,6 @@ materialises the desired state in a bare scratch database to plan against, and
 emitted to fail later against a database you have never seen.
 
 ### `reason`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 It is the one field with no SQL behind it, and it is optional — but write it.
 
@@ -391,8 +383,6 @@ build them differently:
 
 ## What is refused, and when
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 All of these are refused when the schema is compiled, naming the table and the
 position in the array — an index that silently does not exist is the failure
 this whole feature removes:
@@ -409,8 +399,6 @@ this whole feature removes:
 - an empty `reason`
 
 ## Related
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Search](/docs/backend/search) — ranked full-text, which builds its own GIN
   index over a generated `tsvector`

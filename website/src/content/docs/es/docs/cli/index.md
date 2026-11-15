@@ -1,5 +1,5 @@
 ---
-sourceHash: d0b65c1ecccde6ba
+sourceHash: db5795d457e22066
 title: Referencia de la CLI
 sidebar_label: CLI
 description: Comandos de la CLI de Rebase para inicialización de proyectos, generación de esquemas, migraciones de bases de datos y generación de SDK.
@@ -24,8 +24,6 @@ O ejecuta cualquier comando sin instalarlo: `pnpm dlx @rebasepro/cli <command>`.
 ## Comandos
 
 ### `rebase init`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Inicializa un nuevo proyecto de Rebase:
 
@@ -84,7 +82,7 @@ El bundle es el artefacto que despliegas —la imagen del runtime lo carga, por 
 | `--no-static` | No integra el frontend en el bundle del backend (cada aplicación estática sigue obteniendo su propio bundle) |
 | `--skip-static-build` | Integra el frontend tal como ya está compilado, sin ejecutar su comando de compilación |
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span> Un frontend —cada aplicación estática de `rebase.json` con una configuración de Vite— cuya configuración no utilice `rebaseBackendGuard()` (de `@rebasepro/app/vitePlugin`) es rechazado: es lo que mantiene el código del servidor fuera del bundle del navegador y evita que Vite incluya en línea un archivo del backend como una URL `data:` (falla la compilación, nombrándose a sí mismo, cuando otro plugin reemplaza su `build.assetsInlineLimit`). `frontend/src/cms/ui-config.json` se traslada al bundle como `entry.uiConfig`, la presentación del espacio de trabajo que sirve un backend desplegado.
+Un frontend —cada aplicación estática de `rebase.json` con una configuración de Vite— cuya configuración no utilice `rebaseBackendGuard()` (de `@rebasepro/app/vitePlugin`) es rechazado: es lo que mantiene el código del servidor fuera del bundle del navegador y evita que Vite incluya en línea un archivo del backend como una URL `data:` (falla la compilación, nombrándose a sí mismo, cuando otro plugin reemplaza su `build.assetsInlineLimit`). `frontend/src/cms/ui-config.json` se traslada al bundle como `entry.uiConfig`, la presentación del espacio de trabajo que sirve un backend desplegado.
 
 Las dependencias se empaquetan (vendored) por defecto para que una nueva instancia no tenga que asumir una instalación de 35 a 55 segundos. En cambio, si un árbol supera los 2 GB en disco, se descarta, ya que el límite de subida es de 1 GB comprimido.
 
@@ -134,8 +132,6 @@ El servidor expulsado (ejected) mantiene las subidas locales en `uploads/` del p
 
 ### `rebase schema generate` / `rebase schema stale`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 ```bash
 rebase schema generate       # backend/schema → backend/src/schema.generated.ts
 rebase schema stale          # name what differs from the tables, exit 1 if anything does
@@ -164,8 +160,6 @@ Cada uno se encuentra en [Comandos de base de datos](/docs/cli/database/), con e
 
 ### `rebase console`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Un REPL de Node con los datos del proyecto abiertos, o un fragmento ejecutado con `-e`:
 
 ```bash
@@ -176,8 +170,6 @@ rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
 `rebase` (`dataAsAdmin`, `sql`, `withAuth(user)`) y `tables` (las tablas del proyecto, cargadas desde `backend/schema`) están en el ámbito (scope), y `await` en el nivel superior funciona. La base de datos se resuelve de la misma forma en que la resuelve `rebase db push`, y abrirla no cambia nada en ella. Con `-e`, el resultado esperado se imprime como JSON en stdout y cualquier excepción genera una salida con código `1`. Flags: `--eval`/`-e`, `--schema-dir`, `--database-url`, `--docker`. Consulta [Scripts y la consola](/docs/backend/scripts/).
 
 ### `rebase migrate`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Migraciones unidireccionales desde una estructura que esta versión ya no lee: `rebase migrate collections-to-tables` (`config/collections` → `backend/schema` y `frontend/src/cms`) y `rebase migrate sdk-calls` (`data.collection("x")` → `data.table("x")` en tu propio código). Sus flags, lo que escriben y la sección "Revisar antes de desplegar" se encuentran en [Generación de esquemas](/docs/cli/schema/#rebase-migrate).
 
@@ -247,8 +239,6 @@ Para ver lo que la plataforma mantiene para un proyecto en comparación con lo q
 
 ### `rebase generate-sdk`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 ```bash
 rebase generate-sdk
 ```
@@ -302,8 +292,6 @@ rebase verify --json
 rebase verify --live
 rebase verify --live --database-url postgresql://…
 ```
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Si las tablas son seguras para enviar a producción, en un único comando rápido para CI y para hooks de agentes de IA. Funciona sin conexión (offline) de forma predeterminada y nunca modifica nada.
 

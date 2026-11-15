@@ -51,8 +51,6 @@ The `createPostgresAdapter` handles database connection pooling, schema resoluti
 
 ### Table descriptors
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 At boot the backend compiles the tables `backend/schema/index.ts` exports into
 **descriptors**: each column with its Postgres type, nullability, validation and
 storage rules, the relations by slug, and the row-level security posture. A
@@ -80,8 +78,6 @@ For **multi-instance deployments** (e.g., Cloud Run with multiple replicas), eve
 Like drivers, storage backends are registered in a registry. You can have multiple storage providers (local, S3) and route different storage columns to different backends with `col.storage({ source })`.
 
 ## Package Map
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 | Package | Role | Used By |
 |---------|------|---------|

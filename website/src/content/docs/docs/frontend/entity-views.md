@@ -15,8 +15,6 @@ Entity views let you add custom **tabs** to the entity detail page alongside the
 
 ## Adding Entity Views
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 ```tsx
 // frontend/src/cms/products.tsx
 import { customizeTable } from "@rebasepro/cms";
@@ -37,8 +35,6 @@ share. A registered view shows only on the tables that name its key.
 `position: "start"` puts the tab before the form's; it goes after otherwise.
 
 ## Building an Entity View
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `Builder` is the component itself, imported by value:
 
@@ -63,8 +59,6 @@ export function ArticlePreview({ row, modifiedValues }: EntityCustomViewParams) 
 ```
 
 ### EntityCustomViewParams
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 | Prop | Type | Description |
 |------|------|-------------|

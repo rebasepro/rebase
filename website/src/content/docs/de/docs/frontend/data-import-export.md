@@ -1,5 +1,5 @@
 ---
-sourceHash: 66fc9b42bef4d463
+sourceHash: 8984b70f55593a5d
 title: Datenimport & -export
 sidebar_label: Datenimport & -export
 description: Importieren Sie Daten aus CSV-, JSON- und Excel-Dateien in Ihre Collections und exportieren Sie Collection-Daten nach CSV oder JSON mit optionalen berechneten Feldern.
@@ -103,13 +103,9 @@ Alle aktiven Filter in der Collection-Ansicht werden auf den Export angewendet. 
 
 ### Export-Konfiguration
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Der Export ist für jede Collection verfügbar, es sei denn, Sie deaktivieren ihn. `exportable` in `customizeTable` konfiguriert dies: `exportable: false` entfernt die Schaltfläche **Export**, und eine `ExportConfig` behält sie bei und fügt berechnete Spalten hinzu.
 
 ### Berechnete Felder hinzufügen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `additionalFields` fügt Spalten hinzu, die in der Tabelle nicht existieren; jede wird zum Zeitpunkt des Exports berechnet und kann asynchron sein:
 

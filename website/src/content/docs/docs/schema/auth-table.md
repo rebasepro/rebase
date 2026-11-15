@@ -4,8 +4,6 @@ sidebar_label: Users table
 description: "defineAuthTable declares the table auth stores users in: the columns auth needs, a self-read policy, admin-only privilege columns, and the access model — roles, app scopes, personal keys and the user-lifecycle hooks."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `defineAuthTable` declares the table that authentication reads and writes. It
 is a `defineTable` with three things added:
 
@@ -52,8 +50,6 @@ admins manage users, and each user still reads their own row.
 
 ## The columns
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Declare the columns your app reads or presents, with the modifiers you want;
 auth adds the ones it needs and you left out. A declared column with an auth
 column's key or SQL name (`email`, `displayName`, `roles`, `passwordHash`,
@@ -72,8 +68,6 @@ the users table itself may also name every auth column, declared or not.
 
 ## The `auth` block
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | Key | What it does |
 |---|---|
 | `roles` | The roles a user can hold, each with a `name`, an optional `description` and the admin-plane and app `scopes` it grants. `admin` is built in and cannot be declared. |
@@ -87,8 +81,6 @@ The two hooks stay on the server; the descriptor only says which of them exist. 
 covers what each scope grants and how keys and tokens narrow it.
 
 ### `onCreateUser` and `onResetPassword`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```ts
 import { randomBytes } from "node:crypto";
@@ -135,8 +127,6 @@ Both hooks receive a context with:
 
 ## What does not run for auth writes
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Registration, OAuth sign-in and an admin's user management write the users table
 directly. The table's [hooks](/docs/collections/callbacks/) do not run for those
 writes, so a welcome e-mail in `afterSave` never fires on sign-up. Put it in the
@@ -144,8 +134,6 @@ auth lifecycle hooks (`beforeUserCreate`, `afterUserCreate`, `afterUserDelete`,
 …) configured on the backend. See [Authentication](/docs/backend/authentication/).
 
 ## Next steps
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Authentication](/docs/backend/authentication/): sign-in methods, tokens and the auth hooks
 - [Roles and scopes](/docs/backend/roles-and-scopes/): declaring roles and app scopes

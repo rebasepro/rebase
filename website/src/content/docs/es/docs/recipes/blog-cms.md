@@ -1,5 +1,5 @@
 ---
-sourceHash: 0c385399c3a984b7
+sourceHash: 19a897df04526a75
 title: "Receta: Blog CMS"
 sidebar_label: Blog CMS
 description: Crea un CMS de blog completo con artículos, autores, categorías, edición de texto enriquecido y subida de imágenes — tablas en backend/schema, presentación en frontend/src/cms.
@@ -14,14 +14,10 @@ Crea un backend de blog con:
 
 ## Tablas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Tres archivos en `backend/schema/`. Contienen lo que la base de datos y la API
 hacen cumplir; cómo los presenta el panel de administración viene después, en el frontend.
 
 ### Autores
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```ts
 // backend/schema/authors.ts
@@ -41,8 +37,6 @@ export const authors = defineTable("authors", {
 
 ### Categorías
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 ```ts
 // backend/schema/categories.ts
 import { defineTable, col } from "@rebasepro/server/schema";
@@ -59,8 +53,6 @@ export const categories = defineTable("categories", {
 ```
 
 ### Artículos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```ts
 // backend/schema/articles.ts
@@ -148,8 +140,6 @@ scaffold, añade `writer` a las opciones de rol de la columna `roles` en
 
 ## Cómo los muestra el panel
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 El panel de administración renderiza los tres sin necesidad de código adicional. Estos archivos en
 `frontend/src/cms/` añaden los iconos, los colores de los enums y los editores:
 
@@ -187,8 +177,6 @@ export const authorsCms = customizeTable<typeof authors>("authors", {
 ```
 
 ## Configuración
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 1. Guarda los tres archivos de tabla en `backend/schema/` y expórtalos desde
    `backend/schema/index.ts`: un `defineTable` que el index no exporte
@@ -245,8 +233,6 @@ for (const article of articles) {
 
 
 ## Relacionado
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Tablas](/docs/schema/) — la API `defineTable` que utiliza esta receta
 - [Personalizar una tabla](/docs/frontend/customize-table/) — la parte del panel

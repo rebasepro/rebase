@@ -1,5 +1,5 @@
 ---
-sourceHash: 3317ba94279d0cb8
+sourceHash: c3ddd891a53e23c1
 title: Extender Rebase
 sidebar_label: Extender Rebase
 description: "Una guía de decisión para elegir el mecanismo de extensión adecuado: plugins, slots, reemplazos de componentes, vistas de entidad, acciones y más."
@@ -21,8 +21,6 @@ añadir una ruta, embeber el driver en su propio proceso, `rebase eject`— cons
 para el backend.
 
 ## Tabla de decisión
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 | Quiero… | Mecanismo | Alcance | Referencia |
 |---|---|---|---|
@@ -56,8 +54,6 @@ fijado manualmente es invisible en uno de los dos temas. Consulte
 ## Mecanismos en detalle
 
 ### Plugins
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 **Alcance:** app.
 
@@ -110,8 +106,6 @@ Dos modos: **Eject** (reemplazo total) o **Wrap** (extender el original).
 
 ### Vistas de entidad
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 **Alcance:** entidad (añade pestañas).
 
 Vistas personalizadas que aparecen como pestañas en la página de detalles de la entidad. Se definen por tabla en `customizeTable`, o se registran una sola vez en `<Rebase entityViews>` (o `<RebaseCMS entityViews>`) y se referencian por su `key` en el `entityViews` de una tabla.
@@ -119,8 +113,6 @@ Vistas personalizadas que aparecen como pestañas en la página de detalles de l
 → [Vistas de entidad](/docs/frontend/entity-views)
 
 ### Acciones de entidad
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 **Alcance:** entidad.
 
@@ -140,7 +132,6 @@ Componentes de React a nivel de barra de herramientas que reciben `CollectionAct
 
 ### Modos de vista personalizados
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 **Alcance:** colección (añade un modo de vista).
 
 Un mapa, un calendario, una galería, una línea de tiempo — otra representación de *las mismas filas*,
@@ -231,7 +222,6 @@ de búsqueda y su conteo de registros, estaría describiendo una consulta que no
 
 ### `formView`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 **Alcance:** colección.
 
 Reemplaza por completo el formulario de entidad predeterminado por un componente personalizado, configurado mediante
@@ -276,8 +266,6 @@ muestra el panel, esta no es la página indicada. El servidor tiene su propio es
 → [Rebase no hace X](/docs/backend/extending)
 
 ## Resumen de precedencia
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - **Los `components` de una tabla tienen prioridad sobre los `components` globales** dentro de su colección. Un reemplazo a nivel de colección sustituye a ambos; un reemplazo de colección con `wrap: true` envuelve al reemplazo global en caso de existir uno. Consulte [Reemplazos de componentes](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **Las `Actions` de colección y el slot `collection.actions` son aditivos** — `Actions` se renderiza primero, seguido de las contribuciones de slots.

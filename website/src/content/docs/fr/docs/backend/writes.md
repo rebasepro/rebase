@@ -1,5 +1,5 @@
 ---
-sourceHash: b1b5ef4227e130d2
+sourceHash: 2229a4346ece8f3c
 title: Écriture via REST
 sidebar_label: Écriture via REST
 description: Clés d'idempotence, écritures conditionnelles avec ETag et If-Match, opérations de champ, upserts sur clé naturelle, return=minimal et lots multi-tables.
@@ -13,7 +13,7 @@ Au-delà des verbes, les routes d'écriture acceptent cinq éléments qui modifi
 
 Le corps d'une écriture doit être un objet JSON. `null`, un nombre, une chaîne ou un tableau renvoie un `400 BAD_REQUEST`.
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span> Une écriture accepte les valeurs documentées par l'API REST et rien d'autre — la même structure que celle renvoyée par une lecture : une relation to-one (`belongsTo`, `hasOne`, un `via` to-one) sous la forme de la clé de la ligne liée ou `null`, une relation to-many sous la forme d'une liste de clés ou d'objets `{ id, _pivot? }`, une date sous forme de texte ISO, un vecteur sous forme de liste de nombres, un géopoint sous la forme `{ latitude, longitude }`, un `bytea` sous la forme d'une URL `data:application/octet-stream;base64,`. Une relation to-one écrite sous forme d'objet (`{ "author": { "id": 5 } }`) renvoie une erreur `400 VALIDATION_INVALID_VALUE` ("'posts.author' links one 'authors' row: write that row's key …"), tout comme un vecteur écrit sous la forme `{ "value": [...] }`. En processus, `rebase.data` accepte également un `Date` et un `Buffer` / `Uint8Array`.
+Une écriture accepte les valeurs documentées par l'API REST et rien d'autre — la même structure que celle renvoyée par une lecture : une relation to-one (`belongsTo`, `hasOne`, un `via` to-one) sous la forme de la clé de la ligne liée ou `null`, une relation to-many sous la forme d'une liste de clés ou d'objets `{ id, _pivot? }`, une date sous forme de texte ISO, un vecteur sous forme de liste de nombres, un géopoint sous la forme `{ latitude, longitude }`, un `bytea` sous la forme d'une URL `data:application/octet-stream;base64,`. Une relation to-one écrite sous forme d'objet (`{ "author": { "id": 5 } }`) renvoie une erreur `400 VALIDATION_INVALID_VALUE` ("'posts.author' links one 'authors' row: write that row's key …"), tout comme un vecteur écrit sous la forme `{ "value": [...] }`. En processus, `rebase.data` accepte également un `Date` et un `Buffer` / `Uint8Array`.
 
 Écrire une relation `hasMany` ou `hasOne` depuis le parent (`{ "replies": [1, 2] }` sur un thread) définit la clé étrangère sur les lignes enfants, et est donc soumis aux règles de cette clé : une colonne clé qui est `.readOnly()`, `.private()` ou restreinte par `access.write` la refuse (`400 VALIDATION_EXCLUDED_FIELDS` / `FIELD_NOT_WRITABLE`, "Writing 'replies' on 'threads' sets 'threadId' on the rows of 'replies'"), tout comme le ferait une écriture de la clé directement sur l'enfant.
 
@@ -119,8 +119,6 @@ Une ligne qui existait déjà conserve son horodatage `.onCreateNow()` et son cr
 
 #### Pas sur la table d'authentification
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 La table d'authentification (déclarée avec `defineAuthTable`) refuse les upserts par tous les moyens d'accès — `?on_conflict=`, `/bulk` avec `upsert: true`, une opération `upsert` dans `_batch`, la méthode `upsert()` du SDK et le socket temps réel — avec un code `400` (`INVALID_CONFLICT_TARGET`). Ses lignes représentent les utilisateurs, et en créer un ou en modifier un répond à des règles différentes : une création hache le mot de passe, normalise l'e-mail, exécute `onCreateUser` et envoie l'invitation, tandis qu'une mise à jour ne peut pas rétrograder le dernier administrateur. Un upsert ne sait de quel cas il s'agit qu'au cours de l'écriture, trop tard pour appliquer l'un ou l'autre. Créez les utilisateurs avec un simple `POST` et modifiez-les avec `PATCH`.
 
 ### `Prefer: return=minimal`
@@ -138,7 +136,7 @@ Une écriture simple renvoie `204`. Une écriture `/bulk` ou `/_batch` renvoie `
 
 ## Lots multi-tables
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span> Chaque opération désigne sa table avec `table` (auparavant `collection`).
+Chaque opération désigne sa table avec `table` (auparavant `collection`).
 
 `POST /api/data/_batch` effectue des écritures sur plusieurs tables au sein d'une seule transaction, sous le rôle propre de l'appelant, avec la même validation, les mêmes hooks et la même sécurité au niveau des lignes que ceux que la route unitaire de chaque opération appliquerait.
 

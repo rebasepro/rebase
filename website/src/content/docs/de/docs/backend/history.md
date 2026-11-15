@@ -1,5 +1,5 @@
 ---
-sourceHash: 37c268f3d4b76c7f
+sourceHash: a0c661b1716664d6
 title: Entity-Historie
 sidebar_label: Entity-Historie
 description: Verfolgen Sie jede Änderung an Ihren Entitäten mit einem vollständigen Audit-Trail – wer was wann geändert hat, sowie die vollständige Vorher-/Nachher-Entität.
@@ -44,8 +44,6 @@ history: {
 ```
 
 ### Pro Tabelle
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Legen Sie mit `history: true` fest, welche Tabellen die Historie nachverfolgen:
 
@@ -116,7 +114,7 @@ Die Aufbewahrungsfrist wird an zwei Stellen durchgesetzt:
 GET /api/data/:slug/:entityId/history
 ```
 
-Gibt eine Liste von Historieeinträgen für eine bestimmte Entität zurück, sortiert nach den neuesten zuerst. <span class="since-badge" data-since="0.31">Seit 0.31</span> Einträge, die von einer Transaktion aufgezeichnet werden – ein Erstellen und das darauffolgende Update in einem einzelnen `_batch`, ein Revert und dessen Revert – werden in der Reihenfolge zurückgegeben, in der sie geschrieben wurden: Das `updated_at` jedes Eintrags liegt zeitlich nach dem vorherigen Eintrag der Zeile. Eine bestehende Datenbank erhält dies mit ihrem nächsten Bereitstellungsstart (Provisioning Boot) oder einem Durchlauf mit `REBASE_PROVISION_ONLY=true`, wodurch die Funktion `rebase.record_history` ersetzt wird; ein Deployment, das niemals bereitgestellt wird, behält bis dahin die alte Reihenfolge bei. Einträge, die davor aufgezeichnet wurden, behalten ihre Reihenfolge.
+Gibt eine Liste von Historieeinträgen für eine bestimmte Entität zurück, sortiert nach den neuesten zuerst. Einträge, die von einer Transaktion aufgezeichnet werden – ein Erstellen und das darauffolgende Update in einem einzelnen `_batch`, ein Revert und dessen Revert – werden in der Reihenfolge zurückgegeben, in der sie geschrieben wurden: Das `updated_at` jedes Eintrags liegt zeitlich nach dem vorherigen Eintrag der Zeile. Eine bestehende Datenbank erhält dies mit ihrem nächsten Bereitstellungsstart (Provisioning Boot) oder einem Durchlauf mit `REBASE_PROVISION_ONLY=true`, wodurch die Funktion `rebase.record_history` ersetzt wird; ein Deployment, das niemals bereitgestellt wird, behält bis dahin die alte Reihenfolge bei. Einträge, die davor aufgezeichnet wurden, behalten ihre Reihenfolge.
 
 ```json
 {
@@ -139,8 +137,6 @@ Gibt eine Liste von Historieeinträgen für eine bestimmte Entität zurück, sor
 ```
 
 ### Einträge werden wie Lesevorgänge ausgeliefert
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Historieeinträge werden genauso ausgeliefert wie die Zeile selbst: zuerst Feldzugriff, dann `afterRead` (global, Tabelle, Spalte), innerhalb der schreibgeschützten Transaktion des Aufrufers. Eine Spalte, die durch einen Hook oder ein `.transform({ afterRead })` maskiert wird, ist in `values` und `previous_values` maskiert; eine Spalte, die die Rollen des Aufrufers nicht lesen dürfen, wird vorenthalten und aus `changed_fields` weggelassen; Schlüssel von Spalten, die die Tabelle nicht mehr besitzt, werden vorenthalten. Wer die Zeile jetzt lesen darf, kann auch deren Historie einsehen, und `updated_by` bleibt erhalten. Ein Hook, der bei einem alten Snapshot einen Fehler wirft, schlägt für die gesamte Anfrage fehl, anstatt sie unmaskiert auszuliefern, und die Historie einer endgültig gelöschten (hard-deleted) Zeile antwortet mit 404 ("No row with id '…' in table '…'").
 

@@ -1,11 +1,9 @@
 ---
-sourceHash: 59fc3060e8bce0e2
+sourceHash: 8ed0f8885ebc5b1d
 title: Tables
 sidebar_label: Tables
 description: "Déclarez des tables Postgres dans backend/schema avec defineTable : colonnes, relations et une posture de sécurité au niveau des lignes (RLS) obligatoire. Chaque table génère du SQL, des stratégies, des routes REST, realtime et MCP, ainsi que des types SDK."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Une table est déclarée une seule fois, en TypeScript, dans le répertoire `backend/schema/`.
 Cette déclaration est la seule chose que le backend connaît de vos données. À partir
@@ -54,8 +52,6 @@ le frontend. Le guide de mise à niveau de cette version détaille cette migrati
 :::
 
 ## Le répertoire `backend/schema`
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 ```text
 backend/
@@ -116,8 +112,6 @@ par rapport à une table, sans inclure de code backend dans le bundle du navigat
 
 ## Ce que devient une table
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 | De la déclaration | Rebase génère |
 |---|---|
 | `columns`, `relations`, `indexes` | le `CREATE TABLE`, les clés étrangères, les tables de jonction et les index, écrits dans `schema.sql` par `rebase db push` et `rebase db generate` |
@@ -139,8 +133,6 @@ Le pipeline menant de la déclaration à la base de données est décrit dans
 
 ## Options de `defineTable`
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 `defineTable(name, config)` prend le nom de la table et ces clés :
 
 | Clé | Description |
@@ -153,7 +145,7 @@ Le pipeline menant de la déclaration à la base de données est décrit dans
 | `schema` | Le schéma Postgres. `public` lorsqu'il est omis. |
 | `database` | Une base de données Postgres non définie par défaut, déclarée dans `backend/resources.ts`. Voir [Sources multiples](/docs/backend/multiple-sources/). |
 | `description` | Ce que contient la table. Affiché dans OpenAPI et dans les descriptions des outils MCP. |
-| `defaultPolicies` | `false` génère uniquement vos règles, sans les stratégies d'administration par défaut (baseline). Refusé avec `rls: "admin-only"`. <span class="since-badge" data-since="0.31">Depuis 0.31</span> `true` conserve la baseline lorsque la base de données de la table la désactive pour toutes les tables (`database({ rls: { defaultPolicies: false } })`). Lorsqu'il est omis, c'est le paramètre de la base de données qui s'applique. |
+| `defaultPolicies` | `false` génère uniquement vos règles, sans les stratégies d'administration par défaut (baseline). Refusé avec `rls: "admin-only"`. `true` conserve la baseline lorsque la base de données de la table la désactive pour toutes les tables (`database({ rls: { defaultPolicies: false } })`). Lorsqu'il est omis, c'est le paramètre de la base de données qui s'applique. |
 | `tenant` | Isole chaque ligne par tenant. Voir [Multi-tenant](/docs/collections/tenancy/). |
 | `softDelete` | `true` ou `{ field }` : une suppression applique un horodatage au lieu de supprimer la ligne. Voir [Suppression réversible](/docs/collections/soft-delete/). |
 | `history` | `true` consigne chaque écriture dans la table d'historique. Voir [Historique des entités](/docs/backend/history/). |
@@ -168,8 +160,6 @@ Deux autres définitions partagent la plupart de ces clés :
 utilisateurs, et [`defineView`](/docs/collections/views/) pour les vues SQL.
 
 ## Noms
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Le premier argument de `defineTable` est le nom de la table, et il sert de valeur
 par défaut pour tout le reste :
@@ -196,8 +186,6 @@ explicitement lorsqu'il doit être différent du nom de la table, et ne le modif
 par la suite.
 
 ## Clés primaires
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Il n'y a pas de colonne `id` implicite. Chaque table marque au moins une colonne
 avec `.primaryKey()` :
@@ -231,8 +219,6 @@ valeur par défaut est fournie par l'appelant lors de la création. Une colonne 
 
 ## Quand une définition est refusée
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Un schéma qui laisserait une table sans protection ou impossible à servir n'atteint
 jamais la base de données. Il est refusé à trois moments :
 
@@ -263,8 +249,6 @@ un fichier situé à côté de `index.ts` mais omise de `index.ts` lui-même est
 refusée : l'index fait foi pour la liste des tables.
 
 ## Prochaines étapes
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - [Colonnes](/docs/schema/columns/) : l'ensemble des constructeurs et modificateurs `col.*`
 - [Documents JSON](/docs/schema/json/) : du `jsonb` typé et validé avec `json.*`

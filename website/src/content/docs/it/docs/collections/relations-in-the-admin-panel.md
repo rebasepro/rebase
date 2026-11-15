@@ -1,11 +1,9 @@
 ---
-sourceHash: 8f8ab97f8302c1f8
+sourceHash: c26e358d70b93640
 title: Relazioni nel pannello di amministrazione
 sidebar_label: Relazioni nel pannello di amministrazione
 description: "Come il CMS visualizza le relazioni di una tabella: un selettore per un belongsTo, una scheda sotto il record per ogni relazione to-many, righe di proprietà rispetto a righe condivise, le stesse regole via REST e le opzioni customizeTable per i campi di relazione."
 ---
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Il CMS legge le [relazioni](/docs/collections/relations/) di una tabella dal suo
 descrittore e disegna ciascuna in base a ciò che è:
@@ -50,8 +48,6 @@ un semplice campo, in modo che il valore rimanga visibile e modificabile. Viene 
 
 ## Il segmento del percorso è il nome della relazione
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Le righe di una scheda vengono indirizzate come `parent/parentId/relationName`:
 
 ```text
@@ -64,8 +60,6 @@ slug della destinazione. È questo che consente il funzionamento di due relazion
 il proprio nome, quindi ciascuna ottiene la propria scheda e il proprio percorso.
 
 ## Righe di proprietà rispetto a righe condivise
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Ciò che una scheda consente di fare dipende da come viene memorizzata la relazione:
 
@@ -80,8 +74,6 @@ Una scheda molti-a-molti offre **Aggiungi esistente** e **Rimuovi da questo reco
 mai un'eliminazione che sottrarrebbe la riga ad altri genitori.
 
 ## Le stesse regole via REST
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Una scheda è una normale query ristretta a un solo genitore, quindi accetta tutto ciò che
 accetta un elenco radice (filtri, `orderBy`, `limit`, `offset`, `include`) e
@@ -107,16 +99,12 @@ già esistente.
 
 ## Cosa non diventa una scheda
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 - **Relazioni to-one**: un `belongsTo` o un `hasOne` è un campo del record, non
   un elenco. La scrittura tramite un percorso to-one viene rifiutata.
 - **Una tabella con `hideFromEntityViews`** nel suo `customizeTable` non viene proposta
   come scheda sui record delle tabelle correlate ad essa.
 
 ## Personalizzazione dei campi di relazione
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 ```tsx
 // frontend/src/cms/articles.tsx
@@ -154,8 +142,6 @@ al `customizeTable` della tabella di destinazione stessa, e inserire `fields` al
 genera un errore.
 
 ## Passaggi successivi
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 - [Relazioni](/docs/collections/relations/): i cinque tipi e come dichiarare ciascuno
 - [customizeTable](/docs/frontend/customize-table/#relations): opzioni di relazione nella guida di riferimento

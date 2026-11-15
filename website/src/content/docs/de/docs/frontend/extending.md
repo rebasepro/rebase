@@ -1,5 +1,5 @@
 ---
-sourceHash: 3317ba94279d0cb8
+sourceHash: c3ddd891a53e23c1
 title: Rebase erweitern
 sidebar_label: Rebase erweitern
 description: Ein Leitfaden zur Auswahl des richtigen Erweiterungsmechanismus – Plugins, Slots, Komponenten-Overrides, Entity-Views, Aktionen und mehr.
@@ -18,8 +18,6 @@ Jeder der folgenden Mechanismen ist im Kern dasselbe: eine React-Komponente, die
 Alles hier betrifft das **Admin-Panel**. Für den Server – Einschränken eines Lesevorgangs, Hinzufügen einer Route, Einbetten des Treibers in Ihren eigenen Prozess, `rebase eject` – siehe [Rebase doesn't do X](/docs/backend/extending), was die entsprechende Übersichtstabelle für das Backend darstellt.
 
 ## Entscheidungstabelle
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 | Ich möchte… | Mechanismus | Scope | Referenz |
 |---|---|---|---|
@@ -49,8 +47,6 @@ Jeder der folgenden Mechanismen stellt Ihnen eine React-Komponente bereit und ma
 ## Mechanismen im Detail
 
 ### Plugins
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 **Scope:** app.
 
@@ -103,8 +99,6 @@ Zwei Modi: **Eject** (vollständiger Ersatz) oder **Wrap** (Erweiterung des Orig
 
 ### Entity Views
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 **Scope:** entity (fügt Tabs hinzu).
 
 Benutzerdefinierte Ansichten, die als Tabs auf der Entity-Detailseite erscheinen. Definiert pro Tabelle in `customizeTable` oder einmalig unter `<Rebase entityViews>` (oder `<RebaseCMS entityViews>`) registriert und über den `key` in den `entityViews` einer Tabelle referenziert.
@@ -112,8 +106,6 @@ Benutzerdefinierte Ansichten, die als Tabs auf der Entity-Detailseite erscheinen
 → [Entity Views](/docs/frontend/entity-views)
 
 ### Entity Actions
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 **Scope:** entity.
 
@@ -133,7 +125,6 @@ React-Komponenten auf Symbolleistenebene, die `CollectionActionsProps` empfangen
 
 ### Benutzerdefinierte Ansichtsmodi
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 **Scope:** collection (fügt einen Ansichtsmodus hinzu).
 
 Eine Karte, ein Kalender, eine Galerie, eine Zeitleiste – eine alternative Darstellung *derselben Zeilen*, angeboten im Ansichtsumschalter der Collection neben Liste, Tabelle, Karten und Board.
@@ -208,7 +199,6 @@ Das Auswählen der Ansicht aktualisiert `?__view=`, bleibt bei einem Neuladen er
 
 ### `formView`
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 **Scope:** collection.
 
 Ersetzt das gesamte Standard-Entity-Formular durch eine benutzerdefinierte Komponente, festgelegt mit `formView: { Builder, includeActions }` in `customizeTable`; siehe [Replacing the form](/docs/frontend/form-layout/#replacing-the-form). `includeActions` (Standardwert `true`) behält Speichern und Verwerfen in der Leiste bei.
@@ -248,8 +238,6 @@ Wenn das, was Sie ändern möchten, das Serververhalten betrifft und nicht das, 
 → [Rebase doesn't do X](/docs/backend/extending)
 
 ## Zusammenfassung der Rangfolge
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - **Die `components` einer Tabelle haben Vorrang vor globalen `components`** innerhalb ihrer Collection. Ein Ersatz auf Collection-Ebene ersetzt beide; ein Override mit `wrap: true` auf Collection-Ebene umschließt den globalen Override, falls vorhanden. Siehe [Component Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **Collection-`Actions` und der `collection.actions`-Slot sind additiv** – `Actions` werden zuerst gerendert, danach die Slot-Beiträge.

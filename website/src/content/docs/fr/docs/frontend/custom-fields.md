@@ -1,5 +1,5 @@
 ---
-sourceHash: d337d344b88534c8
+sourceHash: a63ce157610d02d8
 title: Champs personnalisés
 sidebar_label: Champs personnalisés
 description: Créez des champs de formulaire personnalisés pour l'édition d'entités avec un accès complet au contexte du formulaire, aux valeurs de l'entité et aux hooks Rebase.
@@ -10,8 +10,6 @@ description: Créez des champs de formulaire personnalisés pour l'édition d'en
 </video>
 
 ## Vue d'ensemble
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Le CMS génère un champ pour chaque colonne à partir de son type (voir
 [Champs](/docs/collections/properties/)). Lorsque cela ne correspond pas à vos
@@ -27,8 +25,6 @@ de chaîne de caractères ou un thunk lazy `() => import(…)` lèvera une excep
 en indiquant quoi écrire à la place.
 
 ## Créer un champ personnalisé
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un champ personnalisé est un composant React qui reçoit `FieldProps` :
 
@@ -55,8 +51,6 @@ export function ColorPickerField({ value, setValue, error, showError, minimalist
 
 ### FieldProps
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 | Prop | Type | Description |
 |------|------|-------------|
 | `value` | `T` | Valeur actuelle du champ |
@@ -71,8 +65,6 @@ export function ColorPickerField({ value, setValue, error, showError, minimalist
 | `customProps` | `unknown` | Les `customProps` du champ définies dans `customizeTable`, intactes |
 
 ## Utilisation
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 ```tsx
 // frontend/src/cms/brands.tsx
@@ -94,15 +86,11 @@ jamais le composant, et le frontend importe uniquement le type de la table depui
 
 ## Un type de champ réutilisable
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Un champ utilisé sur plusieurs tables peut être enregistré une seule fois dans
 `<Rebase propertyConfigs>`, indexé par son nom, et spécifié sur chaque champ avec
 `propertyConfig: "color_picker"`.
 
 ## Accéder au contexte du formulaire
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un champ personnalisé peut lire l'intégralité de l'enregistrement en cours de
 modification :
@@ -131,16 +119,12 @@ export function PriceWithTaxField({ value, setValue, context }: FieldProps<Numbe
 
 ## Mode tableau
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Un champ personnalisé n'est pas affiché directement dans une cellule de tableau :
 la cellule affiche la valeur (ou votre `Preview`), et la modifier ouvre le champ
 dans une fenêtre contextuelle avec `minimalistView` activé. Veillez à ce qu'il
 reste compact dans ce contexte, comme le fait `ColorPickerField` ci-dessus.
 
 ## Aperçus personnalisés
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `Preview` affiche la valeur en dehors du formulaire. Il reçoit `FieldPreviewProps` :
 `value`, la `property` résolue, la taille `size` attribuée par la surface (`"small"`,
@@ -163,8 +147,6 @@ export function ColorPreview({ value }: FieldPreviewProps) {
 ```
 
 ## Filtres personnalisés
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `Filter` remplace le contrôle de filtre d'un champ. Il prend le pas sur une
 surcharge globale à la collection `Collection.FilterField` ainsi que sur le

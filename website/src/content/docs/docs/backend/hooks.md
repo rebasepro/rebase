@@ -6,8 +6,6 @@ description: "Apply cross-cutting lifecycle hooks to every table at the server l
 
 ## Overview
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Rebase runs table hooks at two levels, both of the `TableHooks` type from
 `@rebasepro/server/schema`:
 

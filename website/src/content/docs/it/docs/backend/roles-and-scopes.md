@@ -1,5 +1,5 @@
 ---
-sourceHash: 1610ca294114442e
+sourceHash: d68196665de50636
 title: Ruoli e scope
 sidebar_label: Ruoli e scope
 description: "Cosa può fare un chiamante: il data plane posseduto da ogni persona, l'admin plane concesso dai ruoli, gli scope che un'app dichiara per se stessa e come ogni credenziale li trasporta."
@@ -79,8 +79,6 @@ Gli scope dell'admin plane non prevedono target. Uno scope dell'app ne prevede u
 
 ## Dichiarazione dei ruoli
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 I ruoli vengono dichiarati nella [tabella utenti](/docs/schema/auth-table/), sotto
 `auth.roles`. Un ruolo è un nome riconosciuto dal database, che le policy di row-level security
 possono verificare, unitamente a un elenco di scope dell'admin plane e dell'app.
@@ -146,8 +144,6 @@ const { roles } = await client.admin.listRoles();
 ```
 
 ## Scope dell'applicazione
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Un'app può definire le proprie operazioni come scope, sotto `auth.scopes`:
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: d1b243f804318232
+sourceHash: fa700834543b9475
 title: Plugin-System
 sidebar_label: Plugins
 description: Erweitern Sie Rebase mit Plugins – binden Sie UI-Komponenten ein, modifizieren Sie Collections, fügen Sie Toolbar-Aktionen hinzu und erstellen Sie benutzerdefinierte Field Builder.
@@ -263,8 +263,6 @@ hooks: {
 ```
 
 ## Collection-Modifikation
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Plugins können bestehende Collections modifizieren:
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 3bff62ceb5aceb62
+sourceHash: fbdc423a29403c10
 title: Esecuzione su un database esistente o condiviso
 sidebar_label: Database esistente o condiviso
 description: Esegui Rebase su un database PostgreSQL di cui non è proprietario — un cluster condiviso con altre app, un secondo progetto Rebase, Supabase o un database bloccato da un DBA — con le impostazioni rls, rebase doctor --database e rebase db request-role migrate.
@@ -289,8 +289,6 @@ In alternativa, eliminale: ogni policy il cui nome termina in `_ar_` seguito da 
 il cui ruolo è `rebase_admin_request`.
 
 ### Uno schema `public` condiviso
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Quando `public` contiene tabelle che Rebase non deve gestire:
 

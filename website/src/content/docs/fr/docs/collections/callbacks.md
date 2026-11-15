@@ -1,11 +1,9 @@
 ---
-sourceHash: 067f45147f37ef16
+sourceHash: 283f536f508ee0b7
 title: Hooks de table
 sidebar_label: Hooks de table
 description: "Exécutez du code côté serveur à chaque étape du cycle de vie d'une table avec les hooks : restreignez les lectures, masquez des champs, validez et complétez les écritures, réagissez aux enregistrements et suppressions, et transformez des colonnes individuelles."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Les `hooks` d'une table s'exécutent sur le serveur à chaque étape de la vie d'une ligne : avant une lecture, sur chaque ligne quittant le serveur, avant et après une écriture, et avant et après une suppression. Ils s'exécutent pour chaque point d'entrée vers la table — REST, le SDK, le temps réel, MCP et le code serveur via `rebase.data` — et leur code ne quitte jamais le serveur, de sorte qu'une clé d'API ou une lecture de `process.env` dans un hook est totalement sécurisée.
 
@@ -46,8 +44,6 @@ Les hooks de table correspondent aux `callbacks` serveur d'une collection, avec 
 
 ## Les sept hooks
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 | Hook | S'exécute | Retourne |
 |---|---|---|
 | `beforeQuery` | avant la compilation de chaque lecture | un filtre à combiner avec un ET logique (AND) dans la lecture, ou rien |
@@ -71,8 +67,6 @@ Un auteur d'écriture ne les exécute pas : **le système d'authentification**. 
 Une table modifiée par le CMS directement dans le navigateur, sans serveur Rebase dans le chemin de la requête, n'atteint jamais ces hooks. Le CMS dispose de ses propres hooks côté navigateur pour ce cas, décrits dans les personnalisations du CMS.
 
 ## `beforeQuery`
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 S'exécute **avant la compilation d'une lecture**, afin de restreindre les lignes demandées. Retournez des conditions à ajouter avec un opérateur AND dans la requête ; ne retournez rien pour n'en ajouter aucune.
 
@@ -106,8 +100,6 @@ La vérification d'unicité derrière `.unique()` n'est pas restreinte : si elle
 La sécurité au niveau des lignes (Row-level security) est le modèle d'autorisation ; `beforeQuery` constitue une logique applicative par-dessus. Utilisez [`rls`](/docs/collections/security-rules/) pour tout ce qui doit également s'appliquer au SQL exécuté en tant qu'appelant.
 
 ## `beforeSave`
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 S'exécute avant qu'une ligne ne soit écrite et retourne les valeurs à écrire. `values` contient toutes les valeurs lors d'une création et les valeurs modifiées lors d'une mise à jour ; `previousValues` correspond à la ligne telle qu'elle était avant la mise à jour ; `status` vaut `"new"`, `"existing"` ou `"copy"` ; `id` est absent lors d'une création dont la clé est générée par la base de données.
 
@@ -149,8 +141,6 @@ Importez `RebaseApiError` depuis `@rebasepro/types` : les fichiers de schéma ne
 
 ## `afterSave` et `afterSaveError`
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 `afterSave` s'exécute après l'écriture de la ligne et avant le commit, dans la même transaction. Ses `values` représentent la ligne telle qu'elle est stockée. Une exception annule l'enregistrement (rollback), ainsi que tout ce que le hook a écrit via `context.data` :
 
 ```ts
@@ -176,8 +166,6 @@ Les opérations qui sortent de la base de données — un e-mail, un webhook —
 `afterSaveError` s'exécute lorsqu'un enregistrement a échoué au niveau de la base de données ou après, une fois que la transaction de l'écriture ayant échoué a été annulée. Il ne s'exécute pas en cas de refus dans `beforeSave` ou pour une requête refusée avant l'écriture. Son `context.data` est une instance nouvelle pour le même appelant, de sorte qu'un job qu'il met en file d'attente survit à l'échec qu'il signale. Une exception levée depuis celui-ci est journalisée, et l'appelant reçoit toujours l'erreur d'origine de l'enregistrement.
 
 ## `afterRead`
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 S'exécute sur chaque ligne quittant le serveur — la réponse d'une lecture, la réponse d'une écriture, une trame temps réel, un résultat MCP — et retourne la ligne à servir. `values` correspond à la ligne telle qu'elle est stockée, après que [l'accès aux champs](/docs/collections/field-access/) a retiré ce que l'appelant n'est pas autorisé à lire.
 
@@ -216,8 +204,6 @@ Une valeur qu'un appelant ne doit jamais recevoir gagne à être retenue plutôt
 
 ## `beforeDelete` et `afterDelete`
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Tous deux reçoivent la ligne en cours de suppression sous forme de `values`, ainsi que son `id`.
 
 `beforeDelete` s'exécute au sein de la transaction de suppression. Levez une exception pour refuser la suppression, et l'appelant recevra `400 CALLBACK_REJECTED` avec votre message. Retourner `false` la refuse également, sous la forme d'un `403 CALLBACK_REJECTED` sans message personnalisé.
@@ -225,8 +211,6 @@ Tous deux reçoivent la ligne en cours de suppression sous forme de `values`, ai
 `afterDelete` s'exécute après la suppression de la ligne et avant le commit. Une exception annule la suppression (rollback). Sur une table avec [suppression réversible (soft delete)](/docs/collections/soft-delete/), une suppression est un horodatage (stamp), et les deux hooks s'exécutent tout de même.
 
 ## Hooks de champ : `.transform()`
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 La méthode `.transform()` d'une colonne prend deux hooks au niveau du champ : `beforeSave` retourne la valeur à stocker, et `afterRead` retourne la valeur à servir. Ils s'exécutent sur le serveur, pour chaque appelant, et reçoivent `value`, la ligne entière sous forme de `values`, ainsi que les props reçues par chaque hook.
 
@@ -253,8 +237,6 @@ export const contacts = defineTable("contacts", {
 `.transform()` est également disponible sur les éléments de tableau et sur chaque champ d'un [document JSON](/docs/schema/json/). Pour la suppression des espaces et la casse, les [règles de validation](/docs/schema/columns/#validation) `trim`, `lowercase` et `uppercase` ne nécessitent aucun code.
 
 ## Écrire dans d'autres tables
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `context.data` lit et écrit dans n'importe quelle table via son slug, en tant qu'appelant et dans la même transaction que l'écriture qui a déclenché le hook :
 
@@ -285,15 +267,11 @@ La mise à jour ci-dessus enregistre à nouveau `job_submissions`, ce qui réex�
 
 ## Hooks pour toutes les tables
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Les hooks s'appliquant à toutes les tables — masquage des données personnelles (PII) à l'échelle du schéma, journal d'audit global — sont exportés sous le nom `hooks` depuis `backend/hooks.ts`, avec la même structure `TableHooks`. Ils s'exécutent avant les hooks propres à chaque table, qui s'exécutent eux-mêmes avant le `.transform()` de leurs colonnes. Voir [Hooks globaux](/docs/backend/hooks/).
 
 Les hooks peuvent également être rattachés après le démarrage avec `setTableHooks(slug, hooks)` sur le backend. Cela **remplace** les hooks déclarés par la table ; pour les combiner, passez `composeTableHooks(declared, yours)`.
 
 ## Combiner des ensembles de hooks
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Une table possède un seul objet `hooks`. Lorsque plusieurs fonctionnalités ont chacune besoin d'un hook — un générateur de slug, une piste d'audit, une portée par tenant — écrivez chacune dans son propre ensemble et combinez-les avec `composeTableHooks` issu de `@rebasepro/common` :
 
@@ -338,13 +316,9 @@ Un hook n'est présent dans le résultat que si un ensemble le définit, et un e
 
 ## Tester un hook
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Un hook est une simple fonction acceptant un objet de props, de sorte qu'un test unitaire l'appelle directement : `posts.config.hooks?.beforeSave?.(props)`. La fonction `createCallContext` issue de `@rebasepro/server` construit la prop `context` uniquement avec les champs transmis par le test ; tout autre champ lève une exception dès sa première utilisation en indiquant son nom. `table` est le descripteur renvoyé par `compileTables` de `@rebasepro/common` pour la table. Pour exécuter des hooks sur une vraie base de données, voir [Scripts et la Console](/docs/backend/scripts/).
 
 ## Prochaines étapes
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - [L'API `context.data`](/docs/collections/context-data-api/) : privilèges, transactions et la connexion retenue par un hook
 - [Hooks globaux](/docs/backend/hooks/) : des hooks appliqués à toutes les tables

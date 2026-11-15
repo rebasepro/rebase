@@ -1,5 +1,5 @@
 ---
-sourceHash: 50d3082d86c52ae2
+sourceHash: af8850222953a27b
 title: Referencia de herramientas MCP
 sidebar_label: Referencia de herramientas MCP
 description: Cada herramienta que registra el servidor MCP de Rebase, por grupo — qué necesita y qué hace cada una, y cuáles rechaza la compuerta de bucle invertido en un proyecto no local.
@@ -13,8 +13,6 @@ decide qué significa ⚠ se encuentran en la página del [servidor MCP](/docs/a
 a menos que decidas excluirlas de esta restricción.
 
 ## Esquema y base de datos (13)
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Ejecuta la CLI de Rebase en el directorio del proyecto activo.
 
@@ -36,8 +34,6 @@ Ejecuta la CLI de Rebase en el directorio del proyecto activo.
 
 ## Planificación de esquema (1)
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Pregunta al backend qué haría un cambio, mediante `POST /api/admin/schema/plan`. Sin
 CLI y sin escribir nada en disco — opera en la base de datos de desarrollo administrada,
 lo cual los comandos respaldados por Atlas no pueden hacer.
@@ -48,7 +44,7 @@ lo cual los comandos respaldados por Atlas no pueden hacer.
 
 ## Filas (5)
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span> Los mismos nombres que utiliza el `/mcp` remoto; anteriormente eran `list_documents`, `get_document`, `create_document`, `update_document` y `delete_document`, con un argumento `collection`.
+Los mismos nombres que utiliza el `/mcp` remoto; anteriormente eran `list_documents`, `get_document`, `create_document`, `update_document` y `delete_document`, con un argumento `collection`.
 
 | Herramienta | Requerido | Descripción |
 |---|---|---|

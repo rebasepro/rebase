@@ -10,8 +10,6 @@ description: Build custom form fields for entity editing with full access to the
 
 ## Overview
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 The CMS draws a field for every column from its type (see
 [Fields](/docs/collections/properties/)). When that is not what you want, give
 the field a component of your own in `customizeTable`: `Field` replaces the
@@ -25,8 +23,6 @@ itself. A string path or a lazy `() => import(…)` thunk throws, with what to
 write instead.
 
 ## Creating a Custom Field
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A custom field is a React component that receives `FieldProps`:
 
@@ -53,8 +49,6 @@ export function ColorPickerField({ value, setValue, error, showError, minimalist
 
 ### FieldProps
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | Prop | Type | Description |
 |------|------|-------------|
 | `value` | `T` | Current field value |
@@ -69,8 +63,6 @@ export function ColorPickerField({ value, setValue, error, showError, minimalist
 | `customProps` | `unknown` | The field's `customProps` from `customizeTable`, untouched |
 
 ## Using it
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```tsx
 // frontend/src/cms/brands.tsx
@@ -92,15 +84,11 @@ component, and the frontend imports only the table's type from
 
 ## A reusable field type
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A field you use across many tables can be registered once on
 `<Rebase propertyConfigs>`, keyed by name, and named on each field with
 `propertyConfig: "color_picker"`.
 
 ## Accessing Form Context
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A custom field can read the whole record as it is being edited:
 
@@ -128,15 +116,11 @@ export function PriceWithTaxField({ value, setValue, context }: FieldProps<Numbe
 
 ## Table Mode
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A custom field is not drawn inside a table cell: the cell shows the value (or
 your `Preview`), and editing it opens the field in a popup with `minimalistView`
 set. Keep it compact there, as `ColorPickerField` does above.
 
 ## Custom Previews
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `Preview` draws the value outside the form. It receives `FieldPreviewProps`:
 `value`, the resolved `property`, the `size` the surface gives it (`"small"`,
@@ -159,8 +143,6 @@ export function ColorPreview({ value }: FieldPreviewProps) {
 ```
 
 ## Custom Filters
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `Filter` replaces the filter control of one field. It wins over a
 collection-wide `Collection.FilterField` override and the built-in control for

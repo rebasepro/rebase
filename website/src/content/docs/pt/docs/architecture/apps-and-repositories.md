@@ -1,13 +1,11 @@
 ---
-sourceHash: 4ad669042dfd8fc9
+sourceHash: 884874204e98ec96
 title: Apps e Repositórios
 sidebar_label: Apps & Repositórios
 description: Um projeto é um backend mais os apps que se comunicam com ele, os quais podem viver cada um em seu próprio repositório.
 ---
 
 ## Projetos e apps
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Um **projeto** é o backend: o banco de dados, autenticação, armazenamento, realtime e
 funções. Um **app** é algo que se comunica com ele.
@@ -370,7 +368,7 @@ registro de versão não revela nada sobre o schema que ele representa:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.30.1","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.31.0","contract":1}}
 ```
 
 Comparar os dois no CI transforma uma incompatibilidade silenciosa em uma verificação com falha. A estampa

@@ -1,11 +1,9 @@
 ---
-sourceHash: 80e40ea5912a48c8
+sourceHash: 5b835c7e865a4f8f
 title: Arquivos de Instruções de IA
 sidebar_label: Arquivos de Instruções de IA
 description: Todo projeto Rebase gerado vem com o ai-instructions.md mais arquivos de ponteiro para Claude, Cursor, Windsurf, Copilot e AGENTS.md que carregam as cinco regras que os assistentes mais quebram — uma única fonte da verdade, muitos nomes de arquivo.
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Cada assistente quer suas regras em um arquivo diferente. O Claude Code lê
 `CLAUDE.md`, o Cursor lê `.cursorrules`, o Windsurf lê `.windsurfrules`,
@@ -83,8 +81,6 @@ recorre ao que quer que tenha sido persistido pelo último projeto nessa máquin
 
 ## Por que um ponteiro em vez de uma cópia
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Os arquivos ponteiro quase não contêm nada. Um arquivo que referencia o arquivo real
 mantém as convenções em um só lugar e tem propriedades que uma cópia não tem:
 
@@ -108,8 +104,6 @@ Vale a pena manter esse padrão se você fizer um fork do scaffold, e vale a pen
 adotá-lo mesmo em repositórios que não sejam projetos Rebase.
 
 ## Com o que o `ai-instructions.md` começa
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O arquivo gerado é deliberadamente curto — ele aponta para
 [`rebase skills install`](/docs/ai/skills) para mais detalhes e, em seguida, estabelece

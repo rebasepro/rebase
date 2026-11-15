@@ -1,5 +1,5 @@
 ---
-sourceHash: d337d344b88534c8
+sourceHash: a63ce157610d02d8
 title: Benutzerdefinierte Felder
 sidebar_label: Benutzerdefinierte Felder
 description: Erstellen Sie benutzerdefinierte Formularfelder für die Entitätsbearbeitung mit vollem Zugriff auf den Formularkontext, Entitätswerte und Rebase-Hooks.
@@ -10,8 +10,6 @@ description: Erstellen Sie benutzerdefinierte Formularfelder für die Entitätsb
 </video>
 
 ## Übersicht
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Das CMS rendert für jede Spalte basierend auf ihrem Typ ein Feld (siehe
 [Felder](/docs/collections/properties/)). Wenn dies nicht Ihren Anforderungen
@@ -27,8 +25,6 @@ in Ihrem Frontend importieren und direkt übergeben. Ein Pfad als Zeichenkette
 dazu, was stattdessen zu schreiben ist.
 
 ## Erstellen eines benutzerdefinierten Felds
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein benutzerdefiniertes Feld ist eine React-Komponente, die `FieldProps` empfängt:
 
@@ -55,8 +51,6 @@ export function ColorPickerField({ value, setValue, error, showError, minimalist
 
 ### FieldProps
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 | Prop | Typ | Beschreibung |
 |------|------|-------------|
 | `value` | `T` | Aktueller Feldwert |
@@ -71,8 +65,6 @@ export function ColorPickerField({ value, setValue, error, showError, minimalist
 | `customProps` | `unknown` | Die `customProps` des Felds aus `customizeTable`, unverändert |
 
 ## Verwendung
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```tsx
 // frontend/src/cms/brands.tsx
@@ -94,15 +86,11 @@ Tabelle aus `backend/schema`.
 
 ## Ein wiederverwendbarer Feldtyp
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Ein Feld, das Sie über mehrere Tabellen hinweg verwenden, kann einmalig in
 `<Rebase propertyConfigs>` registriert werden, mit dem Namen als Schlüssel, und
 auf jedem Feld über `propertyConfig: "color_picker"` angegeben werden.
 
 ## Zugriff auf den Formularkontext
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein benutzerdefiniertes Feld kann den gesamten Datensatz lesen, während er
 bearbeitet wird:
@@ -131,16 +119,12 @@ export function PriceWithTaxField({ value, setValue, context }: FieldProps<Numbe
 
 ## Tabellenmodus
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Ein benutzerdefiniertes Feld wird nicht innerhalb einer Tabellenzelle dargestellt:
 Die Zelle zeigt den Wert (oder Ihre `Preview`), und beim Bearbeiten wird das Feld in
 einem Popup geöffnet, bei dem `minimalistView` gesetzt ist. Halten Sie es dort
 kompakt, wie es oben bei `ColorPickerField` der Fall ist.
 
 ## Benutzerdefinierte Vorschauen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `Preview` stellt den Wert außerhalb des Formulars dar. Es empfängt
 `FieldPreviewProps`: `value`, die aufgelöste `property`, die `size`, die die
@@ -164,8 +148,6 @@ export function ColorPreview({ value }: FieldPreviewProps) {
 ```
 
 ## Benutzerdefinierte Filter
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `Filter` ersetzt das Filter-Steuerelement eines einzelnen Felds. Es hat Vorrang
 vor einem sammlungsweiten `Collection.FilterField`-Override sowie dem integrierten

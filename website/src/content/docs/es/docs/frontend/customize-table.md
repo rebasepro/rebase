@@ -1,11 +1,9 @@
 ---
-sourceHash: 749d3a5f47923f4d
+sourceHash: a0e9a8a853fff9c0
 title: customizeTable
 sidebar_label: customizeTable
 description: "customizeTable indica cómo la colección de una tabla difiere de lo que el CMS infiere: etiquetas, icono, vistas, kanban, ranuras de visualización, diseño de formularios, acciones y opciones por campo con componentes de React importados por valor. Cada opción, con su tipo y efecto."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Si utilizas el CMS, cada tabla que sirve el backend ya tiene una colección en el
 panel, derivada de la propia tabla (consulta
@@ -77,8 +75,6 @@ un error indicando el nuevo.
 
 ## Dónde se ubican los archivos
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 ```text
 frontend/src/cms/
 ├── index.ts        # export const tableCustomizations = [postsCms, …]
@@ -96,8 +92,6 @@ el código del frontend es lo único que no se debe escribir. El backend nunca i
 del frontend.
 
 ## El slug y el tipo
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 El primer argumento es el slug de la tabla: el nombre con el que se definió o el
 `slug` que se le asignó. Con la tabla como argumento de tipo, el slug, cada clave
@@ -121,8 +115,6 @@ argumento de tipo, `customizeTable("posts", { … })` acepta las mismas opciones
 con tipado débil.
 
 ## Qué se rechaza y qué se omite
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `customizeTable` comprueba lo que el compilador no puede ver cuando se carga el módulo y
 lanza un error indicando qué escribir en su lugar:
@@ -159,8 +151,6 @@ desarrollo, el panel imprime una advertencia por cada discrepancia y la omite:
 El resto de la personalización se sigue aplicando.
 
 ## Opciones de tabla
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Cada clave es opcional. Una clave que omitas conserva lo que el panel infirió.
 
@@ -278,7 +268,7 @@ Cada sección acepta:
 |---|---|---|
 | `entityActions` | `(string \| TableEntityAction)[]` | Acciones sobre un registro. Un objeto, o la clave de uno registrado en `<RebaseCMS entityActions>`. Consulta [Acciones de entidad](/docs/frontend/entity-actions/). |
 | `disableDefaultActions` | `("edit" \| "copy" \| "delete")[]` | Acciones integradas que esta tabla no ofrece. |
-| `resetPasswordAction` | `false \| TableEntityAction` | <span class="since-badge" data-since="0.31">Desde 0.31</span> Solo para la tabla de autenticación (`defineAuthTable`): `false` elimina la acción integrada de restablecer contraseña, una acción la reemplaza (ofrecida independientemente de lo que admita el adaptador de autenticación: el backend es tuyo). Se ignora, con una advertencia, en cualquier otra tabla. |
+| `resetPasswordAction` | `false \| TableEntityAction` | Solo para la tabla de autenticación (`defineAuthTable`): `false` elimina la acción integrada de restablecer contraseña, una acción la reemplaza (ofrecida independientemente de lo que admita el adaptador de autenticación: el backend es tuyo). Se ignora, con una advertencia, en cualquier otra tabla. |
 | `entityViews` | `(string \| TableEntityView)[]` | Pestañas adicionales en un registro. Consulta [Vistas de entidad](/docs/frontend/entity-views/). |
 | `Actions` | `Component[]` | Componentes renderizados en la barra de herramientas de la colección. |
 | `components` | `TableComponentOverrides` | Overrides de componentes a nivel de colección, cada uno `{ Component, wrap? }`. Consulta [Overrides de componentes](/docs/frontend/component-overrides/#collection-level-component-overrides). |
@@ -286,8 +276,6 @@ Cada sección acepta:
 | `fields` | `TableFields` | Opciones por campo, indexadas por columna o relación. A continuación. |
 
 ## Opciones de campo
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `fields.<key>` acepta las opciones que admite cada campo, además de las de su tipo de
 columna. [Campos](/docs/collections/properties/) muestra cada una junto al widget que
@@ -439,8 +427,6 @@ Consulta [Relaciones en el panel](/docs/collections/relations-in-the-admin-panel
 
 ## Personalizaciones, `ui-config.json` y preferencias
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Lo que el panel muestra para una tabla se compone en un orden fijo, superponiendo cada capa
 sobre la anterior:
 
@@ -486,8 +472,6 @@ personalizada dos veces, un `ui-config.json` que no se pasa a ningún `<RebaseCM
 configuración de Vite sin `rebaseBackendGuard()`. Consulta [`rebase verify`](/docs/cli/#rebase-verify).
 
 ## Próximos pasos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Cómo las tablas se convierten en colecciones](/docs/collections/): lo que el panel infiere antes de todo esto
 - [Campos](/docs/collections/properties/): el widget y las opciones de cada tipo de columna

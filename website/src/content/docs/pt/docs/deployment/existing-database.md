@@ -1,5 +1,5 @@
 ---
-sourceHash: 3bff62ceb5aceb62
+sourceHash: fbdc423a29403c10
 title: Executando em um banco de dados existente ou compartilhado
 sidebar_label: Banco de dados existente ou compartilhado
 description: Execute o Rebase em um banco de dados PostgreSQL do qual ele não é proprietário — um cluster compartilhado com outros apps, um segundo projeto Rebase, Supabase ou um banco de dados restrito por um DBA — com as configurações de rls, rebase doctor --database e rebase db request-role migrate.
@@ -271,8 +271,6 @@ Ou remova-as: toda política cujo nome termina em `_ar_` e oito dígitos hexadec
 seja `rebase_admin_request`.
 
 ### Um esquema `public` compartilhado
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Quando `public` contém tabelas que o Rebase não deve acessar:
 

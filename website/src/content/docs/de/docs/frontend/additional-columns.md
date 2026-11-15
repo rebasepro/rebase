@@ -1,5 +1,5 @@
 ---
-sourceHash: 395db046e3ecafc8
+sourceHash: e275bf79725ed509
 title: Zusätzliche Spalten
 sidebar_label: Zusätzliche Spalten
 description: Fügen Sie Collection-Tabellen berechnete/virtuelle Spalten hinzu, die Werte aus Entitätsdaten ableiten.
@@ -10,8 +10,6 @@ description: Fügen Sie Collection-Tabellen berechnete/virtuelle Spalten hinzu, 
 Mit zusätzlichen Spalten können Sie berechnete oder abgeleitete Daten in der Collection-Tabelle anzeigen, ohne diese in der Datenbank zu speichern.
 
 ## Zusätzliche Spalten definieren
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```tsx
 // frontend/src/cms/products.tsx

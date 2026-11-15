@@ -1,5 +1,5 @@
 ---
-sourceHash: dc2857e881f65bd3
+sourceHash: c2767dda8fb3294a
 title: Scrittura dei dati
 sidebar_label: Scrittura dei dati
 description: create, upsert, update e delete con l'SDK — operazioni sui campi, scritture condizionali, chiavi di idempotenza, scritture batch e scrittura tra tabelle in un'unica transazione.
@@ -92,8 +92,6 @@ fanno lo stesso per riga e restituiscono solo le righe che hanno scritto. Entram
 le due opzioni non possono essere combinate (`INVALID_CONFLICT_RULE`).
 
 #### Non sulla tabella di autenticazione
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 `upsert()` sulla tabella di autenticazione (quella dichiarata con `defineAuthTable`) viene rifiutato
 con un 400 (`INVALID_CONFLICT_TARGET`), così come `createMany` con `upsert`
@@ -374,8 +372,6 @@ eseguire silenziosamente un ciclo di singole scritture — il che non offrirebbe
 né il singolo round trip per cui si era scelto di utilizzare un batch.
 
 ## Scrittura tra tabelle
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 `createMany` e metodi analoghi operano su una tabella alla volta. `client.batch()` è la
 forma per lavorare tra tabelle diverse: una richiesta, una transazione, tutto o niente.

@@ -1,11 +1,9 @@
 ---
-sourceHash: 96c18e52b3f61548
+sourceHash: 8b1976a4b6c5e595
 title: Geräte-Anmeldung
 sidebar_label: Geräte-Anmeldung
 description: "Ermöglicht einem Terminal oder einem anderen Gerät ohne Browser die Anmeldung über einen Browser: ein kurzer Code, ein Link und die Bestätigung durch einen angemeldeten Benutzer. RFC 8628 Device Authorization Grant, wie er von rebase cloud login verwendet wird."
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein Terminal, eine TV-App oder ein Skript verfügt über keinen eigenen Browser,
 und das Eintippen eines Passworts sollte dort vermieden werden. Die Geräte-Anmeldung

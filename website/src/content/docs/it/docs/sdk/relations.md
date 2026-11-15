@@ -1,5 +1,5 @@
 ---
-sourceHash: 3db2d10879df1c44
+sourceHash: 61ebfc32eadc2236
 title: Interrogare le relazioni
 sidebar_label: Relazioni
 description: "Includi entità correlate in una query e leggi una tabella figlia tramite il genitore con gli accessor di relazione dell'SDK."
@@ -238,8 +238,6 @@ tipo riga scritto a mano non contiene relazioni su cui eseguire controlli, e l'e
 funge da linea di difesa.
 
 ### Nomi delle relazioni
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 I nomi passati a `include()` sono le chiavi di `relations` della tabella:
 

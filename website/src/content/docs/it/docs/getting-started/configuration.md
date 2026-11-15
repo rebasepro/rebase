@@ -1,5 +1,5 @@
 ---
-sourceHash: acc55c3c58895863
+sourceHash: 5c1f59b5ea8496bf
 title: Ambiente e configurazione
 sidebar_label: Configurazione
 description: Tutte le variabili d'ambiente e le opzioni di configurazione per i progetti Rebase.
@@ -237,7 +237,7 @@ pubblicata. Un progetto su cui è stato eseguito l'eject gestisce invece queste 
 | `REBASE_HISTORY` | Registra la [cronologia delle modifiche alle entità](/docs/backend/history). | `true` |
 | `REBASE_COMPRESSION` | Comprime le risposte tramite gzip/brotli. | `true` |
 | `REBASE_MAX_BODY_SIZE` | Dimensione massima del corpo della richiesta, **in byte** (`10485760`, non `10MB` — un valore non numerico impedisce l'avvio anziché rimuovere silenziosamente il limite). `0` disattiva il limite. | `10485760` (10 MiB) |
-| `REBASE_ENABLE_SWAGGER` | La superficie OpenAPI. A tre stati (tri-state). <span class="since-badge" data-since="0.31">Dalla versione 0.31</span> Non impostata, in ogni ambiente: `/api/docs` viene servito ai chiamanti a cui `GET /api/schema/tables` descrive le tabelle, ciascuno con il documento relativo alle tabelle a essi descritte, senza Swagger UI. `true` pubblica l'intero documento a chiunque, con la Swagger **UI** su `/api/swagger` al di fuori della produzione (mai in produzione). `false` mantiene il documento protetto dietro l'autenticazione da amministratore. | — |
+| `REBASE_ENABLE_SWAGGER` | La superficie OpenAPI. A tre stati (tri-state). Non impostata, in ogni ambiente: `/api/docs` viene servito ai chiamanti a cui `GET /api/schema/tables` descrive le tabelle, ciascuno con il documento relativo alle tabelle a essi descritte, senza Swagger UI. `true` pubblica l'intero documento a chiunque, con la Swagger **UI** su `/api/swagger` al di fuori della produzione (mai in produzione). `false` mantiene il documento protetto dietro l'autenticazione da amministratore. | — |
 | `REBASE_METRICS` | Espone le metriche Prometheus su `/metrics`. | `false` |
 | `REBASE_HSTS_INCLUDE_SUBDOMAINS` | Aggiunge `includeSubDomains` all'header `Strict-Transport-Security`, imponendo ai browser di rifiutare il traffico HTTP semplice su ogni sottodominio dell'host per sei mesi — inclusi host non serviti da questo processo. Attivare solo se ogni sottodominio del dominio utilizza esclusivamente HTTPS. Qualsiasi valore diverso da `true`/`false` impedisce l'avvio. Vedere [Header di sicurezza](/docs/deployment/self-hosting/#security-headers). | `false` |
 | `REBASE_METRICS_TOKEN` | Bearer token a protezione di `/metrics`. Se non impostata, l'endpoint rimane aperto a chiunque possa raggiungere la porta — accettabile su una rete privata, non su una pubblica, come segnalato nei log di avvio. | — |
@@ -299,7 +299,7 @@ Disattivata se non è impostata `REBASE_LIVE_SCHEMA_REPOSITORY`. Un bundle compi
 |----------|-------------|---------|
 | `REBASE_LIVE_SCHEMA_REPOSITORY` | Il repository GitHub su cui effettuare il commit delle modifiche allo schema, nel formato `owner/name`. L'impostazione di questa variabile attiva la funzionalità. | — |
 | `REBASE_LIVE_SCHEMA_BRANCH` | Il branch su cui viene inviato il commit. | `main` |
-| `REBASE_LIVE_SCHEMA_PATH` | <span class="since-badge" data-since="0.31">Dalla versione 0.31</span> La posizione di `backend/schema` all'interno di tale repository, relativa alla radice del repo. Un percorso che esca dal repository impedisce l'avvio, così come la variabile rimossa `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH`. | `backend/schema` |
+| `REBASE_LIVE_SCHEMA_PATH` | La posizione di `backend/schema` all'interno di tale repository, relativa alla radice del repo. Un percorso che esca dal repository impedisce l'avvio, così come la variabile rimossa `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH`. | `backend/schema` |
 | `REBASE_LIVE_SCHEMA_GITHUB_TOKEN` | Un token con permessi granulari con accesso di lettura e scrittura ai contenuti del repository. Impostare questa opzione oppure le tre variabili `_GITHUB_APP_*`, non entrambe. | — |
 | `REBASE_LIVE_SCHEMA_GITHUB_APP_ID` | L'ID di una GitHub App, per effettuare i commit come app anziché tramite token. | — |
 | `REBASE_LIVE_SCHEMA_GITHUB_APP_INSTALLATION_ID` | L'ID di installazione dell'app sul repository. | — |
@@ -405,8 +405,6 @@ The environment is not valid:
 ```
 
 ## Oggetto di configurazione del backend
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 L'oggetto `RebaseBackendConfig` passato a `initializeRebaseBackend()` consente il controllo programmatico:
 

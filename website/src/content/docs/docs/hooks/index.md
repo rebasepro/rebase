@@ -10,8 +10,6 @@ Rebase provides React hooks to access framework functionality from any component
 
 ## `useRebaseContext`
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 The master hook — access everything:
 
 ```typescript
@@ -59,8 +57,6 @@ function UserMenu() {
 ```
 
 ## Rows: `useRows`, `useRow`, `useRowCount`, `useAggregate`, `useRowWrites`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Read and write a collection's rows in the shape the server sends them: dates as ISO strings, a belongsTo under its foreign-key column (`author_id`). It is the same shape `client.data` and `context.data` return, so code written with these hooks reads like code written against the SDK.
 

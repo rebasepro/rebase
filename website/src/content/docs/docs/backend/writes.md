@@ -20,7 +20,7 @@ everything in this section applies to them too, except `?on_conflict=`.
 A write's body must be a JSON object. `null`, a number, a string or an array is
 a `400 BAD_REQUEST`.
 
-<span class="since-badge" data-since="0.31">Since 0.31</span> A write takes the values the REST API documents and nothing else — the
+A write takes the values the REST API documents and nothing else — the
 same shape a read returns: a to-one relation (`belongsTo`, `hasOne`, a to-one
 `via`) as the related row's key or `null`, a to-many relation as a list of keys
 or `{ id, _pivot? }` objects, a date as ISO text, a vector as a list of numbers,
@@ -236,8 +236,6 @@ would take every "new this week" query with it.
 
 #### Not on the auth table
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 The auth table (the one declared with `defineAuthTable`) refuses an upsert on every
 door — `?on_conflict=`, `/bulk` with `upsert: true`, a `_batch` `upsert`
 operation, the SDK's `upsert()` and the realtime socket — with a `400`
@@ -269,7 +267,7 @@ back as the scalar; a composite key as an object of its columns.
 
 ## Cross-table batches
 
-<span class="since-badge" data-since="0.31">Since 0.31</span> Each operation names its table as `table` (it was `collection`).
+Each operation names its table as `table` (it was `collection`).
 
 `POST /api/data/_batch` writes across tables in one transaction, under the
 caller's own role, with the same validation, hooks and row-level security

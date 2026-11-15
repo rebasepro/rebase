@@ -6,8 +6,6 @@ description: How a Rebase project separates into a project bundle and a versione
 
 ## The two halves of a deployment
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A Rebase deployment is two things, not one:
 
 - **The bundle** — your project. Compiled tables, hooks, functions and cron
@@ -59,7 +57,7 @@ before it agrees to boot:
 ```jsonc
 {
   "bundleFormat": 3,
-  "runtime": { "range": "^1", "builtAgainst": "0.30.1", "contract": 2 },
+  "runtime": { "range": "^1", "builtAgainst": "0.31.0", "contract": 2 },
   "schemaVersion": "v2:3f0c9a1e7d2b5c48",
   "kind": "backend",
   "entry": {
@@ -76,7 +74,7 @@ before it agrees to boot:
 }
 ```
 
-<span class="since-badge" data-since="0.31">Since 0.31</span> `bundleFormat`
+`bundleFormat`
 3 and runtime contract 2: the schema is `entry.tables`, the compiled
 `backend/schema` directory, beside `entry.resources`, `entry.storage` and
 `entry.hooks`. `schemaVersion` starts with `v2:` — it is computed from the
@@ -102,8 +100,6 @@ bundle so there is no second install; a deployment installs the bundle's own
 
 ## Compatibility
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Two version numbers govern whether a bundle and a runtime can work together, and
 they are deliberately not the package version.
 
@@ -127,7 +123,7 @@ different one rather than start and misbehave later.
 This is why upgrading Rebase in a self-hosted deployment is a tag change:
 
 ```yaml
-image: rebasepro/server:0.30.1   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.31.0   # a newer tag — your bundle is untouched
 ```
 
 ## Development uses the same path

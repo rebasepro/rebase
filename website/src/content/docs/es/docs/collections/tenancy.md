@@ -1,13 +1,11 @@
 ---
-sourceHash: 9338d2b094861fba
+sourceHash: 5c1d614961675bb5
 title: Tenancy
 sidebar_label: Tenancy
 description: Delimita cada fila de una tabla a un sitio, organización o espacio de trabajo con una sola declaración de tenant, aplicada mediante la seguridad a nivel de fila de Postgres.
 ---
 
 ## Qué hace
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `tenant` en una tabla especifica la columna que contiene el tenant al que pertenece una fila (un sitio, una organización, un espacio de trabajo) e indica de dónde proviene el tenant de quien realiza la llamada. A partir de esa única declaración, Rebase genera:
 
@@ -19,8 +17,6 @@ description: Delimita cada fila de una tabla a un sitio, organización o espacio
 Dado que Postgres lo hace cumplir, el panel de administración, la API REST, el SDK y el SQL ejecutado como quien realiza la llamada ven todos las mismas filas.
 
 ## Un tenant por usuario: un claim
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Cuando cada usuario pertenece exactamente a un tenant, colóquelo en su token de sesión e indique el nombre del claim:
 
@@ -41,8 +37,6 @@ export const posts = defineTable("posts", {
 La política compara el `site_id` de la fila con el claim `site_id`, convertido (cast) al tipo de la columna. El claim proviene de su proveedor de identidad o del hook de autenticación `customizeAccessToken` (`auth.hooks`, consulte [Autenticación](/docs/backend/authentication/); el runtime administrado no tiene rutas para hooks, por lo que esto requiere un backend desacoplado [ejected]). Los claims reservados como `uid`, `roles` y `aal` no pueden designar a un tenant: se escriben después de los claims personalizados, por lo que un hook no puede definirlos, y cualquier configuración que especifique uno de ellos será rechazada.
 
 ## Varios tenants por usuario: una tabla de membresías
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Cuando los usuarios trabajan en varios tenants (un editor en dos sitios, un consultor en tres organizaciones), mantenga las membresías en una tabla propia:
 
@@ -108,8 +102,6 @@ Cada rechazo es un error `400` que nombra el campo, antes de consultar a la base
 El SQL ejecutado como quien realiza la llamada obtiene las mismas respuestas de Postgres: el `WITH CHECK` de la política rechaza un tenant ajeno y un trigger `BEFORE UPDATE` rechaza un traslado (`42501`). Quien realiza la llamada con un rol de omisión (bypass role) está exento de los tres.
 
 ## El campo
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - Una columna de tipo text, `uuid`, enum o integer (`numeric` también), o una relación `belongsTo` con la tabla de tenants. Para una relación, su columna de clave foránea es el campo; no se crea una segunda.
 - Debe declararse en la tabla y ser legible: el esquema es rechazado cuando el campo falta, es de otro tipo o está restringido por `.private()` o `.access({ read })`. Los tipos comprueban que el campo designe una columna.

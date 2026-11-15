@@ -1,5 +1,5 @@
 ---
-sourceHash: 37c268f3d4b76c7f
+sourceHash: a0c661b1716664d6
 title: Histórico de Entidades
 sidebar_label: Histórico de Entidades
 description: Rastreie cada alteração em suas entidades com uma trilha de auditoria completa — quem alterou o quê, quando e a entidade completa antes/depois.
@@ -44,8 +44,6 @@ history: {
 ```
 
 ### Por tabela
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Marque quais tabelas rastreiam o histórico com `history: true`:
 
@@ -144,7 +142,7 @@ A retenção é aplicada em dois locais:
 GET /api/data/:slug/:entityId/history
 ```
 
-Retorna uma lista de entradas de histórico para uma entidade específica, ordenada a partir da mais recente. <span class="since-badge" data-since="0.31">Desde 0.31</span> Entradas que uma transação registra — uma criação e a atualização seguinte em um único `_batch`, uma reversão e a reversão dela — retornam na ordem em que foram gravadas: o `updated_at` de cada entrada é posterior à entrada anterior da linha. Um banco de dados existente obtém isso em sua próxima inicialização de provisionamento, ou em uma execução com `REBASE_PROVISION_ONLY=true`, que substitui a função `rebase.record_history`; um deployment que nunca provisiona mantém a ordenação antiga até lá. Entradas registradas antes disso mantêm sua ordem.
+Retorna uma lista de entradas de histórico para uma entidade específica, ordenada a partir da mais recente. Entradas que uma transação registra — uma criação e a atualização seguinte em um único `_batch`, uma reversão e a reversão dela — retornam na ordem em que foram gravadas: o `updated_at` de cada entrada é posterior à entrada anterior da linha. Um banco de dados existente obtém isso em sua próxima inicialização de provisionamento, ou em uma execução com `REBASE_PROVISION_ONLY=true`, que substitui a função `rebase.record_history`; um deployment que nunca provisiona mantém a ordenação antiga até lá. Entradas registradas antes disso mantêm sua ordem.
 
 ```json
 {
@@ -167,8 +165,6 @@ Retorna uma lista de entradas de histórico para uma entidade específica, orden
 ```
 
 ### As entradas são servidas como leituras
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 As entradas de histórico são servidas da mesma forma que a linha: controle de acesso a nível de campo primeiro, depois
 `afterRead` (global, tabela, coluna), dentro da transação somente leitura do chamador. Uma coluna que um hook ou um `.transform({ afterRead })` mascara é mascarada

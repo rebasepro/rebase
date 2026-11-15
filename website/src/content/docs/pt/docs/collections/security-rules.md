@@ -1,11 +1,9 @@
 ---
-sourceHash: f385a35cc59df9c6
+sourceHash: acac0f12ed25af39
 title: Segurança a nível de linha
 sidebar_label: Segurança a nível de linha
 description: "Cada tabela declara sua postura de rls — admin-only, inherit ou uma lista de regras — e o Rebase a compila em políticas de row-level security do Postgres. Formatos de regra, condições abreviadas, defaultRls e o que falha em modo fechado."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Cada tabela define quem acessa suas linhas em sua chave `rls`. O Rebase compila
 isso em segurança a nível de linha (row-level security) do Postgres: `ENABLE ROW LEVEL SECURITY`
@@ -45,8 +43,6 @@ para esta versão aborda `defaultSecurityRules` e `disableDefaultPolicies`.
 
 ## As três posturas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | `rls` | Significado |
 |---|---|
 | `"admin-only"` | Row-level security ativada e apenas as políticas de linha de base de admin: o papel `admin` e o próprio código do servidor acessam as linhas. Qualquer outro chamador não obtém nenhuma linha e suas gravações são recusadas. |
@@ -58,8 +54,6 @@ quem deve visualizá-la. Nada é exposto até que você escreva as regras que a
 exponham.
 
 ### `defaultRls`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O `backend/schema/index.ts` pode exportar uma postura para as tabelas que declaram
 `rls: "inherit"`:
@@ -84,8 +78,6 @@ nenhuma dessas, e as duas listas nunca são combinadas. `rls: "inherit"` sem nen
 inicialização com um erro instruindo a exportar um.
 
 ## Políticas que uma tabela recebe sem precisar escrevê-las
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 As políticas em uma tabela vão além de suas próprias regras:
 
@@ -114,8 +106,6 @@ O DDL gerado marca cada política injetada, e o comando `rebase db push` restaur
 qualquer uma que tenha sido removida manualmente.
 
 ## Formatos de regras
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Uma regra segue um destes formatos. Misturar dois em uma mesma regra é um erro de
 tipo, e o compilador também o recusa, capturando casos em JavaScript ou casts:
@@ -166,8 +156,6 @@ lista cada um sob "Review before deploying"; consulte [o guia de atualização](
 
 ### Owner
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 ```ts
 import { defineTable, col } from "@rebasepro/server/schema";
 
@@ -190,8 +178,6 @@ significado real à comparação.
 
 ### Acesso público
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `{ operation: "select", access: "public" }` gera `USING (true)`: nenhum filtro de
 linhas em leituras, portanto todo chamador que a API aceitar poderá ler todas as linhas.
 
@@ -208,8 +194,6 @@ com login anônimo. Ambos se combinam com `condition` e `check` da mesma forma q
 `"public"`. Consulte [`authenticated()` e `registered()`](#authenticated-e-registered).
 
 ### Condições
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Uma `condition` define quais linhas existentes uma regra cobre; um `check` define
 quais valores novos ou atualizados ela permite, tendo como padrão a própria condição.
@@ -314,8 +298,6 @@ o CMS os trata como desconhecidos e reflete o que o servidor reportar.
 
 ### Raw SQL
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `using` e `withCheck` aceitam SQL. `{column}` faz referência à coluna da tabela,
 e o chamador fica acessível como `rebase.uid()`, `rebase.roles()` (papéis separados
 por vírgula) e `rebase.jwt()` (as claims do token como `jsonb`):
@@ -345,8 +327,6 @@ mesma regra.
 
 ## Avaliado uma vez por instrução
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Qualquer parte de uma regra que não leia a linha — o id do chamador, uma checagem
 de papéis, uma claim, `serverContext()` — compila dentro de uma subconsulta escalar.
 Uma regra de proprietário (owner) se torna `(user_id)::text = (SELECT rebase.uid())`.
@@ -360,8 +340,6 @@ O SQL puro recebe o mesmo tratamento quando o Rebase consegue interpretar sua es
 escrita; portanto, envolva as chamadas manualmente: `(SELECT rebase.uid())`.
 
 ## `authenticated()` e `registered()`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Uma requisição sem nenhuma sessão recebe um ID sentinela; assim, `rebase.uid()` nunca
 é `NULL` em uma requisição, e `policy.authenticated()` (assim como
@@ -386,8 +364,6 @@ de acesso que ignora as políticas.
 
 ## Permissivo e restritivo
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Regras permissivas (o padrão) são combinadas com OR: uma linha pode ser acessada
 quando qualquer uma delas a permitir. Regras restritivas são combinadas com AND
 a elas: todas as regras restritivas também precisam ser satisfeitas. Uma regra
@@ -396,8 +372,6 @@ permissiva expande o acesso; uma restritiva só pode afunilá-lo. O isolamento d
 outra parte da tabela não é capaz de romper o limite do tenant.
 
 ## O que falha em modo fechado
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Uma tabela não pode ficar acessível por acidente:
 
@@ -424,8 +398,6 @@ papéis e as claims do chamador. É isso que `rebase.uid()`, `rebase.roles()` e
 
 ## Requisições sem sessão
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Uma requisição sem token atinge as políticas apenas se `AUTH_REQUIRE=false`; caso
 contrário, a API responde 401 imediatamente. Ela então é executada com `rebase.uid()`
 definido como `'anonymous'` e sem papéis: regras `access: "public"` a admitem,
@@ -451,8 +423,6 @@ export const contactMessages = defineTable("contact_messages", {
 ```
 
 ## Linhas aqui, colunas ao lado
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `rls` decide quais linhas um chamador alcança. Ele não atua sobre as colunas
 de uma linha que já foi alcançada: uma regra que permita a um funcionário ler
@@ -481,8 +451,6 @@ uma consulta executada por meio de `rebase.sql()` acessa todas as colunas, pois
 ignora a segurança a nível de linha.
 
 ## Próximos passos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Acesso a campos](/docs/collections/field-access/): papéis de leitura e gravação por coluna
 - [Tenancy](/docs/collections/tenancy/): um limite restritivo por tenant

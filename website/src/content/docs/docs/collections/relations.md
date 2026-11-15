@@ -4,8 +4,6 @@ sidebar_label: Relations
 description: "Link tables with rel.belongsTo, hasOne, hasMany, manyToMany and via: foreign keys bound or derived, junction tables with _pivot columns, delete rules, naming rules and multi-hop joins."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A table's `relations` name the links it has to other tables. Each one is a
 `rel.*` call, and its key is the relation's name: what `include` asks for, what
 a nested path such as `/api/data/users/1/posts` reads, and what a write names to
@@ -43,8 +41,6 @@ for this release shows the mapping.
 
 ## The five kinds
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | Kind | The key lives | Returns | Options |
 |---|---|---|---|
 | `rel.belongsTo` | on **this** table | one row | `localKey`, `notNull`, `unique`, `onDelete`, `onUpdate`, `index`, `constraint` |
@@ -69,8 +65,6 @@ See [Field access](/docs/collections/field-access/) for what a caller without
 access sees.
 
 ## belongsTo — the key is on this table
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `belongsTo` puts the foreign key on the declaring table. The key's SQL column is
 `localKey`, and `<relation name in the singular>_id` when that is omitted:
@@ -132,8 +126,6 @@ read from the other side scans this table. See
 
 ## hasOne and hasMany — the key is on the target
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `hasMany` reads rows of the target that point back at this one. `hasOne` is the
 same link with at most one row on the far side. Neither adds a column here: the
 target declares the `belongsTo` that holds the key.
@@ -175,8 +167,6 @@ with an offset or a cursor.
 
 ### Joining on a natural key
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 By default the target's key holds this row's primary key. When the two sides are
 joined on something else (an external identity id, a SKU), `sourceKey` names
 the column on this table:
@@ -203,8 +193,6 @@ rows cannot say which one a related row belongs to. A row whose `sourceKey` is
 `NULL` reaches no related rows, and writing through the relation is an error.
 
 ## manyToMany — through a junction
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `manyToMany` links rows through a junction table that Rebase creates, with
 row-level security of its own. Removing a link deletes the junction row, never
@@ -267,8 +255,6 @@ junction as managed. A view declares no `manyToMany` of its own.
 
 ### `_pivot`: the junction's own columns
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `pivot` columns are read and written under `_pivot`. A read that includes the
 relation serves each related row with its link's columns:
 
@@ -290,8 +276,6 @@ key is its two link columns.
 
 ### `_count`: how many related rows
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 An include of a to-many relation (`hasMany`, `manyToMany`, a to-many `via`) can
 ask for the total alongside a limited page of rows, served under the row's
 `_count`. It is counted in the same statement, under the same filters and
@@ -299,8 +283,6 @@ row-level security. See
 [Counting what a limit leaves out](/docs/sdk/relations#counting-what-a-limit-leaves-out).
 
 ## via — an explicit join chain
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `via` reads through joins you spell out: several hops, composite keys, or a
 condition that is not a plain foreign key.
@@ -348,8 +330,6 @@ not take a `via`, and says so.
 
 ## Delete and update rules
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | Action | Behaviour |
 |---|---|
 | `"cascade"` | Delete or update the related rows too |
@@ -366,8 +346,6 @@ delete the row. Ask for `"cascade"` when that is what you mean: it is the one
 value that removes rows you did not name.
 
 ## Names
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Every name a relation uses is derived when you do not write it. The rules are
 the ones a deployed database already has, so they do not move between releases.
@@ -390,8 +368,6 @@ names a column: in `indexes`, in `tenant`, and in a rule's `ownerField` or
 condition.
 
 ## Reading and writing relations
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Relations are not included in a read unless the caller asks:
 
@@ -418,8 +394,6 @@ In the CMS, every to-many relation becomes a tab under the record. See
 
 ## What is refused
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `rel.via()` without steps throws when the module loads. When the schema is
 compiled, a table is refused for:
 
@@ -442,8 +416,6 @@ compiled, a table is refused for:
   target's `afterRead` sees `_pivot`).
 
 ## Next steps
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Row-level security](/docs/collections/security-rules/): who reaches the rows at either end
 - [Indexes](/docs/backend/indexes/): the foreign-key index and composite indexes over relations

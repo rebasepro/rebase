@@ -1,13 +1,11 @@
 ---
-sourceHash: ee142b42a4f33d5c
+sourceHash: 963af8e4b34aac80
 title: Arrays und JSON-Felder
 sidebar_label: Arrays und JSON
 description: "Wie das CMS Array- und jsonb-Spalten darstellt – wiederholbare Listen, Mehrfachauswahlen, strukturierte Gruppen, Block-Editoren und freie Schlüssel/Wert-Dokumente – und wie customizeTable deren Elemente und verschachtelte Schlüssel anpasst."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Eine Array-Spalte ist eine Liste, die das Formular wiederholt. Eine `jsonb`-Spalte ist ein
 Dokument: Das CMS erstellt ein Formular dafür, wenn die Spalte ihre Struktur mit
@@ -40,8 +38,6 @@ export const pages = defineTable("pages", {
 
 ## Arrays
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Eine Array-Spalte (`col.text().array()`) ist eine wiederholbare Liste des Elementfelds: `tags`
 oben ist eine Liste von Texteingaben. `.validate({ minItems, maxItems, uniqueItems })` auf dem
 Array legt fest, wie viele Elemente das Formular akzeptiert.
@@ -54,8 +50,6 @@ Eine `col.storage().multiple()`-Spalte ist ein Upload für mehrere Dateien; sieh
 [Datei-Uploads](/docs/collections/file-uploads/#several-files).
 
 ## Dokumente mit einer Struktur
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `col.jsonb(json.object({ … }))` ist eine Gruppe von Feldern, eines pro Schlüssel, jeweils das
 Feld, das sein `json.*`-Builder vorsieht: `json.string()` ein Texteingabefeld, `json.number()`
@@ -76,8 +70,6 @@ strukturiertes Feld: Sie werden als freies JSON bearbeitet.
 
 ## Dokumente ohne Struktur
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `col.jsonb().$type<T>()` typisiert das Dokument für TypeScript, aber `T` wird beim Ausführen
 des Codes gelöscht, sodass der Server und das CMS nichts darüber wissen. `settings` oben wird
 als freie Schlüssel/Wert-Paare bearbeitet. Geben Sie der Spalte eine `json.*`-Struktur, wenn
@@ -86,8 +78,6 @@ das CMS dafür ein Formular darstellen soll.
 <FieldWidgetPreview client:only="react" variant="key_value" />
 
 ## Elemente und verschachtelte Schlüssel anpassen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```tsx
 // frontend/src/cms/pages.tsx
@@ -148,8 +138,6 @@ Entwicklung. Verschachtelte Optionen für einen Schlüssel, eine Variante oder e
 das das Dokument nicht besitzt, werden auf dieselbe Weise übersprungen.
 
 ## Nächste Schritte
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - [JSON-Dokumente](/docs/schema/json/): Die `json.*`-Builder und was der Server mit einer Struktur macht
 - [Felder](/docs/collections/properties/): Alle anderen Spaltentypen

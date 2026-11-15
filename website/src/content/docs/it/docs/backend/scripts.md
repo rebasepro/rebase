@@ -1,5 +1,5 @@
 ---
-sourceHash: 87e4ee6ea63add18
+sourceHash: 7357057de2408250
 title: Script e la console
 sidebar_label: Script e la console
 description: Apri i dati di un progetto da uno script, un test o un REPL con openRebase, oppure dal terminale con rebase console. Nessun server, nessuna modifica allo schema.
@@ -15,8 +15,6 @@ Per esaminare alcune righe, correggerne una, provare un filtro o verificare cosa
 Entrambi aprono il database senzaチェーンmodificarlo: non viene creata alcuna tabella, ruolo, trigger o funzione. Il metodo `close()` di uno script termina ciò che `openRebase` ha aperto. Sul database di sviluppo gestito, `rebase console` avvia il database se non è in esecuzione e lo lascia attivo al termine, come fanno i comandi `rebase db`; `rebase db stop` lo arresta. L'oggetto dispone del vocabolario che una [funzione personalizzata](/docs/backend/custom-functions/) riceve dal server, `dataAsAdmin` e `sql`, quindi uno snippet può passare da una funzione a uno script e alla console senza alcuna modifica.
 
 ## `rebase console`
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Eseguilo nel tuo progetto:
 
@@ -60,8 +58,6 @@ Un database che la console non riesce ad aprire viene segnalato una sola volta e
 
 ### Opzioni
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 | Flag | Descrizione |
 |---|---|
 | `--eval`, `-e` | Esegue questo codice invece del REPL, stampa il risultato atteso come JSON ed esce con 1 in caso di errore |
@@ -70,8 +66,6 @@ Un database che la console non riesce ad aprire viene segnalato una sola volta e
 | `--docker` | Usa il database da docker compose, avviandolo se necessario |
 
 ## `openRebase`
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `openRebase` del pacchetto `@rebasepro/server-postgres` è ciò che la console richiama. Usalo in uno script, in un seed, in una correzione di dati o in un test. In un progetto generato tramite scaffold, posiziona lo script all'interno di `backend/`, ad esempio `backend/scripts/publish-drafts.ts`: il workspace del backend è infatti quello che dipende da `@rebasepro/server-postgres`, e uno script nella cartella root `scripts/` non potrebbe importarlo.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 9cda7971a27b0475
+sourceHash: 471f34b7c0546357
 title: Solo backend (headless)
 sidebar_label: Solo backend
 description: Ejecuta Rebase como un Backend-as-a-Service headless sobre tu propio PostgreSQL — una API REST, autenticación, almacenamiento y tiempo real, sin panel de administración ni backend/schema.
@@ -58,8 +58,6 @@ entre máquinas.
 
 ## De dónde provienen las tablas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 No hay ninguna en el código: sin un `backend/schema/index.ts`, el backend no declara tablas. El servidor lee el esquema de tu base de datos durante el arranque y expone
 las tablas que encuentra, de modo que la API sigue tus migraciones: cambia el esquema y
 los endpoints cambiarán con él.
@@ -99,8 +97,6 @@ el runtime administrado no la lee desde ningún archivo ni desde el entorno. Sol
 :::
 
 ### Generar archivos de tablas en su lugar
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Si prefieres tener las tablas definidas como TypeScript — para tipos,
 hooks o revisión —, puedes introspeccionarlas:
@@ -157,8 +153,6 @@ const { data: posts } = await rebase.data.table("posts").find({
   ninguno de los dos: el documento se genera a partir de las tablas
 
 ## `404 NO_TABLES`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Si cada solicitud de datos responde con esto:
 

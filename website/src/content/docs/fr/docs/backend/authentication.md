@@ -1,5 +1,5 @@
 ---
-sourceHash: 71a134ba2ec7ae97
+sourceHash: d5713d30b794c000
 title: Authentification
 sidebar_label: Authentification
 description: Configurez l'authentification JWT, les fournisseurs OAuth, les e-mails SMTP, la protection contre les bots et la table des utilisateurs sur le backend Rebase.
@@ -23,8 +23,6 @@ Rebase inclut un système d'authentification backend complet :
 - **Auto-bootstrapping** — Hors production, le premier utilisateur obtient automatiquement le rôle admin ; un déploiement en production désigne son administrateur avec `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD`
 
 ## Configuration
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 :::note[Où cela se configure]
 **Runtime géré :** environnement — `JWT_SECRET`, `AUTH_*`, `SMTP_*`, `CAPTCHA_*` et les paires `*_CLIENT_ID` / `*_CLIENT_SECRET` des fournisseurs, une pour chacun des douze fournisseurs ([les syntaxes](#syntaxes-des-variables-denvironnement) ; celle d'Apple compte quatre clés, pas une paire). La table des utilisateurs est le [`defineAuthTable`](#la-table-des-utilisateurs) exporté depuis `backend/schema/index.ts`.
@@ -372,8 +370,6 @@ SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'));
 ```
 
 ## La table des utilisateurs
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Les utilisateurs sont stockés dans la table déclarée avec `defineAuthTable` dans `backend/schema`. Il s'agit d'une table ordinaire à laquelle s'ajoutent les colonnes requises par l'authentification, une policy permettant à chaque utilisateur de lire sa propre ligne, et un contrôle d'accès réservé aux administrateurs sur la colonne `roles`. Son bloc `auth` déclare les rôles, les scopes de l'application, les clés d'API personnelles et les hooks qui s'exécutent lorsqu'un administrateur crée un utilisateur ou réinitialise un mot de passe :
 

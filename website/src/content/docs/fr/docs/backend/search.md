@@ -1,5 +1,5 @@
 ---
-sourceHash: 72daf47d8a15bafe
+sourceHash: ceff4ba3bdacfb06
 title: Recherche
 sidebar_label: Recherche
 description: Comment .search() se comporte par défaut, et comment une table active la recherche plein texte classée sur les colonnes spécifiées — y compris le contenu JSONB et de tableaux.
@@ -46,8 +46,6 @@ fait pas.
 Une recherche d'un seul mot se compile exactement dans le SQL habituel.
 
 ## Activation explicite
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Déclarez `search` sur une table, en nommant les colonnes que vous souhaitez indexer :
 
@@ -135,8 +133,6 @@ vérification remplace : une colonne qui continue d'indexer l'ancien jeu de cham
 qui ne retourne rien pour un contenu pourtant bien présent dans la ligne.
 
 ## Ce que vous pouvez spécifier dans `fields`
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un chemin commence par une clé de colonne.
 

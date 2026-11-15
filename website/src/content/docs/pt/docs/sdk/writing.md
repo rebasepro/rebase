@@ -1,5 +1,5 @@
 ---
-sourceHash: dc2857e881f65bd3
+sourceHash: c2767dda8fb3294a
 title: Gravação de dados
 sidebar_label: Gravação de dados
 description: create, upsert, update e delete com o SDK — operações de campo, gravações condicionais, chaves de idempotência, gravações em lote e gravação entre tabelas em uma única transação.
@@ -93,8 +93,6 @@ fazem o mesmo por linha e retornam apenas as linhas que gravaram. Ambos necessit
 os dois não podem ser combinados (`INVALID_CONFLICT_RULE`).
 
 #### Indisponível na tabela de autenticação
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O uso de `upsert()` na tabela de autenticação (aquela declarada com `defineAuthTable`) é recusado
 com um erro 400 (`INVALID_CONFLICT_TARGET`), assim como `createMany` com `upsert`.
@@ -376,8 +374,6 @@ de executar silenciosamente gravações individuais em loop — o que não ofere
 nem o round trip único que você buscou ao usar um lote.
 
 ## Gravação entre tabelas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `createMany` e métodos afins operam em uma tabela por vez. `client.batch()` é a
 forma entre tabelas: uma requisição, uma transação, tudo ou nada.

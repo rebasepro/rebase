@@ -1,5 +1,5 @@
 ---
-sourceHash: 145ba18b6f108fbd
+sourceHash: 72babf07dc797d77
 title: Deployment
 sidebar_label: Deployment
 description: Distribuisci il tuo progetto Rebase in produzione utilizzando Docker, piattaforme cloud o configurazioni manuali.
@@ -88,8 +88,6 @@ Il bundle viene montato in sola lettura. `rebase build` installa le dipendenze d
 Modifica l'email dell'amministratore con la tua, accedi e modifica la password. Vedi [Il tuo primo amministratore](#il-tuo-primo-amministratore).
 
 ### Lo schema
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Il runtime crea le tabelle mancanti all'avvio, **incluse quelle dichiarate da `backend/schema`** — `REBASE_MIGRATE_ON_BOOT` è impostato di default su `ensure`, che è additivo su tutto lo schema e applica di conseguenza la sicurezza a livello di riga (RLS). Un primo `docker compose up` su un database vuoto si avvia servendo le tue tabelle.
 

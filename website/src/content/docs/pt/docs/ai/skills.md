@@ -1,5 +1,5 @@
 ---
-sourceHash: dd9c77451521c040
+sourceHash: 24eb3a62199fe58b
 title: Skills do Agente
 sidebar_label: Skills do Agente
 description: O rebase skills install grava 24 skills de referência do Rebase no seu repositório, no formato que seu assistente de IA espera — Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity.
@@ -149,8 +149,6 @@ O comando também funciona fora de um projeto Rebase, recorrendo ao diretório d
 útil para um repositório de frontend separado que se comunica com um backend Rebase.
 
 ## As 24 skills
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 | Skill | Aborda |
 |---|---|

@@ -1,11 +1,9 @@
 ---
-sourceHash: 96c18e52b3f61548
+sourceHash: 8b1976a4b6c5e595
 title: Inicio de sesión en dispositivos
 sidebar_label: Inicio de sesión en dispositivos
 description: "Permite que una terminal u otro dispositivo sin navegador inicie sesión a través de uno: un código corto, un enlace y la aprobación de un usuario con sesión iniciada. La concesión de autorización de dispositivos de RFC 8628, tal como la utiliza rebase cloud login."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Una terminal, una aplicación de TV o un script no tienen un navegador propio, y
 escribir una contraseña en ellos es algo que conviene evitar. El inicio de sesión

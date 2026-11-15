@@ -1,5 +1,5 @@
 ---
-sourceHash: acc55c3c58895863
+sourceHash: 5c1f59b5ea8496bf
 title: Entorno y configuración
 sidebar_label: Configuración
 description: Todas las variables de entorno y opciones de configuración para proyectos de Rebase.
@@ -238,7 +238,7 @@ código en su lugar.
 | `REBASE_HISTORY` | Registrar el [historial de cambios de entidades](/docs/backend/history). | `true` |
 | `REBASE_COMPRESSION` | Respuestas gzip/brotli. | `true` |
 | `REBASE_MAX_BODY_SIZE` | Cuerpo máximo de la solicitud, **en bytes** (`10485760`, no `10MB`; un valor que no sea un número rechaza el arranque en lugar de eliminar silenciosamente el límite). `0` desactiva el límite. | `10485760` (10 MiB) |
-| `REBASE_ENABLE_SWAGGER` | La superficie OpenAPI. Tri-estado. <span class="since-badge" data-since="0.31">Desde 0.31</span> Sin definir, en todos los entornos: `/api/docs` se sirve a los emisores a los que `GET /api/schema/tables` describe las tablas, a cada uno el documento de las tablas que se le describen, y no hay UI de Swagger. `true` publica el documento completo para todos, con la **UI** de Swagger en `/api/swagger` fuera de producción (nunca en producción). `false` mantiene el documento tras la barrera de administración. | — |
+| `REBASE_ENABLE_SWAGGER` | La superficie OpenAPI. Tri-estado. Sin definir, en todos los entornos: `/api/docs` se sirve a los emisores a los que `GET /api/schema/tables` describe las tablas, a cada uno el documento de las tablas que se le describen, y no hay UI de Swagger. `true` publica el documento completo para todos, con la **UI** de Swagger en `/api/swagger` fuera de producción (nunca en producción). `false` mantiene el documento tras la barrera de administración. | — |
 | `REBASE_METRICS` | Expone métricas de Prometheus en `/metrics`. | `false` |
 | `REBASE_HSTS_INCLUDE_SUBDOMAINS` | Agrega `includeSubDomains` a la cabecera `Strict-Transport-Security`, por lo que los navegadores rechazan HTTP sin cifrar en cada subdominio del host durante seis meses, incluidos los hosts que este proceso no sirve. Actívalo solo cuando todos los subdominios del dominio sean exclusivamente HTTPS. Cualquier valor que no sea `true`/`false` rechaza el arranque. Consulta [Cabeceras de seguridad](/docs/deployment/self-hosting/#security-headers). | `false` |
 | `REBASE_METRICS_TOKEN` | Token Bearer que protege `/metrics`. Si no se define, deja el endpoint abierto a cualquiera que pueda alcanzar el puerto: correcto en una red privada, pero no en una pública, y los registros de arranque así lo advierten. | — |
@@ -324,7 +324,7 @@ sin credenciales utilizables rechazará el arranque. Consulta
 |----------|-------------|-------------|
 | `REBASE_LIVE_SCHEMA_REPOSITORY` | El repositorio de GitHub en el que hacer commit de los cambios de esquema, en formato `owner/name`. Configurarlo es lo que activa la funcionalidad. | — |
 | `REBASE_LIVE_SCHEMA_BRANCH` | La rama en la que se registra el commit. | `main` |
-| `REBASE_LIVE_SCHEMA_PATH` | <span class="since-badge" data-since="0.31">Desde 0.31</span> Dónde reside `backend/schema` en ese repositorio, relativo a la raíz del repositorio. Una ruta que apunte fuera del repositorio rechaza el arranque, al igual que la variable eliminada `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH`. | `backend/schema` |
+| `REBASE_LIVE_SCHEMA_PATH` | Dónde reside `backend/schema` en ese repositorio, relativo a la raíz del repositorio. Una ruta que apunte fuera del repositorio rechaza el arranque, al igual que la variable eliminada `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH`. | `backend/schema` |
 | `REBASE_LIVE_SCHEMA_GITHUB_TOKEN` | Un token de granularidad fina con acceso de lectura y escritura al contenido del repositorio. Configura esta variable o las tres variables `_GITHUB_APP_*`, no ambas opciones. | — |
 | `REBASE_LIVE_SCHEMA_GITHUB_APP_ID` | El ID de una GitHub App, para hacer commits como la aplicación en lugar de usar un token. | — |
 | `REBASE_LIVE_SCHEMA_GITHUB_APP_INSTALLATION_ID` | La instalación de la aplicación en el repositorio. | — |
@@ -432,8 +432,6 @@ The environment is not valid:
 ```
 
 ## Objeto de configuración del backend
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 El `RebaseBackendConfig` que se pasa a `initializeRebaseBackend()` proporciona control programático:
 

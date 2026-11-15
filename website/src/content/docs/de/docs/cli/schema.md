@@ -1,13 +1,11 @@
 ---
-sourceHash: 78c09101b46f0864
+sourceHash: 6d4ba1cab463df74
 title: Schema-Generierung
 sidebar_label: Schema-Generierung
 description: Generieren Sie Drizzle-ORM-Schemas aus den Tabellen in backend/schema, erstellen Sie SQL-Migrationen, introspektieren Sie eine bestehende Datenbank in defineTable-Dateien und halten Sie Ihre Datenbank mit der Rebase-CLI synchron.
 ---
 
 ## Übersicht
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Rebase verwendet eine **Schema-as-Code**-Pipeline, bei der die Tabellen, die Sie mit
 `defineTable` in `backend/schema/` deklarieren, die Single Source of Truth sind. Die CLI
@@ -22,8 +20,6 @@ Diese Seite behandelt jeden CLI-Befehl, der an dieser Pipeline beteiligt ist.
 ## Die Pipeline
 
 ### 1. Tabellen → Drizzle-Schema
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Die Tabellen, die `backend/schema/index.ts` exportiert, beschreiben Spalten, Typen, Relationen,
 Enums und Row-Level Security. Jeder nachfolgende Befehl liest sie über den Loader ein,
@@ -50,8 +46,6 @@ Der Befehl `db migrate` wendet ausstehende Migrationen auf Ihre PostgreSQL-Daten
 ## Befehle
 
 ### `rebase schema generate`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Generieren Sie eine Drizzle-ORM-Schemadatei aus Ihren Tabellen:
 
@@ -96,8 +90,6 @@ oder einen CI-Schritt. Der Befehl akzeptiert `--schema-dir` und `--output` genau
 
 ### `rebase schema reconcile`
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Lockern und entfernen Sie, was der Boot-Vorgang nicht bereinigt, nachdem Sie den Plan geprüft haben:
 
 ```bash
@@ -114,8 +106,6 @@ rebase schema reconcile --drop voice_cache.wav  # und eine Spalte entfernen, die
 Der Boot-Vorgang fügt immer nur hinzu. Wenn Sie also eine Spalte aus ihrem `defineTable` entfernen, bleibt die Spalte mitsamt ihren Daten in der Datenbank erhalten. Eine `NOT NULL`-Spalte ohne Standardwert führt dann dazu, dass jedes Einfügen fehlschlägt, und das Boot-Log verweist für diesen Fall auf diesen Befehl: ohne `--drop`, um die Daten zu behalten, mit `--drop`, um die Spalte zu entfernen. Rollen Sie die Tabellenänderung zuerst aus, da Reconcile gegen das plant, was das Backend ausführt. Es erfordert `REBASE_SERVICE_KEY` in `.env`. Lokal deckt `rebase db push` dasselbe über seine Sperre für destruktive Änderungen ab.
 
 ### `rebase schema introspect`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Schreiben Sie `defineTable`-Dateien aus einer bestehenden PostgreSQL-Datenbank:
 
@@ -445,8 +435,6 @@ selbst ausführt.
 
 ### `rebase generate-sdk`
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Generieren Sie ein typisiertes SDK aus Ihren Tabellen:
 
 ```bash
@@ -505,8 +493,6 @@ wird auf dieselbe Weise in einen Eigenschaftsnamen umgewandelt (`my-notes` → `
 
 ### `rebase migrate`
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `rebase migrate collections-to-tables [dir]` migriert `config/collections` nach
 `backend/schema` (ein `defineTable` pro Collection, jede Spalte explizit an
 ihrer ursprünglichen Position in Drizzle-Schreibweise und `index.ts` mit
@@ -552,8 +538,6 @@ changes: the database already matches these tables." ausgeben und
 
 ## Entwicklungs-Workflow
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Der Workflow für schnelle Iterationen während der Entwicklung:
 
 ```bash
@@ -566,8 +550,6 @@ rebase db push
 ```
 
 ## Produktions-Workflow
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Der sichere, überprüfbare Workflow für die Produktion:
 

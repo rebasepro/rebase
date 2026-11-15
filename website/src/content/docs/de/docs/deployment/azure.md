@@ -1,5 +1,5 @@
 ---
-sourceHash: 1fdfb40ed3615bbd
+sourceHash: 4377767287972898
 title: Rebase auf Microsoft Azure bereitstellen
 description: Stellen Sie Ihre Rebase-Instanz sicher auf Azure mithilfe von Azure Database for PostgreSQL und Azure Container Apps bereit.
 sidebar_label: Azure
@@ -35,7 +35,7 @@ rebase build
 Container Apps bezieht Images aus einer Registry, betten Sie das Bundle also in ein abgeleitetes Image ein. Drei Zeilen, und es legt exakt fest, was ausgeführt wird:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -81,8 +81,6 @@ Azure Container Apps bietet eine serverlose Container-Umgebung mit integriertem 
 8. Schließen Sie die Erstellung ab. Azure stellt den Container bereit und stellt Ihnen eine mit TLS gesicherte Anwendungs-URL zur Verfügung.
 
 ## 4. Das Schema
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 **Die Runtime erstellt beim Start fehlende Tabellen, einschließlich jener, die in `backend/schema` deklariert sind.** `REBASE_MIGRATE_ON_BOOT` ist standardmäßig auf `ensure` gesetzt, was über das gesamte Schema hinweg additiv wirkt – es erstellt fehlende Tabellen, Spalten und Enum-Typen und wendet deren Row-Level Security an – sodass der erste Start gegen einen leeren Server direkt mit der Bereitstellung Ihrer Tabellen hochfährt.
 

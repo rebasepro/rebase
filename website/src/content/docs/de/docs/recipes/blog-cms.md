@@ -1,5 +1,5 @@
 ---
-sourceHash: 0c385399c3a984b7
+sourceHash: 19a897df04526a75
 title: "Rezept: Blog-CMS"
 sidebar_label: Blog-CMS
 description: Erstellen Sie ein vollständiges Blog-CMS mit Artikeln, Autoren, Kategorien, Rich-Text-Bearbeitung und Bild-Uploads – Tabellen in backend/schema, Darstellung in frontend/src/cms.
@@ -14,14 +14,10 @@ Erstellen Sie ein Blog-Backend mit:
 
 ## Tabellen
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Drei Dateien in `backend/schema/`. Sie definieren, was die Datenbank und die API
 durchsetzen; wie das Admin-Panel sie darstellt, folgt danach im Frontend.
 
 ### Autoren
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```ts
 // backend/schema/authors.ts
@@ -41,8 +37,6 @@ export const authors = defineTable("authors", {
 
 ### Kategorien
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 ```ts
 // backend/schema/categories.ts
 import { defineTable, col } from "@rebasepro/server/schema";
@@ -59,8 +53,6 @@ export const categories = defineTable("categories", {
 ```
 
 ### Artikel
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```ts
 // backend/schema/articles.ts
@@ -148,8 +140,6 @@ Scaffold begonnen haben, fügen Sie `writer` zu den Rollenoptionen der `roles`-S
 
 ## Wie das Panel sie anzeigt
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Das Admin-Panel rendert alle drei ohne weiteren Code. Diese Dateien in
 `frontend/src/cms/` fügen die Icons, die Enum-Farben und die Editoren hinzu:
 
@@ -187,8 +177,6 @@ export const authorsCms = customizeTable<typeof authors>("authors", {
 ```
 
 ## Einrichtung
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 1. Speichern Sie die drei Tabellendateien in `backend/schema/` und exportieren Sie sie aus
    `backend/schema/index.ts` – ein `defineTable`, das der Index nicht exportiert,
@@ -244,8 +232,6 @@ for (const article of articles) {
 ```
 
 ## Verwandte Themen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - [Tabellen](/docs/schema/) – die `defineTable`-API, die dieses Rezept verwendet
 - [Anpassen einer Tabelle](/docs/frontend/customize-table/) – die Panel-Seite

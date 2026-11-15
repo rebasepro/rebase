@@ -1,11 +1,9 @@
 ---
-sourceHash: 93694433369991ae
+sourceHash: 8e6d7b5d495d9275
 title: Layout del form
 sidebar_label: Layout del form
 description: "Organizza il form di un record: larghezze dei campi su una griglia a quattro colonne, sezioni con titolo e comprimibili, la barra laterale dei metadati e un componente che sostituisce il form generato."
 ---
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Il form del record viene generato a partire dalle colonne e dalle relazioni della tabella:
 
@@ -60,8 +58,6 @@ export const ordersCms = customizeTable<typeof orders>("orders", {
 
 ## Larghezza dei campi
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 La larghezza di un campo è uno **span** su una griglia a quattro colonne; `4` corrisponde all'intera larghezza della colonna principale. Gli span si agganciano alla griglia, garantendo l'allineamento dei campi indipendentemente dall'ordine in cui sono stati dichiarati.
 
 Scegli uno span in base al contenuto del campo, non al suo tipo. Due valori brevi correlati condividono una riga: data di inizio e di fine, città e paese, corriere e codice di tracciamento con `2` ciascuno, oppure un valore e il relativo qualificatore con `3` + `1`. Numeri, booleani e codici brevi possono occupare `1` accanto ai campi correlati. Tutto ciò che risulta lungo alla lettura (nomi, URL, email, id, descrizioni, markdown, file) mantiene `4`. Le righe si riempiono secondo l'ordine dei campi e nessun campo viene allargato automaticamente per colmare gli spazi vuoti; disponi quindi le coppie l'una accanto all'altra e fai in modo che ogni riga sommi a 4.
@@ -69,8 +65,6 @@ Scegli uno span in base al contenuto del campo, non al suo tipo. Due valori brev
 Nei layout troppo stretti per due colonne (il pannello laterale, il riquadro diviso, uno smartphone), la griglia si riduce a una sola colonna e gli span vengono ignorati.
 
 ## Sezioni
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `form.sections` raggruppa la colonna principale sotto diverse intestazioni. Ogni sezione è definita come `{ key, title?, fields, collapsed?, collapsible?, readVariant? }`. Una sezione con titolo può essere compressa; una senza titolo non può esserlo. `readVariant: "summary"` impila i campi della sezione come righe di etichetta e valore nella vista in sola lettura del record; l'impostazione predefinita, `"grid"`, utilizza la griglia del form.
 
@@ -80,15 +74,11 @@ Ogni voce viene verificata rispetto alla tabella. Le voci che il server non invi
 
 ## La barra laterale dei metadati
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 `form.sidebar` sposta i campi fuori dalla colonna principale in una barra laterale stretta adiacente: stato, proprietà, date di pubblicazione, flag. La barra laterale non utilizza la griglia, quindi `span` viene ignorato al suo interno. Dove non c'è spazio sufficiente per una barra laterale, viene visualizzata come una normale sezione iniziale.
 
 `form.showRecordMeta` posiziona il blocco del record in sola lettura (id, creato, aggiornato) in fondo alla barra laterale. È `true` ogni volta che viene mostrata una barra laterale. `sidebar: []` disattiva la barra laterale derivata e mantiene ogni campo nella colonna principale. `hideIdFromForm` nasconde completamente l'id dal form.
 
 ## Sostituire il form
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `formView` sostituisce il form generato con un componente personalizzato, importato per valore. Riceve gli stessi parametri `EntityCustomViewParams` di una [vista entità](/docs/frontend/entity-views/). `includeActions: true` mantiene i pulsanti Salva e Annulla nella barra del record mentre è visibile a schermo.
 
@@ -111,8 +101,6 @@ Per una modifica più mirata, sostituisci invece una singola parte del form (`En
 
 ## Altre opzioni del form
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 | Opzione | Effetto |
 |---|---|
 | `formAutoSave` | Salva man mano che l'utente digita. |
@@ -121,8 +109,6 @@ Per una modifica più mirata, sostituisci invece una singola parte del form (`En
 | `localChangesBackup` | Mantiene le modifiche non salvate nella memoria locale: `"manual_apply"`, `"auto_apply"` o `false`. |
 
 ## Correlati
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 - [Campi personalizzati](/docs/frontend/custom-fields/): i campi organizzati dal layout
 - [Viste entità](/docs/frontend/entity-views/): un'intera scheda personalizzata accanto al form

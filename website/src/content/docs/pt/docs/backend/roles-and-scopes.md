@@ -1,5 +1,5 @@
 ---
-sourceHash: 1610ca294114442e
+sourceHash: d68196665de50636
 title: Papéis e escopos
 sidebar_label: Papéis e escopos
 description: "O que um chamador pode fazer: o plano de dados que cada pessoa detém, o plano de administração concedido por papéis, os escopos que um aplicativo declara para si mesmo e como cada credencial os carrega."
@@ -79,8 +79,6 @@ quando declara um `target`, como mostrado abaixo.
 
 ## Declarando papéis
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Os papéis são declarados na [tabela de usuários](/docs/schema/auth-table/), sob
 `auth.roles`. Um papel é um nome visível para o banco de dados, com o qual as políticas
 de segurança em nível de linha podem corresponder, além de uma lista de escopos do plano de administração e da aplicação.
@@ -146,8 +144,6 @@ const { roles } = await client.admin.listRoles();
 ```
 
 ## Escopos da aplicação
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Uma aplicação pode nomear suas próprias operações como escopos, sob `auth.scopes`:
 

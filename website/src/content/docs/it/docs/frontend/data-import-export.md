@@ -1,5 +1,5 @@
 ---
-sourceHash: 66fc9b42bef4d463
+sourceHash: 8984b70f55593a5d
 title: Importazione ed esportazione dati
 sidebar_label: Importazione ed esportazione dati
 description: Importa dati da file CSV, JSON ed Excel nelle tue collezioni ed esporta i dati delle collezioni in formato CSV o JSON con campi calcolati opzionali.
@@ -103,13 +103,9 @@ Tutti i filtri attivi nella visualizzazione della collezione vengono applicati a
 
 ### Configurazione dell'esportazione
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 L'esportazione è disponibile su ogni collezione, a meno che non venga disattivata. Viene configurata tramite la proprietà `exportable` in `customizeTable`: impostare `exportable: false` rimuove il pulsante **Export**, mentre un oggetto `ExportConfig` lo mantiene e consente di aggiungere colonne calcolate.
 
 ### Aggiunta di campi calcolati
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 La proprietà `additionalFields` aggiunge colonne non presenti nella tabella; ciascuna di esse viene calcolata al momento dell'esportazione e può essere asincrona:
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: d1b243f804318232
+sourceHash: fa700834543b9475
 title: Sistema di plugin
 sidebar_label: Plugin
 description: Estendi Rebase con i plugin — inserisci componenti UI, modifica collezioni, aggiungi azioni alla barra degli strumenti e crea costruttori di campi personalizzati.
@@ -263,8 +263,6 @@ hooks: {
 ```
 
 ## Modifica delle collezioni
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 I plugin possono modificare le collezioni esistenti:
 

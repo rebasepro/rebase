@@ -1,11 +1,9 @@
 ---
-sourceHash: e951bd1fd3fc48e0
+sourceHash: 84bd0f15d2a016c7
 title: Validação e condições
 sidebar_label: Validação e condições
 description: "Como o formulário do CMS exibe as regras de uma coluna — obrigatório, comprimento, padrão, limites, único — onde essas regras são verificadas e campos condicionais que se tornam obrigatórios, desativados ou ocultos com base nos próprios valores do registro."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 As regras de uma coluna são declaradas uma única vez, na própria coluna, e
 impostas pelo servidor em cada gravação que atinge a API. O CMS lê as mesmas
@@ -37,8 +35,6 @@ coluna com `.notNull()` e `.validate({ … })`, e o CMS as lê.
 
 ## O que o formulário verifica
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | Na coluna | No formulário |
 |---|---|
 | `.notNull()` | Obrigatório, com `requiredMessage` como o erro quando informado. Não é obrigatório onde ninguém digita o valor: uma chave gerada, um stamp, uma coluna gerada ou `.readOnly()`. |
@@ -57,8 +53,6 @@ Todas as regras estão listadas, com seus significados exatos, em
 
 ## Onde a validação é executada
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 O servidor verifica as regras de uma coluna no limite da requisição (REST, o
 socket em tempo real e MCP) com base no que o chamador enviou, antes da execução
 de `beforeSave`, e responde a uma gravação que viole uma regra com um erro 400
@@ -73,8 +67,6 @@ edita: um valor armazenado que viole uma regra adicionada posteriormente não
 exibirá erro até que alguém edite essa célula.
 
 ## Campos condicionais
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Um campo pode reagir aos próprios valores do registro: tornar-se obrigatório,
 desativado, somente leitura ou oculto. Existem duas formas, ambas em `customizeTable`:
@@ -139,15 +131,11 @@ banco de dados impõe para qualquer pessoa.
 
 ## Rótulos para um conjunto fechado
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Os valores de um `col.enum([...])` ou `.oneOf([...])` pertencem à coluna. Seus
 rótulos, cores e ordem pertencem ao CMS, definidos com `enumLabels` e `enumOrder`;
 consulte [conjuntos fechados](/docs/collections/properties/#closed-sets-of-values).
 
 ## Próximos passos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Colunas](/docs/schema/columns/#validation): todas as regras de validação
 - [Campos](/docs/collections/properties/): os campos aos quais essas regras se aplicam

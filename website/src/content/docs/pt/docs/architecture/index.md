@@ -1,5 +1,5 @@
 ---
-sourceHash: b58890f96ff100b4
+sourceHash: 9053234803842e2e
 title: Visão Geral da Arquitetura
 sidebar_label: Arquitetura
 description: Entenda como o backend, frontend, SDK tipado e banco de dados do Rebase se integram para formar um Backend-as-a-Service completo.
@@ -52,8 +52,6 @@ O `createPostgresAdapter` gerencia automaticamente o pool de conexões com o ban
 
 ### Descritores de tabela
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Na inicialização, o backend compila as tabelas exportadas por `backend/schema/index.ts` em **descritores**: cada coluna com seu tipo Postgres, nulabilidade, regras de validação e armazenamento, as relações por slug e a política de segurança em nível de linha (RLS). Um problema em qualquer tabela impede a inicialização com um erro `SchemaDefinitionError` listando cada inconsistência. Os descritores são a base para o funcionamento do REST, realtime, MCP e da especificação OpenAPI, sobre os quais a versão do esquema é calculada e o que o `GET /api/schema/tables` fornece ao painel de administração e ao Studio, com dados sensíveis ocultados de acordo com o solicitante. O código dos hooks nunca sai do servidor. Um backend sem `backend/schema` faz a introspecção do banco de dados nesses mesmos descritores.
 
 ### Serviço em Tempo Real
@@ -73,8 +71,6 @@ Para **implantações multi-instância** (por exemplo, Cloud Run com múltiplas 
 Assim como os drivers, os backends de armazenamento são registrados em um catálogo centralizado. É possível configurar múltiplos provedores de armazenamento (local, S3) e rotear diferentes colunas de arquivos para backends distintos usando `col.storage({ source })`.
 
 ## Mapa de Pacotes
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 | Pacote | Função | Usado por |
 |---------|------|---------|

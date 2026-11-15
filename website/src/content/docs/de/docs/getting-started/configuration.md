@@ -1,5 +1,5 @@
 ---
-sourceHash: acc55c3c58895863
+sourceHash: 5c1f59b5ea8496bf
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -236,7 +236,7 @@ Ein Projekt, für das `eject` ausgeführt wurde, steuert diese Entscheidungen st
 | `REBASE_HISTORY` | [Entitäts-Änderungshistorie](/docs/backend/history) aufzeichnen. | `true` |
 | `REBASE_COMPRESSION` | Antworten mit gzip/brotli komprimieren. | `true` |
 | `REBASE_MAX_BODY_SIZE` | Maximaler Request-Body, **in Bytes** (`10485760`, nicht `10MB` – ein Wert, der keine Zahl ist, verweigert den Start, anstatt das Limit stillschweigend aufzuheben). `0` schaltet das Limit aus. | `10485760` (10 MiB) |
-| `REBASE_ENABLE_SWAGGER` | Die OpenAPI-Oberfläche. Drei Zustände. <span class="since-badge" data-since="0.31">Seit 0.31</span> Wenn nicht gesetzt, in jeder Umgebung: `/api/docs` wird den Aufrufern bereitgestellt, für die `GET /api/schema/tables` Tabellen beschreibt, jeweils das Dokument der für sie beschriebenen Tabellen, und es gibt keine Swagger-UI. `true` veröffentlicht das gesamte Dokument für alle, mit der Swagger-**UI** unter `/api/swagger` außerhalb der Produktion (niemals in der Produktion). `false` hält das Dokument hinter dem Admin-Gate. | — |
+| `REBASE_ENABLE_SWAGGER` | Die OpenAPI-Oberfläche. Drei Zustände. Wenn nicht gesetzt, in jeder Umgebung: `/api/docs` wird den Aufrufern bereitgestellt, für die `GET /api/schema/tables` Tabellen beschreibt, jeweils das Dokument der für sie beschriebenen Tabellen, und es gibt keine Swagger-UI. `true` veröffentlicht das gesamte Dokument für alle, mit der Swagger-**UI** unter `/api/swagger` außerhalb der Produktion (niemals in der Produktion). `false` hält das Dokument hinter dem Admin-Gate. | — |
 | `REBASE_METRICS` | Prometheus-Metriken unter `/metrics` bereitstellen. | `false` |
 | `REBASE_HSTS_INCLUDE_SUBDOMAINS` | Fügt dem `Strict-Transport-Security`-Header `includeSubDomains` hinzu, sodass Browser für sechs Monate reines HTTP auf jeder Subdomain des Hosts verweigern – einschließlich Hosts, die dieser Prozess nicht bedient. Nur aktivieren, wenn jede Subdomain der Domain ausschließlich über HTTPS läuft. Jeder Wert außer `true`/`false` verweigert den Start. Siehe [Sicherheits-Header](/docs/deployment/self-hosting/#security-headers). | `false` |
 | `REBASE_METRICS_TOKEN` | Bearer-Token zum Schutz von `/metrics`. Wenn ungesetzt, bleibt der Endpunkt für jeden offen, der den Port erreichen kann – in einem privaten Netzwerk in Ordnung, in einem öffentlichen nicht, und die Startprotokolle weisen darauf hin. | — |
@@ -298,7 +298,7 @@ Deaktiviert, es sei denn, `REBASE_LIVE_SCHEMA_REPOSITORY` ist gesetzt. Ein gebau
 |----------|--------------|----------|
 | `REBASE_LIVE_SCHEMA_REPOSITORY` | Das GitHub-Repository, in das Schemaänderungen committet werden sollen, im Format `owner/name`. Das Setzen dieser Variablen aktiviert die Funktion. | — |
 | `REBASE_LIVE_SCHEMA_BRANCH` | Der Branch, auf dem der Commit landet. | `main` |
-| `REBASE_LIVE_SCHEMA_PATH` | <span class="since-badge" data-since="0.31">Seit 0.31</span> Speicherort von `backend/schema` in diesem Repository, relativ zum Repository-Root. Ein Pfad, der das Repository verlässt, verweigert den Start; dasselbe gilt für das entfernte `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH`. | `backend/schema` |
+| `REBASE_LIVE_SCHEMA_PATH` | Speicherort von `backend/schema` in diesem Repository, relativ zum Repository-Root. Ein Pfad, der das Repository verlässt, verweigert den Start; dasselbe gilt für das entfernte `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH`. | `backend/schema` |
 | `REBASE_LIVE_SCHEMA_GITHUB_TOKEN` | Ein fein abgestimmtes Token mit Lese- und Schreibzugriff auf den Repository-Inhalt. Setzen Sie entweder dies oder die drei `_GITHUB_APP_*`-Variablen, nicht beides. | — |
 | `REBASE_LIVE_SCHEMA_GITHUB_APP_ID` | Die ID einer GitHub App, um als App statt mit einem Token zu committen. | — |
 | `REBASE_LIVE_SCHEMA_GITHUB_APP_INSTALLATION_ID` | Die Installation der App auf dem Repository. | — |
@@ -394,8 +394,6 @@ The environment is not valid:
 ```
 
 ## Backend-Konfigurationsobjekt
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Das an `initializeRebaseBackend()` übergebene `RebaseBackendConfig` bietet programmatische Steuerung:
 

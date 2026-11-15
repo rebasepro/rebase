@@ -1,5 +1,5 @@
 ---
-sourceHash: 93c74d4bdc0c12ea
+sourceHash: ac08953dfecf5543
 title: Integrazione Server Personalizzato
 sidebar_label: Server personalizzato
 description: Costruisci il backend di Rebase da componenti pubblici nel tuo server — createRebaseBackend, i suoi gruppi di route, mount, attachRealtime e start — oppure incorpora il driver Postgres in Express.
@@ -72,8 +72,6 @@ utilizzato da `@rebasepro/server`, garantendo l'installazione di una sola copia:
 Consulta il file `.env.example` nell'applicazione generata dallo scaffold per l'elenco completo delle variabili supportate.
 
 ## Un livello sotto `initializeRebaseBackend`
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 `initializeRebaseBackend` è costituito da queste chiamate, e nient'altro:
 
@@ -257,8 +255,6 @@ delle tabelle per qualsiasi backend nel processo. `initializeRebaseBackend` pass
 `false` quando `REBASE_PROVISION=false`.
 
 ## Montare solo i gruppi desiderati
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 `backend.routes` contiene i gruppi di route. Ciascuno è una sotto-app Hono che puoi
 montare singolarmente, su qualsiasi percorso:

@@ -1,5 +1,5 @@
 ---
-sourceHash: b1b5ef4227e130d2
+sourceHash: 2229a4346ece8f3c
 title: Escritura a través de REST
 sidebar_label: Escritura a través de REST
 description: Claves de idempotencia, escrituras condicionales con ETag e If-Match, operaciones de campo, upserts sobre una clave natural, return=minimal y lotes entre tablas.
@@ -21,7 +21,7 @@ que todo lo indicado en esta sección también se aplica a ellas, excepto `?on_c
 El cuerpo de una escritura debe ser un objeto JSON. Un valor `null`, un número, una cadena o un array resulta
 en un `400 BAD_REQUEST`.
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span> Una escritura acepta los valores documentados en la API REST y nada más — la
+Una escritura acepta los valores documentados en la API REST y nada más — la
 misma forma que devuelve una lectura: una relación a-uno (`belongsTo`, `hasOne`, un `via` a-uno)
 como la clave de la fila relacionada o `null`, una relación a-muchos como una lista de claves
 o de objetos `{ id, _pivot? }`, una fecha como texto ISO, un vector como una lista de números,
@@ -235,8 +235,6 @@ arruinaría cualquier consulta de "nuevo esta semana".
 
 #### No en la tabla de autenticación
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 La tabla de autenticación (la declarada con `defineAuthTable`) rechaza un upsert por cualquier
 vía — `?on_conflict=`, `/bulk` con `upsert: true`, una operación `upsert` en `_batch`,
 el `upsert()` del SDK y el socket en tiempo real — con un `400`
@@ -268,7 +266,7 @@ devuelve como un escalar; una clave compuesta como un objeto con sus columnas.
 
 ## Lotes entre tablas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span> Cada operación indica su tabla mediante `table` (antes era `collection`).
+Cada operación indica su tabla mediante `table` (antes era `collection`).
 
 `POST /api/data/_batch` escribe en múltiples tablas en una sola transacción, bajo el
 propio rol del emisor, con las mismas validaciones, hooks y seguridad a nivel de fila

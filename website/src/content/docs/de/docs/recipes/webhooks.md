@@ -1,5 +1,5 @@
 ---
-sourceHash: 517637e2cfd34608
+sourceHash: a5eff26fca2535c7
 title: "Rezept: Webhook-Integration"
 sidebar_label: Webhooks
 description: Verwenden Sie Table Hooks, um Webhooks an externe Dienste zu senden, wenn sich Daten ändern, ohne die Transaktion des Schreibvorgangs offenzuhalten.
@@ -17,8 +17,6 @@ Zwei Eigenschaften dieser Hooks bestimmen, wie dieses Rezept aufgebaut ist, und 
 Daher gilt: Führen Sie niemals ein `await` für eine ausgehende HTTP-Anfrage in einem Hook aus. Stellen Sie sie in eine Warteschlange (Queue).
 
 ## Slack-Benachrichtigung bei neuer Bestellung
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `WebhookDispatcher` wird aus `@rebasepro/server` exportiert. `enqueueEntityChange` kehrt sofort zurück – der POST-Request erfolgt erst, sobald der Schreibvorgang committet wurde, und niemals bei einem Rollback – und der Dispatcher validiert das Ziel, signiert die Payload, begrenzt jeden Versuch mit einer Frist (Deadline) und wiederholt fehlgeschlagene Versuche.
 
@@ -79,8 +77,6 @@ Es wird nur die ID des Webhooks im Job gespeichert, sodass dessen Signaturgeheim
 `setTableHooks` **ersetzt** die Hooks, die von der Tabelle `orders` deklariert wurden. Falls bereits Hooks vorhanden sind, behalten Sie diese bei: Übergeben Sie `composeTableHooks(declared, { afterSave })`, wobei `composeTableHooks` aus `@rebasepro/common` stammt und `declared` die eigenen `hooks` der Tabelle darstellen (`orders.config.hooks`). Siehe [Kombinieren von Hook-Sets](/docs/collections/callbacks/#combining-hook-sets).
 
 ### Ohne Job-Queue
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Lassen Sie `jobQueue` weg – oder führen Sie den Code dort aus, wo das Backend keine Job-Queue hat –, werden die Zustellungen im Arbeitsspeicher des Prozesses eingereiht, der die Änderung vorgenommen hat. Das ist einfacher und reicht für Benachrichtigungen aus, deren Verlust verkraftbar ist:
 

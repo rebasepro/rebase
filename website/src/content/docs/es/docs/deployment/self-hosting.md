@@ -1,5 +1,5 @@
 ---
-sourceHash: cfc9a95285da2353
+sourceHash: db0130f92b3095af
 title: Autohospedaje
 sidebar_label: Autohospedaje
 description: "Ejecute Rebase en cualquier lugar con la imagen de runtime oficial y el bundle de su proyecto: Docker Compose, Fly, Railway o un VPS básico."
@@ -131,13 +131,11 @@ Para un despliegue real, es preferible empaquetar ambos en una imagen, lo que ta
 fija con exactitud lo que se ejecuta:
 
 ```dockerfile
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
 ## Creación del esquema
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 **El runtime crea las tablas que falten al arrancar, incluidas las que declara `backend/schema`.**
 `REBASE_MIGRATE_ON_BOOT` tiene como valor predeterminado `ensure`, que es aditivo en todo el
@@ -197,7 +195,7 @@ cron, contadores compartidos de límite de peticiones). En su lugar, lee lo que 
 - **Falta una tabla opcional** (API keys, claves de idempotencia, bloqueos de cron,
   contadores de límite de tasa, presencia, historial de métricas): esa funcionalidad se
   desactiva y el log indica qué tabla necesita.
-- <span class="since-badge" data-since="0.31">Desde 0.31</span> **Una tabla declarada que la base de datos no protege**:
+- **Una tabla declarada que la base de datos no protege**:
   seguridad a nivel de fila deshabilitada, ninguna de las políticas declaradas presente,
   o falta una política restrictiva declarada: esa tabla no se servirá (si falta una
   política permisiva, sí se sirve, emitiendo una advertencia en el arranque indicándola).
@@ -347,7 +345,7 @@ lugar:
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.30.1 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.31.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -583,7 +581,7 @@ arrancarse como varios procesos que cooperan entre sí. Consulte
 ## Actualización
 
 ```yaml
-image: rebasepro/server:0.30.1
+image: rebasepro/server:0.31.0
 ```
 
 Reinicie. Su bundle permanece intacto. Dentro de una misma versión mayor del contrato del

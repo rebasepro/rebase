@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f137cdb15196a3e
+sourceHash: 3e87d9e1b148c9f5
 title: Outils Studio
 sidebar_label: Studio
 description: Rebase Studio fournit des outils de développement pour l'édition visuelle de schémas, les requêtes SQL, les scripts JavaScript, la gestion des politiques RLS et l'exploration du stockage.
@@ -36,8 +36,6 @@ migré vers `"cms"` à la lecture.
 ## Outils Studio intégrés
 
 ### Éditeur de collections
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un éditeur visuel pour une table et sa présentation dans le panneau. Un enregistrement se divise en deux parties :
 
@@ -120,8 +118,6 @@ en mode `baas`, et sur un serveur sans `schemaDir`. Le panneau interroge
 bouton désactivé.
 
 ### Outils intégrés
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Chaque outil qui connaît le schéma lit les tables renvoyées par le serveur, depuis
 `GET /api/schema/tables`, que le CMS soit présent ou non sur la page — ainsi, Studio fonctionne

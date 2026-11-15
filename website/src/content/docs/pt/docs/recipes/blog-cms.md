@@ -1,5 +1,5 @@
 ---
-sourceHash: 0c385399c3a984b7
+sourceHash: 19a897df04526a75
 title: "Receita: CMS de Blog"
 sidebar_label: CMS de Blog
 description: Construa um CMS de blog completo com artigos, autores, categorias, edição de rich text e upload de imagens — tabelas em backend/schema, apresentação em frontend/src/cms.
@@ -14,14 +14,10 @@ Construa um backend de blog com:
 
 ## Tabelas
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Três arquivos em `backend/schema/`. Eles definem o que o banco de dados e a API
 impõem; a forma como o painel de administração os apresenta vem depois, no frontend.
 
 ### Autores
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```ts
 // backend/schema/authors.ts
@@ -41,8 +37,6 @@ export const authors = defineTable("authors", {
 
 ### Categorias
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 ```ts
 // backend/schema/categories.ts
 import { defineTable, col } from "@rebasepro/server/schema";
@@ -59,8 +53,6 @@ export const categories = defineTable("categories", {
 ```
 
 ### Artigos
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```ts
 // backend/schema/articles.ts
@@ -148,8 +140,6 @@ scaffold, adicione `writer` às opções de papéis da coluna `roles` em
 
 ## Como o painel os exibe
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 O painel de administração renderiza todos os três sem a necessidade de código adicional. Estes arquivos em
 `frontend/src/cms/` adicionam os ícones, as cores dos enums e os editores:
 
@@ -187,8 +177,6 @@ export const authorsCms = customizeTable<typeof authors>("authors", {
 ```
 
 ## Configuração
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 1. Salve os três arquivos de tabela em `backend/schema/` e exporte-os a partir de
    `backend/schema/index.ts` — um `defineTable` que o index não exporta
@@ -245,8 +233,6 @@ for (const article of articles) {
 
 
 ## Relacionados
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Tabelas](/docs/schema/) — a API `defineTable` que esta receita utiliza
 - [Personalizando uma tabela](/docs/frontend/customize-table/) — a parte do painel

@@ -1,11 +1,9 @@
 ---
-sourceHash: 8f8ab97f8302c1f8
+sourceHash: c26e358d70b93640
 title: Relações no painel de administração
 sidebar_label: Relações no painel de administração
 description: "Como o CMS renderiza as relações de uma tabela: um seletor para belongsTo, uma aba sob o registro para cada relação to-many, linhas próprias versus compartilhadas, as mesmas regras via REST e as opções de customizeTable para campos de relação."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O CMS lê as [relações](/docs/collections/relations/) de uma tabela a partir do seu descritor e renderiza cada uma de acordo com o que ela é:
 
@@ -42,8 +40,6 @@ Uma relação cujo destino não é disponibilizado ao chamador é omitida: o CMS
 
 ## O segmento do caminho é o nome da relação
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 As linhas de uma aba são endereçadas como `parent/parentId/relationName`:
 
 ```text
@@ -54,8 +50,6 @@ As linhas de uma aba são endereçadas como `parent/parentId/relationName`:
 O último segmento é o **nome da relação**, a chave em `relations`, e não o slug do destino. É isso que permite que duas relações com a mesma tabela funcionem: cada uma tem seu próprio nome, portanto cada uma ganha sua própria aba e seu próprio caminho.
 
 ## Linhas próprias versus linhas compartilhadas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O que uma aba permite fazer depende de como a relação é armazenada:
 
@@ -69,8 +63,6 @@ O que uma aba permite fazer depende de como a relação é armazenada:
 Uma aba muitos-para-muitos oferece **Add existing** e **Remove from this record**, e nunca uma exclusão que removeria a linha de outros pais.
 
 ## As mesmas regras via REST
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Uma aba é uma consulta comum restrita a um pai, portanto aceita tudo o que uma listagem raiz aceita (filtros, `orderBy`, `limit`, `offset`, `include`) e `meta.total` faz a contagem das linhas filtradas. Filtre por campo (`?field=op.value`) ou com um objeto completo `?where={"field":["op","value"]}`:
 
@@ -89,14 +81,10 @@ Para um muitos-para-muitos, `PATCH parent/id/child/childId` é uma *associação
 
 ## O que não se torna uma aba
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 - **Relações to-one**: um `belongsTo` ou um `hasOne` é um campo do registro, não uma lista. A escrita por meio de um caminho to-one é rejeitada.
 - **Uma tabela com `hideFromEntityViews`** em seu `customizeTable` não é oferecida como uma aba nos registros das tabelas relacionadas a ela.
 
 ## Personalizando campos de relação
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```tsx
 // frontend/src/cms/articles.tsx
@@ -132,8 +120,6 @@ export const articlesCms = customizeTable<typeof articles>("articles", {
 O `overrides` altera o estilo da aba, não os campos do destino. Esses pertencem ao próprio `customizeTable` da tabela de destino, e definir `fields` dentro de `overrides` lança um erro.
 
 ## Próximos passos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Relações](/docs/collections/relations/): os cinco tipos e como declarar cada um
 - [customizeTable](/docs/frontend/customize-table/#relations): opções de relação na referência

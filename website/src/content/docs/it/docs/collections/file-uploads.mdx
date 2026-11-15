@@ -1,13 +1,11 @@
 ---
-sourceHash: 5037df8f9b275f93
+sourceHash: 2813a331b4153057
 title: Campi per il caricamento di file
 sidebar_label: Caricamenti di file
 description: "Come il CMS visualizza una colonna col.storage() come campo di caricamento: le regole applicate dal server sulla colonna, le funzioni solo per il browser aggiunte da customizeTable, i campi a singolo file e multifile e cosa succede ai file memorizzati."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Un campo file è una colonna [`col.storage()`](/docs/schema/columns/#storage-columns).
 La colonna contiene del testo, ovvero la chiave dell'oggetto nel bucket (o il suo URL, se
@@ -26,8 +24,6 @@ funzioni: non possono raggiungere il server, quindi modellano solo i caricamenti
 dal CMS.
 
 ## Un file
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 ```ts
 // backend/schema/listings.ts
@@ -54,16 +50,12 @@ dell'immagine del record nelle schede e negli elenchi.
 
 ## Più file
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 `.multiple()` rende la colonna un `TEXT[]` e il campo un caricamento multifile,
 riordinabile tramite trascinamento. Ogni opzione si applica a ciascun file.
 
 <FieldWidgetPreview client:only="react" variant="multi_file_upload" />
 
 ## Opzioni lato browser
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 ```tsx
 // frontend/src/cms/listings.tsx
@@ -107,8 +99,6 @@ svuota il campo.
 
 ## Cosa verifica il server
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 `accept` e `maxBytes` vengono applicati dal server in base a **dove viene salvato
 il file**. Il `path` di una colonna è la destinazione dei suoi file, quindi è anche dove valgono
 i suoi limiti: ogni caricamento la cui chiave è un file direttamente sotto quel percorso deve
@@ -132,15 +122,11 @@ dei byte: un file caricato con un'altra modalità viene memorizzato così come �
 
 ## Dove può essere salvato un file
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 `path` è un valore predefinito, non un limite invalicabile: nulla sul server confina un caricamento ad
 esso. Chi può scrivere e dove è determinato da una regola di autorizzazione dello storage; vedere
 [Storage](/docs/backend/storage/).
 
 ## I file non vengono mai eliminati automaticamente
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Svuotare un campo file, sostituire il suo file o eliminare la riga lascia l'oggetto
 memorizzato al suo posto. Ogni caricamento riceve una propria chiave, quindi una sostituzione scrive
@@ -153,8 +139,6 @@ con `--delete`; vedere [la CLI](/docs/cli/#rebase-storage).
 
 ## Spostare una colonna in un altro bucket
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Un campo file memorizza la chiave dell'oggetto, non il suo bucket. La modifica del `source`
 di una colonna reindirizza ogni valore esistente verso il nuovo bucket, dove tali chiavi non
 esistono, facendo sì che le anteprime dei file più vecchi restituiscano "non trovato". Copiare prima gli oggetti
@@ -164,8 +148,6 @@ del provider, come `aws s3 sync` o `gcloud storage cp`, oppure mantenere il vecc
 per i file esistenti.
 
 ## Passaggi successivi
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 - [Colonne](/docs/schema/columns/#storage-columns): tutte le opzioni di `col.storage()`
 - [Campi](/docs/collections/properties/): gli altri tipi di colonna

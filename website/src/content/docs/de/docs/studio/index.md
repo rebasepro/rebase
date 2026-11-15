@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f137cdb15196a3e
+sourceHash: 3e87d9e1b148c9f5
 title: Studio-Tools
 sidebar_label: Studio
 description: Rebase Studio bietet Entwickler-Tools für visuelle Schema-Bearbeitung, SQL-Abfragen, JavaScript-Scripting, RLS-Richtlinienverwaltung und das Durchsuchen von Speicher.
@@ -38,8 +38,6 @@ Wert `"content"` und wird beim Lesen auf `"cms"` migriert.
 ## Integrierte Studio-Tools
 
 ### Collection Editor
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein visueller Editor für eine Tabelle und deren Darstellung im Panel. Ein Speichervorgang ist in zwei Teile aufgeteilt:
 
@@ -133,8 +131,6 @@ benennt ein Repository), ebenso im `baas`-Modus und auf einem Server ohne
 zurückgegebene Begründung neben dem deaktivierten Button an.
 
 ### Integrierte Tools
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Jedes Tool, das das Schema kennt, liest die vom Server bereitgestellten Tabellen
 über `GET /api/schema/tables` aus, unabhängig davon, ob das CMS auf der Seite

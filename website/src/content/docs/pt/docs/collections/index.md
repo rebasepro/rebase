@@ -1,11 +1,9 @@
 ---
-sourceHash: f7689301748e2ce5
+sourceHash: fc0bdfb0ae7ceb1b
 title: Tabelas no CMS
 sidebar_label: Tabelas no CMS
 description: "Como o CMS exibe todas as tabelas do Postgres sem nenhuma configuração de frontend: rótulos, o widget atribuído a cada tipo de coluna, campos obrigatórios e somente leitura, relações, slots de exibição e controles de Criação, Edição e Exclusão que respeitam a segurança em nível de linha (RLS) da tabela."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Se você usa o CMS, não precisa descrever suas tabelas para ele. Quando alguém faz
 login, o painel solicita ao backend as tabelas que essa pessoa pode ver e exibe
@@ -38,8 +36,6 @@ ele lê as tabelas fornecidas pelo backend, e a apresentação fica em
 
 ## De onde vêm as tabelas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 O `<RebaseCMS>` chama `client.schema.tables()`, que lê
 `GET /api/schema/tables`. A resposta é a lista de descritores de tabelas,
 filtrada para o solicitante: uma tabela que ele não pode ler fica ausente, assim
@@ -60,8 +56,6 @@ estejam em sincronia sobre o que é uma tabela.
 
 ## Rótulos
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Cada rótulo é derivado de um identificador, de modo que uma tabela seja lida da
 mesma forma para qualquer solicitante e em cada carregamento:
 
@@ -80,8 +74,6 @@ maiúsculas. O singular altera apenas a última palavra e não modifica palavras
 apenas terminam em `s` (`Status`, `Analysis`, `Address`).
 
 ## O campo atribuído a cada coluna
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 | Coluna | Campo no formulário | Observações |
 |---|---|---|
@@ -122,8 +114,6 @@ em [Campos](/docs/collections/properties/).
 
 ## Campos obrigatórios, padrões e somente leitura
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | A coluna | No formulário |
 |---|---|
 | `.notNull()` | obrigatório, com a `requiredMessage` de `.validate()` quando houver |
@@ -147,8 +137,6 @@ do formulário.
 
 ## Relações
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 - Um `belongsTo` é um seletor da linha relacionada no lugar da sua coluna de
   chave estrangeira: o formulário exibe **Author**, e não **Author ID**. Ele é
   obrigatório quando a chave estrangeira é `NOT NULL` sem valor padrão. Uma
@@ -166,8 +154,6 @@ do formulário.
 Consulte [Relações no painel](/docs/collections/relations-in-the-admin-panel/).
 
 ## Slots de exibição
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Toda superfície que renderiza um registro utiliza alguns de seis slots: title,
 subtitle, image, status, date e tags (consulte
@@ -187,8 +173,6 @@ painel sobre o registro (para o title: o primeiro campo de texto curto). O
 `display` em `customizeTable` define qualquer slot explicitamente.
 
 ## Quem visualiza quais controles
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O painel oculta **Create**, **Edit** e **Delete** quando o usuário conectado não
 tem permissão para executá-los. Ele decide isso avaliando a segurança em nível de
@@ -214,8 +198,6 @@ gravação recusada, nunca em uma gravação indevida.
 
 ## Ordem e padrões
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 As tabelas aparecem na navegação na ordem em que o backend as fornece, que é a
 ordem em que são exportadas de `backend/schema/index.ts`. Cada uma abre na
 visualização em tabela. `customizeTable` define `group`, `icon`,
@@ -223,8 +205,6 @@ visualização em tabela. `customizeTable` define `group`, `icon`,
 os grupos entre as tabelas.
 
 ## Carregamento e erros
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - **Enquanto as tabelas carregam**, a rota para uma coleção exibe o estado de
   carregamento, e não "coleção não encontrada", e um link direto (deep link) abre
@@ -243,8 +223,6 @@ são ignoradas, com um aviso em ambiente de desenvolvimento. Consulte
 
 ## Grande volume de tabelas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Não há limite para o número de tabelas. O painel precisa de todas as coleções
 para renderizar a navegação, portanto, os descritores são buscados após o login,
 e o que for necessário para abrir uma coleção (a tabela, as visualizações do
@@ -254,8 +232,6 @@ leva dezenas de segundos; consulte
 [quanto tempo um push leva](/docs/cli/schema#rebase-db-push).
 
 ## Próximos passos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/): altere qualquer um dos itens acima, por tabela
 - [Campos](/docs/collections/properties/): o widget e as opções de cada tipo de coluna

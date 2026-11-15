@@ -1,11 +1,9 @@
 ---
-sourceHash: 067f45147f37ef16
+sourceHash: 283f536f508ee0b7
 title: Hook delle tabelle
 sidebar_label: Hook delle tabelle
 description: "Esegui codice lato server a ogni passaggio del ciclo di vita di una tabella con gli hook: limita le letture, maschera campi, convalida e completa scritture, reagisci a salvataggi ed eliminazioni, e trasforma singole colonne."
 ---
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Gli `hooks` di una tabella vengono eseguiti sul server a ogni passaggio della vita di una riga: prima di una lettura, su ogni riga che lascia il server, prima e dopo una scrittura, e prima e dopo un'eliminazione. Vengono eseguiti per qualsiasi punto di accesso alla tabella — REST, l'SDK, realtime, MCP e codice server tramite `rebase.data` — e il loro codice non lascia mai il server, quindi una chiave API o una lettura di `process.env` all'interno di un hook è sicura.
 
@@ -46,8 +44,6 @@ Gli hook delle tabelle sono i `callbacks` lato server di una collection, con lo 
 
 ## I sette hook
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 | Hook | Quando viene eseguito | Valore restituito |
 |---|---|---|
 | `beforeQuery` | prima che ogni lettura venga compilata | un filtro da combinare in AND nella lettura, o nulla |
@@ -71,8 +67,6 @@ C'è un'operazione di scrittura che non li esegue: **il sistema di autenticazion
 Una tabella scritta dal CMS direttamente nel browser, senza alcun server Rebase nel percorso della richiesta, non raggiunge mai questi hook. Il CMS dispone di hook proprietari lato browser per questo caso, descritti insieme alle personalizzazioni del CMS.
 
 ## `beforeQuery`
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Viene eseguito **prima che una lettura venga compilata**, per limitare le righe richieste. Restituisce condizioni da combinare in AND nella query; non restituire nulla per non aggiungerne alcuna.
 
@@ -106,8 +100,6 @@ Il controllo di unicità alla base di `.unique()` non viene ristretto: se lo fos
 La Row-Level Security è il modello di autorizzazione; `beforeQuery` è logica applicativa al di sopra di essa. Usa [`rls`](/docs/collections/security-rules/) per qualsiasi cosa debba valere anche per l'SQL eseguito con l'identità del chiamante.
 
 ## `beforeSave`
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Viene eseguito prima che una riga venga scritta e restituisce i valori da scrivere. `values` contiene ogni valore in caso di creazione e quelli modificati in caso di aggiornamento; `previousValues` è la riga così com'era, in caso di aggiornamento; `status` è `"new"`, `"existing"` o `"copy"`; `id` è assente in una creazione la cui chiave viene generata dal database.
 
@@ -149,8 +141,6 @@ Importa `RebaseApiError` da `@rebasepro/types`: i file di schema non caricano co
 
 ## `afterSave` e `afterSaveError`
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 `afterSave` viene eseguito dopo che la riga è stata scritta e prima del commit, nella stessa transazione. Le sue `values` rappresentano la riga così come memorizzata. Un'eccezione lanciata esegue il rollback del salvataggio, insieme a tutto ciò che l'hook ha scritto tramite `context.data`:
 
 ```ts
@@ -176,8 +166,6 @@ Le operazioni che escono dal database — un'e-mail, un webhook — non apparten
 `afterSaveError` viene eseguito quando un salvataggio fallisce sul database o successivamente, dopo che la transazione della scrittura fallita ha eseguito il rollback. Non viene eseguito per un rifiuto in `beforeSave` o per una richiesta rifiutata prima della scrittura. Il suo `context.data` è una nuova istanza per lo stesso chiamante, quindi un job accodato al suo interno sopravvive al fallimento segnalato. Un errore lanciato al suo interno viene registrato nei log e il chiamante riceve comunque l'errore originario del salvataggio.
 
 ## `afterRead`
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Viene eseguito su ogni riga che lascia il server — la risposta di una lettura, la risposta di una scrittura, un frame realtime, un risultato MCP — e restituisce la riga da servire. `values` è la riga così come memorizzata, dopo che il [controllo accessi ai campi](/docs/collections/field-access/) ha rimosso ciò che il chiamante non può leggere.
 
@@ -216,8 +204,6 @@ Un valore che un chiamante non deve mai ricevere è meglio che venga escluso del
 
 ## `beforeDelete` e `afterDelete`
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Entrambi ricevono come `values` la riga in fase di eliminazione e il suo `id`.
 
 `beforeDelete` viene eseguito all'interno della transazione dell'eliminazione. Lancia un errore per rifiutare l'eliminazione e il chiamante riceverà `400 CALLBACK_REJECTED` con il tuo messaggio. Anche restituire `false` la rifiuta, con `403 CALLBACK_REJECTED` senza alcun messaggio personalizzato.
@@ -225,8 +211,6 @@ Entrambi ricevono come `values` la riga in fase di eliminazione e il suo `id`.
 `afterDelete` viene eseguito dopo che la riga è stata eliminata e prima del commit. Un'eccezione lanciata esegue il rollback dell'eliminazione. Su una tabella con [soft delete](/docs/collections/soft-delete/), un'eliminazione corrisponde all'applicazione di un contrassegno, ed entrambi gli hook vengono comunque eseguiti.
 
 ## Hook di campo: `.transform()`
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Il metodo `.transform()` di una colonna accetta due hook a livello di campo: `beforeSave` restituisce il valore da memorizzare e `afterRead` restituisce il valore da servire. Vengono eseguiti sul server per qualsiasi chiamante e ricevono `value`, l'intera riga come `values`, e le proprietà ricevute da ogni hook.
 
@@ -253,8 +237,6 @@ export const contacts = defineTable("contacts", {
 `.transform()` è disponibile anche sugli elementi degli array e su ciascun campo di un [documento JSON](/docs/schema/json/). Per la rimozione degli spazi bianchi e la gestione di maiuscole/minuscole, le [regole di convalida](/docs/schema/columns/#validation) `trim`, `lowercase` e `uppercase` non richiedono codice.
 
 ## Scrivere su altre tabelle
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `context.data` legge e scrive su qualsiasi tabella tramite il suo slug, agendo con l'identità del chiamante e nella stessa transazione della scrittura che ha attivato l'hook:
 
@@ -285,15 +267,11 @@ L'aggiornamento riportato sopra salva nuovamente `job_submissions`, provocando u
 
 ## Hook per tutte le tabelle
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Gli hook validi per tutte le tabelle — mascheramento di dati personali (PII) nell'intero schema, un log di audit globale — vengono esportati come `hooks` da `backend/hooks.ts`, con la medesima struttura `TableHooks`. Vengono eseguiti prima degli hook specifici di ciascuna tabella, i quali vengono eseguiti a loro volta prima del `.transform()` delle relative colonne. Consulta [Hook globali](/docs/backend/hooks/).
 
 Gli hook possono anche essere collegati dopo l'avvio tramite `setTableHooks(slug, hooks)` sul backend. Questa operazione **sostituisce** gli hook dichiarati dalla tabella; per aggiungerne altri a quelli esistenti, usa `composeTableHooks(declared, yours)`.
 
 ## Combinare set di hook
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Una tabella ha un solo oggetto `hooks`. Quando diverse funzionalità richiedono ciascuna un hook — un generatore di slug, una traccia di audit, un filtro per tenant — scrivi ciascuna di esse come set a sé stante e combinale con `composeTableHooks` da `@rebasepro/common`:
 
@@ -338,13 +316,9 @@ Un hook è presente nel risultato solo se è definito in almeno un set, mentre u
 
 ## Testare un hook
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Un hook è una semplice funzione con un singolo oggetto di proprietà, quindi un unit test può chiamarlo direttamente: `posts.config.hooks?.beforeSave?.(props)`. `createCallContext` da `@rebasepro/server` crea la proprietà `context` solo con i campi passati dal test; qualsiasi altro campo lancerà un'eccezione al primo utilizzo, indicando il proprio nome. `table` è il descrittore restituito per la tabella da `compileTables` di `@rebasepro/common`. Per eseguire gli hook a fronte di un database reale, consulta [Script e Console](/docs/backend/scripts/).
 
 ## Passaggi successivi
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 - [L'API `context.data`](/docs/collections/context-data-api/): privilegi, transazioni e la connessione trattenuta da un hook
 - [Hook globali](/docs/backend/hooks/): hook validi su tutte le tabelle

@@ -1,5 +1,5 @@
 ---
-sourceHash: b247fb716c8348a7
+sourceHash: d92fc6d34e2b4f26
 title: Referencia de hooks
 sidebar_label: Hooks
 description: Hooks de React proporcionados por Rebase para acceder a autenticación, datos, navegación, paneles laterales, almacenamiento y estado de la interfaz de usuario.
@@ -10,8 +10,6 @@ description: Hooks de React proporcionados por Rebase para acceder a autenticaci
 Rebase proporciona hooks de React para acceder a la funcionalidad del framework desde cualquier componente dentro del árbol del proveedor `<Rebase>`.
 
 ## `useRebaseContext`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 El hook principal: accede a todo:
 
@@ -60,8 +58,6 @@ function UserMenu() {
 ```
 
 ## Filas: `useRows`, `useRow`, `useRowCount`, `useAggregate`, `useRowWrites`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Lee y escribe las filas de una colección en la forma en que las envía el servidor: fechas como cadenas ISO, relaciones belongsTo bajo su columna de clave foránea (`author_id`). Es la misma forma que devuelven `client.data` y `context.data`, por lo que el código escrito con estos hooks se lee como código escrito contra el SDK.
 

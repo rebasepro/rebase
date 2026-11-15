@@ -4,8 +4,6 @@ sidebar_label: Device sign-in
 description: "Let a terminal or another device without a browser sign in through one: a short code, a link, and an approval by a signed-in user. RFC 8628's device authorization grant, as rebase cloud login uses it."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A terminal, a TV app or a script has no browser of its own, and typing a
 password into one is the thing to avoid. Device sign-in hands the work to a
 browser where the person is already signed in: the device shows a short code

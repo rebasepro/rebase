@@ -1,5 +1,5 @@
 ---
-sourceHash: d337d344b88534c8
+sourceHash: a63ce157610d02d8
 title: Campos personalizados
 sidebar_label: Campos personalizados
 description: Construye campos de formulario personalizados para la edición de entidades con acceso total al contexto del formulario, los valores de la entidad y los hooks de Rebase.
@@ -10,8 +10,6 @@ description: Construye campos de formulario personalizados para la edición de e
 </video>
 
 ## Descripción general
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 El CMS genera un campo para cada columna a partir de su tipo (consulta
 [Campos](/docs/collections/properties/)). Cuando esto no sea lo que deseas, asigna
@@ -26,8 +24,6 @@ la referencia directamente. Una ruta como cadena de texto o un thunk diferido `(
 indicando qué escribir en su lugar.
 
 ## Crear un campo personalizado
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Un campo personalizado es un componente de React que recibe `FieldProps`:
 
@@ -54,8 +50,6 @@ export function ColorPickerField({ value, setValue, error, showError, minimalist
 
 ### FieldProps
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | Propiedad | Tipo | Descripción |
 |------|------|-------------|
 | `value` | `T` | Valor actual del campo |
@@ -70,8 +64,6 @@ export function ColorPickerField({ value, setValue, error, showError, minimalist
 | `customProps` | `unknown` | Los `customProps` del campo desde `customizeTable`, sin modificar |
 
 ## Cómo usarlo
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```tsx
 // frontend/src/cms/brands.tsx
@@ -93,15 +85,11 @@ componente, y el frontend solo importa el tipo de la tabla desde
 
 ## Un tipo de campo reutilizable
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Un campo que utilices en varias tablas se puede registrar una sola vez en
 `<Rebase propertyConfigs>`, indexado por nombre, y referenciado en cada campo mediante
 `propertyConfig: "color_picker"`.
 
 ## Acceder al contexto del formulario
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Un campo personalizado puede leer el registro completo mientras se está editando:
 
@@ -129,15 +117,11 @@ export function PriceWithTaxField({ value, setValue, context }: FieldProps<Numbe
 
 ## Modo tabla
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Un campo personalizado no se dibuja dentro de una celda de la tabla: la celda muestra el valor (o
 tu `Preview`), y al editarlo se abre el campo en una ventana emergente con `minimalistView`
 activado. Mantenlo compacto allí, como lo hace `ColorPickerField` anteriormente.
 
 ## Vistas previas personalizadas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `Preview` dibuja el valor fuera del formulario. Recibe `FieldPreviewProps`:
 `value`, la `property` resuelta, el `size` asignado por la superficie (`"small"`,
@@ -160,8 +144,6 @@ export function ColorPreview({ value }: FieldPreviewProps) {
 ```
 
 ## Filtros personalizados
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `Filter` reemplaza el control de filtro de un campo. Prevalece sobre una
 sobrescritura a nivel de colección mediante `Collection.FilterField` y sobre el control integrado

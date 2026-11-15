@@ -1,13 +1,11 @@
 ---
-sourceHash: a289b69be61220df
+sourceHash: c75bfea30303f60e
 title: Soft delete
 sidebar_label: Soft delete
 description: "softDelete sur une table transforme delete en un horodatage, masque les lignes marquées de chaque lecture et les restaure avec une simple mise à jour."
 ---
 
 ## Ce que cela change
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Lorsque `softDelete` est activé, une suppression **horodate une colonne au lieu de supprimer la ligne**, et chaque lecture filtre les lignes ainsi marquées. Rien d'autre ne change dans l'opération : la même permission est requise, `beforeDelete` peut toujours y mettre son veto et `afterDelete` se déclenche toujours. Du point de vue de l'appelant, la ligne a été supprimée ; la manière dont la table l'enregistre concerne ce flag.
 

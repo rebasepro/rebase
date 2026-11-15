@@ -1,11 +1,9 @@
 ---
-sourceHash: d08c6bb1dfd3357e
+sourceHash: f57a8ae030d7e978
 title: Dati server-side tipizzati
 sidebar_label: Dati server-side tipizzati
 description: "Registra il tipo Database generato una sola volta, e context.data, rebase.dataAsAdmin e l'istanza di rebase ricevuta da una funzione o un cron saranno tipizzati a partire da esso: righe, filtri, ordinamenti, include e input di scrittura."
 ---
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Il client browser viene tipizzato passando il tuo `Database` generato a
 `createRebaseClient<Database>()` (vedi [Generazione SDK tipizzato](/docs/sdk#typed-sdk-generation)).
@@ -24,8 +22,6 @@ Esistono due modi per effettuare la registrazione: il `Database` generato, che �
 il tuo modulo `backend/schema` stesso, che non richiede alcuna esecuzione di codegen.
 
 ## Registrare il `Database` generato
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```bash
 rebase generate-sdk --register
@@ -68,8 +64,6 @@ non tipizzati, rimuovi `registerDatabase` ed elimina `backend/generated/`.
 
 ## Registrare lo schema, senza codegen
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Un progetto che non ha generato nulla registra invece il proprio modulo schema,
 e viene tipizzato direttamente dai suoi `defineTable`:
 
@@ -96,8 +90,6 @@ degli hook di tabella di quello stesso schema, poiché tipizzare gli hook di uno
 schema stesso costituirebbe una dipendenza circolare rifiutata da TypeScript.
 
 ## Cosa tipizza
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```ts
 // backend/schema/orders.ts — a hook

@@ -1,5 +1,5 @@
 ---
-sourceHash: 690eccad01963163
+sourceHash: 848322a393579626
 title: Rebase auf Hostman bereitstellen
 description: Stellen Sie ein „rebase init“-Projekt auf Hostman bereit – App Platform mit Managed PostgreSQL und S3-Speicher oder ein Cloud-Server mit der projektinternen Compose-Datei.
 sidebar_label: Hostman
@@ -64,7 +64,7 @@ COPY . .
 RUN npx -y pnpm@11 install --frozen-lockfile && npx -y pnpm@11 run build
 
 # The published runtime, with nothing added but the bundle
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY --from=build --chown=node:node /app/dist-bundle /bundle
 ```
 
@@ -126,8 +126,6 @@ Erstellen Sie ihn mit **Ubuntu 24.04** und Ihrem SSH-Schlüssel und folgen Sie a
 Auf einem Server verbleiben Uploads auf dessen Datenträger: Die Compose-Datei speichert sie auf einem Named Volume und setzt `FORCE_LOCAL_STORAGE=true`. Sie überstehen Neustarts und erneute Deployments, jedoch nicht den Verlust des Servers. Aktivieren Sie daher die Server-Backups von Hostman oder verschieben Sie die Dateien in einen Bucket, sobald sie wichtiger werden.
 
 ## Das Schema
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 **Die Runtime erstellt beim Start fehlende Tabellen, einschließlich derer, die in `backend/schema` deklariert sind.** `REBASE_MIGRATE_ON_BOOT` ist standardmäßig auf `ensure` gesetzt, was additiv für das gesamte Schema wirkt. Es erstellt fehlende Tabellen, Spalten und Enum-Typen und wendet deren Row-Level Security an, sodass eine neue Tabelle beim nächsten Deployment direkt live ist.
 

@@ -1,13 +1,11 @@
 ---
-sourceHash: c858a7a8e7622cee
+sourceHash: ae48e0b641989cf2
 title: "Receta: Publicación editorial"
 sidebar_label: Publicación editorial
 description: "Gestione un blog o una sala de redacción en Rebase: redactores y editores, revisión, publicación programada, borradores de artículos publicados, vistas previas, traducciones, biblioteca de medios, bloques de contenido, feeds, notas editoriales e importación desde WordPress."
 ---
 
 ## Descripción general
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Esta receta construye el aspecto editorial de una publicación en Rebase. Cada parte es un punto de extensión documentado, por lo que puede tomar solo las partes que necesite:
 
@@ -31,8 +29,6 @@ Extiende el modelo de roles de la [Receta de Blog CMS](/docs/recipes/blog-cms/):
 Cada tabla es un archivo en `backend/schema/`, exportado desde su `index.ts`; la forma en que el panel de administración lo presenta —el tablero, los botones, las vistas previas— es un `customizeTable` en `frontend/src/cms/`, pasado a `<RebaseCMS tableCustomizations>`.
 
 ## Medios
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Una fila por imagen, para que una foto se suba una sola vez y se reutilice, con su texto alternativo y créditos junto a ella:
 
@@ -58,8 +54,6 @@ export const media = defineTable("media", {
 Una publicación apunta a una fila de medios mediante una relación, y el selector de relaciones lista las imágenes que ya están en la biblioteca. Quién puede subir los archivos en sí se define en su [autorización de almacenamiento](/docs/backend/storage-authorization/).
 
 ## Publicaciones
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```ts
 // backend/schema/posts.ts
@@ -230,8 +224,6 @@ export default defineCron({
 
 ## Edición de una publicación activa
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Editar una publicación ya publicada la modifica en vivo, y las reglas anteriores impiden que un redactor la edite en absoluto. Para preparar cambios y publicarlos en un solo paso, manténgalos en una segunda tabla con las mismas columnas:
 
 ```ts
@@ -334,8 +326,6 @@ export default function PostPreview({ modifiedValues }: EntityCustomViewParams) 
 Para previsualizarla con el diseño propio del sitio, renderice el componente de artículo del sitio en esta pestaña, o inserte en un iframe la página de vista previa del sitio y envíele `modifiedValues` mediante `postMessage`. Un sitio estático servido por Rebase solo se puede mostrar en un iframe desde su propio origen.
 
 ## Notas editoriales
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Las notas entre redactor y editor son filas independientes que se muestran en la publicación:
 

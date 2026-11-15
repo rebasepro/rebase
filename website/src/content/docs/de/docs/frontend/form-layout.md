@@ -1,11 +1,9 @@
 ---
-sourceHash: 93694433369991ae
+sourceHash: 8e6d7b5d495d9275
 title: Formular-Layout
 sidebar_label: Formular-Layout
 description: "Gestalten Sie das Formular eines Datensatzes: Feldbreiten in einem vierspaltigen Raster, betitelte und einklappbare Abschnitte, die Metadaten-Leiste und eine Komponente, die das generierte Formular ersetzt."
 ---
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Das Datensatzformular wird aus den Spalten und Relationen der Tabelle generiert:
 
@@ -66,8 +64,6 @@ export const ordersCms = customizeTable<typeof orders>("orders", {
 
 ## Feldbreite
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Die Breite eines Feldes ist eine Spannenangabe (**span**) über ein vierspaltiges Raster; `4` entspricht der vollen Breite
 der Hauptspalte. Spans rasten im Raster ein, wodurch zwei Felder unabhängig von ihrer
 Deklarationsreihenfolge bündig ausgerichtet werden.
@@ -85,8 +81,6 @@ bricht das Raster auf eine einzelne Spalte um und Spans werden ignoriert.
 
 ## Abschnitte
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `form.sections` gruppiert die Hauptspalte unter Überschriften. Jeder Abschnitt ist
 `{ key, title?, fields, collapsed?, collapsible?, readVariant? }`. Ein betitelter
 Abschnitt kann eingeklappt werden; ein unbetitelter nicht. `readVariant: "summary"`
@@ -103,8 +97,6 @@ Aufrufer nicht bereitstellt, weil dieser die Spalte nicht lesen darf, wird über
 
 ## Die Metadaten-Leiste
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `form.sidebar` verschiebt Felder aus der Hauptspalte in eine schmale Leiste daneben:
 Status, Zuständigkeit, Veröffentlichungsdaten, Flags. Die Leiste verwendet kein Raster, daher
 wird `span` dort ignoriert. Wenn kein Platz für eine Leiste vorhanden ist, wird sie als
@@ -116,8 +108,6 @@ die abgeleitete Leiste und behält jedes Feld in der Hauptspalte. `hideIdFromFor
 blendet die ID vollständig aus dem Formular aus.
 
 ## Ersetzen des Formulars
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `formView` tauscht das generierte Formular gegen eine eigene, als Wert importierte
 Komponente aus. Sie empfängt dieselben `EntityCustomViewParams` wie eine
@@ -146,8 +136,6 @@ Felder mit `<RecordForm>` und `<FormField>` auf einer eigenen Seite selbst anord
 
 ## Weitere Formularoptionen
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | Option | Wirkung |
 |---|---|
 | `formAutoSave` | Speichern während der Eingabe. |
@@ -156,8 +144,6 @@ Felder mit `<RecordForm>` und `<FormField>` auf einer eigenen Seite selbst anord
 | `localChangesBackup` | Nicht gespeicherte Änderungen im lokalen Speicher behalten: `"manual_apply"`, `"auto_apply"` oder `false`. |
 
 ## Verwandte Themen
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Benutzerdefinierte Felder](/docs/frontend/custom-fields/): die Felder, die ein Layout anordnet
 - [Entity Views](/docs/frontend/entity-views/): ein kompletter eigener Tab neben dem Formular

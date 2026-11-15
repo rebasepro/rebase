@@ -1,5 +1,5 @@
 ---
-sourceHash: 41e067cb49021d45
+sourceHash: 9a0c7964e2f9eac6
 title: Fonctions personnalisées
 sidebar_label: Fonctions personnalisées
 description: Ajoutez des points de terminaison d'API Hono personnalisés aux côtés de vos routes CRUD Rebase. Découverte automatique à partir d'un répertoire, avec un accès complet à l'instance backend.
@@ -314,7 +314,7 @@ export default defineFunction((app) => {
 
 `requireDriver(c)` est l'équivalent de `getDriver(c)` sans le `!` — il lève une exception avec un message précisant le problème de câblage au lieu d'échouer vingt lignes plus bas sur `undefined`.
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span> `fetchCollection` et `fetchOne` renvoient les lignes que `GET /api/data/<table>` renvoie : les dates sous forme de chaînes RFC 3339, un `belongsTo` sous sa clé étrangère (`authorId`), et une ligne liée uniquement lorsque `include` la spécifie — `driver.fetchOne({ path: "articles", id, include: ["author"] })`.
+`fetchCollection` et `fetchOne` renvoient les lignes que `GET /api/data/<table>` renvoie : les dates sous forme de chaînes RFC 3339, un `belongsTo` sous sa clé étrangère (`authorId`), et une ligne liée uniquement lorsque `include` la spécifie — `driver.fetchOne({ path: "articles", id, include: ["author"] })`.
 
 ### 2. `rebase.dataAsAdmin` — pour le travail d'arrière-plan de confiance
 
@@ -403,8 +403,6 @@ export default defineFunction((app) => {
 C'est `getSql(c)` avec une identité différente : le rôle de requête restreint, la branche administrateur de vos politiques, en lecture seule sauf indication `{ write: true }`, et la même protection `SQL_NOT_ALLOWED`. Contrairement au `rebase.sql()` du propriétaire (*owner*), il ne peut pas exécuter de DDL, et dans le magasin d'authentification, il n'atteint que ce qu'un administrateur atteint via la collection d'utilisateurs : les sessions, les clés et les secrets MFA sont masqués pour le rôle de requête, et le hachage du mot de passe est retiré des lignes. Une instruction isolée coûte un aller-retour réseau (*round trip*), tout comme `rebase.sql()`. Depuis un script, `openRebase()` le propose également.
 
 ### 4. `rebase.sql()` — Le SQL propriétaire (owner), et le seul accesseur réservé à Node
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Si vous avez réellement besoin d'un contournement inconditionnel, `rebase.sql()` est la solution : du SQL brut sur la connexion propriétaire, aucune politique, toutes les lignes. C'est l'élément le plus privilégié dans le contexte d'une fonction — encore plus que l'accesseur portant la mention « admin » dans son nom.
 

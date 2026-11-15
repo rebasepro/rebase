@@ -1,5 +1,5 @@
 ---
-sourceHash: 04353ad7d35cfe5c
+sourceHash: 792208bc04f9ab81
 title: Início rápido
 sidebar_label: Início rápido
 description: Crie um novo projeto Rebase e execute-o localmente em menos de 2 minutos.
@@ -110,8 +110,6 @@ docker compose up -d db
 
 ## Fazer introspecção de um banco de dados existente (opcional)
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Se você estiver se conectando a um banco de dados existente com tabelas pré-existentes, pode fazer a introspecção dele para gerar um arquivo `defineTable` para cada uma:
 
 ```bash
@@ -131,8 +129,6 @@ Ao abrir a URL do frontend impressa pelo `rebase dev`, você verá a tela de log
 O `rebase init` também gravou `REBASE_ADMIN_EMAIL` e um `REBASE_ADMIN_PASSWORD` gerado no `.env`. Essas não são as suas credenciais aqui: o `rebase dev` as ignora e avisa sobre isso na inicialização. Elas pertencem a uma inicialização em produção — `docker compose up`, ou qualquer coisa com `NODE_ENV=production` — onde essa janela de bootstrap fica fechada, porque o servidor responde em um hostname antes que você tenha digitado qualquer coisa. Consulte [Seu primeiro admin](/docs/getting-started/deployment#your-first-admin).
 
 ## Definir sua primeira tabela
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Crie um arquivo em `backend/schema/`:
 
@@ -163,8 +159,6 @@ export { products } from "./products";
 ```
 
 ## Criar a tabela
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Salve o arquivo. Essa é toda a etapa: o `rebase dev` regenera
 `backend/src/schema.generated.ts` e os tipos do SDK em `generated/sdk/` a partir das suas
@@ -203,8 +197,6 @@ pnpm run db:push
 Ele é executado tanto no banco de dados gerenciado quanto no seu próprio.
 
 ## Referência de comandos de banco de dados
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 | Comando | Descrição |
 |---------|-------------|

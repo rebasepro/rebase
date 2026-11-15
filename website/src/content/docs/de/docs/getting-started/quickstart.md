@@ -1,5 +1,5 @@
 ---
-sourceHash: 04353ad7d35cfe5c
+sourceHash: 792208bc04f9ab81
 title: Schnellstart
 sidebar_label: Schnellstart
 description: Erstelle ein neues Rebase-Projekt und führe es lokal in unter 2 Minuten aus.
@@ -110,8 +110,6 @@ docker compose up -d db
 
 ## Eine bestehende Datenbank introspektieren (Optional)
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Wenn du dich mit einer bestehenden Datenbank verbindest, die bereits Tabellen enthält, kannst du sie introspektieren, um für jede davon eine `defineTable`-Datei zu generieren:
 
 ```bash
@@ -131,8 +129,6 @@ Wenn du die Frontend-URL öffnest, die `rebase dev` ausgegeben hat, siehst du de
 `rebase init` hat außerdem `REBASE_ADMIN_EMAIL` und ein generiertes `REBASE_ADMIN_PASSWORD` in die `.env` geschrieben. Das sind hier nicht deine Anmeldedaten: `rebase dev` ignoriert sie und weist beim Booten darauf hin. Sie gehören zu einem Produktionsstart – `docker compose up` oder allem mit `NODE_ENV=production` –, bei dem dieses Bootstrap-Zeitfenster geschlossen ist, da der Server bereits unter einem Hostnamen antwortet, bevor du etwas eingeben konntest. Siehe [Dein erster Admin](/docs/getting-started/deployment#your-first-admin).
 
 ## Definiere deine erste Tabelle
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Erstelle eine Datei in `backend/schema/`:
 
@@ -163,8 +159,6 @@ export { products } from "./products";
 ```
 
 ## Die Tabelle erstellen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Speichere die Datei. Das ist bereits der gesamte Schritt: `rebase dev` generiert
 `backend/src/schema.generated.ts` und die SDK-Typen in `generated/sdk/` aus deinen
@@ -204,8 +198,6 @@ Es funktioniert auf der
 verwalteten Datenbank genauso wie auf deiner eigenen.
 
 ## Referenz der Datenbankbefehle
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 | Befehl | Beschreibung |
 |---------|-------------|

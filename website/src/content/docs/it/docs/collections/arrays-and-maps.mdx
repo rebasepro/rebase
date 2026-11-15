@@ -1,13 +1,11 @@
 ---
-sourceHash: ee142b42a4f33d5c
+sourceHash: 963af8e4b34aac80
 title: Array e campi JSON
 sidebar_label: Array e JSON
 description: "Come il CMS renderizza colonne array e jsonb — liste ripetibili, selezioni multiple, gruppi strutturati, editor a blocchi e documenti chiave/valore liberi — e come customizeTable personalizza i loro elementi e chiavi annidate."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 Una colonna array è un elenco che il modulo ripete. Una colonna `jsonb` è un documento: il
 CMS genera un modulo per essa quando la colonna ne descrive la struttura con
@@ -40,8 +38,6 @@ export const pages = defineTable("pages", {
 
 ## Array
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 Una colonna array (`col.text().array()`) è un elenco ripetibile del campo dell'elemento: `tags`
 nell'esempio sopra è un elenco di campi di input di testo. `.validate({ minItems, maxItems, uniqueItems })`
 sull'array imposta quanti elementi accetta il modulo.
@@ -54,8 +50,6 @@ Una colonna `col.storage().multiple()` è un caricamento di più file; vedi
 [Caricamenti di file](/docs/collections/file-uploads/#several-files).
 
 ## Documenti con una struttura
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 `col.jsonb(json.object({ … }))` è un gruppo di campi, uno per chiave, ciascuno corrispondente
 al campo richiesto dal rispettivo builder `json.*`: `json.string()` un input di testo, `json.number()` un
@@ -76,8 +70,6 @@ campo strutturato: vengono modificati come JSON libero.
 
 ## Documenti senza una struttura
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 `col.jsonb().$type<T>()` tipizza il documento per TypeScript, ma `T` viene rimosso quando il
 codice viene eseguito, quindi il server e il CMS non ne sanno nulla. `settings` sopra viene
 modificato come coppie chiave/valore libere. Definisci una struttura `json.*` per la colonna
@@ -86,8 +78,6 @@ quando il CMS deve visualizzare un modulo per essa.
 <FieldWidgetPreview client:only="react" variant="key_value" />
 
 ## Personalizzazione di elementi e chiavi annidate
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 ```tsx
 // frontend/src/cms/pages.tsx
@@ -147,8 +137,6 @@ ignorati, con un avviso in fase di sviluppo. Le opzioni annidate per una chiave,
 un elemento non presenti nel documento vengono ignorate allo stesso modo.
 
 ## Prossimi passi
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 - [Documenti JSON](/docs/schema/json/): i builder `json.*` e come il server gestisce una struttura
 - [Campi](/docs/collections/properties/): tutti gli altri tipi di colonna

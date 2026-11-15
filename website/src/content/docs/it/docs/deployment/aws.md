@@ -1,5 +1,5 @@
 ---
-sourceHash: d9b167443cc3fd35
+sourceHash: c117340992cb4446
 title: Distribuzione di Rebase su AWS
 description: Distribuisci la tua istanza Rebase in modo sicuro su Amazon Web Services utilizzando RDS e AWS App Runner con una forte attenzione all'Europa.
 sidebar_label: AWS
@@ -35,7 +35,7 @@ rebase build
 Per App Runner, che effettua il pull da un registry, incorpora il bundle in un'immagine derivata. Si tratta di tre righe e fissa con precisione ciò che viene eseguito:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -80,8 +80,6 @@ Le ultime tre variabili definiscono il modo in cui questa distribuzione ottiene 
 AWS gestisce la terminazione TLS, fornendo un URL `https` pronto all'uso.
 
 ## 4. Lo schema
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 **Il runtime crea le tabelle mancanti all'avvio, incluse quelle dichiarate in `backend/schema`.** `REBASE_MIGRATE_ON_BOOT` è impostato per impostazione predefinita su `ensure`, che ha un comportamento additivo sull'intero schema — crea tabelle, colonne e tipi enum mancanti e applica la relativa row-level security — in modo che il primo avvio su un'istanza RDS vuota sia subito pronto a gestire le tue tabelle.
 

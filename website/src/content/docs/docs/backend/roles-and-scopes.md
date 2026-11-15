@@ -78,8 +78,6 @@ Admin-plane scopes take no target. An app scope takes one when it declares a
 
 ## Declaring roles
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Roles are declared on the [users table](/docs/schema/auth-table/), under
 `auth.roles`. A role is a name the database sees, which row-level security
 policies can match, plus a list of admin-plane and app scopes.
@@ -145,8 +143,6 @@ const { roles } = await client.admin.listRoles();
 ```
 
 ## App scopes
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 An app can name its own operations as scopes, under `auth.scopes`:
 

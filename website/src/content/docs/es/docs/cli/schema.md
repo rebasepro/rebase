@@ -1,13 +1,11 @@
 ---
-sourceHash: 78c09101b46f0864
+sourceHash: 6d4ba1cab463df74
 title: Generación de esquemas
 sidebar_label: Generación de esquemas
 description: Genera esquemas de Drizzle ORM a partir de las tablas en backend/schema, crea migraciones SQL, realiza introspección de una base de datos existente hacia archivos defineTable y mantén tu base de datos sincronizada con la CLI de Rebase.
 ---
 
 ## Descripción general
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Rebase utiliza un pipeline de **esquema como código** (schema-as-code) donde las tablas que declaras con
 `defineTable` en `backend/schema/` son la única fuente de verdad. La CLI
@@ -22,8 +20,6 @@ Esta página cubre cada comando de la CLI involucrado en ese pipeline.
 ## El Pipeline
 
 ### 1. Tablas → Esquema de Drizzle
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Las tablas que exporta `backend/schema/index.ts` describen columnas, tipos, relaciones,
 enums y seguridad a nivel de fila (RLS). Cada comando a continuación las lee a través del cargador
@@ -51,8 +47,6 @@ El comando `db migrate` aplica las migraciones pendientes a tu base de datos Pos
 ## Comandos
 
 ### `rebase schema generate`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Genera un archivo de esquema de Drizzle ORM a partir de tus tablas:
 
@@ -96,8 +90,6 @@ rebase schema stale --fix    # regenerate the file instead
 
 ### `rebase schema reconcile`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Relaja y elimina lo que el arranque no hará, después de haber revisado el plan:
 
 ```bash
@@ -114,8 +106,6 @@ rebase schema reconcile --drop voice_cache.wav  # and drop a column no table dec
 El arranque únicamente añade cosas, por lo que tras eliminar una columna de su `defineTable`, la columna permanece en la base de datos junto con sus datos. Una columna `NOT NULL` sin valor por defecto hará que fallen todas las inserciones, y el registro del arranque indicará este comando: sin `--drop` para mantener los datos, o con él para eliminar la columna. Despliega primero el cambio de la tabla, porque reconcile planifica contra lo que ejecuta el backend. Requiere `REBASE_SERVICE_KEY` en `.env`. A nivel local, `rebase db push` cubre lo mismo mediante su control de cambios destructivos.
 
 ### `rebase schema introspect`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Escribe archivos `defineTable` a partir de una base de datos PostgreSQL existente:
 
@@ -428,8 +418,6 @@ Indica una **unión huérfana**: una tabla en `public` estructurada como una uni
 
 ### `rebase generate-sdk`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Genera un SDK tipado a partir de tus tablas:
 
 ```bash
@@ -490,8 +478,6 @@ asocia de vuelta al slug.
 
 ### `rebase migrate`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `rebase migrate collections-to-tables [dir]` traslada `config/collections` a
 `backend/schema` (un `defineTable` por colección, cada columna explícita en
 su posición original, con la sintaxis de Drizzle, e `index.ts` con
@@ -536,8 +522,6 @@ changes: the database already matches these tables.", y
 
 ## Flujo de trabajo de desarrollo
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 El flujo de trabajo de iteración rápida para desarrollo:
 
 ```bash
@@ -550,8 +534,6 @@ rebase db push
 ```
 
 ## Flujo de trabajo de producción
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 El flujo de trabajo seguro y revisable para producción:
 

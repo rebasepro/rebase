@@ -1,5 +1,5 @@
 ---
-sourceHash: d1b243f804318232
+sourceHash: fa700834543b9475
 title: Sistema de Plugins
 sidebar_label: Plugins
 description: Estenda o Rebase com plugins — injete componentes de interface, modifique coleções, adicione ações na barra de ferramentas e crie construtores de campos personalizados.
@@ -262,8 +262,6 @@ hooks: {
 ```
 
 ## Modificação de Coleções
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Os plugins podem modificar coleções existentes:
 

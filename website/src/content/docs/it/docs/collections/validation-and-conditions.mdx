@@ -1,11 +1,9 @@
 ---
-sourceHash: e951bd1fd3fc48e0
+sourceHash: 84bd0f15d2a016c7
 title: Validazione e condizioni
 sidebar_label: Validazione & condizioni
 description: "Come il modulo del CMS mostra le regole di una colonna — obbligatorio, lunghezza, pattern, limiti, univoco —, dove vengono verificate tali regole e i campi condizionali che diventano obbligatori, disabilitati o nascosti in base ai valori del record stesso."
 ---
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Le regole di una colonna vengono dichiarate una sola volta, sulla colonna, e vengono applicate dal server a ogni scrittura che raggiunge l'API. Il CMS legge le stesse regole dal descrittore della tabella e le verifica nel modulo prima del salvataggio, in modo che l'operatore veda l'errore direttamente sul campo anziché sotto forma di richiesta rifiutata.
 
@@ -33,8 +31,6 @@ Non esiste più un blocco `validation` nel frontend. Le regole vengono definite 
 
 ## Cosa controlla il modulo
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 | Sulla colonna | Nel modulo |
 |---|---|
 | `.notNull()` | Obbligatorio, con `requiredMessage` come errore se specificato. Non obbligatorio dove nessuno digita il valore: una chiave generata, un timestamp, una colonna generata o `.readOnly()`. |
@@ -52,15 +48,11 @@ Ogni regola è elencata, con il relativo significato esatto, in [Colonne](/docs/
 
 ## Dove viene eseguita la validazione
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Il server controlla le regole di una colonna a livello di confine della richiesta (REST, socket in tempo reale e MCP) sui dati inviati dal chiamante, prima dell'esecuzione di `beforeSave`, e risponde a una scrittura che viola una regola con un errore 400 indicando ogni campo non valido. Il codice server che esegue scritture in-process è considerato attendibile e non viene verificato rispetto a queste regole; in quel caso si applicano solo i vincoli imposti dal database. Consulta [Colonne](/docs/schema/columns/#validation).
 
 Il CMS verifica le stesse regole prima del salvataggio, sia nel modulo del record sia nell'editor inline della tabella. Una cella della tabella valuta un valore non appena viene modificata: un valore già memorizzato che viola una regola aggiunta successivamente non mostrerà alcun errore finché qualcuno non modificherà quella cella.
 
 ## Campi condizionali
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Un campo può reagire ai valori del record stesso: diventare obbligatorio, disabilitato, in sola lettura o nascosto. Ci sono due modalità, entrambe in `customizeTable`:
 
@@ -112,13 +104,9 @@ A `dynamicProps` viene passato il record mentre viene modificato (`values`, comp
 
 ## Etichette per un set chiuso di valori
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 I valori di un `col.enum([...])` o di un `.oneOf([...])` appartengono alla colonna. Le relative etichette, i colori e l'ordinamento appartengono invece al CMS, configurati tramite `enumLabels` ed `enumOrder`; vedi [set chiusi](/docs/collections/properties/#closed-sets-of-values).
 
 ## Passaggi successivi
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 - [Colonne](/docs/schema/columns/#validation): tutte le regole di validazione
 - [Campi](/docs/collections/properties/): i campi a cui si applicano queste regole

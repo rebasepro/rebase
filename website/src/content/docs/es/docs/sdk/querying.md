@@ -1,13 +1,11 @@
 ---
-sourceHash: 45064786f1785a65
+sourceHash: a76d8213b1ba989b
 title: Consultar datos
 sidebar_label: Consultar datos
 description: Operaciones CRUD, constructor de consultas fluido, operadores de filtrado, ordenación, selección de columnas y agregaciones con el SDK tipado de Rebase.
 ---
 
 ## Acceso a tablas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Accede a cualquier tabla mediante `client.data.<tableName>` (en camelCase, convertido automáticamente a snake_case) o `client.data.table<Record<string, unknown>>("slug")` (slug explícito):
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 1b875d11f8a07037
+sourceHash: c343d961821c04f2
 title: Synchronisation hors ligne et « Local-First »
 sidebar_label: Hors ligne
 description: Activez le moteur de synchronisation local-first du SDK typé Rebase — une base de données locale de lignes, des écritures hors ligne instantanées avec rollback et des requêtes réactives en direct.
@@ -77,8 +77,6 @@ Les écritures sont rejouées dans l'ordre où vous les avez effectuées, toutes
 Chaque écriture en file d'attente correspond à une seule requête par défaut, de sorte que 500 lignes saisies hors ligne nécessitent 500 allers-retours pour être vidées. Lorsque `replayBatchSize` est configuré (jusqu'à 1 000), une série de créations consécutives hors ligne dans une même table est rejouée sous forme d'un seul `createMany`. Seules les créations avec un identifiant généré sous forme de chaîne par le SDK sont regroupées, et jamais celles qui font référence à une autre ligne de la même série. Si le serveur refuse ou reporte la série pour une raison autre qu'une perte de connexion, rien n'est écrit (une écriture en masse constitue une seule transaction), et la série est rejouée une écriture à la fois, comme elle le ferait par défaut.
 
 ### Écritures mises en file d'attente par une version antérieure
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 La file d'attente stocke une écriture sous forme des valeurs qu'elle envoie — les clés pour les relations, les listes de nombres pour les vecteurs, `{ latitude, longitude }` pour les points, le texte ISO pour les dates — et les lignes en cache sous forme des lignes du serveur. Une écriture mise en file d'attente hors ligne par la version précédente du SDK, qui les stockait sous forme de classes (`EntityRelation`, `GeoPoint`, `Vector`), est convertie vers ces valeurs lors de sa relecture et rejouée comme d'habitude : rien de ce qui a été mis en attente avant la mise à niveau n'est perdu. Un SDK plus ancien rencontrant une écriture mise en attente par celui-ci la laisse dans la file.
 
@@ -245,7 +243,7 @@ Cette option est désactivée par défaut car sur un appareil partagé, elle per
 
 ## Configuration
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span> `maxCachedRowsPerTable` et `maxCachedQueriesPerTable` s'appelaient auparavant `…PerCollection`.
+`maxCachedRowsPerTable` et `maxCachedQueriesPerTable` s'appelaient auparavant `…PerCollection`.
 
 ```typescript
 createRebaseClient({

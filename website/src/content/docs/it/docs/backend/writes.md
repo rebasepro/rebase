@@ -1,5 +1,5 @@
 ---
-sourceHash: b1b5ef4227e130d2
+sourceHash: 2229a4346ece8f3c
 title: Scrittura tramite REST
 sidebar_label: Scrittura tramite REST
 description: Chiavi di idempotenza, scritture condizionali con ETag e If-Match, operazioni sui campi, upsert su chiave naturale, return=minimal e batch cross-tabella.
@@ -21,7 +21,7 @@ tutto ciò che si trova in questa sezione si applica anche ad esse, ad eccezione
 Il corpo di una scrittura deve essere un oggetto JSON. `null`, un numero, una stringa o un array
 restituiscono un errore `400 BAD_REQUEST`.
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span> Una scrittura accetta i valori documentati dall'API REST e nient'altro — la
+Una scrittura accetta i valori documentati dall'API REST e nient'altro — la
 stessa forma restituita da una lettura: una relazione to-one (`belongsTo`, `hasOne`, una to-one
 `via`) come chiave della riga correlata o `null`, una relazione to-many come elenco di chiavi
 o oggetti `{ id, _pivot? }`, una data come testo ISO, un vettore come elenco di numeri,
@@ -237,8 +237,6 @@ comprometterebbe qualsiasi query del tipo "novità di questa settimana".
 
 #### Non sulla tabella auth
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 La tabella di autenticazione (quella dichiarata con `defineAuthTable`) rifiuta l'upsert da qualsiasi
 punto di accesso — `?on_conflict=`, `/bulk` con `upsert: true`, un'operazione `upsert` in `_batch`,
 l'`upsert()` dell'SDK e il socket realtime — con un `400`
@@ -270,7 +268,7 @@ come scalare; una chiave composita come oggetto delle sue colonne.
 
 ## Batch cross-tabella
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span> Ogni operazione indica la propria tabella come `table` (in precedenza era `collection`).
+Ogni operazione indica la propria tabella come `table` (in precedenza era `collection`).
 
 `POST /api/data/_batch` scrive su più tabelle in un'unica transazione, con il
 ruolo del chiamante, applicando le stesse validazioni, hook e row-level security

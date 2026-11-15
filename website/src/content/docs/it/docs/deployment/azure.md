@@ -1,5 +1,5 @@
 ---
-sourceHash: 1fdfb40ed3615bbd
+sourceHash: 4377767287972898
 title: Distribuzione di Rebase su Microsoft Azure
 description: Distribuisci la tua istanza Rebase in modo sicuro su Azure utilizzando Azure Database for PostgreSQL e Azure Container Apps.
 sidebar_label: Azure
@@ -35,7 +35,7 @@ rebase build
 Container Apps esegue il pull da un registry, quindi integra il bundle in un'immagine derivata. Tre righe, e definisce esattamente cosa viene eseguito:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -81,8 +81,6 @@ Le ultime tre variabili definiscono il modo in cui questo deployment ottiene un 
 8. Completa la creazione. Azure effettuerà il provisioning del container e ti fornirà un Application URL protetto con TLS.
 
 ## 4. Lo schema
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 **Il runtime crea le tabelle mancanti all'avvio, incluse quelle dichiarate in `backend/schema`.** `REBASE_MIGRATE_ON_BOOT` è impostato di default su `ensure`, che è additivo per l'intero schema — crea tabelle, colonne e tipi enum mancanti e applica la loro row-level security — in modo che il primo avvio su un server vuoto sia subito pronto a gestire le tue tabelle.
 

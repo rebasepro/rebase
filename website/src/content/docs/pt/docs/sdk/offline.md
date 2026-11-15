@@ -1,5 +1,5 @@
 ---
-sourceHash: 1b875d11f8a07037
+sourceHash: c343d961821c04f2
 title: Sincronização Offline e Local-First
 sidebar_label: Offline
 description: Ative o motor de sincronização local-first do SDK tipado do Rebase — um banco de dados local de linhas, gravações offline instantâneas com reversão e consultas reativas em tempo real.
@@ -77,8 +77,6 @@ As gravações são reproduzidas na ordem em que foram feitas, entre tabelas —
 Cada gravação enfileirada é uma requisição por padrão; portanto, 500 linhas digitadas offline levam 500 idas e voltas (round trips) para serem esvaziadas. Com `replayBatchSize` configurado (até 1.000), uma sequência de criações consecutivas offline em uma mesma tabela é reproduzida como um único `createMany`. Apenas criações com um ID gerado pelo SDK como string são agrupadas, e nunca uma que faça referência a outra linha da mesma sequência. Se o servidor recusar ou adiar a sequência por qualquer motivo que não seja perda de conexão, nada é gravado (uma gravação em lote é uma transação única), e a sequência é reproduzida uma gravação por vez, como faria por padrão.
 
 ### Gravações enfileiradas por uma versão anterior
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 A fila armazena uma gravação como os valores que ela envia — chaves para relações, listas de números para vetores, `{ latitude, longitude }` para pontos, texto ISO para datas — e linhas em cache como as linhas do servidor. Uma gravação enfileirada offline pela versão anterior do SDK, que as armazenava como classes (`EntityRelation`, `GeoPoint`, `Vector`), é convertida para esses valores quando é lida de volta e reproduzida normalmente: nada enfileirado antes da atualização é perdido. Um SDK mais antigo que encontrar uma gravação enfileirada por esta versão a manterá na fila.
 
@@ -245,7 +243,7 @@ Vem desativado por padrão porque, em um dispositivo compartilhado, permite que 
 
 ## Configuração
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span> `maxCachedRowsPerTable` e `maxCachedQueriesPerTable` chamavam-se anteriormente `…PerCollection`.
+`maxCachedRowsPerTable` e `maxCachedQueriesPerTable` chamavam-se anteriormente `…PerCollection`.
 
 ```typescript
 createRebaseClient({

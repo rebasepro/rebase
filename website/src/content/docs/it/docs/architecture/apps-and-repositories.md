@@ -1,13 +1,11 @@
 ---
-sourceHash: 4ad669042dfd8fc9
+sourceHash: 884874204e98ec96
 title: App e Repository
 sidebar_label: App e Repository
 description: Un progetto è composto da un backend più le app che comunicano con esso, ciascuna delle quali può risiedere nel proprio repository.
 ---
 
 ## Progetti e app
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Un **progetto** è il backend: il database, l'autenticazione, lo storage, il realtime e le
 funzioni. Un'**app** è qualcosa che comunica con esso.
@@ -364,7 +362,7 @@ poiché un identificativo di versione non svela dettagli strutturali sullo schem
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.30.1","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.31.0","contract":1}}
 ```
 
 Confrontare questi due identificatori all'interno della pipeline di CI trasforma un potenziale disallineamento silente in un controllo fallito prima del rilascio. L'identificativo

@@ -1,5 +1,5 @@
 ---
-sourceHash: d3b3f413d231c3d0
+sourceHash: 96d3468f540e7260
 title: SDK Tipado — Primeiros Passos
 sidebar_label: Primeiros Passos
 description: Instale e configure o SDK tipado do Rebase para interagir com o seu backend a partir de qualquer aplicação JavaScript ou TypeScript.
@@ -58,7 +58,7 @@ const client = createRebaseClient({
 | `fetch` | `typeof fetch` | Implementação de fetch customizada (ex.: para SSR) |
 | `onUnauthorized` | `() => Promise<boolean>` | Manipulador de 401 customizado — retorne `true` para tentar novamente |
 | `realtime` | `boolean \| RealtimeClientOptions` | Abre o WebSocket (padrão `true`) — defina como `false` em scripts de execução única (one-shot). `{ affinity }` [define o nome do grupo ao qual o socket pertence](/docs/sdk/realtime#keeping-a-group-on-one-instance) |
-| `tables` | `Record<string, string>` | <span class="since-badge" data-since="0.31">Desde 0.31</span> Mapeia nomes de acessores para slugs de tabelas — o `tablesDictionary` gerado |
+| `tables` | `Record<string, string>` | Mapeia nomes de acessores para slugs de tabelas — o `tablesDictionary` gerado |
 | `offline` | `boolean \| OfflineConfig` | [Sincronização local-first](/docs/sdk/offline) — desativada por padrão |
 | `impersonate` | `string` | Executa todas as requisições como este usuário, pelo uid, para verificar o que esse usuário pode ver. Apenas uma sessão de administrador pode fazer isso: a API de dados, funções e realtime rodam como esse usuário, e todas as outras rotas recusam |
 | `debug` | `boolean` | Registra o progresso da conexão realtime com `console.debug` (padrão `false`) — consulte [Logs de conexão](#logs-de-conexão) |
@@ -74,8 +74,6 @@ localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_de
 Isso se aplica a partir da próxima linha que o cliente registrar, portanto, uma página que já está conectada não precisa ser recarregada. Fora de um navegador, defina `globalThis.__REBASE_DEBUG__ = true`. Os navegadores exibem o `console.debug` apenas no nível Verbose (detalhado).
 
 ## Geração de SDK Tipado
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Gere um cliente totalmente tipado a partir de suas tabelas:
 

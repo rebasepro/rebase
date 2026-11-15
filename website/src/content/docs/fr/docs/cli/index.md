@@ -1,5 +1,5 @@
 ---
-sourceHash: d0b65c1ecccde6ba
+sourceHash: db5795d457e22066
 title: Référence de la CLI
 sidebar_label: CLI
 description: Commandes de la CLI Rebase pour l'initialisation de projet, la génération de schéma, les migrations de base de données et la génération de SDK.
@@ -24,8 +24,6 @@ Ou exécutez n'importe quelle commande sans l'installer : `pnpm dlx @rebasepro/c
 ## Commandes
 
 ### `rebase init`
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Initialiser un nouveau projet Rebase :
 
@@ -93,7 +91,7 @@ image d'application à construire vous-même. Options utiles :
 | `--no-static` | Ne pas intégrer le frontend dans le bundle backend (chaque application statique conserve son propre bundle) |
 | `--skip-static-build` | Intégrer le frontend tel qu'il a déjà été compilé, sans exécuter sa commande de build |
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span> Un frontend — toute application statique de `rebase.json` dotée d'une configuration Vite — dont la configuration n'utilise pas `rebaseBackendGuard()` (issu de
+Un frontend — toute application statique de `rebase.json` dotée d'une configuration Vite — dont la configuration n'utilise pas `rebaseBackendGuard()` (issu de
 `@rebasepro/app/vitePlugin`) est refusé : c'est ce qui empêche le code serveur d'atterrir dans le
 bundle du navigateur, et empêche Vite d'intégrer un fichier backend en tant qu'URL `data:`
 (le build échoue, en se nommant, lorsqu'un autre plugin remplace son
@@ -189,8 +187,6 @@ lu à partir de `backend/`.
 
 ### `rebase schema generate` / `rebase schema stale`
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 ```bash
 rebase schema generate       # backend/schema → backend/src/schema.generated.ts
 rebase schema stale          # nomme ce qui diffère des tables, quitte avec 1 si c'est le cas
@@ -224,8 +220,6 @@ détail dans [Génération de schéma](/docs/cli/schema/).
 
 ### `rebase console`
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Un REPL Node avec les données du projet accessibles, ou un extrait de code exécuté avec `-e` :
 
 ```bash
@@ -242,8 +236,6 @@ est affiché au format JSON sur stdout et une exception entraîne une sortie ave
 [Scripts et console](/docs/backend/scripts/).
 
 ### `rebase migrate`
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Transitions à sens unique depuis une disposition que cette version ne lit plus :
 `rebase migrate collections-to-tables` (`config/collections` → `backend/schema`
@@ -360,8 +352,6 @@ et pour supprimer une base de données provisionnée que le code ne mentionne pl
 
 ### `rebase generate-sdk`
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 ```bash
 rebase generate-sdk
 ```
@@ -439,8 +429,6 @@ rebase verify --json
 rebase verify --live
 rebase verify --live --database-url postgresql://…
 ```
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Vérifier si les tables sont prêtes pour la production, en une seule commande rapide pour la CI et pour les
 hooks d'un agent IA. Hors ligne par défaut, et ne modifie jamais rien.

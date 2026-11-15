@@ -1,5 +1,5 @@
 ---
-sourceHash: cfc9a95285da2353
+sourceHash: db0130f92b3095af
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Betreiben Sie Rebase überall mit dem offiziellen Runtime-Image und Ihrem Projekt-Bundle – Docker Compose, Fly, Railway oder auf einem einfachen VPS.
@@ -129,13 +129,11 @@ Für ein echtes Deployment sollten Sie es vorziehen, beides in ein Image einzube
 (bake), wodurch auch exakt feststeht, was ausgeführt wird:
 
 ```dockerfile
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
 ## Erstellen des Schemas
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 **Die Runtime erstellt beim Start fehlende Tabellen, einschließlich derjenigen, die von `backend/schema` deklariert werden.**
 `REBASE_MIGRATE_ON_BOOT` ist standardmäßig auf `ensure` gesetzt, was additiv für
@@ -196,7 +194,7 @@ was vorhanden ist:
 - **Eine optionale Tabelle fehlt** (API-Keys, Idempotenzschlüssel, Cron-Claims,
   Rate-Limit-Zähler, Presence, Metriken-Historie): Dieses Feature ist deaktiviert
   und das Log gibt an, welche Tabelle benötigt wird.
-- <span class="since-badge" data-since="0.31">Seit 0.31</span> **Eine deklarierte Tabelle, die die Datenbank nicht schützt** —
+- **Eine deklarierte Tabelle, die die Datenbank nicht schützt** —
   Row-Level Security deaktiviert, keine der deklarierten Policies vorhanden oder
   eine restriktive deklarierte Policy fehlt: Diese Tabelle wird nicht bereitgestellt
   (bei einer fehlenden permissiven Policy wird sie bereitgestellt, begleitet von einer
@@ -349,7 +347,7 @@ funktioniert, was Container ausführen kann. Zwei Dinge müssen überall stimmen
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.30.1 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.31.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -586,7 +584,7 @@ Prozesse gestartet werden. Siehe [Split processes](/docs/deployment/split-proces
 ## Upgrades
 
 ```yaml
-image: rebasepro/server:0.30.1
+image: rebasepro/server:0.31.0
 ```
 
 Starten Sie neu. Ihr Bundle bleibt unverändert. Innerhalb einer Major-Version des

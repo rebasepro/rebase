@@ -63,7 +63,7 @@ COPY . .
 RUN npx -y pnpm@11 install --frozen-lockfile && npx -y pnpm@11 run build
 
 # The published runtime, with nothing added but the bundle
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY --from=build --chown=node:node /app/dist-bundle /bundle
 ```
 
@@ -125,8 +125,6 @@ Create it with **Ubuntu 24.04** and your SSH key, then follow the [one-server st
 On a server, uploads stay on its disk: the Compose file keeps them on a named volume and sets `FORCE_LOCAL_STORAGE=true`. They survive restarts and redeploys, but not the loss of the server, so turn on Hostman's server backups or move them to a bucket when they start to matter.
 
 ## The schema
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 **The runtime creates missing tables at boot, including the ones `backend/schema` declares.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema. It creates missing tables, columns and enum types and applies their row-level security, so a new table is live on the next deploy.
 

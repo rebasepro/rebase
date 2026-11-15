@@ -1,11 +1,9 @@
 ---
-sourceHash: 59fc3060e8bce0e2
+sourceHash: 8ed0f8885ebc5b1d
 title: Tabellen
 sidebar_label: Tabellen
 description: "Deklarieren Sie Postgres-Tabellen in backend/schema mit defineTable: Spalten, Relationen und eine obligatorische Row-Level-Security-Konfiguration. Jede Tabelle wird zu SQL, Policies, REST-, Realtime- und MCP-Routen sowie SDK-Typen."
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Eine Tabelle wird einmalig in TypeScript im Verzeichnis `backend/schema/` deklariert.
 Diese Deklaration ist das Einzige, was das Backend über Ihre Daten weiß. Daraus
@@ -54,8 +52,6 @@ Frontend. Der Upgrade-Leitfaden für diese Version beschreibt die Umstellung.
 :::
 
 ## Das Verzeichnis `backend/schema`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```text
 backend/
@@ -116,8 +112,6 @@ typensicher an eine Tabelle zu binden, ohne Backend-Code in das Browser-Bundle e
 
 ## Was aus einer Tabelle wird
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 | Aus der Deklaration | Rebase generiert |
 |---|---|
 | `columns`, `relations`, `indexes` | das `CREATE TABLE`, Fremdschlüssel, Junction-Tabellen und Indizes, geschrieben in `schema.sql` durch `rebase db push` und `rebase db generate` |
@@ -138,8 +132,6 @@ Die Pipeline von der Deklaration bis zur Datenbank wird in
 
 ## `defineTable`-Optionen
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `defineTable(name, config)` nimmt den Namen der Tabelle und die folgenden Schlüssel entgegen:
 
 | Schlüssel | Funktion |
@@ -152,7 +144,7 @@ Die Pipeline von der Deklaration bis zur Datenbank wird in
 | `schema` | Das Postgres-Schema. `public`, wenn nicht angegeben. |
 | `database` | Eine vom Standard abweichende Postgres-Datenbank, deklariert in `backend/resources.ts`. Siehe [Mehrere Quellen](/docs/backend/multiple-sources/). |
 | `description` | Was die Tabelle enthält. Wird in OpenAPI und in den Beschreibungen der MCP-Tools angezeigt. |
-| `defaultPolicies` | `false` generiert nur Ihre Regeln ohne die standardmäßigen Admin-Baseline-Policies. Bei `rls: "admin-only"` abgelehnt. <span class="since-badge" data-since="0.31">Seit 0.31</span> `true` behält die Baseline bei, wenn die Datenbank der Tabelle sie für alle Tabellen deaktiviert (`database({ rls: { defaultPolicies: false } })`). Wenn weggelassen, entscheidet die Einstellung der Datenbank. |
+| `defaultPolicies` | `false` generiert nur Ihre Regeln ohne die standardmäßigen Admin-Baseline-Policies. Bei `rls: "admin-only"` abgelehnt. `true` behält die Baseline bei, wenn die Datenbank der Tabelle sie für alle Tabellen deaktiviert (`database({ rls: { defaultPolicies: false } })`). Wenn weggelassen, entscheidet die Einstellung der Datenbank. |
 | `tenant` | Weist jede Zeile einem Mandanten zu. Siehe [Mandantenfähigkeit](/docs/collections/tenancy/). |
 | `softDelete` | `true` oder `{ field }`: Ein Löschvorgang setzt einen Zeitstempel, anstatt die Zeile zu entfernen. Siehe [Soft Delete](/docs/collections/soft-delete/). |
 | `history` | `true` zeichnet jeden Schreibvorgang in der Verlaufstabelle auf. Siehe [Entitätsverlauf](/docs/backend/history/). |
@@ -167,8 +159,6 @@ Zwei weitere Definitionen teilen die meisten dieser Schlüssel:
 werden, und [`defineView`](/docs/collections/views/) für SQL-Views.
 
 ## Namen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Das erste Argument von `defineTable` ist der Name der Tabelle und dient als Standardwert
 für alles andere:
@@ -194,8 +184,6 @@ Slugs einer bereits bereitgestellten Tabelle Spalten umbenennen kann. Setzen Sie
 wenn er vom Namen der Tabelle abweichen soll, und ändern Sie ihn danach nicht mehr.
 
 ## Primärschlüssel
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Es gibt keine implizite `id`-Spalte. Jede Tabelle markiert mindestens eine Spalte
 mit `.primaryKey()`:
@@ -229,8 +217,6 @@ Standardwert wird vom Aufrufer bei der Erstellung übergeben. Eine Schlüsselspa
 
 ## Wann eine Definition abgelehnt wird
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Ein Schema, das eine Tabelle ungeschützt oder unbrauchbar hinterlassen würde, erreicht niemals die
 Datenbank. Es wird an drei Stellen abgelehnt:
 
@@ -260,8 +246,6 @@ die aus einer Datei neben `index.ts`, aber nicht aus `index.ts` selbst exportier
 abgelehnt: Der Index ist die maßgebliche Liste der Tabellen.
 
 ## Nächste Schritte
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - [Spalten](/docs/schema/columns/): alle `col.*`-Builder und -Modifikatoren
 - [JSON-Dokumente](/docs/schema/json/): typisiertes und validiertes `jsonb` mit `json.*`

@@ -1,11 +1,9 @@
 ---
-sourceHash: f55095351eb33abe
+sourceHash: d482e63c42ac3a1a
 title: Feldzugriff
 sidebar_label: Feldzugriff
 description: "Lese- und Schreibberechtigungen pro Spalte nach Rolle mit .access(), Spalten, die den Server nie verlassen mit .private(), und Spalten, die Clients nicht schreiben können mit .readOnly(). Ein Aufrufer, den die Richtlinien der Zeile durchlassen, erhält dennoch keine Spalte, die seine Rollen nicht lesen dürfen."
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 [Sicherheit auf Zeilenebene (Row-level security)](/docs/collections/security-rules/) entscheidet, welche **Zeilen** ein
 Aufrufer erreicht. Drei Spaltenmodifikatoren entscheiden, welche **Spalten einer erreichten Zeile**
@@ -39,8 +37,6 @@ jede Mitarbeiterzeile liest. Nur ein Aufrufer mit der Rolle `hr` erhält die Spa
 einer Zeile, und niemand setzt sie über HTTP.
 
 ## Die Regel
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `.access()` akzeptiert zwei optionale Listen, und eine weggelassene Liste ist keine leere Liste —
 dieser Unterschied macht das gesamte Feature aus.
@@ -78,8 +74,6 @@ nicht lesen können (`FIELD_NOT_READABLE`), und antwortet auf einen `.private()`
 einen Tippfehler — genauso wie REST und der Socket.
 
 ## `.private()` und `.readOnly()` nutzen denselben Mechanismus
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `.private()` entspricht `.access({ read: [], write: [] })`, mit einem Unterschied: Eine
 private Spalte wird auch in OpenAPI, den SDK-Typen und den MCP-Tool-Schemas
@@ -186,8 +180,6 @@ Grenze überschritten hat, würde Ihnen den Wert verraten, den Sie nicht sehen d
 
 ### Ein Link folgt seiner Schlüsselspalte
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Ein `belongsTo` und die Schlüsselspalte, an die es gebunden ist, sind ein Feld mit zwei
 Schreibweisen. Das Schreiben von `{ "reviewer": 7 }` unterliegt jeder Regel von `reviewerId`
 (seiner Schreibregel, `.readOnly()`, `.private()`, einem Erstellungs-Zeitstempel, der Mandanten-Spalte);
@@ -224,8 +216,6 @@ zum Treiber durch. Es lockert niemals eine Regel für eine deklarierte Spalte, e
 den Mandanten, den Schlüssel, ein Relationsziel oder `_pivot`.
 
 ## Suche
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Die Fallback-Suche — eine Tabelle ohne `search`-Block — gleicht mittels `ILIKE` über
 Ihre Textspalten ab und überspringt diejenigen, die der Aufrufer nicht lesen darf. Nichts sickert
@@ -299,8 +289,6 @@ nichts vor ihnen verbirgt. `[]` tut dies weiterhin — auch vor `dataAsAdmin`. V
 [`rebase.sql()`](/docs/backend/custom-functions), wenn Sie die rohe Spalte benötigen.
 
 ## Validierung
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `.access()` auf einer Spalte und `access` auf einer Relation werfen beim Laden des Moduls
 einen Fehler, es sei denn, `read` und `write` sind Listen nicht-leerer Rollennamen: Ein String,

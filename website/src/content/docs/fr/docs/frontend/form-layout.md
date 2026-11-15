@@ -1,11 +1,9 @@
 ---
-sourceHash: 93694433369991ae
+sourceHash: 8e6d7b5d495d9275
 title: Disposition du formulaire
 sidebar_label: Disposition du formulaire
 description: "Organisez le formulaire d'un enregistrement : largeurs de champs sur une grille à quatre colonnes, sections titrées et repliables, rail de métadonnées et composant remplaçant le formulaire généré."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Le formulaire d'enregistrement est généré à partir des colonnes et des relations de la table :
 
@@ -60,8 +58,6 @@ export const ordersCms = customizeTable<typeof orders>("orders", {
 
 ## Largeur des champs
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 La largeur d'un champ est définie par un **span** sur une grille à quatre colonnes ; `4` représente la pleine largeur de la colonne principale. Les spans s'alignent automatiquement sur la grille, ce qui permet à deux champs de s'aligner quel que soit l'ordre dans lequel ils ont été déclarés.
 
 Choisissez un span en fonction de ce que contient le champ, et non de son type. Deux valeurs courtes qui vont ensemble partagent une ligne : date de début et de fin, ville et pays, transporteur et numéro de suivi à `2` chacun, ou une valeur et son qualificatif à `3` + `1`. Les nombres, les booléens et les codes courts peuvent occuper `1` à côté de leurs semblables. Tout ce qui est long à lire (noms, URL, e-mails, identifiants, descriptions, markdown, fichiers) conserve `4`. Les lignes se remplissent dans l'ordre des champs et rien n'élargit un champ pour combler un espace vide ; placez donc les paires côte à côte et faites en sorte que chaque ligne totalise 4.
@@ -69,8 +65,6 @@ Choisissez un span en fonction de ce que contient le champ, et non de son type. 
 Sur les affichages trop étroits pour deux colonnes (le panneau latéral, le volet scindé, un smartphone), la grille se réduit à une seule colonne et les spans sont ignorés.
 
 ## Sections
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `form.sections` regroupe la colonne principale sous des titres. Chaque section est un objet `{ key, title?, fields, collapsed?, collapsible?, readVariant? }`. Une section avec un titre peut être repliée ; une section sans titre ne le peut pas. `readVariant: "summary"` empile les champs de la section sous forme de lignes de libellé et valeur dans la vue en lecture seule de l'enregistrement ; la valeur par défaut, `"grid"`, utilise la grille du formulaire.
 
@@ -80,15 +74,11 @@ Chaque entrée est vérifiée par rapport à la table. Une entrée que le serveu
 
 ## Le rail de métadonnées
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 `form.sidebar` déplace les champs hors de la colonne principale vers un rail étroit situé à côté : statut, propriété, dates de publication, indicateurs. Le rail n'utilise pas la grille, donc `span` y est ignoré. Lorsqu'il n'y a pas assez de place pour un rail, il s'affiche comme une section de tête ordinaire.
 
 `form.showRecordMeta` place le bloc d'enregistrement en lecture seule (id, created, updated) en bas du rail. Il vaut `true` dès qu'un rail est affiché. `sidebar: []` désactive le rail dérivé et conserve tous les champs dans la colonne principale. `hideIdFromForm` masque complètement l'identifiant du formulaire.
 
 ## Remplacer le formulaire
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `formView` remplace le formulaire généré par votre propre composant, importé par valeur. Il reçoit les mêmes `EntityCustomViewParams` qu'une [vue d'entité](/docs/frontend/entity-views/). `includeActions: true` conserve Enregistrer et Abandonner dans la barre de l'enregistrement tant qu'il est à l'écran.
 
@@ -111,8 +101,6 @@ Pour une modification plus ponctuelle, surchargez plutôt une partie du formulai
 
 ## Autres options de formulaire
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 | Option | Effet |
 |---|---|
 | `formAutoSave` | Sauvegarder au fur et à mesure que le visiteur saisit. |
@@ -121,8 +109,6 @@ Pour une modification plus ponctuelle, surchargez plutôt une partie du formulai
 | `localChangesBackup` | Conserver les modifications non enregistrées dans le stockage local : `"manual_apply"`, `"auto_apply"` ou `false`. |
 
 ## Voir aussi
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - [Champs personnalisés](/docs/frontend/custom-fields/) : les champs organisés par une disposition
 - [Vues d'entités](/docs/frontend/entity-views/) : un onglet complet dédié à côté du formulaire

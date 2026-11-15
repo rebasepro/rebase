@@ -1,13 +1,11 @@
 ---
-sourceHash: 507990241e43f026
+sourceHash: 65f05732c36bd742
 title: Esquema como código
 sidebar_label: Esquema como código
 description: Cómo Rebase utiliza las tablas de TypeScript en backend/schema como la única fuente de verdad para el esquema de su base de datos, API, SDK y panel de administración.
 ---
 
 ## La idea central
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 En Rebase, las **tablas que declara con `defineTable` en `backend/schema/` son la única fuente de verdad**. A partir de ellas, Rebase genera:
 
@@ -25,8 +23,6 @@ Esto significa que su esquema es:
 
 ## Edición visual con manipulación de AST
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Rebase también proporciona un **editor visual de esquemas** en Studio. Cuando alguien lo utiliza para agregar una columna:
 
 1. Studio **no** modifica directamente la base de datos
@@ -40,8 +36,6 @@ Cómo se *ve* una tabla en el panel no forma parte de esto: las etiquetas, icono
 Este enfoque de "UI como generador de código" significa que las ediciones visuales producen el mismo TypeScript limpio que un desarrollador escribiría a mano.
 
 ## Pipeline de generación de esquemas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Sus tablas se leen una vez y se emiten dos veces: como un esquema de Drizzle a través del cual consulta el servidor en ejecución, y como SQL que describe la base de datos que pretendía tener. Es este SQL con el que se alinea la base de datos mediante [Atlas](https://atlasgo.io), que calcula las diferencias (diff) entre el esquema deseado y el activo, y planifica el cambio:
 
@@ -77,8 +71,6 @@ Sus tablas se leen una vez y se emiten dos veces: como un esquema de Drizzle a t
 `db push` es el ciclo de desarrollo; `db generate` + `db migrate` es el ciclo revisable y el que se debe utilizar en producción. Ambos pasan por el mismo SQL generado, por lo que no pueden discrepar sobre lo que significan sus tablas, y ambos lo vuelven a escribir desde cero a partir de las tablas antes de leerlo, de modo que no hay ninguna copia en su repositorio que quede desactualizada. Las migraciones son lo que usted incluye en sus commits. Consulte [Generación de esquemas](/docs/cli/schema) para ver todos los flags.
 
 ### Ejemplo
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Dada esta tabla:
 
@@ -159,8 +151,6 @@ Cuando Rebase actualiza el esquema de la base de datos, mapea las tablas que dec
 5. **Propiedad de índices por nombre**: Los índices son el único objeto que reside *en* una tabla mapeada, por lo que el filtrado de tablas no puede protegerlos; anteriormente, un push planificaba un `DROP INDEX` para cualquier índice ausente en el estado deseado, lo que incluía a todos los creados a mano. Rebase ahora nombra los índices que genera como `<table>_<columns>_ix_<7 hex>` (`_ux_` cuando es único), un formato que ningún otro generador de nombres produce aquí, y excluye todo lo demás de la comparación (diff) por nombre. Un índice que haya escrito a mano o que provenga de una introspección nunca se toca; una declaración que elimine seguirá borrándose, que es lo esperado. Consulte **[Índices](/docs/backend/indexes)**.
 
 ## Próximos pasos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - **[Tablas](/docs/schema/)** — Todas las opciones de `defineTable`
 - **[Columnas](/docs/schema/columns/)** — Mapeos detallados de tipos de columna

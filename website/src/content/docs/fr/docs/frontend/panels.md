@@ -1,5 +1,5 @@
 ---
-sourceHash: 7a427ea4f8f8b272
+sourceHash: 41940d8e882be98e
 title: Des panneaux dans votre propre page
 sidebar_label: Panneaux dans vos propres pages
 description: "Affichez une table, le formulaire d'un enregistrement, un enregistrement ou une valeur dans votre propre page : CollectionPanel, RecordForm, RecordDetail, FieldValue et CollectionsProvider, sans shell d'administration autour d'eux."
@@ -39,8 +39,6 @@ les autres, seule l'invite de fermeture de page du navigateur fait office de gar
 doit d'abord afficher la connexion Rebase.
 
 ## Ce qu'affiche un panneau
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un panneau affiche la table comme le fait l'admin — à partir du descripteur servi par
 le serveur, avec les éventuels `customizeTable` que vous avez enregistrés. Ces props permettent de la restreindre à ce dont

@@ -1,5 +1,5 @@
 ---
-sourceHash: 72daf47d8a15bafe
+sourceHash: ceff4ba3bdacfb06
 title: Búsqueda
 sidebar_label: Búsqueda
 description: Cómo se comporta .search() por defecto y cómo una tabla se habilita para la búsqueda de texto completo con clasificación sobre las columnas especificadas — incluyendo contenido JSONB y arrays.
@@ -46,8 +46,6 @@ lo hace.
 Una búsqueda de una sola palabra se compila exactamente al SQL que siempre tuvo.
 
 ## Habilitación
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Declara `search` en una tabla, nombrando las columnas que deseas indexar:
 
@@ -135,8 +133,6 @@ reemplazó: una columna que sigue indexando el conjunto de campos anterior, y un
 no devuelve nada para contenido que claramente está en la fila.
 
 ## Qué puedes especificar en `fields`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Una ruta comienza con la clave de una columna.
 

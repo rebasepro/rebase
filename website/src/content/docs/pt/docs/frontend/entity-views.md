@@ -1,5 +1,5 @@
 ---
-sourceHash: faf8f760aabce923
+sourceHash: f76fb5b27f8eb93c
 title: Visualizações de Entidade
 sidebar_label: Visualizações de Entidade
 description: Adicione abas e visualizações personalizadas às páginas de detalhes da entidade para pré-visualizações, métricas, dados relacionados ou interfaces personalizadas.
@@ -15,8 +15,6 @@ As visualizações de entidade permitem adicionar **abas** personalizadas à pá
 - **Editores personalizados** (rich text, editores de mapa)
 
 ## Adicionando Visualizações de Entidade
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```tsx
 // frontend/src/cms/products.tsx
@@ -38,8 +36,6 @@ várias tabelas. Uma visualização registrada é exibida apenas nas tabelas que
 `position: "start"` coloca a aba antes da do formulário; caso contrário, ela é posicionada depois.
 
 ## Construindo uma Visualização de Entidade
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O `Builder` é o próprio componente, importado por valor:
 
@@ -64,8 +60,6 @@ export function ArticlePreview({ row, modifiedValues }: EntityCustomViewParams) 
 ```
 
 ### EntityCustomViewParams
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 | Prop | Tipo | Descrição |
 |------|------|-------------|

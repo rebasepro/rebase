@@ -1,13 +1,11 @@
 ---
-sourceHash: ceb4d7703eefec3a
+sourceHash: 7f745fbf9e5bda12
 title: Champs
 sidebar_label: Champs
 description: "Le champ généré par le CMS pour chaque type de colonne — texte, markdown, e-mail, URL, sélection, sélection multiple, nombre, interrupteur, date, téléversement de fichier, JSON, géopoint, vecteur, binaire — et les options customizeTable qui modifient chacun d'eux."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Chaque colonne d'une table est un champ dans le CMS. La nature du champ découle
 de la colonne : son type, sa validation et ses règles de stockage, tous déclarés
@@ -75,8 +73,6 @@ export const productsCms = customizeTable<typeof products>("products", {
 
 ## Texte
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Une colonne `col.text()`, `col.varchar({ length })`, `col.char({ length })` ou `col.uuid()` est un champ
 de saisie de texte. `varchar(n)` et `char(n)` limitent sa longueur à `n`, et `.validate({ min,
 max, length, matches })` ajoute les règles que le formulaire vérifie avant l'enregistrement.
@@ -116,8 +112,6 @@ et affiche un sélecteur de référence ; voir [Firestore](/docs/frontend/fireba
 
 ## Ensembles fermés de valeurs
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Un `col.enum([...])` est une liste déroulante (select), affichée ailleurs sous forme de badge coloré. Il
 en va de même pour une colonne text ou number avec `.oneOf([...])`. Chaque valeur reçoit un libellé
 dérivé de son identifiant (`needs_review` devient « Needs Review ») ainsi qu'une couleur générée à partir
@@ -141,8 +135,6 @@ le tableau s'appliquent à ses éléments.
 
 ## Nombres
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Chaque colonne integer, serial, `real`, `doublePrecision` et `numeric` est un
 champ de saisie de nombre. Les colonnes integer et serial acceptent uniquement des nombres entiers,
 et `.validate({ min, max, moreThan, lessThan, positive, negative })` ajoute des limites.
@@ -157,15 +149,11 @@ une commande permettant de définir la valeur sur `null`.
 
 ## Booléens
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Un `col.boolean()` est un interrupteur.
 
 <FieldWidgetPreview client:only="react" variant="boolean" />
 
 ## Dates et heures
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un `col.timestamp({ withTimezone: true })` est un sélecteur de date et d'heure, un `col.date()` un sélecteur
 de date et un `col.time()` une heure de la journée. `mode` permet de basculer entre `"date"` et
@@ -183,8 +171,6 @@ le serveur y inscrit l'identifiant de l'utilisateur effectuant l'action, quel qu
 
 ## Fichiers
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Une colonne `col.storage({ … })` est un champ de téléversement avec aperçu, et
 `.multiple()` en fait un champ multifichier. Le bucket, le chemin, les types
 acceptés et la limite de taille sont déclarés sur la colonne ; les fonctions qui
@@ -195,16 +181,12 @@ Voir [Téléversements de fichiers](/docs/collections/file-uploads/).
 
 ## Tableaux et JSON
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Une colonne de tableau (`<item>.array()`) est une liste répétable du champ de l'élément. Une colonne `jsonb`
 dotée d'une structure [`json.*`](/docs/schema/json/) est un groupe de champs typés, de listes et
 de blocs ; une colonne sans structure est un éditeur clé/valeur. Voir
 [Tableaux et JSON](/docs/collections/arrays-and-maps/).
 
 ## Relations et références
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un `belongsTo` est un sélecteur de la ligne associée, affiché à la place de sa colonne de clé
 étrangère ; une relation to-many correspond à un onglet de l'enregistrement. Une colonne texte
@@ -216,16 +198,12 @@ Voir [Relations dans le panneau](/docs/collections/relations-in-the-admin-panel/
 
 ## Géopoints, vecteurs et données binaires
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Un `col.geopoint()` est un champ de latitude et longitude. Un `col.vector({ dimensions })` est un
 champ de vecteur ; `clearable` est sa seule option. Un `col.bytea()` est un champ binaire,
 lu et écrit en base64. Aucun d'entre eux ne possède d'options spécifiques au type au-delà de
 celles acceptées par chaque champ.
 
 ## Options communes à tous les champs
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Quel que soit le type de colonne :
 
@@ -262,8 +240,6 @@ chaque appelant relève de la colonne (`.notNull()`, `.validate()`, `.access()`)
 :::
 
 ## Prochaines étapes
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/) : chaque option, avec son type
 - [Validation et conditions](/docs/collections/validation-and-conditions/) : ce que le formulaire vérifie et les champs réagissant aux valeurs

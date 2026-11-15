@@ -1,5 +1,5 @@
 ---
-sourceHash: 1b875d11f8a07037
+sourceHash: c343d961821c04f2
 title: Offline- & Local-First-Synchronisation
 sidebar_label: Offline
 description: Aktivieren Sie die Local-First-Sync-Engine des typisierten Rebase SDKs – eine lokale Zeilen-Datenbank, sofortige Offline-Schreibvorgänge mit Rollback und reaktive Live-Queries.
@@ -77,8 +77,6 @@ Schreibvorgänge werden tabellenübergreifend in der Reihenfolge erneut abgespie
 Jeder eingereihte Schreibvorgang entspricht standardmäßig einer Anfrage, sodass 500 offline erfasste Zeilen 500 Roundtrips zum Abarbeiten benötigen. Wenn `replayBatchSize` festgelegt ist (bis zu 1 000), wird eine Folge aufeinanderfolgender Offline-Erstellungen in einer Tabelle stattdessen als ein einzelnes `createMany` erneut abgespielt. Es werden nur Erstellungen zusammengefasst, deren ID vom SDK als String generiert wurde, und niemals solche, die auf eine andere Zeile desselben Durchlaufs verweisen. Wenn der Server den Durchlauf aus einem anderen Grund als einer verlorenen Verbindung ablehnt oder aufschiebt, wird nichts geschrieben (ein Bulk-Schreibvorgang ist eine Transaktion), und der Durchlauf wird Schreibvorgang für Schreibvorgang erneut abgespielt, wie es standardmäßig der Fall wäre.
 
 ### Von einer früheren Version eingereihte Schreibvorgänge
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Die Warteschlange speichert einen Schreibvorgang in Form der Werte, die er sendet – Schlüssel für Relationen, Zahlenlisten für Vektoren, `{ latitude, longitude }` für Punkte, ISO-Text für Daten – und zwischengespeicherte Zeilen als die Zeilen des Servers. Ein Schreibvorgang, der von der vorherigen Version des SDKs offline eingereiht wurde und diese als Klassen (`EntityRelation`, `GeoPoint`, `Vector`) gespeichert hat, wird beim Zurücklesen in diese Werte umgewandelt und wie gewohnt erneut abgespielt: Nichts, was vor dem Upgrade eingereiht wurde, geht verloren. Ein älteres SDK, das auf einen von dieser Version eingereihten Schreibvorgang trifft, belässt ihn in der Warteschlange.
 
@@ -245,7 +243,7 @@ Standardmäßig ist dies deaktiviert, da es auf einem gemeinsam genutzten Gerät
 
 ## Konfiguration
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span> `maxCachedRowsPerTable` und `maxCachedQueriesPerTable` hießen zuvor `…PerCollection`.
+`maxCachedRowsPerTable` und `maxCachedQueriesPerTable` hießen zuvor `…PerCollection`.
 
 ```typescript
 createRebaseClient({

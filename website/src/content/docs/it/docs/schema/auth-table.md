@@ -1,11 +1,9 @@
 ---
-sourceHash: c7bebbe33f0a0611
+sourceHash: e70397bdea9251db
 title: La tabella utenti
 sidebar_label: Tabella utenti
 description: "defineAuthTable dichiara la tabella in cui l'autenticazione memorizza gli utenti: le colonne necessarie all'autenticazione, una policy di auto-lettura, colonne di privilegio solo per amministratori e il modello di accesso — ruoli, scope dell'app, chiavi personali e hook del ciclo di vita dell'utente."
 ---
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 `defineAuthTable` dichiara la tabella che l'autenticazione legge e scrive. È
 una `defineTable` con tre elementi aggiunti:
@@ -53,8 +51,6 @@ un'impostazione valida: gli amministratori gestiscono gli utenti e ciascun utent
 
 ## Le colonne
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 Dichiara le colonne che la tua app legge o visualizza, con i modificatori che preferisci;
 l'autenticazione aggiunge quelle necessarie che sono state omesse. Una colonna dichiarata con la
 chiave o il nome SQL di una colonna di autenticazione (`email`, `displayName`, `roles`, `passwordHash`,
@@ -73,8 +69,6 @@ sulla tabella utenti stessa può anche fare riferimento a qualsiasi colonna di a
 
 ## Il blocco `auth`
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 | Chiave | Cosa fa |
 |---|---|
 | `roles` | I ruoli che un utente può ricoprire, ciascuno con un `name`, una `description` facoltativa e gli `scopes` del piano di amministrazione e dell'app concessi. `admin` è predefinito e non può essere dichiarato. |
@@ -88,8 +82,6 @@ I due hook rimangono sul server; il descrittore indica solo quali di essi esisto
 illustra ciò che ciascuno scope concede e come chiavi e token lo limitano.
 
 ### `onCreateUser` e `onResetPassword`
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 ```ts
 import { randomBytes } from "node:crypto";
@@ -136,8 +128,6 @@ Entrambi gli hook ricevono un contesto contenente:
 
 ## Cosa non viene eseguito per le scritture di autenticazione
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 La registrazione, l'accesso OAuth e la gestione degli utenti da parte dell'amministratore scrivono
 direttamente nella tabella utenti. Gli [hook](/docs/collections/callbacks/) della tabella non vengono eseguiti per queste
 scritture, quindi un'e-mail di benvenuto in `afterSave` non verrà mai attivata al momento dell'iscrizione.
@@ -145,8 +135,6 @@ Inseriscila negli hook del ciclo di vita dell'autenticazione (`beforeUserCreate`
 …) configurati nel backend. Consulta [Autenticazione](/docs/backend/authentication/).
 
 ## Passaggi successivi
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 - [Autenticazione](/docs/backend/authentication/): metodi di accesso, token e hook di autenticazione
 - [Ruoli e scope](/docs/backend/roles-and-scopes/): dichiarazione di ruoli e scope dell'app

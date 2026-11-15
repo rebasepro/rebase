@@ -1,5 +1,5 @@
 ---
-sourceHash: 7a427ea4f8f8b272
+sourceHash: 41940d8e882be98e
 title: Panels auf einer eigenen Seite
 sidebar_label: Panels auf eigenen Seiten
 description: "Zeigen Sie eine Tabelle, das Formular eines Datensatzes, einen Datensatz oder einen Wert auf einer eigenen Seite an: CollectionPanel, RecordForm, RecordDetail, FieldValue und CollectionsProvider, ganz ohne Admin-Shell drumherum."
@@ -39,8 +39,6 @@ zum Verlassen der Seite. Hüllen Sie das Panel in `<RebaseAuthGate>` ein, wenn d
 anzeigen soll.
 
 ## Was ein Panel anzeigt
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein Panel stellt die Tabelle so dar, wie es das Admin-Panel tut – anhand des vom Server bereitgestellten
 Deskriptors samt aller registrierten `customizeTable`-Anpassungen. Diese Props schränken die Ansicht auf das

@@ -1,5 +1,5 @@
 ---
-sourceHash: dc2857e881f65bd3
+sourceHash: c2767dda8fb3294a
 title: Écriture de données
 sidebar_label: Écriture de données
 description: create, upsert, update et delete avec le SDK — opérations sur les champs, écritures conditionnelles, clés d'idempotence, écritures par lot et écriture sur plusieurs tables en une seule transaction.
@@ -92,8 +92,6 @@ effectuent la même opération par ligne et ne renvoient que les lignes qu'ils o
 ils ne peuvent pas être combinés (`INVALID_CONFLICT_RULE`).
 
 #### Pas sur la table d'authentification
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `upsert()` sur la table d'authentification (celle déclarée avec `defineAuthTable`) est refusé
 avec une 400 (`INVALID_CONFLICT_TARGET`), tout comme `createMany` avec `upsert`
@@ -376,8 +374,6 @@ que d'exécuter silencieusement une boucle d'écritures individuelles — ce qui
 ni l'atomicité ni l'aller-retour unique que vous recherchiez en utilisant un lot.
 
 ## Écriture sur plusieurs tables
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `createMany` et ses variantes s'appliquent à une table à la fois. `client.batch()` est la forme
 multi-tables : une requête, une transaction, le tout ou rien.

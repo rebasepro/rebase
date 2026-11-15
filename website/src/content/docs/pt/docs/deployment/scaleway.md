@@ -1,5 +1,5 @@
 ---
-sourceHash: 0664758f56d33104
+sourceHash: dc3620dc82d2a013
 title: Implantando o Rebase na Scaleway
 description: Aprenda como implantar o Rebase na Scaleway para uma infraestrutura em nuvem segura e sediada na França usando Serverless Containers.
 sidebar_label: Scaleway
@@ -34,7 +34,7 @@ rebase build
 O Serverless Containers faz o pull a partir de um registro, portanto, embale o bundle em uma imagem derivada. Três linhas, e isso fixa exatamente o que é executado:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -79,8 +79,6 @@ A Scaleway provisiona o contêiner e fornece a você um endpoint público (ex.: 
 *Para uma conformidade rigorosa de dados, verifique se os detalhes da sua Organização na Scaleway refletem sua entidade corporativa europeia.*
 
 ## 4. O schema
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 **O runtime cria tabelas ausentes na inicialização, incluindo aquelas que `backend/schema` declara.** O valor padrão de `REBASE_MIGRATE_ON_BOOT` é `ensure`, que é aditivo em todo o schema — ele cria tabelas, colunas e tipos enum ausentes e aplica a segurança em nível de linha (row-level security) deles — de modo que a primeira inicialização em um banco de dados vazio já começa servindo suas tabelas.
 

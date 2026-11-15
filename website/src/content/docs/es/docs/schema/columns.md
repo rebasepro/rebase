@@ -1,11 +1,9 @@
 ---
-sourceHash: a919caafccd81923
+sourceHash: 435a9c498c9da3cc
 title: Columnas
 sidebar_label: Columnas
 description: "Cada constructor y modificador col.*: el tipo de Postgres que crea cada uno, el tipo que un cliente lee y escribe, y lo que la API impone: nulabilidad, valores predeterminados, marcas (stamps), validación, conjuntos de valores cerrados, acceso y almacenamiento."
 ---
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Una columna es un constructor `col.*`, refinado mediante modificadores. El
 constructor decide el tipo de Postgres; los modificadores definen todo lo demás:
@@ -55,8 +53,6 @@ tener en cuenta:
 
 ## Constructores
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Un constructor por cada tipo de Postgres. El tipo wire es lo que un cliente lee
 en una fila y envía en una escritura, y con lo que el SDK e
 [`InferRow`](/docs/schema/types/) tipan la columna. Cada constructor toma un
@@ -95,8 +91,6 @@ sin él, el nombre SQL es el snake_case de la clave.
 
 ## Modificadores
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Cada constructor cuenta con el primer grupo. El resto existe únicamente en los
 constructores para los que tiene sentido; llamar a uno en cualquier otro lugar
 provoca un error de tipo.
@@ -130,8 +124,6 @@ provoca un error de tipo.
 | `.multiple()` | `col.storage()` | `TEXT[]` | la columna contiene varias rutas de archivo |
 
 ## Nulos, obligatorios y valores predeterminados
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Las columnas admiten valores NULL de forma predeterminada. `.notNull()` y
 `.primaryKey()` hacen que una columna sea `NOT NULL`, y la API la requerirá al
@@ -175,8 +167,6 @@ puede ser `.private()`.
 
 ## Stamps
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Una marca (stamp) es un valor que el servidor escribe en una columna por su cuenta.
 Sobrescribe cualquier dato que un cliente envíe para esa columna.
 
@@ -196,8 +186,6 @@ seguridad a nivel de fila compara con el invocador (`ownerField`). Una columna q
 completa el invocador es una columna sobre la que el invocador puede mentir.
 
 ## Columnas de usuario
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `.userId()` indica que una columna contiene el id de un usuario. Es un significado,
 no un tipo: la columna sigue siendo `text` (o `varchar`, `char`, `uuid`), y el
@@ -234,8 +222,6 @@ el servidor complete la columna con el id del invocador, utilice una
 [marca (stamp)](#stamps) en su lugar.
 
 ## Validación
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `.validate(rules)` recibe las reglas para el tipo de columna. La API las comprueba
 antes de una creación o actualización y rechaza la escritura con un código `400`
@@ -282,8 +268,6 @@ especifique la longitud una sola vez.
 
 ## Conjuntos de valores cerrados
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Existen dos formas de aceptar solo determinados valores:
 
 - **Un tipo enum de Postgres**, para que la base de datos también imponga el conjunto.
@@ -323,8 +307,6 @@ Pertenecen al CMS, no a la tabla.
 
 ## Arrays
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `.array()` crea un array de Postgres del tipo de la columna, como en Drizzle:
 `col.text().array()` es `TEXT[]`, `col.integer().array()` es `INTEGER[]`. Lo que
 se encadena antes de `.array()` describe cada elemento: su `{ enum }`, `.validate()`,
@@ -347,8 +329,6 @@ un número y un elemento nulo como `null`.
 
 ## Claves, identidad y seriales
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `.generatedByDefaultAsIdentity()` hace que una columna de enteros sea `GENERATED
 BY DEFAULT AS IDENTITY`. Es la forma recomendada para una clave entera en un esquema
 nuevo (`.generatedAlwaysAsIdentity()` no compila: Rebase crea identidades solo por
@@ -363,8 +343,6 @@ Consulte [Claves primarias](/docs/schema/#primary-keys) para claves compuestas.
 double a través del wire, sin importar la precisión que almacene Postgres.
 
 ## Quién puede leer y escribir una columna
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 La seguridad a nivel de fila (RLS) decide a qué filas accede un invocador. Tres
 modificadores delimitan lo que pueden ver de una fila y lo que pueden establecer:
@@ -385,8 +363,6 @@ modificadores delimitan lo que pueden ver de una fila y lo que pueden establecer
 cuando se retiene una columna, y cada vía a la que se aplica la regla.
 
 ## Columnas de almacenamiento
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `col.storage(options)` almacena la ruta de un archivo en un bucket de almacenamiento.
 La ruta de subida impone `accept` y `maxBytes`, y el barrido de huérfanos contabiliza
@@ -428,8 +404,6 @@ descargar qué rutas corresponde a la [autorización de almacenamiento](/docs/ba
 servir y almacenar en caché los archivos corresponde a [Almacenamiento](/docs/backend/storage/).
 
 ## Qué se rechaza
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Al cargar el módulo, un constructor genera un error en caso de:
 
@@ -478,8 +452,6 @@ muestra qué escribir: `col.timestamp()` sin `withTimezone: true`, `.references(
 que Rebase nombra únicamente mediante `col.custom({ dataType })`.
 
 ## Próximos pasos
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Documentos JSON](/docs/schema/json/): la estructura de una columna `jsonb`
 - [Relaciones](/docs/collections/relations/): las claves foráneas provienen de `rel.*`, no de las columnas

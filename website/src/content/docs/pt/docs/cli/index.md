@@ -1,5 +1,5 @@
 ---
-sourceHash: d0b65c1ecccde6ba
+sourceHash: db5795d457e22066
 title: Referência da CLI
 sidebar_label: CLI
 description: Comandos da CLI do Rebase para inicialização de projetos, geração de schema, migrações de banco de dados e geração de SDK.
@@ -24,8 +24,6 @@ Ou execute qualquer comando sem instalá-lo: `pnpm dlx @rebasepro/cli <command>`
 ## Comandos
 
 ### `rebase init`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Inicializa um novo projeto Rebase:
 
@@ -84,7 +82,7 @@ O bundle é o artefato que você implanta — a imagem de runtime o carrega, por
 | `--no-static` | Não incorpora o frontend no bundle do backend (cada app estático ainda obtém seu próprio bundle) |
 | `--skip-static-build` | Incorpora o frontend como já compilado, sem executar seu comando de build |
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span> Um frontend — cada app estático de `rebase.json` com uma configuração do Vite — cuja configuração não use `rebaseBackendGuard()` (de `@rebasepro/app/vitePlugin`) é recusado: é isso que mantém o código do servidor fora do bundle do navegador e impede o Vite de embutir um arquivo de backend como uma URL `data:` (ele falha o build, identificando-se, quando outro plugin substitui seu `build.assetsInlineLimit`). `frontend/src/cms/ui-config.json` é transportado para o bundle como `entry.uiConfig`, a apresentação do workspace que um backend implantado serve.
+Um frontend — cada app estático de `rebase.json` com uma configuração do Vite — cuja configuração não use `rebaseBackendGuard()` (de `@rebasepro/app/vitePlugin`) é recusado: é isso que mantém o código do servidor fora do bundle do navegador e impede o Vite de embutir um arquivo de backend como uma URL `data:` (ele falha o build, identificando-se, quando outro plugin substitui seu `build.assetsInlineLimit`). `frontend/src/cms/ui-config.json` é transportado para o bundle como `entry.uiConfig`, a apresentação do workspace que um backend implantado serve.
 
 As dependências são incluídas (vendored) por padrão para que uma nova instância não sofra uma instalação de 35 a 55 segundos. Uma árvore que ultrapasse 2 GB em disco é descartada, pois o limite de upload é de 1 GB compactado.
 
@@ -134,8 +132,6 @@ O servidor ejetado mantém uploads locais em `uploads/` do projeto, executado a 
 
 ### `rebase schema generate` / `rebase schema stale`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 ```bash
 rebase schema generate       # backend/schema → backend/src/schema.generated.ts
 rebase schema stale          # name what differs from the tables, exit 1 if anything does
@@ -164,8 +160,6 @@ Cada um deles está em [Comandos de Banco de Dados](/docs/cli/database/), com a 
 
 ### `rebase console`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Um REPL do Node com os dados do projeto abertos, ou um snippet executado com `-e`:
 
 ```bash
@@ -176,8 +170,6 @@ rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
 `rebase` (`dataAsAdmin`, `sql`, `withAuth(user)`) e `tables` (as tabelas do projeto, carregadas de `backend/schema`) estão no escopo, e `await` no nível superior funciona. O banco de dados é resolvido da mesma forma que o `rebase db push` o resolve, e abri-lo não altera nada nele. Com `-e`, o resultado aguardado é impresso como JSON no stdout e qualquer exceção lançada encerra com código `1`. Flags: `--eval`/`-e`, `--schema-dir`, `--database-url`, `--docker`. Consulte [Scripts e o Console](/docs/backend/scripts/).
 
 ### `rebase migrate`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Migrações unidirecionais a partir de uma estrutura que esta versão não lê mais: `rebase migrate collections-to-tables` (`config/collections` → `backend/schema` e `frontend/src/cms`) e `rebase migrate sdk-calls` (`data.collection("x")` → `data.table("x")` no seu próprio código). Suas flags, o que elas gravam e a seção "Revisar antes de implantar" estão em [Geração de Schema](/docs/cli/schema/#rebase-migrate).
 
@@ -247,8 +239,6 @@ Para ver o que a plataforma mantém para um projeto em comparação com o que se
 
 ### `rebase generate-sdk`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 ```bash
 rebase generate-sdk
 ```
@@ -302,8 +292,6 @@ rebase verify --json
 rebase verify --live
 rebase verify --live --database-url postgresql://…
 ```
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Verifica se as tabelas estão seguras para envio, em um comando rápido para CI e para hooks de agentes de IA. Offline por padrão e nunca altera nada.
 

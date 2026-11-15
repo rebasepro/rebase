@@ -1,5 +1,5 @@
 ---
-sourceHash: bdf9409c94709498
+sourceHash: 27b170adac8e577c
 title: Database e bucket multipli
 sidebar_label: Più sorgenti
 description: Instrada le tabelle verso diversi database e le colonne di archiviazione verso diversi bucket, e configura ciascuno di essi dall'ambiente.
@@ -46,8 +46,6 @@ signups.subscription("send-welcome", async (event) => {
 `queue()` dalla versione 0.18.
 
 Poi punta una tabella a una di esse, tramite handle — lo stesso nome, scritto una volta sola:
-
-<span class="since-badge" data-since="0.31">Dalla 0.31</span>
 
 ```ts
 // backend/schema/page_views.ts
@@ -149,8 +147,6 @@ effettuare il bind nello stesso modo in cui faceva al momento della pubblicazion
 kind già rilasciato; usa `registerResourceKind` solo per un kind che nessuno ha ancora pubblicato.
 
 ### Passaggio al frontend
-
-<span class="since-badge" data-since="0.31">Dalla 0.31</span>
 
 Il frontend non importa `backend/resources.ts`: un'importazione di valori di
 qualsiasi elemento in `backend/` da `frontend/` viene rifiutata da

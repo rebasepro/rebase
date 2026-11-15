@@ -1,5 +1,5 @@
 ---
-sourceHash: fb9fac4af8dcfaaf
+sourceHash: 5b1baf3816d33bb8
 slug: it/docs/compatibility
 title: Compatibilità
 description: Cosa garantisce Rebase tra le versioni e cosa no — i sei contratti con controllo di versione, come fallisce ciascuno di essi e cosa potrebbe ancora cambiare in una versione minor.
@@ -37,8 +37,6 @@ che corrompa qualcosa in modo silente. Lo stato dei vari sottosistemi è pubblic
 lasciato da scoprire all'utente — la tabella sottostante rappresenta tale pubblicazione.
 
 ## Idoneità per sottosistema
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 **Ultima revisione il 14 settembre 2026, rispetto alla versione 0.21.0.** Rileggila a ogni versione
 minor; una valutazione rimasta invariata per tre release è consolidata oppure è stata dimenticata,
@@ -140,8 +138,6 @@ del runtime accetta questo progetto. Chiamato deliberatamente `rebase` anziché 
 `runtime` indica già *chi possiede il processo* (`managed` | `custom`) su un'app.
 
 ### 2 — `BUNDLE_FORMAT_VERSION` (attualmente 3)
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 La struttura su disco di un bundle compilato. Un runtime rifiuta un bundle il cui formato è più
 recente del proprio e ne legge uno precedente dove il layout lo consente, il che permette al tier
@@ -268,8 +264,6 @@ Altri due segnali identificativi, nessuno dei quali funge da gate da solo:
 
 ### 6 — Identificatori derivati del database
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Ogni nome che questo framework elabora autonomamente anziché ricevere esplicitamente: una
 colonna foreign key, un vincolo di foreign key, una junction table e le sue due colonne chiave, un
 tipo enum, il nome di una policy, la colonna in `snake_case` derivata da una chiave di colonna in
@@ -341,8 +335,6 @@ tabelle tramite codice diverso, e un progetto caricato con il comando push e avv
 non deve trovarsi con due schemi distinti.
 
 ## Cosa *non* è bloccato (frozen)
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Detto chiaramente, affinché nessuno presuma promesse mai fatte:
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: b58890f96ff100b4
+sourceHash: 9053234803842e2e
 title: Panoramica dell'architettura
 sidebar_label: Architettura
 description: Scopri come backend, frontend, SDK tipizzato e database di Rebase si integrano per formare un Backend-as-a-Service completo.
@@ -52,8 +52,6 @@ Ogni tabella viene risolta rispetto all'adapter configurato: il database predefi
 
 ### Descrittori di tabella
 
-<span class="since-badge" data-since="0.31">Dalla 0.31</span>
-
 All'avvio, il backend compila le tabelle esportate da `backend/schema/index.ts` in
 **descrittori**: ogni colonna con il suo tipo Postgres, tolleranza ai valori nulli (nullability), regole di validazione e
 archiviazione, le relazioni per slug e la postura di row-level security. Un
@@ -81,8 +79,6 @@ Per i **deployment multi-istanza** (ad es. Cloud Run con repliche multiple), cia
 Analogamente ai driver, i backend di storage vengono registrati in un apposito registro. È possibile configurare più provider di storage (locale, S3) e instradare diverse colonne di storage verso backend distinti tramite `col.storage({ source })`.
 
 ## Mappa dei pacchetti
-
-<span class="since-badge" data-since="0.31">Dalla 0.31</span>
 
 | Pacchetto | Ruolo | Utilizzato da |
 |-----------|-------|---------------|

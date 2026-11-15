@@ -1,11 +1,9 @@
 ---
-sourceHash: 59fc3060e8bce0e2
+sourceHash: 8ed0f8885ebc5b1d
 title: Tablas
 sidebar_label: Tablas
 description: "Declara tablas de Postgres en backend/schema con defineTable: columnas, relaciones y una postura obligatoria de seguridad a nivel de fila (RLS). Cada tabla se convierte en SQL, políticas, rutas REST, de tiempo real y MCP, y tipos de SDK."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Una tabla se declara una sola vez, en TypeScript, en el directorio `backend/schema/`.
 Esa declaración es lo único que el backend sabe sobre tus datos. A partir de ella,
@@ -54,8 +52,6 @@ frontend. La guía de actualización para esta versión cubre la migración.
 :::
 
 ## El directorio `backend/schema`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```text
 backend/
@@ -116,8 +112,6 @@ contra una tabla, sin incluir código del backend en el bundle del navegador.
 
 ## En qué se convierte una tabla
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | A partir de la declaración | Rebase genera |
 |---|---|
 | `columns`, `relations`, `indexes` | el `CREATE TABLE`, claves foráneas, tablas de unión e índices, escritos en `schema.sql` mediante `rebase db push` y `rebase db generate` |
@@ -138,8 +132,6 @@ El flujo desde la declaración hasta la base de datos se describe en
 
 ## Opciones de `defineTable`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `defineTable(name, config)` toma el nombre de la tabla y estas claves:
 
 | Clave | Qué hace |
@@ -152,7 +144,7 @@ El flujo desde la declaración hasta la base de datos se describe en
 | `schema` | El esquema de Postgres. `public` cuando se omite. |
 | `database` | Una base de datos de Postgres no predeterminada, declarada en `backend/resources.ts`. Consulta [Múltiples fuentes](/docs/backend/multiple-sources/). |
 | `description` | Lo que contiene la tabla. Se muestra en OpenAPI y en las descripciones de herramientas MCP. |
-| `defaultPolicies` | `false` genera únicamente tus reglas, sin las políticas base de administrador. Rechazado con `rls: "admin-only"`. <span class="since-badge" data-since="0.31">Desde 0.31</span> `true` mantiene la base cuando la base de datos de la tabla la desactiva para todas las tablas (`database({ rls: { defaultPolicies: false } })`). Si se omite, la configuración de la base de datos decide. |
+| `defaultPolicies` | `false` genera únicamente tus reglas, sin las políticas base de administrador. Rechazado con `rls: "admin-only"`. `true` mantiene la base cuando la base de datos de la tabla la desactiva para todas las tablas (`database({ rls: { defaultPolicies: false } })`). Si se omite, la configuración de la base de datos decide. |
 | `tenant` | Limita cada fila a un tenant. Consulta [Tenancy](/docs/collections/tenancy/). |
 | `softDelete` | `true` o `{ field }`: un borrado estampa una marca de tiempo en lugar de eliminar la fila. Consulta [Borrado suave](/docs/collections/soft-delete/). |
 | `history` | `true` registra cada escritura en la tabla de historial. Consulta [Historial de entidades](/docs/backend/history/). |
@@ -167,8 +159,6 @@ Otras dos definiciones comparten la mayoría de estas claves:
 y [`defineView`](/docs/collections/views/) para vistas SQL.
 
 ## Nombres
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 El primer argumento de `defineTable` es el nombre de la tabla, y es el valor predeterminado
 para todo lo demás:
@@ -194,8 +184,6 @@ tabla que ya está desplegada puede renombrar columnas. Establece `slug` explíc
 deba diferir del nombre de la tabla, y no lo modifiques después.
 
 ## Claves primarias
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 No hay una columna `id` implícita. Cada tabla marca al menos una columna
 con `.primaryKey()`:
@@ -229,8 +217,6 @@ ser `.private()`, y no puede ser un `timestamptz` o `time`.
 
 ## Cuándo se rechaza una definición
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Un esquema que dejaría una tabla desprotegida o inservible nunca llega a la
 base de datos. Se rechaza en tres puntos:
 
@@ -260,8 +246,6 @@ sin un `defaultRls`. Una tabla exportada desde un archivo junto a `index.ts` per
 desde el propio `index.ts` también es rechazada: el índice es la lista de tablas.
 
 ## Próximos pasos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Columnas](/docs/schema/columns/): cada constructor y modificador `col.*`
 - [Documentos JSON](/docs/schema/json/): `jsonb` tipado y validado con `json.*`

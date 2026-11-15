@@ -3,8 +3,6 @@ title: Live schema editing
 description: Create and alter tables against a running backend — the edit is written to backend/schema, committed to your repository first, then applied.
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 The schema editor in the admin panel rewrites the table files in
 `backend/schema`. That works on your machine and nowhere else: a deployed
 server's files are rebuilt from your repository on every deploy, so an edit made
@@ -25,8 +23,6 @@ every other `/api/admin` surface that names a scope. An admin holds both.
 Applying also needs one thing more than the scope — see [Who may apply](#who-may-apply).
 
 ## The edits: `TablePatch`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Every route that changes the schema takes the same body, `{ patches }`: a list
 of edits, each naming its table by slug. The type is `TablePatch`, from
@@ -77,8 +73,6 @@ account holding `schema:read`: an admin, or a role that declares it. Nothing on
 the machine sets it for you.
 
 ## Plan before you apply
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `/plan` has no side effects. Post the edits, and it tells you what they mean:
 
@@ -185,8 +179,6 @@ and are not refused:
   `safe`, and applied with `ALTER COLUMN … SET DEFAULT` / `DROP DEFAULT`.
 
 ### Edit source only
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A refused change can still be written to `backend/schema` and committed,
 leaving the database as it is — removing a column you no longer serve is the
@@ -331,8 +323,6 @@ So a failed apply is **not an error**. The response says so:
 
 ## Rules take effect in the same apply
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A change to a table's `rls` (or a new table) is enforced in the same apply: the
 policies of the changed tables are written to the database right after the DDL,
 and the response says what happened under `policies`:
@@ -352,8 +342,6 @@ Hooks edited in source take effect with the apply too: the server runs the
 compiled tables of the edited schema without a restart.
 
 ## Served without a restart
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A change applied from the Studio is served at once. The Postgres driver reads
 the changed tables back from the database and swaps them in: the data API,
@@ -381,8 +369,6 @@ offers Reload; make the edit again against the file as it is now.
 
 ## Where this works
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Live schema editing rewrites `backend/schema` with the same editor the panel's
 source-only saves use (it needs `ts-morph` installed). Where that source
 comes from decides where it runs:
@@ -409,8 +395,6 @@ repository, `/api/admin/schema/status` answers `enabled: false` with the code
 deploy.
 
 ### From a built bundle
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A bundle has no code of its own to configure, so it opts in with environment
 variables. Nothing changes for a bundle that does not set them.
@@ -461,8 +445,6 @@ result, and deploy it. Line endings and trailing whitespace do not count as a
 difference.
 
 ### Committing to a remote repository
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `liveSchema.repository` makes the server commit each change to a GitHub
 repository through the Git Data API instead of running `git commit` in a

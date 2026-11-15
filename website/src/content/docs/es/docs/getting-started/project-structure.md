@@ -1,5 +1,5 @@
 ---
-sourceHash: c6b361597710219f
+sourceHash: b26bc6f688a4ec9b
 title: Estructura del proyecto
 sidebar_label: Estructura del proyecto
 description: "La estructura de un proyecto Rebase: las tablas en backend/schema, los módulos del backend que lee el runtime y las personalizaciones del panel de administración en frontend/src/cms, con y sin el panel."
@@ -26,8 +26,6 @@ Cada una de ellas significa algo específico aquí, y la mayoría significa algo
   un bucket, un topic. Declarado en `backend/resources.ts`, vinculado mediante variables de
   entorno.
 :::
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `rebase init` genera una de dos estructuras iniciales. Ambas tienen el mismo `backend/`; la
 diferencia radica en si el proyecto incluye o no el panel de administración.
@@ -109,8 +107,6 @@ archivo compose que los construye. Consulta [Integración de servidor personaliz
 :::
 
 ## Tablas (`backend/schema/`)
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Las tablas son la **única fuente de verdad** para tu modelo de datos:
 
@@ -206,8 +202,6 @@ coincidan en un único valor sin necesidad de escribirlo tres veces.
 
 ### Conceptos clave
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 - **`createRebaseClient`** — Crea el cliente SDK que gestiona las solicitudes HTTP, las conexiones WebSocket y la administración de tokens de autenticación. Llámalo una sola vez, en el alcance del módulo: dentro de un componente, incluso en un `useMemo`, `<React.StrictMode>` construye un segundo cliente en desarrollo
 - **`<RebaseCMS tableCustomizations>`** — el panel renderiza cada tabla que el backend sirve en `GET /api/schema/tables`; los objetos `customizeTable` de `frontend/src/cms/` modifican la apariencia de algunas de ellas, y `uiConfig` traslada lo que el editor de colecciones guardó en desarrollo. Consulta [Personalización de una tabla](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
 - **`useRebaseAuthController`** — Contiene el usuario autenticado y el ciclo de vida del token, y es lo que `<Rebase>` distribuye a todos los componentes que están debajo
@@ -256,8 +250,6 @@ de la plataforma ya no llegarán al proyecto. Dicha interfaz está documentada e
 [Integración de servidor personalizado](/docs/backend/custom-server).
 
 ## Cómo se conectan
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 1. **Tú declaras** las tablas en `backend/schema/`
 2. **El backend** las compila, crea las tablas y políticas, y monta las rutas REST, de tiempo real y MCP

@@ -1,11 +1,9 @@
 ---
-sourceHash: 8a72cff37e30800b
+sourceHash: d3c645c7930945a3
 title: Views
 sidebar_label: Views
 description: "Disponibilize uma view SQL ou uma view materializada somente leitura com defineView: views security_invoker governadas pelas tabelas que leem, views materializadas restritas por papéis, atualizadas sob demanda, criadas por db push."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O `defineView` disponibiliza uma consulta SQL como uma tabela somente leitura. Declare a consulta, as colunas que ela retorna e a coluna ou colunas que identificam uma linha:
 
@@ -30,8 +28,6 @@ O `rebase db push` cria a view após as tabelas, o `rebase db generate` a anexa 
 
 ## Opções
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | Chave | O que faz |
 |---|---|
 | `query` | **Obrigatório.** O `SELECT` definidor. |
@@ -52,13 +48,9 @@ Uma view possui pelo menos uma coluna `.primaryKey()`: uma view não possui chav
 
 ## Quem vê quais linhas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Uma view simples é criada `WITH (security_invoker = true)`, portanto ela é executada **como o chamador**: a segurança a nível de linha das tabelas que ela lê decide o que cada chamador vê. Um usuário cujas políticas exibem apenas suas próprias músicas verá a view de suas próprias músicas. É por isso que uma view não tem `rls`: não há nada ao que anexar políticas e nada que elas possam adicionar. Consulte [Segurança a nível de linha](/docs/collections/security-rules/) para as políticas nas tabelas subjacentes.
 
 ## Views materializadas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `materialized: true` armazena as linhas, de modo que uma leitura não executa a consulta:
 
@@ -96,8 +88,6 @@ POST /api/data/langs/refresh
 `concurrently` continua servindo as linhas antigas enquanto as novas são computadas. Ele requer o índice exclusivo que o Rebase cria nas colunas `.primaryKey()`, portanto elas devem ser exclusivas no resultado da consulta. Para atualizar de forma agendada, chame `refresh()` a partir de um [cron job](/docs/backend/cron-jobs/). Uma view materializada pode ter seus próprios `indexes` (consulte [Índices](/docs/backend/indexes/)), construídos sobre suas linhas armazenadas; uma view simples lê os índices de suas tabelas.
 
 ## O que uma view não pode ter
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `rls`, `history`, `softDelete`, `tenant` e `search` são recusados quando o esquema é compilado: cada um precisa de uma tabela para gravar ou para anexar políticas. `roles` em uma view simples é recusado quando o módulo é carregado, assim como uma `query` vazia. `indexes` em uma view simples é recusado quando o esquema é compilado.
 

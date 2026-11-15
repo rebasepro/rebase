@@ -1,11 +1,9 @@
 ---
-sourceHash: f385a35cc59df9c6
+sourceHash: acac0f12ed25af39
 title: Row-Level-Security
 sidebar_label: Row-Level-Security
 description: "Jede Tabelle deklariert ihre RLS-Grundhaltung – admin-only, inherit oder eine Liste von Regeln – und Rebase kompiliert sie zu Postgres-Row-Level-Security-Policies. Regelformen, Kurzschreibweisen für Bedingungen, defaultRls und was fail-closed ist."
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Jede Tabelle legt in ihrem `rls`-Schlüssel fest, wer auf ihre Zeilen zugreifen kann. Rebase kompiliert dies in Postgres-Row-Level-Security: `ENABLE ROW LEVEL SECURITY` auf der Tabelle und ein `CREATE POLICY` pro Regel und Operation. Postgres filtert dann jede Anweisung auf jeder Route – REST, Realtime, MCP, dem CMS und SQL, das im Kontext des Aufrufers ausgeführt wird –, da sich die Regeln in der Datenbank und nicht im Anwendungscode befinden.
 
@@ -37,8 +35,6 @@ export const posts = defineTable("posts", {
 
 ## Die drei Grundhaltungen
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 | `rls` | Bedeutung |
 |---|---|
 | `"admin-only"` | Row-Level-Security aktiviert und nur die Admin-Baseline-Policies: Die `admin`-Rolle und der eigene Code des Servers erreichen Zeilen. Jeder andere Aufrufer erhält keine Zeilen, und Schreibzugriffe werden abgewiesen. |
@@ -48,8 +44,6 @@ export const posts = defineTable("posts", {
 `"admin-only"` ist die Grundhaltung, mit der eine Tabelle gestartet werden sollte, wenn Sie noch nicht entschieden haben, wer darauf zugreifen darf. Nichts wird freigegeben, bis Sie die Regeln schreiben, die den Zugriff erlauben.
 
 ### `defaultRls`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `backend/schema/index.ts` kann eine Grundhaltung für die Tabellen exportieren, die `rls: "inherit"` angeben:
 
@@ -70,8 +64,6 @@ export const defaultRls: DefaultRls = [
 
 ## Policies, die eine Tabelle automatisch erhält
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Die Policies auf einer Tabelle umfassen mehr als nur ihre eigenen Regeln:
 
 - **Die Admin-Baseline.** Jede Tabelle erhält `<table>_default_admin_read`- und `<table>_default_admin_write`-Policies für Insert, Update und Delete. Sie sind permissiv und lassen den Serverkontext sowie die `admin`-Rolle zu, sodass Administratoren jede Zeile lesen und schreiben können. Permissive Policies werden mit ODER verknüpft, sodass die Baseline alles erweitert, was Ihre Regeln erlauben; sie schränkt sie niemals ein.
@@ -84,8 +76,6 @@ Die Policies auf einer Tabelle umfassen mehr als nur ihre eigenen Regeln:
 Das generierte DDL markiert jede injizierte Policy, und `rebase db push` stellt manuell gelöschte Policies wieder her.
 
 ## Regelformen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Eine Regel entspricht einer dieser Formen. Das Mischen von zweien in einer Regel ist ein Typfehler, und der Compiler lehnt dies ebenfalls ab, sodass auch JavaScript und Typ-Casts abgefangen werden: `access` neben `ownerField`, `using` oder `withCheck`; `ownerField` neben `using`, `withCheck`, `condition` oder `check`; `condition` oder `check` neben `using` oder `withCheck`. Ebenso verhält es sich mit Werten außerhalb der Liste für `access`, `mode`, `operation(s)` oder `roles` (ein falsch geschriebenes `"restrictive"` wird abgelehnt, nicht als permissiv interpretiert). Eine Regel wird niemals zu einer Policy, die stillschweigend die Hälfte dessen ignoriert, was definiert wurde.
 
@@ -121,8 +111,6 @@ Der 0.30-Compiler hat nur eine Klausel einer Regel gelesen und kannte außer `"p
 
 ### Owner
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 ```ts
 import { defineTable, col } from "@rebasepro/server/schema";
 
@@ -141,8 +129,6 @@ Dies generiert `USING ((owner_id)::text = (SELECT rebase.uid()))`.
 
 ### Öffentlicher Zugriff
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `{ operation: "select", access: "public" }` generiert `USING (true)`: kein Zeilenfilter bei Lesezugriffen, sodass jeder Aufrufer, den die API durchlässt, jede Zeile lesen kann.
 
 Es erweitert, welche Zeilen ein Aufrufer sieht, nicht wer anfragen darf. Standardmäßig antwortet die API bei einem Request ohne Token weiterhin mit 401. Setzen Sie `AUTH_REQUIRE=false` (`auth.requireAuth: false`), um diese Schranke zu entfernen und ausschließlich die Policies entscheiden zu lassen; dann kann auch ein nicht authentifizierter Aufrufer diese Zeilen lesen.
@@ -150,8 +136,6 @@ Es erweitert, welche Zeilen ein Aufrufer sieht, nicht wer anfragen darf. Standar
 `{ access: "authenticated" }` entspricht dem mit einer Prüfung auf Anmeldung: Der Aufrufer verfügt über eine Sitzung. Ein über die anonyme Anmeldung erstellter Gast besitzt eine solche. `{ access: "registered" }` schließt Gäste zusätzlich aus; bevorzugen Sie dies in Projekten mit anonymer Anmeldung. Beide lassen sich wie `"public"` mit `condition` und `check` kombinieren. Siehe [`authenticated()` und `registered()`](#authenticated-und-registered).
 
 ### Bedingungen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Eine `condition` legt fest, welche vorhandenen Zeilen eine Regel abdeckt; ein `check` definiert, welche neuen oder aktualisierten Werte sie zulässt, und verwendet standardmäßig die Bedingung. Beide akzeptieren die Kurzschreibweise als Objekt oder einen strukturierten Ausdruck.
 
@@ -242,8 +226,6 @@ Innerhalb von `existsIn` benennt `policy.field()` eine Spalte der anderen Tabell
 
 ### Reines SQL
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `using` und `withCheck` akzeptieren SQL. `{column}` wird zur Spalte der Tabelle aufgelöst, und der Aufrufer ist als `rebase.uid()`, `rebase.roles()` (kommagetrennte Rollen) und `rebase.jwt()` (die Claims des Tokens als `jsonb`) verfügbar:
 
 ```ts
@@ -269,15 +251,11 @@ Reines SQL wird allein von Postgres durchgesetzt: Das CMS kann es nicht auswerte
 
 ## Einmal pro Anweisung ausgewertet
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Jeder Teil einer Regel, der die Zeile nicht liest – die ID des Aufrufers, eine Rollenprüfung, ein Claim, `serverContext()` –, wird innerhalb einer skalaren Unterabfrage kompiliert. Eine Owner-Regel wird zu `(user_id)::text = (SELECT rebase.uid())`. Postgres berechnet eine solche Unterabfrage einmal pro Anweisung statt einmal pro Zeile und plant so, als ob die Prüfung die Hälfte der Tabelle statt 1,5 % davon passiert, wodurch auch tiefe Seiten einer großen Tabelle auf ihrem Index bleiben. Wer was lesen oder schreiben darf, bleibt unverändert.
 
 Reines SQL wird genauso behandelt, wenn Rebase seine Struktur lesen kann (`owner_id = rebase.uid()` tut dies). Alles andere wird unverändert eingefügt; kapseln Sie die Aufrufe daher selbst: `(SELECT rebase.uid())`.
 
 ## `authenticated()` und `registered()`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Einem Request ganz ohne Sitzung wird eine Sentinel-ID zugewiesen, sodass `rebase.uid()` bei einem Request niemals `NULL` ist und `policy.authenticated()` (wie `access: "authenticated"`) diesen ausschließt.
 
@@ -289,13 +267,9 @@ Es kompiliert zu `rebase.uid() IS NULL`, was nur für integrierte Abläufe gilt,
 
 ## Permissiv und restriktiv
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Permissive Regeln (Standard) werden mit ODER verknüpft: Eine Zeile wird erreicht, sobald eine beliebige dieser Regeln den Zugriff gewährt. Restriktive Regeln werden mit ihnen durch UND verknüpft: Jede restriktive Regel muss ebenfalls erfüllt sein. Eine permissive Regel erweitert den Zugriff; eine restriktive kann ihn nur einschränken. Mandantenfähigkeit (Tenancy) ist aus diesem Grund eine restriktive Regel: Eine `access: "public"`-Regel an anderer Stelle der Tabelle kann die Mandantengrenze nicht aufheben.
 
 ## Was fail-closed ist
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Eine Tabelle kann nicht versehentlich erreichbar werden:
 
@@ -307,8 +281,6 @@ Eine Tabelle kann nicht versehentlich erreichbar werden:
 Jeder Request führt seine Anweisungen unter einer Datenbankrolle aus, für die Row-Level-Security gilt, innerhalb einer Transaktion, die die ID, Rollen und Claims des Aufrufers enthält. Dies ist es, was `rebase.uid()`, `rebase.roles()` und `rebase.jwt()` auslesen.
 
 ## Requests ohne Sitzung
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein Request ohne Token erreicht die Policies nur dann, wenn `AUTH_REQUIRE=false` gesetzt ist; andernfalls antwortet die API vorab mit 401. Er wird dann mit `rebase.uid()` gesetzt auf `'anonymous'` und ohne Rollen ausgeführt: `access: "public"`-Regeln gewähren Zugriff, `access: "authenticated"`- und Owner-Regeln hingegen nicht.
 
@@ -332,8 +304,6 @@ export const contactMessages = defineTable("contact_messages", {
 
 ## Zeilen hier, Spalten nebenan
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `rls` entscheidet, welche Zeilen ein Aufrufer erreicht. Es trifft keine Aussage über die Spalten einer Zeile, die erreicht wird: Eine Regel, die es einem Mitarbeiter erlaubt, die Zeilen seines Teams zu lesen, erlaubt ihm das Lesen jeder Spalte dieser Zeilen, einschließlich des Gehalts. Regeln pro Spalte werden über [`.access()`](/docs/collections/field-access/) an der Spalte definiert:
 
 ```ts
@@ -353,8 +323,6 @@ export const staff = defineTable("staff", {
 Die Rollen sind dieselben Rollen: `policy.rolesOverlap(["hr"])` in einer Regel und `.access({ read: ["hr"] })` an einer Spalte bedeuten dasselbe `hr`. Spaltenregeln werden vom Server angewendet, sodass sie jede API-Route abdecken; eine über `rebase.sql()` ausgeführte Abfrage sieht jede Spalte, da sie die Row-Level-Security umgeht.
 
 ## Nächste Schritte
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - [Feldzugriff](/docs/collections/field-access/): Lese- und Schreibrollen pro Spalte
 - [Mandantenfähigkeit (Tenancy)](/docs/collections/tenancy/): eine restriktive Grenze pro Mandant

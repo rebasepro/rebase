@@ -1,11 +1,9 @@
 ---
-sourceHash: 23be8a1faf1d5f49
+sourceHash: a64928625cee8ee8
 title: Documentos JSON
 sidebar_label: Documentos JSON
 description: "Tipifique uma coluna jsonb com col.jsonb().$type<T>(), ou atribua a ela uma estrutura com json.* para que o servidor valide campos aninhados, aplique valores padrão e carimbos, encontre os arquivos referenciados por um documento e pesquise dentro dele."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Uma coluna `jsonb` pode ser declarada de duas maneiras. `col.jsonb().$type<T>()` tipifica o documento
 para o TypeScript e não informa nada ao servidor sobre ele. `col.jsonb(shape)` recebe uma
@@ -50,8 +48,6 @@ obtém um editor JSON genérico.
 
 ## Builders
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | Builder | Contém | Tipo TypeScript |
 |---|---|---|
 | `json.string()` | uma string | `string` |
@@ -69,8 +65,6 @@ obtém um editor JSON genérico.
 `json.object(fields, { additional: true })` também aceita chaves que não foram nomeadas explicitamente.
 
 ## Modificadores
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 | Modificador | Em | O que faz |
 |---|---|---|
@@ -114,8 +108,6 @@ pela escrita, e o `.default()` de um campo o preenche primeiro.
 
 ## Arrays e blocos tipificados
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `json.array(of)` é uma lista de uma única estrutura. `json.oneOf(variants)` é um bloco cuja
 chave `type` indica qual é a variante e cuja chave `value` contém o
 conteúdo dessa variante. Como itens de um array, ele representa a estrutura de um editor de blocos:
@@ -158,8 +150,6 @@ outros nomes: `json.oneOf({ … }, { typeField: "kind", valueField: "data" })`.
 
 ## `jsonb` ou `json`
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `col.json()` aceita os mesmos argumentos que `col.jsonb()`. Ele armazena o texto exatamente como foi
 fornecido, incluindo a ordem das chaves e espaços em branco, e não pode ser indexado ou pesquisado da
 mesma forma que o `jsonb`. Use-o apenas quando o texto exato for importante; caso contrário, use
@@ -171,8 +161,6 @@ de array: `col.text().array()`. Listas aninhadas devem usar `jsonb`: `.array()` 
 um array é recusado.
 
 ## Próximos passos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Columns](/docs/schema/columns/): os builders de colunas e suas regras de validação
 - [Search](/docs/backend/search/): pesquisando caminhos dentro de um documento

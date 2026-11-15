@@ -6,8 +6,6 @@ description: "How the CMS draws a col.storage() column as an upload field: the r
 
 import { FieldWidgetPreview } from '../../../../components/docs/FieldWidgetPreview';
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A file field is a [`col.storage()`](/docs/schema/columns/#storage-columns)
 column. The column holds text, the object's key in the bucket (or its URL, if
 the column says so), and the CMS draws it as an upload field with a preview.
@@ -25,8 +23,6 @@ functions: they cannot reach the server, so they shape only uploads made from
 the CMS.
 
 ## One file
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```ts
 // backend/schema/listings.ts
@@ -53,16 +49,12 @@ image slot in cards and lists.
 
 ## Several files
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `.multiple()` makes the column a `TEXT[]` and the field a multi-file upload,
 reorderable by dragging. Every option applies to each file.
 
 <FieldWidgetPreview client:only="react" variant="multi_file_upload" />
 
 ## Browser-side options
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```tsx
 // frontend/src/cms/listings.tsx
@@ -106,8 +98,6 @@ empties the field.
 
 ## What the server checks
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `accept` and `maxBytes` are enforced by the server against **where the file
 lands**. A column's `path` is where its files go, so it is also where its
 limits hold: every upload whose key is a file directly under that path meets
@@ -131,15 +121,11 @@ bytes are sent: a file uploaded another way is stored as it was sent.
 
 ## Where a file may go
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `path` is a default, not a boundary: nothing on the server confines an upload to
 it. Who may write where is a storage authorization rule; see
 [Storage](/docs/backend/storage/).
 
 ## Files are never deleted for you
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Clearing a file field, replacing its file, or deleting the row leaves the stored
 object where it is. Every upload gets a key of its own, so a replacement writes
@@ -152,8 +138,6 @@ them with `--delete`; see [the CLI](/docs/cli/#rebase-storage).
 
 ## Moving a column to another bucket
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A file field stores the object's key, not its bucket. Changing a column's
 `source` points every existing value at the new bucket, where those keys do not
 exist, so previews of older files answer "not found". Copy the objects to the
@@ -163,8 +147,6 @@ own tooling, such as `aws s3 sync` or `gcloud storage cp`, or keep the old bucke
 for the existing files.
 
 ## Next steps
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - [Columns](/docs/schema/columns/#storage-columns): every `col.storage()` option
 - [Fields](/docs/collections/properties/): the other column types

@@ -27,8 +27,6 @@ else elsewhere in the industry.
   variables.
 :::
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `rebase init` scaffolds one of two layouts. Both have the same `backend/`; the
 difference is whether the project has the admin panel.
 
@@ -109,8 +107,6 @@ file that builds them. See [Custom Server Integration](/docs/backend/custom-serv
 :::
 
 ## Tables (`backend/schema/`)
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Tables are the **single source of truth** for your data model:
 
@@ -206,8 +202,6 @@ one value without it being written down three times.
 
 ### Key Concepts
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 - **`createRebaseClient`** — Creates the SDK client that handles HTTP requests, WebSocket connections, and auth token management. Call it once, at module scope: inside a component, even in a `useMemo`, `<React.StrictMode>` builds a second client in development
 - **`<RebaseCMS tableCustomizations>`** — the panel renders every table the backend serves at `GET /api/schema/tables`; the `customizeTable` objects from `frontend/src/cms/` change how some of them look, and `uiConfig` carries what the collection editor saved in development. See [Customizing a table](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
 - **`useRebaseAuthController`** — Holds the signed-in user and the token lifecycle, and is what `<Rebase>` distributes to everything below it
@@ -256,8 +250,6 @@ longer reach the project. That surface is documented in
 [Custom Server Integration](/docs/backend/custom-server).
 
 ## How They Connect
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 1. **You declare** tables in `backend/schema/`
 2. **The backend** compiles them, creates the tables and policies, and mounts REST, realtime and MCP routes

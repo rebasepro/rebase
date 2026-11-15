@@ -1,13 +1,11 @@
 ---
-sourceHash: 5037df8f9b275f93
+sourceHash: 2813a331b4153057
 title: Campos de upload de arquivos
 sidebar_label: Uploads de arquivos
 description: "Como o CMS renderiza uma coluna col.storage() como um campo de upload: as regras que o servidor aplica à coluna, as funções exclusivas do navegador adicionadas pelo customizeTable, campos de arquivo único e múltiplos arquivos, e o que acontece com os arquivos armazenados."
 ---
 
 import { FieldWidgetPreview } from '../../../../../components/docs/FieldWidgetPreview';
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Um campo de arquivo é uma coluna [`col.storage()`](/docs/schema/columns/#storage-columns).
 A coluna armazena texto, a chave do objeto no bucket (ou sua URL, se
@@ -26,8 +24,6 @@ funções: elas não podem chegar ao servidor, portanto moldam apenas os uploads
 partir do CMS.
 
 ## Um arquivo
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```ts
 // backend/schema/listings.ts
@@ -54,16 +50,12 @@ espaço de imagem do registro em cartões e listas.
 
 ## Vários arquivos
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `.multiple()` transforma a coluna em um `TEXT[]` e o campo em um upload de múltiplos arquivos,
 reordenável por arrastar e soltar. Todas as opções se aplicam a cada arquivo.
 
 <FieldWidgetPreview client:only="react" variant="multi_file_upload" />
 
 ## Opções no navegador
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 ```tsx
 // frontend/src/cms/listings.tsx
@@ -107,8 +99,6 @@ limpa o campo.
 
 ## O que o servidor verifica
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `accept` e `maxBytes` são aplicados pelo servidor com base em **onde o arquivo é
 gravado**. O `path` de uma coluna é para onde seus arquivos vão, portanto é também onde seus
 limites se aplicam: qualquer upload cuja chave seja um arquivo diretamente sob esse caminho deve
@@ -132,15 +122,11 @@ bytes sejam enviados: um arquivo enviado por outro meio é armazenado exatamente
 
 ## Para onde um arquivo pode ir
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `path` é um padrão, não um limite restritivo: nada no servidor confina um upload a
 ele. Quem pode gravar onde é uma regra de autorização de armazenamento; consulte
 [Armazenamento](/docs/backend/storage/).
 
 ## Arquivos nunca são excluídos para você
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Limpar um campo de arquivo, substituir seu arquivo ou excluir a linha deixa o
 objeto armazenado onde ele está. Cada upload recebe uma chave própria, portanto uma substituição grava
@@ -153,8 +139,6 @@ exclui com `--delete`; consulte [a CLI](/docs/cli/#rebase-storage).
 
 ## Movendo uma coluna para outro bucket
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Um campo de arquivo armazena a chave do objeto, não seu bucket. Alterar o `source`
 de uma coluna aponta todos os valores existentes para o novo bucket, onde essas chaves não
 existem, fazendo com que as pré-visualizações de arquivos mais antigos retornem "não encontrado". Copie primeiro os objetos para o
@@ -164,8 +148,6 @@ próprio provedor, como `aws s3 sync` ou `gcloud storage cp`, ou mantenha o buck
 para os arquivos existentes.
 
 ## Próximos passos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Colunas](/docs/schema/columns/#storage-columns): todas as opções de `col.storage()`
 - [Campos](/docs/collections/properties/): os outros tipos de coluna

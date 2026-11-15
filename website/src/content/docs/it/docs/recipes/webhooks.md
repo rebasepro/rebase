@@ -1,5 +1,5 @@
 ---
-sourceHash: 517637e2cfd34608
+sourceHash: a5eff26fca2535c7
 title: "Ricetta: Integrazione webhook"
 sidebar_label: Webhooks
 description: Usa gli hook di tabella per inviare webhook a servizi esterni quando i dati cambiano, senza mantenere aperta la transazione di scrittura.
@@ -17,8 +17,6 @@ Due aspetti riguardanti questi hook determinano il modo in cui è scritta questa
 Quindi: non usare mai `await` per una richiesta HTTP in uscita all'interno di un hook. Mettila in coda.
 
 ## Notifica Slack su nuovo ordine
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `WebhookDispatcher` viene esportato da `@rebasepro/server`. `enqueueEntityChange` ritorna immediatamente — la POST viene effettuata una volta eseguito il commit della scrittura, mai per una che subisce il rollback — e il dispatcher convalida la destinazione, firma il payload, delimita ogni tentativo con una scadenza e ritenta i fallimenti.
 
@@ -79,8 +77,6 @@ Solo l'id del webhook viene memorizzato nel job, quindi il suo segreto di firma 
 `setTableHooks` **sostituisce** gli hook dichiarati dalla tabella `orders`. Se ne dichiara già alcuni, mantienili: passa `composeTableHooks(declared, { afterSave })`, con `composeTableHooks` da `@rebasepro/common` e `declared` corrispondente agli `hooks` della tabella stessa (`orders.config.hooks`). Consulta [Combining hook sets](/docs/collections/callbacks/#combining-hook-sets).
 
 ### Senza una coda di job
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Ometti `jobQueue` — o esegui l'applicazione dove il backend non ha una coda di job — e le consegne verranno accodate in memoria, nel processo che ha apportato la modifica. Questo approccio è più semplice ed è sufficiente per le notifiche che ci si può permettere di perdere:
 

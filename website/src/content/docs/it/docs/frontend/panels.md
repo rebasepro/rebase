@@ -1,5 +1,5 @@
 ---
-sourceHash: 7a427ea4f8f8b272
+sourceHash: 41940d8e882be98e
 title: Pannelli in una pagina personalizzata
 sidebar_label: Pannelli nelle tue pagine
 description: "Mostra una tabella, il form di un record, un record o un singolo valore in una pagina personalizzata: CollectionPanel, RecordForm, RecordDetail, FieldValue e CollectionsProvider, senza alcuna shell di amministrazione attorno."
@@ -38,8 +38,6 @@ altri router, solo il prompt del browser per l'uscita dalla pagina fornisce prot
 deve mostrare prima il login di Rebase.
 
 ## Cosa mostra un pannello
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 Un pannello esegue il rendering della tabella nello stesso modo dell'admin — a partire dal descrittore fornito dal server,
 insieme a qualsiasi `customizeTable` tu abbia registrato. Queste prop la restringono a ciò che

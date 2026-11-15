@@ -1,5 +1,5 @@
 ---
-sourceHash: 00f5a2af4d9eec17
+sourceHash: 1cb8519ab1fea20d
 title: Rebase auf InstaPods bereitstellen
 description: Bringen Sie ein frisches rebase init-Projekt auf eine Live-HTTPS-URL auf einem InstaPods-Pod – Node, PostgreSQL und Datei-Uploads auf derselben Maschine, ohne Docker.
 sidebar_label: InstaPods
@@ -143,8 +143,6 @@ instapods env set my-app STORAGE_TYPE=s3 S3_BUCKET=my-uploads S3_REGION=... \
 Bereits auf dem Pod vorhandene Dateien werden nicht automatisch verschoben: Kopieren Sie sie unter Beibehaltung ihrer Keys in den Bucket. Wer Dateien lesen, schreiben und auflisten darf, wird von `storageAuthorize` in `backend/storage.ts` bestimmt – unabhängig davon, welches Backend sie speichert. Siehe [Speicher](/docs/backend/storage).
 
 ## Das Schema
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 **Die Runtime erstellt fehlende Tabellen beim Start, einschließlich der in `backend/schema` deklarierten.** `REBASE_MIGRATE_ON_BOOT` ist standardmäßig auf `ensure` gesetzt, was über das gesamte Schema hinweg additiv wirkt. Es erstellt fehlende Tabellen, Spalten und Enum-Typen und wendet deren Row-Level Security an, sodass eine neue Tabelle beim nächsten Deployment sofort live ist.
 

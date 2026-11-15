@@ -1,5 +1,5 @@
 ---
-sourceHash: d337d344b88534c8
+sourceHash: a63ce157610d02d8
 title: Campi personalizzati
 sidebar_label: Campi personalizzati
 description: Crea campi modulo personalizzati per la modifica delle entità con accesso completo al contesto del modulo, ai valori dell'entità e agli hook di Rebase.
@@ -10,8 +10,6 @@ description: Crea campi modulo personalizzati per la modifica delle entità con 
 </video>
 
 ## Panoramica
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Il CMS disegna un campo per ogni colonna in base al suo tipo (vedi
 [Fields](/docs/collections/properties/)). Quando non è ciò che desideri, assegna
@@ -26,8 +24,6 @@ direttamente. Un percorso stringa o un thunk lazy `() => import(…)` generano u
 cosa scrivere al suo posto.
 
 ## Creazione di un campo personalizzato
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Un campo personalizzato è un componente React che riceve `FieldProps`:
 
@@ -54,8 +50,6 @@ export function ColorPickerField({ value, setValue, error, showError, minimalist
 
 ### FieldProps
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 | Prop | Tipo | Descrizione |
 |------|------|-------------|
 | `value` | `T` | Valore corrente del campo |
@@ -70,8 +64,6 @@ export function ColorPickerField({ value, setValue, error, showError, minimalist
 | `customProps` | `unknown` | I `customProps` del campo da `customizeTable`, senza modifiche |
 
 ## Utilizzo
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 ```tsx
 // frontend/src/cms/brands.tsx
@@ -93,15 +85,11 @@ componente e il frontend importa solo il tipo della tabella da
 
 ## Un tipo di campo riutilizzabile
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Un campo utilizzato in molte tabelle può essere registrato una sola volta su
 `<Rebase propertyConfigs>`, indicizzato per nome, e indicato su ciascun campo con
 `propertyConfig: "color_picker"`.
 
 ## Accesso al contesto del modulo
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Un campo personalizzato può leggere l'intero record durante la modifica:
 
@@ -129,15 +117,11 @@ export function PriceWithTaxField({ value, setValue, context }: FieldProps<Numbe
 
 ## Modalità tabella
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Un campo personalizzato non viene disegnato all'interno di una cella di tabella: la cella mostra il valore (o
 la tua `Preview`) e la sua modifica apre il campo in un popup con `minimalistView`
 impostato. Mantienilo compatto in quel contesto, come fa `ColorPickerField` qui sopra.
 
 ## Anteprime personalizzate
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `Preview` visualizza il valore all'esterno del modulo. Riceve `FieldPreviewProps`:
 `value`, la `property` risolta, la dimensione `size` assegnata dalla superficie (`"small"`,
@@ -160,8 +144,6 @@ export function ColorPreview({ value }: FieldPreviewProps) {
 ```
 
 ## Filtri personalizzati
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 `Filter` sostituisce il controllo del filtro di un singolo campo. Ha la precedenza su un
 override `Collection.FilterField` a livello di collezione e sul controllo integrato per

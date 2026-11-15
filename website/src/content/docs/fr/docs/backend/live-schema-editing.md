@@ -1,10 +1,8 @@
 ---
-sourceHash: a8ca2780e6bbad15
+sourceHash: 97486e7c061d503d
 title: Édition de schéma en direct
 description: Créez et modifiez des tables sur un backend en cours d'exécution — la modification est écrite dans backend/schema, d'abord commitée dans votre dépôt, puis appliquée.
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 L'éditeur de schéma dans le panneau d'administration réécrit les fichiers de table dans
 `backend/schema`. Cela fonctionne sur votre machine et nulle part ailleurs : les fichiers
@@ -26,8 +24,6 @@ comme toute autre surface de `/api/admin` qui spécifie une portée. Un administ
 L'application nécessite également une chose de plus que la portée — voir [Qui peut appliquer](#qui-peut-appliquer).
 
 ## Les modifications : `TablePatch`
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Chaque route qui modifie le schéma prend le même corps, `{ patches }` : une liste
 de modifications, chacune désignant sa table par son slug. Le type est `TablePatch`,
@@ -78,8 +74,6 @@ compte disposant de `schema:read` : un administrateur, ou un rôle qui le décla
 machine ne le définit pour vous.
 
 ## Planifier avant d'appliquer
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `/plan` n'a pas d'effets secondaires. Envoyez les modifications en POST, et il vous indique ce qu'elles impliquent :
 
@@ -187,8 +181,6 @@ ressemblent à des changements et ne sont pas refusées :
   C'est `safe`, et appliqué avec `ALTER COLUMN … SET DEFAULT` / `DROP DEFAULT`.
 
 ### Modifier la source uniquement
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Une modification refusée peut toujours être écrite dans `backend/schema` et commitée,
 laissant la base de données telle quelle — la suppression d'une colonne que vous ne servez
@@ -330,8 +322,6 @@ Une application ayant échoué n'est donc **pas une erreur**. La réponse l'indi
 
 ## Les règles prennent effet lors de la même application
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Une modification du `rls` d'une table (ou une nouvelle table) est appliquée lors de la même
 opération : les politiques des tables modifiées sont écrites dans la base de données juste après
 le DDL, et la réponse indique ce qui s'est passé sous `policies` :
@@ -350,8 +340,6 @@ Les hooks modifiés dans le code source prennent également effet avec l'applica
 exécute les tables compilées du schéma modifié sans redémarrage.
 
 ## Servi sans redémarrage
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Une modification appliquée depuis le Studio est servie immédiatement. Le pilote Postgres relit
 les tables modifiées depuis la base de données et les remplace : l'API de données, les includes,
@@ -378,8 +366,6 @@ propose Reload ; effectuez à nouveau la modification par rapport au fichier dan
 
 ## Où cela fonctionne
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 L'édition de schéma en direct réécrit `backend/schema` avec le même éditeur que les sauvegardes
 source-only du panneau utilisent (il nécessite l'installation de `ts-morph`). La provenance de cette
 source détermine où elle s'exécute :
@@ -405,8 +391,6 @@ et le runtime qui le sert désactive l'éditeur source-only. À moins qu'il ne s
 modifiez `backend/schema` en développement, commitez et déployez.
 
 ### Depuis un bundle compilé
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un bundle n'a pas de code propre à configurer, il s'active donc à l'aide de variables
 d'environnement. Rien ne change pour un bundle qui ne les définit pas.
@@ -454,8 +438,6 @@ avec la version exécutée par le déploiement, commitez le résultat et déploy
 et les espaces en fin de ligne ne sont pas considérés comme une différence.
 
 ### Commiter vers un dépôt distant
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `liveSchema.repository` permet au serveur de commiter chaque modification dans un dépôt GitHub
 via la Git Data API au lieu d'exécuter `git commit` dans un arbre de travail. Cela ne dépend pas

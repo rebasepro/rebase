@@ -1,5 +1,5 @@
 ---
-sourceHash: ff162864c3d1600b
+sourceHash: 6403748b3ff6521b
 slug: it/docs/troubleshooting
 title: Risoluzione dei problemi
 description: Gli errori che impediscono a un backend Rebase di avviarsi o gestire le richieste — un database irraggiungibile, credenziali errate, un'estensione mancante, un rifiuto RLS, disallineamento dello schema, una porta occupata, una funzione che non si carica — e come si presenta ciascuno di essi.
@@ -88,8 +88,6 @@ silenziosamente l'URL e l'host a cui finisci per connetterti non sarà quello sc
 
 ## `SchemaDefinitionError` — lo schema non compila
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 L'avvio, `rebase db generate`, `db push`, `generate-sdk` e `doctor` compilano
 le tabelle esportate da `backend/schema/index.ts` prima di qualsiasi altra operazione, e si arrestano quando una qualsiasi
 tabella non compila — assenza di `rls`, `"inherit"` senza `defaultRls`, una relazione
@@ -98,8 +96,6 @@ l'index tralascia — indicando ogni tabella, chiave e problema contemporaneamen
 `rebase verify` segnala lo stesso elenco senza avviare nulla.
 
 ## `config/collections` viene rifiutato
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Un progetto precedente alla versione 0.31 mantiene il proprio modello dati in `config/collections`, che
 non viene più letto da nulla: il runtime, ogni comando CLI e un bundle format-2
@@ -124,8 +120,6 @@ la configurazione è già corretta e ciò che manca è la libreria sul
 server oppure un ruolo autorizzato a eseguire `CREATE EXTENSION vector;`.
 
 ## Il database ha rifiutato l'istruzione
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```
 DB_PERMISSION_DENIED — Permission denied by the database on "notes"
@@ -209,8 +203,6 @@ Passa `--port` per fissarne una, oppure arresta l'altro processo. In produzione 
 nuovi tentativi: la porta configurata è vincolante ed `EADDRINUSE` è un errore fatale.
 
 ## Il backend è andato in crash e `rebase dev` è rimasto in esecuzione
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Un backend che genera un'eccezione all'avvio non arresta il watcher — stampa lo stack trace e
 rimane in attesa di una modifica ai file. Quando il backend non segnala il proprio avvio entro

@@ -24,8 +24,6 @@ and the console unchanged.
 
 ## `rebase console`
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Run it in your project:
 
 ```bash
@@ -87,8 +85,6 @@ client or stop `rebase dev` and run it again.
 
 ### Options
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | Flag | What it does |
 |---|---|
 | `--eval`, `-e` | Run this code instead of the REPL, print its awaited result as JSON, and exit 1 if it throws |
@@ -97,8 +93,6 @@ client or stop `rebase dev` and run it again.
 | `--docker` | Use the database from docker compose, starting it if needed |
 
 ## `openRebase`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `openRebase` from `@rebasepro/server-postgres` is what the console calls. Use
 it in a script, a seed, a data fix or a test. In a scaffolded project, put the

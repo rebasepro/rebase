@@ -1,13 +1,11 @@
 ---
-sourceHash: 4ad669042dfd8fc9
+sourceHash: 884874204e98ec96
 title: Apps und Repositories
 sidebar_label: Apps & Repositories
 description: Ein Projekt ist ein Backend plus die Apps, die damit kommunizieren, welche jeweils in ihrem eigenen Repository liegen können.
 ---
 
 ## Projekte und Apps
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Ein **Projekt** ist das Backend: die Datenbank, Auth, Storage, Realtime und
 Funktionen. Eine **App** ist etwas, das damit kommuniziert.
@@ -371,7 +369,7 @@ Versionsstempel nichts über das Schema verrät, für das er steht:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.30.1","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.31.0","contract":1}}
 ```
 
 Ein Vergleich der beiden Werte in der CI verwandelt eine unbemerkte Diskrepanz in einen fehlgeschlagenen Check. Der Stempel

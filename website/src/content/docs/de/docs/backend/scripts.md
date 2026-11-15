@@ -1,5 +1,5 @@
 ---
-sourceHash: 87e4ee6ea63add18
+sourceHash: 7357057de2408250
 title: Skripte und die Konsole
 sidebar_label: Skripte und die Konsole
 description: Öffnen Sie die Daten eines Projekts aus einem Skript, einem Test oder einer REPL mit openRebase oder aus dem Terminal mit rebase console. Kein Server, keine Schemaänderungen.
@@ -15,8 +15,6 @@ Um einige Zeilen anzusehen, eine zu korrigieren, einen Filter auszuprobieren ode
 Beide öffnen die Datenbank, ohne sie zu verändern: Es werden weder Tabellen, Rollen, Trigger noch Funktionen erstellt. Das `close()` eines Skripts beendet das, was `openRebase` geöffnet hat. Auf der verwalteten Entwicklungsdatenbank startet `rebase console` diese Datenbank, wenn sie nicht läuft, und lässt sie danach weiterlaufen, wie es auch die `rebase db`-Befehle tun; `rebase db stop` stoppt sie. Das Objekt verfügt über das gleiche Vokabular, das eine [benutzerdefinierte Funktion](/docs/backend/custom-functions/) vom Server erhält, `dataAsAdmin` und `sql`, sodass ein Code-Snippet unverändert zwischen einer Funktion, einem Skript und der Konsole verschoben werden kann.
 
 ## `rebase console`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Führen Sie es in Ihrem Projekt aus:
 
@@ -60,8 +58,6 @@ Eine Datenbank, die von der Konsole nicht geöffnet werden kann, wird einmalig g
 
 ### Optionen
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 | Flag | Beschreibung |
 |---|---|
 | `--eval`, `-e` | Führt diesen Code anstelle der REPL aus, gibt das per await abgewartete Ergebnis als JSON aus und beendet sich mit 1, falls ein Fehler auftritt |
@@ -70,8 +66,6 @@ Eine Datenbank, die von der Konsole nicht geöffnet werden kann, wird einmalig g
 | `--docker` | Verwendet die Datenbank aus Docker Compose und startet sie bei Bedarf |
 
 ## `openRebase`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `openRebase` aus `@rebasepro/server-postgres` ist die Funktion, die von der Konsole aufgerufen wird. Verwenden Sie sie in einem Skript, einem Seed-Skript, einer Datenbereinigung oder einem Test. Legen Sie das Skript in einem per Scaffold erstellten Projekt unter `backend/` ab, beispielsweise `backend/scripts/publish-drafts.ts`: Der Backend-Workspace ist derjenige, der von `@rebasepro/server-postgres` abhängt, und ein Skript im Stammordner `scripts/` kann dieses Paket nicht importieren.
 

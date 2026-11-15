@@ -1,11 +1,9 @@
 ---
-sourceHash: f385a35cc59df9c6
+sourceHash: acac0f12ed25af39
 title: Seguridad a nivel de fila
 sidebar_label: Seguridad a nivel de fila
 description: "Cada tabla declara su postura de rls — admin-only, inherit o una lista de reglas — y Rebase la compila en políticas de seguridad a nivel de fila de Postgres. Formas de reglas, condiciones abreviadas, defaultRls y qué falla de forma cerrada."
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Cada tabla indica quién puede acceder a sus filas mediante su clave `rls`. Rebase compila esto
 en seguridad a nivel de fila de Postgres: `ENABLE ROW LEVEL SECURITY` en la tabla y
@@ -45,8 +43,6 @@ versión cubre `defaultSecurityRules` y `disableDefaultPolicies`.
 
 ## Las tres posturas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 | `rls` | Significado |
 |---|---|
 | `"admin-only"` | Seguridad a nivel de fila activada y solo las políticas base de administrador: el rol `admin` y el propio código del servidor acceden a las filas. Cualquier otro llamador no obtiene filas y sus escrituras son rechazadas. |
@@ -58,8 +54,6 @@ quién debería verla. Nada queda expuesto hasta que escribas las reglas que lo
 expongan.
 
 ### `defaultRls`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `backend/schema/index.ts` puede exportar una postura para las tablas que indiquen
 `rls: "inherit"`:
@@ -84,8 +78,6 @@ exportado detiene `rebase db generate`, `rebase db push` y el inicio del servido
 que indica exportar uno.
 
 ## Políticas que una tabla obtiene sin escribirlas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Las políticas en una tabla son más que sus propias reglas:
 
@@ -112,8 +104,6 @@ El DDL generado marca cada política inyectada, y `rebase db push` restaura las 
 se hayan eliminado manualmente.
 
 ## Formas de reglas
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Una regla tiene una de estas formas. Mezclar dos en una misma regla es un error de tipo, y el
 compilador también lo rechaza, detectando así casos en JavaScript y conversiones de tipo (*casts*): `access` junto a
@@ -162,8 +152,6 @@ El compilador de la versión 0.30 leía solo una cláusula de una regla y no rec
 
 ### Propietario (Owner)
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 ```ts
 import { defineTable, col } from "@rebasepro/server/schema";
 
@@ -185,8 +173,6 @@ independientemente de lo que haya enviado la solicitud, que es lo que le da sent
 
 ### Acceso público
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `{ operation: "select", access: "public" }` genera `USING (true)`: sin filtro de
 filas en las lecturas, por lo que cualquier llamador al que la API dé paso lee cada fila.
 
@@ -202,8 +188,6 @@ inicio de sesión anónimo. Ambos se combinan con `condition` y `check` al igual
 Consulta [`authenticated()` y `registered()`](#authenticated-y-registered).
 
 ### Condiciones
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Una `condition` indica qué filas existentes cubre una regla; un `check` indica qué valores
 nuevos o actualizados permite, y por defecto toma el valor de la condición. Ambos aceptan la
@@ -307,8 +291,6 @@ los trata como desconocidos y refleja lo que informa el servidor.
 
 ### SQL sin formato
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `using` y `withCheck` aceptan SQL. `{column}` se resuelve a la columna de la tabla, y
 el llamador está disponible como `rebase.uid()`, `rebase.roles()` (roles separados por
 comas) y `rebase.jwt()` (los claims del token como `jsonb`):
@@ -337,8 +319,6 @@ condición abreviada o estructurada siempre que sea posible expresar lo mismo.
 
 ## Evaluado una vez por sentencia
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Cada parte de una regla que no lea la fila —el id del llamador, una comprobación
 de roles, un claim, `serverContext()`— se compila dentro de una subconsulta escalar. Una regla de
 propietario se convierte en `(user_id)::text = (SELECT rebase.uid())`. Postgres calcula dicha
@@ -351,8 +331,6 @@ El SQL sin formato recibe el mismo tratamiento cuando Rebase puede interpretar s
 debes envolver las llamadas tú mismo: `(SELECT rebase.uid())`.
 
 ## `authenticated()` y `registered()`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 A una solicitud sin ninguna sesión se le asigna un id centinela, por lo que `rebase.uid()`
 nunca es `NULL` en una solicitud, y `policy.authenticated()` (al igual que
@@ -376,8 +354,6 @@ elude las políticas.
 
 ## Permisivas y restrictivas
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Las reglas permisivas (las predeterminadas) se combinan mediante OR: se accede a una fila cuando cualquiera de
 ellas lo admite. Las reglas restrictivas se combinan mediante AND con ellas: cada regla restrictiva también
 debe cumplirse. Una regla permisiva amplía el acceso; una restrictiva solo puede
@@ -385,8 +361,6 @@ reducirlo. El aislamiento de inquilinos (*tenancy*) es una regla restrictiva por
 en otra parte de la tabla no puede anular el límite del inquilino.
 
 ## Qué falla de forma cerrada
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Una tabla no puede volverse accesible por accidente:
 
@@ -410,8 +384,6 @@ aplica la seguridad a nivel de fila, dentro de una transacción que transporta e
 y los claims del llamador. Eso es lo que leen `rebase.uid()`, `rebase.roles()` y `rebase.jwt()`.
 
 ## Solicitudes sin sesión
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Una solicitud sin token llega a las políticas únicamente cuando `AUTH_REQUIRE=false`;
 de lo contrario, la API responde 401 primero. Luego se ejecuta con `rebase.uid()` establecido
@@ -438,8 +410,6 @@ export const contactMessages = defineTable("contact_messages", {
 
 ## Filas aquí, columnas al lado
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 `rls` decide a qué filas puede acceder un llamador. No tiene nada que decir sobre las
 columnas de una fila a la que sí acceda: una regla que permite a un empleado leer las filas de su
 equipo le permite leer todas las columnas de esas filas, salario incluido. Las reglas
@@ -465,8 +435,6 @@ son aplicadas por el servidor, por lo que cubren todas las rutas de la API; una 
 de `rebase.sql()` ve todas las columnas, ya que elude la seguridad a nivel de fila.
 
 ## Próximos pasos
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 - [Acceso a campos](/docs/collections/field-access/): roles de lectura y escritura por columna
 - [Multiinquilino (Tenancy)](/docs/collections/tenancy/): un límite restrictivo por inquilino

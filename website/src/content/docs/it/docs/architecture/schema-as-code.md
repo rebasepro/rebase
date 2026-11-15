@@ -1,13 +1,11 @@
 ---
-sourceHash: 507990241e43f026
+sourceHash: 65f05732c36bd742
 title: Schema as Code
 sidebar_label: Schema as Code
 description: Come Rebase utilizza le tabelle TypeScript in backend/schema come unica fonte di verità per lo schema del database, l'API, l'SDK e il pannello di amministrazione.
 ---
 
 ## L'idea di fondo
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 In Rebase, le **tabelle dichiarate con `defineTable` in `backend/schema/` sono l'unica fonte di verità**. A partire da esse, Rebase genera:
 
@@ -25,8 +23,6 @@ Ciò significa che il tuo schema è:
 
 ## Modifica visuale con manipolazione dell'AST
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Rebase fornisce anche un **editor visuale di schemi** in Studio. Quando qualcuno lo utilizza per aggiungere una colonna:
 
 1. Studio **non** modifica direttamente il database
@@ -43,8 +39,6 @@ per i casi in cui l'editor rifiuta un'operazione.
 Questo approccio basato sull'"interfaccia utente come generatore di codice" fa sì che le modifiche visuali producano lo stesso TypeScript pulito che uno sviluppatore scriverebbe a mano.
 
 ## Pipeline di generazione dello schema
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Le tabelle vengono lette una volta sola ed emesse due volte: come schema Drizzle tramite il quale
 il server in esecuzione effettua le query, e come SQL che descrive il database che si intende
@@ -89,8 +83,6 @@ rimangano nel repository. I file di migrazione sono l'unico elemento da sottopor
 [Schema Generation](/docs/cli/schema) per l'elenco completo dei flag.
 
 ### Esempio
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Data questa tabella:
 
@@ -183,8 +175,6 @@ Quando Rebase aggiorna lo schema del database, associa le tabelle dichiarate all
 5. **Proprietà degli indici per nome**: Gli indici sono l'unico oggetto che risiede *all'interno* di una tabella mappata, per cui il filtraggio a livello di tabella non può proteggerli; in passato, un push avrebbe pianificato un `DROP INDEX` per ogni indice assente dallo stato desiderato, colpendo anche quelli creati a mano. Rebase assegna ora agli indici generati una denominazione con pattern `<table>_<columns>_ix_<7 hex>` (`_ux_` nel caso di indici univoci), un formato non prodotto da nessun altro generatore, ed esclude dal diff per nome tutti gli altri indici. Un indice creato manualmente, o introdotto tramite introspezione, non viene mai toccato; una dichiarazione rimossa dal codice continuerà invece a essere eliminata, conformemente a quanto desiderato. Consulta **[Indexes](/docs/backend/indexes)**.
 
 ## Passaggi successivi
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 - **[Tables](/docs/schema/)** — Tutte le opzioni di `defineTable`
 - **[Columns](/docs/schema/columns/)** — Mappature dettagliate dei tipi di colonna

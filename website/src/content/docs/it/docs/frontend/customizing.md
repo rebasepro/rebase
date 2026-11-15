@@ -1,11 +1,9 @@
 ---
-sourceHash: 362c7b70fede8ad5
+sourceHash: 2564e6bc51f454da
 title: Personalizzazione dell'Admin
 sidebar_label: Personalizzazione dell'Admin
 description: Come personalizzare l'admin di Rebase — componenti di base, hook e punti di inserimento, con ricette testate per singleton, impostazioni per utente, azioni di massa, viste a calendario, dashboard e schermate di login personalizzate.
 ---
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 L'admin è costruito a partire da elementi modulari che puoi utilizzare tu stesso. Per personalizzarlo, basta scrivere
 un comune componente React e posizionarlo in un punto di inserimento. Questo è l'intero modello:
@@ -37,8 +35,6 @@ esclusivamente pacchetti pubblici: puoi copiarne uno nel tuo progetto così com'
 Il file `README.md` posizionato accanto ad esse rappresenta la guida di riferimento completa per componenti di base, hook e punti di inserimento.
 
 ## Esempio: un singleton
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Un singleton non è un tipo speciale di tabella. È una normale tabella la cui pagina
 apre sempre la stessa riga. Ricevendo un id, `RecordForm` modifica quel record e
@@ -97,8 +93,6 @@ valida unicamente ciò che mostra — vedi
 [Pannelli in una pagina personalizzata](/docs/frontend/panels).
 
 ## Punti di inserimento
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 | Per aggiungere… | Posiziona un componente in |
 |---|---|

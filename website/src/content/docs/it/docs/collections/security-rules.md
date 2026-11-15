@@ -1,11 +1,9 @@
 ---
-sourceHash: f385a35cc59df9c6
+sourceHash: acac0f12ed25af39
 title: Row-level security
 sidebar_label: Row-level security
 description: "Ogni tabella dichiara la propria postura rls — admin-only, inherit o un elenco di regole — e Rebase la compila in policy di row-level security di Postgres. Formati delle regole, condizioni sintetiche, defaultRls e cosa fallisce in sicurezza."
 ---
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 Ogni tabella stabilisce chi può accedere alle sue righe nella chiave `rls`. Rebase compila questa configurazione nella row-level security di Postgres: `ENABLE ROW LEVEL SECURITY` sulla tabella e una `CREATE POLICY` per ogni regola e operazione. Postgres filtra quindi ogni istruzione, su ogni route — REST, realtime, MCP, il CMS e l'SQL eseguito come chiamante — poiché le regole risiedono nel database, non nel codice dell'applicazione.
 
@@ -37,8 +35,6 @@ export const posts = defineTable("posts", {
 
 ## Le tre posture
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 | `rls` | Significato |
 |---|---|
 | `"admin-only"` | Row-level security attiva e solo le policy di baseline per l'admin: il ruolo `admin` e il codice interno del server possono accedere alle righe. Tutti gli altri chiamanti non ottengono alcuna riga e le loro scritture vengono rifiutate. |
@@ -48,8 +44,6 @@ export const posts = defineTable("posts", {
 `"admin-only"` è la postura con cui iniziare per una tabella quando non hai ancora deciso chi debba vederla. Nulla viene esposto finché non scrivi le regole per esporlo.
 
 ### `defaultRls`
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 `backend/schema/index.ts` può esportare una postura per le tabelle che specificano `rls: "inherit"`:
 
@@ -70,8 +64,6 @@ export const defaultRls: DefaultRls = [
 
 ## Policy che una tabella riceve senza scriverle
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 Le policy applicate a una tabella vanno oltre le sue sole regole:
 
 - **La baseline per l'admin.** Ogni tabella ottiene le policy `<table>_default_admin_read` e `<table>_default_admin_write` per insert, update e delete. Sono di tipo permissive e consentono l'accesso al contesto del server e al ruolo `admin`, così che gli admin possano leggere e scrivere ogni riga. Le policy permissive vengono combinate con OR, quindi la baseline amplia qualsiasi cosa le tue regole consentano; non le restringe mai.
@@ -84,8 +76,6 @@ Impostare `defaultPolicies: false` su una tabella rimuove la baseline permissiva
 Il DDL generato contrassegna ogni policy inserita e `rebase db push` ripristina quelle eventualmente rimosse manualmente.
 
 ## Formati delle regole
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 Una regola assume uno dei seguenti formati. Combinarne due in una singola regola è un errore di tipo ed è rifiutato anche dal compilatore, consentendo di intercettare problemi in JavaScript e nei cast: `access` accanto a `ownerField`, `using` o `withCheck`; `ownerField` accanto a `using`, `withCheck`, `condition` o `check`; `condition` o `check` accanto a `using` o `withCheck`. Lo stesso vale per un valore non valido per `access`, `mode`, `operation(s)` o `roles` (un errore di battitura come `"restrictive"` errato viene rifiutato, non interpretato come permissivo). Una regola non diventa mai una policy che ignora silenziosamente metà di ciò che è stato scritto.
 
@@ -121,8 +111,6 @@ Il compilatore della versione 0.30 leggeva solo una clausola di una regola e non
 
 ### Owner
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 ```ts
 import { defineTable, col } from "@rebasepro/server/schema";
 
@@ -141,8 +129,6 @@ Questo genera `USING ((owner_id)::text = (SELECT rebase.uid()))`.
 
 ### Accesso pubblico
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 `{ operation: "select", access: "public" }` genera `USING (true)`: nessun filtro sulle righe in lettura, quindi qualsiasi chiamante ammesso dalle API può leggere tutte le righe.
 
 Amplia le righe che un chiamante può visualizzare, non chi può effettuare la chiamata. Per impostazione predefinita, le API rispondono comunque con 401 a una richiesta senza token. Imposta `AUTH_REQUIRE=false` (`auth.requireAuth: false`) per rimuovere tale blocco e lasciare che siano unicamente le policy a decidere; in tal caso, anche un chiamante non autenticato potrà leggere queste righe.
@@ -150,8 +136,6 @@ Amplia le righe che un chiamante può visualizzare, non chi può effettuare la c
 `{ access: "authenticated" }` è analogo, ma con una verifica di autenticazione: il chiamante deve avere una sessione. Un guest creato tramite accesso anonimo ne possiede una. `{ access: "registered" }` esclude anche i guest; è preferibile nei progetti che consentono l'accesso anonimo. Entrambi si combinano con `condition` e `check` allo stesso modo di `"public"`. Consulta [`authenticated()` e `registered()`](#authenticated-e-registered).
 
 ### Condizioni
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 Una `condition` definisce a quali righe esistenti si applica una regola; un `check` stabilisce quali valori nuovi o aggiornati siano consentiti e assume come valore predefinito la condizione. Entrambi accettano il formato sintetico ad oggetto (shorthand) o un'espressione strutturata.
 
@@ -242,8 +226,6 @@ All'interno di `existsIn`, `policy.field()` fa riferimento a una colonna dell'al
 
 ### SQL grezzo
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 `using` e `withCheck` accettano codice SQL. `{column}` fa riferimento alla colonna della tabella, mentre il chiamante è disponibile come `rebase.uid()`, `rebase.roles()` (ruoli separati da virgola) e `rebase.jwt()` (i claim del token in formato `jsonb`):
 
 ```ts
@@ -269,15 +251,11 @@ L'SQL grezzo viene applicato esclusivamente da Postgres: il CMS non è in grado 
 
 ## Valutazione una volta per istruzione
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 Ogni elemento di una regola che non legge la riga — l'id del chiamante, un controllo sui ruoli, un claim, `serverContext()` — viene compilato all'interno di una sottoquery scalare. Una regola owner diventa `(user_id)::text = (SELECT rebase.uid())`. Postgres calcola questa sottoquery una sola volta per istruzione anziché una volta per riga, pianificando l'esecuzione come se il controllo superasse la metà della tabella invece dell'1,5%, garantendo che le pagine profonde di tabelle di grandi dimensioni continuino a utilizzare i relativi indici. Chi può leggere o scrivere cosa rimane invariato.
 
 L'SQL grezzo riceve lo stesso trattamento quando Rebase è in grado di analizzarne la struttura (come accade per `owner_id = rebase.uid()`). Qualsiasi altra espressione viene inserita così come scritta; è quindi opportuno incapsulare autonomamente le chiamate: `(SELECT rebase.uid())`.
 
 ## `authenticated()` e `registered()`
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 A una richiesta completamente priva di sessione viene assegnato un id sentinella, pertanto `rebase.uid()` non è mai `NULL` durante una richiesta, e `policy.authenticated()` (così come `access: "authenticated"`) la esclude.
 
@@ -289,13 +267,9 @@ Viene compilato in `rebase.uid() IS NULL`, vero solo per i flussi integrati eseg
 
 ## Permissive e restrictive
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 Le regole permissive (impostazione predefinita) sono valutate in OR: una riga è accessibile quando una qualsiasi di esse la ammette. Le regole restrittive (restrictive) sono valutate in AND con esse: ogni regola restrittiva deve necessariamente essere soddisfatta. Una regola permissiva amplia l'accesso; una restrittiva può solo limitarlo. La tenancy è una regola restrittiva per questo motivo: una regola `access: "public"` presente altrove sulla tabella non può scavalcare il confine del tenant.
 
 ## Cosa fallisce in sicurezza
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 Una tabella non può diventare accessibile per errore:
 
@@ -307,8 +281,6 @@ Una tabella non può diventare accessibile per errore:
 Ogni richiesta esegue le proprie istruzioni con un ruolo del database a cui si applica la row-level security, all'interno di una transazione che include l'id, i ruoli e i claim del chiamante. È questo ciò che leggono `rebase.uid()`, `rebase.roles()` e `rebase.jwt()`.
 
 ## Richieste senza sessione
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 Una richiesta senza token raggiunge le policy solo se `AUTH_REQUIRE=false`; in caso contrario, le API rispondono preventivamente con 401. Viene quindi eseguita con `rebase.uid()` impostato su `'anonymous'` e nessun ruolo: le regole `access: "public"` la ammettono, mentre le regole `access: "authenticated"` e owner la respingono.
 
@@ -332,8 +304,6 @@ export const contactMessages = defineTable("contact_messages", {
 
 ## Righe qui, colonne accanto
 
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
-
 `rls` decide a quali righe può accedere un chiamante. Non ha invece alcun effetto sulle colonne delle righe a cui si ha accesso: una regola che consente a un dipendente di leggere le righe del proprio team gli permette di leggerne tutte le colonne, stipendio incluso. Le regole a livello di singola colonna si definiscono con [`.access()`](/docs/collections/field-access/) sulla colonna:
 
 ```ts
@@ -353,8 +323,6 @@ export const staff = defineTable("staff", {
 I ruoli sono i medesimi: `policy.rolesOverlap(["hr"])` in una regola e `.access({ read: ["hr"] })` su una colonna fanno riferimento allo stesso `hr`. Le regole sulle colonne vengono applicate dal server, quindi coprono ogni route delle API; una query eseguita tramite `rebase.sql()` vede tutte le colonne, poiché scavalca la row-level security.
 
 ## Prossimi passi
-
-<span class="since-badge" data-since="0.31">Dalla versione 0.31</span>
 
 - [Accesso ai campi](/docs/collections/field-access/): ruoli di lettura e scrittura per colonna
 - [Tenancy](/docs/collections/tenancy/): un confine restrittivo per tenant

@@ -1,13 +1,11 @@
 ---
-sourceHash: 4ad669042dfd8fc9
+sourceHash: 884874204e98ec96
 title: Applications et dépôts
 sidebar_label: Apps & dépôts
 description: Un projet est un backend accompagné des applications qui communiquent avec lui, chacune pouvant résider dans son propre dépôt.
 ---
 
 ## Projets et applications
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 Un **projet** correspond au backend : la base de données, l'authentification, le stockage, le temps réel et les fonctions. Une **app** est un élément qui communique avec lui.
 
@@ -250,7 +248,7 @@ Et chaque projet publie son schéma actuel, sans authentification, car un identi
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.30.1","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.31.0","contract":1}}
 ```
 
 Comparer les deux dans la CI transforme une incompatibilité silencieuse en une vérification en échec. L'empreinte change lorsque les types générés sont susceptibles de changer — une nouvelle propriété, une relation modifiée — et délibérément *pas* lorsqu'un hook, une règle de sécurité ou une icône change, évitant ainsi les fausses alertes.

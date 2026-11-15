@@ -1,5 +1,5 @@
 ---
-sourceHash: 8d400239df61cbd4
+sourceHash: 8e1af6247c009612
 title: Desplegar Rebase en Google Cloud Platform
 description: Despliega tu instancia de Rebase de forma segura en GCP utilizando Cloud SQL y Cloud Run, centrándote en regiones de centros de datos de la UE.
 sidebar_label: Google Cloud
@@ -34,7 +34,7 @@ rebase build
 Cloud Run descarga imágenes desde un registro, así que incorpora el bundle en una imagen derivada. Tres líneas, y fija exactamente lo que se ejecuta:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -75,8 +75,6 @@ Cloud Run inyecta `PORT` y el runtime se vincula a él, por lo que no hay ningú
 Para acceder a una instancia privada de Cloud SQL se necesita `--add-cloudsql-instances YOUR_PROJECT:REGION:INSTANCE` y una `DATABASE_URL` de tipo socket; una instancia pública con una red autorizada no necesita ninguna de las dos cosas.
 
 ## 4. El esquema
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 **El runtime crea las tablas faltantes al iniciar, incluidas las que declara `backend/schema`.** `REBASE_MIGRATE_ON_BOOT` tiene como valor predeterminado `ensure`, que es aditivo en todo el esquema: crea las tablas, columnas y tipos enum faltantes y aplica su seguridad a nivel de fila (row-level security), de modo que el primer inicio frente a una instancia vacía arranca sirviendo tus tablas.
 

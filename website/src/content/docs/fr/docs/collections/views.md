@@ -1,11 +1,9 @@
 ---
-sourceHash: 8a72cff37e30800b
+sourceHash: d3c645c7930945a3
 title: Vues
 sidebar_label: Vues
 description: "Servez une vue SQL ou une vue matérialisée en lecture seule avec defineView : des vues security_invoker régies par les tables qu'elles lisent, des vues matérialisées filtrées par rôles, rafraîchies à la demande, créées par db push."
 ---
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `defineView` sert une requête SQL sous la forme d'une table en lecture seule. Déclarez la requête, les colonnes qu'elle retourne, ainsi que la ou les colonnes qui identifient une ligne :
 
@@ -30,8 +28,6 @@ Exportez-la depuis `backend/schema/index.ts` comme une table. Elle se lit comme 
 
 ## Options
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 | Clé | Ce qu'elle fait |
 |---|---|
 | `query` | **Requis.** Le `SELECT` de définition. |
@@ -52,13 +48,9 @@ Une vue possède au moins une colonne `.primaryKey()` : une vue n'a pas de clé 
 
 ## Qui voit quelles lignes
 
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
-
 Une vue standard est créée `WITH (security_invoker = true)`, elle s'exécute donc **avec les droits de l'appelant** : la sécurité au niveau des lignes (RLS) des tables qu'elle lit détermine ce que chaque appelant voit. Un utilisateur dont les politiques lui permettent de voir ses propres morceaux voit la vue correspondant à ses propres morceaux. C'est pourquoi une vue n'a pas de `rls` : il n'y a rien à quoi associer des politiques, et rien qu'elles ne pourraient ajouter. Voir [Sécurité au niveau des lignes](/docs/collections/security-rules/) pour les politiques sur les tables sous-jacentes.
 
 ## Vues matérialisées
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `materialized: true` stocke les lignes, ainsi une lecture n'exécute pas la requête :
 
@@ -96,8 +88,6 @@ POST /api/data/langs/refresh
 `concurrently` continue de servir les anciennes lignes pendant que les nouvelles sont calculées. Cela nécessite l'index unique que Rebase crée sur les colonnes `.primaryKey()`, ces dernières doivent donc être uniques dans le résultat de la requête. Pour effectuer un rafraîchissement planifié, appelez `refresh()` depuis une [tâche cron](/docs/backend/cron-jobs/). Une vue matérialisée peut comporter ses propres `indexes` (voir [Index](/docs/backend/indexes/)), créés sur ses lignes stockées ; une vue standard lit les index de ses tables sous-jacentes.
 
 ## Ce qu'une vue ne peut pas avoir
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `rls`, `history`, `softDelete`, `tenant` et `search` sont refusés lors de la compilation du schéma : chacun d'entre eux nécessite une table dans laquelle écrire ou à laquelle rattacher des politiques. `roles` sur une vue standard est refusé lors du chargement du module, tout comme une valeur `query` vide. `indexes` sur une vue standard est refusé lors de la compilation du schéma.
 

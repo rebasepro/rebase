@@ -1,11 +1,9 @@
 ---
-sourceHash: e086faac3624de8d
+sourceHash: f957d9b26ce4636f
 title: Indizes
 sidebar_label: Indizes
 description: Deklarieren Sie gewöhnliche Postgres-Indizes für eine Tabelle – btree, GIN und BRIN, partiell, zusammengesetzt, abdeckend und eindeutig – und warum manuell erstellte früher verschwanden.
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Eine Tabelle deklariert die Indizes, die ihre Abfragen benötigen, neben den Spalten, die sie abdecken:
 
@@ -43,8 +41,6 @@ Dies wird durch die unten stehende Eigentumsregel behoben: Ein Index, den Rebase
 
 ## Die Struktur
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 | Feld | Typ | Beschreibung |
 |-------|------|-------------|
 | `columns` | `(string \| { column, direction?, nulls? })[]` | **Erforderlich.** Die Schlüsselspalten in Reihenfolge. 1–5 Einträge. |
@@ -55,8 +51,6 @@ Dies wird durch die unten stehende Eigentumsregel behoben: Ein Index, den Rebase
 | `include` | `string[]` | Nur btree. Payload-Spalten, die für Index-Only-Scans mitgeführt werden. |
 
 ### `columns` nimmt Spaltenschlüssel entgegen, niemals SQL-Namen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Der Name einer `belongsTo`-Relation steht für deren Fremdschlüsselspalte, sodass die Relation `author` für die Spalte `author_id` steht:
 
@@ -141,8 +135,6 @@ indexes: [{ columns: ["status"], include: ["title"], reason: "the status sidebar
 Es gibt kein `gist` und kein `hash`: Jede interessante Gist-Operatorklasse wird in einer Extension mitgeliefert, und Hash-Indizes können weder eindeutig, zusammengesetzt noch sortiert sein. Diese Einschränkung hält das gesamte Modell auf dem Atlas-Pfad – `rebase db push` materialisiert den Soll-Zustand in einer leeren Scratch-Datenbank, um dagegen zu planen, und `CREATE EXTENSION` kann nicht in dieser Datei stehen. **Trigramm-Suche ist [`search:`](/docs/backend/search); ANN ist eine [`col.vector()`-Spalte](/docs/sdk/aggregates-and-search#the-index).** Ein Index, der `gin_trgm_ops` oder `vector_cosine_ops` benötigt, wird zur Build-Zeit abgelehnt, anstatt ausgegeben zu werden, um später an einer Datenbank zu scheitern, die Sie noch nie gesehen haben.
 
 ### `reason`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Es ist das einzige Feld, hinter dem kein SQL steht, und es ist optional – aber schreiben Sie es.
 
@@ -242,8 +234,6 @@ Die Indizes sind neue Objekte auf Tabellen, die bereits Daten enthalten, und die
 
 ## Was abgelehnt wird und wann
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 All dies wird abgelehnt, wenn das Schema kompiliert wird, unter Nennung der Tabelle und der Position im Array – ein Index, der stillschweigend nicht existiert, ist genau der Fehler, den dieses gesamte Feature beseitigt:
 
 - ein Schlüssel, der keine Spalte oder `belongsTo`-Relation der Tabelle ist, oder eine Relation, deren Fremdschlüssel sich auf der anderen Tabelle befindet
@@ -257,8 +247,6 @@ All dies wird abgelehnt, wenn das Schema kompiliert wird, unter Nennung der Tabe
 - ein leerer `reason`
 
 ## Verwandte Themen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - [Suche](/docs/backend/search) – bewertete Volltextsuche (ranked full-text), die ihren eigenen GIN-Index über einem generierten `tsvector` erstellt
 - [Vektorsuche](/docs/sdk/aggregates-and-search#vector-search) – der ANN-Index über einer Embedding-Spalte, konfiguriert über `col.vector()`

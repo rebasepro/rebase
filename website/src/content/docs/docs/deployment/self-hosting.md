@@ -130,13 +130,11 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
 ## Creating the schema
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 **The runtime creates missing tables at boot, including the ones `backend/schema` declares.**
 `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole
@@ -196,7 +194,7 @@ is there instead:
 - **An optional table missing** (API keys, idempotency keys, cron claims,
   rate-limit counters, presence, metrics history): that feature is off, and the
   log says which table it needs.
-- <span class="since-badge" data-since="0.31">Since 0.31</span> **A declared table the database does not protect** — row-level security
+- **A declared table the database does not protect** — row-level security
   disabled, none of the policies it declares present, or a restrictive policy
   it declares missing: that table is not served (a missing permissive policy
   is served, with a boot warning naming it). A request for it answers `503 TABLE_WITHHELD`, and the boot log
@@ -338,7 +336,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.30.1 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.31.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -566,7 +564,7 @@ processes. See [Split processes](/docs/deployment/split-processes/).
 ## Upgrading
 
 ```yaml
-image: rebasepro/server:0.30.1
+image: rebasepro/server:0.31.0
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that

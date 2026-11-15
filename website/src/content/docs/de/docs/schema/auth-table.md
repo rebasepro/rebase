@@ -1,11 +1,9 @@
 ---
-sourceHash: c7bebbe33f0a0611
+sourceHash: e70397bdea9251db
 title: Die Benutzertabelle
 sidebar_label: Benutzertabelle
 description: "defineAuthTable deklariert die Tabelle, in der Auth Benutzer speichert: die Spalten, die Auth benötigt, eine Richtlinie zum Selbstlesen, Berechtigungsspalten nur für Admins und das Zugriffsmodell – Rollen, App-Scopes, persönliche Schlüssel und die Benutzer-Lifecycle-Hooks."
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `defineAuthTable` deklariert die Tabelle, die die Authentifizierung liest und beschreibt. Es
 handelt sich um ein `defineTable` mit drei Ergänzungen:
@@ -53,8 +51,6 @@ Admins verwalten Benutzer, und jeder Benutzer kann weiterhin seine eigene Zeile 
 
 ## Die Spalten
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Deklarieren Sie die Spalten, die Ihre App liest oder darstellt, mit den Modifikatoren, die Sie wünschen;
 Auth fügt diejenigen hinzu, die es benötigt und die Sie weggelassen haben. Eine deklarierte Spalte mit dem
 Schlüssel oder SQL-Namen einer Auth-Spalte (`email`, `displayName`, `roles`, `passwordHash`,
@@ -73,8 +69,6 @@ die Benutzertabelle selbst kann ebenfalls jede Auth-Spalte benennen, unabhängig
 
 ## Der `auth`-Block
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 | Schlüssel | Beschreibung |
 |---|---|
 | `roles` | Die Rollen, die ein Benutzer innehaben kann, jeweils mit einem `name`, einer optionalen `description` und den Admin-Ebenen- und App-`scopes`, die sie gewährt. `admin` ist integriert und kann nicht deklariert werden. |
@@ -88,8 +82,6 @@ Die beiden Hooks verbleiben auf dem Server; der Deskriptor gibt lediglich an, we
 beschreibt, was die einzelnen Scopes gewähren und wie Schlüssel und Tokens diese einschränken.
 
 ### `onCreateUser` und `onResetPassword`
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```ts
 import { randomBytes } from "node:crypto";
@@ -136,8 +128,6 @@ Beide Hooks erhalten einen Kontext mit:
 
 ## Was bei Auth-Schreibvorgängen nicht ausgeführt wird
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Registrierung, OAuth-Anmeldung und die Benutzerverwaltung durch Admins schreiben die Benutzertabelle
 direkt. Die [Hooks](/docs/collections/callbacks/) der Tabelle werden bei diesen Schreibvorgängen
 nicht ausgeführt, sodass eine Willkommens-E-Mail in `afterSave` bei der Registrierung niemals ausgelöst wird.
@@ -145,8 +135,6 @@ Platzieren Sie diese stattdessen in den im Backend konfigurierten Auth-Lifecycle
 `afterUserCreate`, `afterUserDelete`, …). Siehe [Authentifizierung](/docs/backend/authentication/).
 
 ## Nächste Schritte
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - [Authentifizierung](/docs/backend/authentication/): Anmeldemethoden, Tokens und die Auth-Hooks
 - [Rollen und Scopes](/docs/backend/roles-and-scopes/): Deklarieren von Rollen und App-Scopes

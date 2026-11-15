@@ -1,11 +1,9 @@
 ---
-sourceHash: f7689301748e2ce5
+sourceHash: fc0bdfb0ae7ceb1b
 title: Tabellen im CMS
 sidebar_label: Tabellen im CMS
 description: "Wie das CMS jede Postgres-Tabelle ohne Frontend-Konfiguration anzeigt: Labels, das Widget für jeden Spaltentyp, Pflicht- und schreibgeschützte Felder, Relationen, Anzeige-Slots sowie Steuerelemente zum Erstellen, Bearbeiten und Löschen gemäß der Row-Level-Security der Tabelle."
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Wenn Sie das CMS verwenden, beschreiben Sie ihm Ihre Tabellen nicht. Wenn sich jemand anmeldet, fragt das Panel das Backend nach den Tabellen ab, die diese Person sehen darf, und zeigt jede davon als **Collection** an: eine Seite in der Navigation mit einer Tabellenansicht, einem Formular, Filtern und den zugehörigen Zeilen des Datensatzes. Eine Tabelle ist das Backend-Objekt, das Sie in [`backend/schema`](/docs/schema/) deklarieren; eine Collection ist die Art und Weise, wie das Panel sie anzeigt.
 
@@ -26,8 +24,6 @@ Früher las das Panel `config/collections` über ein Vite-Plugin. Jetzt liest es
 
 ## Woher die Tabellen stammen
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 `<RebaseCMS>` ruft `client.schema.tables()` auf, was `GET /api/schema/tables` abfragt. Die Antwort ist die Liste der Tabellendeskriptoren, bereinigt für den Aufrufer: Eine Tabelle, die er nicht lesen darf, fehlt, ebenso wie eine Spalte, die seine Rollen nicht lesen dürfen (siehe [Feldzugriff](/docs/collections/field-access/)). Hook-Code verlässt niemals den Server; der Deskriptor gibt lediglich an, welche Hooks existieren.
 
 - Das Panel fragt an, sobald jemand angemeldet ist, und fragt erneut an, wenn sich der angemeldete Benutzer oder dessen Rollen ändern. Einem abgemeldeten Besucher wird keine Tabelle gesendet.
@@ -37,8 +33,6 @@ Früher las das Panel `config/collections` über ein Vite-Plugin. Jetzt liest es
 Dieselben Deskriptoren steuern das Studio und die MCP-Apps, sodass alle drei dasselbe Verständnis davon haben, was eine Tabelle ist.
 
 ## Labels
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Jedes Label wird von einem Bezeichner abgeleitet, sodass sich eine Tabelle für jeden Aufrufer und bei jedem Laden gleich liest:
 
@@ -54,8 +48,6 @@ Jedes Label wird von einem Bezeichner abgeleitet, sodass sich eine Tabelle für 
 Die Labels der Tabelle stammen von dem Namen, unter dem sie definiert wurde, nicht von ihrem Slug oder SQL-Namen. `ID`, `IDs`, `URL`, `URLs`, `UUID`, `API` und `IP` behalten ihre Großschreibung. Die Singularform ändert nur das letzte Wort und lässt Wörter, die lediglich auf `s` enden, unverändert (`Status`, `Analysis`, `Address`).
 
 ## Welches Feld jede Spalte erhält
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 | Spalte | Feld im Formular | Hinweise |
 |---|---|---|
@@ -87,8 +79,6 @@ Jeder Spaltentyp, sein Widget und die Optionen zu dessen Anpassung finden sich u
 
 ## Pflichtfelder, Standardwerte und schreibgeschützte Felder
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 | Die Spalte | Im Formular |
 |---|---|
 | `.notNull()` | erforderlich, mit der `requiredMessage` von `.validate()`, sofern vorhanden |
@@ -108,8 +98,6 @@ Die ID des Datensatzes und seine Zeitstempel von `.onCreateNow()` und `.onUpdate
 
 ## Relationen
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 - Ein `belongsTo` ist eine Auswahl der verknüpften Zeile anstelle ihrer Fremdschlüssel-Spalte: Das Formular zeigt **Author** anstelle von **Author ID**. Es ist ein Pflichtfeld, wenn der Fremdschlüssel `NOT NULL` ohne Standardwert ist. Ein Fremdschlüssel, der Teil des Primärschlüssels ist, bleibt ein eigenes Feld neben der Auswahl.
 - Ein `hasOne` ist eine Auswahl der einen verknüpften Zeile.
 - Ein `hasMany`, ein `manyToMany` und ein To-Many-`via` sind **Reiter (Tabs)** des Datensatzes, die die verknüpften Zeilen auflisten. Die Auswahl neben dem Tab wird ausgeblendet.
@@ -119,8 +107,6 @@ Die ID des Datensatzes und seine Zeitstempel von `.onCreateNow()` und `.onUpdate
 Siehe [Relationen im Panel](/docs/collections/relations-in-the-admin-panel/).
 
 ## Anzeige-Slots
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Jede Oberfläche, die einen Datensatz darstellt, verwendet einige von sechs Slots: title, subtitle, image, status, date und tags (siehe [Anzeige-Slots](/docs/frontend/view-modes/#display-slots)). Ein Slot wird nur dann aus einer Spalte gefüllt, wenn die Spalte eindeutig dorthin gehört; die erste passende Spalte in Deklarationsreihenfolge gewinnt:
 
@@ -135,8 +121,6 @@ Ein Slot, den keine Spalte füllt, wird der Interpretation des Datensatzes durch
 
 ## Wer welche Steuerelemente sieht
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Das Panel blendet **Create**, **Edit** und **Delete** aus, wenn der angemeldete Benutzer diese nicht ausführen darf. Es entscheidet dies, indem es die Row-Level-Security der Tabelle im Browser evaluiert, und zwar mit demselben Policy-Modell, das nach Postgres kompiliert wird:
 
 - die Regeln, die Sie in `rls` deklariert haben, plus die Policies, die Rebase zusätzlich hinzufügt: die Admin-Baseline (sofern nicht `defaultPolicies: false`), die Lese-Zugriffsberechtigung für eigene Benutzerdaten und die Admin-Schreibschranke der Benutzertabelle sowie die Mandantenregel (siehe [Policies, die eine Tabelle automatisch erhält](/docs/collections/security-rules/#policies-a-table-gets-without-writing-them));
@@ -148,13 +132,9 @@ Dies entscheidet lediglich darüber, was dargestellt wird. Jeder Schreibvorgang 
 
 ## Reihenfolge und Standardwerte
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Tabellen erscheinen in der Navigation in der Reihenfolge, in der das Backend sie ausliefert – der Reihenfolge, in der sie aus `backend/schema/index.ts` exportiert werden. Jede öffnet sich in der Tabellenansicht. `customizeTable` legt `group`, `icon`, `defaultViewMode` und den Rest fest; `<RebaseCMS navigationGroupMappings>` ordnet Gruppen über Tabellen hinweg an.
 
 ## Ladevorgang und Fehler
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - **Während die Tabellen laden**, zeigt eine Route zu einer Collection den Ladezustand an, nicht „Collection nicht gefunden“, und ein Deep-Link öffnet sich, sobald die Collection existiert.
 - **Wenn die Tabellen nicht geladen werden können**, informieren die Startseite und die Collection-Route darüber, was fehlgeschlagen ist, und bieten einen erneuten Versuch an. Wenn der Server die Sitzung nicht mehr akzeptiert, fordert die Meldung dazu auf, sich erneut anzumelden.
@@ -164,13 +144,9 @@ Anpassungen, die eine Tabelle benennen, die dem Aufrufer nicht bereitgestellt wi
 
 ## Viele Tabellen
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Die Anzahl der Tabellen ist nicht begrenzt. Das Panel benötigt jede Collection, um die Navigation darzustellen, daher werden die Deskriptoren nach der Anmeldung abgerufen; was das Öffnen einer Collection erfordert (die Tabelle, die Datensatzansichten, das Formular), lädt erst dann. Ein großes Schema verlangsamt `rebase db push` mehr als das Panel: Bei 400 oder mehr Tabellen dauert ein Push mehrere zehn Sekunden; siehe [Wie lange ein Push dauert](/docs/cli/schema#rebase-db-push).
 
 ## Nächste Schritte
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/): Beliebiges davon pro Tabelle anpassen
 - [Felder](/docs/collections/properties/): Widget und Optionen für jeden Spaltentyp

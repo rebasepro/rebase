@@ -1,5 +1,5 @@
 ---
-sourceHash: faf8f760aabce923
+sourceHash: f76fb5b27f8eb93c
 title: Entitätsansichten (Entity Views)
 sidebar_label: Entity Views
 description: Fügen Sie benutzerdefinierte Tabs und Ansichten zu Entitätsdetailseiten für Vorschauen, Analysen, verknüpfte Daten oder benutzerdefinierte UIs hinzu.
@@ -15,8 +15,6 @@ Mit Entitätsansichten (Entity Views) können Sie der Entitätsdetailseite neben
 - **Benutzerdefinierte Editoren** (Rich-Text, Karten-Editoren)
 
 ## Entitätsansichten hinzufügen
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```tsx
 // frontend/src/cms/products.tsx
@@ -38,8 +36,6 @@ die mehrere Tabellen teilen. Eine registrierte Ansicht wird nur auf den Tabellen
 `position: "start"` platziert den Tab vor dem Formular-Tab; andernfalls wird er dahinter eingefügt.
 
 ## Erstellen einer Entitätsansicht
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `Builder` ist die Komponente selbst, die als Wert importiert wird:
 
@@ -64,8 +60,6 @@ export function ArticlePreview({ row, modifiedValues }: EntityCustomViewParams) 
 ```
 
 ### EntityCustomViewParams
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 | Prop | Typ | Beschreibung |
 |------|------|-------------|

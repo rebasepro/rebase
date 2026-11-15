@@ -1,5 +1,5 @@
 ---
-sourceHash: fb9fac4af8dcfaaf
+sourceHash: 5b1baf3816d33bb8
 slug: es/docs/compatibility
 title: Compatibilidad
 description: Lo que Rebase promete entre versiones y lo que no — los seis contratos versionados, cómo falla cada uno y qué puede seguir cambiando en una versión menor.
@@ -43,8 +43,6 @@ se publica y fecha en lugar de dejarse al descubrimiento — la siguiente tabla 
 esa publicación.
 
 ## Preparación por subsistema
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 **Última revisión: 14 de septiembre de 2026, frente a 0.21.0.** Vuelva a leerlo
 en cada versión menor; una calificación que no se haya movido en tres versiones
@@ -154,8 +152,6 @@ runtime acepta este proyecto. Se llama deliberadamente `rebase` en lugar de
 (`managed` | `custom`) en una aplicación.
 
 ### 2 — `BUNDLE_FORMAT_VERSION` (actualmente 3)
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 La disposición en disco de un bundle compilado. Un runtime rechaza un bundle
 cuyo formato sea más nuevo que el suyo y lee uno más antiguo donde la estructura
@@ -292,8 +288,6 @@ Dos señales de identificación más, ninguna de las cuales bloquea nada por sí
 
 ### 6 — Identificadores de base de datos derivados
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Cada nombre que este framework calcula por sí mismo en lugar de recibirlo
 explícitamente: una columna de clave foránea, una restricción de clave foránea,
 una tabla de unión (junction table) y sus dos columnas de clave, un tipo enum, un
@@ -377,8 +371,6 @@ primero: compilan las mismas tablas a través de código diferente, y un proyect
 enviado una vez con push y arrancado más tarde no debe terminar con dos esquemas.
 
 ## Lo que *no* está congelado
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Dicho claramente, para que nadie infiera una promesa que nunca se hizo:
 

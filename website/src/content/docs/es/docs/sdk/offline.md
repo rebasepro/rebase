@@ -1,5 +1,5 @@
 ---
-sourceHash: 1b875d11f8a07037
+sourceHash: c343d961821c04f2
 title: Sincronización offline y local-first
 sidebar_label: Offline
 description: Habilite el motor de sincronización local-first del SDK tipado de Rebase — una base de datos local de filas, escrituras offline instantáneas con rollback y consultas en vivo reactivas.
@@ -77,8 +77,6 @@ Las escrituras se reproducen en el orden en que se realizaron, a través de toda
 Cada escritura en cola es una petición por defecto, por lo que 500 filas escritas offline requieren 500 viajes de ida y vuelta (*round trips*) para vaciarse. Con `replayBatchSize` configurado (hasta 1 000), una serie de creaciones offline consecutivas en una misma tabla se reproduce como un solo `createMany`. Solo se agrupan las creaciones con un id que el SDK generó como cadena, y nunca una que haga referencia a otra fila de la misma serie. Si el servidor rechaza o pospone la serie por cualquier motivo que no sea una pérdida de conexión, no se escribe nada (una escritura por lotes es una sola transacción), y la serie se reproduce una escritura a la vez, como lo haría por defecto.
 
 ### Escrituras puestas en cola por una versión anterior
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 La cola almacena una escritura como los valores que envía —claves para relaciones, listas de números para vectores, `{ latitude, longitude }` para puntos, texto ISO para fechas— y las filas en caché como las filas del servidor. Una escritura puesta en cola offline por la versión anterior del SDK, que las almacenaba como clases (`EntityRelation`, `GeoPoint`, `Vector`), se convierte a esos valores cuando se vuelve a leer y se reproduce normalmente: nada de lo encolado antes de la actualización se pierde. Un SDK más antiguo que encuentre una escritura encolada por este la dejará en cola.
 
@@ -245,7 +243,7 @@ Está desactivado por defecto porque, en un dispositivo compartido, permitiría 
 
 ## Configuración
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span> `maxCachedRowsPerTable` y `maxCachedQueriesPerTable` eran `…PerCollection`.
+`maxCachedRowsPerTable` y `maxCachedQueriesPerTable` eran `…PerCollection`.
 
 ```typescript
 createRebaseClient({

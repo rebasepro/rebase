@@ -1,5 +1,5 @@
 ---
-sourceHash: 9c7b1e0ee0076030
+sourceHash: 118e606ac71718ef
 title: Autenticación e inicio de sesión
 sidebar_label: Autenticación e inicio de sesión
 description: Configura el controlador de autenticación, la vista de inicio de sesión y la simulación de roles en tu frontend React de Rebase.
@@ -74,8 +74,6 @@ La vista de inicio de sesión gestiona:
 - Validación de formularios y estados de error
 
 ## Modelo de roles
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Los roles se almacenan como una columna de array `text[]` en la tabla de usuarios. Defines los roles que un usuario puede tener como un conjunto cerrado en esa columna, dentro de la tabla declarada con [`defineAuthTable`](/docs/schema/auth-table/):
 

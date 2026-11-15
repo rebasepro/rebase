@@ -46,8 +46,6 @@ A one-word search compiles to exactly the SQL it always did.
 
 ## Opting in
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 Declare `search` on a table, naming the columns you want indexed:
 
 ```ts
@@ -134,8 +132,6 @@ replaced: a column that keeps indexing the previous field set, and a search that
 returns nothing for content plainly in the row.
 
 ## What you can name in `fields`
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A path starts with a column key.
 

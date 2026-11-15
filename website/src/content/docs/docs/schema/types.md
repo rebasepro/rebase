@@ -4,8 +4,6 @@ sidebar_label: Type inference
 description: "InferRow, InferInsert and InferUpdate read a table's columns and modifiers to type the rows it serves and the writes it accepts — in hooks, in server code, and in a frontend that imports the table's type."
 ---
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A table's TypeScript types are read off its declaration. Nothing is written
 twice: change a column, and every type derived from it changes with it.
 
@@ -44,8 +42,6 @@ key is the key.
 
 ## The rules
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 | The column | `InferRow` | `InferInsert` | `InferUpdate` |
 |---|---|---|---|
 | `.notNull()` or `.primaryKey()` | `T` | required, unless it has a default | optional |
@@ -64,8 +60,6 @@ there is no single row type that is right for a reader who holds a role and one
 who does not. A caller without the role simply does not receive the column.
 
 ## Foreign keys
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A `belongsTo` foreign key that you declare in `columns` is typed there, exactly.
 One the relation derives is added as an optional key named after its column in
@@ -94,8 +88,6 @@ type Comment = InferRow<typeof comments>;
 
 ## Keys of a table
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 `ColumnKeyOf<typeof posts>` is the union of a table's column keys, and
 `RelationKeyOf<typeof posts>` the union of its relation names. Both work on
 views too. Use them to type code that takes a column or a relation by name.
@@ -112,8 +104,6 @@ type PostRelation = RelationKeyOf<typeof posts>; // never, for a table without r
 
 ## Hooks are typed for you
 
-<span class="since-badge" data-since="0.31">Since 0.31</span>
-
 A table's [hooks](/docs/collections/callbacks/) are typed from its columns
 without any annotation: `values` in `beforeSave` is a `Partial` of the insert
 type, `previousValues` and the rows of `afterRead` and the delete hooks are the
@@ -122,8 +112,6 @@ row type. A column's `.transform()` receives that column's type as `value`:
 field's `.transform()` receives `T | undefined`, or `T` after `.required()`.
 
 ## In a frontend
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A frontend may import a table's **type** from `backend/schema`, never its value:
 

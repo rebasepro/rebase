@@ -1,11 +1,9 @@
 ---
-sourceHash: f7689301748e2ce5
+sourceHash: fc0bdfb0ae7ceb1b
 title: Tabelle nel CMS
 sidebar_label: Tabelle nel CMS
 description: "Come il CMS mostra ogni tabella Postgres senza configurazione frontend: etichette, il widget assegnato a ciascun tipo di colonna, campi obbligatori e di sola lettura, relazioni, display slot e controlli Crea, Modifica ed Elimina che seguono la row-level security della tabella."
 ---
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Se usi il CMS, non devi descrivergli le tue tabelle. Quando qualcuno effettua
 l'accesso, il pannello richiede al backend le tabelle che quella persona può vedere
@@ -37,8 +35,6 @@ Ora legge le tabelle fornite dal backend, e la presentazione si trova in
 
 ## Da dove provengono le tabelle
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 `<RebaseCMS>` chiama `client.schema.tables()`, che legge
 `GET /api/schema/tables`. La risposta è l'elenco dei descrittori delle tabelle,
 redatto in base al chiamante: una tabella che non può leggere è assente, così come
@@ -58,8 +54,6 @@ sulla definizione di una tabella.
 
 ## Etichette
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Ogni etichetta è derivata da un identificatore, affinché una tabella risulti identica
 per ogni chiamante e a ogni caricamento:
 
@@ -78,8 +72,6 @@ maiuscole. Il singolare modifica solo l'ultima parola e lascia invariate le paro
 che finiscono semplicemente in `s` (`Status`, `Analysis`, `Address`).
 
 ## Il campo assegnato a ciascuna colonna
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 | Colonna | Campo nel modulo | Note |
 |---|---|---|
@@ -120,8 +112,6 @@ descritti in [Campi](/docs/collections/properties/).
 
 ## Campi obbligatori, predefiniti e di sola lettura
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 | Colonna | Nel modulo |
 |---|---|
 | `.notNull()` | obbligatorio, con il `requiredMessage` di `.validate()` se presente |
@@ -144,8 +134,6 @@ mostrati nel blocco di sola lettura in fondo alla barra laterale del modulo.
 
 ## Relazioni
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 - Un `belongsTo` è un selettore della riga correlata, al posto della relativa colonna
   di chiave esterna: il modulo mostra **Author**, non **Author ID**. È obbligatorio
   quando la chiave esterna è `NOT NULL` senza valore predefinito. Una chiave esterna
@@ -161,8 +149,6 @@ mostrati nel blocco di sola lettura in fondo alla barra laterale del modulo.
 Vedi [Relazioni nel pannello](/docs/collections/relations-in-the-admin-panel/).
 
 ## Display slot
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Ogni interfaccia che visualizza un record utilizza alcuni dei sei slot: title, subtitle,
 image, status, date e tags (vedi [display slot](/docs/frontend/view-modes/#display-slots)).
@@ -182,8 +168,6 @@ proprietà `display` in `customizeTable` consente di impostare esplicitamente
 qualsiasi slot.
 
 ## Chi vede quali controlli
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 Il pannello nasconde **Crea**, **Modifica** ed **Elimina** quando l'utente autenticato
 non è autorizzato a eseguire tali azioni. Lo determina valutando la row-level security
@@ -208,16 +192,12 @@ mostrato porterà a una scrittura rifiutata, mai a una scrittura che non sarebbe
 
 ## Ordinamento e valori predefiniti
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Le tabelle compaiono nella navigazione nell'ordine in cui il backend le fornisce,
 ossia l'ordine in cui sono esportate da `backend/schema/index.ts`. Ciascuna si apre
 nella vista tabella. `customizeTable` imposta `group`, `icon`, `defaultViewMode` e
 le altre opzioni; `<RebaseCMS navigationGroupMappings>` organizza i gruppi tra le varie tabelle.
 
 ## Caricamento ed errori
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 - **Durante il caricamento delle tabelle**, una route verso una collection mostra
   lo stato di caricamento e non "collection non trovata", e un deep link si apre
@@ -235,8 +215,6 @@ vengono ignorate, con un avviso in fase di sviluppo. Vedi
 
 ## Numerose tabelle
 
-<span class="since-badge" data-since="0.31">Da 0.31</span>
-
 Non vi è alcun limite al numero di tabelle. Il pannello ha bisogno di ogni collection
 per visualizzare la navigazione, quindi i descrittori vengono recuperati dopo l'accesso,
 e ciò che serve per aprire una collection (la tabella, le viste dei record, il modulo)
@@ -245,8 +223,6 @@ più del pannello: con 400 o più tabelle un push richiede decine di secondi; ve
 [quanto dura un push](/docs/cli/schema#rebase-db-push).
 
 ## Passaggi successivi
-
-<span class="since-badge" data-since="0.31">Da 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/): personalizza qualsiasi aspetto sopra descritto, per singola tabella
 - [Campi](/docs/collections/properties/): widget e opzioni per ogni tipo di colonna

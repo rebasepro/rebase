@@ -1,13 +1,11 @@
 ---
-sourceHash: a289b69be61220df
+sourceHash: c75bfea30303f60e
 title: Soft Delete
 sidebar_label: Soft Delete
 description: "softDelete auf einer Tabelle verwandelt Löschvorgänge in einen Zeitstempel, blendet markierte Zeilen bei jedem Lesevorgang aus und stellt sie mit einer gewöhnlichen Aktualisierung wieder her."
 ---
 
 ## Was sich ändert
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Wenn `softDelete` aktiviert ist, versieht ein Löschvorgang **eine Spalte mit einem Zeitstempel, anstatt die Zeile zu entfernen**, und jeder Lesevorgang filtert die markierten Zeilen heraus. Alles andere an der Operation bleibt unverändert: Es ist dieselbe Berechtigung erforderlich, `beforeDelete` kann weiterhin ein Veto einlegen und `afterDelete` wird weiterhin ausgelöst. Aus Sicht des Aufrufers wurde die Zeile gelöscht; wie die Tabelle dies aufzeichnet, ist Aufgabe dieses Flags.
 

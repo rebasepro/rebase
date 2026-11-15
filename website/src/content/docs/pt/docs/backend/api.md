@@ -1,5 +1,5 @@
 ---
-sourceHash: 4fc45b4d1d08afde
+sourceHash: 1e919257566479bf
 title: API REST
 sidebar_label: API REST
 description: Endpoints de API REST gerados automaticamente para cada tabela, com filtragem, ordenação, paginação e inclusão de relações.
@@ -351,7 +351,7 @@ Cada hook é aguardado com await, e uma exceção (throw) em qualquer um deles d
 | Método | Caminho | Autenticação | Descrição |
 |--------|---------|--------------|-----------|
 | `GET` | `/health` e `/api/health` | nenhuma | Verificação de disponibilidade/prontidão (liveness/readiness) |
-| `GET` | `/api/docs` | <span class="since-badge" data-since="0.31">A partir de 0.31</span> por padrão, os chamadores para os quais `GET /api/schema/tables` descreve tabelas (401 anônimo a menos que `schemaTables.public`); nenhuma quando `enableSwagger` é `true`; a barreira de admin quando é `false` | A especificação JSON do OpenAPI 3.0 — por padrão apenas as tabelas, colunas e relações que o endpoint de schema descreve para esse chamador. `404 DOCS_UNAVAILABLE` quando nenhuma autenticação estiver configurada |
+| `GET` | `/api/docs` | por padrão, os chamadores para os quais `GET /api/schema/tables` descreve tabelas (401 anônimo a menos que `schemaTables.public`); nenhuma quando `enableSwagger` é `true`; a barreira de admin quando é `false` | A especificação JSON do OpenAPI 3.0 — por padrão apenas as tabelas, colunas e relações que o endpoint de schema descreve para esse chamador. `404 DOCS_UNAVAILABLE` quando nenhuma autenticação estiver configurada |
 | `GET` | `/api/swagger` | nenhuma | Swagger UI. Servido apenas quando `enableSwagger` é `true` (`REBASE_ENABLE_SWAGGER=true`), e nunca em produção |
 | `GET` | `/api/meta/schema-version` | nenhuma | O hash do schema a partir do qual este backend foi construído e a versão do runtime — deliberadamente não autenticado, sem conter nada que descreva o schema |
 | `GET` | `/api/meta/contract` | `schema:read`: um administrador, a chave de serviço ou uma chave de API que o possua | A versão do schema, o runtime e cada tabela como um administrador os vê, para `rebase generate-sdk --from`. Fail-closed: `404` quando nenhuma autenticação estiver configurada |
@@ -367,8 +367,6 @@ Chamadores automatizados/máquinas autenticam-se com uma chave com escopo em vez
 
 ## Metadados do schema
 
-<span class="since-badge" data-since="0.31">A partir de 0.31</span>
-
 As tabelas que o backend serve são descritas, por chamador, em `GET /api/schema/tables` — os descritores a partir dos quais o CMS e o Studio realizam a renderização. Qualquer chamador autenticado recebe as tabelas que tem permissão de ver, ocultando o que não puder ler; [Endpoints](/docs/backend/endpoints/#schema) contém a matriz.
 
 Todo o schema como um administrador o vê é servido em:
@@ -378,7 +376,7 @@ GET /api/meta/contract
 ```
 
 ```json
-{ "schemaVersion": "v2:…", "runtime": { "version": "0.30.1", "contract": 2 }, "tables": [ … ] }
+{ "schemaVersion": "v2:…", "runtime": { "version": "0.31.0", "contract": 2 }, "tables": [ … ] }
 ```
 
 Ele requer o escopo **`schema:read`**, que um administrador possui, e em uma implantação sem autenticação configurada ele não é servido de forma alguma (404 `CONTRACT_UNAVAILABLE`), em vez de expor o schema para qualquer pessoa. As versões de schema começam com `v2:` desde a versão 0.31: elas são calculadas a partir das tabelas compiladas, de modo que a versão de cada projeto mudou uma vez. Seu endpoint irmão retorna uma string de versão que representa o schema sem descrevê-lo, e é deliberadamente acessível sem nenhuma credencial — que é o que um job de CI consulta:

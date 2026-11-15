@@ -1,5 +1,5 @@
 ---
-sourceHash: 82f7615bf6bd44b4
+sourceHash: 90e4ac2603a6ef96
 title: Intégrer le pilote Postgres
 sidebar_label: Intégrer le pilote Postgres
 description: Ouvrez le pilote de données et le socket temps réel de @rebasepro/server-postgres dans Express, Fastify ou Node standard, sans le serveur Rebase — réplicas de lecture, Drizzle et vidage de connexions inclus.
@@ -14,8 +14,6 @@ npm install @rebasepro/server-postgres @rebasepro/types express pg drizzle-orm
 ```
 
 ## Ouverture du pilote et du socket
-
-<span class="since-badge" data-since="0.31">Depuis 0.31</span>
 
 `openPostgresDriver`
 et `postgresDriverConfigFromEnv` sont exportés.

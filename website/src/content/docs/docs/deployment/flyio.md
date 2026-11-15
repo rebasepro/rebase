@@ -37,7 +37,7 @@ rebase build
 Commit a three-line `Dockerfile` at the project root:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.30.1
+FROM rebasepro/server:0.31.0
 COPY dist-bundle /bundle
 ```
 
@@ -93,8 +93,6 @@ fly deploy
 Then `fly open`.
 
 ## 5. The schema
-
-<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 **The runtime creates missing tables at boot, including the ones `backend/schema` declares.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema — it creates missing tables, columns and enum types and applies their row-level security — so the first start against an empty database comes up serving your tables.
 

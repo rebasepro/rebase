@@ -1,11 +1,9 @@
 ---
-sourceHash: 57ee5c3ecdf49419
+sourceHash: 2e189939df0c022e
 title: Ansichtsmodi
 sidebar_label: Ansichtsmodi
 description: "Zeigen Sie die Zeilen einer Tabelle als Liste, Tabellenblatt, Karten oder Kanban-Board an; wählen Sie, was Titel, Bild, Status und Datum der einzelnen Datensätze füllt; und legen Sie die Standard-Sortierung, Filter sowie Ein-Klick-Filtervoreinstellungen fest."
 ---
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 Jede Collection kann über den Umschalter in ihrer Toolbar auf vier Arten dargestellt werden:
 
@@ -21,8 +19,6 @@ eine Galerie), gesteuert über dieselbe Toolbar: siehe
 [Custom view modes](/docs/frontend/extending#custom-view-modes).
 
 ## Ansichten auswählen
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 ```ts
 // backend/schema/tasks.ts
@@ -83,8 +79,6 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 | `"xl"` | 160 | Große Bild-Thumbnails |
 
 ## Kanban
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 `kanban.columnField` benennt die Spalte, nach der das Board gruppiert. Sie muss
 eine geschlossene Menge von Strings enthalten, ein `col.enum([...])` oder eine
@@ -155,8 +149,6 @@ Durchlauf wieder zunichte.
 
 ## Display-Slots
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 Jede Oberfläche, die einen Datensatz darstellt, nutzt einige von sechs Slots: **title**,
 **subtitle**, **image**, **status**, **date** und **tags**. Eine Zeile in der Liste
 besteht aus Bild + Titel + Untertitel + Status + Datum, eine Karte aus demselben mit dem
@@ -218,8 +210,6 @@ formatiert, ein Array zusammengefügt und eine Relation als das erste aus `name`
 
 ## Filter, Voreinstellungen und Sortierung
 
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
-
 ```tsx
 import { customizeTable } from "@rebasepro/cms";
 import type { tasks } from "../../../backend/schema/tasks";
@@ -250,8 +240,6 @@ Was ein Aufrufer lesen darf, wird für jeden Aufrufer durch die
 [Row-Level-Security](/docs/collections/security-rules/) der Tabelle bestimmt.
 
 ## Nächste Schritte
-
-<span class="since-badge" data-since="0.31">Seit 0.31</span>
 
 - [customizeTable](/docs/frontend/customize-table/): alle Optionen
 - [Customizing the admin](/docs/frontend/customizing/): eigene Ansichtsmodi, Seiten und Aktionen

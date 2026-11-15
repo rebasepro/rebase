@@ -1,10 +1,8 @@
 ---
-sourceHash: a8ca2780e6bbad15
+sourceHash: 97486e7c061d503d
 title: Edición de esquemas en vivo
 description: Crea y modifica tablas en un backend en ejecución; la edición se escribe en backend/schema, primero se confirma en tu repositorio y luego se aplica.
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 El editor de esquemas en el panel de administración reescribe los archivos de tablas en
 `backend/schema`. Eso funciona en tu máquina y en ningún otro lugar: los archivos de un
@@ -26,8 +24,6 @@ cualquier otra superficie de `/api/admin` que especifique un ámbito. Un adminis
 La aplicación también requiere una cosa más además del ámbito; consulta [Quién puede aplicar](#quién-puede-aplicar).
 
 ## Las ediciones: `TablePatch`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Cada ruta que cambia el esquema toma el mismo cuerpo, `{ patches }`: una lista
 de ediciones, cada una identificando su tabla por slug. El tipo es `TablePatch`, de
@@ -78,8 +74,6 @@ una cuenta con el permiso `schema:read`: un administrador o un rol que lo declar
 la máquina lo configurará por ti.
 
 ## Planifica antes de aplicar
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `/plan` no tiene efectos secundarios. Envía las ediciones por POST y te dirá lo que significan:
 
@@ -186,8 +180,6 @@ cambios y no se rechazan:
   `safe` y se aplica con `ALTER COLUMN … SET DEFAULT` / `DROP DEFAULT`.
 
 ### Editar solo el código fuente
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Un cambio rechazado todavía se puede escribir en `backend/schema` y confirmarse en un
 commit, dejando la base de datos tal como está; eliminar una columna que ya no se utiliza es el
@@ -332,8 +324,6 @@ Por lo tanto, una aplicación fallida **no es un error**. La respuesta así lo i
 
 ## Las reglas surten efecto en la misma aplicación
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Un cambio en el `rls` de una tabla (o una tabla nueva) se aplica en la misma ejecución: las
 directivas de las tablas modificadas se escriben en la base de datos inmediatamente después del DDL,
 y la respuesta detalla lo sucedido bajo `policies`:
@@ -353,8 +343,6 @@ Los hooks editados en el código fuente también surten efecto con la aplicació
 tablas compiladas del esquema editado sin necesidad de reiniciar.
 
 ## Servido sin reiniciar
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Un cambio aplicado desde Studio se sirve de inmediato. El controlador de Postgres lee
 las tablas modificadas de la base de datos y las reemplaza: la API de datos,
@@ -382,8 +370,6 @@ ofrece Reload; vuelve a realizar la edición sobre el archivo tal como se encuen
 
 ## Dónde funciona esto
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 La edición de esquemas en vivo reescribe `backend/schema` con el mismo editor que utilizan los
 guardados de solo código fuente del panel (necesita tener instalado `ts-morph`). El origen de ese
 código fuente determina dónde se ejecuta:
@@ -410,8 +396,6 @@ repositorio, `/api/admin/schema/status` responde `enabled: false` con el código
 despliega.
 
 ### Desde un bundle compilado
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Un bundle no tiene código propio para configurar, por lo que se habilita mediante variables
 de entorno. Nada cambia para un bundle que no las defina.
@@ -462,8 +446,6 @@ resultado en un commit y despliégalo. Los saltos de línea y los espacios en bl
 diferencias.
 
 ### Confirmar en un repositorio remoto
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `liveSchema.repository` hace que el servidor confirme cada cambio en un repositorio de GitHub
 a través de la Git Data API en lugar de ejecutar `git commit` en un

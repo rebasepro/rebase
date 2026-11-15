@@ -1,11 +1,9 @@
 ---
-sourceHash: 362c7b70fede8ad5
+sourceHash: 2564e6bc51f454da
 title: Personalizando o Admin
 sidebar_label: Personalizando o Admin
 description: Como personalizar o admin do Rebase — blocos de construção, hooks e locais, com receitas testadas para singletons, configurações por usuário, ações em massa, visualizações em calendário, dashboards e telas de login personalizadas.
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O admin é construído a partir de partes que você mesmo pode usar. Para personalizá-lo, você escreve
 um componente React comum e o coloca em um local. Esse é todo o modelo:
@@ -37,8 +35,6 @@ importam apenas pacotes públicos: copie um para o seu projeto no estado em que 
 O `README.md` ao lado deles é a referência completa de blocos de construção, hooks e locais.
 
 ## Exemplo: um singleton
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Um singleton não é um tipo especial de tabela. É uma tabela comum cuja página
 sempre abre a mesma linha. Ao receber um id, o `RecordForm` edita esse registro e
@@ -97,8 +93,6 @@ valida apenas o que exibe — consulte
 [Painéis em uma página própria](/docs/frontend/panels).
 
 ## Locais
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 | Para adicionar… | Coloque um componente em |
 |---|---|

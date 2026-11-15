@@ -1,10 +1,8 @@
 ---
-sourceHash: a8ca2780e6bbad15
+sourceHash: 97486e7c061d503d
 title: Edição de schema em tempo real
 description: Crie e altere tabelas em um backend em execução — a edição é gravada em backend/schema, confirmada primeiro em seu repositório e depois aplicada.
 ---
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 O editor de schema no painel de administração reescreve os arquivos de tabela em
 `backend/schema`. Isso funciona na sua máquina e em nenhum outro lugar: os
@@ -27,8 +25,6 @@ administrador possui ambos. Aplicar também requer uma coisa a mais além do esc
 — veja [Quem pode aplicar](#quem-pode-aplicar).
 
 ## As edições: `TablePatch`
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Cada rota que altera o schema recebe o mesmo corpo, `{ patches }`: uma lista
 de edições, cada uma nomeando sua tabela por slug. O tipo é `TablePatch`, de
@@ -81,8 +77,6 @@ uma conta que possui `schema:read`: um administrador ou uma role que o declare.
 Nada na máquina o define para você.
 
 ## Planeje antes de aplicar
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `/plan` não tem efeitos colaterais. Envie as edições via POST e ele informará o
 que elas significam:
@@ -193,8 +187,6 @@ Duas edições que parecem alterações e não são recusadas:
   futuras. É `safe` e aplicado com `ALTER COLUMN … SET DEFAULT` / `DROP DEFAULT`.
 
 ### Editar somente o código-fonte
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Uma alteração recusada ainda pode ser gravada em `backend/schema` e confirmada em
 commit, deixando o banco de dados como está — remover uma coluna que você não
@@ -348,8 +340,6 @@ Portanto, uma aplicação que falha **não é um erro**. A resposta indica isso:
 
 ## As regras entram em vigor na mesma aplicação
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 Uma alteração no `rls` de uma tabela (ou uma nova tabela) passa a valer na mesma
 aplicação: as políticas das tabelas alteradas são gravadas no banco de dados logo
 após o DDL, e a resposta indica o que aconteceu em `policies`:
@@ -370,8 +360,6 @@ servidor executa as tabelas compiladas do schema editado sem necessidade de
 reinicialização.
 
 ## Disponibilizado sem reinicialização
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Uma alteração aplicada pelo Studio é disponibilizada imediatamente. O driver do
 Postgres lê as tabelas alteradas de volta do banco de dados e as substitui: a API
@@ -400,8 +388,6 @@ com base no arquivo em seu estado atual.
 
 ## Onde isso funciona
 
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
-
 A edição de schema em tempo real reescreve `backend/schema` usando o mesmo editor
 que os salvamentos somente em código-fonte do painel utilizam (requer `ts-morph`
 instalado). A origem desse código-fonte define onde ele é executado:
@@ -429,8 +415,6 @@ que ele especifique um repositório, `/api/admin/schema/status` responderá
 desenvolvimento, faça o commit e o deploy.
 
 ### A partir de um bundle compilado
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 Um bundle não tem código próprio para configurar, portanto a ativação é feita
 por meio de variáveis de ambiente. Nada muda para um bundle que não as defina.
@@ -484,8 +468,6 @@ resultado e faça o deploy. Quebras de linha e espaços em branco no final de li
 não contam como diferença.
 
 ### Fazendo commit em um repositório remoto
-
-<span class="since-badge" data-since="0.31">Desde 0.31</span>
 
 `liveSchema.repository` faz com que o servidor confirme cada alteração em um
 repositório GitHub por meio da Git Data API, em vez de executar `git commit` em
