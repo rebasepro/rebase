@@ -177,7 +177,17 @@ describe("db branch with other clients connected, and from a switched checkout",
         const sticky = stickyClient(urlFor("rb_held"), "rebase-realtime:held");
         await sticky.start();
         try {
-            const deleted = await run(["db", "branch", "delete", "held", "--force"]);
+            // --force is how hard to try, not consent: with no terminal to ask
+            // on, the delete refuses before it touches the database.
+            const unconfirmed = await run(["db", "branch", "delete", "held", "--force"]);
+            expect(unconfirmed.code, unconfirmed.said).toBe(1);
+            expect(unconfirmed.said).toContain("there is no terminal to confirm on");
+            expect(unconfirmed.said).toContain("Re-run with --yes");
+            expect(await databases()).toContain("rb_held");
+            stdout.length = 0;
+            stderr.length = 0;
+
+            const deleted = await run(["db", "branch", "delete", "held", "--force", "--yes"]);
 
             expect(deleted.code, deleted.said).toBe(1);
             expect(deleted.said).toContain("still had connections after they were disconnected");
