@@ -30,6 +30,7 @@ import {
     sortRows
 } from "./offline-query";
 import { unref } from "@rebasepro/utils";
+import { browserLeaseStorage, withStorageLease } from "./offline-lease";
 
 /**
  * The SDK's local-first sync engine.
@@ -3547,7 +3548,7 @@ data: u.data as AnyRow })),
     private async withLock<T>(fn: () => Promise<T>): Promise<T> {
         const locks = (globalThis as { navigator?: { locks?: LockManager } }).navigator?.locks;
         // Two tabs replaying the same queue would each send every mutation.
-        if (!locks?.request) return fn();
+        if (!locks?.request) return this.withLeaseFallback(fn);
         // The request settles with the callback's own outcome, so a failure
         // of the work and a refusal of the lock look the same from here. Only
         // the refusal may fall back: a replay that had started and thrown was
@@ -3563,8 +3564,19 @@ data: u.data as AnyRow })),
             if (started) throw error;
             // A browser that denies the lock (or a policy that blocks it) must
             // not stop the queue from draining at all.
-            return fn();
+            return this.withLeaseFallback(fn);
         }
+    }
+
+    /**
+     * Serialise replay across tabs without Web Locks — see `offline-lease.ts`.
+     * Where there is no `localStorage` either (a worker), there is no other
+     * tab sharing this queue through it to guard against.
+     */
+    private withLeaseFallback<T>(fn: () => Promise<T>): Promise<T> {
+        const storage = browserLeaseStorage();
+        if (!storage) return fn();
+        return withStorageLease(storage, `rebase-offline-sync:${this.scope}`, this.tabId, fn);
     }
 
     // ─── Cross-tab ───────────────────────────────────────────────────────────

@@ -282,6 +282,60 @@ describe("two tabs over one database", () => {
         tabB.dispose();
         uninstall();
     });
+
+    /**
+     * A browser with no Web Locks — Safari before 15.4, a plain-http page,
+     * a webview. Replay is serialised through a lease in `localStorage`
+     * instead (`offline-lease.ts`); without it both tabs sent every write.
+     */
+    function installLocalStorage(): () => void {
+        const map = new Map<string, string>();
+        const storage = {
+            getItem: (key: string) => map.get(key) ?? null,
+            setItem: (key: string, value: string) => { map.set(key, value); },
+            removeItem: (key: string) => { map.delete(key); }
+        };
+        Object.defineProperty(globalThis, "localStorage", { value: storage, configurable: true });
+        return () => { Reflect.deleteProperty(globalThis, "localStorage"); };
+    }
+
+    it("replays a shared write once without Web Locks", async () => {
+        const uninstall = installLocalStorage();
+        const server = createServer();
+        let creates = 0;
+        const counting = fakeTableClient<Record<string, unknown>>({
+            find: server.client.find,
+            findById: server.client.findById,
+            async create(data: Record<string, unknown>) {
+                const row = await server.client.create(data);
+                creates++;
+                return row;
+            },
+            createMany: server.client.createMany,
+            update: server.client.update,
+            delete: server.client.delete,
+            count: server.client.count
+        });
+        const tabA = new OfflineManager({ store: new IndexedDBOfflineStore(), syncIntervalMs: 0 }, () => counting);
+        const tabB = new OfflineManager({ store: new IndexedDBOfflineStore(), syncIntervalMs: 0 }, () => counting);
+        const postsA = tabA.wrap("xtab-nolocks", counting);
+        const postsB = tabB.wrap("xtab-nolocks", counting);
+        await postsA.find();
+        await postsB.find();
+
+        server.state.online = false;
+        await postsA.create({ title: "from tab A" }, "nl1");
+        await settleUntil(async () => (await tabB.api.pending()).length === 1);
+
+        server.state.online = true;
+        const [a, b] = await Promise.all([tabA.sync(), tabB.sync()]);
+        expect(a.flushed + b.flushed).toBe(1);
+        expect(creates).toBe(1);
+
+        tabA.dispose();
+        tabB.dispose();
+        uninstall();
+    });
 });
 
 describe("OfflineManager over IndexedDB", () => {
