@@ -597,6 +597,12 @@ function engineOf(version: string): PullTargetEngine {
     return /\bPGlite\b/i.test(version) ? "pglite" : "postgres";
 }
 
+/** The major version `version()` names: 15 for `PostgreSQL 15.19 on aarch64-…`. Null when it names none. */
+function majorVersionOf(version: string): number | null {
+    const major = /\bPostgreSQL (\d+)/.exec(version)?.[1];
+    return major === undefined ? null : Number(major);
+}
+
 const NOTHING_CHANGED = "Nothing was changed: the local database is as it was.";
 
 /** What the target database runs on, or why it could not be asked. */
@@ -776,6 +782,11 @@ export interface RestoreRunOutcome {
      * what finishes the job: everything else repeats until its cause is fixed.
      */
     advice: string | null;
+    /**
+     * Something the copy did that is worth one line, whether or not it
+     * succeeded — see {@link attverNotice} and {@link transactionTimeoutNotice}.
+     */
+    notice?: string;
 }
 
 /**
@@ -798,11 +809,19 @@ export interface RestoreRunOutcome {
  * means the local pg_dump is older than the source server and the dump could
  * not be edited to drop the key (`attver`, what {@link stripAttverFromArchive}
  * said, tells why).
+ *
+ * One error is known to cost the copy nothing, and does not fail it: a target
+ * older than PostgreSQL 17 (`targetMajor`, read from its `version()`) refusing
+ * the `SET transaction_timeout` a pg_dump 17 or newer writes at the top of
+ * every dump — see {@link onlyTransactionTimeoutRefused}. Only when it is the
+ * one kind of error in the run; the copy is then complete, and the outcome
+ * carries a notice saying why pg_restore's error was harmless.
  */
 export function restoreOutcome(
     run: RestoreRun,
     engine: PullTargetEngine = "postgres",
-    attver: AttverStrip | null = null
+    attver: AttverStrip | null = null,
+    targetMajor: number | null = null
 ): RestoreRunOutcome {
     if (run.signal) {
         return {
@@ -819,6 +838,12 @@ export function restoreOutcome(
         };
     }
     if (run.exitCode === 0) return { started: true, failure: null, advice: null };
+    if (run.exitCode === 1 && targetMajor !== null && targetMajor < TRANSACTION_TIMEOUT_SINCE) {
+        const refused = onlyTransactionTimeoutRefused(run.stderr ?? "");
+        if (refused !== null) {
+            return { started: true, failure: null, advice: null, notice: transactionTimeoutNotice(targetMajor, refused) };
+        }
+    }
 
     const ignored = /errors ignored on restore: (\d+)/.exec(run.stderr ?? "");
     const refusedAttver = (run.stderr ?? "").includes("unrecognized parameter \"pg_attver\"");
@@ -874,12 +899,60 @@ export function attverNotice(attver: AttverStrip): string | null {
         + `out of ${attver.entries} table(s) before restoring. Upgrading the PostgreSQL client tools to ${atLeast} is the supported fix.`;
 }
 
+/** The PostgreSQL major that added `transaction_timeout`, and whose pg_dump began writing `SET transaction_timeout = 0;`. */
+const TRANSACTION_TIMEOUT_SINCE = 17;
+
+/** pg_restore's line for an error, whatever caused it. */
+const RESTORE_ERROR_LINE = /^pg_restore: error: /;
+
+/** What a server older than 17 answers `SET transaction_timeout`: pg_restore's line for it, word for word. */
+const TRANSACTION_TIMEOUT_REFUSED_LINE =
+    /^pg_restore: error: could not execute query: ERROR: {2}unrecognized configuration parameter "transaction_timeout"$/;
+
+/** The statement pg_restore names after that error. */
+const TRANSACTION_TIMEOUT_COMMAND_LINE = /^Command was: SET transaction_timeout = \d+;$/;
+
+/**
+ * How many errors pg_restore reported when every one of them was the target
+ * refusing the dump's `SET transaction_timeout`, or null when any was
+ * anything else.
+ *
+ * Strict on purpose, because whatever it accepts is reported as a complete
+ * copy: its summary ("errors ignored on restore: N") must be there, and N must
+ * be exactly the number of errors it printed, each of them that refusal and
+ * each naming that statement. An error it cannot read is never called harmless.
+ */
+function onlyTransactionTimeoutRefused(stderr: string): number | null {
+    const ignored = /errors ignored on restore: (\d+)/.exec(stderr);
+    if (!ignored) return null;
+    const count = Number(ignored[1]);
+    const lines = stderr.split(/\r?\n/).map((line) => line.trimEnd());
+    const errors = lines.filter((line) => RESTORE_ERROR_LINE.test(line));
+    const commands = lines.filter((line) => line.startsWith("Command was: "));
+    if (count === 0 || errors.length !== count || commands.length !== count) return null;
+    const allRefusals = errors.every((line) => TRANSACTION_TIMEOUT_REFUSED_LINE.test(line))
+        && commands.every((line) => TRANSACTION_TIMEOUT_COMMAND_LINE.test(line));
+
+    return allRefusals ? count : null;
+}
+
+/**
+ * The line a pull prints when the only errors pg_restore reported were the
+ * target refusing `SET transaction_timeout`: pg_restore has already printed
+ * them, and this says they cost nothing.
+ */
+function transactionTimeoutNotice(targetMajor: number, errors: number): string {
+    const which = errors === 1 ? "The error above is" : `The ${errors} errors above are`;
+
+    return `${which} the local PostgreSQL ${targetMajor} refusing the \`SET transaction_timeout = 0\` a pg_dump `
+        + `${TRANSACTION_TIMEOUT_SINCE} or newer writes at the top of every dump: that setting does not exist before `
+        + `PostgreSQL ${TRANSACTION_TIMEOUT_SINCE}, nothing else failed, and the copy is complete.`;
+}
+
 /** How {@link restoreCopy} ended. */
 export interface RestoreOutcome extends RestoreRunOutcome {
     /** Whether the local database was emptied first. False means it is exactly as it was. */
     cleared: boolean;
-    /** Something the copy did that is worth one line, whether or not it succeeded — see {@link attverNotice}. */
-    notice?: string;
 }
 
 /**
@@ -1017,13 +1090,16 @@ export async function restoreCopy(plan: PullPlan, dumpFile: string): Promise<Res
     });
     client.on("error", () => undefined);
     let engine: PullTargetEngine;
+    let targetMajor: number | null;
     // ROLLBACK only once BEGIN has been sent. Before that there is nothing to
     // roll back, and after a statement that timed out a ROLLBACK only waits
     // out a second bound.
     let begun = false;
     try {
         await client.connect();
-        engine = engineOf((await client.query<{ version: string }>("SELECT version() AS version")).rows[0]?.version ?? "");
+        const version = (await client.query<{ version: string }>("SELECT version() AS version")).rows[0]?.version ?? "";
+        engine = engineOf(version);
+        targetMajor = majorVersionOf(version);
         if (engine === "pglite" && plan.targetEngine !== "pglite") {
             return {
                 cleared: false,
@@ -1065,9 +1141,10 @@ export async function restoreCopy(plan: PullPlan, dumpFile: string): Promise<Res
 
     if (engine === "pglite") await resetSharedSession(plan.target);
 
-    const notice = attverNotice(attver);
+    const outcome = restoreOutcome(run, engine, attver, targetMajor);
+    const notice = [attverNotice(attver), outcome.notice].filter((line) => line).join(" ");
 
-    return { cleared: true, ...restoreOutcome(run, engine, attver), ...(notice ? { notice } : {}) };
+    return { cleared: true, ...outcome, ...(notice ? { notice } : {}) };
 }
 
 /**

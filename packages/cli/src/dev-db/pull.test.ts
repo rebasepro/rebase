@@ -481,6 +481,71 @@ describe("restoreOutcome", () => {
 });
 
 /**
+ * A pg_dump from PostgreSQL 17 or newer writes `SET transaction_timeout = 0;`
+ * at the top of every dump. A target older than 17 has no such parameter, so
+ * pg_restore counts that one statement as an error and exits 1 — and the pull
+ * reported a failure although every table and row had arrived.
+ *
+ * The stderr below is pg_restore 18.4's, word for word, restoring a dump of a
+ * PostgreSQL 18.7 database into postgres:15-alpine (15.19).
+ */
+describe("restoreOutcome on a target older than PostgreSQL 17", () => {
+    const TRANSACTION_TIMEOUT_REFUSED = "pg_restore: error: could not execute query: ERROR:  unrecognized configuration parameter \"transaction_timeout\"\n"
+        + "Command was: SET transaction_timeout = 0;\n";
+    const RELATION_MISSING = "pg_restore: error: could not execute query: ERROR:  relation \"public.posts\" does not exist\n"
+        + "Command was: ALTER TABLE ONLY public.posts\n"
+        + "    ADD CONSTRAINT posts_pkey PRIMARY KEY (id);\n"
+        + "\n"
+        + "\n";
+    const ignored = (count: number) => `pg_restore: warning: errors ignored on restore: ${count}\n`;
+
+    it("calls the copy complete when the dump's SET transaction_timeout was the only error, and says so in one line", () => {
+        const outcome = restoreOutcome({ exitCode: 1, stderr: TRANSACTION_TIMEOUT_REFUSED + ignored(1) }, "postgres", null, 15);
+
+        expect(outcome).toEqual({ started: true, failure: null, advice: null, notice: expect.any(String) });
+        expect(outcome.notice).toContain("PostgreSQL 15");
+        expect(outcome.notice).toContain("SET transaction_timeout");
+        expect(outcome.notice).toMatch(/complete/);
+        expect(outcome.notice).not.toContain("\n");
+    });
+
+    it("still fails when another error came with it", () => {
+        const outcome = restoreOutcome(
+            { exitCode: 1, stderr: TRANSACTION_TIMEOUT_REFUSED + RELATION_MISSING + ignored(2) },
+            "postgres",
+            null,
+            15
+        );
+
+        expect(outcome.failure).toMatch(/could not restore 2 object\(s\)/);
+        expect(outcome.notice).toBeUndefined();
+    });
+
+    it("still fails when the summary counts more errors than it can see", () => {
+        // An error it cannot read is not one it may call harmless.
+        const outcome = restoreOutcome({ exitCode: 1, stderr: TRANSACTION_TIMEOUT_REFUSED + ignored(3) }, "postgres", null, 15);
+
+        expect(outcome.failure).toMatch(/could not restore 3 object\(s\)/);
+    });
+
+    it("leaves a target on PostgreSQL 17 or newer exactly as before", () => {
+        // There the parameter exists, so a refusal of it is not the known one.
+        for (const major of [17, 18]) {
+            const run = { exitCode: 1, stderr: TRANSACTION_TIMEOUT_REFUSED + ignored(1) };
+            expect(restoreOutcome(run, "postgres", null, major)).toEqual(restoreOutcome(run));
+            expect(restoreOutcome(run, "postgres", null, major).failure).toMatch(/could not restore 1 object\(s\)/);
+        }
+    });
+
+    it("leaves a target whose version it could not read exactly as before", () => {
+        const run = { exitCode: 1, stderr: TRANSACTION_TIMEOUT_REFUSED + ignored(1) };
+
+        expect(restoreOutcome(run, "postgres", null, null)).toEqual(restoreOutcome(run));
+        expect(restoreOutcome(run).failure).toMatch(/could not restore 1 object\(s\)/);
+    });
+});
+
+/**
  * A pull from a LATIN1 database into the managed one emptied it and then
  * restored nothing: pg_restore's first statement, `SET client_encoding =
  * 'LATIN1'`, left the PGlite daemon answering nobody, and every statement

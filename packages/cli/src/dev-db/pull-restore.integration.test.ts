@@ -14,6 +14,11 @@
  * with every row in place, and pulling again failed the same way. A local
  * table referencing a pulled one blocked its DROP TABLE the same way.
  *
+ * A pull into a Postgres older than 17 reported a failure with every table and
+ * row in place: a pg_dump 17 or newer writes `SET transaction_timeout = 0;` at
+ * the top of the dump, which such a server does not know, and pg_restore
+ * counted that one statement as an error.
+ *
  * Needs Docker and the PostgreSQL client tools. A missing client fails the
  * suite rather than skipping it: a skipped suite reports a pass.
  */
@@ -36,8 +41,15 @@ let work = "";
 const url = (database: string, user = "rebase", password = "rebase") =>
     `postgresql://${user}:${password}@127.0.0.1:${new URL(base).port}/${database}?sslmode=disable`;
 
-async function sql(database: string, text: string): Promise<pg.QueryResult> {
-    const client = new pg.Client({ connectionString: url(database) });
+/** The same server's URL for another database on it. */
+function at(server: string, database: string): string {
+    const located = new URL(server);
+    located.pathname = `/${database}`;
+    return located.toString();
+}
+
+async function query(connectionString: string, text: string): Promise<pg.QueryResult> {
+    const client = new pg.Client({ connectionString });
     await client.connect();
     try {
         return await client.query(text);
@@ -46,40 +58,54 @@ async function sql(database: string, text: string): Promise<pg.QueryResult> {
     }
 }
 
-/** The image whose major the local `pg_dump` can read: a client older than the server refuses it. */
-async function imageForLocalClient(): Promise<string> {
+async function sql(database: string, text: string): Promise<pg.QueryResult> {
+    return query(url(database), text);
+}
+
+/** The major version of the local `pg_dump`. */
+async function localClientMajor(): Promise<number> {
     const version = await findPgTool("pg_dump");
     const major = Number(/(\d+)(\.\d+)*\s*(\(|$)/.exec(version ?? "")?.[1] ?? Number.NaN);
     if (!version || !Number.isInteger(major) || !(await findPgTool("pg_restore"))) {
         throw new Error("pg_dump and pg_restore are needed on PATH for this suite (e.g. `brew install libpq`).");
     }
+    return major;
+}
+
+/** The image whose major the local `pg_dump` can read: a client older than the server refuses it. */
+async function imageForLocalClient(): Promise<string> {
+    const major = await localClientMajor();
     return major >= 18 ? "postgres:18-alpine" : `postgres:${major}-alpine`;
 }
 
-beforeAll(async () => {
-    const image = await imageForLocalClient();
-    process.once("exit", () => spawnSync("docker", ["rm", "-f", "-v", container], { stdio: "ignore" }));
+/** Run `image` as `name` on a random local port: the URL of its `rebase` database, once a query answers there. */
+async function startPostgres(name: string, image: string): Promise<string> {
+    process.once("exit", () => spawnSync("docker", ["rm", "-f", "-v", name], { stdio: "ignore" }));
     await execa("docker", [
-        "run", "--rm", "-d", "--name", container,
+        "run", "--rm", "-d", "--name", name,
         "-e", "POSTGRES_USER=rebase", "-e", "POSTGRES_PASSWORD=rebase", "-e", "POSTGRES_DB=rebase",
         "-p", "127.0.0.1::5432", image
     ]);
-    const { stdout } = await execa("docker", ["port", container, "5432"]);
+    const { stdout } = await execa("docker", ["port", name, "5432"]);
     const port = /:(\d+)\s*$/m.exec(stdout)?.[1];
     if (!port) throw new Error(`No published port in: ${stdout}`);
-    base = `postgresql://rebase:rebase@127.0.0.1:${port}/rebase?sslmode=disable`;
+    const started = `postgresql://rebase:rebase@127.0.0.1:${port}/rebase?sslmode=disable`;
 
     // Ready means a query answers, not that the port listens: the image
     // restarts once during initialisation.
     for (let attempt = 0; ; attempt += 1) {
         try {
-            await sql("rebase", "SELECT 1");
-            break;
+            await query(started, "SELECT 1");
+            return started;
         } catch (error) {
             if (attempt > 60) throw error;
             await new Promise(resolve => setTimeout(resolve, 500));
         }
     }
+}
+
+beforeAll(async () => {
+    base = await startPostgres(container, await imageForLocalClient());
     work = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-pull-it-"));
 }, 120_000);
 
@@ -129,7 +155,11 @@ beforeEach(async () => {
 });
 
 async function tablesIn(database: string): Promise<string[]> {
-    const { rows } = await sql(database, `
+    return tablesAt(url(database));
+}
+
+async function tablesAt(connectionString: string): Promise<string[]> {
+    const { rows } = await query(connectionString, `
         SELECT table_schema || '.' || table_name AS name FROM information_schema.tables
          WHERE table_schema NOT IN ('pg_catalog', 'information_schema') ORDER BY 1`);
     return rows.map(row => String(row.name));
@@ -187,5 +217,34 @@ describe("restoreCopy", () => {
         expect(await tablesIn(target)).toContain("rebase.atlas_schema_revisions");
         const titles = (await sql(target, "SELECT title FROM public.posts ORDER BY id")).rows.map(row => row.title);
         expect(titles[0]).toBe("stale local row");
+    });
+});
+
+describe("restoreCopy into a PostgreSQL older than 17", () => {
+    const older = `${container}-pg15`;
+    let olderBase = "";
+
+    beforeAll(async () => {
+        olderBase = await startPostgres(older, "postgres:15-alpine");
+    }, 120_000);
+
+    afterAll(async () => {
+        await execa("docker", ["rm", "-f", "-v", older], { reject: false });
+    });
+
+    it("succeeds with every table in place, and says why pg_restore's error was harmless", async () => {
+        const target = at(olderBase, `dst_${crypto.randomUUID().slice(0, 8)}`);
+        await query(olderBase, `CREATE DATABASE ${new URL(target).pathname.slice(1)}`);
+
+        const outcome = await restoreCopy({ ...plan, target }, dumpFile);
+
+        expect(outcome).toMatchObject({ cleared: true, started: true, failure: null, advice: null });
+        // Only a pg_dump 17 or newer writes the SET; an older client's dump restores without an error.
+        if ((await localClientMajor()) >= 17) expect(outcome.notice).toContain("SET transaction_timeout = 0");
+        expect(await tablesAt(target)).toEqual(["public.posts", "rebase.users"]);
+        const titles = (await query(target, "SELECT title FROM public.posts ORDER BY id")).rows.map(row => row.title);
+        expect(titles).toEqual(["from the source", "also from the source"]);
+        expect((await query(target, "SELECT count(*)::int AS n FROM pg_policies WHERE tablename = 'posts'")).rows[0].n).toBe(1);
+        expect((await query(target, "SELECT count(*)::int AS n FROM pg_trigger WHERE tgname = 'posts_touch'")).rows[0].n).toBe(1);
     });
 });
