@@ -1,0 +1,9 @@
+import { defineConfig } from "vite";
+import { rebaseCollectionsPlugin, rebaseMcpViewPlugin } from "@rebasepro/app/vitePlugin";
+
+export default defineConfig({
+    plugins: [
+        rebaseCollectionsPlugin({ collectionsDir: "../config/collections" }),
+        rebaseMcpViewPlugin()
+    ]
+});

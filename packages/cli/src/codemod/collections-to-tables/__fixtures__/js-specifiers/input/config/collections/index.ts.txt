@@ -1,0 +1,4 @@
+import postsCollection from "./posts.js";
+import authorsCollection from "./authors.js";
+
+export const collections = [postsCollection, authorsCollection];

@@ -128,7 +128,7 @@ const run = (dir: string, options: { dryRun?: boolean; check?: boolean; force?: 
     });
 
 describe("fixture projects", () => {
-    it.each(["blog", "typed", "firestore"])("migrates %s, SQL byte-identical, as recorded", async fixture => {
+    it.each(["blog", "typed", "firestore", "js-specifiers"])("migrates %s, SQL byte-identical, as recorded", async fixture => {
         const dir = materialize(fixture);
         const report = await run(dir);
         expect(report.refusals).toEqual([]);
@@ -314,6 +314,49 @@ describe("a relation field's form default", () => {
         expect(content).toContain("defaultValue: new EntityRelation(\"a1\", \"authors\")");
         // A 0.30 file imports it from @rebasepro/types, where 0.31 no longer has it: it loads (the shim) and the import moves.
         expect(content).toContain("import { EntityRelation } from \"@rebasepro/cms-types\";");
+    }, 120_000);
+});
+
+/**
+ * A project whose collections import each other as Node ESM does
+ * (`./authors.js`) builds its backend with a plain `tsc` (NodeNext) and runs it
+ * on Node, which resolves no extensionless relative import: an index
+ * re-exporting `./posts` boots nowhere but under tsx or `rebase build`.
+ */
+describe("collections that import with Node ESM specifiers (`./x.js`)", () => {
+    /** Every relative specifier of a TypeScript module's imports and re-exports. */
+    const relativeSpecifiers = (content: string): string[] =>
+        [...content.matchAll(/\b(?:from|import)\s*\(?\s*"(\.\.?\/[^"]*)"/g)].map(match => match[1]);
+
+    it("writes every relative import it generates with .js, and the schema it writes loads", async () => {
+        const dir = materialize("js-specifiers");
+        const report = await run(dir);
+        expect(report.refusals).toEqual([]);
+        expect(report.status).toBe("migrated");
+        // Read back through the loader the server uses, `./posts.js` naming posts.ts.
+        expect(report.verification?.identical).toBe(true);
+        const written = (file: string): string => fs.readFileSync(path.join(dir, file), "utf8");
+        expect(written("backend/schema/index.ts")).toBe(`export { posts } from "./posts.js";\nexport { authors } from "./authors.js";\n`);
+        expect(written("backend/schema/posts.ts")).toContain(`import { authors } from "./authors.js";`);
+        expect(written("backend/schema/authors.ts")).toContain(`import { posts } from "./posts.js";`);
+        expect(written("frontend/src/cms/index.ts")).toContain(`from "./posts.js";`);
+        const modules = report.files.filter(file => /\.tsx?$/.test(file.path) && file.action !== "unchanged");
+        expect(modules.length).toBeGreaterThan(4);
+        for (const file of modules) {
+            for (const specifier of relativeSpecifiers(written(file.path))) expect(specifier, file.path).toMatch(/\.(js|json)$/);
+        }
+    }, 120_000);
+
+    it("keeps the extensionless spelling for a project that writes it", async () => {
+        const dir = materialize("relation-key");
+        const report = await run(dir, { dryRun: true });
+        expect(report.refusals).toEqual([]);
+        const content = (file: string): string => report.files.find(entry => entry.path === file)?.content ?? "";
+        expect(content("backend/schema/index.ts")).toBe(`export { companies } from "./companies";\nexport { members } from "./members";\n`);
+        expect(content("backend/schema/members.ts")).toContain(`import { companies } from "./companies";`);
+        for (const file of report.files.filter(entry => /\.tsx?$/.test(entry.path))) {
+            for (const specifier of relativeSpecifiers(file.content)) expect(specifier, file.path).not.toMatch(/\.js$/);
+        }
     }, 120_000);
 });
 

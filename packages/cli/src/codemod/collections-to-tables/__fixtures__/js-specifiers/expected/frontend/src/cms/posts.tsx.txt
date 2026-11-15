@@ -1,0 +1,11 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { posts } from "../../../backend/schema/posts.js";
+
+export const postsCms = customizeTable<typeof posts>("posts", {
+    name: "Articles",
+    fields: {
+        title: {
+            name: "Headline"
+        }
+    }
+});

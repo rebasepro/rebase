@@ -336,7 +336,8 @@ export function planFrontendWiring(plan: PlanContext, frontendDir: string, hasEx
         planFile(plan, uiConfigFile, UI_CONFIG_CONTENT, "ui-config.json (the collection editor's presentation file)");
     }
     const wireUiConfig = !mountsUiConfig;
-    const importLine = `import { ${names} } from "./cms";${wireUiConfig ? `\n${UI_CONFIG_IMPORT}` : ""}`;
+    const cmsSpecifier = plan.specifierStyle === "js" ? "./cms/index.js" : "./cms";
+    const importLine = `import { ${names} } from "${cmsSpecifier}";${wireUiConfig ? `\n${UI_CONFIG_IMPORT}` : ""}`;
     const props = [
         "tableCustomizations={tableCustomizations}",
         ...(hasExternal ? ["externalCollections={externalCollections}"] : []),

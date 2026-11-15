@@ -1,0 +1,7 @@
+{
+    "name": "jsspec-frontend",
+    "type": "module",
+    "dependencies": {
+        "@rebasepro/cms": "workspace:*"
+    }
+}

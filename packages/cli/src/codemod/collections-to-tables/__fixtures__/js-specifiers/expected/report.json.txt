@@ -1,0 +1,43 @@
+{
+  "status": "migrated",
+  "collections": [
+    {
+      "slug": "authors",
+      "file": "config/collections/authors.ts",
+      "kind": "table",
+      "backendFile": "backend/schema/authors.ts"
+    },
+    {
+      "slug": "posts",
+      "file": "config/collections/posts.ts",
+      "kind": "table",
+      "backendFile": "backend/schema/posts.ts",
+      "frontendFile": "frontend/src/cms/posts.tsx"
+    }
+  ],
+  "files": [
+    "update backend/package.json",
+    "create backend/schema/authors.ts",
+    "create backend/schema/index.ts",
+    "create backend/schema/posts.ts",
+    "update backend/tsconfig.json",
+    "update frontend/package.json",
+    "update frontend/src/App.tsx",
+    "create frontend/src/cms/index.ts",
+    "create frontend/src/cms/posts.tsx",
+    "create frontend/src/cms/ui-config.json",
+    "update frontend/src/virtual.d.ts",
+    "update frontend/vite.config.ts",
+    "update package.json",
+    "update pnpm-workspace.yaml",
+    "update rebase.json"
+  ],
+  "refusals": [],
+  "notes": [],
+  "manualSteps": [],
+  "verification": {
+    "identical": true,
+    "differences": []
+  },
+  "removeCommand": "git rm -r config"
+}

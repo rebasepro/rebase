@@ -1,6 +1,6 @@
 import { customizeTable } from "@rebasepro/cms";
-import type { tickets } from "../../../backend/schema/tickets";
-import { LOCALE_LABELS } from "./lib/locales";
+import type { tickets } from "../../../backend/schema/tickets.js";
+import { LOCALE_LABELS } from "./lib/locales.js";
 
 export const ticketsCms = customizeTable<typeof tickets>("support-tickets", {
     name: "Support tickets",

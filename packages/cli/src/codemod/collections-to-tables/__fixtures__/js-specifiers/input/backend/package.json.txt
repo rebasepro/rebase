@@ -1,0 +1,8 @@
+{
+    "name": "jsspec-backend",
+    "type": "module",
+    "dependencies": {
+        "jsspec-config": "*",
+        "@rebasepro/server": "workspace:*"
+    }
+}

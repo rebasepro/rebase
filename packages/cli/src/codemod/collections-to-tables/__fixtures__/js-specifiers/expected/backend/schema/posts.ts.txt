@@ -1,0 +1,16 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { authors } from "./authors.js";
+
+export const posts = defineTable("posts", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        title: col.text().notNull(),
+        authorId: col.uuid()
+    },
+    relations: {
+        author: rel.belongsTo(() => authors, { onDelete: "set null" })
+    },
+    rls: [
+        { operation: "select", access: "public" }
+    ]
+});

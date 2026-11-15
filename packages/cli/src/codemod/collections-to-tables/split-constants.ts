@@ -25,8 +25,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { plural } from "@rebasepro/utils";
 
-import { toPosix } from "./ast";
 import type { ModuleImporter } from "./load-legacy";
+import { generatedSpecifier } from "./modules";
 import type { CollectionEntry, PlanContext } from "./plan-context";
 import { planFile, relativeToRoot } from "./plan-context";
 import { printStringLiteral } from "./print-js";
@@ -152,12 +152,6 @@ function printedIds(constant: SplitConstant): string {
     return `[${constant.ids.map(id => (typeof id === "string" ? printStringLiteral(id) : String(id))).join(", ")}]`;
 }
 
-function specifierFrom(fromFile: string, target: string): string {
-    let relative = toPosix(path.relative(path.dirname(fromFile), target.replace(/\.(tsx?|mts)$/, "")));
-    if (!relative.startsWith(".")) relative = `./${relative}`;
-    return relative;
-}
-
 /** Insert an import line after a module's import block. */
 function addImport(content: string, line: string): string {
     if (content.includes(line)) return content;
@@ -186,7 +180,7 @@ export function planSplitConstants(plan: PlanContext, constants: readonly SplitC
         planFile(plan, group[0].backendFile, `${backend.join("\n\n")}\n`, `values of ${legacy}`);
         const frontendFile = group[0].frontendFile;
         if (frontendFile) {
-            const typeImport = `import type { ${group.map(constant => constant.typeName).join(", ")} } from ${JSON.stringify(specifierFrom(frontendFile, group[0].backendFile))};`;
+            const typeImport = `import type { ${group.map(constant => constant.typeName).join(", ")} } from ${JSON.stringify(generatedSpecifier(frontendFile, group[0].backendFile, plan.specifierStyle))};`;
             const frontend = group.map(constant => [
                 `/** What the panel calls each value of \`${constant.legacyName}\` (${legacy}); the values are the backend's. */`,
                 `export const ${constant.labelsName}: Record<${constant.typeName}, string> = {`,
@@ -205,7 +199,7 @@ export function planSplitConstants(plan: PlanContext, constants: readonly SplitC
                 const printed = printedIds(constant);
                 if (!content.includes(printed)) continue;
                 content = content.split(printed).join(constant.valuesName);
-                content = addImport(content, `import { ${constant.valuesName} } from ${JSON.stringify(specifierFrom(tableFile, constant.backendFile))};`);
+                content = addImport(content, `import { ${constant.valuesName} } from ${JSON.stringify(generatedSpecifier(tableFile, constant.backendFile, plan.specifierStyle))};`);
             }
             if (content !== planned.content) plan.files.set(tableFile, { ...planned, content });
         }

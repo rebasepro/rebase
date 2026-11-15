@@ -1,0 +1,12 @@
+{
+    "name": "jsspec",
+    "private": true,
+    "type": "module",
+    "workspaces": [
+        "frontend",
+        "backend"
+    ],
+    "scripts": {
+        "build": "pnpm --filter \"./frontend\" -r run build"
+    }
+}

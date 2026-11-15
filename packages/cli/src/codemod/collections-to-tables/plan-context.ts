@@ -8,7 +8,7 @@ import type { LegacyCollectionConfig } from "@rebasepro/common/migrate";
 
 import type { AstContext, CollectionSite } from "./ast";
 import { toPosix } from "./ast";
-import type { Relocator } from "./modules";
+import type { GeneratedSpecifierStyle, Relocator } from "./modules";
 import type { SplitConstant } from "./split-constants";
 import type { ManualStep, Note, Refusal } from "./types";
 
@@ -31,6 +31,12 @@ export interface PlanContext {
     root: string;
     ast: AstContext;
     relocator: Relocator;
+    /**
+     * How every relative import the run writes itself ends (`./users` or
+     * `./users.js`): as the legacy collection sources write theirs, decided
+     * once from them (`projectSpecifierStyle`).
+     */
+    specifierStyle: GeneratedSpecifierStyle;
     /** The frontend app's root directory, absolute, when the project has one. */
     frontendDir?: string;
     /** Planned files: absolute path → content. */

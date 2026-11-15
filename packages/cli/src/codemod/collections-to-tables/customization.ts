@@ -22,7 +22,7 @@ import type { LegacyEnumValues, LiftNote } from "@rebasepro/common/migrate";
 import { enumValueLabel, labelFromIdentifier, singularLabel } from "@rebasepro/utils";
 
 import type { Member, PathSegment } from "./ast";
-import { collectReferences, memberOf, nodeAtPath, nodeText, postDeclarationAssignments, resolveObject, spreadSource, toPosix, unwrap } from "./ast";
+import { collectReferences, memberOf, nodeAtPath, nodeText, postDeclarationAssignments, resolveObject, spreadSource, unwrap } from "./ast";
 import { rewriteDynamicProps } from "./dynamic-props";
 import { findLiteral } from "./helper-hooks";
 import { memberFunctionText } from "./hooks";
@@ -33,12 +33,11 @@ import {
     PROPERTY_ADMIN_DESTINATIONS,
     PROPERTY_FIELD_DESTINATIONS
 } from "./vocabulary";
-import { importLines, resolveRelative } from "./modules";
+import { generatedSpecifier, importLines, resolveRelative, type GeneratedSpecifierStyle } from "./modules";
 import type { CollectionEntry, PlanContext } from "./plan-context";
 import { note, planFile, refuse, relativeToRoot } from "./plan-context";
 import { printValue, RawSource } from "./print-js";
 import type { TableName } from "./backend";
-import { tableImportPath } from "./backend";
 import { own } from "./own";
 
 /** The keys whose string value is a component path (the Vite plugin's `LAZY_COMPONENT_KEYS`). */
@@ -523,8 +522,7 @@ function applyFieldNote(plan: PlanContext, builder: Builder, item: LiftNote, fie
         case "enum": {
             const constant = constantForEnum(plan.splitConstants ?? [], builder.entry.file, item.value);
             if (constant?.frontendFile) {
-                let specifier = toPosix(path.relative(path.dirname(builder.file), constant.frontendFile.replace(/\.tsx?$/, "")));
-                if (!specifier.startsWith(".")) specifier = `./${specifier}`;
+                const specifier = generatedSpecifier(builder.file, constant.frontendFile, plan.specifierStyle);
                 builder.libImports.set(specifier, new Set([...(builder.libImports.get(specifier) ?? []), constant.labelsName]));
                 target.enumLabels = new RawSource(constant.labelsName);
                 return;
@@ -846,7 +844,7 @@ function printModule(plan: PlanContext, builder: Builder, options: Record<string
         imported === "default" ? `import ${local} from ${JSON.stringify(specifier)};` : `import { ${imported === local ? local : `${imported} as ${local}`} } from ${JSON.stringify(specifier)};`);
     const imports = [
         `import { customizeTable } from "@rebasepro/cms";`,
-        `import type { ${name.identifier} } from ${JSON.stringify(tableImportPath(file, name))};`,
+        `import type { ${name.identifier} } from ${JSON.stringify(generatedSpecifier(file, name.file, plan.specifierStyle))};`,
         ...componentLines,
         ...[...builder.libImports].map(([specifier, imported]) => `import { ${[...imported].join(", ")} } from ${JSON.stringify(specifier)};`),
         ...carriedImports
@@ -894,13 +892,12 @@ export function brandAdditionalFieldKeys(options: Record<string, unknown>): bool
 export function printCmsIndex(
     cmsDir: string,
     customizations: readonly { identifier: string; file: string }[],
-    external: readonly { identifier: string; file: string }[]
+    external: readonly { identifier: string; file: string }[],
+    style: GeneratedSpecifierStyle
 ): string {
     const lines: string[] = [];
-    const specifier = (file: string): string => {
-        const relative = toPosix(path.relative(cmsDir, file.replace(/\.tsx?$/, "")));
-        return JSON.stringify(relative.startsWith(".") ? relative : `./${relative}`);
-    };
+    const indexFile = path.join(cmsDir, "index.ts");
+    const specifier = (file: string): string => JSON.stringify(generatedSpecifier(indexFile, file, style));
     for (const module of customizations) lines.push(`import { ${module.identifier} } from ${specifier(module.file)};`);
     // A Firestore collection file keeps its default export, as it was written.
     for (const module of external) lines.push(`import ${module.identifier} from ${specifier(module.file)};`);

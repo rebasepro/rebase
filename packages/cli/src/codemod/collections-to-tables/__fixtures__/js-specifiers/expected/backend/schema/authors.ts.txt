@@ -1,0 +1,15 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { posts } from "./posts.js";
+
+export const authors = defineTable("authors", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        name: col.text()
+    },
+    relations: {
+        posts: rel.hasMany(() => posts, { foreignKey: "author_id" })
+    },
+    rls: [
+        { operation: "select", access: "public" }
+    ]
+});

@@ -1,0 +1,19 @@
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+import authorsCollection from "./authors.js";
+
+const postsCollection: PostgresCollectionConfig = {
+    name: "Articles",
+    slug: "posts",
+    securityRules: [{ operation: "select", access: "public" }],
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        title: { name: "Headline", type: "string", validation: { required: true } },
+        author: {
+            name: "Author",
+            type: "relation",
+            relation: { kind: "belongsTo", target: () => authorsCollection, onDelete: "set null" }
+        }
+    }
+};
+
+export default postsCollection;

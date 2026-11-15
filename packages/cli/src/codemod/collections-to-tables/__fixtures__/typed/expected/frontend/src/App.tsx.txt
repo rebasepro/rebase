@@ -1,6 +1,6 @@
 import { Rebase } from "@rebasepro/app";
 import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
-import { tableCustomizations } from "./cms";
+import { tableCustomizations } from "./cms/index.js";
 // How the collection editor laid out the tables in development (labels, columns, views).
 import uiConfig from "./cms/ui-config.json";
 

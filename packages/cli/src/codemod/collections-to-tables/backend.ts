@@ -22,10 +22,10 @@ import type { LegacyProperty, LiftResult } from "@rebasepro/common/migrate";
 import { isViewDef, type AnyTableDef, type AnyViewDef, type DefaultRls } from "@rebasepro/types";
 
 import type { Member, PathSegment } from "./ast";
-import { collectReferences, leadingComments, memberOf, nodeAtPath, nodeText, postDeclarationAssignments, resolveObject, toPosix } from "./ast";
+import { collectReferences, leadingComments, memberOf, nodeAtPath, nodeText, postDeclarationAssignments, resolveObject } from "./ast";
 import { carryHelperHooks } from "./helper-hooks";
 import { carryHook, carryTransform, type CarriedFunction } from "./hooks";
-import { importLines, RelocationError, replaceLegacyTypes } from "./modules";
+import { generatedSpecifier, importLines, RelocationError, replaceLegacyTypes } from "./modules";
 import type { CollectionEntry, PlanContext } from "./plan-context";
 import { note, planFile, refuse, relativeToRoot } from "./plan-context";
 import { dedent, reindent } from "./print-js";
@@ -225,11 +225,12 @@ export function planBackend(plan: PlanContext, input: BackendPlanInput, names: M
     });
     const ordered = [...input.order.map(slug => names.get(slug)).filter((value): value is TableName => value !== undefined)];
     for (const name of names.values()) if (!ordered.includes(name)) ordered.push(name);
+    const indexFile = path.join(schemaDir, "index.ts");
     const index = printIndexModule(
-        ordered.map(name => ({ identifier: name.identifier, importPath: `./${path.basename(name.file, ".ts")}` })),
+        ordered.map(name => ({ identifier: name.identifier, importPath: generatedSpecifier(indexFile, name.file, plan.specifierStyle) })),
         lift.defaultRls !== undefined ? { defaultRls: lift.defaultRls satisfies DefaultRls } : {}
     );
-    planFile(plan, path.join(schemaDir, "index.ts"), index, "the schema index");
+    planFile(plan, indexFile, index, "the schema index");
 }
 
 function planTableModule(plan: PlanContext, entry: CollectionEntry, def: AnyTableDef | AnyViewDef, name: TableName, names: Map<string, TableName>): void {
@@ -352,7 +353,7 @@ function planTableModule(plan: PlanContext, entry: CollectionEntry, def: AnyTabl
         }
         return {
             identifier: found.identifier,
-            importPath: `./${path.basename(found.file, ".ts")}`,
+            importPath: generatedSpecifier(name.file, found.file, plan.specifierStyle),
             table: found.table,
             kind: found.kind === "view" ? "view" : "table"
         };
@@ -453,11 +454,4 @@ function fileHeader(plan: PlanContext, entry: CollectionEntry): string[] {
     const first = entry.sourceFile.getStatements()[0];
     if (!first || !plan.ast.tsm.Node.isImportDeclaration(first)) return [];
     return leadingComments(first);
-}
-
-/** The relative module path of a table, from a file in another directory. */
-export function tableImportPath(fromFile: string, table: TableName): string {
-    let relative = toPosix(path.relative(path.dirname(fromFile), table.file.replace(/\.ts$/, "")));
-    if (!relative.startsWith(".")) relative = `./${relative}`;
-    return relative;
 }

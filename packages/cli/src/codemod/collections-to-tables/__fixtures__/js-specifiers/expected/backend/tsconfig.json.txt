@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    // Plain tsc, run on Node: every relative import names its .js file.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    // Everything this program compiles lives under backend/, so the emit
+    // mirrors it: `dist/schema/…`, `dist/functions/…`, `dist/src/…`. Saying so
+    // is required from TypeScript 6, which refuses to infer it (TS5011).
+    "rootDir": "."
+  },
+  "include": ["src/**/*", "schema/**/*"]
+}

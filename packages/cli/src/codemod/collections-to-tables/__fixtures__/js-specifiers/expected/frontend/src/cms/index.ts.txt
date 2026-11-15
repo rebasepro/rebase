@@ -1,0 +1,4 @@
+import { postsCms } from "./posts.js";
+
+/** The table customizations, in the order the panel lists them. */
+export const tableCustomizations = [postsCms];

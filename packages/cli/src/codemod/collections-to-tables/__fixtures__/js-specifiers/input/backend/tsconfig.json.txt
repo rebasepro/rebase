@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    // Plain tsc, run on Node: every relative import names its .js file.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": ".."
+  },
+  "include": ["src/**/*", "../config/**/*"]
+}

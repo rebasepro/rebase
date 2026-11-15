@@ -1,5 +1,5 @@
-import { openTicketsCms } from "./open_tickets";
-import { ticketsCms } from "./tickets";
+import { openTicketsCms } from "./open_tickets.js";
+import { ticketsCms } from "./tickets.js";
 
 /** The table customizations, in the order the panel lists them. */
 export const tableCustomizations = [openTicketsCms, ticketsCms];

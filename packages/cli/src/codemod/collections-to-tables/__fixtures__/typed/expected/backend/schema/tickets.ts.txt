@@ -1,7 +1,7 @@
 import { defineTable, col } from "@rebasepro/server/schema";
 import { audit } from "../../config/audit.js";
 import { notifyOwner } from "../../config/notify.js";
-import { LOCALES } from "../lib/locales";
+import { LOCALES } from "../lib/locales.js";
 
 export const tickets = defineTable("tickets", {
     slug: "support-tickets",

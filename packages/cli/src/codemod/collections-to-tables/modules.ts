@@ -73,6 +73,62 @@ export function writeSpecifier(fromFile: string, target: string, style: Specifie
     return relative;
 }
 
+/**
+ * How the relative imports the codemod writes itself end — the schema index,
+ * a table's import of a related table, a customization's type import of its
+ * table: `"js"` (`./users.js`) or `"extensionless"` (`./users`).
+ *
+ * A project whose backend is built with a plain `tsc` (NodeNext) and run on
+ * Node needs `"js"`: Node's ESM loader resolves no relative import without
+ * its extension. `rebase build` and tsx resolve either spelling.
+ */
+export type GeneratedSpecifierStyle = "js" | "extensionless";
+
+/**
+ * The {@link GeneratedSpecifierStyle} of a project, from the module specifiers
+ * its legacy collection sources write (the collection files and the
+ * collections index): `"js"` when more of their relative specifiers end in
+ * a JavaScript extension (`./users.js`) than in none (`./users`, `../lib`);
+ * `"extensionless"`, the house style, otherwise — a tie, or no relative
+ * import at all. A specifier with another extension (`./labels.json`,
+ * `./users.schema`) says nothing either way.
+ *
+ * @param specifiers every module specifier the sources import or re-export from, package names included
+ */
+export function projectSpecifierStyle(specifiers: readonly string[]): GeneratedSpecifierStyle {
+    let withExtension = 0;
+    let without = 0;
+    for (const specifier of specifiers) {
+        if (!/^\.\.?(\/|$)/.test(specifier)) continue;
+        const last = specifier.split("/").pop() ?? "";
+        if (/\.[mc]?jsx?$/.test(last)) withExtension++;
+        else if (last === "" || last === "." || last === ".." || !last.includes(".")) without++;
+    }
+    return withExtension > without ? "js" : "extensionless";
+}
+
+/** The module specifiers a file imports and re-exports from, as written. */
+export function writtenSpecifiers(sourceFile: SourceFile): string[] {
+    return [
+        ...sourceFile.getImportDeclarations().map(declaration => declaration.getModuleSpecifierValue()),
+        ...sourceFile.getExportDeclarations().flatMap(declaration => declaration.getModuleSpecifierValue() ?? [])
+    ];
+}
+
+/**
+ * The relative specifier of an import the codemod writes, from `fromFile` to
+ * the module `target`, in the project's {@link GeneratedSpecifierStyle}: for
+ * `users.ts`, `./users` or `./users.js`. A JavaScript target keeps its own
+ * extension in either style.
+ */
+export function generatedSpecifier(fromFile: string, target: string, style: GeneratedSpecifierStyle): string {
+    const typescript = /\.(tsx?|mts)$/.exec(target);
+    let relative = toPosix(path.relative(path.dirname(fromFile), typescript ? target.slice(0, -typescript[0].length) : target));
+    if (!relative.startsWith("../")) relative = `./${relative}`;
+    if (style === "extensionless" || !typescript) return relative;
+    return `${relative}${typescript[1] === "mts" ? ".mjs" : ".js"}`;
+}
+
 /** One helper module copied out of `config/`. */
 export interface HelperCopy {
     /** Where it was, absolute. */

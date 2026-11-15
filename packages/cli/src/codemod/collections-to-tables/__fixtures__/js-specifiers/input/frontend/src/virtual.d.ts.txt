@@ -1,0 +1,5 @@
+/// <reference types="vite/client" />
+
+declare module "virtual:rebase-collections" {
+    export const collections: any[];
+}

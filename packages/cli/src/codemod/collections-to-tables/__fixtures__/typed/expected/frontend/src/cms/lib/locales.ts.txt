@@ -1,4 +1,4 @@
-import type { Locale } from "../../../../backend/lib/locales";
+import type { Locale } from "../../../../backend/lib/locales.js";
 
 /** What the panel calls each value of `LOCALE_ENUM` (config/locales.ts); the values are the backend's. */
 export const LOCALE_LABELS: Record<Locale, string> = {

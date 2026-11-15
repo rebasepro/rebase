@@ -35,7 +35,7 @@ import { createSchemaModuleImporter } from "../../utils/import-schema-module";
 import { createShimDir, legacyLoadAliases, movedNameAliases, removeShimDir, type ShimDir } from "./legacy-shims";
 import { movedSymbolTable } from "./moved-imports";
 import { LegacyLoadError, loadLegacyProject } from "./load-legacy";
-import { Relocator } from "./modules";
+import { projectSpecifierStyle, Relocator, writtenSpecifiers } from "./modules";
 import type { CollectionEntry, PlanContext } from "./plan-context";
 import { note, planFile, relativeToRoot } from "./plan-context";
 import {
@@ -170,16 +170,6 @@ async function migrateWithShims(options: MigrateOptions, shimDir: ShimDir): Prom
         backend: path.join(root, "backend", "lib"),
         frontend: cmsDir ? path.join(cmsDir, "lib") : path.join(root, "frontend", "src", "cms", "lib")
     });
-    const plan: PlanContext = {
-        root,
-        ast,
-        relocator,
-        ...(frontendDir ? { frontendDir } : {}),
-        files: new Map(),
-        refusals: report.refusals,
-        notes: report.notes,
-        manualSteps: report.manualSteps
-    };
 
     // The AST of every collection file.
     const entries: CollectionEntry[] = legacy.collections.map(({ collection, file }) => {
@@ -187,6 +177,24 @@ async function migrateWithShims(options: MigrateOptions, shimDir: ShimDir): Prom
         const site = findCollectionSite(ast, sourceFile);
         return { collection, file, sourceFile, ...(site.node ? { site: site.node } : { siteProblem: site.reason }) };
     });
+    // The relative imports the run writes end as the collection files and their index write theirs:
+    // `./users.js` for a project built with a plain `tsc` (NodeNext) and run on Node.
+    const legacyIndexFile = ["index.ts", "index.js"].map(file => path.join(legacy.collectionsDir, file)).find(file => fs.existsSync(file));
+    const specifierStyle = projectSpecifierStyle([
+        ...entries.flatMap(entry => writtenSpecifiers(entry.sourceFile)),
+        ...(legacyIndexFile ? writtenSpecifiers(addSourceFile(ast, legacyIndexFile, fs.readFileSync(legacyIndexFile, "utf8"))) : [])
+    ]);
+    const plan: PlanContext = {
+        root,
+        ast,
+        relocator,
+        specifierStyle,
+        ...(frontendDir ? { frontendDir } : {}),
+        files: new Map(),
+        refusals: report.refusals,
+        notes: report.notes,
+        manualSteps: report.manualSteps
+    };
     for (const entry of entries) {
         if (!entry.site?.binding) continue;
         for (const [assigned, { statement }] of postDeclarationAssignments(ast, entry.sourceFile, entry.site.binding)) {
@@ -356,14 +364,13 @@ async function migrateWithShims(options: MigrateOptions, shimDir: ShimDir): Prom
     // The CMS index and the frontend's wiring.
     if (cmsDir && frontendDir) {
         if (customizationModules.length > 0 || external.length > 0) {
-            planFile(plan, path.join(cmsDir, "index.ts"), printCmsIndex(cmsDir, customizationModules, external), "the CMS index");
+            planFile(plan, path.join(cmsDir, "index.ts"), printCmsIndex(cmsDir, customizationModules, external, plan.specifierStyle), "the CMS index");
         }
         planFrontendWiring(plan, frontendDir, external.length > 0);
     }
     planStaticAppGuards(plan, frontendDir);
 
     // The legacy index's comments, onto the two indexes.
-    const legacyIndexFile = ["index.ts", "index.js"].map(file => path.join(legacy.collectionsDir, file)).find(file => fs.existsSync(file));
     const schemaIndex = plan.files.get(path.join(schemaDir, "index.ts"));
     if (legacyIndexFile && schemaIndex) {
         const cmsIndexPath = cmsDir ? path.join(cmsDir, "index.ts") : undefined;
