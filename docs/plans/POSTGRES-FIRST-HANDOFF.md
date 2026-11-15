@@ -157,6 +157,35 @@ All committed on the branch (≈150 commits OSS, 12 in `saas`). Details per slic
 
 ## 6. What is running right now, and what is next
 
+> **STATUS UPDATE — 2026-11-15, about 09:45 CET. This block supersedes everything below it,
+> in this section and in sections 7, 8 and 10, where they disagree.**
+> - LANDED. The work is on `main` in both repositories (`rebasepro/rebase`, `rebasepro/saas`),
+>   with CI green. The last commit pushed is the `db pull` fix below: check that its CI run is
+>   green before doing anything else.
+> - CANARY PUBLISHED through CI (`publish.yml`, channel `canary`): `0.31.0-canary.g902a0ce`,
+>   21 packages under the dist-tag `canary`; `latest` is still 0.30.1. Tested end to end from
+>   the real registry (`~/.rebase-audits/pgfirst/canary-smoke.md`). It does NOT contain two
+>   later fixes that are on `main`: the auth table never serves a token column or a hash of
+>   one (d8a30a8fef), and `db pull` edits a dump in any server encoding (101b9f2a75 — the
+>   canary can damage the dump of a non-UTF-8 database with non-ASCII names when the local
+>   `pg_dump` is older than the server). A fresh canary needs Francesco's go.
+> - STABLE 0.31.0 IS NOT STARTED. It is Francesco's call, and three steps are his alone: pause
+>   the `release-intake` cron, name the version, `release:runtime --prod`. The chain, its order
+>   hazards and the open questions: `~/.rebase-audits/pgfirst/RELEASE-RUNBOOK.md`.
+> - ROLLOUT PACKAGES for the nine real projects are ready in `~/.rebase-audits/pgfirst/rollout/`
+>   (read its `README.md` first): per project a patch, a runbook and the owner's decisions.
+>   Nothing was applied to any original. Three patches apply only on top of the owner's
+>   uncommitted files.
+> - The public demo still runs commit 9726335d50. Another rollout of it needs an explicit yes.
+> - Closed: "21 one-to-many relations shown as form fields" on the hybrid project is not a
+>   framework issue — the form does not draw them, and the refusal is that project's own hook
+>   (notes: `## ADMIN-DEFAULTS`).
+> - Open, small, not fixed: with a Postgres older than 17 as the pull target, a newer
+>   `pg_dump`'s `SET transaction_timeout` counts as a restore error although every table
+>   arrives. Names that still say "collection" wait for Francesco
+>   (`~/.rebase-audits/pgfirst/collection-names.md`).
+> - No agent is running. The live list stays the CURRENT STATE block of `PLAN.md`.
+
 > **STATUS UPDATE — 2026-11-13, about 22:00 CET. This block supersedes the lists below where
 > they disagree.**
 > Everything short of the release is DONE and committed:
@@ -255,11 +284,9 @@ All committed on the branch (≈150 commits OSS, 12 in `saas`). Details per slic
 
 ## 8. Known red or open right now
 
-- The locale gates until the translations are committed.
-- Product: the schema endpoint and custom auth adapters (2a above) — blocks the hybrid
-  project's rollout and any project with its own auth; should be fixed before a release.
-- Three low security items (2b). The version is not bumped; `DRIVER_SKEW` is empty until
-  0.31.0 exists.
+- Nothing is red (2026-11-15): the locale gates are green, the schema endpoint resolves the
+  caller through the auth adapter, and the low security items are fixed.
+- The version is not bumped; `DRIVER_SKEW` is empty until 0.31.0 exists.
 - Not proven anywhere: equality of each project's LIVE database with the migrated schema (a
   dry run at rollout); the hosted MCP connector against a live tenant.
 
@@ -292,7 +319,8 @@ All committed on the branch (≈150 commits OSS, 12 in `saas`). Details per slic
 
 ## 10. Things to tell Francesco (keep current; goes into the final report)
 
-- Everything is on a branch in both repos; nothing pushed or deployed.
+- Everything is on `main` in both repos and a canary is on npm; the stable release, the
+  control plane and every project rollout are not started (section 6, newest status block).
 - Deployed projects must be rebuilt after the codemod; the control plane must ship first.
 - Names added beyond the spec are marked "(gap)" in Part II B; decisions taken on the way are
   in `PLAN.md` (test fixtures through the lift; the lift kept as migration tooling; MCP naming
@@ -330,5 +358,8 @@ All committed on the branch (≈150 commits OSS, 12 in `saas`). Details per slic
 - Duplicating a row does not copy the extra values stored on its many-to-many links (also 0.30).
 - Three in-process SDK quirks pinned by tests; wire names that still say "collection"; the
   admin's eager bundle grew ~6%; `imageResize` has no browser test.
-- Usage: weekly limit at 91% on Fri 14:30 CET; it resets Sun 2026-11-15 08:00 CET. Nothing more
-  is launched before the reset.
+- Real projects: all nine are proven on copies, and each has a rollout package (patch,
+  runbook, decisions) in `~/.rebase-audits/pgfirst/rollout/`.
+- `db pull`: when the local `pg_dump` is older than the server, the pull now says so and names
+  the supported fix (upgrade the PostgreSQL client tools).
+- Usage: the weekly limit reset on Sun 2026-11-15 08:00 CET.
