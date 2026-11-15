@@ -196,16 +196,16 @@ const staged: string[] = [];
  * Add a version when one ships; remove one only when no deployed project can
  * still be on it, which is a decision about the fleet and not about this file.
  *
- * Empty until 0.31.0 is published, and that is a measurement, not a skip. The
- * driver travels inside the bundle, and every published driver (0.10.0 through
+ * Starts at 0.31.0, and that is a measurement, not a gap. The driver travels
+ * inside the bundle, and every driver published before it (0.10.0 through
  * 0.30.x) can only have been built into a format-1 or format-2 bundle — which
  * this runtime refuses at manifest read, as the format axis above asserts. So no
  * accepted bundle can carry one of them, and the pairing they used to test does
  * not exist in the fleet any more. (Run against the format-3 fixture they fail
  * on loading: they import `loadCollectionsFromDirectory`, which the runtime no
- * longer exports.) The first entry is the first driver that builds format 3.
+ * longer exports.) 0.31.0 is the first published driver that builds format 3.
  */
-const DRIVER_SKEW: string[] = [];
+const DRIVER_SKEW: string[] = ["0.31.0"];
 
 /**
  * The fixture the skew pass exercises — current format, real tables, real
