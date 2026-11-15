@@ -1,5 +1,5 @@
 ---
-sourceHash: 6d4d1426d30011ff
+sourceHash: 2883815081dc2c2a
 title: Comandos de base de datos
 sidebar_label: Comandos de base de datos
 description: Los comandos de rebase db — push, generate y migrate, copias de seguridad y restauraciones, extracción de copias, la cadena de conexión, la base de datos de desarrollo administrada y ramas.
@@ -179,6 +179,10 @@ Un pull reemplaza el contenido de la base de datos local: vacía primero cada
 esquema que copia, por lo que una tabla que solo exista localmente no
 sobrevivirá. En la base de datos de desarrollo administrada, las filas viajan
 como sentencias `INSERT`, las cuales acepta allí donde `COPY` se detendría.
+Solo acepta un volcado en UTF8: un pull desde una base de datos con otra
+codificación, LATIN1 por ejemplo, se rechaza antes de vaciar nada. Ese hay que
+llevarlo a Postgres en Docker (`rebase db pull --docker` con el mismo `--from`), o
+a un Postgres que indique `DATABASE_URL`.
 
 ### `rebase db url`
 

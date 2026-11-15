@@ -1,5 +1,5 @@
 ---
-sourceHash: 6d4d1426d30011ff
+sourceHash: 2883815081dc2c2a
 title: Datenbankbefehle
 sidebar_label: Datenbankbefehle
 description: Die rebase db-Befehle — push, generate und migrate, Backups und Wiederherstellungen, Abrufen einer Kopie, der Verbindungs-String, die verwaltete Entwicklungsdatenbank und Branches.
@@ -168,7 +168,10 @@ Ein Pull ersetzt
 die Inhalte der lokalen Datenbank: Zunächst leert er jedes Schema, das er kopiert, sodass eine
 Tabelle, die nur lokal existiert, diesen Vorgang nicht überlebt. In die verwaltete Entwicklungsdatenbank
 gelangen die Zeilen als `INSERT`-Anweisungen, die sie dort akzeptiert, wo `COPY`
-sie stoppen würde.
+sie stoppen würde. Sie nimmt nur einen Dump in UTF8 an: Ein Pull aus einer Datenbank
+mit einer anderen Kodierung, etwa LATIN1, wird abgelehnt, bevor irgendetwas geleert wird.
+Ziehen Sie diesen in Postgres in Docker (`rebase db pull --docker` mit demselben
+`--from`) oder in ein Postgres, das `DATABASE_URL` angibt.
 
 ### `rebase db url`
 

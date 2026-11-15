@@ -1,5 +1,5 @@
 ---
-sourceHash: 6d4d1426d30011ff
+sourceHash: 2883815081dc2c2a
 title: Commandes de base de données
 sidebar_label: Commandes de base de données
 description: Les commandes rebase db — push, generate et migrate, sauvegardes et restaurations, extraction d'une copie, chaîne de connexion, base de données de développement gérée et branches.
@@ -96,7 +96,7 @@ Sur `pull` comme sur toutes les autres commandes, un commutateur recevant une va
 
 La cible est toujours la base de données de développement locale de ce projet et ne peut pas être choisie : `--database-url` est rejetée plutôt qu'acceptée, il n'y a donc aucun moyen de demander un « pull en production ». `--from` est l'unique direction.
 
-Un pull remplace le contenu de la base de données locale : il vide d'abord chaque schéma qu'il copie, de sorte qu'une table existant uniquement en local ne subsiste pas. Dans la base de données de développement gérée, les lignes transitent sous forme d'instructions `INSERT`, qu'elle accepte là où `COPY` échouerait.
+Un pull remplace le contenu de la base de données locale : il vide d'abord chaque schéma qu'il copie, de sorte qu'une table existant uniquement en local ne subsiste pas. Dans la base de données de développement gérée, les lignes transitent sous forme d'instructions `INSERT`, qu'elle accepte là où `COPY` échouerait. Elle n'accepte qu'un dump en UTF8 : un pull depuis une base de données dans un autre encodage, LATIN1 par exemple, est refusé avant que quoi que ce soit ne soit vidé. Dans ce cas, faites le pull vers Postgres dans Docker (`rebase db pull --docker` avec le même `--from`), ou vers un Postgres que `DATABASE_URL` désigne.
 
 ### `rebase db url`
 

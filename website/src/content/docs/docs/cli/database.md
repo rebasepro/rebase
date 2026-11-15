@@ -167,7 +167,10 @@ A pull replaces
 the local database's contents: it empties each schema it copies first, so a
 table that exists only locally does not survive it. Into the managed development
 database the rows travel as `INSERT` statements, which it takes where `COPY`
-would stop it.
+would stop it. It takes a dump in UTF8 only: a pull from a database in another
+encoding, LATIN1 say, is refused before anything is emptied. Pull that one into
+Postgres in Docker (`rebase db pull --docker` with the same `--from`), or into a
+Postgres that `DATABASE_URL` names.
 
 ### `rebase db url`
 
