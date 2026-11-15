@@ -38,7 +38,11 @@
         "desk": "remotion render src/index.ts RebaseDesk out/rebase-desk.mp4",
         "desk:vo": "remotion render src/index.ts RebaseDesk-VO out/rebase-desk-vo.mp4",
         "live": "node scripts/live.mjs",
-        "take": "node scripts/take.mjs"
+        "take": "node scripts/take.mjs",
+        "typecheck": "tsc --noEmit",
+        "lint:film": "tsx scripts/lint-film.ts",
+        "audit:film": "tsx scripts/audit-film.ts",
+        "proof:view-side-door": "bash scripts/proof-view-side-door.sh"
     },
     "sideEffects": [
         "*.css"

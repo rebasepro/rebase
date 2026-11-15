@@ -1,0 +1,185 @@
+CREATE ROLE app LOGIN;
+CREATE ROLE alice LOGIN;
+CREATE ROLE bob LOGIN;
+GRANT CREATE ON SCHEMA public TO app;
+== 1. The table, guarded by a policy
+SET ROLE app;
+CREATE TABLE orders (id int PRIMARY KEY, customer text NOT NULL, total numeric NOT NULL);
+INSERT INTO orders VALUES (1, 'alice', 18.50), (2, 'bob', 64.00), (3, 'carol', 120.00);
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+CREATE POLICY own_orders ON orders FOR SELECT USING (customer = current_user);
+GRANT SELECT ON orders TO alice, bob;
+RESET ROLE;
+SET ROLE alice;
+SELECT * FROM orders;
+ id | customer | total 
+----+----------+-------
+  1 | alice    | 18.50
+(1 row)
+
+RESET ROLE;
+== 2. A view over it, from the same migration role
+SET ROLE app;
+CREATE VIEW order_list AS SELECT id, customer, total FROM orders;
+GRANT SELECT ON order_list TO alice, bob;
+RESET ROLE;
+SET ROLE alice;
+SELECT * FROM order_list;
+ id | customer | total  
+----+----------+--------
+  1 | alice    |  18.50
+  2 | bob      |  64.00
+  3 | carol    | 120.00
+(3 rows)
+
+RESET ROLE;
+== 3. Why: the view reads as its owner, and the table owner skips RLS
+SELECT relname, relowner::regrole AS owner
+FROM pg_class
+WHERE relname IN ('orders', 'order_list')
+ORDER BY 1 DESC;
+  relname   | owner 
+------------+-------
+ orders     | app
+ order_list | app
+(2 rows)
+
+SET ROLE alice;
+SELECT (SELECT count(*) FROM orders) AS via_table,
+       (SELECT count(*) FROM order_list) AS via_view;
+ via_table | via_view 
+-----------+----------
+         1 |        3
+(1 row)
+
+RESET ROLE;
+== 3b. "unless you force it": FORCE puts the owner under the policy too
+SET ROLE app;
+ALTER TABLE orders FORCE ROW LEVEL SECURITY;
+RESET ROLE;
+SET ROLE alice;
+SELECT * FROM order_list;
+ id | customer | total 
+----+----------+-------
+  1 | alice    | 18.50
+(1 row)
+
+RESET ROLE;
+SET ROLE app;
+ALTER TABLE orders NO FORCE ROW LEVEL SECURITY;
+RESET ROLE;
+== 4. The fix (Postgres 15+): the view checks as whoever queries it
+SET ROLE app;
+ALTER VIEW order_list SET (security_invoker = true);
+RESET ROLE;
+SET ROLE alice;
+SELECT * FROM order_list;
+ id | customer | total 
+----+----------+-------
+  1 | alice    | 18.50
+(1 row)
+
+RESET ROLE;
+== 4b. The same switch at creation
+SET ROLE app;
+CREATE VIEW my_orders
+  WITH (security_invoker = true)
+  AS SELECT id, customer, total
+  FROM orders;
+GRANT SELECT ON my_orders TO alice, bob;
+RESET ROLE;
+SET ROLE bob;
+SELECT * FROM order_list;
+ id | customer | total 
+----+----------+-------
+  2 | bob      | 64.00
+(1 row)
+
+RESET ROLE;
+SET ROLE alice;
+SELECT * FROM my_orders;
+ id | customer | total 
+----+----------+-------
+  1 | alice    | 18.50
+(1 row)
+
+RESET ROLE;
+== 5. A materialized view has the same hole, and no switch
+SET ROLE app;
+CREATE MATERIALIZED VIEW order_totals AS SELECT customer, sum(total) AS spent FROM orders GROUP BY customer ORDER BY customer;
+GRANT SELECT ON order_totals TO alice;
+RESET ROLE;
+SET ROLE alice;
+SELECT * FROM order_totals;
+ customer | spent  
+----------+--------
+ alice    |  18.50
+ bob      |  64.00
+ carol    | 120.00
+(3 rows)
+
+RESET ROLE;
+SET ROLE app;
+ALTER MATERIALIZED VIEW order_totals SET (security_invoker = true);
+ERROR:  unrecognized parameter "security_invoker"
+ALTER TABLE order_totals ENABLE ROW LEVEL SECURITY;
+ERROR:  ALTER action ENABLE ROW SECURITY cannot be performed on relation "order_totals"
+DETAIL:  This operation is not supported for materialized views.
+RESET ROLE;
+== 6. Not every view is a side door: an owner that RLS applies to
+CREATE ROLE reporter;
+GRANT CREATE ON SCHEMA public TO reporter;
+SET ROLE app;
+GRANT SELECT ON orders TO reporter;
+RESET ROLE;
+SET ROLE reporter;
+CREATE VIEW reporter_list AS SELECT id, customer FROM orders;
+GRANT SELECT ON reporter_list TO alice;
+RESET ROLE;
+SET ROLE alice;
+SELECT * FROM reporter_list;
+ id | customer 
+----+----------
+  1 | alice
+(1 row)
+
+RESET ROLE;
+== 7. The check: views and materialized views without security_invoker over RLS tables
+DROP VIEW reporter_list;
+SELECT DISTINCT v.oid::regclass AS view,
+       t.oid::regclass AS rls_table
+FROM pg_class v
+JOIN pg_rewrite r ON r.ev_class = v.oid
+JOIN pg_depend d ON d.classid = 'pg_rewrite'::regclass
+                AND d.objid = r.oid
+                AND d.refclassid = 'pg_class'::regclass
+JOIN pg_class t ON t.oid = d.refobjid AND t.relrowsecurity
+WHERE v.relkind IN ('v', 'm')
+  AND NOT coalesce((SELECT option_value::bool
+                    FROM pg_options_to_table(v.reloptions)
+                    WHERE option_name = 'security_invoker'), false);
+     view     | rls_table 
+--------------+-----------
+ order_totals | orders
+(1 row)
+
+== 7b. The check catches a view set back to definer rights
+SET ROLE app;
+ALTER VIEW order_list RESET (security_invoker);
+RESET ROLE;
+SELECT DISTINCT v.oid::regclass AS view, t.oid::regclass AS rls_table
+FROM pg_class v
+JOIN pg_rewrite r ON r.ev_class = v.oid
+JOIN pg_depend d ON d.classid = 'pg_rewrite'::regclass AND d.objid = r.oid
+                AND d.refclassid = 'pg_class'::regclass
+JOIN pg_class t ON t.oid = d.refobjid AND t.relrowsecurity
+WHERE v.relkind IN ('v', 'm')
+  AND NOT coalesce((SELECT option_value::bool FROM pg_options_to_table(v.reloptions)
+                    WHERE option_name = 'security_invoker'), false)
+ORDER BY 1;
+     view     | rls_table 
+--------------+-----------
+ order_list   | orders
+ order_totals | orders
+(2 rows)
+

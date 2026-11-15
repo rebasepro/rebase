@@ -5,6 +5,7 @@ import { loadFonts } from "./fonts";
 import { RebaseIntro, RebaseIntroVO, STANDALONE } from "./Intro";
 import { deskDuration, RebaseDesk, RebaseDeskVO, type DeskProps } from "./desk/DeskFilm";
 import { SERIES_FILMS } from "./series";
+import { EXPLAINER_FILMS, explainerCompositions } from "./explainers";
 import { EicFilm, eicDuration } from "./eic/EicFilm";
 import { DeskPlane } from "./desk/DeskPlane";
 import { INTRO_DURATION, SCENES } from "./film";
@@ -117,6 +118,35 @@ export const RemotionRoot: React.FC = () => (
                 />
             </React.Fragment>
         ))}
+        {/* THE EXPLAINERS — Postgres lessons, not about Rebase, each with its
+            own device; the series' machinery. See src/explainers/index.ts. */}
+        {EXPLAINER_FILMS.map(({ spec, component, duration }) => {
+            const [wide, tall] = explainerCompositions(spec.id);
+            return (
+                <React.Fragment key={spec.id}>
+                    <Composition
+                        id={wide}
+                        component={component}
+                        defaultProps={{ timing: null, take: null }}
+                        calculateMetadata={({ props }) => ({ durationInFrames: duration(props) })}
+                        durationInFrames={duration({})}
+                        fps={FPS}
+                        width={WIDTH}
+                        height={HEIGHT}
+                    />
+                    <Composition
+                        id={tall}
+                        component={component}
+                        defaultProps={{ timing: null, take: null }}
+                        calculateMetadata={({ props }) => ({ durationInFrames: duration(props) })}
+                        durationInFrames={duration({})}
+                        fps={FPS}
+                        width={HEIGHT}
+                        height={WIDTH}
+                    />
+                </React.Fragment>
+            );
+        })}
         {/* THE DESK — one workspace, a camera, no cuts. See src/desk/beats.ts.
             Its length is its narration's: the authored read by default, a
             take's with --props=takes/<id>/props.json (scripts/take.mjs). */}

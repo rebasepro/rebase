@@ -2,6 +2,7 @@ import type React from "react";
 import { RebaseDesk } from "../desk/DeskFilm";
 import { DESK_NARRATION } from "../desk/script";
 import { SERIES_FILMS } from "../series";
+import { EXPLAINER_FILMS, explainerCompositions } from "../explainers";
 import { EIC_SCRIPT, EicFilm } from "../eic/EicFilm";
 import type { LiveFeed, Take } from "../desk/Presenter";
 import type { Script, Timing } from "../spoken/narration";
@@ -45,6 +46,13 @@ export const FILMS: RecordableFilm[] = [
         script: spec.script,
         component,
         compositions: [`Series-${spec.id}`, `Series-${spec.id}-Tall`],
+    })),
+    ...EXPLAINER_FILMS.map(({ spec, component }) => ({
+        id: spec.id,
+        title: `Explainer ${String(spec.number).padStart(2, "0")} · ${spec.title}`,
+        script: spec.script,
+        component,
+        compositions: explainerCompositions(spec.id),
     })),
 ];
 

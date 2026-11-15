@@ -110,6 +110,14 @@ export interface FilmSpec {
     accent: string;
     /** Per-format overrides of the presenter's places. */
     presenter?: Partial<Record<Format, Partial<PresenterPlan>>>;
+    /** A film-wide layer over the scenes that does not cut with them: a
+     *  picture that persists and changes state across several scenes (the
+     *  explainers' floor plan). It times itself off `useSeries()`; frames
+     *  are the film's own. None by default. */
+    layer?: React.FC;
+    /** The command under the address on the end card. Undefined keeps the
+     *  series' `pnpm dlx @rebasepro/cli init`; null leaves the line out. */
+    endCommand?: string | null;
 }
 
 /* ── the timeline ───────────────────────────────────────────────────── */
@@ -203,6 +211,13 @@ export interface SeriesProps {
     timing?: Timing | null;
     take?: Take | null;
     live?: LiveFeed | null;
+    /** FOR scripts/audit-film.ts ONLY. "probe" renders the film as it is and
+     *  logs the display-type sizes on screen; "content" also drops the
+     *  ground, the captions and the episode mark and paints the presenter
+     *  flat while large, so what is left is what the scenes, the layer and
+     *  the end card put up — a bare-ground frame renders black. Absent,
+     *  nothing changes. */
+    audit?: "probe" | "content" | null;
     [key: string]: unknown;
 }
 
@@ -213,18 +228,34 @@ export function seriesDuration(spec: FilmSpec, props: SeriesProps): number {
 /** The composition component for a film. */
 export function seriesFilm(spec: FilmSpec): React.FC<SeriesProps> {
     const authored = authoredTiming(spec.script);
-    const Film: React.FC<SeriesProps> = ({ timing, take, live }) => {
+    const Layer = spec.layer;
+    const Film: React.FC<SeriesProps> = ({ timing, take, live, audit }) => {
         const t = timing ?? authored;
         const series = useMemo(() => buildSeries(spec, t), [t]);
+        if (audit === "content") {
+            return (
+                <SeriesContext.Provider value={series}>
+                    <AbsoluteFill style={{ background: "#000", overflow: "hidden" }}>
+                        <Scenes />
+                        {Layer && <Layer />}
+                        <EndCard />
+                        <Presenter flat />
+                        <AuditProbe />
+                    </AbsoluteFill>
+                </SeriesContext.Provider>
+            );
+        }
         return (
             <SeriesContext.Provider value={series}>
                 <AbsoluteFill style={{ background: GROUND.base, overflow: "hidden" }}>
                     <Ribbon />
                     <Scenes />
+                    {Layer && <Layer />}
                     <EndCard />
                     <Presenter take={take} live={live} />
                     <Captions />
                     <EpisodeMark />
+                    {audit === "probe" && <AuditProbe />}
                 </AbsoluteFill>
             </SeriesContext.Provider>
         );
@@ -350,7 +381,7 @@ function lerp(a: Box, b: Box, t: number): Box {
     return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, w: a.w + (b.w - a.w) * t, h: a.h + (b.h - a.h) * t };
 }
 
-const Presenter: React.FC<{ take?: Take | null; live?: LiveFeed | null }> = ({ take, live }) => {
+const Presenter: React.FC<{ take?: Take | null; live?: LiveFeed | null; flat?: boolean }> = ({ take, live, flat }) => {
     const frame = useCurrentFrame();
     const series = useSeries();
     const format = useFormat();
@@ -367,6 +398,15 @@ const Presenter: React.FC<{ take?: Take | null; live?: LiveFeed | null }> = ({ t
         stage = "close";
     }
     if (opacity <= 0) return null;
+    if (flat) {
+        /* The audit's stand-in: solid while the presenter is the picture
+           (open, close and the moves between), gone in the corner, where it
+           is not what fills the frame. */
+        const area = (b: Box) => b.w * b.h;
+        const large = Math.min(1, Math.max(0, (area(box) - area(plan.corner)) / (area(plan.open) - area(plan.corner) || 1)));
+        if (large <= 0.02) return null;
+        return <div style={{ position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h, background: "#808080", opacity: opacity * large }} />;
+    }
     return (
         <AbsoluteFill style={{ pointerEvents: "none" }}>
             <div
@@ -413,6 +453,7 @@ const EpisodeMark: React.FC = () => {
     const { number, title, accent } = series.spec;
     return (
         <div
+            data-audit="skip"
             style={{
                 position: "absolute",
                 left: format === "tall" ? 72 : 120,
@@ -449,13 +490,14 @@ const EndCard: React.FC = () => {
     if (frame < at) return null;
     const url = ramp(frame, at + 22, 24);
     const cmd = ramp(frame, at + 40, 22);
+    const command = series.spec.endCommand === undefined ? "pnpm dlx @rebasepro/cli init" : series.spec.endCommand;
     const plan = { ...PRESENTER[format], ...(series.spec.presenter?.[format] ?? {}) };
     const tall = format === "tall";
     const area: React.CSSProperties = tall
         ? { left: 0, right: 0, top: plan.close.y + plan.close.h + 40, bottom: 260 }
         : { left: plan.close.x + plan.close.w + 60, right: 120, top: 0, bottom: 0 };
     return (
-        <AbsoluteFill>
+        <AbsoluteFill data-audit="skip">
             <AbsoluteFill style={{ background: GROUND.base, opacity: 0.82 * ramp(frame, at - 20, 40) }} />
             <div style={{ position: "absolute", ...area, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                 <Mark size={tall ? 96 : 110} delay={at} spread={18} />
@@ -474,26 +516,69 @@ const EndCard: React.FC = () => {
                         rebase.pro
                     </div>
                 </div>
-                <div
-                    style={{
-                        marginTop: 34,
-                        padding: "16px 30px",
-                        borderRadius: 12,
-                        border: `1px solid ${INK.rule}`,
-                        background: FRAME.background,
-                        fontFamily: FONT.mono,
-                        fontSize: tall ? 30 : 26,
-                        color: INK.high,
-                        opacity: cmd,
-                        transform: `translateY(${(1 - cmd) * 14}px)`,
-                    }}
-                >
-                    <span style={{ color: INK.muted, marginRight: 14 }}>$</span>
-                    pnpm dlx @rebasepro/cli init
-                </div>
+                {command !== null && (
+                    <div
+                        style={{
+                            marginTop: 34,
+                            padding: "16px 30px",
+                            borderRadius: 12,
+                            border: `1px solid ${INK.rule}`,
+                            background: FRAME.background,
+                            fontFamily: FONT.mono,
+                            fontSize: tall ? 30 : 26,
+                            color: INK.high,
+                            opacity: cmd,
+                            transform: `translateY(${(1 - cmd) * 14}px)`,
+                        }}
+                    >
+                        <span style={{ color: INK.muted, marginRight: 14 }}>$</span>
+                        {command}
+                    </div>
+                )}
             </div>
         </AbsoluteFill>
     );
+};
+
+/* ── the audit probe ────────────────────────────────────────────────── */
+
+/** Display type at or above this size is a headline, for the audit. */
+export const AUDIT_HEADLINE_MIN = 32;
+
+/**
+ * Mounted only when the composition gets `audit` (scripts/audit-film.ts).
+ * After each frame commits it logs, as one `[audit] {...}` console line, the
+ * sizes of every run of display type on screen at headline size, and how
+ * many lines the most-wrapped headline takes — outside the captions, the
+ * marks and the end card (`data-audit="skip"`), which are the kit's own.
+ * Line count reads `offsetTop`, which ignores transforms, so words still
+ * rising into place count on their final line. Reads the DOM; changes nothing.
+ */
+const AuditProbe: React.FC = () => {
+    const frame = useCurrentFrame();
+    React.useLayoutEffect(() => {
+        const sizes = new Set<number>();
+        const lineTops = new Map<Element, Set<number>>();
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+            const el = n.parentElement;
+            if (!el || !n.textContent?.trim()) continue;
+            if (el.closest("[data-audit=skip]")) continue;
+            const cs = getComputedStyle(el);
+            if (!cs.fontFamily.includes("Instrument Sans") || cs.opacity === "0") continue;
+            const px = Math.round(parseFloat(cs.fontSize));
+            if (px < AUDIT_HEADLINE_MIN) continue;
+            sizes.add(px);
+            if (el instanceof HTMLElement && el.offsetParent) {
+                const tops = lineTops.get(el.offsetParent) ?? new Set<number>();
+                tops.add(Math.round(el.offsetTop / (px * 0.5)));
+                lineTops.set(el.offsetParent, tops);
+            }
+        }
+        const headlineLines = Math.max(0, ...[...lineTops.values()].map((t) => t.size));
+        console.log(`[audit] ${JSON.stringify({ frame, headlineSizes: [...sizes].sort((a, b) => a - b), headlineLines })}`);
+    }, [frame]);
+    return null;
 };
 
 /* ── building blocks for scenes ─────────────────────────────────────── */
@@ -623,6 +708,7 @@ const Captions: React.FC = () => {
     const tall = format === "tall";
     return (
         <div
+            data-audit="skip"
             style={{
                 position: "absolute",
                 left: tall ? 72 : 120,
