@@ -288,10 +288,18 @@ describe("rebase db pull into the managed database", () => {
         await sql(managed, LOCAL);
 
         const intoPostgres = await pullInto(url("postgres_copy"), "postgres");
-        expect(intoPostgres).toEqual({ cleared: true, started: true, failure: null, advice: null });
+        // `notice` only when the local pg_dump is older than the server's minor (see attverNotice).
+        expect(intoPostgres).toEqual({
+            cleared: true, started: true, failure: null, advice: null,
+            ...(intoPostgres.notice === undefined ? {} : { notice: expect.stringContaining("pg_attver") })
+        });
 
         const intoManaged = await pullInto(managed, "managed");
-        expect(intoManaged).toEqual({ cleared: true, started: true, failure: null, advice: null });
+        // `notice` only when the local pg_dump is older than the server's minor (see attverNotice).
+        expect(intoManaged).toEqual({
+            cleared: true, started: true, failure: null, advice: null,
+            ...(intoManaged.notice === undefined ? {} : { notice: expect.stringContaining("pg_attver") })
+        });
 
         const expected = await fingerprint(url("postgres_copy"));
         // The source itself, so the comparison is with what was pulled and

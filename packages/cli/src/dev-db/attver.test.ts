@@ -19,9 +19,14 @@ const CI_DEFINITION = [
     ""
 ].join("\n");
 
+/** {@link blankAttverOptions} on the UTF-8 bytes of `definition`, read back as UTF-8. */
+function blankText(definition: string): string {
+    return blankAttverOptions(Buffer.from(definition, "utf8")).toString("utf8");
+}
+
 describe("blankAttverOptions", () => {
     it("blanks the statements that only set pg_attver, keeping the length", () => {
-        const blanked = blankAttverOptions(CI_DEFINITION);
+        const blanked = blankText(CI_DEFINITION);
 
         expect(blanked).not.toContain("pg_attver");
         expect(blanked).toContain("CREATE TABLE public.authors (");
@@ -35,28 +40,41 @@ describe("blankAttverOptions", () => {
         const middle = "ALTER TABLE ONLY public.t ALTER COLUMN c SET (n_distinct=5, pg_attver=7, n_distinct_inherited=3);";
 
         for (const statement of [first, later, middle]) {
-            const blanked = blankAttverOptions(statement);
+            const blanked = blankText(statement);
             expect(blanked).not.toContain("pg_attver");
             expect(blanked.replace(/ +/g, " ")).toContain("n_distinct=5");
             expect(blanked.length).toBe(statement.length);
         }
-        expect(blankAttverOptions(middle)).toContain("n_distinct_inherited=3);");
+        expect(blankText(middle)).toContain("n_distinct_inherited=3);");
     });
 
     it("counts bytes, not characters, for a name outside ASCII", () => {
         const statement = "ALTER TABLE ONLY public.\"café\" ALTER COLUMN \"naïve\" SET (pg_attver=1);";
-        const blanked = blankAttverOptions(statement);
+        const blanked = blankText(statement);
 
         expect(blanked.trim()).toBe("");
         expect(Buffer.byteLength(blanked)).toBe(Buffer.byteLength(statement));
+    });
+
+    it("leaves every byte around the statement as it was, in an encoding that is not UTF-8", () => {
+        const definition = Buffer.from(
+            "CREATE TABLE public.\"caf\u00e9\" (x integer);\nALTER TABLE ONLY public.\"caf\u00e9\" ALTER COLUMN x SET (pg_attver=1, n_distinct=2);\n-- \u00e9\n",
+            "latin1"
+        );
+        const blanked = blankAttverOptions(definition);
+
+        expect(blanked.length).toBe(definition.length);
+        expect(blanked.toString("latin1")).toContain(`SET (${" ".repeat("pg_attver=1, ".length)}n_distinct=2);`);
+        const changed = [...definition].flatMap((byte, i) => (blanked[i] === byte ? [] : [i]));
+        expect(changed.every((i) => blanked[i] === 0x20)).toBe(true);
     });
 
     it("leaves a definition without pg_attver, and a row that mentions it, alone", () => {
         const other = "ALTER TABLE ONLY public.t ALTER COLUMN c SET (n_distinct=5);";
         const comment = "COMMENT ON TABLE public.t IS 'SET (pg_attver=1);';";
 
-        expect(blankAttverOptions(other)).toBe(other);
-        expect(blankAttverOptions(comment)).toBe(comment);
+        expect(blankText(other)).toBe(other);
+        expect(blankText(comment)).toBe(comment);
     });
 });
 
@@ -81,9 +99,9 @@ class ArchiveWriter {
         this.raw(digits);
     }
 
-    str(text: string | null): void {
+    str(text: string | Buffer | null): void {
         if (text === null) return this.int(-1);
-        const bytes = Buffer.from(text, "utf8");
+        const bytes = typeof text === "string" ? Buffer.from(text, "utf8") : text;
         this.int(bytes.length);
         this.raw(bytes);
     }
@@ -103,16 +121,26 @@ class ArchiveWriter {
 interface Entry {
     tag: string;
     desc: string;
-    defn: string;
+    /** As pg_dump wrote it: text in UTF-8, or the bytes of another encoding. */
+    defn: string | Buffer;
     data?: Buffer;
 }
 
-/** A version 1.16 custom-format archive (pg_dump 18): header, TOC, then each entry's data block. */
-function archive(entries: Entry[]): Buffer {
+/** The ENCODING entry pg_dump writes first in every archive. */
+function encoding(name: string): Entry {
+    return { tag: "ENCODING", desc: "ENCODING", defn: `SET client_encoding = '${name}';\n` };
+}
+
+/**
+ * A custom-format archive, version 1.16.`revision` (pg_dump 18): header, TOC,
+ * then each entry's data block. Its first entry is ENCODING, as in every dump.
+ */
+function archive(entries: Entry[], options: { revision?: number; encoding?: string } = {}): Buffer {
+    entries = [encoding(options.encoding ?? "UTF8"), ...entries];
     const tocFor = (offsets: number[]): ArchiveWriter => {
         const w = new ArchiveWriter();
         w.raw(Buffer.from("PGDMP", "latin1"));
-        w.byte(1); w.byte(16); w.byte(0); // version 1.16.0
+        w.byte(1); w.byte(16); w.byte(options.revision ?? 0); // version 1.16.x
         w.byte(4); w.byte(8); w.byte(1); // intSize, offSize, archCustom
         w.byte(0); // compression: none
         for (const value of [0, 0, 0, 13, 10, 126, 0]) w.int(value);
@@ -141,6 +169,10 @@ function archive(entries: Entry[]): Buffer {
     return Buffer.concat([tocFor(offsets).buffer(), ...entries.flatMap((entry) => (entry.data ? [entry.data] : []))]);
 }
 
+function latin1ToString(bytes: Buffer): string {
+    return bytes.toString("latin1");
+}
+
 describe("stripAttverFromArchive", () => {
     const dirs: string[] = [];
     afterEach(() => {
@@ -162,11 +194,11 @@ describe("stripAttverFromArchive", () => {
         ]);
         const file = write(before);
 
-        expect(stripAttverFromArchive(file)).toBe(1);
+        expect(stripAttverFromArchive(file)).toEqual({ entries: 1, skipped: null, serverVersion: "18.5", dumpVersion: "18.4" });
 
         const after = fs.readFileSync(file);
         expect(after.length).toBe(before.length);
-        const blanked = Buffer.from(blankAttverOptions(CI_DEFINITION));
+        const blanked = blankAttverOptions(Buffer.from(CI_DEFINITION));
         expect(after.indexOf(blanked)).toBe(before.indexOf(Buffer.from(CI_DEFINITION)));
         expect(after.subarray(after.length - rows.length).equals(rows)).toBe(true);
         expect(after.toString("latin1").match(/pg_attver/g)).toHaveLength(1); // only the row's text
@@ -176,7 +208,7 @@ describe("stripAttverFromArchive", () => {
         const before = archive([{ tag: "t", desc: "TABLE", defn: "CREATE TABLE public.t (id integer);\n" }]);
         const file = write(before);
 
-        expect(stripAttverFromArchive(file)).toBe(0);
+        expect(stripAttverFromArchive(file)).toMatchObject({ entries: 0, skipped: null });
         expect(fs.readFileSync(file).equals(before)).toBe(true);
     });
 
@@ -186,8 +218,118 @@ describe("stripAttverFromArchive", () => {
 
         for (const bytes of [plain, truncated]) {
             const file = write(bytes);
-            expect(stripAttverFromArchive(file)).toBe(0);
+            expect(stripAttverFromArchive(file)).toMatchObject({ entries: 0, skipped: expect.stringMatching(/not a pg_dump custom-format archive/) });
             expect(fs.readFileSync(file).equals(bytes)).toBe(true);
         }
+    });
+
+    it("blanks a definition in a single-byte encoding at its length in bytes, and corrupts nothing after it", () => {
+        // A LATIN1 database dumps its names as LATIN1 bytes: 0xE9 is "é", and
+        // not UTF-8. Read as UTF-8 each became a 3-byte U+FFFD, the patch came
+        // out longer than the field and overwrote the TOC after it.
+        const latin1 = (text: string): Buffer => Buffer.from(text, "latin1");
+        const definition = latin1([
+            "CREATE TABLE public.\"caf\u00e9\" (",
+            "    \"gr\u00f6\u00dfe\" integer",
+            ");",
+            "ALTER TABLE ONLY public.\"caf\u00e9\" ALTER COLUMN \"gr\u00f6\u00dfe\" SET (pg_attver=29166168);",
+            "COMMENT ON nothing; -- \u00e9 after the statement too",
+            ""
+        ].join("\n"));
+        const rows = Buffer.from("1\t\\N\n\\.\n");
+        const before = archive([
+            { tag: "caf\u00e9", desc: "TABLE", defn: definition },
+            { tag: "after", desc: "TABLE", defn: "CREATE TABLE public.after (x integer);\nALTER TABLE ONLY public.after ALTER COLUMN x SET (pg_attver=7);\n" },
+            { tag: "caf\u00e9", desc: "TABLE DATA", defn: "", data: rows }
+        ], { encoding: "LATIN1" });
+        const file = write(before);
+
+        expect(stripAttverFromArchive(file)).toMatchObject({ entries: 2, skipped: null });
+
+        const after = fs.readFileSync(file);
+        const blanked = latin1(latin1ToString(definition).replace(/^ALTER TABLE ONLY public\."caf\u00e9".*$/m, (line) => " ".repeat(line.length)));
+        const expected = Buffer.from(before);
+        blanked.copy(expected, before.indexOf(definition));
+        const second = Buffer.from("ALTER TABLE ONLY public.after ALTER COLUMN x SET (pg_attver=7);");
+        Buffer.alloc(second.length, " ").copy(expected, before.indexOf(second));
+        expect(after.equals(expected)).toBe(true);
+    });
+
+    it("leaves pg_attver alone in an entry that is not a table's, such as a comment", () => {
+        // pg_dump writes attribute options only in TABLE, FOREIGN TABLE and
+        // MATERIALIZED VIEW entries. Anywhere else the line is text someone
+        // wrote — here, inside a COMMENT's string literal.
+        const comment = "COMMENT ON TABLE public.t IS 'how to break a restore:\nALTER TABLE ONLY public.t ALTER COLUMN id SET (pg_attver=5);\n';\n";
+        const before = archive([
+            { tag: "t", desc: "TABLE", defn: "CREATE TABLE public.t (id integer);\n" },
+            { tag: "TABLE t", desc: "COMMENT", defn: comment }
+        ]);
+        const file = write(before);
+
+        expect(stripAttverFromArchive(file)).toMatchObject({ entries: 0, skipped: null });
+        expect(fs.readFileSync(file).equals(before)).toBe(true);
+    });
+
+    it("blanks pg_attver in a materialized view's entry, which pg_dump writes it in too", () => {
+        const definition = "CREATE MATERIALIZED VIEW public.mv AS\n SELECT 1 AS one\n  WITH NO DATA;\nALTER TABLE ONLY public.mv ALTER COLUMN one SET (pg_attver=9);\n";
+        const file = write(archive([{ tag: "mv", desc: "MATERIALIZED VIEW", defn: definition }]));
+
+        expect(stripAttverFromArchive(file)).toMatchObject({ entries: 1, skipped: null });
+        expect(fs.readFileSync(file).toString("latin1")).not.toContain("pg_attver");
+    });
+
+    it("reads an archive whose format has a revision past 1.16.0", () => {
+        // K_VERS_MAX accepts any 1.16 revision: a revision bump keeps the layout.
+        const before = archive([{ tag: "authors", desc: "TABLE", defn: CI_DEFINITION }], { revision: 3 });
+        const file = write(before);
+
+        expect(stripAttverFromArchive(file)).toMatchObject({ entries: 1, skipped: null });
+        expect(fs.readFileSync(file).toString("latin1")).not.toContain("pg_attver");
+    });
+
+    it("leaves an archive in a format it does not know as it was, and says which format", () => {
+        const before = archive([{ tag: "authors", desc: "TABLE", defn: CI_DEFINITION }]);
+        before[6] = 17; // version 1.17.0
+        const file = write(before);
+
+        expect(stripAttverFromArchive(file)).toEqual({
+            entries: 0,
+            skipped: "its archive format is version 1.17.0, which this version of Rebase does not read",
+            serverVersion: null,
+            dumpVersion: null
+        });
+        expect(fs.readFileSync(file).equals(before)).toBe(true);
+    });
+
+    it("refuses to edit a dump written in a client-only encoding, which is not ASCII-safe", () => {
+        const before = archive([{ tag: "authors", desc: "TABLE", defn: CI_DEFINITION }], { encoding: "SJIS" });
+        const file = write(before);
+
+        const result = stripAttverFromArchive(file);
+
+        expect(result.entries).toBe(0);
+        expect(result.skipped).toMatch(/SJIS encoding/);
+        expect(fs.readFileSync(file).equals(before)).toBe(true);
+    });
+
+    it("writes nothing when an edit would change a definition's length", () => {
+        const before = archive([
+            { tag: "first", desc: "TABLE", defn: CI_DEFINITION },
+            { tag: "second", desc: "TABLE", defn: "CREATE TABLE public.second (x integer);\nALTER TABLE ONLY public.second ALTER COLUMN x SET (pg_attver=1);\n" }
+        ]);
+        const file = write(before);
+        let calls = 0;
+        // The first entry's edit is sound; the second one's grows by a byte.
+        const growsTheSecond = (definition: Buffer): Buffer => {
+            calls += 1;
+            const blanked = blankAttverOptions(definition);
+            return calls === 2 ? Buffer.concat([blanked, Buffer.from(" ")]) : blanked;
+        };
+
+        const result = stripAttverFromArchive(file, growsTheSecond);
+
+        expect(result.entries).toBe(0);
+        expect(result.skipped).toMatch(/changed that entry's length/);
+        expect(fs.readFileSync(file).equals(before)).toBe(true);
     });
 });

@@ -1141,6 +1141,7 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
         // lacks in the way. A failure is reported only after whatever did
         // arrive has been anonymized.
         const restored = await restoreCopy(dumped.plan, dumpFile);
+        if (restored.notice) console.log(chalk.yellow(`  ${restored.notice}`));
         failure = restored.failure ? describeRestoreFailure(restored, describeTarget(source)) : null;
 
         // Before the verdict: a partial copy of personal data on a laptop is

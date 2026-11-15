@@ -139,7 +139,11 @@ describe("restoreCopy", () => {
     it("replaces the local database's contents with the source's, local-only tables and all", async () => {
         const outcome = await restoreCopy(plan, dumpFile);
 
-        expect(outcome).toEqual({ cleared: true, started: true, failure: null, advice: null });
+        // `notice` only when the local pg_dump is older than the server's minor (see attverNotice).
+        expect(outcome).toEqual({
+            cleared: true, started: true, failure: null, advice: null,
+            ...(outcome.notice === undefined ? {} : { notice: expect.stringContaining("pg_attver") })
+        });
         const target = new URL(plan.target).pathname.slice(1);
         expect(await tablesIn(target)).toEqual(["public.posts", "rebase.users"]);
         const titles = (await sql(target, "SELECT title FROM public.posts ORDER BY id")).rows.map(row => row.title);

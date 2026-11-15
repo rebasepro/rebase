@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 import {
     anonymizableColumns,
     anonymizeStatements,
+    attverNotice,
     clearStatements,
     describeDumpFailure,
     describeRestoreFailure,
@@ -378,6 +379,20 @@ describe("pg_dump and pg_restore arguments", () => {
  * restore that stopped half-way, or never started, ended on a green tick over
  * a partial or empty database.
  */
+describe("attverNotice", () => {
+    it("says once that pg_attver was taken out, why it was there and what fixes that", () => {
+        const notice = attverNotice({ entries: 3, skipped: null, serverVersion: "18.7", dumpVersion: "18.4" });
+
+        expect(notice).toBe("Your pg_dump (18.4) is older than the server it dumped from (18.7): its dump carried pg_attver "
+            + "column options this database would refuse, so they were taken out of 3 table(s) before restoring. "
+            + "Upgrading the PostgreSQL client tools to at least 18.7 is the supported fix.");
+    });
+
+    it("says nothing when there was nothing to take out", () => {
+        expect(attverNotice({ entries: 0, skipped: null, serverVersion: "18.7", dumpVersion: "18.7" })).toBeNull();
+    });
+});
+
 describe("restoreOutcome", () => {
     it("calls a clean exit complete", () => {
         expect(restoreOutcome({ exitCode: 0, stderr: "" })).toEqual({ started: true, failure: null, advice: null });
@@ -434,6 +449,26 @@ describe("restoreOutcome", () => {
 
         expect(outcome.started).toBe(true);
         expect(outcome.failure).toMatch(/SIGKILL/);
+    });
+
+    it("names an old pg_dump as the cause when the target refuses pg_attver, and how to fix it", () => {
+        // The dump could not be edited (here, a format this Rebase does not
+        // read), so the target met the key and dropped the table. "An
+        // extension" sent people looking for the wrong thing.
+        const outcome = restoreOutcome(
+            {
+                exitCode: 1,
+                stderr: "pg_restore: error: could not execute query: ERROR:  unrecognized parameter \"pg_attver\"\n"
+                    + "pg_restore: warning: errors ignored on restore: 1\n"
+            },
+            "postgres",
+            { entries: 0, skipped: "its archive format is version 1.17.0, which this version of Rebase does not read", serverVersion: "18.7", dumpVersion: "18.4" }
+        );
+
+        expect(outcome.advice).toContain("Your pg_dump (18.4) is older than the server it dumped from (18.7)");
+        expect(outcome.advice).toContain("archive format is version 1.17.0");
+        expect(outcome.advice).toContain("Upgrade the PostgreSQL client tools to at least 18.7");
+        expect(outcome.advice).not.toMatch(/extension/);
     });
 
     it("fails, and says nothing arrived, when pg_restore never started", () => {

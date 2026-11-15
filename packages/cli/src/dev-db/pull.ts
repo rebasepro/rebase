@@ -38,7 +38,7 @@ import { execa } from "execa";
 import fs from "fs";
 import type { Client } from "pg";
 
-import { stripAttverFromArchive } from "./attver";
+import { type AttverStrip, stripAttverFromArchive } from "./attver";
 import { banner, connectionErrorText, hostOf } from "./connection-banner";
 import { PGLITE_EXTENSIONS } from "./constraints";
 
@@ -786,8 +786,17 @@ export interface RestoreRunOutcome {
  * advice names that, rather than "pull again", which sent people in a loop.
  * On the managed database an extension cannot be installed at all, so the
  * advice there is Postgres in Docker.
+ *
+ * One cause is named for what it is: a target refusing `pg_attver`, which
+ * means the local pg_dump is older than the source server and the dump could
+ * not be edited to drop the key (`attver`, what {@link stripAttverFromArchive}
+ * said, tells why).
  */
-export function restoreOutcome(run: RestoreRun, engine: PullTargetEngine = "postgres"): RestoreRunOutcome {
+export function restoreOutcome(
+    run: RestoreRun,
+    engine: PullTargetEngine = "postgres",
+    attver: AttverStrip | null = null
+): RestoreRunOutcome {
     if (run.signal) {
         return {
             started: true,
@@ -805,14 +814,17 @@ export function restoreOutcome(run: RestoreRun, engine: PullTargetEngine = "post
     if (run.exitCode === 0) return { started: true, failure: null, advice: null };
 
     const ignored = /errors ignored on restore: (\d+)/.exec(run.stderr ?? "");
-    const repeats = engine === "pglite"
-        ? "Pulling again repeats these errors until what they name is fixed — most often an extension the "
-            + `source uses that the managed database does not have (it has ${PGLITE_EXTENSIONS.map(extension => extension.name).join(", ")}). `
-            + "Pull into Postgres in Docker instead (`rebase db pull --docker`), or pull only the schemas that do "
-            + "not need it (--schema)."
-        : "Pulling again repeats these errors until what they name is fixed — most often an extension "
-            + "the source uses that this Postgres does not have installed. Install it here, or pull only the schemas "
-            + "that do not need it (--schema).";
+    const refusedAttver = (run.stderr ?? "").includes("unrecognized parameter \"pg_attver\"");
+    const repeats = refusedAttver
+        ? attverAdvice(attver)
+        : engine === "pglite"
+            ? "Pulling again repeats these errors until what they name is fixed — most often an extension the "
+                + `source uses that the managed database does not have (it has ${PGLITE_EXTENSIONS.map(extension => extension.name).join(", ")}). `
+                + "Pull into Postgres in Docker instead (`rebase db pull --docker`), or pull only the schemas that do "
+                + "not need it (--schema)."
+            : "Pulling again repeats these errors until what they name is fixed — most often an extension "
+                + "the source uses that this Postgres does not have installed. Install it here, or pull only the schemas "
+                + "that do not need it (--schema).";
 
     return {
         started: true,
@@ -823,10 +835,44 @@ export function restoreOutcome(run: RestoreRun, engine: PullTargetEngine = "post
     };
 }
 
+/**
+ * What to do when the target refused the dump's `pg_attver` options: they are
+ * there because the local pg_dump is older than the server it dumped from,
+ * and a pg_dump at least as new leaves them out.
+ */
+function attverAdvice(attver: AttverStrip | null): string {
+    const older = attver?.dumpVersion && attver.serverVersion
+        ? `Your pg_dump (${attver.dumpVersion}) is older than the server it dumped from (${attver.serverVersion})`
+        : "Your pg_dump is older than the server it dumped from";
+    const skipped = attver?.skipped ? `, and Rebase could not take them out of this dump: ${attver.skipped}` : "";
+    const atLeast = attver?.serverVersion ? `at least ${attver.serverVersion}` : "at least the server's minor version";
+
+    return `${older}: it wrote pg_attver column options, which this database refuses${skipped}. `
+        + `Upgrade the PostgreSQL client tools to ${atLeast} (check with \`pg_dump --version\`), then pull again.`;
+}
+
+/**
+ * The line a pull prints when it took `pg_attver` out of the dump: the copy is
+ * whole, but the local pg_dump is older than the source server, which is what
+ * to fix. Null when nothing was taken out.
+ */
+export function attverNotice(attver: AttverStrip): string | null {
+    if (attver.entries === 0) return null;
+    const older = attver.dumpVersion && attver.serverVersion
+        ? `Your pg_dump (${attver.dumpVersion}) is older than the server it dumped from (${attver.serverVersion})`
+        : "Your pg_dump is older than the server it dumped from";
+    const atLeast = attver.serverVersion ? `at least ${attver.serverVersion}` : "at least the server's minor version";
+
+    return `${older}: its dump carried pg_attver column options this database would refuse, so they were taken `
+        + `out of ${attver.entries} table(s) before restoring. Upgrading the PostgreSQL client tools to ${atLeast} is the supported fix.`;
+}
+
 /** How {@link restoreCopy} ended. */
 export interface RestoreOutcome extends RestoreRunOutcome {
     /** Whether the local database was emptied first. False means it is exactly as it was. */
     cleared: boolean;
+    /** Something the copy did that is worth one line, whether or not it succeeded — see {@link attverNotice}. */
+    notice?: string;
 }
 
 /**
@@ -930,8 +976,10 @@ export async function restoreCopy(plan: PullPlan, dumpFile: string): Promise<Res
     }
 
     // A pg_dump older than the source server's minor writes its `pg_attver`
-    // attribute options, which the target may refuse — see attver.ts.
-    stripAttverFromArchive(dumpFile);
+    // attribute options, which the target may refuse — see attver.ts. A dump
+    // it could not edit is restored as it is; if the target then refuses the
+    // key, the advice says why (`restoreOutcome`).
+    const attver = stripAttverFromArchive(dumpFile);
 
     // stderr is shown as it arrives and kept, for the count in its summary
     // line. Not rejected: every way this ends is judged by `restoreOutcome`.
@@ -945,7 +993,9 @@ export async function restoreCopy(plan: PullPlan, dumpFile: string): Promise<Res
 
     if (engine === "pglite") await resetSharedSession(plan.target);
 
-    return { cleared: true, ...restoreOutcome(run, engine) };
+    const notice = attverNotice(attver);
+
+    return { cleared: true, ...restoreOutcome(run, engine, attver), ...(notice ? { notice } : {}) };
 }
 
 /**
