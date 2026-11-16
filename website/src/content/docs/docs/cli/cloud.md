@@ -205,6 +205,7 @@ rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 rebase cloud app-key [rotate]           # the app key init --claim wrote; owners and admins
 rebase cloud service-key [rotate]       # REBASE_SERVICE_KEY; owners and admins
+rebase cloud service-key [rotate] --preview <name>  # a backend preview's own key
 ```
 
 `app-key` lists the
@@ -224,6 +225,16 @@ issues a new key and restarts the app onto it. The old key works until the
 restart has finished, and nothing after. It is refused while a deploy is
 running, and it runs with your login. Claiming a project rotates its service
 key too.
+
+A backend preview has a service key of its own. Its first deploy makes it,
+redeploys keep it, and production's key answers 401 on the preview.
+`service-key --preview <name>` prints it, as does `env reveal
+REBASE_SERVICE_KEY --preview <name>`. `service-key rotate --preview <name>`
+writes a new one and restarts only that preview's pod; the old key works until
+the new pod is ready. It asks first, and `--yes` skips the question. Both ask
+what `env reveal` asks: the organization's owner or admin role, and for an
+access token the `env` capability on a claimed project. Production's key and
+pod are not touched.
 
 A backend preview starts from production's variables, live keys included.
 `env set KEY=VALUE --preview` gives previews their own value, `env unset KEY

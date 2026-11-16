@@ -604,7 +604,7 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "extensions", section: "Config", description: "The Postgres extension allowlist" },
     { action: "settings", section: "Config", description: "Name, subdomain, repository, branch, Studio access" },
     { action: "app-key", section: "Config", args: "[rotate]", description: "The app key `init --claim` wrote into .env, and replacing it. Owners and admins" },
-    { action: "service-key", section: "Config", args: "[rotate]", description: "REBASE_SERVICE_KEY, admin on the app's API: its state, and replacing it. Owners and admins" },
+    { action: "service-key", section: "Config", args: "[rotate] [--preview <name>]", description: "REBASE_SERVICE_KEY, admin on the app's API: its state, and replacing it; a backend preview's own with --preview. Owners and admins" },
 
     { action: "orgs", section: "Organizations", description: "Organizations you belong to, and their members" },
     { action: "activity", section: "Organizations", description: "Who did what in the organization: deploys, env vars, domains, backups, members. Owners and admins" },

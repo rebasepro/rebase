@@ -12,7 +12,8 @@
  * --preview` hands a variable back to production's value. A backend preview
  * starts from a copy of production's environment, live third-party keys
  * included; this is how a preview gets a test key instead, or none. Production
- * is never changed by any of them.
+ * is never changed by any of them. `reveal REBASE_SERVICE_KEY --preview <name>`
+ * prints one backend preview's own service key (`service-key --preview`).
  *
  * Values are the sharp edge here. The list endpoint returns keys and never
  * values by design (a page load is not consent to spray a customer's secrets
@@ -24,6 +25,7 @@ import chalk from "chalk";
 import fs from "fs";
 import path from "path";
 import { isMissingRoute } from "./cron";
+import { previewNameArg, revealPreviewServiceKey } from "./service-key";
 import {
     requireClient,
     requireProject,
@@ -454,18 +456,32 @@ export function resolveEnvKeyArg(rawArgs: string[], action: string): string | un
     return resolveEnvKeyArgs(rawArgs, action).key;
 }
 
-/** {@link resolveEnvKeyArg}, and whether `--preview` was given (`unset` and `reset` take it). */
-export function resolveEnvKeyArgs(rawArgs: string[], action: string): { key: string | undefined; preview: boolean; yes: boolean } {
+/**
+ * {@link resolveEnvKeyArg}, and whether `--preview` was given (`unset` and
+ * `reset` take it).
+ *
+ * `reveal` takes it too, with the preview's name after it, and only for
+ * `REBASE_SERVICE_KEY` — the one value a backend preview holds that is neither
+ * production's nor an override `env list --preview` already shows. The name
+ * is a positional, as in `logs --preview <name>`, so `--preview` stays the
+ * switch it is everywhere else.
+ */
+export function resolveEnvKeyArgs(rawArgs: string[], action: string): { key: string | undefined; preview: boolean; previewName: string | undefined; yes: boolean } {
     const { flags, positionals } = parseCloudArgs({
-        spec: action === "reveal" ? {} : ENV_PREVIEW_FLAGS,
+        spec: ENV_PREVIEW_FLAGS,
         rawArgs,
         commandWords: 3, // cloud env <action>
         command: `cloud env ${action}`,
-        maxPositionals: 1
+        maxPositionals: action === "reveal" ? 2 : 1
     });
+    const preview = flags["--preview"] === true;
+    if (positionals.length > 1 && !preview) {
+        fail(`\`rebase cloud env ${action} ${positionals.join(" ")}\`: one KEY at most.`, "A preview is named after --preview.", "usage");
+    }
     return {
         key: positionals[0],
-        preview: (flags as { "--preview"?: boolean })["--preview"] === true,
+        preview,
+        previewName: positionals[1],
         yes: flags["--yes"] === true
     };
 }
@@ -561,8 +577,22 @@ async function resetPreviewEnv(rawArgs: string[]): Promise<void> {
 }
 
 async function revealEnv(rawArgs: string[]): Promise<void> {
-    const key = resolveEnvKeyArg(rawArgs, "reveal");
-    if (!key) fail("Usage: rebase cloud env reveal KEY", undefined, "usage");
+    const { key, preview, previewName } = resolveEnvKeyArgs(rawArgs, "reveal");
+    if (!key) fail("Usage: rebase cloud env reveal KEY [--preview <name>]", undefined, "usage");
+    if (preview) {
+        // Refused before the login round-trip, like every unusable line.
+        if (key !== "REBASE_SERVICE_KEY") {
+            fail(
+                `Only REBASE_SERVICE_KEY is revealed per preview; ${key} is not one a preview holds of its own.`,
+                "A preview runs with production's variables and the overrides `rebase cloud env list --preview` shows.",
+                "usage"
+            );
+        }
+        const name = previewNameArg(previewName, "rebase cloud env reveal REBASE_SERVICE_KEY --preview <name>");
+        const { client } = await requireClient(rawArgs);
+        // The same call as `rebase cloud service-key --preview <name>`.
+        return revealPreviewServiceKey(client, await requireProject(rawArgs, client), name);
+    }
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -752,7 +782,8 @@ description: "Give previews production's value of KEY again",
 flags: [["--preview", "Required: only previews have values to reset"]] },
             { action: "reveal",
 args: "KEY",
-description: "Print one non-secret value" },
+description: "Print one non-secret value",
+flags: [["--preview <name>", "REBASE_SERVICE_KEY only: that backend preview's own key, as `service-key --preview` prints it"]] },
             {
                 action: "pull",
                 description: "Write revealable values to a dotenv file",
