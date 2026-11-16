@@ -718,8 +718,8 @@ script. A command whose control-plane route is not deployed answers
 The app's own data, users, cron, logs, functions and files are not under
 `rebase cloud`: `rebase data`, `rebase users`, `rebase cron`, `rebase logs`,
 `rebase functions`, `rebase storage` and `rebase api` take `--project <slug>`
-and go through the console's Studio proxy (see `rebase-basics`
-`references/cli-commands.md`).
+and go through the console's Studio proxy (see the **`rebase-basics`** skill:
+`../rebase-basics/references/cli-commands.md`).
 
 ---
 
