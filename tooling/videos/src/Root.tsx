@@ -5,7 +5,7 @@ import { loadFonts } from "./fonts";
 import { RebaseIntro, RebaseIntroVO, STANDALONE } from "./Intro";
 import { deskDuration, RebaseDesk, RebaseDeskVO, type DeskProps } from "./desk/DeskFilm";
 import { SERIES_FILMS } from "./series";
-import { EXPLAINER_FILMS, explainerCompositions } from "./explainers";
+import { EXPLAINER_FILMS, explainerCompositions, shortComposition } from "./explainers";
 import { EicFilm, eicDuration } from "./eic/EicFilm";
 import { DeskPlane } from "./desk/DeskPlane";
 import { INTRO_DURATION, SCENES } from "./film";
@@ -120,7 +120,7 @@ export const RemotionRoot: React.FC = () => (
         ))}
         {/* THE EXPLAINERS — Postgres lessons, not about Rebase, each with its
             own device; the series' machinery. See src/explainers/index.ts. */}
-        {EXPLAINER_FILMS.map(({ spec, component, duration }) => {
+        {EXPLAINER_FILMS.map(({ spec, component, duration, short }) => {
             const [wide, tall] = explainerCompositions(spec.id);
             return (
                 <React.Fragment key={spec.id}>
@@ -144,6 +144,18 @@ export const RemotionRoot: React.FC = () => (
                         width={HEIGHT}
                         height={WIDTH}
                     />
+                    {short && (
+                        <Composition
+                            id={shortComposition(spec.id)}
+                            component={short.component}
+                            defaultProps={{ timing: null, take: null, clips: null }}
+                            calculateMetadata={({ props }) => ({ durationInFrames: short.duration(props) })}
+                            durationInFrames={short.duration({})}
+                            fps={FPS}
+                            width={HEIGHT}
+                            height={WIDTH}
+                        />
+                    )}
                 </React.Fragment>
             );
         })}

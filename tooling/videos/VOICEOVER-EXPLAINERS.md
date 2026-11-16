@@ -43,10 +43,40 @@ for what it does not catch.
 pnpm live
 ```
 
-Open http://localhost:3500/?film=view-side-door (or pick it from the
-**Film** menu). Everything else is the series' routine (`VOICEOVER-SERIES.md`
-→ *Recording*): Space to start, read at your pace, the film follows your
-voice. Try it without a camera first with `&simulate`.
+Open http://localhost:3500/?film=view-side-door in Chrome. Try the whole
+workflow first with no camera: `&simulate` reads the script by itself and
+saves its takes as test patterns (they are only used in simulate mode).
+
+**One film, many takes.** The sidebar lists the film's **chapters**. Pick
+one (↑↓, or N for the next one still to record), press **Space** and read
+it; the film plays from that point and follows your voice. Esc stops and
+keeps the take, R throws it away. Record a chapter as often as you like:
+every take is kept, and a line read only partway is never used. Click a
+line to start the take there instead, or tick *keep going into the next
+chapters* to read on in one take.
+
+**Play back.** After each take the chapter plays back in place, with
+sound: the scenes before it, your take, the scenes it leads into. P plays
+the selected chapter again, ⇧P the whole cut.
+
+**Choose.** Each chapter lists its takes. The newest serves by default (a
+film cuts between takes only where you re-recorded); ▶ plays the chapter
+with an older one, **Use** keeps it. If the script's words change, the
+lines that changed must be recorded again: the page marks them *old*.
+
+**Two cuts.** The long film (16:9) and the short (9:16, `Explainer-<id>-Short`)
+are assembled from the same takes. Tab switches between them. A short is a
+list of the long film's lines plus any line only it says (here, its
+sign-off, recorded as its own chapter). The film file declares both
+(`LINES`, `CHAPTERS`, the long and short `FilmSpec`s; src/spoken/production.ts
+says how a cut is assembled).
+
+**Render** from the sidebar (1080p, into `out/`), or from the command line:
+
+```bash
+pnpm assemble view-side-door            # writes takes/edits/<film>-<cut>.props.json, prints the render
+pnpm assemble view-side-door --render   # and renders each cut
+```
 
 **Pace.** 236 words. At a natural 140–155 words a minute that is about
 **95–105 seconds** with the end card (the audit's simulated read at 155 wpm

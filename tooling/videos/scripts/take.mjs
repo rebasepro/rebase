@@ -184,10 +184,38 @@ function placeWords(words, line) {
 
 const clock = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 
+/**
+ * A SIMULATED take's recording. The page's `?simulate` presenter has no
+ * camera and no voice, but a dry run of the whole workflow — chapters,
+ * retakes, picks, assembling, rendering — needs takes that behave like real
+ * ones. So the processor makes one: a test pattern with a running clock, and
+ * a tone wherever the simulated presenter was saying a line, which is what
+ * the speech finder below listens for.
+ */
+async function synthesize(live, file) {
+    const seconds = Math.max(1, live.durationFrames / live.fps);
+    const spans = live.timing.lines
+        .filter((l) => l && l.words.length && l.end !== undefined)
+        .map((l) => `between(t,${(l.words[0] / live.fps).toFixed(2)},${(l.end / live.fps).toFixed(2)})`);
+    const voice = spans.length ? spans.join("+") : "0";
+    await run([
+        "-y",
+        "-f", "lavfi", "-i", `testsrc2=s=1280x720:r=30:d=${seconds.toFixed(2)}`,
+        "-f", "lavfi", "-i", `aevalsrc='0.25*sin(2*PI*180*t)*sin(2*PI*3*t)*(${voice})':s=48000:d=${seconds.toFixed(2)}`,
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "96k", "-shortest",
+        file,
+    ]);
+}
+
 export async function processTake(id, { log = console.log } = {}) {
     if (!/^take-\d{8}-\d{6}$/.test(id)) throw new Error(`not a take id: ${id}`);
     const dir = path.join(ROOT, "takes", id);
     const live = JSON.parse(await readFile(path.join(dir, "live.json"), "utf8"));
+    if (live.simulated && !existsSync(path.join(dir, "take.mp4"))) {
+        log(`${id}: a simulated take — making its recording…`);
+        await synthesize(live, path.join(dir, "take.mp4"));
+    }
     const source = ["take.webm", "take.mp4"].map((f) => path.join(dir, f)).find((f) => existsSync(f));
     if (!source) throw new Error(`no recording in takes/${id}/`);
 
@@ -215,7 +243,12 @@ export async function processTake(id, { log = console.log } = {}) {
         );
     }
 
-    const lines = placeLines(live, segments);
+    /* A line read only partway — the take was stopped in the middle of it —
+       is not a reading of that line: it cannot serve it in a film, and
+       counting it would cut the film off mid-sentence. The page knows how
+       far it got: the line's end, or its last word, was heard. */
+    const finished = live.lines.map((l) => l.end != null || (Array.isArray(l.said) && l.said[l.said.length - 1] != null));
+    const lines = placeLines(live, segments).map((line, k) => (finished[k] ? line : null));
     const first = lines.find(Boolean);
     if (!first) throw new Error("no line of the script was heard in this take");
     const said = lines.filter(Boolean);
@@ -244,7 +277,7 @@ export async function processTake(id, { log = console.log } = {}) {
        thought it was — a big difference is worth a look before rendering. */
     const rows = lines.map((line, k) => {
         const name = live.lines[k].id.padEnd(9);
-        if (!line) return `${name} — never heard`;
+        if (!line) return `${name} — ${live.timing.lines[k] ? "stopped before the end of it" : "never heard"}`;
         const words = live.lines[k].words.length;
         const wpm = Math.round((words / Math.max(0.1, line.end - line.start)) * 60);
         const drift = Math.round((line.start - line.prior.start) * FPS);
@@ -262,6 +295,12 @@ export async function processTake(id, { log = console.log } = {}) {
     /* A take names its film; each film renders as one or more compositions
        (the series: wide and tall from the same take). */
     const compositions = live.compositions ?? ["RebaseDesk"];
+    /* A take of some of the lines is one piece of a film: it is assembled
+       with the others, on the recording page or with `pnpm assemble`. */
+    if (live.assembles) {
+        const render = `pnpm assemble ${live.film}   (or Render on the recording page)`;
+        return { id, summary, render, props };
+    }
     const render = compositions
         .map((c) => `pnpm exec remotion render src/index.ts ${c} out/${c}-${id}.mp4 --props=takes/${id}/props.json --scale=2 --timeout=120000`)
         .join("\n  ");

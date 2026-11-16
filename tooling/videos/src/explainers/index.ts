@@ -1,5 +1,7 @@
 import { seriesDuration, seriesFilm, type FilmSpec, type SeriesProps } from "../series/kit";
-import { SHOWN as VIEW_SIDE_DOOR_SHOWN, VIEW_SIDE_DOOR } from "./01-view-side-door";
+import type { Script } from "../spoken/narration";
+import type { Chapter } from "../spoken/production";
+import { CHAPTERS as VIEW_SIDE_DOOR_CHAPTERS, SHOWN as VIEW_SIDE_DOOR_SHOWN, VIEW_SIDE_DOOR, VIEW_SIDE_DOOR_LINES, VIEW_SIDE_DOOR_SHORT } from "./01-view-side-door";
 
 /**
  * THE EXPLAINERS — short lessons about Postgres (and the things around it)
@@ -14,7 +16,15 @@ import { SHOWN as VIEW_SIDE_DOOR_SHOWN, VIEW_SIDE_DOOR } from "./01-view-side-do
  * `?film=<id>`. Scripts and proof notes live in VOICEOVER-EXPLAINERS.md.
  */
 export interface ExplainerSpec {
+    /** The long film: 16:9, three to five minutes. */
     film: FilmSpec;
+    /** Every line read for it (the long film's and the short's), in
+     *  reading order, and the chapters they are recorded in. Absent: the
+     *  long film's script, recorded whole. */
+    lines?: Script;
+    chapters?: readonly Chapter[];
+    /** The short cut: 9:16, under a minute, from the same takes. */
+    short?: FilmSpec;
     /** The claims' evidence: a file of real output (path from tooling/videos)
      *  and every statement and result the film puts on screen. The lint
      *  fails if one of them is not in the file (whitespace aside). */
@@ -27,6 +37,9 @@ export interface ExplainerSpec {
 export const EXPLAINERS: ExplainerSpec[] = [
     {
         film: VIEW_SIDE_DOOR,
+        lines: VIEW_SIDE_DOOR_LINES,
+        chapters: VIEW_SIDE_DOOR_CHAPTERS,
+        short: VIEW_SIDE_DOOR_SHORT,
         proof: { expected: "scripts/proof/view-side-door.expected", shown: VIEW_SIDE_DOOR_SHOWN },
         terms: ["view", "views", "table", "row-level", "security", "invoker", "materialized"],
     },
@@ -36,13 +49,28 @@ export interface ExplainerEntry {
     spec: FilmSpec;
     component: React.FC<SeriesProps>;
     duration: (props: SeriesProps) => number;
+    lines?: Script;
+    chapters?: readonly Chapter[];
+    short?: { spec: FilmSpec; component: React.FC<SeriesProps>; duration: (props: SeriesProps) => number };
 }
 
-export const EXPLAINER_FILMS: ExplainerEntry[] = EXPLAINERS.map(({ film }) => ({
+export const EXPLAINER_FILMS: ExplainerEntry[] = EXPLAINERS.map(({ film, lines, chapters, short }) => ({
     spec: film,
     component: seriesFilm(film),
     duration: (props: SeriesProps) => seriesDuration(film, props),
+    lines,
+    chapters,
+    short: short && {
+        spec: short,
+        component: seriesFilm(short),
+        duration: (props: SeriesProps) => seriesDuration(short, props),
+    },
 }));
+
+/** The short's composition id (1080x1920). */
+export function shortComposition(id: string): string {
+    return `Explainer-${id}-Short`;
+}
 
 /** The composition ids a film renders as, wide then tall. */
 export function explainerCompositions(id: string): [string, string] {

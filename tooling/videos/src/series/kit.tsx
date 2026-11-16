@@ -15,6 +15,7 @@ import { Code } from "../components/Code";
 import { Dot } from "../components/Type";
 import { ENTER, ramp, SHIFT } from "../components/motion";
 import { LiveCamera, Placeholder, type LiveFeed, type Take } from "../desk/Presenter";
+import { DISSOLVE, type Clip } from "../spoken/production";
 import { EYEBROW, FONT, FRAME, GROUND, INK, SURFACE, TONE, TRACKING } from "../theme";
 import {
     assertSameScript,
@@ -146,7 +147,12 @@ const TAIL = 50;
 
 export function buildSeries(spec: FilmSpec, timing: Timing): SeriesTimeline {
     if (timing.script) assertSameScript(spec.script, timing.script);
-    const cue = (c: Cue) => cueFrame(spec.script, timing, c);
+    /* A cut leaves lines out (a short is a few of the long film's): a cue on
+       a line this cut does not have is a line never said — null, as an
+       unsaid word is live. Scenes, the corner and the close are still
+       checked against the cut's own script at import (checkFilm). */
+    const has = new Set(spec.script.map((l) => l.id));
+    const cue = (c: Cue) => (has.has(c.line) ? cueFrame(spec.script, timing, c) : null);
     const starts: (number | null)[] = [];
     let previous = -Infinity;
     for (const s of spec.scenes) {
@@ -214,6 +220,9 @@ export function useSceneEnd(): number | null {
 export interface SeriesProps {
     timing?: Timing | null;
     take?: Take | null;
+    /** An assembled film's recordings, laid end to end (production.ts):
+     *  instead of one `take`. */
+    clips?: Clip[] | null;
     live?: LiveFeed | null;
     /** FOR scripts/audit-film.ts ONLY. "probe" renders the film as it is and
      *  logs the display-type sizes on screen; "content" also drops the
@@ -233,7 +242,7 @@ export function seriesDuration(spec: FilmSpec, props: SeriesProps): number {
 export function seriesFilm(spec: FilmSpec): React.FC<SeriesProps> {
     const authored = authoredTiming(spec.script);
     const Layer = spec.layer;
-    const Film: React.FC<SeriesProps> = ({ timing, take, live, audit }) => {
+    const Film: React.FC<SeriesProps> = ({ timing, take, clips, live, audit }) => {
         const t = timing ?? authored;
         const series = useMemo(() => buildSeries(spec, t), [t]);
         if (audit === "content") {
@@ -256,7 +265,7 @@ export function seriesFilm(spec: FilmSpec): React.FC<SeriesProps> {
                     <Scenes />
                     {Layer && <Layer />}
                     <EndCard />
-                    <Presenter take={take} live={live} />
+                    <Presenter take={take} clips={clips} live={live} />
                     <Captions />
                     <EpisodeMark />
                     {audit === "probe" && <AuditProbe />}
@@ -395,7 +404,7 @@ function lerp(a: Box, b: Box, t: number): Box {
     return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, w: a.w + (b.w - a.w) * t, h: a.h + (b.h - a.h) * t };
 }
 
-const Presenter: React.FC<{ take?: Take | null; live?: LiveFeed | null; flat?: boolean }> = ({ take, live, flat }) => {
+const Presenter: React.FC<{ take?: Take | null; clips?: Clip[] | null; live?: LiveFeed | null; flat?: boolean }> = ({ take, clips, live, flat }) => {
     const frame = useCurrentFrame();
     const series = useSeries();
     const format = useFormat();
@@ -441,12 +450,45 @@ const Presenter: React.FC<{ take?: Take | null; live?: LiveFeed | null; flat?: b
             >
                 {live?.stream ? (
                     <LiveCamera stream={live.stream} />
+                ) : clips && clips.length > 0 ? (
+                    <Clips clips={clips} stage={stage} />
                 ) : take ? (
                     <OffthreadVideo src={staticFile(take.src)} startFrom={take.startFrom} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 ) : (
                     <Placeholder stage={stage} />
                 )}
             </div>
+        </AbsoluteFill>
+    );
+};
+
+/** An assembled film's recordings, end to end. Each after the first fades
+ *  in over the one before for DISSOLVE frames (the earlier runs on under
+ *  it, its sound fading out), so a cut between takes never jumps. Where no
+ *  clip plays — a line nobody has recorded yet — the placeholder shows. */
+const Clips: React.FC<{ clips: Clip[]; stage: string }> = ({ clips, stage }) => (
+    <>
+        <Placeholder stage={stage} />
+        {clips.map((c, i) => (
+            <Sequence key={`${c.take}-${c.from}`} from={c.from} durationInFrames={Math.max(1, c.to - c.from + (i < clips.length - 1 ? DISSOLVE : 0))} layout="none">
+                <ClipVideo clip={c} fadeIn={i > 0} fadeOut={i < clips.length - 1} />
+            </Sequence>
+        ))}
+    </>
+);
+
+const ClipVideo: React.FC<{ clip: Clip; fadeIn: boolean; fadeOut: boolean }> = ({ clip, fadeIn, fadeOut }) => {
+    const frame = useCurrentFrame();
+    const length = clip.to - clip.from;
+    const o = fadeIn ? ramp(frame, 0, DISSOLVE) : 1;
+    return (
+        <AbsoluteFill style={{ opacity: o }}>
+            <OffthreadVideo
+                src={staticFile(clip.src)}
+                startFrom={clip.startFrom}
+                volume={(f) => (fadeIn ? Math.min(1, f / DISSOLVE) : 1) * (fadeOut ? Math.max(0, Math.min(1, (length + DISSOLVE - f) / DISSOLVE)) : 1)}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
         </AbsoluteFill>
     );
 };

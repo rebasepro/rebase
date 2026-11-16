@@ -42,7 +42,8 @@
         "typecheck": "tsc --noEmit",
         "lint:film": "tsx scripts/lint-film.ts",
         "audit:film": "tsx scripts/audit-film.ts",
-        "proof:view-side-door": "bash scripts/proof-view-side-door.sh"
+        "proof:view-side-door": "bash scripts/proof-view-side-door.sh",
+        "assemble": "tsx scripts/assemble.ts"
     },
     "sideEffects": [
         "*.css"

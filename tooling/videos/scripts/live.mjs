@@ -11,22 +11,32 @@
  *   POST /api/takes/<id>/log              what the page heard (live.json)
  *   POST /api/takes/<id>/process          make it renderable (take.mjs)
  *   POST /api/takes/<id>/discard          move it to takes/.discarded
+ *   GET  /api/takes?film=<id>              a film's processed takes
+ *   GET  /api/edits/<film>                 which take serves each line
+ *   POST /api/edits/<film>                   (takes/edits/<film>.json)
+ *   POST /api/render/<film>/<cut>          render a cut from the props the
+ *                                          page assembled; GET it for progress
+ *   GET  /out/<file>                       a finished render
  *
  * Localhost only, and only take ids the page mints. Open the page in
  * Chrome: its speech recognition is what hears the words.
  */
 import { context } from "esbuild";
+import { spawn } from "node:child_process";
 import { createReadStream, existsSync } from "node:fs";
-import { appendFile, mkdir, rename, stat, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { processTake } from "./take.mjs";
+import { listTakes } from "./takes.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = path.join(ROOT, "build", "live");
 const PUBLIC = path.join(ROOT, "public");
 const TAKES = path.join(ROOT, "takes");
+const EDITS = path.join(TAKES, "edits");
+const RENDERS = path.join(ROOT, "out");
 const PORT = Number(process.env.PORT ?? 3500);
 
 const ctx = await context({
@@ -49,7 +59,7 @@ const HTML = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Rebase — record the desk film</title>
+<title>Rebase — recording</title>
 <link rel="icon" href="data:,">
 <style>html,body{margin:0;background:#090A0C;color:#fff}</style>
 ${existsSync(path.join(OUT, "main.css")) ? '<link rel="stylesheet" href="/live/main.css">' : ""}
@@ -123,6 +133,45 @@ function body(req) {
 
 const json = (res, status, value) => res.writeHead(status, { "Content-Type": "application/json" }).end(JSON.stringify(value));
 
+/** Renders in progress or done, by "<film>/<cut>". */
+const renders = new Map();
+
+function startRender(key, compositions, propsFile) {
+    const job = { state: "rendering", progress: 0, step: 0, steps: compositions.length, files: [], log: "", startedAt: Date.now() };
+    renders.set(key, job);
+    const next = () => {
+        if (job.step >= compositions.length) {
+            job.state = "done";
+            return;
+        }
+        const comp = compositions[job.step];
+        const file = `${comp}.mp4`;
+        const child = spawn("pnpm", ["exec", "remotion", "render", "src/index.ts", comp, `out/${file}`, `--props=${propsFile}`, "--timeout=120000"], { cwd: ROOT });
+        const onData = (c) => {
+            const text = String(c);
+            job.log = (job.log + text).slice(-4000);
+            const m = /(?:Rendered|Encoded)\s+(\d+)\/(\d+)/g;
+            let hit;
+            let last = null;
+            while ((hit = m.exec(text))) last = hit;
+            if (last) job.progress = (job.step + Number(last[1]) / Number(last[2])) / compositions.length;
+        };
+        child.stdout.on("data", onData);
+        child.stderr.on("data", onData);
+        child.on("close", (code) => {
+            if (code !== 0) {
+                job.state = "error";
+                return;
+            }
+            job.files.push(file);
+            job.step++;
+            job.progress = job.step / compositions.length;
+            next();
+        });
+    };
+    next();
+}
+
 const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     try {
@@ -150,8 +199,47 @@ const server = http.createServer(async (req, res) => {
             console.log(`\n${out.summary}\n\nrender:\n  ${out.render}\n`);
             return json(res, 200, { summary: out.summary, render: out.render });
         }
+        if (url.pathname === "/api/takes" && req.method === "GET") {
+            const film = url.searchParams.get("film") ?? "";
+            if (!/^[a-z0-9-]+$/.test(film)) return json(res, 400, { error: "film?" });
+            return json(res, 200, await listTakes(film));
+        }
+        const edit = /^\/api\/edits\/([a-z0-9-]+)$/.exec(url.pathname);
+        if (edit) {
+            const file = path.join(EDITS, `${edit[1]}.json`);
+            if (req.method === "POST") {
+                const value = JSON.parse(String(await body(req)));
+                await mkdir(EDITS, { recursive: true });
+                await writeFile(file, JSON.stringify({ picks: value.picks ?? {} }, null, 1));
+                return json(res, 200, { ok: true });
+            }
+            return json(res, 200, existsSync(file) ? JSON.parse(await readFile(file, "utf8")) : { picks: {} });
+        }
+        const render = /^\/api\/render\/([a-z0-9-]+)\/([a-z]+)$/.exec(url.pathname);
+        if (render) {
+            const key = `${render[1]}/${render[2]}`;
+            if (req.method === "POST") {
+                const job = renders.get(key);
+                if (job?.state === "rendering") return json(res, 409, { error: "already rendering" });
+                const value = JSON.parse(String(await body(req)));
+                const compositions = (value.compositions ?? []).filter((c) => /^[A-Za-z0-9-]+$/.test(c));
+                if (!compositions.length) return json(res, 400, { error: "compositions?" });
+                await mkdir(EDITS, { recursive: true });
+                const propsFile = path.join("takes", "edits", `${render[1]}-${render[2]}.props.json`);
+                await writeFile(path.join(ROOT, propsFile), JSON.stringify(value.props, null, 1));
+                startRender(key, compositions, propsFile);
+                const command = compositions.map((c) => `pnpm exec remotion render src/index.ts ${c} out/${c}.mp4 --props=${propsFile} --scale=2`).join("\n");
+                console.log(`rendering ${key}:\n  ${command.replace(/\n/g, "\n  ")}`);
+                return json(res, 200, { ok: true, command });
+            }
+            return json(res, 200, renders.get(key) ?? { state: "idle" });
+        }
         if (req.method !== "GET" && req.method !== "HEAD") return res.writeHead(405).end();
         if (url.pathname === "/") return res.writeHead(200, { "Content-Type": "text/html" }).end(HTML);
+        if (url.pathname.startsWith("/out/")) {
+            const file = inside(RENDERS, url.pathname.slice("/out".length));
+            return file ? serveFile(req, res, file) : res.writeHead(404).end();
+        }
         if (url.pathname.startsWith("/live/")) {
             const file = inside(OUT, url.pathname.slice("/live".length));
             return file ? serveFile(req, res, file) : res.writeHead(404).end();
@@ -165,11 +253,10 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, "127.0.0.1", () => {
-    console.log(`\n  Record the desk film:  http://localhost:${PORT}\n`);
-    console.log(`  Open it in Chrome (speech recognition is Chrome's), allow the camera and`);
-    console.log(`  microphone, press Space and read. Try it without a camera first:`);
-    console.log(`  http://localhost:${PORT}/?simulate\n`);
-    console.log(`  Record a film of the series:  http://localhost:${PORT}/?film=<id>`);
-    console.log(`  typed · security · agents · own · one-definition · zero · realtime ·`);
-    console.log(`  panel · backend · existing   (scripts: VOICEOVER-SERIES.md)\n`);
+    console.log(`\n  The recording page:  http://localhost:${PORT}/?film=<id>\n`);
+    console.log(`  Open it in Chrome (speech recognition is Chrome's) and allow the camera and`);
+    console.log(`  microphone. Pick a chapter, press Space, read. Every take is kept; the film`);
+    console.log(`  plays back each one in place, and each cut (long, short) is assembled from`);
+    console.log(`  the takes you choose. Render from the page, or: pnpm assemble <film> --render`);
+    console.log(`\n  A dry run with no camera:  http://localhost:${PORT}/?film=view-side-door&simulate\n`);
 });

@@ -4,6 +4,7 @@ import { tokenize } from "../components/Code";
 import { ENTER, ramp, SHIFT } from "../components/motion";
 import { CHROMA, FONT, INK, SURFACE } from "../theme";
 import type { Cue } from "../spoken/narration";
+import { checkChapters, cutScript } from "../spoken/production";
 import { checkFilm, Headline, lines, useCue, useSceneEnd, useSeries, useStage, type FilmSpec, type Format } from "../series/kit";
 
 /**
@@ -36,7 +37,9 @@ const CORAL = CHROMA.coral;
 const ACCENT = CYAN;
 const NEVER = 1e9;
 
-const SCRIPT = lines([
+/** Every line read for this film, in reading order: the long film's, then
+ *  the line only the short says. Recorded chapter by chapter (CHAPTERS). */
+const LINES = lines([
     ["hook", "A view over a table with row-level security can show every row to anyone allowed to query it."],
     ["table", "Here's a table of orders, with a policy that lets each customer see only their own. When Alice selects from it, she gets one row."],
     ["view", "The same migration then creates a view of that table and grants Alice access. She queries the view, and all three orders come back."],
@@ -53,7 +56,28 @@ const SCRIPT = lines([
     ],
     ["check", "To find these in your own database, run one query against the catalog. It lists every view and materialized view that reads a protected table without security invoker."],
     ["close", "We build Rebase, an open-source backend for Postgres."],
+    ["shortClose", "The full version shows how to check your own database."],
 ]);
+
+const LONG = cutScript(LINES, ["hook", "table", "view", "why", "door", "fix", "after", "matview", "check", "close"]);
+/** The short: the surprise and the fix, under a minute, and a pointer to
+ *  the full film. The why, the materialized view and the catalog query
+ *  are the long film's. */
+const SHORT = cutScript(LINES, ["hook", "table", "view", "door", "fix", "after", "shortClose"]);
+
+/** The pieces you record one at a time. */
+export const CHAPTERS = checkChapters(LINES, [
+    { id: "hook", title: "Hook", lines: ["hook"] },
+    { id: "setup", title: "The setup", lines: ["table", "view"] },
+    { id: "why", title: "Why it happens", lines: ["why", "door"] },
+    { id: "fix", title: "The fix", lines: ["fix", "after"] },
+    { id: "matview", title: "Materialized views", lines: ["matview"] },
+    { id: "check", title: "Check your database", lines: ["check"] },
+    { id: "close", title: "Close", lines: ["close"] },
+    { id: "short-close", title: "Short · sign-off", lines: ["shortClose"] },
+]);
+
+export { LINES as VIEW_SIDE_DOOR_LINES };
 
 /* ── what psql printed (scripts/proof/view-side-door.expected) ────────── */
 
@@ -751,7 +775,7 @@ export const VIEW_SIDE_DOOR: FilmSpec = checkFilm({
     number: 1,
     title: "Views and row-level security",
     accent: ACCENT,
-    script: SCRIPT,
+    script: LONG,
     toCorner: { line: "hook", end: true, plus: 2 },
     close: { line: "close", plus: -2 },
     layer: FloorPlan,
@@ -768,5 +792,23 @@ export const VIEW_SIDE_DOOR: FilmSpec = checkFilm({
         /* The last scene holds until the presenter has grown back: its exit
            and the close overlap, so the frame is never bare between them. */
         { id: "close", at: { line: "close", plus: 24 }, render: Close, roll: 0.46 },
+    ],
+});
+
+/** The short: 9:16, the same floor plan and scenes for the lines it keeps.
+ *  The plan never leaves (its exit is the long film's catalog scene); the
+ *  end card takes the frame. */
+export const VIEW_SIDE_DOOR_SHORT: FilmSpec = checkFilm({
+    ...VIEW_SIDE_DOOR,
+    id: "view-side-door-short",
+    script: SHORT,
+    close: { line: "shortClose", plus: -2 },
+    scenes: [
+        { id: "table", at: { line: "table", plus: ON }, render: Table, roll: 0.3 },
+        { id: "view", at: { line: "view", plus: ON }, render: View, roll: 0.36 },
+        { id: "door", at: { line: "door", plus: ON }, render: Door, roll: 0.62 },
+        { id: "fix", at: { line: "fix", plus: ON }, render: Fix, roll: 0.24, bright: true },
+        { id: "new", at: { line: "after", word: "For", plus: ON }, render: New, roll: 0.3 },
+        { id: "close", at: { line: "shortClose", plus: 24 }, render: Close, roll: 0.46 },
     ],
 });
