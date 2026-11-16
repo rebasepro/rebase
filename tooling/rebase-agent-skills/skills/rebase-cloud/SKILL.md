@@ -421,6 +421,36 @@ remove the hostname — `rebase cloud domains remove` does.
 > the deploy printed and the `verify` command, and do not poll `verify` in a
 > loop — nothing changes until someone edits their DNS zone.
 
+### A function at a path on a static app, and framing by another origin
+
+`routes` on a static app serves a custom function's response at a path on the
+app's own address — a sitemap, a feed, a server-rendered page — with no custom
+runtime or proxy in front:
+
+```jsonc
+"site": {
+  "type": "static", "root": "site", "output": "site/dist",
+  "path": "https://www.example.com",
+  "routes": [
+    { "path": "/sitemap.xml", "function": "sitemap" },
+    { "path": "/blog/*", "function": "blog" }
+  ],
+  "frameAncestors": ["https://admin.example.com"]
+}
+```
+
+- The function sees the request as a call to `/api/functions/<name>` (same
+  auth, scopes, rate limit, timeout); `/blog/*` matches `/blog` and everything
+  under it and hands the function the rest of the path. The most specific
+  route wins, and a route wins over a file of the same path in the build.
+- Routes are served by the backend the app is folded into: `rebase build`
+  fails on a route naming a function the backend lacks, and
+  `rebase cloud deploy` refuses a static app with routes deployed on its own.
+- `frameAncestors` adds origins to the app's `frame-ancestors` (default
+  `'self'`), so a CMS on another hostname can preview the site in an iframe.
+  Each entry is exactly one origin (`https://host[:port]`, or `http://` for
+  localhost) — no wildcard, no path; anything else is refused before deploy.
+
 ---
 
 ## Diagnosing a failed deploy
@@ -649,20 +679,23 @@ out.
 | `rebase cloud db backup list` / `create` / `restore` / `status` / `download` | Backups |
 | `rebase cloud db pitr status` / `restore` / `cutover` / `discard` | Point-in-time recovery |
 | `rebase cloud deploy` / `logs` / `deployments list` | Ship and observe |
+| `rebase cloud deploy --git [<branch>]` | Build on the control plane from the connected repository (on the managed runtime it needs `--eject`) |
+| `rebase cloud deploy-hooks` / `create` / `revoke <id>` | Secret URLs a git host or CI calls to deploy; `create` prints the URL once |
+| `rebase cloud alerts` / `ack <id>` / `snooze <id> --hours <1-168>` | The project's incidents |
 | `rebase cloud previews` / `previews delete <name>` | Builds served at their own address by `deploy --preview` |
 | `rebase cloud rollback` / `cancel` | Recover |
-| `rebase cloud start` / `stop` / `restart` / `status` / `metrics` / `debug` | Operate |
+| `rebase cloud start` / `stop` / `restart` / `status` / `metrics` / `debug` | Operate; `metrics --runtime` is requests, errors and latency per surface, `--history` over time |
 | `rebase cloud cron` | The deployed app's cron jobs and their runs. Read-only |
 | `rebase cloud env list` / `set` / `unset` / `reset` / `reveal` / `pull` | Configuration |
-| `rebase cloud domains list` / `add` / `verify` / `remove` | Custom domains |
+| `rebase cloud domains list` / `add` / `verify` / `remove` / `primary <domain>` | Custom domains; `primary` makes a verified one canonical |
 | `rebase cloud extensions list` / `enable` / `disable` | Postgres extensions |
-| `rebase cloud settings show` / `set` | Name, branch, repo, subdomain |
+| `rebase cloud settings show` / `set` | Name, branch, repo, subdomain, `--studio on\|off` (Studio access, which `--project` commands and `cloud guests` go through) |
 | `rebase cloud compute` / `compute set` | What it reserves, and what it costs |
 | `rebase cloud resources` / `resources prune database <key>` | What the platform holds against what the code declares |
 | `rebase cloud storage` / `storage create` / `storage attach` | Object storage |
 | `rebase cloud notifications` / `add <url>` / `test <id>` / `remove <id>` | Deploy, backup, billing and usage events to Slack, Discord or any URL |
-| `rebase cloud orgs list` / `create` / `members` | Organizations |
-| `rebase cloud billing` / `billing setup` / `billing checkout` | Card on file |
+| `rebase cloud orgs list` / `create` / `rename` / `delete` / `members` | Organizations |
+| `rebase cloud billing` / `billing setup` / `billing checkout` / `billing email <address>` | Card on file, and where invoices go |
 | `rebase cloud usage` / `usage org` | Requests used this month against the allowance, and the overage so far |
 | `rebase cloud activity` | The organization's audit log, newest first |
 | `rebase cloud app-key` / `app-key rotate` | The app key `init --claim` wrote; owners and admins |
@@ -674,6 +707,19 @@ when rows of your own tables change, use a `WebhookDispatcher` in app code.
 
 Global flags on every one of them: `--project, -p <slug>`, `--json`,
 `--url <origin>`, `--yes, -y`, `--debug`.
+
+Destructive commands ask first (`env unset`, `compute set` with its price
+quote, `settings set --subdomain`, `db access enable`, `projects create`,
+`orgs members role`, `orgs invites revoke`, …). With no terminal, or under
+`--json`, they refuse with `confirmation_required`; `--yes` answers for a
+script. A command whose control-plane route is not deployed answers
+`not_served` instead of a bare 404.
+
+The app's own data, users, cron, logs, functions and files are not under
+`rebase cloud`: `rebase data`, `rebase users`, `rebase cron`, `rebase logs`,
+`rebase functions`, `rebase storage` and `rebase api` take `--project <slug>`
+and go through the console's Studio proxy (see `rebase-basics`
+`references/cli-commands.md`).
 
 ---
 
@@ -695,6 +741,13 @@ and `connect` / `connect --remove`.
 | `--yes` on `projects delete` | Deletes the project |
 
 **Never retry or "fix" a `platform_permission_denied`.** Report it.
+
+**The local MCP tools `rebase_cloud_deploy` (production), `rebase_cloud_env_set`
+(production), `rebase_cloud_rollback` and `rebase_cloud_provision` take
+`confirm: true`.** Without it they answer what they would do and do nothing.
+Show that plan to the user and call again with `confirm: true` only after they
+agree — never set it on the first call. A preview deploy and a preview variable
+need none.
 
 **Safe to run unasked:** `status`, `logs`, `deployments list`, `env list`,
 `resources`, `compute`, `metrics`, `debug`, `db info`, `domains list`, `extensions list`,
