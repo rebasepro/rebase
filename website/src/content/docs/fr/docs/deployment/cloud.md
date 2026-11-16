@@ -477,7 +477,7 @@ sauf celle qui redémarre la base de données, qui attendra une fenêtre de main
 | `projects` | Créer, lister, inspecter, supprimer |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Déployer et surveiller |
 | `deploy-hooks` | URL secrètes qu'un hébergeur git ou un outil de CI appelle pour déployer le projet : lister, créer (l'URL n'est affichée qu'une fois), révoquer. |
-| `previews` | Builds servis sur leur propre adresse via `deploy --preview`, et leur suppression. Voir [Prévisualiser une modification](#preview-a-change) |
+| `previews` | Builds servis sur leur propre adresse via `deploy --preview`, et leur suppression. Voir [Prévisualiser une modification](#prévisualiser-une-modification) |
 | `start`, `stop`, `restart` | Mettre en pause un projet et le réactiver. Un projet arrêté conserve son abonnement, à moins que la plateforme ne facture aux projets arrêtés uniquement le stockage et les frais de plateforme ; la ligne **Billing** de la console le précise le cas échéant |
 | `status`, `metrics`, `debug` | Ce qu'il fait, et pourquoi il ne le fait pas |
 | `alerts` | Incidents en cours du projet, acquittement ou mise en veille d'un incident. |
@@ -496,7 +496,7 @@ sauf celle qui redémarre la base de données, qui attendra une fenêtre de main
 | `usage` | Requêtes consommées ce mois-ci par rapport au quota inclus, et dépassement actuel tel que comptabilisé sur la facture. `usage org` liste tous les projets de l'organisation |
 | `clusters` | Clusters sur lesquels tournent les environnements clients. Administrateurs de plateforme uniquement |
 | `settings`, `orgs`, `billing` | Paramètres du projet, organisations ainsi que leurs membres et invitations, paiement |
-| `activity` | Journal d'audit de l'organisation : qui a déployé, modifié une variable d'environnement (par nom), un domaine, une sauvegarde, un membre ou un jeton. Propriétaires et administrateurs. Voir [Voir qui a fait quoi](#see-who-did-what) |
+| `activity` | Journal d'audit de l'organisation : qui a déployé, modifié une variable d'environnement (par nom), un domaine, une sauvegarde, un membre ou un jeton. Propriétaires et administrateurs. Voir [Voir qui a fait quoi](#voir-qui-a-fait-quoi) |
 | `notifications` | Emplacement où les événements du projet sont envoyés par POST : Slack, Discord ou toute URL https ([Notifications Cloud](/docs/deployment/cloud-notifications/)) |
 
 Chaque groupe de ce tableau répond à `--help` par une page dédiée — une ligne d'utilisation,
@@ -524,7 +524,7 @@ Clairement énoncé, car le découvrir plus tard serait pire :
   lors de votre demande d'accès plutôt que de le présumer.
 - **Pas de déploiements par branche**, et pas d'application GitHub officielle. Les deploy hooks — des URL secrètes
   vers lesquelles pointer un webhook de dépôt — constituent l'automatisation prise en charge. Les [déploiements de
-  prévisualisation](#preview-a-change) sont en cours de déploiement et sont déclenchés depuis la CLI.
+  prévisualisation](#prévisualiser-une-modification) sont en cours de déploiement et sont déclenchés depuis la CLI.
 - **Les jetons agissent en tant que personne.** Un [jeton](/docs/deployment/cloud-agents/#ci-and-agents) est généré par un compte
   et agit en son nom ; il n'existe pas encore d'identité machine propre à une organisation. Si vous
   vous connectez plutôt depuis la CI, transmettez `REBASE_CLOUD_EMAIL` et `REBASE_CLOUD_PASSWORD`
