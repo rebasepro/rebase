@@ -17,6 +17,12 @@
  *   POST /api/render/<film>/<cut>          render a cut from the props the
  *                                          page assembled; GET it for progress
  *   GET  /out/<file>                       a finished render
+ *   POST /api/loose/<id>/chunk|save        a talk-through: unscripted, kept
+ *                                          with its transcript (takes/loose/)
+ *   GET  /api/loose?film=<id>              a film's talk-throughs
+ *   POST /api/rehearsals/<film>            what a rehearsal heard, per line
+ *   POST /api/script/<film>                change one line of the script in
+ *                                          its source file (and the docs)
  *
  * Localhost only, and only take ids the page mints. Open the page in
  * Chrome: its speech recognition is what hears the words.
@@ -133,6 +139,68 @@ function body(req) {
 
 const json = (res, status, value) => res.writeHead(status, { "Content-Type": "application/json" }).end(JSON.stringify(value));
 
+const LOOSE = path.join(TAKES, "loose");
+const REHEARSALS = path.join(TAKES, "rehearsals");
+const SRC = path.join(ROOT, "src");
+
+/** Every .ts/.tsx file under src/. */
+async function sources(dir = SRC) {
+    const out = [];
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+        const file = path.join(dir, entry.name);
+        if (entry.isDirectory()) out.push(...(await sources(file)));
+        else if (/\.tsx?$/.test(entry.name)) out.push(file);
+    }
+    return out;
+}
+
+/**
+ * One line of a script, changed where it is written. A line is a string
+ * literal in its film's source (`lines([["id", "text"], …])`), so the text
+ * must appear exactly once, quoted, in exactly one file — anything else is
+ * refused rather than guessed at. The voice-over docs' tables carry the same
+ * text and follow along.
+ */
+async function changeLine(from, to) {
+    const needle = JSON.stringify(from);
+    const hits = [];
+    for (const file of await sources()) {
+        const text = await readFile(file, "utf8");
+        const count = text.split(needle).length - 1;
+        if (count) hits.push({ file, text, count });
+    }
+    const total = hits.reduce((n, h) => n + h.count, 0);
+    if (total !== 1) throw new Error(total ? `the line appears ${total} times in src/ — change it by hand` : "the line is not in src/ as written — was it changed already?");
+    const [hit] = hits;
+    await writeFile(hit.file, hit.text.replace(needle, JSON.stringify(to)));
+    const docs = [];
+    for (const name of (await readdir(ROOT)).filter((f) => /^VOICEOVER.*\.md$/.test(f))) {
+        const file = path.join(ROOT, name);
+        const text = await readFile(file, "utf8");
+        if (text.includes(from)) {
+            await writeFile(file, text.split(from).join(to));
+            docs.push(name);
+        }
+    }
+    return { file: path.relative(ROOT, hit.file), docs };
+}
+
+async function listLoose(film) {
+    if (!existsSync(LOOSE)) return [];
+    const out = [];
+    for (const id of (await readdir(LOOSE)).filter((d) => /^loose-\d{8}-\d{6}$/.test(d)).sort().reverse()) {
+        try {
+            const t = JSON.parse(await readFile(path.join(LOOSE, id, "transcript.json"), "utf8"));
+            if (t.film !== film) continue;
+            const markdown = await readFile(path.join(LOOSE, id, "transcript.md"), "utf8");
+            out.push({ id, recordedAt: t.recordedAt, words: t.words?.length ?? 0, simulated: !!t.simulated, markdown });
+        } catch {
+            /* still recording, or never saved */
+        }
+    }
+    return out;
+}
+
 /** Renders in progress or done, by "<film>/<cut>". */
 const renders = new Map();
 
@@ -198,6 +266,48 @@ const server = http.createServer(async (req, res) => {
             const out = await processTake(id, { log: (line) => console.log(line) });
             console.log(`\n${out.summary}\n\nrender:\n  ${out.render}\n`);
             return json(res, 200, { summary: out.summary, render: out.render });
+        }
+        const loose = /^\/api\/loose\/(loose-\d{8}-\d{6})\/(chunk|save)$/.exec(url.pathname);
+        if (loose && req.method === "POST") {
+            const [, id, action] = loose;
+            const dir = path.join(LOOSE, id);
+            await mkdir(dir, { recursive: true });
+            if (action === "chunk") {
+                const ext = url.searchParams.get("ext") === "mp4" ? "mp4" : "webm";
+                await appendFile(path.join(dir, `take.${ext}`), await body(req));
+                return json(res, 200, { ok: true });
+            }
+            const value = JSON.parse(String(await body(req)));
+            await writeFile(path.join(dir, "transcript.json"), JSON.stringify(value, null, 1));
+            await writeFile(path.join(dir, "transcript.md"), String(value.markdown ?? ""));
+            console.log(`${id}: a talk-through, ${value.words?.length ?? 0} words → takes/loose/${id}/transcript.md`);
+            return json(res, 200, { ok: true, path: `takes/loose/${id}/transcript.md` });
+        }
+        if (url.pathname === "/api/loose" && req.method === "GET") {
+            const film = url.searchParams.get("film") ?? "";
+            if (!/^[a-z0-9-]+$/.test(film)) return json(res, 400, { error: "film?" });
+            return json(res, 200, await listLoose(film));
+        }
+        const rehearsal = /^\/api\/rehearsals\/([a-z0-9-]+)$/.exec(url.pathname);
+        if (rehearsal && req.method === "POST") {
+            const dir = path.join(REHEARSALS, rehearsal[1]);
+            await mkdir(dir, { recursive: true });
+            const value = JSON.parse(String(await body(req)));
+            const name = `${String(value.id ?? Date.now()).replace(/[^a-z0-9-]/gi, "")}.json`;
+            await writeFile(path.join(dir, name), JSON.stringify(value, null, 1));
+            return json(res, 200, { ok: true, path: `takes/rehearsals/${rehearsal[1]}/${name}` });
+        }
+        const script = /^\/api\/script\/([a-z0-9-]+)$/.exec(url.pathname);
+        if (script && req.method === "POST") {
+            const { from, to } = JSON.parse(String(await body(req)));
+            if (typeof from !== "string" || typeof to !== "string" || !to.trim() || to.length > 600 || /[\n\r]/.test(to)) return json(res, 400, { error: "a line is one non-empty line of text" });
+            try {
+                const out = await changeLine(from, to.trim());
+                console.log(`script: ${out.file}${out.docs.length ? ` (+ ${out.docs.join(", ")})` : ""}\n  was: ${from}\n  now: ${to.trim()}`);
+                return json(res, 200, out);
+            } catch (err) {
+                return json(res, 409, { error: String(err instanceof Error ? err.message : err) });
+            }
         }
         if (url.pathname === "/api/takes" && req.method === "GET") {
             const film = url.searchParams.get("film") ?? "";

@@ -71,6 +71,26 @@ sign-off, recorded as its own chapter). The film file declares both
 (`LINES`, `CHAPTERS`, the long and short `FilmSpec`s; src/spoken/production.ts
 says how a cut is assembled).
 
+**Make it sound like you.** Two modes beside *Record*, picked under the film:
+
+- **Talk it through.** Unscripted. The prompter shows only the chapter
+  titles; explain each one the way you would to a colleague, and press →
+  (or a clicker) to move to the next. The camera and microphone record,
+  and Chrome's recogniser writes down what you say, sorted under the
+  chapters: `takes/loose/<id>/transcript.md`, the recording beside it.
+  That transcript is what a script gets rebuilt from, in your words.
+- **Rehearse.** Read a chapter with the script up, saying each line the
+  way you would say it. Nothing is recorded. When you stop, every line you
+  said differently is listed with the difference highlighted and your
+  version ready to edit (punctuated from the script where the words agree);
+  **Use mine** writes it into the film's source and these docs. Reload to
+  read the new script; takes of a changed line must be recorded again.
+  Each rehearsal is kept in `takes/rehearsals/<film>/`.
+
+Transcripts come from Chrome's live recognition: no punctuation, and a
+word here and there misheard. Good enough to keep your phrasing; read the
+recording when a word matters.
+
 **Render** from the sidebar (1080p, into `out/`), or from the command line:
 
 ```bash

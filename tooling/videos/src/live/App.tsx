@@ -6,6 +6,7 @@ import { assemble, serves, type Chapter, type Edit, type TakeInfo } from "../spo
 import { Follower } from "./follow";
 import { canRecognize, Recognizer, TakeRecorder, VoiceDetector } from "./listen";
 import { simulateRead } from "./simulate";
+import { diffWords, heardPerLine, sameWords, suggestLine, TranscriptLog, type DiffPart, type HeardWord } from "./transcript";
 
 /**
  * THE RECORDING PAGE — a film recorded in pieces, watched back as it will be
@@ -69,6 +70,11 @@ interface Range {
 /** One take in progress. */
 interface Session {
     id: string;
+    /** A rehearsal: followed and listened to like a take, but nothing is
+     *  recorded — what was said is compared with the script afterwards. */
+    rehearse: boolean;
+    /** Every word the recogniser heard, with when. */
+    heard: TranscriptLog;
     follower: Follower;
     range: Range;
     cut: Cut;
@@ -83,6 +89,29 @@ interface Session {
     stopping: boolean;
     version: number;
     lastTiming: Timing;
+}
+
+/** A talk-through in progress: unscripted, the chapters as prompts. */
+interface Talk {
+    id: string;
+    t0: number;
+    recorder: TakeRecorder | null;
+    recognizer: Recognizer | null;
+    heard: TranscriptLog;
+    /** When each chapter was moved on to, in take frames. */
+    marks: { chapter: number; at: number }[];
+    stopSim: (() => void) | null;
+    raf: number;
+    stopping: boolean;
+}
+
+type Mode = "record" | "rehearse" | "talk";
+
+/** One line of a rehearsal: the script, and what was said. */
+interface RehearsedLine {
+    id: string;
+    script: string;
+    heard: string;
 }
 
 /** What the player is showing when it is not recording. */
@@ -137,6 +166,15 @@ export const App: React.FC = () => {
     const [phase, setPhase] = useState<Phase>(SIMULATE ? "ready" : "setup");
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
+    const [mode, setModeState] = useState<Mode>(() => (remember("live.mode") as Mode | undefined) ?? "record");
+    const setMode = (m: Mode) => {
+        setModeState(m);
+        remember("live.mode", m);
+    };
+    const [rehearsal, setRehearsal] = useState<{ id: string; rows: RehearsedLine[] } | null>(null);
+    const [transcript, setTranscript] = useState<{ title: string; markdown: string; path?: string } | null>(null);
+    const talk = useRef<Talk | null>(null);
+    const [talkChapter, setTalkChapter] = useState<number | null>(null);
     /** A take's report for a film rendered from one take: kept until closed. */
     const [info, setInfo] = useState<string | null>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
@@ -339,8 +377,12 @@ export const App: React.FC = () => {
         const id = takeId();
         const follower = new Follower(FPS, 15, rangeScript);
         const cut = recordCut;
+        const rehearse = mode === "rehearse";
+        const heard = new TranscriptLog();
         const s: Session = {
             id,
+            rehearse,
+            heard,
             follower,
             range,
             cut,
@@ -357,19 +399,33 @@ export const App: React.FC = () => {
         };
         const now = () => ((performance.now() - s.t0) * FPS) / 1000;
         try {
+            /* What the page hears goes to the follower and to the transcript. */
+            const ear: Ear = {
+                onSession: (at) => {
+                    follower.onSession(at);
+                    heard.onSession();
+                },
+                onTranscript: (text, final, at) => {
+                    follower.onTranscript(text, final, at);
+                    heard.update(text, at);
+                },
+                onVoice: (speaking, at, at2) => follower.onVoice(speaking, at, at2),
+            };
             if (stream && !SIMULATE) {
-                const recorder: TakeRecorder = new TakeRecorder(stream, async (chunk: Blob): Promise<void> => {
-                    await post(`/api/takes/${id}/chunk?ext=${recorder.extension}`, chunk);
-                });
-                s.recorder = recorder;
-                await recorder.start();
-                s.t0 = recorder.startedAt;
-                s.voice = new VoiceDetector(stream, (speaking, atMs) => follower.onVoice(speaking, ((atMs - s.t0) * FPS) / 1000, now()));
+                if (!rehearse) {
+                    const recorder: TakeRecorder = new TakeRecorder(stream, async (chunk: Blob): Promise<void> => {
+                        await post(`/api/takes/${id}/chunk?ext=${recorder.extension}`, chunk);
+                    });
+                    s.recorder = recorder;
+                    await recorder.start();
+                    s.t0 = recorder.startedAt;
+                } else s.t0 = performance.now();
+                s.voice = new VoiceDetector(stream, (speaking, atMs) => ear.onVoice(speaking, ((atMs - s.t0) * FPS) / 1000, now()));
                 s.voice.start();
                 s.recognizer = new Recognizer(LANG, {
-                    onSession: () => follower.onSession(now()),
+                    onSession: () => ear.onSession(now()),
                     onTranscript: (text, final) => {
-                        follower.onTranscript(text, final, now());
+                        ear.onTranscript(text, final, now());
                         setStatus((st) => ({ ...st, transcript: text.split(" ").slice(-12).join(" ") }));
                     },
                     onState: (state, detail) => setStatus((st) => ({ ...st, recognition: detail ?? state })),
@@ -377,8 +433,11 @@ export const App: React.FC = () => {
                 s.recognizer.start();
             } else {
                 s.t0 = performance.now();
-                s.stopSim = runSimulation(follower, s.t0, SIMULATE ?? 155, rangeScript, (text) =>
+                s.stopSim = runSimulation(ear, s.t0, SIMULATE ?? 155, rangeScript, (text) =>
                     setStatus((st) => ({ ...st, recognition: "simulated", transcript: text.split(" ").slice(-12).join(" ") })),
+                    /* A rehearsal's dry run mishears a few words, so there is
+                       something to compare. */
+                    rehearse ? 0.12 : undefined,
                 );
             }
         } catch (err) {
@@ -399,7 +458,7 @@ export const App: React.FC = () => {
             player.current?.play();
         });
         s.raf = requestAnimationFrame(loop);
-    }, [phase, stream, loop, range, rangeScript, recordCut, offsetIn]);
+    }, [phase, stream, loop, range, rangeScript, recordCut, offsetIn, mode]);
 
     const stop = useCallback(
         async (discard = false) => {
@@ -442,7 +501,25 @@ export const App: React.FC = () => {
                     })),
                     timing: f.timing(),
                     events: f.events,
+                    /* Every word heard, as said: ad-libs included. */
+                    transcript: s.heard.words(),
                 };
+                if (s.rehearse && !discard) {
+                    const said = heardPerLine(f.script, f.timing(), s.heard.words());
+                    const rows = f.script.map((l, k) => ({ id: l.id, script: l.words.join(" "), heard: said[k] }));
+                    session.current = null;
+                    setLiveTiming(null);
+                    setPhase("ready");
+                    setRehearsal({ id: s.id.replace("take-", "rehearsal-"), rows });
+                    void post(`/api/rehearsals/${FILM.id}`, JSON.stringify({ id: s.id.replace("take-", "rehearsal-"), film: FILM.id, recordedAt: log.recordedAt, simulated: log.simulated, lines: rows, transcript: log.transcript }, null, 1)).catch(() => undefined);
+                    return;
+                }
+                if (s.rehearse) {
+                    session.current = null;
+                    setLiveTiming(null);
+                    setPhase("ready");
+                    return;
+                }
                 if (discard) {
                     if (s.recorder) await post(`/api/takes/${s.id}/discard`, "");
                     session.current = null;
@@ -490,6 +567,152 @@ export const App: React.FC = () => {
         [refresh, playback],
     );
     stopRef.current = stop;
+
+    /* ── talking it through ──────────────────────────────────────────── */
+
+    /* Unscripted: the camera and microphone record, the recogniser writes
+       down what you say, and the prompter shows only the chapter titles. →
+       (or a clicker) moves to the next chapter, so the transcript comes out
+       sorted under them. Nothing here becomes a take: it is raw material
+       for the script, in your own words. */
+    const startTalk = useCallback(async () => {
+        if (session.current || talk.current || starting.current || testing.current || phase !== "ready") return;
+        starting.current = true;
+        setError(null);
+        setNotice(null);
+        setTranscript(null);
+        player.current?.pause();
+        player.current?.mute();
+        setReview((r) => ({ ...r, playing: false, trial: null }));
+        callOff.current = false;
+        for (let n = COUNTDOWN; n > 0; n--) {
+            setCountdown(n);
+            await new Promise((r) => window.setTimeout(r, 1000));
+            if (callOff.current) break;
+        }
+        setCountdown(null);
+        if (callOff.current) {
+            starting.current = false;
+            return;
+        }
+        const id = `loose-${takeId().slice("take-".length)}`;
+        const heard = new TranscriptLog();
+        const t: Talk = { id, t0: 0, recorder: null, recognizer: null, heard, marks: [{ chapter, at: 0 }], stopSim: null, raf: 0, stopping: false };
+        const now = () => ((performance.now() - t.t0) * FPS) / 1000;
+        const show = (text: string) => setStatus((st) => ({ ...st, transcript: text.split(" ").slice(-12).join(" ") }));
+        try {
+            if (stream && !SIMULATE) {
+                const recorder: TakeRecorder = new TakeRecorder(stream, async (chunk: Blob): Promise<void> => {
+                    await post(`/api/loose/${id}/chunk?ext=${recorder.extension}`, chunk);
+                });
+                t.recorder = recorder;
+                await recorder.start();
+                t.t0 = recorder.startedAt;
+                t.recognizer = new Recognizer(LANG, {
+                    onSession: () => heard.onSession(),
+                    onTranscript: (text) => {
+                        heard.update(text, now());
+                        show(text);
+                    },
+                    onState: (state, detail) => setStatus((st) => ({ ...st, recognition: detail ?? state })),
+                });
+                t.recognizer.start();
+            } else {
+                /* A dry run reads the script from this chapter on, and moves
+                   the chapters on as the read reaches them. */
+                t.t0 = performance.now();
+                const lines = SCRIPT.slice(chapterRange(FILM.chapters[chapter]).from);
+                const follow = new Follower(FPS, 15, lines);
+                const ear: Ear = {
+                    onSession: (at) => {
+                        follow.onSession(at);
+                        heard.onSession();
+                    },
+                    onTranscript: (text, final, at) => {
+                        follow.onTranscript(text, final, at);
+                        heard.update(text, at);
+                        const pos = follow.position();
+                        const c = chapterOf(indexOf(lines[Math.min(pos.line, lines.length - 1)].id));
+                        if (c > t.marks[t.marks.length - 1].chapter) {
+                            t.marks.push({ chapter: c, at });
+                            setTalkChapter(c);
+                        }
+                    },
+                    onVoice: (speaking, at, at2) => follow.onVoice(speaking, at, at2),
+                };
+                t.stopSim = runSimulation(ear, t.t0, SIMULATE ?? 155, lines, (text) => {
+                    setStatus((st) => ({ ...st, recognition: "simulated" }));
+                    show(text);
+                });
+            }
+        } catch (err) {
+            starting.current = false;
+            setError(String(err));
+            return;
+        }
+        starting.current = false;
+        talk.current = t;
+        setTalkChapter(chapter);
+        setPhase("recording");
+        const tick = () => {
+            if (talk.current !== t) return;
+            setElapsed(now() / FPS);
+            t.raf = requestAnimationFrame(tick);
+        };
+        t.raf = requestAnimationFrame(tick);
+    }, [phase, stream, chapter]);
+
+    const nextTalkChapter = useCallback(() => {
+        const t = talk.current;
+        if (!t) return;
+        const last = t.marks[t.marks.length - 1].chapter;
+        if (last >= FILM.chapters.length - 1) return;
+        t.marks.push({ chapter: last + 1, at: ((performance.now() - t.t0) * FPS) / 1000 });
+        setTalkChapter(last + 1);
+    }, []);
+
+    const stopTalk = useCallback(async () => {
+        const t = talk.current;
+        if (!t || t.stopping) return;
+        t.stopping = true;
+        cancelAnimationFrame(t.raf);
+        t.recognizer?.stop();
+        t.stopSim?.();
+        setPhase("saving");
+        try {
+            await t.recorder?.stop();
+            const words = t.heard.words();
+            const markdown = talkMarkdown(words, t.marks);
+            const res = await post(
+                `/api/loose/${t.id}/save`,
+                JSON.stringify({
+                    id: t.id,
+                    film: FILM.id,
+                    recordedAt: new Date().toISOString(),
+                    simulated: SIMULATE !== null,
+                    durationFrames: Math.round(((performance.now() - t.t0) * FPS) / 1000),
+                    container: t.recorder?.extension ?? null,
+                    marks: t.marks.map((m) => ({ ...m, title: FILM.chapters[m.chapter].title })),
+                    words,
+                    markdown,
+                }),
+            );
+            const out = (await res.json()) as { path: string };
+            setTranscript({ title: words.length ? "Talk-through saved" : "Talk-through saved — but nothing was heard", markdown, path: out.path });
+        } catch (err) {
+            setError(`Saving the talk-through failed: ${String(err)}. What was recorded is in takes/loose/${t.id}/.`);
+        }
+        talk.current = null;
+        setTalkChapter(null);
+        setPhase("ready");
+    }, []);
+
+    const showLastTalk = useCallback(async () => {
+        const list = (await fetch(`/api/loose?film=${FILM.id}`).then((r) => r.json())) as { id: string; markdown: string }[];
+        const usable = list.filter((l) => !!(l as { simulated?: boolean }).simulated === (SIMULATE !== null));
+        if (!usable.length) setNotice("No talk-through for this film yet.");
+        else setTranscript({ title: `Talk-through ${usable[0].id.replace("loose-", "")}`, markdown: usable[0].markdown, path: `takes/loose/${usable[0].id}/transcript.md` });
+    }, []);
 
     /* ── playing back ────────────────────────────────────────────────── */
 
@@ -675,12 +898,22 @@ export const App: React.FC = () => {
         const onKey = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLSelectElement || (e.target instanceof HTMLInputElement && e.target.type !== "checkbox")) return;
             const s = session.current;
+            if (talk.current) {
+                if (e.code === "Escape" || e.code === "Space") {
+                    e.preventDefault();
+                    void stopTalk();
+                } else if (e.code === "ArrowRight" || e.code === "PageDown") {
+                    e.preventDefault();
+                    nextTalkChapter();
+                }
+                return;
+            }
             if (e.code === "Space" && !s) {
-                /* Space always records — never ticks the box or presses the
+                /* Space always starts — never ticks the box or presses the
                    button that was clicked last. */
                 e.preventDefault();
                 if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-                void start();
+                void (mode === "talk" ? startTalk() : start());
             } else if (e.code === "Escape" && s) {
                 e.preventDefault();
                 void stop();
@@ -729,17 +962,31 @@ export const App: React.FC = () => {
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [start, stop, testMic, stopReview, playChapter, playCut, chapter, review.playing, review.cut, takes]);
+    }, [start, stop, testMic, stopReview, playChapter, playCut, chapter, review.playing, review.cut, takes, mode, startTalk, stopTalk, nextTalkChapter]);
 
     /* ── the page ────────────────────────────────────────────────────── */
 
     const recording = phase === "recording" || phase === "saving";
-    const playerCut = recording && session.current ? session.current.cut : viewCut;
+    const talking = talkChapter !== null;
+    const playerCut = talking ? FILM.cuts[0] : recording && session.current ? session.current.cut : viewCut;
     const inputProps = useMemo<FilmProps>(() => {
+        /* Talking it through: the film at its authored read, held on the
+           chapter being talked about, the camera in it. */
+        if (talking) return { timing: null, live: { stream } };
         if (recording) return { timing: liveTiming, live: { stream } };
         if (assembled) return { timing: assembled.timing, clips: assembled.clips };
         return { timing: null };
-    }, [recording, liveTiming, stream, assembled]);
+    }, [recording, liveTiming, stream, assembled, talking]);
+
+    useEffect(() => {
+        if (talkChapter === null) return;
+        const cut = FILM.cuts[0];
+        const first = FILM.chapters[talkChapter].lines.find((id) => cut.script.some((l) => l.id === id));
+        const k = first ? cut.script.findIndex((l) => l.id === first) : -1;
+        const at = k < 0 ? 12 : Math.max(12, (authoredTiming(cut.script).lines[k]?.words[0] ?? 0) + 20);
+        const id = requestAnimationFrame(() => player.current?.seekTo(at));
+        return () => cancelAnimationFrame(id);
+    }, [talkChapter]);
     const duration = recording ? LIVE_HORIZON : assembled ? Math.max(1, assembled.frames) : LIVE_HORIZON;
 
     /* Before a take, the film sits where the take will start, so the
@@ -771,18 +1018,26 @@ export const App: React.FC = () => {
 
     return (
         <div style={page}>
-            <Prompter
-                lines={reviewLine ? [SCRIPT[indexOf(reviewLine)]] : rangeScript}
-                position={position}
-                active={phase === "recording"}
-                label={reviewLine ? "playing back" : `${FILM.chapters[chapter].title}${range.from !== chapterRange(FILM.chapters[chapter]).from || through ? " · from line " + (range.from + 1) + (through ? " to " + (range.to + 1) : "") : ""}`}
-            />
+            {mode === "talk" && !review.playing ? (
+                <TalkPrompter current={talkChapter ?? chapter} active={talking} />
+            ) : (
+                <Prompter
+                    lines={reviewLine ? [SCRIPT[indexOf(reviewLine)]] : rangeScript}
+                    position={position}
+                    active={phase === "recording"}
+                    label={
+                        reviewLine
+                            ? "playing back"
+                            : `${mode === "rehearse" ? "rehearsal · say it your way · " : ""}${FILM.chapters[chapter].title}${range.from !== chapterRange(FILM.chapters[chapter]).from || through ? " · from line " + (range.from + 1) + (through ? " to " + (range.to + 1) : "") : ""}`
+                    }
+                />
+            )}
 
             <div style={{ minHeight: 0, display: "grid", gridTemplateColumns: "minmax(0, 1fr) 400px", gap: 16, padding: "0 24px" }}>
                 <div style={{ minHeight: 0, display: "flex", justifyContent: "center", alignItems: "center" }}>
                     <div style={{ height: "100%", aspectRatio: aspect, maxWidth: "100%", maxHeight: "100%", borderRadius: 13, overflow: "hidden", border: `1px solid ${recording ? "rgba(255,90,95,0.6)" : "rgba(255,255,255,0.08)"}`, position: "relative" }}>
                         <Player
-                            key={`${playerCut.id}-${recording ? "rec" : "view"}`}
+                            key={`${playerCut.id}-${talking ? "talk" : recording ? "rec" : "view"}`}
                             ref={player}
                             component={playerCut.component}
                             inputProps={inputProps}
@@ -835,10 +1090,22 @@ export const App: React.FC = () => {
 
             <div style={bar}>
                 <span style={{ color: recording ? "#FF5A5F" : "rgba(255,255,255,0.45)", fontWeight: 600, minWidth: 120 }}>
-                    {phase === "recording" ? `● REC ${clock(elapsed)}` : phase === "saving" ? "saving the take…" : review.playing ? "▶ playing back" : SIMULATE ? `dry run, ${SIMULATE} wpm` : "ready"}
+                    {phase === "recording"
+                        ? `${talking ? "● TALKING" : session.current?.rehearse ? "● REHEARSING" : "● REC"} ${clock(elapsed)}`
+                        : phase === "saving"
+                          ? "saving…"
+                          : review.playing
+                            ? "▶ playing back"
+                            : SIMULATE
+                              ? `dry run, ${SIMULATE} wpm`
+                              : "ready"}
                 </span>
                 <span>
-                    {phase === "recording" ? `line ${Math.min(position.line + 1, rangeScript.length)}/${rangeScript.length}` : `lines ${range.from + 1}–${range.to + 1} of ${SCRIPT.length}`}
+                    {talking
+                        ? `chapter ${(talkChapter ?? 0) + 1}/${FILM.chapters.length}`
+                        : phase === "recording"
+                          ? `line ${Math.min(position.line + 1, rangeScript.length)}/${rangeScript.length}`
+                          : `lines ${range.from + 1}–${range.to + 1} of ${SCRIPT.length}`}
                 </span>
                 <Meter level={status.level} threshold={status.threshold} speaking={status.speaking} />
                 <span style={{ color: "rgba(255,255,255,0.45)" }}>{canRecognize() || SIMULATE ? status.recognition : "no speech recognition — use Chrome"}</span>
@@ -850,20 +1117,43 @@ export const App: React.FC = () => {
             <div style={{ ...bar, paddingTop: 0, color: "rgba(255,255,255,0.45)", flexWrap: "wrap", rowGap: 8 }}>
                 {phase === "ready" ? (
                     <>
-                        <button style={button} onClick={() => void start()}>
-                            Record — Space
+                        <span style={{ display: "flex", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 7, overflow: "hidden" }}>
+                            {(
+                                [
+                                    ["record", "Record", "Takes for the film"],
+                                    ["rehearse", "Rehearse", "Read the script your way; nothing is recorded, and afterwards you see every line you said differently"],
+                                    ["talk", "Talk it through", "Unscripted: the chapter titles as prompts, a transcript of what you say"],
+                                ] as const
+                            ).map(([m, label, hint]) => (
+                                <button key={m} title={hint} onClick={() => setMode(m)} style={{ ...segment, ...(mode === m ? segmentOn : null) }}>
+                                    {label}
+                                </button>
+                            ))}
+                        </span>
+                        <button style={button} onClick={() => void (mode === "talk" ? startTalk() : start())}>
+                            {mode === "talk" ? "Start talking — Space" : mode === "rehearse" ? "Rehearse — Space" : "Record — Space"}
                         </button>
-                        <button style={ghost} onClick={() => (review.playing ? stopReview() : playChapter(chapter))}>
-                            {review.playing ? "Stop — P" : "Play chapter — P"}
-                        </button>
-                        <button style={ghost} onClick={playCut}>
-                            Play cut — ⇧P
-                        </button>
+                        {mode === "talk" && (
+                            <button style={ghost} onClick={() => void showLastTalk()}>
+                                Last talk-through
+                            </button>
+                        )}
+                        {mode !== "talk" && (
+                            <>
+                                <button style={ghost} onClick={() => (review.playing ? stopReview() : playChapter(chapter))}>
+                                    {review.playing ? "Stop — P" : "Play chapter — P"}
+                                </button>
+                                <button style={ghost} onClick={playCut}>
+                                    Play cut — ⇧P
+                                </button>
+                            </>
+                        )}
                         {!SIMULATE && (
                             <button style={ghost} onClick={testMic}>
                                 {micTest?.state === "listening" ? "Stop test — M" : micTest?.state === "playing" ? "Stop playback — M" : "Test mic — M"}
                             </button>
                         )}
+                        {mode !== "talk" && (
                         <label style={check}>
                             <input
                                 type="checkbox"
@@ -875,6 +1165,8 @@ export const App: React.FC = () => {
                             />
                             keep going into the next chapters
                         </label>
+                        )}
+                        {mode === "record" && (
                         <label style={check}>
                             <input
                                 type="checkbox"
@@ -886,6 +1178,7 @@ export const App: React.FC = () => {
                             />
                             play back after each take
                         </label>
+                        )}
                         <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
                             Film
                             <select
@@ -910,8 +1203,12 @@ export const App: React.FC = () => {
                                 <Select label="Microphone" value={mic} options={mics} onChange={(v) => { setMic(v); remember("live.mic", v); }} />
                             </>
                         )}
-                        <span>↑↓ chapter · N next to record · click a line to start there · Tab cut · Esc stop</span>
+                        <span>{mode === "talk" ? "↑↓ chapter to start from · → moves on while talking" : "↑↓ chapter · N next to record · click a line to start there · Tab cut · Esc stop"}</span>
                     </>
+                ) : phase === "recording" && talking ? (
+                    <span>Talk about the chapter in your own words, as if to a colleague. → or a clicker: next chapter · Space or Esc: stop and save the transcript</span>
+                ) : phase === "recording" && session.current?.rehearse ? (
+                    <span>Say each line the way you would say it — change words freely. If the prompter stops following, → moves to the next line · Esc: stop and compare</span>
                 ) : phase === "recording" ? (
                     <span>Read at your own pace. → or a clicker: next line · Esc: stop and keep · R: throw this take away</span>
                 ) : null}
@@ -938,11 +1235,27 @@ export const App: React.FC = () => {
                 </div>
             )}
             {error && (
-                <div style={{ ...panel, borderColor: "rgba(255,90,95,0.5)", color: "#FFB4B6" }} onClick={() => setError(null)}>
+                <div style={{ ...panel, border: "1px solid rgba(255,90,95,0.5)", color: "#FFB4B6" }} onClick={() => setError(null)}>
                     {error}
                 </div>
             )}
             {notice && !error && <Toast text={notice} onDone={() => setNotice(null)} />}
+            {rehearsal && !recording && <RehearsalPanel rows={rehearsal.rows} onClose={() => setRehearsal(null)} />}
+            {transcript && !recording && (
+                <div style={{ ...sheet }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                        <span style={{ fontWeight: 600, flex: 1 }}>{transcript.title}</span>
+                        {transcript.path && <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 12, color: "rgba(255,255,255,0.5)", userSelect: "all" }}>{transcript.path}</span>}
+                        <button style={mini} onClick={() => void navigator.clipboard?.writeText(transcript.markdown)}>
+                            Copy
+                        </button>
+                        <button style={mini} onClick={() => setTranscript(null)}>
+                            Close
+                        </button>
+                    </div>
+                    <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "Inter, sans-serif", fontSize: 15, lineHeight: 1.55, color: "rgba(255,255,255,0.85)" }}>{transcript.markdown}</pre>
+                </div>
+            )}
             {info && !error && (
                 <div style={{ ...panel, maxHeight: "60vh", overflow: "auto" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, marginBottom: 8 }}>
@@ -1159,6 +1472,154 @@ const Toast: React.FC<{ text: string; onDone: () => void }> = ({ text, onDone })
     return <div style={{ ...panel, left: "auto", right: 448, width: "auto", maxWidth: 520 }}>{text}</div>;
 };
 
+/* ── talking it through, rehearsing ───────────────────────────────────── */
+
+/** A talk-through's transcript, under the chapter each part was said in. */
+function talkMarkdown(words: readonly HeardWord[], marks: readonly { chapter: number; at: number }[]): string {
+    const LAG = 12;
+    const parts = marks.map((m, i) => {
+        const from = i === 0 ? -Infinity : m.at;
+        const to = marks[i + 1]?.at ?? Infinity;
+        const text = words
+            .filter((w) => w.at - LAG >= from && w.at - LAG < to)
+            .map((w) => w.text)
+            .join(" ");
+        return `## ${FILM.chapters[m.chapter].title}\n\n${text || "(nothing heard)"}`;
+    });
+    return [
+        `# Talk-through · ${FILM.title} · ${new Date().toLocaleString()}`,
+        "Transcribed live by Chrome's speech recognition: no punctuation, and a word here and there may be misheard. The recording is next to this file.",
+        ...parts,
+    ].join("\n\n") + "\n";
+}
+
+/** The talk-through's prompter: the chapter titles, the current one large,
+ *  pinned under the camera like the script's rows. */
+const TalkPrompter: React.FC<{ current: number; active: boolean }> = ({ current, active }) => (
+    <div style={{ position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", left: 24, top: 10, fontFamily: "JetBrains Mono, monospace", fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)" }}>
+            talk it through · in your own words
+        </div>
+        <div style={{ width: "min(560px, 46vw)", margin: "0 auto", paddingTop: 10, fontFamily: "Instrument Sans, Inter, sans-serif" }}>
+            <div style={{ fontSize: "clamp(28px, 4.4vh, 44px)", fontWeight: 600, letterSpacing: "-0.015em", color: "#FFFFFF" }}>{FILM.chapters[current].title}</div>
+            <div style={{ marginTop: 6, fontSize: "clamp(15px, 2vh, 19px)", lineHeight: 1.45, color: "rgba(255,255,255,0.5)" }}>
+                {active ? "What is it, and why does it matter? Say it the way you would to a colleague." : "Space starts. The chapter titles are the only prompts."}
+            </div>
+            <div style={{ marginTop: 10, fontSize: "clamp(14px, 1.8vh, 17px)", color: "rgba(255,255,255,0.32)" }}>
+                {FILM.chapters
+                    .slice(current + 1, current + 4)
+                    .map((c) => c.title)
+                    .join("  ·  ")}
+            </div>
+        </div>
+    </div>
+);
+
+/**
+ * A rehearsal's result: every line, what you said, and where they differ.
+ * A line you said differently gets your version, already punctuated from
+ * the script where the words agree, to edit and keep — "Use mine" writes it
+ * into the film's source (and the voice-over docs) through the server.
+ */
+const RehearsalPanel: React.FC<{ rows: RehearsedLine[]; onClose: () => void }> = ({ rows, onClose }) => {
+    const [drafts, setDrafts] = useState(() => rows.map((r) => (r.heard ? suggestLine(r.script, r.heard) : r.script)));
+    const [done, setDone] = useState<Record<string, "mine" | "kept" | string>>({});
+    const changed = Object.values(done).some((d) => d === "mine");
+    const differing = rows.filter((r) => r.heard && !sameWords(r.script, r.heard)).length;
+    const keep = async (k: number) => {
+        const r = rows[k];
+        const res = await fetch(`/api/script/${FILM.id}`, { method: "POST", body: JSON.stringify({ from: r.script, to: drafts[k] }) });
+        const out = (await res.json()) as { error?: string };
+        setDone((d) => ({ ...d, [r.id]: res.ok ? "mine" : `couldn't change it: ${out.error ?? res.status}` }));
+    };
+    return (
+        <div style={sheet}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+                <span style={{ fontWeight: 600, flex: 1 }}>
+                    Rehearsal · {differing ? `${differing} of ${rows.length} lines said differently` : "every line as written"}
+                </span>
+                {changed && (
+                    <button style={button} onClick={() => location.reload()}>
+                        Reload with the new script
+                    </button>
+                )}
+                <button style={mini} onClick={onClose}>
+                    Close
+                </button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {rows.map((r, k) => {
+                    const state = done[r.id];
+                    const same = !!r.heard && sameWords(r.script, r.heard);
+                    return (
+                        <div key={r.id} style={{ ...card, display: "flex", flexDirection: "column", gap: 8 }}>
+                            <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                                <span style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11, color: "rgba(255,255,255,0.4)", width: 90, flex: "none" }}>{r.id}</span>
+                                <span style={{ fontSize: 15, lineHeight: 1.5 }}>
+                                    {!r.heard ? (
+                                        <span style={{ color: "rgba(255,255,255,0.4)" }}>{r.script} — not reached</span>
+                                    ) : same ? (
+                                        <span style={{ color: "rgba(255,255,255,0.7)" }}>{r.script} ✓</span>
+                                    ) : (
+                                        <Diff parts={diffWords(r.script, r.heard)} />
+                                    )}
+                                </span>
+                            </div>
+                            {r.heard && !same && (
+                                <div style={{ display: "flex", gap: 8, alignItems: "center", paddingLeft: 100 }}>
+                                    <input
+                                        value={drafts[k]}
+                                        disabled={state === "mine"}
+                                        onChange={(e) => setDrafts((d) => d.map((x, i) => (i === k ? e.target.value : x)))}
+                                        style={{ flex: 1, background: "#0B0C0E", color: "#FFFFFF", border: "1px solid rgba(255,255,255,0.18)", borderRadius: 6, padding: "7px 10px", fontSize: 15 }}
+                                    />
+                                    {state === "mine" ? (
+                                        <span style={{ color: "#34D399", fontSize: 13 }}>in the script</span>
+                                    ) : state === "kept" ? (
+                                        <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 13 }}>kept as written</span>
+                                    ) : (
+                                        <>
+                                            <button style={mini} onClick={() => void keep(k)}>
+                                                Use mine
+                                            </button>
+                                            <button style={mini} onClick={() => setDone((d) => ({ ...d, [r.id]: "kept" }))}>
+                                                Keep script
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                            {state && state !== "mine" && state !== "kept" && <div style={{ paddingLeft: 100, color: "#FFB4B6", fontSize: 13 }}>{state}</div>}
+                        </div>
+                    );
+                })}
+            </div>
+            <div style={{ marginTop: 14, fontSize: 13, color: "rgba(255,255,255,0.45)" }}>
+                Green: what you said that the script doesn't. Struck through: what you left out. Changing a line means its takes must be recorded again.
+            </div>
+        </div>
+    );
+};
+
+const Diff: React.FC<{ parts: DiffPart[] }> = ({ parts }) => (
+    <>
+        {parts.map((p, i) => (
+            <span
+                key={i}
+                style={
+                    p.kind === "said"
+                        ? { color: "#34D399" }
+                        : p.kind === "dropped"
+                          ? { color: "rgba(255,120,120,0.75)", textDecorationLine: "line-through" }
+                          : { color: "rgba(255,255,255,0.8)" }
+                }
+            >
+                {p.text}{" "}
+            </span>
+        ))}
+    </>
+);
+
 /* ── the prompter ────────────────────────────────────────────────────── */
 
 /**
@@ -1299,9 +1760,16 @@ const Select: React.FC<{ label: string; value: string | undefined; options: Medi
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 
-/** Feeds the follower a simulated read of `script`, on the real clock. */
-function runSimulation(follower: Follower, t0: number, wpm: number, script: Script, onText: (text: string) => void): () => void {
-    const read = simulateRead({ wpm, startMs: 1500, script, seed: Math.floor(Math.random() * 1e6) });
+/** What listens to a read: the follower, and the transcript beside it. */
+interface Ear {
+    onSession(now: number): void;
+    onTranscript(text: string, final: boolean, now: number): void;
+    onVoice(speaking: boolean, at: number, now: number): void;
+}
+
+/** Feeds a simulated read of `script` to the ear, on the real clock. */
+function runSimulation(follower: Ear, t0: number, wpm: number, script: Script, onText: (text: string) => void, mishear?: number): () => void {
+    const read = simulateRead({ wpm, startMs: 1500, script, seed: Math.floor(Math.random() * 1e6), ...(mishear === undefined ? {} : { mishear }) });
     let i = 0;
     let stopped = false;
     const frame = (ms: number) => (ms * FPS) / 1000;
@@ -1363,4 +1831,21 @@ const tab: React.CSSProperties = { flex: 1, textAlign: "left", background: "#111
 const tabOn: React.CSSProperties = { background: "#FFFFFF", color: "#090A0C", border: "1px solid #FFFFFF" };
 const card: React.CSSProperties = { background: "#0F1114", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 9, padding: "10px 12px", fontSize: 14 };
 const cardOn: React.CSSProperties = { background: "#14171B", border: "1px solid rgba(255,255,255,0.22)" };
+const segment: React.CSSProperties = { background: "transparent", color: "rgba(255,255,255,0.7)", border: 0, padding: "7px 12px", fontSize: 13, cursor: "pointer" };
+const segmentOn: React.CSSProperties = { background: "rgba(255,255,255,0.14)", color: "#FFFFFF" };
+/* A large sheet over the film and the chapters: a rehearsal, a transcript. */
+const sheet: React.CSSProperties = {
+    position: "fixed",
+    left: 48,
+    right: 48,
+    top: "21vh",
+    bottom: 96,
+    overflow: "auto",
+    padding: "18px 22px",
+    borderRadius: 11,
+    border: "1px solid rgba(255,255,255,0.14)",
+    background: "#0E1013",
+    zIndex: 3,
+    boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+};
 const badge: React.CSSProperties = { fontFamily: "JetBrains Mono, monospace", fontSize: 10, padding: "1px 5px", borderRadius: 4, border: "1px solid rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.55)" };
