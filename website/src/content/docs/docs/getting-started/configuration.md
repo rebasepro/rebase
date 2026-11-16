@@ -36,7 +36,7 @@ All configuration is done via environment variables in your `.env` file at the p
 >
 > - **`sslmode=no-verify`** — encrypted, not checked: what `require` means to
 >   libpq. It is a node-postgres spelling that libpq lacks, so `psql`, `pg_dump`
->   and Atlas refuse it with `invalid sslmode value: "no-verify"`. Rebase's own
+>   and Ptah Compat refuse it with `invalid sslmode value: "no-verify"`. Rebase's own
 >   commands (`rebase db push`, `rebase db backup`, `rebase db restore`) pass it
 >   to them as `sslmode=require`, so they work with the URL as configured; for
 >   `psql` by hand, swap in `sslmode=require`.

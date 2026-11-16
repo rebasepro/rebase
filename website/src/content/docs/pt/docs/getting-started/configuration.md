@@ -1,5 +1,5 @@
 ---
-sourceHash: cb7cd2cb2b7562c3
+sourceHash: d836b152792dc3ff
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -37,7 +37,7 @@ Toda a configuração é feita por meio de variáveis de ambiente no seu arquivo
 >
 > - **`sslmode=no-verify`** — criptografado, não verificado: o que `require` significa para
 >   a libpq. É uma grafia do node-postgres inexistente na libpq, portanto `psql`, `pg_dump`
->   e Atlas a rejeitam com `invalid sslmode value: "no-verify"`. Os próprios comandos do Rebase
+>   e Ptah Compat a rejeitam com `invalid sslmode value: "no-verify"`. Os próprios comandos do Rebase
 >   (`rebase db push`, `rebase db backup`, `rebase db restore`) a repassam como
 >   `sslmode=require`, funcionando com a URL como configurada; para o
 >   `psql` manualmente, substitua por `sslmode=require`.

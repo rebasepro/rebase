@@ -1,5 +1,5 @@
 ---
-sourceHash: cb7cd2cb2b7562c3
+sourceHash: d836b152792dc3ff
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -37,7 +37,7 @@ Die gesamte Konfiguration erfolgt über Umgebungsvariablen in Ihrer `.env`-Datei
 >
 > - **`sslmode=no-verify`** – verschlüsselt, nicht geprüft: was `require` für
 >   libpq bedeutet. Dies ist eine Schreibweise von node-postgres, die libpq fehlt, sodass `psql`, `pg_dump`
->   und Atlas dies mit `invalid sslmode value: "no-verify"` ablehnen. Die eigenen Befehle von Rebase
+>   und Ptah Compat dies mit `invalid sslmode value: "no-verify"` ablehnen. Die eigenen Befehle von Rebase
 >   (`rebase db push`, `rebase db backup`, `rebase db restore`) übergeben es an diese
 >   als `sslmode=require`, sodass sie mit der konfigurierten URL funktionieren; für
 >   manuelles `psql` tauschen Sie es gegen `sslmode=require` aus.
