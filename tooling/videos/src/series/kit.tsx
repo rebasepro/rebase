@@ -400,7 +400,9 @@ const Presenter: React.FC<{ take?: Take | null; live?: LiveFeed | null; flat?: b
     const series = useSeries();
     const format = useFormat();
     const plan = { ...PRESENTER[format], ...(series.spec.presenter?.[format] ?? {}) };
-    const opacity = ramp(frame, 0, 10);
+    /* In the picture from the first frame, like the ground: a film that
+       opens on a person never pops them in. */
+    const opacity = 1;
     let box = plan.open;
     let stage = "open";
     if (series.toCorner !== null && frame >= series.toCorner) {
