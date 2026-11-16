@@ -22,6 +22,21 @@ describe("forLibpq", () => {
         }
     });
 
+    it("drops uselibpqcompat, which libpq reports as an unknown server setting", () => {
+        // node-postgres's own warning tells people to write
+        // `uselibpqcompat=true&sslmode=require`; Atlas then failed with
+        // `unrecognized configuration parameter "uselibpqcompat" (42704)`.
+        expect(forLibpq("postgres://u:p@host:5432/db?sslmode=require&uselibpqcompat=true"))
+            .toBe("postgres://u:p@host:5432/db?sslmode=require");
+        expect(forLibpq("postgres://u:p@host/db?uselibpqcompat=true"))
+            .toBe("postgres://u:p@host/db");
+    });
+
+    it("drops uselibpqcompat and rewrites no-verify in one pass", () => {
+        expect(forLibpq("postgres://u:p@host/db?uselibpqcompat=true&sslmode=no-verify&application_name=x"))
+            .toBe("postgres://u:p@host/db?sslmode=require&application_name=x");
+    });
+
     it("leaves a URL with no sslmode alone", () => {
         expect(forLibpq("postgres://u:p@host/db")).toBe("postgres://u:p@host/db");
     });
@@ -89,6 +104,11 @@ describe("forAtlas", () => {
         "host=localhost port=5432 dbname=rebase"
     ])("leaves %s as written", (url) => {
         expect(forAtlas(url)).toBe(url);
+    });
+
+    it("drops uselibpqcompat for a remote database", () => {
+        expect(forAtlas("postgresql://u:p@db.example.com:5432/app?sslmode=require&uselibpqcompat=true"))
+            .toBe("postgresql://u:p@db.example.com:5432/app?sslmode=require");
     });
 
     it("still makes a node-postgres sslmode one libpq takes", () => {

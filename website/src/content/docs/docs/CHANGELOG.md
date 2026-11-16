@@ -10,6 +10,8 @@ description: Every released change to Rebase — new features, fixes, and the br
 ### Fixed
 
 - **A new project installs on Windows.** The scaffold declared `@ariga/atlas` as a dependency, and the package has no Windows build: its `preinstall` exits "Unsupported platform", which failed the whole `pnpm install`. It is now an optional dependency, which an install skips where it cannot build. Only `db push`, `db generate` and `db migrate` use Atlas, and on Windows the CLI and `rebase doctor` now say how to install Atlas's own `atlas.exe`, instead of npm remedies that cannot work there. The steps are in the new [Windows](/docs/getting-started/windows/) guide, along with how to move an existing project.
+- **A managed database's certificate no longer fails with a bare `self-signed certificate`.** Rebase's Postgres driver reads `sslmode=require` as "verify the certificate", where `psql` reads it as "encrypt only", so a `DATABASE_URL` that `psql` accepted stopped boot and `rebase db push` with a stack trace. Both now stop with a message that names the host and the two fixes: `sslmode=no-verify` (encrypted, unverified, passed to Atlas, `pg_dump` and `psql` as `require`), or `sslmode=verify-full` with the provider's CA in `sslrootcert`. See [Configuration](/docs/getting-started/configuration/#required).
+- **`uselibpqcompat=true` no longer breaks `rebase db push`.** It is what the driver's own warning suggests adding, and Atlas rejected it as `unrecognized configuration parameter "uselibpqcompat"`. The CLI now drops it before handing the URL to Atlas, `pg_dump`, `pg_restore` and `psql`.
 
 ### Changed
 

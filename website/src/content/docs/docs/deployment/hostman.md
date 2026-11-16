@@ -27,7 +27,7 @@ The cluster comes with a user, `gen_user`, and a database, `default_db`. From th
 postgresql://gen_user:<password>@<private-ip>:5432/default_db
 ```
 
-If the cluster requires TLS, add `?sslmode=require` to the end.
+If the cluster requires TLS, add `?sslmode=no-verify` to the end: encrypted, without checking the certificate against a public authority. A bare `sslmode=require` is read as "verify it" by the Node driver Rebase runs on, and fails on a certificate a public authority did not sign. See [Configuration](/docs/getting-started/configuration/#required).
 
 #### Create the role Rebase switches to
 

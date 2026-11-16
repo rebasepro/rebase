@@ -237,7 +237,7 @@ export interface PostgresDriverInternals {
 }
 
 // Re-export from shared CLI error utilities
-import { closedDatabaseName, deepestErrorMessage, diagnoseDbError, isEconnrefused, parseHostInfo } from "./cli-errors";
+import { closedDatabaseName, deepestErrorMessage, diagnoseDbError, isEconnrefused, isUntrustedServerCertificate, parseHostInfo } from "./cli-errors";
 import { classifyConnectFailure, extractPgError } from "./utils/pg-error-utils";
 import type { OpenIndexBuildSession, ScheduledIndexBuild } from "./schema/deferred-index-build";
 
@@ -517,6 +517,19 @@ function diagnoseConnectFailure(err: unknown, connectionString: string | undefin
         return new Error(
             `Database "${closed}" at ${hostInfo} is closed to new connections: ${reason}${detail}. ` +
             "Open it again with `rebase db branch list`.",
+            { cause: err }
+        );
+    }
+
+    // A certificate no trusted authority signed: settled, since every
+    // connection presents the same one. Usually `sslmode=require` on a managed
+    // database, which node-postgres reads as `verify-full`; the banner names
+    // both ways out.
+    if (isUntrustedServerCertificate(err)) {
+        logger.error(diagnoseDbError(err, url) ?? `❌ The certificate of the PostgreSQL server at ${hostInfo} is not trusted`);
+        return new Error(
+            `The certificate of the PostgreSQL server at ${hostInfo} is not trusted: ${reason}${detail}. ` +
+            "Use sslmode=no-verify to encrypt without verifying, or sslmode=verify-full with sslrootcert.",
             { cause: err }
         );
     }

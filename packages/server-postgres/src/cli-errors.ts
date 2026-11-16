@@ -68,6 +68,33 @@ export function isSslNotEnabled(err: unknown): boolean {
     return false;
 }
 
+/** Node's codes for a server certificate no trusted authority vouches for. */
+const UNTRUSTED_CERTIFICATE_CODES = new Set([
+    "DEPTH_ZERO_SELF_SIGNED_CERT",
+    "SELF_SIGNED_CERT_IN_CHAIN",
+    "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+    "UNABLE_TO_GET_ISSUER_CERT_LOCALLY"
+]);
+
+/**
+ * Whether the connection failed because the server's certificate is not signed
+ * by an authority Node trusts.
+ *
+ * Almost always a managed database whose URL says `sslmode=require`:
+ * node-postgres reads `require` as `verify-full`, where libpq — `psql`, Atlas,
+ * the provider's own docs — reads it as "encrypted, not verified". The same
+ * URL that `psql` accepts then fails here with `self-signed certificate`.
+ * Matched on the error code, through Drizzle's `cause` and a dual-stack
+ * `AggregateError`.
+ */
+export function isUntrustedServerCertificate(err: unknown): boolean {
+    if (!err || typeof err !== "object") return false;
+    if ("code" in err && typeof err.code === "string" && UNTRUSTED_CERTIFICATE_CODES.has(err.code)) return true;
+    if ("cause" in err && isUntrustedServerCertificate(err.cause)) return true;
+    if (err instanceof AggregateError) return err.errors.some(isUntrustedServerCertificate);
+    return false;
+}
+
 /**
  * The database a connection was refused by because it is closed to new
  * connections (`ALLOW_CONNECTIONS false`), or null.
@@ -282,6 +309,58 @@ function formatSslNotEnabledBanner(databaseUrl: string): string {
 }
 
 /**
+ * `databaseUrl` with `sslmode=no-verify` in place of its own `sslmode`, the
+ * password masked, for a banner to print. Null when it is not a postgres URL.
+ */
+function withNoVerify(databaseUrl: string): string | null {
+    let url: URL;
+    try {
+        url = new URL(databaseUrl);
+    } catch {
+        return null;
+    }
+    if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") return null;
+    if (url.password) url.password = "***";
+    url.searchParams.delete("uselibpqcompat");
+    url.searchParams.set("sslmode", "no-verify");
+    url.search = Array.from(url.searchParams.entries())
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+        .join("&");
+    return url.toString();
+}
+
+/**
+ * The banner for a server certificate Node does not trust. See
+ * {@link isUntrustedServerCertificate}. Both ways out are named: verify it
+ * against the provider's CA, or encrypt without verifying, which is what
+ * `sslmode=require` already means to every libpq tool.
+ */
+function formatUntrustedCertificateBanner(databaseUrl: string): string {
+    const hostInfo = parseHostInfo(databaseUrl);
+    const suggestion = withNoVerify(databaseUrl);
+    return (
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `  ❌  The certificate of the PostgreSQL server at ${hostInfo} is not trusted\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `\n` +
+        `  The server's certificate is not signed by an authority Node trusts.\n` +
+        `  Rebase's Postgres driver reads ${chalk.bold("sslmode=require")} as "encrypt and verify\n` +
+        `  the certificate", which is stricter than what ${chalk.bold("require")} means to psql.\n` +
+        `\n` +
+        `  To encrypt without verifying, as psql does, use ${chalk.bold("sslmode=no-verify")}:\n` +
+        `\n` +
+        `    DATABASE_URL=${suggestion ?? "postgresql://…?sslmode=no-verify"}\n` +
+        `\n` +
+        `  Rebase's CLI passes it to Atlas, pg_dump and psql as sslmode=require.\n` +
+        `  To verify instead, download the provider's CA certificate and use\n` +
+        `  ${chalk.bold("sslmode=verify-full&sslrootcert=/path/to/ca.pem")}.\n` +
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
+    );
+}
+
+/**
  * Format a diagnostic banner for a database closed to new connections.
  *
  * Nothing in a development database closes one but `rebase db branch create
@@ -405,6 +484,9 @@ export function diagnoseDbError(err: unknown, databaseUrl?: string): string | nu
     }
     if (isSslNotEnabled(err)) {
         return formatSslNotEnabledBanner(databaseUrl || "");
+    }
+    if (isUntrustedServerCertificate(err)) {
+        return formatUntrustedCertificateBanner(databaseUrl || "");
     }
     const closed = closedDatabaseName(err);
     if (closed) {

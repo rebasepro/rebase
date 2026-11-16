@@ -10,6 +10,9 @@
  */
 const LIBPQ_SSLMODES = new Set(["disable", "allow", "prefer", "require", "verify-ca", "verify-full"]);
 
+/** Query parameters node-postgres reads and libpq rejects. See {@link forLibpq}. */
+const NODE_PG_ONLY_PARAMS = ["uselibpqcompat"];
+
 /**
  * Make a connection string safe to hand to a libpq program.
  *
@@ -28,7 +31,15 @@ const LIBPQ_SSLMODES = new Set(["disable", "allow", "prefer", "require", "verify
  * Nothing is relaxed by the rewrite — `verify-ca` and `verify-full` are left
  * alone, so a connection string that asked for verification still gets it.
  *
- * Only `sslmode` is touched, and only when it is a value libpq would reject.
+ * `uselibpqcompat` is node-postgres's too. It is what node-postgres's own
+ * warning tells people to add (`uselibpqcompat=true&sslmode=require`), because
+ * node-postgres reads a bare `sslmode=require` as `verify-full`. libpq reports
+ * any parameter it does not know as a server setting, so Atlas fails with
+ * `unrecognized configuration parameter "uselibpqcompat"`. It only changes how
+ * node-postgres reads `sslmode`, and libpq already reads it the standard way,
+ * so it is dropped.
+ *
+ * Only these two are touched, and only when libpq would reject them.
  * Anything unparseable is returned as given: a connection that works
  * unverified beats one this corrupted.
  */
@@ -46,9 +57,12 @@ export function forLibpq(connectionString: string): string {
     if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") return connectionString;
 
     const sslmode = url.searchParams.get("sslmode");
-    if (sslmode === null || LIBPQ_SSLMODES.has(sslmode)) return connectionString;
+    const rejectedSslmode = sslmode !== null && !LIBPQ_SSLMODES.has(sslmode);
+    const nodePgOnly = NODE_PG_ONLY_PARAMS.filter(key => url.searchParams.has(key));
+    if (!rejectedSslmode && nodePgOnly.length === 0) return connectionString;
 
-    url.searchParams.set("sslmode", "require");
+    if (rejectedSslmode) url.searchParams.set("sslmode", "require");
+    for (const key of nodePgOnly) url.searchParams.delete(key);
     // Re-serialize by hand for the reason `pinSearchPath` does: URLSearchParams
     // writes a space as `+`, which node-postgres decodes and libpq does not.
     url.search = Array.from(url.searchParams.entries())
