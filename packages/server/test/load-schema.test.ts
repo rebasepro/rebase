@@ -175,14 +175,24 @@ describe("loadBackendSchema — a module that fails to import is fatal", () => {
 });
 
 describe("loadBackendSchema — the legacy layout is refused with the codemod", () => {
-    it("refuses a project that still has config/collections", async () => {
+    it("refuses a project that has config/collections and no tables, with the codemod", async () => {
+        fs.mkdirSync(path.join(root, "config", "collections"), { recursive: true });
+
+        const error = await schemaLoadError();
+
+        expect(error.message).toContain(LEGACY_LAYOUT_REMEDY);
+        expect(error.file).toBe(path.join(root, "config", "collections"));
+    });
+
+    it("refuses a migrated project that kept config/collections, with the files to remove rather than the codemod", async () => {
         fs.mkdirSync(path.join(root, "config", "collections"), { recursive: true });
         write("index.ts", `export { posts } from "./posts";`);
         write("posts.ts", table("posts"));
 
         const error = await schemaLoadError();
 
-        expect(error.message).toContain(LEGACY_LAYOUT_REMEDY);
+        expect(error.message).toContain("git rm -r config/collections");
+        expect(error.message).not.toContain(LEGACY_LAYOUT_REMEDY);
         expect(error.file).toBe(path.join(root, "config", "collections"));
     });
 

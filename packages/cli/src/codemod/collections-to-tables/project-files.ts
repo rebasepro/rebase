@@ -362,7 +362,12 @@ export function planFrontendWiring(plan: PlanContext, frontendDir: string, hasEx
         const text = appText;
         const importCount = text.split(SCAFFOLD_COLLECTIONS_IMPORT).length - 1;
         const propCount = text.split(SCAFFOLD_COLLECTIONS_PROP).length - 1;
-        if (importCount === 1 && propCount === 1 && !/\bcollections\b/.test(text.replace(SCAFFOLD_COLLECTIONS_IMPORT, "").replace(SCAFFOLD_COLLECTIONS_PROP, ""))) {
+        // Any other `collections` in the code is a use the rewrite would break,
+        // so it falls back to the printed step. A comment that says the word is
+        // not one: SongBuzz's admin, `{/* … what the collections don't show */}`
+        // beside <RebaseStudio/>, was left for its author to migrate by hand.
+        const rest = withoutComments(text.replace(SCAFFOLD_COLLECTIONS_IMPORT, "").replace(SCAFFOLD_COLLECTIONS_PROP, ""));
+        if (importCount === 1 && propCount === 1 && !/\bcollections\b/.test(rest)) {
             const propLine = text.split("\n").find(line => line.includes(SCAFFOLD_COLLECTIONS_PROP)) ?? "";
             const indent = /^[ \t]*/.exec(propLine)?.[0] ?? "";
             const next = text
@@ -398,6 +403,18 @@ export function planFrontendWiring(plan: PlanContext, frontendDir: string, hasEx
             });
         }
     }
+}
+
+/**
+ * A TSX source with its `//` and block comments blanked out.
+ *
+ * For one question only — does a word still occur in the code — so it may be
+ * coarse: a `//` inside a string (a URL) cuts the rest of that line, which can
+ * only hide a use on a line that also holds a URL, and the rewrite it guards is
+ * checked by the build that follows.
+ */
+function withoutComments(text: string): string {
+    return text.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
 }
 
 /** The frontend's own .ts/.tsx sources (no declaration files, no node_modules, not the generated cms/). */

@@ -64,6 +64,11 @@
       "message": "exports no collection: read as a module the collections import, not as a table. It is copied next to the code that imports it, since config/collections goes; when nothing imports it, a step lists it."
     },
     {
+      "file": "config/collections/posts.ts",
+      "collection": "posts",
+      "message": "properties.cover.admin.Preview is imported now rather than loaded by path, so the admin's type check reads it against its slot's props (`FieldPreviewProps` for a Preview, `FieldProps` for a Field): a component that types `customProps` as its own props type fails `tsc` until it takes `unknown` and narrows it inside."
+    },
+    {
       "file": "config",
       "message": "keeps 4 module(s) of the project's own (config/actions.ts, config/form-rules.ts, config/slugify.ts, config/tag-callbacks.ts): 0.31 stops reading config/collections, not config/. They stay where they are, importable as before; only what Rebase read is removed."
     }

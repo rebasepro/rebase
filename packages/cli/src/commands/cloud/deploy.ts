@@ -101,6 +101,8 @@ import { buildAssetApp } from "../build";
 import { foldableApps, foldFrontendIntoBundle } from "../../fold-static";
 import { checkStaticSyntax, formatSyntaxErrors, type StaticSyntaxError } from "../../static-syntax-check";
 import { loadManifest, findBackendApp, formatAppAddress, resolveBackendPaths, selectDeployApp } from "../../manifest";
+import { legacyCollectionsDir, legacyLayoutRefusal, MIGRATE_COMMAND } from "../../utils/legacy-layout";
+import { BUNDLE_FORMAT_VERSION } from "@rebasepro/types";
 import { findProjectRoot, requireProjectRoot } from "../../utils/project";
 import { withTempArchive } from "../../utils/temp-archive";
 import { deriveOptionsFor, deriveResourceGraph } from "../../resources/derive";
@@ -373,6 +375,17 @@ appName: target.name });
             return;
         }
 
+        // Before the build and long before the upload: the platform refuses a
+        // bundle built from config/collections only once it has all of it.
+        if (target.app.type === "backend") {
+            const tablesDir = resolveBackendPaths(target.app, projectRoot).tables;
+            const legacy = legacyCollectionsDir(projectRoot, tablesDir);
+            if (legacy) {
+                const refusal = legacyLayoutRefusal(legacy, tablesDir);
+                fail(refusal.message, refusal.hint, "legacy_layout");
+            }
+        }
+
         progress(chalk.gray("  Building bundle..."));
         // `target` is decided above, by the manifest. Naming it `backend` here
         // is what the rest of this block reads.
@@ -575,6 +588,18 @@ async function uploadAndTrigger(opts: {
         startedAt: opts.startedAt,
         projectRoot
     });
+
+    // A `--bundle-dir` built by a CLI before 0.31, from config/collections. The
+    // platform refuses it too, but only after the upload, and with a remedy for
+    // the source rather than for the bundle in hand.
+    if (manifest.bundleFormat < BUNDLE_FORMAT_VERSION) {
+        fail(
+            `${path.relative(process.cwd(), bundleDir) || "."} is a format-${manifest.bundleFormat} bundle, built from ` +
+                `config/collections, and Rebase Cloud takes format ${BUNDLE_FORMAT_VERSION} (backend/schema). Nothing was uploaded.`,
+            `In the project, run \`${MIGRATE_COMMAND}\`, commit, then \`rebase build\` with this CLI and deploy that bundle.`,
+            "bundle_format_too_old"
+        );
+    }
 
     // Native modules cannot run on the managed runtime — the server rejects them
     // at intake anyway, but catching it here saves a pointless upload of a bundle

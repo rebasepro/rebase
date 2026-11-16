@@ -176,6 +176,16 @@ See [Scripts](/docs/backend/scripts/#openrebase). See [Backend overview](/docs/b
 
 **What to do:** migrate the source, then `rebase build` and deploy. On Rebase Cloud, deploying the migrated repository rebuilds it. See [Runtime and bundles](/docs/architecture/runtime-and-bundles/).
 
+**On Rebase Cloud, a project still on 0.30 keeps running but cannot deploy.** The platform keeps serving the bundle it has, and its runtime updates stop there (the console says so), but it accepts format 3 only: a deploy from a 0.30 CLI uploads the whole bundle and is then refused with `BUNDLE_FORMAT_TOO_OLD`. The way forward is the same three commands on any project:
+
+```bash
+pnpm exec rebase upgrade --to latest
+rebase migrate collections-to-tables
+rebase cloud deploy
+```
+
+A CLI from after 0.32.0 refuses earlier, before it builds or uploads anything: `rebase build` and `rebase cloud deploy` on a project whose tables are still in `config/collections` stop with the codemod's name, a `--bundle-dir` holding a format-2 bundle is refused with "Nothing was uploaded", and `rebase upgrade` names the codemod as the next step instead of `rebase build`. (0.30's own `rebase upgrade` still ends by saying "Run `rebase build`"; the build it points to is the one that stops.)
+
 ## 113. The schema version is computed from tables (`v2:`)
 
 **Who this hits:** every database a runtime before 0.31 provisioned, and every generated SDK.
@@ -247,6 +257,8 @@ Typed accessors (`client.data.posts`) are unchanged.
 **What changed:** a field's `Field` / `Preview` / `Filter`, collection `Actions`, `entityViews[].Builder`, `collectionViews[].Builder`, `formView.Builder` and component overrides take the component itself. `ComponentRef`, `ComponentLike`, `LazyComponentRef` and `isLazyComponentRef` (`@rebasepro/types`), `asComponentRef` and `asReactComponent` (`@rebasepro/cms-types`) and `resolveComponentRef` / `useResolvedComponent` (`@rebasepro/app`) are removed. `customizeTable` refuses a string or a thunk with the "imported by value" message.
 
 **What to do:** import the component in the `frontend/src/cms/` file and pass it. See [Custom fields](/docs/frontend/custom-fields/).
+
+The codemod does this for every string path, and notes each one, because an imported component is type-checked against its slot where a path never was. A `Preview` that declares `customProps?: MyProps` fails your frontend's `tsc`: the slot hands `customProps` as `unknown`, since nothing ties a field's `customProps` to the component that reads them. Take `customProps?: unknown` and narrow it inside the component.
 
 ## 119. Panel preferences are UI preferences
 

@@ -81,7 +81,7 @@ function write(root: string, relative: string, content: string): void {
 
 function bundle(kind: "backend" | "static", deps: Record<string, unknown> = { declared: {} }): void {
     write(bundleDir, "manifest.json", JSON.stringify({
-        bundleFormat: 2,
+        bundleFormat: 3,
         runtime: { range: "^1", builtAgainst: "0.21.0", contract: 1 },
         schemaVersion: "v1:abc",
         app: kind === "backend" ? "backend" : "web",

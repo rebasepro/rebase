@@ -43,6 +43,15 @@ import { own } from "./own";
 /** The keys whose string value is a component path (the Vite plugin's `LAZY_COMPONENT_KEYS`). */
 export const COMPONENT_KEYS = new Set(["Field", "Preview", "Builder", "Filter", "Component"]);
 
+/**
+ * Said of every component the migration turns from a path into an import. One
+ * sentence for all of them, so the notes group into one line.
+ */
+export const IMPORTED_COMPONENT_REMARK =
+    "is imported now rather than loaded by path, so the admin's type check reads it against its slot's props " +
+    "(`FieldPreviewProps` for a Preview, `FieldProps` for a Field): a component that types `customProps` as its own " +
+    "props type fails `tsc` until it takes `unknown` and narrows it inside.";
+
 /** A customization module being built. */
 interface Builder {
     entry: CollectionEntry;
@@ -340,7 +349,14 @@ function printable(plan: PlanContext, builder: Builder, value: unknown, segments
     }
     if (typeof value === "string" && COMPONENT_KEYS.has(String(segments[segments.length - 1])) && (value.startsWith("./") || value.startsWith("../"))) {
         try {
-            return importComponent(plan, builder, value, "default", componentWriter(builder.entry, value));
+            const imported = importComponent(plan, builder, value, "default", componentWriter(builder.entry, value));
+            // By path, the component was loaded and never type-checked against
+            // its slot. As an import it is, by the admin's own `tsc`: SongBuzz's
+            // previews typed `customProps` as their own props type, which no
+            // slot can hand them, and 37 errors appeared in a build the
+            // migration had reported clean.
+            note(plan, builder.entry, `${label} ${IMPORTED_COMPONENT_REMARK}`);
+            return imported;
         } catch (error) {
             refuse(plan, builder.entry, error instanceof Error ? error.message : String(error), { key: segments.join(".") });
             builder.failed = true;

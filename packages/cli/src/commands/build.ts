@@ -32,6 +32,7 @@ import {
     resolveBackendPaths,
     staticAppAddress
 } from "../manifest";
+import { legacyCollectionsDir, legacyLayoutRefusal } from "../utils/legacy-layout";
 import {
     buildBundle,
     buildStaticBundle,
@@ -229,6 +230,20 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
             `${bundled.map(t => t.name).join(", ")}. Build one app into it: ` +
             `rebase build ${bundled[0].name} --output ${args["--output"]}`
         );
+    }
+
+    // Before the frontend guard and everything else: on a project still on
+    // config/collections every later check fails for a reason that is not the
+    // one to fix, and none of them names the command that fixes it.
+    for (const { app } of targets) {
+        if (app.type !== "backend" || app.runtime === "custom") continue;
+        const tablesDir = resolveBackendPaths(app, projectRoot).tables;
+        const legacy = legacyCollectionsDir(projectRoot, tablesDir);
+        if (!legacy) continue;
+        const refusal = legacyLayoutRefusal(legacy, tablesDir);
+        console.error(chalk.red(`✗ ${refusal.message}`));
+        console.error(chalk.dim(`  ${refusal.hint}`));
+        process.exit(1);
     }
 
     console.log(`${chalk.bold("Rebase")} — building ${targets.length} app(s)\n`);

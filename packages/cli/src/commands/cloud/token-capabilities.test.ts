@@ -324,7 +324,7 @@ beforeEach(() => {
     write(project_, "rebase.json", JSON.stringify({ rebase: "^1", apps: { backend: { type: "backend", runtime: "managed" } } }));
     write(project_, "backend/src/index.ts", "export {};\n");
     write(bundleDir, "manifest.json", JSON.stringify({
-        bundleFormat: 2,
+        bundleFormat: 3,
         runtime: { range: "^1", builtAgainst: "0.23.0", contract: 1 },
         schemaVersion: "v1:abc",
         app: "backend",

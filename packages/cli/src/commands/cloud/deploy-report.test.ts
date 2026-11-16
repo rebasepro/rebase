@@ -70,7 +70,7 @@ path: "/" }
         }
     }));
     write(bundleDir, "manifest.json", JSON.stringify({
-        bundleFormat: 2,
+        bundleFormat: 3,
         runtime: { range: "^1",
 builtAgainst: "0.25.1",
 contract: 1 },
@@ -254,5 +254,40 @@ describe("a followed deploy that failed", () => {
             apps: ["game", "backend"],
             reason: "Managed deploy failed: The new version did not become ready: CrashLoopBackOff"
         });
+    });
+});
+
+describe("a deploy the platform would refuse for its layout", () => {
+    function stderrOf(): string[] {
+        const lines: string[] = [];
+        vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { lines.push(args.map(String).join(" ")); });
+        return lines;
+    }
+    const uploads = (): string[] => vi.mocked(fetch).mock.calls.map(([input]) => String(input)).filter(url => url.includes("/upload"));
+
+    it("refuses a format-2 --bundle-dir before uploading it, naming the codemod", async () => {
+        const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8")) as Record<string, unknown>;
+        fs.writeFileSync(path.join(bundleDir, "manifest.json"), JSON.stringify({ ...manifest, bundleFormat: 2 }));
+        const stderr = stderrOf();
+
+        await expect(deploy()).rejects.toThrow(Exited);
+
+        const out = plain(stderr.join("\n"));
+        expect(out).toContain("is a format-2 bundle");
+        expect(out).toContain("Nothing was uploaded.");
+        expect(out).toContain("rebase migrate collections-to-tables");
+        expect(uploads()).toEqual([]);
+    });
+
+    it("refuses a project still on config/collections before building or uploading", async () => {
+        write(project, "config/collections/index.ts", "export const collections = [];\n");
+        const stderr = stderrOf();
+
+        await expect(deployCommand(["node", "rebase", "cloud", "deploy", "--no-source"], "songbuzz")).rejects.toThrow(Exited);
+
+        const out = plain(stderr.join("\n"));
+        expect(out).toContain("This project declares its tables in config/collections");
+        expect(out).toContain("Run `rebase migrate collections-to-tables`");
+        expect(uploads()).toEqual([]);
     });
 });

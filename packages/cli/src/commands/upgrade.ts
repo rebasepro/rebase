@@ -10,7 +10,8 @@ import chalk from "chalk";
 import { execa } from "execa";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { failAsJson, requireProjectRoot, type JsonFailureIssue } from "../utils/project";
-import { loadManifest, ManifestError } from "../manifest";
+import { findBackendApp, loadManifest, ManifestError, resolveBackendPaths } from "../manifest";
+import { legacyCollectionsDir, MIGRATE_COMMAND } from "../utils/legacy-layout";
 import {
     applyUpgradePlan,
     detectInstaller,
@@ -304,14 +305,19 @@ export async function upgradeCommand(rawArgs: string[], io: UpgradeIo = defaultI
     };
 
     const databaseNotice = wrote ? await runningDatabaseNotice(projectRoot, plan.target) : [];
+    const legacyNotice = legacyLayoutNotice(projectRoot, plan.target);
 
     if (json) {
         console.log(JSON.stringify(result, null, 2));
-        for (const line of databaseNotice) console.error(line);
+        for (const line of [...legacyNotice, ...databaseNotice]) console.error(line);
         return;
     }
 
-    printOutcome(plan, { dryRun, wrote, installed, installLine, wouldRefuse: dryRun ? downgradeRefusal : null });
+    printOutcome(plan, { dryRun, wrote, installed, installLine, wouldRefuse: dryRun ? downgradeRefusal : null, migrateFirst: legacyNotice.length > 0 });
+    if (legacyNotice.length > 0) {
+        for (const line of legacyNotice) console.log(chalk.yellow(line));
+        console.log("");
+    }
     if (databaseNotice.length > 0) {
         for (const line of databaseNotice) console.log(chalk.yellow(line));
         console.log("");
@@ -397,9 +403,47 @@ function printSummary(plan: UpgradePlan, dryRun: boolean): void {
     console.log("");
 }
 
+/** The first release that builds from `backend/schema` and no longer from `config/collections`. */
+const TABLES_LAYOUT_SINCE = "0.31.0-0";
+
+/**
+ * What to say about a project still on `config/collections`, or nothing.
+ *
+ * A target of 0.31 or later builds
+ * from `backend/schema` only, so for such a project "run `rebase build`" is the
+ * wrong next step: the build refuses it. SongBuzz was told exactly that on
+ * 2026-11-16, built, and found out from the platform after a full upload.
+ */
+function legacyLayoutNotice(projectRoot: string, target: string): string[] {
+    // Canaries of 0.31 included: `-0` sorts below every prerelease of it.
+    if (isDowngrade(TABLES_LAYOUT_SINCE, target)) return [];
+    let tablesDir: string;
+    try {
+        const backend = findBackendApp(loadManifest(projectRoot).manifest);
+        if (!backend || backend.app.type !== "backend" || backend.app.runtime === "custom") return [];
+        tablesDir = resolveBackendPaths(backend.app, projectRoot).tables;
+    } catch {
+        return [];
+    }
+    const legacy = legacyCollectionsDir(projectRoot, tablesDir);
+    if (!legacy) return [];
+    return [
+        `⚠ This project's tables are still in ${legacy}, and this release builds and deploys ${tablesDir} only.`,
+        `  Run \`${MIGRATE_COMMAND}\` next (\`--dry-run\` first to see the files), commit, then \`rebase build\` and \`rebase cloud deploy\`.`
+    ];
+}
+
 function printOutcome(
     plan: UpgradePlan,
-    outcome: { dryRun: boolean; wrote: boolean; installed: boolean; installLine: string; wouldRefuse: UpgradeRefusal | null }
+    outcome: {
+        dryRun: boolean;
+        wrote: boolean;
+        installed: boolean;
+        installLine: string;
+        wouldRefuse: UpgradeRefusal | null;
+        /** The project must run the collections codemod before it builds: see {@link legacyLayoutNotice}. */
+        migrateFirst?: boolean;
+    }
 ): void {
     const moved = plan.changed.length + plan.overrides.filter(o => o.action !== "kept-local").length;
     // What the project is not moved off by this command: every pin it left
@@ -450,10 +494,13 @@ function printOutcome(
         `✓ Moved ${moved} entr${moved === 1 ? "y" : "ies"} in ${files} file${files === 1 ? "" : "s"} to ${plan.target}` +
             `${outcome.installed ? " and installed" : ""}.`
     ));
+    // The notice printed after this names the step between; this line must not
+    // contradict it with "build" as the next thing to type.
+    const build = outcome.migrateFirst ? `\`${MIGRATE_COMMAND}\`, then \`rebase build\`` : "`rebase build`";
     if (!outcome.installed) {
-        console.log(chalk.gray(`  Install with \`${outcome.installLine}\`, then run \`rebase build\`, then \`rebase cloud deploy\`.`));
+        console.log(chalk.gray(`  Install with \`${outcome.installLine}\`, then run ${build}, then \`rebase cloud deploy\`.`));
     } else {
-        console.log(chalk.gray("  Run `rebase build`, then `rebase cloud deploy`."));
+        console.log(chalk.gray(`  Run ${build}, then \`rebase cloud deploy\`.`));
     }
     console.log("");
 }

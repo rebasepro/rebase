@@ -252,6 +252,18 @@ export async function loadBackendSchema(dir: string, options: LoadBackendSchemaO
         const projectRoot = path.resolve(options.projectRoot ?? path.join(resolved, "..", ".."));
         const legacyDir = path.join(projectRoot, "config", "collections");
         if (fs.existsSync(legacyDir) && fs.statSync(legacyDir).isDirectory()) {
+            // With the tables already written, the codemod has run: it leaves
+            // config/collections for `--check` until its author deletes it. Telling
+            // that author to run the codemod sends them round the loop again.
+            if (INDEX_FILES.some(name => fs.existsSync(path.join(resolved, name)))) {
+                throw new SchemaLoadError(
+                    `The project has ${resolved} and still has ${legacyDir}, which the migration leaves in place ` +
+                    "for `rebase migrate collections-to-tables --check`. Remove what Rebase used to read from config/ " +
+                    "once you no longer need that check — `git rm -r config/collections`, and config/index.ts, " +
+                    "config/resources.ts and config/storage.ts if the migration moved them — then run this again.",
+                    legacyDir
+                );
+            }
             throw legacyLayoutError(`The project still has ${legacyDir}`, legacyDir);
         }
     }

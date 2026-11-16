@@ -262,6 +262,32 @@ describe("rebase upgrade, for a person", () => {
         expect(fake.install).toHaveBeenCalledWith(["pnpm", ["install"]], root, false);
     });
 
+    it("names the collections codemod as the next step for a project still on config/collections", async () => {
+        project();
+        write("config/collections/index.ts", "export const collections = [];\n");
+
+        expect(await run(["--to", "0.32.0"], io())).toBe(0);
+
+        // eslint-disable-next-line no-control-regex
+        const text = stdout.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
+        expect(text).toContain("Run `rebase migrate collections-to-tables`, then `rebase build`, then `rebase cloud deploy`.");
+        expect(text).toContain("tables are still in config/collections");
+        expect(text).not.toContain("Run `rebase build`, then");
+    });
+
+    it("says nothing about config/collections on a project that has backend/schema, or for a target before 0.31", async () => {
+        project();
+        write("config/collections/index.ts", "export const collections = [];\n");
+        write("backend/schema/index.ts", "export {};\n");
+        expect(await run(["--to", "0.32.0"], io())).toBe(0);
+        expect(stdout.join("\n")).not.toContain("collections-to-tables");
+
+        fs.rmSync(path.join(root, "backend", "schema"), { recursive: true });
+        stdout.length = 0;
+        expect(await run(["--to", "0.30.0", "--allow-downgrade"], io())).toBe(0);
+        expect(stdout.join("\n")).not.toContain("collections-to-tables");
+    });
+
     it("says the project is already there when it is", async () => {
         project();
         await run(["--to", "0.21.0", "--no-install"], io());

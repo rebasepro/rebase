@@ -77,7 +77,7 @@ function write(root: string, relative: string, content: string): void {
 
 function bundle(kind: "backend" | "static"): void {
     write(bundleDir, "manifest.json", JSON.stringify({
-        bundleFormat: 2,
+        bundleFormat: 3,
         runtime: { range: "^1", builtAgainst: "0.25.1", contract: 1 },
         schemaVersion: "v1:abc",
         app: kind === "backend" ? "backend" : "game",

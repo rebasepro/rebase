@@ -17,7 +17,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
-import { enumLabelsOf, noteKeySegments } from "./customization";
+import { enumLabelsOf, IMPORTED_COMPONENT_REMARK, noteKeySegments } from "./customization";
 import { Journal } from "./journal";
 import { migrateCollectionsToTables } from "./migrate";
 import { runCollectionsToTables } from "./command";
@@ -533,6 +533,29 @@ describe("modes", () => {
         expect(step?.detail).toContain("ui-config.json");
         expect(report.files.find(file => file.path === "frontend/src/cms/ui-config.json")?.content).toBe(`{\n  "tables": {}\n}\n`);
         expect(report.files.map(file => file.path)).not.toContain("frontend/src/App.tsx");
+    }, 120_000);
+
+    it("notes that a component loaded by path is imported, and type-checked, now", async () => {
+        const dir = materialize("blog");
+        const report = await run(dir, { dryRun: true });
+        const noted = report.notes.filter(item => item.message.endsWith(IMPORTED_COMPONENT_REMARK));
+        expect(noted.map(item => item.message)).toEqual([expect.stringMatching(/^[\w$.]+Preview is imported now/)]);
+        expect(noted[0].file).toBe("config/collections/posts.ts");
+    }, 120_000);
+
+    it("rewrites App.tsx itself when the only other `collections` is in a comment", async () => {
+        const dir = materialize("blog");
+        const app = path.join(dir, "frontend", "src", "App.tsx");
+        fs.writeFileSync(app, fs.readFileSync(app, "utf8").replace(
+            "<RebaseCMS",
+            "{/* SQL and storage, for what the collections don't show */}\n                <RebaseCMS"
+        ).replace("import ", "// The collections come from config.\nimport "));
+        const report = await run(dir, { dryRun: true });
+        expect(report.manualSteps.map(step => step.title)).not.toContain("Mount the table customizations");
+        const rewritten = report.files.find(file => file.path === "frontend/src/App.tsx")?.content ?? "";
+        expect(rewritten).toContain("tableCustomizations={tableCustomizations}");
+        expect(rewritten).not.toContain("virtual:rebase-collections");
+        expect(rewritten).toContain("what the collections don't show");
     }, 120_000);
 
     it("carries a storageAuthorize that config/index.ts re-exports from another module to backend/storage.ts", async () => {
