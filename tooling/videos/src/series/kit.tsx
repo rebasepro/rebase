@@ -296,12 +296,12 @@ export const Ribbon: React.FC = () => {
     const { fps } = useVideoConfig();
     const series = useSeries();
     const format = useFormat();
+    /* The film opens on the hero at full colour from its first frame — no
+       rise out of black, so the only change of strength is the bank to the
+       ember when the scenes begin (and back for a bright one). */
     const keys: { at: number; roll: number; reveal: number; ground: string }[] = [
-        { at: 0, roll: 0.1, reveal: 0, ground: GROUND.base },
+        { at: 0, roll: 0.58, reveal: 0.8, ground: GROUND.base },
     ];
-    /* The field rises with the first word, under the presenter's open. */
-    const first = series.cue({ line: series.spec.script[0].id, plus: -4 });
-    if (first !== null) keys.push({ at: Math.max(1, first), roll: 0.58, reveal: 0.8, ground: GROUND.base });
     series.spec.scenes.forEach((s, i) => {
         const start = series.starts[i];
         if (start === null) return;
