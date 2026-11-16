@@ -329,11 +329,11 @@ const DOOR = { y0: 380, y1: 440 };
 const GAP = { x0: 500, x1: 540 };
 const ROWS_Y = [218, 282, 346];
 const ROW = { x: 302, w: 336, h: 52 };
-const MAT = { x: 750, y: 215, w: 235, h: 235, gap0: 792, gap1: 848 };
+const MAT = { x: 765, y: 215, w: 220, h: 235, gap0: 807, gap1: 863 };
 const HOME: Pt = [145, 410];
 const FRONT: Pt[] = [HOME, [236, 410]];
 const SIDE: Pt[] = [HOME, [145, 75], [520, 75], [520, 124]];
-const TO_COPY: Pt[] = [HOME, [145, 566], [820, 566], [820, 492]];
+const TO_COPY: Pt[] = [HOME, [145, 566], [835, 566], [835, 492]];
 const PEOPLE = [
     ["alice", "18.50"],
     ["bob", "64.00"],
@@ -559,10 +559,10 @@ const FloorPlan: React.FC = () => {
                             <g key={who}>
                                 <rect x={MAT.x + 12} y={ROWS_Y[i]} width={MAT.w - 24} height={ROW.h} rx={9} fill={SURFACE.card} />
                                 {copyLit > 0 && <rect x={MAT.x + 12} y={ROWS_Y[i]} width={MAT.w - 24} height={ROW.h} rx={9} fill="none" stroke={CORAL} strokeWidth={4} opacity={copyLit} />}
-                                <text x={MAT.x + 28} y={ROWS_Y[i] + 35} {...label} fontSize={24} fill={INK.high}>
+                                <text x={MAT.x + 28} y={ROWS_Y[i] + 35} {...label} fontSize={22} fill={INK.high}>
                                     {who}
                                 </text>
-                                <text x={MAT.x + MAT.w - 28} y={ROWS_Y[i] + 35} textAnchor="end" {...label} fontSize={24} fill={INK.copy}>
+                                <text x={MAT.x + MAT.w - 28} y={ROWS_Y[i] + 35} textAnchor="end" {...label} fontSize={22} fill={INK.copy}>
                                     {total}
                                 </text>
                             </g>
@@ -589,7 +589,7 @@ const FloorPlan: React.FC = () => {
                 {/* what she got, each way in */}
                 <Tag x={196} y={360} text="1 row" color={CYAN} o={frontDone * clearForCopy} />
                 <Tag x={652} y={124} text={frame >= t.backToOne ? "1 row" : "3 rows"} color={sideColor} o={sideLit * clearForCopy} />
-                <Tag x={700} y={502} text="3 rows" color={CORAL} o={copyLit} />
+                <Tag x={680} y={502} text="3 rows" color={CORAL} o={copyLit} />
 
                 {/* traffic on both ways in */}
                 {flowing &&
