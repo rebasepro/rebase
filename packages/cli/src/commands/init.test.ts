@@ -1563,8 +1563,29 @@ runtime: "managed" });
         expect(atlasScripts.length).toBeGreaterThan(0);
         // The same range the CMS backend ships, so `rebase upgrade` and the
         // template gates see one Atlas, not two.
-        expect(backend.dependencies?.["@ariga/atlas"]).toBe(shipped.dependencies["@ariga/atlas"]);
+        expect(backend.optionalDependencies?.["@ariga/atlas"]).toBe(shipped.optionalDependencies["@ariga/atlas"]);
         expect(pkg.pnpm?.onlyBuiltDependencies).toContain("@ariga/atlas");
+    });
+
+    /**
+     * `@ariga/atlas` ships Linux and macOS builds only: on Windows its
+     * `preinstall` exits 1 with "Unsupported platform". As a plain dependency
+     * that failed the whole `pnpm install`, so a scaffold could not be installed
+     * on Windows at all — although only `db push`, `db generate` and `db
+     * migrate` ever run Atlas. An optional dependency whose install script fails
+     * is skipped, by pnpm and npm alike, and the install carries on.
+     */
+    it.each([
+        ["template", TEMPLATE_DIR],
+        ["baas overlay", overlay]
+    ])("%s: Atlas is optional, so a Windows install does not fail on it", (_name, root) => {
+        const backend = JSON.parse(fs.readFileSync(path.join(root, "backend", "package.json"), "utf8"));
+        const rootPkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+        expect(backend.optionalDependencies?.["@ariga/atlas"]).toBeDefined();
+        for (const manifest of [backend, rootPkg]) {
+            expect(manifest.dependencies?.["@ariga/atlas"]).toBeUndefined();
+            expect(manifest.devDependencies?.["@ariga/atlas"]).toBeUndefined();
+        }
     });
 
     /**

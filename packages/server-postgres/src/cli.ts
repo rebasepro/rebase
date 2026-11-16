@@ -12,6 +12,7 @@ import {
     diagnoseMissingBin,
     detectProjectPackageManager,
     describeBuildScriptRemedy,
+    describeAtlasWindowsInstall,
     describeDevAddCommand,
     describeReinstallCommand,
     workspaceMemberDir,
@@ -2328,6 +2329,14 @@ async function runAtlas(
         // pnpm add -D @ariga/atlas" unconditionally, which is the exact command
         // that produces the far more common of the two states.
         outError(chalk.red("\n✗ The atlas binary is missing, so the schema cannot be applied.\n"));
+
+        // On Windows every remedy below is a loop: the npm package has no
+        // Windows build, so no install or allowlist ever produces the binary.
+        if (process.platform === "win32") {
+            for (const line of describeAtlasWindowsInstall()) outError(line);
+            outError("");
+            process.exit(1);
+        }
 
         // Every remedy below is package-manager specific, and this used to print
         // pnpm's unconditionally. npm 12 blocks a dependency's install scripts

@@ -206,6 +206,43 @@ export function describeDevAddCommand(
     }
 }
 
+/**
+ * The Atlas release Windows readers are sent: the floor of the scaffold's
+ * `@ariga/atlas` range. The npm package's version is the Atlas version — its
+ * `install.js` passes it to atlasgo.sh as `ATLAS_VERSION` — so Linux and macOS
+ * get the newest 1.x the range resolves to (1.3.10 on 2026-11-16) and this is
+ * the oldest release that range accepts. A pinned URL keeps the advice
+ * reproducible; `tooling/scripts/check-templates.mjs` holds it to the range.
+ */
+export const ATLAS_WINDOWS_VERSION = "1.2.3";
+
+/**
+ * How to install Atlas on Windows, as lines for the terminal.
+ *
+ * `@ariga/atlas` ships Linux and macOS builds only — on Windows its
+ * `preinstall` exits "Unsupported platform", so nothing an install command can
+ * do will put Atlas in `node_modules/.bin`, and the npm advice below it is a
+ * loop. Atlas does publish a Windows binary; `resolveLocalBin` finds it through
+ * `where atlas` once it is on PATH. Only x64 is built: Windows on Arm runs it
+ * under emulation.
+ */
+export function describeAtlasWindowsInstall(version: string = ATLAS_WINDOWS_VERSION): string[] {
+    const url = `https://release.ariga.io/atlas/atlas-windows-amd64-v${version}.exe`;
+    return [
+        "  The @ariga/atlas npm package has no Windows build, so it cannot install here.",
+        "  Install Atlas's own Windows binary instead. In PowerShell:",
+        "",
+        "    $dir = \"$env:LOCALAPPDATA\\Programs\\atlas\"",
+        "    New-Item -ItemType Directory -Force $dir | Out-Null",
+        `    Invoke-WebRequest ${url} -OutFile "$dir\\atlas.exe"`,
+        "    [Environment]::SetEnvironmentVariable(\"Path\", [Environment]::GetEnvironmentVariable(\"Path\", \"User\") + \";$dir\", \"User\")",
+        "",
+        "  Then open a new terminal, check it with `atlas version`, and run the command again.",
+        "  Only `db push`, `db generate` and `db migrate` need Atlas; `rebase dev` does not.",
+        "  Guide: https://rebase.pro/docs/getting-started/windows/"
+    ];
+}
+
 /** A path as one shell word: as it is when it needs no quoting, single-quoted otherwise. */
 const shellWord = (value: string): string =>
     /^[\w./-]+$/.test(value) ? value : `'${value.replace(/'/g, "'\\''")}'`;

@@ -1,5 +1,5 @@
 ---
-sourceHash: 792208bc04f9ab81
+sourceHash: 6f9ed21db2b9e2a4
 title: Guida rapida
 sidebar_label: Guida rapida
 description: Crea un nuovo progetto Rebase e avvialo localmente in meno di 2 minuti.
@@ -24,6 +24,7 @@ Questo esegue lo scaffold di un progetto con due pacchetti. Se termini come *tab
 
 - **Node.js** 22.22+ — ogni scaffold, headless incluso, dichiara `"node": ">=22.22.0"`
 - **pnpm** (consigliato) o npm
+- **Su Windows**, leggi prima [Windows](/docs/getting-started/windows/): uno strumento, Atlas, ha bisogno del proprio binario per Windows
 
 Nessun database da installare e niente Docker. `rebase dev` esegue un PostgreSQL gestito per il progetto, con i suoi dati in `.rebase/`. Consulta [Variante: usa il tuo PostgreSQL](#variante-usa-il-tuo-postgresql) se preferisci fornirne uno — un'installazione locale, Neon, Supabase, o il container fornito da questo scaffold.
 

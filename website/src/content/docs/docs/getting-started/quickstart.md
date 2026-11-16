@@ -23,6 +23,7 @@ This scaffolds a project with two packages. If any of *table*, *collection*,
 
 - **Node.js** 22.22+ — every scaffold, headless included, declares `"node": ">=22.22.0"`
 - **pnpm** (recommended) or npm
+- **On Windows**, read [Windows](/docs/getting-started/windows/) first: one tool, Atlas, needs its own Windows binary
 
 No database to install, and no Docker. `rebase dev` runs a managed PostgreSQL for the project, with its data under `.rebase/`. See [Variant: use your own PostgreSQL](#variant-use-your-own-postgresql) if you would rather supply one — a local install, Neon, Supabase, or the container this scaffold ships.
 

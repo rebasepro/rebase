@@ -240,6 +240,36 @@ manager: "pnpm" };
         // The wrong advice for this state, and the advice it used to give.
         expect(finding.fix).not.toContain("approve-builds");
     });
+
+    /**
+     * `@ariga/atlas` has no Windows build — its `preinstall` exits "Unsupported
+     * platform" — so every npm remedy is a loop there. Each of the three states
+     * gets the same answer on Windows: Atlas's own binary, on PATH.
+     */
+    it.each([
+        ["not installed", { packageInstalled: false }],
+        ["script blocked", { binaryOnDisk: false }],
+        ["link missing", {}]
+    ])("on Windows, points at atlas.exe instead of npm (%s)", (_state, overrides) => {
+        const [finding] = checkAtlasBinary({
+            ...base,
+            ...overrides,
+            platform: "win32"
+        });
+        expect(finding.message).toContain("no Windows build");
+        expect(finding.fix).toContain("atlas-windows-amd64-v");
+        expect(finding.fix).toContain(".exe");
+        expect(finding.fix).not.toContain("add -D");
+        expect(finding.fix).not.toContain("allowBuilds");
+    });
+
+    it("on Windows, says nothing once atlas.exe is on PATH", () => {
+        expect(checkAtlasBinary({
+            ...base,
+            onPath: true,
+            platform: "win32"
+        })).toEqual([]);
+    });
 });
 
 describe("atlas binary state on disk", () => {

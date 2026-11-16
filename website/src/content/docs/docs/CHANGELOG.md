@@ -7,6 +7,10 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+### Fixed
+
+- **A new project installs on Windows.** The scaffold declared `@ariga/atlas` as a dependency, and the package has no Windows build: its `preinstall` exits "Unsupported platform", which failed the whole `pnpm install`. It is now an optional dependency, which an install skips where it cannot build. Only `db push`, `db generate` and `db migrate` use Atlas, and on Windows the CLI and `rebase doctor` now say how to install Atlas's own `atlas.exe`, instead of npm remedies that cannot work there. The steps are in the new [Windows](/docs/getting-started/windows/) guide, along with how to move an existing project.
+
 ### Changed
 
 - **A write only refetches the realtime lists it can reach.** A list filtered with `==` or `in` on a column (`listen({ where: { owner: ["==", me] } })`) is asked to look again only when the changed row matched its filter before the write or matches it after; 5,000 users each watching their own rows now cost one RLS-scoped read per write instead of 5,000 (measured: fan-out done ~305 ms after the write, from 3.3 s). Every list that is asked still reads under its own subscriber's scope, and a change it cannot judge (an external `UPDATE` without `REPLICA IDENTITY FULL`, a capture-trigger change to a non-key column, a delete through the API, other operators, `include`, `afterRead`) asks every list, as before. A list narrowed only by RLS still costs one read per distinct user. See [What a write costs, and the limits](https://rebase.pro/docs/backend/realtime/#what-a-write-costs-and-the-limits).

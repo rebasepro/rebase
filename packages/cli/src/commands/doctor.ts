@@ -267,10 +267,13 @@ export function readAtlasBinaryState(projectRoot: string): AtlasBinaryState | nu
 
     // The `.bin` shim is written beside whichever package declared the
     // dependency, so the driver's own directory is a search root too.
+    // On Windows the npm package cannot install at all, so the binary that
+    // counts is Atlas's own `atlas.exe` on PATH — the same one the driver
+    // finds through `where atlas`.
     const onPath = findUpwards(
         [...roots, ...driverManifests.map(file => path.dirname(file))],
         path.join(".bin", "atlas")
-    ) !== null;
+    ) !== null || (process.platform === "win32" && windowsPathHas("atlas.exe"));
 
     let binaryOnDisk = false;
     if (manifest) {
@@ -293,8 +296,15 @@ export function readAtlasBinaryState(projectRoot: string): AtlasBinaryState | nu
         manager: readPackageManagerName(projectRoot),
         workspaceDir: fs.existsSync(path.join(projectRoot, "backend", "package.json")) && isWorkspaceRoot(projectRoot)
             ? "backend"
-            : null
+            : null,
+        platform: process.platform
     };
+}
+
+/** Whether a directory on `PATH` holds `file`. `Path` is how Windows spells it. */
+function windowsPathHas(file: string): boolean {
+    const value = process.env.PATH ?? process.env.Path ?? "";
+    return value.split(path.delimiter).some(dir => dir !== "" && fs.existsSync(path.join(dir, file)));
 }
 
 /** Whether `dir` is a workspace root, where `pnpm add` refuses without `-w`. */

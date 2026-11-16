@@ -43,7 +43,17 @@ export interface AtlasBinaryState {
      * `pnpm add` without `-w`, and atlas belongs to the backend anyway.
      */
     workspaceDir?: string | null;
+    /** `process.platform`, for the one platform where the npm package cannot install. */
+    platform?: NodeJS.Platform;
 }
+
+/**
+ * The Atlas release Windows readers are sent: the floor of the scaffold's
+ * `@ariga/atlas` range, the oldest release it accepts (the npm version is the
+ * Atlas version). `tooling/scripts/check-templates.mjs` holds it to that range,
+ * beside the same constant in `@rebasepro/server-postgres`.
+ */
+export const ATLAS_WINDOWS_VERSION = "1.2.3";
 
 /** `@ariga/atlas` added as a dev dependency where the project keeps it. */
 function atlasAddCommand(manager: string, workspaceDir: string | null | undefined): string {
@@ -76,6 +86,21 @@ function atlasAddCommand(manager: string, workspaceDir: string | null | undefine
  */
 export function checkAtlasBinary(state: AtlasBinaryState | null): EnvironmentFinding[] {
     if (!state || state.onPath) return [];
+
+    // `@ariga/atlas` ships Linux and macOS builds only, so on Windows every
+    // remedy below — install it, allow its script, re-install — ends where it
+    // started. Atlas's own Windows binary on PATH is the way.
+    if (state.platform === "win32") {
+        return [{
+            check: "atlas",
+            severity: "warning",
+            message: "atlas.exe is not on PATH — the @ariga/atlas npm package has no Windows build, so "
+                + "`db push`, `db generate` and `db migrate` will fail. `rebase dev` does not need it.",
+            fix: `Download https://release.ariga.io/atlas/atlas-windows-amd64-v${ATLAS_WINDOWS_VERSION}.exe, `
+                + "save it as atlas.exe in a folder on PATH, and open a new terminal. "
+                + "Step by step: https://rebase.pro/docs/getting-started/windows/"
+        }];
+    }
 
     if (!state.packageInstalled) {
         return [{

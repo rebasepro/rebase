@@ -417,6 +417,73 @@ function checkInstallAllowlistsAgree() {
  * resolve, and this gate runs offline — but a set that did when it was pinned
  * cannot drift while the pins are exact.
  */
+/**
+ * The Windows Atlas download the CLI prints is one the scaffold's range accepts.
+ *
+ * `@ariga/atlas` has no Windows build, so on Windows `rebase db push` and
+ * `rebase doctor` print a pinned `atlas-windows-amd64-v<version>.exe` URL
+ * instead. The npm package's version is the Atlas version, so that URL names
+ * the floor of the scaffold's `@ariga/atlas` range — the oldest release it
+ * accepts. Raise the floor and forget the constants, and Windows readers are
+ * sent an Atlas the project has just said is too old, with nothing failing.
+ *
+ * It must also stay an optionalDependency: as a plain one its failing
+ * `preinstall` aborts the whole install on Windows.
+ */
+function checkAtlasWindowsPin() {
+    const problems = [];
+    const ranges = new Set();
+    for (const [label, root] of [["template", templateRoot], ["baas overlay", baasOverlay]]) {
+        const manifestPath = path.join(root, "backend", "package.json");
+        if (!fs.existsSync(manifestPath)) continue;
+        const pkg = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+        for (const field of ["dependencies", "devDependencies"]) {
+            if (pkg[field]?.["@ariga/atlas"]) {
+                problems.push(
+                    `${label}: backend/package.json declares @ariga/atlas in ${field}. It has no Windows `
+                    + "build, and its preinstall exits 1 there — keep it in optionalDependencies so a "
+                    + "Windows install skips it instead of failing"
+                );
+            }
+        }
+        const range = pkg.optionalDependencies?.["@ariga/atlas"];
+        if (range) ranges.add(range);
+    }
+    const floors = [...ranges].map(range => range.replace(/^[\^~>=\s]+/, ""));
+    const sources = [
+        "packages/server-postgres/src/cli-helpers.ts",
+        "packages/cli/src/doctor-environment.ts"
+    ];
+    for (const relative of sources) {
+        const text = fs.readFileSync(path.join(repoRoot, relative), "utf8");
+        const pinned = /export const ATLAS_WINDOWS_VERSION = "([^"]+)"/.exec(text)?.[1];
+        if (!pinned) {
+            problems.push(`${relative} no longer exports ATLAS_WINDOWS_VERSION — update this check`);
+            continue;
+        }
+        for (const floor of floors) {
+            if (floor !== pinned) {
+                problems.push(
+                    `${relative} sends Windows readers Atlas ${pinned}, but the scaffold's range for `
+                    + `@ariga/atlas starts at ${floor}. Set ATLAS_WINDOWS_VERSION to ${floor}`
+                );
+            }
+        }
+    }
+    // The Windows guide pins the same download for readers who start there.
+    const guide = "website/src/content/docs/docs/getting-started/windows.md";
+    const guidePath = path.join(repoRoot, guide);
+    if (fs.existsSync(guidePath)) {
+        const text = fs.readFileSync(guidePath, "utf8");
+        for (const floor of floors) {
+            if (!text.includes(`atlas-windows-amd64-v${floor}.exe`)) {
+                problems.push(`${guide} does not download atlas-windows-amd64-v${floor}.exe, the floor of the scaffold's Atlas range`);
+            }
+        }
+    }
+    return problems;
+}
+
 function checkPgliteStackIsPinned() {
     const manifestPath = path.join(repoRoot, "packages/cli/package.json");
     if (!fs.existsSync(manifestPath)) return [];
@@ -917,6 +984,15 @@ if (duplicateDepProblems.length > 0) {
     for (const p of duplicateDepProblems) console.error(`    ${p}`);
 } else {
     console.log("  ok   no dependency is declared twice at different ranges in a scaffold");
+}
+
+const atlasWindowsProblems = checkAtlasWindowsPin();
+if (atlasWindowsProblems.length > 0) {
+    failed++;
+    console.log("  FAIL Atlas stays optional and the Windows download names the floor of the scaffold's Atlas range");
+    for (const p of atlasWindowsProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   Atlas stays optional and the Windows download names the floor of the scaffold's Atlas range");
 }
 
 const pgliteProblems = checkPgliteStackIsPinned();

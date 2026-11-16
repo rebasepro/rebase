@@ -107,6 +107,7 @@ export default defineConfig({
                     items: [
                         { label: "Introduction", slug: "docs" },
                         { label: "Quickstart", slug: "docs/getting-started/quickstart" },
+                        { label: "Windows", slug: "docs/getting-started/windows" },
                         { label: "Project Structure", slug: "docs/getting-started/project-structure" },
                         { label: "Environment & Configuration", slug: "docs/getting-started/configuration" },
                         { label: "Troubleshooting", slug: "docs/troubleshooting" },

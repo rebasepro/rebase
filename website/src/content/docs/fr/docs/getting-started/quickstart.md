@@ -1,5 +1,5 @@
 ---
-sourceHash: 792208bc04f9ab81
+sourceHash: 6f9ed21db2b9e2a4
 title: Démarrage rapide
 sidebar_label: Démarrage rapide
 description: Créez un nouveau projet Rebase et lancez-le localement en moins de 2 minutes.
@@ -24,6 +24,7 @@ la page [Structure du projet](/docs/getting-started/project-structure/) les déf
 
 - **Node.js** 22.22+ — chaque modèle généré, y compris headless, déclare `"node": ">=22.22.0"`
 - **pnpm** (recommandé) ou npm
+- **Sous Windows**, lisez d'abord [Windows](/docs/getting-started/windows/) : un outil, Atlas, a besoin de son propre binaire Windows
 
 Aucune base de données à installer, et aucun Docker requis. `rebase dev` exécute un PostgreSQL managé pour le projet, avec ses données stockées sous `.rebase/`. Consultez [Variante : utiliser votre propre PostgreSQL](#variante--utiliser-votre-propre-postgresql) si vous préférez en fournir une — une installation locale, Neon, Supabase, ou le conteneur fourni avec ce modèle.
 
