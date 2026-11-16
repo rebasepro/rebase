@@ -1,5 +1,5 @@
 ---
-sourceHash: b225492a194c9e7e
+sourceHash: 3c5dd206e42c4700
 title: rebase cloud
 sidebar_label: rebase cloud
 description: I gruppi di comandi per Rebase Cloud nella CLI — autenticazione, collegamento del progetto, deploy, notifiche, configurazione, organizzazioni, database, risorse, calcolo, storage, cluster, fatturazione e utilizzo.
@@ -201,6 +201,7 @@ rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 rebase cloud app-key [rotate]           # the app key init --claim wrote; owners and admins
 rebase cloud service-key [rotate]       # REBASE_SERVICE_KEY; owners and admins
+rebase cloud service-key [rotate] --preview <name>  # a backend preview's own key
 ```
 
 `app-key` elenca la
@@ -219,6 +220,17 @@ mai la chiave: per farlo si usa `env reveal REBASE_SERVICE_KEY`. `service-key ro
 genera una nuova chiave e riavvia l'app su di essa. La vecchia chiave rimane valida fino al completamento
 del riavvio, e non oltre. Il comando viene rifiutato mentre è in corso un
 deploy e viene eseguito con il tuo login. Anche il riscatto di un progetto ruota la relativa service key.
+
+Una preview del backend ha una service key tutta sua. Il primo deploy la crea,
+i deploy successivi la mantengono, e la chiave di produzione riceve un 401 sulla
+preview. `service-key --preview <name>` la stampa, come anche
+`env reveal REBASE_SERVICE_KEY --preview <name>`. `service-key rotate --preview
+<name>` ne scrive una nuova e riavvia solo il pod di quella preview; la vecchia
+chiave funziona finché il nuovo pod non è pronto. Chiede conferma prima, e
+`--yes` salta la domanda. Entrambi richiedono ciò che richiede `env reveal`: il
+ruolo owner o admin dell'organizzazione e, per un token di accesso, la capacità
+`env` su un progetto riscattato. La chiave e il pod di produzione non vengono
+toccati.
 
 Una preview del backend parte dalle variabili di produzione, incluse le chiavi live.
 `env set KEY=VALUE --preview` assegna alle preview un valore dedicato, `env unset KEY

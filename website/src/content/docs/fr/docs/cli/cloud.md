@@ -1,5 +1,5 @@
 ---
-sourceHash: b225492a194c9e7e
+sourceHash: 3c5dd206e42c4700
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Les groupes de commandes pour Rebase Cloud dans la CLI — auth, liaison de projet, déploiements, notifications, configuration, organisations, bases de données, ressources, calcul, stockage, clusters, facturation et utilisation.
@@ -201,6 +201,7 @@ rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 rebase cloud app-key [rotate]           # the app key init --claim wrote; owners and admins
 rebase cloud service-key [rotate]       # REBASE_SERVICE_KEY; owners and admins
+rebase cloud service-key [rotate] --preview <name>  # a backend preview's own key
 ```
 
 `app-key` répertorie la
@@ -220,6 +221,17 @@ communique jamais la clé : cela se fait via `env reveal REBASE_SERVICE_KEY`. `s
 du redémarrage, et plus du tout après. La commande est refusée pendant qu'un déploiement est en
 cours, et elle s'exécute avec vos identifiants de connexion. Revendiquer un projet effectue également la rotation de sa
 clé de service.
+
+Une prévisualisation backend a sa propre clé de service. Son premier
+déploiement la crée, les suivants la conservent, et la clé de production est
+refusée avec un 401 sur la prévisualisation. `service-key --preview <name>`
+l'affiche, tout comme `env reveal REBASE_SERVICE_KEY --preview <name>`.
+`service-key rotate --preview <name>` en écrit une nouvelle et ne redémarre que
+le pod de cette prévisualisation ; l'ancienne clé fonctionne jusqu'à ce que le
+nouveau pod soit prêt. La commande demande d'abord confirmation, et `--yes` passe
+la question. Les deux exigent ce qu'exige `env reveal` : le rôle owner ou admin
+de l'organisation et, pour un jeton d'accès, la capacité `env` sur un projet
+revendiqué. La clé et le pod de production ne sont pas touchés.
 
 Une prévisualisation backend démarre à partir des variables de production, clés actives incluses.
 `env set KEY=VALUE --preview` attribue une valeur propre aux prévisualisations, `env unset KEY

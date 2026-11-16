@@ -845,23 +845,31 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
     },
     "service-key": {
         command: "cloud service-key",
-        usage: "cloud service-key [rotate]",
+        usage: "cloud service-key [rotate] [--preview <name>]",
         summary:
             "The project's REBASE_SERVICE_KEY, admin on the app's own API. Without an action, prints its generation, "
             + "when it was last rotated and whether the app is still restarting onto the newest one (never the key: "
             + "that is `rebase cloud env reveal REBASE_SERVICE_KEY`). `rotate` issues a new key and restarts the app "
             + "onto it; the old key works until the restart has finished and nothing after. Refused while a deploy is "
-            + "running. Owners and admins, signed in.",
-        flags: [],
+            + "running. Owners and admins, signed in. With `--preview <name>`, the same for one backend preview's own "
+            + "key: without an action it prints that key, and `rotate` restarts only the preview's pod.",
+        flags: [
+            ["--preview <name>", "A backend preview's own key instead of production's: printed, or with `rotate` replaced"]
+        ],
         examples: [
             "rebase cloud service-key",
             "rebase cloud service-key rotate",
-            "rebase cloud service-key rotate --yes --json"
+            "rebase cloud service-key rotate --yes --json",
+            "rebase cloud service-key --preview new-quiz",
+            "rebase cloud service-key rotate --preview new-quiz --yes"
         ],
         notes: [
             "Anything that copied the old key (a script, a CI job) is refused once the restart has finished.",
             "Claiming a project rotates its service key too.",
-            "It runs with your login: no access-token capability grants it, so REBASE_TOKEN is refused."
+            "It runs with your login: no access-token capability grants it, so REBASE_TOKEN is refused.",
+            "A backend preview's key is its own: minted at its first deploy, kept across redeploys, and production's key "
+                + "answers 401 there. `--preview` asks what `env reveal` asks — the owner or admin role, and a token "
+                + "with the env capability on a claimed project — and never touches production's key or pod."
         ]
     },
     guests: {

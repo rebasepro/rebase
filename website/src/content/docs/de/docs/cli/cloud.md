@@ -1,5 +1,5 @@
 ---
-sourceHash: b225492a194c9e7e
+sourceHash: 3c5dd206e42c4700
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Die Befehlsgruppen für Rebase Cloud in der CLI – Auth, Projektverknüpfung, Deploys, Benachrichtigungen, Konfiguration, Organisationen, Datenbanken, Ressourcen, Compute, Storage, Cluster, Abrechnung und Nutzung.
@@ -201,6 +201,7 @@ rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 rebase cloud app-key [rotate]           # the app key init --claim wrote; owners and admins
 rebase cloud service-key [rotate]       # REBASE_SERVICE_KEY; owners and admins
+rebase cloud service-key [rotate] --preview <name>  # a backend preview's own key
 ```
 
 `app-key` listet den
@@ -219,6 +220,17 @@ ausgegeben: dafür gibt es `env reveal REBASE_SERVICE_KEY`. `service-key rotate`
 stellt einen neuen Schlüssel aus und startet die App damit neu. Der alte Schlüssel funktioniert, bis der
 Neustart abgeschlossen ist, danach nicht mehr. Der Befehl wird verweigert, während ein Deployment
 läuft, und wird mit Ihrem Login ausgeführt. Das Beanspruchen eines Projekts rotiert auch dessen Service-Schlüssel.
+
+Eine Backend-Preview hat einen eigenen Service-Schlüssel. Ihr erstes Deployment
+erzeugt ihn, weitere Deployments behalten ihn, und der Schlüssel der Produktion
+wird von der Preview mit 401 abgewiesen. `service-key --preview <name>` gibt ihn
+aus, ebenso `env reveal REBASE_SERVICE_KEY --preview <name>`.
+`service-key rotate --preview <name>` schreibt einen neuen und startet nur den
+Pod dieser Preview neu; der alte Schlüssel funktioniert, bis der neue Pod bereit
+ist. Der Befehl fragt vorher nach, `--yes` überspringt die Frage. Beide verlangen,
+was `env reveal` verlangt: die Rolle Owner oder Admin der Organisation und bei
+einem Access-Token die Fähigkeit `env` auf einem beanspruchten Projekt. Schlüssel
+und Pod der Produktion bleiben unberührt.
 
 Eine Backend-Preview übernimmt zunächst die Variablen der Produktion, einschließlich Live-Schlüsseln.
 `env set KEY=VALUE --preview` weist Previews einen eigenen Wert zu, `env unset KEY

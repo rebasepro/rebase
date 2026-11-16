@@ -1,5 +1,5 @@
 ---
-sourceHash: b225492a194c9e7e
+sourceHash: 3c5dd206e42c4700
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Os grupos de comandos do Rebase Cloud na CLI — autenticação, vinculação de projeto, deploys, notificações, configuração, organizações, bancos de dados, recursos, computação, armazenamento, clusters, faturamento e uso.
@@ -201,6 +201,7 @@ rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 rebase cloud app-key [rotate]           # the app key init --claim wrote; owners and admins
 rebase cloud service-key [rotate]       # REBASE_SERVICE_KEY; owners and admins
+rebase cloud service-key [rotate] --preview <name>  # a backend preview's own key
 ```
 
 `app-key` lista a
@@ -220,6 +221,16 @@ emite uma nova chave e reinicia o app com ela. A chave antiga funciona até a
 conclusão da reinicialização, e nunca mais depois. O comando é recusado enquanto um deploy estiver
 em andamento e roda com o seu login. Reivindicar um projeto também rotaciona sua
 chave de serviço.
+
+Uma prévia de backend tem sua própria chave de serviço. O primeiro deploy a
+cria, os seguintes a mantêm, e a chave de produção recebe 401 na prévia.
+`service-key --preview <name>` a imprime, assim como
+`env reveal REBASE_SERVICE_KEY --preview <name>`. `service-key rotate --preview
+<name>` grava uma nova e reinicia apenas o pod dessa prévia; a chave antiga
+funciona até o novo pod ficar pronto. Ele pergunta antes, e `--yes` pula a
+pergunta. Ambos exigem o mesmo que `env reveal`: o papel de owner ou admin da
+organização e, para um token de acesso, a capacidade `env` em um projeto
+reivindicado. A chave e o pod de produção não são tocados.
 
 Uma prévia de backend começa a partir das variáveis de produção, incluindo chaves ativas.
 `env set KEY=VALUE --preview` define um valor específico para prévias, `env unset KEY

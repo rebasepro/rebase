@@ -1,5 +1,5 @@
 ---
-sourceHash: b225492a194c9e7e
+sourceHash: 3c5dd206e42c4700
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Los grupos de comandos para Rebase Cloud en la CLI — autenticación, enlace de proyectos, despliegues, notificaciones, configuración, organizaciones, bases de datos, recursos, cómputo, almacenamiento, clústeres, facturación y uso.
@@ -201,6 +201,7 @@ rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 rebase cloud app-key [rotate]           # the app key init --claim wrote; owners and admins
 rebase cloud service-key [rotate]       # REBASE_SERVICE_KEY; owners and admins
+rebase cloud service-key [rotate] --preview <name>  # a backend preview's own key
 ```
 
 `app-key` lista la
@@ -220,6 +221,17 @@ emite una nueva clave y reinicia la aplicación con ella. La clave anterior sigu
 el reinicio haya finalizado, y deja de funcionar después. Se rechaza mientras un despliegue esté
 en ejecución, y se ejecuta con tu sesión iniciada. Reclamar un proyecto también rota su clave
 de servicio.
+
+Una vista previa del backend tiene su propia clave de servicio. Su primer
+despliegue la crea, los siguientes la conservan, y la clave de producción
+responde 401 en la vista previa. `service-key --preview <name>` la imprime, igual
+que `env reveal REBASE_SERVICE_KEY --preview <name>`.
+`service-key rotate --preview <name>` escribe una nueva y reinicia solo el pod de
+esa vista previa; la clave anterior funciona hasta que el nuevo pod está listo.
+Pregunta antes, y `--yes` se salta la pregunta. Ambos piden lo mismo que
+`env reveal`: el rol de owner o admin de la organización y, para un token de
+acceso, la capacidad `env` sobre un proyecto reclamado. La clave y el pod de
+producción no se tocan.
 
 Una vista previa del backend parte de las variables de producción, incluidas las claves en vivo.
 `env set KEY=VALUE --preview` asigna a las vistas previas su propio valor, `env unset KEY
