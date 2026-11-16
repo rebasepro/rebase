@@ -131,10 +131,11 @@ it is then only built when someone opens the screen.
 
 ```tsx
 import { RebaseCMS } from "@rebasepro/cms";
-import { tableCustomizations } from "./cms";
+import { ordersCms } from "./cms/orders";
+import uiConfig from "./cms/ui-config.json";
 import { views } from "./views";
 
-export const Admin = () => <RebaseCMS tableCustomizations={tableCustomizations} views={views}/>;
+export const Admin = () => <RebaseCMS tableCustomizations={[ordersCms]} uiConfig={uiConfig} views={views}/>;
 ```
 
 ## A record tab (`entityViews`)

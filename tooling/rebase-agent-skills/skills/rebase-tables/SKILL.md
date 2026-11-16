@@ -113,8 +113,10 @@ export const tasksCms = customizeTable<typeof tasks>("tasks", {
 });
 ```
 
-   and list it in `App.tsx`: `<RebaseCMS tableCustomizations={[tasksCms]} />`
-   (projects usually collect them in `frontend/src/cms/index.ts`).
+   and add it to the list `App.tsx` already passes, beside the scaffold's
+   `uiConfig`: `<RebaseCMS tableCustomizations={[postsCms, tasksCms]} uiConfig={uiConfig} />`
+   (`import uiConfig from "./cms/ui-config.json"`). Never drop `uiConfig`:
+   `rebase verify` reports a panel mounted without it (`cms-ui-config-not-mounted`).
 
 6. **Use it** from code: `client.data.tasks.find()` in the browser,
    `rebase.dataAsAdmin.tasks` in functions and crons, `context.data.table("tasks")`

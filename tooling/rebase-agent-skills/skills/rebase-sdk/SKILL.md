@@ -739,6 +739,35 @@ Channels are per-name singletons, so two components asking for `"document-42"` s
 
 The SDK handles two protocol details that are easy to get wrong by hand: **the roster is not pushed on join** (a joining client's `presence_diff` contains only itself, so the full state must be requested), and **presence expires after 30 seconds** unless re-sent — the SDK heartbeats at 20s. Channel and presence frames do not require an account, so anonymous visitors can join public channels; the server still authorizes them. See the **rebase-realtime** skill for the raw protocol.
 
+## Web Push (`client.push`)
+
+Needs the backend's `push: true` (see **rebase-custom-functions** for sending)
+and a service worker at the site root (`public/sw.js` in a Vite app) that
+calls `self.registration.showNotification(...)` on every `push` event — a
+browser may revoke the permission of a site that receives pushes and shows
+nothing.
+
+```typescript
+import { createRebaseClient } from "@rebasepro/client";
+
+const client = createRebaseClient({ baseUrl: "https://api.example.com" });
+await navigator.serviceWorker.register("/sw.js");
+
+// From a click: Safari only asks for permission inside a user gesture.
+async function turnOnNotifications() {
+    if (!client.push.isSupported()) return;
+    const { id } = await client.push.subscribe({ lang: "es" });
+    localStorage.setItem("pushSubscriptionId", id); // to target this browser later
+}
+```
+
+`subscribe()` needs a signed-in user; it asks for permission, subscribes with
+the server's VAPID key and registers the browser, and is safe to call again (it
+replaces a subscription made with an old key). It throws `RebaseClientError`
+with `PUSH_UNSUPPORTED`, `PUSH_PERMISSION_DENIED`, `PUSH_NO_SERVICE_WORKER` or
+`PUSH_NOT_CONFIGURED`. `client.push.unsubscribe()` and `getSubscription()`
+undo and inspect it. On iOS/iPadOS the web app must be on the Home Screen first.
+
 ## Offline & Local-First Sync
 
 Opt in with one option. It is **off by default**, so nothing below applies unless you enable it:

@@ -102,7 +102,8 @@ section is background; this is the actual sequence.
    whose schema moves by migrations: `rebase db generate && rebase db migrate`.
 5. Optional: `frontend/src/cms/<table>.tsx` with
    `customizeTable<typeof posts>("posts", { … })`, passed to
-   `<RebaseCMS tableCustomizations>`. The table is in the admin panel without it.
+   `<RebaseCMS tableCustomizations={[…]} uiConfig={uiConfig} />` in `App.tsx`
+   (keep the scaffold's `uiConfig`). The table is in the admin panel without it.
 
 **Add a backend function**
 

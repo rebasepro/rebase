@@ -397,7 +397,33 @@ await rebase.email.send({ to, subject, html: "<p>Thanks for your order.</p>" });
 | Object storage | `rebase.storage` (see **rebase-storage** skill) | `@aws-sdk/client-s3`, `@google-cloud/storage` |
 | Database / collections | `rebase.dataAsAdmin` (or `requireDriver(c)`) | `pg`, `drizzle` clients by hand |
 | Email | `rebase.email` | `nodemailer`, provider SDKs |
+| Web Push to browsers | `rebase.push` | `web-push`, a hand-rolled VAPID signer |
 | Auth / users | `rebase.auth` / `getUser(c)` | custom JWT parsing |
+
+**Web Push (`rebase.push`).** Off until the backend has `push: true`
+(`REBASE_PUSH=true` on the managed runtime) and VAPID keys
+(`REBASE_VAPID_PUBLIC_KEY`, `REBASE_VAPID_PRIVATE_KEY`, `REBASE_VAPID_SUBJECT`;
+outside production a pair is generated into `.rebase-dev-secrets.json`). Rebase
+stores each browser's subscription in `rebase.push_subscriptions` (a caller
+reads and deletes only their own) and drops a browser its push service answers
+404/410 for. The browser subscribes with `client.push.subscribe()` (see
+**rebase-sdk**); the server sends:
+
+```typescript
+import { rebase } from "@rebasepro/server";
+
+declare const userId: string, ids: string[];
+const { sent, removed, failed } = await rebase.push.sendToUser(userId, { title: "Your order shipped", url: "/orders/42" }, { ttl: 3600, urgency: "high" });
+// One message per browser, e.g. in its language:
+await rebase.push.sendToUser(userId, (sub) => ({ title: sub.lang?.startsWith("es") ? "Enviado" : "Shipped" }));
+// Exactly these browsers (ids from subscribe() / subscriptionsOf(userId)):
+await rebase.push.sendToSubscriptions(ids, { title: "Time to play" });
+```
+
+The payload is whatever your service worker reads. `rebase.push.isConfigured()`
+is `false` when push is off or has no keys; in production without keys every
+send throws and `/api/push/*` answers `503 PUSH_NOT_CONFIGURED`. Keep your own
+per-browser settings in a table keyed by the subscription id.
 
 Importing a provider SDK hardcodes one backend, bypasses the app's config
 (`STORAGE_TYPE`, `DATABASE_URL`, SMTP, …), and defeats the point of the platform.
