@@ -1,5 +1,5 @@
 ---
-sourceHash: dc15b1a8aff0e700
+sourceHash: 408bc318cfdfdf07
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Agende tarefas recorrentes em segundo plano com o sistema de cron jobs integrado do Rebase. Defina jobs como arquivos TypeScript, monitore-os no Studio e gerencie-os por meio da API REST.
@@ -230,7 +230,7 @@ Era um segundo nome para `ctx.rebase`, e seu tipo reexpunha `client.data` — o 
 `ctx.rebase.dataAsAdmin` é o plano de dados com escopo de administrador. Um cron não possui um usuário por requisição, portanto não há alternativa com escopo de usuário aqui — defina o escopo dos filtros de cada consulta você mesmo.
 
 :::caution[Escopo de administrador não ignora o RLS]
-`dataAsAdmin` é delimitado uma vez, na inicialização, como `{ uid: "service", roles: ["admin"] }`. Cada leitura e escrita ainda é executada em uma transação que realizou `SET LOCAL ROLE rebase_user` com `app.uid = 'service'`, e **suas políticas são avaliadas** — em relação a essa identidade. Ela passa pelas políticas padrão integradas por meio de seu braço `rolesOverlap(['admin'])`, razão pela qual a diferença raramente se manifesta. Ela se manifesta quando você escreve suas próprias regras: `policy.serverContext()` é compilado para `rebase.uid() IS NULL` e, portanto, é **false** aqui, de modo que uma tabela com `disableDefaultPolicies: true` cuja única regra seja `serverContext()` negará essas escritas e retornará zero linhas — HTTP 200, vazio — para essas leituras.
+`dataAsAdmin` é delimitado uma vez, na inicialização, como `{ uid: "service", roles: ["admin"] }`. Cada leitura e escrita ainda é executada em uma transação que realizou `SET LOCAL ROLE rebase_user` com `app.uid = 'service'`, e **suas políticas são avaliadas** — em relação a essa identidade. Ela passa pelas políticas padrão integradas por meio de seu braço `rolesOverlap(['admin'])`, razão pela qual a diferença raramente se manifesta. Ela se manifesta quando você escreve suas próprias regras: `policy.serverContext()` é compilado para `rebase.uid() IS NULL` e, portanto, é **false** aqui, de modo que uma tabela com `defaultPolicies: false` cuja única regra seja `serverContext()` negará essas escritas e retornará zero linhas — HTTP 200, vazio — para essas leituras.
 
 `rebase.sql()` *é* um bypass incondicional: conexão do proprietário (owner), sem políticas.
 :::

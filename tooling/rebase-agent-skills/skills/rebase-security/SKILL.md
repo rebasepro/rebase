@@ -379,6 +379,27 @@ compile them into `ENABLE ROW LEVEL SECURITY` and one `CREATE POLICY` per rule
 and operation. Nothing on the data path reads them at runtime; the database
 does.
 
+> **IMPORTANT FOR AGENTS — a rule must not read its own table.** Every policy
+> reads the caller's id in a scalar subquery (`(SELECT rebase.uid())`), so
+> Postgres refuses to expand a policy whose subquery leads back to a table it
+> is already expanding. A `team_members` rule with
+> `EXISTS (SELECT 1 FROM team_members …)` — or two tables whose rules read each
+> other — fails *every* statement it guards with `infinite recursion detected
+> in policy for relation "team_members"` (42P17), for signed-in users, the
+> service key and `dataAsAdmin` alike. `rebase verify` reports each such rule
+> as an error. Move the read into a `SECURITY DEFINER` function with
+> `SET search_path = ''` (Postgres does not expand it), create it with your own
+> SQL, and call it from the rule: `using: "public.is_team_manager({team_id})"`.
+
+When the backend does not provision its tables (`REBASE_PROVISION=false`,
+`provision.tables: false`, `REBASE_MIGRATE_ON_BOOT=none`), boot reads the
+catalogue and **withholds** a declared table the database does not protect —
+RLS off, none of its declared policies present, or a declared restrictive
+policy missing. Requests for it answer `503 TABLE_WITHHELD` and the boot log
+names the SQL that protects it (or `rebase db push`); the other tables are
+served. A junction the database does not protect withholds the tables whose
+relations use it.
+
 ### Rule forms
 
 A rule is one of these. Mixing two in one rule is a type error **and** a
@@ -767,7 +788,8 @@ Use this checklist when setting up security for a Rebase project:
 - [ ] **API keys are scoped** — the narrowest scopes that work (`data:read:orders`, not `data:read`); no `data:delete` or `functions:invoke` unless needed
 - [ ] **API keys are never client-side** — a key is a long-lived credential (a service key acts as `service`, plus `admin` if given that role; a personal key acts as its owner); only use server-side
 - [ ] **CORS is configured** — Restrict origins in production
-- [ ] **Rate limiting is in place** — Default limiters apply to auth endpoints; add custom limiters for sensitive operations
+- [ ] **No rule reads its own table** — `rebase verify` passes with no 42P17 (policy recursion) error; such reads go through a `SECURITY DEFINER` function
+- [ ] **Rate limiting is in place** — Default limiters apply to auth endpoints; a custom function that costs per call uses `rateLimit` / `checkRateLimit` from `@rebasepro/server/functions` (with `REBASE_RATE_LIMIT_STORE=sql` across replicas)
 
 ---
 

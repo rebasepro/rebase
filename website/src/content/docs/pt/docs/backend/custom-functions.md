@@ -1,5 +1,5 @@
 ---
-sourceHash: 18de9bd3e1179740
+sourceHash: 981d8ad3d6e13c80
 title: Funções Personalizadas
 sidebar_label: Funções Personalizadas
 description: Adicione endpoints de API Hono personalizados junto com suas rotas CRUD do Rebase. Descobertos automaticamente a partir de um diretório, com acesso total à instância do backend.
@@ -354,7 +354,7 @@ export default defineFunction((app, { rebase }) => {
 
 Para a maioria dos projetos, essa distinção nunca se torna visível, pois as políticas padrão que o Rebase injeta em cada tabela aceitam `serverContext() OR rolesOverlap(['admin'])`, e a identidade de serviço atende à segunda condição. Ela se torna perceptível no momento em que você escreve suas próprias políticas:
 
-- **`policy.serverContext()` é falso para ele.** Esse helper é compilado como `rebase.uid() IS NULL`, e o `uid` deste acessador é `'service'`. Uma tabela com `disableDefaultPolicies: true` cuja única regra de escrita seja `serverContext()` recusará uma escrita do `dataAsAdmin` com o erro Postgres `42501`, e uma leitura nessa coleção retornará **zero linhas com HTTP 200** — a falha silenciosa. Escreva `rolesOverlap(["admin"])` (ou adicione-o juntamente) quando quiser representar "meu backend".
+- **`policy.serverContext()` é falso para ele.** Esse helper é compilado como `rebase.uid() IS NULL`, e o `uid` deste acessador é `'service'`. Uma tabela com `defaultPolicies: false` cuja única regra de escrita seja `serverContext()` recusará uma escrita do `dataAsAdmin` com o erro Postgres `42501`, e uma leitura nessa coleção retornará **zero linhas com HTTP 200** — a falha silenciosa. Escreva `rolesOverlap(["admin"])` (ou adicione-o juntamente) quando quiser representar "meu backend".
 - **Seu alcance é igual ao alcance de um usuário `admin`.** Conceder a role `admin` a um usuário da aplicação concede a ele exatamente as mesmas linhas que este acessador enxerga. Não se trata de um canal privado.
 
 ### 3. `getSql(c)` — SQL como o chamador

@@ -1,5 +1,5 @@
 ---
-sourceHash: dc15b1a8aff0e700
+sourceHash: 408bc318cfdfdf07
 title: Tareas cron
 sidebar_label: Tareas cron
 description: Programa tareas recurrentes en segundo plano con el sistema de tareas cron integrado de Rebase. Define tareas como archivos TypeScript, monitorízalas en Studio y gestiónalas a través de la API REST.
@@ -248,7 +248,7 @@ contra esa identidad. Supera las políticas predeterminadas integradas a través
 rama `rolesOverlap(['admin'])`, por lo que la diferencia rara vez se nota. Se
 nota cuando escribes las tuyas propias: `policy.serverContext()` se compila en
 `rebase.uid() IS NULL` y, por lo tanto, es **false** aquí, por lo que una tabla con
-`disableDefaultPolicies: true` cuya única regla sea `serverContext()` denegará estas
+`defaultPolicies: false` cuya única regla sea `serverContext()` denegará estas
 escrituras y devolverá cero filas — HTTP 200, vacío — para estas lecturas.
 
 `rebase.sql()` *sí* es una omisión incondicional: conexión de propietario, sin políticas.

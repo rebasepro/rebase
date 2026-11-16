@@ -1,5 +1,5 @@
 ---
-sourceHash: 598d10fdd9ac95db
+sourceHash: 1974d7d32fb837b2
 title: Agregações e busca
 sidebar_label: Agregações e busca
 description: "Conte, some e agrupe com o SDK, filtre dentro de colunas JSON e execute busca textual e vetorial a partir do cliente."
@@ -308,7 +308,7 @@ para cada linha da tabela. Faça a paginação com `meta.hasMore`, que permanece
   apenas onde você autorizar:
 
   ```ts
-  // config/resources.ts
+  // backend/resources.ts
   export const main = database({ extensions: ["vector"] });
   ```
 

@@ -898,7 +898,7 @@ With more than one Postgres database in a single instance (`database("warehouse"
 
 For multi-instance deployments (behind a load balancer), Rebase uses PostgreSQL `LISTEN/NOTIFY` to synchronize changes.
 
-With database-level change capture active (`REALTIME_CDC=auto`, the default, wherever the role can create triggers), every instance listens on `rebase_cdc`, which the capture triggers publish to — so a write is heard whichever process or tool made it, and the path below is not used. Without capture:
+With database-level change capture active, a write is heard whichever process or tool made it, and the path below is not used. `REALTIME_CDC=auto`, the default, reads changes from the write-ahead log where the database allows it (`wal_level=logical`, a role that may replicate, a free replication slot and a direct connection): a write then runs no trigger and sends no `NOTIFY`. Elsewhere it falls back to capture triggers, which publish on `rebase_cdc` that every instance listens on, and logs the fallback as info. Trigger capture's `NOTIFY` takes a server-wide commit lock, so under heavy concurrent writes WAL capture is the one to enable. A WAL instance keeps the capture triggers while any other realtime instance may still listen on them (a replica that fell back, an older version mid-rollout); realtime connections name their role in `application_name` (`rebase-realtime:<instance>:cdc` / `:wal` / `:entity`). `REALTIME_CDC=trigger` forces triggers. Without capture:
 
 - A mutation on Instance A triggers `pg_notify('rebase_entity_changes', ...)`.
 - Instance B receives the notification via its dedicated `LISTEN` connection.

@@ -1,5 +1,5 @@
 ---
-sourceHash: dc15b1a8aff0e700
+sourceHash: 408bc318cfdfdf07
 title: Tâches Cron (Cron Jobs)
 sidebar_label: Cron Jobs
 description: Planifiez des tâches d'arrière-plan récurrentes grâce au système de tâches cron intégré de Rebase. Définissez des tâches sous forme de fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
@@ -252,7 +252,7 @@ par rapport à cette identité. Cela valide les politiques par défaut intégré
 branche `rolesOverlap(['admin'])`, c'est pourquoi la différence se remarque rarement. Elle
 se remarque lorsque vous écrivez les vôtres : `policy.serverContext()` compile en
 `rebase.uid() IS NULL` et est par conséquent **faux** ici ; ainsi, une table avec
-`disableDefaultPolicies: true` dont la seule règle est `serverContext()` refusera ces
+`defaultPolicies: false` dont la seule règle est `serverContext()` refusera ces
 écritures et renverra zéro ligne — HTTP 200, vide — pour ces lectures.
 
 `rebase.sql()` *est* un contournement inconditionnel : connexion en tant que propriétaire, aucune politique.

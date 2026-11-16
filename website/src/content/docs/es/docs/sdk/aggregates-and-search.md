@@ -1,5 +1,5 @@
 ---
-sourceHash: 598d10fdd9ac95db
+sourceHash: 1974d7d32fb837b2
 title: Agregaciones y búsqueda
 sidebar_label: Agregaciones y búsqueda
 description: "Cuenta, suma y agrupa con el SDK, filtra dentro de columnas JSON y ejecuta búsquedas de texto completo y vectoriales desde el cliente."
@@ -235,7 +235,7 @@ Con un `threshold`, el resultado no incluye `meta.total`: contar las filas dentr
 - **pgvector.** Una propiedad `vector` compila en una columna `VECTOR(n)`, y ese tipo proviene de la extensión `vector`. Rebase la instalará por ti, pero solo donde indiques que puede hacerlo:
 
   ```ts
-  // config/resources.ts
+  // backend/resources.ts
   export const main = database({ extensions: ["vector"] });
   ```
 

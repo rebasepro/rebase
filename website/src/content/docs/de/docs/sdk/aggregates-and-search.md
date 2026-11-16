@@ -1,5 +1,5 @@
 ---
-sourceHash: 598d10fdd9ac95db
+sourceHash: 1974d7d32fb837b2
 title: Aggregate und Suche
 sidebar_label: Aggregate & Suche
 description: "Zählen, summieren und gruppieren mit dem SDK, innerhalb von JSON-Spalten filtern sowie Volltext- und Vektorsuche vom Client aus ausführen."
@@ -235,7 +235,7 @@ Mit einem `threshold` enthält das Ergebnis kein `meta.total` – das Zählen de
 - **pgvector.** Eine `vector`-Eigenschaft wird zu einer `VECTOR(n)`-Spalte kompiliert, und dieser Typ stammt aus der `vector`-Extension. Rebase installiert sie für Sie, jedoch nur dort, wo Sie es ausdrücklich erlauben:
 
   ```ts
-  // config/resources.ts
+  // backend/resources.ts
   export const main = database({ extensions: ["vector"] });
   ```
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: dc15b1a8aff0e700
+sourceHash: 408bc318cfdfdf07
 title: Cron-Jobs
 sidebar_label: Cron Jobs
 description: Planen Sie wiederkehrende Hintergrundaufgaben mit dem integrierten Cron-Job-System von Rebase. Definieren Sie Jobs als TypeScript-Dateien, überwachen Sie sie in Studio und verwalten Sie sie über die REST-API.
@@ -230,7 +230,7 @@ Es war ein zweiter Name für `ctx.rebase`, und sein Typ machte `client.data` wie
 `ctx.rebase.dataAsAdmin` ist die Daten-Ebene mit Admin-Berechtigung (admin-scoped). Ein Cron-Job hat keinen anfragebezogenen Benutzer, daher gibt es hier keine benutzerbezogene Alternative – schränken Sie die Filter jeder Abfrage selbst ein.
 
 :::caution[Admin-Berechtigung umgeht RLS nicht automatisch]
-`dataAsAdmin` wird einmalig beim Booten als `{ uid: "service", roles: ["admin"] }` festgelegt. Jeder Lese- und Schreibvorgang läuft weiterhin in einer Transaktion ab, die `SET LOCAL ROLE rebase_user` mit `app.uid = 'service'` ausgeführt hat, und **Ihre Policies werden ausgewertet** – bezogen auf diese Identität. Dies erfüllt die integrierten Standard-Policies über deren `rolesOverlap(['admin'])`-Zweig, weshalb der Unterschied selten auffällt. Er zeigt sich, wenn Sie eigene schreiben: `policy.serverContext()` wird zu `rebase.uid() IS NULL` kompiliert und ist hier daher **false**. Eine Tabelle mit `disableDefaultPolicies: true`, deren einzige Regel `serverContext()` ist, verweigert diese Schreibvorgänge und gibt für diese Lesevorgänge null Zeilen zurück – HTTP 200, leer.
+`dataAsAdmin` wird einmalig beim Booten als `{ uid: "service", roles: ["admin"] }` festgelegt. Jeder Lese- und Schreibvorgang läuft weiterhin in einer Transaktion ab, die `SET LOCAL ROLE rebase_user` mit `app.uid = 'service'` ausgeführt hat, und **Ihre Policies werden ausgewertet** – bezogen auf diese Identität. Dies erfüllt die integrierten Standard-Policies über deren `rolesOverlap(['admin'])`-Zweig, weshalb der Unterschied selten auffällt. Er zeigt sich, wenn Sie eigene schreiben: `policy.serverContext()` wird zu `rebase.uid() IS NULL` kompiliert und ist hier daher **false**. Eine Tabelle mit `defaultPolicies: false`, deren einzige Regel `serverContext()` ist, verweigert diese Schreibvorgänge und gibt für diese Lesevorgänge null Zeilen zurück – HTTP 200, leer.
 
 `rebase.sql()` *ist* eine bedingungslose Umgehung: Owner-Verbindung, keine Policies.
 :::

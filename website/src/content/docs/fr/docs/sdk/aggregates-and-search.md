@@ -1,5 +1,5 @@
 ---
-sourceHash: 598d10fdd9ac95db
+sourceHash: 1974d7d32fb837b2
 title: Agrégats et recherche
 sidebar_label: Agrégats & recherche
 description: "Comptez, additionnez et groupez avec le SDK, filtrez dans les colonnes JSON, et exécutez des recherches textuelles et vectorielles depuis le client."
@@ -235,7 +235,7 @@ Avec un `threshold`, le résultat ne comporte pas de `meta.total` — compter le
 - **pgvector.** Une propriété `vector` est compilée en une colonne `VECTOR(n)`, et ce type provient de l'extension `vector`. Rebase l'installera pour vous, mais seulement si vous l'y autorisez :
 
   ```ts
-  // config/resources.ts
+  // backend/resources.ts
   export const main = database({ extensions: ["vector"] });
   ```
 

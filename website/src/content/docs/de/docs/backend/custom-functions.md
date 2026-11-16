@@ -1,5 +1,5 @@
 ---
-sourceHash: 18de9bd3e1179740
+sourceHash: 981d8ad3d6e13c80
 title: Benutzerdefinierte Funktionen
 sidebar_label: Benutzerdefinierte Funktionen
 description: Fügen Sie benutzerdefinierte Hono-API-Endpunkte neben Ihren Rebase-CRUD-Routen hinzu. Automatisch aus einem Verzeichnis erkannt, mit vollem Zugriff auf die Backend-Instanz.
@@ -354,7 +354,7 @@ export default defineFunction((app, { rebase }) => {
 
 Bei den meisten Projekten fällt dieser Unterschied nie auf, da die Standardrichtlinien, die Rebase in jede Tabelle einfügt, `serverContext() OR rolesOverlap(['admin'])` zulassen und die Service-Identität den zweiten Zweig erfüllt. Er wird jedoch in dem Moment relevant, in dem Sie eigene Richtlinien schreiben:
 
-- **`policy.serverContext()` ist dafür false.** Dieser Helper kompiliert zu `rebase.uid() IS NULL`, und die `uid` dieses Accessors ist `'service'`. Eine Tabelle mit `disableDefaultPolicies: true`, deren einzige Schreibregel `serverContext()` ist, verweigert ein Schreiben über `dataAsAdmin` mit dem Postgres-Fehler `42501`, und ein Lesevorgang auf einer solchen Collection gibt **null Zeilen mit HTTP 200** zurück – die stille Variante. Schreiben Sie `rolesOverlap(["admin"])` (oder fügen Sie es hinzu), wenn Sie „mein Backend“ meinen.
+- **`policy.serverContext()` ist dafür false.** Dieser Helper kompiliert zu `rebase.uid() IS NULL`, und die `uid` dieses Accessors ist `'service'`. Eine Tabelle mit `defaultPolicies: false`, deren einzige Schreibregel `serverContext()` ist, verweigert ein Schreiben über `dataAsAdmin` mit dem Postgres-Fehler `42501`, und ein Lesevorgang auf einer solchen Collection gibt **null Zeilen mit HTTP 200** zurück – die stille Variante. Schreiben Sie `rolesOverlap(["admin"])` (oder fügen Sie es hinzu), wenn Sie „mein Backend“ meinen.
 - **Seine Reichweite entspricht der eines `admin`-Benutzers.** Das Zuweisen der `admin`-Rolle an einen Anwendungsbenutzer gewährt diesem genau die Zeilen, die auch dieser Accessor sieht. Es handelt sich nicht um einen privaten Kanal.
 
 ### 3. `getSql(c)` – SQL als Aufrufer

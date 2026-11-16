@@ -1,5 +1,5 @@
 ---
-sourceHash: 598d10fdd9ac95db
+sourceHash: 1974d7d32fb837b2
 title: Aggregazioni e ricerca
 sidebar_label: Aggregazioni e ricerca
 description: "Esegui conteggi, somme e raggruppamenti con l'SDK, filtra all'interno delle colonne JSON ed esegui ricerche full-text e vettoriali dal client."
@@ -309,7 +309,7 @@ per ogni riga della tabella. Per la paginazione, usa `meta.hasMore`, che rimane 
   solo dove autorizzato:
 
   ```ts
-  // config/resources.ts
+  // backend/resources.ts
   export const main = database({ extensions: ["vector"] });
   ```
 

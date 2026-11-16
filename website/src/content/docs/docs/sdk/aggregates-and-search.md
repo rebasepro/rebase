@@ -307,7 +307,7 @@ for every row of the table. Page with `meta.hasMore`, which stays exact.
   only where you say it may:
 
   ```ts
-  // config/resources.ts
+  // backend/resources.ts
   export const main = database({ extensions: ["vector"] });
   ```
 

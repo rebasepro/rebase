@@ -348,6 +348,33 @@ cron, job or queue handler, `await` the work instead. Work that takes minutes
 belongs in a cron job or a job: shutdown waits for `waitUntil` work at most 5
 seconds.
 
+## Rate limits — `rateLimit` / `checkRateLimit`
+
+> **IMPORTANT FOR AGENTS:** do not count calls in a module-scope `Map`. It only
+> ever counts per process, so every replica (and every role in a split
+> deployment) hands out its own allowance. Use the helpers, which count in the
+> backend's own store.
+
+```typescript
+import { defineFunction, rateLimit, checkRateLimit } from "@rebasepro/server/functions";
+
+export default defineFunction((app) => {
+    // Middleware: answers 429 with Retry-After once the caller is over.
+    app.post("/invite", rateLimit({ name: "invite", limit: 40, windowMs: 3_600_000 }), (c) => c.json({ ok: true }));
+
+    // Inline: decide yourself, keyed by anything.
+    app.post("/speak", async (c) => {
+        const { allowed } = await checkRateLimit(c, { name: "speak", limit: 200, windowMs: 86_400_000, key: c.req.query("room") });
+        return allowed ? c.json({ ok: true }) : c.json({ error: "limit reached" }, 429);
+    });
+});
+```
+
+Counts are per process by default and shared across replicas and roles with
+`REBASE_RATE_LIMIT_STORE=sql`. The default key is `clientAddress(c)`, the
+caller's address by the `TRUSTED_PROXY_HOPS` rule the auth limiters use, never
+a header the caller wrote; pass `key` to count per user, room or anything else (a function of `c` for the middleware, a string for `checkRateLimit`). `name` namespaces the count, so two limits on the same caller never share one.
+
 ### Use the `rebase` singleton for platform services — not raw SDKs
 
 > **🚨 CRITICAL FOR AGENTS:** For data, storage, auth, and email inside a

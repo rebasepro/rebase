@@ -251,7 +251,7 @@ against that identity. It clears the built-in default policies through their
 `rolesOverlap(['admin'])` arm, which is why the difference rarely shows. It
 shows when you write your own: `policy.serverContext()` compiles to
 `rebase.uid() IS NULL` and is therefore **false** here, so a table with
-`disableDefaultPolicies: true` whose only rule is `serverContext()` denies these
+`defaultPolicies: false` whose only rule is `serverContext()` denies these
 writes and returns zero rows — HTTP 200, empty — for these reads.
 
 `rebase.sql()` *is* an unconditional bypass: owner connection, no policies.

@@ -1096,6 +1096,13 @@ await initializeRebaseBackend({
 });
 ```
 
+> **IMPORTANT FOR AGENTS:** `isAdmin` on the user a custom adapter returns is
+> informational. Every decision reads `roles`, so a user with `isAdmin: true`
+> and no `admin` role is an administrator nowhere: admin-only tables are left
+> out of `GET /api/schema/tables` and the admin panel. The server warns once per
+> process when the two disagree. Return the `admin` role, or set
+> `schemaTables: { persons: "all" }` when only staff sign in.
+
 ### The client half: send your provider's token
 
 The adapter verifies the token; the client has to send it. With your own sign-in

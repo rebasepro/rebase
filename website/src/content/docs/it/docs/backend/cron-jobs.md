@@ -1,5 +1,5 @@
 ---
-sourceHash: dc15b1a8aff0e700
+sourceHash: 408bc318cfdfdf07
 title: Cron Job
 sidebar_label: Cron Job
 description: Pianifica attività in background ricorrenti con il sistema integrato di cron job di Rebase. Definisci i job come file TypeScript, monitorali in Studio e gestiscili tramite l'API REST.
@@ -230,7 +230,7 @@ Era un nome alternativo per `ctx.rebase`, e il suo tipo riproponeva `client.data
 `ctx.rebase.dataAsAdmin` è il data plane con privilegi di amministratore. Un cron non ha un utente associato a una richiesta, quindi non esiste un'alternativa con ambito utente: dovrai filtrare manualmente l'ambito di ogni query.
 
 :::caution[L'ambito amministratore non aggira la RLS]
-`dataAsAdmin` ha un ambito definito una volta all'avvio come `{ uid: "service", roles: ["admin"] }`. Ogni lettura e scrittura viene comunque eseguita in una transazione con `SET LOCAL ROLE rebase_user` e `app.uid = 'service'`, e **le tue policy vengono valutate** a fronte di tale identità. Soddisfa le policy predefinite integrate tramite il loro controllo `rolesOverlap(['admin'])`, motivo per cui la differenza si nota raramente. La differenza emerge quando scrivi le tue policy: `policy.serverContext()` compila in `rebase.uid() IS NULL` e risulta quindi **false** in questo contesto; perciò una tabella con `disableDefaultPolicies: true` la cui unica regola è `serverContext()` rifiuterà queste scritture e restituirà zero righe — HTTP 200, vuoto — per queste letture.
+`dataAsAdmin` ha un ambito definito una volta all'avvio come `{ uid: "service", roles: ["admin"] }`. Ogni lettura e scrittura viene comunque eseguita in una transazione con `SET LOCAL ROLE rebase_user` e `app.uid = 'service'`, e **le tue policy vengono valutate** a fronte di tale identità. Soddisfa le policy predefinite integrate tramite il loro controllo `rolesOverlap(['admin'])`, motivo per cui la differenza si nota raramente. La differenza emerge quando scrivi le tue policy: `policy.serverContext()` compila in `rebase.uid() IS NULL` e risulta quindi **false** in questo contesto; perciò una tabella con `defaultPolicies: false` la cui unica regola è `serverContext()` rifiuterà queste scritture e restituirà zero righe — HTTP 200, vuoto — per queste letture.
 
 `rebase.sql()` è invece un bypass incondizionato: connessione come proprietario, nessuna policy applicata.
 :::
