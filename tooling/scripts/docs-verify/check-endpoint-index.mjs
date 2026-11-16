@@ -103,6 +103,7 @@ const MOUNTS = new Map([
     ["packages/server/src/auth/api-keys/api-key-routes.ts#router", "/api/admin/api-keys"],
     ["packages/server/src/auth/jwks-routes.ts#router", "/.well-known"],
     ["packages/server/src/storage/routes.ts#router", "/api/storage"],
+    ["packages/server/src/push/push-routes.ts#router", "/api/push"],
     ["packages/server/src/history/history-routes.ts#router", "/api/data"],
     ["packages/server/src/cron/cron-routes.ts#router", "/api/admin/cron"],
     ["packages/server/src/backup/backup-routes.ts#router", "/api/admin/backups"],

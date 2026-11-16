@@ -282,6 +282,13 @@ export const bootEnvExtension = z.object({
         .optional()),
     REBASE_COMPRESSION: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),
     REBASE_HISTORY: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),
+    /**
+     * `true` turns on Web Push (`push: true`): the `/push` routes, the
+     * `rebase.push_subscriptions` table and `rebase.push`. Off by default. The
+     * keys are `REBASE_VAPID_PUBLIC_KEY`, `REBASE_VAPID_PRIVATE_KEY` and
+     * `REBASE_VAPID_SUBJECT`, read where push is set up.
+     */
+    REBASE_PUSH: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
     /** Comma-separated origins allowed to make credentialed cross-origin calls. */
     CORS_ORIGINS: z.string().optional(),
 

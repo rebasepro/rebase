@@ -333,6 +333,14 @@ the message names the constraint.
 | `FUNCTION_TIMEOUT` | 504 | The handler exceeded its timeout. It is still running; it cannot be cancelled from here. | Give outbound calls an `AbortSignal`, or raise `REBASE_FUNCTIONS_TIMEOUT_MS`. |
 | `FUNCTIONS_UPSTREAM_UNREACHABLE` | 502 | This process proxies functions to another one, which did not answer. | Check that the functions unit is running. |
 
+## Push notifications
+
+| Code | Status | Means | Do |
+| --- | --- | --- | --- |
+| `PUSH_ENDPOINT_REFUSED` | 400 | The subscription's endpoint is not on a push service browsers use (FCM, Mozilla, Apple, Windows) over `https`. The server posts to that address on every send, so it takes no other. | Send `PushSubscription.toJSON()` as the browser produced it, or list a test push service in `push.allowedHosts`. See [Push notifications](/docs/backend/push-notifications/#routes). |
+| `PUSH_NEEDS_A_USER` | 403 | An API key or the service key called a push route. A subscription is a signed-in person's browser. | Call it with that person's session. |
+| `PUSH_NOT_CONFIGURED` | 503 | Push is on, but cannot send: no VAPID keys in production, or its table could not be prepared. The message says which. | Set `REBASE_VAPID_PUBLIC_KEY`, `REBASE_VAPID_PRIVATE_KEY` and `REBASE_VAPID_SUBJECT`. See [Push notifications](/docs/backend/push-notifications/#keys). |
+
 ## Cron jobs
 
 | Code | Status | Means | Do |

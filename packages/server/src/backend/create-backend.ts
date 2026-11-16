@@ -199,6 +199,8 @@ import { createTopicRuntime, topicJobHandlers } from "../topics/runtime.js";
 import { createQueueRuntime, queueJobHandlers } from "../queues/runtime.js";
 import type { CronScheduler } from "../cron";
 import type { JobQueue } from "../jobs";
+import { setUpPush } from "../push/set-up";
+import { createPushRoutes } from "../push/push-routes";
 import type { MetricsHistory } from "../metrics/history-recorder.js";
 import type { ProvisionOptions, RebaseAuthConfig, RebaseBackendOptions } from "./options";
 import type { BackendServices } from "./services";
@@ -267,6 +269,12 @@ export interface RebaseRoutes {
      * Studio and MCP views render tables from.
      */
     schema(): Hono<HonoEnv>;
+    /**
+     * Web Push subscriptions, normally at `/api/push`: the VAPID key and a
+     * signed-in browser's subscribe and unsubscribe. Throws when the backend
+     * was created without `push`.
+     */
+    push(): Hono<HonoEnv>;
 }
 
 /** A route group, by the name `routes` gives it. */
@@ -3187,6 +3195,27 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         logger.debug("Email service attached to singleton", { configured: attached.isConfigured() });
     }
 
+    // Web Push. Always attached, like `email`: off or without keys, it is the
+    // stand-in that throws the reason, never `undefined`.
+    const pushSetUp = await setUpPush({ push: config.push, driver: defaultDriver, provision: provision.database });
+    Object.assign(serverClient, { push: pushSetUp.service });
+    let pushSurface: Hono<HonoEnv> | undefined;
+    if (pushSetUp.enabled) {
+        pushSurface = createPushRoutes({
+            service: pushSetUp.service,
+            store: pushSetUp.store,
+            unconfiguredReason: pushSetUp.reason,
+            allowedHosts: pushSetUp.allowedHosts,
+            // The data plane's authentication, so an external auth adapter
+            // signs callers in here as it does there — but required whatever
+            // `auth.requireAuth` says: a subscription is a signed-in person's.
+            auth: authAdapter
+                ? createAdapterAuthMiddleware({ adapter: authAdapter, driver: defaultDriver, requireAuth: true, apiKeyStore })
+                : createAuthMiddleware({ driver: defaultDriver, requireAuth: true, serviceKey: internalServiceKey, apiKeyStore }),
+            after: rateLimitConfig ? [createDataRateLimiter(rateLimitConfig)] : []
+        });
+    }
+
     // Attach raw SQL capability when the driver supports it. Postgres does; a
     // custom test driver may not.
     const driverAdmin = defaultBootstrapper.getAdmin?.(defaultDriverResult);
@@ -4150,6 +4179,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             const schemaGroup = group(schemaTablesSurface!);
             schemaGroup.onError(errorHandler);
             return schemaGroup;
+        },
+        push: () => {
+            if (!pushSurface) {
+                throw new Error("routes.push(): this backend was created without `push`. Pass `push: true` to serve push subscriptions.");
+            }
+            return group(pushSurface);
         }
     };
 
@@ -4171,7 +4206,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         admin: servedGroup("admin"),
         cron: servedGroup("cron"),
         meta: servedGroup("meta"),
-        schema: servedGroup("schema")
+        schema: servedGroup("schema"),
+        push: servedGroup("push")
     };
 
     /** The base path the application last mounted at — where the SDK's socket dials by default. */
@@ -4319,6 +4355,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
         if (surfaces.meta && metaSurface) app.route(`${basePath}/meta`, groups.meta());
         if (surfaces.meta && schemaTablesSurface) app.route(`${basePath}/schema`, groups.schema());
+
+        // With the data surface: a browser subscribes where it reads data.
+        if (pushSurface && surfaces.data) app.route(`${basePath}/push`, groups.push());
 
         if (announce) logger.debug("Rebase backend mounted", { basePath });
     };

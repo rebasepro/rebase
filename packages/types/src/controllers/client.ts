@@ -2,6 +2,7 @@ import type { User } from "../users";
 import type { ResourceRef } from "../types/resources";
 import type { RebaseSdkData } from "./data";
 import type { EmailService } from "./email";
+import type { PushService } from "./push";
 import type { StorageSource } from "./storage";
 import type { CallerSqlOptions } from "./data_driver";
 import type { CronJobStatus, CronJobLogEntry, CronJobListing, CronJobStarted } from "../types/cron";
@@ -670,6 +671,13 @@ export interface RebaseServerClient<DB = RegisteredDatabase> extends Omit<Rebase
      * site can carry on without mail.
      */
     email: EmailService;
+
+    /**
+     * Server-side Web Push. Always present: on a backend without `push: true`,
+     * or without VAPID keys in production, `isConfigured()` is `false` and every
+     * send throws a message naming what to set, as {@link email} does.
+     */
+    push: PushService;
 
     /**
      * Execute raw SQL against the database. Always present server-side for SQL

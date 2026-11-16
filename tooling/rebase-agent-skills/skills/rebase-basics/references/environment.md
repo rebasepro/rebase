@@ -58,7 +58,7 @@ Everything `rebaseEnvSchema` declares — what an **ejected** project's own
 > `<PROVIDER>_CLIENT_*` pairs of every OAuth provider past Google
 > (`GITHUB`, `MICROSOFT`, `APPLE_*`, …); `REBASE_MCP_ENABLED`, `REBASE_BASE_PATH`,
 > `REBASE_ENABLE_SWAGGER`, `REBASE_MAX_BODY_SIZE`, `REBASE_COMPRESSION`,
-> `REBASE_HISTORY`; and the split-deployment set `REBASE_ROLE`,
+> `REBASE_HISTORY`, `REBASE_PUSH` and `REBASE_VAPID_*`; and the split-deployment set `REBASE_ROLE`,
 > `REBASE_CRON_SCHEDULER`, `REBASE_JOB_WORKERS`, `REBASE_FUNCTIONS_ONLY`,
 > `REBASE_FUNCTIONS_EXCLUDE`, `REBASE_FUNCTIONS_UPSTREAM`. Do not tell a user a
 > variable "is not supported" because it is missing from the table below.

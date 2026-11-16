@@ -258,13 +258,14 @@
     },
     {
       "id": "server-logic",
-      "title": "Callbacks, functions, cron, jobs, webhooks, email, history",
+      "title": "Callbacks, functions, cron, jobs, webhooks, email, push, history",
       "paths": [
         "packages/server/src/functions/**",
         "packages/server/src/cron/**",
         "packages/server/src/jobs/**",
         "packages/server/src/queues/**",
         "packages/server/src/email/**",
+        "packages/server/src/push/**",
         "packages/server/src/history/**",
         "packages/server/src/services/webhook-service.ts",
         "packages/server/src/services/outbound-url-guard.ts",

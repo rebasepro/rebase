@@ -90,6 +90,7 @@ Both paths reach the same `RebaseBackendConfig`. This is the whole map.
 | `storageDownloadTokenTtl` | `STORAGE_DOWNLOAD_TOKEN_TTL` |
 | `hooks` | `export const hooks` from `backend/hooks.ts` — global table hooks |
 | `history` | `REBASE_HISTORY` (on by default) — the boolean form only |
+| `push` | `REBASE_PUSH`, with `REBASE_VAPID_*` for the keys — the boolean form only |
 | `enableSwagger` | `REBASE_ENABLE_SWAGGER`; unset serves `/api/docs` to the schema endpoint's audience, `true` publishes it with the Swagger UI, `false` keeps it behind the admin gate |
 | `compression` | `REBASE_COMPRESSION` |
 | `maxBodySize` | `REBASE_MAX_BODY_SIZE` |
@@ -109,7 +110,8 @@ only from a hand-written `initializeRebaseBackend` call — `rebase eject`, or a
 
 `rateLimit` · `jobs` · `csrf` · `cronPersistence` ·
 `storagePolicies` · `storageTriggers` · `baas` · `schemaTables` ·
-`history` in its object form (`{ retention }`)
+`history` in its object form (`{ retention }`) ·
+`push` in its object form (`{ allowedHosts, sender, vapid }`)
 
 `schemaEditor` is forced off in a built bundle: the editor rewrites the
 `backend/schema` *source* files, and a bundle holds compiled output.
@@ -131,6 +133,7 @@ After initialization, these routes are mounted:
 | `/api/meta/contract` | The schema version, the runtime and every table as an administrator sees it (needs `schema:read`) |
 | `/api/meta/schema-version` | A version string for that schema (unauthenticated) |
 | `/api/functions/*` | Custom function routes (when `functions` or `functionsDir` is set) |
+| `/api/push/*` | [Push notification](/docs/backend/push-notifications/) subscriptions (when `push` is on) |
 | `/api/admin/cron/*` | Cron job management (`cron:read` / `cron:write`, when `crons` or `cronsDir` is set) |
 | WebSocket on upgrade | Real-time subscriptions, on `/` for an API at `/api` |
 

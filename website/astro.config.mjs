@@ -232,6 +232,7 @@ export default defineConfig({
                         { label: "Cron Jobs API", slug: "docs/backend/cron-jobs-api" },
                         { label: "Cron across instances", slug: "docs/backend/cron-across-instances" },
                         { label: "Background Jobs", slug: "docs/backend/jobs" },
+                        { label: "Push notifications", slug: "docs/backend/push-notifications" },
                         { label: "Custom Functions", slug: "docs/backend/custom-functions" },
                         { label: "Background Work", slug: "docs/backend/background-work" },
                         { label: "Rate limits in functions", slug: "docs/backend/function-rate-limits" },

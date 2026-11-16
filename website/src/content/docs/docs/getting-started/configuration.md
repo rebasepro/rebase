@@ -234,6 +234,9 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REBASE_SERVE_STATIC` | Serve the bundle's static/admin assets from this process. Turn it off when a CDN sits in front. | `true` |
 | `REBASE_HISTORY` | Record [entity change history](/docs/backend/history). | `true` |
 | `REBASE_COMPRESSION` | gzip/brotli responses. | `true` |
+| `REBASE_PUSH` | `true` turns on [push notifications](/docs/backend/push-notifications/): the `/api/push` routes, the `rebase.push_subscriptions` table and `rebase.push`. | `false` |
+| `REBASE_VAPID_PUBLIC_KEY`, `REBASE_VAPID_PRIVATE_KEY` | The VAPID key pair push messages are signed with. Outside production a pair is generated and kept in `.rebase-dev-secrets.json` when unset; in production push stays off without them. | — |
+| `REBASE_VAPID_SUBJECT` | A `mailto:` address or `https://` URL the push services can contact. Defaults to the origin of an `https` `REBASE_PUBLIC_URL`. | — |
 | `REBASE_MAX_BODY_SIZE` | Maximum request body, **in bytes** (`10485760`, not `10MB` — a value that is not a number refuses to boot rather than silently removing the limit). `0` turns the limit off. | `10485760` (10 MiB) |
 | `REBASE_ENABLE_SWAGGER` | The OpenAPI surface. Tri-state. Unset, in every environment: `/api/docs` is served to the callers `GET /api/schema/tables` describes tables to, each the document of the tables they are described, and there is no Swagger UI. `true` publishes the whole document to everyone, with the Swagger **UI** at `/api/swagger` outside production (never in production). `false` keeps the document behind the admin gate. | — |
 | `REBASE_METRICS` | Expose Prometheus metrics at `/metrics`. | `false` |

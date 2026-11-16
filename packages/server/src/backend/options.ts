@@ -936,6 +936,16 @@ export interface RebaseBackendOptions {
      */
     jobs?: JobQueueOptions;
     /**
+     * Web Push notifications to browsers. Off by default.
+     *
+     * `true` mounts `/push/key` and `/push/subscriptions` (signed-in callers
+     * only), creates `rebase.push_subscriptions`, and makes `rebase.push` send.
+     * The VAPID keys come from `REBASE_VAPID_PUBLIC_KEY`,
+     * `REBASE_VAPID_PRIVATE_KEY` and `REBASE_VAPID_SUBJECT`; outside
+     * production a pair is generated and kept when they are unset.
+     */
+    push?: boolean | import("../push/push-options").PushOptions;
+    /**
      * Maximum request body size in bytes for API routes (default: 10MB).
      * Set to 0 to disable the global limit entirely.
      *

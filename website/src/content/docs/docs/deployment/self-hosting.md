@@ -541,10 +541,7 @@ site's app in `rebase.json`:
 
 ```jsonc
 "site": {
-  "type": "static",
-  "root": "site",
-  "output": "site/dist",
-  "path": "https://www.example.com",
+  "type": "static", "root": "site", "output": "site/dist", "path": "https://www.example.com",
   "frameAncestors": ["https://admin.example.com"]
 }
 ```

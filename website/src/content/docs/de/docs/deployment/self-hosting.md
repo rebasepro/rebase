@@ -1,5 +1,5 @@
 ---
-sourceHash: 617ea30e35c8bdfe
+sourceHash: 8abf60bdba2b3d3d
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Betreiben Sie Rebase überall mit dem offiziellen Runtime-Image und Ihrem Projekt-Bundle – Docker Compose, Fly, Railway oder auf einem einfachen VPS.
@@ -555,10 +555,7 @@ Sie die Policy auf dem vorgeschalteten Reverse-Proxy.
 
 ```jsonc
 "site": {
-  "type": "static",
-  "root": "site",
-  "output": "site/dist",
-  "path": "https://www.example.com",
+  "type": "static", "root": "site", "output": "site/dist", "path": "https://www.example.com",
   "frameAncestors": ["https://admin.example.com"]
 }
 ```

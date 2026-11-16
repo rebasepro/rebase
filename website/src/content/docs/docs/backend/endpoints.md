@@ -259,6 +259,18 @@ A deployment with no storage configured serves this prefix as a `501` naming the
 variable it needs, rather than 404ing as if the feature did not exist —
 except `GET /api/storage/sources`, which answers `200` with an empty list.
 
+## Push
+
+Mounted only with `push: true` (`REBASE_PUSH=true`). With push on but no keys,
+every route answers `503 PUSH_NOT_CONFIGURED`. API keys and the service key are
+refused: a subscription is a person's browser.
+
+| Method | Path | Gate | More |
+|---|---|---|---|
+| `GET` | `/api/push/key` | session | The VAPID public key — [Push notifications](/docs/backend/push-notifications/) |
+| `POST` | `/api/push/subscriptions` | session | This browser takes notifications, for the caller — [Push notifications](/docs/backend/push-notifications/#routes) |
+| `DELETE` | `/api/push/subscriptions` | session | Stop them, on the caller's own browser — [Push notifications](/docs/backend/push-notifications/#routes) |
+
 ## Functions
 
 | Method | Path | Gate | More |

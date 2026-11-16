@@ -288,7 +288,7 @@ describe("a group mounted alone answers the impersonation and simulation headers
     ];
 
     it("every group but data and functions refuses them, wherever it is mounted", async () => {
-        const backend = await create({ surfaces: { cron: true, meta: true } });
+        const backend = await create({ surfaces: { cron: true, meta: true }, push: true });
         const auth = await bearer("admin-1", ["admin"]);
         let checked = 0;
         for (const name of Object.keys(backend.routes) as Array<keyof typeof backend.routes>) {

@@ -1,5 +1,5 @@
 ---
-sourceHash: 617ea30e35c8bdfe
+sourceHash: 8abf60bdba2b3d3d
 title: Autohospedaje
 sidebar_label: Autohospedaje
 description: "Ejecute Rebase en cualquier lugar con la imagen de runtime oficial y el bundle de su proyecto: Docker Compose, Fly, Railway o un VPS básico."
@@ -552,10 +552,7 @@ proxy inverso intermedio.
 
 ```jsonc
 "site": {
-  "type": "static",
-  "root": "site",
-  "output": "site/dist",
-  "path": "https://www.example.com",
+  "type": "static", "root": "site", "output": "site/dist", "path": "https://www.example.com",
   "frameAncestors": ["https://admin.example.com"]
 }
 ```

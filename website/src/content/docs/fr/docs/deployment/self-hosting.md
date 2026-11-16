@@ -1,5 +1,5 @@
 ---
-sourceHash: 617ea30e35c8bdfe
+sourceHash: 8abf60bdba2b3d3d
 title: Auto-hébergement
 sidebar_label: Auto-hébergement
 description: Exécutez Rebase n'importe où avec l'image runtime officielle et le bundle de votre projet — Docker Compose, Fly, Railway ou un simple VPS.
@@ -327,10 +327,7 @@ Les applications statiques — l'administration du CMS et tout frontend servi pa
 
 ```jsonc
 "site": {
-  "type": "static",
-  "root": "site",
-  "output": "site/dist",
-  "path": "https://www.example.com",
+  "type": "static", "root": "site", "output": "site/dist", "path": "https://www.example.com",
   "frameAncestors": ["https://admin.example.com"]
 }
 ```

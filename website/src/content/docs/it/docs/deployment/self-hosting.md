@@ -1,5 +1,5 @@
 ---
-sourceHash: 617ea30e35c8bdfe
+sourceHash: 8abf60bdba2b3d3d
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Esegui Rebase ovunque con l'immagine di runtime ufficiale e il bundle del tuo progetto — Docker Compose, Fly, Railway o un semplice VPS.
@@ -327,10 +327,7 @@ Le app statiche — il pannello di amministrazione CMS e qualsiasi frontend serv
 
 ```jsonc
 "site": {
-  "type": "static",
-  "root": "site",
-  "output": "site/dist",
-  "path": "https://www.example.com",
+  "type": "static", "root": "site", "output": "site/dist", "path": "https://www.example.com",
   "frameAncestors": ["https://admin.example.com"]
 }
 ```

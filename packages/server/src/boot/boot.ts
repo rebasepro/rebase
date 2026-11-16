@@ -478,6 +478,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         hooks: projectExports.hooks,
         auth: resolveAuthOptions(env),
         history: env.REBASE_HISTORY,
+        push: env.REBASE_PUSH,
         rlsAudit,
         enableSwagger: resolveEnableSwagger(env),
         compression: env.REBASE_COMPRESSION,

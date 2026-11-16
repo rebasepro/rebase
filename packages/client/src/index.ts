@@ -8,6 +8,7 @@ import { createSchema } from "./schema";
 import { createApiKeys, CreateApiKeysOptions, createPersonalKeys, CreatePersonalKeysOptions } from "./api-keys";
 import { TableClient, createTableClient, invalidBulkBody } from "./table";
 import { createFunctionsClient } from "./functions";
+import { createPushClient, type PushClient } from "./push";
 import { createStorage } from "./storage";
 import { ClientStorageSourceRegistry } from "./storage-registry";
 import { RebaseWebSocketClient } from "./websocket";
@@ -117,6 +118,7 @@ export type {
     UpdateApiKeyRequest
 } from "./api-keys";
 export type { FunctionInvokeOptions, FunctionsClient } from "./functions";
+export type { PushClient, PushSubscribeOptions, PushRegistrationOptions } from "./push";
 
 // Realtime: the WebSocket client class is internal to `createRebaseClient()`,
 // but re-exported (see @internal on the class) so a data-source driver can
@@ -344,6 +346,8 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
     apiKeys: ReturnType<typeof createApiKeys>;
     personalKeys: ReturnType<typeof createPersonalKeys>;
     functions: ReturnType<typeof createFunctionsClient>;
+    /** Web Push from the browser: subscribe and unsubscribe through a service worker. Needs `push: true` on the backend. */
+    push: PushClient;
     ws?: RebaseWebSocketClient;
     /**
      * Broadcast and presence channels.
@@ -522,6 +526,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
     const personalKeys = createPersonalKeys(transport, options.personalKeys);
     const storage = createStorage(transport);
     const functions = createFunctionsClient(transport);
+    const push = createPushClient(transport);
 
     // Build a server-backed StorageSource for a given storage-source key.
     const createStorageSource = (storageId: string): StorageSource =>
@@ -951,6 +956,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         apiKeys,
         personalKeys,
         functions,
+        push,
         storage,
         storageRegistry,
         createStorageSource,

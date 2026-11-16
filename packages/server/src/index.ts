@@ -296,6 +296,23 @@ export { ETAG_HEADER, IF_MATCH_HEADER, assertIfMatch, rowETag, versionColumn } f
 // Email
 // =============================================================================
 export * from "./email";
+// Web Push: `push: true` in the backend options, `rebase.push` to send.
+export type { PushOptions } from "./push/push-options";
+export { generateVapidKeys } from "./push/web-push-crypto";
+export type { VapidKeys } from "./push/web-push-crypto";
+export { createWebPushSender } from "./push/web-push-sender";
+export { subscriptionIdOf } from "./push/subscription-input";
+export type {
+    PushService,
+    PushSender,
+    PushPayload,
+    PushPayloadInput,
+    PushSendOptions,
+    PushSendResult,
+    PushSubscriptionInfo,
+    PushTarget,
+    PushDelivery
+} from "@rebasepro/types";
 
 // =============================================================================
 // Storage
