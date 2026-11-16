@@ -468,6 +468,10 @@ function resolveRelativeModule(fromDir: string, specifier: string): string | nul
     const base = path.resolve(fromDir, specifier);
     const candidates = [
         base,
+        // TypeScript source names its siblings by their compiled spelling
+        // (`./access.js` for `access.ts`), and the legacy-hook check below reads
+        // source, not a build.
+        ...(/\.m?js$/.test(base) ? [base.replace(/\.(m?)js$/, ".$1ts")] : []),
         `${base}.js`,
         `${base}.mjs`,
         `${base}.ts`,
@@ -1288,6 +1292,35 @@ stdio: "pipe" }
     }
 }
 
+/** Where the 0.30 layout kept `storageAuthorize`: the config package's index. */
+const LEGACY_CONFIG_INDEX_FILES = ["index.ts", "index.mts", "index.js", "index.mjs"].map(file => path.join("config", file));
+
+/**
+ * A `config/index.ts` that still exports `storageAuthorize`, which no bundle reads.
+ *
+ * Up to 0.30 the runtime read the hook from the config package's index. From
+ * 0.31 it reads `backend/storage.ts` (`entry.storage`) and nothing else: the
+ * index is not compiled into the bundle, has no manifest entry, and is never
+ * imported. The codemod moves the hook, but a project migrated by hand — or one
+ * that kept the old export beside the new module — built clean, and deployed
+ * with whatever `backend/storage.ts` said, which for a project without that file
+ * is no access control at all. Nothing said so.
+ *
+ * Read from SOURCE with the same textual check {@link detectStorageAuthorize}
+ * applies to the compiled storage module: the index is not part of the build,
+ * so there is no compiled copy to read.
+ *
+ * @returns the index, relative to the project root, or undefined
+ */
+export function findIgnoredConfigStorageAuthorize(projectRoot: string): string | undefined {
+    for (const candidate of LEGACY_CONFIG_INDEX_FILES) {
+        const file = path.join(projectRoot, candidate);
+        if (!fs.existsSync(file) || !fs.statSync(file).isFile()) continue;
+        if (moduleExportsStorageAuthorize(file, 0)) return candidate.split(path.sep).join("/");
+    }
+    return undefined;
+}
+
 /**
  * A hand-written server entrypoint that a bundle does not use.
  *
@@ -1591,6 +1624,23 @@ stdio: toolStdio(options.quietStdout) });
     const nativeModules = detectNativeDependencies(projectRoot, declared);
     const compiledModule = (source: string): string => source.replace(/\.[mc]?ts$/, ".js");
     const declaresStorageAuthorize = detectStorageAuthorize(path.join(outDir, compiledModule(paths.storage)));
+
+    // A hook left where 0.30 read it. See `findIgnoredConfigStorageAuthorize`.
+    const ignoredHook = findIgnoredConfigStorageAuthorize(projectRoot);
+    if (ignoredHook) {
+        say(options, chalk.yellow(
+            `  ⚠ ${ignoredHook} exports \`storageAuthorize\`, and this bundle does not read it — ` +
+            `the runtime takes the hook from ${paths.storage} only.`
+        ));
+        if (declaresStorageAuthorize) {
+            say(options, chalk.dim(`      ${paths.storage} exports one too, and that is the one deployed. Delete the`));
+            say(options, chalk.dim(`      ${ignoredHook} export so the two cannot drift apart.`));
+        } else {
+            say(options, chalk.dim("      This bundle ships no storage access control: with file storage on, the deploy is"));
+            say(options, chalk.dim("      refused, or the runtime refuses to boot. Move the hook:"));
+            say(options, chalk.dim(`      export const storageAuthorize = … from ${paths.storage}.`));
+        }
+    }
 
     // Resolve the declared buckets now, and refuse the build if two of them would
     // read the same environment variables. Catching it here means a rename, not a

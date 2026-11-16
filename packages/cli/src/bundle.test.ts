@@ -12,6 +12,7 @@ import {
     detectFrameworkDepDrift,
     detectNativeDependencies,
     detectStorageAuthorize,
+    findIgnoredConfigStorageAuthorize,
     findUnusedServerEntry,
     foldStaticIntoBundle,
     normalizeEsmSpecifiers,
@@ -500,6 +501,39 @@ describe("storage access-control detection", () => {
 
     it("reports false when there is no storage module at all", () => {
         expect(detectStorageAuthorize(path.join(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-empty-")), "storage"))).toBe(false);
+    });
+});
+
+/**
+ * 0.30 read `storageAuthorize` from `config/index.ts`; 0.31 reads
+ * `backend/storage.ts` only. A hook left in the index was dropped with no
+ * entry, no import and no word — and a project without `backend/storage.ts`
+ * then deployed with no storage access control.
+ */
+describe("a storageAuthorize left in config/index.ts", () => {
+    it("is found when the index defines it", () => {
+        write("config/index.ts", "export const storageAuthorize = () => true;\n");
+        expect(findIgnoredConfigStorageAuthorize(scratch)).toBe("config/index.ts");
+    });
+
+    it("is found when the index re-exports it, by name or through a wildcard", () => {
+        write("config/index.ts", 'export { authz as storageAuthorize } from "./access.js";\n');
+        expect(findIgnoredConfigStorageAuthorize(scratch)).toBe("config/index.ts");
+
+        write("config/index.ts", 'export * from "./access.js";\n');
+        write("config/access.ts", "export async function storageAuthorize() { return true; }\n");
+        expect(findIgnoredConfigStorageAuthorize(scratch)).toBe("config/index.ts");
+    });
+
+    it("says nothing for an index that only keeps the project's own modules", () => {
+        write("config/index.ts", 'export * from "./constants.js";\n// storageAuthorize moved to backend/storage.ts\n');
+        write("config/constants.ts", "export const APP_NAME = \"x\";\n");
+        expect(findIgnoredConfigStorageAuthorize(scratch)).toBeUndefined();
+    });
+
+    it("says nothing for a project with no config package", () => {
+        write("backend/storage.ts", "export const storageAuthorize = () => true;\n");
+        expect(findIgnoredConfigStorageAuthorize(scratch)).toBeUndefined();
     });
 });
 
