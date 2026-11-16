@@ -161,6 +161,7 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
 ### EN Documentation
 - [Introduction (EN)](https://rebase.pro/docs)
 - [Docs > Getting started > Quickstart (EN)](https://rebase.pro/docs/getting-started/quickstart)
+- [Docs > Getting started > Windows (EN)](https://rebase.pro/docs/getting-started/windows)
 - [Docs > Getting started > Project Structure (EN)](https://rebase.pro/docs/getting-started/project-structure)
 - [Docs > Getting started > Environment & Configuration (EN)](https://rebase.pro/docs/getting-started/configuration)
 - [Docs > Troubleshooting (EN)](https://rebase.pro/docs/troubleshooting)
@@ -425,6 +426,7 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
 - [Docs > Deployment > Deploying Rebase on Fly.io (EN)](https://rebase.pro/docs/deployment/flyio)
 - [Docs > Deployment > Deploying Rebase on InstaPods (EN)](https://rebase.pro/docs/deployment/instapods)
 - [Docs > Deployment > Deploying Rebase on Hostman (EN)](https://rebase.pro/docs/deployment/hostman)
+- [Docs > Deployment > Deploying Rebase on Out Plane (EN)](https://rebase.pro/docs/deployment/outplane)
 - [Docs > Recipes > Recipe: Blog CMS (EN)](https://rebase.pro/docs/recipes/blog-cms)
 - [Docs > Recipes > Recipe: Editorial publishing (EN)](https://rebase.pro/docs/recipes/editorial-publishing)
 - [Docs > Recipes > Recipe: Importing from WordPress (EN)](https://rebase.pro/docs/recipes/import-from-wordpress)
@@ -434,6 +436,7 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
 ### ES Documentation
 - [Introduction (ES)](https://rebase.pro/es/docs)
 - [Docs > Getting started > Quickstart (ES)](https://rebase.pro/es/docs/getting-started/quickstart)
+- [Docs > Getting started > Windows (ES)](https://rebase.pro/es/docs/getting-started/windows)
 - [Docs > Getting started > Project Structure (ES)](https://rebase.pro/es/docs/getting-started/project-structure)
 - [Docs > Getting started > Environment & Configuration (ES)](https://rebase.pro/es/docs/getting-started/configuration)
 - [Docs > Troubleshooting (ES)](https://rebase.pro/es/docs/troubleshooting)
@@ -698,6 +701,7 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
 - [Docs > Deployment > Deploying Rebase on Fly.io (ES)](https://rebase.pro/es/docs/deployment/flyio)
 - [Docs > Deployment > Deploying Rebase on InstaPods (ES)](https://rebase.pro/es/docs/deployment/instapods)
 - [Docs > Deployment > Deploying Rebase on Hostman (ES)](https://rebase.pro/es/docs/deployment/hostman)
+- [Docs > Deployment > Deploying Rebase on Out Plane (ES)](https://rebase.pro/es/docs/deployment/outplane)
 - [Docs > Recipes > Recipe: Blog CMS (ES)](https://rebase.pro/es/docs/recipes/blog-cms)
 - [Docs > Recipes > Recipe: Editorial publishing (ES)](https://rebase.pro/es/docs/recipes/editorial-publishing)
 - [Docs > Recipes > Recipe: Importing from WordPress (ES)](https://rebase.pro/es/docs/recipes/import-from-wordpress)
@@ -707,6 +711,7 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
 ### DE Documentation
 - [Introduction (DE)](https://rebase.pro/de/docs)
 - [Docs > Getting started > Quickstart (DE)](https://rebase.pro/de/docs/getting-started/quickstart)
+- [Docs > Getting started > Windows (DE)](https://rebase.pro/de/docs/getting-started/windows)
 - [Docs > Getting started > Project Structure (DE)](https://rebase.pro/de/docs/getting-started/project-structure)
 - [Docs > Getting started > Environment & Configuration (DE)](https://rebase.pro/de/docs/getting-started/configuration)
 - [Docs > Troubleshooting (DE)](https://rebase.pro/de/docs/troubleshooting)
@@ -971,6 +976,7 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
 - [Docs > Deployment > Deploying Rebase on Fly.io (DE)](https://rebase.pro/de/docs/deployment/flyio)
 - [Docs > Deployment > Deploying Rebase on InstaPods (DE)](https://rebase.pro/de/docs/deployment/instapods)
 - [Docs > Deployment > Deploying Rebase on Hostman (DE)](https://rebase.pro/de/docs/deployment/hostman)
+- [Docs > Deployment > Deploying Rebase on Out Plane (DE)](https://rebase.pro/de/docs/deployment/outplane)
 - [Docs > Recipes > Recipe: Blog CMS (DE)](https://rebase.pro/de/docs/recipes/blog-cms)
 - [Docs > Recipes > Recipe: Editorial publishing (DE)](https://rebase.pro/de/docs/recipes/editorial-publishing)
 - [Docs > Recipes > Recipe: Importing from WordPress (DE)](https://rebase.pro/de/docs/recipes/import-from-wordpress)
@@ -980,6 +986,7 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
 ### FR Documentation
 - [Introduction (FR)](https://rebase.pro/fr/docs)
 - [Docs > Getting started > Quickstart (FR)](https://rebase.pro/fr/docs/getting-started/quickstart)
+- [Docs > Getting started > Windows (FR)](https://rebase.pro/fr/docs/getting-started/windows)
 - [Docs > Getting started > Project Structure (FR)](https://rebase.pro/fr/docs/getting-started/project-structure)
 - [Docs > Getting started > Environment & Configuration (FR)](https://rebase.pro/fr/docs/getting-started/configuration)
 - [Docs > Troubleshooting (FR)](https://rebase.pro/fr/docs/troubleshooting)
@@ -1244,6 +1251,7 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
 - [Docs > Deployment > Deploying Rebase on Fly.io (FR)](https://rebase.pro/fr/docs/deployment/flyio)
 - [Docs > Deployment > Deploying Rebase on InstaPods (FR)](https://rebase.pro/fr/docs/deployment/instapods)
 - [Docs > Deployment > Deploying Rebase on Hostman (FR)](https://rebase.pro/fr/docs/deployment/hostman)
+- [Docs > Deployment > Deploying Rebase on Out Plane (FR)](https://rebase.pro/fr/docs/deployment/outplane)
 - [Docs > Recipes > Recipe: Blog CMS (FR)](https://rebase.pro/fr/docs/recipes/blog-cms)
 - [Docs > Recipes > Recipe: Editorial publishing (FR)](https://rebase.pro/fr/docs/recipes/editorial-publishing)
 - [Docs > Recipes > Recipe: Importing from WordPress (FR)](https://rebase.pro/fr/docs/recipes/import-from-wordpress)

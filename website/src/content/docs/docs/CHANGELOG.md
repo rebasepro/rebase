@@ -7,15 +7,15 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+### Changed
+
+- **A write only refetches the realtime lists it can reach.** A list filtered with `==` or `in` on a column (`listen({ where: { owner: ["==", me] } })`) is asked to look again only when the changed row matched its filter before the write or matches it after; 5,000 users each watching their own rows now cost one RLS-scoped read per write instead of 5,000 (measured: fan-out done ~305 ms after the write, from 3.3 s). Every list that is asked still reads under its own subscriber's scope, and a change it cannot judge (an external `UPDATE` without `REPLICA IDENTITY FULL`, a capture-trigger change to a non-key column, a delete through the API, other operators, `include`, `afterRead`) asks every list, as before. A list narrowed only by RLS still costs one read per distinct user. See [What a write costs, and the limits](https://rebase.pro/docs/backend/realtime/#what-a-write-costs-and-the-limits).
+
 ### Fixed
 
 - **A new project installs on Windows.** The scaffold declared `@ariga/atlas` as a dependency, and the package has no Windows build: its `preinstall` exits "Unsupported platform", which failed the whole `pnpm install`. It is now an optional dependency, which an install skips where it cannot build. Only `db push`, `db generate` and `db migrate` use Atlas, and on Windows the CLI and `rebase doctor` now say how to install Atlas's own `atlas.exe`, instead of npm remedies that cannot work there. The steps are in the new [Windows](/docs/getting-started/windows/) guide, along with how to move an existing project.
 - **A managed database's certificate no longer fails with a bare `self-signed certificate`.** Rebase's Postgres driver reads `sslmode=require` as "verify the certificate", where `psql` reads it as "encrypt only", so a `DATABASE_URL` that `psql` accepted stopped boot and `rebase db push` with a stack trace. Both now stop with a message that names the host and the two fixes: `sslmode=no-verify` (encrypted, unverified, passed to Atlas, `pg_dump` and `psql` as `require`), or `sslmode=verify-full` with the provider's CA in `sslrootcert`. See [Configuration](/docs/getting-started/configuration/#required).
 - **`uselibpqcompat=true` no longer breaks `rebase db push`.** It is what the driver's own warning suggests adding, and Atlas rejected it as `unrecognized configuration parameter "uselibpqcompat"`. The CLI now drops it before handing the URL to Atlas, `pg_dump`, `pg_restore` and `psql`.
-
-### Changed
-
-- **A write only refetches the realtime lists it can reach.** A list filtered with `==` or `in` on a column (`listen({ where: { owner: ["==", me] } })`) is asked to look again only when the changed row matched its filter before the write or matches it after; 5,000 users each watching their own rows now cost one RLS-scoped read per write instead of 5,000 (measured: fan-out done ~305 ms after the write, from 3.3 s). Every list that is asked still reads under its own subscriber's scope, and a change it cannot judge (an external `UPDATE` without `REPLICA IDENTITY FULL`, a capture-trigger change to a non-key column, a delete through the API, other operators, `include`, `afterRead`) asks every list, as before. A list narrowed only by RLS still costs one read per distinct user. See [What a write costs, and the limits](https://rebase.pro/docs/backend/realtime/#what-a-write-costs-and-the-limits).
 
 ## [0.32.0] - 2026-11-16
 

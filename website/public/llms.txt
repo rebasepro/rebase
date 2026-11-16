@@ -36,6 +36,7 @@
 
 - [Introduction](https://rebase.pro/docs/index.md): Rebase is the open-source backend for Postgres, with an admin panel for your team, built with React and TypeScript. Define your schema in TypeScript, and Rebase generates a full CRUD UI, REST API, authentication, storage, and real-time sync — powered by PostgreSQL.
 - [Quickstart](https://rebase.pro/docs/getting-started/quickstart.md): Create a new Rebase project and get it running locally in under 2 minutes.
+- [Windows](https://rebase.pro/docs/getting-started/windows.md): Install and run a Rebase project on Windows — what works natively, the one tool (Atlas) that needs its own Windows binary for db push, db generate and db migrate, and when to use WSL2 instead.
 - [Project Structure](https://rebase.pro/docs/getting-started/project-structure.md): The layout of a Rebase project — the tables in backend/schema, the backend modules the runtime reads, and the admin panel's customizations in frontend/src/cms — with and without the panel.
 - [Environment & Configuration](https://rebase.pro/docs/getting-started/configuration.md): All environment variables and configuration options for Rebase projects.
 - [Troubleshooting](https://rebase.pro/docs/troubleshooting.md): The failures that stop a Rebase backend from starting or serving — an unreachable database, wrong credentials, a missing extension, an RLS refusal, schema drift, a busy port, a function that will not load — and what each one looks like.
@@ -300,6 +301,7 @@
 - [Deploying Rebase on Fly.io](https://rebase.pro/docs/deployment/flyio.md): Learn how to deploy Rebase globally or restrict it to European data centers using Fly.io.
 - [Deploying Rebase on InstaPods](https://rebase.pro/docs/deployment/instapods.md): Take a fresh rebase init project to a live HTTPS URL on one InstaPods pod — Node, PostgreSQL and file uploads on the same machine, no Docker.
 - [Deploying Rebase on Hostman](https://rebase.pro/docs/deployment/hostman.md): Deploy a rebase init project on Hostman — App Platform with Managed PostgreSQL and S3 storage, or one cloud server with your project's own Compose file.
+- [Deploying Rebase on Out Plane](https://rebase.pro/docs/deployment/outplane.md): Deploy a rebase init project on Out Plane — one app built from your repository, Out Plane's managed PostgreSQL, and file uploads in an Out Plane bucket.
 - [Recipe: Blog CMS](https://rebase.pro/docs/recipes/blog-cms.md): Build a complete blog CMS with articles, authors, categories, rich text editing, and image uploads — tables in backend/schema, presentation in frontend/src/cms.
 - [Recipe: Editorial publishing](https://rebase.pro/docs/recipes/editorial-publishing.md): Run a blog or newsroom on Rebase: writers and editors, review, scheduled publishing, drafts of live posts, previews, translations, a media library, content blocks, feeds, editorial notes and a WordPress import.
 - [Recipe: Importing from WordPress](https://rebase.pro/docs/recipes/import-from-wordpress.md): Move posts from WordPress into Rebase with a script that reads the WordPress REST API and upserts each post by slug, so it can run again safely.
