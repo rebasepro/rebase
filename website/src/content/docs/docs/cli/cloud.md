@@ -443,6 +443,7 @@ rebase cloud deploy --git [<branch>]     # build on the control plane from the c
 rebase cloud metrics --runtime           # requests, errors and latency, per surface
 rebase cloud metrics --history [--series cpu_millicores|memory_bytes|event_loop_delay_ms] [--minutes <n>]
 rebase cloud domains primary <domain>    # make a verified domain the canonical one
+rebase cloud domains redirect <domain> [--off]   # answer it with a 308 to the primary, path and query kept
 rebase cloud settings set --studio on|off
 rebase cloud orgs rename <name> [--slug <slug>]
 rebase cloud orgs delete                 # refused while the organization has projects
@@ -450,4 +451,4 @@ rebase cloud billing email <address>     # where invoices go
 rebase cloud clusters baseline <id> [--install]   # platform admins
 ```
 
-`deploy-hooks create` prints the hook's URL once. `deploy --git` cannot be combined with the flags of a local build, and on the managed runtime it needs `--eject`, because the control plane builds from source. `settings set --studio` is the switch the project commands (`rebase data`, `rebase users`, …) need on for `--project`: they reach the app through the console's Studio proxy. A command whose control-plane route is not deployed yet answers `not_served` and names it. Destructive commands ask first and refuse with `confirmation_required` when nobody can answer: pass `--yes`.
+`domains redirect` is per domain and off by default, so a project serving an `api.` host beside its site keeps both; it takes effect while the domain is verified and another one is primary, and never applies to a domain an app is served on. `deploy-hooks create` prints the hook's URL once. `deploy --git` cannot be combined with the flags of a local build, and on the managed runtime it needs `--eject`, because the control plane builds from source. `settings set --studio` is the switch the project commands (`rebase data`, `rebase users`, …) need on for `--project`: they reach the app through the console's Studio proxy. A command whose control-plane route is not deployed yet answers `not_served` and names it. Destructive commands ask first and refuse with `confirmation_required` when nobody can answer: pass `--yes`.

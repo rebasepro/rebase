@@ -5,6 +5,7 @@
  *   domains add <domain>       Register a host (starts, does not finish, setup)
  *   domains verify [domain]    Check the host's published DNS now; live only if it passes
  *   domains primary <domain>   Make a verified host the canonical one
+ *   domains redirect <domain>  Answer a host with a 308 to the primary (`--off` serves it again)
  *   domains remove <domain>    Stop serving a host
  *
  * A project's hosts are rows of the control plane's `project_domains` table,
@@ -62,6 +63,8 @@ interface DomainEntry {
     id: string | null;
     host: string;
     primary: boolean;
+    /** Answered with a 308 to the primary instead of served. */
+    redirectToPrimary?: boolean;
     status: "pending" | "verified";
     verifiedAt: string | null;
     isApex?: boolean;
@@ -84,6 +87,7 @@ interface DomainRow {
     id?: string;
     host?: string;
     primary?: boolean;
+    redirectToPrimary?: boolean;
     status?: string;
     verifiedAt?: string | null;
     isApex?: boolean;
@@ -150,6 +154,7 @@ function rowEntry(row: DomainRow | null | undefined): DomainEntry | null {
         id: row.id,
         host: row.host,
         primary: row.primary === true,
+        ...(row.redirectToPrimary === true ? { redirectToPrimary: true } : {}),
         status: row.status === "verified" ? "verified" : "pending",
         verifiedAt: row.verifiedAt ?? null,
         isApex: row.isApex,
@@ -266,6 +271,9 @@ export async function domainsCommand(action: string | undefined, rawArgs: string
         case "primary":
             await primaryDomain(rawArgs);
             break;
+        case "redirect":
+            await redirectDomain(rawArgs);
+            break;
         case "remove":
         case "rm":
         case "delete":
@@ -306,7 +314,10 @@ maxPositionals: 0 });
                 }
                 for (const d of set.domains) {
                     const status = d.status === "verified" ? chalk.green(d.status) : chalk.yellow(d.status);
-                    console.log(`  ${chalk.bold(d.host)}  ${status}${d.primary && set.domains.length > 1 ? chalk.gray("  primary") : ""}`);
+                    const role = d.primary && set.domains.length > 1
+                        ? chalk.gray("  primary")
+                        : d.redirectToPrimary ? chalk.gray("  redirects to the primary") : "";
+                    console.log(`  ${chalk.bold(d.host)}  ${status}${role}`);
                     if (d.verifiedAt) console.log(chalk.gray(`    verified ${d.verifiedAt}`));
                     if (d.status !== "verified") printRecords(d.instructions);
                 }
@@ -514,6 +525,102 @@ async function primaryDomain(rawArgs: string[]): Promise<void> {
     );
 }
 
+/**
+ * Answer one host with a permanent redirect (308) to the primary, path and
+ * query kept, instead of serving the project on it — or, with `--off`, serve it
+ * again.
+ *
+ * Per host and off by default, because a project may serve distinct hosts on
+ * purpose (an `api.` host beside the site). What it is for is the other case:
+ * `www.example.com` and `example.com` serving one site are two origins to a
+ * browser, and whatever is keyed on the origin — Google sign-in's authorised
+ * origins first — works on one and fails on the other.
+ */
+async function redirectDomain(rawArgs: string[]): Promise<void> {
+    const { flags, positionals } = parseCloudArgs({
+        spec: { "--off": Boolean },
+        rawArgs,
+        commandWords: 3, // cloud domains redirect
+        command: "cloud domains redirect",
+        maxPositionals: 1
+    });
+    const named = positionals[0];
+    const on = flags["--off"] !== true;
+    if (!named) {
+        fail(
+            "Usage: rebase cloud domains redirect <domain> [--off]",
+            "Name the host to send to the primary, e.g. `rebase cloud domains redirect www.example.com`.",
+            "usage"
+        );
+    }
+    const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    const projectRef = displayProjectRef(rawArgs);
+
+    let set: DomainSet;
+    try {
+        set = await loadDomains(client, projectId);
+    } catch (e) {
+        reportError(e, "Failed to load custom domains");
+    }
+    if (set.model === "column") {
+        fail(
+            "This control plane serves one custom domain per project, so there is no other host to redirect.",
+            "`rebase cloud domains list` shows the one it serves.",
+            "not_served"
+        );
+    }
+    const target = pickDomain(set, named, "redirect");
+    if (target.id === null) {
+        fail(
+            `${target.host} is held outside this project's host list, so it cannot redirect.`,
+            `Add it to the list first: \`rebase cloud domains add ${target.host}\`, then \`rebase cloud domains verify ${target.host}\`.`,
+            "usage"
+        );
+    }
+    if (on && target.primary) {
+        const other = set.domains.find(d => !d.primary && d.status === "verified");
+        fail(
+            `${target.host} is the primary host: the other hosts redirect to it.`,
+            other
+                ? `Make another host primary first: \`rebase cloud domains primary ${other.host}\`.`
+                : "Add and verify the host it should redirect to, and make that one primary.",
+            "domain_is_primary"
+        );
+    }
+
+    let res: DomainRow & { redirectsTo?: string | null; notInEffect?: string };
+    try {
+        res = await client.functions.invoke<DomainRow & { redirectsTo?: string | null; notInEffect?: string }>(
+            "domains", { redirect: on }, { path: `${projectId}/${target.id}/redirect` }
+        );
+    } catch (e) {
+        reportError(e, on ? "Failed to redirect the domain" : "Failed to stop the redirect");
+    }
+    const redirectsTo = res.redirectsTo ?? null;
+    emit(
+        () => {
+            if (!on) {
+                success(`${target.host} is served by project ${projectRef} again`);
+            } else if (redirectsTo) {
+                success(`${target.host} now redirects to https://${redirectsTo} (308, path and query kept)`);
+            } else {
+                success(`${target.host} will redirect to the primary host`);
+                if (res.notInEffect) console.log(chalk.yellow(`  Not in effect yet: ${res.notInEffect}`));
+            }
+        },
+        {
+            success: true,
+            projectId,
+            id: target.id,
+            host: target.host,
+            redirectToPrimary: on,
+            redirectsTo,
+            ...(res.notInEffect ? { notInEffect: res.notInEffect } : {})
+        }
+    );
+}
+
 async function removeDomain(rawArgs: string[]): Promise<void> {
     // Strict: detaching a host is destructive, and the permissive parse
     // accepted `domains remove --dry-run` by ignoring the flag and detaching
@@ -587,12 +694,15 @@ description: "Check a host's DNS and put it live" },
             { action: "primary",
 args: "<domain>",
 description: "Make a verified host the canonical one, the address links are built from" },
+            { action: "redirect",
+args: "<domain> [--off]",
+description: "Answer a host with a 308 to the primary instead of serving it" },
             { action: "remove",
 args: "<domain>",
 description: "Stop serving a host" }
         ],
         notes: [
-            "A project can be served on several hosts; each is verified on its own.",
+            "A project can be served on several hosts; each is verified on its own, and each serves the project unless it redirects.",
             "A CNAME is invalid at a zone apex: use an A record there and a CNAME below it.",
             "`list` prints the exact records to add — copy them rather than deriving them."
         ]

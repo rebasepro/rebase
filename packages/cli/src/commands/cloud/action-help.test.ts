@@ -75,6 +75,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     "deployments list": { "--limit": Number, "--all": Boolean },
     "domains add": {},
     "domains primary": {},
+    "domains redirect": { "--off": Boolean },
     "domains remove": {},
     "env set": ENV_SET_FLAGS,
     "env pull": { "--output": String, "--out": "--output" },

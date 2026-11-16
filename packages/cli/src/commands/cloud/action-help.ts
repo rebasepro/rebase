@@ -607,13 +607,35 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         command: "cloud domains primary",
         usage: "cloud domains primary <domain>",
         summary:
-            "Make one of the project's verified domains its canonical host: the address links and redirects are built "
-            + "from. The project keeps serving its other domains.",
+            "Make one of the project's verified domains its canonical host: the address links are built from, and the "
+            + "one `domains redirect` sends the others to. The project keeps serving its other domains as themselves "
+            + "unless each is told to redirect.",
         flags: [],
         examples: ["rebase cloud domains primary app.example.com"],
         notes: [
             "Only a verified domain can be primary: run `domains verify <domain>` first.",
             "Refused with not_served by a control plane that keeps a single domain per project."
+        ]
+    },
+
+    "domains redirect": {
+        command: "cloud domains redirect",
+        usage: "cloud domains redirect <domain> [--off]",
+        summary:
+            "Answer one of the project's domains with a permanent redirect (308) to the primary domain, keeping the path "
+            + "and the query, instead of serving the project on it. Use it for `www.` beside an apex: two hosts serving "
+            + "one site are two origins, and Google sign-in, cookies and passkeys each work on one and fail on the other.",
+        flags: [["--off", "Serve the domain again instead of redirecting it"]],
+        examples: [
+            "rebase cloud domains primary example.com",
+            "rebase cloud domains redirect www.example.com",
+            "rebase cloud domains redirect www.example.com --off"
+        ],
+        notes: [
+            "Off by default, per domain: a project serving an `api.` host beside its site keeps both.",
+            "In effect while the domain is verified and another domain is primary; until then it is stored and says so.",
+            "Never applies to the primary itself, to the project's <slug>.rebase.website host, or to a domain an app is "
+            + "served on (an app `path` with a hostname in rebase.json)."
         ]
     },
 

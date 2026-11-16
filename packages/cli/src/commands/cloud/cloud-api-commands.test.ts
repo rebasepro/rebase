@@ -287,6 +287,41 @@ describe("rebase cloud domains primary", () => {
     });
 });
 
+/* ── domains redirect ──────────────────────────────────────────── */
+
+describe("rebase cloud domains redirect", () => {
+    const DOMAINS = {
+        tenantHost: "songbuzz.rebase.website",
+        domains: [
+            { id: "d1", host: "songbuzz.tv", primary: true, status: "verified" },
+            { id: "d2", host: "www.songbuzz.tv", primary: false, status: "verified" }
+        ]
+    };
+
+    it("asks the domains function to redirect the host, and says where it goes", async () => {
+        answer = (_n, _b, opts) => (opts?.method === "GET"
+            ? DOMAINS
+            : { id: "d2", host: "www.songbuzz.tv", primary: false, status: "verified", redirectToPrimary: true, redirectsTo: "songbuzz.tv" });
+        const r = await stdoutOf(() => domainsCommand("redirect", argv("domains", "redirect", "www.songbuzz.tv")));
+        expect(invoke).toHaveBeenCalledWith("domains", { redirect: true }, { path: `${PROJECT_ID}/d2/redirect` });
+        expect(r.json()).toMatchObject({ host: "www.songbuzz.tv", redirectToPrimary: true, redirectsTo: "songbuzz.tv" });
+    });
+
+    it("serves the host again with --off", async () => {
+        answer = (_n, _b, opts) => (opts?.method === "GET" ? DOMAINS : { id: "d2", host: "www.songbuzz.tv", redirectsTo: null });
+        const r = await stdoutOf(() => domainsCommand("redirect", argv("domains", "redirect", "www.songbuzz.tv", "--off")));
+        expect(invoke).toHaveBeenCalledWith("domains", { redirect: false }, { path: `${PROJECT_ID}/d2/redirect` });
+        expect(r.json()).toMatchObject({ redirectToPrimary: false, redirectsTo: null });
+    });
+
+    it("refuses the primary, and a missing domain, before the call", async () => {
+        answer = () => DOMAINS;
+        expect(errorOf(await stdoutOf(() => domainsCommand("redirect", argv("domains", "redirect", "songbuzz.tv")))).code).toBe("domain_is_primary");
+        expect(errorOf(await stdoutOf(() => domainsCommand("redirect", argv("domains", "redirect")))).code).toBe("usage");
+        expect(invoke).not.toHaveBeenCalledWith("domains", expect.objectContaining({ redirect: expect.anything() }), expect.anything());
+    });
+});
+
 /* ── settings ──────────────────────────────────────────────────── */
 
 describe("rebase cloud settings set", () => {
