@@ -436,8 +436,6 @@ charge them yet). An autoscaled project's answer also carries `autoscale`:
 
 ## Deploy hooks, alerts and the rest
 
-<span class="since-badge" data-since="0.32">Since 0.32</span>
-
 ```bash
 rebase cloud deploy-hooks [list] | create [--name <name>] [--branch <branch>] | revoke <id>   # secret URLs a git host or CI calls to deploy
 rebase cloud alerts [list] [--all] | ack <id> | snooze <id> --hours <1-168>   # the project's incidents

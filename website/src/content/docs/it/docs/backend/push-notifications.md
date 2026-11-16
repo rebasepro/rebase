@@ -1,13 +1,11 @@
 ---
-sourceHash: bcfb0bd417433447
+sourceHash: 1decbd73d73d8d9b
 title: Notifiche push
 sidebar_label: Notifiche push
 description: Web Push per i browser dei tuoi utenti — Chrome, Firefox, Edge e Safari su iPhone, iPad e Mac — inviate da funzioni e cron job con rebase.push.
 ---
 
 ## Panoramica
-
-<span class="since-badge" data-since="0.32">Da 0.32</span>
 
 Il Web Push mostra una notifica sulla schermata di blocco o sul desktop dell'utente mentre l'app è chiusa. Rebase si occupa del lato server: memorizza la sottoscrizione di ogni browser, firma i messaggi con le tue chiavi VAPID, li crittografa in modo che solo quel browser possa leggerli e rimuove i browser che si sono disiscritti.
 
@@ -43,8 +41,6 @@ await initializeRebaseBackend({
 Questo crea la tabella `rebase.push_subscriptions` all'avvio e monta le route sotto `/api/push`.
 
 ### Chiavi
-
-<span class="since-badge" data-since="0.32">Da 0.32</span>
 
 Un browser si iscrive con la chiave pubblica del tuo server e accetta solo messaggi firmati con la chiave privata corrispondente. Configura la coppia e un indirizzo di contatto al quale i servizi push possono raggiungerti:
 

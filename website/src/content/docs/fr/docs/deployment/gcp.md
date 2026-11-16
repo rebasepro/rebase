@@ -1,5 +1,5 @@
 ---
-sourceHash: 8e1af6247c009612
+sourceHash: 0a72296caa851657
 title: Déployer Rebase sur Google Cloud Platform
 description: Déployez votre instance Rebase en toute sécurité sur GCP à l'aide de Cloud SQL et Cloud Run, en ciblant les régions de centres de données de l'UE.
 sidebar_label: Google Cloud
@@ -34,7 +34,7 @@ rebase build
 Cloud Run récupère les images depuis un registre, vous devez donc intégrer le bundle dans une image dérivée. Trois lignes suffisent, et cela fige exactement ce qui s'exécute :
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.31.0
+FROM rebasepro/server:0.32.0
 COPY dist-bundle /bundle
 ```
 

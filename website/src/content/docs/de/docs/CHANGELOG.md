@@ -11,6 +11,8 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-11-16
+
 The CLI reaches a running app's whole API: rows, users, cron, files, functions, logs and the RLS simulator, on the local `rebase dev`, a server named with `--url`, or a Rebase Cloud project with `--project`. See [A running app](https://rebase.pro/docs/cli/project/).
 
 ### Added

@@ -319,8 +319,6 @@ then delete it. The whole workflow is on [Database Branching](/docs/backend/bran
 
 #### `rebase db branch merge`
 
-<span class="since-badge" data-since="0.32">Since 0.32</span>
-
 ```bash
 rebase db branch merge <name> [--on-conflict abort|branch|target] [--skip-blocked] [--yes]
 ```

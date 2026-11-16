@@ -1,5 +1,5 @@
 ---
-sourceHash: 79cc7825b045bc4d
+sourceHash: 535fb9801df93ad9
 title: Comandos de Banco de Dados
 sidebar_label: Comandos de Banco de Dados
 description: Os comandos rebase db — push, generate e migrate, backups e restaurações, extração de cópia, a string de conexão, o banco de dados de desenvolvimento gerenciado e branches.
@@ -319,8 +319,6 @@ no checkout, inclusive a exclusão, estão apontados para ela: use `switch --off
 e, em seguida, exclua-a. O fluxo de trabalho completo está em [Database Branching](/docs/backend/branching/).
 
 #### `rebase db branch merge`
-
-<span class="since-badge" data-since="0.32">Since 0.32</span>
 
 ```bash
 rebase db branch merge <name> [--on-conflict abort|branch|target] [--skip-blocked] [--yes]

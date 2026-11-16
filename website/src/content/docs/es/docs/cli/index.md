@@ -1,5 +1,5 @@
 ---
-sourceHash: 3dcd0c56a34458b0
+sourceHash: 45a9e8008b0f4c8c
 title: Referencia de la CLI
 sidebar_label: CLI
 description: Comandos de la CLI de Rebase para inicialización de proyectos, generación de esquemas, migraciones de bases de datos y generación de SDK.
@@ -308,8 +308,6 @@ Si las tablas son seguras para enviar a producción, en un único comando rápid
 Un proyecto creado con scaffolding lo ejecuta para Claude Code tras cada edición en `backend/schema/`: consulta [`rebase skills install`](#rebase-skills-install).
 
 ### Comandos para una app en ejecución
-
-<span class="since-badge" data-since="0.32">Since 0.32</span>
 
 `rebase api`, `rebase data`, `rebase users`, `rebase cron`, `rebase logs`, `rebase functions`, `rebase rls simulate`, `rebase auth login` y `rebase storage ls|cp|rm|url|stat` actúan sobre una app en ejecución a través de su API: el `rebase dev` local, un servidor que indicas con `--url` o un proyecto de Rebase Cloud con `--project`. Consulta [Una app en ejecución](/docs/cli/project/).
 

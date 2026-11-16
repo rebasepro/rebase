@@ -1,5 +1,5 @@
 ---
-sourceHash: 3dcd0c56a34458b0
+sourceHash: 45a9e8008b0f4c8c
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schema-Generierung, Datenbankmigrationen und SDK-Generierung.
@@ -308,8 +308,6 @@ Prüft in einem schnellen Befehl für CI und für Hooks von KI-Agents, ob die Ta
 Ein gescaffoldetes Projekt führt diesen Befehl für Claude Code nach jeder Bearbeitung unter `backend/schema/` aus: siehe [`rebase skills install`](#rebase-skills-install).
 
 ### Befehle für eine laufende App
-
-<span class="since-badge" data-since="0.32">Since 0.32</span>
 
 `rebase api`, `rebase data`, `rebase users`, `rebase cron`, `rebase logs`, `rebase functions`, `rebase rls simulate`, `rebase auth login` und `rebase storage ls|cp|rm|url|stat` arbeiten über die API mit einer laufenden App: dem lokalen `rebase dev`, einem Server, den Sie mit `--url` angeben, oder einem Rebase-Cloud-Projekt mit `--project`. Siehe [Eine laufende App](/docs/cli/project/).
 

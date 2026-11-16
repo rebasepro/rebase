@@ -1,5 +1,5 @@
 ---
-sourceHash: 79cc7825b045bc4d
+sourceHash: 535fb9801df93ad9
 title: Comandos de base de datos
 sidebar_label: Comandos de base de datos
 description: Los comandos de rebase db — push, generate y migrate, copias de seguridad y restauraciones, extracción de copias, la cadena de conexión, la base de datos de desarrollo administrada y ramas.
@@ -340,8 +340,6 @@ elimínela. Todo el flujo de trabajo se encuentra en
 [Ramificación de bases de datos](/docs/backend/branching/).
 
 #### `rebase db branch merge`
-
-<span class="since-badge" data-since="0.32">Since 0.32</span>
 
 ```bash
 rebase db branch merge <name> [--on-conflict abort|branch|target] [--skip-blocked] [--yes]

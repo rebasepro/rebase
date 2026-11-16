@@ -1,13 +1,11 @@
 ---
-sourceHash: bcfb0bd417433447
+sourceHash: 1decbd73d73d8d9b
 title: Push-Benachrichtigungen
 sidebar_label: Push-Benachrichtigungen
 description: Web Push an die Browser Ihrer Benutzer – Chrome, Firefox, Edge und Safari auf iPhone, iPad und Mac – gesendet aus Funktionen und Cron-Jobs mit rebase.push.
 ---
 
 ## Übersicht
-
-<span class="since-badge" data-since="0.32">Seit 0.32</span>
 
 Web Push zeigt eine Benachrichtigung auf dem Sperrbildschirm oder Desktop eines Benutzers an,
 während Ihre App geschlossen ist. Rebase kümmert sich um die Serverseite: Es speichert
@@ -49,8 +47,6 @@ Dadurch wird die Tabelle `rebase.push_subscriptions` beim Systemstart erstellt u
 die Routen unter `/api/push` bereitgestellt.
 
 ### Schlüssel
-
-<span class="since-badge" data-since="0.32">Seit 0.32</span>
 
 Ein Browser abonniert Benachrichtigungen mit dem öffentlichen Schlüssel Ihres Servers und akzeptiert nur Nachrichten,
 die mit dem passenden privaten Schlüssel signiert sind. Legen Sie das Schlüsselpaar sowie eine Kontaktadresse fest,

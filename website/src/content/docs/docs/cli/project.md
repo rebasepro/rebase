@@ -4,13 +4,9 @@ sidebar_label: A running app
 description: CLI commands that act on a running Rebase app through its API — rows, users, cron, logs, functions, files, the RLS simulator — on rebase dev, a server you name, or a Rebase Cloud project.
 ---
 
-<span class="since-badge" data-since="0.32">Since 0.32</span>
-
 These commands talk to a running app over its own API, so row-level security, field access, hooks and storage policies decide what they may do, as they do for the SDK. They reach the local `rebase dev`, a server you name, or a Rebase Cloud project, with the same flags everywhere.
 
 ## Choosing the server and the credential
-
-<span class="since-badge" data-since="0.32">Since 0.32</span>
 
 | Flag | Where requests go, and as whom |
 |---|---|
@@ -28,8 +24,6 @@ Nothing else is guessed: with no `REBASE_BASE_URL` and no running `rebase dev`, 
 
 ## `rebase api`
 
-<span class="since-badge" data-since="0.32">Since 0.32</span>
-
 Any route the app serves, with the project's credential — the long tail that has no command of its own: a materialized view's refresh, the RLS audit, `/api/meta/contract`, a route a plugin adds.
 
 ```bash
@@ -42,8 +36,6 @@ rebase api PATCH data/posts/42 --input change.json --include
 A path without a leading `/` is under `/api`. `-f key=value` is a string field and `-F` a typed one (`true`, `false`, `null`, numbers, JSON, `@file`); fields are the query string of a GET, HEAD or DELETE and a JSON body otherwise. Unlike `gh api`, a field alone never makes the request a POST: a write names its method or carries `--input`. The answer is printed as it came — JSON pretty-printed — and a non-2xx answer is printed and exits 1. An `Authorization` header is refused; the target flags choose the credential.
 
 ## `rebase data`
-
-<span class="since-badge" data-since="0.32">Since 0.32</span>
 
 The rows of a table, through `/api/data`. Filters are the API's own (`?status=eq.published`), passed through as written: `--where status=eq.published`, `--where price=gte.10`, and a bare `--where status=draft` for equality.
 
@@ -78,8 +70,6 @@ The service key is the `admin` role: row-level security still runs, as that role
 
 ## `rebase schema show`
 
-<span class="since-badge" data-since="0.32">Since 0.32</span>
-
 The tables, or one table's columns, relations and row-level security — from `backend/schema` by default, or with `--remote` (or any target flag) as the running server describes them to this credential. A credential without `schema:read` sees no policies, and a table it cannot read is not listed.
 
 ```bash
@@ -88,8 +78,6 @@ rebase schema show posts --remote --project acme
 ```
 
 ## `rebase users`
-
-<span class="since-badge" data-since="0.32">Since 0.32</span>
 
 The accounts, through `/api/admin/users`, `/roles` and `/guests`. An account is named by its uid or its email (an exact match, never the first fuzzy hit).
 
@@ -108,8 +96,6 @@ rebase users guests prune --older-than 30d --yes
 
 ## `rebase cron`
 
-<span class="since-badge" data-since="0.32">Since 0.32</span>
-
 The app's scheduled jobs (`backend/crons/*`).
 
 ```bash
@@ -124,8 +110,6 @@ rebase cron reset nightly-backup          # the job's code decides again
 
 ## `rebase logs`
 
-<span class="since-badge" data-since="0.32">Since 0.32</span>
-
 The server's request and application log — the buffer the Studio Logs Explorer reads — once, or followed with `-f`.
 
 ```bash
@@ -136,8 +120,6 @@ rebase logs -f --source auth --search "sign-in"
 The buffer is one process's. With `--project` or `--cloud` this is `rebase cloud logs --runtime`: every replica's output, through the control plane.
 
 ## `rebase functions`
-
-<span class="since-badge" data-since="0.32">Since 0.32</span>
 
 The app's own routes, one per file in `backend/functions/`.
 
@@ -150,8 +132,6 @@ rebase functions invoke billing webhook -X POST --input event.json
 `invoke` takes the fields, body and headers `rebase api` takes, and prints the answer as it came. Functions decide their own access, so the credential matters: `--anon` shows what a visitor gets.
 
 ## `rebase storage`
-
-<span class="since-badge" data-since="0.32">Since 0.32</span>
 
 Stored files, through the storage policies. The stored side starts with a colon: `:avatars/me.png` in the default source, `media:avatars/me.png` in the source keyed `media`.
 
@@ -168,8 +148,6 @@ rebase storage rm :avatars/me.png --yes
 
 ## `rebase rls simulate`
 
-<span class="since-badge" data-since="0.32">Since 0.32</span>
-
 What another identity would see, from the app's RLS simulator — the one Studio's "view as" uses: per table, the rows it reads against the rows you read, the tables its scopes shut it out of, and the columns it cannot read. Read-only.
 
 ```bash
@@ -184,8 +162,6 @@ The simulator answers an administrator's own session and never a key, so this se
 
 ## `rebase auth login`, `emails` and `keys`
 
-<span class="since-badge" data-since="0.32">Since 0.32</span>
-
 Some routes answer a person and never a machine: the RLS simulator, personal keys, live schema apply. `rebase auth login` signs in to a running app — through the browser when the server offers device sign-in, else with `--email` and a password (`--code` for a second factor) — and keeps the session in `~/.rebase/sessions.json`, by server, never in the project. `auth whoami` says who the server takes you to be and the scopes you hold; `auth logout` ends the session there too.
 
 ```bash
@@ -199,8 +175,6 @@ rebase auth keys revoke <id> --yes
 `auth emails` reads the development mailbox a server with no `SMTP_HOST` keeps instead of sending; `--clear` empties it. `auth keys` manages your own `rk_` keys, which act as you, narrowed to the scopes named; the server answers it only when the auth table sets `auth.personalKeys: true`. Service keys are `rebase api-keys`, which also gained `update <id>`.
 
 ## Next steps
-
-<span class="since-badge" data-since="0.32">Since 0.32</span>
 
 - [Endpoint index](/docs/backend/endpoints/) — every route these commands reach, and the scope each needs
 - [REST API](/docs/backend/api/) — the filter, sort and paging syntax `rebase data` passes through

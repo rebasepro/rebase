@@ -1,5 +1,5 @@
 ---
-sourceHash: d92634b4d2c8413c
+sourceHash: 70204f908d35bb64
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud est le même Rebase, géré pour vous. Ce que c'est, comment lier et déployer un projet, et ce que la bêta privée n'inclut pas encore.
@@ -478,11 +478,11 @@ sauf si elle redémarre la base de données, auquel cas elle attend une fenêtre
 | `init`, `claim` | Avec `--claim` : un backend actif sans compte, et un lien pour le revendiquer ; `claim` réaffiche ce lien. Voir [Un backend sans compte](/docs/deployment/cloud-agents/#a-backend-with-no-account) |
 | `projects` | Créer, lister, inspecter, supprimer |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Déployer et surveiller |
-| `deploy-hooks` | Des URL secrètes qu'un hébergeur git ou une CI appelle pour déployer le projet : lister, créer (l'URL n'est affichée qu'une fois), révoquer. <span class="since-badge" data-since="0.32">Since 0.32</span> |
+| `deploy-hooks` | Des URL secrètes qu'un hébergeur git ou une CI appelle pour déployer le projet : lister, créer (l'URL n'est affichée qu'une fois), révoquer. |
 | `previews` | Builds servis sur leur propre adresse via `deploy --preview`, et leur suppression. Voir [Prévisualiser une modification](#prévisualiser-une-modification) |
 | `start`, `stop`, `restart` | Mettre en pause un projet et le réactiver. Un projet arrêté conserve son abonnement, à moins que la plateforme ne facture aux projets arrêtés uniquement le stockage et les frais de plateforme ; la ligne **Billing** de la console l'indique le cas échéant |
 | `status`, `metrics`, `debug` | Ce qu'il fait, et pourquoi il ne le fait pas |
-| `alerts` | Les incidents ouverts du projet, et en acquitter ou en mettre un en pause. <span class="since-badge" data-since="0.32">Since 0.32</span> |
+| `alerts` | Les incidents ouverts du projet, et en acquitter ou en mettre un en pause. |
 | `cron` | Les tâches cron de l'application déployée et leurs exécutions enregistrées, lues avec vos identifiants `rebase cloud`. En lecture seule |
 | `env` | Variables d'environnement. `list` n'affiche jamais les valeurs ; `--secret` est en écriture seule |
 | `app-key` | La clé que `init --claim` a écrite dans `.env` sous `REBASE_API_TOKEN`, transférée lors de la revendication ; `rotate` la remplace et révoque l'ancienne. Propriétaires et administrateurs |

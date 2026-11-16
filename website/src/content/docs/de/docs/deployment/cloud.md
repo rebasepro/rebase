@@ -1,5 +1,5 @@
 ---
-sourceHash: d92634b4d2c8413c
+sourceHash: 70204f908d35bb64
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud ist dasselbe Rebase, für Sie betrieben. Was es ist, wie ein Projekt verknüpft und bereitgestellt wird und was die Private Beta noch nicht enthält.
@@ -474,11 +474,11 @@ die einen Neustart der Datenbank erfordern, welcher im nächsten Wartungsfenster
 | `init`, `claim` | Mit `--claim`: Ein Live-Backend ohne Konto und ein Link zur Übernahme; `claim` gibt diesen Link erneut aus. Siehe [Ein Backend ohne Benutzerkonto](/docs/deployment/cloud-agents/#a-backend-with-no-account) |
 | `projects` | Erstellen, Auflisten, Inspizieren, Löschen |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Bereitstellen und Überwachen |
-| `deploy-hooks` | Geheime URLs, die ein Git-Host oder eine CI aufruft, um das Projekt zu deployen: auflisten, erstellen (die URL wird einmal angezeigt), widerrufen. <span class="since-badge" data-since="0.32">Since 0.32</span> |
+| `deploy-hooks` | Geheime URLs, die ein Git-Host oder eine CI aufruft, um das Projekt zu deployen: auflisten, erstellen (die URL wird einmal angezeigt), widerrufen. |
 | `previews` | Durch `deploy --preview` unter eigener Adresse bereitgestellte Builds und deren Löschung. Siehe [Eine Änderung als Preview bereitstellen](#eine-änderung-als-preview-bereitstellen) |
 | `start`, `stop`, `restart` | Pausieren und Fortsetzen eines Projekts. Ein gestopptes Projekt behält sein Abonnement, es sei denn, die Plattform stellt gestoppten Projekten nur Speicher und die Plattformgebühr in Rechnung; die Zeile **Billing** in der Konsole weist darauf hin, wenn dies zutrifft |
 | `status`, `metrics`, `debug` | Was das Projekt tut und warum eventuell nicht |
-| `alerts` | Die offenen Vorfälle des Projekts, und einen bestätigen oder stummschalten. <span class="since-badge" data-since="0.32">Since 0.32</span> |
+| `alerts` | Die offenen Vorfälle des Projekts, und einen bestätigen oder stummschalten. |
 | `cron` | Cron-Jobs der bereitgestellten App und deren aufgezeichnete Ausführungen, abrufbar mit Ihrem `rebase cloud`-Login. Schreibgeschützt |
 | `env` | Umgebungsvariablen. `list` gibt niemals Werte aus; `--secret` ist Write-Only |
 | `app-key` | Der Schlüssel, den `init --claim` als `REBASE_API_TOKEN` in die `.env` geschrieben hat und der bei der Übernahme übergeben wurde; `rotate` ersetzt ihn und widerruft den alten. Inhaber und Admins |
