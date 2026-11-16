@@ -18,7 +18,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { FILMS } from "../src/live/films";
 import { assemble, type Edit, type TakeInfo } from "../src/spoken/production";
-// @ts-expect-error — a plain .mjs module, shared with the recording page's server
 import { EDITS, listTakes, readEdit } from "./takes.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
