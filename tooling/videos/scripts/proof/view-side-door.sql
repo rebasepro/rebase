@@ -154,3 +154,89 @@ WHERE v.relkind IN ('v', 'm')
   AND NOT coalesce((SELECT option_value::bool FROM pg_options_to_table(v.reloptions)
                     WHERE option_name = 'security_invoker'), false)
 ORDER BY 1;
+
+-- ── THE LONG FILM'S CLAIMS ─────────────────────────────────────────────
+-- Everything below backs a line only the long version says. It runs after
+-- §7b, so order_list is back to definer rights here.
+
+\echo '== 8. Why it slips through: a superuser and the migration role see every row anyway'
+SELECT count(*) AS superuser_sees FROM orders;
+SET ROLE app;
+SELECT (SELECT count(*) FROM orders) AS app_via_table,
+       (SELECT count(*) FROM order_list) AS app_via_view;
+RESET ROLE;
+
+\echo '== 9. Roles with BYPASSRLS skip the policy too'
+CREATE ROLE auditor BYPASSRLS;
+SET ROLE app;
+GRANT SELECT ON orders TO auditor;
+RESET ROLE;
+SET ROLE auditor;
+SELECT count(*) AS auditor_sees FROM orders;
+RESET ROLE;
+
+\echo '== 10. Forcing RLS closes the door, and shuts the migration role out of its own table'
+SET ROLE app;
+ALTER TABLE orders FORCE ROW LEVEL SECURITY;
+SELECT count(*) AS app_sees_when_forced FROM orders;
+ALTER TABLE orders NO FORCE ROW LEVEL SECURITY;
+RESET ROLE;
+
+\echo '== 11. Definer rights are on purpose: a view can show what the caller cannot read'
+CREATE ROLE dave;
+SET ROLE app;
+GRANT SELECT ON order_list TO dave;
+RESET ROLE;
+SET ROLE dave;
+SELECT * FROM orders;
+SELECT count(*) AS dave_via_view FROM order_list;
+RESET ROLE;
+
+\echo '== 11b. With security_invoker, the caller needs their own grant on the table'
+SET ROLE app;
+ALTER VIEW order_list SET (security_invoker = true);
+RESET ROLE;
+SET ROLE dave;
+SELECT * FROM order_list;
+RESET ROLE;
+
+\echo '== 12. A materialized view served through a filtering view, and not granted itself'
+-- current_user inside a view is still the caller: views do not switch user.
+SET ROLE app;
+CREATE VIEW my_totals AS SELECT customer, spent FROM order_totals WHERE customer = current_user;
+REVOKE SELECT ON order_totals FROM alice;
+GRANT SELECT ON my_totals TO alice;
+RESET ROLE;
+SET ROLE alice;
+SELECT * FROM my_totals;
+SELECT * FROM order_totals;
+RESET ROLE;
+
+\echo '== 13. A definer view over a security_invoker view stays safe'
+-- Checked because it looked like a gap: order_summary runs as app, which
+-- owns orders. But the inner view checks the policy as the user running the
+-- query (alice), however it was reached — so alice still gets her one row.
+SET ROLE app;
+CREATE VIEW order_summary AS SELECT customer, total FROM order_list;
+GRANT SELECT ON order_summary TO alice;
+RESET ROLE;
+SET ROLE alice;
+SELECT * FROM order_summary;
+RESET ROLE;
+
+\echo '== 14. The check is a list to review: a harmless view is listed too'
+-- reporter_list (as in section 6) is subject to the policy, so it leaks
+-- nothing, and the check lists it anyway.
+SET ROLE reporter;
+CREATE VIEW reporter_list AS SELECT id, customer FROM orders;
+RESET ROLE;
+SELECT DISTINCT v.oid::regclass AS view, t.oid::regclass AS rls_table
+FROM pg_class v
+JOIN pg_rewrite r ON r.ev_class = v.oid
+JOIN pg_depend d ON d.classid = 'pg_rewrite'::regclass AND d.objid = r.oid
+                AND d.refclassid = 'pg_class'::regclass
+JOIN pg_class t ON t.oid = d.refobjid AND t.relrowsecurity
+WHERE v.relkind IN ('v', 'm')
+  AND NOT coalesce((SELECT option_value::bool FROM pg_options_to_table(v.reloptions)
+                    WHERE option_name = 'security_invoker'), false)
+ORDER BY 1;

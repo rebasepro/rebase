@@ -183,3 +183,115 @@ ORDER BY 1;
  order_totals | orders
 (2 rows)
 
+== 8. Why it slips through: a superuser and the migration role see every row anyway
+SELECT count(*) AS superuser_sees FROM orders;
+ superuser_sees 
+----------------
+              3
+(1 row)
+
+SET ROLE app;
+SELECT (SELECT count(*) FROM orders) AS app_via_table,
+       (SELECT count(*) FROM order_list) AS app_via_view;
+ app_via_table | app_via_view 
+---------------+--------------
+             3 |            3
+(1 row)
+
+RESET ROLE;
+== 9. Roles with BYPASSRLS skip the policy too
+CREATE ROLE auditor BYPASSRLS;
+SET ROLE app;
+GRANT SELECT ON orders TO auditor;
+RESET ROLE;
+SET ROLE auditor;
+SELECT count(*) AS auditor_sees FROM orders;
+ auditor_sees 
+--------------
+            3
+(1 row)
+
+RESET ROLE;
+== 10. Forcing RLS closes the door, and shuts the migration role out of its own table
+SET ROLE app;
+ALTER TABLE orders FORCE ROW LEVEL SECURITY;
+SELECT count(*) AS app_sees_when_forced FROM orders;
+ app_sees_when_forced 
+----------------------
+                    0
+(1 row)
+
+ALTER TABLE orders NO FORCE ROW LEVEL SECURITY;
+RESET ROLE;
+== 11. Definer rights are on purpose: a view can show what the caller cannot read
+CREATE ROLE dave;
+SET ROLE app;
+GRANT SELECT ON order_list TO dave;
+RESET ROLE;
+SET ROLE dave;
+SELECT * FROM orders;
+ERROR:  permission denied for table orders
+SELECT count(*) AS dave_via_view FROM order_list;
+ dave_via_view 
+---------------
+             3
+(1 row)
+
+RESET ROLE;
+== 11b. With security_invoker, the caller needs their own grant on the table
+SET ROLE app;
+ALTER VIEW order_list SET (security_invoker = true);
+RESET ROLE;
+SET ROLE dave;
+SELECT * FROM order_list;
+ERROR:  permission denied for table orders
+RESET ROLE;
+== 12. A materialized view served through a filtering view, and not granted itself
+SET ROLE app;
+CREATE VIEW my_totals AS SELECT customer, spent FROM order_totals WHERE customer = current_user;
+REVOKE SELECT ON order_totals FROM alice;
+GRANT SELECT ON my_totals TO alice;
+RESET ROLE;
+SET ROLE alice;
+SELECT * FROM my_totals;
+ customer | spent 
+----------+-------
+ alice    | 18.50
+(1 row)
+
+SELECT * FROM order_totals;
+ERROR:  permission denied for materialized view order_totals
+RESET ROLE;
+== 13. A definer view over a security_invoker view stays safe
+SET ROLE app;
+CREATE VIEW order_summary AS SELECT customer, total FROM order_list;
+GRANT SELECT ON order_summary TO alice;
+RESET ROLE;
+SET ROLE alice;
+SELECT * FROM order_summary;
+ customer | total 
+----------+-------
+ alice    | 18.50
+(1 row)
+
+RESET ROLE;
+== 14. The check is a list to review: a harmless view is listed too
+SET ROLE reporter;
+CREATE VIEW reporter_list AS SELECT id, customer FROM orders;
+RESET ROLE;
+SELECT DISTINCT v.oid::regclass AS view, t.oid::regclass AS rls_table
+FROM pg_class v
+JOIN pg_rewrite r ON r.ev_class = v.oid
+JOIN pg_depend d ON d.classid = 'pg_rewrite'::regclass AND d.objid = r.oid
+                AND d.refclassid = 'pg_class'::regclass
+JOIN pg_class t ON t.oid = d.refobjid AND t.relrowsecurity
+WHERE v.relkind IN ('v', 'm')
+  AND NOT coalesce((SELECT option_value::bool FROM pg_options_to_table(v.reloptions)
+                    WHERE option_name = 'security_invoker'), false)
+ORDER BY 1;
+     view      | rls_table 
+---------------+-----------
+ order_totals  | orders
+ reporter_list | orders
+(2 rows)
+
