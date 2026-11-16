@@ -170,9 +170,29 @@ export async function moveMouseAway(page: Page): Promise<void> {
     else await page.mouse.move((page.viewportSize()?.width ?? 1280) - 40, 8);
 }
 
-/** Opens a collection and waits until its toolbar is drawn. */
+/**
+ * Opens a collection and waits until its toolbar is drawn.
+ *
+ * "A view-mode button is visible" does not say whose toolbar it is. The router
+ * commits a navigation inside a transition, so the collection being left keeps
+ * its toolbar on screen for a moment after `go()` — up to a few hundred ms —
+ * and the check passed on that one. `switchViewMode` then opened the outgoing
+ * toolbar's menu, the new screen replaced it, and the click on the menu's
+ * option waited for the rest of the test (`docs/bug-classes.md`, class 50).
+ * So the toolbar being left is marked first and waited out: a predicate the
+ * previous screen cannot satisfy. Within the same collection the toolbar is
+ * kept, not replaced, and is already the right one.
+ */
 export async function openCollection(page: Page, slug: string, mode?: ViewModeName): Promise<void> {
-    await go(page, `/c/${slug}`);
+    const target = `/c/${slug}`;
+    const pathname = await page.evaluate(() => window.location.pathname);
+    const sameCollection = pathname === target || pathname.startsWith(`${target}/`);
+    // `elementHandles`, not a locator action: it takes what is on screen now
+    // and does not wait for a toolbar that may already be on its way out.
+    const [leaving] = sameCollection ? [] : await viewModeButton(page).elementHandles();
+    await leaving?.evaluate(button => button instanceof Element && button.setAttribute("data-e2e-leaving", ""));
+    await go(page, target);
+    if (leaving) await expect(page.locator("[data-e2e-leaving]")).toHaveCount(0, { timeout: 30_000 });
     await expect(viewModeButton(page)).toBeVisible({ timeout: 30_000 });
     if (mode) await switchViewMode(page, mode);
 }

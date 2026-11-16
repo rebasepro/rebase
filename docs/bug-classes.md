@@ -3376,6 +3376,28 @@ report `not-ready` would revert healthy tenants for being mid-move; making it
 Kubernetes' own progress deadline are what let both be right — when a wait gains
 a "not yet" answer, ask what happens to something that stays in it.
 
+**The same class in a browser** — 2026-11-12. The admin Playwright specs move
+between screens with `go()` (a `pushState` and a `popstate`), and React Router
+commits that navigation inside a transition, so the screen being left stays
+drawn for 70–320 ms afterwards. `openCollection` waited for "a view-mode button
+is visible", which the outgoing collection's toolbar satisfies: from the tickets
+board, the check passed on the tickets toolbar in 9 of 10 samples. Nearly always
+harmless, because the click came after the commit. When it did not,
+`switchViewMode` opened the outgoing toolbar's menu, the new screen replaced it,
+and the click on the menu's option waited out the test's minute. That stopped the
+0.30.1 publish run (`admin-display.spec.ts:94`, a pass on retry, and
+`--fail-on-flaky-tests`). It passed 100 of 100 unthrottled. At 6× CPU throttling
+it failed 10 of 16 with the CI call log. With the fix it passed 8 of 8.
+`openCollection` now marks the toolbar it is leaving and waits for that element to
+be gone, which is the fix above (a disappearance the old state cannot fake).
+
+| checked | result |
+|---|---|
+| `tests/e2e/tests/admin-helpers.ts` — `openCollection` | **BUG**, fixed as above |
+| `tests/e2e/tests/admin-fixtures.ts` — the `page` fixture's "home is drawn" check | **same shape, OPEN.** It waits for the "Orders" navigation link, which every screen has, so a test can start while the previous test's screen is still drawn. Harmless today: the first step of every spec either goes through `openCollection` or waits for something only its own screen has |
+| `admin-record-form.spec.ts:129` — `not.toHaveValue("")` on the edit form's shipped date after `go()` | **weak, not failing.** A negative predicate that another order's form could satisfy. The previous test's order has no shipped date, so nothing satisfies it today |
+| every other check after `go()` in `admin-*.spec.ts` | clean: each names the record it made (`itemFor(id)`, an exact field value) or something only that screen draws ("All 2 entries loaded", "Last 30 days") |
+
 ---
 
 ## 51. The reassuring half, and the same defect run backwards
