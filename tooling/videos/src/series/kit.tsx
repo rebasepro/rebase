@@ -89,6 +89,10 @@ export interface SceneSpec {
     roll?: number;
     /** How much of the field shows, 0-1. */
     reveal?: number;
+    /** One of the film's bright moments: the field at the hero's full
+     *  strength instead of banked to EMBER. Keep it to the film's turn —
+     *  one scene, the payoff; the open is always bright. */
+    bright?: boolean;
     /** The ground colour under the scene. */
     ground?: string;
     render: React.FC;
@@ -276,6 +280,13 @@ const CLAMP = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 const MASK_WIDE = GLOW_MASK;
 const MASK_TALL = "linear-gradient(to bottom, #000 0%, #000 16%, transparent 50%)";
 
+/** The field's strength under the scenes, as a share of the hero's. The open
+ *  and a scene marked `bright` keep the full hero; the rest bank to this. The
+ *  full hero is right for a page seen for seconds and too loud under a minute
+ *  of code; chosen 2026-11-16 against a top band (the glow cut off above the
+ *  panels) and a thin top edge (too little left to read as the site's). */
+const EMBER = 0.22;
+
 /** The ground: the glow field under the whole film, flowing to each scene's
  *  seat over the scene's first second, steady in between; the drafting grid
  *  and its rails over it. Kept under its old name — the films and the EIC
@@ -294,7 +305,10 @@ export const Ribbon: React.FC = () => {
     series.spec.scenes.forEach((s, i) => {
         const start = series.starts[i];
         if (start === null) return;
-        keys.push({ at: start, roll: s.roll ?? 0.3 + 0.13 * i, reveal: s.reveal ?? 0.8, ground: s.ground ?? GROUND.base });
+        /* Under a scene the field banks to an ember of itself, unless the
+           scene is one of the film's bright moments. */
+        const exposure = (s.reveal ?? 0.8) * (s.bright ? 1 : EMBER);
+        keys.push({ at: start, roll: s.roll ?? 0.3 + 0.13 * i, reveal: exposure, ground: s.ground ?? GROUND.base });
     });
     /* A running blend: each scene eases the field from wherever it is to
        its own seat and exposure over its first second. Continuous even when

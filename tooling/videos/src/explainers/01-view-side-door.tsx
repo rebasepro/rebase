@@ -761,7 +761,7 @@ export const VIEW_SIDE_DOOR: FilmSpec = checkFilm({
         { id: "view", at: { line: "view", plus: ON }, render: View, roll: 0.36 },
         { id: "why", at: { line: "why", plus: ON }, render: Why, roll: 0.42 },
         { id: "door", at: { line: "door", plus: ON }, render: Door, roll: 0.62 },
-        { id: "fix", at: { line: "fix", plus: ON }, render: Fix, roll: 0.24 },
+        { id: "fix", at: { line: "fix", plus: ON }, render: Fix, roll: 0.24, bright: true },
         { id: "new", at: { line: "after", word: "For", plus: ON }, render: New, roll: 0.3 },
         { id: "matview", at: { line: "matview", plus: ON }, render: Matview, roll: 0.7 },
         { id: "check", at: { line: "check", plus: ON }, render: Check, roll: 0.5 },
