@@ -58,3 +58,5 @@ and container runtime. All of them can be kept inside the EU.
   uploads on its disk, no Docker.
 - **[Hostman](/docs/deployment/hostman/)** — App Platform with Managed
   PostgreSQL, or one cloud server.
+- **[Out Plane](/docs/deployment/outplane/)** — an app from your repository,
+  managed PostgreSQL and a bucket, in Germany.
