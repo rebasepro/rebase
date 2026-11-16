@@ -239,28 +239,60 @@ table it touched — not with the number of open sockets:
   identity. A first page that comes back shorter than its `limit` is the whole
   set, so it is not counted at all.
 - A single-record subscription is asked only when its own record changes.
+- A list filtered with `==` or `in` on a column of the table is asked only
+  when the write can reach it: when the row matched the filter before the
+  write or matches it after. `listen({ where: { owner: ["==", me] } })` held
+  by five thousand users costs one read when one of them writes a row of
+  theirs, not five thousand. This decides only *who* refetches, never what
+  anyone receives: each list that is asked still reads under its own
+  subscriber's scope, so a list asking for someone else's rows is asked and
+  finds nothing its policy hides.
 - Different principals never share a read — that is what keeps a frame from
-  carrying a row its reader may not see. A list watched by a thousand
-  different signed-in users is a thousand reads and a thousand counts on every
-  write to it, in a thousand transactions.
+  carrying a row its reader may not see. A list that RLS alone narrows (the
+  same unfiltered list, watched by a thousand different signed-in users) is a
+  thousand reads on every write to it, in a thousand transactions.
 
-Measured on a laptop against a local PostgreSQL with a 20-connection pool, one
-write to a list:
+The pre-filter asks every list on the table, as before, whenever it cannot be
+sure a list is unaffected:
 
-| Subscribers | Transactions for the write | Last frame after the write |
-|-------------|----------------------------|----------------------------|
-| 1,000, one principal | 2 | ~310 ms |
-| 1,000, each a different principal | ~1,000 | ~600 ms |
+- It judges `==` and `in` on text, `varchar`, uuid, enum, integer and boolean
+  columns. Other conditions (ranges, patterns, JSON paths, relations, `or(...)`
+  groups, search) are left out, which only widens what it admits. A list that
+  loads relations (`include`), a table with an `afterRead` hook, and a column
+  with a field-level hook are never pre-filtered.
+- It needs the row's values before and after the write. A write through the
+  API supplies them for a create, and for an update that read the row first
+  (every REST update does). A change read from the WAL (`REALTIME_CDC=wal`, or
+  `auto` where the WAL is available) supplies the whole new row, but the old
+  one only as its key unless the table has `REPLICA IDENTITY FULL` — so an
+  external `UPDATE` or `DELETE` of a non-key column asks every list. The
+  capture trigger (`REALTIME_CDC=trigger`) sends the key alone, so it can only
+  rule out lists filtered on the key. A delete through the API, and a key too
+  large to notify, ask every list.
 
-300 ms of each is the debounce. The second row is the ceiling to plan for. The
+Measured on a laptop against PostgreSQL 18 in Docker, with a 20-connection pool
+(`tooling/scripts/bench-realtime-fanout.mts`), one write to a table whose
+policy shows each user their own rows:
+
+| Subscribers on the table | Transactions for the write | Fan-out done after the write |
+|--------------------------|----------------------------|------------------------------|
+| 5,000 users, each `where owner == me`, write through the API | 1 | ~305 ms |
+| 5,000 users, each `where owner == me`, raw SQL read from the WAL | 1 | ~307 ms |
+| 5,000 sockets of one user, one list | 1 | ~311 ms |
+| 1,000 users, the same unfiltered list | 1,000 | ~780 ms |
+| 5,000 users, the same unfiltered list | 5,000 | ~2.6 s |
+
+300 ms of each is the debounce. The last two rows are the ceiling to plan for:
+a list that only RLS narrows costs one read per distinct user per write. The
 refetches run on the same pool as your REST traffic, but at most a quarter of
 its connections at a time (5 of the default 20, never fewer than 2); the rest
 wait their turn in the server, so a write's fan-out delays its own frames
 rather than your requests. A table written several times a second while
-**hundreds of different users** watch the same list is where those frames
-start to lag. Beyond that, prefer narrower subscriptions (a page, a filter on
-the user's own rows) or a [broadcast channel](#broadcast-channels) carrying the
-change for clients to re-fetch on their own schedule.
+**thousands of different users** watch the same unfiltered list is where those
+frames start to lag. Filter the subscription on the column your policy reads
+(`where owner == me` beside `owner = app.uid`) and it costs one read again; or
+use a [broadcast channel](#broadcast-channels) carrying the change for clients
+to re-fetch on their own schedule.
 
 **One socket may hold at most 1,000 subscriptions.** The next is refused with an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the socket already holds replaces that subscription and does not count again. The SDK shares identical subscriptions on a socket, so this counts the distinct lists and records a page has open. Change it with `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket` on the Postgres adapter (the environment variable wins); a value that is not a positive whole number stops the server at boot. **The sockets one user holds can be limited too**, per server instance: set `REALTIME_MAX_SOCKETS_PER_USER` (or `realtime.maxSocketsPerUser`), and a sign-in past it is refused with `TOO_MANY_SOCKETS` and the socket closed with 4002. Sockets signed in with an API key count against that key, each key on its own, not against the account that made it; the service key is one credential, so all of its sockets count together. An administrator's sockets that impersonate a user count against the administrator, with their own sockets, not against the user they act as. The SDK tells every live subscription and `onConnectionLost` at once, with a `CONNECTION_LOST` error whose `details.reason` is `TOO_MANY_SOCKETS`, and keeps retrying, waiting longer each time up to 30 s, so the tab gets in once another socket closes. Unset, as by default, there is no ceiling.
 

@@ -220,7 +220,7 @@ describe("PostgresBackendDriver", () => {
             expect(rec.db.transaction).toHaveBeenCalled();
 
             // Ensure notification was flushed after commit
-            expect(realtime.notifyUpdate).toHaveBeenCalledWith("test", "123", {}, undefined);
+            expect(realtime.notifyUpdate).toHaveBeenCalledWith("test", "123", {}, undefined, true, "app", undefined);
         });
 
         it("should NOT flush notifications if transaction throws an error", async () => {
@@ -257,7 +257,7 @@ describe("PostgresBackendDriver", () => {
             const result = await authDelegate.save({ path: "test", id: "buggy-123", values: {}, status: "new" });
 
             expect(result).toEqual({ id: "success" });
-            expect(notifySpy).toHaveBeenCalledWith("test", "buggy-123", {}, undefined);
+            expect(notifySpy).toHaveBeenCalledWith("test", "buggy-123", {}, undefined, true, "app", undefined);
         });
 
         it("should safely isolate completely concurrent transaction notifications from leaking across scopes", async () => {
@@ -281,8 +281,8 @@ describe("PostgresBackendDriver", () => {
             ]);
 
             // Ensure our notify was called with both exact combinations, but NOT cross-pollinated
-            expect(realtime.notifyUpdate).toHaveBeenCalledWith("scope-1", "1", {}, undefined);
-            expect(realtime.notifyUpdate).toHaveBeenCalledWith("scope-2", "2", {}, undefined);
+            expect(realtime.notifyUpdate).toHaveBeenCalledWith("scope-1", "1", {}, undefined, true, "app", undefined);
+            expect(realtime.notifyUpdate).toHaveBeenCalledWith("scope-2", "2", {}, undefined, true, "app", undefined);
 
             // Check count
             expect(realtime.notifyUpdate).toHaveBeenCalledTimes(2);
@@ -649,8 +649,8 @@ describe("PostgresBackendDriver", () => {
 
             // Each call should have flushed exactly 1 notification, not accumulated
             expect(realtime.notifyUpdate).toHaveBeenCalledTimes(2);
-            expect(realtime.notifyUpdate).toHaveBeenNthCalledWith(1, "call-1", "1", {}, undefined);
-            expect(realtime.notifyUpdate).toHaveBeenNthCalledWith(2, "call-2", "2", {}, undefined);
+            expect(realtime.notifyUpdate).toHaveBeenNthCalledWith(1, "call-1", "1", {}, undefined, true, "app", undefined);
+            expect(realtime.notifyUpdate).toHaveBeenNthCalledWith(2, "call-2", "2", {}, undefined, true, "app", undefined);
         });
     });
 

@@ -28,6 +28,7 @@ import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collect
 import type { RuntimeTable } from "../model/runtime-table";
 import { isNestedPath } from "./nested-path";
 import { afterReadApplies, afterReadOnRows, resolveTableHooks } from "./table-hooks";
+import { changeMayReach, compileListPrefilter, imageIndexKey, MAX_IMAGE_VALUE_LENGTH, type ListPrefilter, type RowChangeImage } from "./realtime-prefilter";
 import { ChannelHistoryStore, type ResolvedRetention } from "./channel-history";
 import { ChannelPresenceStore } from "./channel-presence";
 import { CHANNEL_BUS_NOTIFY_CHANNEL, ChannelBus, ChannelBusFrame, MemoryChannelBus, PostgresChannelBus, frameByteLength } from "./channel-bus";
@@ -344,7 +345,16 @@ type SubscriptionGroup = {
      */
     firstPendingAt?: number;
     timer?: ReturnType<typeof setTimeout>;
+    /**
+     * Which row changes can reach this list, when that can be told from the
+     * change — see `realtime-prefilter.ts`. Absent, every change on the path
+     * schedules the group.
+     */
+    prefilter?: ListPrefilter;
 };
+
+/** The pre-filtered list groups on one path, by the field each is indexed by, then by value. */
+type PrefilterIndex = Map<string, { kind: ListPrefilter["index"]["kind"]; buckets: Map<string, Set<SubscriptionGroup>> }>;
 
 /**
  * How many group refetches may run at once: a quarter of the connection pool
@@ -700,6 +710,13 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      */
     private unscheduledListGroups = new Map<string, Set<SubscriptionGroup>>();
     /**
+     * The subset of {@link unscheduledListGroups} with no pre-filter: what a
+     * change that can be judged still schedules wholesale.
+     */
+    private unscheduledPlainListGroups = new Map<string, Set<SubscriptionGroup>>();
+    /** The pre-filtered list groups on each path. See {@link groupsReachedBy}. */
+    private prefilterIndex = new Map<string, PrefilterIndex>();
+    /**
      * Every path a subscription holds, with the collection it lands on and how
      * many hold it — the candidates `aliasPaths` considers, resolved once.
      */
@@ -940,6 +957,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 lastChangeAt: 0
             };
             this.groups.set(group.key, group);
+            if (group.type === "collection") this.indexPrefilter(group);
             const [index, address] = group.type === "collection"
                 ? [this.collectionGroupsByPath, group.path]
                 : [this.singleGroupsByAddress, `${group.path}\u0000${group.id}`];
@@ -1011,11 +1029,88 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         }
         if (group.type === "collection") {
             this.unscheduledListGroups.get(group.path)?.delete(group);
+            this.unscheduledPlainListGroups.get(group.path)?.delete(group);
+            this.unindexPrefilter(group);
             if (!this.collectionGroupsByPath.has(group.path)) {
                 this.unscheduledListGroups.delete(group.path);
+                this.unscheduledPlainListGroups.delete(group.path);
                 this.listPathChangedAt.delete(group.path);
             }
         }
+    }
+
+    /**
+     * Compile `group`'s pre-filter and index it under its narrowest
+     * condition. Only for a list on a table's own path: a nested list's rows
+     * are chosen by its parent, which a change to the row does not describe.
+     */
+    private indexPrefilter(group: SubscriptionGroup): void {
+        group.prefilter = undefined;
+        if (isNestedPath(group.path)) return;
+        let table: RuntimeTable | undefined;
+        try {
+            table = this.registry.tableAt(group.path);
+        } catch {
+            return;
+        }
+        if (!table) return;
+        const prefilter = compileListPrefilter(
+            table,
+            group.collectionRequest ?? {},
+            afterReadApplies(this.registry, resolveTableHooks(this.registry, group.path))
+        );
+        if (!prefilter) return;
+        group.prefilter = prefilter;
+        let index = this.prefilterIndex.get(group.path);
+        if (!index) this.prefilterIndex.set(group.path, index = new Map());
+        let entry = index.get(prefilter.index.field);
+        if (!entry) index.set(prefilter.index.field, entry = { kind: prefilter.index.kind, buckets: new Map() });
+        for (const value of prefilter.index.accepts) {
+            let bucket = entry.buckets.get(value);
+            if (!bucket) entry.buckets.set(value, bucket = new Set());
+            bucket.add(group);
+        }
+    }
+
+    private unindexPrefilter(group: SubscriptionGroup): void {
+        const prefilter = group.prefilter;
+        if (!prefilter) return;
+        const index = this.prefilterIndex.get(group.path);
+        const entry = index?.get(prefilter.index.field);
+        if (!index || !entry) return;
+        for (const value of prefilter.index.accepts) {
+            const bucket = entry.buckets.get(value);
+            bucket?.delete(group);
+            if (bucket?.size === 0) entry.buckets.delete(value);
+        }
+        if (entry.buckets.size === 0) index.delete(prefilter.index.field);
+        if (index.size === 0) this.prefilterIndex.delete(group.path);
+    }
+
+    /**
+     * The pre-filtered list groups on `path` that `image` may reach, or
+     * `undefined` when the change cannot say which value it had in a field
+     * groups are indexed by — then every group on the path is asked, as for
+     * a change with no image at all.
+     */
+    private groupsReachedBy(index: PrefilterIndex, image: RowChangeImage): Set<SubscriptionGroup> | undefined {
+        const reached = new Set<SubscriptionGroup>();
+        for (const [field, entry] of index) {
+            const keys: string[] = [];
+            for (const version of [image.before, image.after]) {
+                if (version === null) continue;
+                if (version === undefined) return undefined;
+                const key = imageIndexKey(version, field, entry.kind);
+                if (key === undefined) return undefined;
+                keys.push(key);
+            }
+            for (const key of keys) {
+                for (const group of entry.buckets.get(key) ?? []) {
+                    if (group.prefilter && changeMayReach(group.prefilter, image)) reached.add(group);
+                }
+            }
+        }
+        return reached;
     }
 
     /** See {@link unscheduledListGroups}. */
@@ -1023,6 +1118,10 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         let unscheduled = this.unscheduledListGroups.get(group.path);
         if (!unscheduled) this.unscheduledListGroups.set(group.path, unscheduled = new Set());
         unscheduled.add(group);
+        if (group.prefilter) return;
+        let plain = this.unscheduledPlainListGroups.get(group.path);
+        if (!plain) this.unscheduledPlainListGroups.set(group.path, plain = new Set());
+        plain.add(group);
     }
 
     /**
@@ -1052,7 +1151,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             group.timer = undefined;
             if (this.groups.get(group.key) !== group) return;
             const now = Date.now();
-            const lastChangeAt = group.type === "collection"
+            // A pre-filtered group's clock is its own: it is scheduled by the
+            // changes that reach it, not by every change on the path.
+            const lastChangeAt = group.type === "collection" && !group.prefilter
                 ? Math.max(group.lastChangeAt, this.listPathChangedAt.get(group.path) ?? 0)
                 : group.lastChangeAt;
             const quietFor = now - lastChangeAt;
@@ -1902,7 +2003,12 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      *               records the change so this instance can suppress the matching
      *               CDC echo, while an unmatched CDC event is delivered normally.
      */
-    async notifyUpdate(path: string, id: string, row: Record<string, unknown> | null, databaseId?: string, broadcast = true, origin: "app" | "cdc" = "app") {
+    /**
+     * @param image What the change is known to have done to the row, by column
+     *   key — see `realtime-prefilter.ts`. It narrows which list groups on
+     *   `path` refetch, never what any of them receives. Absent, all of them do.
+     */
+    async notifyUpdate(path: string, id: string, row: Record<string, unknown> | null, databaseId?: string, broadcast = true, origin: "app" | "cdc" = "app", image?: RowChangeImage) {
         this.debugLog("🔔 [RealtimeService] notifyUpdate called for path:", path, "id:", id, "isDelete:", row === null, "origin:", origin);
 
         // De-duplicate against database-level CDC. The app path (a mutation made
@@ -1945,7 +2051,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
 
         // Process each path that needs notification
         for (const notifyPath of pathsToNotify) {
-            this.notifyPathUpdate(notifyPath, path, id);
+            this.notifyPathUpdate(notifyPath, path, id, notifyPath === path && !isNestedPath(path) ? image : undefined);
         }
 
         // Each alias is an address of this very row, so its single-row
@@ -2007,7 +2113,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * being able to know, without asking the database as this subscriber,
      * whether this subscriber may see the row at all.
      */
-    private notifyPathUpdate(notifyPath: string, originalPath: string, id: string) {
+    private notifyPathUpdate(notifyPath: string, originalPath: string, id: string, image?: RowChangeImage) {
         this.debugLog(`📡 [RealtimeService] Notifying path: ${notifyPath} (original: ${originalPath})`);
 
         // Every list on the path may have changed — but every changed row of a
@@ -2017,12 +2123,34 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         // visit every group on the path, so a 100k-row UPDATE on a list open
         // as 1,000 principals was 100M visits, ~3.9 s of event loop no socket
         // or request on this instance got past.
+        //
+        // A change whose image says which rows it touched schedules the
+        // pre-filtered groups it can reach and no other: a list of
+        // `owner_id == A` is not asked to look again when B's row changes.
+        // A change it cannot judge — no image, or one that leaves out a field
+        // groups are indexed by — asks every group on the path, as before.
         if (this.collectionGroupsByPath.has(notifyPath)) {
             this.listPathChangedAt.set(notifyPath, Date.now());
-            const unscheduled = this.unscheduledListGroups.get(notifyPath);
-            if (unscheduled?.size) {
-                for (const group of unscheduled) this.scheduleGroupRefetch(group);
-                unscheduled.clear();
+            const index = image ? this.prefilterIndex.get(notifyPath) : undefined;
+            const reached = index && image ? this.groupsReachedBy(index, image) : undefined;
+            if (reached) {
+                const plain = this.unscheduledPlainListGroups.get(notifyPath);
+                if (plain?.size) {
+                    const unscheduled = this.unscheduledListGroups.get(notifyPath);
+                    for (const group of plain) {
+                        this.scheduleGroupRefetch(group);
+                        unscheduled?.delete(group);
+                    }
+                    plain.clear();
+                }
+                for (const group of reached) this.scheduleGroupRefetch(group);
+            } else {
+                const unscheduled = this.unscheduledListGroups.get(notifyPath);
+                if (unscheduled?.size) {
+                    for (const group of unscheduled) this.scheduleGroupRefetch(group);
+                    unscheduled.clear();
+                }
+                this.unscheduledPlainListGroups.get(notifyPath)?.clear();
             }
         }
         // A single-row subscription is asked only at the written path, and
@@ -3665,6 +3793,8 @@ lastSeen: Date.now() });
 
         // 2. Clear subscriptions, callbacks and the groups and indexes over them
         this.unscheduledListGroups.clear();
+        this.unscheduledPlainListGroups.clear();
+        this.prefilterIndex.clear();
         this.listPathChangedAt.clear();
         this.refetchQueue.clear();
         this._subscriptions.clear();
@@ -3888,6 +4018,15 @@ lastSeen: Date.now() });
      * change capture is off: the maps are built when it starts.
      */
     refreshTableMaps(): void {
+        // A list's pre-filter read its table's columns and hooks, which the
+        // apply may have changed: compiled again, against the new tables.
+        for (const group of this.groups.values()) {
+            if (group.type !== "collection") continue;
+            this.unindexPrefilter(group);
+            this.unscheduledPlainListGroups.get(group.path)?.delete(group);
+            this.indexPrefilter(group);
+            if (this.unscheduledListGroups.get(group.path)?.has(group)) this.markListGroupUnscheduled(group);
+        }
         if (!this.cdcTableMap) return;
         this.cdcTableMap = this.buildCdcTableMap();
         this.junctionLinkMap = buildJunctionLinkMap(this.registry);
@@ -4027,7 +4166,35 @@ lastSeen: Date.now() });
         // an invalidation marker that forces a per-subscriber RLS-bound refetch.
         const row = event.op === "DELETE" || event.op === "TRUNCATE" ? null : { _rebase_invalidated: true };
 
-        await this.notifyUpdate(path, id, row, undefined, /* broadcast */ false, /* origin */ "cdc");
+        await this.notifyUpdate(path, id, row, undefined, /* broadcast */ false, /* origin */ "cdc", this.cdcChangeImage(served, event));
+    }
+
+    /**
+     * What a captured change says about the row's two versions, by column
+     * key — which list groups it can reach, never what they receive.
+     *
+     * From the WAL, the values it streamed (`CdcChangeEvent.values`). From the
+     * capture trigger, the key alone, and only where the op pins the other
+     * version: an insert had no row before, a delete has none after. A
+     * trigger's update names the new key only — the old one may differ — and
+     * a key too large to send names nothing: both are unknown.
+     */
+    private cdcChangeImage(served: RuntimeTable, event: CdcChangeEvent): RowChangeImage | undefined {
+        if (event.op === "TRUNCATE") return undefined;
+        const byKey = (values: Record<string, unknown> | null | undefined): Record<string, unknown> | null | undefined => {
+            if (values === null || values === undefined) return values;
+            const keyed: Record<string, unknown> = {};
+            for (const [columnName, value] of Object.entries(values)) {
+                const column = served.columnsBySqlName.get(columnName);
+                if (column) keyed[column.key] = value;
+            }
+            return keyed;
+        };
+        if (event.values) return { before: byKey(event.values.before), after: byKey(event.values.after) };
+        if (event.truncated || Object.keys(event.row).length === 0) return undefined;
+        if (event.op === "INSERT") return { before: null, after: byKey(event.row) };
+        if (event.op === "DELETE") return { before: byKey(event.row), after: null };
+        return undefined;
     }
 
     /**

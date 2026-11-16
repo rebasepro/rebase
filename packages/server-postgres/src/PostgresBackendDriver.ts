@@ -2,6 +2,7 @@ import { DataService } from "./services/dataService";
 import { filterRequired, type ConflictRule } from "./services/PersistService";
 import { BranchService } from "./services/BranchService";
 import { RealtimeService, type SubscriptionAuthContext } from "./services/realtimeService";
+import type { RowChangeImage } from "./services/realtime-prefilter";
 import { DatabasePoolManager } from "./databasePoolManager";
 import { DrizzleClient } from "./interfaces";
 import {
@@ -543,6 +544,8 @@ export class PostgresBackendDriver implements DataDriver {
         id: string;
         row: Record<string, unknown> | null;
         databaseId?: string;
+        /** What the write did to the row — see `RealtimeService.notifyUpdate`. */
+        image?: RowChangeImage;
     }> = [];
 
     constructor(
@@ -1772,11 +1775,21 @@ export class PostgresBackendDriver implements DataDriver {
             }
 
             // Notify real-time subscribers (deferred if inside a transaction)
+            // Which list subscriptions this write can reach: the stored row
+            // after, and before it what the pre-write read found — nothing for
+            // a create, unknown for an upsert or an update that skipped the
+            // read. Raw stored values, never `savedRow` (an `afterRead` view).
+            const image: RowChangeImage = {
+                before: upserting ? undefined
+                    : status === "existing" ? (previousValuesForHistory as Record<string, unknown> | undefined) : null,
+                after: storedRow as Record<string, unknown>
+            };
             const notifications: PostgresBackendDriver["_pendingNotifications"] = [{
                 path,
                 id: savedId,
                 row: savedRow,
-                databaseId: undefined
+                databaseId: undefined,
+                image
             }, ...this.childListNotifications(runtime, savedId, updatedValues as Record<string, unknown>)];
             if (this._deferNotifications) {
                 this._pendingNotifications.push(...notifications);
@@ -1786,7 +1799,10 @@ export class PostgresBackendDriver implements DataDriver {
                         notification.path,
                         notification.id,
                         notification.row,
-                        notification.databaseId
+                        notification.databaseId,
+                        true,
+                        "app",
+                        notification.image
                     );
                 }
             }
@@ -1861,7 +1877,7 @@ export class PostgresBackendDriver implements DataDriver {
             for (const notification of pending) {
                 try {
                     await this.realtimeService.notifyUpdate(
-                        notification.path, notification.id, notification.row, notification.databaseId
+                        notification.path, notification.id, notification.row, notification.databaseId, true, "app", notification.image
                     );
                 } catch (error) {
                     logger.error("[DataDriver] Error flushing deferred notification", { error });
@@ -3783,7 +3799,10 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                     notification.path,
                     notification.id,
                     notification.row,
-                    notification.databaseId
+                    notification.databaseId,
+                    true,
+                    "app",
+                    notification.image
                 );
             } catch (e) {
                 logger.error("[DataDriver] Error flushing deferred notification", { error: e });
