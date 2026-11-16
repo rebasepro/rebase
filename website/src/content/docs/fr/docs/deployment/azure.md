@@ -1,5 +1,5 @@
 ---
-sourceHash: fc6a7fdad43be83c
+sourceHash: 546e7845fb05c24f
 title: Déployer Rebase sur Microsoft Azure
 description: Déployez votre instance Rebase en toute sécurité sur Azure à l'aide d'Azure Database pour PostgreSQL et d'Azure Container Apps.
 sidebar_label: Azure
@@ -35,7 +35,7 @@ rebase build
 Container Apps télécharge les images depuis un registre, intégrez donc le bundle dans une image dérivée. Trois lignes suffisent pour figer exactement ce qui s'exécute :
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.32.0
+FROM rebasepro/server:0.33.0
 COPY dist-bundle /bundle
 ```
 

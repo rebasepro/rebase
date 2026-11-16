@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/codegen",
-  "version": "0.32.0",
+  "version": "0.33.0",
   "description": "Generate a typed JS SDK from Rebase table descriptors",
   "keywords": [
     "sdk",

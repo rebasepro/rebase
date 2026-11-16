@@ -11,6 +11,8 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-11-16
+
 ### Added
 
 - **`rebase cloud domains redirect <domain> [--off]`**: Rebase Cloud answers one of a project's domains with a permanent redirect (308) to its primary domain, keeping the path and the query, instead of serving the project on it. Per domain and off by default. Two domains serving one site are two origins, so Google sign-in (`origin_mismatch`), cookies and passkeys each worked on one and failed on the other; `domains primary` only chose the address links are built from. A domain an app is served on is never redirected.

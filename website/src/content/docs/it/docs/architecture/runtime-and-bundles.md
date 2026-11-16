@@ -1,5 +1,5 @@
 ---
-sourceHash: feb955f28437603c
+sourceHash: 1b78f435c6cfa3a7
 title: Runtime e bundle
 sidebar_label: Runtime & Bundle
 description: Come un progetto Rebase si suddivide in un bundle di progetto e un runtime con versione, e perché questa separazione rende possibili aggiornamenti, app multi-repo e hosting gestito.
@@ -60,7 +60,7 @@ prima di consentire l'avvio:
 ```jsonc
 {
   "bundleFormat": 3,
-  "runtime": { "range": "^1", "builtAgainst": "0.32.0", "contract": 2 },
+  "runtime": { "range": "^1", "builtAgainst": "0.33.0", "contract": 2 },
   "schemaVersion": "v2:3f0c9a1e7d2b5c48",
   "kind": "backend",
   "entry": {
@@ -129,7 +129,7 @@ Ecco perché aggiornare Rebase in un deployment self-hosted richiede solo una
 modifica del tag:
 
 ```yaml
-image: rebasepro/server:0.32.0   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.33.0   # a newer tag — your bundle is untouched
 ```
 
 ## Lo sviluppo utilizza lo stesso percorso
